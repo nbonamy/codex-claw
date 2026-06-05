@@ -58,6 +58,8 @@ doc and update it when behavior changes:
 - `docs/codex.md`: how Electron main communicates with Codex app-server,
   including transport, lifecycle, event adaptation, generated types, and test
   fixtures.
+- `docs/mcp.md`: how the app-owned MCP server exposes agent collaboration
+  tools, inbox state, backend enablement, security, and tests.
 - `docs/architecture.md`: product model, process architecture, IPC,
   backend seam, persistence, and open architecture decisions.
 - `plans/codex-claw.md`: current product progression and commit checkpoints.

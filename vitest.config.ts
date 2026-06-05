@@ -11,6 +11,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       include: [
+        'src/main/mcp/**/*.ts',
         'src/main/snapshot-service.ts',
         'src/renderer/**/*.{ts,vue}',
         'src/shared/**/*.ts',

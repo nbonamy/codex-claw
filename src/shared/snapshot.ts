@@ -2,6 +2,7 @@ import type {
   Agent,
   AgentStatus,
   AppSnapshot,
+  ClientRequest,
   CreateAgentInput,
   MainToRendererEvent,
   RendererMessage,
@@ -9,6 +10,7 @@ import type {
 } from './contracts';
 
 const seedCreatedAt = '2026-06-05T00:00:00.000Z';
+const structuredToolResultNotice = 'Result returned in structuredContent.';
 type ToolPart = Extract<RendererMessagePart, { type: 'tool' }>;
 
 export function createInitialSnapshot(): AppSnapshot {
@@ -104,6 +106,14 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     return;
   }
 
+  if (event.type === 'agent.updated') {
+    const agent = findAgent(snapshot, event.agentId);
+    if (agent && isRecord(event.payload)) {
+      Object.assign(agent, event.payload);
+    }
+    return;
+  }
+
   if (event.type === 'agent.statusChanged') {
     setAgentStatus(snapshot, event.agentId, event.payload as AgentStatus);
     return;
@@ -146,6 +156,16 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
 
   if (event.type === 'item.updated' && event.turnId) {
     updateAssistantToolPart(snapshot, event.agentId, event.turnId, event.payload);
+    return;
+  }
+
+  if (event.type === 'approval.requested' && event.turnId) {
+    applyApprovalRequest(snapshot, event.agentId, event.turnId, event.payload);
+    const confirmation = confirmToolRequest(event.payload);
+    setAgentStatus(snapshot, event.agentId, {
+      type: 'awaitingInput',
+      detail: confirmation?.payload.confirmation.summary,
+    });
     return;
   }
 
@@ -316,7 +336,24 @@ function mcpResultText(result: unknown): string | undefined {
     return undefined;
   }
 
-  const content = Array.isArray(result.content) ? result.content : [];
+  const contentText = mcpContentText(result.content);
+  const structuredText = 'structuredContent' in result ? toolOutputText(result.structuredContent) : undefined;
+  if (!structuredText) {
+    return contentText;
+  }
+
+  if (!contentText || contentText.trim() === structuredToolResultNotice) {
+    return structuredText;
+  }
+
+  return `${contentText}\n\n${structuredText}`;
+}
+
+function mcpContentText(content: unknown): string | undefined {
+  if (!Array.isArray(content)) {
+    return undefined;
+  }
+
   return content
     .map((entry) => {
       if (!isRecord(entry)) {
@@ -481,6 +518,20 @@ function toolOutputText(output: unknown): string | undefined {
     return output === undefined ? undefined : JSON.stringify(output);
   }
 
+  const structuredText = 'structuredContent' in output ? toolOutputText(output.structuredContent) : undefined;
+  if (structuredText) {
+    const contentText = toolOutputContentText(output);
+    if (!contentText || contentText.trim() === structuredToolResultNotice) {
+      return structuredText;
+    }
+
+    return `${contentText}\n\n${structuredText}`;
+  }
+
+  return toolOutputContentText(output) ?? JSON.stringify(output);
+}
+
+function toolOutputContentText(output: Record<string, unknown>): string | undefined {
   if (typeof output.text === 'string') {
     return output.text;
   }
@@ -493,7 +544,7 @@ function toolOutputText(output: unknown): string | undefined {
     return toolOutputText(output.content);
   }
 
-  return JSON.stringify(output);
+  return undefined;
 }
 
 function upsertAssistantToolPart(snapshot: AppSnapshot, agentId: string, turnId: string, toolPart: ToolPart): void {
@@ -508,6 +559,7 @@ function upsertAssistantToolPart(snapshot: AppSnapshot, agentId: string, turnId:
       body: toolPart.body ?? existing.body,
       input: toolPart.input ?? existing.input,
       output: toolPart.output ?? existing.output,
+      statusText: toolPart.statusText ?? (toolPart.status === 'running' ? existing.statusText : undefined),
       metadata: {
         ...(existing.metadata ?? {}),
         ...(toolPart.metadata ?? {}),
@@ -517,6 +569,122 @@ function upsertAssistantToolPart(snapshot: AppSnapshot, agentId: string, turnId:
   }
 
   message.parts.push(toolPart);
+}
+
+function applyApprovalRequest(snapshot: AppSnapshot, agentId: string, turnId: string, payload: unknown): void {
+  const request = confirmToolRequest(payload);
+  if (!request) {
+    return;
+  }
+
+  const confirmation = request.payload.confirmation;
+  const toolPart = findPendingMcpToolPart(snapshot, agentId, turnId, confirmation.integrationId, confirmation.toolName);
+  const statusText = JSON.stringify({
+    source: 'mcp',
+    action: 'run',
+    phase: 'running',
+    params: {
+      requestId: request.id,
+      tool: `${confirmation.integrationId}.${confirmation.toolName}`,
+      confirmationSummary: confirmation.summary,
+      argumentsPreview: confirmation.argumentsPreview,
+      allowConversation: confirmation.allowConversation === true,
+      allowAlways: confirmation.allowAlways === true,
+    },
+  });
+  const input = parseJsonPreview(confirmation.argumentsPreview) ?? (confirmation.argumentsPreview || undefined);
+
+  if (toolPart) {
+    toolPart.title = `${confirmation.integrationId}.${confirmation.toolName}`;
+    toolPart.status = 'running';
+    toolPart.statusText = statusText;
+    toolPart.input = toolPart.input ?? input;
+    toolPart.metadata = {
+      ...(toolPart.metadata ?? {}),
+      confirmationRequestId: request.id,
+      server: confirmation.integrationId,
+      tool: confirmation.toolName,
+    };
+    return;
+  }
+
+  upsertAssistantToolPart(snapshot, agentId, turnId, {
+    type: 'tool',
+    id: `approval-${request.id}`,
+    kind: 'mcp',
+    title: `${confirmation.integrationId}.${confirmation.toolName}`,
+    status: 'running',
+    statusText,
+    input,
+    metadata: {
+      confirmationRequestId: request.id,
+      server: confirmation.integrationId,
+      tool: confirmation.toolName,
+    },
+  });
+}
+
+function findPendingMcpToolPart(snapshot: AppSnapshot, agentId: string, turnId: string, server: string, tool: string): ToolPart | undefined {
+  const message = findAssistantMessage(snapshot, agentId, turnId);
+  if (!message) {
+    return undefined;
+  }
+
+  const runningMcpTools = message.parts.filter((part): part is ToolPart => {
+    if (part.type !== 'tool' || part.kind !== 'mcp' || part.status !== 'running') {
+      return false;
+    }
+
+    return true;
+  });
+  const exactMatch = runningMcpTools.find((part) => {
+    const metadataServer = isRecord(part.metadata) ? stringValue(part.metadata.server) : undefined;
+    const metadataTool = isRecord(part.metadata) ? stringValue(part.metadata.tool) : undefined;
+    return (
+      (metadataServer === server && metadataTool === tool) ||
+      part.title === `${server}.${tool}` ||
+      part.title.endsWith(`.${tool}`)
+    );
+  });
+
+  return exactMatch ?? (runningMcpTools.length === 1 ? runningMcpTools[0] : undefined);
+}
+
+function confirmToolRequest(payload: unknown): ClientRequest | null {
+  if (
+    !isRecord(payload) ||
+    payload.kind !== 'confirm_tool' ||
+    typeof payload.id !== 'string' ||
+    !isRecord(payload.payload) ||
+    !isRecord(payload.payload.confirmation)
+  ) {
+    return null;
+  }
+
+  const confirmation = payload.payload.confirmation;
+  if (
+    typeof confirmation.argumentsPreview !== 'string' ||
+    typeof confirmation.integrationId !== 'string' ||
+    typeof confirmation.integrationName !== 'string' ||
+    typeof confirmation.summary !== 'string' ||
+    typeof confirmation.toolName !== 'string'
+  ) {
+    return null;
+  }
+
+  return payload as ClientRequest;
+}
+
+function parseJsonPreview(preview: string): unknown {
+  if (!preview.trim().startsWith('{') && !preview.trim().startsWith('[')) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(preview);
+  } catch {
+    return undefined;
+  }
 }
 
 function appendAssistantDelta(snapshot: AppSnapshot, agentId: string, turnId: string, delta: string, itemId?: string): void {
@@ -578,6 +746,10 @@ function findAgent(snapshot: AppSnapshot, agentId: string): Agent | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
 }
 
 function createSeedAgents(): Agent[] {

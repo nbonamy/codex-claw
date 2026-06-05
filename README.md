@@ -67,6 +67,7 @@ See [plans/codex-claw.md](plans/codex-claw.md) for the working product plan.
 - [docs/architecture.md](docs/architecture.md): product model, process
   architecture, IPC, backend seam, persistence, and open decisions.
 - [docs/codex.md](docs/codex.md): Codex app-server communication.
+- [docs/mcp.md](docs/mcp.md): app-owned MCP server for agent collaboration.
 - [docs/frontend.md](docs/frontend.md): Vue, Element Plus, component, shell,
   and theming principles.
 - [docs/testing.md](docs/testing.md): testing strategy and coverage bar.

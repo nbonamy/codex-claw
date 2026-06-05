@@ -101,6 +101,56 @@ describe('renderer message adapter', () => {
     ]);
   });
 
+  it('prefers structuredContent over the MCP model-facing placeholder result', () => {
+    const rendererMessage: RendererMessage = {
+      agentId: 'agent-dina',
+      createdAt: '2026-06-05T00:00:00.000Z',
+      id: 'assistant-turn-structured',
+      parts: [
+        {
+          type: 'tool',
+          id: 'tool-set-status',
+          kind: 'mcp',
+          title: 'codex_claw.set-status',
+          status: 'completed',
+          body: 'Result returned in structuredContent.',
+          input: {
+            agentId: 'agent-dina',
+            status: 'Registered and idle',
+          },
+          output: {
+            content: [{ type: 'text', text: 'Result returned in structuredContent.' }],
+            structuredContent: {
+              agentId: 'agent-dina',
+              status: 'Registered and idle',
+            },
+            isError: false,
+          },
+        },
+      ],
+      role: 'assistant',
+      status: 'complete',
+    };
+
+    expect(rendererMessageToChatMessage(rendererMessage).toolCalls).toStrictEqual([
+      {
+        args: {
+          agentId: 'agent-dina',
+          status: 'Registered and idle',
+        },
+        done: true,
+        function: 'codex_claw.set-status',
+        id: 'tool-set-status',
+        result: {
+          agentId: 'agent-dina',
+          status: 'Registered and idle',
+        },
+        state: 'completed',
+        status: 'completed',
+      },
+    ]);
+  });
+
   it('preserves ordered renderer parts so tools can render between text chunks', () => {
     const rendererMessage: RendererMessage = {
       agentId: 'agent-dina',
@@ -139,5 +189,35 @@ describe('renderer message adapter', () => {
       },
       { type: 'text', content: 'After the read.' },
     ]);
+  });
+
+  it('uses renderer tool status text for confirmation descriptors', () => {
+    const statusText = JSON.stringify({
+      source: 'mcp',
+      action: 'run',
+      phase: 'running',
+      params: {
+        requestId: 'approval-1',
+      },
+    });
+    const rendererMessage: RendererMessage = {
+      agentId: 'agent-dina',
+      createdAt: '2026-06-05T00:00:00.000Z',
+      id: 'assistant-turn-confirm',
+      parts: [
+        {
+          type: 'tool',
+          id: 'tool-register',
+          kind: 'mcp',
+          title: 'codex_claw.register-agent',
+          status: 'running',
+          statusText,
+        },
+      ],
+      role: 'assistant',
+      status: 'streaming',
+    };
+
+    expect(rendererMessageToChatMessage(rendererMessage).toolCalls?.at(0)?.status).toBe(statusText);
   });
 });

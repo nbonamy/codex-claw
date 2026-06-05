@@ -106,6 +106,54 @@ describe('ConversationPane', () => {
     expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('');
   });
 
+  it('bubbles tool confirmation responses from the message list', async () => {
+    const wrapper = mountPane({
+      agent,
+      messages: [
+        {
+          id: 'assistant-confirm',
+          agentId: agent.id,
+          role: 'assistant',
+          status: 'streaming',
+          createdAt: '2026-06-05T00:00:01.000Z',
+          parts: [
+            {
+              type: 'tool',
+              id: 'tool-register',
+              kind: 'mcp',
+              title: 'codex_claw.register-agent',
+              status: 'running',
+              statusText: JSON.stringify({
+                source: 'mcp',
+                action: 'run',
+                phase: 'running',
+                params: {
+                  requestId: 'approval-1',
+                  confirmationSummary: 'Allow codex_claw to register this agent?',
+                  argumentsPreview: '{\n  "agentId": "agent-dina"\n}',
+                },
+              }),
+            },
+          ],
+        },
+      ],
+      isSending: true,
+    });
+
+    await wrapper.get('.chat-tool-confirmation__button--primary').trigger('click');
+
+    expect(wrapper.emitted('client-response')).toStrictEqual([
+      [
+        {
+          id: 'approval-1',
+          payload: {
+            decision: 'allow',
+          },
+        },
+      ],
+    ]);
+  });
+
   it('disables composer actions while sending', () => {
     const wrapper = mountPane({
       agent,

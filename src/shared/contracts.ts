@@ -21,6 +21,9 @@ export type Agent = {
   avatar?: string;
   folder: string;
   codexThreadId?: string;
+  isRegistered?: boolean;
+  mcpSessionId?: string;
+  statusText?: string;
   status: AgentStatus;
   createdAt: string;
   updatedAt: string;
@@ -49,6 +52,7 @@ export type RendererMessagePart =
     kind: 'command' | 'mcp' | 'dynamic' | 'fileChange' | 'generic';
     title: string;
     status: 'running' | 'completed' | 'failed';
+    statusText?: string;
     body?: string;
     input?: unknown;
     output?: unknown;
@@ -87,6 +91,7 @@ export type MainToRendererEvent = {
   turnId?: string;
   type:
     | 'appServer.statusChanged'
+    | 'agent.updated'
     | 'agent.statusChanged'
     | 'thread.started'
     | 'turn.started'
@@ -109,11 +114,44 @@ export type CreateAgentInput = {
   avatar?: string;
 };
 
+export type ToolConfirmationDecision =
+  | 'allow'
+  | 'allow_conversation'
+  | 'always_allow'
+  | 'deny';
+
+export type ConfirmToolRequest = {
+  argumentsPreview: string;
+  integrationId: string;
+  integrationName: string;
+  summary: string;
+  toolName: string;
+  allowConversation?: boolean;
+  allowAlways?: boolean;
+};
+
+export type ClientRequest =
+  | {
+    id: string;
+    kind: 'confirm_tool';
+    payload: {
+      confirmation: ConfirmToolRequest;
+    };
+  };
+
+export type ClientRequestResponse = {
+  id: string;
+  payload?: {
+    decision?: ToolConfirmationDecision | null;
+  };
+};
+
 export type CodexClawApi = {
   getSnapshot(): Promise<AppSnapshot>;
   createAgent(input: CreateAgentInput): Promise<Agent>;
   selectAgent(agentId: string): Promise<AppSnapshot>;
   selectAgentFolder(agentId: string): Promise<AppSnapshot | null>;
   sendPrompt(agentId: string, prompt: string): Promise<AppSnapshot>;
+  respondToClientRequest(response: ClientRequestResponse): Promise<AppSnapshot>;
   onEvent(listener: (event: MainToRendererEvent) => void): () => void;
 };

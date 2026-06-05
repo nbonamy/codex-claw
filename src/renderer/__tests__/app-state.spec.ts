@@ -223,6 +223,38 @@ describe('useAppState', () => {
 
     expect(state.visibleMessages.value.at(-1)?.parts).toStrictEqual([{ type: 'text', text: 'streamed' }]);
   });
+
+  it('responds to client requests through preload and tracks answered request ids', async () => {
+    const updatedSnapshot = createInitialSnapshot();
+    updatedSnapshot.agents[0].status = { type: 'working' };
+    const respondToClientRequest = vi.fn().mockResolvedValue(updatedSnapshot);
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(createInitialSnapshot()),
+        onEvent: vi.fn(),
+        respondToClientRequest,
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await state.respondToClientRequest({
+      id: 'approval-1',
+      payload: {
+        decision: 'allow',
+      },
+    });
+
+    expect(respondToClientRequest).toHaveBeenCalledWith({
+      id: 'approval-1',
+      payload: {
+        decision: 'allow',
+      },
+    });
+    expect(state.answeredClientRequestIds.value.has('approval-1')).toBe(true);
+    expect(state.snapshot.value.agents[0].status).toStrictEqual({ type: 'working' });
+  });
 });
 
 function deferred<T>() {

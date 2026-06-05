@@ -128,6 +128,63 @@ describe('CodexAgentSessionManager', () => {
     ]);
   });
 
+  it('injects Codex Claw agent instructions when MCP is enabled', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport), {
+      clawMcpEnabled: true,
+    });
+
+    const prompt = manager.sendPrompt(agent, 'hello codex');
+    await waitForSentCount(transport, 1);
+    transport.receive({
+      id: 1,
+      result: {
+        userAgent: 'codex',
+        codexHome: '/tmp/codex-home',
+        platformFamily: 'unix',
+        platformOs: 'macos',
+      },
+    });
+    await waitForSentCount(transport, 3);
+
+    expect(transport.sent[2]).toStrictEqual({
+      id: 2,
+      method: 'thread/start',
+      params: {
+        cwd: expandHome('~/src/codex-claw'),
+        approvalPolicy: 'never',
+        sandbox: 'workspace-write',
+        serviceName: 'codex_claw',
+        developerInstructions: expect.stringContaining('Your Codex Claw agent ID is agent-dina.'),
+      },
+    });
+
+    transport.receive({
+      id: 2,
+      result: {
+        thread: {
+          id: 'thread-1',
+          cwd: '/Users/nbonamy/src/codex-claw',
+        },
+      },
+    });
+    await waitForSentCount(transport, 4);
+    transport.receive({
+      id: 3,
+      result: {
+        turn: {
+          id: 'turn-1',
+          status: 'running',
+        },
+      },
+    });
+
+    await expect(prompt).resolves.toStrictEqual({
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+    });
+  });
+
   it('shares app-server initialization across concurrent agent prompts', async () => {
     const transport = new FakeTransport();
     const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
@@ -357,6 +414,310 @@ describe('CodexAgentSessionManager', () => {
         occurredAt: '<now>',
       },
     ]);
+  });
+
+  it('ignores unimplemented notifications instead of emitting misleading app events', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+    const events: unknown[] = [];
+    manager.onEvent((event) => events.push(event));
+
+    await resolveStartedPrompt(transport, manager);
+
+    transport.receive({
+      method: 'turn/plan/updated',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        plan: [],
+      },
+    });
+
+    expect(events).toStrictEqual([]);
+  });
+
+  it('maps Codex thread status notifications into agent status events', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+    const events: unknown[] = [];
+    manager.onEvent((event) => events.push({
+      ...event,
+      occurredAt: '<now>',
+    }));
+
+    await resolveStartedPrompt(transport, manager);
+
+    transport.receive({
+      method: 'thread/status/changed',
+      params: {
+        threadId: 'thread-1',
+        status: {
+          type: 'active',
+          activeFlags: ['waitingOnApproval'],
+        },
+      },
+    });
+    transport.receive({
+      method: 'thread/status/changed',
+      params: {
+        threadId: 'thread-1',
+        status: {
+          type: 'active',
+          activeFlags: [],
+        },
+      },
+    });
+    transport.receive({
+      method: 'thread/status/changed',
+      params: {
+        threadId: 'thread-1',
+        status: {
+          type: 'idle',
+        },
+      },
+    });
+    transport.receive({
+      method: 'thread/status/changed',
+      params: {
+        threadId: 'thread-1',
+        status: {
+          type: 'systemError',
+        },
+      },
+    });
+
+    expect(events).toStrictEqual([
+      {
+        seq: 1,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        type: 'agent.statusChanged',
+        payload: { type: 'awaitingInput', detail: 'Waiting for approval' },
+        occurredAt: '<now>',
+      },
+      {
+        seq: 2,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        type: 'agent.statusChanged',
+        payload: { type: 'working' },
+        occurredAt: '<now>',
+      },
+      {
+        seq: 3,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        type: 'agent.statusChanged',
+        payload: { type: 'idle' },
+        occurredAt: '<now>',
+      },
+      {
+        seq: 4,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        type: 'agent.statusChanged',
+        payload: { type: 'error', message: 'Codex app-server reported a system error.' },
+        occurredAt: '<now>',
+      },
+    ]);
+  });
+
+  it('turns MCP tool approval elicitations into client requests and resolves user decisions', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+    const events: unknown[] = [];
+    manager.onEvent((event) => events.push({
+      ...event,
+      occurredAt: '<now>',
+    }));
+
+    await resolveStartedPrompt(transport, manager);
+
+    transport.receive({
+      id: 'approval-1',
+      method: 'mcpServer/elicitation/request',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        serverName: 'codex_claw',
+        mode: 'form',
+        message: 'Allow codex_claw to run tool "send_message"?',
+        _meta: {
+          codex_approval_kind: 'mcp_tool_call',
+          persist: ['session', 'always'],
+          tool_name: 'send_message',
+          tool_params: {
+            to: 'agent-jesse',
+            content: 'please review this',
+          },
+        },
+        requestedSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
+    });
+
+    expect(events).toStrictEqual([
+      {
+        seq: 1,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        type: 'approval.requested',
+        payload: {
+          id: 'approval-1',
+          kind: 'confirm_tool',
+          payload: {
+            confirmation: {
+              allowAlways: true,
+              allowConversation: true,
+              argumentsPreview: '{\n  "to": "agent-jesse",\n  "content": "please review this"\n}',
+              integrationId: 'codex_claw',
+              integrationName: 'codex_claw',
+              summary: 'Allow codex_claw to run tool "send_message"?',
+              toolName: 'send_message',
+            },
+          },
+        },
+        occurredAt: '<now>',
+      },
+    ]);
+
+    await manager.respondToClientRequest({
+      id: 'approval-1',
+      payload: {
+        decision: 'allow_conversation',
+      },
+    });
+
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 'approval-1',
+      result: {
+        action: 'accept',
+        content: null,
+        _meta: {
+          persist: 'session',
+        },
+      },
+    });
+    expect(events.at(-1)).toStrictEqual({
+      seq: 2,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'agent.statusChanged',
+      payload: { type: 'working' },
+      occurredAt: '<now>',
+    });
+  });
+
+  it('declines denied MCP tool approval elicitations', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+
+    await resolveStartedPrompt(transport, manager);
+    transport.receive({
+      id: 'approval-denied',
+      method: 'mcpServer/elicitation/request',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        serverName: 'codex_claw',
+        mode: 'form',
+        message: 'Allow codex_claw to run tool "send_message"?',
+        _meta: {
+          codex_approval_kind: 'mcp_tool_call',
+          tool_name: 'send_message',
+        },
+        requestedSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
+    });
+
+    await manager.respondToClientRequest({
+      id: 'approval-denied',
+      payload: {
+        decision: 'deny',
+      },
+    });
+
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 'approval-denied',
+      result: {
+        action: 'decline',
+        content: null,
+        _meta: null,
+      },
+    });
+    await expect(manager.respondToClientRequest({ id: 'approval-denied', payload: { decision: 'deny' } }))
+      .rejects.toThrow("Unknown client request 'approval-denied'.");
+  });
+
+  it('consumes server request resolved notifications after pending approvals clear', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+    const events: unknown[] = [];
+    manager.onEvent((event) => events.push({
+      ...event,
+      occurredAt: '<now>',
+    }));
+
+    await resolveStartedPrompt(transport, manager);
+    transport.receive({
+      id: 'approval-cleanup',
+      method: 'mcpServer/elicitation/request',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        serverName: 'codex_claw',
+        mode: 'form',
+        message: 'Allow codex_claw to run tool "register-agent"?',
+        _meta: {
+          codex_approval_kind: 'mcp_tool_call',
+          tool_name: 'register-agent',
+        },
+        requestedSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
+    });
+    transport.receive({
+      method: 'serverRequest/resolved',
+      params: {
+        threadId: 'thread-1',
+        requestId: 'approval-cleanup',
+      },
+    });
+
+    expect(events).toStrictEqual([
+      {
+        seq: 1,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        type: 'approval.requested',
+        payload: expect.objectContaining({
+          id: 'approval-cleanup',
+          kind: 'confirm_tool',
+        }),
+        occurredAt: '<now>',
+      },
+      {
+        seq: 2,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        type: 'agent.statusChanged',
+        payload: { type: 'working' },
+        occurredAt: '<now>',
+      },
+    ]);
+    await expect(manager.respondToClientRequest({ id: 'approval-cleanup', payload: { decision: 'allow' } }))
+      .rejects.toThrow("Unknown client request 'approval-cleanup'.");
   });
 
   it('adapts raw response tool items into app-owned renderer events', async () => {

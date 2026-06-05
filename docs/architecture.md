@@ -312,6 +312,21 @@ Those generated types should live under a main-process protocol package, for
 example `src/main/codex-protocol/generated`. Renderer code should depend on
 our IPC event types instead.
 
+## Agent Collaboration MCP
+
+Codex Claw's MCP server is the app-owned collaboration protocol for agents.
+It lives in Electron main, exposes Skwad-shaped communication tools, stores
+runtime inbox state, and emits app-owned agent updates. Detailed behavior lives
+in `docs/mcp.md`.
+
+Backend drivers enable this server in backend-specific ways. Codex receives the
+server through app-server command-line config overrides for
+`mcp_servers.codex_claw`. During MCP elicitation development, the scoped
+`default_tools_approval_mode = "approve"` override stays disabled so the
+approval UI path is exercised; we expect to bring it back for normal Claw MCP
+collaboration after that flow is proven. Future backends should keep the Claw
+tool semantics and only change the backend-specific enablement path.
+
 ## SDK Decision
 
 The TypeScript SDK is useful, but it is not the target integration boundary. It

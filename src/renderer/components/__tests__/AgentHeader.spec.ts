@@ -38,6 +38,21 @@ describe('AgentHeader', () => {
     expect(mountHeader({ status: 'error', detail: 'failed' }).text()).toContain('Codex error');
   });
 
+  it('shows the agent collaboration status when one is set', () => {
+    const wrapper = mount(AgentHeader, {
+      props: {
+        agent: {
+          ...agent,
+          statusText: 'Running tests',
+        },
+        appServer: { status: 'running' },
+        isLoading: false,
+      },
+    });
+
+    expect(wrapper.text()).toContain('Running tests');
+  });
+
   it('renders an empty identity when no agent is selected', () => {
     const wrapper = mount(AgentHeader, {
       props: {

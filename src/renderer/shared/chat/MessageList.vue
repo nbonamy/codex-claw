@@ -27,6 +27,7 @@
 
 <script setup lang="ts">
 import { nextTick, onMounted, ref, watch } from 'vue'
+import type { ClientRequestResponse } from '../../../shared/contracts'
 import type { Message } from './types'
 import ChatMessage from './ChatMessage.vue'
 
@@ -39,7 +40,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   cancel: []
-  'client-response': [response: { id: string; payload: unknown }]
+  'client-response': [response: ClientRequestResponse]
   'copy-message': [index: number]
   'delete-message': [index: number]
   'edit-message': [payload: { content: string; index: number }]

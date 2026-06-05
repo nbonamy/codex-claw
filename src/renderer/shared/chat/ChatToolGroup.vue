@@ -1,5 +1,12 @@
 <template>
-  <section class="chat-tool-group">
+  <ChatToolCall
+    v-if="singleConfirmationToolCall"
+    :answered-client-request-ids="answeredClientRequestIds"
+    :tool-call="singleConfirmationToolCall"
+    @cancel="emit('cancel')"
+    @client-response="emit('client-response', $event)"
+  />
+  <section v-else class="chat-tool-group">
     <button class="chat-tool-group__header" type="button" @click="toggleExpanded">
       <SquareDashed v-if="runningCount > 0" class="chat-tool-group__icon chat-tool-group__icon--running" :size="15" />
       <SquareCheck v-else class="chat-tool-group__icon" :size="15" />
@@ -42,8 +49,10 @@
 <script setup lang="ts">
 import { ChevronDown, ChevronUp, SquareCheck, SquareDashed } from '../icons/app-icons'
 import { computed, ref } from 'vue'
+import type { ClientRequestResponse } from '../../../shared/contracts'
 import ChatFoldTransition from './ChatFoldTransition.vue'
 import ChatToolCall from './ChatToolCall.vue'
+import { parseToolStatusDescriptor } from './tool-status'
 import type { MessageToolCall } from './types'
 
 const props = defineProps<{
@@ -52,12 +61,19 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   cancel: []
-  'client-response': [response: { id: string; payload: unknown }]
+  'client-response': [response: ClientRequestResponse]
 }>()
 
 const expanded = ref(false)
 
 const isSingleTool = computed(() => props.toolCalls.length === 1)
+const singleConfirmationToolCall = computed(() => {
+  if (!isSingleTool.value || !props.toolCalls[0] || !isConfirmationTool(props.toolCalls[0])) {
+    return undefined
+  }
+
+  return props.toolCalls[0]
+})
 const activeToolCall = computed(() => props.toolCalls.find(isActiveToolCall))
 const headerToolCall = computed(() => activeToolCall.value ?? (isSingleTool.value ? props.toolCalls[0] : undefined))
 const runningCount = computed(() => props.toolCalls.filter(isActiveToolCall).length)
@@ -79,6 +95,15 @@ function formatActions(count: number) {
 
 function isActiveToolCall(toolCall: MessageToolCall) {
   return !toolCall.done && toolCall.state !== 'completed'
+}
+
+function isConfirmationTool(toolCall: MessageToolCall) {
+  const descriptor = parseToolStatusDescriptor(toolCall.status)
+  return (
+    (descriptor?.source === 'mcp' || descriptor?.source === 'home') &&
+    typeof descriptor.params?.requestId === 'string' &&
+    toolCall.state === 'running'
+  )
 }
 </script>
 

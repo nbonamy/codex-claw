@@ -6,6 +6,7 @@ export type CodexProcessTransportOptions = {
   command?: string;
   codexHome?: string;
   env?: NodeJS.ProcessEnv;
+  configOverrides?: string[];
 };
 
 export class CodexProcessTransport implements CodexTransport {
@@ -24,8 +25,15 @@ export class CodexProcessTransport implements CodexTransport {
 
     const command = this.options.command ?? 'codex';
     const codexHome = this.options.codexHome;
+    const configOverrideArgs = this.options.configOverrides?.flatMap((override) => ['-c', override]) ?? [];
+    const args = [
+      ...configOverrideArgs,
+      'app-server',
+      '--listen',
+      'stdio://',
+    ];
 
-    this.child = spawn(command, ['app-server', '--listen', 'stdio://'], {
+    this.child = spawn(command, args, {
       env: {
         ...process.env,
         ...this.options.env,

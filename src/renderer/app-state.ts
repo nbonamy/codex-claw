@@ -1,10 +1,11 @@
 import { computed, ref } from 'vue';
-import type { AppSnapshot, MainToRendererEvent } from '../shared/contracts';
+import type { AppSnapshot, ClientRequestResponse, MainToRendererEvent } from '../shared/contracts';
 import { applyMainEventToSnapshot, createInitialSnapshot } from '../shared/snapshot';
 
 const snapshot = ref<AppSnapshot>(createInitialSnapshot());
 const isLoading = ref(false);
 const sendingAgentIds = ref(new Set<string>());
+const answeredClientRequestIds = ref(new Set<string>());
 let unsubscribeMainEvents: (() => void) | null = null;
 
 export function useAppState() {
@@ -71,13 +72,25 @@ export function useAppState() {
     }
   }
 
+  async function respondToClientRequest(response: ClientRequestResponse): Promise<void> {
+    markClientRequestAnswered(response.id);
+
+    if (!window.codexClaw) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.respondToClientRequest(response);
+  }
+
   return {
     snapshot,
     activeAgent,
     visibleMessages,
     isLoading,
     isSending,
+    answeredClientRequestIds,
     loadSnapshot,
+    respondToClientRequest,
     selectAgent,
     sendPrompt,
   };
@@ -102,4 +115,10 @@ function markAgentSending(agentId: string, sending: boolean): void {
     next.delete(agentId);
   }
   sendingAgentIds.value = next;
+}
+
+function markClientRequestAnswered(requestId: string): void {
+  const next = new Set(answeredClientRequestIds.value);
+  next.add(requestId);
+  answeredClientRequestIds.value = next;
 }

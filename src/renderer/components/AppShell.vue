@@ -21,6 +21,8 @@
           :messages="messages"
           :agent="activeAgent"
           :is-sending="isSending"
+          :answered-client-request-ids="answeredClientRequestIds"
+          @client-response="$emit('client-response', $event)"
           @send-prompt="$emit('sendPrompt', $event)"
         />
       </div>
@@ -29,7 +31,7 @@
 </template>
 
 <script setup lang="ts">
-import type { Agent, AppSnapshot, RendererMessage } from '../../shared/contracts';
+import type { Agent, AppSnapshot, ClientRequestResponse, RendererMessage } from '../../shared/contracts';
 import AgentHeader from './AgentHeader.vue';
 import AgentSidebar from './AgentSidebar.vue';
 import ConversationPane from './ConversationPane.vue';
@@ -41,9 +43,11 @@ defineProps<{
   messages: RendererMessage[];
   isLoading: boolean;
   isSending: boolean;
+  answeredClientRequestIds?: Set<string>;
 }>();
 
 defineEmits<{
+  'client-response': [response: ClientRequestResponse];
   'select-agent': [agentId: string];
   sendPrompt: [prompt: string];
 }>();

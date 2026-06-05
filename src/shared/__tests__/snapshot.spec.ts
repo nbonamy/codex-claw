@@ -101,6 +101,37 @@ describe('snapshot reducer', () => {
     expect(snapshot.appServer).toStrictEqual({ status: 'running', detail: 'connected' });
   });
 
+  it('merges agent updates from main-process collaboration tools', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'agent.updated',
+      payload: {
+        id: 'agent-dina',
+        statusText: 'Reviewing MCP shape',
+        isRegistered: true,
+        mcpSessionId: 'mcp-session-1',
+        updatedAt: '2026-06-05T00:00:02.000Z',
+      },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(snapshot.agents[0]).toStrictEqual({
+      id: 'agent-dina',
+      name: 'Dina',
+      avatar: 'DI',
+      folder: '~/src/codex-claw',
+      isRegistered: true,
+      mcpSessionId: 'mcp-session-1',
+      statusText: 'Reviewing MCP shape',
+      status: { type: 'idle' },
+      createdAt: '2026-06-05T00:00:00.000Z',
+      updatedAt: '2026-06-05T00:00:02.000Z',
+    });
+  });
+
   it('keeps agent selection and streamed chats isolated per agent', () => {
     const snapshot = createInitialSnapshot();
 
@@ -746,6 +777,70 @@ describe('snapshot reducer', () => {
     ]);
   });
 
+  it('uses MCP structuredContent instead of the model-facing placeholder text', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'item.completed',
+      payload: {
+        item: {
+          type: 'mcpToolCall',
+          id: 'call-set-status',
+          server: 'codex_claw',
+          tool: 'set-status',
+          status: 'completed',
+          arguments: {
+            agentId: 'agent-dina',
+            status: 'Registered and idle',
+          },
+          result: {
+            content: [{ type: 'text', text: 'Result returned in structuredContent.' }],
+            structuredContent: {
+              agentId: 'agent-dina',
+              status: 'Registered and idle',
+            },
+            isError: false,
+          },
+        },
+      },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([
+      {
+        type: 'tool',
+        id: 'call-set-status',
+        kind: 'mcp',
+        title: 'codex_claw.set-status',
+        status: 'completed',
+        body: '{"agentId":"agent-dina","status":"Registered and idle"}',
+        input: {
+          agentId: 'agent-dina',
+          status: 'Registered and idle',
+        },
+        output: {
+          content: [{ type: 'text', text: 'Result returned in structuredContent.' }],
+          structuredContent: {
+            agentId: 'agent-dina',
+            status: 'Registered and idle',
+          },
+          isError: false,
+        },
+        metadata: {
+          server: 'codex_claw',
+          tool: 'set-status',
+          pluginId: undefined,
+          mcpAppResourceUri: undefined,
+          durationMs: undefined,
+        },
+      },
+    ]);
+  });
+
   it('handles tool item fallbacks, progress updates, and malformed payloads', () => {
     const snapshot = createInitialSnapshot();
 
@@ -897,6 +992,194 @@ describe('snapshot reducer', () => {
         body: 'update src/next.ts\n"raw change"',
       },
     ]);
+  });
+
+  it('attaches approval requests to the matching running MCP tool part', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'item.started',
+      payload: {
+        item: {
+          type: 'mcpToolCall',
+          id: 'call-register-agent',
+          server: 'codex_claw',
+          tool: 'register-agent',
+          status: 'inProgress',
+          arguments: { agentId: 'agent-dina' },
+        },
+      },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'approval.requested',
+      payload: {
+        id: 'approval-1',
+        kind: 'confirm_tool',
+        payload: {
+          confirmation: {
+            allowAlways: true,
+            allowConversation: true,
+            argumentsPreview: '{\n  "agentId": "agent-dina"\n}',
+            integrationId: 'codex_claw',
+            integrationName: 'codex_claw',
+            summary: 'Allow codex_claw to run register-agent?',
+            toolName: 'register-agent',
+          },
+        },
+      },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    const tool = snapshot.messages.at(-1)?.parts[0];
+    expect(tool).toMatchObject({
+      type: 'tool',
+      id: 'call-register-agent',
+      kind: 'mcp',
+      title: 'codex_claw.register-agent',
+      status: 'running',
+      input: { agentId: 'agent-dina' },
+      metadata: {
+        confirmationRequestId: 'approval-1',
+        server: 'codex_claw',
+        tool: 'register-agent',
+      },
+    });
+    expect(tool?.type === 'tool' ? JSON.parse(tool.statusText ?? '') : null).toStrictEqual({
+      source: 'mcp',
+      action: 'run',
+      phase: 'running',
+      params: {
+        requestId: 'approval-1',
+        tool: 'codex_claw.register-agent',
+        confirmationSummary: 'Allow codex_claw to run register-agent?',
+        argumentsPreview: '{\n  "agentId": "agent-dina"\n}',
+        allowConversation: true,
+        allowAlways: true,
+      },
+    });
+    expect(snapshot.agents[0].status).toStrictEqual({
+      type: 'awaitingInput',
+      detail: 'Allow codex_claw to run register-agent?',
+    });
+  });
+
+  it('creates an inline approval placeholder if the MCP tool item has not arrived yet', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'approval.requested',
+      payload: {
+        id: 'approval-early',
+        kind: 'confirm_tool',
+        payload: {
+          confirmation: {
+            argumentsPreview: 'agentId: agent-dina',
+            integrationId: 'codex_claw',
+            integrationName: 'codex_claw',
+            summary: 'Allow codex_claw to register this agent?',
+            toolName: 'register-agent',
+          },
+        },
+      },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([
+      {
+        type: 'tool',
+        id: 'approval-approval-early',
+        kind: 'mcp',
+        title: 'codex_claw.register-agent',
+        status: 'running',
+        statusText: JSON.stringify({
+          source: 'mcp',
+          action: 'run',
+          phase: 'running',
+          params: {
+            requestId: 'approval-early',
+            tool: 'codex_claw.register-agent',
+            confirmationSummary: 'Allow codex_claw to register this agent?',
+            argumentsPreview: 'agentId: agent-dina',
+            allowConversation: false,
+            allowAlways: false,
+          },
+        }),
+        input: 'agentId: agent-dina',
+        metadata: {
+          confirmationRequestId: 'approval-early',
+          server: 'codex_claw',
+          tool: 'register-agent',
+        },
+      },
+    ]);
+  });
+
+  it('attaches approval requests to the only running MCP tool when metadata is incomplete', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'item.started',
+      payload: {
+        item: {
+          type: 'mcpToolCall',
+          id: 'call-without-metadata',
+          server: 'unknown_server',
+          tool: 'unknown-tool',
+          status: 'inProgress',
+        },
+      },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'approval.requested',
+      payload: {
+        id: 'approval-sole-tool',
+        kind: 'confirm_tool',
+        payload: {
+          confirmation: {
+            argumentsPreview: '{\n  "agentId": "agent-dina"\n}',
+            integrationId: 'codex_claw',
+            integrationName: 'codex_claw',
+            summary: 'Allow codex_claw to register this agent?',
+            toolName: 'register-agent',
+          },
+        },
+      },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(snapshot.messages.at(-1)?.parts).toHaveLength(1);
+    expect(snapshot.messages.at(-1)?.parts[0]).toMatchObject({
+      type: 'tool',
+      id: 'call-without-metadata',
+      title: 'codex_claw.register-agent',
+      metadata: {
+        confirmationRequestId: 'approval-sole-tool',
+        server: 'codex_claw',
+        tool: 'register-agent',
+      },
+    });
   });
 
   it('handles reducer fallback and error events without Codex protocol leaking into UI state', () => {

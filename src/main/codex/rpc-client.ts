@@ -1,3 +1,4 @@
+import { warnMain } from '../log';
 import type { JsonRpcClientMessage, JsonRpcId, JsonRpcServerMessage } from './protocol';
 
 export type CodexTransport = {
@@ -13,11 +14,27 @@ type PendingRequest = {
   reject: (error: Error) => void;
 };
 
+type JsonRpcServerRequest = {
+  id: JsonRpcId;
+  method: string;
+  params?: unknown;
+};
+
+export type CodexServerRequest = JsonRpcServerRequest;
+
+export type CodexServerRequestResponder = {
+  reject(error: Error | string): void;
+  resolve(result: unknown): void;
+};
+
+const NOT_IMPLEMENTED_ERROR_CODE = -32000;
+
 export class CodexRpcClient {
   private nextId = 1;
   private initialized = false;
   private readonly pending = new Map<JsonRpcId, PendingRequest>();
   private readonly notificationListeners = new Set<(message: Extract<JsonRpcServerMessage, { method: string }>) => void>();
+  private readonly serverRequestListeners = new Set<(request: CodexServerRequest, responder: CodexServerRequestResponder) => boolean | void>();
   private unsubscribeMessage?: () => void;
   private unsubscribeError?: () => void;
 
@@ -84,6 +101,14 @@ export class CodexRpcClient {
     };
   }
 
+  onServerRequest(listener: (request: CodexServerRequest, responder: CodexServerRequestResponder) => boolean | void): () => void {
+    this.serverRequestListeners.add(listener);
+
+    return () => {
+      this.serverRequestListeners.delete(listener);
+    };
+  }
+
   async close(): Promise<void> {
     this.unsubscribeMessage?.();
     this.unsubscribeError?.();
@@ -92,8 +117,13 @@ export class CodexRpcClient {
   }
 
   private handleMessage(message: JsonRpcServerMessage): void {
-    if ('id' in message && ('result' in message || 'error' in message)) {
+    if ('id' in message && message.id !== undefined && ('result' in message || 'error' in message)) {
       this.handleResponse(message);
+      return;
+    }
+
+    if ('id' in message && message.id !== undefined && 'method' in message) {
+      this.handleServerRequest(message as JsonRpcServerRequest);
       return;
     }
 
@@ -102,6 +132,97 @@ export class CodexRpcClient {
         listener(message);
       }
     }
+  }
+
+  private handleServerRequest(request: JsonRpcServerRequest): void {
+    switch (request.method) {
+      case 'mcpServer/elicitation/request':
+        if (this.dispatchServerRequest(request)) {
+          return;
+        }
+        this.rejectNotImplementedServerRequest(request);
+        return;
+      case 'item/commandExecution/requestApproval':
+      case 'item/fileChange/requestApproval':
+      case 'item/tool/requestUserInput':
+      case 'item/permissions/requestApproval':
+      case 'item/tool/call':
+      case 'account/chatgptAuthTokens/refresh':
+      case 'attestation/generate':
+      case 'applyPatchApproval':
+      case 'execCommandApproval':
+        this.rejectNotImplementedServerRequest(request);
+        return;
+      default:
+        this.rejectNotImplementedServerRequest(request);
+    }
+  }
+
+  private dispatchServerRequest(request: JsonRpcServerRequest): boolean {
+    if (this.serverRequestListeners.size === 0) {
+      return false;
+    }
+
+    const responder = this.createServerRequestResponder(request);
+    for (const listener of this.serverRequestListeners) {
+      try {
+        if (listener(request, responder) === true) {
+          return true;
+        }
+      } catch (error) {
+        responder.reject(error instanceof Error ? error : String(error));
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private createServerRequestResponder(request: JsonRpcServerRequest): CodexServerRequestResponder {
+    let responded = false;
+
+    return {
+      reject: (error) => {
+        if (responded) {
+          return;
+        }
+        responded = true;
+        const message = typeof error === 'string' ? error : error.message;
+        this.transport.send({
+          id: request.id,
+          error: {
+            code: NOT_IMPLEMENTED_ERROR_CODE,
+            message,
+          },
+        });
+      },
+      resolve: (result) => {
+        if (responded) {
+          return;
+        }
+        responded = true;
+        this.transport.send({
+          id: request.id,
+          result,
+        });
+      },
+    };
+  }
+
+  private rejectNotImplementedServerRequest(request: JsonRpcServerRequest): void {
+    warnMain('codex-request', 'not implemented', {
+      id: request.id,
+      method: request.method,
+      ...summarizeCodexParams(request.params),
+    });
+
+    this.transport.send({
+      id: request.id,
+      error: {
+        code: NOT_IMPLEMENTED_ERROR_CODE,
+        message: `Codex Claw does not implement app-server request '${request.method}' yet.`,
+      },
+    });
   }
 
   private handleResponse(message: Extract<JsonRpcServerMessage, { id: JsonRpcId }>): void {
@@ -127,4 +248,23 @@ export class CodexRpcClient {
 
     this.pending.clear();
   }
+}
+
+function summarizeCodexParams(params: unknown): Record<string, unknown> {
+  if (!params || typeof params !== 'object' || Array.isArray(params)) {
+    return { paramType: typeof params };
+  }
+
+  const record = params as Record<string, unknown>;
+  return {
+    paramKeys: Object.keys(record),
+    threadId: stringValue(record.threadId),
+    turnId: stringValue(record.turnId),
+    itemId: stringValue(record.itemId),
+    requestId: stringValue(record.requestId),
+  };
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
 }

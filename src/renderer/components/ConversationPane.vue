@@ -11,6 +11,8 @@
       <MessageList
         class="conversation-pane__messages"
         :messages="chatMessages"
+        :answered-client-request-ids="answeredClientRequestIds"
+        @client-response="$emit('client-response', $event)"
       />
 
       <template #footer>
@@ -45,7 +47,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Agent, RendererMessage } from '../../shared/contracts';
+import type { Agent, ClientRequestResponse, RendererMessage } from '../../shared/contracts';
 import WorkbenchLayout from './WorkbenchLayout.vue';
 import ChatComposer from './ChatComposer.vue';
 import MessageList from '../shared/chat/MessageList.vue';
@@ -55,9 +57,11 @@ const props = defineProps<{
   messages: RendererMessage[];
   agent: Agent | null;
   isSending: boolean;
+  answeredClientRequestIds?: Set<string>;
 }>();
 
 defineEmits<{
+  'client-response': [response: ClientRequestResponse];
   sendPrompt: [prompt: string];
 }>();
 

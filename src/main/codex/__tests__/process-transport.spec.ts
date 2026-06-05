@@ -61,4 +61,27 @@ describe('CodexProcessTransport', () => {
       CODEX_HOME: '/tmp/codex-claw-home',
     });
   });
+
+  it('passes config overrides before the app-server subcommand', async () => {
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const transport = new CodexProcessTransport({
+      configOverrides: [
+        'mcp_servers.codex_claw.url="http://127.0.0.1:1234/mcp"',
+        'mcp_servers.codex_claw.default_tools_approval_mode="approve"',
+      ],
+    });
+
+    await transport.start();
+
+    expect(spawnMock.mock.calls[0][1]).toStrictEqual([
+      '-c',
+      'mcp_servers.codex_claw.url="http://127.0.0.1:1234/mcp"',
+      '-c',
+      'mcp_servers.codex_claw.default_tools_approval_mode="approve"',
+      'app-server',
+      '--listen',
+      'stdio://',
+    ]);
+  });
 });

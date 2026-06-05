@@ -93,6 +93,34 @@ Important requests for the first product:
 The main process should expose these through app-level services such as
 `AgentSessionManager`, not directly through renderer IPC.
 
+## MCP Enablement
+
+The Claw MCP server is documented in `docs/mcp.md`. It is an app-owned
+collaboration server, not a Codex-specific subsystem.
+
+For Codex, do not rely on a global `codex mcp add` entry for the product path.
+Codex Claw starts the app-server process with command-line config overrides for
+the local Claw MCP server:
+
+```bash
+codex \
+  -c 'mcp_servers.codex_claw.url="http://127.0.0.1:<port>/mcp"' \
+  app-server --listen stdio://
+```
+
+During MCP elicitation development, Claw intentionally does not pass
+`mcp_servers.codex_claw.default_tools_approval_mode = "approve"` so the
+renderer approval flow is exercised. We expect to bring that scoped override
+back for normal Claw MCP collaboration once the flow is proven. The override is
+scoped to `codex_claw`; it does not put the entire Codex session into
+full-access/yolo mode.
+
+Each `thread/start` still receives agent-specific developer instructions, such
+as the Claw agent ID and guidance to register with the MCP server.
+
+This keeps normal Codex config and normal Codex data untouched, including when
+`CODEX_CLAW_CODEX_HOME` is used for an isolated Codex home.
+
 ## Notifications And Server Requests
 
 Important notifications:
@@ -112,16 +140,35 @@ Important notifications:
 - `item/fileChange/patchUpdated`
 - `turn/diff/updated`
 
-Important server-initiated requests:
+Current server-initiated request methods:
 
 - `item/commandExecution/requestApproval`
 - `item/fileChange/requestApproval`
-- `item/permissions/requestApproval`
 - `item/tool/requestUserInput`
+- `mcpServer/elicitation/request`
+- `item/permissions/requestApproval`
+- `item/tool/call`
+- `account/chatgptAuthTokens/refresh`
+- `attestation/generate`
+- `applyPatchApproval`
+- `execCommandApproval`
 
 Server requests are not renderer implementation details. Main stores the
 pending request, emits an app-owned prompt event, and resolves or rejects the
-server request when the renderer answers.
+server request when the renderer answers. Until a request type is implemented,
+main must log `not implemented` and respond with a JSON-RPC error so the
+app-server does not wait forever.
+
+`mcpServer/elicitation/request` with `_meta.codex_approval_kind =
+"mcp_tool_call"` maps to the same renderer-facing confirmation shape as id8:
+`kind: "confirm_tool"` with a stable request id, summary, integration/server
+name, tool name, arguments preview, and supported persistence choices. The
+renderer returns `allow`, `allow_conversation`, `always_allow`, or `deny`;
+main translates that back to Codex's `accept`/`decline` elicitation response
+and optional `_meta.persist`.
+
+Unhandled notifications should also log `not implemented`, but they do not need
+a response because notifications cannot block the app-server.
 
 ## Generated Protocol Types
 
@@ -176,7 +223,9 @@ Mapping sketch:
 - `rawResponseItem/completed` is adapted in main into the same app-owned tool
   events when the app-server exposes raw function, shell, custom-tool, search,
   or output items.
-- approval and ask-user requests become pending UI prompts.
+- approval and ask-user requests become pending UI prompts. MCP tool approval
+  elicitations update the matching running MCP tool part when possible so the
+  confirmation appears where the tool call happened in the stream.
 - `TurnCompleted` finalizes streaming state and updates usage/status.
 
 Keep original Codex payloads available in debug fields during development, but

@@ -9,6 +9,7 @@ describe('ipc channels', () => {
       selectAgent: 'agent:select',
       selectAgentFolder: 'agent:select-folder',
       sendPrompt: 'agent:send-prompt',
+      respondToClientRequest: 'client-request:respond',
       event: 'app:event',
     });
   });

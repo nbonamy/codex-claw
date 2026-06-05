@@ -39,6 +39,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { ClientRequestResponse } from '../../../shared/contracts'
 import type { Message } from './types'
 import type { MessageBlock } from './message-blocks'
 import ChatMessageBlock from './ChatMessageBlock.vue'
@@ -55,7 +56,7 @@ const props = withDefaults(defineProps<{
 })
 const emit = defineEmits<{
   cancel: []
-  'client-response': [response: { id: string; payload: unknown }]
+  'client-response': [response: ClientRequestResponse]
   'copy-message': [index: number]
   'delete-message': [index: number]
   'edit-message': [payload: { content: string; index: number }]

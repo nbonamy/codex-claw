@@ -100,4 +100,22 @@ describe('AgentSidebar', () => {
     expect(wrapper.find('[aria-label="Awaiting input"]').exists()).toBe(true);
     expect(wrapper.find('[aria-label="Error"]').exists()).toBe(true);
   });
+
+  it('surfaces short collaboration statuses in compact rows', () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: [
+          { ...agents[0], statusText: 'Running tests' },
+        ],
+        activeAgentId: 'agent-dina',
+        benchCount: 0,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.text()).toContain('Running tests');
+    expect(wrapper.text()).not.toContain('~/src/id8');
+  });
 });

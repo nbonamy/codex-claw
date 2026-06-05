@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { CodexClawApi, CreateAgentInput, MainToRendererEvent } from '../shared/contracts';
+import type { ClientRequestResponse, CodexClawApi, CreateAgentInput, MainToRendererEvent } from '../shared/contracts';
 import { ipcChannels } from '../shared/ipc';
 
 const api: CodexClawApi = {
@@ -8,6 +8,7 @@ const api: CodexClawApi = {
   selectAgent: (agentId: string) => ipcRenderer.invoke(ipcChannels.selectAgent, agentId),
   selectAgentFolder: (agentId: string) => ipcRenderer.invoke(ipcChannels.selectAgentFolder, agentId),
   sendPrompt: (agentId: string, prompt: string) => ipcRenderer.invoke(ipcChannels.sendPrompt, agentId, prompt),
+  respondToClientRequest: (response: ClientRequestResponse) => ipcRenderer.invoke(ipcChannels.respondToClientRequest, response),
   onEvent: (listener: (event: MainToRendererEvent) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, payload: MainToRendererEvent) => listener(payload);
     ipcRenderer.on(ipcChannels.event, handler);

@@ -21,7 +21,7 @@
       class="agent-header__context"
     >
       <span>codex</span>
-      <span>{{ agent.status.type }}</span>
+      <span>{{ agent.statusText ?? agent.status.type }}</span>
     </div>
     <div class="agent-header__status">
       <span :data-status="appServer.status" />

@@ -5,7 +5,9 @@
     :messages="visibleMessages"
     :is-loading="isLoading"
     :is-sending="isSending"
+    :answered-client-request-ids="answeredClientRequestIds"
     @select-agent="selectAgent"
+    @client-response="respondToClientRequest"
     @send-prompt="sendPrompt"
   />
 </template>
@@ -21,7 +23,9 @@ const {
   visibleMessages,
   isLoading,
   isSending,
+  answeredClientRequestIds,
   loadSnapshot,
+  respondToClientRequest,
   selectAgent,
   sendPrompt,
 } = useAppState();

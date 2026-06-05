@@ -109,4 +109,98 @@ describe('CodexRpcClient', () => {
     ]);
     await expect(pending).rejects.toThrow('closed');
   });
+
+  it('rejects unimplemented app-server requests so turns do not hang forever', async () => {
+    const transport = new FakeTransport();
+    const client = new CodexRpcClient(transport);
+    const notifications: JsonRpcServerMessage[] = [];
+    await client.start();
+    client.onNotification((message) => notifications.push(message));
+
+    transport.receive({
+      id: 'server-request-1',
+      method: 'item/commandExecution/requestApproval',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        itemId: 'cmd-1',
+      },
+    });
+
+    expect(notifications).toStrictEqual([]);
+    expect(transport.sent).toStrictEqual([
+      {
+        id: 'server-request-1',
+        error: {
+          code: -32000,
+          message: "Codex Claw does not implement app-server request 'item/commandExecution/requestApproval' yet.",
+        },
+      },
+    ]);
+  });
+
+  it('lets the session layer claim and resolve app-server elicitation requests', async () => {
+    const transport = new FakeTransport();
+    const client = new CodexRpcClient(transport);
+    await client.start();
+
+    client.onServerRequest((request, responder) => {
+      expect(request).toStrictEqual({
+        id: 'elicitation-1',
+        method: 'mcpServer/elicitation/request',
+        params: {
+          threadId: 'thread-1',
+          turnId: 'turn-1',
+          serverName: 'codex_claw',
+          mode: 'form',
+          message: 'Allow codex_claw to run tool "send_message"?',
+          _meta: {
+            codex_approval_kind: 'mcp_tool_call',
+            tool_name: 'send_message',
+          },
+          requestedSchema: {
+            type: 'object',
+            properties: {},
+          },
+        },
+      });
+      responder.resolve({
+        action: 'accept',
+        content: null,
+        _meta: null,
+      });
+      return true;
+    });
+
+    transport.receive({
+      id: 'elicitation-1',
+      method: 'mcpServer/elicitation/request',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        serverName: 'codex_claw',
+        mode: 'form',
+        message: 'Allow codex_claw to run tool "send_message"?',
+        _meta: {
+          codex_approval_kind: 'mcp_tool_call',
+          tool_name: 'send_message',
+        },
+        requestedSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
+    });
+
+    expect(transport.sent).toStrictEqual([
+      {
+        id: 'elicitation-1',
+        result: {
+          action: 'accept',
+          content: null,
+          _meta: null,
+        },
+      },
+    ]);
+  });
 });

@@ -1,5 +1,11 @@
 <template>
-  <section class="chat-tool-call" :class="{ 'chat-tool-call--open': isOpen, [`chat-tool-call--${toolCall.state}`]: true }">
+  <ChatToolConfirmation
+    v-if="isToolConfirmation"
+    :answered-client-request-ids="answeredClientRequestIds"
+    :tool-call="toolCall"
+    @client-response="emit('client-response', $event)"
+  />
+  <section v-else class="chat-tool-call" :class="{ 'chat-tool-call--open': isOpen, [`chat-tool-call--${toolCall.state}`]: true }">
     <div v-if="summaryOnly" class="chat-tool-call__summary">
       <ChatToolCallTitle :line-diff="lineDiff" :running="isRunning" :title="title" />
       <component :is="isOpen ? ChevronUp : ChevronDown" class="chat-tool-group__chevron" :size="15" />
@@ -41,7 +47,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { ChevronDown, ChevronUp } from '../icons/app-icons'
+import type { ClientRequestResponse } from '../../../shared/contracts'
 import ChatFoldTransition from './ChatFoldTransition.vue'
+import ChatToolConfirmation from './ChatToolConfirmation.vue'
 import ChatToolCallTitle from './ChatToolCallTitle.vue'
 import { getToolFallbackTitle, getToolLineDiff, parseToolStatusDescriptor } from './tool-status'
 import { getMessageToolCallArgs, getMessageToolCallName, type MessageToolCall } from './types'
@@ -54,7 +62,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   cancel: []
-  'client-response': [response: { id: string; payload: unknown }]
+  'client-response': [response: ClientRequestResponse]
 }>()
 
 const isOpen = ref(false)
@@ -63,6 +71,16 @@ const toolCallName = computed(() => getMessageToolCallName(props.toolCall))
 const toolCallArgs = computed(() => getMessageToolCallArgs(props.toolCall))
 const isRunning = computed(() => !props.toolCall.done && props.toolCall.state !== 'completed')
 const statusDescriptor = computed(() => parseToolStatusDescriptor(props.toolCall.status))
+const confirmationParams = computed(() => (
+  statusDescriptor.value?.params && typeof statusDescriptor.value.params === 'object'
+    ? statusDescriptor.value.params
+    : {}
+))
+const isToolConfirmation = computed(() => (
+  (statusDescriptor.value?.source === 'mcp' || statusDescriptor.value?.source === 'home') &&
+  typeof confirmationParams.value.requestId === 'string' &&
+  props.toolCall.state === 'running'
+))
 const fallbackTitle = computed(() => getToolFallbackTitle(props.toolCall))
 const title = computed(() => {
   const descriptor = statusDescriptor.value
@@ -76,7 +94,7 @@ const title = computed(() => {
 })
 const lineDiff = computed(() => getToolLineDiff(statusDescriptor.value))
 const hasParams = computed(() => toolCallArgs.value !== undefined)
-const hasResult = computed(() => props.toolCall.result !== undefined)
+const hasResult = computed(() => props.toolCall.result !== undefined && props.toolCall.result !== null)
 
 function toggleOpen() {
   isOpen.value = !isOpen.value

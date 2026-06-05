@@ -39,10 +39,18 @@ function rendererToolPartToToolCall(message: RendererMessage, part: Extract<Rend
     done: part.status !== 'running',
     function: part.title,
     id: part.id || `${message.id}-tool-${index}`,
-    result: part.body ?? part.output,
+    result: rendererToolPartResult(part),
     state: rendererToolStatusToState(part.status),
-    status: part.status,
+    status: part.statusText ?? part.status,
   };
+}
+
+function rendererToolPartResult(part: Extract<RendererMessagePart, { type: 'tool' }>): unknown {
+  if (isRecord(part.output) && 'structuredContent' in part.output) {
+    return part.output.structuredContent;
+  }
+
+  return part.body ?? part.output;
 }
 
 function rendererToolStatusToState(status: Extract<RendererMessagePart, { type: 'tool' }>['status']): ToolExecutionState {
@@ -51,4 +59,8 @@ function rendererToolStatusToState(status: Extract<RendererMessagePart, { type: 
   }
 
   return status === 'failed' ? 'error' : 'completed';
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }

@@ -2,13 +2,17 @@ import type { Agent, MainToRendererEvent } from '../../shared/contracts';
 
 export type JsonRpcId = number | string;
 
+export type JsonRpcError = { code: number; message: string; data?: unknown };
+
 export type JsonRpcClientMessage =
   | { id: JsonRpcId; method: string; params?: unknown }
-  | { method: string; params?: unknown };
+  | { method: string; params?: unknown }
+  | { id: JsonRpcId; result: unknown }
+  | { id: JsonRpcId; error: JsonRpcError };
 
 export type JsonRpcServerMessage =
   | { id: JsonRpcId; result: unknown }
-  | { id: JsonRpcId; error: { code: number; message: string; data?: unknown } }
+  | { id: JsonRpcId; error: JsonRpcError }
   | { id?: JsonRpcId; method: string; params?: unknown };
 
 export type CodexThread = {
@@ -21,6 +25,14 @@ export type CodexTurn = {
   id: string;
   status: string;
 };
+
+export type CodexThreadActiveFlag = 'waitingOnApproval' | 'waitingOnUserInput';
+
+export type CodexThreadStatus =
+  | { type: 'notLoaded' }
+  | { type: 'idle' }
+  | { type: 'systemError' }
+  | { type: 'active'; activeFlags: CodexThreadActiveFlag[] };
 
 export type CodexThreadItem = {
   type: string;
@@ -52,6 +64,7 @@ export type TurnStartResponse = {
 
 export type CodexNotification =
   | { method: 'thread/started'; params: { thread: CodexThread } }
+  | { method: 'thread/status/changed'; params: { threadId: string; status: CodexThreadStatus } }
   | { method: 'turn/started'; params: { threadId: string; turn: CodexTurn } }
   | { method: 'item/agentMessage/delta'; params: { threadId: string; turnId: string; itemId: string; delta: string } }
   | { method: 'item/started'; params: { threadId: string; turnId: string; item: CodexThreadItem } }
@@ -60,6 +73,7 @@ export type CodexNotification =
   | { method: 'item/commandExecution/outputDelta'; params: { threadId: string; turnId: string; itemId: string; delta: string } }
   | { method: 'item/fileChange/patchUpdated'; params: { threadId: string; turnId: string; itemId: string; changes: unknown[] } }
   | { method: 'item/mcpToolCall/progress'; params: { threadId: string; turnId: string; itemId: string; message: string } }
+  | { method: 'serverRequest/resolved'; params: { threadId: string; requestId: JsonRpcId } }
   | { method: 'turn/completed'; params: { threadId: string; turn: CodexTurn } }
   | { method: string; params?: unknown };
 

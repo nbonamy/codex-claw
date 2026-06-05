@@ -1,6 +1,6 @@
 # Codex Claw Plan
 
-Status: MVP 2 implemented, 2026-06-05.
+Status: no-team agent communication implemented, 2026-06-05.
 
 ## Tech Stack
 
@@ -58,12 +58,20 @@ Verification: persistence tests and deploy-from-bench UI smoke.
 
 Commit checkpoint: `feat: add agent bench`
 
-### 4. No Team, Agent Communication
+### 4. No Team, Agent Communication - Complete
 
 Expose app-owned communication tools to Codex agents: list agents, send message,
 check messages, and broadcast. Start global first; team scoping comes later.
 
-Verification: fake app-server tool-call tests and two-agent communication smoke.
+Implementation: main starts a local Streamable HTTP MCP server using the
+official TypeScript MCP SDK, injects it into each Codex app-server thread with
+`thread/start.config.mcp_servers.codex_claw.url`, and adds the Skwad-shaped
+core collaboration tools: `register-agent`, `list-agents`, `set-status`,
+`send-message`, `check-messages`, and `broadcast-message`.
+
+Verification: MCP coordinator contract tests, Streamable HTTP MCP round-trip
+tests, thread-start config tests, reducer/component tests, coverage, lint, and
+build pass.
 
 Commit checkpoint: `feat: add agent messaging tools`
 
@@ -122,3 +130,9 @@ Commit checkpoint: `feat: add swe workspace tools`
   routing keyed by agent/thread IDs. Background turns become much easier when
   prompt submission queues immediately and later app-server events update the
   owning agent.
+- For Claw, Codex MCP enablement should be request-local, not global. Passing
+  `config.mcp_servers.codex_claw.url` on `thread/start` gives each Codex thread
+  the app-owned collaboration server without mutating the user's Codex config.
+- MCP tools should only advertise real Claw capabilities. Copy Skwad's tool
+  shape for implemented collaboration tools, but leave repo/worktree/panel
+  tools out until Claw owns those product surfaces.

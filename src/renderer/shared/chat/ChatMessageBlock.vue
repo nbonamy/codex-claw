@@ -47,6 +47,7 @@ import ChatToolGroup from './ChatToolGroup.vue'
 import ChatToolCall from './ChatToolCall.vue'
 import { renderMarkdown, renderUserText } from './message-markdown'
 import type { MessageBlock } from './message-blocks'
+import type { ClientRequestResponse } from '../../../shared/contracts'
 
 defineProps<{
   block: MessageBlock
@@ -56,7 +57,7 @@ defineProps<{
 
 const emit = defineEmits<{
   cancel: []
-  'client-response': [response: { id: string; payload: unknown }]
+  'client-response': [response: ClientRequestResponse]
   'send-follow-up': [prompt: string]
 }>()
 </script>

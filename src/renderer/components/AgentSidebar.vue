@@ -21,7 +21,7 @@
         <span class="agent-sidebar__avatar">{{ agent.avatar ?? agent.name.slice(0, 2).toUpperCase() }}</span>
         <span class="agent-sidebar__meta">
           <strong>{{ agent.name }}</strong>
-          <span>{{ agent.folder }}</span>
+          <span>{{ agent.statusText || agent.folder }}</span>
         </span>
         <span
           class="agent-sidebar__status"
