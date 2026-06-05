@@ -1,6 +1,4 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import os from 'node:os';
-import path from 'node:path';
 import type { JsonRpcClientMessage, JsonRpcServerMessage } from './protocol';
 import type { CodexTransport } from './rpc-client';
 
@@ -25,13 +23,13 @@ export class CodexProcessTransport implements CodexTransport {
     }
 
     const command = this.options.command ?? 'codex';
-    const codexHome = this.options.codexHome ?? path.join(os.homedir(), '.codex-claw', 'codex-home');
+    const codexHome = this.options.codexHome;
 
     this.child = spawn(command, ['app-server', '--listen', 'stdio://'], {
       env: {
         ...process.env,
         ...this.options.env,
-        CODEX_HOME: codexHome,
+        ...(codexHome ? { CODEX_HOME: codexHome } : {}),
       },
       stdio: 'pipe',
     });

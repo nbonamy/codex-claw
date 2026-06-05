@@ -58,9 +58,10 @@ Connection flow:
 7. Stream notifications and server requests into the session manager.
 8. Cleanly interrupt, stop, or shut down when the app exits.
 
-Prefer a custom `CODEX_HOME` for Codex Claw so normal Codex CLI/app data is not
-disturbed. Whether this is mandatory from day one or only for packaged builds is
-still a product decision.
+For the first chat milestone, Codex Claw inherits the user's normal Codex
+environment by default so existing authentication works. Set
+`CODEX_CLAW_CODEX_HOME` to point the spawned app-server at an isolated Codex
+home when testing or when we later build a dedicated auth/onboarding flow.
 
 ## Thread And Agent Mapping
 

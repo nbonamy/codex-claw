@@ -69,7 +69,7 @@ export class AppController {
     }
 
     const transport = new CodexProcessTransport({
-      codexHome: path.join(app.getPath('userData'), 'codex-home'),
+      codexHome: process.env.CODEX_CLAW_CODEX_HOME,
     });
     this.codexSessionManager = new CodexAgentSessionManager(new CodexRpcClient(transport));
     this.codexSessionManager.onEvent((event) => {
