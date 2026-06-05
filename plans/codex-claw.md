@@ -13,7 +13,7 @@ Status: reviewed initial plan, 2026-06-05.
 
 ## Product Progression
 
-### 0. Foundation
+### 0. Foundation - Complete
 
 Scaffold the desktop app with Electron Forge, TypeScript, Vue 3, Element Plus,
 and Vitest. Hard-copy the first useful id8 renderer pieces, define app-owned
@@ -21,7 +21,9 @@ theme tokens, app state, IPC, `RendererMessage`, and `AgentBackendDriver`.
 Use the Skwad screenshots and `docs/codex.png` as the visual references for the
 first shell.
 
-Verification: app boots locally, foundational unit tests pass.
+Verification: `npm test`, `npm run test:coverage`, `npm run lint`, and
+`npm run build` pass. Coverage is above the 85% threshold for statements,
+branches, functions, and lines.
 
 Commit checkpoint: `feat: scaffold codex claw desktop`
 
@@ -108,4 +110,9 @@ Commit checkpoint: `feat: add swe workspace tools`
 
 ## Key Learnings
 
-- Pending.
+- Phase 0 works best as a single-package Electron app. We can split packages
+  later if the code asks for it, but the initial product surface benefits from
+  fewer moving parts.
+- Keep coverage thresholds enabled from the first scaffold. It immediately
+  pushed tests toward state loading, status branches, and component fallbacks
+  instead of only checking the happy path.
