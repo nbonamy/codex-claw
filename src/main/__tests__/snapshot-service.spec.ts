@@ -75,6 +75,6 @@ describe('snapshot service', () => {
     expect(createAgentFromInput({
       name: ' ',
       folder: '/tmp/project',
-    }, '2026-06-05T10:11:12.000Z').id).toBe('agent-codex-20260605t101112000z');
+    }, '2026-06-05T10:11:12.000Z').id).toBe('agent-project-20260605t101112000z');
   });
 });

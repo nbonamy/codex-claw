@@ -6,6 +6,8 @@ describe('ipc channels', () => {
     expect(ipcChannels).toStrictEqual({
       getSnapshot: 'app:get-snapshot',
       createAgent: 'agent:create',
+      chooseAgentFolder: 'agent:choose-folder',
+      updateAgent: 'agent:update',
       selectAgent: 'agent:select',
       selectAgentFolder: 'agent:select-folder',
       listCodexModels: 'codex:models:list',

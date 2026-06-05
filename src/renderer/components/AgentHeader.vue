@@ -17,7 +17,12 @@
       v-if="agent"
       class="agent-header__identity"
     >
-      <span class="agent-header__avatar">{{ agent.avatar ?? agent.name.slice(0, 2).toUpperCase() }}</span>
+      <AgentAvatar
+        class="agent-header__avatar"
+        :avatar="agent.avatar"
+        :name="agent.name"
+        :size="sidebarCollapsed ? 'xs' : 'md'"
+      />
       <div class="agent-header__agent-line">
         <strong>{{ agent.name }}</strong>
         <span
@@ -69,6 +74,7 @@
 import { computed } from 'vue';
 import type { Agent, AppSnapshot } from '../../shared/contracts';
 import { PanelLeftOpenIcon } from '../shared/icons/app-icons';
+import AgentAvatar from './AgentAvatar.vue';
 
 const props = defineProps<{
   agent: Agent | null;
@@ -174,23 +180,13 @@ const gitStatusLabel = computed(() => 'Git status pending');
 }
 
 .agent-header__avatar {
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: var(--agent-header-avatar-size);
-  height: var(--agent-header-avatar-size);
-  border-radius: var(--radius-full);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-  font-size: var(--font-size-15);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-16);
+  --agent-avatar-size: var(--agent-header-avatar-size);
+  --agent-avatar-font-size: var(--font-size-15);
 }
 
 .agent-header--sidebar-collapsed .agent-header__avatar {
-  width: var(--space-8);
-  height: var(--space-8);
-  font-size: var(--font-size-8);
+  --agent-avatar-size: var(--space-8);
+  --agent-avatar-font-size: var(--font-size-8);
 }
 
 .agent-header__agent-line {

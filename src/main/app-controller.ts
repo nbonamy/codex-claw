@@ -1,9 +1,11 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { sendAgentPrompt } from './agent-chat-service';
 import { CodexAgentSessionManager } from './codex/agent-session';
 import { CodexProcessTransport } from './codex/process-transport';
 import { CodexRpcClient } from './codex/rpc-client';
+import { warnMain } from './log';
 import { createMainWindow } from './main-window';
 import { ClawMcpAgentCoordinator } from './mcp/agent-coordinator';
 import { CHECK_INBOX_PROMPT } from './mcp/agent-prompts';
@@ -11,17 +13,20 @@ import { buildCodexClawMcpConfigOverrides } from './mcp/codex-config';
 import { ClawMcpHttpServer } from './mcp/http-server';
 import {
   applyMainEventToSnapshot,
-  createAgentFromInput,
+  createAgentInSnapshot,
   createInitialSnapshot,
   selectAgent,
+  updateAgentFromInput,
   updateAgentFolder,
 } from './snapshot-service';
-import type { AppSnapshot, ClientRequestResponse, CreateAgentInput, MainToRendererEvent, SendPromptOptions } from '../shared/contracts';
+import { AppStatePersistence } from './state-persistence';
+import type { AppSnapshot, ClientRequestResponse, CreateAgentInput, MainToRendererEvent, SendPromptOptions, UpdateAgentInput } from '../shared/contracts';
 import { ipcChannels } from '../shared/ipc';
 
 export class AppController {
   private mainWindow: BrowserWindow | null = null;
-  private readonly snapshot = createInitialSnapshot();
+  private snapshot = createInitialSnapshot();
+  private readonly persistence: AppStatePersistence;
   private readonly notifiedInboxMessageIds = new Map<string, string>();
   private readonly mcpCoordinator = new ClawMcpAgentCoordinator({
     getAgents: () => this.snapshot.agents,
@@ -42,6 +47,14 @@ export class AppController {
   private codexSessionManager: CodexAgentSessionManager | null = null;
   private seq = 0;
 
+  constructor(persistence = new AppStatePersistence(path.join(app.getPath('userData'), 'state.json'))) {
+    this.persistence = persistence;
+  }
+
+  async initialize(): Promise<void> {
+    this.snapshot = await this.persistence.load();
+  }
+
   registerIpcHandlers(): void {
     ipcMain.handle(ipcChannels.getSnapshot, () => this.snapshot);
 
@@ -49,15 +62,31 @@ export class AppController {
       return (await this.getCodexSessionManager()).listModels();
     });
 
-    ipcMain.handle(ipcChannels.createAgent, (_event, input: CreateAgentInput) => {
-      const agent = createAgentFromInput(input);
-      this.snapshot.agents.push(agent);
-      this.snapshot.activeAgentId = agent.id;
-      return agent;
+    ipcMain.handle(ipcChannels.chooseAgentFolder, async () => {
+      return this.chooseAgentFolder();
     });
 
-    ipcMain.handle(ipcChannels.selectAgent, (_event, agentId: string) => {
-      return selectAgent(this.snapshot, agentId);
+    ipcMain.handle(ipcChannels.createAgent, async (_event, input: CreateAgentInput) => {
+      await this.validateAgentInput(input);
+      createAgentInSnapshot(this.snapshot, input);
+      await this.persistSnapshot();
+      return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.updateAgent, async (_event, input: UpdateAgentInput) => {
+      await this.validateAgentInput(input);
+      const agent = updateAgentFromInput(this.snapshot, input);
+      if (!agent) {
+        throw new Error(`Agent not found: ${input.id}`);
+      }
+      await this.persistSnapshot();
+      return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.selectAgent, async (_event, agentId: string) => {
+      const snapshot = selectAgent(this.snapshot, agentId);
+      await this.persistSnapshot();
+      return snapshot;
     });
 
     ipcMain.handle(ipcChannels.selectAgentFolder, async (_event, agentId: string) => {
@@ -71,6 +100,7 @@ export class AppController {
       }
 
       updateAgentFolder(this.snapshot, agentId, result.filePaths[0]);
+      await this.persistSnapshot();
       return this.snapshot;
     });
 
@@ -101,6 +131,31 @@ export class AppController {
     return sendAgentPrompt(this.snapshot, await this.getCodexSessionManager(), agentId, prompt, options, (event) => {
       this.emitAndApply(event);
     });
+  }
+
+  private async chooseAgentFolder(): Promise<string | null> {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory'],
+      title: 'Select agent folder',
+    });
+
+    return result.canceled ? null : result.filePaths[0] ?? null;
+  }
+
+  private async validateAgentInput(input: Pick<CreateAgentInput, 'name' | 'folder'>): Promise<void> {
+    if (!input.name.trim()) {
+      throw new Error('Agent name is required.');
+    }
+
+    const folder = input.folder.trim();
+    if (!folder) {
+      throw new Error('Agent folder is required.');
+    }
+
+    const folderStat = await stat(folder);
+    if (!folderStat.isDirectory()) {
+      throw new Error('Agent folder must be a directory.');
+    }
   }
 
   private async getCodexSessionManager(): Promise<CodexAgentSessionManager> {
@@ -152,6 +207,13 @@ export class AppController {
 
     applyMainEventToSnapshot(this.snapshot, fullEvent);
     this.mainWindow?.webContents.send(ipcChannels.event, fullEvent);
+    if (fullEvent.type === 'thread.started') {
+      void this.persistSnapshot().catch((error: unknown) => {
+        warnMain('state', 'failed to persist thread mapping', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+    }
 
     if (fullEvent.type === 'turn.completed' && fullEvent.agentId) {
       this.promptLatestUnreadMessage(fullEvent.agentId);
@@ -178,13 +240,18 @@ export class AppController {
     this.notifiedInboxMessageIds.set(agentId, messageId);
     void this.sendPrompt(agentId, CHECK_INBOX_PROMPT);
   }
+
+  private async persistSnapshot(): Promise<void> {
+    await this.persistence.save(this.snapshot);
+  }
 }
 
 export function startMainApp(): void {
   const controller = new AppController();
   controller.registerIpcHandlers();
 
-  void app.whenReady().then(() => {
+  void app.whenReady().then(async () => {
+    await controller.initialize();
     controller.createWindow();
   });
 

@@ -17,6 +17,8 @@
         :min-width="agentSidebarMinWidth"
         :max-width="agentSidebarMaxWidth"
         @collapse-sidebar="agentSidebarCollapsed = true"
+        @edit-agent="openEditAgent"
+        @new-agent="openNewAgent"
         @resize-sidebar="setAgentSidebarWidth"
         @select-agent="$emit('select-agent', $event)"
       />
@@ -46,18 +48,28 @@
         />
       </div>
     </section>
+    <AgentDialog
+      :visible="agentDialogVisible"
+      :mode="agentDialogMode"
+      :agent="editingAgent"
+      :choose-agent-folder="chooseAgentFolder"
+      :create-agent="createAgent"
+      :update-agent="updateAgent"
+      @close="closeAgentDialog"
+    />
   </main>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Agent, AppSnapshot, ClientRequestResponse, CodexModelOption, ReasoningEffort, RendererMessage, Team } from '../../shared/contracts';
+import type { Agent, AppSnapshot, ClientRequestResponse, CodexModelOption, CreateAgentInput, ReasoningEffort, RendererMessage, Team, UpdateAgentInput } from '../../shared/contracts';
+import AgentDialog from './AgentDialog.vue';
 import AgentHeader from './AgentHeader.vue';
 import AgentSidebar from './AgentSidebar.vue';
 import ConversationPane from './ConversationPane.vue';
 import TeamRail from './TeamRail.vue';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   snapshot: AppSnapshot;
   activeAgent: Agent | null;
   messages: RendererMessage[];
@@ -68,7 +80,19 @@ const props = defineProps<{
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
-}>();
+  chooseAgentFolder?: () => Promise<string | null>;
+  createAgent?: (input: CreateAgentInput) => Promise<void>;
+  updateAgent?: (input: UpdateAgentInput) => Promise<void>;
+}>(), {
+  answeredClientRequestIds: () => new Set<string>(),
+  codexModels: () => [],
+  modelCatalogStatus: 'notLoaded',
+  selectedModelId: null,
+  selectedReasoningEffort: null,
+  chooseAgentFolder: async () => null,
+  createAgent: async () => undefined,
+  updateAgent: async () => undefined,
+});
 
 defineEmits<{
   'client-response': [response: ClientRequestResponse];
@@ -82,9 +106,31 @@ const agentSidebarCollapsed = ref(false);
 const agentSidebarMinWidth = 72;
 const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
+const agentDialogVisible = ref(false);
+const agentDialogMode = ref<'create' | 'edit'>('create');
+const editingAgentId = ref<string | null>(null);
+const editingAgent = computed(() => (
+  editingAgentId.value ? props.snapshot.agents.find((agent) => agent.id === editingAgentId.value) ?? null : null
+));
 
 function setAgentSidebarWidth(width: number): void {
   agentSidebarWidth.value = Math.min(Math.max(width, agentSidebarMinWidth), agentSidebarMaxWidth);
+}
+
+function openNewAgent(): void {
+  agentDialogMode.value = 'create';
+  editingAgentId.value = null;
+  agentDialogVisible.value = true;
+}
+
+function openEditAgent(agentId: string): void {
+  agentDialogMode.value = 'edit';
+  editingAgentId.value = agentId;
+  agentDialogVisible.value = true;
+}
+
+function closeAgentDialog(): void {
+  agentDialogVisible.value = false;
 }
 
 const activeTeam = computed<Team | null>(() => {

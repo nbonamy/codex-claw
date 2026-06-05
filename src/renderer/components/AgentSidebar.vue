@@ -25,8 +25,14 @@
         type="button"
         :aria-pressed="agent.id === activeAgentId"
         @click="emit('select-agent', agent.id)"
+        @contextmenu.prevent="openAgentMenu(agent.id, $event)"
       >
-        <span class="agent-sidebar__avatar">{{ agent.avatar ?? agent.name.slice(0, 2).toUpperCase() }}</span>
+        <AgentAvatar
+          class="agent-sidebar__avatar"
+          :avatar="agent.avatar"
+          :name="agent.name"
+          size="md"
+        />
         <span class="agent-sidebar__meta">
           <strong>{{ agent.name }}</strong>
           <span>{{ agent.statusText || agent.folder }}</span>
@@ -39,11 +45,30 @@
       </button>
     </nav>
 
+    <div
+      v-if="contextMenuAgentId"
+      class="agent-sidebar__context-menu"
+      :style="contextMenuStyle"
+      role="menu"
+      aria-label="Agent actions"
+    >
+      <button
+        class="agent-sidebar__context-action"
+        type="button"
+        role="menuitem"
+        @click="editContextAgent"
+      >
+        <PencilIcon class="agent-sidebar__context-icon" />
+        <span>Edit Agent</span>
+      </button>
+    </div>
+
     <footer class="agent-sidebar__footer">
       <el-button
         type="primary"
         class="agent-sidebar__new"
         aria-label="New Agent"
+        @click="emit('new-agent')"
       >
         <PlusIcon class="agent-sidebar__new-icon" />
         <span class="agent-sidebar__new-label">New Agent</span>
@@ -70,9 +95,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import type { Agent, AgentStatus } from '../../shared/contracts';
-import { PanelLeftCloseIcon, PlusIcon } from '../shared/icons/app-icons';
+import { PanelLeftCloseIcon, PencilIcon, PlusIcon } from '../shared/icons/app-icons';
+import AgentAvatar from './AgentAvatar.vue';
 
 const props = defineProps<{
   agents: Agent[];
@@ -85,6 +111,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'collapse-sidebar': [];
+  'edit-agent': [agentId: string];
+  'new-agent': [];
   'resize-sidebar': [width: number];
   'select-agent': [agentId: string];
 }>();
@@ -94,10 +122,16 @@ const maxWidth = computed(() => props.maxWidth ?? 420);
 const resizeStep = 16;
 const currentWidth = computed(() => clampWidth(props.width ?? 260));
 const teamTitle = computed(() => props.teamName.toUpperCase());
+const contextMenuAgentId = ref<string | null>(null);
+const contextMenuPosition = ref({ x: 0, y: 0 });
 const sidebarStyle = computed<Record<string, string>>(() => ({
   '--agent-sidebar-width': `${currentWidth.value}px`,
   '--agent-sidebar-min-width': `${minWidth.value}px`,
   '--agent-sidebar-max-width': `${maxWidth.value}px`,
+}));
+const contextMenuStyle = computed<Record<string, string>>(() => ({
+  left: `${contextMenuPosition.value.x}px`,
+  top: `${contextMenuPosition.value.y}px`,
 }));
 
 let resizeStart: { pointerId: number; clientX: number; width: number } | null = null;
@@ -123,6 +157,23 @@ function clampWidth(width: number): number {
 
 function emitResizedWidth(width: number): void {
   emit('resize-sidebar', clampWidth(width));
+}
+
+function openAgentMenu(agentId: string, event: MouseEvent): void {
+  contextMenuAgentId.value = agentId;
+  contextMenuPosition.value = {
+    x: event.clientX,
+    y: event.clientY,
+  };
+}
+
+function editContextAgent(): void {
+  if (!contextMenuAgentId.value) {
+    return;
+  }
+
+  emit('edit-agent', contextMenuAgentId.value);
+  contextMenuAgentId.value = null;
 }
 
 function resizeHandle(event: PointerEvent): HTMLElement | null {
@@ -242,7 +293,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   grid-template-columns: var(--agent-sidebar-avatar-size) minmax(0, 1fr) var(--agent-sidebar-status-column-width);
   align-items: center;
   gap: var(--space-6);
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-1);
   padding: var(--space-6);
   border: 1px solid transparent;
   border-radius: var(--radius-lg);
@@ -253,21 +304,13 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__agent--active {
-  background: var(--color-surface-high);
-  border-color: var(--color-outline-variant);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  border-color: var(--color-primary);
 }
 
 .agent-sidebar__avatar {
-  display: grid;
-  place-items: center;
-  width: var(--agent-sidebar-avatar-size);
-  height: var(--agent-sidebar-avatar-size);
-  border-radius: var(--radius-full);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-  font-size: var(--font-size-13);
-  font-weight: var(--font-weight-semibold);
-  line-height: 0;
+  --agent-avatar-size: var(--agent-sidebar-avatar-size);
+  --agent-avatar-font-size: var(--font-size-13);
 }
 
 .agent-sidebar__meta {
@@ -317,6 +360,42 @@ function onResizePointerEnd(event: PointerEvent): void {
   display: grid;
   gap: var(--space-4);
   padding: var(--space-6);
+}
+
+.agent-sidebar__context-menu {
+  position: fixed;
+  z-index: 20;
+  min-width: 136px;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-lowest);
+  box-shadow: var(--shadow-menu);
+}
+
+.agent-sidebar__context-action {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agent-sidebar__context-action:hover,
+.agent-sidebar__context-action:focus-visible {
+  background: var(--color-surface-low);
+}
+
+.agent-sidebar__context-icon {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
 }
 
 .agent-sidebar__new {

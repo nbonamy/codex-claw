@@ -3,10 +3,10 @@ import ElementPlus from 'element-plus';
 import { nextTick } from 'vue';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createInitialSnapshot } from '../../../shared/snapshot';
-import type { Agent } from '../../../shared/contracts';
+import type { Agent, CreateAgentInput, UpdateAgentInput } from '../../../shared/contracts';
 
 function pointerEvent(type: string, clientX: number): PointerEvent {
   const event = new MouseEvent(type, {
@@ -184,4 +184,90 @@ describe('AppShell', () => {
     expect(wrapper.text()).toContain('No agent');
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('true');
   });
+
+  it('opens the new agent dialog from the sidebar and forwards create requests', async () => {
+    const snapshot = createInitialSnapshot();
+    const chooseAgentFolder = vi.fn().mockResolvedValue('/Users/nbonamy/src/new-agent');
+    const createAgent = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({
+      snapshot,
+      chooseAgentFolder,
+      createAgent,
+    });
+
+    await wrapper.get('.agent-sidebar__new').trigger('click');
+
+    expect(wrapper.text()).toContain('New Agent');
+    await wrapper.get('.agent-dialog__row--button').trigger('click');
+    await wrapper.get('.agent-dialog__text-input').setValue('Jules');
+    await wrapper.findAll('button').find((button) => button.text() === 'Add Agent')?.trigger('click');
+
+    expect(createAgent).toHaveBeenCalledWith({
+      name: 'Jules',
+      avatar: undefined,
+      folder: '/Users/nbonamy/src/new-agent',
+    });
+  });
+
+  it('opens the edit agent dialog from the sidebar context menu and forwards updates', async () => {
+    const snapshot = createInitialSnapshot();
+    const updateAgent = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({
+      snapshot,
+      updateAgent,
+    });
+
+    await wrapper.findAll('.agent-sidebar__agent')[0].trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80,
+    });
+    await wrapper.get('.agent-sidebar__context-action').trigger('click');
+
+    expect(wrapper.text()).toContain('Edit Agent');
+    await wrapper.get('.agent-dialog__text-input').setValue('Dina Prime');
+    await wrapper.findAll('button').find((button) => button.text() === 'Save')?.trigger('click');
+
+    expect(updateAgent).toHaveBeenCalledWith({
+      id: 'agent-dina',
+      name: 'Dina Prime',
+      avatar: 'DI',
+      folder: '~/src/codex-claw',
+    });
+  });
 });
+
+function mountShell(overrides: Partial<{
+  snapshot: ReturnType<typeof createInitialSnapshot>;
+  chooseAgentFolder: () => Promise<string | null>;
+  createAgent: (input: CreateAgentInput) => Promise<void>;
+  updateAgent: (input: UpdateAgentInput) => Promise<void>;
+}> = {}) {
+  const snapshot = overrides.snapshot ?? createInitialSnapshot();
+  return mount(AppShell, {
+    props: {
+      snapshot,
+      activeAgent: snapshot.agents.find((agent) => agent.id === snapshot.activeAgentId) ?? null,
+      messages: [],
+      isLoading: false,
+      isSending: false,
+      chooseAgentFolder: overrides.chooseAgentFolder ?? vi.fn().mockResolvedValue(null),
+      createAgent: overrides.createAgent ?? vi.fn().mockResolvedValue(undefined),
+      updateAgent: overrides.updateAgent ?? vi.fn().mockResolvedValue(undefined),
+    },
+    global: {
+      plugins: [ElementPlus],
+      stubs: {
+        ElDialog: {
+          props: ['modelValue'],
+          template: `
+            <section v-if="modelValue" class="agent-dialog-test-shell">
+              <slot name="header" />
+              <slot />
+              <slot name="footer" />
+            </section>
+          `,
+        },
+      },
+    },
+  });
+}

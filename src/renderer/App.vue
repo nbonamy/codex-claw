@@ -10,6 +10,9 @@
     :model-catalog-status="modelCatalogStatus"
     :selected-model-id="selectedModelId"
     :selected-reasoning-effort="selectedReasoningEffort"
+    :choose-agent-folder="chooseAgentFolder"
+    :create-agent="createAgent"
+    :update-agent="updateAgent"
     @select-agent="selectAgent"
     @select-model="selectModel"
     @select-reasoning-effort="selectReasoningEffort"
@@ -36,6 +39,9 @@ const {
   selectedReasoningEffort,
   loadCodexModels,
   loadSnapshot,
+  chooseAgentFolder,
+  createAgent,
+  updateAgent,
   respondToClientRequest,
   selectModel,
   selectReasoningEffort,

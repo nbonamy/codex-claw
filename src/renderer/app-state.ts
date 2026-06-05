@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { AppSnapshot, ClientRequestResponse, CodexModelOption, MainToRendererEvent, ReasoningEffort, SendPromptOptions } from '../shared/contracts';
+import type { AppSnapshot, ClientRequestResponse, CodexModelOption, CreateAgentInput, MainToRendererEvent, ReasoningEffort, SendPromptOptions, UpdateAgentInput } from '../shared/contracts';
 import { applyMainEventToSnapshot, createInitialSnapshot } from '../shared/snapshot';
 
 const snapshot = ref<AppSnapshot>(createInitialSnapshot());
@@ -100,6 +100,26 @@ export function useAppState() {
     }
   }
 
+  async function chooseAgentFolder(): Promise<string | null> {
+    return await window.codexClaw?.chooseAgentFolder?.() ?? null;
+  }
+
+  async function createAgent(input: CreateAgentInput): Promise<void> {
+    if (!window.codexClaw?.createAgent) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.createAgent(input);
+  }
+
+  async function updateAgent(input: UpdateAgentInput): Promise<void> {
+    if (!window.codexClaw?.updateAgent) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.updateAgent(input);
+  }
+
   async function respondToClientRequest(response: ClientRequestResponse): Promise<void> {
     markClientRequestAnswered(response.id);
 
@@ -143,6 +163,9 @@ export function useAppState() {
     selectedReasoningEffort,
     loadCodexModels,
     loadSnapshot,
+    chooseAgentFolder,
+    createAgent,
+    updateAgent,
     respondToClientRequest,
     selectModel,
     selectReasoningEffort,

@@ -7,6 +7,7 @@ import type {
   MainToRendererEvent,
   RendererMessage,
   RendererMessagePart,
+  UpdateAgentInput,
 } from './contracts';
 
 const seedCreatedAt = '2026-06-05T00:00:00.000Z';
@@ -40,17 +41,50 @@ export function createInitialSnapshot(): AppSnapshot {
   };
 }
 
-export function createAgentFromInput(input: CreateAgentInput, createdAt = new Date().toISOString()): Agent {
+export function createAgentFromInput(input: CreateAgentInput, createdAt = new Date().toISOString(), teamId = seedTeamId): Agent {
+  const name = normalizedAgentName(input.name, input.folder);
+
   return {
-    id: `agent-${slug(input.name)}-${createdAt.replace(/\W/g, '').toLowerCase()}`,
-    teamId: seedTeamId,
-    name: input.name.trim(),
-    avatar: input.avatar,
-    folder: input.folder,
+    id: `agent-${slug(name)}-${createdAt.replace(/\W/g, '').toLowerCase()}`,
+    teamId,
+    name,
+    avatar: normalizedOptionalString(input.avatar),
+    folder: normalizedFolder(input.folder),
     status: { type: 'idle' },
     createdAt,
     updatedAt: createdAt,
   };
+}
+
+export function createAgentInSnapshot(snapshot: AppSnapshot, input: CreateAgentInput, createdAt = new Date().toISOString()): AppSnapshot {
+  const agent = createAgentFromInput(input, createdAt, activeTeamId(snapshot));
+  snapshot.agents.push(agent);
+  attachAgentToTeam(snapshot, agent);
+  snapshot.activeAgentId = agent.id;
+  return snapshot;
+}
+
+export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentInput, updatedAt = new Date().toISOString()): Agent | null {
+  const agent = findAgent(snapshot, input.id);
+  if (!agent) {
+    return null;
+  }
+
+  if (agent.status.type !== 'idle') {
+    throw new Error('Agent must be idle before editing.');
+  }
+
+  const nextFolder = normalizedFolder(input.folder);
+  const folderChanged = nextFolder !== agent.folder;
+  agent.name = normalizedAgentName(input.name, nextFolder);
+  agent.avatar = normalizedOptionalString(input.avatar);
+  agent.folder = nextFolder;
+  if (folderChanged) {
+    clearAgentRuntimeState(agent);
+  }
+  agent.updatedAt = updatedAt;
+
+  return agent;
 }
 
 export function appendUserPrompt(snapshot: AppSnapshot, agentId: string, prompt: string, createdAt = new Date().toISOString()): RendererMessage {
@@ -89,16 +123,21 @@ export function updateAgentFolder(snapshot: AppSnapshot, agentId: string, folder
     return null;
   }
 
-  agent.folder = folder;
-  delete agent.codexThreadId;
+  agent.folder = normalizedFolder(folder);
+  clearAgentRuntimeState(agent);
   agent.updatedAt = updatedAt;
 
   return agent;
 }
 
 export function selectAgent(snapshot: AppSnapshot, agentId: string): AppSnapshot {
-  if (findAgent(snapshot, agentId)) {
+  const agent = findAgent(snapshot, agentId);
+  if (agent) {
     snapshot.activeAgentId = agentId;
+    const team = snapshot.teams.find((candidate) => candidate.id === agent.teamId);
+    if (team) {
+      team.activeAgentId = agentId;
+    }
   }
 
   return snapshot;
@@ -751,6 +790,57 @@ function setAgentStatus(snapshot: AppSnapshot, agentId: string, status: AgentSta
 
 function findAgent(snapshot: AppSnapshot, agentId: string): Agent | undefined {
   return snapshot.agents.find((agent) => agent.id === agentId);
+}
+
+function activeTeamId(snapshot: AppSnapshot): string {
+  const activeAgent = snapshot.activeAgentId ? findAgent(snapshot, snapshot.activeAgentId) : undefined;
+  if (activeAgent?.teamId) {
+    return activeAgent.teamId;
+  }
+
+  const activeTeam = snapshot.teams.find((team) => activeAgent && team.agentIds.includes(activeAgent.id));
+  return activeTeam?.id ?? snapshot.teams[0]?.id ?? seedTeamId;
+}
+
+function attachAgentToTeam(snapshot: AppSnapshot, agent: Agent): void {
+  let team = snapshot.teams.find((candidate) => candidate.id === agent.teamId);
+  if (!team) {
+    team = snapshot.teams[0];
+  }
+
+  if (!team) {
+    return;
+  }
+
+  agent.teamId = team.id;
+  if (!team.agentIds.includes(agent.id)) {
+    team.agentIds.push(agent.id);
+  }
+  team.activeAgentId = agent.id;
+}
+
+function clearAgentRuntimeState(agent: Agent): void {
+  delete agent.codexThreadId;
+  delete agent.isRegistered;
+  delete agent.mcpSessionId;
+  delete agent.statusText;
+}
+
+function normalizedAgentName(name: string, folder: string): string {
+  return name.trim() || folderBasename(folder) || 'Codex';
+}
+
+function normalizedFolder(folder: string): string {
+  return folder.trim();
+}
+
+function normalizedOptionalString(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized || undefined;
+}
+
+function folderBasename(folder: string): string {
+  return normalizedFolder(folder).split(/[\\/]/).filter(Boolean).at(-1) ?? '';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   appendUserPrompt,
   applyMainEventToSnapshot,
+  createAgentInSnapshot,
   createInitialSnapshot,
   selectAgent,
+  updateAgentFromInput,
   updateAgentFolder,
 } from '../snapshot';
 
@@ -11,6 +13,9 @@ describe('snapshot reducer', () => {
   it('updates the agent folder and clears the old thread mapping', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].codexThreadId = 'thread-old';
+    snapshot.agents[0].isRegistered = true;
+    snapshot.agents[0].mcpSessionId = 'mcp-session';
+    snapshot.agents[0].statusText = 'Registered';
 
     expect(updateAgentFolder(snapshot, 'agent-dina', '/Users/nbonamy/src/id8', '2026-06-05T00:00:01.000Z')).toStrictEqual({
       id: 'agent-dina',
@@ -22,6 +27,124 @@ describe('snapshot reducer', () => {
       createdAt: '2026-06-05T00:00:00.000Z',
       updatedAt: '2026-06-05T00:00:01.000Z',
     });
+  });
+
+  it('creates agents in the active team and selects the new agent', () => {
+    const snapshot = createInitialSnapshot();
+
+    createAgentInSnapshot(snapshot, {
+      name: ' Jules ',
+      avatar: '🤖',
+      folder: '/Users/nbonamy/src/id8',
+    }, '2026-06-05T10:11:12.000Z');
+
+    expect(snapshot.activeAgentId).toBe('agent-jules-20260605t101112000z');
+    expect(snapshot.teams[0].agentIds).toContain('agent-jules-20260605t101112000z');
+    expect(snapshot.teams[0].activeAgentId).toBe('agent-jules-20260605t101112000z');
+    expect(snapshot.agents.at(-1)).toStrictEqual({
+      id: 'agent-jules-20260605t101112000z',
+      teamId: 'team-codex-claw',
+      name: 'Jules',
+      avatar: '🤖',
+      folder: '/Users/nbonamy/src/id8',
+      status: { type: 'idle' },
+      createdAt: '2026-06-05T10:11:12.000Z',
+      updatedAt: '2026-06-05T10:11:12.000Z',
+    });
+  });
+
+  it('defaults a blank created agent name from the folder basename', () => {
+    const snapshot = createInitialSnapshot();
+
+    createAgentInSnapshot(snapshot, {
+      name: ' ',
+      folder: '/tmp/codex-claw',
+    }, '2026-06-05T10:11:12.000Z');
+
+    expect(snapshot.agents.at(-1)?.name).toBe('codex-claw');
+    expect(snapshot.agents.at(-1)?.id).toBe('agent-codex-claw-20260605t101112000z');
+  });
+
+  it('updates idle agents and clears Codex runtime state when the folder changes', () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0];
+    agent.codexThreadId = 'thread-old';
+    agent.isRegistered = true;
+    agent.mcpSessionId = 'mcp-session';
+    agent.statusText = 'Registered and idle';
+
+    expect(updateAgentFromInput(snapshot, {
+      id: 'agent-dina',
+      name: 'Dina Prime',
+      avatar: 'DP',
+      folder: '/Users/nbonamy/src/id8',
+    }, '2026-06-05T10:11:12.000Z')).toStrictEqual({
+      id: 'agent-dina',
+      teamId: 'team-codex-claw',
+      name: 'Dina Prime',
+      avatar: 'DP',
+      folder: '/Users/nbonamy/src/id8',
+      status: { type: 'idle' },
+      createdAt: '2026-06-05T00:00:00.000Z',
+      updatedAt: '2026-06-05T10:11:12.000Z',
+    });
+  });
+
+  it('updates idle agents without clearing the thread when the folder is unchanged', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].codexThreadId = 'thread-existing';
+
+    updateAgentFromInput(snapshot, {
+      id: 'agent-dina',
+      name: 'Dina Prime',
+      avatar: undefined,
+      folder: '~/src/codex-claw',
+    }, '2026-06-05T10:11:12.000Z');
+
+    expect(snapshot.agents[0].codexThreadId).toBe('thread-existing');
+    expect(snapshot.agents[0].avatar).toBeUndefined();
+  });
+
+  it('defaults blank edited names from the folder basename', () => {
+    const snapshot = createInitialSnapshot();
+
+    updateAgentFromInput(snapshot, {
+      id: 'agent-dina',
+      name: ' ',
+      folder: '~/src/codex-claw',
+    }, '2026-06-05T10:11:12.000Z');
+
+    expect(snapshot.agents[0].name).toBe('codex-claw');
+  });
+
+  it('returns null when updating a missing agent', () => {
+    const snapshot = createInitialSnapshot();
+
+    expect(updateAgentFromInput(snapshot, {
+      id: 'agent-missing',
+      name: 'Missing',
+      folder: '/tmp/missing',
+    })).toBeNull();
+  });
+
+  it('rejects edits for busy agents', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].status = { type: 'working', detail: 'Running tests' };
+
+    expect(() => updateAgentFromInput(snapshot, {
+      id: 'agent-dina',
+      name: 'Dina Prime',
+      folder: '~/src/codex-claw',
+    })).toThrow('Agent must be idle before editing.');
+  });
+
+  it('selects the active agent on its team when switching agents', () => {
+    const snapshot = createInitialSnapshot();
+
+    selectAgent(snapshot, 'agent-jesse');
+
+    expect(snapshot.activeAgentId).toBe('agent-jesse');
+    expect(snapshot.teams[0].activeAgentId).toBe('agent-jesse');
   });
 
   it('appends user prompts and reduces assistant deltas into one streaming message', () => {

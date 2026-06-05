@@ -147,6 +147,48 @@ describe('AgentSidebar', () => {
     expect(wrapper.find('.agent-sidebar__new-icon').exists()).toBe(true);
   });
 
+  it('emits new agent requests from the footer action', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    await wrapper.get('.agent-sidebar__new').trigger('click');
+
+    expect(wrapper.emitted('new-agent')).toStrictEqual([[]]);
+  });
+
+  it('opens a small context menu and emits edit agent requests', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    await wrapper.findAll('.agent-sidebar__agent')[0].trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80,
+    });
+
+    expect(wrapper.find('.agent-sidebar__context-menu').exists()).toBe(true);
+    expect(wrapper.get('.agent-sidebar__context-action').text()).toContain('Edit Agent');
+
+    await wrapper.get('.agent-sidebar__context-action').trigger('click');
+
+    expect(wrapper.emitted('edit-agent')).toStrictEqual([['agent-dina']]);
+  });
+
   it('emits collapse requests from the team header icon', async () => {
     const wrapper = mount(AgentSidebar, {
       props: {

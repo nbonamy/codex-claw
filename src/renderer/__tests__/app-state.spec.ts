@@ -22,6 +22,57 @@ describe('useAppState', () => {
     await state.sendPrompt('ignored');
 
     expect(state.visibleMessages.value).toStrictEqual([]);
+    expect(state.isSending.value).toBe(false);
+  });
+
+  it('keeps loading idle when snapshot loading is requested without preload', async () => {
+    vi.stubGlobal('window', {});
+    const state = useAppState();
+    state.isLoading.value = false;
+
+    await state.loadSnapshot();
+
+    expect(state.isLoading.value).toBe(false);
+  });
+
+  it('ignores missing agent selections and local-selects when main selection is unavailable', async () => {
+    vi.stubGlobal('window', {});
+    const state = useAppState();
+    state.snapshot.value = createInitialSnapshot();
+
+    await state.selectAgent('agent-missing');
+    expect(state.activeAgent.value?.id).toBe('agent-dina');
+
+    await state.selectAgent('agent-dina');
+    expect(state.activeAgent.value?.id).toBe('agent-dina');
+  });
+
+  it('tracks answered client requests even when preload is unavailable', async () => {
+    vi.stubGlobal('window', {});
+    const state = useAppState();
+
+    await state.respondToClientRequest({
+      id: 'request-local',
+      payload: {
+        decision: 'deny',
+      },
+    });
+
+    expect(state.answeredClientRequestIds.value.has('request-local')).toBe(true);
+  });
+
+  it('loads snapshots without subscribing when main events are unavailable', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    expect(state.snapshot.value).toStrictEqual(remoteSnapshot);
   });
 
   it('loads the snapshot from the preload bridge when available', async () => {
@@ -256,6 +307,70 @@ describe('useAppState', () => {
     expect(state.snapshot.value.agents[0].status).toStrictEqual({ type: 'working' });
   });
 
+  it('chooses folders and replaces the snapshot after creating and updating agents', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const createdSnapshot = createInitialSnapshot();
+    createdSnapshot.agents.push({
+      id: 'agent-jules',
+      teamId: 'team-codex-claw',
+      name: 'Jules',
+      avatar: '🤖',
+      folder: '/Users/nbonamy/src/jules',
+      status: { type: 'idle' },
+      createdAt: '2026-06-05T00:00:00.000Z',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    });
+    createdSnapshot.activeAgentId = 'agent-jules';
+    const updatedSnapshot = {
+      ...createdSnapshot,
+      agents: createdSnapshot.agents.map((agent) => agent.id === 'agent-jules' ? { ...agent, name: 'Jules Prime' } : agent),
+    };
+    const chooseAgentFolder = vi.fn().mockResolvedValue('/Users/nbonamy/src/jules');
+    const createAgent = vi.fn().mockResolvedValue(createdSnapshot);
+    const updateAgent = vi.fn().mockResolvedValue(updatedSnapshot);
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn(),
+        chooseAgentFolder,
+        createAgent,
+        updateAgent,
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    await expect(state.chooseAgentFolder()).resolves.toBe('/Users/nbonamy/src/jules');
+    await state.createAgent({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules' });
+    await state.updateAgent({ id: 'agent-jules', name: 'Jules Prime', avatar: '🤖', folder: '/Users/nbonamy/src/jules' });
+
+    expect(createAgent).toHaveBeenCalledWith({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules' });
+    expect(updateAgent).toHaveBeenCalledWith({ id: 'agent-jules', name: 'Jules Prime', avatar: '🤖', folder: '/Users/nbonamy/src/jules' });
+    expect(state.activeAgent.value?.name).toBe('Jules Prime');
+  });
+
+  it('returns safe defaults when optional agent preload helpers are unavailable', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    const before = state.snapshot.value;
+
+    await expect(state.chooseAgentFolder()).resolves.toBeNull();
+    await state.createAgent({ name: 'Ignored', folder: '/tmp/ignored' });
+    await state.updateAgent({ id: 'agent-dina', name: 'Ignored', folder: '/tmp/ignored' });
+
+    expect(state.snapshot.value).toBe(before);
+  });
+
   it('loads Codex models, selects the default reasoning effort, and sends it with prompts', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();
@@ -322,6 +437,72 @@ describe('useAppState', () => {
       model: 'gpt-5.1-codex-fast',
       reasoningEffort: 'low',
     });
+  });
+
+  it('handles model catalog loading guards, errors, and invalid selections', async () => {
+    const listCodexModels = vi.fn().mockRejectedValue(new Error('models unavailable'));
+    vi.stubGlobal('window', {
+      codexClaw: {
+        listCodexModels,
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    state.modelCatalogStatus.value = 'loading';
+    await state.loadCodexModels();
+
+    expect(listCodexModels).not.toHaveBeenCalled();
+
+    state.modelCatalogStatus.value = 'notLoaded';
+    state.modelCatalogError.value = null;
+    await state.loadCodexModels();
+
+    expect(state.modelCatalogStatus.value).toBe('error');
+    expect(state.modelCatalogError.value).toBe('models unavailable');
+
+    state.selectedModelId.value = null;
+    state.selectedReasoningEffort.value = null;
+    state.selectModel('missing-model');
+    state.selectReasoningEffort('high');
+
+    expect(state.selectedModelId.value).toBeNull();
+    expect(state.selectedReasoningEffort.value).toBeNull();
+  });
+
+  it('keeps an already selected model when the catalog reloads', async () => {
+    vi.stubGlobal('window', {
+      codexClaw: {
+        listCodexModels: vi.fn().mockResolvedValue([
+          {
+            id: 'codex-existing',
+            model: 'gpt-5.1-codex-existing',
+            displayName: 'Existing',
+            hidden: false,
+            supportedReasoningEfforts: [],
+            isDefault: false,
+          },
+          {
+            id: 'codex-default',
+            model: 'gpt-5.1-codex-default',
+            displayName: 'Default',
+            hidden: false,
+            supportedReasoningEfforts: [{ reasoningEffort: 'medium', description: 'Balanced' }],
+            defaultReasoningEffort: 'medium',
+            isDefault: true,
+          },
+        ]),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    state.modelCatalogStatus.value = 'notLoaded';
+    state.selectedModelId.value = 'codex-existing';
+    state.selectedReasoningEffort.value = null;
+
+    await state.loadCodexModels();
+
+    expect(state.selectedModelId.value).toBe('codex-existing');
+    expect(state.selectedReasoningEffort.value).toBeNull();
   });
 });
 

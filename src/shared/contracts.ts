@@ -137,6 +137,13 @@ export type CreateAgentInput = {
   avatar?: string;
 };
 
+export type UpdateAgentInput = {
+  id: string;
+  name: string;
+  folder: string;
+  avatar?: string;
+};
+
 export type ToolConfirmationDecision =
   | 'allow'
   | 'allow_conversation'
@@ -172,7 +179,9 @@ export type ClientRequestResponse = {
 export type CodexClawApi = {
   getSnapshot(): Promise<AppSnapshot>;
   listCodexModels(): Promise<CodexModelOption[]>;
-  createAgent(input: CreateAgentInput): Promise<Agent>;
+  chooseAgentFolder(): Promise<string | null>;
+  createAgent(input: CreateAgentInput): Promise<AppSnapshot>;
+  updateAgent(input: UpdateAgentInput): Promise<AppSnapshot>;
   selectAgent(agentId: string): Promise<AppSnapshot>;
   selectAgentFolder(agentId: string): Promise<AppSnapshot | null>;
   sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot>;
