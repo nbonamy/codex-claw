@@ -16,6 +16,13 @@
     >
       <strong>No agent</strong>
     </div>
+    <div
+      v-if="agent"
+      class="agent-header__context"
+    >
+      <span>codex</span>
+      <span>{{ agent.status.type }}</span>
+    </div>
     <div class="agent-header__status">
       <span :data-status="appServer.status" />
       {{ statusLabel }}
@@ -52,9 +59,10 @@ const statusLabel = computed(() => {
 
 <style scoped>
 .agent-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--cc-space-4);
   padding: 0 var(--cc-space-5);
   background: var(--cc-header-bg);
   border-bottom: 1px solid var(--cc-border-muted);
@@ -85,10 +93,26 @@ const statusLabel = computed(() => {
 
 .agent-header__identity strong {
   color: var(--cc-text);
+  font-weight: var(--cc-font-weight-bold);
 }
 
 .agent-header__identity span {
   color: var(--cc-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-header__context {
+  display: inline-flex;
+  gap: var(--cc-space-2);
+  align-items: center;
+  color: var(--cc-text-muted);
+  font: var(--cc-font-body-small);
+}
+
+.agent-header__context span:first-child {
+  color: var(--cc-text);
 }
 
 .agent-header__status {

@@ -111,7 +111,7 @@ describe('snapshot reducer', () => {
       payload: { delta: 'ignored without agent' },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
-    expect(snapshot.messages).toHaveLength(1);
+    expect(snapshot.messages).toHaveLength(0);
 
     applyMainEventToSnapshot(snapshot, {
       seq: 2,

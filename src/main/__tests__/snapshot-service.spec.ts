@@ -18,25 +18,7 @@ describe('snapshot service', () => {
       ],
       bench: [],
       activeAgentId: 'agent-dina',
-      messages: [
-        {
-          id: 'message-welcome',
-          agentId: 'agent-dina',
-          role: 'assistant',
-          status: 'complete',
-          createdAt: '2026-06-05T00:00:00.000Z',
-          parts: [
-            {
-              type: 'text',
-              text: 'Codex Claw is ready for the first native Codex agent.',
-            },
-            {
-              type: 'status',
-              text: 'app-server integration pending',
-            },
-          ],
-        },
-      ],
+      messages: [],
       appServer: {
         status: 'notConfigured',
         detail: 'Codex app-server is not connected yet.',

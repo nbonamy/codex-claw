@@ -17,25 +17,7 @@ export function createInitialSnapshot(): AppSnapshot {
     agents: [agent],
     bench: [],
     activeAgentId: agent.id,
-    messages: [
-      {
-        id: 'message-welcome',
-        agentId: agent.id,
-        role: 'assistant',
-        status: 'complete',
-        createdAt: seedCreatedAt,
-        parts: [
-          {
-            type: 'text',
-            text: 'Codex Claw is ready for the first native Codex agent.',
-          },
-          {
-            type: 'status',
-            text: 'app-server integration pending',
-          },
-        ],
-      },
-    ],
+    messages: [],
     appServer: {
       status: 'notConfigured',
       detail: 'Codex app-server is not connected yet.',

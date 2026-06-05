@@ -23,7 +23,6 @@
           :is-sending="isSending"
           @send-prompt="$emit('sendPrompt', $event)"
         />
-        <ArtifactPane />
       </div>
     </section>
   </main>
@@ -33,7 +32,6 @@
 import type { Agent, AppSnapshot, RendererMessage } from '../../shared/contracts';
 import AgentHeader from './AgentHeader.vue';
 import AgentSidebar from './AgentSidebar.vue';
-import ArtifactPane from './ArtifactPane.vue';
 import ConversationPane from './ConversationPane.vue';
 import TeamRail from './TeamRail.vue';
 
@@ -55,22 +53,27 @@ defineEmits<{
 .app-shell {
   display: grid;
   grid-template-columns: var(--cc-team-rail-width) var(--cc-agent-sidebar-width) minmax(0, 1fr);
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
   color: var(--cc-text);
   background: var(--cc-bg);
 }
 
 .app-shell__workspace {
   min-width: 0;
+  min-height: 0;
   display: grid;
   grid-template-rows: var(--cc-header-height) minmax(0, 1fr);
+  overflow: hidden;
   background: var(--cc-workspace);
 }
 
 .app-shell__body {
   min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(var(--cc-conversation-min-width), 1fr) minmax(var(--cc-artifact-pane-min), var(--cc-artifact-pane-width));
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
 }
 
 @media (max-width: 1100px) {
@@ -78,8 +81,5 @@ defineEmits<{
     grid-template-columns: var(--cc-team-rail-width) minmax(var(--cc-agent-sidebar-compact-min), var(--cc-agent-sidebar-compact-width)) minmax(0, 1fr);
   }
 
-  .app-shell__body {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 </style>

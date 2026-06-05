@@ -1,0 +1,212 @@
+<template>
+  <div
+    v-if="block.type === 'user-text'"
+    class="chat-message-block chat-message-block--text"
+    v-html="renderUserText(block.content)"
+  />
+  <div
+    v-else-if="block.type === 'text'"
+    class="chat-message-block chat-message-block--text"
+    v-html="renderMarkdown(block.content)"
+  />
+  <pre
+    v-else-if="block.type === 'mermaid'"
+    class="chat-message-block chat-message-block--mermaid"
+  >{{ block.code }}</pre>
+  <figure
+    v-else-if="block.type === 'media'"
+    class="chat-message-block chat-message-block--media"
+  >
+    <img
+      :alt="block.media.alt ?? block.media.title ?? 'Generated media'"
+      :src="block.media.url"
+    >
+    <figcaption v-if="block.media.title || block.media.prompt">
+      {{ block.media.title ?? block.media.prompt }}
+    </figcaption>
+  </figure>
+  <ChatToolCall
+    v-else-if="block.type === 'tool'"
+    :answered-client-request-ids="answeredClientRequestIds"
+    :tool-call="block.toolCall"
+    @cancel="emit('cancel')"
+    @client-response="emit('client-response', $event)"
+  />
+  <ChatToolGroup
+    v-else-if="block.type === 'tool-group'"
+    :answered-client-request-ids="answeredClientRequestIds"
+    :tool-calls="block.toolCalls"
+    @cancel="emit('cancel')"
+    @client-response="emit('client-response', $event)"
+  />
+  <ChatFollowUps
+    v-else
+    :disabled="followUpsDisabled"
+    :prompts="block.prompts"
+    @send-follow-up="emit('send-follow-up', $event)"
+  />
+</template>
+
+<script setup lang="ts">
+import ChatFollowUps from './ChatFollowUps.vue'
+import ChatToolGroup from './ChatToolGroup.vue'
+import ChatToolCall from './ChatToolCall.vue'
+import { renderMarkdown, renderUserText } from './message-markdown'
+import type { MessageBlock } from './message-blocks'
+
+defineProps<{
+  block: MessageBlock
+  answeredClientRequestIds?: Set<string>
+  followUpsDisabled?: boolean
+}>()
+
+const emit = defineEmits<{
+  cancel: []
+  'client-response': [response: { id: string; payload: unknown }]
+  'send-follow-up': [prompt: string]
+}>()
+</script>
+
+<style scoped>
+
+.chat-message-block--text {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: var(--line-height-24);
+  font-size: var(--font-size-16);
+  opacity: 0.9;
+}
+
+.chat-message--user .chat-message-block--text {
+  padding: var(--space-3) var(--space-6);
+}
+
+.chat-message-block--text :deep(> *:first-child) {
+  margin-top: 0;
+}
+
+.chat-message-block--text :deep(> *:last-child) {
+  margin-bottom: 0;
+}
+
+.chat-message-block--text :deep(p),
+.chat-message-block--text :deep(ul),
+.chat-message-block--text :deep(ol),
+.chat-message-block--text :deep(blockquote),
+.chat-message-block--text :deep(pre),
+.chat-message-block--text :deep(table) {
+  margin: 0 0 var(--space-6);
+}
+
+.chat-message-block--text :deep(h1),
+.chat-message-block--text :deep(h2),
+.chat-message-block--text :deep(h3),
+.chat-message-block--text :deep(h4),
+.chat-message-block--text :deep(h5),
+.chat-message-block--text :deep(h6) {
+  margin: var(--space-8) 0 var(--space-4);
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-24);
+}
+
+.chat-message-block--text :deep(h1) {
+  font-size: var(--font-size-20);
+  line-height: var(--line-height-28);
+}
+
+.chat-message-block--text :deep(h2) {
+  font-size: var(--font-size-18);
+}
+
+.chat-message-block--text :deep(h3),
+.chat-message-block--text :deep(h4) {
+  font-size: var(--font-size-16);
+}
+
+.chat-message-block--text :deep(h5),
+.chat-message-block--text :deep(h6) {
+  font-size: var(--font-size-15);
+}
+
+.chat-message-block--text :deep(ul),
+.chat-message-block--text :deep(ol) {
+  padding-left: var(--space-12);
+}
+
+.chat-message-block--text :deep(strong) {
+  font-weight: var(--font-weight-medium);
+}
+
+.chat-message-block--text :deep(code) {
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-surface-low);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-14);
+}
+
+.chat-message-block--text :deep(pre),
+.chat-message-block--mermaid {
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  background: var(--color-surface-low);
+  color: var(--color-text);
+}
+
+.chat-message-block--text :deep(pre code),
+.chat-message-block--mermaid {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-20);
+}
+
+.chat-message-block--text :deep(blockquote) {
+  border-left: 3px solid var(--color-border-strong);
+  padding-left: var(--space-8);
+  color: var(--color-text-muted);
+}
+
+.chat-message-block--text :deep(a) {
+  color: var(--color-primary);
+  line-height: inherit;
+  text-decoration: none;
+  vertical-align: baseline;
+}
+
+.chat-message-block--text :deep(.chat-message-link__icon) {
+  display: inline-block;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  margin-left: var(--space-1);
+  margin-right: var(--space-2);
+  vertical-align: -0.12em;
+}
+
+.chat-message-block--text :deep(.chat-message-link__icon--favicon) {
+  background-image: var(--favicon-url, none);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  margin-left: var(--space-2);
+  margin-right: var(--space-3);
+}
+
+.chat-message-block--media {
+  margin: 0;
+}
+
+.chat-message-block--media img {
+  display: block;
+  max-width: 100%;
+  border-radius: var(--radius-lg);
+}
+
+.chat-message-block--media figcaption {
+  margin-top: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+}
+</style>

@@ -67,6 +67,6 @@ describe('agent chat service', () => {
     await sendAgentPrompt(snapshot, sessionManager, 'missing-agent', 'hello', vi.fn());
 
     expect(sessionManager.sendPrompt).not.toHaveBeenCalled();
-    expect(snapshot.messages).toHaveLength(1);
+    expect(snapshot.messages).toHaveLength(0);
   });
 });

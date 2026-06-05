@@ -53,7 +53,31 @@ describe('ConversationPane', () => {
     expect(wrapper.text()).toContain('Looking now.');
     expect(wrapper.text()).toContain('npm test');
     expect(wrapper.text()).toContain('running vitest');
-    expect(wrapper.get('input').attributes('placeholder')).toBe('Prompt Dina');
+    expect(wrapper.get('textarea').attributes('placeholder')).toBe('Ask for follow-up changes');
+  });
+
+  it('keeps long started chats inside the transcript scroll container', () => {
+    const wrapper = mountPane({
+      agent,
+      messages: [
+        messages[0],
+        {
+          id: 'message-long-assistant',
+          agentId: agent.id,
+          role: 'assistant',
+          status: 'complete',
+          createdAt: '2026-06-05T00:00:01.000Z',
+          parts: [{ type: 'text', text: Array.from({ length: 80 }, (_, index) => `line ${index + 1}`).join('\n') }],
+        },
+      ],
+      isSending: false,
+    });
+
+    expect(wrapper.find('.conversation-pane__hero').exists()).toBe(false);
+    expect(wrapper.find('.workbench-layout__body--child').exists()).toBe(true);
+    expect(wrapper.find('.workbench-layout__body--child > .message-list').exists()).toBe(true);
+    expect(wrapper.find('.workbench-layout__footer .chat-composer').exists()).toBe(true);
+    expect(wrapper.text()).toContain('line 80');
   });
 
   it('shows a select-agent composer placeholder without an agent', () => {
@@ -63,7 +87,7 @@ describe('ConversationPane', () => {
       isSending: false,
     });
 
-    expect(wrapper.get('input').attributes('placeholder')).toBe('Select an agent');
+    expect(wrapper.get('textarea').attributes('placeholder')).toBe('Select an agent');
   });
 
   it('emits trimmed prompts from the composer', async () => {
@@ -73,11 +97,11 @@ describe('ConversationPane', () => {
       isSending: false,
     });
 
-    await wrapper.get('input').setValue('  hello codex  ');
+    await wrapper.get('textarea').setValue('  hello codex  ');
     await wrapper.get('form').trigger('submit');
 
     expect(wrapper.emitted('sendPrompt')).toStrictEqual([['hello codex']]);
-    expect((wrapper.get('input').element as HTMLInputElement).value).toBe('');
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('');
   });
 
   it('disables composer actions while sending', () => {
@@ -87,8 +111,9 @@ describe('ConversationPane', () => {
       isSending: true,
     });
 
-    expect(wrapper.get('input').attributes()).toHaveProperty('disabled');
-    expect(wrapper.get('input').attributes('placeholder')).toBe('Codex is working...');
+    expect(wrapper.get('textarea').attributes()).not.toHaveProperty('disabled');
+    expect(wrapper.get('textarea').attributes('placeholder')).toBe('Codex is working...');
+    expect(wrapper.get('button[type="submit"]').attributes()).toHaveProperty('disabled');
   });
 });
 

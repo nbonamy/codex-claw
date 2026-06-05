@@ -25,8 +25,8 @@ describe('AppShell', () => {
     expect(wrapper.text()).toContain('Codex Claw');
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('Codex pending');
-    expect(wrapper.text()).toContain('Codex Claw is ready for the first native Codex agent.');
-    expect(wrapper.text()).toContain('Artifacts');
+    expect(wrapper.text()).toContain('Chat with Dina');
+    expect(wrapper.text()).not.toContain('Artifacts');
   });
 
   it('forwards prompt and folder actions from child surfaces', async () => {
@@ -45,7 +45,7 @@ describe('AppShell', () => {
     });
 
     await wrapper.find('.agent-sidebar__folder').trigger('click');
-    await wrapper.get('input').setValue('hello');
+    await wrapper.get('textarea').setValue('hello');
     await wrapper.get('form').trigger('submit');
 
     expect(wrapper.emitted('selectAgentFolder')).toHaveLength(1);

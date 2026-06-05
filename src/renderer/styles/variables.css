@@ -5,6 +5,7 @@
   --cc-font-size-caption: 12px;
   --cc-font-size-small: 13px;
   --cc-font-size-body: 15px;
+  --cc-font-size-title: 22px;
   --cc-font-weight-regular: 400;
   --cc-font-weight-medium: 500;
   --cc-font-weight-bold: 700;
@@ -26,10 +27,14 @@
   --cc-space-3: 12px;
   --cc-space-4: 16px;
   --cc-space-5: 24px;
+  --cc-space-6: 32px;
 
   /* Radii */
   --cc-radius-1: 4px;
   --cc-radius-2: 8px;
+  --cc-radius-3: 16px;
+  --cc-radius-message: 14px;
+  --cc-radius-composer: 28px;
   --cc-radius-pill: 999px;
 
   /* Layout */
@@ -43,7 +48,14 @@
   --cc-agent-sidebar-compact-width: 32vw;
   --cc-conversation-min-width: 420px;
   --cc-message-max-width: 860px;
+  --cc-user-message-max-width: 680px;
+  --cc-chat-content-width: 860px;
+  --cc-message-gap: 36px;
+  --cc-message-list-padding-top: 48px;
+  --cc-message-list-padding-bottom: 40px;
   --cc-composer-min-height: 64px;
+  --cc-composer-floating-min-height: 60px;
+  --cc-composer-input-max-height: 160px;
 
   /* Component sizing */
   --cc-avatar-size: 44px;
@@ -55,10 +67,55 @@
   --cc-agent-row-min-height: 76px;
   --cc-agent-status-column-width: 12px;
   --cc-meta-gap: 2px;
+  --cc-icon-size: 18px;
+  --cc-composer-button-size: 36px;
 
   /* Effects */
   --cc-shadow-soft: 0 1px 3px rgb(0 0 0 / 8%);
   --cc-shadow-panel: 0 8px 24px rgb(0 0 0 / 10%);
+  --cc-shadow-composer: 0 12px 40px rgb(0 0 0 / 10%), 0 2px 6px rgb(0 0 0 / 8%);
+  --cc-shadow-composer-focus: 0 14px 42px rgb(0 0 0 / 14%), 0 0 0 3px rgb(0 0 0 / 5%);
   --cc-focus-ring-size: 2px;
   --cc-transition-fast: 120ms ease;
+
+  /* id8 chat component aliases, kept so copied chat files stay recognizable. */
+  --space-1: var(--cc-space-1);
+  --space-2: var(--cc-space-1);
+  --space-3: var(--cc-space-2);
+  --space-4: var(--cc-space-2);
+  --space-6: var(--cc-space-3);
+  --space-8: var(--cc-space-4);
+  --space-10: 20px;
+  --space-12: var(--cc-space-5);
+  --space-16: var(--cc-space-6);
+  --font-family-base: var(--cc-font-family-ui);
+  --font-family-mono: var(--cc-font-family-code);
+  --font-size-12: var(--cc-font-size-caption);
+  --font-size-13: var(--cc-font-size-small);
+  --font-size-14: 14px;
+  --font-size-15: var(--cc-font-size-body);
+  --font-size-16: 16px;
+  --font-size-18: 18px;
+  --font-size-20: 20px;
+  --font-size-24: var(--cc-font-size-title);
+  --font-weight-light: var(--cc-font-weight-regular);
+  --font-weight-xlight: var(--cc-font-weight-regular);
+  --font-weight-medium: var(--cc-font-weight-medium);
+  --font-weight-semibold: var(--cc-font-weight-bold);
+  --line-height-16: 16px;
+  --line-height-18: 18px;
+  --line-height-20: 20px;
+  --line-height-24: 24px;
+  --line-height-28: 28px;
+  --radius-xs: 2px;
+  --radius-sm: var(--cc-radius-1);
+  --radius-md: var(--cc-radius-2);
+  --radius-lg: var(--cc-radius-2);
+  --radius-xl: var(--cc-radius-message);
+  --radius-full: var(--cc-radius-pill);
+  --icon-sm: 16px;
+  --shadow-sm: var(--cc-shadow-soft);
+  --shadow-md: var(--cc-shadow-panel);
+  --workbench-layout-header-offset: 0px;
+  --workbench-layout-footer-offset: 0px;
 }

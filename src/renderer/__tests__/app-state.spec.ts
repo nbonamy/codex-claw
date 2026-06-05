@@ -11,7 +11,7 @@ describe('useAppState', () => {
     const state = useAppState();
 
     expect(state.activeAgent.value?.name).toBe('Dina');
-    expect(state.visibleMessages.value).toHaveLength(1);
+    expect(state.visibleMessages.value).toHaveLength(0);
   });
 
   it('does not send prompts or select folders without preload or an active agent', async () => {

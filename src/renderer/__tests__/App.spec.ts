@@ -31,5 +31,6 @@ describe('App', () => {
 
     expect(getSnapshot).toHaveBeenCalledOnce();
     expect(wrapper.text()).toContain('Connected');
+    expect(wrapper.text()).toContain('Chat with Dina');
   });
 });
