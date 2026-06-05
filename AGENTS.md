@@ -89,6 +89,22 @@ When scripts exist, run the relevant focused tests while iterating and the
 relevant build/test gate before handoff. Do not invent server/API integration
 gates for this project; Codex Claw is a desktop app.
 
+## Project Skills
+
+Repo-local Codex skills live in `.agents/skills/`. When a task clearly matches
+one of those areas, read the relevant `.agents/skills/<name>/SKILL.md` before
+editing.
+
+Use `codex-claw-dod` before handing off, committing, pushing, or calling Codex
+Claw work done.
+
+- `codex-claw-dod`: Definition of Done checklist for scope, architecture,
+  tests, coverage, security, UX, docs, worktree hygiene, and handoff.
+- `codex-claw-frontend-dev`: Vue, Element Plus, app shell, chat rendering,
+  artifact panes, design tokens, themes, and frontend tests.
+- `codex-claw-testing-coverage`: Vitest, component isolation, IPC contracts,
+  fake Codex transports, coverage triage, and verification gates.
+
 ## Plans
 
 Plans are used for large implementations and are developed collaboratively.
