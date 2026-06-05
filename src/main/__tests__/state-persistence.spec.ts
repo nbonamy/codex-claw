@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { AppStatePersistence, persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
-import { appendUserPrompt, createInitialSnapshot } from '../../shared/snapshot';
+import { appendUserPrompt, createEmptySnapshot, createInitialSnapshot } from '../../shared/snapshot';
 
 let tempDir: string | null = null;
 
@@ -15,10 +15,24 @@ afterEach(async () => {
 });
 
 describe('AppStatePersistence', () => {
-  it('loads a seed snapshot when no state file exists', async () => {
+  it('loads the default team with no agents when no state file exists', async () => {
     const persistence = new AppStatePersistence(await tempStatePath());
 
-    await expect(persistence.load()).resolves.toStrictEqual(createInitialSnapshot());
+    await expect(persistence.load()).resolves.toStrictEqual(createEmptySnapshot());
+  });
+
+  it('keeps persisted empty agents empty while defaulting missing teams', () => {
+    const restored = snapshotFromPersistedState({
+      teams: [],
+      agents: [],
+      bench: [],
+      activeAgentId: 'agent-dina',
+      theme: { id: 'codex-claw-dark' },
+    });
+
+    expect(restored.teams).toStrictEqual(createEmptySnapshot().teams);
+    expect(restored.agents).toStrictEqual([]);
+    expect(restored.activeAgentId).toBeNull();
   });
 
   it('saves metadata without transcripts or app-server runtime state', async () => {

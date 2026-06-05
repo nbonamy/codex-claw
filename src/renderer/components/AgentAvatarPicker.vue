@@ -35,6 +35,7 @@
           :aria-pressed="!modelValue"
           @click="selectAvatar(undefined)"
         >
+          {{ initials }}
         </button>
         <button
           v-for="preset in avatarPresets"
@@ -197,7 +198,7 @@ function applyCroppedAvatar(nextAvatar: string): void {
   z-index: 30;
   right: 0;
   top: calc(100% + var(--space-6));
-  width: 280px;
+  width: 276px;
   display: grid;
   gap: var(--space-4);
   padding: var(--space-6);
@@ -209,20 +210,20 @@ function applyCroppedAvatar(nextAvatar: string): void {
 
 .agent-avatar-picker__grid {
   display: grid;
-  grid-template-columns: repeat(8, var(--space-12));
-  gap: var(--space-4);
+  grid-template-columns: repeat(6, var(--space-12));
+  gap: var(--space-3);
 }
 
 .agent-avatar-picker__preset {
-  width: var(--space-16);
-  height: var(--space-16);
+  width: var(--space-12);
+  height: var(--space-12);
   display: grid;
   place-items: center;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   color: var(--color-text);
   background: transparent;
-  font-size: var(--font-size-20);
+  font-size: var(--font-size-16);
   cursor: pointer;
 }
 

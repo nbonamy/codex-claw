@@ -1,8 +1,8 @@
 import { computed, ref } from 'vue';
 import type { AppSnapshot, ClientRequestResponse, CodexModelOption, CreateAgentInput, MainToRendererEvent, ReasoningEffort, SendPromptOptions, UpdateAgentInput } from '../shared/contracts';
-import { applyMainEventToSnapshot, createInitialSnapshot } from '../shared/snapshot';
+import { applyMainEventToSnapshot, createEmptySnapshot } from '../shared/snapshot';
 
-const snapshot = ref<AppSnapshot>(createInitialSnapshot());
+const snapshot = ref<AppSnapshot>(createEmptySnapshot());
 const isLoading = ref(false);
 const sendingAgentIds = ref(new Set<string>());
 const answeredClientRequestIds = ref(new Set<string>());

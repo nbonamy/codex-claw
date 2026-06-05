@@ -25,6 +25,7 @@
     </Transition>
     <section class="app-shell__agent">
       <AgentHeader
+        v-if="!isAgentEmpty"
         :agent="activeAgent"
         :app-server="snapshot.appServer"
         :is-loading="isLoading"
@@ -32,7 +33,12 @@
         @expand-sidebar="agentSidebarCollapsed = false"
       />
       <div class="app-shell__body">
+        <AgentEmptyState
+          v-if="isAgentEmpty"
+          @new-agent="openNewAgent"
+        />
         <ConversationPane
+          v-else
           :messages="messages"
           :agent="activeAgent"
           :is-sending="isSending"
@@ -64,6 +70,7 @@
 import { computed, ref } from 'vue';
 import type { Agent, AppSnapshot, ClientRequestResponse, CodexModelOption, CreateAgentInput, ReasoningEffort, RendererMessage, Team, UpdateAgentInput } from '../../shared/contracts';
 import AgentDialog from './AgentDialog.vue';
+import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
 import AgentSidebar from './AgentSidebar.vue';
 import ConversationPane from './ConversationPane.vue';
@@ -109,6 +116,7 @@ const agentSidebarWidth = ref(260);
 const agentDialogVisible = ref(false);
 const agentDialogMode = ref<'create' | 'edit'>('create');
 const editingAgentId = ref<string | null>(null);
+const isAgentEmpty = computed(() => props.snapshot.agents.length === 0);
 const editingAgent = computed(() => (
   editingAgentId.value ? props.snapshot.agents.find((agent) => agent.id === editingAgentId.value) ?? null : null
 ));

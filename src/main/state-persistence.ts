@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { Agent, AppSnapshot, BenchTemplate, Team } from '../shared/contracts';
-import { createInitialSnapshot } from '../shared/snapshot';
+import { createEmptySnapshot } from '../shared/snapshot';
 
 type PersistedState = {
   teams: Team[];
@@ -20,7 +20,7 @@ export class AppStatePersistence {
       return snapshotFromPersistedState(parsed);
     } catch (error) {
       if (isNodeError(error) && error.code === 'ENOENT') {
-        return createInitialSnapshot();
+        return createEmptySnapshot();
       }
       throw error;
     }
@@ -44,21 +44,21 @@ export function persistedStateFromSnapshot(snapshot: AppSnapshot): PersistedStat
 }
 
 export function snapshotFromPersistedState(value: unknown): AppSnapshot {
-  const seed = createInitialSnapshot();
+  const seed = createEmptySnapshot();
   if (!isRecord(value)) {
     return seed;
   }
 
   const agents = Array.isArray(value.agents)
     ? value.agents.map(sanitizeAgent).filter((agent): agent is Agent => Boolean(agent))
-    : seed.agents;
+    : [];
   const teams = Array.isArray(value.teams)
     ? value.teams.map((team) => sanitizeTeam(team, agents)).filter((team): team is Team => Boolean(team))
     : seed.teams;
   const snapshot: AppSnapshot = {
     ...seed,
     teams: teams.length > 0 ? teams : seed.teams,
-    agents: agents.length > 0 ? agents : seed.agents,
+    agents,
     bench: Array.isArray(value.bench)
       ? value.bench.map(sanitizeBenchTemplate).filter((template): template is BenchTemplate => Boolean(template))
       : seed.bench,

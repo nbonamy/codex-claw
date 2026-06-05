@@ -1,16 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import { useAppState } from '../app-state';
-import { createInitialSnapshot } from '../../shared/snapshot';
+import { createEmptySnapshot, createInitialSnapshot } from '../../shared/snapshot';
 import type { CodexClawApi, MainToRendererEvent } from '../../shared/contracts';
 
 describe('useAppState', () => {
-  it('uses the local seed snapshot before preload is available', () => {
+  it('uses the local empty snapshot before preload is available', () => {
     vi.stubGlobal('window', {});
 
     const state = useAppState();
 
-    expect(state.activeAgent.value?.name).toBe('Dina');
+    expect(state.snapshot.value).toStrictEqual(createEmptySnapshot());
+    expect(state.activeAgent.value).toBeNull();
     expect(state.visibleMessages.value).toHaveLength(0);
   });
 

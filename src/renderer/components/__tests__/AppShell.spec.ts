@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
-import { createInitialSnapshot } from '../../../shared/snapshot';
+import { createEmptySnapshot, createInitialSnapshot } from '../../../shared/snapshot';
 import type { Agent, CreateAgentInput, UpdateAgentInput } from '../../../shared/contracts';
 
 function pointerEvent(type: string, clientX: number): PointerEvent {
@@ -183,6 +183,30 @@ describe('AppShell', () => {
     expect(wrapper.text()).toContain('CODEX CLAW');
     expect(wrapper.text()).toContain('No agent');
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('true');
+  });
+
+  it('shows the empty agent page when the active team has no agents', async () => {
+    const snapshot = createEmptySnapshot();
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: null,
+        messages: [],
+        isLoading: false,
+        isSending: false,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.text()).toContain('Welcome to Codex Claw!');
+    expect(wrapper.text()).toContain('Add an agent to your team');
+    expect(wrapper.find('.agent-header').exists()).toBe(false);
+    expect(wrapper.find('.conversation-pane').exists()).toBe(false);
+
+    await wrapper.get('.agent-empty-state__new').trigger('click');
+    expect(wrapper.text()).toContain('New Agent');
   });
 
   it('opens the new agent dialog from the sidebar and forwards create requests', async () => {

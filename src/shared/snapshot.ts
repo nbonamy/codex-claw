@@ -15,15 +15,32 @@ const seedTeamId = 'team-codex-claw';
 const structuredToolResultNotice = 'Result returned in structuredContent.';
 type ToolPart = Extract<RendererMessagePart, { type: 'tool' }>;
 
+export function createEmptySnapshot(): AppSnapshot {
+  return {
+    teams: [
+      createDefaultTeam(),
+    ],
+    agents: [],
+    bench: [],
+    activeAgentId: null,
+    messages: [],
+    appServer: {
+      status: 'notConfigured',
+      detail: 'Codex app-server is not connected yet.',
+    },
+    theme: {
+      id: 'codex-claw-dark',
+    },
+  };
+}
+
 export function createInitialSnapshot(): AppSnapshot {
   const agents = createSeedAgents();
 
   return {
     teams: [
       {
-        id: seedTeamId,
-        name: 'Codex Claw',
-        avatar: 'CC',
+        ...createDefaultTeam(),
         agentIds: agents.map((agent) => agent.id),
       },
     ],
@@ -849,6 +866,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
+}
+
+function createDefaultTeam(): AppSnapshot['teams'][number] {
+  return {
+    id: seedTeamId,
+    name: 'Codex Claw',
+    avatar: 'CC',
+    agentIds: [],
+  };
 }
 
 function createSeedAgents(): Agent[] {

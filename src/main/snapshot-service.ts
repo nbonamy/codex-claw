@@ -3,6 +3,7 @@ export {
   appendUserPrompt,
   applyMainEventToSnapshot,
   createAgentFromInput,
+  createEmptySnapshot,
   createAgentInSnapshot,
   createInitialSnapshot,
   selectAgent,

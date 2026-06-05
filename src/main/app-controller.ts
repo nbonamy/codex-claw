@@ -14,7 +14,7 @@ import { ClawMcpHttpServer } from './mcp/http-server';
 import {
   applyMainEventToSnapshot,
   createAgentInSnapshot,
-  createInitialSnapshot,
+  createEmptySnapshot,
   selectAgent,
   updateAgentFromInput,
   updateAgentFolder,
@@ -25,7 +25,7 @@ import { ipcChannels } from '../shared/ipc';
 
 export class AppController {
   private mainWindow: BrowserWindow | null = null;
-  private snapshot = createInitialSnapshot();
+  private snapshot = createEmptySnapshot();
   private readonly persistence: AppStatePersistence;
   private readonly notifiedInboxMessageIds = new Map<string, string>();
   private readonly mcpCoordinator = new ClawMcpAgentCoordinator({

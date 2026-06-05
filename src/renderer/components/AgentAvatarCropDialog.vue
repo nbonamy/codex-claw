@@ -11,6 +11,14 @@
     <template #header>
       <div class="claw-dialog__header">
         <h2 class="claw-dialog__title">Adjust Avatar</h2>
+        <button
+          class="claw-dialog__icon-button"
+          type="button"
+          aria-label="Close avatar editor"
+          @click="emit('cancel')"
+        >
+          <X aria-hidden="true" />
+        </button>
       </div>
     </template>
 
@@ -88,7 +96,6 @@ function onVisibilityChanged(nextVisible: boolean): void {
 </script>
 
 <style scoped>
-
 .agent-avatar-crop-dialog__body {
   display: grid;
   justify-items: center;
