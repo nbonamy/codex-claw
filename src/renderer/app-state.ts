@@ -4,7 +4,7 @@ import { applyMainEventToSnapshot, createInitialSnapshot } from '../shared/snaps
 
 const snapshot = ref<AppSnapshot>(createInitialSnapshot());
 const isLoading = ref(false);
-const isSending = ref(false);
+const sendingAgentIds = ref(new Set<string>());
 let unsubscribeMainEvents: (() => void) | null = null;
 
 export function useAppState() {
@@ -15,6 +15,18 @@ export function useAppState() {
   const visibleMessages = computed(() => {
     const agentId = activeAgent.value?.id;
     return agentId ? snapshot.value.messages.filter((message) => message.agentId === agentId) : [];
+  });
+
+  const isSending = computed(() => {
+    const agent = activeAgent.value;
+    if (!agent) {
+      return false;
+    }
+
+    return sendingAgentIds.value.has(agent.id) ||
+      agent.status.type === 'starting' ||
+      agent.status.type === 'working' ||
+      agent.status.type === 'awaitingInput';
   });
 
   async function loadSnapshot(): Promise<void> {
@@ -38,12 +50,24 @@ export function useAppState() {
       return;
     }
 
-    isSending.value = true;
+    markAgentSending(agentId, true);
 
     try {
       snapshot.value = await window.codexClaw.sendPrompt(agentId, prompt);
     } finally {
-      isSending.value = false;
+      markAgentSending(agentId, false);
+    }
+  }
+
+  async function selectAgent(agentId: string): Promise<void> {
+    if (!snapshot.value.agents.some((agent) => agent.id === agentId)) {
+      return;
+    }
+
+    snapshot.value.activeAgentId = agentId;
+
+    if (window.codexClaw?.selectAgent) {
+      snapshot.value = await window.codexClaw.selectAgent(agentId);
     }
   }
 
@@ -54,6 +78,7 @@ export function useAppState() {
     isLoading,
     isSending,
     loadSnapshot,
+    selectAgent,
     sendPrompt,
   };
 }
@@ -67,4 +92,14 @@ function subscribeToMainEvents(): void {
   unsubscribeMainEvents = window.codexClaw.onEvent((event: MainToRendererEvent) => {
     applyMainEventToSnapshot(snapshot.value, event);
   });
+}
+
+function markAgentSending(agentId: string, sending: boolean): void {
+  const next = new Set(sendingAgentIds.value);
+  if (sending) {
+    next.add(agentId);
+  } else {
+    next.delete(agentId);
+  }
+  sendingAgentIds.value = next;
 }

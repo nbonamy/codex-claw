@@ -1,6 +1,6 @@
 # Codex Claw Plan
 
-Status: reviewed initial plan, 2026-06-05.
+Status: MVP 2 implemented, 2026-06-05.
 
 ## Tech Stack
 
@@ -27,22 +27,24 @@ branches, functions, and lines.
 
 Commit checkpoint: `feat: scaffold codex claw desktop`
 
-### 1. No Team, Single Agent Chat
+### 1. No Team, Single Agent Chat - Complete
 
 One configured agent with name, avatar, and folder. Main launches
 `codex app-server`, preferably with isolated `CODEX_HOME`, starts or resumes one
 Codex thread, sends prompts, and streams basic text plus simple tool calls.
 
-Verification: fake app-server tests plus one real local smoke test.
+Verification: fake app-server/session tests, renderer tests, coverage, lint,
+and build pass. Real app-server smoke remains a useful follow-up.
 
 Commit checkpoint: `feat: add single codex agent chat`
 
-### 2. No Team, Multiple Agent Chats
+### 2. No Team, Multiple Agent Chats - Complete
 
 Add an agent list and multiple independent agents, each with folder, thread, and
 status. Switching agents restores the right transcript and in-flight state.
 
-Verification: multi-agent reducer/session tests, UI smoke.
+Verification: reducer, app-state, session-manager, sidebar, and shell tests
+prove two agents, isolated chats, switching, and background prompt starts.
 
 Commit checkpoint: `feat: add multiple agent sessions`
 
@@ -116,3 +118,7 @@ Commit checkpoint: `feat: add swe workspace tools`
 - Keep coverage thresholds enabled from the first scaffold. It immediately
   pushed tests toward state loading, status branches, and component fallbacks
   instead of only checking the happy path.
+- Multi-agent work should keep selection as app-owned state and keep Codex
+  routing keyed by agent/thread IDs. Background turns become much easier when
+  prompt submission queues immediately and later app-server events update the
+  owning agent.

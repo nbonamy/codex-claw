@@ -49,4 +49,24 @@ describe('AppShell', () => {
 
     expect(wrapper.emitted('sendPrompt')).toStrictEqual([['hello']]);
   });
+
+  it('forwards agent selection from the sidebar', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [],
+        isLoading: false,
+        isSending: false,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    await wrapper.findAll('.agent-sidebar__agent')[1]?.trigger('click');
+
+    expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-jesse']]);
+  });
 });

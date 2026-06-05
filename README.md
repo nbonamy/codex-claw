@@ -10,9 +10,10 @@ and streams those messages into a Vue renderer over typed IPC.
 
 ## Status
 
-This repository is in the architecture and planning stage. The first
-implementation milestone is a no-team, single-agent chat that can talk to the
-Codex app-server and render basic Codex output natively.
+The current implementation is the no-team multi-agent MVP. It boots an Electron
+app with two Codex agents, routes prompts through Electron main to the Codex
+app-server, keeps each agent's transcript isolated, and allows switching agents
+while another agent keeps working in the background.
 
 ## Product Shape
 
@@ -50,8 +51,8 @@ Claude Code, can be added later without rewriting the UI.
 
 ## Roadmap
 
-1. No team, single Codex agent chat with basic rendering.
-2. No team, multiple independent agent chats.
+1. No team, single Codex agent chat with basic rendering. Complete.
+2. No team, multiple independent agent chats. Complete.
 3. Bench support for reusable agent templates.
 4. Agent-to-agent communication tools.
 5. Team support.
@@ -74,9 +75,11 @@ See [plans/codex-claw.md](plans/codex-claw.md) for the working product plan.
 
 ## Development
 
-Application code has not been scaffolded yet. When implementation starts, the
-first step is the Electron Forge + Vue + TypeScript + Vitest foundation from
-phase 0 of the plan.
+Run the app during development with:
+
+```bash
+npm run dev
+```
 
 Every code change should include focused tests unless it is docs-only or cannot
 be tested. Once coverage tooling exists, the minimum coverage threshold is 85%

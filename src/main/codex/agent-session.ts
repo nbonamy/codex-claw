@@ -27,6 +27,7 @@ export class CodexAgentSessionManager {
   private readonly agentIdsByThreadId = new Map<string, string>();
   private readonly listeners = new Set<EventListener>();
   private initialized = false;
+  private startPromise: Promise<void> | null = null;
 
   constructor(private readonly client: CodexRpcClient) {
     this.client.onNotification((message) => this.handleNotification(message as CodexNotification));
@@ -37,9 +38,21 @@ export class CodexAgentSessionManager {
       return;
     }
 
-    await this.client.start();
-    await this.client.initialize();
-    this.initialized = true;
+    if (!this.startPromise) {
+      this.startPromise = (async () => {
+        await this.client.start();
+        await this.client.initialize();
+        this.initialized = true;
+      })();
+    }
+
+    try {
+      await this.startPromise;
+    } finally {
+      if (!this.initialized) {
+        this.startPromise = null;
+      }
+    }
   }
 
   async sendPrompt(agent: Agent, prompt: string): Promise<CodexSessionPromptResult> {

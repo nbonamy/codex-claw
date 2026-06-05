@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { createAgentFromInput, createInitialSnapshot } from '../snapshot-service';
+import { createAgentFromInput, createInitialSnapshot, selectAgent } from '../snapshot-service';
 
 describe('snapshot service', () => {
-  it('creates the phase zero app snapshot with an implicit single agent', () => {
+  it('creates the phase one app snapshot with two implicit agents', () => {
     expect(createInitialSnapshot()).toStrictEqual({
       teams: [],
       agents: [
@@ -10,6 +10,15 @@ describe('snapshot service', () => {
           id: 'agent-dina',
           name: 'Dina',
           avatar: 'DI',
+          folder: '~/src/codex-claw',
+          status: { type: 'idle' },
+          createdAt: '2026-06-05T00:00:00.000Z',
+          updatedAt: '2026-06-05T00:00:00.000Z',
+        },
+        {
+          id: 'agent-jesse',
+          name: 'Jesse',
+          avatar: 'JE',
           folder: '~/src/codex-claw',
           status: { type: 'idle' },
           createdAt: '2026-06-05T00:00:00.000Z',
@@ -27,6 +36,13 @@ describe('snapshot service', () => {
         id: 'codex-claw-dark',
       },
     });
+  });
+
+  it('selects an existing agent without disturbing agent state', () => {
+    const snapshot = createInitialSnapshot();
+
+    expect(selectAgent(snapshot, 'agent-jesse').activeAgentId).toBe('agent-jesse');
+    expect(selectAgent(snapshot, 'missing-agent').activeAgentId).toBe('agent-jesse');
   });
 
   it('creates named agents from UI input', () => {

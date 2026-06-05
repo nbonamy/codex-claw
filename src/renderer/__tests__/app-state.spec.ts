@@ -62,6 +62,53 @@ describe('useAppState', () => {
     expect(state.visibleMessages.value).toStrictEqual(remoteSnapshot.messages);
   });
 
+  it('switches active agents and displays that agent conversation only', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.messages = [
+      {
+        id: 'message-dina',
+        agentId: 'agent-dina',
+        role: 'assistant',
+        status: 'complete',
+        createdAt: '2026-06-05T00:00:00.000Z',
+        parts: [{ type: 'text', text: 'Dina transcript' }],
+      },
+      {
+        id: 'message-jesse',
+        agentId: 'agent-jesse',
+        role: 'assistant',
+        status: 'complete',
+        createdAt: '2026-06-05T00:00:01.000Z',
+        parts: [{ type: 'text', text: 'Jesse transcript' }],
+      },
+    ];
+    const jesseSnapshot = {
+      ...remoteSnapshot,
+      activeAgentId: 'agent-jesse',
+    };
+    const selectAgent = vi.fn().mockResolvedValue(jesseSnapshot);
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        selectAgent,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    expect(state.activeAgent.value?.id).toBe('agent-dina');
+    expect(state.visibleMessages.value.map((message) => message.id)).toStrictEqual(['message-dina']);
+
+    await state.selectAgent('agent-jesse');
+
+    expect(selectAgent).toHaveBeenCalledWith('agent-jesse');
+    expect(state.activeAgent.value?.id).toBe('agent-jesse');
+    expect(state.visibleMessages.value.map((message) => message.id)).toStrictEqual(['message-jesse']);
+  });
+
   it('sends prompts through preload and replaces the snapshot with the main result', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();
@@ -95,6 +142,57 @@ describe('useAppState', () => {
     expect(state.visibleMessages.value.at(-1)?.parts).toStrictEqual([{ type: 'text', text: 'hello' }]);
   });
 
+  it('tracks sending state per agent so another agent can be used while one starts', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const dinaQueuedSnapshot = {
+      ...createInitialSnapshot(),
+      activeAgentId: 'agent-jesse',
+    };
+    const jesseQueuedSnapshot = {
+      ...createInitialSnapshot(),
+      activeAgentId: 'agent-jesse',
+    };
+    const dinaSend = deferred<typeof dinaQueuedSnapshot>();
+    const sendPrompt = vi.fn((agentId: string) => {
+      if (agentId === 'agent-dina') {
+        return dinaSend.promise;
+      }
+
+      return Promise.resolve(jesseQueuedSnapshot);
+    });
+    const selectAgent = vi.fn().mockResolvedValue({
+      ...remoteSnapshot,
+      activeAgentId: 'agent-jesse',
+    });
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        selectAgent,
+        sendPrompt,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    const firstSend = state.sendPrompt('work in dina');
+    expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'work in dina');
+    expect(state.isSending.value).toBe(true);
+
+    await state.selectAgent('agent-jesse');
+    expect(state.activeAgent.value?.id).toBe('agent-jesse');
+    expect(state.isSending.value).toBe(false);
+
+    await state.sendPrompt('work in jesse');
+    expect(sendPrompt).toHaveBeenCalledWith('agent-jesse', 'work in jesse');
+
+    dinaSend.resolve(dinaQueuedSnapshot);
+    await firstSend;
+    expect(state.activeAgent.value?.id).toBe('agent-jesse');
+  });
+
   it('applies streamed main-process events to the visible conversation', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     vi.stubGlobal('window', {
@@ -126,3 +224,14 @@ describe('useAppState', () => {
     expect(state.visibleMessages.value.at(-1)?.parts).toStrictEqual([{ type: 'text', text: 'streamed' }]);
   });
 });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((innerResolve, innerReject) => {
+    resolve = innerResolve;
+    reject = innerReject;
+  });
+
+  return { promise, reject, resolve };
+}

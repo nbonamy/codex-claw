@@ -5,6 +5,7 @@
     :messages="visibleMessages"
     :is-loading="isLoading"
     :is-sending="isSending"
+    @select-agent="selectAgent"
     @send-prompt="sendPrompt"
   />
 </template>
@@ -21,6 +22,7 @@ const {
   isLoading,
   isSending,
   loadSnapshot,
+  selectAgent,
   sendPrompt,
 } = useAppState();
 

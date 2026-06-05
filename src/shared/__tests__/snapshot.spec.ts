@@ -3,6 +3,7 @@ import {
   appendUserPrompt,
   applyMainEventToSnapshot,
   createInitialSnapshot,
+  selectAgent,
   updateAgentFolder,
 } from '../snapshot';
 
@@ -98,6 +99,42 @@ describe('snapshot reducer', () => {
 
     expect(snapshot.agents[0].codexThreadId).toBe('thread-1');
     expect(snapshot.appServer).toStrictEqual({ status: 'running', detail: 'connected' });
+  });
+
+  it('keeps agent selection and streamed chats isolated per agent', () => {
+    const snapshot = createInitialSnapshot();
+
+    selectAgent(snapshot, 'agent-jesse');
+    appendUserPrompt(snapshot, 'agent-dina', 'Dina prompt', '2026-06-05T00:00:01.000Z');
+    appendUserPrompt(snapshot, 'agent-jesse', 'Jesse prompt', '2026-06-05T00:00:02.000Z');
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-dina',
+      type: 'message.delta',
+      payload: { delta: 'Dina answer' },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-jesse',
+      threadId: 'thread-jesse',
+      turnId: 'turn-jesse',
+      type: 'message.delta',
+      payload: { delta: 'Jesse answer' },
+      occurredAt: '2026-06-05T00:00:04.000Z',
+    });
+
+    expect(snapshot.activeAgentId).toBe('agent-jesse');
+    expect(snapshot.messages.filter((message) => message.agentId === 'agent-dina').map((message) => message.parts)).toStrictEqual([
+      [{ type: 'text', text: 'Dina prompt' }],
+      [{ type: 'text', text: 'Dina answer' }],
+    ]);
+    expect(snapshot.messages.filter((message) => message.agentId === 'agent-jesse').map((message) => message.parts)).toStrictEqual([
+      [{ type: 'text', text: 'Jesse prompt' }],
+      [{ type: 'text', text: 'Jesse answer' }],
+    ]);
   });
 
   it('reduces structured Codex tool items into assistant tool parts', () => {

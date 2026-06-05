@@ -15,6 +15,8 @@
         class="agent-sidebar__agent"
         :class="{ 'agent-sidebar__agent--active': agent.id === activeAgentId }"
         type="button"
+        :aria-pressed="agent.id === activeAgentId"
+        @click="emit('select-agent', agent.id)"
       >
         <span class="agent-sidebar__avatar">{{ agent.avatar ?? agent.name.slice(0, 2).toUpperCase() }}</span>
         <span class="agent-sidebar__meta">
@@ -47,6 +49,10 @@ defineProps<{
   agents: Agent[];
   activeAgentId: string | null;
   benchCount: number;
+}>();
+
+const emit = defineEmits<{
+  'select-agent': [agentId: string];
 }>();
 
 function agentStatusLabel(status: AgentStatus['type']): string {

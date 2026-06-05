@@ -128,6 +128,85 @@ describe('CodexAgentSessionManager', () => {
     ]);
   });
 
+  it('shares app-server initialization across concurrent agent prompts', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+    const secondAgent: Agent = {
+      ...agent,
+      id: 'agent-jesse',
+      name: 'Jesse',
+      avatar: 'JE',
+    };
+
+    const dinaPrompt = manager.sendPrompt(agent, 'dina prompt');
+    const jessePrompt = manager.sendPrompt(secondAgent, 'jesse prompt');
+    await waitForSentCount(transport, 1);
+
+    expect(transport.sent.filter((message) => 'method' in message && message.method === 'initialize')).toHaveLength(1);
+
+    transport.receive({
+      id: 1,
+      result: {
+        userAgent: 'codex',
+        codexHome: '/tmp/codex-home',
+        platformFamily: 'unix',
+        platformOs: 'macos',
+      },
+    });
+    await waitForSentCount(transport, 4);
+
+    const threadStarts = transport.sent.filter((message) => 'method' in message && message.method === 'thread/start');
+    expect(threadStarts).toHaveLength(2);
+
+    transport.receive({
+      id: 2,
+      result: {
+        thread: {
+          id: 'thread-dina',
+          cwd: '/Users/nbonamy/src/codex-claw',
+        },
+      },
+    });
+    transport.receive({
+      id: 3,
+      result: {
+        thread: {
+          id: 'thread-jesse',
+          cwd: '/Users/nbonamy/src/codex-claw',
+        },
+      },
+    });
+    await waitForSentCount(transport, 6);
+
+    transport.receive({
+      id: 4,
+      result: {
+        turn: {
+          id: 'turn-dina',
+          status: 'running',
+        },
+      },
+    });
+    transport.receive({
+      id: 5,
+      result: {
+        turn: {
+          id: 'turn-jesse',
+          status: 'running',
+        },
+      },
+    });
+
+    await expect(dinaPrompt).resolves.toStrictEqual({
+      threadId: 'thread-dina',
+      turnId: 'turn-dina',
+    });
+    await expect(jessePrompt).resolves.toStrictEqual({
+      threadId: 'thread-jesse',
+      turnId: 'turn-jesse',
+    });
+  });
+
   it('adapts Codex notifications into app-owned renderer events', async () => {
     const transport = new FakeTransport();
     const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));

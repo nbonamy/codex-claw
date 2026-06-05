@@ -44,7 +44,25 @@ describe('AgentSidebar', () => {
     expect(wrapper.text()).toContain('Jesse');
     expect(wrapper.text()).toContain('~/src/multi-llm-ts');
     expect(wrapper.find('.agent-sidebar__agent--active').text()).toContain('Dina');
+    expect(wrapper.find('.agent-sidebar__agent--active').attributes('aria-pressed')).toBe('true');
     expect(wrapper.find('[aria-label="Working"]').exists()).toBe(true);
+  });
+
+  it('emits agent selection from agent rows', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        benchCount: 0,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    await wrapper.findAll('.agent-sidebar__agent')[1]?.trigger('click');
+
+    expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-jesse']]);
   });
 
   it('falls back to name initials when an avatar is not set', () => {

@@ -9,6 +9,7 @@ import {
   applyMainEventToSnapshot,
   createAgentFromInput,
   createInitialSnapshot,
+  selectAgent,
   updateAgentFolder,
 } from './snapshot-service';
 import type { AppSnapshot, CreateAgentInput, MainToRendererEvent } from '../shared/contracts';
@@ -28,6 +29,10 @@ export class AppController {
       this.snapshot.agents.push(agent);
       this.snapshot.activeAgentId = agent.id;
       return agent;
+    });
+
+    ipcMain.handle(ipcChannels.selectAgent, (_event, agentId: string) => {
+      return selectAgent(this.snapshot, agentId);
     });
 
     ipcMain.handle(ipcChannels.selectAgentFolder, async (_event, agentId: string) => {

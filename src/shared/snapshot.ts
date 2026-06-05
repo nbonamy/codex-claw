@@ -12,13 +12,13 @@ const seedCreatedAt = '2026-06-05T00:00:00.000Z';
 type ToolPart = Extract<RendererMessagePart, { type: 'tool' }>;
 
 export function createInitialSnapshot(): AppSnapshot {
-  const agent = createSeedAgent();
+  const agents = createSeedAgents();
 
   return {
     teams: [],
-    agents: [agent],
+    agents,
     bench: [],
-    activeAgentId: agent.id,
+    activeAgentId: agents[0]?.id ?? null,
     messages: [],
     appServer: {
       status: 'notConfigured',
@@ -85,6 +85,14 @@ export function updateAgentFolder(snapshot: AppSnapshot, agentId: string, folder
   return agent;
 }
 
+export function selectAgent(snapshot: AppSnapshot, agentId: string): AppSnapshot {
+  if (findAgent(snapshot, agentId)) {
+    snapshot.activeAgentId = agentId;
+  }
+
+  return snapshot;
+}
+
 export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRendererEvent): void {
   if (event.type === 'appServer.statusChanged') {
     const payload = event.payload as AppSnapshot['appServer'];
@@ -93,6 +101,11 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   }
 
   if (!event.agentId) {
+    return;
+  }
+
+  if (event.type === 'agent.statusChanged') {
+    setAgentStatus(snapshot, event.agentId, event.payload as AgentStatus);
     return;
   }
 
@@ -144,8 +157,9 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
 
   if (event.type === 'error') {
     const payload = event.payload as { message?: unknown };
-    appendSystemMessage(snapshot, event.agentId, typeof payload.message === 'string' ? payload.message : 'Codex app-server error');
-    setAgentStatus(snapshot, event.agentId, { type: 'error', message: 'Codex app-server error' });
+    const message = typeof payload.message === 'string' ? payload.message : 'Codex app-server error';
+    appendSystemMessage(snapshot, event.agentId, message);
+    setAgentStatus(snapshot, event.agentId, { type: 'error', message });
   }
 }
 
@@ -566,16 +580,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }
 
-function createSeedAgent(): Agent {
-  return {
-    id: 'agent-dina',
-    name: 'Dina',
-    avatar: 'DI',
-    folder: '~/src/codex-claw',
-    status: { type: 'idle' },
-    createdAt: seedCreatedAt,
-    updatedAt: seedCreatedAt,
-  };
+function createSeedAgents(): Agent[] {
+  return [
+    {
+      id: 'agent-dina',
+      name: 'Dina',
+      avatar: 'DI',
+      folder: '~/src/codex-claw',
+      status: { type: 'idle' },
+      createdAt: seedCreatedAt,
+      updatedAt: seedCreatedAt,
+    },
+    {
+      id: 'agent-jesse',
+      name: 'Jesse',
+      avatar: 'JE',
+      folder: '~/src/codex-claw',
+      status: { type: 'idle' },
+      createdAt: seedCreatedAt,
+      updatedAt: seedCreatedAt,
+    },
+  ];
 }
 
 function slug(value: string): string {

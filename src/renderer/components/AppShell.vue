@@ -8,6 +8,7 @@
       :agents="snapshot.agents"
       :active-agent-id="snapshot.activeAgentId"
       :bench-count="snapshot.bench.length"
+      @select-agent="$emit('select-agent', $event)"
     />
     <section class="app-shell__workspace">
       <AgentHeader
@@ -43,6 +44,7 @@ defineProps<{
 }>();
 
 defineEmits<{
+  'select-agent': [agentId: string];
   sendPrompt: [prompt: string];
 }>();
 </script>

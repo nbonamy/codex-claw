@@ -4,5 +4,6 @@ export {
   applyMainEventToSnapshot,
   createAgentFromInput,
   createInitialSnapshot,
+  selectAgent,
   updateAgentFolder,
 } from '../shared/snapshot';
