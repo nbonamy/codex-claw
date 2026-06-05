@@ -96,6 +96,7 @@ function isActiveToolCall(toolCall: MessageToolCall) {
   max-width: 100%;
   padding: 0;
   border: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text-muted);
   font: inherit;
@@ -103,9 +104,16 @@ function isActiveToolCall(toolCall: MessageToolCall) {
   text-align: left;
 }
 
+.chat-tool-group__header:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: var(--space-1);
+}
+
 .chat-tool-group__icon,
 .chat-tool-group__chevron {
   flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
   color: var(--color-text-muted);
 }
 

@@ -33,6 +33,10 @@ export type MessageMedia = {
   url: string;
 };
 
+export type MessagePart =
+  | { type: 'text'; content: string }
+  | { type: 'tool'; toolCall: MessageToolCall };
+
 export type MessageSuggestedPrompt = {
   kind: 'chat' | 'idea';
   text: string;
@@ -45,6 +49,7 @@ export type Message = {
   engine?: string;
   id?: string;
   model?: string;
+  parts?: MessagePart[];
   streaming?: boolean;
   suggestedPrompts?: MessageSuggestedPrompt[];
   toolCalls?: MessageToolCall[];

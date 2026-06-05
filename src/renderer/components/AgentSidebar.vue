@@ -31,12 +31,6 @@
 
     <footer class="agent-sidebar__footer">
       <el-button
-        class="agent-sidebar__folder"
-        @click="$emit('selectFolder')"
-      >
-        Change Folder
-      </el-button>
-      <el-button
         type="primary"
         class="agent-sidebar__new"
       >
@@ -53,10 +47,6 @@ defineProps<{
   agents: Agent[];
   activeAgentId: string | null;
   benchCount: number;
-}>();
-
-defineEmits<{
-  selectFolder: [];
 }>();
 
 function agentStatusLabel(status: AgentStatus['type']): string {
@@ -181,7 +171,6 @@ function agentStatusLabel(status: AgentStatus['type']): string {
   border-top: 1px solid var(--cc-border-muted);
 }
 
-.agent-sidebar__folder,
 .agent-sidebar__new {
   width: 100%;
 }

@@ -33,6 +33,8 @@ const messages: RendererMessage[] = [
       { type: 'text', text: 'Looking now.' },
       {
         type: 'tool',
+        id: 'tool-npm-test',
+        kind: 'command',
         title: 'npm test',
         status: 'running',
         body: 'running vitest',

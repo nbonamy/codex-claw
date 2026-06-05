@@ -4,6 +4,7 @@ import type { Agent, MainToRendererEvent } from '../../shared/contracts';
 import type { CodexRpcClient } from './rpc-client';
 import type {
   CodexNotification,
+  CodexRawResponseItem,
   CodexThread,
   CodexSessionEvent,
   CodexSessionPromptResult,
@@ -11,6 +12,7 @@ import type {
   ThreadStartResponse,
   TurnStartResponse,
 } from './protocol';
+import { rawResponseItemToEvent } from './raw-response-item-adapter';
 
 type AgentSession = {
   agentId: string;
@@ -135,6 +137,72 @@ export class CodexAgentSessionManager {
         payload: {
           itemId: params.itemId,
           delta: params.delta,
+        },
+      });
+      return;
+    }
+
+    if (notification.method === 'item/started' || notification.method === 'item/completed') {
+      const params = notification.params as { threadId: string; turnId: string; item: unknown };
+      this.emitForThread(params.threadId, {
+        turnId: params.turnId,
+        type: notification.method === 'item/started' ? 'item.started' : 'item.completed',
+        payload: {
+          item: params.item,
+        },
+      });
+      return;
+    }
+
+    if (notification.method === 'rawResponseItem/completed') {
+      const params = notification.params as { threadId: string; turnId: string; item: CodexRawResponseItem };
+      const event = rawResponseItemToEvent(params.item);
+      if (event) {
+        this.emitForThread(params.threadId, {
+          turnId: params.turnId,
+          ...event,
+        });
+      }
+      return;
+    }
+
+    if (notification.method === 'item/commandExecution/outputDelta') {
+      const params = notification.params as { threadId: string; turnId: string; itemId: string; delta: string };
+      this.emitForThread(params.threadId, {
+        turnId: params.turnId,
+        type: 'item.updated',
+        payload: {
+          itemId: params.itemId,
+          delta: params.delta,
+          kind: 'commandExecution.outputDelta',
+        },
+      });
+      return;
+    }
+
+    if (notification.method === 'item/fileChange/patchUpdated') {
+      const params = notification.params as { threadId: string; turnId: string; itemId: string; changes: unknown[] };
+      this.emitForThread(params.threadId, {
+        turnId: params.turnId,
+        type: 'item.updated',
+        payload: {
+          itemId: params.itemId,
+          changes: params.changes,
+          kind: 'fileChange.patchUpdated',
+        },
+      });
+      return;
+    }
+
+    if (notification.method === 'item/mcpToolCall/progress') {
+      const params = notification.params as { threadId: string; turnId: string; itemId: string; message: string };
+      this.emitForThread(params.threadId, {
+        turnId: params.turnId,
+        type: 'item.updated',
+        payload: {
+          itemId: params.itemId,
+          message: params.message,
+          kind: 'mcpToolCall.progress',
         },
       });
       return;

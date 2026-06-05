@@ -61,6 +61,25 @@ describe('message block computation', () => {
     expect(blocks.at(-1)).toStrictEqual({ type: 'follow-ups', prompts: ['Open the diff'] });
   });
 
+  it('uses ordered message parts to place Codex tool calls between text chunks', () => {
+    const blocks = computeMessageBlocks({
+      role: 'assistant',
+      content: 'Before the read.\n\nAfter the read.',
+      parts: [
+        { type: 'text', content: 'Before the read.' },
+        { type: 'tool', toolCall: completedTool },
+        { type: 'text', content: 'After the read.' },
+      ],
+      toolCalls: [completedTool],
+    });
+
+    expect(blocks).toStrictEqual([
+      { type: 'text', content: 'Before the read.' },
+      { type: 'tool-group', toolCalls: [completedTool] },
+      { type: 'text', content: 'After the read.' },
+    ]);
+  });
+
   it('completes partial streaming follow-up and tool tags', () => {
     const blocks = computeMessageBlocks({
       role: 'assistant',

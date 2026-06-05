@@ -42,8 +42,18 @@ export type BenchTemplate = {
 };
 
 export type RendererMessagePart =
-  | { type: 'text'; text: string }
-  | { type: 'tool'; title: string; status: 'running' | 'completed' | 'failed'; body?: string }
+  | { type: 'text'; text: string; itemId?: string }
+  | {
+    type: 'tool';
+    id: string;
+    kind: 'command' | 'mcp' | 'dynamic' | 'fileChange' | 'generic';
+    title: string;
+    status: 'running' | 'completed' | 'failed';
+    body?: string;
+    input?: unknown;
+    output?: unknown;
+    metadata?: Record<string, unknown>;
+  }
   | { type: 'status'; text: string };
 
 export type RendererMessage = {

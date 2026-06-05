@@ -47,18 +47,6 @@ export function useAppState() {
     }
   }
 
-  async function selectAgentFolder(): Promise<void> {
-    const agentId = activeAgent.value?.id;
-    if (!agentId || !window.codexClaw) {
-      return;
-    }
-
-    const nextSnapshot = await window.codexClaw.selectAgentFolder(agentId);
-    if (nextSnapshot) {
-      snapshot.value = nextSnapshot;
-    }
-  }
-
   return {
     snapshot,
     activeAgent,
@@ -67,7 +55,6 @@ export function useAppState() {
     isSending,
     loadSnapshot,
     sendPrompt,
-    selectAgentFolder,
   };
 }
 

@@ -27,6 +27,7 @@
   --cc-text-inverse: #ffffff;
   --cc-code-text: #262626;
   --cc-accent: #111111;
+  --cc-link: #3f68bd;
   --cc-send-bg: #111111;
   --cc-send-bg-hover: #2b2b2b;
   --cc-send-disabled-bg: #d0d0d0;
@@ -54,6 +55,7 @@
 
   /* id8 chat component aliases, derived from Codex Claw theme tokens. */
   --color-primary: var(--cc-accent);
+  --color-link: var(--cc-link);
   --color-success: var(--cc-status-success);
   --color-error: var(--cc-status-danger);
   --color-border: var(--cc-border);
@@ -62,6 +64,7 @@
   --color-surface-base: var(--cc-user-message-bg);
   --color-surface-low: var(--cc-tool-bg);
   --color-surface-lowest: var(--cc-conversation-bg);
+  --color-overlay: rgb(0 0 0 / 72%);
   --color-on-surface: var(--cc-text);
   --color-on-surface-variant: var(--cc-send-bg);
   --color-text: var(--cc-text);

@@ -6,7 +6,6 @@
     :is-loading="isLoading"
     :is-sending="isSending"
     @send-prompt="sendPrompt"
-    @select-agent-folder="selectAgentFolder"
   />
 </template>
 
@@ -23,7 +22,6 @@ const {
   isSending,
   loadSnapshot,
   sendPrompt,
-  selectAgentFolder,
 } = useAppState();
 
 onMounted(() => {

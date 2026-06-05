@@ -11,7 +11,15 @@ describe('renderer message adapter', () => {
       parts: [
         { type: 'text', text: 'Done.' },
         { type: 'status', text: 'checked workspace' },
-        { type: 'tool', title: 'npm test', status: 'completed', body: '46 passed' },
+        {
+          type: 'tool',
+          id: 'tool-npm-test',
+          kind: 'command',
+          title: 'npm test',
+          status: 'completed',
+          body: '46 passed',
+          input: { command: 'npm test' },
+        },
       ],
       role: 'assistant',
       status: 'streaming',
@@ -21,14 +29,30 @@ describe('renderer message adapter', () => {
       content: 'Done.\n\nchecked workspace',
       createdAt: '2026-06-05T00:00:00.000Z',
       id: 'assistant-turn-1',
+      parts: [
+        { type: 'text', content: 'Done.' },
+        { type: 'text', content: 'checked workspace' },
+        {
+          type: 'tool',
+          toolCall: {
+            args: { command: 'npm test' },
+            done: true,
+            function: 'npm test',
+            id: 'tool-npm-test',
+            result: '46 passed',
+            state: 'completed',
+            status: 'completed',
+          },
+        },
+      ],
       role: 'assistant',
       streaming: true,
       toolCalls: [
         {
-          args: { output: '46 passed' },
+          args: { command: 'npm test' },
           done: true,
           function: 'npm test',
-          id: 'assistant-turn-1-tool-0',
+          id: 'tool-npm-test',
           result: '46 passed',
           state: 'completed',
           status: 'completed',
@@ -58,7 +82,7 @@ describe('renderer message adapter', () => {
       createdAt: '2026-06-05T00:00:00.000Z',
       id: 'assistant-turn-2',
       parts: [
-        { type: 'tool', title: 'git diff', status: 'failed' },
+        { type: 'tool', id: 'tool-git-diff', kind: 'command', title: 'git diff', status: 'failed' },
       ],
       role: 'assistant',
       status: 'complete',
@@ -69,11 +93,51 @@ describe('renderer message adapter', () => {
         args: undefined,
         done: true,
         function: 'git diff',
-        id: 'assistant-turn-2-tool-0',
+        id: 'tool-git-diff',
         result: undefined,
         state: 'error',
         status: 'failed',
       },
+    ]);
+  });
+
+  it('preserves ordered renderer parts so tools can render between text chunks', () => {
+    const rendererMessage: RendererMessage = {
+      agentId: 'agent-dina',
+      createdAt: '2026-06-05T00:00:00.000Z',
+      id: 'assistant-turn-ordered',
+      parts: [
+        { type: 'text', text: 'Before the read.' },
+        {
+          type: 'tool',
+          id: 'tool-read',
+          kind: 'command',
+          title: 'cat docs/architecture.md',
+          status: 'completed',
+          body: 'architecture contents',
+          input: { command: 'cat docs/architecture.md' },
+        },
+        { type: 'text', text: 'After the read.' },
+      ],
+      role: 'assistant',
+      status: 'complete',
+    };
+
+    expect(rendererMessageToChatMessage(rendererMessage).parts).toStrictEqual([
+      { type: 'text', content: 'Before the read.' },
+      {
+        type: 'tool',
+        toolCall: {
+          args: { command: 'cat docs/architecture.md' },
+          done: true,
+          function: 'cat docs/architecture.md',
+          id: 'tool-read',
+          result: 'architecture contents',
+          state: 'completed',
+          status: 'completed',
+        },
+      },
+      { type: 'text', content: 'After the read.' },
     ]);
   });
 });

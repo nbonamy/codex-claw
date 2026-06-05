@@ -116,6 +116,7 @@
   --icon-sm: 16px;
   --shadow-sm: var(--cc-shadow-soft);
   --shadow-md: var(--cc-shadow-panel);
+  --shadow-lg: var(--cc-shadow-panel);
   --workbench-layout-header-offset: 0px;
   --workbench-layout-footer-offset: 0px;
 }

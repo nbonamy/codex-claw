@@ -14,13 +14,12 @@ describe('useAppState', () => {
     expect(state.visibleMessages.value).toHaveLength(0);
   });
 
-  it('does not send prompts or select folders without preload or an active agent', async () => {
+  it('does not send prompts without preload or an active agent', async () => {
     vi.stubGlobal('window', {});
     const state = useAppState();
     state.snapshot.value.activeAgentId = null;
 
     await state.sendPrompt('ignored');
-    await state.selectAgentFolder();
 
     expect(state.visibleMessages.value).toStrictEqual([]);
   });
@@ -94,33 +93,6 @@ describe('useAppState', () => {
     expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'hello');
     expect(state.isSending.value).toBe(false);
     expect(state.visibleMessages.value.at(-1)?.parts).toStrictEqual([{ type: 'text', text: 'hello' }]);
-  });
-
-  it('updates the snapshot when a folder is selected and ignores canceled selection', async () => {
-    const selectedSnapshot = createInitialSnapshot();
-    selectedSnapshot.agents[0].folder = '/Users/nbonamy/src/id8';
-    const selectAgentFolder = vi.fn()
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(selectedSnapshot);
-
-    vi.stubGlobal('window', {
-      codexClaw: {
-        getSnapshot: vi.fn().mockResolvedValue(createInitialSnapshot()),
-        selectAgentFolder,
-        onEvent: vi.fn(),
-      } satisfies Partial<CodexClawApi>,
-    });
-
-    const state = useAppState();
-    await state.loadSnapshot();
-    await state.selectAgentFolder();
-
-    expect(state.activeAgent.value?.folder).toBe('~/src/codex-claw');
-
-    await state.selectAgentFolder();
-
-    expect(selectAgentFolder).toHaveBeenCalledWith('agent-dina');
-    expect(state.activeAgent.value?.folder).toBe('/Users/nbonamy/src/id8');
   });
 
   it('applies streamed main-process events to the visible conversation', async () => {

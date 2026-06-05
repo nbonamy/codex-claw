@@ -29,7 +29,7 @@ describe('AppShell', () => {
     expect(wrapper.text()).not.toContain('Artifacts');
   });
 
-  it('forwards prompt and folder actions from child surfaces', async () => {
+  it('forwards prompts from the composer', async () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mount(AppShell, {
       props: {
@@ -44,11 +44,9 @@ describe('AppShell', () => {
       },
     });
 
-    await wrapper.find('.agent-sidebar__folder').trigger('click');
     await wrapper.get('textarea').setValue('hello');
     await wrapper.get('form').trigger('submit');
 
-    expect(wrapper.emitted('selectAgentFolder')).toHaveLength(1);
     expect(wrapper.emitted('sendPrompt')).toStrictEqual([['hello']]);
   });
 });

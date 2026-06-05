@@ -103,6 +103,8 @@ Important notifications:
 - `turn/completed`
 - `item/started`
 - `item/completed`
+- `rawResponseItem/completed` as a compatibility/fallback path for raw
+  Responses items that are not projected into `ThreadItem`s.
 - `item/agentMessage/delta`
 - `item/reasoning/*`
 - `item/plan/delta`
@@ -149,17 +151,31 @@ Codex app-server event -> Codex adapter -> app event -> renderer store -> UI
 Renderer components consume app-owned state such as `RendererMessage`,
 `RendererToolCall`, plan state, approval state, and diff state.
 
+Do not encode Codex tool calls as id8-style `<tool>` text tags. Those tags are
+an id8/multi-LLM parsing artifact. Codex app-server already emits structured
+`ThreadItem` payloads and item-specific progress notifications, so Codex Claw
+should preserve that structure in main-process adapters and expose app-owned
+tool parts to the renderer. The chat renderer preserves placement with ordered
+message parts (`text`, `tool`, `text`) so tool calls appear where they happened
+in the stream while the legacy id8 `<tool>` parser remains available for copied
+id8-shaped messages.
+
 Mapping sketch:
 
 - `UserMessage` becomes a user message.
 - `AgentMessageDelta` appends assistant text to an in-flight assistant message.
 - completed `AgentMessage` finalizes the assistant message.
-- `CommandExecution` becomes a tool call named `command_execution`.
+- `CommandExecution` from `item/started` and `item/completed` becomes a
+  command tool part with stable item id, command, cwd, status, output, exit
+  code, and duration.
 - `CommandExecutionOutputDelta` appends output to the matching tool call.
 - `FileChange` and `FileChangePatchUpdated` become file-change tool/diff
   state.
 - `TurnDiffUpdated` updates the turn-level diff panel.
 - MCP and dynamic tool calls become renderer tool calls.
+- `rawResponseItem/completed` is adapted in main into the same app-owned tool
+  events when the app-server exposes raw function, shell, custom-tool, search,
+  or output items.
 - approval and ask-user requests become pending UI prompts.
 - `TurnCompleted` finalizes streaming state and updates usage/status.
 

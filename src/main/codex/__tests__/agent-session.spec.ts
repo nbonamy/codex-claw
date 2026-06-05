@@ -157,6 +157,42 @@ describe('CodexAgentSessionManager', () => {
         delta: 'Hello back.',
       },
     });
+    transport.receive({
+      method: 'item/started',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        item: {
+          type: 'commandExecution',
+          id: 'cmd-1',
+          command: 'npm test',
+          status: 'inProgress',
+        },
+      },
+    });
+    transport.receive({
+      method: 'item/commandExecution/outputDelta',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        itemId: 'cmd-1',
+        delta: 'running\n',
+      },
+    });
+    transport.receive({
+      method: 'item/completed',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        item: {
+          type: 'commandExecution',
+          id: 'cmd-1',
+          command: 'npm test',
+          status: 'completed',
+          aggregatedOutput: 'passed',
+        },
+      },
+    });
     transport.receive({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
 
     expect(events).toStrictEqual([
@@ -191,8 +227,136 @@ describe('CodexAgentSessionManager', () => {
         agentId: 'agent-dina',
         threadId: 'thread-1',
         turnId: 'turn-1',
+        type: 'item.started',
+        payload: {
+          item: {
+            type: 'commandExecution',
+            id: 'cmd-1',
+            command: 'npm test',
+            status: 'inProgress',
+          },
+        },
+        occurredAt: '<now>',
+      },
+      {
+        seq: 5,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        type: 'item.updated',
+        payload: {
+          itemId: 'cmd-1',
+          delta: 'running\n',
+          kind: 'commandExecution.outputDelta',
+        },
+        occurredAt: '<now>',
+      },
+      {
+        seq: 6,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        type: 'item.completed',
+        payload: {
+          item: {
+            type: 'commandExecution',
+            id: 'cmd-1',
+            command: 'npm test',
+            status: 'completed',
+            aggregatedOutput: 'passed',
+          },
+        },
+        occurredAt: '<now>',
+      },
+      {
+        seq: 7,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        turnId: 'turn-1',
         type: 'turn.completed',
         payload: { status: 'completed' },
+        occurredAt: '<now>',
+      },
+    ]);
+  });
+
+  it('adapts raw response tool items into app-owned renderer events', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+    const events: unknown[] = [];
+    manager.onEvent((event) => events.push({
+      ...event,
+      occurredAt: '<now>',
+    }));
+
+    await resolveStartedPrompt(transport, manager);
+
+    transport.receive({
+      method: 'rawResponseItem/completed',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        item: {
+          type: 'function_call',
+          name: 'shell_command',
+          call_id: 'raw-call-1',
+          arguments: JSON.stringify({
+            command: 'sed -n 1,80p docs/architecture.md',
+            workdir: '/Users/nbonamy/src/codex-claw',
+          }),
+        },
+      },
+    });
+    transport.receive({
+      method: 'rawResponseItem/completed',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        item: {
+          type: 'function_call_output',
+          call_id: 'raw-call-1',
+          output: 'architecture contents',
+        },
+      },
+    });
+
+    expect(events).toStrictEqual([
+      {
+        seq: 1,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        type: 'item.started',
+        payload: {
+          item: {
+            type: 'commandExecution',
+            id: 'raw-call-1',
+            command: 'sed -n 1,80p docs/architecture.md',
+            cwd: '/Users/nbonamy/src/codex-claw',
+            processId: null,
+            source: 'agent',
+            status: 'inProgress',
+            commandActions: [],
+            aggregatedOutput: null,
+            exitCode: null,
+            durationMs: null,
+          },
+        },
+        occurredAt: '<now>',
+      },
+      {
+        seq: 2,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        type: 'item.updated',
+        payload: {
+          itemId: 'raw-call-1',
+          kind: 'rawResponseItem.output',
+          output: 'architecture contents',
+          status: 'completed',
+          title: undefined,
+        },
         occurredAt: '<now>',
       },
     ]);
@@ -234,6 +398,17 @@ describe('CodexAgentSessionManager', () => {
     });
   });
 });
+
+async function resolveStartedPrompt(transport: FakeTransport, manager: CodexAgentSessionManager): Promise<void> {
+  const prompt = manager.sendPrompt(agent, 'hello codex');
+  await waitForSentCount(transport, 1);
+  transport.receive({ id: 1, result: { userAgent: 'codex', codexHome: '/tmp/codex-home', platformFamily: 'unix', platformOs: 'macos' } });
+  await waitForSentCount(transport, 3);
+  transport.receive({ id: 2, result: { thread: { id: 'thread-1', cwd: '/Users/nbonamy/src/codex-claw' } } });
+  await waitForSentCount(transport, 4);
+  transport.receive({ id: 3, result: { turn: { id: 'turn-1', status: 'running' } } });
+  await prompt;
+}
 
 async function waitForSentCount(transport: FakeTransport, count: number): Promise<void> {
   await vi.waitFor(() => {

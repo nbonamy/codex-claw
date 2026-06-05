@@ -22,6 +22,17 @@ export type CodexTurn = {
   status: string;
 };
 
+export type CodexThreadItem = {
+  type: string;
+  id?: string;
+  [key: string]: unknown;
+};
+
+export type CodexRawResponseItem = {
+  type: string;
+  [key: string]: unknown;
+};
+
 export type InitializeResponse = {
   userAgent: string;
   codexHome: string;
@@ -43,6 +54,12 @@ export type CodexNotification =
   | { method: 'thread/started'; params: { thread: CodexThread } }
   | { method: 'turn/started'; params: { threadId: string; turn: CodexTurn } }
   | { method: 'item/agentMessage/delta'; params: { threadId: string; turnId: string; itemId: string; delta: string } }
+  | { method: 'item/started'; params: { threadId: string; turnId: string; item: CodexThreadItem } }
+  | { method: 'item/completed'; params: { threadId: string; turnId: string; item: CodexThreadItem } }
+  | { method: 'rawResponseItem/completed'; params: { threadId: string; turnId: string; item: CodexRawResponseItem } }
+  | { method: 'item/commandExecution/outputDelta'; params: { threadId: string; turnId: string; itemId: string; delta: string } }
+  | { method: 'item/fileChange/patchUpdated'; params: { threadId: string; turnId: string; itemId: string; changes: unknown[] } }
+  | { method: 'item/mcpToolCall/progress'; params: { threadId: string; turnId: string; itemId: string; message: string } }
   | { method: 'turn/completed'; params: { threadId: string; turn: CodexTurn } }
   | { method: string; params?: unknown };
 

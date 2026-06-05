@@ -1,4 +1,4 @@
-import { getMessageToolCallArgs, getMessageToolCallName, type Message, type MessageMedia, type MessageToolCall } from './types'
+import { getMessageToolCallArgs, getMessageToolCallName, type Message, type MessageMedia, type MessageToolCall, type MessagePart } from './types'
 
 export type MessageBlock =
   | { type: 'text'; content: string }
@@ -31,14 +31,48 @@ export function computeMessageBlocks(message: Message): MessageBlock[] {
   }
 
   const toolCalls = message.toolCalls ?? []
-  if (!message.content && toolCalls.length === 0) {
+  const parts = message.parts ?? []
+  if (!message.content && toolCalls.length === 0 && parts.length === 0) {
     return []
   }
 
-  const { content, prompts } = extractFollowUps(completeStreamingCustomTags(message.content))
+  if (parts.length > 0) {
+    return computeMessageBlocksFromParts(parts, toolCalls)
+  }
+
+  const anchoredToolCallIds = new Set<string>()
+  const { blocks, prompts } = parseTextBlocks(message.content, toolCalls, anchoredToolCallIds)
+
+  appendUnanchoredTools(blocks, toolCalls, anchoredToolCallIds)
+  return finalizeAssistantBlocks(blocks, prompts)
+}
+
+function computeMessageBlocksFromParts(parts: MessagePart[], toolCalls: MessageToolCall[]): MessageBlock[] {
+  const blocks: MessageBlock[] = []
+  const prompts: string[] = []
+  const anchoredToolCallIds = new Set<string>()
+
+  for (const part of parts) {
+    if (part.type === 'tool') {
+      anchoredToolCallIds.add(part.toolCall.id)
+      blocks.push({ type: 'tool', toolCall: part.toolCall })
+      continue
+    }
+
+    const parsed = parseTextBlocks(part.content, toolCalls, anchoredToolCallIds)
+    blocks.push(...parsed.blocks)
+    prompts.push(...parsed.prompts)
+  }
+
+  appendUnanchoredTools(blocks, toolCalls, anchoredToolCallIds)
+  return finalizeAssistantBlocks(blocks, prompts)
+}
+
+function parseTextBlocks(rawContent: string, toolCalls: MessageToolCall[], anchoredToolCallIds: Set<string>) {
+  const { content, prompts } = extractFollowUps(completeStreamingCustomTags(rawContent))
   const codeBlocks = findCodeBlocks(content)
   const blocks: MessageBlock[] = []
-  const anchoredToolCallIds = findReferencedToolCallIds(content, toolCalls)
+  addReferencedToolCallIds(content, toolCalls, anchoredToolCallIds)
   let lastIndex = 0
 
   for (const item of findSpecialBlocks(content, codeBlocks)) {
@@ -76,12 +110,18 @@ export function computeMessageBlocks(message: Message): MessageBlock[] {
     pushTextBlock(blocks, content.slice(lastIndex))
   }
 
+  return { blocks, prompts }
+}
+
+function appendUnanchoredTools(blocks: MessageBlock[], toolCalls: MessageToolCall[], anchoredToolCallIds: Set<string>) {
   for (const toolCall of toolCalls) {
     if (!anchoredToolCallIds.has(toolCall.id)) {
       blocks.push({ type: 'tool', toolCall })
     }
   }
+}
 
+function finalizeAssistantBlocks(blocks: MessageBlock[], prompts: string[]): MessageBlock[] {
   const grouped = groupToolBlocks(blocks)
   if (prompts.length > 0) {
     grouped.push({ type: 'follow-ups', prompts })
@@ -235,15 +275,13 @@ function findToolCall(kind: string, value: string, toolCalls: MessageToolCall[])
   return undefined
 }
 
-function findReferencedToolCallIds(content: string, toolCalls: MessageToolCall[]) {
-  const ids = new Set<string>()
+function addReferencedToolCallIds(content: string, toolCalls: MessageToolCall[], ids: Set<string>) {
   for (const match of content.matchAll(toolTagRegex)) {
     const toolCall = findToolCall(match[1], match[2], toolCalls)
     if (toolCall) {
       ids.add(toolCall.id)
     }
   }
-  return ids
 }
 
 function findMediaToolCall(media: MessageMedia, toolCalls: MessageToolCall[]) {

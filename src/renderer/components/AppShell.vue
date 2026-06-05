@@ -8,7 +8,6 @@
       :agents="snapshot.agents"
       :active-agent-id="snapshot.activeAgentId"
       :bench-count="snapshot.bench.length"
-      @select-folder="$emit('selectAgentFolder')"
     />
     <section class="app-shell__workspace">
       <AgentHeader
@@ -45,7 +44,6 @@ defineProps<{
 
 defineEmits<{
   sendPrompt: [prompt: string];
-  selectAgentFolder: [];
 }>();
 </script>
 

@@ -119,12 +119,21 @@ function formatValue(value: unknown) {
 .chat-tool-call__header {
   padding: 0;
   border: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   cursor: pointer;
 }
 
-.chat-tool-call__chevron {
+.chat-tool-call__header:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: var(--space-1);
+}
+
+.chat-tool-call__chevron,
+.chat-tool-group__chevron {
   flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
   color: var(--color-text-muted);
 }
 

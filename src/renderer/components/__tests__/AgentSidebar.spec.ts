@@ -62,11 +62,15 @@ describe('AgentSidebar', () => {
     expect(wrapper.find('.agent-sidebar__agent--active .agent-sidebar__avatar').text()).toBe('JE');
   });
 
-  it('emits folder selection from the footer action', async () => {
+  it('labels non-idle statuses for assistive tech', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
-        agents,
-        activeAgentId: 'agent-dina',
+        agents: [
+          { ...agents[0], id: 'starting', status: { type: 'starting' } },
+          { ...agents[0], id: 'awaiting', status: { type: 'awaitingInput' } },
+          { ...agents[0], id: 'error', status: { type: 'error', message: 'failed' } },
+        ],
+        activeAgentId: 'starting',
         benchCount: 0,
       },
       global: {
@@ -74,8 +78,8 @@ describe('AgentSidebar', () => {
       },
     });
 
-    await wrapper.find('.agent-sidebar__folder').trigger('click');
-
-    expect(wrapper.emitted('selectFolder')).toHaveLength(1);
+    expect(wrapper.find('[aria-label="Starting"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Awaiting input"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Error"]').exists()).toBe(true);
   });
 });

@@ -9,22 +9,14 @@
     class="chat-message-block chat-message-block--text"
     v-html="renderMarkdown(block.content)"
   />
-  <pre
+  <ChatMermaidBlock
     v-else-if="block.type === 'mermaid'"
-    class="chat-message-block chat-message-block--mermaid"
-  >{{ block.code }}</pre>
-  <figure
+    :code="block.code"
+  />
+  <ChatMediaBlock
     v-else-if="block.type === 'media'"
-    class="chat-message-block chat-message-block--media"
-  >
-    <img
-      :alt="block.media.alt ?? block.media.title ?? 'Generated media'"
-      :src="block.media.url"
-    >
-    <figcaption v-if="block.media.title || block.media.prompt">
-      {{ block.media.title ?? block.media.prompt }}
-    </figcaption>
-  </figure>
+    :media="block.media"
+  />
   <ChatToolCall
     v-else-if="block.type === 'tool'"
     :answered-client-request-ids="answeredClientRequestIds"
@@ -49,6 +41,8 @@
 
 <script setup lang="ts">
 import ChatFollowUps from './ChatFollowUps.vue'
+import ChatMediaBlock from './ChatMediaBlock.vue'
+import ChatMermaidBlock from './ChatMermaidBlock.vue'
 import ChatToolGroup from './ChatToolGroup.vue'
 import ChatToolCall from './ChatToolCall.vue'
 import { renderMarkdown, renderUserText } from './message-markdown'
@@ -74,7 +68,7 @@ const emit = defineEmits<{
   overflow-wrap: anywhere;
   line-height: var(--line-height-24);
   font-size: var(--font-size-16);
-  opacity: 0.9;
+  opacity: 0.85;
 }
 
 .chat-message--user .chat-message-block--text {
@@ -146,18 +140,18 @@ const emit = defineEmits<{
   font-size: var(--font-size-14);
 }
 
-.chat-message-block--text :deep(pre),
-.chat-message-block--mermaid {
+.chat-message-block--text :deep(pre) {
   overflow: auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: var(--space-8);
   background: var(--color-surface-low);
-  color: var(--color-text);
 }
 
-.chat-message-block--text :deep(pre code),
-.chat-message-block--mermaid {
+.chat-message-block--text :deep(pre code) {
+  padding: 0;
+  background: transparent;
+  color: inherit;
   font-family: var(--font-family-mono);
   font-size: var(--font-size-13);
   line-height: var(--line-height-20);
@@ -170,10 +164,14 @@ const emit = defineEmits<{
 }
 
 .chat-message-block--text :deep(a) {
-  color: var(--color-primary);
+  color: var(--color-link);
   line-height: inherit;
   text-decoration: none;
   vertical-align: baseline;
+}
+
+.chat-message-block--text :deep(a:hover) {
+  color: var(--color-link);
 }
 
 .chat-message-block--text :deep(.chat-message-link__icon) {
@@ -194,19 +192,22 @@ const emit = defineEmits<{
   margin-right: var(--space-3);
 }
 
-.chat-message-block--media {
-  margin: 0;
+.chat-message-block--text :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-14);
 }
 
-.chat-message-block--media img {
-  display: block;
-  max-width: 100%;
-  border-radius: var(--radius-lg);
+.chat-message-block--text :deep(th),
+.chat-message-block--text :deep(td) {
+  border: 1px solid var(--color-border);
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  vertical-align: top;
 }
 
-.chat-message-block--media figcaption {
-  margin-top: var(--space-2);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-13);
+.chat-message-block--text :deep(th) {
+  background: var(--color-surface-low);
+  font-weight: var(--font-weight-semibold);
 }
 </style>
