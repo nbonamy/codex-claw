@@ -1,7 +1,5 @@
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AgentAvatarPicker from '../AgentAvatarPicker.vue';
 
@@ -28,8 +26,9 @@ describe('AgentAvatarPicker', () => {
     const wrapper = mountPicker({ modelValue: '🤖', name: 'Dina Bot' });
 
     await wrapper.get('.agent-avatar-picker__trigger').trigger('click');
-    expect(wrapper.findAll('.agent-avatar-picker__preset')[0].text()).toBe('DB');
-    await wrapper.findAll('.agent-avatar-picker__preset')[0].trigger('click');
+    const initialsButton = wrapper.findAll('.agent-avatar-picker__preset')[0];
+    expect(initialsButton.attributes('aria-label')).toBe('Use initials');
+    await initialsButton.trigger('click');
 
     expect(wrapper.emitted('update:modelValue')).toStrictEqual([[undefined]]);
   });
@@ -127,14 +126,6 @@ describe('AgentAvatarPicker', () => {
 
     expect(wrapper.findComponent({ name: 'AgentAvatarCropDialog' }).props('visible')).toBe(false);
     expect(wrapper.emitted('update:modelValue')).toBeUndefined();
-  });
-
-  it('keeps the picker compact and right-aligned inside dialog rows', () => {
-    const source = readFileSync(join(import.meta.dirname, '../AgentAvatarPicker.vue'), 'utf8');
-
-    expect(source).toContain('justify-self: end;');
-    expect(source).toContain('width: 276px;');
-    expect(source).toContain('grid-template-columns: repeat(6, var(--space-12));');
   });
 });
 

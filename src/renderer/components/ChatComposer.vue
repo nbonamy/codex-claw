@@ -120,8 +120,7 @@ function resizeTextareaSoon(): void {
 }
 
 .chat-composer:focus-within {
-  border-color: var(--color-border-strong);
-  box-shadow: var(--shadow-lg), 0 0 0 3px var(--color-outline-subtle);
+  box-shadow: 0 0 var(--space-6) var(--space-2) var(--color-surface-low), var(--shadow-md);
 }
 
 .chat-composer--disabled {

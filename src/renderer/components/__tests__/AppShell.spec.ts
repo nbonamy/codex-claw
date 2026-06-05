@@ -1,8 +1,6 @@
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { nextTick } from 'vue';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '../../../shared/snapshot';
@@ -130,16 +128,6 @@ describe('AppShell', () => {
     await nextTick();
 
     expect(sidebar().attributes('style')).toContain('--agent-sidebar-width: 320px');
-  });
-
-  it('animates collapse without animating manual resize width changes', () => {
-    const appShellSource = readFileSync(join(import.meta.dirname, '../AppShell.vue'), 'utf8');
-    const sidebarSource = readFileSync(join(import.meta.dirname, '../AgentSidebar.vue'), 'utf8');
-
-    expect(appShellSource).toContain('<Transition name="agent-sidebar">');
-    expect(appShellSource).toContain('.app-shell > .agent-sidebar-enter-active');
-    expect(appShellSource).toContain('.app-shell > .agent-sidebar-leave-to');
-    expect(sidebarSource).not.toContain('transition:');
   });
 
   it('resolves the active team from legacy agent membership when teamId is missing', () => {

@@ -83,6 +83,22 @@ export type RendererMessagePart =
   }
   | { type: 'status'; text: string };
 
+export type RendererToolPart = Extract<RendererMessagePart, { type: 'tool' }>;
+
+export type RendererToolPartUpdate = {
+  itemId: string;
+  title?: string;
+  status?: RendererToolPart['status'];
+  statusText?: string;
+  body?: string;
+  bodyDelta?: string;
+  bodyAppend?: string;
+  input?: unknown;
+  output?: unknown;
+  metadata?: Record<string, unknown>;
+  fallbackToolPart?: RendererToolPart;
+};
+
 export type RendererMessage = {
   id: string;
   agentId: string;

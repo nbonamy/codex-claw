@@ -4,6 +4,12 @@ import type { Agent, AgentStatus, ClientRequest, ClientRequestResponse, CodexMod
 import { logMain, warnMain } from '../log';
 import { buildCodexClawThreadConfig } from '../mcp/codex-config';
 import type { CodexRpcClient, CodexServerRequest, CodexServerRequestResponder } from './rpc-client';
+import {
+  codexThreadItemToToolPart,
+  commandOutputDeltaToToolPartUpdate,
+  fileChangePatchToToolPartUpdate,
+  mcpProgressToToolPartUpdate,
+} from './tool-part-adapter';
 import type {
   CodexNotification,
   CodexModelListResponse,
@@ -230,13 +236,14 @@ export class CodexAgentSessionManager {
       case 'item/completed': {
         const params = notification.params as { threadId: string; turnId: string; item: unknown };
         this.logMcpToolItem(notification.method, params.threadId, params.item);
-        this.emitForThread(params.threadId, {
-          turnId: params.turnId,
-          type: notification.method === 'item/started' ? 'item.started' : 'item.completed',
-          payload: {
-            item: params.item,
-          },
-        });
+        const toolPart = codexThreadItemToToolPart(params.item);
+        if (toolPart) {
+          this.emitForThread(params.threadId, {
+            turnId: params.turnId,
+            type: notification.method === 'item/started' ? 'item.started' : 'item.completed',
+            payload: { toolPart },
+          });
+        }
         return;
       }
 
@@ -257,11 +264,7 @@ export class CodexAgentSessionManager {
         this.emitForThread(params.threadId, {
           turnId: params.turnId,
           type: 'item.updated',
-          payload: {
-            itemId: params.itemId,
-            delta: params.delta,
-            kind: 'commandExecution.outputDelta',
-          },
+          payload: commandOutputDeltaToToolPartUpdate(params.itemId, params.delta),
         });
         return;
       }
@@ -271,11 +274,7 @@ export class CodexAgentSessionManager {
         this.emitForThread(params.threadId, {
           turnId: params.turnId,
           type: 'item.updated',
-          payload: {
-            itemId: params.itemId,
-            changes: params.changes,
-            kind: 'fileChange.patchUpdated',
-          },
+          payload: fileChangePatchToToolPartUpdate(params.itemId, params.changes),
         });
         return;
       }
@@ -285,11 +284,7 @@ export class CodexAgentSessionManager {
         this.emitForThread(params.threadId, {
           turnId: params.turnId,
           type: 'item.updated',
-          payload: {
-            itemId: params.itemId,
-            message: params.message,
-            kind: 'mcpToolCall.progress',
-          },
+          payload: mcpProgressToToolPartUpdate(params.itemId, params.message),
         });
         return;
       }

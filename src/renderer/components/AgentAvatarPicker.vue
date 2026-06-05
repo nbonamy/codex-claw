@@ -35,7 +35,6 @@
           :aria-pressed="!modelValue"
           @click="selectAvatar(undefined)"
         >
-          {{ initials }}
         </button>
         <button
           v-for="preset in avatarPresets"
@@ -80,7 +79,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { ref } from 'vue';
 import { PhotoIcon } from '../shared/icons/app-icons';
 import AgentAvatar from './AgentAvatar.vue';
 import AgentAvatarCropDialog from './AgentAvatarCropDialog.vue';
@@ -106,14 +105,6 @@ const emit = defineEmits<{
 const fileInput = ref<HTMLInputElement | null>(null);
 const pendingImage = ref<string | null>(null);
 const popoverOpen = ref(false);
-const initials = computed(() => {
-  const words = props.name.trim().split(/\s+/).filter(Boolean);
-  if (words.length >= 2) {
-    return `${words[0][0] ?? ''}${words[1][0] ?? ''}`.toUpperCase();
-  }
-
-  return props.name.trim().slice(0, 2).toUpperCase() || 'AG';
-});
 
 function openImagePicker(): void {
   fileInput.value?.click();
@@ -198,7 +189,7 @@ function applyCroppedAvatar(nextAvatar: string): void {
   z-index: 30;
   right: 0;
   top: calc(100% + var(--space-6));
-  width: 276px;
+  width: 280px;
   display: grid;
   gap: var(--space-4);
   padding: var(--space-6);
@@ -210,20 +201,20 @@ function applyCroppedAvatar(nextAvatar: string): void {
 
 .agent-avatar-picker__grid {
   display: grid;
-  grid-template-columns: repeat(6, var(--space-12));
-  gap: var(--space-3);
+  grid-template-columns: repeat(8, var(--space-12));
+  gap: var(--space-4);
 }
 
 .agent-avatar-picker__preset {
-  width: var(--space-12);
-  height: var(--space-12);
+  width: var(--space-16);
+  height: var(--space-16);
   display: grid;
   place-items: center;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   color: var(--color-text);
   background: transparent;
-  font-size: var(--font-size-16);
+  font-size: var(--font-size-20);
   cursor: pointer;
 }
 

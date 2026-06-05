@@ -1,5 +1,6 @@
 import type { MainToRendererEvent } from '../../shared/contracts';
 import type { CodexRawResponseItem, CodexThreadItem } from './protocol';
+import { codexThreadItemToToolPart, rawOutputToToolPartUpdate } from './tool-part-adapter';
 
 type AdaptedRawResponseItemEvent = Pick<MainToRendererEvent, 'type' | 'payload'>;
 
@@ -9,20 +10,26 @@ export function rawResponseItemToEvent(item: CodexRawResponseItem): AdaptedRawRe
   }
 
   if (item.type === 'local_shell_call') {
+    const toolPart = codexThreadItemToToolPart(localShellCallToCommandExecution(item));
+    if (!toolPart) {
+      return null;
+    }
+
     return {
       type: rawStatusIsCompleted(item.status) ? 'item.completed' : 'item.started',
-      payload: {
-        item: localShellCallToCommandExecution(item),
-      },
+      payload: { toolPart },
     };
   }
 
   if (item.type === 'function_call') {
+    const toolPart = codexThreadItemToToolPart(functionCallToThreadItem(item));
+    if (!toolPart) {
+      return null;
+    }
+
     return {
       type: 'item.started',
-      payload: {
-        item: functionCallToThreadItem(item),
-      },
+      payload: { toolPart },
     };
   }
 
@@ -31,21 +38,24 @@ export function rawResponseItemToEvent(item: CodexRawResponseItem): AdaptedRawRe
   }
 
   if (item.type === 'custom_tool_call') {
+    const toolPart = codexThreadItemToToolPart({
+      type: 'dynamicToolCall',
+      id: stringValue(item.call_id) ?? fallbackRawItemId(item),
+      namespace: null,
+      tool: stringValue(item.name) ?? 'custom_tool',
+      status: item.status ?? 'inProgress',
+      arguments: stringValue(item.input) ?? '',
+      contentItems: null,
+      success: null,
+      durationMs: null,
+    } satisfies CodexThreadItem);
+    if (!toolPart) {
+      return null;
+    }
+
     return {
       type: 'item.started',
-      payload: {
-        item: {
-          type: 'dynamicToolCall',
-          id: stringValue(item.call_id) ?? fallbackRawItemId(item),
-          namespace: null,
-          tool: stringValue(item.name) ?? 'custom_tool',
-          status: item.status ?? 'inProgress',
-          arguments: stringValue(item.input) ?? '',
-          contentItems: null,
-          success: null,
-          durationMs: null,
-        } satisfies CodexThreadItem,
-      },
+      payload: { toolPart },
     };
   }
 
@@ -54,70 +64,73 @@ export function rawResponseItemToEvent(item: CodexRawResponseItem): AdaptedRawRe
   }
 
   if (item.type === 'tool_search_call') {
+    const toolPart = codexThreadItemToToolPart({
+      type: 'dynamicToolCall',
+      id: stringValue(item.call_id) ?? fallbackRawItemId(item),
+      namespace: 'codex',
+      tool: 'tool_search',
+      status: item.status ?? 'inProgress',
+      arguments: item.arguments,
+      contentItems: null,
+      success: null,
+      durationMs: null,
+      execution: item.execution,
+    } satisfies CodexThreadItem);
+    if (!toolPart) {
+      return null;
+    }
+
     return {
       type: 'item.started',
-      payload: {
-        item: {
-          type: 'dynamicToolCall',
-          id: stringValue(item.call_id) ?? fallbackRawItemId(item),
-          namespace: 'codex',
-          tool: 'tool_search',
-          status: item.status ?? 'inProgress',
-          arguments: item.arguments,
-          contentItems: null,
-          success: null,
-          durationMs: null,
-          execution: item.execution,
-        } satisfies CodexThreadItem,
-      },
+      payload: { toolPart },
     };
   }
 
   if (item.type === 'tool_search_output') {
     return {
       type: 'item.updated',
-      payload: {
-        itemId: stringValue(item.call_id) ?? fallbackRawItemId(item),
-        kind: 'rawResponseItem.output',
-        output: item.tools,
-        status: item.status,
-        title: 'tool_search',
-      },
+      payload: rawOutputToToolPartUpdate(stringValue(item.call_id) ?? fallbackRawItemId(item), item.tools, 'tool_search', item.status),
     };
   }
 
   if (item.type === 'web_search_call') {
+    const toolPart = codexThreadItemToToolPart({
+      type: 'webSearch',
+      id: fallbackRawItemId(item),
+      query: webSearchQuery(item.action),
+      action: item.action,
+    } satisfies CodexThreadItem);
+    if (!toolPart) {
+      return null;
+    }
+
     return {
       type: 'item.completed',
-      payload: {
-        item: {
-          type: 'webSearch',
-          id: fallbackRawItemId(item),
-          query: webSearchQuery(item.action),
-          action: item.action,
-        } satisfies CodexThreadItem,
-      },
+      payload: { toolPart },
     };
   }
 
   if (item.type === 'image_generation_call') {
+    const toolPart = codexThreadItemToToolPart({
+      type: 'dynamicToolCall',
+      id: stringValue(item.id) ?? fallbackRawItemId(item),
+      namespace: null,
+      tool: 'image_generation',
+      status: item.status,
+      arguments: {
+        revisedPrompt: item.revised_prompt,
+      },
+      contentItems: item.result ? [{ type: 'inputText', text: String(item.result) }] : null,
+      success: item.status === 'completed',
+      durationMs: null,
+    } satisfies CodexThreadItem);
+    if (!toolPart) {
+      return null;
+    }
+
     return {
       type: 'item.completed',
-      payload: {
-        item: {
-          type: 'dynamicToolCall',
-          id: stringValue(item.id) ?? fallbackRawItemId(item),
-          namespace: null,
-          tool: 'image_generation',
-          status: item.status,
-          arguments: {
-            revisedPrompt: item.revised_prompt,
-          },
-          contentItems: item.result ? [{ type: 'inputText', text: String(item.result) }] : null,
-          success: item.status === 'completed',
-          durationMs: null,
-        } satisfies CodexThreadItem,
-      },
+      payload: { toolPart },
     };
   }
 
@@ -182,13 +195,7 @@ function functionCallToThreadItem(item: Record<string, unknown>): CodexThreadIte
 function rawOutputUpdate(callId: unknown, output: unknown, title?: string): AdaptedRawResponseItemEvent {
   return {
     type: 'item.updated',
-    payload: {
-      itemId: stringValue(callId) ?? 'raw-response-output',
-      kind: 'rawResponseItem.output',
-      output,
-      status: 'completed',
-      title,
-    },
+    payload: rawOutputToToolPartUpdate(stringValue(callId) ?? 'raw-response-output', output, title),
   };
 }
 

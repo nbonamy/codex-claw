@@ -8,6 +8,8 @@ import {
   updateAgentFromInput,
   updateAgentFolder,
 } from '../snapshot';
+import type { RendererToolPart, RendererToolPartUpdate } from '../contracts';
+import { toolOutputText } from '../tool-output';
 
 describe('snapshot reducer', () => {
   it('updates the agent folder and clears the old thread mapping', () => {
@@ -293,7 +295,7 @@ describe('snapshot reducer', () => {
     ]);
   });
 
-  it('reduces structured Codex tool items into assistant tool parts', () => {
+  it('reduces app-owned tool items into assistant tool parts', () => {
     const snapshot = createInitialSnapshot();
 
     applyMainEventToSnapshot(snapshot, {
@@ -302,19 +304,15 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
-      payload: {
-        item: {
-          type: 'commandExecution',
-          id: 'cmd-1',
-          command: 'npm test',
-          cwd: '/Users/nbonamy/src/codex-claw',
-          status: 'inProgress',
-          commandActions: [],
-          aggregatedOutput: null,
-          exitCode: null,
-          durationMs: null,
-        },
-      },
+      payload: toolPartPayload(commandToolPart({
+        id: 'cmd-1',
+        title: 'npm test',
+        status: 'running',
+        cwd: '/Users/nbonamy/src/codex-claw',
+        commandActions: [],
+        exitCode: undefined,
+        durationMs: undefined,
+      })),
       occurredAt: '2026-06-05T00:00:03.000Z',
     });
     applyMainEventToSnapshot(snapshot, {
@@ -323,11 +321,7 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.updated',
-      payload: {
-        itemId: 'cmd-1',
-        kind: 'commandExecution.outputDelta',
-        delta: 'running vitest\n',
-      },
+      payload: commandOutputDeltaToToolPartUpdate('cmd-1', 'running vitest\n'),
       occurredAt: '2026-06-05T00:00:04.000Z',
     });
     applyMainEventToSnapshot(snapshot, {
@@ -336,19 +330,16 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.completed',
-      payload: {
-        item: {
-          type: 'commandExecution',
-          id: 'cmd-1',
-          command: 'npm test',
-          cwd: '/Users/nbonamy/src/codex-claw',
-          status: 'completed',
-          commandActions: [],
-          aggregatedOutput: '1 test passed',
-          exitCode: 0,
-          durationMs: 123,
-        },
-      },
+      payload: toolPartPayload(commandToolPart({
+        id: 'cmd-1',
+        title: 'npm test',
+        status: 'completed',
+        body: '1 test passed',
+        cwd: '/Users/nbonamy/src/codex-claw',
+        commandActions: [],
+        exitCode: 0,
+        durationMs: 123,
+      })),
       occurredAt: '2026-06-05T00:00:05.000Z',
     });
 
@@ -394,16 +385,12 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
-      payload: {
-        item: {
-          type: 'commandExecution',
-          id: 'cmd-read',
-          command: 'cat docs/architecture.md',
-          cwd: '/Users/nbonamy/src/codex-claw',
-          status: 'inProgress',
-          aggregatedOutput: null,
-        },
-      },
+      payload: toolPartPayload(commandToolPart({
+        id: 'cmd-read',
+        title: 'cat docs/architecture.md',
+        status: 'running',
+        cwd: '/Users/nbonamy/src/codex-claw',
+      })),
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
     applyMainEventToSnapshot(snapshot, {
@@ -492,11 +479,7 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.updated',
-      payload: {
-        itemId: 'cmd-missed-start',
-        kind: 'commandExecution.outputDelta',
-        delta: 'reading docs/architecture.md\n',
-      },
+      payload: commandOutputDeltaToToolPartUpdate('cmd-missed-start', 'reading docs/architecture.md\n'),
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
     applyMainEventToSnapshot(snapshot, {
@@ -505,11 +488,7 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.updated',
-      payload: {
-        itemId: 'mcp-missed-start',
-        kind: 'mcpToolCall.progress',
-        message: 'opening file',
-      },
+      payload: mcpProgressToToolPartUpdate('mcp-missed-start', 'opening file'),
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
     applyMainEventToSnapshot(snapshot, {
@@ -518,13 +497,7 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.updated',
-      payload: {
-        itemId: 'raw-output-only',
-        kind: 'rawResponseItem.output',
-        output: 'architecture contents',
-        status: 'completed',
-        title: 'read_file',
-      },
+      payload: rawOutputToToolPartUpdate('raw-output-only', 'architecture contents', 'read_file'),
       occurredAt: '2026-06-05T00:00:03.000Z',
     });
 
@@ -566,16 +539,12 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
-      payload: {
-        item: {
-          type: 'commandExecution',
-          id: 'cmd-streamed',
-          command: 'cat docs/architecture.md',
-          cwd: '/Users/nbonamy/src/codex-claw',
-          status: 'inProgress',
-          aggregatedOutput: null,
-        },
-      },
+      payload: toolPartPayload(commandToolPart({
+        id: 'cmd-streamed',
+        title: 'cat docs/architecture.md',
+        status: 'running',
+        cwd: '/Users/nbonamy/src/codex-claw',
+      })),
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
     applyMainEventToSnapshot(snapshot, {
@@ -584,11 +553,7 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.updated',
-      payload: {
-        itemId: 'cmd-streamed',
-        kind: 'commandExecution.outputDelta',
-        delta: 'streamed output',
-      },
+      payload: commandOutputDeltaToToolPartUpdate('cmd-streamed', 'streamed output'),
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
     applyMainEventToSnapshot(snapshot, {
@@ -597,17 +562,13 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.completed',
-      payload: {
-        item: {
-          type: 'commandExecution',
-          id: 'cmd-streamed',
-          command: 'cat docs/architecture.md',
-          cwd: '/Users/nbonamy/src/codex-claw',
-          status: 'completed',
-          aggregatedOutput: null,
-          exitCode: 0,
-        },
-      },
+      payload: toolPartPayload(commandToolPart({
+        id: 'cmd-streamed',
+        title: 'cat docs/architecture.md',
+        status: 'completed',
+        cwd: '/Users/nbonamy/src/codex-claw',
+        exitCode: 0,
+      })),
       occurredAt: '2026-06-05T00:00:03.000Z',
     });
 
@@ -632,18 +593,18 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
-      payload: {
-        item: {
-          type: 'dynamicToolCall',
-          id: 'raw-call-1',
+      payload: toolPartPayload(dynamicToolPart({
+        id: 'raw-call-1',
+        title: 'read_file',
+        status: 'running',
+        input: { path: 'docs/architecture.md' },
+        metadata: {
           namespace: null,
           tool: 'read_file',
-          status: 'inProgress',
-          arguments: { path: 'docs/architecture.md' },
-          contentItems: null,
           success: null,
+          durationMs: undefined,
         },
-      },
+      })),
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
     applyMainEventToSnapshot(snapshot, {
@@ -652,12 +613,7 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.updated',
-      payload: {
-        itemId: 'raw-call-1',
-        kind: 'rawResponseItem.output',
-        output: [{ type: 'input_text', text: 'architecture contents' }],
-        status: 'completed',
-      },
+      payload: rawOutputToToolPartUpdate('raw-call-1', [{ type: 'input_text', text: 'architecture contents' }]),
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
 
@@ -699,34 +655,33 @@ describe('snapshot reducer', () => {
 
     expect(snapshot.messages).toHaveLength(0);
 
-    const rawOutputPayloads = [
+    const rawOutputPayloads: Array<{
+      itemId: string;
+      output: unknown;
+      status: RendererToolPartUpdate['status'];
+    }> = [
       {
         itemId: 'undefined-output',
-        kind: 'rawResponseItem.output',
         output: undefined,
         status: 'completed',
       },
       {
         itemId: 'number-output',
-        kind: 'rawResponseItem.output',
         output: 42,
         status: 'completed',
       },
       {
         itemId: 'content-string',
-        kind: 'rawResponseItem.output',
         output: { content: 'plain content' },
         status: 'completed',
       },
       {
         itemId: 'content-array',
-        kind: 'rawResponseItem.output',
         output: { content: [{ text: 'nested content' }] },
         status: 'completed',
       },
       {
         itemId: 'json-object',
-        kind: 'rawResponseItem.output',
         output: { other: 'value' },
         status: 'completed',
       },
@@ -739,7 +694,7 @@ describe('snapshot reducer', () => {
         threadId: 'thread-1',
         turnId: 'turn-1',
         type: 'item.updated',
-        payload,
+        payload: rawOutputToToolPartUpdate(payload.itemId, payload.output, undefined, payload.status),
         occurredAt: '2026-06-05T00:00:02.000Z',
       });
     }
@@ -802,18 +757,20 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
-      payload: {
-        item: {
-          type: 'mcpToolCall',
-          id: 'mcp-1',
+      payload: toolPartPayload(mcpToolPart({
+        id: 'mcp-1',
+        title: 'browser.open',
+        status: 'running',
+        input: { url: 'http://localhost:5173' },
+        output: null,
+        metadata: {
           server: 'browser',
           tool: 'open',
-          status: 'inProgress',
-          arguments: { url: 'http://localhost:5173' },
-          result: null,
-          error: null,
+          pluginId: undefined,
+          mcpAppResourceUri: undefined,
+          durationMs: undefined,
         },
-      },
+      })),
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
     applyMainEventToSnapshot(snapshot, {
@@ -822,18 +779,20 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.completed',
-      payload: {
-        item: {
-          type: 'dynamicToolCall',
-          id: 'dynamic-1',
+      payload: toolPartPayload(dynamicToolPart({
+        id: 'dynamic-1',
+        title: 'image.generate',
+        status: 'completed',
+        body: 'done',
+        input: { prompt: 'ship' },
+        output: [{ type: 'inputText', text: 'done' }],
+        metadata: {
           namespace: 'image',
           tool: 'generate',
-          status: 'completed',
-          arguments: { prompt: 'ship' },
-          contentItems: [{ type: 'inputText', text: 'done' }],
           success: true,
+          durationMs: undefined,
         },
-      },
+      })),
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
     applyMainEventToSnapshot(snapshot, {
@@ -842,14 +801,7 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.completed',
-      payload: {
-        item: {
-          type: 'fileChange',
-          id: 'patch-1',
-          changes: [{ kind: 'update', path: 'src/app.ts' }],
-          status: 'completed',
-        },
-      },
+      payload: toolPartPayload(fileChangeToolPart('patch-1', [{ kind: 'update', path: 'src/app.ts' }], 'completed')),
       occurredAt: '2026-06-05T00:00:03.000Z',
     });
 
@@ -911,27 +863,31 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.completed',
-      payload: {
-        item: {
-          type: 'mcpToolCall',
-          id: 'call-set-status',
-          server: 'codex_claw',
-          tool: 'set-status',
-          status: 'completed',
-          arguments: {
+      payload: toolPartPayload(mcpToolPart({
+        id: 'call-set-status',
+        title: 'codex_claw.set-status',
+        status: 'completed',
+        body: '{"agentId":"agent-dina","status":"Registered and idle"}',
+        input: {
+          agentId: 'agent-dina',
+          status: 'Registered and idle',
+        },
+        output: {
+          content: [{ type: 'text', text: 'Result returned in structuredContent.' }],
+          structuredContent: {
             agentId: 'agent-dina',
             status: 'Registered and idle',
           },
-          result: {
-            content: [{ type: 'text', text: 'Result returned in structuredContent.' }],
-            structuredContent: {
-              agentId: 'agent-dina',
-              status: 'Registered and idle',
-            },
-            isError: false,
-          },
+          isError: false,
         },
-      },
+        metadata: {
+          server: 'codex_claw',
+          tool: 'set-status',
+          pluginId: undefined,
+          mcpAppResourceUri: undefined,
+          durationMs: undefined,
+        },
+      })),
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
 
@@ -975,7 +931,7 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
-      payload: { item: { type: 'ignored' } },
+      payload: { toolPart: { type: 'ignored' } },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
     applyMainEventToSnapshot(snapshot, {
@@ -996,16 +952,11 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
-      payload: {
-        item: {
-          type: 'commandExecution',
-          id: 'cmd-defaults',
-          status: 'failed',
-          aggregatedOutput: null,
-          exitCode: null,
-          durationMs: null,
-        },
-      },
+      payload: toolPartPayload(commandToolPart({
+        id: 'cmd-defaults',
+        title: 'command',
+        status: 'failed',
+      })),
       occurredAt: '2026-06-05T00:00:03.000Z',
     });
     applyMainEventToSnapshot(snapshot, {
@@ -1014,18 +965,16 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
-      payload: {
-        item: {
-          type: 'mcpToolCall',
-          id: 'mcp-error',
-          status: 'failed',
-          arguments: null,
-          result: {
-            content: [{ type: 'image', url: 'file.png' }, 'bad-shape'],
-          },
-          error: { message: 'tool failed' },
+      payload: toolPartPayload(mcpToolPart({
+        id: 'mcp-error',
+        title: 'mcp.tool',
+        status: 'failed',
+        body: 'tool failed',
+        input: null,
+        output: {
+          content: [{ type: 'image', url: 'file.png' }, 'bad-shape'],
         },
-      },
+      })),
       occurredAt: '2026-06-05T00:00:04.000Z',
     });
     applyMainEventToSnapshot(snapshot, {
@@ -1034,15 +983,13 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
-      payload: {
-        item: {
-          type: 'dynamicToolCall',
-          id: 'dynamic-defaults',
-          arguments: null,
-          status: 'failed',
-          contentItems: [{ type: 'inputImage', imageUrl: 'file.png' }],
-        },
-      },
+      payload: toolPartPayload(dynamicToolPart({
+        id: 'dynamic-defaults',
+        title: 'tool',
+        status: 'failed',
+        body: '{"type":"inputImage","imageUrl":"file.png"}',
+        input: null,
+      })),
       occurredAt: '2026-06-05T00:00:05.000Z',
     });
     applyMainEventToSnapshot(snapshot, {
@@ -1051,14 +998,7 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
-      payload: {
-        item: {
-          type: 'fileChange',
-          id: 'patch-empty',
-          changes: ['unexpected'],
-          status: 'completed',
-        },
-      },
+      payload: toolPartPayload(fileChangeToolPart('patch-empty', ['unexpected'], 'completed')),
       occurredAt: '2026-06-05T00:00:06.000Z',
     });
     applyMainEventToSnapshot(snapshot, {
@@ -1067,10 +1007,7 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.updated',
-      payload: {
-        itemId: 'mcp-error',
-        message: 'still failing',
-      },
+      payload: mcpProgressToToolPartUpdate('mcp-error', 'still failing'),
       occurredAt: '2026-06-05T00:00:07.000Z',
     });
     applyMainEventToSnapshot(snapshot, {
@@ -1079,10 +1016,7 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.updated',
-      payload: {
-        itemId: 'patch-empty',
-        changes: [{ path: 'src/next.ts' }, 'raw change'],
-      },
+      payload: fileChangePatchToToolPartUpdate('patch-empty', [{ path: 'src/next.ts' }, 'raw change']),
       occurredAt: '2026-06-05T00:00:08.000Z',
     });
 
@@ -1128,16 +1062,16 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
-      payload: {
-        item: {
-          type: 'mcpToolCall',
-          id: 'call-register-agent',
+      payload: toolPartPayload(mcpToolPart({
+        id: 'call-register-agent',
+        title: 'codex_claw.register-agent',
+        status: 'running',
+        input: { agentId: 'agent-dina' },
+        metadata: {
           server: 'codex_claw',
           tool: 'register-agent',
-          status: 'inProgress',
-          arguments: { agentId: 'agent-dina' },
         },
-      },
+      })),
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
     applyMainEventToSnapshot(snapshot, {
@@ -1261,15 +1195,15 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
-      payload: {
-        item: {
-          type: 'mcpToolCall',
-          id: 'call-without-metadata',
+      payload: toolPartPayload(mcpToolPart({
+        id: 'call-without-metadata',
+        title: 'unknown_server.unknown-tool',
+        status: 'running',
+        metadata: {
           server: 'unknown_server',
           tool: 'unknown-tool',
-          status: 'inProgress',
         },
-      },
+      })),
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
     applyMainEventToSnapshot(snapshot, {
@@ -1343,3 +1277,179 @@ describe('snapshot reducer', () => {
     expect(snapshot.messages.at(-1)?.parts).toStrictEqual([{ type: 'status', text: 'Codex app-server error' }]);
   });
 });
+
+function toolPartPayload(toolPart: RendererToolPart): { toolPart: RendererToolPart } {
+  return { toolPart };
+}
+
+function commandToolPart(input: {
+  id: string;
+  title: string;
+  status: RendererToolPart['status'];
+  body?: string;
+  cwd?: string;
+  commandActions?: unknown;
+  exitCode?: number;
+  durationMs?: number;
+}): RendererToolPart {
+  return {
+    type: 'tool',
+    id: input.id,
+    kind: 'command',
+    title: input.title,
+    status: input.status,
+    body: input.body,
+    input: {
+      command: input.title,
+      cwd: input.cwd,
+      commandActions: input.commandActions,
+    },
+    output: {
+      exitCode: input.exitCode,
+      durationMs: input.durationMs,
+    },
+    metadata: {
+      source: undefined,
+      processId: undefined,
+    },
+  };
+}
+
+function mcpToolPart(input: {
+  id: string;
+  title: string;
+  status: RendererToolPart['status'];
+  body?: string;
+  input?: unknown;
+  output?: unknown;
+  metadata?: Record<string, unknown>;
+}): RendererToolPart {
+  return {
+    type: 'tool',
+    id: input.id,
+    kind: 'mcp',
+    title: input.title,
+    status: input.status,
+    body: input.body,
+    input: input.input,
+    output: input.output,
+    metadata: input.metadata,
+  };
+}
+
+function dynamicToolPart(input: {
+  id: string;
+  title: string;
+  status: RendererToolPart['status'];
+  body?: string;
+  input?: unknown;
+  output?: unknown;
+  metadata?: Record<string, unknown>;
+}): RendererToolPart {
+  return {
+    type: 'tool',
+    id: input.id,
+    kind: 'dynamic',
+    title: input.title,
+    status: input.status,
+    body: input.body,
+    input: input.input,
+    output: input.output,
+    metadata: input.metadata,
+  };
+}
+
+function fileChangeToolPart(
+  id: string,
+  changes: unknown[],
+  status: RendererToolPart['status'],
+): RendererToolPart {
+  return {
+    type: 'tool',
+    id,
+    kind: 'fileChange',
+    title: changes.length === 1 ? '1 file change' : `${changes.length} file changes`,
+    status,
+    body: fileChangesText(changes),
+    input: { changes },
+    metadata: { changes },
+  };
+}
+
+function commandOutputDeltaToToolPartUpdate(itemId: string, delta: string): RendererToolPartUpdate {
+  return {
+    itemId,
+    bodyDelta: delta,
+    fallbackToolPart: {
+      type: 'tool',
+      id: itemId,
+      kind: 'command',
+      title: 'Command',
+      status: 'running',
+    },
+  };
+}
+
+function mcpProgressToToolPartUpdate(itemId: string, message: string): RendererToolPartUpdate {
+  return {
+    itemId,
+    bodyAppend: message,
+    fallbackToolPart: {
+      type: 'tool',
+      id: itemId,
+      kind: 'mcp',
+      title: 'MCP tool',
+      status: 'running',
+    },
+  };
+}
+
+function fileChangePatchToToolPartUpdate(itemId: string, changes: unknown[]): RendererToolPartUpdate {
+  return {
+    itemId,
+    body: fileChangesText(changes),
+    input: { changes },
+    metadata: { changes },
+    fallbackToolPart: fileChangeToolPart(itemId, changes, 'running'),
+  };
+}
+
+function rawOutputToToolPartUpdate(
+  itemId: string,
+  output: unknown,
+  title?: string,
+  status: RendererToolPart['status'] = 'completed',
+): RendererToolPartUpdate {
+  const body = toolOutputText(output);
+  return {
+    itemId,
+    title,
+    status,
+    body,
+    output,
+    fallbackToolPart: {
+      type: 'tool',
+      id: itemId,
+      kind: 'generic',
+      title: title ?? 'Tool output',
+      status,
+      body,
+      output,
+    },
+  };
+}
+
+function fileChangesText(changes: unknown[]): string | undefined {
+  return changes
+    .map((change) => {
+      if (typeof change !== 'object' || change === null || Array.isArray(change)) {
+        return JSON.stringify(change);
+      }
+
+      const record = change as Record<string, unknown>;
+      const kind = typeof record.kind === 'string' ? record.kind : 'update';
+      const path = typeof record.path === 'string' ? record.path : 'unknown';
+      return `${kind} ${path}`;
+    })
+    .join('\n') || undefined;
+}

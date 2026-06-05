@@ -11,14 +11,6 @@
     <template #header>
       <div class="claw-dialog__header">
         <h2 class="claw-dialog__title">Adjust Avatar</h2>
-        <button
-          class="claw-dialog__icon-button"
-          type="button"
-          aria-label="Close avatar editor"
-          @click="emit('cancel')"
-        >
-          <X aria-hidden="true" />
-        </button>
       </div>
     </template>
 
@@ -59,7 +51,6 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { X } from '../shared/icons/app-icons';
 import { cropImageDataUrl } from './agent-avatar-crop';
 
 const props = defineProps<{

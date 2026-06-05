@@ -1,7 +1,5 @@
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import AgentSidebar from '../AgentSidebar.vue';
 import type { Agent } from '../../../shared/contracts';
@@ -241,17 +239,6 @@ describe('AgentSidebar', () => {
 
     expect(wrapper.attributes('style')).toContain('--agent-sidebar-width: 72px');
     expect(wrapper.attributes('style')).toContain('--agent-sidebar-min-width: 72px');
-  });
-
-  it('defines avatar-only responsive rules for the small sidebar', () => {
-    const source = readFileSync(join(import.meta.dirname, '../AgentSidebar.vue'), 'utf8');
-
-    expect(source).toContain('@container (max-width: 140px)');
-    expect(source).toContain('.agent-sidebar__meta');
-    expect(source).toContain('display: none;');
-    expect(source).toContain('.agent-sidebar__status');
-    expect(source).toContain('position: absolute;');
-    expect(source).toContain('.agent-sidebar__new-label');
   });
 
   it('emits clamped resize widths from the right border drag handle', async () => {

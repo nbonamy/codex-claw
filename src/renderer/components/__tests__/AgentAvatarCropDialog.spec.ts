@@ -42,7 +42,7 @@ describe('AgentAvatarCropDialog', () => {
     expect(wrapper.emitted('apply')).toStrictEqual([['data:image/png;base64,cropped']]);
   });
 
-  it('emits cancel from the close action', async () => {
+  it('emits cancel from the footer action', async () => {
     const wrapper = mount(AgentAvatarCropDialog, {
       props: {
         image: 'data:image/png;base64,original',
@@ -59,7 +59,7 @@ describe('AgentAvatarCropDialog', () => {
       },
     });
 
-    await wrapper.get('[aria-label="Close avatar editor"]').trigger('click');
+    await wrapper.findAll('button').find((button) => button.text() === 'Cancel')?.trigger('click');
 
     expect(wrapper.emitted('cancel')).toStrictEqual([[]]);
   });

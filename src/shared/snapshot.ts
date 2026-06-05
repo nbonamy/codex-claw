@@ -7,13 +7,15 @@ import type {
   MainToRendererEvent,
   RendererMessage,
   RendererMessagePart,
+  RendererToolPart,
+  RendererToolPartUpdate,
   UpdateAgentInput,
 } from './contracts';
+import { toolOutputText } from './tool-output';
 
 const seedCreatedAt = '2026-06-05T00:00:00.000Z';
 const seedTeamId = 'team-codex-claw';
-const structuredToolResultNotice = 'Result returned in structuredContent.';
-type ToolPart = Extract<RendererMessagePart, { type: 'tool' }>;
+type ToolPart = RendererToolPart;
 
 export function createEmptySnapshot(): AppSnapshot {
   return {
@@ -211,8 +213,8 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   }
 
   if ((event.type === 'item.started' || event.type === 'item.completed') && event.turnId) {
-    const payload = event.payload as { item?: unknown };
-    const toolPart = rendererToolPartFromCodexItem(payload.item);
+    const payload = event.payload as { toolPart?: unknown };
+    const toolPart = rendererToolPart(payload.toolPart);
     if (toolPart) {
       upsertAssistantToolPart(snapshot, event.agentId, event.turnId, toolPart);
     }
@@ -248,368 +250,122 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   }
 }
 
-function rendererToolPartFromCodexItem(item: unknown): ToolPart | null {
-  if (!isRecord(item) || typeof item.id !== 'string' || typeof item.type !== 'string') {
-    return null;
-  }
-
-  if (item.type === 'commandExecution') {
-    const command = typeof item.command === 'string' ? item.command : 'command';
-    return {
-      type: 'tool',
-      id: item.id,
-      kind: 'command',
-      title: command,
-      status: rendererToolStatus(item.status),
-      body: typeof item.aggregatedOutput === 'string' ? item.aggregatedOutput : undefined,
-      input: {
-        command,
-        cwd: typeof item.cwd === 'string' ? item.cwd : undefined,
-        commandActions: item.commandActions,
-      },
-      output: {
-        exitCode: typeof item.exitCode === 'number' ? item.exitCode : undefined,
-        durationMs: typeof item.durationMs === 'number' ? item.durationMs : undefined,
-      },
-      metadata: {
-        source: item.source,
-        processId: item.processId,
-      },
-    };
-  }
-
-  if (item.type === 'mcpToolCall') {
-    const server = typeof item.server === 'string' ? item.server : 'mcp';
-    const tool = typeof item.tool === 'string' ? item.tool : 'tool';
-    const errorMessage = mcpErrorMessage(item.error);
-    return {
-      type: 'tool',
-      id: item.id,
-      kind: 'mcp',
-      title: `${server}.${tool}`,
-      status: rendererToolStatus(item.status),
-      body: errorMessage ?? mcpResultText(item.result),
-      input: item.arguments,
-      output: item.result,
-      metadata: {
-        server,
-        tool,
-        pluginId: item.pluginId,
-        mcpAppResourceUri: item.mcpAppResourceUri,
-        durationMs: item.durationMs,
-      },
-    };
-  }
-
-  if (item.type === 'dynamicToolCall') {
-    const tool = typeof item.tool === 'string' ? item.tool : 'tool';
-    const namespace = typeof item.namespace === 'string' ? item.namespace : null;
-    return {
-      type: 'tool',
-      id: item.id,
-      kind: 'dynamic',
-      title: namespace ? `${namespace}.${tool}` : tool,
-      status: rendererToolStatus(item.status),
-      body: dynamicToolContentText(item.contentItems),
-      input: item.arguments,
-      output: item.contentItems,
-      metadata: {
-        namespace,
-        tool,
-        success: item.success,
-        durationMs: item.durationMs,
-      },
-    };
-  }
-
-  if (item.type === 'fileChange') {
-    const changes = Array.isArray(item.changes) ? item.changes : [];
-    return {
-      type: 'tool',
-      id: item.id,
-      kind: 'fileChange',
-      title: changes.length === 1 ? '1 file change' : `${changes.length} file changes`,
-      status: rendererToolStatus(item.status),
-      body: fileChangesText(changes),
-      input: { changes },
-      metadata: {
-        changes,
-      },
-    };
-  }
-
-  if (item.type === 'webSearch') {
-    const query = typeof item.query === 'string' && item.query.trim() ? item.query.trim() : 'web search';
-    return {
-      type: 'tool',
-      id: item.id,
-      kind: 'generic',
-      title: 'Web search',
-      status: 'completed',
-      body: query,
-      input: item.action ?? { query },
-      metadata: {
-        query,
-        action: item.action,
-      },
-    };
-  }
-
-  if (item.type === 'imageGeneration') {
-    return {
-      type: 'tool',
-      id: item.id,
-      kind: 'dynamic',
-      title: 'image_generation',
-      status: rendererToolStatus(item.status),
-      body: typeof item.revisedPrompt === 'string' ? item.revisedPrompt : undefined,
-      input: {
-        revisedPrompt: item.revisedPrompt,
-      },
-      output: item.savedPath ?? item.result,
-      metadata: {
-        savedPath: item.savedPath,
-      },
-    };
-  }
-
-  return null;
-}
-
-function rendererToolStatus(status: unknown): ToolPart['status'] {
-  if (status === 'completed' || status === 'succeeded' || status === 'success') {
-    return 'completed';
-  }
-
-  if (status === 'failed' || status === 'error' || status === 'declined' || status === 'incomplete' || status === 'canceled' || status === 'cancelled') {
-    return 'failed';
-  }
-
-  return 'running';
-}
-
-function mcpErrorMessage(error: unknown): string | undefined {
-  if (!isRecord(error)) {
-    return undefined;
-  }
-
-  return typeof error.message === 'string' ? error.message : undefined;
-}
-
-function mcpResultText(result: unknown): string | undefined {
-  if (!isRecord(result)) {
-    return undefined;
-  }
-
-  const contentText = mcpContentText(result.content);
-  const structuredText = 'structuredContent' in result ? toolOutputText(result.structuredContent) : undefined;
-  if (!structuredText) {
-    return contentText;
-  }
-
-  if (!contentText || contentText.trim() === structuredToolResultNotice) {
-    return structuredText;
-  }
-
-  return `${contentText}\n\n${structuredText}`;
-}
-
-function mcpContentText(content: unknown): string | undefined {
-  if (!Array.isArray(content)) {
-    return undefined;
-  }
-
-  return content
-    .map((entry) => {
-      if (!isRecord(entry)) {
-        return '';
-      }
-
-      if (typeof entry.text === 'string') {
-        return entry.text;
-      }
-
-      return JSON.stringify(entry);
-    })
-    .filter(Boolean)
-    .join('\n\n') || undefined;
-}
-
-function dynamicToolContentText(contentItems: unknown): string | undefined {
-  if (!Array.isArray(contentItems)) {
-    return undefined;
-  }
-
-  return contentItems
-    .map((entry) => {
-      if (isRecord(entry) && typeof entry.text === 'string') {
-        return entry.text;
-      }
-
-      return JSON.stringify(entry);
-    })
-    .filter(Boolean)
-    .join('\n\n') || undefined;
-}
-
-function fileChangesText(changes: unknown[]): string | undefined {
-  return changes
-    .map((change) => {
-      if (!isRecord(change)) {
-        return JSON.stringify(change);
-      }
-
-      const kind = typeof change.kind === 'string' ? change.kind : 'update';
-      const path = typeof change.path === 'string' ? change.path : 'unknown';
-      return `${kind} ${path}`;
-    })
-    .join('\n') || undefined;
-}
-
 function updateAssistantToolPart(snapshot: AppSnapshot, agentId: string, turnId: string, payload: unknown): void {
-  if (!isRecord(payload) || typeof payload.itemId !== 'string') {
+  const update = rendererToolPartUpdate(payload);
+  if (!update) {
     return;
   }
 
   let message = findAssistantMessage(snapshot, agentId, turnId);
   let toolPart = message?.parts.find((part): part is ToolPart => {
-    return part.type === 'tool' && part.id === payload.itemId;
+    return part.type === 'tool' && part.id === update.itemId;
   });
-  if (!toolPart) {
-    const placeholder = fallbackToolPartFromUpdate(payload);
-    if (!placeholder) {
-      return;
-    }
 
+  if (!toolPart && update.fallbackToolPart) {
     message = message ?? ensureAssistantMessage(snapshot, agentId, turnId);
-    message.parts.push(placeholder);
-    toolPart = placeholder;
+    message.parts.push(update.fallbackToolPart);
+    toolPart = update.fallbackToolPart;
   }
 
-  if (typeof payload.status === 'string') {
-    toolPart.status = rendererToolStatus(payload.status);
+  if (!toolPart) {
+    return;
   }
 
-  if (typeof payload.delta === 'string') {
-    toolPart.body = `${toolPart.body ?? ''}${payload.delta}`;
+  if (update.title) {
+    toolPart.title = update.title;
   }
 
-  if (typeof payload.message === 'string') {
-    toolPart.body = [toolPart.body, payload.message].filter(Boolean).join('\n');
+  if (update.status) {
+    toolPart.status = update.status;
   }
 
-  if (Array.isArray(payload.changes)) {
-    toolPart.body = fileChangesText(payload.changes);
-    toolPart.input = { changes: payload.changes };
+  if (update.statusText !== undefined) {
+    toolPart.statusText = update.statusText;
+  }
+
+  if (update.body !== undefined) {
+    toolPart.body = update.body;
+  }
+
+  if (update.bodyDelta !== undefined) {
+    toolPart.body = `${toolPart.body ?? ''}${update.bodyDelta}`;
+  }
+
+  if (update.bodyAppend !== undefined) {
+    toolPart.body = [toolPart.body, update.bodyAppend].filter(Boolean).join('\n');
+  }
+
+  if ('output' in update) {
+    toolPart.output = update.output;
+    toolPart.body = update.body ?? toolOutputText(update.output) ?? toolPart.body;
+  }
+
+  if ('input' in update) {
+    toolPart.input = update.input;
+  }
+
+  if (update.metadata) {
     toolPart.metadata = {
       ...(toolPart.metadata ?? {}),
-      changes: payload.changes,
+      ...update.metadata,
     };
-  }
-
-  if ('output' in payload) {
-    toolPart.output = payload.output;
-    toolPart.body = toolOutputText(payload.output) ?? toolPart.body;
-  }
-
-  if ('input' in payload) {
-    toolPart.input = payload.input;
   }
 }
 
-function fallbackToolPartFromUpdate(payload: Record<string, unknown>): ToolPart | null {
-  if (payload.kind === 'commandExecution.outputDelta') {
-    return {
-      type: 'tool',
-      id: payload.itemId as string,
-      kind: 'command',
-      title: 'Command',
-      status: 'running',
-    };
+function rendererToolPart(value: unknown): ToolPart | null {
+  if (
+    !isRecord(value) ||
+    value.type !== 'tool' ||
+    typeof value.id !== 'string' ||
+    typeof value.kind !== 'string' ||
+    typeof value.title !== 'string' ||
+    !isToolStatus(value.status)
+  ) {
+    return null;
   }
 
-  if (payload.kind === 'fileChange.patchUpdated') {
-    const changes = Array.isArray(payload.changes) ? payload.changes : [];
-    return {
-      type: 'tool',
-      id: payload.itemId as string,
-      kind: 'fileChange',
-      title: changes.length === 1 ? '1 file change' : `${changes.length} file changes`,
-      status: 'running',
-      body: fileChangesText(changes),
-      input: { changes },
-      metadata: { changes },
-    };
-  }
-
-  if (payload.kind === 'mcpToolCall.progress') {
-    return {
-      type: 'tool',
-      id: payload.itemId as string,
-      kind: 'mcp',
-      title: 'MCP tool',
-      status: 'running',
-    };
-  }
-
-  if (payload.kind === 'rawResponseItem.output') {
-    return {
-      type: 'tool',
-      id: payload.itemId as string,
-      kind: 'generic',
-      title: typeof payload.title === 'string' && payload.title.trim() ? payload.title : 'Tool output',
-      status: rendererToolStatus(payload.status ?? 'completed'),
-      body: toolOutputText(payload.output),
-      output: payload.output,
-    };
-  }
-
-  return null;
+  return value as ToolPart;
 }
 
-function toolOutputText(output: unknown): string | undefined {
-  if (typeof output === 'string') {
-    return output;
+function rendererToolPartUpdate(value: unknown): RendererToolPartUpdate | null {
+  if (!isRecord(value) || typeof value.itemId !== 'string') {
+    return null;
   }
 
-  if (Array.isArray(output)) {
-    return output
-      .map((entry) => toolOutputText(entry))
-      .filter(Boolean)
-      .join('\n\n') || undefined;
+  if ('status' in value && value.status !== undefined && !isToolStatus(value.status)) {
+    return null;
   }
 
-  if (!isRecord(output)) {
-    return output === undefined ? undefined : JSON.stringify(output);
+  const fallbackToolPart = rendererToolPart(value.fallbackToolPart);
+  if ('fallbackToolPart' in value && value.fallbackToolPart !== undefined && !fallbackToolPart) {
+    return null;
   }
 
-  const structuredText = 'structuredContent' in output ? toolOutputText(output.structuredContent) : undefined;
-  if (structuredText) {
-    const contentText = toolOutputContentText(output);
-    if (!contentText || contentText.trim() === structuredToolResultNotice) {
-      return structuredText;
-    }
+  const update: RendererToolPartUpdate = {
+    itemId: value.itemId,
+    title: typeof value.title === 'string' ? value.title : undefined,
+    status: isToolStatus(value.status) ? value.status : undefined,
+    statusText: typeof value.statusText === 'string' ? value.statusText : undefined,
+    body: typeof value.body === 'string' ? value.body : undefined,
+    bodyDelta: typeof value.bodyDelta === 'string' ? value.bodyDelta : undefined,
+    bodyAppend: typeof value.bodyAppend === 'string' ? value.bodyAppend : undefined,
+    metadata: isRecord(value.metadata) ? value.metadata : undefined,
+    fallbackToolPart: fallbackToolPart ?? undefined,
+  };
 
-    return `${contentText}\n\n${structuredText}`;
+  if ('input' in value) {
+    update.input = value.input;
   }
 
-  return toolOutputContentText(output) ?? JSON.stringify(output);
+  if ('output' in value) {
+    update.output = value.output;
+  }
+
+  return update;
 }
 
-function toolOutputContentText(output: Record<string, unknown>): string | undefined {
-  if (typeof output.text === 'string') {
-    return output.text;
-  }
-
-  if (typeof output.content === 'string') {
-    return output.content;
-  }
-
-  if (Array.isArray(output.content)) {
-    return toolOutputText(output.content);
-  }
-
-  return undefined;
+function isToolStatus(value: unknown): value is ToolPart['status'] {
+  return value === 'running' || value === 'completed' || value === 'failed';
 }
 
 function upsertAssistantToolPart(snapshot: AppSnapshot, agentId: string, turnId: string, toolPart: ToolPart): void {

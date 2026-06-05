@@ -490,11 +490,26 @@ describe('CodexAgentSessionManager', () => {
         turnId: 'turn-1',
         type: 'item.started',
         payload: {
-          item: {
-            type: 'commandExecution',
+          toolPart: {
+            type: 'tool',
             id: 'cmd-1',
-            command: 'npm test',
-            status: 'inProgress',
+            kind: 'command',
+            title: 'npm test',
+            status: 'running',
+            body: undefined,
+            input: {
+              command: 'npm test',
+              cwd: undefined,
+              commandActions: undefined,
+            },
+            output: {
+              exitCode: undefined,
+              durationMs: undefined,
+            },
+            metadata: {
+              source: undefined,
+              processId: undefined,
+            },
           },
         },
         occurredAt: '<now>',
@@ -507,8 +522,14 @@ describe('CodexAgentSessionManager', () => {
         type: 'item.updated',
         payload: {
           itemId: 'cmd-1',
-          delta: 'running\n',
-          kind: 'commandExecution.outputDelta',
+          bodyDelta: 'running\n',
+          fallbackToolPart: {
+            type: 'tool',
+            id: 'cmd-1',
+            kind: 'command',
+            title: 'Command',
+            status: 'running',
+          },
         },
         occurredAt: '<now>',
       },
@@ -519,12 +540,26 @@ describe('CodexAgentSessionManager', () => {
         turnId: 'turn-1',
         type: 'item.completed',
         payload: {
-          item: {
-            type: 'commandExecution',
+          toolPart: {
+            type: 'tool',
             id: 'cmd-1',
-            command: 'npm test',
+            kind: 'command',
+            title: 'npm test',
             status: 'completed',
-            aggregatedOutput: 'passed',
+            body: 'passed',
+            input: {
+              command: 'npm test',
+              cwd: undefined,
+              commandActions: undefined,
+            },
+            output: {
+              exitCode: undefined,
+              durationMs: undefined,
+            },
+            metadata: {
+              source: undefined,
+              processId: undefined,
+            },
           },
         },
         occurredAt: '<now>',
@@ -893,18 +928,26 @@ describe('CodexAgentSessionManager', () => {
         turnId: 'turn-1',
         type: 'item.started',
         payload: {
-          item: {
-            type: 'commandExecution',
+          toolPart: {
+            type: 'tool',
             id: 'raw-call-1',
-            command: 'sed -n 1,80p docs/architecture.md',
-            cwd: '/Users/nbonamy/src/codex-claw',
-            processId: null,
-            source: 'agent',
-            status: 'inProgress',
-            commandActions: [],
-            aggregatedOutput: null,
-            exitCode: null,
-            durationMs: null,
+            kind: 'command',
+            title: 'sed -n 1,80p docs/architecture.md',
+            status: 'running',
+            body: undefined,
+            input: {
+              command: 'sed -n 1,80p docs/architecture.md',
+              cwd: '/Users/nbonamy/src/codex-claw',
+              commandActions: [],
+            },
+            output: {
+              exitCode: undefined,
+              durationMs: undefined,
+            },
+            metadata: {
+              source: 'agent',
+              processId: null,
+            },
           },
         },
         occurredAt: '<now>',
@@ -917,10 +960,19 @@ describe('CodexAgentSessionManager', () => {
         type: 'item.updated',
         payload: {
           itemId: 'raw-call-1',
-          kind: 'rawResponseItem.output',
+          body: 'architecture contents',
           output: 'architecture contents',
           status: 'completed',
           title: undefined,
+          fallbackToolPart: {
+            type: 'tool',
+            id: 'raw-call-1',
+            kind: 'generic',
+            title: 'Tool output',
+            status: 'completed',
+            body: 'architecture contents',
+            output: 'architecture contents',
+          },
         },
         occurredAt: '<now>',
       },
