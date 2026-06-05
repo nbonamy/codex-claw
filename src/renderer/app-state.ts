@@ -120,6 +120,38 @@ export function useAppState() {
     snapshot.value = await window.codexClaw.updateAgent(input);
   }
 
+  async function duplicateAgent(agentId: string): Promise<void> {
+    if (!window.codexClaw?.duplicateAgent) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.duplicateAgent(agentId);
+  }
+
+  async function saveAgentToBench(agentId: string): Promise<void> {
+    if (!window.codexClaw?.saveAgentToBench) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.saveAgentToBench(agentId);
+  }
+
+  async function restartAgent(agentId: string): Promise<void> {
+    if (!window.codexClaw?.restartAgent) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.restartAgent(agentId);
+  }
+
+  async function closeAgent(agentId: string): Promise<void> {
+    if (!window.codexClaw?.closeAgent) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.closeAgent(agentId);
+  }
+
   async function respondToClientRequest(response: ClientRequestResponse): Promise<void> {
     markClientRequestAnswered(response.id);
 
@@ -166,6 +198,10 @@ export function useAppState() {
     chooseAgentFolder,
     createAgent,
     updateAgent,
+    duplicateAgent,
+    saveAgentToBench,
+    restartAgent,
+    closeAgent,
     respondToClientRequest,
     selectModel,
     selectReasoningEffort,

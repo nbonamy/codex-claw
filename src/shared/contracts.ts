@@ -198,6 +198,10 @@ export type CodexClawApi = {
   chooseAgentFolder(): Promise<string | null>;
   createAgent(input: CreateAgentInput): Promise<AppSnapshot>;
   updateAgent(input: UpdateAgentInput): Promise<AppSnapshot>;
+  duplicateAgent(agentId: string): Promise<AppSnapshot>;
+  saveAgentToBench(agentId: string): Promise<AppSnapshot>;
+  restartAgent(agentId: string): Promise<AppSnapshot>;
+  closeAgent(agentId: string): Promise<AppSnapshot>;
   selectAgent(agentId: string): Promise<AppSnapshot>;
   selectAgentFolder(agentId: string): Promise<AppSnapshot | null>;
   sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot>;

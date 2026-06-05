@@ -13,6 +13,10 @@
     :choose-agent-folder="chooseAgentFolder"
     :create-agent="createAgent"
     :update-agent="updateAgent"
+    @close-agent="closeAgent"
+    @duplicate-agent="duplicateAgent"
+    @restart-agent="restartAgent"
+    @save-agent-to-bench="saveAgentToBench"
     @select-agent="selectAgent"
     @select-model="selectModel"
     @select-reasoning-effort="selectReasoningEffort"
@@ -42,6 +46,10 @@ const {
   chooseAgentFolder,
   createAgent,
   updateAgent,
+  duplicateAgent,
+  saveAgentToBench,
+  restartAgent,
+  closeAgent,
   respondToClientRequest,
   selectModel,
   selectReasoningEffort,

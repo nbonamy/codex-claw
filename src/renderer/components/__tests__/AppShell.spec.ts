@@ -233,7 +233,7 @@ describe('AppShell', () => {
       clientX: 120,
       clientY: 80,
     });
-    await wrapper.get('.agent-sidebar__context-action').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Edit Agent')?.trigger('click');
 
     expect(wrapper.text()).toContain('Edit Agent');
     await wrapper.get('.agent-dialog__text-input').setValue('Dina Prime');
@@ -245,6 +245,27 @@ describe('AppShell', () => {
       avatar: 'DI',
       folder: '~/src/codex-claw',
     });
+  });
+
+  it('forwards agent context menu action intents', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mountShell({ snapshot });
+
+    await wrapper.findAll('.agent-sidebar__agent')[0].trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80,
+    });
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Duplicate Agent')?.trigger('click');
+
+    expect(wrapper.emitted('duplicate-agent')).toStrictEqual([['agent-dina']]);
+
+    await wrapper.findAll('.agent-sidebar__agent')[0].trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80,
+    });
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Restart Agent')?.trigger('click');
+
+    expect(wrapper.emitted('restart-agent')).toStrictEqual([['agent-dina']]);
   });
 });
 

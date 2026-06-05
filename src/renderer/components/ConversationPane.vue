@@ -151,12 +151,13 @@ const heroSubhead = computed(() => {
 .conversation-pane__hero {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   gap: var(--space-12);
   width: min(100%, var(--conversation-content-width));
   height: 100%;
   margin: 0 auto;
-  padding: var(--space-8);
+  padding: var(--space-8) var(--space-16);
+  padding-top: 25vh;
 }
 
 .conversation-pane__hero-copy {

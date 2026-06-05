@@ -162,7 +162,7 @@ describe('AgentSidebar', () => {
     expect(wrapper.emitted('new-agent')).toStrictEqual([[]]);
   });
 
-  it('opens a small context menu and emits edit agent requests', async () => {
+  it('opens a context menu, closes it on request, and emits agent actions', async () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents,
@@ -179,12 +179,61 @@ describe('AgentSidebar', () => {
       clientY: 80,
     });
 
-    expect(wrapper.find('.agent-sidebar__context-menu').exists()).toBe(true);
-    expect(wrapper.get('.agent-sidebar__context-action').text()).toContain('Edit Agent');
+    expect(wrapper.find('.agent-context-menu').exists()).toBe(true);
+    expect(wrapper.findAll('[role="menuitem"]').map((item) => item.text())).toStrictEqual([
+      'Edit Agent',
+      'Duplicate Agent',
+      'Move to Other Team',
+      'Save to Bench',
+      'Restart Agent',
+      'Close Agent',
+    ]);
 
-    await wrapper.get('.agent-sidebar__context-action').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Edit Agent')?.trigger('click');
 
     expect(wrapper.emitted('edit-agent')).toStrictEqual([['agent-dina']]);
+    expect(wrapper.find('.agent-context-menu').exists()).toBe(false);
+
+    const expectedActions = [
+      ['Duplicate Agent', 'duplicate-agent'],
+      ['Move to Other Team', 'move-agent-to-team'],
+      ['Save to Bench', 'save-agent-to-bench'],
+      ['Restart Agent', 'restart-agent'],
+      ['Close Agent', 'close-agent'],
+    ] as const;
+
+    for (const [label, eventName] of expectedActions) {
+      await wrapper.findAll('.agent-sidebar__agent')[0].trigger('contextmenu', {
+        clientX: 120,
+        clientY: 80,
+      });
+      await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === label)?.trigger('click');
+      expect(wrapper.emitted(eventName)).toStrictEqual([['agent-dina']]);
+    }
+  });
+
+  it('closes the context menu when the menu emits close', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    await wrapper.findAll('.agent-sidebar__agent')[0].trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80,
+    });
+
+    expect(wrapper.find('.agent-context-menu').exists()).toBe(true);
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('.agent-context-menu').exists()).toBe(false);
   });
 
   it('emits collapse requests from the team header icon', async () => {

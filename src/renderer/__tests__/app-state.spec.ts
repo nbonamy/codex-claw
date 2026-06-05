@@ -308,7 +308,7 @@ describe('useAppState', () => {
     expect(state.snapshot.value.agents[0].status).toStrictEqual({ type: 'working' });
   });
 
-  it('chooses folders and replaces the snapshot after creating and updating agents', async () => {
+  it('chooses folders and replaces the snapshot after agent metadata actions', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const createdSnapshot = createInitialSnapshot();
     createdSnapshot.agents.push({
@@ -326,9 +326,40 @@ describe('useAppState', () => {
       ...createdSnapshot,
       agents: createdSnapshot.agents.map((agent) => agent.id === 'agent-jules' ? { ...agent, name: 'Jules Prime' } : agent),
     };
+    const duplicatedSnapshot = {
+      ...updatedSnapshot,
+      activeAgentId: 'agent-jules-copy',
+    };
+    const benchSnapshot = {
+      ...duplicatedSnapshot,
+      bench: [
+        {
+          id: 'bench-jules-prime',
+          name: 'Jules Prime',
+          avatar: '🤖',
+          folder: '/Users/nbonamy/src/jules',
+          backend: 'codex' as const,
+          createdAt: '2026-06-05T00:00:00.000Z',
+          updatedAt: '2026-06-05T00:00:00.000Z',
+        },
+      ],
+    };
+    const restartedSnapshot = {
+      ...benchSnapshot,
+      messages: [],
+    };
+    const closedSnapshot = {
+      ...restartedSnapshot,
+      agents: restartedSnapshot.agents.filter((agent) => agent.id !== 'agent-jules'),
+      activeAgentId: 'agent-dina',
+    };
     const chooseAgentFolder = vi.fn().mockResolvedValue('/Users/nbonamy/src/jules');
     const createAgent = vi.fn().mockResolvedValue(createdSnapshot);
     const updateAgent = vi.fn().mockResolvedValue(updatedSnapshot);
+    const duplicateAgent = vi.fn().mockResolvedValue(duplicatedSnapshot);
+    const saveAgentToBench = vi.fn().mockResolvedValue(benchSnapshot);
+    const restartAgent = vi.fn().mockResolvedValue(restartedSnapshot);
+    const closeAgent = vi.fn().mockResolvedValue(closedSnapshot);
 
     vi.stubGlobal('window', {
       codexClaw: {
@@ -337,6 +368,10 @@ describe('useAppState', () => {
         chooseAgentFolder,
         createAgent,
         updateAgent,
+        duplicateAgent,
+        saveAgentToBench,
+        restartAgent,
+        closeAgent,
       } satisfies Partial<CodexClawApi>,
     });
 
@@ -346,10 +381,18 @@ describe('useAppState', () => {
     await expect(state.chooseAgentFolder()).resolves.toBe('/Users/nbonamy/src/jules');
     await state.createAgent({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules' });
     await state.updateAgent({ id: 'agent-jules', name: 'Jules Prime', avatar: '🤖', folder: '/Users/nbonamy/src/jules' });
+    await state.duplicateAgent('agent-jules');
+    await state.saveAgentToBench('agent-jules');
+    await state.restartAgent('agent-jules');
+    await state.closeAgent('agent-jules');
 
     expect(createAgent).toHaveBeenCalledWith({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules' });
     expect(updateAgent).toHaveBeenCalledWith({ id: 'agent-jules', name: 'Jules Prime', avatar: '🤖', folder: '/Users/nbonamy/src/jules' });
-    expect(state.activeAgent.value?.name).toBe('Jules Prime');
+    expect(duplicateAgent).toHaveBeenCalledWith('agent-jules');
+    expect(saveAgentToBench).toHaveBeenCalledWith('agent-jules');
+    expect(restartAgent).toHaveBeenCalledWith('agent-jules');
+    expect(closeAgent).toHaveBeenCalledWith('agent-jules');
+    expect(state.snapshot.value).toStrictEqual(closedSnapshot);
   });
 
   it('returns safe defaults when optional agent preload helpers are unavailable', async () => {
@@ -368,6 +411,10 @@ describe('useAppState', () => {
     await expect(state.chooseAgentFolder()).resolves.toBeNull();
     await state.createAgent({ name: 'Ignored', folder: '/tmp/ignored' });
     await state.updateAgent({ id: 'agent-dina', name: 'Ignored', folder: '/tmp/ignored' });
+    await state.duplicateAgent('agent-dina');
+    await state.saveAgentToBench('agent-dina');
+    await state.restartAgent('agent-dina');
+    await state.closeAgent('agent-dina');
 
     expect(state.snapshot.value).toBe(before);
   });

@@ -17,9 +17,14 @@
         :min-width="agentSidebarMinWidth"
         :max-width="agentSidebarMaxWidth"
         @collapse-sidebar="agentSidebarCollapsed = true"
+        @close-agent="$emit('close-agent', $event)"
+        @duplicate-agent="$emit('duplicate-agent', $event)"
         @edit-agent="openEditAgent"
+        @move-agent-to-team="$emit('move-agent-to-team', $event)"
         @new-agent="openNewAgent"
+        @restart-agent="$emit('restart-agent', $event)"
         @resize-sidebar="setAgentSidebarWidth"
+        @save-agent-to-bench="$emit('save-agent-to-bench', $event)"
         @select-agent="$emit('select-agent', $event)"
       />
     </Transition>
@@ -102,7 +107,12 @@ const props = withDefaults(defineProps<{
 });
 
 defineEmits<{
+  'close-agent': [agentId: string];
   'client-response': [response: ClientRequestResponse];
+  'duplicate-agent': [agentId: string];
+  'move-agent-to-team': [agentId: string];
+  'restart-agent': [agentId: string];
+  'save-agent-to-bench': [agentId: string];
   'select-agent': [agentId: string];
   'select-model': [modelId: string];
   'select-reasoning-effort': [reasoningEffort: ReasoningEffort];

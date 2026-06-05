@@ -107,7 +107,7 @@ function resizeTextareaSoon(): void {
   --chat-composer-button-size: 36px;
   --chat-composer-input-max-height: 160px;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: var(--space-6);
   width: 100%;
   min-height: 60px;

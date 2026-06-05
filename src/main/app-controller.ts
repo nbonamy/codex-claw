@@ -12,6 +12,12 @@ import { CHECK_INBOX_PROMPT } from './mcp/agent-prompts';
 import { buildCodexClawMcpConfigOverrides } from './mcp/codex-config';
 import { ClawMcpHttpServer } from './mcp/http-server';
 import {
+  closeAgentInSnapshot,
+  duplicateAgentInSnapshot,
+  restartAgentConversation,
+  saveAgentToBench,
+} from '../shared/agent-manager';
+import {
   applyMainEventToSnapshot,
   createAgentInSnapshot,
   createEmptySnapshot,
@@ -78,6 +84,42 @@ export class AppController {
       const agent = updateAgentFromInput(this.snapshot, input);
       if (!agent) {
         throw new Error(`Agent not found: ${input.id}`);
+      }
+      await this.persistSnapshot();
+      return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.duplicateAgent, async (_event, agentId: string) => {
+      const agent = duplicateAgentInSnapshot(this.snapshot, agentId);
+      if (!agent) {
+        throw new Error(`Agent not found: ${agentId}`);
+      }
+      await this.persistSnapshot();
+      return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.saveAgentToBench, async (_event, agentId: string) => {
+      const template = saveAgentToBench(this.snapshot, agentId);
+      if (!template) {
+        throw new Error(`Agent not found: ${agentId}`);
+      }
+      await this.persistSnapshot();
+      return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.restartAgent, async (_event, agentId: string) => {
+      const agent = restartAgentConversation(this.snapshot, agentId);
+      if (!agent) {
+        throw new Error(`Agent not found: ${agentId}`);
+      }
+      await this.persistSnapshot();
+      return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.closeAgent, async (_event, agentId: string) => {
+      const agent = closeAgentInSnapshot(this.snapshot, agentId);
+      if (!agent) {
+        throw new Error(`Agent not found: ${agentId}`);
       }
       await this.persistSnapshot();
       return this.snapshot;
