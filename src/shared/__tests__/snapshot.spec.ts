@@ -14,6 +14,7 @@ describe('snapshot reducer', () => {
 
     expect(updateAgentFolder(snapshot, 'agent-dina', '/Users/nbonamy/src/id8', '2026-06-05T00:00:01.000Z')).toStrictEqual({
       id: 'agent-dina',
+      teamId: 'team-codex-claw',
       name: 'Dina',
       avatar: 'DI',
       folder: '/Users/nbonamy/src/id8',
@@ -120,6 +121,7 @@ describe('snapshot reducer', () => {
 
     expect(snapshot.agents[0]).toStrictEqual({
       id: 'agent-dina',
+      teamId: 'team-codex-claw',
       name: 'Dina',
       avatar: 'DI',
       folder: '~/src/codex-claw',

@@ -7,7 +7,7 @@ export function createMainWindow(): BrowserWindow {
     height: 960,
     minWidth: 1024,
     minHeight: 720,
-    title: 'Codex Claw',
+    titleBarStyle: 'hidden',
     show: false,
     backgroundColor: '#061c2a',
     webPreferences: {

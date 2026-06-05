@@ -1,20 +1,27 @@
 <template>
-  <main class="app-shell">
+  <main
+    class="app-shell"
+  >
     <TeamRail
       :teams="snapshot.teams"
-      :active-agent="activeAgent"
+      :active-team-id="activeTeam?.id ?? null"
+      class="app-shell__team-rail"
     />
     <AgentSidebar
+      v-if="!agentSidebarCollapsed"
       :agents="snapshot.agents"
       :active-agent-id="snapshot.activeAgentId"
-      :bench-count="snapshot.bench.length"
+      :team-name="activeTeamName"
+      @collapse-sidebar="agentSidebarCollapsed = true"
       @select-agent="$emit('select-agent', $event)"
     />
-    <section class="app-shell__workspace">
+    <section class="app-shell__agent">
       <AgentHeader
         :agent="activeAgent"
         :app-server="snapshot.appServer"
         :is-loading="isLoading"
+        :sidebar-collapsed="agentSidebarCollapsed"
+        @expand-sidebar="agentSidebarCollapsed = false"
       />
       <div class="app-shell__body">
         <ConversationPane
@@ -31,13 +38,14 @@
 </template>
 
 <script setup lang="ts">
-import type { Agent, AppSnapshot, ClientRequestResponse, RendererMessage } from '../../shared/contracts';
+import { computed, ref } from 'vue';
+import type { Agent, AppSnapshot, ClientRequestResponse, RendererMessage, Team } from '../../shared/contracts';
 import AgentHeader from './AgentHeader.vue';
 import AgentSidebar from './AgentSidebar.vue';
 import ConversationPane from './ConversationPane.vue';
 import TeamRail from './TeamRail.vue';
 
-defineProps<{
+const props = defineProps<{
   snapshot: AppSnapshot;
   activeAgent: Agent | null;
   messages: RendererMessage[];
@@ -51,12 +59,25 @@ defineEmits<{
   'select-agent': [agentId: string];
   sendPrompt: [prompt: string];
 }>();
+
+const agentSidebarCollapsed = ref(false);
+const activeTeam = computed<Team | null>(() => {
+  if (props.activeAgent?.teamId) {
+    return props.snapshot.teams.find((team) => team.id === props.activeAgent?.teamId) ?? props.snapshot.teams[0] ?? null;
+  }
+
+  if (props.activeAgent) {
+    return props.snapshot.teams.find((team) => team.agentIds.includes(props.activeAgent?.id ?? '')) ?? props.snapshot.teams[0] ?? null;
+  }
+
+  return props.snapshot.teams[0] ?? null;
+});
+const activeTeamName = computed(() => activeTeam.value?.name ?? 'Codex Claw');
 </script>
 
 <style scoped>
 .app-shell {
-  display: grid;
-  grid-template-columns: var(--cc-team-rail-width) var(--cc-agent-sidebar-width) minmax(0, 1fr);
+  display: flex;
   height: 100vh;
   min-height: 0;
   overflow: hidden;
@@ -64,26 +85,24 @@ defineEmits<{
   background: var(--cc-bg);
 }
 
-.app-shell__workspace {
+.app-shell__team-rail {
+  padding-top: var(--cc-space-6);
+}
+
+.app-shell__agent {
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
-  display: grid;
-  grid-template-rows: var(--cc-header-height) minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   background: var(--cc-workspace);
 }
 
 .app-shell__body {
+  flex: 1 1 auto;
   min-height: 0;
-  display: flex;
   min-width: 0;
   overflow: hidden;
-}
-
-@media (max-width: 1100px) {
-  .app-shell {
-    grid-template-columns: var(--cc-team-rail-width) minmax(var(--cc-agent-sidebar-compact-min), var(--cc-agent-sidebar-compact-width)) minmax(0, 1fr);
-  }
-
 }
 </style>

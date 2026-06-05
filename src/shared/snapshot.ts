@@ -10,6 +10,7 @@ import type {
 } from './contracts';
 
 const seedCreatedAt = '2026-06-05T00:00:00.000Z';
+const seedTeamId = 'team-codex-claw';
 const structuredToolResultNotice = 'Result returned in structuredContent.';
 type ToolPart = Extract<RendererMessagePart, { type: 'tool' }>;
 
@@ -17,7 +18,14 @@ export function createInitialSnapshot(): AppSnapshot {
   const agents = createSeedAgents();
 
   return {
-    teams: [],
+    teams: [
+      {
+        id: seedTeamId,
+        name: 'Codex Claw',
+        avatar: 'CC',
+        agentIds: agents.map((agent) => agent.id),
+      },
+    ],
     agents,
     bench: [],
     activeAgentId: agents[0]?.id ?? null,
@@ -35,6 +43,7 @@ export function createInitialSnapshot(): AppSnapshot {
 export function createAgentFromInput(input: CreateAgentInput, createdAt = new Date().toISOString()): Agent {
   return {
     id: `agent-${slug(input.name)}-${createdAt.replace(/\W/g, '').toLowerCase()}`,
+    teamId: seedTeamId,
     name: input.name.trim(),
     avatar: input.avatar,
     folder: input.folder,
@@ -756,6 +765,7 @@ function createSeedAgents(): Agent[] {
   return [
     {
       id: 'agent-dina',
+      teamId: seedTeamId,
       name: 'Dina',
       avatar: 'DI',
       folder: '~/src/codex-claw',
@@ -765,6 +775,7 @@ function createSeedAgents(): Agent[] {
     },
     {
       id: 'agent-jesse',
+      teamId: seedTeamId,
       name: 'Jesse',
       avatar: 'JE',
       folder: '~/src/codex-claw',

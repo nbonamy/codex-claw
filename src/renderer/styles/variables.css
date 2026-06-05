@@ -38,7 +38,7 @@
   --cc-radius-pill: 999px;
 
   /* Layout */
-  --cc-team-rail-width: 72px;
+  --cc-team-rail-width: 64px;
   --cc-agent-sidebar-width: 320px;
   --cc-header-height: 76px;
   --cc-artifact-header-height: 48px;
@@ -60,9 +60,7 @@
   /* Component sizing */
   --cc-avatar-size: 44px;
   --cc-avatar-size-small: 42px;
-  --cc-team-button-size: 46px;
-  --cc-window-control-size: 11px;
-  --cc-window-controls-width: 48px;
+  --cc-team-button-size: 38px;
   --cc-status-dot-size: 10px;
   --cc-agent-row-min-height: 76px;
   --cc-agent-status-column-width: 12px;

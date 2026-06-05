@@ -4,8 +4,20 @@
     aria-label="Agents"
   >
     <header class="agent-sidebar__header">
-      <strong>Codex Claw</strong>
-      <span>Bench {{ benchCount }}</span>
+      <strong>{{ teamTitle }}</strong>
+      <el-tooltip
+        content="Hide agent sidebar"
+        placement="bottom"
+      >
+        <button
+          class="agent-sidebar__collapse"
+          type="button"
+          aria-label="Hide agent sidebar"
+          @click="emit('collapse-sidebar')"
+        >
+          <Fold class="agent-sidebar__collapse-icon" />
+        </button>
+      </el-tooltip>
     </header>
 
     <nav class="agent-sidebar__list">
@@ -43,17 +55,22 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+import { Fold } from '@element-plus/icons-vue';
 import type { Agent, AgentStatus } from '../../shared/contracts';
 
-defineProps<{
+const props = defineProps<{
   agents: Agent[];
   activeAgentId: string | null;
-  benchCount: number;
+  teamName: string;
 }>();
 
 const emit = defineEmits<{
+  'collapse-sidebar': [];
   'select-agent': [agentId: string];
 }>();
+
+const teamTitle = computed(() => props.teamName.toUpperCase());
 
 function agentStatusLabel(status: AgentStatus['type']): string {
   switch (status) {
@@ -73,30 +90,70 @@ function agentStatusLabel(status: AgentStatus['type']): string {
 
 <style scoped>
 .agent-sidebar {
+  flex: 0 0 var(--cc-agent-sidebar-width);
+  width: var(--cc-agent-sidebar-width);
   min-width: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   background: var(--cc-sidebar-bg);
   border-right: 1px solid var(--cc-border-muted);
+  user-select: none;
 }
 
 .agent-sidebar__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--cc-space-5) var(--cc-space-4) var(--cc-space-3);
+  gap: var(--cc-space-3);
+  min-width: 0;
+  padding-left: var(--cc-space-5);
+  border-bottom: 1px solid var(--cc-border-muted);
   color: var(--cc-text);
+  --webkit-app-region: drag;
 }
 
-.agent-sidebar__header span {
-  color: var(--cc-text-muted);
+.agent-sidebar__header strong {
+  min-width: 0;
+  overflow: hidden;
   font: var(--cc-font-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-sidebar__collapse {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--cc-radius-1);
+  color: var(--cc-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.agent-sidebar__collapse:hover {
+  background: var(--cc-control-hover-bg);
+}
+
+.agent-sidebar__collapse:focus-visible {
+  outline: var(--cc-focus-ring-size) solid var(--cc-accent);
+  outline-offset: 2px;
+}
+
+.agent-sidebar__collapse-icon {
+  width: var(--cc-icon-size);
+  height: var(--cc-icon-size);
 }
 
 .agent-sidebar__list {
+  flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: var(--cc-space-2);
+  padding: var(--cc-space-3) var(--cc-space-2);
 }
 
 .agent-sidebar__agent {
@@ -179,5 +236,16 @@ function agentStatusLabel(status: AgentStatus['type']): string {
 
 .agent-sidebar__new {
   width: 100%;
+  min-height: 48px;
+  border-radius: var(--cc-radius-2);
+  font-weight: var(--cc-font-weight-bold);
+}
+
+@media (max-width: 1100px) {
+  .agent-sidebar {
+    flex-basis: var(--cc-agent-sidebar-compact-width);
+    width: var(--cc-agent-sidebar-compact-width);
+    min-width: var(--cc-agent-sidebar-compact-min);
+  }
 }
 </style>

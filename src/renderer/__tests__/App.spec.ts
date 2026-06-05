@@ -30,7 +30,7 @@ describe('App', () => {
     await flushPromises();
 
     expect(getSnapshot).toHaveBeenCalledOnce();
-    expect(wrapper.text()).toContain('Connected');
+    expect(wrapper.text()).toContain('Ready to get going');
     expect(wrapper.text()).toContain('Chat with Dina');
   });
 });

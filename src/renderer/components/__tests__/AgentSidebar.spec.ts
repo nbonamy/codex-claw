@@ -25,20 +25,21 @@ const agents: Agent[] = [
 ];
 
 describe('AgentSidebar', () => {
-  it('renders agents, folders, bench count, and active selection', () => {
+  it('renders the team header, agents, folders, and active selection without Bench chrome', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents,
         activeAgentId: 'agent-dina',
-        benchCount: 2,
+        teamName: 'Codex Claw',
       },
       global: {
         plugins: [ElementPlus],
       },
     });
 
-    expect(wrapper.text()).toContain('Codex Claw');
-    expect(wrapper.text()).toContain('Bench 2');
+    expect(wrapper.get('.agent-sidebar__header').text()).toContain('CODEX CLAW');
+    expect(wrapper.text()).toContain('CODEX CLAW');
+    expect(wrapper.text()).not.toContain('Bench');
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('~/src/id8');
     expect(wrapper.text()).toContain('Jesse');
@@ -53,7 +54,7 @@ describe('AgentSidebar', () => {
       props: {
         agents,
         activeAgentId: 'agent-dina',
-        benchCount: 0,
+        teamName: 'Codex Claw',
       },
       global: {
         plugins: [ElementPlus],
@@ -70,7 +71,7 @@ describe('AgentSidebar', () => {
       props: {
         agents,
         activeAgentId: 'agent-jesse',
-        benchCount: 0,
+        teamName: 'Codex Claw',
       },
       global: {
         plugins: [ElementPlus],
@@ -89,7 +90,7 @@ describe('AgentSidebar', () => {
           { ...agents[0], id: 'error', status: { type: 'error', message: 'failed' } },
         ],
         activeAgentId: 'starting',
-        benchCount: 0,
+        teamName: 'Codex Claw',
       },
       global: {
         plugins: [ElementPlus],
@@ -108,7 +109,7 @@ describe('AgentSidebar', () => {
           { ...agents[0], statusText: 'Running tests' },
         ],
         activeAgentId: 'agent-dina',
-        benchCount: 0,
+        teamName: 'Codex Claw',
       },
       global: {
         plugins: [ElementPlus],
@@ -117,5 +118,37 @@ describe('AgentSidebar', () => {
 
     expect(wrapper.text()).toContain('Running tests');
     expect(wrapper.text()).not.toContain('~/src/id8');
+  });
+
+  it('renders a taller rounded new agent action', () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.get('.agent-sidebar__new').text()).toContain('New Agent');
+  });
+
+  it('emits collapse requests from the team header icon', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    await wrapper.get('[aria-label="Hide agent sidebar"]').trigger('click');
+
+    expect(wrapper.emitted('collapse-sidebar')).toStrictEqual([[]]);
   });
 });

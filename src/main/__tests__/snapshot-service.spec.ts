@@ -4,10 +4,18 @@ import { createAgentFromInput, createInitialSnapshot, selectAgent } from '../sna
 describe('snapshot service', () => {
   it('creates the phase one app snapshot with two implicit agents', () => {
     expect(createInitialSnapshot()).toStrictEqual({
-      teams: [],
+      teams: [
+        {
+          id: 'team-codex-claw',
+          name: 'Codex Claw',
+          avatar: 'CC',
+          agentIds: ['agent-dina', 'agent-jesse'],
+        },
+      ],
       agents: [
         {
           id: 'agent-dina',
+          teamId: 'team-codex-claw',
           name: 'Dina',
           avatar: 'DI',
           folder: '~/src/codex-claw',
@@ -17,6 +25,7 @@ describe('snapshot service', () => {
         },
         {
           id: 'agent-jesse',
+          teamId: 'team-codex-claw',
           name: 'Jesse',
           avatar: 'JE',
           folder: '~/src/codex-claw',
@@ -52,6 +61,7 @@ describe('snapshot service', () => {
       folder: '/Users/nbonamy/src/id8',
     }, '2026-06-05T10:11:12.000Z')).toStrictEqual({
       id: 'agent-jules-20260605t101112000z',
+      teamId: 'team-codex-claw',
       name: 'Jules',
       avatar: 'JU',
       folder: '/Users/nbonamy/src/id8',
