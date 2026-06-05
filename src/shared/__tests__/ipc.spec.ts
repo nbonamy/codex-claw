@@ -6,6 +6,7 @@ describe('ipc channels', () => {
     expect(ipcChannels).toStrictEqual({
       getSnapshot: 'app:get-snapshot',
       createAgent: 'agent:create',
+      selectAgentFolder: 'agent:select-folder',
       sendPrompt: 'agent:send-prompt',
       event: 'app:event',
     });

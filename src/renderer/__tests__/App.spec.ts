@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import App from '../App.vue';
-import { createInitialSnapshot } from '../../main/snapshot-service';
+import { createInitialSnapshot } from '../../shared/snapshot';
 import type { CodexClawApi } from '../../shared/contracts';
 
 describe('App', () => {
@@ -17,6 +17,7 @@ describe('App', () => {
     vi.stubGlobal('window', {
       codexClaw: {
         getSnapshot,
+        onEvent: vi.fn(),
       } satisfies Partial<CodexClawApi>,
     });
 

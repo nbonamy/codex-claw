@@ -8,6 +8,7 @@
       :agents="snapshot.agents"
       :active-agent-id="snapshot.activeAgentId"
       :bench-count="snapshot.bench.length"
+      @select-folder="$emit('selectAgentFolder')"
     />
     <section class="app-shell__workspace">
       <AgentHeader
@@ -19,6 +20,8 @@
         <ConversationPane
           :messages="messages"
           :agent="activeAgent"
+          :is-sending="isSending"
+          @send-prompt="$emit('sendPrompt', $event)"
         />
         <ArtifactPane />
       </div>
@@ -39,6 +42,12 @@ defineProps<{
   activeAgent: Agent | null;
   messages: RendererMessage[];
   isLoading: boolean;
+  isSending: boolean;
+}>();
+
+defineEmits<{
+  sendPrompt: [prompt: string];
+  selectAgentFolder: [];
 }>();
 </script>
 
@@ -61,12 +70,12 @@ defineProps<{
 .app-shell__body {
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(420px, 1fr) minmax(280px, 28vw);
+  grid-template-columns: minmax(var(--cc-conversation-min-width), 1fr) minmax(var(--cc-artifact-pane-min), var(--cc-artifact-pane-width));
 }
 
 @media (max-width: 1100px) {
   .app-shell {
-    grid-template-columns: var(--cc-team-rail-width) minmax(250px, 32vw) minmax(0, 1fr);
+    grid-template-columns: var(--cc-team-rail-width) minmax(var(--cc-agent-sidebar-compact-min), var(--cc-agent-sidebar-compact-width)) minmax(0, 1fr);
   }
 
   .app-shell__body {

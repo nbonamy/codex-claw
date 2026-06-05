@@ -4,6 +4,9 @@
     :active-agent="activeAgent"
     :messages="visibleMessages"
     :is-loading="isLoading"
+    :is-sending="isSending"
+    @send-prompt="sendPrompt"
+    @select-agent-folder="selectAgentFolder"
   />
 </template>
 
@@ -17,7 +20,10 @@ const {
   activeAgent,
   visibleMessages,
   isLoading,
+  isSending,
   loadSnapshot,
+  sendPrompt,
+  selectAgentFolder,
 } = useAppState();
 
 onMounted(() => {

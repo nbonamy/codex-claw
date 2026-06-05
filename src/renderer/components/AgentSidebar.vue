@@ -31,6 +31,12 @@
 
     <footer class="agent-sidebar__footer">
       <el-button
+        class="agent-sidebar__folder"
+        @click="$emit('selectFolder')"
+      >
+        Change Folder
+      </el-button>
+      <el-button
         type="primary"
         class="agent-sidebar__new"
       >
@@ -47,6 +53,10 @@ defineProps<{
   agents: Agent[];
   activeAgentId: string | null;
   benchCount: number;
+}>();
+
+defineEmits<{
+  selectFolder: [];
 }>();
 
 function agentStatusLabel(status: AgentStatus['type']): string {
@@ -95,9 +105,9 @@ function agentStatusLabel(status: AgentStatus['type']): string {
 
 .agent-sidebar__agent {
   width: 100%;
-  min-height: 76px;
+  min-height: var(--cc-agent-row-min-height);
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 12px;
+  grid-template-columns: var(--cc-avatar-size) minmax(0, 1fr) var(--cc-agent-status-column-width);
   align-items: center;
   gap: var(--cc-space-3);
   margin-bottom: var(--cc-space-2);
@@ -118,9 +128,9 @@ function agentStatusLabel(status: AgentStatus['type']): string {
 .agent-sidebar__avatar {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 999px;
+  width: var(--cc-avatar-size);
+  height: var(--cc-avatar-size);
+  border-radius: var(--cc-radius-pill);
   background: var(--cc-avatar-bg);
   color: var(--cc-avatar-text);
   font: var(--cc-font-label);
@@ -129,7 +139,7 @@ function agentStatusLabel(status: AgentStatus['type']): string {
 .agent-sidebar__meta {
   min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: var(--cc-meta-gap);
 }
 
 .agent-sidebar__meta strong,
@@ -145,9 +155,9 @@ function agentStatusLabel(status: AgentStatus['type']): string {
 }
 
 .agent-sidebar__status {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
+  width: var(--cc-status-dot-size);
+  height: var(--cc-status-dot-size);
+  border-radius: var(--cc-radius-pill);
   background: var(--cc-status-idle);
 }
 
@@ -165,10 +175,13 @@ function agentStatusLabel(status: AgentStatus['type']): string {
 }
 
 .agent-sidebar__footer {
+  display: grid;
+  gap: var(--cc-space-2);
   padding: var(--cc-space-3);
   border-top: 1px solid var(--cc-border-muted);
 }
 
+.agent-sidebar__folder,
 .agent-sidebar__new {
   width: 100%;
 }

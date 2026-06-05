@@ -17,7 +17,7 @@
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: 48px minmax(0, 1fr);
+  grid-template-rows: var(--cc-artifact-header-height) minmax(0, 1fr);
   background: var(--cc-artifact-bg);
   border-left: 1px solid var(--cc-border-muted);
 }

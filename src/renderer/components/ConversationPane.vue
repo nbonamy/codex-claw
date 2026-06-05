@@ -30,30 +30,61 @@
 
     <form
       class="conversation-pane__composer"
-      @submit.prevent
+      @submit.prevent="submitPrompt"
     >
       <span aria-hidden="true">&gt;</span>
       <input
+        v-model="prompt"
         :placeholder="composerPlaceholder"
         aria-label="Prompt"
-        disabled
+        :disabled="!agent || isSending"
       />
+      <el-button
+        type="primary"
+        :disabled="!canSend"
+        native-type="submit"
+      >
+        Send
+      </el-button>
     </form>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import type { Agent, RendererMessage } from '../../shared/contracts';
 
 const props = defineProps<{
   messages: RendererMessage[];
   agent: Agent | null;
+  isSending: boolean;
 }>();
 
+const emit = defineEmits<{
+  sendPrompt: [prompt: string];
+}>();
+
+const prompt = ref('');
+
 const composerPlaceholder = computed(() => {
-  return props.agent ? `Prompt ${props.agent.name}` : 'Select an agent';
+  if (!props.agent) {
+    return 'Select an agent';
+  }
+
+  return props.isSending ? 'Codex is working...' : `Prompt ${props.agent.name}`;
 });
+
+const canSend = computed(() => Boolean(props.agent && prompt.value.trim() && !props.isSending));
+
+function submitPrompt(): void {
+  const trimmed = prompt.value.trim();
+  if (!canSend.value) {
+    return;
+  }
+
+  prompt.value = '';
+  emit('sendPrompt', trimmed);
+}
 </script>
 
 <style scoped>
@@ -72,7 +103,7 @@ const composerPlaceholder = computed(() => {
 }
 
 .conversation-pane__message {
-  max-width: 860px;
+  max-width: var(--cc-message-max-width);
   margin-bottom: var(--cc-space-4);
   color: var(--cc-text);
 }
@@ -89,7 +120,7 @@ const composerPlaceholder = computed(() => {
   border: 1px solid var(--cc-border);
   border-radius: var(--cc-radius-2);
   background: var(--cc-message-bg);
-  line-height: 1.5;
+  line-height: var(--cc-line-height-comfortable);
 }
 
 .conversation-pane__part + .conversation-pane__part {
@@ -116,10 +147,10 @@ const composerPlaceholder = computed(() => {
 
 .conversation-pane__composer {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: var(--cc-space-2);
   align-items: center;
-  min-height: 64px;
+  min-height: var(--cc-composer-min-height);
   padding: 0 var(--cc-space-5);
   color: var(--cc-text);
   background: var(--cc-composer-bg);

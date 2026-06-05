@@ -1,4 +1,5 @@
 import { mount } from '@vue/test-utils';
+import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import ConversationPane from '../ConversationPane.vue';
 import type { Agent, RendererMessage } from '../../../shared/contracts';
@@ -42,11 +43,10 @@ const messages: RendererMessage[] = [
 
 describe('ConversationPane', () => {
   it('renders text and tool message parts for the active agent', () => {
-    const wrapper = mount(ConversationPane, {
-      props: {
-        agent,
-        messages,
-      },
+    const wrapper = mountPane({
+      agent,
+      messages,
+      isSending: false,
     });
 
     expect(wrapper.text()).toContain('Find the failing test.');
@@ -57,13 +57,46 @@ describe('ConversationPane', () => {
   });
 
   it('shows a select-agent composer placeholder without an agent', () => {
-    const wrapper = mount(ConversationPane, {
-      props: {
-        agent: null,
-        messages: [],
-      },
+    const wrapper = mountPane({
+      agent: null,
+      messages: [],
+      isSending: false,
     });
 
     expect(wrapper.get('input').attributes('placeholder')).toBe('Select an agent');
   });
+
+  it('emits trimmed prompts from the composer', async () => {
+    const wrapper = mountPane({
+      agent,
+      messages: [],
+      isSending: false,
+    });
+
+    await wrapper.get('input').setValue('  hello codex  ');
+    await wrapper.get('form').trigger('submit');
+
+    expect(wrapper.emitted('sendPrompt')).toStrictEqual([['hello codex']]);
+    expect((wrapper.get('input').element as HTMLInputElement).value).toBe('');
+  });
+
+  it('disables composer actions while sending', () => {
+    const wrapper = mountPane({
+      agent,
+      messages: [],
+      isSending: true,
+    });
+
+    expect(wrapper.get('input').attributes()).toHaveProperty('disabled');
+    expect(wrapper.get('input').attributes('placeholder')).toBe('Codex is working...');
+  });
 });
+
+function mountPane(props: { messages: RendererMessage[]; agent: Agent | null; isSending: boolean }) {
+  return mount(ConversationPane, {
+    props,
+    global: {
+      plugins: [ElementPlus],
+    },
+  });
+}

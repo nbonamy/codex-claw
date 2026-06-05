@@ -61,4 +61,21 @@ describe('AgentSidebar', () => {
 
     expect(wrapper.find('.agent-sidebar__agent--active .agent-sidebar__avatar').text()).toBe('JE');
   });
+
+  it('emits folder selection from the footer action', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        benchCount: 0,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    await wrapper.find('.agent-sidebar__folder').trigger('click');
+
+    expect(wrapper.emitted('selectFolder')).toHaveLength(1);
+  });
 });

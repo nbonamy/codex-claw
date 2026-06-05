@@ -70,9 +70,9 @@ const statusLabel = computed(() => {
 .agent-header__avatar {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 999px;
+  width: var(--cc-avatar-size-small);
+  height: var(--cc-avatar-size-small);
+  border-radius: var(--cc-radius-pill);
   background: var(--cc-avatar-bg);
   color: var(--cc-avatar-text);
   font: var(--cc-font-label);
@@ -99,9 +99,9 @@ const statusLabel = computed(() => {
 }
 
 .agent-header__status span {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
+  width: var(--cc-status-dot-size);
+  height: var(--cc-status-dot-size);
+  border-radius: var(--cc-radius-pill);
   background: var(--cc-status-warning);
 }
 

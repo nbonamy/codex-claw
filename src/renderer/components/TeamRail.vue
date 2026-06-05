@@ -60,22 +60,22 @@ const initials = computed(() => {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: var(--cc-space-1);
-  width: 48px;
+  width: var(--cc-window-controls-width);
   margin-bottom: var(--cc-space-4);
 }
 
 .team-rail__window-controls span {
-  width: 11px;
-  height: 11px;
-  border-radius: 999px;
+  width: var(--cc-window-control-size);
+  height: var(--cc-window-control-size);
+  border-radius: var(--cc-radius-pill);
   background: var(--cc-window-control);
 }
 
 .team-rail__team {
-  width: 46px;
-  height: 46px;
+  width: var(--cc-team-button-size);
+  height: var(--cc-team-button-size);
   border: 1px solid var(--cc-border);
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   color: var(--cc-text);
   background: var(--cc-rail-item-bg);
   font: var(--cc-font-label);

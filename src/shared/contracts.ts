@@ -102,6 +102,7 @@ export type CreateAgentInput = {
 export type CodexClawApi = {
   getSnapshot(): Promise<AppSnapshot>;
   createAgent(input: CreateAgentInput): Promise<Agent>;
-  sendPrompt(agentId: string, prompt: string): Promise<void>;
+  selectAgentFolder(agentId: string): Promise<AppSnapshot | null>;
+  sendPrompt(agentId: string, prompt: string): Promise<AppSnapshot>;
   onEvent(listener: (event: MainToRendererEvent) => void): () => void;
 };

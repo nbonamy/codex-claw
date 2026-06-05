@@ -1,9 +1,11 @@
 import { computed, ref } from 'vue';
-import type { AppSnapshot } from '../shared/contracts';
-import { createInitialSnapshot } from '../main/snapshot-service';
+import type { AppSnapshot, MainToRendererEvent } from '../shared/contracts';
+import { applyMainEventToSnapshot, createInitialSnapshot } from '../shared/snapshot';
 
 const snapshot = ref<AppSnapshot>(createInitialSnapshot());
 const isLoading = ref(false);
+const isSending = ref(false);
+let unsubscribeMainEvents: (() => void) | null = null;
 
 export function useAppState() {
   const activeAgent = computed(() => {
@@ -24,8 +26,36 @@ export function useAppState() {
 
     try {
       snapshot.value = await window.codexClaw.getSnapshot();
+      subscribeToMainEvents();
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  async function sendPrompt(prompt: string): Promise<void> {
+    const agentId = activeAgent.value?.id;
+    if (!agentId || !window.codexClaw) {
+      return;
+    }
+
+    isSending.value = true;
+
+    try {
+      snapshot.value = await window.codexClaw.sendPrompt(agentId, prompt);
+    } finally {
+      isSending.value = false;
+    }
+  }
+
+  async function selectAgentFolder(): Promise<void> {
+    const agentId = activeAgent.value?.id;
+    if (!agentId || !window.codexClaw) {
+      return;
+    }
+
+    const nextSnapshot = await window.codexClaw.selectAgentFolder(agentId);
+    if (nextSnapshot) {
+      snapshot.value = nextSnapshot;
     }
   }
 
@@ -34,6 +64,20 @@ export function useAppState() {
     activeAgent,
     visibleMessages,
     isLoading,
+    isSending,
     loadSnapshot,
+    sendPrompt,
+    selectAgentFolder,
   };
+}
+
+function subscribeToMainEvents(): void {
+  if (!window.codexClaw || typeof window.codexClaw.onEvent !== 'function') {
+    return;
+  }
+
+  unsubscribeMainEvents?.();
+  unsubscribeMainEvents = window.codexClaw.onEvent((event: MainToRendererEvent) => {
+    applyMainEventToSnapshot(snapshot.value, event);
+  });
 }
