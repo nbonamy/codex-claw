@@ -1,12 +1,11 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import path from 'node:path';
+import { sendAgentPrompt } from './agent-chat-service';
 import { CodexAgentSessionManager } from './codex/agent-session';
 import { CodexProcessTransport } from './codex/process-transport';
 import { CodexRpcClient } from './codex/rpc-client';
 import { createMainWindow } from './main-window';
 import {
-  appendSystemMessage,
-  appendUserPrompt,
   applyMainEventToSnapshot,
   createAgentFromInput,
   createInitialSnapshot,
@@ -59,42 +58,9 @@ export class AppController {
   }
 
   private async sendPrompt(agentId: string, prompt: string): Promise<AppSnapshot> {
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    const trimmedPrompt = prompt.trim();
-    if (!agent || !trimmedPrompt) {
-      return this.snapshot;
-    }
-
-    appendUserPrompt(this.snapshot, agentId, trimmedPrompt);
-    agent.status = { type: 'starting' };
-    this.emitAndApply({
-      type: 'appServer.statusChanged',
-      payload: {
-        status: 'starting',
-        detail: 'Starting Codex app-server...',
-      },
+    return sendAgentPrompt(this.snapshot, this.getCodexSessionManager(), agentId, prompt, (event) => {
+      this.emitAndApply(event);
     });
-
-    try {
-      await this.getCodexSessionManager().sendPrompt(agent, trimmedPrompt);
-      this.emitAndApply({
-        type: 'appServer.statusChanged',
-        payload: {
-          status: 'running',
-          detail: 'Codex app-server connected.',
-        },
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      agent.status = { type: 'error', message };
-      this.snapshot.appServer = {
-        status: 'error',
-        detail: message,
-      };
-      appendSystemMessage(this.snapshot, agentId, message);
-    }
-
-    return this.snapshot;
   }
 
   private getCodexSessionManager(): CodexAgentSessionManager {
