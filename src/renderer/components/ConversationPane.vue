@@ -157,7 +157,7 @@ const heroSubhead = computed(() => {
   height: 100%;
   margin: 0 auto;
   padding: var(--space-8) var(--space-16);
-  padding-top: 25vh;
+  padding-top: 33vh;
 }
 
 .conversation-pane__hero-copy {
