@@ -1,8 +1,19 @@
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import AgentSidebar from '../AgentSidebar.vue';
 import type { Agent } from '../../../shared/contracts';
+
+function pointerEvent(type: string, clientX: number): PointerEvent {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    clientX,
+  });
+  Object.defineProperty(event, 'pointerId', { value: 1 });
+  return event as PointerEvent;
+}
 
 const agents: Agent[] = [
   {
@@ -133,6 +144,7 @@ describe('AgentSidebar', () => {
     });
 
     expect(wrapper.get('.agent-sidebar__new').text()).toContain('New Agent');
+    expect(wrapper.find('.agent-sidebar__new-icon').exists()).toBe(true);
   });
 
   it('emits collapse requests from the team header icon', async () => {
@@ -150,5 +162,98 @@ describe('AgentSidebar', () => {
     await wrapper.get('[aria-label="Hide agent sidebar"]').trigger('click');
 
     expect(wrapper.emitted('collapse-sidebar')).toStrictEqual([[]]);
+  });
+
+  it('renders a clamped sidebar width contract for the shell', () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+        width: 180,
+        minWidth: 220,
+        maxWidth: 420,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.attributes('style')).toContain('--agent-sidebar-width: 220px');
+    expect(wrapper.attributes('style')).toContain('--agent-sidebar-min-width: 220px');
+    expect(wrapper.attributes('style')).toContain('--agent-sidebar-max-width: 420px');
+  });
+
+  it('allows the shell to shrink the sidebar to avatar-only size by default', () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+        width: 40,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.attributes('style')).toContain('--agent-sidebar-width: 72px');
+    expect(wrapper.attributes('style')).toContain('--agent-sidebar-min-width: 72px');
+  });
+
+  it('defines avatar-only responsive rules for the small sidebar', () => {
+    const source = readFileSync(join(import.meta.dirname, '../AgentSidebar.vue'), 'utf8');
+
+    expect(source).toContain('@container (max-width: 140px)');
+    expect(source).toContain('.agent-sidebar__meta');
+    expect(source).toContain('display: none;');
+    expect(source).toContain('.agent-sidebar__status');
+    expect(source).toContain('position: absolute;');
+    expect(source).toContain('.agent-sidebar__new-label');
+  });
+
+  it('emits clamped resize widths from the right border drag handle', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+        width: 260,
+        minWidth: 220,
+        maxWidth: 420,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    const handle = wrapper.get('[aria-label="Resize agent sidebar"]');
+
+    handle.element.dispatchEvent(pointerEvent('pointerdown', 260));
+    handle.element.dispatchEvent(pointerEvent('pointermove', 500));
+    handle.element.dispatchEvent(pointerEvent('pointerup', 500));
+
+    expect(wrapper.emitted('resize-sidebar')).toStrictEqual([[420]]);
+  });
+
+  it('supports keyboard resizing from the right border handle', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+        width: 260,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    const handle = wrapper.get('[aria-label="Resize agent sidebar"]');
+
+    await handle.trigger('keydown', { key: 'ArrowLeft' });
+    await handle.trigger('keydown', { key: 'ArrowRight' });
+
+    expect(wrapper.emitted('resize-sidebar')).toStrictEqual([[244], [276]]);
   });
 });

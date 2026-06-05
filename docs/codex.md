@@ -89,9 +89,26 @@ Important requests for the first product:
 - `turn/start`
 - `turn/steer`
 - `turn/interrupt`
+- `model/list`
 
 The main process should expose these through app-level services such as
 `AgentSessionManager`, not directly through renderer IPC.
+
+## Models And Reasoning Effort
+
+Codex app-server v2 exposes the model picker catalog through `model/list`.
+Codex Claw should use that request instead of hardcoding model or reasoning
+level options. The response includes visible model entries, each model's
+`supportedReasoningEfforts` in the order Codex intends clients to display, and
+the model's `defaultReasoningEffort`.
+
+The renderer consumes an app-owned picker shape only. Main fetches and adapts
+the Codex catalog, the renderer stores the selected catalog model and reasoning
+effort, and prompt IPC sends `{ model, reasoningEffort }` back to main.
+
+`turn/start` accepts `model` and `effort` overrides for the current turn and
+subsequent turns, so Codex Claw applies the current picker selection on every
+prompt without requiring a new thread.
 
 ## MCP Enablement
 

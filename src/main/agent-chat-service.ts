@@ -2,7 +2,7 @@ import {
   appendUserPrompt,
 } from './snapshot-service';
 import type { CodexAgentSessionManager } from './codex/agent-session';
-import type { AgentStatus, AppSnapshot, MainToRendererEvent } from '../shared/contracts';
+import type { AgentStatus, AppSnapshot, MainToRendererEvent, SendPromptOptions } from '../shared/contracts';
 
 export type AgentChatEventEmitter = (
   event: Omit<MainToRendererEvent, 'seq' | 'occurredAt'> & Partial<Pick<MainToRendererEvent, 'seq' | 'occurredAt'>>,
@@ -13,6 +13,7 @@ export function sendAgentPrompt(
   sessionManager: CodexAgentSessionManager,
   agentId: string,
   prompt: string,
+  options: SendPromptOptions | undefined,
   emit: AgentChatEventEmitter,
 ): AppSnapshot {
   const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
@@ -28,7 +29,11 @@ export function sendAgentPrompt(
     detail: 'Starting Codex app-server...',
   }, emit, snapshot);
 
-  void sessionManager.sendPrompt(agent, trimmedPrompt)
+  const promptResult = hasPromptOptions(options)
+    ? sessionManager.sendPrompt(agent, trimmedPrompt, options)
+    : sessionManager.sendPrompt(agent, trimmedPrompt);
+
+  void promptResult
     .then((result) => {
       agent.codexThreadId = result.threadId;
       if (agent.status.type === 'starting') {
@@ -53,6 +58,10 @@ export function sendAgentPrompt(
     });
 
   return snapshot;
+}
+
+function hasPromptOptions(options: SendPromptOptions | undefined): options is SendPromptOptions {
+  return Boolean(options?.model || options?.reasoningEffort);
 }
 
 function isBusy(status: AgentStatus): boolean {

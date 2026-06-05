@@ -7,14 +7,20 @@
       :active-team-id="activeTeam?.id ?? null"
       class="app-shell__team-rail"
     />
-    <AgentSidebar
-      v-if="!agentSidebarCollapsed"
-      :agents="snapshot.agents"
-      :active-agent-id="snapshot.activeAgentId"
-      :team-name="activeTeamName"
-      @collapse-sidebar="agentSidebarCollapsed = true"
-      @select-agent="$emit('select-agent', $event)"
-    />
+    <Transition name="agent-sidebar">
+      <AgentSidebar
+        v-if="!agentSidebarCollapsed"
+        :agents="snapshot.agents"
+        :active-agent-id="snapshot.activeAgentId"
+        :team-name="activeTeamName"
+        :width="agentSidebarWidth"
+        :min-width="agentSidebarMinWidth"
+        :max-width="agentSidebarMaxWidth"
+        @collapse-sidebar="agentSidebarCollapsed = true"
+        @resize-sidebar="setAgentSidebarWidth"
+        @select-agent="$emit('select-agent', $event)"
+      />
+    </Transition>
     <section class="app-shell__agent">
       <AgentHeader
         :agent="activeAgent"
@@ -29,7 +35,13 @@
           :agent="activeAgent"
           :is-sending="isSending"
           :answered-client-request-ids="answeredClientRequestIds"
+          :codex-models="codexModels"
+          :model-catalog-status="modelCatalogStatus"
+          :selected-model-id="selectedModelId"
+          :selected-reasoning-effort="selectedReasoningEffort"
           @client-response="$emit('client-response', $event)"
+          @select-model="$emit('select-model', $event)"
+          @select-reasoning-effort="$emit('select-reasoning-effort', $event)"
           @send-prompt="$emit('sendPrompt', $event)"
         />
       </div>
@@ -39,7 +51,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Agent, AppSnapshot, ClientRequestResponse, RendererMessage, Team } from '../../shared/contracts';
+import type { Agent, AppSnapshot, ClientRequestResponse, CodexModelOption, ReasoningEffort, RendererMessage, Team } from '../../shared/contracts';
 import AgentHeader from './AgentHeader.vue';
 import AgentSidebar from './AgentSidebar.vue';
 import ConversationPane from './ConversationPane.vue';
@@ -52,15 +64,29 @@ const props = defineProps<{
   isLoading: boolean;
   isSending: boolean;
   answeredClientRequestIds?: Set<string>;
+  codexModels?: CodexModelOption[];
+  modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
+  selectedModelId?: string | null;
+  selectedReasoningEffort?: ReasoningEffort | null;
 }>();
 
 defineEmits<{
   'client-response': [response: ClientRequestResponse];
   'select-agent': [agentId: string];
+  'select-model': [modelId: string];
+  'select-reasoning-effort': [reasoningEffort: ReasoningEffort];
   sendPrompt: [prompt: string];
 }>();
 
 const agentSidebarCollapsed = ref(false);
+const agentSidebarMinWidth = 72;
+const agentSidebarMaxWidth = 420;
+const agentSidebarWidth = ref(260);
+
+function setAgentSidebarWidth(width: number): void {
+  agentSidebarWidth.value = Math.min(Math.max(width, agentSidebarMinWidth), agentSidebarMaxWidth);
+}
+
 const activeTeam = computed<Team | null>(() => {
   if (props.activeAgent?.teamId) {
     return props.snapshot.teams.find((team) => team.id === props.activeAgent?.teamId) ?? props.snapshot.teams[0] ?? null;
@@ -81,12 +107,43 @@ const activeTeamName = computed(() => activeTeam.value?.name ?? 'Codex Claw');
   height: 100vh;
   min-height: 0;
   overflow: hidden;
-  color: var(--cc-text);
-  background: var(--cc-bg);
+  color: var(--color-text);
+  background: var(--color-background);
 }
 
 .app-shell__team-rail {
-  padding-top: var(--cc-space-6);
+  padding-top: var(--space-20);
+}
+
+.app-shell > .agent-sidebar-enter-active,
+.app-shell > .agent-sidebar-leave-active {
+  overflow: hidden;
+  transition:
+    flex-basis 180ms ease,
+    width 180ms ease,
+    min-width 180ms ease,
+    max-width 180ms ease,
+    opacity 140ms ease,
+    transform 180ms ease,
+    border-color 180ms ease;
+}
+
+.app-shell > .agent-sidebar-enter-from,
+.app-shell > .agent-sidebar-leave-to {
+  flex-basis: 0;
+  width: 0;
+  min-width: 0;
+  max-width: 0;
+  opacity: 0;
+  transform: translateX(-8px);
+  border-right-color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell > .agent-sidebar-enter-active,
+  .app-shell > .agent-sidebar-leave-active {
+    transition-duration: 1ms;
+  }
 }
 
 .app-shell__agent {
@@ -96,7 +153,7 @@ const activeTeamName = computed(() => activeTeam.value?.name ?? 'Codex Claw');
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--cc-workspace);
+  background: var(--color-surface-lowest);
 }
 
 .app-shell__body {

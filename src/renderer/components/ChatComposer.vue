@@ -11,7 +11,7 @@
       aria-label="Attach context"
       :disabled="disabled"
     >
-      <Plus />
+      <PlusIcon />
     </button>
 
     <textarea
@@ -28,39 +28,47 @@
     />
 
     <div class="chat-composer__meta">
-      <button
-        class="chat-composer__model"
-        type="button"
-        aria-label="Model"
-        disabled
-      >
-        gpt-5.5 high
-      </button>
-      <button
-        class="chat-composer__send"
-        type="submit"
-        :aria-label="isSending ? 'Codex is working' : 'Send prompt'"
+      <ChatModelReasoningSelector
+        :disabled="disabled || isSending"
+        :models="models"
+        :model-catalog-status="modelCatalogStatus"
+        :model-id="selectedModelId"
+        :reasoning-effort="selectedReasoningEffort"
+        @update:model-id="$emit('update:modelId', $event)"
+        @update:reasoning-effort="$emit('update:reasoningEffort', $event)"
+      />
+      <ChatComposerSendButton
         :disabled="!canSend"
-      >
-        <Loading v-if="isSending" class="chat-composer__spinner" />
-        <Promotion v-else />
-      </button>
+        :loading="isSending"
+        label="Send prompt"
+        cancel-label="Codex is working"
+        @click="submitPrompt"
+      />
     </div>
   </form>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue';
-import { Loading, Plus, Promotion } from '@element-plus/icons-vue';
+import type { CodexModelOption, ReasoningEffort } from '../../shared/contracts';
+import { PlusIcon } from '../shared/icons/app-icons';
+import ChatComposerSendButton from '../shared/chat/ChatComposerSendButton.vue';
+import ChatModelReasoningSelector from './ChatModelReasoningSelector.vue';
 
 const props = defineProps<{
   disabled: boolean;
   isSending: boolean;
+  modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
+  models?: CodexModelOption[];
   placeholder: string;
+  selectedModelId?: string | null;
+  selectedReasoningEffort?: ReasoningEffort | null;
 }>();
 
 const emit = defineEmits<{
   send: [prompt: string];
+  'update:modelId': [modelId: string];
+  'update:reasoningEffort': [reasoningEffort: ReasoningEffort];
 }>();
 
 const prompt = ref('');
@@ -96,129 +104,86 @@ function resizeTextareaSoon(): void {
 
 <style scoped>
 .chat-composer {
+  --chat-composer-button-size: 36px;
+  --chat-composer-input-max-height: 160px;
   display: flex;
   align-items: flex-end;
-  gap: var(--cc-space-3);
+  gap: var(--space-6);
   width: 100%;
-  min-height: var(--cc-composer-floating-min-height);
-  padding: var(--cc-space-3);
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-composer);
-  background: var(--cc-composer-bg);
-  box-shadow: var(--cc-shadow-composer);
-  transition: border-color var(--cc-transition-fast), box-shadow var(--cc-transition-fast);
+  min-height: 60px;
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-lowest);
+  box-shadow: var(--shadow-lg);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
 .chat-composer:focus-within {
-  border-color: var(--cc-border-strong);
-  box-shadow: var(--cc-shadow-composer-focus);
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-lg), 0 0 0 3px var(--color-outline-subtle);
 }
 
 .chat-composer--disabled {
   opacity: 0.62;
 }
 
-.chat-composer__tool,
-.chat-composer__send,
-.chat-composer__model {
-  border: 0;
-  color: var(--cc-text-muted);
-  background: transparent;
-}
-
-.chat-composer__tool,
-.chat-composer__send {
+.chat-composer__tool {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  width: var(--cc-composer-button-size);
-  height: var(--cc-composer-button-size);
-  border-radius: var(--cc-radius-pill);
+  width: var(--chat-composer-button-size);
+  height: var(--chat-composer-button-size);
+  border: 0;
+  border-radius: var(--radius-full);
+  color: var(--color-text-muted);
+  background: transparent;
   cursor: pointer;
 }
 
-.chat-composer__tool:hover:not(:disabled),
-.chat-composer__model:hover:not(:disabled) {
-  color: var(--cc-text);
-  background: var(--cc-control-hover-bg);
+.chat-composer__tool:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--color-surface-base);
 }
 
-.chat-composer__tool:disabled,
-.chat-composer__send:disabled,
-.chat-composer__model:disabled {
+.chat-composer__tool:disabled {
   cursor: default;
 }
 
-.chat-composer__tool svg,
-.chat-composer__send svg {
-  width: var(--cc-icon-size);
-  height: var(--cc-icon-size);
+.chat-composer__tool svg {
+  width: var(--icon-lg);
+  height: var(--icon-lg);
 }
 
 .chat-composer__input {
   flex: 1 1 auto;
   min-width: 0;
-  max-height: var(--cc-composer-input-max-height);
-  padding: var(--cc-space-2) 0;
+  max-height: var(--chat-composer-input-max-height);
+  padding: var(--space-4) 0;
   border: 0;
   outline: 0;
   resize: none;
   overflow-y: auto;
-  color: var(--cc-text);
+  color: var(--color-text);
   background: transparent;
-  font: var(--cc-font-body);
-  line-height: var(--cc-line-height-comfortable);
+  font: inherit;
+  line-height: var(--line-height-24);
 }
 
 .chat-composer__input::placeholder {
-  color: var(--cc-text-placeholder);
+  color: var(--color-text-muted);
 }
 
 .chat-composer__meta {
   display: flex;
   align-items: center;
-  gap: var(--cc-space-2);
+  gap: var(--space-4);
   flex: 0 0 auto;
-}
-
-.chat-composer__model {
-  min-height: var(--cc-composer-button-size);
-  padding: 0 var(--cc-space-2);
-  border-radius: var(--cc-radius-pill);
-  font: var(--cc-font-body-small);
-}
-
-.chat-composer__send {
-  color: var(--cc-text-inverse);
-  background: var(--cc-send-bg);
-}
-
-.chat-composer__send:hover:not(:disabled) {
-  background: var(--cc-send-bg-hover);
-}
-
-.chat-composer__send:disabled {
-  color: var(--cc-send-disabled-text);
-  background: var(--cc-send-disabled-bg);
-}
-
-.chat-composer__spinner {
-  animation: chat-composer-spin 900ms linear infinite;
-}
-
-@keyframes chat-composer-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 @media (max-width: 720px) {
   .chat-composer {
-    border-radius: var(--cc-radius-3);
-  }
-
-  .chat-composer__model {
-    display: none;
+    border-radius: var(--radius-2xl);
   }
 }
 </style>

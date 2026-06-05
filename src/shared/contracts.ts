@@ -44,6 +44,29 @@ export type BenchTemplate = {
   updatedAt: string;
 };
 
+export type ReasoningEffort = string;
+
+export type CodexReasoningEffortOption = {
+  reasoningEffort: ReasoningEffort;
+  description: string;
+};
+
+export type CodexModelOption = {
+  id: string;
+  model: string;
+  displayName: string;
+  description: string;
+  hidden: boolean;
+  supportedReasoningEfforts: CodexReasoningEffortOption[];
+  defaultReasoningEffort: ReasoningEffort;
+  isDefault: boolean;
+};
+
+export type SendPromptOptions = {
+  model?: string | null;
+  reasoningEffort?: ReasoningEffort | null;
+};
+
 export type RendererMessagePart =
   | { type: 'text'; text: string; itemId?: string }
   | {
@@ -148,10 +171,11 @@ export type ClientRequestResponse = {
 
 export type CodexClawApi = {
   getSnapshot(): Promise<AppSnapshot>;
+  listCodexModels(): Promise<CodexModelOption[]>;
   createAgent(input: CreateAgentInput): Promise<Agent>;
   selectAgent(agentId: string): Promise<AppSnapshot>;
   selectAgentFolder(agentId: string): Promise<AppSnapshot | null>;
-  sendPrompt(agentId: string, prompt: string): Promise<AppSnapshot>;
+  sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot>;
   respondToClientRequest(response: ClientRequestResponse): Promise<AppSnapshot>;
   onEvent(listener: (event: MainToRendererEvent) => void): () => void;
 };

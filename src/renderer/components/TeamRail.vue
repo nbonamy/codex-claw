@@ -27,31 +27,36 @@ defineProps<{
 </script>
 
 <style scoped>
+
 .team-rail {
-  flex: 0 0 var(--cc-team-rail-width);
-  width: var(--cc-team-rail-width);
+  --team-rail-width: var(--space-24);
+  --team-rail-button-size: var(--space-16);
+  flex: 0 0 var(--team-rail-width);
+  width: var(--team-rail-width);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--cc-space-3);
-  padding: var(--cc-space-3) var(--cc-space-2);
-  background: var(--cc-rail-bg);
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-4);
+  background: var(--color-surface);
 }
 
 .team-rail__team {
-  width: var(--cc-team-button-size);
-  height: var(--cc-team-button-size);
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-pill);
-  color: var(--cc-text);
-  background: var(--cc-rail-item-bg);
-  font: var(--cc-font-label);
+  width: var(--team-rail-button-size);
+  height: var(--team-rail-button-size);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  color: var(--color-text);
+  background: var(--color-surface-lowest);
+  font-size: var(--font-size-12);
+  font-weight: var(--font-weight-semibold);
+  line-height: 0;
   cursor: pointer;
 }
 
 .team-rail__team--active {
-  color: var(--cc-text-inverse);
-  background: var(--cc-accent);
-  border-color: var(--cc-accent);
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
 }
 </style>

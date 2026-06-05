@@ -21,6 +21,12 @@
           :disabled="!agent"
           :is-sending="isSending"
           :placeholder="composerPlaceholder"
+          :models="codexModels"
+          :model-catalog-status="modelCatalogStatus"
+          :selected-model-id="selectedModelId"
+          :selected-reasoning-effort="selectedReasoningEffort"
+          @update:model-id="$emit('select-model', $event)"
+          @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
           @send="$emit('sendPrompt', $event)"
         />
       </template>
@@ -39,6 +45,12 @@
         :disabled="!agent"
         :is-sending="isSending"
         :placeholder="composerPlaceholder"
+        :models="codexModels"
+        :model-catalog-status="modelCatalogStatus"
+        :selected-model-id="selectedModelId"
+        :selected-reasoning-effort="selectedReasoningEffort"
+        @update:model-id="$emit('select-model', $event)"
+        @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
         @send="$emit('sendPrompt', $event)"
       />
     </div>
@@ -47,7 +59,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Agent, ClientRequestResponse, RendererMessage } from '../../shared/contracts';
+import type { Agent, ClientRequestResponse, CodexModelOption, ReasoningEffort, RendererMessage } from '../../shared/contracts';
 import WorkbenchLayout from './WorkbenchLayout.vue';
 import ChatComposer from './ChatComposer.vue';
 import MessageList from '../shared/chat/MessageList.vue';
@@ -58,10 +70,16 @@ const props = defineProps<{
   agent: Agent | null;
   isSending: boolean;
   answeredClientRequestIds?: Set<string>;
+  codexModels?: CodexModelOption[];
+  modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
+  selectedModelId?: string | null;
+  selectedReasoningEffort?: ReasoningEffort | null;
 }>();
 
 defineEmits<{
   'client-response': [response: ClientRequestResponse];
+  'select-model': [modelId: string];
+  'select-reasoning-effort': [reasoningEffort: ReasoningEffort];
   sendPrompt: [prompt: string];
 }>();
 
@@ -87,6 +105,7 @@ const heroSubhead = computed(() => {
 
 <style scoped>
 .conversation-pane {
+  --conversation-content-width: 860px;
   flex: 1 1 auto;
   width: 100%;
   height: 100%;
@@ -95,7 +114,7 @@ const heroSubhead = computed(() => {
   overflow: hidden;
   display: grid;
   grid-template-rows: minmax(0, 1fr);
-  background: var(--cc-conversation-bg);
+  background: var(--color-surface-lowest);
 }
 
 .conversation-pane__layout {
@@ -117,7 +136,7 @@ const heroSubhead = computed(() => {
   min-height: 0;
   overflow-y: auto;
   background: var(--color-surface-lowest);
-  --message-list-content-width: var(--cc-chat-content-width);
+  --message-list-content-width: var(--conversation-content-width);
   --message-list-content-padding-top: var(--space-12);
   --message-list-content-padding-bottom: calc(var(--workbench-layout-footer-offset) + var(--space-12));
   --message-list-padding-inline-start: var(--space-8);
@@ -125,7 +144,7 @@ const heroSubhead = computed(() => {
 }
 
 .conversation-pane__composer {
-  width: min(100%, var(--cc-chat-content-width));
+  width: min(100%, var(--conversation-content-width));
   margin: 0 auto;
 }
 
@@ -134,7 +153,7 @@ const heroSubhead = computed(() => {
   flex-direction: column;
   justify-content: center;
   gap: var(--space-12);
-  width: min(100%, var(--cc-chat-content-width));
+  width: min(100%, var(--conversation-content-width));
   height: 100%;
   margin: 0 auto;
   padding: var(--space-8);

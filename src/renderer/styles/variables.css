@@ -1,120 +1,222 @@
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap");
+
 :root {
-  /* Typography */
-  --cc-font-family-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --cc-font-family-code: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  --cc-font-size-caption: 12px;
-  --cc-font-size-small: 13px;
-  --cc-font-size-body: 15px;
-  --cc-font-size-title: 22px;
-  --cc-font-weight-regular: 400;
-  --cc-font-weight-medium: 500;
-  --cc-font-weight-bold: 700;
-  --cc-line-height-tight: 1;
-  --cc-line-height-caption: 1.2;
-  --cc-line-height-small: 1.3;
-  --cc-line-height-body: 1.4;
-  --cc-line-height-code: 1.45;
-  --cc-line-height-comfortable: 1.5;
-  --cc-font-body: var(--cc-font-size-body) / var(--cc-line-height-body) var(--cc-font-family-ui);
-  --cc-font-body-small: var(--cc-font-size-small) / var(--cc-line-height-small) var(--cc-font-family-ui);
-  --cc-font-label: var(--cc-font-weight-bold) var(--cc-font-size-body) / var(--cc-line-height-tight) var(--cc-font-family-ui);
-  --cc-font-caption: var(--cc-font-weight-bold) var(--cc-font-size-caption) / var(--cc-line-height-caption) var(--cc-font-family-ui);
-  --cc-font-code: var(--cc-font-size-small) / var(--cc-line-height-code) var(--cc-font-family-code);
 
-  /* Spacing */
-  --cc-space-1: 4px;
-  --cc-space-2: 8px;
-  --cc-space-3: 12px;
-  --cc-space-4: 16px;
-  --cc-space-5: 24px;
-  --cc-space-6: 32px;
+  /* ========================================
+    COLOR SYSTEM
+  ======================================== */
 
-  /* Radii */
-  --cc-radius-1: 4px;
-  --cc-radius-2: 8px;
-  --cc-radius-3: 16px;
-  --cc-radius-message: 14px;
-  --cc-radius-composer: 28px;
-  --cc-radius-pill: 999px;
+  /* Primary */
+  --color-primary: #1B4FB2;
+  --color-on-primary: #FFFFFF;
+  --color-primary-container: #EFF4FF;
+  --color-on-primary-container: #1E4B97;
 
-  /* Layout */
-  --cc-team-rail-width: 64px;
-  --cc-agent-sidebar-width: 320px;
-  --cc-header-height: 76px;
-  --cc-artifact-header-height: 48px;
-  --cc-artifact-pane-min: 280px;
-  --cc-artifact-pane-width: 28vw;
-  --cc-agent-sidebar-compact-min: 250px;
-  --cc-agent-sidebar-compact-width: 32vw;
-  --cc-conversation-min-width: 420px;
-  --cc-message-max-width: 860px;
-  --cc-user-message-max-width: 680px;
-  --cc-chat-content-width: 860px;
-  --cc-message-gap: 36px;
-  --cc-message-list-padding-top: 48px;
-  --cc-message-list-padding-bottom: 40px;
-  --cc-composer-min-height: 64px;
-  --cc-composer-floating-min-height: 60px;
-  --cc-composer-input-max-height: 160px;
+  /* Secondary Colors */
+  --color-secondary: #0C72EE;
+  --color-on-secondary: #FFFFFF;
+  --color-secondary-container: #EBF8FF;
+  --color-on-secondary-container: #1159BC;
 
-  /* Component sizing */
-  --cc-avatar-size: 44px;
-  --cc-avatar-size-small: 42px;
-  --cc-team-button-size: 38px;
-  --cc-status-dot-size: 10px;
-  --cc-agent-row-min-height: 76px;
-  --cc-agent-status-column-width: 12px;
-  --cc-meta-gap: 2px;
-  --cc-icon-size: 18px;
-  --cc-composer-button-size: 36px;
+  /* Semantic */
+  --color-error: #D5351F;
+  --color-on-error: #FFFFFF;
+  --color-error-container: #FEF3F2;
+  --color-on-error-container: #9B2919;
 
-  /* Effects */
-  --cc-shadow-soft: 0 1px 3px rgb(0 0 0 / 8%);
-  --cc-shadow-panel: 0 8px 24px rgb(0 0 0 / 10%);
-  --cc-shadow-composer: 0 12px 40px rgb(0 0 0 / 10%), 0 2px 6px rgb(0 0 0 / 8%);
-  --cc-shadow-composer-focus: 0 14px 42px rgb(0 0 0 / 14%), 0 0 0 3px rgb(0 0 0 / 5%);
-  --cc-focus-ring-size: 2px;
-  --cc-transition-fast: 120ms ease;
+  --color-warning: #D97708;
+  --color-on-warning: #FFFFFF;
+  --color-warning-container: #FFFAE5;
+  --color-on-warning-container: #B4540A;
 
-  /* id8 chat component aliases, kept so copied chat files stay recognizable. */
-  --space-1: var(--cc-space-1);
-  --space-2: var(--cc-space-1);
-  --space-3: var(--cc-space-2);
-  --space-4: var(--cc-space-2);
-  --space-6: var(--cc-space-3);
-  --space-8: var(--cc-space-4);
-  --space-10: 20px;
-  --space-12: var(--cc-space-5);
-  --space-16: var(--cc-space-6);
-  --font-family-base: var(--cc-font-family-ui);
-  --font-family-mono: var(--cc-font-family-code);
-  --font-size-12: var(--cc-font-size-caption);
-  --font-size-13: var(--cc-font-size-small);
+  --color-success: #079669;
+  --color-on-success: #FFFFFF;
+  --color-success-container: #E8FDF3;
+  --color-on-success-container: #064E3B;
+
+  /* Surfaces — neutral gray scale */
+  --color-surface: #F9F9F9;
+  --color-surface-lowest: #FFFFFF;
+  --color-surface-low: #F4F4F4;
+  --color-surface-base: #EFEFEF;
+  --color-surface-high: #E8E8E8;
+  --color-surface-highest: #E0E0E0;
+
+  --color-on-surface: #0D0D0D;
+  --color-on-surface-variant: #666666;
+
+  /* Borders */
+  --color-outline: #B0B0B0;
+  --color-outline-variant: #DEDEDE;
+  --color-outline-subtle: rgba(0, 0, 0, 0.08);
+
+  /* Semantic aliases */
+  --color-text: var(--color-on-surface);
+  --color-text-muted: var(--color-on-surface-variant);
+  --color-background: var(--color-surface);
+  --color-border: var(--color-outline-variant);
+  --color-border-strong: var(--color-outline);
+  --color-overlay: rgba(255, 255, 255, 0.78);
+  --color-shine: rgba(255, 255, 255, 0.95);
+
+  /* ========================================
+    TYPOGRAPHY
+  ======================================== */
+
+  --font-family-ui: ui-sans-serif, -apple-system, sans-serif;
+  --font-family-base: ui-sans-serif, -apple-system, sans-serif;
+  --font-family-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
+
+  --font-size-8: 8px;
+  --font-size-9: 9px;
+  --font-size-10: 10px;
+  --font-size-11: 11px;
+  --font-size-12: 12px;
+  --font-size-13: 13px;
   --font-size-14: 14px;
-  --font-size-15: var(--cc-font-size-body);
+  --font-size-15: 15px;
   --font-size-16: 16px;
   --font-size-18: 18px;
   --font-size-20: 20px;
-  --font-size-24: var(--cc-font-size-title);
-  --font-weight-light: var(--cc-font-weight-regular);
-  --font-weight-xlight: var(--cc-font-weight-regular);
-  --font-weight-medium: var(--cc-font-weight-medium);
-  --font-weight-semibold: var(--cc-font-weight-bold);
+  --font-size-24: 24px;
+
+  --font-weight-xlight: 200;
+  --font-weight-light: 300;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
   --line-height-16: 16px;
   --line-height-18: 18px;
   --line-height-20: 20px;
   --line-height-24: 24px;
   --line-height-28: 28px;
+  --line-height-32: 32px;
+
+  /* ========================================
+    LAYOUT
+  ======================================== */
+
   --radius-xs: 2px;
-  --radius-sm: var(--cc-radius-1);
-  --radius-md: var(--cc-radius-2);
-  --radius-lg: var(--cc-radius-2);
-  --radius-xl: var(--cc-radius-message);
-  --radius-full: var(--cc-radius-pill);
-  --icon-sm: 16px;
-  --shadow-sm: var(--cc-shadow-soft);
-  --shadow-md: var(--cc-shadow-panel);
-  --shadow-lg: var(--cc-shadow-panel);
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-full: 100px;
+
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-6: 12px;
+  --space-8: 16px;
+  --space-10: 20px;
+  --space-12: 24px;
+  --space-16: 32px;
+  --space-20: 40px;
+  --space-24: 48px;
+  --space-32: 64px;
+
+  --workbench-appbar-height: 32px;
   --workbench-layout-header-offset: 0px;
   --workbench-layout-footer-offset: 0px;
+  --idea-pane-header-height: 56px;
+  --ideas-chat-width: 40%;
+  --ideas-explorer-width: 44px;
+
+  --icon-sm: 14px;
+  --icon-md: 16px;
+  --icon-lg: 20px;
+  --icon-xl: 24px;
+  --icon-xxl: 32px;
+
+  /* ========================================
+    SHADOWS
+  ======================================== */
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 3px 8px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
+  --shadow-menu: 0 4px 6px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.05);
+
+}
+
+html.dark {
+
+  color-scheme: dark;
+
+  /* Primary */
+  --color-primary: #7DA6FF;
+  --color-on-primary: #081B3F;
+  --color-primary-container: #17356E;
+
+  /* Semantic */
+  --color-error: #FF8A78;
+  --color-on-error: #3D0B05;
+  --color-error-container: #4A1710;
+
+  --color-success: #5ED9A6;
+  --color-on-success: #022A1B;
+  --color-success-container: #0C3A2A;
+
+  /* Surfaces — neutral gray scale */
+  --color-surface: #0D0F12;
+  --color-surface-lowest: #15181D;
+  --color-surface-low: #1B1F25;
+  --color-surface-base: #232832;
+  --color-surface-high: #2B313C;
+  --color-surface-highest: #363D49;
+
+  --color-on-surface: #F1F4F8;
+  --color-on-surface-variant: #AAB3C0;
+
+  /* Borders */
+  --color-outline: #566171;
+  --color-outline-variant: #323946;
+  --color-outline-subtle: rgba(255, 255, 255, 0.08);
+
+  /* Semantic aliases */
+  --color-text: var(--color-on-surface);
+  --color-text-muted: var(--color-on-surface-variant);
+  --color-background: var(--color-surface);
+  --color-border: var(--color-outline-variant);
+  --color-border-strong: var(--color-outline);
+  --color-overlay: rgba(13, 15, 18, 0.78);
+  --color-shine: rgba(255, 255, 255, 0.72);
+
+  /* Element Plus alignment */
+  --el-color-primary: var(--color-primary);
+  --el-color-primary-light-3: #5C82D5;
+  --el-color-primary-light-5: #3D5E9E;
+  --el-color-primary-light-7: #263F70;
+  --el-color-primary-light-8: #20365F;
+  --el-color-primary-light-9: var(--color-primary-container);
+  --el-color-primary-dark-2: #A4C0FF;
+  --el-color-success: var(--color-success);
+  --el-color-danger: var(--color-error);
+  --el-color-error: var(--color-error);
+  --el-bg-color-page: var(--color-surface);
+  --el-bg-color: var(--color-surface-lowest);
+  --el-bg-color-overlay: var(--color-surface-low);
+  --el-text-color-primary: var(--color-text);
+  --el-text-color-regular: var(--color-text);
+  --el-text-color-secondary: var(--color-text-muted);
+  --el-text-color-placeholder: var(--color-text-muted);
+  --el-border-color: var(--color-border);
+  --el-border-color-light: var(--color-outline-variant);
+  --el-border-color-lighter: var(--color-outline-variant);
+  --el-fill-color: var(--color-surface-base);
+  --el-fill-color-light: var(--color-surface-low);
+  --el-fill-color-lighter: var(--color-surface-lowest);
+  --el-fill-color-blank: var(--color-surface-lowest);
+  --el-mask-color: rgba(0, 0, 0, 0.72);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.34);
+  --shadow-md: 0 3px 10px rgba(0, 0, 0, 0.38);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.42);
+  --shadow-menu: 0 12px 32px rgba(0, 0, 0, 0.42), 0 4px 10px rgba(0, 0, 0, 0.32);
+
 }

@@ -1,9 +1,21 @@
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
+import { nextTick } from 'vue';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createInitialSnapshot } from '../../../shared/snapshot';
 import type { Agent } from '../../../shared/contracts';
+
+function pointerEvent(type: string, clientX: number): PointerEvent {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    clientX,
+  });
+  Object.defineProperty(event, 'pointerId', { value: 1 });
+  return event as PointerEvent;
+}
 
 describe('AppShell', () => {
   it('composes the phase zero shell around the active agent', () => {
@@ -92,6 +104,42 @@ describe('AppShell', () => {
     expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
     expect(wrapper.find('.team-rail').exists()).toBe(true);
     expect(wrapper.get('[aria-label="Show agent sidebar"]').attributes('aria-label')).toBe('Show agent sidebar');
+  });
+
+  it('keeps agent sidebar resize state in the shell', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [],
+        isLoading: false,
+        isSending: false,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    const sidebar = () => wrapper.get('.agent-sidebar');
+    expect(sidebar().attributes('style')).toContain('--agent-sidebar-width: 260px');
+
+    const resizeHandle = wrapper.get('[aria-label="Resize agent sidebar"]');
+    resizeHandle.element.dispatchEvent(pointerEvent('pointerdown', 260));
+    resizeHandle.element.dispatchEvent(pointerEvent('pointermove', 320));
+    await nextTick();
+
+    expect(sidebar().attributes('style')).toContain('--agent-sidebar-width: 320px');
+  });
+
+  it('animates collapse without animating manual resize width changes', () => {
+    const appShellSource = readFileSync(join(import.meta.dirname, '../AppShell.vue'), 'utf8');
+    const sidebarSource = readFileSync(join(import.meta.dirname, '../AgentSidebar.vue'), 'utf8');
+
+    expect(appShellSource).toContain('<Transition name="agent-sidebar">');
+    expect(appShellSource).toContain('.app-shell > .agent-sidebar-enter-active');
+    expect(appShellSource).toContain('.app-shell > .agent-sidebar-leave-to');
+    expect(sidebarSource).not.toContain('transition:');
   });
 
   it('resolves the active team from legacy agent membership when teamId is missing', () => {

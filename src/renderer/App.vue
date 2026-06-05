@@ -6,7 +6,13 @@
     :is-loading="isLoading"
     :is-sending="isSending"
     :answered-client-request-ids="answeredClientRequestIds"
+    :codex-models="codexModels"
+    :model-catalog-status="modelCatalogStatus"
+    :selected-model-id="selectedModelId"
+    :selected-reasoning-effort="selectedReasoningEffort"
     @select-agent="selectAgent"
+    @select-model="selectModel"
+    @select-reasoning-effort="selectReasoningEffort"
     @client-response="respondToClientRequest"
     @send-prompt="sendPrompt"
   />
@@ -24,13 +30,21 @@ const {
   isLoading,
   isSending,
   answeredClientRequestIds,
+  codexModels,
+  modelCatalogStatus,
+  selectedModelId,
+  selectedReasoningEffort,
+  loadCodexModels,
   loadSnapshot,
   respondToClientRequest,
+  selectModel,
+  selectReasoningEffort,
   selectAgent,
   sendPrompt,
 } = useAppState();
 
 onMounted(() => {
   void loadSnapshot();
+  void loadCodexModels();
 });
 </script>

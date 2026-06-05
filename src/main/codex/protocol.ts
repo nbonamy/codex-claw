@@ -62,6 +62,27 @@ export type TurnStartResponse = {
   turn: CodexTurn;
 };
 
+export type CodexModelListResponse = {
+  data: CodexModel[];
+  nextCursor?: string | null;
+};
+
+export type CodexModel = {
+  id: string;
+  model: string;
+  displayName: string;
+  description: string;
+  hidden: boolean;
+  supportedReasoningEfforts: CodexReasoningEffortOption[];
+  defaultReasoningEffort: string;
+  isDefault: boolean;
+};
+
+export type CodexReasoningEffortOption = {
+  reasoningEffort: string;
+  description: string;
+};
+
 export type CodexNotification =
   | { method: 'thread/started'; params: { thread: CodexThread } }
   | { method: 'thread/status/changed'; params: { threadId: string; status: CodexThreadStatus } }

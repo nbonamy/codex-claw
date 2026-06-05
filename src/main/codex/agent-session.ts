@@ -1,11 +1,12 @@
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, AgentStatus, ClientRequest, ClientRequestResponse, ConfirmToolRequest, MainToRendererEvent, ToolConfirmationDecision } from '../../shared/contracts';
+import type { Agent, AgentStatus, ClientRequest, ClientRequestResponse, CodexModelOption, ConfirmToolRequest, MainToRendererEvent, SendPromptOptions, ToolConfirmationDecision } from '../../shared/contracts';
 import { logMain, warnMain } from '../log';
 import { buildCodexClawThreadConfig } from '../mcp/codex-config';
 import type { CodexRpcClient, CodexServerRequest, CodexServerRequestResponder } from './rpc-client';
 import type {
   CodexNotification,
+  CodexModelListResponse,
   CodexRawResponseItem,
   CodexThread,
   CodexThreadStatus,
@@ -73,11 +74,29 @@ export class CodexAgentSessionManager {
     }
   }
 
-  async sendPrompt(agent: Agent, prompt: string): Promise<CodexSessionPromptResult> {
+  async listModels(includeHidden = false): Promise<CodexModelOption[]> {
+    await this.start();
+
+    const models: CodexModelOption[] = [];
+    let cursor: string | null | undefined = null;
+
+    do {
+      const response: CodexModelListResponse = await this.client.request<CodexModelListResponse>('model/list', {
+        cursor,
+        includeHidden,
+      });
+      models.push(...response.data.map(codexModelToOption));
+      cursor = response.nextCursor;
+    } while (cursor);
+
+    return models;
+  }
+
+  async sendPrompt(agent: Agent, prompt: string, options: SendPromptOptions = {}): Promise<CodexSessionPromptResult> {
     await this.start();
 
     const session = await this.ensureSession(agent);
-    const response = await this.client.request<TurnStartResponse>('turn/start', {
+    const turnParams: Record<string, unknown> = {
       threadId: session.threadId,
       input: [
         {
@@ -87,7 +106,15 @@ export class CodexAgentSessionManager {
         },
       ],
       cwd: expandHome(agent.folder),
-    });
+    };
+    if (options.model) {
+      turnParams.model = options.model;
+    }
+    if (options.reasoningEffort) {
+      turnParams.effort = options.reasoningEffort;
+    }
+
+    const response = await this.client.request<TurnStartResponse>('turn/start', turnParams);
 
     return {
       threadId: session.threadId,
@@ -394,6 +421,22 @@ export function expandHome(folder: string): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function codexModelToOption(model: CodexModelListResponse['data'][number]): CodexModelOption {
+  return {
+    id: model.id,
+    model: model.model,
+    displayName: model.displayName,
+    description: model.description,
+    hidden: model.hidden,
+    supportedReasoningEfforts: model.supportedReasoningEfforts.map((effort) => ({
+      reasoningEffort: effort.reasoningEffort,
+      description: effort.description,
+    })),
+    defaultReasoningEffort: model.defaultReasoningEffort,
+    isDefault: model.isDefault,
+  };
 }
 
 function summarizeNotificationParams(params: unknown): Record<string, unknown> {

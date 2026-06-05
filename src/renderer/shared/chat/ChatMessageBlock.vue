@@ -165,14 +165,14 @@ const emit = defineEmits<{
 }
 
 .chat-message-block--text :deep(a) {
-  color: var(--color-link);
+  color: var(--color-secondary);
   line-height: inherit;
   text-decoration: none;
   vertical-align: baseline;
 }
 
 .chat-message-block--text :deep(a:hover) {
-  color: var(--color-link);
+  color: var(--color-secondary);
 }
 
 .chat-message-block--text :deep(.chat-message-link__icon) {

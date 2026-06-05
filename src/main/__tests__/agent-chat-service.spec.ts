@@ -13,7 +13,7 @@ describe('agent chat service', () => {
     } as unknown as CodexAgentSessionManager;
     const events: MainToRendererEvent[] = [];
 
-    const result = sendAgentPrompt(snapshot, sessionManager, 'agent-dina', ' hello ', (event) => {
+    const result = sendAgentPrompt(snapshot, sessionManager, 'agent-dina', ' hello ', undefined, (event) => {
       const fullEvent = {
         ...event,
         seq: events.length + 1,
@@ -59,7 +59,7 @@ describe('agent chat service', () => {
     } as unknown as CodexAgentSessionManager;
     const events: MainToRendererEvent[] = [];
 
-    sendAgentPrompt(snapshot, sessionManager, 'agent-dina', 'hello', (event) => {
+    sendAgentPrompt(snapshot, sessionManager, 'agent-dina', 'hello', undefined, (event) => {
       const fullEvent = {
         ...event,
         seq: events.length + 1,
@@ -83,13 +83,35 @@ describe('agent chat service', () => {
       sendPrompt: vi.fn(),
     } as unknown as CodexAgentSessionManager;
 
-    sendAgentPrompt(snapshot, sessionManager, 'agent-dina', '   ', vi.fn());
-    sendAgentPrompt(snapshot, sessionManager, 'missing-agent', 'hello', vi.fn());
+    sendAgentPrompt(snapshot, sessionManager, 'agent-dina', '   ', undefined, vi.fn());
+    sendAgentPrompt(snapshot, sessionManager, 'missing-agent', 'hello', undefined, vi.fn());
     snapshot.agents[0].status = { type: 'working' };
-    sendAgentPrompt(snapshot, sessionManager, 'agent-dina', 'hello', vi.fn());
+    sendAgentPrompt(snapshot, sessionManager, 'agent-dina', 'hello', undefined, vi.fn());
 
     expect(sessionManager.sendPrompt).not.toHaveBeenCalled();
     expect(snapshot.messages).toHaveLength(0);
+  });
+
+  it('passes selected model and reasoning effort to the session manager', () => {
+    const snapshot = createInitialSnapshot();
+    const sessionManager = {
+      sendPrompt: vi.fn().mockResolvedValue({ threadId: 'thread-1', turnId: 'turn-1' }),
+    } as unknown as CodexAgentSessionManager;
+
+    sendAgentPrompt(
+      snapshot,
+      sessionManager,
+      'agent-dina',
+      'hello',
+      { model: 'gpt-5.1-codex', reasoningEffort: 'high' },
+      vi.fn(),
+    );
+
+    expect(sessionManager.sendPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-dina' }),
+      'hello',
+      { model: 'gpt-5.1-codex', reasoningEffort: 'high' },
+    );
   });
 });
 

@@ -1,23 +1,19 @@
 <template>
   <aside
     class="agent-sidebar"
+    :style="sidebarStyle"
     aria-label="Agents"
   >
     <header class="agent-sidebar__header">
       <strong>{{ teamTitle }}</strong>
-      <el-tooltip
-        content="Hide agent sidebar"
-        placement="bottom"
+      <button
+        class="agent-sidebar__collapse"
+        type="button"
+        aria-label="Hide agent sidebar"
+        @click="emit('collapse-sidebar')"
       >
-        <button
-          class="agent-sidebar__collapse"
-          type="button"
-          aria-label="Hide agent sidebar"
-          @click="emit('collapse-sidebar')"
-        >
-          <Fold class="agent-sidebar__collapse-icon" />
-        </button>
-      </el-tooltip>
+        <PanelLeftCloseIcon class="agent-sidebar__collapse-icon" />
+      </button>
     </header>
 
     <nav class="agent-sidebar__list">
@@ -47,30 +43,64 @@
       <el-button
         type="primary"
         class="agent-sidebar__new"
+        aria-label="New Agent"
       >
-        New Agent
+        <PlusIcon class="agent-sidebar__new-icon" />
+        <span class="agent-sidebar__new-label">New Agent</span>
       </el-button>
     </footer>
+
+    <div
+      class="agent-sidebar__resize-handle"
+      role="separator"
+      aria-label="Resize agent sidebar"
+      aria-orientation="vertical"
+      :aria-valuemin="minWidth"
+      :aria-valuemax="maxWidth"
+      :aria-valuenow="currentWidth"
+      tabindex="0"
+      @pointerdown="onResizePointerDown"
+      @pointermove="onResizePointerMove"
+      @pointerup="onResizePointerEnd"
+      @pointercancel="onResizePointerEnd"
+      @keydown.left.prevent="emitResizedWidth(currentWidth - resizeStep)"
+      @keydown.right.prevent="emitResizedWidth(currentWidth + resizeStep)"
+    />
   </aside>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Fold } from '@element-plus/icons-vue';
 import type { Agent, AgentStatus } from '../../shared/contracts';
+import { PanelLeftCloseIcon, PlusIcon } from '../shared/icons/app-icons';
 
 const props = defineProps<{
   agents: Agent[];
   activeAgentId: string | null;
   teamName: string;
+  width?: number;
+  minWidth?: number;
+  maxWidth?: number;
 }>();
 
 const emit = defineEmits<{
   'collapse-sidebar': [];
+  'resize-sidebar': [width: number];
   'select-agent': [agentId: string];
 }>();
 
+const minWidth = computed(() => props.minWidth ?? 72);
+const maxWidth = computed(() => props.maxWidth ?? 420);
+const resizeStep = 16;
+const currentWidth = computed(() => clampWidth(props.width ?? 260));
 const teamTitle = computed(() => props.teamName.toUpperCase());
+const sidebarStyle = computed<Record<string, string>>(() => ({
+  '--agent-sidebar-width': `${currentWidth.value}px`,
+  '--agent-sidebar-min-width': `${minWidth.value}px`,
+  '--agent-sidebar-max-width': `${maxWidth.value}px`,
+}));
+
+let resizeStart: { pointerId: number; clientX: number; width: number } | null = null;
 
 function agentStatusLabel(status: AgentStatus['type']): string {
   switch (status) {
@@ -86,113 +116,164 @@ function agentStatusLabel(status: AgentStatus['type']): string {
       return 'Idle';
   }
 }
+
+function clampWidth(width: number): number {
+  return Math.min(Math.max(Math.round(width), minWidth.value), maxWidth.value);
+}
+
+function emitResizedWidth(width: number): void {
+  emit('resize-sidebar', clampWidth(width));
+}
+
+function resizeHandle(event: PointerEvent): HTMLElement | null {
+  return event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+}
+
+function onResizePointerDown(event: PointerEvent): void {
+  event.preventDefault();
+  resizeStart = {
+    pointerId: event.pointerId,
+    clientX: event.clientX,
+    width: currentWidth.value,
+  };
+  resizeHandle(event)?.setPointerCapture?.(event.pointerId);
+}
+
+function onResizePointerMove(event: PointerEvent): void {
+  if (!resizeStart || event.pointerId !== resizeStart.pointerId) {
+    return;
+  }
+
+  emitResizedWidth(resizeStart.width + event.clientX - resizeStart.clientX);
+}
+
+function onResizePointerEnd(event: PointerEvent): void {
+  if (!resizeStart || event.pointerId !== resizeStart.pointerId) {
+    return;
+  }
+
+  resizeHandle(event)?.releasePointerCapture?.(event.pointerId);
+  resizeStart = null;
+}
 </script>
 
 <style scoped>
 .agent-sidebar {
-  flex: 0 0 var(--cc-agent-sidebar-width);
-  width: var(--cc-agent-sidebar-width);
-  min-width: 0;
+  --agent-sidebar-width: 260px;
+  --agent-sidebar-min-width: 72px;
+  --agent-sidebar-max-width: 420px;
+  --agent-sidebar-avatar-size: var(--space-16);
+  --agent-sidebar-row-min-height: 64px;
+  --agent-sidebar-status-column-width: 12px;
+  --agent-status-dot-size: 10px;
+  position: relative;
+  container-type: inline-size;
+  flex: 0 0 clamp(var(--agent-sidebar-min-width), var(--agent-sidebar-width), var(--agent-sidebar-max-width));
+  width: clamp(var(--agent-sidebar-min-width), var(--agent-sidebar-width), var(--agent-sidebar-max-width));
+  min-width: var(--agent-sidebar-min-width);
+  max-width: var(--agent-sidebar-max-width);
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--cc-sidebar-bg);
-  border-right: 1px solid var(--cc-border-muted);
+  background: var(--color-surface-low);
+  border-right: 1px solid var(--color-border);
   user-select: none;
 }
 
 .agent-sidebar__header {
+  height: var(--workbench-appbar-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--cc-space-3);
+  gap: var(--space-6);
   min-width: 0;
-  padding-left: var(--cc-space-5);
-  border-bottom: 1px solid var(--cc-border-muted);
-  color: var(--cc-text);
-  --webkit-app-region: drag;
+  padding-left: var(--space-16);
+  padding-right: var(--space-2);
+  color: var(--color-text);
+  -webkit-app-region: drag;
 }
 
 .agent-sidebar__header strong {
   min-width: 0;
   overflow: hidden;
-  font: var(--cc-font-caption);
+  font-size: var(--font-size-12);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-16);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .agent-sidebar__collapse {
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: 32px;
-  height: 32px;
+  display: flex;
+  align-items: center;
+  margin-left: auto;
   padding: 0;
-  border: 1px solid transparent;
-  border-radius: var(--cc-radius-1);
-  color: var(--cc-text-muted);
+  border: none;
   background: transparent;
-  cursor: pointer;
+  -webkit-app-region: no-drag;
 }
 
 .agent-sidebar__collapse:hover {
-  background: var(--cc-control-hover-bg);
+  background: var(--color-surface-base);
 }
 
 .agent-sidebar__collapse:focus-visible {
-  outline: var(--cc-focus-ring-size) solid var(--cc-accent);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
 .agent-sidebar__collapse-icon {
-  width: var(--cc-icon-size);
-  height: var(--cc-icon-size);
+  width: var(--icon-md);
+  height: var(--icon-md);
+  color: var(--color-text-muted);
 }
 
 .agent-sidebar__list {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: var(--cc-space-3) var(--cc-space-2);
+  padding: var(--space-6);
 }
 
 .agent-sidebar__agent {
   width: 100%;
-  min-height: var(--cc-agent-row-min-height);
+  min-height: var(--agent-sidebar-row-min-height);
   display: grid;
-  grid-template-columns: var(--cc-avatar-size) minmax(0, 1fr) var(--cc-agent-status-column-width);
+  grid-template-columns: var(--agent-sidebar-avatar-size) minmax(0, 1fr) var(--agent-sidebar-status-column-width);
   align-items: center;
-  gap: var(--cc-space-3);
-  margin-bottom: var(--cc-space-2);
-  padding: var(--cc-space-3);
+  gap: var(--space-6);
+  margin-bottom: var(--space-4);
+  padding: var(--space-6);
   border: 1px solid transparent;
-  border-radius: var(--cc-radius-2);
-  color: var(--cc-text);
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
   background: transparent;
   text-align: left;
   cursor: pointer;
 }
 
 .agent-sidebar__agent--active {
-  background: var(--cc-selection-bg);
-  border-color: var(--cc-selection-border);
+  background: var(--color-surface-high);
+  border-color: var(--color-outline-variant);
 }
 
 .agent-sidebar__avatar {
   display: grid;
   place-items: center;
-  width: var(--cc-avatar-size);
-  height: var(--cc-avatar-size);
-  border-radius: var(--cc-radius-pill);
-  background: var(--cc-avatar-bg);
-  color: var(--cc-avatar-text);
-  font: var(--cc-font-label);
+  width: var(--agent-sidebar-avatar-size);
+  height: var(--agent-sidebar-avatar-size);
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-semibold);
+  line-height: 0;
 }
 
 .agent-sidebar__meta {
   min-width: 0;
   display: grid;
-  gap: var(--cc-meta-gap);
+  gap: 0;
 }
 
 .agent-sidebar__meta strong,
@@ -202,50 +283,146 @@ function agentStatusLabel(status: AgentStatus['type']): string {
   white-space: nowrap;
 }
 
+.agent-sidebar__meta strong {
+  font-size: var(--font-size-14);
+  font-weight: var(--font-weight-semibold);
+}
+
 .agent-sidebar__meta span {
-  color: var(--cc-text-muted);
-  font: var(--cc-font-body-small);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
 }
 
 .agent-sidebar__status {
-  width: var(--cc-status-dot-size);
-  height: var(--cc-status-dot-size);
-  border-radius: var(--cc-radius-pill);
-  background: var(--cc-status-idle);
+  width: var(--agent-status-dot-size);
+  height: var(--agent-status-dot-size);
+  border-radius: var(--radius-full);
+  background: var(--color-success);
 }
 
 .agent-sidebar__status[data-status='working'],
 .agent-sidebar__status[data-status='starting'] {
-  background: var(--cc-status-working);
+  background: var(--color-warning);
 }
 
 .agent-sidebar__status[data-status='awaitingInput'] {
-  background: var(--cc-status-warning);
+  background: var(--color-warning);
 }
 
 .agent-sidebar__status[data-status='error'] {
-  background: var(--cc-status-danger);
+  background: var(--color-error);
 }
 
 .agent-sidebar__footer {
   display: grid;
-  gap: var(--cc-space-2);
-  padding: var(--cc-space-3);
-  border-top: 1px solid var(--cc-border-muted);
+  gap: var(--space-4);
+  padding: var(--space-6);
 }
 
 .agent-sidebar__new {
   width: 100%;
   min-height: 48px;
-  border-radius: var(--cc-radius-2);
-  font-weight: var(--cc-font-weight-bold);
+  border-radius: var(--radius-lg);
+  font-weight: var(--font-weight-semibold);
 }
 
-@media (max-width: 1100px) {
-  .agent-sidebar {
-    flex-basis: var(--cc-agent-sidebar-compact-width);
-    width: var(--cc-agent-sidebar-compact-width);
-    min-width: var(--cc-agent-sidebar-compact-min);
+.agent-sidebar__new-icon {
+  display: none;
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+.agent-sidebar__resize-handle {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: -4px;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  outline: none;
+  -webkit-app-region: no-drag;
+}
+
+.agent-sidebar__resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 3px;
+  width: 1px;
+  height: 100%;
+  background: transparent;
+}
+
+.agent-sidebar__resize-handle:hover::after,
+.agent-sidebar__resize-handle:focus-visible::after {
+  background: var(--color-primary);
+}
+
+@container (max-width: 140px) {
+  .agent-sidebar__header {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .agent-sidebar__header strong {
+    display: none;
+  }
+
+  .agent-sidebar__collapse {
+    width: var(--space-16);
+    height: var(--space-16);
+  }
+
+  .agent-sidebar__list {
+    display: grid;
+    align-content: start;
+    align-items: start;
+    justify-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4) var(--space-2);
+  }
+
+  .agent-sidebar__agent {
+    position: relative;
+    width: var(--space-20);
+    min-height: var(--space-20);
+    grid-template-columns: var(--agent-sidebar-avatar-size);
+    place-items: center;
+    gap: 0;
+    margin-bottom: 0;
+    padding: var(--space-2);
+    border-radius: var(--radius-full);
+  }
+
+  .agent-sidebar__meta {
+    display: none;
+  }
+
+  .agent-sidebar__status {
+    position: absolute;
+    right: var(--space-2);
+    bottom: var(--space-2);
+    border: 2px solid var(--color-surface-low);
+  }
+
+  .agent-sidebar__footer {
+    justify-items: center;
+    padding: var(--space-4) var(--space-2);
+  }
+
+  .agent-sidebar__new {
+    width: var(--space-20);
+    min-height: var(--space-20);
+    padding: 0;
+  }
+
+  .agent-sidebar__new-icon {
+    display: block;
+  }
+
+  .agent-sidebar__new-label {
+    display: none;
   }
 }
 </style>

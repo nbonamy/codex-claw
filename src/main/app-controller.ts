@@ -16,7 +16,7 @@ import {
   selectAgent,
   updateAgentFolder,
 } from './snapshot-service';
-import type { AppSnapshot, ClientRequestResponse, CreateAgentInput, MainToRendererEvent } from '../shared/contracts';
+import type { AppSnapshot, ClientRequestResponse, CreateAgentInput, MainToRendererEvent, SendPromptOptions } from '../shared/contracts';
 import { ipcChannels } from '../shared/ipc';
 
 export class AppController {
@@ -45,6 +45,10 @@ export class AppController {
   registerIpcHandlers(): void {
     ipcMain.handle(ipcChannels.getSnapshot, () => this.snapshot);
 
+    ipcMain.handle(ipcChannels.listCodexModels, async () => {
+      return (await this.getCodexSessionManager()).listModels();
+    });
+
     ipcMain.handle(ipcChannels.createAgent, (_event, input: CreateAgentInput) => {
       const agent = createAgentFromInput(input);
       this.snapshot.agents.push(agent);
@@ -70,8 +74,8 @@ export class AppController {
       return this.snapshot;
     });
 
-    ipcMain.handle(ipcChannels.sendPrompt, (_event, agentId: string, prompt: string) => {
-      return this.sendPrompt(agentId, prompt);
+    ipcMain.handle(ipcChannels.sendPrompt, (_event, agentId: string, prompt: string, options?: SendPromptOptions) => {
+      return this.sendPrompt(agentId, prompt, options);
     });
 
     ipcMain.handle(ipcChannels.respondToClientRequest, async (_event, response: ClientRequestResponse) => {
@@ -93,8 +97,8 @@ export class AppController {
     await this.mcpServer?.stop();
   }
 
-  private async sendPrompt(agentId: string, prompt: string): Promise<AppSnapshot> {
-    return sendAgentPrompt(this.snapshot, await this.getCodexSessionManager(), agentId, prompt, (event) => {
+  private async sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot> {
+    return sendAgentPrompt(this.snapshot, await this.getCodexSessionManager(), agentId, prompt, options, (event) => {
       this.emitAndApply(event);
     });
   }

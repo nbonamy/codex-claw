@@ -163,7 +163,7 @@ describe('ConversationPane', () => {
 
     expect(wrapper.get('textarea').attributes()).not.toHaveProperty('disabled');
     expect(wrapper.get('textarea').attributes('placeholder')).toBe('Codex is working...');
-    expect(wrapper.get('button[type="submit"]').attributes()).toHaveProperty('disabled');
+    expect(wrapper.get('.chat-composer__send').attributes()).toHaveProperty('disabled');
   });
 });
 

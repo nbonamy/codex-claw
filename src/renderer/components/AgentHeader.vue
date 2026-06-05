@@ -3,20 +3,15 @@
     class="agent-header"
     :class="{ 'agent-header--sidebar-collapsed': sidebarCollapsed }"
   >
-    <el-tooltip
+    <button
       v-if="sidebarCollapsed"
-      content="Show agent sidebar"
-      placement="bottom"
+      class="agent-header__expand"
+      type="button"
+      aria-label="Show agent sidebar"
+      @click="emit('expand-sidebar')"
     >
-      <button
-        class="agent-header__expand"
-        type="button"
-        aria-label="Show agent sidebar"
-        @click="emit('expand-sidebar')"
-      >
-        <Expand class="agent-header__expand-icon" />
-      </button>
-    </el-tooltip>
+      <PanelLeftOpenIcon class="agent-header__expand-icon" />
+    </button>
 
     <div
       v-if="agent"
@@ -72,8 +67,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Expand } from '@element-plus/icons-vue';
 import type { Agent, AppSnapshot } from '../../shared/contracts';
+import { PanelLeftOpenIcon } from '../shared/icons/app-icons';
 
 const props = defineProps<{
   agent: Agent | null;
@@ -145,56 +140,36 @@ const gitStatusLabel = computed(() => 'Git status pending');
 
 <style scoped>
 .agent-header {
-  flex: 0 0 var(--cc-header-height);
-  min-height: var(--cc-header-height);
+  --agent-header-height: 64px;
+  --agent-header-avatar-size: 38px;
+  --agent-status-dot-size: 10px;
+  flex: 0 0 var(--agent-header-height);
+  min-height: var(--agent-header-height);
   display: flex;
   align-items: center;
-  gap: var(--cc-space-4);
+  gap: var(--space-8);
   min-width: 0;
-  padding: 0 var(--cc-space-5);
-  background: var(--cc-header-bg);
-  border-bottom: 1px solid var(--cc-border-muted);
+  padding: 0 var(--space-12);
+  background: var(--color-surface-lowest);
+  border-bottom: 1px solid var(--color-border);
+  -webkit-app-region: drag;
 }
 
 .agent-header--sidebar-collapsed {
-  min-height: 0;
-  gap: var(--cc-space-3);
-  padding-left: var(--cc-space-3);
-}
-
-.agent-header__expand {
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: var(--cc-radius-1);
-  color: var(--cc-text-muted);
-  background: transparent;
-  cursor: pointer;
-}
-
-.agent-header__expand:hover {
-  background: var(--cc-control-hover-bg);
-}
-
-.agent-header__expand:focus-visible {
-  outline: var(--cc-focus-ring-size) solid var(--cc-accent);
-  outline-offset: 2px;
-}
-
-.agent-header__expand-icon {
-  width: var(--cc-icon-size);
-  height: var(--cc-icon-size);
+  flex-basis: var(--workbench-appbar-height);
+  min-height: var(--workbench-appbar-height);
+  max-height: var(--workbench-appbar-height);
+  align-items: center;
+  gap: var(--space-6);
+  padding-left: var(--space-16);
+  border-bottom-color: transparent;
 }
 
 .agent-header__identity {
   flex: 1 1 auto;
   display: flex;
   align-items: center;
-  gap: var(--cc-space-3);
+  gap: var(--space-6);
   min-width: 0;
 }
 
@@ -202,34 +177,36 @@ const gitStatusLabel = computed(() => 'Git status pending');
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  width: var(--cc-avatar-size-small);
-  height: var(--cc-avatar-size-small);
-  border-radius: var(--cc-radius-pill);
-  background: var(--cc-avatar-bg);
-  color: var(--cc-avatar-text);
-  font: var(--cc-font-label);
+  width: var(--agent-header-avatar-size);
+  height: var(--agent-header-avatar-size);
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: var(--font-size-15);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-16);
 }
 
 .agent-header--sidebar-collapsed .agent-header__avatar {
-  width: 34px;
-  height: 34px;
-  font-size: var(--cc-font-size-small);
+  width: var(--space-8);
+  height: var(--space-8);
+  font-size: var(--font-size-8);
 }
 
 .agent-header__agent-line {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: var(--cc-space-3);
+  gap: var(--space-6);
 }
 
 .agent-header__identity strong {
-  color: var(--cc-text);
-  font-weight: var(--cc-font-weight-bold);
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
 }
 
-.agent-header__identity span {
-  color: var(--cc-text-muted);
+.agent-header__identity .agent-header__agent-line {
+  color: var(--color-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -238,51 +215,48 @@ const gitStatusLabel = computed(() => 'Git status pending');
 .agent-header__inline-dot,
 .agent-header__activity-line > span {
   flex: 0 0 auto;
-  width: var(--cc-status-dot-size);
-  height: var(--cc-status-dot-size);
-  border-radius: var(--cc-radius-pill);
-  background: var(--cc-status-idle);
+  width: var(--agent-status-dot-size);
+  height: var(--agent-status-dot-size);
+  border-radius: var(--radius-full);
 }
 
-.agent-header__inline-dot[data-status='working'],
-.agent-header__inline-dot[data-status='starting'],
+.agent-header__inline-dot {
+  background: var(--color-outline);
+}
+
+.agent-header__activity-line > span {
+  background: var(--color-success);
+}
+
 .agent-header__activity-line > span[data-status='working'],
 .agent-header__activity-line > span[data-status='starting'] {
-  background: var(--cc-status-working);
+  background: var(--color-warning);
 }
 
-.agent-header__inline-dot[data-status='awaitingInput'],
 .agent-header__activity-line > span[data-status='awaitingInput'],
 .agent-header__activity-line > span[data-status='notConfigured'] {
-  background: var(--cc-status-warning);
+  background: var(--color-warning);
 }
 
-.agent-header__inline-dot[data-status='error'],
 .agent-header__activity-line > span[data-status='error'] {
-  background: var(--cc-status-danger);
+  background: var(--color-error);
 }
 
 .agent-header__activity-line > span[data-status='running'] {
-  background: var(--cc-status-success);
+  background: var(--color-success);
 }
 
 .agent-header__inline-status {
   min-width: 0;
-  color: var(--cc-text-muted);
-}
-
-.agent-header--sidebar-collapsed .agent-header__folder,
-.agent-header--sidebar-collapsed .agent-header__inline-dot,
-.agent-header--sidebar-collapsed .agent-header__inline-status {
-  display: none;
+  color: var(--color-text-muted);
 }
 
 .agent-header__activity {
   flex: 0 0 auto;
   display: grid;
-  gap: var(--cc-meta-gap);
+  gap: var(--space-1);
   min-width: 152px;
-  color: var(--cc-text-muted);
+  color: var(--color-text-muted);
   text-align: right;
 }
 
@@ -294,7 +268,7 @@ const gitStatusLabel = computed(() => 'Git status pending');
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--cc-space-2);
+  gap: var(--space-4);
   min-width: 0;
 }
 
@@ -306,11 +280,35 @@ const gitStatusLabel = computed(() => 'Git status pending');
 }
 
 .agent-header__activity-line strong {
-  color: var(--cc-text-muted);
-  font-weight: var(--cc-font-weight-bold);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-medium);
 }
 
 .agent-header__git-status {
-  font: var(--cc-font-body-small);
+  font-size: var(--font-size-13);
 }
+
+.agent-header__expand {
+  display: flex;
+  align-items: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  -webkit-app-region: no-drag;
+}
+
+.agent-header__expand-icon {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  color: var(--color-text-muted);
+}
+
+.agent-header--sidebar-collapsed .agent-header__identity,
+.agent-header--sidebar-collapsed .agent-header__activity {
+  font-size: var(--font-size-13);
+}
+
+
+
 </style>

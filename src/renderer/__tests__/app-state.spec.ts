@@ -255,6 +255,74 @@ describe('useAppState', () => {
     expect(state.answeredClientRequestIds.value.has('approval-1')).toBe(true);
     expect(state.snapshot.value.agents[0].status).toStrictEqual({ type: 'working' });
   });
+
+  it('loads Codex models, selects the default reasoning effort, and sends it with prompts', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const updatedSnapshot = createInitialSnapshot();
+    updatedSnapshot.messages.push({
+      id: 'message-user',
+      agentId: 'agent-dina',
+      role: 'user',
+      status: 'complete',
+      createdAt: '2026-06-05T00:00:01.000Z',
+      parts: [{ type: 'text', text: 'use the selected model' }],
+    });
+    const listCodexModels = vi.fn().mockResolvedValue([
+      {
+        id: 'codex-fast',
+        model: 'gpt-5.1-codex-fast',
+        displayName: 'GPT-5.1 Codex Fast',
+        description: 'Fast coding work',
+        hidden: false,
+        supportedReasoningEfforts: [
+          { reasoningEffort: 'low', description: 'Quick' },
+          { reasoningEffort: 'medium', description: 'Balanced' },
+        ],
+        defaultReasoningEffort: 'medium',
+        isDefault: false,
+      },
+      {
+        id: 'codex-max',
+        model: 'gpt-5.1-codex-max',
+        displayName: 'GPT-5.1 Codex Max',
+        description: 'Deep coding work',
+        hidden: false,
+        supportedReasoningEfforts: [
+          { reasoningEffort: 'medium', description: 'Balanced' },
+          { reasoningEffort: 'high', description: 'Deep' },
+        ],
+        defaultReasoningEffort: 'high',
+        isDefault: true,
+      },
+    ]);
+    const sendPrompt = vi.fn().mockResolvedValue(updatedSnapshot);
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        listCodexModels,
+        sendPrompt,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await state.loadCodexModels();
+
+    expect(state.modelCatalogStatus.value).toBe('loaded');
+    expect(state.selectedModelId.value).toBe('codex-max');
+    expect(state.selectedReasoningEffort.value).toBe('high');
+
+    state.selectModel('codex-fast');
+    state.selectReasoningEffort('low');
+    await state.sendPrompt('use the selected model');
+
+    expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'use the selected model', {
+      model: 'gpt-5.1-codex-fast',
+      reasoningEffort: 'low',
+    });
+  });
 });
 
 function deferred<T>() {

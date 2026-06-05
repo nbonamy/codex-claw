@@ -160,7 +160,7 @@ function respond(decision: ToolConfirmationDecision) {
   border: 1px solid color-mix(in srgb, var(--color-primary) 24%, transparent);
   border-radius: var(--radius-full);
   padding: var(--space-1) var(--space-3);
-  background: var(--cc-selection-bg);
+  background: var(--color-primary-container);
   color: var(--color-primary);
   font-size: var(--font-size-12);
   font-weight: var(--font-weight-medium);
@@ -232,11 +232,11 @@ function respond(decision: ToolConfirmationDecision) {
 .chat-tool-confirmation__button--primary {
   border-color: var(--color-primary);
   background: var(--color-primary);
-  color: var(--cc-text-inverse);
+  color: var(--color-on-primary);
 }
 
 .chat-tool-confirmation__button--primary:hover {
-  background: var(--cc-send-bg-hover);
+  background: var(--color-secondary);
 }
 
 .chat-tool-confirmation__summary {

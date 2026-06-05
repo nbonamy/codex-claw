@@ -128,6 +128,131 @@ describe('CodexAgentSessionManager', () => {
     ]);
   });
 
+  it('passes selected model and reasoning effort to turn start', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+
+    const prompt = manager.sendPrompt(agent, 'hello codex', {
+      model: 'gpt-5.1-codex',
+      reasoningEffort: 'high',
+    });
+    await waitForSentCount(transport, 1);
+    transport.receive({
+      id: 1,
+      result: {
+        userAgent: 'codex',
+        codexHome: '/tmp/codex-home',
+        platformFamily: 'unix',
+        platformOs: 'macos',
+      },
+    });
+    await waitForSentCount(transport, 3);
+    transport.receive({
+      id: 2,
+      result: {
+        thread: {
+          id: 'thread-1',
+          cwd: '/Users/nbonamy/src/codex-claw',
+        },
+      },
+    });
+    await waitForSentCount(transport, 4);
+    transport.receive({
+      id: 3,
+      result: {
+        turn: {
+          id: 'turn-1',
+          status: 'running',
+        },
+      },
+    });
+
+    await prompt;
+
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 3,
+      method: 'turn/start',
+      params: {
+        threadId: 'thread-1',
+        input: [
+          {
+            type: 'text',
+            text: 'hello codex',
+            text_elements: [],
+          },
+        ],
+        cwd: expandHome('~/src/codex-claw'),
+        model: 'gpt-5.1-codex',
+        effort: 'high',
+      },
+    });
+  });
+
+  it('lists Codex models and preserves app-server reasoning effort order', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+
+    const models = manager.listModels();
+    await waitForSentCount(transport, 1);
+    transport.receive({
+      id: 1,
+      result: {
+        userAgent: 'codex',
+        codexHome: '/tmp/codex-home',
+        platformFamily: 'unix',
+        platformOs: 'macos',
+      },
+    });
+    await waitForSentCount(transport, 3);
+    transport.receive({
+      id: 2,
+      result: {
+        data: [
+          {
+            id: 'codex-max',
+            model: 'gpt-5.1-codex-max',
+            displayName: 'GPT-5.1 Codex Max',
+            description: 'Best for large implementation work',
+            hidden: false,
+            supportedReasoningEfforts: [
+              { reasoningEffort: 'medium', description: 'Balanced' },
+              { reasoningEffort: 'high', description: 'Deep reasoning' },
+              { reasoningEffort: 'xhigh', description: 'Maximum reasoning' },
+            ],
+            defaultReasoningEffort: 'high',
+            isDefault: true,
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+
+    await expect(models).resolves.toStrictEqual([
+      {
+        id: 'codex-max',
+        model: 'gpt-5.1-codex-max',
+        displayName: 'GPT-5.1 Codex Max',
+        description: 'Best for large implementation work',
+        hidden: false,
+        supportedReasoningEfforts: [
+          { reasoningEffort: 'medium', description: 'Balanced' },
+          { reasoningEffort: 'high', description: 'Deep reasoning' },
+          { reasoningEffort: 'xhigh', description: 'Maximum reasoning' },
+        ],
+        defaultReasoningEffort: 'high',
+        isDefault: true,
+      },
+    ]);
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 2,
+      method: 'model/list',
+      params: {
+        cursor: null,
+        includeHidden: false,
+      },
+    });
+  });
+
   it('injects Codex Claw agent instructions when MCP is enabled', async () => {
     const transport = new FakeTransport();
     const manager = new CodexAgentSessionManager(new CodexRpcClient(transport), {

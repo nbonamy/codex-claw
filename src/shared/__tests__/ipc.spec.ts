@@ -8,6 +8,7 @@ describe('ipc channels', () => {
       createAgent: 'agent:create',
       selectAgent: 'agent:select',
       selectAgentFolder: 'agent:select-folder',
+      listCodexModels: 'codex:models:list',
       sendPrompt: 'agent:send-prompt',
       respondToClientRequest: 'client-request:respond',
       event: 'app:event',

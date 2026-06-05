@@ -1,14 +1,21 @@
 import { computed, ref } from 'vue';
-import type { AppSnapshot, ClientRequestResponse, MainToRendererEvent } from '../shared/contracts';
+import type { AppSnapshot, ClientRequestResponse, CodexModelOption, MainToRendererEvent, ReasoningEffort, SendPromptOptions } from '../shared/contracts';
 import { applyMainEventToSnapshot, createInitialSnapshot } from '../shared/snapshot';
 
 const snapshot = ref<AppSnapshot>(createInitialSnapshot());
 const isLoading = ref(false);
 const sendingAgentIds = ref(new Set<string>());
 const answeredClientRequestIds = ref(new Set<string>());
+const codexModels = ref<CodexModelOption[]>([]);
+const modelCatalogStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
+const modelCatalogError = ref<string | null>(null);
+const selectedModelId = ref<string | null>(null);
+const selectedReasoningEffort = ref<ReasoningEffort | null>(null);
 let unsubscribeMainEvents: (() => void) | null = null;
 
 export function useAppState() {
+  const selectedModel = computed(() => selectedModelFromCatalog());
+
   const activeAgent = computed(() => {
     return snapshot.value.agents.find((agent) => agent.id === snapshot.value.activeAgentId) ?? null;
   });
@@ -45,6 +52,24 @@ export function useAppState() {
     }
   }
 
+  async function loadCodexModels(): Promise<void> {
+    if (!window.codexClaw?.listCodexModels || modelCatalogStatus.value === 'loading') {
+      return;
+    }
+
+    modelCatalogStatus.value = 'loading';
+    modelCatalogError.value = null;
+
+    try {
+      codexModels.value = await window.codexClaw.listCodexModels();
+      modelCatalogStatus.value = 'loaded';
+      selectDefaultModelIfNeeded();
+    } catch (error) {
+      modelCatalogStatus.value = 'error';
+      modelCatalogError.value = error instanceof Error ? error.message : String(error);
+    }
+  }
+
   async function sendPrompt(prompt: string): Promise<void> {
     const agentId = activeAgent.value?.id;
     if (!agentId || !window.codexClaw) {
@@ -54,7 +79,10 @@ export function useAppState() {
     markAgentSending(agentId, true);
 
     try {
-      snapshot.value = await window.codexClaw.sendPrompt(agentId, prompt);
+      const options = selectedPromptOptions();
+      snapshot.value = options
+        ? await window.codexClaw.sendPrompt(agentId, prompt, options)
+        : await window.codexClaw.sendPrompt(agentId, prompt);
     } finally {
       markAgentSending(agentId, false);
     }
@@ -82,6 +110,25 @@ export function useAppState() {
     snapshot.value = await window.codexClaw.respondToClientRequest(response);
   }
 
+  function selectModel(modelId: string): void {
+    const model = codexModels.value.find((candidate) => candidate.id === modelId);
+    if (!model) {
+      return;
+    }
+
+    selectedModelId.value = model.id;
+    selectedReasoningEffort.value = defaultReasoningEffort(model);
+  }
+
+  function selectReasoningEffort(reasoningEffort: ReasoningEffort): void {
+    const model = selectedModel.value;
+    if (!model || !model.supportedReasoningEfforts.some((option) => option.reasoningEffort === reasoningEffort)) {
+      return;
+    }
+
+    selectedReasoningEffort.value = reasoningEffort;
+  }
+
   return {
     snapshot,
     activeAgent,
@@ -89,10 +136,48 @@ export function useAppState() {
     isLoading,
     isSending,
     answeredClientRequestIds,
+    codexModels,
+    modelCatalogStatus,
+    modelCatalogError,
+    selectedModelId,
+    selectedReasoningEffort,
+    loadCodexModels,
     loadSnapshot,
     respondToClientRequest,
+    selectModel,
+    selectReasoningEffort,
     selectAgent,
     sendPrompt,
+  };
+}
+
+function selectDefaultModelIfNeeded(): void {
+  if (selectedModelFromCatalog()) {
+    return;
+  }
+
+  const defaultModel = codexModels.value.find((model) => model.isDefault) ?? codexModels.value[0] ?? null;
+  selectedModelId.value = defaultModel?.id ?? null;
+  selectedReasoningEffort.value = defaultModel ? defaultReasoningEffort(defaultModel) : null;
+}
+
+function selectedModelFromCatalog(): CodexModelOption | null {
+  return codexModels.value.find((model) => model.id === selectedModelId.value) ?? null;
+}
+
+function defaultReasoningEffort(model: CodexModelOption): ReasoningEffort | null {
+  return model.defaultReasoningEffort || (model.supportedReasoningEfforts[0]?.reasoningEffort ?? null);
+}
+
+function selectedPromptOptions(): SendPromptOptions | undefined {
+  const model = selectedModelFromCatalog();
+  if (!model) {
+    return undefined;
+  }
+
+  return {
+    model: model.model,
+    reasoningEffort: selectedReasoningEffort.value ?? defaultReasoningEffort(model),
   };
 }
 

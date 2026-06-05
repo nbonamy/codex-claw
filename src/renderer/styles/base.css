@@ -12,8 +12,10 @@ body,
 
 body {
   overflow: hidden;
-  font: var(--cc-font-body);
-  background: var(--cc-bg);
+  background: var(--color-background);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-15);
+  line-height: var(--line-height-20);
 }
 
 button,
@@ -23,6 +25,5 @@ textarea {
 }
 
 .el-button {
-  --el-color-primary: var(--cc-accent);
-  --el-button-border-radius: var(--cc-radius-1);
+  --el-button-border-radius: var(--radius-sm);
 }

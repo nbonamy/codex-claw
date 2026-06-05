@@ -1,5 +1,6 @@
 export const ipcChannels = {
   getSnapshot: 'app:get-snapshot',
+  listCodexModels: 'codex:models:list',
   createAgent: 'agent:create',
   selectAgent: 'agent:select',
   selectAgentFolder: 'agent:select-folder',
