@@ -9,6 +9,7 @@ export {
   IconCopy as CopyIcon,
   IconDownload as Download,
   IconEye as EyeIcon,
+  IconFileText as FileTextIcon,
   IconFolder as FolderIcon,
   IconInfoCircle as Info,
   IconLayoutSidebarLeftCollapse as PanelLeftCloseIcon,

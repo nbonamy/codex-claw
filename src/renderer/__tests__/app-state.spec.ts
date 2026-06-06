@@ -941,6 +941,32 @@ describe('useAppState', () => {
     });
   });
 
+  it('loads active agent files from preload for composer mentions', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const listAgentFiles = vi.fn().mockResolvedValue([
+      { name: 'README.md', path: 'README.md' },
+      { name: 'research.md', path: 'docs/research.md' },
+    ]);
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        listAgentFiles,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    expect(state.fileCatalogStatus.value).toBe('loaded');
+    expect(listAgentFiles).toHaveBeenCalledWith('agent-dina');
+    expect(state.agentFiles.value).toStrictEqual([
+      { name: 'README.md', path: 'README.md' },
+      { name: 'research.md', path: 'docs/research.md' },
+    ]);
+  });
+
   it('refreshes active agent skills after a skills changed event', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();

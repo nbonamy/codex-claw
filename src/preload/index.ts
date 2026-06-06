@@ -6,6 +6,7 @@ const api: CodexClawApi = {
   getSnapshot: () => ipcRenderer.invoke(ipcChannels.getSnapshot),
   listCodexModels: () => ipcRenderer.invoke(ipcChannels.listCodexModels),
   listCodexSkills: (agentId: string) => ipcRenderer.invoke(ipcChannels.listCodexSkills, agentId),
+  listAgentFiles: (agentId: string) => ipcRenderer.invoke(ipcChannels.listAgentFiles, agentId),
   chooseAgentFolder: () => ipcRenderer.invoke(ipcChannels.chooseAgentFolder),
   createTeam: (input: CreateTeamInput) => ipcRenderer.invoke(ipcChannels.createTeam, input),
   updateTeam: (input: UpdateTeamInput) => ipcRenderer.invoke(ipcChannels.updateTeam, input),

@@ -1,9 +1,10 @@
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { nextTick } from 'vue';
 import ChatComposer from '../ChatComposer.vue';
 import { i18n } from '../../i18n';
-import type { AgentContextUsage, CodexModelOption, CodexSkillSummary } from '../../../shared/contracts';
+import type { AgentContextUsage, AgentFileSearchItem, CodexModelOption, CodexSkillSummary } from '../../../shared/contracts';
 
 vi.mock('fix-webm-duration', () => ({
   default: vi.fn(async (blob: Blob) => blob),
@@ -52,6 +53,12 @@ const skills: CodexSkillSummary[] = [
     scope: 'user',
     enabled: true,
   },
+];
+
+const files: AgentFileSearchItem[] = [
+  { name: 'README.md', path: 'README.md' },
+  { name: 'research.md', path: 'docs/research.md' },
+  { name: 'ChatComposer.vue', path: 'src/renderer/components/ChatComposer.vue' },
 ];
 
 describe('ChatComposer', () => {
@@ -210,6 +217,43 @@ describe('ChatComposer', () => {
     expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('/skill-creator ');
   });
 
+  it('opens an @ file menu, filters files, and inserts the selected relative path', async () => {
+    const wrapper = mountComposer({ files });
+
+    await wrapper.get('textarea').setValue('read @resea');
+    await wrapper.get('textarea').trigger('keyup');
+
+    expect(wrapper.find('.chat-composer-file-menu').exists()).toBe(true);
+    expect(wrapper.text()).toContain('research.md');
+    expect(wrapper.text()).toContain('docs/research.md');
+
+    await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
+
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('read docs/research.md ');
+  });
+
+  it('navigates @ file results with arrow keys', async () => {
+    const wrapper = mountComposer({
+      files: [
+        { name: 'alpha.ts', path: 'src/alpha.ts' },
+        { name: 'beta.ts', path: 'src/beta.ts' },
+      ],
+    });
+
+    await wrapper.get('textarea').setValue('inspect @');
+    await wrapper.get('textarea').trigger('keyup');
+
+    expect(wrapper.find('.chat-composer-file-menu__hint').exists()).toBe(true);
+
+    await wrapper.get('textarea').setValue('inspect @ts');
+    await wrapper.get('textarea').trigger('keyup');
+    await nextTick();
+    await wrapper.get('textarea').trigger('keydown', { key: 'ArrowDown' });
+    await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
+
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('inspect src/beta.ts ');
+  });
+
   it('records audio and inserts the Apple speech transcript at the caret', async () => {
     installAudioRecordingMocks();
     const transcribeAppleSpeech = vi.fn(async () => ({ text: 'dictated change' }));
@@ -246,6 +290,7 @@ function mountComposer(overrides: Partial<ChatComposerProps & {
   planMode: boolean;
   selectedModelId: string;
   selectedReasoningEffort: string;
+  files: AgentFileSearchItem[];
   skills: CodexSkillSummary[];
 }> = {}) {
   return mount(ChatComposer, {

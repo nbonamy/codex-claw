@@ -115,6 +115,11 @@ export type CodexSkillSummary = {
   enabled: boolean;
 };
 
+export type AgentFileSearchItem = {
+  name: string;
+  path: string;
+};
+
 export type PromptSkillInput = {
   name: string;
   path: string;
@@ -331,6 +336,7 @@ export type CodexClawApi = {
   getSnapshot(): Promise<AppSnapshot>;
   listCodexModels(): Promise<CodexModelOption[]>;
   listCodexSkills(agentId: string): Promise<CodexSkillSummary[]>;
+  listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]>;
   chooseAgentFolder(): Promise<string | null>;
   createTeam(input: CreateTeamInput): Promise<AppSnapshot>;
   updateTeam(input: UpdateTeamInput): Promise<AppSnapshot>;

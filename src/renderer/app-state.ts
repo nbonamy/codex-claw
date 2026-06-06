@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { AppSnapshot, ClientRequestResponse, CodexModelOption, CodexSkillSummary, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
+import type { AgentFileSearchItem, AppSnapshot, ClientRequestResponse, CodexModelOption, CodexSkillSummary, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
 import { updateSettingsInSnapshot } from '../shared/settings';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '../shared/snapshot';
 import { createQueuedChatPrompt, type QueuedChatPrompt } from './shared/chat/queued-prompts';
@@ -16,6 +16,9 @@ const modelCatalogError = ref<string | null>(null);
 const codexSkills = ref<CodexSkillSummary[]>([]);
 const skillCatalogStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
 const skillCatalogError = ref<string | null>(null);
+const agentFiles = ref<AgentFileSearchItem[]>([]);
+const fileCatalogStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
+const fileCatalogError = ref<string | null>(null);
 const selectedModelId = ref<string | null>(null);
 const selectedReasoningEffort = ref<ReasoningEffort | null>(null);
 const planMode = ref(false);
@@ -62,7 +65,7 @@ export function useAppState() {
       snapshot.value = await window.codexClaw.getSnapshot();
       subscribeToMainEvents();
       await hydrateActiveAgentHistory();
-      await loadCodexSkillsForActiveAgent();
+      await loadActiveAgentCatalogs();
     } finally {
       isLoading.value = false;
     }
@@ -192,7 +195,7 @@ export function useAppState() {
     if (window.codexClaw?.selectAgent) {
       snapshot.value = await window.codexClaw.selectAgent(agentId);
     }
-    await loadCodexSkillsForActiveAgent();
+    await loadActiveAgentCatalogs();
   }
 
   async function chooseAgentFolder(): Promise<string | null> {
@@ -205,6 +208,7 @@ export function useAppState() {
     }
 
     snapshot.value = await window.codexClaw.createAgent(input);
+    await loadActiveAgentCatalogs();
   }
 
   async function createTeam(input: CreateTeamInput): Promise<void> {
@@ -213,6 +217,7 @@ export function useAppState() {
     }
 
     snapshot.value = await window.codexClaw.createTeam(input);
+    await loadActiveAgentCatalogs();
   }
 
   async function updateTeam(input: UpdateTeamInput): Promise<void> {
@@ -229,6 +234,7 @@ export function useAppState() {
     }
 
     snapshot.value = await window.codexClaw.closeTeam(teamId);
+    await loadActiveAgentCatalogs();
   }
 
   async function selectTeam(teamId: string): Promise<void> {
@@ -243,7 +249,7 @@ export function useAppState() {
     if (window.codexClaw?.selectTeam) {
       snapshot.value = await window.codexClaw.selectTeam(teamId);
     }
-    await loadCodexSkillsForActiveAgent();
+    await loadActiveAgentCatalogs();
   }
 
   async function updateAgent(input: UpdateAgentInput): Promise<void> {
@@ -252,6 +258,7 @@ export function useAppState() {
     }
 
     snapshot.value = await window.codexClaw.updateAgent(input);
+    await loadActiveAgentCatalogs();
   }
 
   async function updateSettings(input: UpdateSettingsInput): Promise<void> {
@@ -280,6 +287,7 @@ export function useAppState() {
     }
 
     snapshot.value = await window.codexClaw.duplicateAgent(agentId);
+    await loadActiveAgentCatalogs();
   }
 
   async function moveAgentToTeam(input: MoveAgentToTeamInput): Promise<void> {
@@ -308,6 +316,7 @@ export function useAppState() {
     }
 
     snapshot.value = await window.codexClaw.deployBenchTemplate(templateId, snapshot.value.activeTeamId ?? undefined);
+    await loadActiveAgentCatalogs();
   }
 
   async function removeBenchTemplate(templateId: string): Promise<void> {
@@ -332,6 +341,7 @@ export function useAppState() {
     }
 
     snapshot.value = await window.codexClaw.closeAgent(agentId);
+    await loadActiveAgentCatalogs();
   }
 
   async function respondToClientRequest(response: ClientRequestResponse): Promise<void> {
@@ -385,12 +395,16 @@ export function useAppState() {
     codexSkills,
     skillCatalogStatus,
     skillCatalogError,
+    agentFiles,
+    fileCatalogStatus,
+    fileCatalogError,
     selectedModelId,
     selectedReasoningEffort,
     planMode,
     goalMode,
     loadCodexModels,
     loadCodexSkills: loadCodexSkillsForActiveAgent,
+    loadAgentFiles: loadAgentFilesForActiveAgent,
     loadSnapshot,
     chooseAgentFolder,
     createAgent,
@@ -478,6 +492,13 @@ function subscribeToMainEvents(): void {
   });
 }
 
+async function loadActiveAgentCatalogs(): Promise<void> {
+  await Promise.all([
+    loadCodexSkillsForActiveAgent(),
+    loadAgentFilesForActiveAgent(),
+  ]);
+}
+
 async function loadCodexSkillsForActiveAgent(): Promise<void> {
   const agentId = snapshot.value.activeAgentId;
   if (!agentId || !window.codexClaw?.listCodexSkills || skillCatalogStatus.value === 'loading') {
@@ -498,6 +519,31 @@ async function loadCodexSkillsForActiveAgent(): Promise<void> {
     codexSkills.value = [];
     skillCatalogStatus.value = 'error';
     skillCatalogError.value = error instanceof Error ? error.message : String(error);
+  }
+}
+
+async function loadAgentFilesForActiveAgent(): Promise<void> {
+  const agentId = snapshot.value.activeAgentId;
+  if (!agentId || !window.codexClaw?.listAgentFiles) {
+    agentFiles.value = [];
+    fileCatalogStatus.value = 'notLoaded';
+    return;
+  }
+
+  if (fileCatalogStatus.value === 'loading') {
+    return;
+  }
+
+  fileCatalogStatus.value = 'loading';
+  fileCatalogError.value = null;
+
+  try {
+    agentFiles.value = await window.codexClaw.listAgentFiles(agentId);
+    fileCatalogStatus.value = 'loaded';
+  } catch (error) {
+    agentFiles.value = [];
+    fileCatalogStatus.value = 'error';
+    fileCatalogError.value = error instanceof Error ? error.message : String(error);
   }
 }
 

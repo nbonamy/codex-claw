@@ -5,6 +5,14 @@
     aria-label="Prompt composer"
     @submit.prevent="submitPrompt"
   >
+    <ChatComposerFileMentionMenu
+      v-if="fileMenuVisible"
+      :active-index="activeFileIndex"
+      :show-hint="fileMenuShowsHint"
+      :visible-files="visibleFiles"
+      @select="selectFile"
+    />
+
     <ChatComposerSkillMenu
       v-if="skillMenuVisible"
       :active-index="activeSkillIndex"
@@ -47,7 +55,7 @@
       aria-label="Prompt"
       rows="1"
       :disabled="disabled && !isSending"
-      @blur="closeSkillMenuSoon"
+      @blur="closeComposerMenusSoon"
       @click="updateCaretPosition"
       @input="handleTextareaInput"
       @keydown="handleTextareaKeydown"
@@ -104,12 +112,15 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import type { AgentContextUsage, CodexModelOption, CodexSkillSummary, ReasoningEffort } from '../../shared/contracts';
+import type { AgentContextUsage, AgentFileSearchItem, CodexModelOption, CodexSkillSummary, ReasoningEffort } from '../../shared/contracts';
 import ChatComposerSendButton from '../shared/chat/ChatComposerSendButton.vue';
 import ChatComposerActionMenu from './ChatComposerActionMenu.vue';
 import ChatContextUsageIndicator from './ChatContextUsageIndicator.vue';
 import ChatModelReasoningSelector from './ChatModelReasoningSelector.vue';
+import ChatComposerFileMentionMenu from './ChatComposerFileMentionMenu.vue';
 import ChatComposerSkillMenu from './ChatComposerSkillMenu.vue';
+import { findActiveFileMention, type ActiveComposerMention } from '../shared/chat/composer-mentions';
+import { filterFileSearchItems } from '../shared/chat/file-search';
 import { filterComposerSkills, findActiveSkillSlash, type ActiveSkillSlash } from '../shared/chat/composer-skills';
 import { BrowserAudioRecorder, isBrowserAudioRecordingSupported } from '../shared/audio/browser-audio-recorder';
 import { transcribeRecordedAudio } from '../shared/audio/apple-speech-transcription';
@@ -119,6 +130,7 @@ import ChatComposerWaveform from '../shared/chat/ChatComposerWaveform.vue';
 const props = defineProps<{
   contextUsage?: AgentContextUsage;
   disabled: boolean;
+  files?: AgentFileSearchItem[];
   goalMode?: boolean;
   isSending: boolean;
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
@@ -145,6 +157,8 @@ const emit = defineEmits<{
 const prompt = ref('');
 const textareaEl = ref<HTMLTextAreaElement | null>(null);
 const caretPosition = ref(0);
+const fileMenuOpen = ref(false);
+const activeFileIndex = ref(0);
 const skillMenuOpen = ref(false);
 const activeSkillIndex = ref(0);
 const recorder = ref<BrowserAudioRecorder | null>(null);
@@ -189,6 +203,26 @@ const activeModes = computed(() => [
   ...(props.planMode ? ['Plan'] : []),
   ...(props.goalMode ? ['Goal'] : []),
 ]);
+const activeFileMention = computed<ActiveComposerMention | null>(() => findActiveFileMention(prompt.value, caretPosition.value));
+const visibleFiles = computed(() => {
+  const mention = activeFileMention.value;
+  if (!mention?.query.trim()) {
+    return [];
+  }
+
+  return filterFileSearchItems(props.files ?? [], mention.query, 5);
+});
+const fileMenuShowsHint = computed(() => (
+  activeFileMention.value !== null &&
+  !activeFileMention.value.query.trim() &&
+  (props.files ?? []).length > 0
+));
+const fileMenuVisible = computed(() => (
+  fileMenuOpen.value &&
+  activeFileMention.value !== null &&
+  (props.files ?? []).length > 0 &&
+  !(props.disabled && !props.isSending)
+));
 const activeSkillSlash = computed<ActiveSkillSlash | null>(() => findActiveSkillSlash(prompt.value, caretPosition.value));
 const visibleSkills = computed(() => filterComposerSkills(props.skills ?? [], activeSkillSlash.value?.query ?? ''));
 const skillMenuVisible = computed(() => (
@@ -200,6 +234,10 @@ const skillMenuVisible = computed(() => (
 
 watch([visibleSkills, activeSkillSlash], () => {
   activeSkillIndex.value = 0;
+});
+
+watch([visibleFiles, activeFileMention], () => {
+  activeFileIndex.value = 0;
 });
 
 function submitPrompt(): void {
@@ -226,7 +264,7 @@ function submitWithIntent(intent: 'send' | 'steer'): void {
   }
 
   prompt.value = '';
-  closeSkillMenu();
+  closeComposerMenus();
   if (intent === 'send') {
     emit('send', trimmed);
   } else {
@@ -305,7 +343,7 @@ function insertTranscript(text: string): void {
   const nextCaret = before.length + insertion.length;
   prompt.value = `${before}${insertion}${after}`;
   caretPosition.value = nextCaret;
-  closeSkillMenu();
+  closeComposerMenus();
   void nextTick(() => {
     textareaEl.value?.focus();
     textareaEl.value?.setSelectionRange(nextCaret, nextCaret);
@@ -314,6 +352,32 @@ function insertTranscript(text: string): void {
 }
 
 function handleTextareaKeydown(event: KeyboardEvent): void {
+  if (fileMenuVisible.value) {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const count = visibleFiles.value.length;
+      if (count > 0) {
+        activeFileIndex.value = (activeFileIndex.value + (event.key === 'ArrowDown' ? 1 : -1) + count) % count;
+      }
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeComposerMenus();
+      return;
+    }
+
+    if (event.key === 'Enter' && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey && visibleFiles.value.length > 0) {
+      event.preventDefault();
+      const file = visibleFiles.value[activeFileIndex.value];
+      if (file) {
+        selectFile(file);
+      }
+      return;
+    }
+  }
+
   if (skillMenuVisible.value) {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
@@ -326,7 +390,7 @@ function handleTextareaKeydown(event: KeyboardEvent): void {
 
     if (event.key === 'Escape') {
       event.preventDefault();
-      closeSkillMenu();
+      closeComposerMenus();
       return;
     }
 
@@ -369,7 +433,26 @@ function handleTextareaKeydown(event: KeyboardEvent): void {
 function handleTextareaInput(): void {
   updateCaretPosition();
   resizeTextarea();
-  skillMenuOpen.value = activeSkillSlash.value !== null;
+  syncComposerMenus();
+}
+
+function selectFile(file: AgentFileSearchItem): void {
+  const mention = activeFileMention.value;
+  const textarea = textareaEl.value;
+  if (!mention || !textarea) {
+    return;
+  }
+
+  const nextText = `${prompt.value.slice(0, mention.start)}${file.path} ${prompt.value.slice(mention.end)}`;
+  const nextCaret = mention.start + file.path.length + 1;
+  prompt.value = nextText;
+  caretPosition.value = nextCaret;
+  closeComposerMenus();
+  void nextTick(() => {
+    textarea.focus();
+    textarea.setSelectionRange(nextCaret, nextCaret);
+    resizeTextarea();
+  });
 }
 
 function selectSkill(skill: CodexSkillSummary): void {
@@ -383,7 +466,7 @@ function selectSkill(skill: CodexSkillSummary): void {
   const nextCaret = slash.start + skill.name.length + 2;
   prompt.value = nextText;
   caretPosition.value = nextCaret;
-  closeSkillMenu();
+  closeComposerMenus();
   void nextTick(() => {
     textarea.focus();
     textarea.setSelectionRange(nextCaret, nextCaret);
@@ -394,17 +477,32 @@ function selectSkill(skill: CodexSkillSummary): void {
 function updateCaretPosition(): void {
   const textarea = textareaEl.value;
   caretPosition.value = textarea?.selectionEnd ?? prompt.value.length;
+  syncComposerMenus();
+}
+
+function closeComposerMenusSoon(): void {
+  window.setTimeout(closeComposerMenus, 120);
+}
+
+function closeComposerMenus(): void {
+  fileMenuOpen.value = false;
+  skillMenuOpen.value = false;
+}
+
+function syncComposerMenus(): void {
+  if (activeFileMention.value !== null) {
+    fileMenuOpen.value = true;
+    skillMenuOpen.value = false;
+    return;
+  }
+
   if (activeSkillSlash.value !== null) {
     skillMenuOpen.value = true;
+    fileMenuOpen.value = false;
+    return;
   }
-}
 
-function closeSkillMenuSoon(): void {
-  window.setTimeout(closeSkillMenu, 120);
-}
-
-function closeSkillMenu(): void {
-  skillMenuOpen.value = false;
+  closeComposerMenus();
 }
 
 function resizeTextarea(): void {

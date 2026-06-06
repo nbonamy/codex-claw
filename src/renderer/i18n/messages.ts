@@ -11,6 +11,11 @@ export const messages = {
         empty: 'No matching skills',
         title: 'Skills',
       },
+      files: {
+        empty: 'No matching files',
+        hint: 'Start typing to search files in this agent folder.',
+        title: 'Files',
+      },
       tool: {
         fallback: {
           completed: 'Ran {name}',

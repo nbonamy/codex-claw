@@ -60,6 +60,7 @@
           v-else
           :messages="messages"
           :agent="currentAgent"
+          :agent-files="agentFiles"
           :is-loading="isLoading"
           :is-sending="isSending"
           :answered-client-request-ids="answeredClientRequestIds"
@@ -113,7 +114,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { Agent, AppCommand, AppSnapshot, ClientRequestResponse, CodexModelOption, CodexSkillSummary, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, Team, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../shared/contracts';
+import type { Agent, AgentFileSearchItem, AppCommand, AppSnapshot, ClientRequestResponse, CodexModelOption, CodexSkillSummary, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, Team, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../shared/contracts';
 import AgentDialog from './AgentDialog.vue';
 import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
@@ -127,6 +128,7 @@ import type { QueuedChatPrompt } from '../shared/chat/queued-prompts';
 const props = withDefaults(defineProps<{
   snapshot: AppSnapshot;
   activeAgent: Agent | null;
+  agentFiles?: AgentFileSearchItem[];
   messages: RendererMessage[];
   isLoading: boolean;
   isSending: boolean;
@@ -149,6 +151,7 @@ const props = withDefaults(defineProps<{
   quit?: () => Promise<void>;
 }>(), {
   answeredClientRequestIds: () => new Set<string>(),
+  agentFiles: () => [],
   codexModels: () => [],
   codexSkills: () => [],
   modelCatalogStatus: 'notLoaded',

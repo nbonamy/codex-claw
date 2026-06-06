@@ -6,6 +6,7 @@
     :is-loading="isLoading"
     :is-sending="isSending"
     :answered-client-request-ids="answeredClientRequestIds"
+    :agent-files="agentFiles"
     :codex-models="codexModels"
     :codex-skills="codexSkills"
     :model-catalog-status="modelCatalogStatus"
@@ -59,6 +60,7 @@ const {
   isLoading,
   isSending,
   answeredClientRequestIds,
+  agentFiles,
   codexModels,
   modelCatalogStatus,
   codexSkills,

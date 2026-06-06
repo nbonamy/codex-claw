@@ -25,6 +25,7 @@
         <ChatComposer
           class="conversation-pane__composer"
           :disabled="!agent"
+          :files="agentFiles"
           :is-sending="isSending"
           :placeholder="composerPlaceholder"
           :models="codexModels"
@@ -69,6 +70,7 @@
       <ChatComposer
         class="conversation-pane__composer"
         :disabled="!agent"
+        :files="agentFiles"
         :is-sending="isSending"
         :placeholder="composerPlaceholder"
         :models="codexModels"
@@ -94,7 +96,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Agent, ClientRequestResponse, CodexModelOption, CodexSkillSummary, ReasoningEffort, RendererMessage } from '../../shared/contracts';
+import type { Agent, AgentFileSearchItem, ClientRequestResponse, CodexModelOption, CodexSkillSummary, ReasoningEffort, RendererMessage } from '../../shared/contracts';
 import WorkbenchLayout from './WorkbenchLayout.vue';
 import ChatComposer from './ChatComposer.vue';
 import ConversationHistoryLoader from './ConversationHistoryLoader.vue';
@@ -106,6 +108,7 @@ import type { QueuedChatPrompt } from '../shared/chat/queued-prompts';
 const props = withDefaults(defineProps<{
   messages: RendererMessage[];
   agent: Agent | null;
+  agentFiles?: AgentFileSearchItem[];
   goalMode?: boolean;
   isLoading: boolean;
   isSending: boolean;
@@ -120,6 +123,7 @@ const props = withDefaults(defineProps<{
   planMode?: boolean;
 }>(), {
   queuedPrompts: () => [],
+  agentFiles: () => [],
   codexSkills: () => [],
   skillCatalogStatus: 'notLoaded',
 });
