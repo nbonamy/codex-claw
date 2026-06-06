@@ -5,3 +5,4 @@ out/
 .vite/
 coverage/
 *.log
+.env

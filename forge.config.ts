@@ -1,19 +1,55 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
-import { MakerDMG } from '@electron-forge/maker-dmg';
+import { MakerDMG, MakerDMGConfig } from '@electron-forge/maker-dmg';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+
+import dotenv from 'dotenv';
+dotenv.config();
+
+// osx special configuration
+let osxPackagerConfig = {}
+const isDarwin = process.platform == 'darwin';
+const dmgOptions: MakerDMGConfig = {
+  icon: './assets/icon.icns',
+  // background: './assets/dmg_background.png',
+  // additionalDMGOptions: {
+  //   window: {
+  //     size: { width: 658, height: 492 },
+  //     position: { x: 500, y: 400 },
+  //   }
+  // }
+}
+
+if (isDarwin) {
+  osxPackagerConfig = {
+    osxSign: {
+      identity: process.env.IDENTIFY_DARWIN_CODE,
+      // provisioningProfile: './build/Witsy_Darwin.provisionprofile',
+      optionsForFile: () => { return {
+        hardenedRuntime: true,
+        // entitlements: './build/Entitlements.darwin.plist'
+      }; },
+    },
+    osxNotarize: {
+      appleId: process.env.APPLE_ID,
+      appleIdPassword: process.env.APPLE_PASSWORD,
+      teamId: process.env.APPLE_TEAM_ID
+    }
+  }
+}
 
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     appBundleId: 'com.nabocorp.codex-claw',
     executableName: 'codex-claw',
+    ...(process.env.TEST ? {} : osxPackagerConfig),
   },
   makers: [
     new MakerZIP({}, ['darwin', 'win32', 'linux']),
-    new MakerDMG({}, ['darwin']),
+    new MakerDMG(dmgOptions, ['darwin']),
   ],
   plugins: [
     new VitePlugin({
