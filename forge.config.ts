@@ -43,6 +43,7 @@ if (isDarwin) {
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    icon: 'assets/icon',
     appBundleId: 'com.nabocorp.codex-claw',
     executableName: 'codex-claw',
     ...(process.env.TEST ? {} : osxPackagerConfig),
