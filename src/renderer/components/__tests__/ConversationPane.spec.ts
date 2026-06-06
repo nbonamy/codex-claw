@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import ConversationPane from '../ConversationPane.vue';
+import { i18n } from '../../i18n';
 import type { Agent, RendererMessage } from '../../../shared/contracts';
 
 const agent: Agent = {
@@ -232,6 +233,23 @@ describe('ConversationPane', () => {
     ]);
   });
 
+  it('fills the composer from quote and bubbles backend message actions', async () => {
+    const wrapper = mountPane({
+      agent,
+      messages,
+      isSending: false,
+    });
+
+    await wrapper.get('[aria-label="Quote"]').trigger('click');
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('Find the failing test.');
+
+    await wrapper.get('[aria-label="Delete"]').trigger('click');
+    await wrapper.get('[aria-label="Retry"]').trigger('click');
+
+    expect(wrapper.emitted('delete-message')).toStrictEqual([[0]]);
+    expect(wrapper.emitted('retry-message')).toStrictEqual([[1]]);
+  });
+
   it('keeps composer drafts submittable while sending', async () => {
     const wrapper = mountPane({
       agent,
@@ -282,7 +300,7 @@ function mountPane(props: {
       ...props,
     },
     global: {
-      plugins: [ElementPlus],
+      plugins: [ElementPlus, i18n],
     },
   });
 }

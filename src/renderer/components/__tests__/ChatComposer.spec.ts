@@ -16,6 +16,8 @@ vi.mock('webm-to-wav-converter', () => ({
 
 type ChatComposerProps = {
   disabled: boolean;
+  draft?: string;
+  draftRevision?: number;
   isSending: boolean;
   placeholder: string;
 };
@@ -84,6 +86,16 @@ describe('ChatComposer', () => {
     await wrapper.get('.chat-composer__send').trigger('click');
 
     expect(wrapper.emitted('send')).toStrictEqual([['ship it']]);
+  });
+
+  it('prefills and focuses the composer from a draft revision', async () => {
+    const wrapper = mountComposer({
+      draft: 'quoted prompt',
+      draftRevision: 1,
+    });
+    await nextTick();
+
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('quoted prompt');
   });
 
   it('interrupts from the shared send button while Codex is working without a draft', async () => {

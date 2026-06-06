@@ -401,6 +401,7 @@ describe('CodexAgentSessionManager', () => {
               agentId: 'agent-dina',
               role: 'user',
               status: 'complete',
+              turnId: 'turn-history',
               createdAt: '2026-05-28T20:26:40.000Z',
               parts: [{ type: 'text', text: 'what did we do?' }],
             },
@@ -409,6 +410,7 @@ describe('CodexAgentSessionManager', () => {
               agentId: 'agent-dina',
               role: 'assistant',
               status: 'complete',
+              turnId: 'turn-history',
               createdAt: '2026-05-28T20:26:40.000Z',
               parts: [{ type: 'text', text: 'We built the first MVP.', itemId: 'message-history' }],
             },
@@ -524,6 +526,7 @@ describe('CodexAgentSessionManager', () => {
               agentId: 'agent-dina',
               role: 'assistant',
               status: 'complete',
+              turnId: 'turn-history',
               createdAt: '2026-05-28T20:26:40.000Z',
               parts: [{ type: 'text', text: 'Restored.', itemId: 'message-history' }],
             },
@@ -532,6 +535,83 @@ describe('CodexAgentSessionManager', () => {
         occurredAt: '<now>',
       },
     ]);
+  });
+
+  it('rolls back from a target turn and returns replacement renderer history', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+    const persistedAgent: Agent = {
+      ...agent,
+      codexThreadId: 'thread-persisted',
+    };
+
+    const rollback = manager.rollbackToTurn(persistedAgent, 'turn-1');
+    await waitForSentCount(transport, 1);
+    transport.receive({ id: 1, result: { userAgent: 'codex', codexHome: '/tmp/codex-home', platformFamily: 'unix', platformOs: 'macos' } });
+    await waitForSentCount(transport, 3);
+    transport.receive({
+      id: 2,
+      result: {
+        thread: {
+          id: 'thread-persisted',
+          cwd: '/Users/nbonamy/src/codex-claw',
+          turns: [
+            { id: 'turn-0', status: 'completed', items: [] },
+            { id: 'turn-1', status: 'completed', items: [] },
+            { id: 'turn-2', status: 'completed', items: [] },
+          ],
+        },
+      },
+    });
+    await waitForSentCount(transport, 4);
+
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 3,
+      method: 'thread/rollback',
+      params: {
+        threadId: 'thread-persisted',
+        numTurns: 2,
+      },
+    });
+
+    transport.receive({
+      id: 3,
+      result: {
+        thread: {
+          id: 'thread-persisted',
+          cwd: '/Users/nbonamy/src/codex-claw',
+          turns: [
+            {
+              id: 'turn-0',
+              status: 'completed',
+              startedAt: 1_780_000_000,
+              items: [
+                {
+                  type: 'userMessage',
+                  id: 'user-0',
+                  content: [{ type: 'text', text: 'kept prompt' }],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+
+    await expect(rollback).resolves.toStrictEqual({
+      threadId: 'thread-persisted',
+      messages: [
+        {
+          id: 'user-thread-persisted-turn-0-user-0',
+          agentId: 'agent-dina',
+          role: 'user',
+          status: 'complete',
+          turnId: 'turn-0',
+          createdAt: '2026-05-28T20:26:40.000Z',
+          parts: [{ type: 'text', text: 'kept prompt' }],
+        },
+      ],
+    });
   });
 
   it('lists Codex models and preserves app-server reasoning effort order', async () => {
@@ -990,6 +1070,57 @@ describe('CodexAgentSessionManager', () => {
         turnId: 'turn-1',
         type: 'turn.completed',
         payload: { status: 'completed' },
+        occurredAt: '<now>',
+      },
+    ]);
+  });
+
+  it('maps turn diff notifications into app-owned diff updates', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+    const events: unknown[] = [];
+    manager.onEvent((event) => events.push({
+      ...event,
+      occurredAt: '<now>',
+    }));
+
+    await resolveStartedPrompt(transport, manager);
+
+    transport.receive({
+      method: 'turn/diff/updated',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        diff: [
+          '--- a/src/app.ts',
+          '+++ b/src/app.ts',
+          '@@ -1,2 +1,3 @@',
+          '-old',
+          '+new',
+          '+extra',
+        ].join('\n'),
+      },
+    });
+
+    expect(events).toStrictEqual([
+      {
+        seq: 1,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        type: 'diff.updated',
+        payload: {
+          addedLines: 2,
+          diff: [
+            '--- a/src/app.ts',
+            '+++ b/src/app.ts',
+            '@@ -1,2 +1,3 @@',
+            '-old',
+            '+new',
+            '+extra',
+          ].join('\n'),
+          removedLines: 1,
+        },
         occurredAt: '<now>',
       },
     ]);

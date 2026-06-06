@@ -279,6 +279,7 @@ describe('snapshot reducer', () => {
         agentId: 'agent-dina',
         role: 'assistant',
         status: 'complete',
+        turnId: 'turn-1',
         createdAt: expect.any(String),
         parts: [
           { type: 'text', text: 'I will inventory the Markdown files.', itemId: 'msg-before' },
@@ -290,6 +291,7 @@ describe('snapshot reducer', () => {
         kind: 'steer',
         role: 'user',
         status: 'complete',
+        turnId: 'turn-1',
         createdAt: '2026-06-05T00:00:03.000Z',
         parts: [{ type: 'text', text: 'read all the markdown files' }],
       },
@@ -298,6 +300,7 @@ describe('snapshot reducer', () => {
         agentId: 'agent-dina',
         role: 'assistant',
         status: 'streaming',
+        turnId: 'turn-1',
         createdAt: '2026-06-05T00:00:03.000Z',
         parts: [
           { type: 'text', text: 'Reading them now.', itemId: 'msg-after' },
@@ -519,6 +522,63 @@ describe('snapshot reducer', () => {
     expect(snapshot.messages[0].id).toBe('user-thread-1-turn-old-user-old');
     expect(snapshot.messages[1].parts).toStrictEqual([{ type: 'text', text: 'older answer refreshed' }]);
     expect(snapshot.messages[2].id).toBe('message-20260605t000003000z');
+  });
+
+  it('replaces an agent transcript when rollback history is loaded', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.messages = [
+      {
+        id: 'user-turn-1',
+        agentId: 'agent-dina',
+        role: 'user',
+        status: 'complete',
+        turnId: 'turn-1',
+        createdAt: '2026-06-05T00:00:01.000Z',
+        parts: [{ type: 'text', text: 'keep this prompt' }],
+      },
+      {
+        id: 'assistant-turn-1',
+        agentId: 'agent-dina',
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'turn-1',
+        createdAt: '2026-06-05T00:00:02.000Z',
+        parts: [{ type: 'text', text: 'keep this answer' }],
+      },
+      {
+        id: 'assistant-turn-2',
+        agentId: 'agent-dina',
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'turn-2',
+        createdAt: '2026-06-05T00:00:03.000Z',
+        parts: [{ type: 'text', text: 'remove this answer' }],
+      },
+    ];
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.historyLoaded',
+      payload: {
+        replace: true,
+        messages: [
+          {
+            id: 'user-turn-1',
+            agentId: 'agent-dina',
+            role: 'user',
+            status: 'complete',
+            turnId: 'turn-1',
+            createdAt: '2026-06-05T00:00:01.000Z',
+            parts: [{ type: 'text', text: 'keep this prompt' }],
+          },
+        ],
+      },
+      occurredAt: '2026-06-05T00:00:04.000Z',
+    });
+
+    expect(snapshot.messages.map((message) => message.id)).toStrictEqual(['user-turn-1']);
   });
 
   it('ignores malformed resumed history payloads', () => {
@@ -875,6 +935,7 @@ describe('snapshot reducer', () => {
         agentId: 'agent-dina',
         role: 'assistant',
         status: 'complete',
+        turnId: 'turn-1',
         createdAt: expect.any(String),
         parts: [{ type: 'text', text: 'Before compaction.' }],
       },
@@ -884,6 +945,7 @@ describe('snapshot reducer', () => {
         kind: 'compaction',
         role: 'assistant',
         status: 'complete',
+        turnId: 'turn-1',
         createdAt: '2026-06-05T00:00:02.000Z',
         parts: [],
       },
@@ -892,6 +954,7 @@ describe('snapshot reducer', () => {
         agentId: 'agent-dina',
         role: 'assistant',
         status: 'streaming',
+        turnId: 'turn-1',
         createdAt: '2026-06-05T00:00:02.000Z',
         parts: [{ type: 'text', text: 'After compaction.' }],
       },
@@ -1320,6 +1383,56 @@ describe('snapshot reducer', () => {
         },
       },
     ]);
+  });
+
+  it('applies turn diff stats to the running file-change tool', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'turn.started',
+      payload: { status: 'running' },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'item.started',
+      payload: toolPartPayload(fileChangeToolPart('patch-1', [{ kind: 'update', path: 'src/app.ts' }], 'running')),
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 3,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'diff.updated',
+      payload: {
+        addedLines: 4,
+        diff: '--- a/src/app.ts\n+++ b/src/app.ts',
+        removedLines: 2,
+      },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+
+    const fileChange = snapshot.messages.at(-1)?.parts.find((part): part is RendererToolPart => {
+      return part.type === 'tool' && part.kind === 'fileChange';
+    });
+    expect(fileChange?.statusText ? JSON.parse(fileChange.statusText) : null).toStrictEqual({
+      action: 'edit',
+      phase: 'running',
+      params: {
+        addedLines: 4,
+        removedLines: 2,
+        target: '1 file change',
+      },
+      source: 'codex',
+    });
   });
 
   it('uses MCP structuredContent instead of the model-facing placeholder text', () => {

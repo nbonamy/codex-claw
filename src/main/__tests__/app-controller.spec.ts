@@ -112,6 +112,92 @@ describe('AppController', () => {
     expect(sessionManager.interruptTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
   });
+
+  it('deletes a message by rolling back from its Codex turn and replacing history', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].codexThreadId = 'thread-dina';
+    snapshot.messages = [
+      userMessage('user-turn-1', 'turn-1', 'first prompt'),
+      assistantMessage('assistant-turn-1', 'turn-1', 'first answer'),
+      userMessage('user-turn-2', 'turn-2', 'second prompt'),
+      assistantMessage('assistant-turn-2', 'turn-2', 'second answer'),
+    ];
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const sessionManager = {
+      rollbackToTurn: vi.fn().mockResolvedValue({
+        threadId: 'thread-dina',
+        messages: snapshot.messages.slice(0, 2),
+      }),
+    };
+
+    await controller.initialize();
+    setCodexSessionManager(controller, sessionManager);
+    await deleteMessage(controller, 'agent-dina', 'user-turn-2');
+
+    expect(sessionManager.rollbackToTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-2');
+    expect(snapshot.messages.map((message) => message.id)).toStrictEqual(['user-turn-1', 'assistant-turn-1']);
+    expect(persistence.save).toHaveBeenCalledWith(snapshot);
+  });
+
+  it('retries an assistant message by rolling back and resending the matching user prompt', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].codexThreadId = 'thread-dina';
+    snapshot.messages = [
+      userMessage('user-turn-1', 'turn-1', 'first prompt'),
+      assistantMessage('assistant-turn-1', 'turn-1', 'first answer'),
+    ];
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const sessionManager = {
+      rollbackToTurn: vi.fn().mockResolvedValue({
+        threadId: 'thread-dina',
+        messages: [],
+      }),
+      sendPrompt: vi.fn().mockResolvedValue({ threadId: 'thread-dina', turnId: 'turn-retry' }),
+    };
+
+    await controller.initialize();
+    setCodexSessionManager(controller, sessionManager);
+    await retryMessage(controller, 'agent-dina', 'assistant-turn-1');
+
+    expect(sessionManager.rollbackToTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-1');
+    expect(sessionManager.sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'first prompt');
+  });
+
+  it('edits a user message by rolling back and resending the edited prompt', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].codexThreadId = 'thread-dina';
+    snapshot.messages = [
+      userMessage('user-turn-1', 'turn-1', 'first prompt'),
+      assistantMessage('assistant-turn-1', 'turn-1', 'first answer'),
+    ];
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const sessionManager = {
+      rollbackToTurn: vi.fn().mockResolvedValue({
+        threadId: 'thread-dina',
+        messages: [],
+      }),
+      sendPrompt: vi.fn().mockResolvedValue({ threadId: 'thread-dina', turnId: 'turn-edit' }),
+    };
+
+    await controller.initialize();
+    setCodexSessionManager(controller, sessionManager);
+    await editMessage(controller, 'agent-dina', 'user-turn-1', ' edited prompt ');
+
+    expect(sessionManager.rollbackToTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-1');
+    expect(sessionManager.sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'edited prompt');
+  });
 });
 
 function mcpCoordinator(controller: AppController): {
@@ -137,7 +223,11 @@ function emitAndApply(
 
 function setCodexSessionManager(
   controller: AppController,
-  sessionManager: { interruptTurn(agent: unknown): Promise<{ threadId: string; turnId: string }> },
+  sessionManager: Partial<{
+    interruptTurn(agent: unknown): Promise<{ threadId: string; turnId: string }>;
+    rollbackToTurn(agent: unknown, turnId: string): Promise<{ threadId: string; messages: unknown[] }>;
+    sendPrompt(agent: unknown, prompt: string): Promise<{ threadId: string; turnId: string }>;
+  }>,
 ): void {
   (controller as unknown as {
     codexSessionManager: typeof sessionManager;
@@ -148,6 +238,48 @@ async function interruptAgent(controller: AppController, agentId: string): Promi
   await (controller as unknown as {
     interruptAgent(agentId: string): Promise<void>;
   }).interruptAgent(agentId);
+}
+
+async function deleteMessage(controller: AppController, agentId: string, messageId: string): Promise<void> {
+  await (controller as unknown as {
+    deleteMessage(agentId: string, messageId: string): Promise<void>;
+  }).deleteMessage(agentId, messageId);
+}
+
+async function retryMessage(controller: AppController, agentId: string, messageId: string): Promise<void> {
+  await (controller as unknown as {
+    retryMessage(agentId: string, messageId: string): Promise<void>;
+  }).retryMessage(agentId, messageId);
+}
+
+async function editMessage(controller: AppController, agentId: string, messageId: string, prompt: string): Promise<void> {
+  await (controller as unknown as {
+    editMessage(agentId: string, messageId: string, prompt: string): Promise<void>;
+  }).editMessage(agentId, messageId, prompt);
+}
+
+function userMessage(id: string, turnId: string, text: string) {
+  return {
+    id,
+    agentId: 'agent-dina',
+    role: 'user' as const,
+    status: 'complete' as const,
+    turnId,
+    createdAt: '2026-06-05T00:00:00.000Z',
+    parts: [{ type: 'text' as const, text }],
+  };
+}
+
+function assistantMessage(id: string, turnId: string, text: string) {
+  return {
+    id,
+    agentId: 'agent-dina',
+    role: 'assistant' as const,
+    status: 'complete' as const,
+    turnId,
+    createdAt: '2026-06-05T00:00:01.000Z',
+    parts: [{ type: 'text' as const, text }],
+  };
 }
 
 async function flushMicrotasks(): Promise<void> {

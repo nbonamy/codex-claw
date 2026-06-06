@@ -39,7 +39,10 @@
     @update:plan-mode="setPlanMode"
     @client-response="respondToClientRequest"
     @delete-queued-prompt="removeQueuedPrompt"
+    @delete-message="deleteMessage"
+    @edit-message="editMessage"
     @interrupt-agent="interruptActiveAgent"
+    @retry-message="retryMessage"
     @send-prompt="sendPrompt"
     @steer-prompt="steerPrompt"
     @steer-queued-prompt="steerQueuedPrompt"
@@ -95,6 +98,9 @@ const {
   sendPrompt,
   steerPrompt,
   interruptActiveAgent,
+  deleteMessage,
+  editMessage,
+  retryMessage,
   steerQueuedPrompt,
   removeQueuedPrompt,
   quit,

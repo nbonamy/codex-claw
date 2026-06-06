@@ -129,7 +129,7 @@ export function appendSteerPrompt(
     activeAssistantMessage.status = 'complete';
   }
 
-  const message = createUserMessage(agentId, prompt, createdAt, `steer-${turnId}`);
+  const message = createUserMessage(agentId, prompt, createdAt, `steer-${turnId}`, turnId);
   snapshot.messages.push(message);
   ensureAssistantMessage(snapshot, agentId, turnId, assistantSegmentMessageId(turnId, createdAt), createdAt);
 
@@ -222,7 +222,8 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   if (event.type === 'thread.historyLoaded') {
     const payload = event.payload as { messages?: unknown };
     const messages = rendererMessages(payload.messages, event.agentId);
-    hydrateAgentMessages(snapshot, event.agentId, messages);
+    const replace = isRecord(event.payload) && event.payload.replace === true;
+    hydrateAgentMessages(snapshot, event.agentId, messages, { replace });
     return;
   }
 
@@ -299,6 +300,11 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
 
   if (event.type === 'item.updated' && event.turnId) {
     updateAssistantToolPart(snapshot, event.agentId, event.turnId, event.payload);
+    return;
+  }
+
+  if (event.type === 'diff.updated' && event.turnId) {
+    updateAssistantTurnDiff(snapshot, event.agentId, event.turnId, event.payload);
     return;
   }
 
@@ -419,6 +425,66 @@ function updateAssistantToolPart(snapshot: AppSnapshot, agentId: string, turnId:
   }
 }
 
+function updateAssistantTurnDiff(snapshot: AppSnapshot, agentId: string, turnId: string, payload: unknown): void {
+  if (!isRecord(payload)) {
+    return;
+  }
+
+  const addedLines = typeof payload.addedLines === 'number' ? payload.addedLines : 0;
+  const removedLines = typeof payload.removedLines === 'number' ? payload.removedLines : 0;
+  if (!addedLines && !removedLines) {
+    return;
+  }
+
+  const message = findAssistantMessage(snapshot, agentId, turnId);
+  const toolPart = lastRunningFileChangeToolPart(message?.parts);
+  if (!toolPart) {
+    return;
+  }
+
+  const existingDescriptor = toolStatusDescriptor(toolPart.statusText);
+  const existingParams = isRecord(existingDescriptor?.params) ? existingDescriptor.params : {};
+  toolPart.statusText = JSON.stringify({
+    action: 'edit',
+    phase: toolPart.status,
+    params: {
+      ...existingParams,
+      addedLines,
+      removedLines,
+      target: typeof existingParams.target === 'string' ? existingParams.target : toolPart.title,
+    },
+    source: 'codex',
+  });
+}
+
+function toolStatusDescriptor(statusText: unknown): { params?: unknown } | undefined {
+  if (typeof statusText !== 'string' || !statusText.trim().startsWith('{')) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(statusText) as unknown;
+    return isRecord(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function lastRunningFileChangeToolPart(parts: RendererMessagePart[] | undefined): ToolPart | undefined {
+  if (!parts) {
+    return undefined;
+  }
+
+  for (let index = parts.length - 1; index >= 0; index -= 1) {
+    const part = parts[index];
+    if (part?.type === 'tool' && part.kind === 'fileChange' && part.status === 'running') {
+      return part;
+    }
+  }
+
+  return undefined;
+}
+
 function rendererToolPart(value: unknown): ToolPart | null {
   if (
     !isRecord(value) ||
@@ -512,7 +578,8 @@ function rendererMessages(value: unknown, agentId: string): RendererMessage[] {
       !isRendererMessageRole(message.role) ||
       !isRendererMessageStatus(message.status) ||
       !Array.isArray(message.parts) ||
-      typeof message.createdAt !== 'string'
+      typeof message.createdAt !== 'string' ||
+      ('turnId' in message && message.turnId !== undefined && typeof message.turnId !== 'string')
     ) {
       return false;
     }
@@ -548,7 +615,16 @@ function isRendererMessageStatus(value: unknown): value is RendererMessage['stat
   return value === 'complete' || value === 'streaming' || value === 'error';
 }
 
-function hydrateAgentMessages(snapshot: AppSnapshot, agentId: string, messages: RendererMessage[]): void {
+function hydrateAgentMessages(
+  snapshot: AppSnapshot,
+  agentId: string,
+  messages: RendererMessage[],
+  options: { replace?: boolean } = {},
+): void {
+  if (options.replace) {
+    snapshot.messages = snapshot.messages.filter((message) => message.agentId !== agentId);
+  }
+
   if (messages.length === 0) {
     return;
   }
@@ -823,6 +899,7 @@ function appendCompactionMarker(snapshot: AppSnapshot, agentId: string, turnId: 
     kind: 'compaction',
     role: 'assistant',
     status: 'complete',
+    turnId,
     createdAt,
     parts: [],
   };
@@ -852,6 +929,7 @@ function ensureAssistantMessage(
     agentId,
     role: 'assistant',
     status: 'streaming',
+    turnId,
     createdAt,
     parts: [],
   };
@@ -904,7 +982,7 @@ function compactionMessageId(turnId: string): string {
   return `compaction-${turnId}`;
 }
 
-function createUserMessage(agentId: string, prompt: string, createdAt: string, idPrefix = 'message'): RendererMessage {
+function createUserMessage(agentId: string, prompt: string, createdAt: string, idPrefix = 'message', turnId?: string): RendererMessage {
   const isSteer = idPrefix.startsWith('steer-');
   return {
     id: `${idPrefix}-${createdAt.replace(/\W/g, '').toLowerCase()}`,
@@ -912,6 +990,7 @@ function createUserMessage(agentId: string, prompt: string, createdAt: string, i
     ...(isSteer ? { kind: 'steer' as const } : {}),
     role: 'user',
     status: 'complete',
+    ...(turnId ? { turnId } : {}),
     createdAt,
     parts: [{ type: 'text', text: prompt }],
   };

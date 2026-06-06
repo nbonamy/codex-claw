@@ -20,14 +20,15 @@ function codexTurnToRendererMessages(threadId: string, turn: CodexThreadTurn, ag
     }
 
     const segmentSuffix = assistantSegmentIndex === 0 ? '' : `-segment-${assistantSegmentIndex}`;
-    messages.push({
-      id: `assistant-${turn.id}${segmentSuffix}`,
-      agentId,
-      role: 'assistant',
-      status: rendererMessageStatus(turn.status),
-      parts: [...assistantParts],
-      createdAt,
-    });
+        messages.push({
+          id: `assistant-${turn.id}${segmentSuffix}`,
+          agentId,
+          role: 'assistant',
+          status: rendererMessageStatus(turn.status),
+          turnId: turn.id,
+          parts: [...assistantParts],
+          createdAt,
+        });
     assistantParts.length = 0;
     assistantSegmentIndex += 1;
   };
@@ -44,6 +45,7 @@ function codexTurnToRendererMessages(threadId: string, turn: CodexThreadTurn, ag
           ...(isSteerMessage ? { kind: 'steer' as const } : {}),
           role: 'user',
           status: 'complete',
+          turnId: turn.id,
           parts: [{ type: 'text', text }],
           createdAt,
         });

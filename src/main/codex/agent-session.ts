@@ -1,6 +1,6 @@
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, AgentContextUsage, AgentStatus, AskUserAnswers, AskUserQuestion, ClientRequest, ClientRequestResponse, CodexModelOption, CodexSkillSummary, ConfirmToolRequest, MainToRendererEvent, SendPromptOptions, ToolConfirmationDecision } from '../../shared/contracts';
+import type { Agent, AgentContextUsage, AgentStatus, AskUserAnswers, AskUserQuestion, ClientRequest, ClientRequestResponse, CodexModelOption, CodexSkillSummary, ConfirmToolRequest, MainToRendererEvent, RendererMessage, SendPromptOptions, ToolConfirmationDecision } from '../../shared/contracts';
 import { logMain, warnMain } from '../log';
 import { buildCodexClawThreadConfig } from '../mcp/codex-config';
 import type { CodexRpcClient, CodexServerRequest, CodexServerRequestResponder } from './rpc-client';
@@ -8,6 +8,7 @@ import {
   codexThreadItemToToolPart,
   commandOutputDeltaToToolPartUpdate,
   fileChangePatchToToolPartUpdate,
+  lineDiffFromUnifiedDiff,
   mcpProgressToToolPartUpdate,
 } from './tool-part-adapter';
 import {
@@ -27,7 +28,9 @@ import type {
   CodexSessionEvent,
   CodexSessionPromptResult,
   CodexTurn,
+  ThreadReadResponse,
   ThreadResumeResponse,
+  ThreadRollbackResponse,
   ThreadStartResponse,
   TurnInterruptResponse,
   TurnStartResponse,
@@ -59,6 +62,7 @@ export class CodexAgentSessionManager {
   private readonly sessionsByAgentId = new Map<string, AgentSession>();
   private readonly agentIdsByThreadId = new Map<string, string>();
   private readonly activeTurnIdsByThreadId = new Map<string, string>();
+  private readonly turnIdsByThreadId = new Map<string, string[]>();
   private readonly pendingClientRequests = new Map<string, PendingClientRequest>();
   private readonly listeners = new Set<EventListener>();
   private initialized = false;
@@ -176,6 +180,7 @@ export class CodexAgentSessionManager {
 
     const response = await this.client.request<TurnStartResponse>('turn/start', turnParams);
     this.activeTurnIdsByThreadId.set(session.threadId, response.turn.id);
+    this.recordTurnId(session.threadId, response.turn.id);
 
     return {
       threadId: session.threadId,
@@ -240,6 +245,34 @@ export class CodexAgentSessionManager {
     return {
       threadId: session.threadId,
       turnId,
+    };
+  }
+
+  async rollbackToTurn(agent: Agent, targetTurnId: string): Promise<{ threadId: string; messages: RendererMessage[] }> {
+    await this.start();
+
+    const session = await this.ensureSession(agent);
+    const turnIds = await this.turnIdsForRollback(session.threadId, targetTurnId);
+    const targetIndex = turnIds.indexOf(targetTurnId);
+    if (targetIndex === -1) {
+      throw new Error(`Cannot roll back to unknown Codex turn '${targetTurnId}'.`);
+    }
+
+    const numTurns = turnIds.length - targetIndex;
+    if (numTurns < 1) {
+      throw new Error('Cannot roll back without at least one Codex turn.');
+    }
+
+    const response = await this.client.request<ThreadRollbackResponse>('thread/rollback', {
+      threadId: session.threadId,
+      numTurns,
+    });
+    this.recordThreadTurns(response.thread);
+    this.activeTurnIdsByThreadId.delete(session.threadId);
+
+    return {
+      threadId: session.threadId,
+      messages: codexThreadHistoryToRendererMessages(response.thread, agent.id),
     };
   }
 
@@ -315,6 +348,7 @@ export class CodexAgentSessionManager {
     };
     this.sessionsByAgentId.set(agent.id, session);
     this.agentIdsByThreadId.set(session.threadId, agent.id);
+    this.recordThreadTurns(response.thread);
 
     if (shouldResume) {
       const messages = codexThreadHistoryToRendererMessages(response.thread, agent.id);
@@ -425,6 +459,7 @@ export class CodexAgentSessionManager {
       case 'turn/started': {
         const params = notification.params as { threadId: string; turn: CodexTurn };
         this.activeTurnIdsByThreadId.set(params.threadId, params.turn.id);
+        this.recordTurnId(params.threadId, params.turn.id);
         this.emitForThread(params.threadId, {
           turnId: params.turn.id,
           type: 'turn.started',
@@ -457,6 +492,21 @@ export class CodexAgentSessionManager {
           payload: {
             explanation: params.explanation,
             plan: params.plan,
+          },
+        });
+        return;
+      }
+
+      case 'turn/diff/updated': {
+        const params = notification.params as { threadId: string; turnId: string; diff: string };
+        const lineDiff = lineDiffFromUnifiedDiff(params.diff);
+        this.emitForThread(params.threadId, {
+          turnId: params.turnId,
+          type: 'diff.updated',
+          payload: {
+            addedLines: lineDiff.addedLines,
+            diff: params.diff,
+            removedLines: lineDiff.removedLines,
           },
         });
         return;
@@ -693,6 +743,38 @@ export class CodexAgentSessionManager {
 
     for (const listener of this.listeners) {
       listener(fullEvent);
+    }
+  }
+
+  private async turnIdsForRollback(threadId: string, targetTurnId: string): Promise<string[]> {
+    const knownTurnIds = this.turnIdsByThreadId.get(threadId) ?? [];
+    if (knownTurnIds.includes(targetTurnId)) {
+      return knownTurnIds;
+    }
+
+    const response = await this.client.request<ThreadReadResponse>('thread/read', {
+      threadId,
+      includeTurns: true,
+    });
+    this.recordThreadTurns(response.thread);
+    return this.turnIdsByThreadId.get(threadId) ?? [];
+  }
+
+  private recordThreadTurns(thread: CodexThread): void {
+    const turnIds = Array.isArray(thread.turns)
+      ? thread.turns.map((turn) => turn.id).filter((turnId): turnId is string => Boolean(turnId))
+      : [];
+    if (turnIds.length > 0) {
+      this.turnIdsByThreadId.set(thread.id, turnIds);
+    } else if (!this.turnIdsByThreadId.has(thread.id)) {
+      this.turnIdsByThreadId.set(thread.id, []);
+    }
+  }
+
+  private recordTurnId(threadId: string, turnId: string): void {
+    const turnIds = this.turnIdsByThreadId.get(threadId) ?? [];
+    if (!turnIds.includes(turnId)) {
+      this.turnIdsByThreadId.set(threadId, [...turnIds, turnId]);
     }
   }
 }

@@ -1,15 +1,31 @@
 import { mount } from '@vue/test-utils';
 import { markRaw } from 'vue';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ChatMessageBlock from '../ChatMessageBlock.vue';
 import ChatMessage from '../ChatMessage.vue';
 import ChatToolCall from '../ChatToolCall.vue';
 import ChatToolGroup from '../ChatToolGroup.vue';
 import ChatToolCallTitle from '../ChatToolCallTitle.vue';
+import { i18n } from '../../../i18n';
 import type { MessageBlock } from '../message-blocks';
+
+const clipboardWriteText = vi.fn();
+
+beforeEach(() => {
+  clipboardWriteText.mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: {
+      writeText: clipboardWriteText,
+    },
+  });
+  vi.stubGlobal('ClipboardItem', undefined);
+});
 
 afterEach(() => {
   document.body.innerHTML = '';
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('ChatMessageBlock', () => {
@@ -268,6 +284,9 @@ describe('ChatMessage', () => {
       props: {
         message: { role: 'assistant', content: '', type: 'compaction' },
       },
+      global: {
+        plugins: [i18n],
+      },
     });
 
     expect(wrapper.text()).toContain('Automatically compacting context');
@@ -278,10 +297,94 @@ describe('ChatMessage', () => {
       props: {
         message: { role: 'assistant', content: '', streaming: true, toolCalls: [] },
       },
+      global: {
+        plugins: [i18n],
+      },
     });
 
     expect(wrapper.text()).toContain('Thinking');
     expect(wrapper.get('.chat-message__thinking').classes()).toContain('text-shimmer');
+  });
+
+  it('renders user copy, edit, quote, and delete actions', async () => {
+    const wrapper = mount(ChatMessage, {
+      props: {
+        index: 2,
+        message: { role: 'user', content: 'Old prompt', createdAt: new Date().toISOString() },
+      },
+      global: {
+        plugins: [i18n],
+      },
+    });
+
+    expect(wrapper.find('[aria-label="Copy"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Edit"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Quote"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Delete"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Retry"]').exists()).toBe(false);
+    expect(wrapper.find('.chat-message-actions__sent-at').exists()).toBe(true);
+    expect(wrapper.find('.chat-message-actions').element.firstElementChild?.classList.contains('chat-message-actions__sent-at')).toBe(true);
+
+    await wrapper.find('[aria-label="Quote"]').trigger('click');
+    await wrapper.find('[aria-label="Delete"]').trigger('click');
+    await wrapper.find('[aria-label="Edit"]').trigger('click');
+    await wrapper.get('.chat-message__edit-input').setValue('  New prompt  ');
+    await wrapper.get('.chat-message__edit-button--primary').trigger('click');
+
+    expect(wrapper.emitted('quote-message')).toStrictEqual([[2]]);
+    expect(wrapper.emitted('delete-message')).toStrictEqual([[2]]);
+    expect(wrapper.emitted('edit-message')).toStrictEqual([[{ content: 'New prompt', index: 2 }]]);
+  });
+
+  it('copies messages without tool markers or follow-up chips', async () => {
+    const wrapper = mount(ChatMessage, {
+      props: {
+        index: 4,
+        message: {
+          role: 'assistant',
+          content: 'Done.<tool id="tool-1"></tool>\n\n<follow-up>Do another thing</follow-up>',
+        },
+      },
+      global: {
+        plugins: [i18n],
+      },
+    });
+
+    await wrapper.find('[aria-label="Copy"]').trigger('click');
+
+    expect(clipboardWriteText).toHaveBeenCalledWith('Done.');
+    expect(wrapper.emitted('copy-message')).toStrictEqual([[4]]);
+  });
+
+  it('renders assistant retry actions and reserves them while streaming', async () => {
+    const wrapper = mount(ChatMessage, {
+      props: {
+        index: 5,
+        message: { role: 'assistant', content: 'Answer', createdAt: new Date().toISOString() },
+      },
+      global: {
+        plugins: [i18n],
+      },
+    });
+    const streaming = mount(ChatMessage, {
+      props: {
+        message: { role: 'assistant', content: 'Answer', streaming: true },
+      },
+      global: {
+        plugins: [i18n],
+      },
+    });
+
+    expect(wrapper.find('[aria-label="Retry"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Delete"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Edit"]').exists()).toBe(false);
+    expect(wrapper.find('.chat-message-actions').element.lastElementChild?.classList.contains('chat-message-actions__sent-at')).toBe(true);
+    await wrapper.find('[aria-label="Retry"]').trigger('click');
+    await wrapper.find('[aria-label="Delete"]').trigger('click');
+    expect(wrapper.emitted('retry-message')).toStrictEqual([[5]]);
+    expect(wrapper.emitted('delete-message')).toStrictEqual([[5]]);
+    expect(streaming.get('.chat-message__actions').classes()).toContain('chat-message__actions--reserved');
+    expect(streaming.get('.chat-message__actions').attributes('aria-hidden')).toBe('true');
   });
 });
 

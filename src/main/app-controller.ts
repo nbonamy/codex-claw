@@ -33,7 +33,7 @@ import {
   updateAgentFolder,
 } from './snapshot-service';
 import { AppStatePersistence } from './state-persistence';
-import type { AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, ClientRequestResponse, CodexSkillSummary, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
+import type { Agent, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, ClientRequestResponse, CodexSkillSummary, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
 import { ipcChannels } from '../shared/ipc';
 import { teamColors } from '../shared/team-colors';
 
@@ -255,6 +255,18 @@ export class AppController {
       return this.interruptAgent(agentId);
     });
 
+    ipcMain.handle(ipcChannels.deleteMessage, (_event, agentId: string, messageId: string) => {
+      return this.deleteMessage(agentId, messageId);
+    });
+
+    ipcMain.handle(ipcChannels.editMessage, (_event, agentId: string, messageId: string, prompt: string) => {
+      return this.editMessage(agentId, messageId, prompt);
+    });
+
+    ipcMain.handle(ipcChannels.retryMessage, (_event, agentId: string, messageId: string) => {
+      return this.retryMessage(agentId, messageId);
+    });
+
     ipcMain.handle(ipcChannels.respondToClientRequest, async (_event, response: ClientRequestResponse) => {
       if (!this.codexSessionManager) {
         throw new Error('No active Codex session can receive this client response.');
@@ -346,6 +358,147 @@ export class AppController {
     }
 
     return this.snapshot;
+  }
+
+  private async deleteMessage(agentId: string, messageId: string): Promise<AppSnapshot> {
+    const action = this.resolveMessageAction(agentId, messageId);
+    if (!action) {
+      return this.snapshot;
+    }
+
+    await this.rollbackAgentToTurn(action.agent, action.turnId);
+    await this.persistSnapshot();
+    return this.snapshot;
+  }
+
+  private async editMessage(agentId: string, messageId: string, prompt: string): Promise<AppSnapshot> {
+    const trimmedPrompt = prompt.trim();
+    const action = this.resolveMessageAction(agentId, messageId);
+    if (!action || !trimmedPrompt) {
+      return this.snapshot;
+    }
+
+    await this.rollbackAgentToTurn(action.agent, action.turnId);
+    await this.persistSnapshot();
+    return this.sendPrompt(agentId, trimmedPrompt);
+  }
+
+  private async retryMessage(agentId: string, messageId: string): Promise<AppSnapshot> {
+    const action = this.resolveMessageAction(agentId, messageId);
+    if (!action?.prompt) {
+      return this.snapshot;
+    }
+
+    await this.rollbackAgentToTurn(action.agent, action.turnId);
+    await this.persistSnapshot();
+    return this.sendPrompt(agentId, action.prompt);
+  }
+
+  private async rollbackAgentToTurn(agent: Agent, turnId: string): Promise<void> {
+    const result = await (await this.getCodexSessionManager()).rollbackToTurn(agent, turnId);
+    this.emitAndApply({
+      agentId: agent.id,
+      threadId: result.threadId,
+      type: 'thread.historyLoaded',
+      payload: {
+        messages: result.messages,
+        replace: true,
+      },
+    });
+    this.emitAndApply({
+      agentId: agent.id,
+      threadId: result.threadId,
+      type: 'agent.statusChanged',
+      payload: { type: 'idle' },
+    });
+  }
+
+  private resolveMessageAction(agentId: string, messageId: string): { agent: Agent; message: RendererMessage; prompt: string | null; turnId: string } | null {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) {
+      return null;
+    }
+
+    const messages = this.snapshot.messages.filter((message) => message.agentId === agentId);
+    const index = messages.findIndex((message) => message.id === messageId);
+    const message = messages[index];
+    if (index === -1 || !message) {
+      return null;
+    }
+
+    const turnId = this.resolveMessageTurnId(messages, index);
+    if (!turnId) {
+      return null;
+    }
+
+    return {
+      agent,
+      message,
+      prompt: this.promptForMessageRetry(messages, index, turnId),
+      turnId,
+    };
+  }
+
+  private resolveMessageTurnId(messages: RendererMessage[], index: number): string | null {
+    const message = messages[index];
+    if (!message) {
+      return null;
+    }
+
+    if (message.turnId) {
+      return message.turnId;
+    }
+
+    const idTurnId = turnIdFromRendererMessageId(message.id);
+    if (idTurnId) {
+      return idTurnId;
+    }
+
+    if (message.role === 'user') {
+      for (let offset = index + 1; offset < messages.length; offset += 1) {
+        const candidate = messages[offset];
+        if (candidate?.role === 'user') {
+          break;
+        }
+        const candidateTurnId = candidate ? candidate.turnId ?? turnIdFromRendererMessageId(candidate.id) : null;
+        if (candidateTurnId) {
+          return candidateTurnId;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private promptForMessageRetry(messages: RendererMessage[], index: number, turnId: string): string | null {
+    const message = messages[index];
+    if (!message) {
+      return null;
+    }
+
+    if (message.role === 'user') {
+      return rendererMessageText(message);
+    }
+
+    for (let offset = index - 1; offset >= 0; offset -= 1) {
+      const candidate = messages[offset];
+      if (!candidate || candidate.role !== 'user') {
+        continue;
+      }
+      const candidateTurnId = candidate.turnId ?? this.resolveMessageTurnId(messages, offset);
+      if (candidateTurnId === turnId) {
+        return rendererMessageText(candidate);
+      }
+    }
+
+    for (let offset = index - 1; offset >= 0; offset -= 1) {
+      const candidate = messages[offset];
+      if (candidate?.role === 'user') {
+        return rendererMessageText(candidate);
+      }
+    }
+
+    return null;
   }
 
   private async hydrateAgentHistory(agentId: string): Promise<void> {
@@ -519,4 +672,24 @@ export function startMainApp(): void {
       controller.createWindow();
     }
   });
+}
+
+function rendererMessageText(message: RendererMessage): string {
+  return message.parts
+    .map((part) => part.type === 'text' || part.type === 'status' ? part.text : '')
+    .filter(Boolean)
+    .join('\n\n')
+    .trim();
+}
+
+function turnIdFromRendererMessageId(messageId: string): string | null {
+  if (messageId.startsWith('assistant-')) {
+    return messageId.slice('assistant-'.length).split('-segment-')[0] || null;
+  }
+
+  if (messageId.startsWith('compaction-')) {
+    return messageId.slice('compaction-'.length) || null;
+  }
+
+  return null;
 }

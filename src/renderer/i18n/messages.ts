@@ -1,6 +1,18 @@
 export const messages = {
   en: {
     chat: {
+      actions: {
+        cancel: 'Cancel',
+        copied: 'Copied',
+        copy: 'Copy',
+        delete: 'Delete',
+        edit: 'Edit',
+        editPrompt: 'Edit prompt',
+        label: 'Message actions',
+        quote: 'Quote',
+        resubmit: 'Resubmit',
+        retry: 'Retry',
+      },
       contextUsage: {
         ariaLabel: 'Context usage',
         title: 'Context window:',

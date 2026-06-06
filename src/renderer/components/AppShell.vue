@@ -75,8 +75,13 @@
           :queued-prompts="queuedPrompts"
           @attach="$emit('attach')"
           @client-response="$emit('client-response', $event)"
+          @copy-message="$emit('copy-message', $event)"
+          @delete-message="$emit('delete-message', $event)"
           @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
+          @edit-message="$emit('edit-message', $event)"
           @interrupt-agent="$emit('interrupt-agent')"
+          @quote-message="$emit('quote-message', $event)"
+          @retry-message="$emit('retry-message', $event)"
           @select-model="$emit('select-model', $event)"
           @select-reasoning-effort="$emit('select-reasoning-effort', $event)"
           @send-prompt="$emit('sendPrompt', $event)"
@@ -173,13 +178,18 @@ const emit = defineEmits<{
   'close-agent': [agentId: string];
   attach: [];
   'client-response': [response: ClientRequestResponse];
+  'copy-message': [index: number];
+  'delete-message': [index: number];
   'delete-queued-prompt': [promptId: string];
   'deploy-bench-template': [templateId: string];
   'duplicate-agent': [agentId: string];
+  'edit-message': [payload: { content: string; index: number }];
   'interrupt-agent': [];
   'move-agent-to-team': [input: MoveAgentToTeamInput];
+  'quote-message': [index: number];
   'restart-agent': [agentId: string];
   'remove-bench-template': [templateId: string];
+  'retry-message': [index: number];
   'save-agent-to-bench': [agentId: string];
   'select-agent': [agentId: string];
   'select-model': [modelId: string];

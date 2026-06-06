@@ -141,6 +141,44 @@ export function useAppState() {
     snapshot.value = await window.codexClaw.interruptAgent(agentId);
   }
 
+  async function deleteMessage(index: number): Promise<void> {
+    const action = activeMessageAction(index);
+    if (!action || !window.codexClaw?.deleteMessage || isAgentSending(action.agentId)) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.deleteMessage(action.agentId, action.messageId);
+  }
+
+  async function editMessage(payload: { content: string; index: number }): Promise<void> {
+    const action = activeMessageAction(payload.index);
+    const trimmed = payload.content.trim();
+    if (!action || !trimmed || !window.codexClaw?.editMessage || isAgentSending(action.agentId)) {
+      return;
+    }
+
+    markAgentSending(action.agentId, true);
+    try {
+      snapshot.value = await window.codexClaw.editMessage(action.agentId, action.messageId, trimmed);
+    } finally {
+      markAgentSending(action.agentId, false);
+    }
+  }
+
+  async function retryMessage(index: number): Promise<void> {
+    const action = activeMessageAction(index);
+    if (!action || !window.codexClaw?.retryMessage || isAgentSending(action.agentId)) {
+      return;
+    }
+
+    markAgentSending(action.agentId, true);
+    try {
+      snapshot.value = await window.codexClaw.retryMessage(action.agentId, action.messageId);
+    } finally {
+      markAgentSending(action.agentId, false);
+    }
+  }
+
   async function steerQueuedPrompt(promptId: string): Promise<void> {
     const agentId = activeAgent.value?.id;
     if (!agentId) {
@@ -430,9 +468,29 @@ export function useAppState() {
     sendPrompt,
     steerPrompt,
     interruptActiveAgent,
+    deleteMessage,
+    editMessage,
+    retryMessage,
     steerQueuedPrompt,
     removeQueuedPrompt,
     quit,
+  };
+}
+
+function activeMessageAction(index: number): { agentId: string; messageId: string } | null {
+  const agentId = snapshot.value.activeAgentId;
+  if (!agentId) {
+    return null;
+  }
+
+  const message = snapshot.value.messages.filter((candidate) => candidate.agentId === agentId)[index];
+  if (!message) {
+    return null;
+  }
+
+  return {
+    agentId,
+    messageId: message.id,
   };
 }
 

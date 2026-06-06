@@ -29,6 +29,9 @@ const api: CodexClawApi = {
   sendPrompt: (agentId: string, prompt: string, options?: SendPromptOptions) => ipcRenderer.invoke(ipcChannels.sendPrompt, agentId, prompt, options),
   steerPrompt: (agentId: string, prompt: string) => ipcRenderer.invoke(ipcChannels.steerPrompt, agentId, prompt),
   interruptAgent: (agentId: string) => ipcRenderer.invoke(ipcChannels.interruptAgent, agentId),
+  deleteMessage: (agentId: string, messageId: string) => ipcRenderer.invoke(ipcChannels.deleteMessage, agentId, messageId),
+  editMessage: (agentId: string, messageId: string, prompt: string) => ipcRenderer.invoke(ipcChannels.editMessage, agentId, messageId, prompt),
+  retryMessage: (agentId: string, messageId: string) => ipcRenderer.invoke(ipcChannels.retryMessage, agentId, messageId),
   respondToClientRequest: (response: ClientRequestResponse) => ipcRenderer.invoke(ipcChannels.respondToClientRequest, response),
   onEvent: (listener: (event: MainToRendererEvent) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, payload: MainToRendererEvent) => listener(payload);

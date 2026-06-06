@@ -339,6 +339,66 @@ describe('useAppState', () => {
     expect(state.visibleMessages.value.at(-1)?.parts).toStrictEqual([{ type: 'text', text: 'hello' }]);
   });
 
+  it('deletes, edits, and retries active messages through preload message actions', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.messages = [
+      {
+        id: 'user-turn-1',
+        agentId: 'agent-dina',
+        role: 'user',
+        status: 'complete',
+        turnId: 'turn-1',
+        createdAt: '2026-06-05T00:00:01.000Z',
+        parts: [{ type: 'text', text: 'original prompt' }],
+      },
+      {
+        id: 'assistant-turn-1',
+        agentId: 'agent-dina',
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'turn-1',
+        createdAt: '2026-06-05T00:00:02.000Z',
+        parts: [{ type: 'text', text: 'original answer' }],
+      },
+    ];
+    const afterDelete = { ...remoteSnapshot, messages: [] };
+    const afterEdit = {
+      ...remoteSnapshot,
+      messages: [remoteSnapshot.messages[0]],
+    };
+    const afterRetry = {
+      ...remoteSnapshot,
+      messages: [remoteSnapshot.messages[1]],
+    };
+    const deleteMessage = vi.fn().mockResolvedValue(afterDelete);
+    const editMessage = vi.fn().mockResolvedValue(afterEdit);
+    const retryMessage = vi.fn().mockResolvedValue(afterRetry);
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        deleteMessage,
+        editMessage,
+        retryMessage,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    await state.deleteMessage(0);
+    expect(deleteMessage).toHaveBeenCalledWith('agent-dina', 'user-turn-1');
+
+    state.snapshot.value = remoteSnapshot;
+    await state.editMessage({ content: '  edited prompt  ', index: 0 });
+    expect(editMessage).toHaveBeenCalledWith('agent-dina', 'user-turn-1', 'edited prompt');
+
+    state.snapshot.value = remoteSnapshot;
+    await state.retryMessage(1);
+    expect(retryMessage).toHaveBeenCalledWith('agent-dina', 'assistant-turn-1');
+  });
+
   it('queues busy prompts and drains them after the active turn completes', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();

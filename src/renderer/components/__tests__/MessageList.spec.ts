@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import MessageList from '../../shared/chat/MessageList.vue';
 import ChatMessage from '../../shared/chat/ChatMessage.vue';
+import { i18n } from '../../i18n';
 import type { Message } from '../../shared/chat/types';
 
 const chatMessageSource = readFileSync(
@@ -44,6 +45,9 @@ describe('MessageList', () => {
       props: {
         messages,
       },
+      global: {
+        plugins: [i18n],
+      },
     });
 
     expect(wrapper.text()).toContain('Please inspect the composer.');
@@ -76,6 +80,9 @@ describe('MessageList', () => {
           },
         ],
       },
+      global: {
+        plugins: [i18n],
+      },
     });
 
     expect(wrapper.text()).toContain('Steered conversation');
@@ -87,6 +94,9 @@ describe('MessageList', () => {
     const wrapper = mount(MessageList, {
       props: {
         messages,
+      },
+      global: {
+        plugins: [i18n],
       },
     });
     const chatMessage = wrapper.getComponent(ChatMessage);
@@ -122,6 +132,9 @@ describe('MessageList', () => {
       props: {
         messages: messages.slice(0, 1),
       },
+      global: {
+        plugins: [i18n],
+      },
       attachTo: document.body,
     });
     const scrollEl = wrapper.get('.message-list').element as HTMLElement;
@@ -139,6 +152,9 @@ describe('MessageList', () => {
     const wrapper = mount(MessageList, {
       props: {
         messages,
+      },
+      global: {
+        plugins: [i18n],
       },
       attachTo: document.body,
     });

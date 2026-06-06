@@ -98,6 +98,14 @@ export type ThreadStartResponse = {
 
 export type ThreadResumeResponse = ThreadStartResponse;
 
+export type ThreadReadResponse = {
+  thread: CodexThread;
+};
+
+export type ThreadRollbackResponse = {
+  thread: CodexThread;
+};
+
 export type TurnStartResponse = {
   turn: CodexTurn;
 };
@@ -184,6 +192,7 @@ export type CodexNotification =
   | { method: 'thread/tokenUsage/updated'; params: { threadId: string; turnId: string; tokenUsage: CodexThreadTokenUsage } }
   | { method: 'thread/status/changed'; params: { threadId: string; status: CodexThreadStatus } }
   | { method: 'turn/started'; params: { threadId: string; turn: CodexTurn } }
+  | { method: 'turn/diff/updated'; params: { threadId: string; turnId: string; diff: string } }
   | { method: 'item/agentMessage/delta'; params: { threadId: string; turnId: string; itemId: string; delta: string } }
   | { method: 'item/plan/delta'; params: { threadId: string; turnId: string; itemId: string; delta: string } }
   | { method: 'item/started'; params: { threadId: string; turnId: string; item: CodexThreadItem } }

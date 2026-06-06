@@ -130,6 +130,8 @@ import ChatComposerWaveform from '../shared/chat/ChatComposerWaveform.vue';
 const props = defineProps<{
   contextUsage?: AgentContextUsage;
   disabled: boolean;
+  draft?: string;
+  draftRevision?: number;
   files?: AgentFileSearchItem[];
   goalMode?: boolean;
   isSending: boolean;
@@ -240,6 +242,10 @@ watch([visibleFiles, activeFileMention], () => {
   activeFileIndex.value = 0;
 });
 
+watch(() => props.draftRevision, () => {
+  setComposerText(props.draft ?? '');
+}, { immediate: props.draftRevision !== undefined });
+
 function submitPrompt(): void {
   submitWithIntent('send');
 }
@@ -342,6 +348,18 @@ function insertTranscript(text: string): void {
   const insertion = `${prefix}${transcript}${suffix}`;
   const nextCaret = before.length + insertion.length;
   prompt.value = `${before}${insertion}${after}`;
+  caretPosition.value = nextCaret;
+  closeComposerMenus();
+  void nextTick(() => {
+    textareaEl.value?.focus();
+    textareaEl.value?.setSelectionRange(nextCaret, nextCaret);
+    resizeTextarea();
+  });
+}
+
+function setComposerText(value: string): void {
+  prompt.value = value;
+  const nextCaret = value.length;
   caretPosition.value = nextCaret;
   closeComposerMenus();
   void nextTick(() => {
@@ -523,6 +541,7 @@ function resizeTextareaSoon(): void {
 <style scoped>
 .chat-composer {
   --chat-composer-button-size: 36px;
+  --chat-composer-button-size-small: 28px;
   --chat-composer-input-max-height: 160px;
   position: relative;
   display: flex;
@@ -557,6 +576,7 @@ function resizeTextareaSoon(): void {
   color: var(--color-text);
   background: transparent;
   font: inherit;
+  font-size: var(--font-size-15);
   line-height: var(--line-height-24);
 }
 
@@ -610,8 +630,8 @@ function resizeTextareaSoon(): void {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--chat-composer-button-size);
-  height: var(--chat-composer-button-size);
+  width: var(--chat-composer-button-size-small);
+  height: var(--chat-composer-button-size-small);
   border: 0;
   border-radius: var(--radius-full);
   color: var(--color-text-muted);

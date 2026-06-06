@@ -185,6 +185,7 @@ export type RendererMessage = {
   kind?: 'compaction' | 'steer';
   role: 'user' | 'assistant' | 'system';
   status: 'complete' | 'streaming' | 'error';
+  turnId?: string;
   parts: RendererMessagePart[];
   createdAt: string;
 };
@@ -359,6 +360,9 @@ export type CodexClawApi = {
   sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot>;
   steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot>;
   interruptAgent(agentId: string): Promise<AppSnapshot>;
+  deleteMessage(agentId: string, messageId: string): Promise<AppSnapshot>;
+  editMessage(agentId: string, messageId: string, prompt: string): Promise<AppSnapshot>;
+  retryMessage(agentId: string, messageId: string): Promise<AppSnapshot>;
   respondToClientRequest(response: ClientRequestResponse): Promise<AppSnapshot>;
   onEvent(listener: (event: MainToRendererEvent) => void): () => void;
   onAppCommand(listener: (command: AppCommand) => void): () => void;

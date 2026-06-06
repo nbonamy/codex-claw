@@ -63,6 +63,7 @@ describe('codexThreadHistoryToRendererMessages', () => {
         agentId: 'agent-dina',
         role: 'user',
         status: 'complete',
+        turnId: 'turn-1',
         createdAt: '2026-05-28T20:26:40.000Z',
         parts: [{ type: 'text', text: 'read README.md' }],
       },
@@ -71,6 +72,7 @@ describe('codexThreadHistoryToRendererMessages', () => {
         agentId: 'agent-dina',
         role: 'assistant',
         status: 'complete',
+        turnId: 'turn-1',
         createdAt: '2026-05-28T20:26:40.000Z',
         parts: [
           { type: 'text', text: 'I will read it.', itemId: 'msg-1' },
@@ -162,6 +164,7 @@ describe('codexThreadHistoryToRendererMessages', () => {
         agentId: 'agent-dina',
         role: 'user',
         status: 'complete',
+        turnId: 'turn-1',
         createdAt: '2026-05-28T20:26:40.000Z',
         parts: [{ type: 'text', text: 'read all markdown files' }],
       },
@@ -170,6 +173,7 @@ describe('codexThreadHistoryToRendererMessages', () => {
         agentId: 'agent-dina',
         role: 'assistant',
         status: 'complete',
+        turnId: 'turn-1',
         createdAt: '2026-05-28T20:26:40.000Z',
         parts: [
           { type: 'text', text: 'I will inventory the Markdown files.', itemId: 'msg-1' },
@@ -181,6 +185,7 @@ describe('codexThreadHistoryToRendererMessages', () => {
         kind: 'steer',
         role: 'user',
         status: 'complete',
+        turnId: 'turn-1',
         createdAt: '2026-05-28T20:26:40.000Z',
         parts: [{ type: 'text', text: 'actually read them too' }],
       },
@@ -189,6 +194,7 @@ describe('codexThreadHistoryToRendererMessages', () => {
         agentId: 'agent-dina',
         role: 'assistant',
         status: 'complete',
+        turnId: 'turn-1',
         createdAt: '2026-05-28T20:26:40.000Z',
         parts: [
           { type: 'text', text: 'Reading them now.', itemId: 'msg-2' },

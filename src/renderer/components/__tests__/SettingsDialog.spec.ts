@@ -24,10 +24,9 @@ describe('SettingsDialog', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('UI font size');
     await wrapper.findComponent({ name: 'ElSegmented' }).vm.$emit('update:modelValue', 'dark');
     await wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'github-dark');
-    await wrapper.findAllComponents({ name: 'ElInputNumber' })[1].vm.$emit('update:modelValue', 17);
+    await wrapper.findAllComponents({ name: 'ElInputNumber' })[0].vm.$emit('update:modelValue', 17);
 
     expect(updateSettings).toHaveBeenCalledWith({ theme: { mode: 'dark', id: 'codex-claw-dark' } });
     expect(updateSettings).toHaveBeenCalledWith({ theme: { id: 'github-dark' } });

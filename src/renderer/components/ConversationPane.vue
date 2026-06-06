@@ -11,8 +11,14 @@
       <MessageList
         class="conversation-pane__messages"
         :messages="chatMessages"
+        :actions-disabled="isSending"
         :answered-client-request-ids="answeredClientRequestIds"
+        @copy-message="$emit('copy-message', $event)"
         @client-response="$emit('client-response', $event)"
+        @delete-message="$emit('delete-message', $event)"
+        @edit-message="$emit('edit-message', $event)"
+        @quote-message="quoteMessage"
+        @retry-message="$emit('retry-message', $event)"
       />
 
       <template #footer>
@@ -32,6 +38,8 @@
           :skills="codexSkills"
           :model-catalog-status="modelCatalogStatus"
           :skill-catalog-status="skillCatalogStatus"
+          :draft="composerDraft"
+          :draft-revision="composerDraftRevision"
           :goal-mode="goalMode"
           :plan-mode="planMode"
           :selected-model-id="selectedModelId"
@@ -77,6 +85,8 @@
         :skills="codexSkills"
         :model-catalog-status="modelCatalogStatus"
         :skill-catalog-status="skillCatalogStatus"
+        :draft="composerDraft"
+        :draft-revision="composerDraftRevision"
         :goal-mode="goalMode"
         :plan-mode="planMode"
         :selected-model-id="selectedModelId"
@@ -95,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import type { Agent, AgentFileSearchItem, ClientRequestResponse, CodexModelOption, CodexSkillSummary, ReasoningEffort, RendererMessage } from '../../shared/contracts';
 import WorkbenchLayout from './WorkbenchLayout.vue';
 import ChatComposer from './ChatComposer.vue';
@@ -131,8 +141,13 @@ const props = withDefaults(defineProps<{
 defineEmits<{
   attach: [];
   'client-response': [response: ClientRequestResponse];
+  'copy-message': [index: number];
+  'delete-message': [index: number];
   'delete-queued-prompt': [promptId: string];
+  'edit-message': [payload: { content: string; index: number }];
   'interrupt-agent': [];
+  'quote-message': [index: number];
+  'retry-message': [index: number];
   'select-model': [modelId: string];
   'select-reasoning-effort': [reasoningEffort: ReasoningEffort];
   'steer-queued-prompt': [promptId: string];
@@ -151,6 +166,8 @@ const composerPlaceholder = computed(() => {
 });
 
 const chatMessages = computed(() => rendererMessagesToChatMessages(props.messages));
+const composerDraft = ref('');
+const composerDraftRevision = ref(0);
 const started = computed(() => chatMessages.value.length > 0 || props.isSending);
 const isHydratingHistory = computed(() => Boolean(props.agent?.codexThreadId) && props.messages.length === 0 && props.isLoading);
 const heroHeadline = computed(() => (props.agent ? `Chat with ${props.agent.name}` : 'Select an agent'));
@@ -161,6 +178,16 @@ const heroSubhead = computed(() => {
 
   return props.agent.folder;
 });
+
+function quoteMessage(index: number): void {
+  const message = chatMessages.value[index];
+  if (!message || message.role !== 'user' || !message.content.trim()) {
+    return;
+  }
+
+  composerDraft.value = message.content;
+  composerDraftRevision.value += 1;
+}
 </script>
 
 <style scoped>
