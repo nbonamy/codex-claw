@@ -5,7 +5,13 @@
     :data-label="title"
   >
     <component v-if="icon" :is="icon" />
-    {{ title }}
+    <span v-if="titlePrefix && titleTarget" class="chat-tool-call__title-text">
+      <span>{{ titlePrefix }}</span>
+      <span class="chat-tool-call__title-target">{{ titleTarget }}</span>
+    </span>
+    <template v-else>
+      {{ title }}
+    </template>
   </span>
   <span v-if="lineDiff" class="chat-tool-call__diff" aria-label="Line changes">
     <ChatAnimatedDiffStat
@@ -33,6 +39,8 @@ defineProps<{
   lineDiff?: ToolLineDiff
   running?: boolean
   title: string
+  titlePrefix?: string
+  titleTarget?: string
   icon?: any
 }>()
 </script>
@@ -78,5 +86,19 @@ defineProps<{
 
 .chat-tool-call__title--running {
   color: var(--color-text-muted);
+}
+
+.chat-tool-call__title-text {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.chat-tool-call__title-target {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-primary);
+  text-overflow: ellipsis;
 }
 </style>

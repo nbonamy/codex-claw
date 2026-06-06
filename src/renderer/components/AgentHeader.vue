@@ -26,19 +26,16 @@
       <div class="agent-header__agent-line">
         <strong>{{ agent.name }}</strong>
         <span
-          v-if="!sidebarCollapsed"
           class="agent-header__folder"
         >
           {{ agent.folder }}
         </span>
         <span
-          v-if="!sidebarCollapsed"
           class="agent-header__inline-dot"
           :data-status="agent.status.type"
           aria-hidden="true"
         />
         <span
-          v-if="!sidebarCollapsed"
           class="agent-header__inline-status"
         >
           {{ agentStatusDetail }}

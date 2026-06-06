@@ -138,7 +138,7 @@ describe('AgentHeader', () => {
 
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('Idle');
-    expect(wrapper.text()).not.toContain('~/src/id8');
+    expect(wrapper.text()).toContain('~/src/id8');
     expect(wrapper.text()).not.toContain('Git status pending');
 
     await wrapper.get('[aria-label="Show agent sidebar"]').trigger('click');

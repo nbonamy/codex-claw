@@ -24,7 +24,7 @@ const runningTool: MessageToolCall = {
   id: 'tool-2',
   result: undefined,
   state: 'running',
-  status: '{"source":"codex","action":"read","phase":"running","params":{"addedLines":2,"removedLines":1}}',
+  status: '{"source":"codex","action":"read","phase":"running","params":{"addedLines":2,"removedLines":1,"target":"src/main.ts"}}',
 };
 
 const confirmationTool: MessageToolCall = {
@@ -44,6 +44,26 @@ const confirmationTool: MessageToolCall = {
       argumentsPreview: '{\n  "agentId": "agent-dina"\n}',
       confirmationSummary: 'Allow codex_claw to register this agent?',
       requestId: 'approval-1',
+    },
+  }),
+};
+
+const editingTool: MessageToolCall = {
+  args: { changes: [{ path: 'src/main/codex/tool-part-adapter.ts' }] },
+  done: false,
+  function: '1 file change',
+  id: 'tool-edit',
+  result: undefined,
+  state: 'running',
+  status: JSON.stringify({
+    source: 'codex',
+    action: 'edit',
+    phase: 'running',
+    params: {
+      addedLines: 134,
+      path: 'src/main/codex/tool-part-adapter.ts',
+      removedLines: 1,
+      target: 'tool-part-adapter.ts',
     },
   }),
 };
@@ -119,7 +139,7 @@ describe('ported id8 chat components', () => {
         toolCall: runningTool,
       },
     });
-    expect(summary.text()).toContain('running read_file');
+    expect(summary.text()).toContain('Reading src/main.ts');
 
     const customStatus = mount(ChatToolCall, {
       props: {
@@ -127,6 +147,28 @@ describe('ported id8 chat components', () => {
       },
     });
     expect(customStatus.text()).toContain('Searched 3 files');
+
+    const completedRead = mount(ChatToolCall, {
+      props: {
+        toolCall: {
+          ...completedTool,
+          function: '/bin/bash -lc "sed -n 1,220p README.md"',
+          status: '{"source":"codex","action":"read","phase":"completed","params":{"target":"README.md"}}',
+        },
+      },
+    });
+    expect(completedRead.text()).toContain('Read README.md');
+
+    const editing = mount(ChatToolCall, {
+      props: {
+        summaryOnly: true,
+        toolCall: editingTool,
+      },
+    });
+    expect(editing.text()).toContain('Editing');
+    expect(editing.find('.chat-tool-call__title-target').text()).toBe('tool-part-adapter.ts');
+    expect(editing.find('.chat-tool-call__diff-add').text()).toBe('+134');
+    expect(editing.find('.chat-tool-call__diff-delete').text()).toBe('-1');
 
     const bare = mount(ChatToolCall, {
       props: {
@@ -153,7 +195,7 @@ describe('ported id8 chat components', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('running read_file');
+    expect(wrapper.text()).toContain('Reading src/main.ts');
     expect(wrapper.text()).toContain('+2');
     expect(wrapper.text()).toContain('-1');
     await wrapper.get('.chat-tool-group__header').trigger('click');

@@ -113,6 +113,22 @@ Theme rules:
 - Syntax highlighting and diff rendering should be fed by the same theme
   source whenever practical.
 
+## Internationalization
+
+User-facing renderer strings should be compatible with Vue I18n from the start.
+
+Rules:
+
+- Put reusable renderer copy in `src/renderer/i18n/messages.ts`.
+- Use `vue-i18n` in components for dynamic UI labels instead of assembling
+  English strings inline.
+- Keep backend adapters responsible for app-owned semantic descriptors, not
+  localized text.
+- Do not send localized strings through IPC as the durable contract when a
+  structured descriptor can express the same state.
+- It is acceptable to migrate existing static copy gradually as components are
+  touched, but new shared rendering primitives should use the i18n catalog.
+
 ## UX Standards
 
 - Build the actual app surface first.

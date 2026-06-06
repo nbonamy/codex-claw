@@ -7,12 +7,26 @@
   />
   <section v-else class="chat-tool-call" :class="{ 'chat-tool-call--open': isOpen, [`chat-tool-call--${toolCall.state}`]: true }">
     <div v-if="summaryOnly" class="chat-tool-call__summary">
-      <ChatToolCallTitle :line-diff="lineDiff" :running="isRunning" :title="title" />
+      <ChatToolCallTitle
+        :icon="titleIcon"
+        :line-diff="lineDiff"
+        :running="isRunning"
+        :title="titleParts.title"
+        :title-prefix="titleParts.prefix"
+        :title-target="titleParts.target"
+      />
       <component :is="isOpen ? ChevronUp : ChevronDown" class="chat-tool-group__chevron" :size="15" />
     </div>
 
     <button v-else-if="!headerless" class="chat-tool-call__header" type="button" @click="toggleOpen">
-      <ChatToolCallTitle :line-diff="lineDiff" :running="isRunning" :title="title" />
+      <ChatToolCallTitle
+        :icon="titleIcon"
+        :line-diff="lineDiff"
+        :running="isRunning"
+        :title="titleParts.title"
+        :title-prefix="titleParts.prefix"
+        :title-target="titleParts.target"
+      />
       <component :is="isOpen ? ChevronUp : ChevronDown" class="chat-tool-call__chevron" :size="15" />
     </button>
 
@@ -46,13 +60,14 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ChevronDown, ChevronUp } from '../icons/app-icons'
+import { useI18n } from 'vue-i18n'
+import { ChevronDown, ChevronUp, PencilIcon } from '../icons/app-icons'
 import type { ClientRequestResponse } from '../../../shared/contracts'
 import ChatFoldTransition from './ChatFoldTransition.vue'
 import ChatToolConfirmation from './ChatToolConfirmation.vue'
 import ChatToolCallTitle from './ChatToolCallTitle.vue'
-import { getToolFallbackTitle, getToolLineDiff, parseToolStatusDescriptor } from './tool-status'
-import { getMessageToolCallArgs, getMessageToolCallName, type MessageToolCall } from './types'
+import { getToolDisplayTitleParts, getToolLineDiff, parseToolStatusDescriptor } from './tool-status'
+import { getMessageToolCallArgs, type MessageToolCall } from './types'
 
 const props = defineProps<{
   answeredClientRequestIds?: Set<string>
@@ -65,9 +80,9 @@ const emit = defineEmits<{
   'client-response': [response: ClientRequestResponse]
 }>()
 
+const { t } = useI18n()
 const isOpen = ref(false)
 
-const toolCallName = computed(() => getMessageToolCallName(props.toolCall))
 const toolCallArgs = computed(() => getMessageToolCallArgs(props.toolCall))
 const isRunning = computed(() => !props.toolCall.done && props.toolCall.state !== 'completed')
 const statusDescriptor = computed(() => parseToolStatusDescriptor(props.toolCall.status))
@@ -81,17 +96,14 @@ const isToolConfirmation = computed(() => (
   typeof confirmationParams.value.requestId === 'string' &&
   props.toolCall.state === 'running'
 ))
-const fallbackTitle = computed(() => getToolFallbackTitle(props.toolCall))
-const title = computed(() => {
+const titleParts = computed(() => {
   const descriptor = statusDescriptor.value
-  if (descriptor) {
-    return `${descriptor.phase} ${toolCallName.value}`
-  }
   if (props.toolCall.status && !['running', 'completed', 'failed'].includes(props.toolCall.status)) {
-    return props.toolCall.status
+    return descriptor ? getToolDisplayTitleParts(props.toolCall, descriptor, t) : { title: props.toolCall.status }
   }
-  return fallbackTitle.value
+  return getToolDisplayTitleParts(props.toolCall, descriptor, t)
 })
+const titleIcon = computed(() => statusDescriptor.value?.source === 'codex' && statusDescriptor.value.action === 'edit' ? PencilIcon : undefined)
 const lineDiff = computed(() => getToolLineDiff(statusDescriptor.value))
 const hasParams = computed(() => toolCallArgs.value !== undefined)
 const hasResult = computed(() => props.toolCall.result !== undefined && props.toolCall.result !== null)

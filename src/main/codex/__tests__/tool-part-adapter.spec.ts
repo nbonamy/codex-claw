@@ -44,6 +44,53 @@ describe('tool-part-adapter', () => {
     });
   });
 
+  it('summarizes Codex command actions for localized renderer labels', () => {
+    const runningRead = codexThreadItemToToolPart({
+      type: 'commandExecution',
+      id: 'cmd-read',
+      command: '/bin/bash -lc "sed -n \'1,220p\' README.md"',
+      status: 'running',
+      commandActions: [
+        {
+          type: 'read',
+          command: "sed -n '1,220p' README.md",
+          name: 'README.md',
+          path: '/Users/nbonamy/src/codex-claw/README.md',
+        },
+      ],
+    });
+
+    expect(runningRead?.statusText ? JSON.parse(runningRead.statusText) : null).toStrictEqual({
+      action: 'read',
+      phase: 'running',
+      params: {
+        names: ['README.md'],
+        target: 'README.md',
+      },
+      source: 'codex',
+    });
+
+    const completedExplore = codexThreadItemToToolPart({
+      type: 'commandExecution',
+      id: 'cmd-explore',
+      command: 'find src -maxdepth 2 -type d | sort',
+      status: 'completed',
+      commandActions: [
+        { type: 'listFiles', command: 'find src -maxdepth 2 -type d | sort', path: 'src' },
+        { type: 'search', command: 'rg tool src', query: 'tool', path: 'src' },
+      ],
+    });
+
+    expect(completedExplore?.statusText ? JSON.parse(completedExplore.statusText) : null).toStrictEqual({
+      action: 'explore',
+      phase: 'completed',
+      params: {
+        actions: ['listFiles', 'search'],
+      },
+      source: 'codex',
+    });
+  });
+
   it('maps MCP structuredContent over the model-facing placeholder', () => {
     expect(codexThreadItemToToolPart({
       type: 'mcpToolCall',
@@ -119,6 +166,17 @@ describe('tool-part-adapter', () => {
       kind: 'fileChange',
       title: '1 file change',
       status: 'completed',
+      statusText: JSON.stringify({
+        action: 'edit',
+        phase: 'completed',
+        params: {
+          addedLines: 0,
+          path: 'src/app.ts',
+          removedLines: 0,
+          target: 'app.ts',
+        },
+        source: 'codex',
+      }),
       body: 'update src/app.ts',
     });
 
@@ -178,6 +236,17 @@ describe('tool-part-adapter', () => {
     expect(fileChangePatchToToolPartUpdate('patch-1', [{ path: 'src/next.ts' }])).toMatchObject({
       itemId: 'patch-1',
       body: 'update src/next.ts',
+      statusText: JSON.stringify({
+        action: 'edit',
+        phase: 'running',
+        params: {
+          addedLines: 0,
+          path: 'src/next.ts',
+          removedLines: 0,
+          target: 'next.ts',
+        },
+        source: 'codex',
+      }),
       input: {
         changes: [{ path: 'src/next.ts' }],
       },
@@ -187,6 +256,17 @@ describe('tool-part-adapter', () => {
         kind: 'fileChange',
         title: '1 file change',
         status: 'running',
+        statusText: JSON.stringify({
+          action: 'edit',
+          phase: 'running',
+          params: {
+            addedLines: 0,
+            path: 'src/next.ts',
+            removedLines: 0,
+            target: 'next.ts',
+          },
+          source: 'codex',
+        }),
       },
     });
 
@@ -210,5 +290,40 @@ describe('tool-part-adapter', () => {
   it('ignores unsupported item shapes', () => {
     expect(codexThreadItemToToolPart(null)).toBeNull();
     expect(codexThreadItemToToolPart({ type: 'unknown', id: 'unknown-1' })).toBeNull();
+  });
+
+  it('summarizes file change patches with filename and diff stats', () => {
+    const toolPart = codexThreadItemToToolPart({
+      type: 'fileChange',
+      id: 'patch-diff',
+      changes: [
+        {
+          kind: { type: 'update', move_path: null },
+          path: 'src/main/codex/tool-part-adapter.ts',
+          diff: [
+            '--- a/src/main/codex/tool-part-adapter.ts',
+            '+++ b/src/main/codex/tool-part-adapter.ts',
+            '@@ -1,2 +1,4 @@',
+            ' import type { RendererToolPart } from "../../shared/contracts";',
+            '+const next = true;',
+            '+const label = "Editing";',
+            '-const old = false;',
+          ].join('\n'),
+        },
+      ],
+      status: 'inProgress',
+    });
+
+    expect(toolPart?.statusText ? JSON.parse(toolPart.statusText) : null).toStrictEqual({
+      action: 'edit',
+      phase: 'running',
+      params: {
+        addedLines: 2,
+        path: 'src/main/codex/tool-part-adapter.ts',
+        removedLines: 1,
+        target: 'tool-part-adapter.ts',
+      },
+      source: 'codex',
+    });
   });
 });

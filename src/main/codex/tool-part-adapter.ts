@@ -10,12 +10,15 @@ export function codexThreadItemToToolPart(item: unknown): RendererToolPart | nul
 
   if (item.type === 'commandExecution') {
     const command = typeof item.command === 'string' ? item.command : 'command';
+    const status = rendererToolStatus(item.status);
+    const statusText = commandStatusText(status, item.commandActions, command);
     return {
       type: 'tool',
       id: item.id,
       kind: 'command',
       title: command,
-      status: rendererToolStatus(item.status),
+      status,
+      ...(statusText ? { statusText } : {}),
       body: typeof item.aggregatedOutput === 'string' ? item.aggregatedOutput : undefined,
       input: {
         command,
@@ -79,12 +82,15 @@ export function codexThreadItemToToolPart(item: unknown): RendererToolPart | nul
 
   if (item.type === 'fileChange') {
     const changes = Array.isArray(item.changes) ? item.changes : [];
+    const status = rendererToolStatus(item.status);
+    const statusText = fileChangeStatusText(status, changes);
     return {
       type: 'tool',
       id: item.id,
       kind: 'fileChange',
       title: changes.length === 1 ? '1 file change' : `${changes.length} file changes`,
-      status: rendererToolStatus(item.status),
+      status,
+      ...(statusText ? { statusText } : {}),
       body: fileChangesText(changes),
       input: { changes },
       metadata: {
@@ -146,9 +152,11 @@ export function commandOutputDeltaToToolPartUpdate(itemId: string, delta: string
 }
 
 export function fileChangePatchToToolPartUpdate(itemId: string, changes: unknown[]): RendererToolPartUpdate {
+  const statusText = fileChangeStatusText('running', changes);
   return {
     itemId,
     body: fileChangesText(changes),
+    ...(statusText ? { statusText } : {}),
     input: { changes },
     metadata: { changes },
     fallbackToolPart: {
@@ -157,6 +165,7 @@ export function fileChangePatchToToolPartUpdate(itemId: string, changes: unknown
       kind: 'fileChange',
       title: changes.length === 1 ? '1 file change' : `${changes.length} file changes`,
       status: 'running',
+      ...(statusText ? { statusText } : {}),
       body: fileChangesText(changes),
       input: { changes },
       metadata: { changes },
@@ -207,6 +216,211 @@ function rendererToolStatus(status: unknown): RendererToolPart['status'] {
   }
 
   return 'running';
+}
+
+function commandStatusText(status: RendererToolPart['status'], commandActions: unknown, command: string): string | undefined {
+  const descriptor = commandStatusDescriptor(status, commandActions, command);
+  return descriptor ? JSON.stringify(descriptor) : undefined;
+}
+
+function commandStatusDescriptor(status: RendererToolPart['status'], commandActions: unknown, command: string): {
+  action: 'edit' | 'explore' | 'list' | 'read' | 'run' | 'search';
+  phase: RendererToolPart['status'];
+  params: Record<string, unknown>;
+  source: 'codex';
+} | undefined {
+  const actions = normalizedCommandActions(commandActions);
+  if (!actions.length) {
+    return undefined;
+  }
+
+  const knownActions = actions.filter((action) => action.type !== 'unknown');
+  const actionTypes = new Set(knownActions.map((action) => action.type));
+  if (knownActions.length === 0) {
+    return {
+      action: 'run',
+      phase: status,
+      params: { target: command },
+      source: 'codex',
+    };
+  }
+
+  if (actionTypes.size === 1 && actionTypes.has('read')) {
+    const names = uniqueNonEmpty(knownActions.map((action) => action.name));
+    return {
+      action: 'read',
+      phase: status,
+      params: {
+        names,
+        target: formatTargetList(names, command),
+      },
+      source: 'codex',
+    };
+  }
+
+  if (actionTypes.size === 1 && actionTypes.has('listFiles')) {
+    const targets = uniqueNonEmpty(knownActions.map((action) => action.path ?? action.command));
+    return {
+      action: 'list',
+      phase: status,
+      params: {
+        targets,
+        target: formatTargetList(targets, command),
+      },
+      source: 'codex',
+    };
+  }
+
+  if (actionTypes.size === 1 && actionTypes.has('search')) {
+    const searches = knownActions.map((action) => {
+      if (action.query && action.path) {
+        return `"${action.query}" in ${action.path}`;
+      }
+
+      return action.query ?? action.path ?? action.command;
+    });
+    const targets = uniqueNonEmpty(searches);
+    return {
+      action: 'search',
+      phase: status,
+      params: {
+        targets,
+        target: formatTargetList(targets, command),
+      },
+      source: 'codex',
+    };
+  }
+
+  return {
+    action: 'explore',
+    phase: status,
+    params: {
+      actions: knownActions.map((action) => action.type),
+    },
+    source: 'codex',
+  };
+}
+
+type NormalizedCommandAction = {
+  command?: string;
+  name?: string;
+  path?: string;
+  query?: string;
+  type: 'listFiles' | 'read' | 'search' | 'unknown';
+};
+
+function normalizedCommandActions(value: unknown): NormalizedCommandAction[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((entry) => {
+    if (!isRecord(entry) || typeof entry.type !== 'string') {
+      return [];
+    }
+
+    if (entry.type !== 'read' && entry.type !== 'listFiles' && entry.type !== 'search' && entry.type !== 'unknown') {
+      return [];
+    }
+
+    return [{
+      command: typeof entry.command === 'string' ? entry.command : undefined,
+      name: typeof entry.name === 'string' ? entry.name : undefined,
+      path: typeof entry.path === 'string' ? entry.path : undefined,
+      query: typeof entry.query === 'string' ? entry.query : undefined,
+      type: entry.type,
+    }];
+  });
+}
+
+function uniqueNonEmpty(values: Array<string | undefined>): string[] {
+  return [...new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)))];
+}
+
+function formatTargetList(values: string[], fallback: string): string {
+  if (values.length === 0) {
+    return fallback;
+  }
+
+  if (values.length <= 3) {
+    return values.join(', ');
+  }
+
+  return `${values.slice(0, 3).join(', ')} and ${values.length - 3} more`;
+}
+
+function fileChangeStatusText(status: RendererToolPart['status'], changes: unknown[]): string | undefined {
+  const descriptor = fileChangeStatusDescriptor(status, changes);
+  return descriptor ? JSON.stringify(descriptor) : undefined;
+}
+
+function fileChangeStatusDescriptor(status: RendererToolPart['status'], changes: unknown[]): {
+  action: 'edit';
+  phase: RendererToolPart['status'];
+  params: Record<string, unknown>;
+  source: 'codex';
+} | undefined {
+  const normalizedChanges = changes.flatMap((change) => {
+    if (!isRecord(change)) {
+      return [];
+    }
+
+    const path = typeof change.path === 'string' ? change.path : undefined;
+    const diff = typeof change.diff === 'string' ? change.diff : undefined;
+    const lineDiff = lineDiffFromUnifiedDiff(diff);
+    return [{
+      addedLines: lineDiff.addedLines,
+      path,
+      removedLines: lineDiff.removedLines,
+    }];
+  });
+
+  if (!normalizedChanges.length) {
+    return undefined;
+  }
+
+  const addedLines = normalizedChanges.reduce((total, change) => total + change.addedLines, 0);
+  const removedLines = normalizedChanges.reduce((total, change) => total + change.removedLines, 0);
+  const paths = uniqueNonEmpty(normalizedChanges.map((change) => change.path));
+  const target = paths.length === 1 ? fileName(paths[0]) : `${normalizedChanges.length} files`;
+  return {
+    action: 'edit',
+    phase: status,
+    params: {
+      addedLines,
+      path: paths.length === 1 ? paths[0] : undefined,
+      removedLines,
+      target,
+    },
+    source: 'codex',
+  };
+}
+
+function lineDiffFromUnifiedDiff(diff: string | undefined): { addedLines: number; removedLines: number } {
+  if (!diff) {
+    return { addedLines: 0, removedLines: 0 };
+  }
+
+  let addedLines = 0;
+  let removedLines = 0;
+  for (const line of diff.split('\n')) {
+    if (line.startsWith('+++') || line.startsWith('---')) {
+      continue;
+    }
+
+    if (line.startsWith('+')) {
+      addedLines += 1;
+    } else if (line.startsWith('-')) {
+      removedLines += 1;
+    }
+  }
+
+  return { addedLines, removedLines };
+}
+
+function fileName(path: string): string {
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  return parts.at(-1) ?? path;
 }
 
 function mcpErrorMessage(error: unknown): string | undefined {
