@@ -188,6 +188,88 @@ describe('CodexAgentSessionManager', () => {
     });
   });
 
+  it('passes plan mode as a Codex collaboration mode override', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+
+    const prompt = manager.sendPrompt(agent, 'plan the work', {
+      model: 'gpt-5.1-codex',
+      planMode: true,
+      reasoningEffort: 'high',
+    });
+    await waitForSentCount(transport, 1);
+    transport.receive({ id: 1, result: { userAgent: 'codex', codexHome: '/tmp/codex-home', platformFamily: 'unix', platformOs: 'macos' } });
+    await waitForSentCount(transport, 3);
+    transport.receive({ id: 2, result: { thread: { id: 'thread-1', cwd: '/Users/nbonamy/src/codex-claw' } } });
+    await waitForSentCount(transport, 4);
+    transport.receive({ id: 3, result: { turn: { id: 'turn-1', status: 'running' } } });
+
+    await prompt;
+
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 3,
+      method: 'turn/start',
+      params: {
+        threadId: 'thread-1',
+        input: [
+          {
+            type: 'text',
+            text: 'plan the work',
+            text_elements: [],
+          },
+        ],
+        cwd: expandHome('~/src/codex-claw'),
+        model: 'gpt-5.1-codex',
+        effort: 'high',
+        collaborationMode: {
+          mode: 'plan',
+          settings: {
+            model: 'gpt-5.1-codex',
+            reasoning_effort: 'high',
+            developer_instructions: null,
+          },
+        },
+      },
+    });
+  });
+
+  it('sets a thread goal before starting a goal-mode prompt', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+
+    const prompt = manager.sendPrompt(agent, 'ship the feature', {
+      goalMode: true,
+    });
+    await waitForSentCount(transport, 1);
+    transport.receive({ id: 1, result: { userAgent: 'codex', codexHome: '/tmp/codex-home', platformFamily: 'unix', platformOs: 'macos' } });
+    await waitForSentCount(transport, 3);
+    transport.receive({ id: 2, result: { thread: { id: 'thread-1', cwd: '/Users/nbonamy/src/codex-claw' } } });
+    await waitForSentCount(transport, 4);
+
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 3,
+      method: 'thread/goal/set',
+      params: {
+        threadId: 'thread-1',
+        objective: 'ship the feature',
+        status: 'active',
+      },
+    });
+
+    transport.receive({ id: 3, result: { goal: { threadId: 'thread-1', objective: 'ship the feature', status: 'active', tokenBudget: null, tokensUsed: 0, timeUsedSeconds: 0, createdAt: 0, updatedAt: 0 } } });
+    await waitForSentCount(transport, 5);
+    transport.receive({ id: 4, result: { turn: { id: 'turn-1', status: 'running' } } });
+
+    await expect(prompt).resolves.toStrictEqual({
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+    });
+    expect(transport.sent.at(-1)).toMatchObject({
+      id: 4,
+      method: 'turn/start',
+    });
+  });
+
   it('resumes a persisted agent thread before starting a turn', async () => {
     const transport = new FakeTransport();
     const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
@@ -797,27 +879,7 @@ describe('CodexAgentSessionManager', () => {
     ]);
   });
 
-  it('ignores unimplemented notifications instead of emitting misleading app events', async () => {
-    const transport = new FakeTransport();
-    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
-    const events: unknown[] = [];
-    manager.onEvent((event) => events.push(event));
-
-    await resolveStartedPrompt(transport, manager);
-
-    transport.receive({
-      method: 'turn/plan/updated',
-      params: {
-        threadId: 'thread-1',
-        turnId: 'turn-1',
-        plan: [],
-      },
-    });
-
-    expect(events).toStrictEqual([]);
-  });
-
-  it('maps Codex thread settings updates into app-owned thread mapping events', async () => {
+  it('maps plan, mode, and goal notifications into app-owned events', async () => {
     const transport = new FakeTransport();
     const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
     const events: unknown[] = [];
@@ -829,13 +891,51 @@ describe('CodexAgentSessionManager', () => {
     await resolveStartedPrompt(transport, manager);
 
     transport.receive({
+      method: 'turn/plan/updated',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        explanation: 'Working plan',
+        plan: [
+          { step: 'Inspect composer', status: 'completed' },
+          { step: 'Wire mode toggle', status: 'inProgress' },
+        ],
+      },
+    });
+    transport.receive({
       method: 'thread/settings/updated',
       params: {
         threadId: 'thread-1',
         threadSettings: {
           cwd: '/Users/nbonamy/src/codex-claw',
           model: 'gpt-5.5',
+          collaborationMode: {
+            mode: 'plan',
+          },
         },
+      },
+    });
+    transport.receive({
+      method: 'thread/goal/updated',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        goal: {
+          threadId: 'thread-1',
+          objective: 'ship it',
+          status: 'active',
+          tokenBudget: null,
+          tokensUsed: 0,
+          timeUsedSeconds: 0,
+          createdAt: 0,
+          updatedAt: 0,
+        },
+      },
+    });
+    transport.receive({
+      method: 'thread/goal/cleared',
+      params: {
+        threadId: 'thread-1',
       },
     });
 
@@ -844,13 +944,69 @@ describe('CodexAgentSessionManager', () => {
         seq: 1,
         agentId: 'agent-dina',
         threadId: 'thread-1',
+        turnId: 'turn-1',
+        type: 'turn.planUpdated',
+        payload: {
+          explanation: 'Working plan',
+          plan: [
+            { step: 'Inspect composer', status: 'completed' },
+            { step: 'Wire mode toggle', status: 'inProgress' },
+          ],
+        },
+        occurredAt: '<now>',
+      },
+      {
+        seq: 2,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
         type: 'thread.settingsUpdated',
         payload: {
           threadSettings: {
             cwd: '/Users/nbonamy/src/codex-claw',
             model: 'gpt-5.5',
+            collaborationMode: {
+              mode: 'plan',
+            },
           },
         },
+        occurredAt: '<now>',
+      },
+      {
+        seq: 3,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        type: 'thread.modeUpdated',
+        payload: {
+          mode: 'plan',
+        },
+        occurredAt: '<now>',
+      },
+      {
+        seq: 4,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        type: 'thread.goalUpdated',
+        payload: {
+          goal: {
+            threadId: 'thread-1',
+            objective: 'ship it',
+            status: 'active',
+            tokenBudget: null,
+            tokensUsed: 0,
+            timeUsedSeconds: 0,
+            createdAt: 0,
+            updatedAt: 0,
+          },
+        },
+        occurredAt: '<now>',
+      },
+      {
+        seq: 5,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        type: 'thread.goalCleared',
+        payload: {},
         occurredAt: '<now>',
       },
     ]);

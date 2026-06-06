@@ -5,14 +5,14 @@
     aria-label="Prompt composer"
     @submit.prevent="submitPrompt"
   >
-    <button
-      class="chat-composer__tool"
-      type="button"
-      aria-label="Attach context"
+    <ChatComposerActionMenu
       :disabled="disabled"
-    >
-      <PlusIcon />
-    </button>
+      :goal-mode="goalMode"
+      :plan-mode="planMode"
+      @attach="$emit('attach')"
+      @update:goal-mode="$emit('update:goalMode', $event)"
+      @update:plan-mode="$emit('update:planMode', $event)"
+    />
 
     <textarea
       ref="textareaEl"
@@ -27,6 +27,19 @@
     />
 
     <div class="chat-composer__meta">
+      <div
+        v-if="activeModes.length > 0"
+        class="chat-composer__modes"
+        aria-label="Active composer modes"
+      >
+        <span
+          v-for="mode in activeModes"
+          :key="mode"
+          class="chat-composer__mode"
+        >
+          {{ mode }}
+        </span>
+      </div>
       <ChatContextUsageIndicator :context-usage="contextUsage" />
       <ChatModelReasoningSelector
         :disabled="disabled || isSending"
@@ -51,18 +64,20 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue';
 import type { AgentContextUsage, CodexModelOption, ReasoningEffort } from '../../shared/contracts';
-import { PlusIcon } from '../shared/icons/app-icons';
 import ChatComposerSendButton from '../shared/chat/ChatComposerSendButton.vue';
+import ChatComposerActionMenu from './ChatComposerActionMenu.vue';
 import ChatContextUsageIndicator from './ChatContextUsageIndicator.vue';
 import ChatModelReasoningSelector from './ChatModelReasoningSelector.vue';
 
 const props = defineProps<{
   contextUsage?: AgentContextUsage;
   disabled: boolean;
+  goalMode?: boolean;
   isSending: boolean;
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   models?: CodexModelOption[];
   placeholder: string;
+  planMode?: boolean;
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
 }>();
@@ -70,7 +85,10 @@ const props = defineProps<{
 const emit = defineEmits<{
   send: [prompt: string];
   steer: [prompt: string];
+  attach: [];
+  'update:goalMode': [enabled: boolean];
   'update:modelId': [modelId: string];
+  'update:planMode': [enabled: boolean];
   'update:reasoningEffort': [reasoningEffort: ReasoningEffort];
 }>();
 
@@ -81,6 +99,10 @@ const hasPrompt = computed(() => Boolean(prompt.value.trim()));
 const canSend = computed(() => Boolean(hasPrompt.value && !props.disabled));
 const sendButtonLoading = computed(() => props.isSending && !hasPrompt.value);
 const sendButtonLabel = computed(() => (props.isSending ? 'Queue prompt' : 'Send prompt'));
+const activeModes = computed(() => [
+  ...(props.planMode ? ['Plan'] : []),
+  ...(props.goalMode ? ['Goal'] : []),
+]);
 
 function submitPrompt(): void {
   submitWithIntent('send');
@@ -106,6 +128,12 @@ function submitWithIntent(intent: 'send' | 'steer'): void {
 }
 
 function handleTextareaKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Tab' && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
+    event.preventDefault();
+    emit('update:planMode', !props.planMode);
+    return;
+  }
+
   if (event.key !== 'Enter') {
     return;
   }
@@ -167,33 +195,6 @@ function resizeTextareaSoon(): void {
   opacity: 0.62;
 }
 
-.chat-composer__tool {
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: var(--chat-composer-button-size);
-  height: var(--chat-composer-button-size);
-  border: 0;
-  border-radius: var(--radius-full);
-  color: var(--color-text-muted);
-  background: transparent;
-  cursor: pointer;
-}
-
-.chat-composer__tool:hover:not(:disabled) {
-  color: var(--color-text);
-  background: var(--color-surface-base);
-}
-
-.chat-composer__tool:disabled {
-  cursor: default;
-}
-
-.chat-composer__tool svg {
-  width: var(--icon-lg);
-  height: var(--icon-lg);
-}
-
 .chat-composer__input {
   flex: 1 1 auto;
   min-width: 0;
@@ -218,6 +219,25 @@ function resizeTextareaSoon(): void {
   align-items: center;
   gap: var(--space-4);
   flex: 0 0 auto;
+}
+
+.chat-composer__modes {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.chat-composer__mode {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-base);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-18);
 }
 
 @media (max-width: 720px) {

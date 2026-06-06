@@ -10,6 +10,7 @@ export {
   IconEye as EyeIcon,
   IconFolder as FolderIcon,
   IconInfoCircle as Info,
+  IconPaperclip as PaperclipIcon,
   IconLayoutSidebarLeftCollapse as PanelLeftCloseIcon,
   IconLayoutSidebarLeftExpand as PanelLeftOpenIcon,
   IconMaximize as Maximize2,

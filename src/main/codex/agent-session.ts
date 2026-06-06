@@ -16,8 +16,10 @@ import type {
   CodexRawResponseItem,
   CodexRateLimitSnapshot,
   CodexThread,
+  CodexThreadGoal,
   CodexThreadStatus,
   CodexThreadTokenUsage,
+  CodexTurnPlanStep,
   CodexSessionEvent,
   CodexSessionPromptResult,
   CodexTurn,
@@ -125,6 +127,24 @@ export class CodexAgentSessionManager {
     }
     if (options.reasoningEffort) {
       turnParams.effort = options.reasoningEffort;
+    }
+    if (options.planMode && options.model) {
+      turnParams.collaborationMode = {
+        mode: 'plan',
+        settings: {
+          model: options.model,
+          reasoning_effort: options.reasoningEffort ?? null,
+          developer_instructions: null,
+        },
+      };
+    }
+
+    if (options.goalMode) {
+      await this.client.request('thread/goal/set', {
+        threadId: session.threadId,
+        objective: prompt,
+        status: 'active',
+      });
     }
 
     const response = await this.client.request<TurnStartResponse>('turn/start', turnParams);
@@ -281,6 +301,36 @@ export class CodexAgentSessionManager {
             threadSettings: params.threadSettings,
           },
         });
+        const mode = collaborationModeFromThreadSettings(params.threadSettings);
+        if (mode) {
+          this.emitForThread(params.threadId, {
+            type: 'thread.modeUpdated',
+            payload: {
+              mode,
+            },
+          });
+        }
+        return;
+      }
+
+      case 'thread/goal/updated': {
+        const params = notification.params as { threadId: string; turnId: string | null; goal: CodexThreadGoal };
+        this.emitForThread(params.threadId, {
+          turnId: params.turnId ?? undefined,
+          type: 'thread.goalUpdated',
+          payload: {
+            goal: params.goal,
+          },
+        });
+        return;
+      }
+
+      case 'thread/goal/cleared': {
+        const params = notification.params as { threadId: string };
+        this.emitForThread(params.threadId, {
+          type: 'thread.goalCleared',
+          payload: {},
+        });
         return;
       }
 
@@ -318,7 +368,8 @@ export class CodexAgentSessionManager {
         return;
       }
 
-      case 'item/agentMessage/delta': {
+      case 'item/agentMessage/delta':
+      case 'item/plan/delta': {
         const params = notification.params as { threadId: string; turnId: string; itemId: string; delta: string };
         this.emitForThread(params.threadId, {
           turnId: params.turnId,
@@ -326,6 +377,19 @@ export class CodexAgentSessionManager {
           payload: {
             itemId: params.itemId,
             delta: params.delta,
+          },
+        });
+        return;
+      }
+
+      case 'turn/plan/updated': {
+        const params = notification.params as { threadId: string; turnId: string; explanation: string | null; plan: CodexTurnPlanStep[] };
+        this.emitForThread(params.threadId, {
+          turnId: params.turnId,
+          type: 'turn.planUpdated',
+          payload: {
+            explanation: params.explanation,
+            plan: params.plan,
           },
         });
         return;
@@ -580,6 +644,15 @@ export function expandHome(folder: string): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function collaborationModeFromThreadSettings(threadSettings: unknown): 'default' | 'plan' | null {
+  if (!isRecord(threadSettings) || !isRecord(threadSettings.collaborationMode)) {
+    return null;
+  }
+
+  const mode = threadSettings.collaborationMode.mode;
+  return mode === 'default' || mode === 'plan' ? mode : null;
 }
 
 function codexModelToOption(model: CodexModelListResponse['data'][number]): CodexModelOption {

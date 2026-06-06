@@ -65,9 +65,12 @@
           :answered-client-request-ids="answeredClientRequestIds"
           :codex-models="codexModels"
           :model-catalog-status="modelCatalogStatus"
+          :goal-mode="goalMode"
+          :plan-mode="planMode"
           :selected-model-id="selectedModelId"
           :selected-reasoning-effort="selectedReasoningEffort"
           :queued-prompts="queuedPrompts"
+          @attach="$emit('attach')"
           @client-response="$emit('client-response', $event)"
           @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
           @select-model="$emit('select-model', $event)"
@@ -75,6 +78,8 @@
           @send-prompt="$emit('sendPrompt', $event)"
           @steer-prompt="$emit('steerPrompt', $event)"
           @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
+          @update:goal-mode="$emit('update:goalMode', $event)"
+          @update:plan-mode="$emit('update:planMode', $event)"
         />
       </div>
     </section>
@@ -122,11 +127,13 @@ const props = withDefaults(defineProps<{
   messages: RendererMessage[];
   isLoading: boolean;
   isSending: boolean;
+  goalMode?: boolean;
   answeredClientRequestIds?: Set<string>;
   codexModels?: CodexModelOption[];
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
+  planMode?: boolean;
   queuedPrompts?: QueuedChatPrompt[];
   chooseAgentFolder?: () => Promise<string | null>;
   createAgent?: (input: CreateAgentInput) => Promise<void>;
@@ -154,6 +161,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   'close-team': [teamId: string];
   'close-agent': [agentId: string];
+  attach: [];
   'client-response': [response: ClientRequestResponse];
   'delete-queued-prompt': [promptId: string];
   'deploy-bench-template': [templateId: string];
@@ -167,6 +175,8 @@ const emit = defineEmits<{
   'select-reasoning-effort': [reasoningEffort: ReasoningEffort];
   'select-team': [teamId: string];
   'steer-queued-prompt': [promptId: string];
+  'update:goalMode': [enabled: boolean];
+  'update:planMode': [enabled: boolean];
   sendPrompt: [prompt: string];
   steerPrompt: [prompt: string];
 }>();

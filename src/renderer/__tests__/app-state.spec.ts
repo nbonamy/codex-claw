@@ -836,6 +836,92 @@ describe('useAppState', () => {
     });
   });
 
+  it('includes selected plan and goal modes in prompt options', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const updatedSnapshot = createInitialSnapshot();
+    const sendPrompt = vi.fn().mockResolvedValue(updatedSnapshot);
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        sendPrompt,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    state.selectedModelId.value = null;
+    state.selectedReasoningEffort.value = null;
+    state.setPlanMode(true);
+    state.setGoalMode(true);
+
+    await state.sendPrompt('make a plan and keep going');
+
+    expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'make a plan and keep going', {
+      goalMode: true,
+      planMode: true,
+    });
+  });
+
+  it('syncs composer modes from app-owned main events', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn((nextListener) => {
+          listeners.push(nextListener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.modeUpdated',
+      payload: { mode: 'plan' },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    listeners[0]?.({
+      seq: 2,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.goalUpdated',
+      payload: { goal: { objective: 'ship it' } },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(state.planMode.value).toBe(true);
+    expect(state.goalMode.value).toBe(true);
+
+    listeners[0]?.({
+      seq: 3,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.modeUpdated',
+      payload: { mode: 'default' },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+    listeners[0]?.({
+      seq: 4,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.goalCleared',
+      payload: {},
+      occurredAt: '2026-06-05T00:00:04.000Z',
+    });
+
+    expect(state.planMode.value).toBe(false);
+    expect(state.goalMode.value).toBe(false);
+  });
+
   it('handles model catalog loading guards, errors, and invalid selections', async () => {
     const listCodexModels = vi.fn().mockRejectedValue(new Error('models unavailable'));
     vi.stubGlobal('window', {

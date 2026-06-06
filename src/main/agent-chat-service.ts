@@ -61,7 +61,7 @@ export function sendAgentPrompt(
 }
 
 function hasPromptOptions(options: SendPromptOptions | undefined): options is SendPromptOptions {
-  return Boolean(options?.model || options?.reasoningEffort);
+  return Boolean(options?.goalMode || options?.model || options?.planMode || options?.reasoningEffort);
 }
 
 function isBusy(status: AgentStatus): boolean {

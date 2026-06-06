@@ -106,6 +106,22 @@ export type TurnSteerResponse = {
   turnId: string;
 };
 
+export type CodexThreadGoal = {
+  threadId: string;
+  objective: string;
+  status: string;
+  tokenBudget: number | null;
+  tokensUsed: number;
+  timeUsedSeconds: number;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type CodexTurnPlanStep = {
+  step: string;
+  status: 'pending' | 'inProgress' | 'completed';
+};
+
 export type CodexModelListResponse = {
   data: CodexModel[];
   nextCursor?: string | null;
@@ -130,10 +146,13 @@ export type CodexReasoningEffortOption = {
 export type CodexNotification =
   | { method: 'thread/started'; params: { thread: CodexThread } }
   | { method: 'thread/settings/updated'; params: { threadId: string; threadSettings: unknown } }
+  | { method: 'thread/goal/updated'; params: { threadId: string; turnId: string | null; goal: CodexThreadGoal } }
+  | { method: 'thread/goal/cleared'; params: { threadId: string } }
   | { method: 'thread/tokenUsage/updated'; params: { threadId: string; turnId: string; tokenUsage: CodexThreadTokenUsage } }
   | { method: 'thread/status/changed'; params: { threadId: string; status: CodexThreadStatus } }
   | { method: 'turn/started'; params: { threadId: string; turn: CodexTurn } }
   | { method: 'item/agentMessage/delta'; params: { threadId: string; turnId: string; itemId: string; delta: string } }
+  | { method: 'item/plan/delta'; params: { threadId: string; turnId: string; itemId: string; delta: string } }
   | { method: 'item/started'; params: { threadId: string; turnId: string; item: CodexThreadItem } }
   | { method: 'item/completed'; params: { threadId: string; turnId: string; item: CodexThreadItem } }
   | { method: 'rawResponseItem/completed'; params: { threadId: string; turnId: string; item: CodexRawResponseItem } }
@@ -143,6 +162,7 @@ export type CodexNotification =
   | { method: 'thread/compacted'; params: { threadId: string; turnId: string } }
   | { method: 'serverRequest/resolved'; params: { threadId: string; requestId: JsonRpcId } }
   | { method: 'account/rateLimits/updated'; params: { rateLimits: CodexRateLimitSnapshot } }
+  | { method: 'turn/plan/updated'; params: { threadId: string; turnId: string; explanation: string | null; plan: CodexTurnPlanStep[] } }
   | { method: 'turn/completed'; params: { threadId: string; turn: CodexTurn } }
   | { method: string; params?: unknown };
 

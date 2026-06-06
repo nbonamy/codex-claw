@@ -68,6 +68,33 @@ describe('ChatComposer', () => {
     expect(wrapper.emitted('send')).toBeUndefined();
   });
 
+  it('opens the composer action menu and toggles modes', async () => {
+    const wrapper = mountComposer();
+
+    await wrapper.get('.chat-composer-action-menu__button').trigger('click');
+
+    expect(wrapper.find('.chat-composer-action-menu').exists()).toBe(true);
+    await wrapper.findAll('.chat-composer-action-menu__item')[1]?.trigger('click');
+    await wrapper.findAll('.chat-composer-action-menu__item')[2]?.trigger('click');
+
+    expect(wrapper.emitted('update:planMode')).toStrictEqual([[true]]);
+    expect(wrapper.emitted('update:goalMode')).toStrictEqual([[true]]);
+  });
+
+  it('toggles plan mode with Shift Tab and renders active mode chips', async () => {
+    const wrapper = mountComposer({
+      goalMode: true,
+      planMode: true,
+    });
+
+    expect(wrapper.text()).toContain('Plan');
+    expect(wrapper.text()).toContain('Goal');
+
+    await wrapper.get('textarea').trigger('keydown', { key: 'Tab', shiftKey: true });
+
+    expect(wrapper.emitted('update:planMode')).toStrictEqual([[false]]);
+  });
+
   it('disables sending without text or without an agent but keeps busy drafts submittable', async () => {
     const empty = mountComposer();
     expect(empty.get('.chat-composer__send').attributes()).toHaveProperty('disabled');
@@ -116,7 +143,9 @@ describe('ChatComposer', () => {
 
 function mountComposer(overrides: Partial<ChatComposerProps & {
   contextUsage: AgentContextUsage;
+  goalMode: boolean;
   models: CodexModelOption[];
+  planMode: boolean;
   selectedModelId: string;
   selectedReasoningEffort: string;
 }> = {}) {

@@ -29,9 +29,14 @@
           :placeholder="composerPlaceholder"
           :models="codexModels"
           :model-catalog-status="modelCatalogStatus"
+          :goal-mode="goalMode"
+          :plan-mode="planMode"
           :selected-model-id="selectedModelId"
           :selected-reasoning-effort="selectedReasoningEffort"
+          @attach="$emit('attach')"
+          @update:goal-mode="$emit('update:goalMode', $event)"
           @update:model-id="$emit('select-model', $event)"
+          @update:plan-mode="$emit('update:planMode', $event)"
           @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
           @send="$emit('sendPrompt', $event)"
           @steer="$emit('steerPrompt', $event)"
@@ -65,9 +70,14 @@
         :placeholder="composerPlaceholder"
         :models="codexModels"
         :model-catalog-status="modelCatalogStatus"
+        :goal-mode="goalMode"
+        :plan-mode="planMode"
         :selected-model-id="selectedModelId"
         :selected-reasoning-effort="selectedReasoningEffort"
+        @attach="$emit('attach')"
+        @update:goal-mode="$emit('update:goalMode', $event)"
         @update:model-id="$emit('select-model', $event)"
+        @update:plan-mode="$emit('update:planMode', $event)"
         @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
         @send="$emit('sendPrompt', $event)"
         @steer="$emit('steerPrompt', $event)"
@@ -90,6 +100,7 @@ import type { QueuedChatPrompt } from '../shared/chat/queued-prompts';
 const props = withDefaults(defineProps<{
   messages: RendererMessage[];
   agent: Agent | null;
+  goalMode?: boolean;
   isLoading: boolean;
   isSending: boolean;
   answeredClientRequestIds?: Set<string>;
@@ -98,16 +109,20 @@ const props = withDefaults(defineProps<{
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
   queuedPrompts?: QueuedChatPrompt[];
+  planMode?: boolean;
 }>(), {
   queuedPrompts: () => [],
 });
 
 defineEmits<{
+  attach: [];
   'client-response': [response: ClientRequestResponse];
   'delete-queued-prompt': [promptId: string];
   'select-model': [modelId: string];
   'select-reasoning-effort': [reasoningEffort: ReasoningEffort];
   'steer-queued-prompt': [promptId: string];
+  'update:goalMode': [enabled: boolean];
+  'update:planMode': [enabled: boolean];
   sendPrompt: [prompt: string];
   steerPrompt: [prompt: string];
 }>();

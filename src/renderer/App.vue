@@ -8,6 +8,8 @@
     :answered-client-request-ids="answeredClientRequestIds"
     :codex-models="codexModels"
     :model-catalog-status="modelCatalogStatus"
+    :goal-mode="goalMode"
+    :plan-mode="planMode"
     :selected-model-id="selectedModelId"
     :selected-reasoning-effort="selectedReasoningEffort"
     :queued-prompts="activeQueuedPrompts"
@@ -30,6 +32,8 @@
     @select-team="selectTeam"
     @select-model="selectModel"
     @select-reasoning-effort="selectReasoningEffort"
+    @update:goal-mode="setGoalMode"
+    @update:plan-mode="setPlanMode"
     @client-response="respondToClientRequest"
     @delete-queued-prompt="removeQueuedPrompt"
     @send-prompt="sendPrompt"
@@ -56,6 +60,8 @@ const {
   modelCatalogStatus,
   selectedModelId,
   selectedReasoningEffort,
+  planMode,
+  goalMode,
   loadCodexModels,
   loadSnapshot,
   chooseAgentFolder,
@@ -75,6 +81,8 @@ const {
   respondToClientRequest,
   selectModel,
   selectReasoningEffort,
+  setPlanMode,
+  setGoalMode,
   selectAgent,
   selectTeam,
   sendPrompt,

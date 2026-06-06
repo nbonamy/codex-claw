@@ -1787,6 +1787,33 @@ describe('snapshot reducer', () => {
     });
   });
 
+  it('renders app-owned plan updates as transcript text', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 0,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-plan',
+      type: 'turn.planUpdated',
+      payload: {
+        explanation: 'Current plan',
+        plan: [
+          { step: 'Inspect composer', status: 'completed' },
+          { step: 'Wire Plan mode', status: 'inProgress' },
+        ],
+      },
+      occurredAt: '2026-06-05T00:00:00.000Z',
+    });
+
+    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([
+      {
+        type: 'text',
+        text: 'Current plan\n- [x] Inspect composer\n- [ ] Wire Plan mode',
+      },
+    ]);
+  });
+
   it('handles reducer fallback and error events without Codex protocol leaking into UI state', () => {
     const snapshot = createInitialSnapshot();
 

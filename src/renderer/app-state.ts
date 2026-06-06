@@ -14,6 +14,8 @@ const modelCatalogStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('no
 const modelCatalogError = ref<string | null>(null);
 const selectedModelId = ref<string | null>(null);
 const selectedReasoningEffort = ref<ReasoningEffort | null>(null);
+const planMode = ref(false);
+const goalMode = ref(false);
 let unsubscribeMainEvents: (() => void) | null = null;
 
 export function useAppState() {
@@ -345,6 +347,14 @@ export function useAppState() {
     selectedReasoningEffort.value = reasoningEffort;
   }
 
+  function setPlanMode(enabled: boolean): void {
+    planMode.value = enabled;
+  }
+
+  function setGoalMode(enabled: boolean): void {
+    goalMode.value = enabled;
+  }
+
   return {
     snapshot,
     activeAgent,
@@ -358,6 +368,8 @@ export function useAppState() {
     modelCatalogError,
     selectedModelId,
     selectedReasoningEffort,
+    planMode,
+    goalMode,
     loadCodexModels,
     loadSnapshot,
     chooseAgentFolder,
@@ -377,6 +389,8 @@ export function useAppState() {
     respondToClientRequest,
     selectModel,
     selectReasoningEffort,
+    setPlanMode,
+    setGoalMode,
     selectAgent,
     selectTeam,
     sendPrompt,
@@ -407,13 +421,15 @@ function defaultReasoningEffort(model: CodexModelOption): ReasoningEffort | null
 
 function selectedPromptOptions(): SendPromptOptions | undefined {
   const model = selectedModelFromCatalog();
-  if (!model) {
+  if (!model && !planMode.value && !goalMode.value) {
     return undefined;
   }
 
   return {
-    model: model.model,
-    reasoningEffort: selectedReasoningEffort.value ?? defaultReasoningEffort(model),
+    ...(goalMode.value ? { goalMode: true } : {}),
+    ...(model ? { model: model.model } : {}),
+    ...(planMode.value ? { planMode: true } : {}),
+    ...(model ? { reasoningEffort: selectedReasoningEffort.value ?? defaultReasoningEffort(model) } : {}),
   };
 }
 
@@ -425,10 +441,36 @@ function subscribeToMainEvents(): void {
   unsubscribeMainEvents?.();
   unsubscribeMainEvents = window.codexClaw.onEvent((event: MainToRendererEvent) => {
     applyMainEventToSnapshot(snapshot.value, event);
+    syncComposerModesFromMainEvent(event);
     if (event.type === 'turn.completed' && event.agentId) {
       void drainQueuedPrompts(event.agentId);
     }
   });
+}
+
+function syncComposerModesFromMainEvent(event: MainToRendererEvent): void {
+  if (event.agentId && event.agentId !== snapshot.value.activeAgentId) {
+    return;
+  }
+
+  if (event.type === 'thread.modeUpdated' && isRecord(event.payload)) {
+    const mode = event.payload.mode;
+    if (mode === 'plan') {
+      planMode.value = true;
+    } else if (mode === 'default') {
+      planMode.value = false;
+    }
+    return;
+  }
+
+  if (event.type === 'thread.goalUpdated') {
+    goalMode.value = true;
+    return;
+  }
+
+  if (event.type === 'thread.goalCleared') {
+    goalMode.value = false;
+  }
 }
 
 async function hydrateActiveAgentHistory(): Promise<void> {
@@ -527,4 +569,8 @@ function markClientRequestAnswered(requestId: string): void {
   const next = new Set(answeredClientRequestIds.value);
   next.add(requestId);
   answeredClientRequestIds.value = next;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }

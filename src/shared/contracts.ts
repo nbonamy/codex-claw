@@ -102,7 +102,9 @@ export type CodexModelOption = {
 };
 
 export type SendPromptOptions = {
+  goalMode?: boolean;
   model?: string | null;
+  planMode?: boolean;
   reasoningEffort?: ReasoningEffort | null;
 };
 
@@ -179,8 +181,12 @@ export type MainToRendererEvent = {
     | 'thread.started'
     | 'thread.historyLoaded'
     | 'thread.settingsUpdated'
+    | 'thread.modeUpdated'
+    | 'thread.goalUpdated'
+    | 'thread.goalCleared'
     | 'thread.tokenUsageUpdated'
     | 'turn.started'
+    | 'turn.planUpdated'
     | 'turn.completed'
     | 'message.steer'
     | 'context.compactionStarted'

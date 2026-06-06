@@ -251,6 +251,18 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     return;
   }
 
+  if (event.type === 'turn.planUpdated' && event.turnId) {
+    const text = formatTurnPlanUpdate(event.payload);
+    if (text) {
+      appendAssistantDelta(snapshot, event.agentId, event.turnId, text);
+    }
+    return;
+  }
+
+  if (event.type === 'thread.modeUpdated' || event.type === 'thread.goalUpdated' || event.type === 'thread.goalCleared') {
+    return;
+  }
+
   if (event.type === 'message.delta' && event.turnId) {
     const payload = event.payload as { delta?: unknown; itemId?: unknown };
     appendAssistantDelta(
@@ -322,6 +334,27 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     appendSystemMessage(snapshot, event.agentId, message);
     setAgentStatus(snapshot, event.agentId, { type: 'error', message });
   }
+}
+
+function formatTurnPlanUpdate(payload: unknown): string {
+  if (!isRecord(payload)) {
+    return '';
+  }
+
+  const explanation = typeof payload.explanation === 'string' && payload.explanation.trim()
+    ? payload.explanation.trim()
+    : '';
+  const plan = Array.isArray(payload.plan) ? payload.plan : [];
+  const steps = plan.map((entry) => {
+    if (!isRecord(entry) || typeof entry.step !== 'string') {
+      return '';
+    }
+
+    const marker = entry.status === 'completed' ? '- [x]' : '- [ ]';
+    return `${marker} ${entry.step}`;
+  }).filter(Boolean);
+
+  return [explanation, ...steps].filter(Boolean).join('\n');
 }
 
 function updateAssistantToolPart(snapshot: AppSnapshot, agentId: string, turnId: string, payload: unknown): void {

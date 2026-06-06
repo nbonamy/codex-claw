@@ -158,15 +158,19 @@ Handled notifications:
 
 - `thread/started`
 - `thread/settings/updated`
+- `thread/goal/updated`
+- `thread/goal/cleared`
 - `thread/tokenUsage/updated`
 - `thread/status/changed`
 - `turn/started`
+- `turn/plan/updated`
 - `turn/completed`
 - `item/started`
 - `item/completed`
 - `rawResponseItem/completed` as a compatibility/fallback path for raw
   Responses items that are not projected into `ThreadItem`s.
 - `item/agentMessage/delta`
+- `item/plan/delta`
 - `item/commandExecution/outputDelta`
 - `item/fileChange/patchUpdated`
 - `item/mcpToolCall/progress`
@@ -176,8 +180,6 @@ Handled notifications:
 High-priority missing notifications:
 
 - `error`: should become an app-owned error event and visible system message.
-- `turn/plan/updated`: needed for plan mode rendering.
-- `item/plan/delta`: needed for streaming plan deltas.
 - `item/reasoning/summaryTextDelta`: needed for reasoning summary rendering.
 - `item/reasoning/summaryPartAdded`: needed for reasoning summary rendering.
 - `item/reasoning/textDelta`: needed for reasoning text rendering.
@@ -205,8 +207,6 @@ we add the matching UI:
 Thread lifecycle notifications that can wait until thread/history management:
 
 - `thread/name/updated`
-- `thread/goal/updated`
-- `thread/goal/cleared`
 - `thread/archived`
 - `thread/unarchived`
 - `thread/closed`
@@ -273,6 +273,29 @@ compatibility.
 
 Unhandled notifications should also log `not implemented`, but they do not need
 a response because notifications cannot block the app-server.
+
+## Plan And Goal Modes
+
+Composer Plan mode is sent through Codex's experimental
+`turn/start.collaborationMode` override. Main builds the `collaborationMode`
+object from app-owned prompt options and the selected model/reasoning effort;
+renderer code only sees a boolean Plan toggle.
+
+Composer Goal mode creates or updates the Codex thread goal before starting the
+turn by calling `thread/goal/set` with the submitted prompt as the objective and
+`active` status.
+
+Mode notifications stay app-owned:
+
+- `thread/settings/updated` is still emitted for persistence/thread mapping.
+- If the thread settings include `collaborationMode.mode`, main also emits
+  `thread.modeUpdated` with `default` or `plan`.
+- `thread/goal/updated` and `thread/goal/cleared` become app-owned goal events
+  so the composer indicator can stay in sync.
+- `turn/plan/updated` becomes transcript text for now; this is the rendering
+  hook for a richer native plan component later.
+- `item/plan/delta` is accepted as an assistant delta so streaming plan text can
+  appear at the point Codex emits it.
 
 ### Token Usage And Rate Limits
 
