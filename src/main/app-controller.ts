@@ -321,10 +321,11 @@ export class AppController {
 
     applyMainEventToSnapshot(this.snapshot, fullEvent);
     this.mainWindow?.webContents.send(ipcChannels.event, fullEvent);
-    if (fullEvent.type === 'thread.started' || fullEvent.type === 'thread.settingsUpdated') {
+    if (fullEvent.type === 'agent.updated' || fullEvent.type === 'thread.started' || fullEvent.type === 'thread.settingsUpdated') {
       void this.persistSnapshot().catch((error: unknown) => {
-        warnMain('state', 'failed to persist thread mapping', {
+        warnMain('state', 'failed to persist snapshot event', {
           error: error instanceof Error ? error.message : String(error),
+          eventType: fullEvent.type,
         });
       });
     }
