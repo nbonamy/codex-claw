@@ -8,6 +8,10 @@ provider app. The goal is narrower: keep Codex and Claude backend details inside
 main-process drivers, while the renderer and persistence layer speak in
 app-owned concepts.
 
+The implementation status above is the source of truth. The numbered sections
+below retain original problem/target language as an audit trail for the cleanup
+that landed on `main`.
+
 Related docs:
 
 - `docs/architecture.md`: target process boundaries and backend seam.
@@ -86,7 +90,7 @@ Those names can remain inside `src/main/codex/*` and Codex-specific tests.
 
 ## 1. Persisted Product Model
 
-Current problem:
+Original problem:
 
 - `Agent.codexThreadId` is the only persisted session identity.
 - `BenchTemplate.backend` can only be `'codex'`.
@@ -159,7 +163,7 @@ Commit checkpoint:
 
 ## 2. Runtime Status
 
-Current problem:
+Original problem:
 
 - `AppSnapshot.appServer` describes the Codex app-server, but the field lives
   in the app-wide snapshot and renderer as if every backend has an app-server.
@@ -197,7 +201,7 @@ Commit checkpoint:
 
 ## 3. Main-Process Backend Seam
 
-Current problem:
+Original problem:
 
 - `AppController` owns a concrete `CodexAgentSessionManager`.
 - `sendAgentPrompt()` accepts `CodexAgentSessionManager` directly.
@@ -257,7 +261,7 @@ Commit checkpoint:
 
 ## 4. Backend Capabilities
 
-Current problem:
+Original problem:
 
 - Renderer assumes every backend supports Codex model reasoning, skills, goal
   mode, steering, rollback, edit, retry, and thread history. Plan mode needs a
@@ -305,7 +309,7 @@ Commit checkpoint:
 
 ## 5. Prompt Options
 
-Current problem:
+Original problem:
 
 - `SendPromptOptions` mixes app prompt options with Codex-specific options.
 
@@ -344,7 +348,7 @@ Commit checkpoint:
 
 ## 6. Models, Skills, And Composer Controls
 
-Current problem:
+Original problem:
 
 - `listCodexModels()` and `listCodexSkills()` are exposed on
   `CodexClawApi`.
@@ -399,7 +403,7 @@ Commit checkpoint:
 
 ## 7. Requests And Approvals
 
-Current problem:
+Original problem:
 
 - The UI request shape is already mostly app-owned, but the response path is
   handled by the Codex manager.
@@ -428,7 +432,7 @@ Commit checkpoint:
 
 ## 8. Thread, Turn, And Session Language
 
-Current problem:
+Original problem:
 
 - IPC events and reducers use `thread.*` for app-level lifecycle events.
 - Codex has thread ids and turn ids. Claude has sessions, SDK messages, and
@@ -492,7 +496,7 @@ Commit checkpoint:
 
 ## 10. MCP Enablement
 
-Current problem:
+Original problem:
 
 - MCP enablement is implemented as Codex command-line config overrides.
 - Docs already say backend enablement should be backend-specific, but code only

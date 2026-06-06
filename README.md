@@ -1,90 +1,104 @@
+<p align="center">
+   <img src="assets/icon.png" width="128" height="128" alt="Codex Claw App Icon" />
+</p>
+
 # Codex Claw
 
-Codex Claw is a desktop app for working with multiple Codex agents as a team.
-It combines the team and agent workflow from Skwad with native chat, tool-call,
-diff, and artifact rendering inspired by id8.
+Meet your native Codex coding crew. Codex Claw is a desktop app that lets you
+run a team of Codex agents, each with its own folder, identity, thread, tools,
+and inbox, while rendering the work as a real app instead of a terminal stream.
 
-The first product is intentionally Codex-only. The app talks to the Codex
-app-server from Electron main, translates Codex events into app-owned messages,
-and streams those messages into a Vue renderer over typed IPC.
+![Electron](https://img.shields.io/badge/Electron-42+-47848F)
+![Vue](https://img.shields.io/badge/Vue-3-42b883)
+![TypeScript](https://img.shields.io/badge/TypeScript-6+-3178c6)
+![License](https://img.shields.io/badge/License-Apache--2.0-green)
 
-## Status
+## Why Codex Claw
 
-The current implementation is the no-team multi-agent MVP. It boots an Electron
-app with two Codex agents, routes prompts through Electron main to the Codex
-app-server, keeps each agent's transcript isolated, and allows switching agents
-while another agent keeps working in the background.
+- **Feels like a team room:** teams, agents, avatars, folders, statuses, and
+  Bench templates stay visible and organized.
+- **Native Codex rendering:** messages, tool calls, command output, approvals,
+  questions, plans, file edits, diff stats, and Markdown render as app UI.
+- **Actually collaborative:** built-in MCP lets agents register, set status,
+  list teammates, send messages, broadcast, and check their inbox.
+- **Built for coding flow:** queue prompts, steer active turns, interrupt work,
+  mention files, trigger skills, dictate prompts, and keep context/rate-limit
+  state in sight.
 
-## Product Shape
+## Features
 
-- **Teams**: top-level groups for agents.
-- **Agents**: named teammates with avatars, folders, Codex threads, and status.
-- **Bench**: saved deployable agent templates, borrowed from Skwad.
-- **Conversation**: native rendering for messages, tool calls, approvals,
-  plans, command output, file changes, and diffs.
-- **Artifacts**: side panes for plans, files, diffs, git state, and related
-  coding context.
+- **Team and agent management** - Create teams, add Codex agents, edit avatars,
+  move agents between teams, duplicate, restart, close, and persist everything.
+- **Bench templates** - Save good agents as reusable templates and deploy them
+  back into a team.
+- **Native chat surface** - Stream assistant text, ordered message parts,
+  syntax-highlighted code, links, tool groups, command logs, and file-change
+  summaries.
+- **Plan and goal modes** - Toggle Codex plan mode, start goal-oriented turns,
+  and process app-server mode updates.
+- **Agent-to-agent communication** - Local Claw MCP server with Skwad-shaped
+  collaboration tools.
+- **Composer superpowers** - Model/reasoning selector, queued prompts,
+  active-turn steering, slash commands, skill search, file mentions, attach
+  affordances, and macOS speech-to-text.
+- **Runtime awareness** - Context-window gauge, account rate limits, backend
+  status, agent status, thread history resume, and loading skeletons.
 
-The renderer consumes Codex Claw's own message model. Codex-specific protocol
-types stay behind the main-process Codex driver so another backend, such as
-Claude Code, can be added later without rewriting the UI.
+## Requirements
 
-## Tech Stack
+- A current macOS development environment.
+- Node.js compatible with the Electron Forge/Vite toolchain.
+- Access to a Codex app-server binary.
 
-- Electron
-- Electron Forge
-- TypeScript
-- Vue 3 with TypeScript
-- Element Plus
-- Vitest
-
-## Architecture Principles
-
-- Electron main owns Codex app-server lifecycle, protocol transport, request
-  IDs, approval handling, filesystem access, and persistence.
-- Preload exposes a small typed IPC bridge.
-- Renderer owns visual state and interaction state only.
-- Backend protocol events are translated into app-owned events before they
-  reach the renderer.
-- Themes are built from semantic tokens and CSS variables from the start.
-- Bench is a first-class product primitive, not just a creation shortcut.
-
-## Roadmap
-
-1. No team, single Codex agent chat with basic rendering. Complete.
-2. No team, multiple independent agent chats. Complete.
-3. Bench support for reusable agent templates.
-4. Agent-to-agent communication tools.
-5. Team support.
-6. Richer Codex rendering for plan mode, approvals, questions, diffs, and
-   command output.
-7. SWE surfaces such as git diff, git actions, and file viewing.
-
-See [plans/codex-claw.md](plans/codex-claw.md) for the working product plan.
-
-## Documentation
-
-- [docs/architecture.md](docs/architecture.md): product model, process
-  architecture, IPC, backend seam, persistence, and open decisions.
-- [docs/codex.md](docs/codex.md): Codex app-server communication.
-- [docs/mcp.md](docs/mcp.md): app-owned MCP server for agent collaboration.
-- [docs/frontend.md](docs/frontend.md): Vue, Element Plus, component, shell,
-  and theming principles.
-- [docs/testing.md](docs/testing.md): testing strategy and coverage bar.
-- [docs/codex.png](docs/codex.png): visual reference for the target shell.
-- [AGENTS.md](AGENTS.md): repo guidance for Codex agents working here.
+Codex Claw can use an isolated Codex home through `CODEX_CLAW_CODEX_HOME` and
+resumes persisted agent sessions when possible.
 
 ## Development
 
-Run the app during development with:
-
 ```bash
+npm install
 npm run dev
 ```
 
-Every code change should include focused tests unless it is docs-only or cannot
-be tested. Once coverage tooling exists, the minimum coverage threshold is 85%
-for statements, branches, functions, and lines.
+Useful verification commands:
+
+```bash
+npm test
+npm run test:coverage
+npm run lint
+npm run build
+```
+
+macOS packaging signs and notarizes by default. For local packaging checks that
+do not need release signing:
+
+```bash
+CODEX_CLAW_SKIP_SIGNING=1 npm run build
+CODEX_CLAW_SKIP_SIGNING=1 npm run package
+```
+
+## Architecture
+
+Codex Claw keeps Codex protocol details in Electron main:
+
+```text
+Renderer UI -> typed preload IPC -> Electron main -> backend driver -> Codex app-server
+```
+
+The renderer consumes app-owned events and `RendererMessage` parts. Codex is
+the implemented backend today, with a narrow backend seam ready for a future
+Claude Code driver.
+
+## Documentation
+
+- [AGENTS.md](AGENTS.md) - repo rules for agents working on Codex Claw
+- [docs/architecture.md](docs/architecture.md) - product and process
+  architecture
+- [docs/codex.md](docs/codex.md) - Codex app-server protocol notes
+- [docs/mcp.md](docs/mcp.md) - Claw MCP collaboration server
+- [docs/frontend.md](docs/frontend.md) - renderer and theming principles
+- [docs/testing.md](docs/testing.md) - test strategy and coverage bar
+- [plans/codex-claw.md](plans/codex-claw.md) - product progression
 
 ## License
 

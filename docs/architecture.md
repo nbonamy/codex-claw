@@ -4,9 +4,10 @@ Status: updated for backend seam cleanup, 2026-06-06.
 
 Codex Claw is an Electron app that merges the team/agent product model from
 Skwad with the native chat and artifact rendering already built in id8. The app
-supports Codex only. It does not launch a terminal emulator as the primary user
-experience; it talks to the Codex app-server from the Electron main process and
-renders structured events in the renderer.
+currently implements Codex through Codex app-server and has a backend-aware
+main-process seam for future drivers such as Claude Code. It does not launch a
+terminal emulator as the primary user experience; main-process backend drivers
+own protocol/process communication and the renderer displays app-owned events.
 
 ## Goals
 
@@ -16,8 +17,8 @@ renders structured events in the renderer.
   document/artifact panes.
 - Treat Bench as a first-class product primitive: saved agent templates that
   can be deployed into a team quickly.
-- Keep Codex as the only agent provider for the first product. Do not carry
-  Skwad's full multi-provider abstraction forward, but keep a narrow backend
+- Keep Codex as the implemented backend for the current product. Do not carry
+  Skwad's full multi-provider abstraction forward, but keep the narrow backend
   seam so another coding backend can be added later without rewriting the UI.
 - Use the Codex app-server protocol as the long-term integration boundary.
 - Keep all app-server communication in Electron main. Renderer code never owns
@@ -28,8 +29,8 @@ renders structured events in the renderer.
 - Reuse id8 renderer primitives for messages, streaming text, tool calls,
   approvals, markdown, mermaid, media, and diffs.
 - Build theme support from day one with semantic tokens, not hardcoded colors.
-- Make the first milestone intentionally small: one implicit team, one agent,
-  one folder, one Codex thread, native rendering.
+- Keep milestones demoable: product state is teams plus agents, while backend
+  drivers own session/thread details and renderer UI stays app-owned.
 
 ## Tech Stack
 
@@ -55,7 +56,6 @@ type Team = {
   color?: string
   agentIds: string[]
   activeAgentId?: string
-  layout: TeamLayoutState
 }
 
 type Agent = {
@@ -113,8 +113,8 @@ team. Initially we can match Skwad and dedupe/update Bench entries by folder;
 later we may allow multiple templates for the same folder if the product needs
 different roles or model defaults.
 
-For the first milestone we can create an implicit default team and a single
-agent, then generalize without changing the app-server layer.
+On a fresh install, create a default team when no teams exist. Do not create a
+default agent automatically; an empty team shows the New Agent empty state.
 
 ## Process Architecture
 
@@ -157,7 +157,8 @@ Modules:
   renderer event protocol. This is where app-server churn is contained.
 - `ApprovalCoordinator`: stores pending approval and user-input requests from
   app-server, emits UI prompts, and resolves/rejects server requests when the
-  renderer answers.
+  renderer answers. In the current implementation this coordination is owned by
+  backend session/controller code rather than a standalone module.
 - `AppStateStore`: persists teams, agents, settings, window state, and theme
   preference under Electron `userData`.
 - `BenchManager`: creates, updates, removes, sorts, validates, and deploys
@@ -214,20 +215,37 @@ renderer entrypoint to Electron APIs.
 ```ts
 type CodexClawApi = {
   getSnapshot(): Promise<AppSnapshot>
-  createAgent(input: CreateAgentInput): Promise<Agent>
-  updateAgent(id: string, patch: UpdateAgentPatch): Promise<Agent>
-  saveAgentToBench(agentId: string): Promise<BenchTemplate>
-  deployBenchTemplate(templateId: string, teamId?: string): Promise<Agent>
-  removeBenchTemplate(templateId: string): Promise<void>
-  selectFolder(): Promise<string | null>
-  startAgent(agentId: string): Promise<void>
   listBackendModels(agentId: string): Promise<BackendModelOption[]>
   listBackendSkills(agentId: string): Promise<BackendSkillSummary[]>
-  sendPrompt(agentId: string, prompt: string): Promise<void>
-  steerTurn(agentId: string, prompt: string): Promise<void>
-  interruptTurn(agentId: string): Promise<void>
-  answerRequest(requestId: string, payload: unknown): Promise<void>
+  listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]>
+  chooseAgentFolder(): Promise<string | null>
+  createTeam(input: CreateTeamInput): Promise<AppSnapshot>
+  updateTeam(input: UpdateTeamInput): Promise<AppSnapshot>
+  closeTeam(teamId: string): Promise<AppSnapshot>
+  selectTeam(teamId: string): Promise<AppSnapshot>
+  createAgent(input: CreateAgentInput): Promise<AppSnapshot>
+  updateAgent(input: UpdateAgentInput): Promise<AppSnapshot>
+  duplicateAgent(agentId: string): Promise<AppSnapshot>
+  moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot>
+  saveAgentToBench(agentId: string): Promise<AppSnapshot>
+  deployBenchTemplate(templateId: string, teamId?: string): Promise<AppSnapshot>
+  removeBenchTemplate(templateId: string): Promise<AppSnapshot>
+  restartAgent(agentId: string): Promise<AppSnapshot>
+  closeAgent(agentId: string): Promise<AppSnapshot>
+  selectAgent(agentId: string): Promise<AppSnapshot>
+  selectAgentFolder(agentId: string): Promise<AppSnapshot | null>
+  updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>
+  transcribeAppleSpeech(audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions): Promise<AppleSpeechTranscriptionResult>
+  quit(): Promise<void>
+  sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot>
+  steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot>
+  interruptAgent(agentId: string): Promise<AppSnapshot>
+  deleteMessage(agentId: string, messageId: string): Promise<AppSnapshot>
+  editMessage(agentId: string, messageId: string, prompt: string): Promise<AppSnapshot>
+  retryMessage(agentId: string, messageId: string): Promise<AppSnapshot>
+  respondToClientRequest(response: ClientRequestResponse): Promise<AppSnapshot>
   onEvent(listener: (event: MainToRendererEvent) => void): () => void
+  onAppCommand(listener: (command: AppCommand) => void): () => void
 }
 ```
 
@@ -268,10 +286,22 @@ type MainToRendererEvent = {
   turnId?: string
   type:
     | "backend.statusChanged"
+    | "agent.updated"
     | "agent.statusChanged"
     | "thread.started"
+    | "thread.historyLoaded"
+    | "thread.settingsUpdated"
+    | "thread.modeUpdated"
+    | "thread.goalUpdated"
+    | "thread.goalCleared"
+    | "thread.tokenUsageUpdated"
     | "turn.started"
+    | "turn.planUpdated"
     | "turn.completed"
+    | "message.steer"
+    | "context.compactionStarted"
+    | "account.rateLimitsUpdated"
+    | "skills.changed"
     | "message.delta"
     | "item.started"
     | "item.updated"
@@ -309,18 +339,21 @@ Connection lifecycle:
 5. Call `turn/start` with `input: [{ type: "text", text, textElements: [] }]`.
 6. Consume notifications and server requests until `turn/completed`.
 
-Important app-server messages for the first native agent:
+Important app-server messages for the current native agent:
 
 - Requests: `thread/start`, `thread/resume`, `thread/list`, `turn/start`,
   `turn/steer`, `turn/interrupt`.
-- Notifications: `thread/started`, `thread/status/changed`, `turn/started`,
-  `turn/completed`, `item/started`, `item/completed`,
-  `item/agentMessage/delta`, `item/reasoning/*`, `item/plan/delta`,
-  `item/commandExecution/outputDelta`, `item/fileChange/patchUpdated`,
-  `turn/diff/updated`.
-- Server-initiated requests: `item/commandExecution/requestApproval`,
-  `item/fileChange/requestApproval`, `item/permissions/requestApproval`,
-  `item/tool/requestUserInput`.
+- Notifications: `thread/started`, `thread/settings/updated`,
+  `thread/status/changed`, `thread/tokenUsage/updated`, `turn/started`,
+  `turn/plan/updated`, `turn/completed`, `item/started`, `item/completed`,
+  `rawResponseItem/completed`, `item/agentMessage/delta`,
+  `item/plan/delta`, `item/commandExecution/outputDelta`,
+  `item/fileChange/patchUpdated`, `turn/diff/updated`,
+  `account/rateLimits/updated`, and `skills/changed`.
+- Server-initiated requests: `mcpServer/elicitation/request`,
+  `item/tool/requestUserInput`, `item/commandExecution/requestApproval`,
+  `item/fileChange/requestApproval`, and
+  `item/permissions/requestApproval`.
 
 The app-server can generate TypeScript protocol bindings with:
 
@@ -359,9 +392,9 @@ phase if possible. The product needs app-server concepts the SDK does not fully
 model: thread list/read/resume, active turn steering, approval routing, turn
 diff updates, server-initiated requests, and future realtime/control surfaces.
 
-If we temporarily use the SDK, it must sit behind the same `CodexSessionDriver`
-interface as the app-server implementation so the renderer and IPC contract do
-not change when it is removed.
+If we temporarily use the SDK, it must sit behind the same
+`AgentBackendDriver` interface as the app-server implementation so the renderer
+and IPC contract do not change when it is removed.
 
 ## Event Adaptation
 
@@ -376,24 +409,30 @@ model:
 ```ts
 type RendererMessage = {
   id: string
+  agentId: string
+  kind?: "compaction" | "steer"
   role: "user" | "assistant" | "system"
+  status: "streaming" | "complete" | "error"
+  turnId?: string
   parts: RendererMessagePart[]
-  status?: "streaming" | "complete" | "error"
   createdAt: string
-  backend: {
-    kind: "codex"
-    threadId: string
-    turnId?: string
-    itemIds?: string[]
-  }
 }
 
 type RendererMessagePart =
-  | { type: "text"; text: string }
-  | { type: "reasoning"; text: string; summary?: boolean }
-  | { type: "tool"; toolCall: RendererToolCall }
-  | { type: "diff"; diffId: string }
-  | { type: "media"; media: RendererMedia }
+  | { type: "text"; text: string; itemId?: string }
+  | {
+      type: "tool"
+      id: string
+      kind: "command" | "mcp" | "dynamic" | "fileChange" | "generic"
+      title: string
+      status: "running" | "completed" | "failed"
+      statusText?: string
+      body?: string
+      input?: unknown
+      output?: unknown
+      metadata?: Record<string, unknown>
+    }
+  | { type: "status"; text: string }
 ```
 
 For the first backend, the flow is Codex app-server event -> Codex adapter ->
@@ -505,30 +544,33 @@ Codex Claw unless we need an app-specific cache for performance.
 - Use Playwright screenshots for the app shell, message streaming, approvals,
   and theme switching.
 
-## First Milestone Boundary
+## Current Product Boundary
 
-The first implementation target is:
+Implemented product surfaces:
 
-- Electron app boots to a single native conversation view.
-- User selects or configures one folder.
-- Main process starts/connects to app-server.
-- App creates or resumes one Codex thread for that folder.
-- User sends prompts from a native composer.
-- Renderer streams assistant text and basic tool calls.
-- Main handles interrupt and minimal approval prompts.
-- App stores the agent name/avatar/folder/thread id locally.
+- Electron app boots to a native team/agent shell.
+- Teams can be created, edited, selected, cycled, and closed.
+- Agents can be created, edited, duplicated, moved between teams, saved to
+  Bench, restarted, closed, and selected.
+- Empty teams show a first-agent call to action instead of creating a default
+  agent.
+- Main process starts/connects to Codex app-server, creates or resumes Codex
+  threads, hydrates history, sends prompts, steers active turns, and
+  interrupts.
+- Renderer displays ordered chat/tool parts, Markdown, links, diff stats,
+  queued prompts, ask-user prompts, approvals, context usage, rate limits,
+  file mentions, skills, plan/goal controls, and voice transcription controls.
+- Claw's local MCP server supports agent registration, status, listing,
+  direct messages, broadcast, and inbox checks.
 
-Explicitly out of scope for milestone one:
+Still intentionally incomplete:
 
-- Bench UI, except for schema decisions that keep it easy to add later;
-- multiple teams;
-- multi-agent layouts;
-- Skwad MCP/team messaging;
-- companion agents;
-- worktree creation;
-- remote-control daemon management;
+- Claude Code driver;
+- worktree creation and companion agents;
 - full VS Code theme import UI;
-- full history browser.
+- full history browser;
+- right-side artifact/file/git panes at the level shown in the long-term visual
+  reference.
 
 ## Direction Set
 

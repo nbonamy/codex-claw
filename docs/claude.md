@@ -41,23 +41,30 @@ stdio://`. Electron main owns the process, JSON-RPC request ids, server
 requests, and event adaptation. Renderer code consumes app-owned
 `MainToRendererEvent` and `RendererMessage` shapes.
 
-The architecture docs already have the right future seam:
+The backend-agnostic cleanup has landed. The current shared/main seam is:
 
 ```ts
 type AgentBackendDriver = {
-  startSession(agent: Agent): Promise<BackendSession>
-  resumeSession(agent: Agent, threadId: string): Promise<BackendSession>
-  sendPrompt(sessionId: string, input: PromptInput): Promise<void>
-  steerTurn(sessionId: string, input: PromptInput): Promise<void>
-  interruptTurn(sessionId: string): Promise<void>
-  answerRequest(requestId: string, payload: unknown): Promise<void>
+  readonly backend: AgentBackend
+  getRuntimeStatus(): BackendRuntimeStatus
+  getCapabilities(agent: Agent): BackendCapabilities
+  sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>
+  interrupt(agent: Agent): Promise<BackendSendResult>
+  respondToRequest(response: ClientRequestResponse): Promise<void>
+  hydrateAgent?(agent: Agent): Promise<BackendSession | null>
+  steerPrompt?(agent: Agent, prompt: string): Promise<BackendSendResult>
+  rollbackToTurn?(agent: Agent, turnId: string): Promise<BackendRollbackResult>
+  listModels?(agent: Agent): Promise<BackendModelOption[]>
+  listSkills?(agent: Agent): Promise<BackendSkillSummary[]>
   onEvent(listener: (event: BackendEvent) => void): () => void
+  close(): Promise<void>
 }
 ```
 
-The implementation is not yet at that seam. `AppController` constructs a
-`CodexAgentSessionManager` directly, `sendAgentPrompt` accepts that concrete
-type, and shared contracts still expose Codex names.
+`CodexBackendDriver` wraps `CodexAgentSessionManager`; `AppController` routes
+prompt send, interrupt, history hydration, rollback, request responses, model
+loading, and skill loading through the backend driver. Claude is represented in
+shared contracts and capabilities, but no Claude driver is implemented yet.
 
 ## Claude Websocket Surfaces
 
@@ -534,7 +541,8 @@ avoids mutating global user state.
 
 ### Models, Thinking, Skills
 
-The current Claw model and skill contracts are Codex-specific.
+The current Claw model and skill contracts are backend-neutral, but only the
+Codex driver currently returns real model and skill catalogs.
 
 Claude exposes model information in `initialize` responses and `system/init`
 messages, and it can accept `set_model`. Thinking is `ThinkingConfig` or older
@@ -542,96 +550,92 @@ messages, and it can accept `set_model`. Thinking is `ThinkingConfig` or older
 
 Claude `system/init` contains `skills`, `plugins`, `slash_commands`, and
 `tools`, but the inspected websocket protocol does not show a direct equivalent
-to Codex `skills/list` scoped by cwd. The composer slash menu should either:
+to Codex `skills/list` scoped by cwd. Composer command and skill menus should
+either:
 
 - become provider-aware behind a generic `BackendSkillSummary`, or
 - hide provider-specific skills until the Claude driver can supply them.
 
-## Current Codex Bias Inventory
+## Historical Codex Bias Inventory
 
-These are not all bugs. Many were correct for the first Codex-only milestone.
-They are the concrete seams to unwind before Claude support.
+This section is retained to explain why `docs/backend-agnostic-cleanup.md`
+exists. Most items below were fixed by the backend-agnostic cleanup on
+2026-06-06 and should not be treated as current code facts. Current remaining
+Claude work is listed in "Remaining Claude Driver Work".
 
 ### Shared Contracts
 
-- `Agent.codexThreadId` stores the only persisted backend session id.
-- `BenchTemplate.backend` is the literal union `'codex'`.
-- `BenchTemplate.codexDefaults` only models Codex settings.
-- `CodexModelOption`, `CodexSkillSummary`, and `ReasoningEffort` are shared
-  renderer-facing types.
-- `SendPromptOptions` contains Codex-specific `reasoningEffort`, `planMode`,
-  `goalMode`, and `skills`.
-- `AppSnapshot.appServer` describes a single Codex app-server, not a generic
-  backend runtime.
-- `CodexClawApi` methods include `listCodexModels()` and
+- Previously, `Agent.codexThreadId` stored the only persisted backend session
+  id.
+- Previously, `BenchTemplate.backend` could only represent `'codex'`.
+- Previously, `BenchTemplate.codexDefaults` only modeled Codex settings.
+- Previously, `CodexModelOption`, `CodexSkillSummary`, and `ReasoningEffort`
+  were shared renderer-facing types.
+- Previously, `SendPromptOptions` mixed Codex-specific `reasoningEffort`,
+  `planMode`, `goalMode`, and `skills`.
+- Previously, `AppSnapshot.appServer` described a single Codex app-server
+  instead of a generic backend runtime.
+- Previously, `CodexClawApi` exposed `listCodexModels()` and
   `listCodexSkills()`.
 
 ### Main Process
 
-- `AppController` owns one `codexSessionManager`.
-- `getCodexSessionManager()` always creates `CodexProcessTransport`,
-  `CodexRpcClient`, and `CodexAgentSessionManager`.
-- MCP enablement is hardwired through Codex command-line config overrides.
-- `sendAgentPrompt()` accepts `CodexAgentSessionManager` directly and emits
-  text like `Starting Codex app-server...`.
-- `respondToClientRequest()` assumes the active backend is Codex.
-- hydrate, rollback, edit, delete, and retry all depend on `codexThreadId`,
-  Codex turns, and `thread/rollback`.
-- `steerPrompt()` assumes Codex active-turn steering. The analyzed Claude
-  websocket protocol has interrupt and additional user messages, but not a
+- Previously, `AppController` owned one concrete Codex session manager.
+- Previously, session manager creation was hardwired to
+  `CodexProcessTransport`, `CodexRpcClient`, and `CodexAgentSessionManager`.
+- MCP enablement is still implemented only for Codex through command-line
+  config overrides; future backends need their own enablement path.
+- Previously, app-level prompt sending accepted `CodexAgentSessionManager`
+  directly and emitted text like `Starting Codex app-server...`.
+- Previously, `respondToClientRequest()` assumed Codex.
+- Rollback, edit, delete, and retry remain Codex-capability-driven product
+  actions until a Claude equivalent is verified.
+- `steerPrompt()` remains a Codex capability. The analyzed Claude websocket
+  protocol has interrupt and additional user messages, but not a
   Codex-equivalent `turn/steer`.
 
 ### Renderer
 
-- `App.vue`, `AppShell.vue`, `ConversationPane.vue`, and `ChatComposer.vue`
-  pass `codexModels` and `codexSkills`.
-- `ChatModelReasoningSelector` assumes Codex model catalog shape and reasoning
-  effort choices.
-- `ChatComposerSkillMenu` assumes `CodexSkillSummary`.
-- Composer and headers show user-visible Codex strings such as
-  `Codex is working`, `Codex pending`, and `Codex error`.
-- History hydration checks `agent.codexThreadId`.
-- Tool rendering logic understands descriptors with `source: "codex"`.
+- Previously, renderer components passed `codexModels` and `codexSkills`.
+- Model, reasoning, skill, goal, and steering controls are now capability
+  gated, but Codex is the only backend with populated model/skill catalogs.
+- Composer and headers may still show user-visible Codex copy for Codex agents;
+  another backend should supply its own display name through app-owned state.
+- Tool rendering logic still understands descriptors with `source: "codex"`
+  because Codex is the only implemented backend.
 
 ### Persistence And State
 
-- `state-persistence.ts` reads/writes `codexThreadId`, `backend: 'codex'`,
-  and `codexDefaults`.
-- `snapshot.ts` sets `codexThreadId` from thread events and clears it on
-  restart.
-- message ids and rollback helpers infer Codex turn ids from ids like
-  `assistant-{turnId}`.
-- initial snapshot data and defaults are Codex-branded.
+- Previously, persistence read/wrote `codexThreadId` and `codexDefaults`.
+- Current persistence writes `backend`, `backendSession`, and
+  `backendDefaults`; legacy migration was intentionally left out of scope.
+- Message ids and rollback helpers may still carry Codex turn concepts where
+  Codex-specific rollback is implemented.
+- Initial default data uses Codex as the implemented backend.
 
 ### Documentation
 
-- `docs/architecture.md` says Codex-only for the first product but names a
-  future backend seam.
-- `docs/codex.md` is correctly Codex-specific.
-- `docs/mcp.md` says backend enablement should be backend-specific, but only
-  Codex enablement is implemented.
+- `docs/architecture.md` now documents the backend seam as current.
+- `docs/codex.md` remains intentionally Codex-specific.
+- `docs/mcp.md` says backend enablement should be backend-specific; only Codex
+  enablement is implemented today.
 
-## Refactor Before Claude
+## Remaining Claude Driver Work
 
-The right prep work is not a broad generic provider abstraction. It is a narrow
-main-process backend seam with app-owned renderer contracts.
+The broad pre-Claude cleanup is implemented. The remaining work is a concrete
+Claude driver and fixtures, not another generic provider refactor.
 
-Recommended steps:
+Recommended next steps:
 
-1. Introduce backend-neutral main-process interfaces:
-   `AgentBackendDriver`, `BackendSession`, `BackendPromptOptions`,
-   `BackendModelOption`, `BackendSkillSummary`, and `BackendRuntimeStatus`.
-2. Rename persisted runtime fields:
-   `codexThreadId` -> backend-specific session state.
-   Keep a migration from existing `codexThreadId`.
-3. Split app state:
-   global app runtime status should not be named `appServer`; agent-specific
-   backend status should sit on the agent or backend session.
-4. Make model and skill loading route through the active agent backend.
-5. Keep Codex-specific plan, goal, steering, thread rollback, and skills as
-   backend capabilities, not universal UI assumptions.
-6. Add a Claude driver behind the same event contract.
-7. Add captured Claude SDK/control fixtures before adding UI surface area.
+1. Add captured Claude SDK/control fixtures before adding UI surface area.
+2. Implement a Claude process `stream-json` transport behind
+   `AgentBackendDriver`.
+3. Map Claude assistant/result/tool/permission events to app-owned
+   `BackendEvent`, `ClientRequest`, and `RendererMessage` shapes.
+4. Implement interrupt and clear unsupported behavior for steering, rollback,
+   edit, retry, goal mode, and skills until Claude support is verified.
+5. Add main-process and renderer tests proving Codex agents keep working while
+   Claude agents use only Claude-supported capabilities.
 
 ## First Claude Milestone
 

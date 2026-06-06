@@ -143,20 +143,26 @@ cwd:
 ```
 
 Main adapts the response into `BackendSkillSummary[]` and exposes that through
-typed IPC. The renderer uses this app-owned shape for the composer slash menu;
+typed IPC. The renderer uses this app-owned shape for the composer skill menu;
 it does not import generated app-server skill types.
 
-When a prompt contains `/skill-name`, renderer state resolves the mention
+When a prompt contains `$skill-name`, renderer state resolves the mention
 against the active skill catalog and sends those skills under
-`SendPromptOptions.backendOptions` with `kind: "codex"`. Main then appends
-Codex `UserInput` skill items to `turn/start`, alongside the normal text input:
+`SendPromptOptions.backendOptions` with `kind: "codex"`. Slash skill fallback
+from `/` command search resolves the same way. Main then appends Codex
+`UserInput` skill items to `turn/start`, alongside the normal text input:
 
 ```json
 [
-  { "type": "text", "text": "/skill-name do the thing", "text_elements": [] },
+  { "type": "text", "text": "$skill-name do the thing", "text_elements": [] },
   { "type": "skill", "name": "skill-name", "path": "/.../SKILL.md" }
 ]
 ```
+
+Composer shortcuts are split by surface: `@` searches files, `$` searches
+skills, and `/` searches backend commands first, then matching skills. The
+initial Codex command catalog includes `/compact`, which submits the canonical
+Codex compact command text.
 
 This is preferred over relying on Codex to infer the skill from text alone.
 `skills/changed` is an invalidation notification; main emits app-owned
@@ -222,8 +228,6 @@ High-priority missing notifications:
 - `item/reasoning/summaryTextDelta`: needed for reasoning summary rendering.
 - `item/reasoning/summaryPartAdded`: needed for reasoning summary rendering.
 - `item/reasoning/textDelta`: needed for reasoning text rendering.
-- `turn/diff/updated`: needed for git/diff status and the future environment
-  panel.
 - `item/commandExecution/terminalInteraction`: useful once native terminal or
   process interaction UI exists.
 - `item/fileChange/outputDelta`: deprecated legacy apply-patch output stream,
@@ -296,11 +300,12 @@ and optional `_meta.persist`.
 
 `item/tool/requestUserInput` maps to an app-owned `ask_user` client request.
 The request carries Codex's `questions[]` shape with stable question ids,
-headers, option lists, and secret/free-form flags. The renderer answers with
-`{ answers: { [questionId]: { answers: string[] } } }`, and main resolves the
-original JSON-RPC request with that exact response shape. This is separate from
-tool approvals because the request is asking Nicolas for information, not for
-permission.
+headers, option lists, `multiSelect`, and secret/free-form flags. The renderer
+shows a paginated id8-style form for multi-question requests and answers with
+`{ answers: { [questionId]: { answers: string[] } } }`. User cancellation is
+handled explicitly by returning an empty `answers` map so the app-server does
+not wait forever. This is separate from tool approvals because the request is
+asking Nicolas for information, not for permission.
 
 Context compaction is primarily represented by the `contextCompaction`
 `ThreadItem`. Main converts the item into a `context.compactionStarted`

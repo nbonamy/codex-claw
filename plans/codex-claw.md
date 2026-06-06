@@ -1,6 +1,7 @@
 # Codex Claw Plan
 
-Status: no-team agent communication implemented, 2026-06-05.
+Status: team shell, Bench, agent messaging, and richer chat rendering are in
+progress on `main`, 2026-06-06.
 
 ## Tech Stack
 
@@ -48,7 +49,7 @@ prove two agents, isolated chats, switching, and background prompt starts.
 
 Commit checkpoint: `feat: add multiple agent sessions`
 
-### 3. Bench / Agent Templates
+### 3. Bench / Agent Templates - Complete
 
 Add Bench as the Skwad-style saved-agent concept: save an active agent as a
 reusable template, show Bench in the agent creation flow, and deploy a Bench
@@ -75,7 +76,7 @@ build pass.
 
 Commit checkpoint: `feat: add agent messaging tools`
 
-### 5. Team Support
+### 5. Team Support - Complete
 
 Add teams as the product grouping: team rail, team-scoped agent lists,
 create/edit/delete teams, move agents, team status, and persisted selected team.
@@ -86,21 +87,30 @@ Verification: persistence tests and team navigation UI tests.
 
 Commit checkpoint: `feat: add team support`
 
-### 6. Richer Rendering
+### 6. Richer Rendering - In Progress
 
 Render Codex-native surfaces beyond basic chat: plan updates, reasoning
 summaries, ask-user questions, approvals, command output, file-change progress,
 errors, and interrupted turns.
 
+Implemented so far: ordered message parts, Markdown/link rendering, tool calls,
+MCP approvals, paginated ask-user prompts with cancellation, plan/goal mode
+controls, command output, file-change diff stats, context usage, rate limits,
+queued prompts, steering markers, skill slash menu, file mentions, and voice
+dictation controls.
+
 Verification: captured event fixture tests and screenshot checks.
 
 Commit checkpoint: `feat: render codex turn details`
 
-### 7. SWE Features
+### 7. SWE Features - In Progress
 
 Add practical coding surfaces: git diff panel, git status/actions, file viewer,
 open file, diff navigation, command helpers, and eventually rollback/review
 flows.
+
+Implemented so far: turn diff aggregation and file-change diff stats. Full git
+status/actions, file viewer panes, and environment panels remain future work.
 
 Verification: git fixture tests, file viewer tests, end-to-end local workflow
 smoke.

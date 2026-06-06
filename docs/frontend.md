@@ -52,7 +52,7 @@ Rules:
 - Pass typed props and emit typed events. Avoid reaching into parent stores
   from deep children unless the component is intentionally store-owned.
 - Keep data shaping in stores, composables, or adapters. Components should not
-  translate raw Codex payloads.
+  translate raw Codex or Claude/backend payloads.
 - Prefer computed view models over complex template expressions.
 - Avoid components that both fetch/subscribe and render large UI trees. Put
   subscription/state orchestration in a view or store and pass stable props
@@ -147,8 +147,8 @@ Rules:
 
 ## Rendering Surfaces
 
-The renderer should be able to display Codex-native work without becoming
-Codex-protocol-shaped.
+The renderer should be able to display backend-native work without becoming
+backend-protocol-shaped.
 
 High-priority surfaces:
 
@@ -163,7 +163,8 @@ High-priority surfaces:
 - file changes and diffs;
 - errors and interrupted turns.
 
-Renderer components consume app-owned state, not raw app-server payloads.
+Renderer components consume app-owned state, not raw app-server or backend
+payloads.
 
 ## Verification
 

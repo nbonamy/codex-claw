@@ -7,6 +7,8 @@ Codex Claw is a desktop app. It does not have an HTTP API server, so do not
 copy id8's API harness or endpoint coverage workflow here. When this repo says
 "contract" or "workflow" test, it means Electron IPC, desktop state, renderer
 behavior, or a fake Codex app-server transport.
+As the backend seam grows, prefer fake backend drivers for app-controller
+routing tests and fake Codex transports for Codex-driver/session tests.
 
 ## Quality Bar
 
@@ -51,7 +53,7 @@ Use the same core testing principles as id8, adapted to a desktop app:
 ## Main Process Tests
 
 Main-process tests should cover desktop backend behavior without depending on a
-real Codex process by default.
+real backend process by default.
 
 Cover:
 
@@ -59,7 +61,9 @@ Cover:
   responses, and server-initiated requests.
 - App-server lifecycle decisions: spawn/connect, readiness, restart, shutdown,
   and process cleanup.
-- `AgentSessionManager` behavior: start/resume thread, start turn, steer,
+- Backend-driver routing for prompt send, interrupt, request responses, history
+  hydration, model/skill catalogs, and unsupported capabilities.
+- `CodexAgentSessionManager` behavior: start/resume thread, start turn, steer,
   interrupt, status updates, and event routing by agent/thread.
 - Codex event adaptation into app-owned events and `RendererMessage` state.
 - Approval and user-input request coordination.
@@ -67,8 +71,8 @@ Cover:
   team/agent, and window state.
 - Filesystem and git operations at the app boundary.
 
-Use fake transports and captured Codex app-server fixtures for normal tests. A
-real Codex app-server smoke test is useful once the first agent works, but it
+Use fake backend drivers, fake transports, and captured Codex app-server
+fixtures for normal tests. A real Codex app-server smoke test is useful, but it
 must be gated behind an environment variable and never required for the normal
 unit-test gate.
 
@@ -92,7 +96,7 @@ Renderer component tests use Vue Test Utils, Vitest, and jsdom.
 
 Rules:
 
-- Co-locate component tests in `__tests__/` folders once the scaffold exists.
+- Co-locate component tests in `__tests__/` folders.
 - Test user-visible rendering and emitted actions.
 - Use the real Element Plus plugin for controls.
 - Narrow stubs are OK for brittle container primitives such as dialogs,
@@ -171,8 +175,7 @@ theme switching.
 
 ## Gates
 
-The exact scripts will arrive with the scaffold. Prefer these names unless the
-tooling gives us a better reason:
+Use the repo scripts for broad verification:
 
 ```bash
 npm test

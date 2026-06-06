@@ -1,18 +1,23 @@
 # New / Edit Agent Dialog
 
+Status: implemented. This plan is retained as historical implementation
+context; some backend wording predates the backend-agnostic cleanup.
+
 ## Summary
 
 Build a Skwad-inspired agent dialog that makes the current `New Agent` button
-real and also supports editing existing agents. The first version stays
-Codex-only, persists agent metadata across restarts, and includes a proper
-avatar flow: initials fallback, preset emoji/icons, and local image crop/edit.
+real and also supports editing existing agents. The first version creates Codex
+agents by default, persists agent metadata across restarts, and includes a
+proper avatar flow: initials fallback, preset emoji/icons, and local image
+crop/edit.
 
 ## Key Changes
 
 - Add a focused `AgentDialog` flow:
   - `New Agent` opens create mode.
   - Agent row right-click opens a small context menu with `Edit Agent`.
-  - Dialog fields: avatar, name, folder, fixed read-only backend row `Codex`.
+  - Dialog fields: avatar, name, folder, and backend defaults for the current
+    supported backend.
   - Create title: `New Agent`; edit title: `Edit Agent`.
   - Save is disabled until folder and name are valid; selecting a folder
     auto-fills name from the folder basename if the name is empty.
@@ -36,15 +41,15 @@ avatar flow: initials fallback, preset emoji/icons, and local image crop/edit.
   - Add `UpdateAgentInput` with `id`, `name`, `folder`, and optional `avatar`.
   - Main validates name/folder, verifies selected folder is a directory, and
     rejects edits for non-idle agents.
-  - Folder changes clear stale Codex thread and MCP registration fields for that
-    agent.
+  - Folder changes clear stale backend session and MCP registration fields for
+    that agent.
 
 - Add lightweight main-process persistence:
   - Store sanitized app metadata in `app.getPath('userData')/state.json`.
-  - Persist teams, agents, bench, active agent, theme, and Codex thread IDs.
+  - Persist teams, agents, bench, active agent, theme, and backend session IDs.
   - Do not persist messages/transcripts yet.
-  - On load, reset transient runtime fields: app-server status, agent status,
-    MCP session IDs, registration flags, and status text.
+  - On load, reset transient runtime fields: backend runtime status, agent
+    status, MCP session IDs, registration flags, and status text.
   - Persist after create, update, select-agent, and `thread.started`.
 
 ## Test Plan

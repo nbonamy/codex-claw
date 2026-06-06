@@ -9,15 +9,17 @@ team/agent product model from Skwad with native Codex rendering inspired by id8.
 - TypeScript across main, preload, renderer, shared contracts, and tests.
 - Vue 3 with TypeScript and Element Plus for the renderer.
 - Vitest for unit, component, contract, and desktop workflow tests.
-- Codex-only backend for the first product, talking to the Codex app-server
-  from Electron main.
+- Codex is the implemented backend today, talking to the Codex app-server from
+  Electron main. The shared contracts and main-process seams are backend-aware
+  so a future Claude Code driver can be added without rewriting renderer UI.
 
 Core product surfaces:
 
 - **Teams**: Skwad-style top-level grouping for agents.
-- **Agents**: named teammates with avatars, folders, Codex threads, and status.
+- **Agents**: named teammates with avatars, folders, backend sessions, and
+  status.
 - **Bench**: saved deployable agent templates.
-- **Conversation**: native chat rendering for Codex messages, tool calls,
+- **Conversation**: native chat rendering for backend messages, tool calls,
   approvals, plans, command output, file changes, and diffs.
 - **Artifacts**: document, plan, diff, git, and file panes beside the active
   conversation.
@@ -26,12 +28,12 @@ Core product surfaces:
 
 Preserve the product and process boundaries:
 
-- Electron main owns Codex app-server process lifecycle, JSON-RPC transport,
-  request IDs, approvals, server requests, app persistence, and filesystem
-  access.
+- Electron main owns backend process lifecycle, transports, request IDs,
+  approvals, server requests, app persistence, and filesystem access. The
+  current concrete backend is Codex app-server.
 - Renderer owns visual state and interactions. It must not talk directly to
-  Codex app-server, spawn Codex, read arbitrary local files, or depend on
-  app-server protocol types.
+  Codex app-server or any future backend process, spawn tools, read arbitrary
+  local files, or depend on backend protocol types.
 - Preload exposes a small typed IPC bridge. Keep it boring and explicit.
 - Backend events become app-owned events before they become renderer state.
 - Codex-specific protocol data belongs in the Codex driver/adapter, not in
@@ -39,7 +41,8 @@ Preserve the product and process boundaries:
 - `RendererMessage` is our app contract. It can borrow ideas from id8, but it
   is not bound to id8 or multi-llm-ts message shapes.
 - Future Claude Code support should arrive through a new backend driver and
-  translator, not by making every renderer component provider-aware.
+  translator behind the existing seam, not by making every renderer component
+  provider-aware.
 - Theme support must use semantic tokens and CSS variables. Do not hard-code
   product colors inside components.
 
@@ -59,10 +62,9 @@ doc and update it when behavior changes:
   including transport, lifecycle, event adaptation, generated types, and test
   fixtures.
 - `docs/claude.md`: Claude Code websocket/SDK protocol research, support
-  strategy, and current Codex-bias inventory.
-- `docs/backend-agnostic-cleanup.md`: cleanup needed to prepare shared
-  contracts, runtime state, renderer controls, and main-process backend seams
-  for Claude support.
+  strategy, and remaining Claude-driver questions.
+- `docs/backend-agnostic-cleanup.md`: implemented pre-Claude cleanup for shared
+  contracts, runtime state, renderer controls, and main-process backend seams.
 - `docs/mcp.md`: how the app-owned MCP server exposes agent collaboration
   tools, inbox state, backend enablement, security, and tests.
 - `docs/architecture.md`: product model, process architecture, IPC,
@@ -88,9 +90,9 @@ Before editing code, read `docs/testing.md`. Before editing UI, also read
 
 ## Build
 
-The app is expected to build through Electron Forge once scaffolded. Keep build
-outputs, generated protocol bindings, copied id8 renderer code, and packaged
-resources clearly separated from source code.
+The app builds through Electron Forge. Keep build outputs, generated protocol
+bindings, copied id8 renderer code, and packaged resources clearly separated
+from source code.
 
 Electron packaging signs and notarizes macOS builds by default. This can take a
 long time and should be reserved for explicit release/signing work. For normal
