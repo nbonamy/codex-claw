@@ -1,8 +1,8 @@
-import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
-import { describe, expect, it } from 'vitest';
+import { flushPromises, mount } from '@vue/test-utils';
+import ElementPlus, { ElMessageBox } from 'element-plus';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgentSidebar from '../AgentSidebar.vue';
-import type { Agent, Team } from '../../../shared/contracts';
+import type { Agent, BenchTemplate, Team } from '../../../shared/contracts';
 
 function pointerEvent(type: string, clientX: number): PointerEvent {
   const event = new MouseEvent(type, {
@@ -49,6 +49,22 @@ const teams: Team[] = [
     agentIds: [],
   },
 ];
+
+const bench: BenchTemplate[] = [
+  {
+    id: 'bench-dina',
+    name: 'Dina',
+    avatar: 'DI',
+    folder: '~/src/id8',
+    backend: 'codex',
+    createdAt: '2026-06-05T00:00:00.000Z',
+    updatedAt: '2026-06-05T00:00:00.000Z',
+  },
+];
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('AgentSidebar', () => {
   it('renders the team header, agents, statuses, folder basenames, and active selection without Bench chrome', () => {
@@ -164,7 +180,7 @@ describe('AgentSidebar', () => {
     });
 
     expect(wrapper.get('.agent-sidebar__new').text()).toContain('New Agent');
-    expect(wrapper.find('.agent-sidebar__new-icon').exists()).toBe(true);
+    expect(wrapper.find('.new-agent-button__icon').exists()).toBe(true);
   });
 
   it('emits new agent requests from the footer action', async () => {
@@ -182,6 +198,34 @@ describe('AgentSidebar', () => {
     await wrapper.get('.agent-sidebar__new').trigger('click');
 
     expect(wrapper.emitted('new-agent')).toStrictEqual([[]]);
+  });
+
+  it('emits Bench deploy and remove requests from the new agent menu', async () => {
+    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        bench,
+        teamName: 'Codex Claw',
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    await wrapper.get('[aria-label="Open Bench"]').trigger('click');
+    await flushPromises();
+    await wrapper.findAll('.new-agent-menu__template').find((row) => row.text().includes('Dina'))?.trigger('click');
+    expect(wrapper.emitted('deploy-bench-template')).toStrictEqual([['bench-dina']]);
+
+    await wrapper.get('[aria-label="Open Bench"]').trigger('click');
+    await flushPromises();
+    await wrapper.get('[aria-label="Remove Dina from Bench"]').trigger('click');
+    await flushPromises();
+
+    expect(confirm).toHaveBeenCalled();
+    expect(wrapper.emitted('remove-bench-template')).toStrictEqual([['bench-dina']]);
   });
 
   it('opens a context menu, closes it on request, and emits agent actions', async () => {
@@ -202,7 +246,7 @@ describe('AgentSidebar', () => {
     });
 
     expect(wrapper.find('.agent-context-menu').exists()).toBe(true);
-    expect(wrapper.findAll('[role="menuitem"]').map((item) => item.text())).toStrictEqual([
+    expect(wrapper.get('.agent-context-menu').findAll('[role="menuitem"]').map((item) => item.text())).toStrictEqual([
       'Edit Agent',
       'Duplicate Agent',
       'Move to Other Team',

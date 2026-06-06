@@ -12,20 +12,33 @@
       <p>Add an agent to your team</p>
     </div>
 
-    <el-button
-      type="primary"
-      class="agent-empty-state__new"
-      @click="emit('new-agent')"
-    >
-      New Agent
-    </el-button>
+    <div class="agent-empty-state__new">
+      <NewAgentButton
+        :bench="bench"
+        @deploy-bench-template="emit('deploy-bench-template', $event)"
+        @new-agent="emit('new-agent')"
+        @remove-bench-template="emit('remove-bench-template', $event)"
+      />
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
-const emit = defineEmits<{
-  'new-agent': [];
+import { computed } from 'vue';
+import type { BenchTemplate } from '../../shared/contracts';
+import NewAgentButton from './NewAgentButton.vue';
+
+const props = defineProps<{
+  bench?: BenchTemplate[];
 }>();
+
+const emit = defineEmits<{
+  'deploy-bench-template': [templateId: string];
+  'new-agent': [];
+  'remove-bench-template': [templateId: string];
+}>();
+
+const bench = computed(() => props.bench ?? []);
 </script>
 
 <style scoped>
@@ -84,9 +97,6 @@ const emit = defineEmits<{
 }
 
 .agent-empty-state__new {
-  min-width: 240px;
-  min-height: 52px;
-  border-radius: var(--radius-lg);
-  font-weight: var(--font-weight-semibold);
+  width: min(240px, 100%);
 }
 </style>

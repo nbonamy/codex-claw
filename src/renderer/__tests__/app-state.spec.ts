@@ -301,6 +301,110 @@ describe('useAppState', () => {
     expect(state.visibleMessages.value.at(-1)?.parts).toStrictEqual([{ type: 'text', text: 'hello' }]);
   });
 
+  it('queues busy prompts and drains them after the active turn completes', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0].status = { type: 'working' };
+    const drainedSnapshot = createInitialSnapshot();
+    drainedSnapshot.messages.push({
+      id: 'message-drained',
+      agentId: 'agent-dina',
+      role: 'user',
+      status: 'complete',
+      createdAt: '2026-06-05T00:00:01.000Z',
+      parts: [{ type: 'text', text: 'run this after the turn' }],
+    });
+    const sendPrompt = vi.fn().mockResolvedValue(drainedSnapshot);
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        sendPrompt,
+        onEvent: vi.fn((nextListener) => {
+          listeners.push(nextListener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await state.sendPrompt('run this after the turn');
+
+    expect(sendPrompt).not.toHaveBeenCalled();
+    expect(state.activeQueuedPrompts.value).toStrictEqual([
+      expect.objectContaining({
+        text: 'run this after the turn',
+      }),
+    ]);
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'turn.completed',
+      payload: { status: 'completed' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    await vi.waitFor(() => {
+      expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'run this after the turn');
+    });
+    expect(state.activeQueuedPrompts.value).toStrictEqual([]);
+    expect(state.visibleMessages.value.at(-1)?.id).toBe('message-drained');
+  });
+
+  it('steers busy drafts and queued prompts through preload', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0].status = { type: 'working' };
+    const steerPrompt = vi.fn().mockResolvedValue(remoteSnapshot);
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        steerPrompt,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await state.steerPrompt('use the smaller patch');
+
+    expect(steerPrompt).toHaveBeenCalledWith('agent-dina', 'use the smaller patch');
+
+    await state.sendPrompt('queued but steerable');
+    const queuedPromptId = state.activeQueuedPrompts.value[0]?.id;
+    expect(queuedPromptId).toBeTruthy();
+
+    await state.steerQueuedPrompt(queuedPromptId as string);
+
+    expect(steerPrompt).toHaveBeenCalledWith('agent-dina', 'queued but steerable');
+    expect(state.activeQueuedPrompts.value).toStrictEqual([]);
+  });
+
+  it('removes queued prompts locally', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0].status = { type: 'working' };
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await state.sendPrompt('delete this queued prompt');
+    const queuedPromptId = state.activeQueuedPrompts.value[0]?.id;
+
+    state.removeQueuedPrompt(queuedPromptId as string);
+
+    expect(state.activeQueuedPrompts.value).toStrictEqual([]);
+  });
+
   it('tracks sending state per agent so another agent can be used while one starts', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const dinaQueuedSnapshot = {
@@ -493,9 +597,31 @@ describe('useAppState', () => {
       ...benchSnapshot,
       messages: [],
     };
-    const closedSnapshot = {
+    const deployedBenchSnapshot = {
       ...restartedSnapshot,
-      agents: restartedSnapshot.agents.filter((agent) => agent.id !== 'agent-jules'),
+      agents: [
+        ...restartedSnapshot.agents,
+        {
+          id: 'agent-jules-bench',
+          teamId: 'team-skwad-core',
+          name: 'Jules Prime',
+          avatar: '🤖',
+          folder: '/Users/nbonamy/src/jules',
+          status: { type: 'idle' as const },
+          createdAt: '2026-06-05T00:00:01.000Z',
+          updatedAt: '2026-06-05T00:00:01.000Z',
+        },
+      ],
+      activeTeamId: 'team-skwad-core',
+      activeAgentId: 'agent-jules-bench',
+    };
+    const removedBenchSnapshot = {
+      ...deployedBenchSnapshot,
+      bench: [],
+    };
+    const closedSnapshot = {
+      ...removedBenchSnapshot,
+      agents: removedBenchSnapshot.agents.filter((agent) => agent.id !== 'agent-jules'),
       activeAgentId: 'agent-dina',
     };
     const closedTeamSnapshot = {
@@ -514,6 +640,8 @@ describe('useAppState', () => {
     const moveAgentToTeam = vi.fn().mockResolvedValue(movedSnapshot);
     const saveAgentToBench = vi.fn().mockResolvedValue(benchSnapshot);
     const restartAgent = vi.fn().mockResolvedValue(restartedSnapshot);
+    const deployBenchTemplate = vi.fn().mockResolvedValue(deployedBenchSnapshot);
+    const removeBenchTemplate = vi.fn().mockResolvedValue(removedBenchSnapshot);
     const closeAgent = vi.fn().mockResolvedValue(closedSnapshot);
 
     vi.stubGlobal('window', {
@@ -531,6 +659,8 @@ describe('useAppState', () => {
         moveAgentToTeam,
         saveAgentToBench,
         restartAgent,
+        deployBenchTemplate,
+        removeBenchTemplate,
         closeAgent,
       } satisfies Partial<CodexClawApi>,
     });
@@ -548,6 +678,8 @@ describe('useAppState', () => {
     await state.moveAgentToTeam({ agentId: 'agent-jules', teamId: 'team-skwad-core' });
     await state.saveAgentToBench('agent-jules');
     await state.restartAgent('agent-jules');
+    await state.deployBenchTemplate('bench-jules-prime');
+    await state.removeBenchTemplate('bench-jules-prime');
     await state.closeAgent('agent-jules');
     await state.closeTeam('team-skwad-core');
 
@@ -560,6 +692,8 @@ describe('useAppState', () => {
     expect(moveAgentToTeam).toHaveBeenCalledWith({ agentId: 'agent-jules', teamId: 'team-skwad-core' });
     expect(saveAgentToBench).toHaveBeenCalledWith('agent-jules');
     expect(restartAgent).toHaveBeenCalledWith('agent-jules');
+    expect(deployBenchTemplate).toHaveBeenCalledWith('bench-jules-prime', 'team-skwad-core');
+    expect(removeBenchTemplate).toHaveBeenCalledWith('bench-jules-prime');
     expect(closeAgent).toHaveBeenCalledWith('agent-jules');
     expect(closeTeam).toHaveBeenCalledWith('team-skwad-core');
     expect(state.snapshot.value).toStrictEqual(closedTeamSnapshot);
@@ -588,6 +722,8 @@ describe('useAppState', () => {
     await state.duplicateAgent('agent-dina');
     await state.moveAgentToTeam({ agentId: 'agent-dina', teamId: 'team-codex-claw' });
     await state.saveAgentToBench('agent-dina');
+    await state.deployBenchTemplate('missing-template');
+    await state.removeBenchTemplate('missing-template');
     await state.restartAgent('agent-dina');
     await state.closeAgent('agent-dina');
 

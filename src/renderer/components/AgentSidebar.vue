@@ -57,15 +57,12 @@
     />
 
     <footer class="agent-sidebar__footer">
-      <el-button
-        type="primary"
-        class="agent-sidebar__new"
-        aria-label="New Agent"
-        @click="emit('new-agent')"
-      >
-        <PlusIcon class="agent-sidebar__new-icon" />
-        <span class="agent-sidebar__new-label">New Agent</span>
-      </el-button>
+      <NewAgentButton
+        :bench="bench"
+        @deploy-bench-template="emit('deploy-bench-template', $event)"
+        @new-agent="emit('new-agent')"
+        @remove-bench-template="emit('remove-bench-template', $event)"
+      />
     </footer>
 
     <div
@@ -89,18 +86,19 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Agent, AgentStatus, Team } from '../../shared/contracts';
+import type { Agent, AgentStatus, BenchTemplate, Team } from '../../shared/contracts';
 import {
   PanelLeftCloseIcon,
-  PlusIcon,
 } from '../shared/icons/app-icons';
 import AgentContextMenu from './AgentContextMenu.vue';
 import type { AgentContextMenuAction } from './AgentContextMenu.vue';
 import AgentAvatar from './AgentAvatar.vue';
+import NewAgentButton from './NewAgentButton.vue';
 
 const props = defineProps<{
   agents: Agent[];
   activeAgentId: string | null;
+  bench?: BenchTemplate[];
   teams?: Team[];
   teamName: string;
   width?: number;
@@ -111,6 +109,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'collapse-sidebar': [];
   'close-agent': [agentId: string];
+  'deploy-bench-template': [templateId: string];
   'duplicate-agent': [agentId: string];
   'edit-agent': [agentId: string];
   'move-agent-to-team': [payload: { agentId: string; teamId: string }];
@@ -119,6 +118,7 @@ const emit = defineEmits<{
   'restart-agent': [agentId: string];
   'save-agent-to-bench': [agentId: string];
   'select-agent': [agentId: string];
+  'remove-bench-template': [templateId: string];
 }>();
 
 const minWidth = computed(() => props.minWidth ?? 72);
@@ -126,6 +126,7 @@ const maxWidth = computed(() => props.maxWidth ?? 420);
 const resizeStep = 16;
 const currentWidth = computed(() => clampWidth(props.width ?? 260));
 const teamTitle = computed(() => props.teamName.toUpperCase());
+const bench = computed(() => props.bench ?? []);
 const contextMenuAgentId = ref<string | null>(null);
 const contextMenuPosition = ref({ x: 0, y: 0 });
 const contextMenuAgent = computed(() => (
@@ -437,19 +438,6 @@ function onResizePointerEnd(event: PointerEvent): void {
   padding: var(--space-6);
 }
 
-.agent-sidebar__new {
-  width: 100%;
-  min-height: 48px;
-  border-radius: var(--radius-lg);
-  font-weight: var(--font-weight-semibold);
-}
-
-.agent-sidebar__new-icon {
-  display: none;
-  width: var(--icon-md);
-  height: var(--icon-md);
-}
-
 .agent-sidebar__resize-handle {
   position: absolute;
   z-index: 2;
@@ -529,18 +517,5 @@ function onResizePointerEnd(event: PointerEvent): void {
     padding: var(--space-4) var(--space-2);
   }
 
-  .agent-sidebar__new {
-    width: var(--space-20);
-    min-height: var(--space-20);
-    padding: 0;
-  }
-
-  .agent-sidebar__new-icon {
-    display: block;
-  }
-
-  .agent-sidebar__new-label {
-    display: none;
-  }
 }
 </style>

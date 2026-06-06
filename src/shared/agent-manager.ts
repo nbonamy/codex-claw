@@ -44,6 +44,43 @@ export function saveAgentToBench(snapshot: AppSnapshot, agentId: string, created
   return template;
 }
 
+export function deployBenchTemplateInSnapshot(snapshot: AppSnapshot, templateId: string, teamId?: string, createdAt = new Date().toISOString()): Agent | null {
+  const template = snapshot.bench.find((candidate) => candidate.id === templateId);
+  const targetTeam = teamId
+    ? snapshot.teams.find((team) => team.id === teamId)
+    : snapshot.teams.find((team) => team.id === snapshot.activeTeamId) ?? snapshot.teams[0];
+  if (!template || !targetTeam) {
+    return null;
+  }
+
+  const agent: Agent = {
+    id: uniqueAgentId(snapshot, template.name, createdAt),
+    teamId: targetTeam.id,
+    name: template.name,
+    avatar: template.avatar,
+    folder: template.folder,
+    status: { type: 'idle' },
+    createdAt,
+    updatedAt: createdAt,
+  };
+
+  snapshot.agents.push(agent);
+  attachAgentToTeam(snapshot, agent);
+  snapshot.activeTeamId = targetTeam.id;
+  snapshot.activeAgentId = agent.id;
+  return agent;
+}
+
+export function removeBenchTemplateFromSnapshot(snapshot: AppSnapshot, templateId: string): BenchTemplate | null {
+  const template = snapshot.bench.find((candidate) => candidate.id === templateId);
+  if (!template) {
+    return null;
+  }
+
+  snapshot.bench = snapshot.bench.filter((candidate) => candidate.id !== templateId);
+  return template;
+}
+
 export function moveAgentToTeamInSnapshot(snapshot: AppSnapshot, agentId: string, teamId: string, updatedAt = new Date().toISOString()): Agent | null {
   const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
   const targetTeam = snapshot.teams.find((candidate) => candidate.id === teamId);

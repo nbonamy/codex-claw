@@ -259,11 +259,14 @@ export type CodexClawApi = {
   duplicateAgent(agentId: string): Promise<AppSnapshot>;
   moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot>;
   saveAgentToBench(agentId: string): Promise<AppSnapshot>;
+  deployBenchTemplate(templateId: string, teamId?: string): Promise<AppSnapshot>;
+  removeBenchTemplate(templateId: string): Promise<AppSnapshot>;
   restartAgent(agentId: string): Promise<AppSnapshot>;
   closeAgent(agentId: string): Promise<AppSnapshot>;
   selectAgent(agentId: string): Promise<AppSnapshot>;
   selectAgentFolder(agentId: string): Promise<AppSnapshot | null>;
   sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot>;
+  steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot>;
   respondToClientRequest(response: ClientRequestResponse): Promise<AppSnapshot>;
   onEvent(listener: (event: MainToRendererEvent) => void): () => void;
   onAppCommand(listener: (command: AppCommand) => void): () => void;

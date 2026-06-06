@@ -10,6 +10,7 @@
     :model-catalog-status="modelCatalogStatus"
     :selected-model-id="selectedModelId"
     :selected-reasoning-effort="selectedReasoningEffort"
+    :queued-prompts="activeQueuedPrompts"
     :choose-agent-folder="chooseAgentFolder"
     :create-agent="createAgent"
     :create-team="createTeam"
@@ -19,6 +20,8 @@
     @close-agent="closeAgent"
     @duplicate-agent="duplicateAgent"
     @move-agent-to-team="moveAgentToTeam"
+    @deploy-bench-template="deployBenchTemplate"
+    @remove-bench-template="removeBenchTemplate"
     @restart-agent="restartAgent"
     @save-agent-to-bench="saveAgentToBench"
     @select-agent="selectAgent"
@@ -26,7 +29,10 @@
     @select-model="selectModel"
     @select-reasoning-effort="selectReasoningEffort"
     @client-response="respondToClientRequest"
+    @delete-queued-prompt="removeQueuedPrompt"
     @send-prompt="sendPrompt"
+    @steer-prompt="steerPrompt"
+    @steer-queued-prompt="steerQueuedPrompt"
   />
 </template>
 
@@ -39,6 +45,7 @@ const {
   snapshot,
   activeAgent,
   visibleMessages,
+  activeQueuedPrompts,
   isLoading,
   isSending,
   answeredClientRequestIds,
@@ -57,6 +64,8 @@ const {
   duplicateAgent,
   moveAgentToTeam,
   saveAgentToBench,
+  deployBenchTemplate,
+  removeBenchTemplate,
   restartAgent,
   closeAgent,
   respondToClientRequest,
@@ -65,6 +74,9 @@ const {
   selectAgent,
   selectTeam,
   sendPrompt,
+  steerPrompt,
+  steerQueuedPrompt,
+  removeQueuedPrompt,
 } = useAppState();
 
 onMounted(() => {

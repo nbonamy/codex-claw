@@ -136,6 +136,42 @@ describe('ConversationPane', () => {
     expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('');
   });
 
+  it('renders queued prompts and bubbles queued prompt actions', async () => {
+    const wrapper = mountPane({
+      agent,
+      messages,
+      isSending: true,
+      queuedPrompts: [
+        {
+          id: 'queued-1',
+          text: 'Run the focused tests next',
+        },
+      ],
+    });
+
+    expect(wrapper.text()).toContain('Run the focused tests next');
+
+    await wrapper.get('[aria-label="Steer queued prompt now"]').trigger('click');
+    await wrapper.get('[aria-label="Delete queued prompt"]').trigger('click');
+
+    expect(wrapper.emitted('steer-queued-prompt')).toStrictEqual([['queued-1']]);
+    expect(wrapper.emitted('delete-queued-prompt')).toStrictEqual([['queued-1']]);
+  });
+
+  it('bubbles Command Enter as a steer prompt', async () => {
+    const wrapper = mountPane({
+      agent,
+      messages,
+      isSending: true,
+    });
+
+    await wrapper.get('textarea').setValue('use the smaller fix');
+    await wrapper.get('textarea').trigger('keydown', { key: 'Enter', metaKey: true });
+
+    expect(wrapper.emitted('steerPrompt')).toStrictEqual([['use the smaller fix']]);
+    expect(wrapper.emitted('sendPrompt')).toBeUndefined();
+  });
+
   it('bubbles tool confirmation responses from the message list', async () => {
     const wrapper = mountPane({
       agent,
@@ -184,7 +220,7 @@ describe('ConversationPane', () => {
     ]);
   });
 
-  it('disables composer actions while sending', () => {
+  it('keeps composer drafts submittable while sending', async () => {
     const wrapper = mountPane({
       agent,
       messages: [],
@@ -193,7 +229,10 @@ describe('ConversationPane', () => {
 
     expect(wrapper.get('textarea').attributes()).not.toHaveProperty('disabled');
     expect(wrapper.get('textarea').attributes('placeholder')).toBe('Codex is working...');
-    expect(wrapper.get('.chat-composer__send').attributes()).toHaveProperty('disabled');
+    await wrapper.get('textarea').setValue('queue this after the current turn');
+    expect(wrapper.get('.chat-composer__send').attributes()).not.toHaveProperty('disabled');
+    await wrapper.get('form').trigger('submit');
+    expect(wrapper.emitted('sendPrompt')).toStrictEqual([['queue this after the current turn']]);
   });
 
   it('shows the thinking shimmer for a started turn before content or tools stream', () => {
@@ -218,7 +257,13 @@ describe('ConversationPane', () => {
   });
 });
 
-function mountPane(props: { messages: RendererMessage[]; agent: Agent | null; isSending: boolean; isLoading?: boolean }) {
+function mountPane(props: {
+  messages: RendererMessage[];
+  agent: Agent | null;
+  isSending: boolean;
+  isLoading?: boolean;
+  queuedPrompts?: Array<{ id: string; text: string }>;
+}) {
   return mount(ConversationPane, {
     props: {
       isLoading: false,

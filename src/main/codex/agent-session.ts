@@ -24,6 +24,7 @@ import type {
   ThreadResumeResponse,
   ThreadStartResponse,
   TurnStartResponse,
+  TurnSteerResponse,
 } from './protocol';
 import { rawResponseItemToEvent } from './raw-response-item-adapter';
 import { codexThreadHistoryToRendererMessages } from './thread-history-adapter';
@@ -49,6 +50,7 @@ export class CodexAgentSessionManager {
   private seq = 0;
   private readonly sessionsByAgentId = new Map<string, AgentSession>();
   private readonly agentIdsByThreadId = new Map<string, string>();
+  private readonly activeTurnIdsByThreadId = new Map<string, string>();
   private readonly pendingClientRequests = new Map<string, PendingClientRequest>();
   private readonly listeners = new Set<EventListener>();
   private initialized = false;
@@ -125,10 +127,39 @@ export class CodexAgentSessionManager {
     }
 
     const response = await this.client.request<TurnStartResponse>('turn/start', turnParams);
+    this.activeTurnIdsByThreadId.set(session.threadId, response.turn.id);
 
     return {
       threadId: session.threadId,
       turnId: response.turn.id,
+    };
+  }
+
+  async steerPrompt(agent: Agent, prompt: string): Promise<CodexSessionPromptResult> {
+    await this.start();
+
+    const session = await this.ensureSession(agent);
+    const expectedTurnId = this.activeTurnIdsByThreadId.get(session.threadId);
+    if (!expectedTurnId) {
+      throw new Error('No active Codex turn to steer.');
+    }
+
+    const response = await this.client.request<TurnSteerResponse>('turn/steer', {
+      threadId: session.threadId,
+      expectedTurnId,
+      input: [
+        {
+          type: 'text',
+          text: prompt,
+          text_elements: [],
+        },
+      ],
+    });
+    this.activeTurnIdsByThreadId.set(session.threadId, response.turnId);
+
+    return {
+      threadId: session.threadId,
+      turnId: response.turnId,
     };
   }
 
@@ -271,6 +302,7 @@ export class CodexAgentSessionManager {
 
       case 'turn/started': {
         const params = notification.params as { threadId: string; turn: CodexTurn };
+        this.activeTurnIdsByThreadId.set(params.threadId, params.turn.id);
         this.emitForThread(params.threadId, {
           turnId: params.turn.id,
           type: 'turn.started',
@@ -378,6 +410,9 @@ export class CodexAgentSessionManager {
 
       case 'turn/completed': {
         const params = notification.params as { threadId: string; turn: CodexTurn };
+        if (this.activeTurnIdsByThreadId.get(params.threadId) === params.turn.id) {
+          this.activeTurnIdsByThreadId.delete(params.threadId);
+        }
         this.emitForThread(params.threadId, {
           turnId: params.turn.id,
           type: 'turn.completed',

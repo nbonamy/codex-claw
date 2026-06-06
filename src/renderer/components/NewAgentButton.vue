@@ -1,0 +1,374 @@
+<template>
+  <div class="new-agent-button">
+    <el-button-group class="new-agent-button__group">
+      <el-button
+        type="primary"
+        class="agent-sidebar__new new-agent-button__primary"
+        aria-label="New Agent"
+        @click="emitNewAgent"
+      >
+        <span class="new-agent-button__label">New Agent</span>
+      </el-button>
+      <el-popover
+        v-model:visible="menuVisible"
+        placement="top"
+        trigger="manual"
+        width="284"
+        popper-class="new-agent-button__popover"
+        :teleported="false"
+      >
+        <template #reference>
+          <el-button
+            type="primary"
+            class="new-agent-button__chevron"
+            aria-label="Open Bench"
+            @click="toggleMenu"
+          >
+            <ChevronDown class="new-agent-button__icon" />
+          </el-button>
+        </template>
+        <div v-if="menuVisible" class="new-agent-menu" role="menu" aria-label="New agent options">
+          <button
+            class="new-agent-menu__create"
+            type="button"
+            role="menuitem"
+            @click="createFromMenu"
+          >
+            <PlusIcon class="new-agent-menu__create-icon" />
+            <span>Create New Agent</span>
+          </button>
+
+          <div class="new-agent-menu__section">Bench</div>
+          <p v-if="bench.length === 0" class="new-agent-menu__empty">
+            Right-click an agent → Save to Bench
+          </p>
+          <template v-else>
+            <div
+              v-for="template in bench"
+              :key="template.id"
+              class="new-agent-menu__template-row"
+            >
+              <button
+                class="new-agent-menu__template"
+                type="button"
+                role="menuitem"
+                @click="deployTemplate(template.id)"
+              >
+                <AgentAvatar
+                  class="new-agent-menu__avatar"
+                  :avatar="template.avatar"
+                  :name="template.name"
+                  size="md"
+                />
+                <span class="new-agent-menu__template-meta">
+                  <strong>{{ template.name }}</strong>
+                  <span>{{ folderBasename(template.folder) }}</span>
+                </span>
+              </button>
+              <button
+                class="new-agent-menu__delete"
+                type="button"
+                :aria-label="`Remove ${template.name} from Bench`"
+                @click="confirmRemoveTemplate(template)"
+              >
+                <Trash2Icon class="new-agent-menu__delete-icon" />
+              </button>
+            </div>
+          </template>
+        </div>
+      </el-popover>
+    </el-button-group>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { nextTick, ref } from 'vue';
+import { ElMessageBox } from 'element-plus';
+import type { BenchTemplate } from '../../shared/contracts';
+import { ChevronDown, PlusIcon, Trash2Icon } from '../shared/icons/app-icons';
+import AgentAvatar from './AgentAvatar.vue';
+
+const props = defineProps<{
+  bench: BenchTemplate[];
+}>();
+
+const emit = defineEmits<{
+  'deploy-bench-template': [templateId: string];
+  'new-agent': [];
+  'remove-bench-template': [templateId: string];
+}>();
+
+const menuVisible = ref(false);
+
+function emitNewAgent(): void {
+  emit('new-agent');
+}
+
+function createFromMenu(): void {
+  menuVisible.value = false;
+  emitNewAgent();
+}
+
+function toggleMenu(): void {
+  menuVisible.value = !menuVisible.value;
+}
+
+function deployTemplate(templateId: string): void {
+  menuVisible.value = false;
+  emit('deploy-bench-template', templateId);
+}
+
+async function confirmRemoveTemplate(template: BenchTemplate): Promise<void> {
+  menuVisible.value = false;
+  await nextTick();
+
+  try {
+    await ElMessageBox.confirm(
+      `${template.name} will be removed from Bench. Existing agents stay unchanged.`,
+      `Remove ${template.name} from Bench?`,
+      {
+        cancelButtonText: 'Cancel',
+        confirmButtonText: 'Remove',
+        type: 'warning',
+      },
+    );
+  } catch {
+    return;
+  }
+
+  emit('remove-bench-template', template.id);
+}
+
+function folderBasename(folder: string): string {
+  return folder.trim().split(/[\\/]/).filter(Boolean).at(-1) ?? folder;
+}
+</script>
+
+<style scoped>
+.new-agent-button {
+  width: 100%;
+}
+
+.new-agent-button__group {
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.new-agent-button__primary {
+  flex: 1;
+  height: 48px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-14);
+  font-weight: var(--font-weight-semibold);
+  justify-content: center;
+  gap: var(--space-6);
+  padding-inline: var(--space-8);
+}
+
+.new-agent-button__chevron {
+  height: 48px;
+  border-top-right-radius: var(--radius-md) !important;
+  border-bottom-right-radius: var(--radius-md) !important;
+  font-size: var(--font-size-14);
+  font-weight: var(--font-weight-semibold);
+  padding: 0 var(--space-4);
+}
+
+.new-agent-button__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.new-agent-menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-1);
+}
+
+.new-agent-menu__create,
+.new-agent-menu__template {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  color: var(--color-text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.new-agent-menu__create {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: var(--space-4) var(--space-6);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-18);
+}
+
+.new-agent-menu__create:hover,
+.new-agent-menu__create:focus-visible,
+.new-agent-menu__template-row:hover,
+.new-agent-menu__template-row:focus-within {
+  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+  outline: none;
+}
+
+.new-agent-menu__create-icon {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  flex: 0 0 auto;
+}
+
+.new-agent-menu__section {
+  padding: var(--space-3) var(--space-6) var(--space-1);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-10);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-16);
+  text-transform: uppercase;
+}
+
+.new-agent-menu__empty {
+  margin: 0;
+  padding: var(--space-4) var(--space-6);
+  padding-left: var(--space-10);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-16);
+}
+
+.new-agent-menu__template-row {
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+}
+
+.new-agent-menu__template {
+  grid-column: 1 / 3;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.new-agent-menu__template:focus-visible {
+  outline: none;
+}
+
+.new-agent-menu__avatar {
+  --agent-avatar-size: 28px;
+  --agent-avatar-font-size: var(--font-size-10);
+}
+
+.new-agent-menu__template-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5px;
+}
+
+.new-agent-menu__template-meta strong,
+.new-agent-menu__template-meta span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.new-agent-menu__template-meta strong {
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-18);
+}
+
+.new-agent-menu__template-meta span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-16);
+}
+
+.new-agent-menu__delete {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  border: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.new-agent-menu__template-row:hover .new-agent-menu__delete,
+.new-agent-menu__template-row:focus-within .new-agent-menu__delete,
+.new-agent-menu__delete:focus-visible {
+  opacity: 1;
+}
+
+.new-agent-menu__delete:hover,
+.new-agent-menu__delete:focus-visible {
+  color: var(--color-error);
+  background: color-mix(in srgb, var(--color-error) 12%, transparent);
+  outline: none;
+}
+
+.new-agent-menu__delete-icon {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+</style>
+
+<style>
+.new-agent-button__popover.el-popper {
+  min-width: 284px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-lowest);
+  box-shadow: var(--shadow-menu);
+}
+
+.new-agent-button__popover.el-popper .el-popper__arrow::before {
+  border-color: var(--color-border);
+  background: var(--color-surface-lowest);
+}
+
+@container (max-width: 140px) {
+  .new-agent-button__group {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .new-agent-button__primary,
+  .new-agent-button__chevron {
+    min-width: 0;
+    height: var(--space-20);
+    min-height: var(--space-20);
+    padding: 0;
+  }
+
+  .new-agent-button__primary {
+    justify-content: center;
+  }
+
+  .new-agent-button__label {
+    display: none;
+  }
+}
+</style>

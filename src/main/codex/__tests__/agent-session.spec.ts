@@ -1382,6 +1382,56 @@ describe('CodexAgentSessionManager', () => {
       },
     });
   });
+
+  it('steers the active turn with an expected turn id', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+
+    await resolveStartedPrompt(transport, manager);
+
+    const steer = manager.steerPrompt(agent, 'try the smaller fix');
+    await waitForSentCount(transport, 5);
+
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 4,
+      method: 'turn/steer',
+      params: {
+        threadId: 'thread-1',
+        expectedTurnId: 'turn-1',
+        input: [
+          {
+            type: 'text',
+            text: 'try the smaller fix',
+            text_elements: [],
+          },
+        ],
+      },
+    });
+
+    transport.receive({
+      id: 4,
+      result: {
+        turnId: 'turn-1',
+      },
+    });
+    await expect(steer).resolves.toStrictEqual({
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+    });
+
+    transport.receive({
+      method: 'turn/completed',
+      params: {
+        threadId: 'thread-1',
+        turn: {
+          id: 'turn-1',
+          status: 'completed',
+        },
+      },
+    });
+
+    await expect(manager.steerPrompt(agent, 'too late')).rejects.toThrow('No active Codex turn to steer.');
+  });
 });
 
 async function resolveStartedPrompt(transport: FakeTransport, manager: CodexAgentSessionManager): Promise<void> {

@@ -54,11 +54,21 @@ describe('ChatComposer', () => {
     await wrapper.get('textarea').trigger('keydown', { key: 'Enter', shiftKey: true });
     expect(wrapper.emitted('send')).toBeUndefined();
 
-    await wrapper.get('textarea').trigger('keydown.enter');
+    await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
     expect(wrapper.emitted('send')).toStrictEqual([['first line']]);
   });
 
-  it('disables sending without text, without an agent, or while Codex is working', async () => {
+  it('steers with Command Enter', async () => {
+    const wrapper = mountComposer({ isSending: true });
+
+    await wrapper.get('textarea').setValue('switch to the smaller fix');
+    await wrapper.get('textarea').trigger('keydown', { key: 'Enter', metaKey: true });
+
+    expect(wrapper.emitted('steer')).toStrictEqual([['switch to the smaller fix']]);
+    expect(wrapper.emitted('send')).toBeUndefined();
+  });
+
+  it('disables sending without text or without an agent but keeps busy drafts submittable', async () => {
     const empty = mountComposer();
     expect(empty.get('.chat-composer__send').attributes()).toHaveProperty('disabled');
 
@@ -68,7 +78,9 @@ describe('ChatComposer', () => {
 
     const sending = mountComposer({ isSending: true });
     await sending.get('textarea').setValue('hello');
-    expect(sending.get('.chat-composer__send').attributes()).toHaveProperty('disabled');
+    expect(sending.get('.chat-composer__send').attributes()).not.toHaveProperty('disabled');
+    await sending.get('form').trigger('submit');
+    expect(sending.emitted('send')).toStrictEqual([['hello']]);
   });
 
   it('renders selected Codex model and reasoning controls', () => {

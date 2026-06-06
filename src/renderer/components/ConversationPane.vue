@@ -16,6 +16,12 @@
       />
 
       <template #footer>
+        <ChatQueuedPrompts
+          class="conversation-pane__queued-prompts"
+          :prompts="queuedPrompts"
+          @delete="$emit('delete-queued-prompt', $event)"
+          @steer="$emit('steer-queued-prompt', $event)"
+        />
         <ChatComposer
           class="conversation-pane__composer"
           :disabled="!agent"
@@ -28,6 +34,7 @@
           @update:model-id="$emit('select-model', $event)"
           @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
           @send="$emit('sendPrompt', $event)"
+          @steer="$emit('steerPrompt', $event)"
         />
       </template>
     </WorkbenchLayout>
@@ -45,6 +52,12 @@
         <h1>{{ heroHeadline }}</h1>
         <p>{{ heroSubhead }}</p>
       </div>
+      <ChatQueuedPrompts
+        class="conversation-pane__queued-prompts"
+        :prompts="queuedPrompts"
+        @delete="$emit('delete-queued-prompt', $event)"
+        @steer="$emit('steer-queued-prompt', $event)"
+      />
       <ChatComposer
         class="conversation-pane__composer"
         :disabled="!agent"
@@ -57,6 +70,7 @@
         @update:model-id="$emit('select-model', $event)"
         @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
         @send="$emit('sendPrompt', $event)"
+        @steer="$emit('steerPrompt', $event)"
       />
     </div>
   </section>
@@ -68,10 +82,12 @@ import type { Agent, ClientRequestResponse, CodexModelOption, ReasoningEffort, R
 import WorkbenchLayout from './WorkbenchLayout.vue';
 import ChatComposer from './ChatComposer.vue';
 import ConversationHistoryLoader from './ConversationHistoryLoader.vue';
+import ChatQueuedPrompts from '../shared/chat/ChatQueuedPrompts.vue';
 import MessageList from '../shared/chat/MessageList.vue';
 import { rendererMessagesToChatMessages } from '../shared/chat/renderer-message-adapter';
+import type { QueuedChatPrompt } from '../shared/chat/queued-prompts';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   messages: RendererMessage[];
   agent: Agent | null;
   isLoading: boolean;
@@ -81,13 +97,19 @@ const props = defineProps<{
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
-}>();
+  queuedPrompts?: QueuedChatPrompt[];
+}>(), {
+  queuedPrompts: () => [],
+});
 
 defineEmits<{
   'client-response': [response: ClientRequestResponse];
+  'delete-queued-prompt': [promptId: string];
   'select-model': [modelId: string];
   'select-reasoning-effort': [reasoningEffort: ReasoningEffort];
+  'steer-queued-prompt': [promptId: string];
   sendPrompt: [prompt: string];
+  steerPrompt: [prompt: string];
 }>();
 
 const composerPlaceholder = computed(() => {
@@ -155,6 +177,10 @@ const heroSubhead = computed(() => {
   width: min(calc(100% - var(--space-16) * 2), var(--conversation-content-width));
   margin: 0 auto;
   margin-bottom: var(--space-8);
+}
+
+.conversation-pane__queued-prompts {
+  width: min(calc(100% - var(--space-16) * 2), var(--conversation-content-width));
 }
 
 .conversation-pane__hero {

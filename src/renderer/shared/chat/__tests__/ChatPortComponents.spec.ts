@@ -90,7 +90,9 @@ describe('ported id8 chat components', () => {
     });
 
     expect(wrapper.text()).toContain('Run the tests after this turn');
-    await wrapper.get('button').trigger('click');
+    await wrapper.get('[aria-label="Steer queued prompt now"]').trigger('click');
+    await wrapper.get('[aria-label="Delete queued prompt"]').trigger('click');
+    expect(wrapper.emitted('steer')).toStrictEqual([['prompt-1']]);
     expect(wrapper.emitted('delete')).toStrictEqual([['prompt-1']]);
   });
 

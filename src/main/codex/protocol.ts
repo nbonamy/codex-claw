@@ -102,6 +102,10 @@ export type TurnStartResponse = {
   turn: CodexTurn;
 };
 
+export type TurnSteerResponse = {
+  turnId: string;
+};
+
 export type CodexModelListResponse = {
   data: CodexModel[];
   nextCursor?: string | null;

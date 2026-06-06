@@ -23,8 +23,7 @@
       rows="1"
       :disabled="disabled && !isSending"
       @input="resizeTextarea"
-      @keydown.enter.exact.prevent="submitPrompt"
-      @keydown.shift.enter="resizeTextareaSoon"
+      @keydown="handleTextareaKeydown"
     />
 
     <div class="chat-composer__meta">
@@ -40,8 +39,8 @@
       />
       <ChatComposerSendButton
         :disabled="!canSend"
-        :loading="isSending"
-        label="Send prompt"
+        :loading="sendButtonLoading"
+        :label="sendButtonLabel"
         cancel-label="Codex is working"
         @click="submitPrompt"
       />
@@ -70,6 +69,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   send: [prompt: string];
+  steer: [prompt: string];
   'update:modelId': [modelId: string];
   'update:reasoningEffort': [reasoningEffort: ReasoningEffort];
 }>();
@@ -77,17 +77,53 @@ const emit = defineEmits<{
 const prompt = ref('');
 const textareaEl = ref<HTMLTextAreaElement | null>(null);
 
-const canSend = computed(() => Boolean(prompt.value.trim() && !props.disabled && !props.isSending));
+const hasPrompt = computed(() => Boolean(prompt.value.trim()));
+const canSend = computed(() => Boolean(hasPrompt.value && !props.disabled));
+const sendButtonLoading = computed(() => props.isSending && !hasPrompt.value);
+const sendButtonLabel = computed(() => (props.isSending ? 'Queue prompt' : 'Send prompt'));
 
 function submitPrompt(): void {
+  submitWithIntent('send');
+}
+
+function submitSteer(): void {
+  submitWithIntent('steer');
+}
+
+function submitWithIntent(intent: 'send' | 'steer'): void {
   const trimmed = prompt.value.trim();
   if (!canSend.value) {
     return;
   }
 
   prompt.value = '';
-  emit('send', trimmed);
+  if (intent === 'send') {
+    emit('send', trimmed);
+  } else {
+    emit('steer', trimmed);
+  }
   void nextTick(resizeTextarea);
+}
+
+function handleTextareaKeydown(event: KeyboardEvent): void {
+  if (event.key !== 'Enter') {
+    return;
+  }
+
+  if (event.shiftKey) {
+    resizeTextareaSoon();
+    return;
+  }
+
+  event.preventDefault();
+  if (event.metaKey && !event.ctrlKey && !event.altKey) {
+    submitSteer();
+    return;
+  }
+
+  if (!event.metaKey && !event.ctrlKey && !event.altKey) {
+    submitPrompt();
+  }
 }
 
 function resizeTextarea(): void {

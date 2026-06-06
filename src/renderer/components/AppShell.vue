@@ -16,6 +16,7 @@
         v-if="showAgentSidebar"
         :agents="activeTeamAgents"
         :active-agent-id="currentAgent?.id ?? null"
+        :bench="snapshot.bench"
         :teams="snapshot.teams"
         :team-name="activeTeamName"
         :width="agentSidebarWidth"
@@ -23,12 +24,14 @@
         :max-width="agentSidebarMaxWidth"
         @collapse-sidebar="agentSidebarCollapsed = true"
         @close-agent="$emit('close-agent', $event)"
+        @deploy-bench-template="$emit('deploy-bench-template', $event)"
         @duplicate-agent="$emit('duplicate-agent', $event)"
         @edit-agent="openEditAgent"
         @move-agent-to-team="$emit('move-agent-to-team', $event)"
         @new-agent="openNewAgent"
         @restart-agent="$emit('restart-agent', $event)"
         @resize-sidebar="setAgentSidebarWidth"
+        @remove-bench-template="$emit('remove-bench-template', $event)"
         @save-agent-to-bench="$emit('save-agent-to-bench', $event)"
         @select-agent="$emit('select-agent', $event)"
       />
@@ -45,7 +48,10 @@
       <div class="app-shell__body">
         <AgentEmptyState
           v-if="isAgentEmpty"
+          :bench="snapshot.bench"
+          @deploy-bench-template="$emit('deploy-bench-template', $event)"
           @new-agent="openNewAgent"
+          @remove-bench-template="$emit('remove-bench-template', $event)"
         />
         <ConversationPane
           v-else
@@ -58,10 +64,14 @@
           :model-catalog-status="modelCatalogStatus"
           :selected-model-id="selectedModelId"
           :selected-reasoning-effort="selectedReasoningEffort"
+          :queued-prompts="queuedPrompts"
           @client-response="$emit('client-response', $event)"
+          @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
           @select-model="$emit('select-model', $event)"
           @select-reasoning-effort="$emit('select-reasoning-effort', $event)"
           @send-prompt="$emit('sendPrompt', $event)"
+          @steer-prompt="$emit('steerPrompt', $event)"
+          @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
         />
       </div>
     </section>
@@ -95,6 +105,7 @@ import AgentSidebar from './AgentSidebar.vue';
 import ConversationPane from './ConversationPane.vue';
 import TeamDialog from './TeamDialog.vue';
 import TeamRail from './TeamRail.vue';
+import type { QueuedChatPrompt } from '../shared/chat/queued-prompts';
 
 const props = withDefaults(defineProps<{
   snapshot: AppSnapshot;
@@ -107,6 +118,7 @@ const props = withDefaults(defineProps<{
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
+  queuedPrompts?: QueuedChatPrompt[];
   chooseAgentFolder?: () => Promise<string | null>;
   createAgent?: (input: CreateAgentInput) => Promise<void>;
   createTeam?: (input: CreateTeamInput) => Promise<void>;
@@ -118,6 +130,7 @@ const props = withDefaults(defineProps<{
   modelCatalogStatus: 'notLoaded',
   selectedModelId: null,
   selectedReasoningEffort: null,
+  queuedPrompts: () => [],
   chooseAgentFolder: async () => null,
   createAgent: async () => undefined,
   createTeam: async () => undefined,
@@ -129,15 +142,20 @@ const emit = defineEmits<{
   'close-team': [teamId: string];
   'close-agent': [agentId: string];
   'client-response': [response: ClientRequestResponse];
+  'delete-queued-prompt': [promptId: string];
+  'deploy-bench-template': [templateId: string];
   'duplicate-agent': [agentId: string];
   'move-agent-to-team': [input: MoveAgentToTeamInput];
   'restart-agent': [agentId: string];
+  'remove-bench-template': [templateId: string];
   'save-agent-to-bench': [agentId: string];
   'select-agent': [agentId: string];
   'select-model': [modelId: string];
   'select-reasoning-effort': [reasoningEffort: ReasoningEffort];
   'select-team': [teamId: string];
+  'steer-queued-prompt': [promptId: string];
   sendPrompt: [prompt: string];
+  steerPrompt: [prompt: string];
 }>();
 
 const agentSidebarCollapsed = ref(false);

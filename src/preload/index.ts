@@ -15,11 +15,14 @@ const api: CodexClawApi = {
   duplicateAgent: (agentId: string) => ipcRenderer.invoke(ipcChannels.duplicateAgent, agentId),
   moveAgentToTeam: (input: MoveAgentToTeamInput) => ipcRenderer.invoke(ipcChannels.moveAgentToTeam, input),
   saveAgentToBench: (agentId: string) => ipcRenderer.invoke(ipcChannels.saveAgentToBench, agentId),
+  deployBenchTemplate: (templateId: string, teamId?: string) => ipcRenderer.invoke(ipcChannels.deployBenchTemplate, templateId, teamId),
+  removeBenchTemplate: (templateId: string) => ipcRenderer.invoke(ipcChannels.removeBenchTemplate, templateId),
   restartAgent: (agentId: string) => ipcRenderer.invoke(ipcChannels.restartAgent, agentId),
   closeAgent: (agentId: string) => ipcRenderer.invoke(ipcChannels.closeAgent, agentId),
   selectAgent: (agentId: string) => ipcRenderer.invoke(ipcChannels.selectAgent, agentId),
   selectAgentFolder: (agentId: string) => ipcRenderer.invoke(ipcChannels.selectAgentFolder, agentId),
   sendPrompt: (agentId: string, prompt: string, options?: SendPromptOptions) => ipcRenderer.invoke(ipcChannels.sendPrompt, agentId, prompt, options),
+  steerPrompt: (agentId: string, prompt: string) => ipcRenderer.invoke(ipcChannels.steerPrompt, agentId, prompt),
   respondToClientRequest: (response: ClientRequestResponse) => ipcRenderer.invoke(ipcChannels.respondToClientRequest, response),
   onEvent: (listener: (event: MainToRendererEvent) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, payload: MainToRendererEvent) => listener(payload);

@@ -13,8 +13,10 @@ import { buildCodexClawMcpConfigOverrides } from './mcp/codex-config';
 import { ClawMcpHttpServer } from './mcp/http-server';
 import {
   closeAgentInSnapshot,
+  deployBenchTemplateInSnapshot,
   duplicateAgentInSnapshot,
   moveAgentToTeamInSnapshot,
+  removeBenchTemplateFromSnapshot,
   restartAgentConversation,
   saveAgentToBench,
 } from '../shared/agent-manager';
@@ -151,6 +153,29 @@ export class AppController {
       return this.snapshot;
     });
 
+    ipcMain.handle(ipcChannels.deployBenchTemplate, async (_event, templateId: string, teamId?: string) => {
+      const template = this.snapshot.bench.find((candidate) => candidate.id === templateId);
+      if (!template) {
+        throw new Error(`Bench template not found: ${templateId}`);
+      }
+      await this.validateAgentInput(template);
+      const agent = deployBenchTemplateInSnapshot(this.snapshot, templateId, teamId);
+      if (!agent) {
+        throw new Error(`Bench template or team not found: ${templateId}`);
+      }
+      await this.persistSnapshot();
+      return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.removeBenchTemplate, async (_event, templateId: string) => {
+      const template = removeBenchTemplateFromSnapshot(this.snapshot, templateId);
+      if (!template) {
+        throw new Error(`Bench template not found: ${templateId}`);
+      }
+      await this.persistSnapshot();
+      return this.snapshot;
+    });
+
     ipcMain.handle(ipcChannels.restartAgent, async (_event, agentId: string) => {
       const agent = restartAgentConversation(this.snapshot, agentId);
       if (!agent) {
@@ -195,6 +220,10 @@ export class AppController {
       return this.sendPrompt(agentId, prompt, options);
     });
 
+    ipcMain.handle(ipcChannels.steerPrompt, (_event, agentId: string, prompt: string) => {
+      return this.steerPrompt(agentId, prompt);
+    });
+
     ipcMain.handle(ipcChannels.respondToClientRequest, async (_event, response: ClientRequestResponse) => {
       if (!this.codexSessionManager) {
         throw new Error('No active Codex session can receive this client response.');
@@ -218,6 +247,17 @@ export class AppController {
     return sendAgentPrompt(this.snapshot, await this.getCodexSessionManager(), agentId, prompt, options, (event) => {
       this.emitAndApply(event);
     });
+  }
+
+  private async steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot> {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    const trimmedPrompt = prompt.trim();
+    if (!agent || !trimmedPrompt) {
+      return this.snapshot;
+    }
+
+    await (await this.getCodexSessionManager()).steerPrompt(agent, trimmedPrompt);
+    return this.snapshot;
   }
 
   private async hydrateAgentHistory(agentId: string): Promise<void> {

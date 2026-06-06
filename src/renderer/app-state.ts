@@ -1,10 +1,12 @@
 import { computed, ref } from 'vue';
 import type { AppSnapshot, ClientRequestResponse, CodexModelOption, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, SendPromptOptions, UpdateAgentInput, UpdateTeamInput } from '../shared/contracts';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '../shared/snapshot';
+import { createQueuedChatPrompt, type QueuedChatPrompt } from './shared/chat/queued-prompts';
 
 const snapshot = ref<AppSnapshot>(createEmptySnapshot());
 const isLoading = ref(false);
 const sendingAgentIds = ref(new Set<string>());
+const queuedPromptsByAgentId = ref<Record<string, QueuedChatPrompt[]>>({});
 const answeredClientRequestIds = ref(new Set<string>());
 const codexModels = ref<CodexModelOption[]>([]);
 const modelCatalogStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
@@ -23,6 +25,11 @@ export function useAppState() {
   const visibleMessages = computed(() => {
     const agentId = activeAgent.value?.id;
     return agentId ? snapshot.value.messages.filter((message) => message.agentId === agentId) : [];
+  });
+
+  const activeQueuedPrompts = computed(() => {
+    const agentId = activeAgent.value?.id;
+    return agentId ? queuedPromptsByAgentId.value[agentId] ?? [] : [];
   });
 
   const isSending = computed(() => {
@@ -77,13 +84,82 @@ export function useAppState() {
       return;
     }
 
+    const trimmed = prompt.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    if (isAgentSending(agentId)) {
+      enqueuePrompt(agentId, trimmed);
+      return;
+    }
+
+    await sendPromptForAgent(agentId, trimmed);
+  }
+
+  async function steerPrompt(prompt: string): Promise<void> {
+    const agentId = activeAgent.value?.id;
+    if (!agentId || !window.codexClaw) {
+      return;
+    }
+
+    const trimmed = prompt.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    if (!isAgentSending(agentId)) {
+      await sendPromptForAgent(agentId, trimmed);
+      return;
+    }
+
+    if (!window.codexClaw.steerPrompt) {
+      enqueuePrompt(agentId, trimmed);
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.steerPrompt(agentId, trimmed);
+  }
+
+  async function steerQueuedPrompt(promptId: string): Promise<void> {
+    const agentId = activeAgent.value?.id;
+    if (!agentId) {
+      return;
+    }
+
+    const queuedPrompt = removeQueuedPromptForAgent(agentId, promptId);
+    if (!queuedPrompt) {
+      return;
+    }
+
+    try {
+      await steerPrompt(queuedPrompt.text);
+    } catch (error) {
+      prependQueuedPrompt(agentId, queuedPrompt);
+      throw error;
+    }
+  }
+
+  function removeQueuedPrompt(promptId: string): void {
+    const agentId = activeAgent.value?.id;
+    if (agentId) {
+      removeQueuedPromptForAgent(agentId, promptId);
+    }
+  }
+
+  async function sendPromptForAgent(agentId: string, prompt: string): Promise<void> {
+    const api = window.codexClaw;
+    if (!api) {
+      return;
+    }
+
     markAgentSending(agentId, true);
 
     try {
       const options = selectedPromptOptions();
       snapshot.value = options
-        ? await window.codexClaw.sendPrompt(agentId, prompt, options)
-        : await window.codexClaw.sendPrompt(agentId, prompt);
+        ? await api.sendPrompt(agentId, prompt, options)
+        : await api.sendPrompt(agentId, prompt);
     } finally {
       markAgentSending(agentId, false);
     }
@@ -187,6 +263,22 @@ export function useAppState() {
     snapshot.value = await window.codexClaw.saveAgentToBench(agentId);
   }
 
+  async function deployBenchTemplate(templateId: string): Promise<void> {
+    if (!window.codexClaw?.deployBenchTemplate || !snapshot.value.bench.some((template) => template.id === templateId)) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.deployBenchTemplate(templateId, snapshot.value.activeTeamId ?? undefined);
+  }
+
+  async function removeBenchTemplate(templateId: string): Promise<void> {
+    if (!window.codexClaw?.removeBenchTemplate || !snapshot.value.bench.some((template) => template.id === templateId)) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.removeBenchTemplate(templateId);
+  }
+
   async function restartAgent(agentId: string): Promise<void> {
     if (!window.codexClaw?.restartAgent) {
       return;
@@ -236,6 +328,7 @@ export function useAppState() {
     snapshot,
     activeAgent,
     visibleMessages,
+    activeQueuedPrompts,
     isLoading,
     isSending,
     answeredClientRequestIds,
@@ -255,6 +348,8 @@ export function useAppState() {
     duplicateAgent,
     moveAgentToTeam,
     saveAgentToBench,
+    deployBenchTemplate,
+    removeBenchTemplate,
     restartAgent,
     closeAgent,
     respondToClientRequest,
@@ -263,6 +358,9 @@ export function useAppState() {
     selectAgent,
     selectTeam,
     sendPrompt,
+    steerPrompt,
+    steerQueuedPrompt,
+    removeQueuedPrompt,
   };
 }
 
@@ -304,6 +402,9 @@ function subscribeToMainEvents(): void {
   unsubscribeMainEvents?.();
   unsubscribeMainEvents = window.codexClaw.onEvent((event: MainToRendererEvent) => {
     applyMainEventToSnapshot(snapshot.value, event);
+    if (event.type === 'turn.completed' && event.agentId) {
+      void drainQueuedPrompts(event.agentId);
+    }
   });
 }
 
@@ -328,6 +429,75 @@ function markAgentSending(agentId: string, sending: boolean): void {
     next.delete(agentId);
   }
   sendingAgentIds.value = next;
+}
+
+function isAgentSending(agentId: string): boolean {
+  const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
+  return sendingAgentIds.value.has(agentId) ||
+    agent?.status.type === 'starting' ||
+    agent?.status.type === 'working' ||
+    agent?.status.type === 'awaitingInput';
+}
+
+function enqueuePrompt(agentId: string, prompt: string): void {
+  appendQueuedPrompt(agentId, createQueuedChatPrompt(prompt));
+}
+
+function appendQueuedPrompt(agentId: string, prompt: QueuedChatPrompt): void {
+  queuedPromptsByAgentId.value = {
+    ...queuedPromptsByAgentId.value,
+    [agentId]: [
+      ...(queuedPromptsByAgentId.value[agentId] ?? []),
+      prompt,
+    ],
+  };
+}
+
+function prependQueuedPrompt(agentId: string, prompt: QueuedChatPrompt): void {
+  queuedPromptsByAgentId.value = {
+    ...queuedPromptsByAgentId.value,
+    [agentId]: [
+      prompt,
+      ...(queuedPromptsByAgentId.value[agentId] ?? []),
+    ],
+  };
+}
+
+function removeQueuedPromptForAgent(agentId: string, promptId: string): QueuedChatPrompt | null {
+  const prompts = queuedPromptsByAgentId.value[agentId] ?? [];
+  const prompt = prompts.find((candidate) => candidate.id === promptId) ?? null;
+  if (!prompt) {
+    return null;
+  }
+
+  queuedPromptsByAgentId.value = {
+    ...queuedPromptsByAgentId.value,
+    [agentId]: prompts.filter((candidate) => candidate.id !== promptId),
+  };
+  return prompt;
+}
+
+async function drainQueuedPrompts(agentId: string): Promise<void> {
+  if (!window.codexClaw || isAgentSending(agentId)) {
+    return;
+  }
+
+  const nextPrompt = queuedPromptsByAgentId.value[agentId]?.[0];
+  if (!nextPrompt) {
+    return;
+  }
+
+  removeQueuedPromptForAgent(agentId, nextPrompt.id);
+  markAgentSending(agentId, true);
+
+  try {
+    const options = selectedPromptOptions();
+    snapshot.value = options
+      ? await window.codexClaw.sendPrompt(agentId, nextPrompt.text, options)
+      : await window.codexClaw.sendPrompt(agentId, nextPrompt.text);
+  } finally {
+    markAgentSending(agentId, false);
+  }
 }
 
 function markClientRequestAnswered(requestId: string): void {

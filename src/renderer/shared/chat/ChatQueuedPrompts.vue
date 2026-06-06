@@ -8,25 +8,33 @@
     >
       <TerminalIcon class="chat-queued-prompt__icon" aria-hidden="true" />
       <span class="chat-queued-prompt__text">{{ prompt.text }}</span>
-      <button
-        class="chat-queued-prompt__delete"
-        type="button"
-        aria-label="Delete queued prompt"
-        @click="emit('delete', prompt.id)"
-      >
-        <Trash2Icon aria-hidden="true" />
-      </button>
+      <div class="chat-queued-prompt__actions">
+        <button
+          class="chat-queued-prompt__action"
+          type="button"
+          aria-label="Steer queued prompt now"
+          title="Steer now"
+          @click="emit('steer', prompt.id)"
+        >
+          <BoltIcon aria-hidden="true" />
+        </button>
+        <button
+          class="chat-queued-prompt__action"
+          type="button"
+          aria-label="Delete queued prompt"
+          title="Delete"
+          @click="emit('delete', prompt.id)"
+        >
+          <Trash2Icon aria-hidden="true" />
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { TerminalIcon, Trash2Icon } from '../icons/app-icons'
-
-export type QueuedChatPrompt = {
-  id: string;
-  text: string;
-}
+import { BoltIcon, TerminalIcon, Trash2Icon } from '../icons/app-icons'
+import type { QueuedChatPrompt } from './queued-prompts'
 
 defineProps<{
   prompts: QueuedChatPrompt[]
@@ -34,6 +42,7 @@ defineProps<{
 
 const emit = defineEmits<{
   delete: [id: string]
+  steer: [id: string]
 }>()
 
 </script>
@@ -83,7 +92,13 @@ const emit = defineEmits<{
   white-space: nowrap;
 }
 
-.chat-queued-prompt__delete {
+.chat-queued-prompt__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.chat-queued-prompt__action {
   width: var(--space-12);
   height: var(--space-12);
   display: inline-flex;
@@ -96,12 +111,12 @@ const emit = defineEmits<{
   cursor: pointer;
 }
 
-.chat-queued-prompt__delete:hover {
+.chat-queued-prompt__action:hover {
   background: var(--color-surface-low);
   color: var(--color-text);
 }
 
-.chat-queued-prompt__delete svg {
+.chat-queued-prompt__action svg {
   width: var(--icon-sm);
   height: var(--icon-sm);
 }

@@ -24,6 +24,11 @@ describe('App', () => {
     const wrapper = mount(App, {
       global: {
         plugins: [ElementPlus],
+        stubs: {
+          ElPopover: {
+            template: '<div><slot name="reference" /><slot /></div>',
+          },
+        },
       },
     });
 

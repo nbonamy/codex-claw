@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus, { ElMessageBox } from 'element-plus';
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -222,8 +222,34 @@ describe('AppShell', () => {
     expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
     expect(wrapper.find('.conversation-pane').exists()).toBe(false);
 
-    await wrapper.get('.agent-empty-state__new').trigger('click');
+    await wrapper.get('.agent-sidebar__new').trigger('click');
     expect(wrapper.text()).toContain('New Agent');
+  });
+
+  it('forwards Bench deploy and remove intents from the empty team screen', async () => {
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
+    const snapshot = createEmptySnapshot();
+    snapshot.bench.push({
+      id: 'bench-dina',
+      name: 'Dina',
+      avatar: 'DI',
+      folder: '~/src/id8',
+      backend: 'codex',
+      createdAt: '2026-06-05T00:00:00.000Z',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    });
+    const wrapper = mountShell({ snapshot });
+
+    await wrapper.get('[aria-label="Open Bench"]').trigger('click');
+    await flushPromises();
+    await wrapper.findAll('.new-agent-menu__template').find((row) => row.text().includes('Dina'))?.trigger('click');
+    await wrapper.get('[aria-label="Open Bench"]').trigger('click');
+    await flushPromises();
+    await wrapper.get('[aria-label="Remove Dina from Bench"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.emitted('deploy-bench-template')).toStrictEqual([['bench-dina']]);
+    expect(wrapper.emitted('remove-bench-template')).toStrictEqual([['bench-dina']]);
   });
 
   it('opens the new agent dialog from the sidebar and forwards create requests', async () => {
@@ -366,6 +392,32 @@ describe('AppShell', () => {
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Restart Agent')?.trigger('click');
 
     expect(wrapper.emitted('restart-agent')).toStrictEqual([['agent-dina']]);
+  });
+
+  it('forwards Bench deploy and remove intents from the new agent menu', async () => {
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
+    const snapshot = createInitialSnapshot();
+    snapshot.bench.push({
+      id: 'bench-dina',
+      name: 'Dina',
+      avatar: 'DI',
+      folder: '~/src/codex-claw',
+      backend: 'codex',
+      createdAt: '2026-06-05T00:00:00.000Z',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    });
+    const wrapper = mountShell({ snapshot });
+
+    await wrapper.get('[aria-label="Open Bench"]').trigger('click');
+    await flushPromises();
+    await wrapper.findAll('.new-agent-menu__template').find((row) => row.text().includes('Dina'))?.trigger('click');
+    await wrapper.get('[aria-label="Open Bench"]').trigger('click');
+    await flushPromises();
+    await wrapper.get('[aria-label="Remove Dina from Bench"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.emitted('deploy-bench-template')).toStrictEqual([['bench-dina']]);
+    expect(wrapper.emitted('remove-bench-template')).toStrictEqual([['bench-dina']]);
   });
 
   it('forwards agent move targets from the context menu', async () => {
