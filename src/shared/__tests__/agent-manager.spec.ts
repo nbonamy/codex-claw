@@ -9,6 +9,7 @@ import {
   saveAgentToBench,
 } from '../agent-manager';
 import { appendUserPrompt, createInitialSnapshot } from '../snapshot';
+import { createTeamInSnapshot } from '../team-manager';
 
 describe('agent-manager', () => {
   it('duplicates an agent in the same team and selects the copy', () => {
@@ -193,6 +194,26 @@ describe('agent-manager', () => {
     expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-jesse']);
     expect(snapshot.activeAgentId).toBe('agent-jesse');
     expect(snapshot.messages.map((message) => message.agentId)).toStrictEqual(['agent-jesse']);
+  });
+
+  it('closes the last active team agent without selecting another team agent', () => {
+    const snapshot = createInitialSnapshot();
+    const otherTeam = createTeamInSnapshot(snapshot, {
+      name: 'Skwad Core',
+      color: '#46A857',
+    }, '2026-06-05T10:11:12.000Z');
+    moveAgentToTeamInSnapshot(snapshot, 'agent-jesse', otherTeam.id);
+    snapshot.activeTeamId = 'team-codex-claw';
+    snapshot.activeAgentId = 'agent-dina';
+    snapshot.teams[0].activeAgentId = 'agent-dina';
+
+    expect(closeAgentInSnapshot(snapshot, 'agent-dina')).toMatchObject({ id: 'agent-dina' });
+
+    expect(snapshot.teams[0].agentIds).toStrictEqual([]);
+    expect(snapshot.teams[0].activeAgentId).toBeUndefined();
+    expect(snapshot.teams[1].agentIds).toStrictEqual(['agent-jesse']);
+    expect(snapshot.activeTeamId).toBe('team-codex-claw');
+    expect(snapshot.activeAgentId).toBeNull();
   });
 
   it('closes a non-active idle agent without changing active selection', () => {

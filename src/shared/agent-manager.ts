@@ -146,7 +146,7 @@ export function closeAgentInSnapshot(snapshot: AppSnapshot, agentId: string): Ag
 
   if (snapshot.activeAgentId === agentId) {
     const sameTeamNextAgent = snapshot.agents.find((candidate) => candidate.teamId === agent.teamId);
-    snapshot.activeAgentId = sameTeamNextAgent?.id ?? snapshot.agents[0]?.id ?? null;
+    snapshot.activeAgentId = sameTeamNextAgent?.id ?? null;
   }
 
   if (snapshot.activeTeamId === agent.teamId && snapshot.activeAgentId) {
