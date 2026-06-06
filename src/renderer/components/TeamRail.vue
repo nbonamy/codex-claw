@@ -170,7 +170,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   height: var(--team-rail-button-size);
   border: 0;
   border-radius: var(--radius-full);
-  color: var(--color-on-primary);
+  color: var(--color-text);
   font-size: var(--font-size-12);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-16);
@@ -178,7 +178,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 }
 
 .team-rail__team--active {
-  color: var(--color-on-primary);
+  color: var(--color-text);
   box-shadow:
     0 0 0 2px var(--color-shell-rail),
     0 0 0 3px var(--color-primary);
