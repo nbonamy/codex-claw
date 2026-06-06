@@ -68,7 +68,7 @@ const emit = defineEmits<{
   white-space: normal;
   overflow-wrap: anywhere;
   line-height: var(--line-height-22);
-  font-size: calc(var(--font-size-15) + .5px);
+  font-size: var(--font-size-15);
   opacity: 0.85;
 }
 
