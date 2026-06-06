@@ -1,8 +1,12 @@
 import { Marked, Renderer } from 'marked'
+import { escapeAttribute, escapeHtml } from './html-escape'
+import { renderCodeBlock } from './syntax-highlighting'
 
 const renderer = new Renderer()
 
 renderer.html = ({ text }) => escapeHtml(text)
+
+renderer.code = ({ text, lang }) => renderCodeBlock(text, lang)
 
 renderer.link = ({ href, title, tokens }) => {
   const text = renderInlineTokens(tokens)
@@ -47,19 +51,6 @@ export function renderUserText(content: string) {
   return `<p>${escapeHtml(content)
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\n/g, '<br>')}</p>`
-}
-
-function escapeHtml(content: string) {
-  return content
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
-
-function escapeAttribute(content: string) {
-  return escapeHtml(content).replace(/`/g, '&#96;')
 }
 
 function isAbsoluteHttpUrl(value: string) {

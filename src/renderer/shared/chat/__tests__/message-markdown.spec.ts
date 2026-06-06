@@ -32,6 +32,25 @@ describe('message markdown rendering', () => {
     expect(html).toContain('<code>code</code>');
   });
 
+  it('syntax-highlights fenced code blocks with a known language', () => {
+    const html = renderMarkdown('```ts\nconst ok = true\n```');
+
+    expect(html).toContain('class="shiki shiki-themes');
+    expect(html).toContain('github-light');
+    expect(html).toContain('github-dark');
+    expect(html).toContain('--shiki-light');
+    expect(html).toContain('--shiki-dark');
+    expect(html).toContain('const');
+  });
+
+  it('escapes fenced code blocks when the language is not supported', () => {
+    const html = renderMarkdown('```unknown-lang\n<script>bad</script>\n```');
+
+    expect(html).toContain('class="language-unknown-lang"');
+    expect(html).toContain('&lt;script&gt;bad&lt;/script&gt;');
+    expect(html).not.toContain('<script>');
+  });
+
   it('renders safe link icons for web, mail, and file-style links', () => {
     const html = renderMarkdown([
       '[web](https://example.com/a)',

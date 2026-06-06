@@ -47,6 +47,23 @@ button {
   animation: text-shimmer 4.5s linear infinite;
 }
 
+/* Shiki injects these local variables on highlighted spans. */
+/* stylelint-disable lyliya/value-no-unknown-custom-properties */
+.shiki,
+.shiki span {
+  color: var(--shiki-light);
+}
+
+:root[data-effective-appearance='dark'] .shiki,
+:root[data-effective-appearance='dark'] .shiki span {
+  color: var(--shiki-dark);
+}
+
+.shiki {
+  background: var(--color-surface-low) !important;
+}
+/* stylelint-enable lyliya/value-no-unknown-custom-properties */
+
 @keyframes text-shimmer {
   0% {
     background-position: 150% 0;
