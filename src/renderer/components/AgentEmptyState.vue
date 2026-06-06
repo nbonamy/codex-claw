@@ -67,7 +67,7 @@ const bench = computed(() => props.bench ?? []);
   position: absolute;
   top: 0;
   width: 100%;
-  height: 30vh;
+  height: var(--space-16);
   -webkit-app-region: drag;
 }
 
