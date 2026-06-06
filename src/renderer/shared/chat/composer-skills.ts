@@ -31,13 +31,13 @@ export function findActiveSkillSlash(value: string, caretPosition: number): Acti
   };
 }
 
-export function filterComposerSkills(skills: CodexSkillSummary[], query: string, maxResults = 8): CodexSkillSummary[] {
+export function filterComposerSkills(skills: CodexSkillSummary[], query: string, maxResults = -1): CodexSkillSummary[] {
   const value = query.trim().toLowerCase();
   if (!value) {
-    return skills.slice(0, maxResults);
+    return limitSkills(skills, maxResults);
   }
 
-  return skills
+  const matches = skills
     .map((skill) => ({
       skill,
       score: Math.max(
@@ -47,9 +47,9 @@ export function filterComposerSkills(skills: CodexSkillSummary[], query: string,
       ),
     }))
     .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, maxResults)
-    .map((entry) => entry.skill);
+    .sort((a, b) => b.score - a.score);
+
+  return limitSkills(matches.map((entry) => entry.skill), maxResults);
 }
 
 export function skillDisplayName(skill: CodexSkillSummary): string {
@@ -99,4 +99,8 @@ function fuzzyScore(pattern: string, target: string): number {
   }
 
   return patternIndex === pattern.length ? score : 0;
+}
+
+function limitSkills(skills: CodexSkillSummary[], maxResults: number): CodexSkillSummary[] {
+  return maxResults >= 0 ? skills.slice(0, maxResults) : skills;
 }

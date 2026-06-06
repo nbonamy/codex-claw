@@ -1,5 +1,6 @@
 <template>
   <div
+    ref="menuEl"
     class="chat-composer-skill-menu"
     role="listbox"
     aria-label="Skills"
@@ -19,7 +20,9 @@
       <span
         class="chat-composer-skill-menu__icon"
         aria-hidden="true"
-      >/</span>
+      >
+        <SparklesIcon />
+      </span>
       <span class="chat-composer-skill-menu__main">
         <span class="chat-composer-skill-menu__name">{{ skillDisplayName(skill) }}</span>
         <span class="chat-composer-skill-menu__description">{{ skillDescription(skill) }}</span>
@@ -35,11 +38,13 @@
 </template>
 
 <script setup lang="ts">
+import { nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { CodexSkillSummary } from '../../shared/contracts';
 import { skillDescription, skillDisplayName } from '../shared/chat/composer-skills';
+import { SparklesIcon } from '../shared/icons/app-icons';
 
-defineProps<{
+const props = defineProps<{
   activeIndex: number;
   visibleSkills: CodexSkillSummary[];
 }>();
@@ -49,6 +54,19 @@ defineEmits<{
 }>();
 
 const { t } = useI18n();
+const menuEl = ref<HTMLElement | null>(null);
+
+watch(
+  () => [props.activeIndex, props.visibleSkills],
+  async () => {
+    await nextTick();
+    const activeItem = menuEl.value?.querySelectorAll<HTMLButtonElement>('.chat-composer-skill-menu__item')
+      .item(props.activeIndex);
+    if (typeof activeItem?.scrollIntoView === 'function') {
+      activeItem.scrollIntoView({ block: 'nearest' });
+    }
+  },
+);
 </script>
 
 <style scoped>
@@ -108,17 +126,13 @@ const { t } = useI18n();
   width: var(--icon-md);
   height: var(--icon-md);
   flex: 0 0 var(--icon-md);
-  border-radius: var(--radius-full);
-  background: var(--color-surface-base);
   color: var(--color-text-muted);
-  font-size: var(--font-size-15);
-  font-weight: var(--font-weight-semibold);
 }
 
 .chat-composer-skill-menu__main {
-  display: grid;
+  display: flex;
   min-width: 0;
-  gap: var(--space-1);
+  gap: var(--space-4);
 }
 
 .chat-composer-skill-menu__name {
@@ -126,6 +140,7 @@ const { t } = useI18n();
   font-weight: var(--font-weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .chat-composer-skill-menu__description {
@@ -134,6 +149,7 @@ const { t } = useI18n();
   font-size: var(--font-size-13);
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex-shrink: 1;
 }
 
 .chat-composer-skill-menu__empty {

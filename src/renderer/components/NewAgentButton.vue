@@ -13,7 +13,7 @@
         v-model:visible="menuVisible"
         placement="top"
         trigger="manual"
-        width="284"
+        width="200"
         popper-class="new-agent-button__popover"
         :teleported="false"
       >
@@ -145,7 +145,10 @@ function folderBasename(folder: string): string {
 </script>
 
 <style scoped>
+
 .new-agent-button {
+  --new-agent-button-height: 40px;
+  --new-agent-button-border-radius: var(--radius-lg);
   width: 100%;
 }
 
@@ -157,8 +160,8 @@ function folderBasename(folder: string): string {
 
 .new-agent-button__primary {
   flex: 1;
-  height: 48px;
-  border-radius: var(--radius-md);
+  height: var(--new-agent-button-height);
+  border-radius: var(--new-agent-button-border-radius);
   font-size: var(--font-size-14);
   font-weight: var(--font-weight-semibold);
   justify-content: center;
@@ -167,9 +170,9 @@ function folderBasename(folder: string): string {
 }
 
 .new-agent-button__chevron {
-  height: 48px;
-  border-top-right-radius: var(--radius-md) !important;
-  border-bottom-right-radius: var(--radius-md) !important;
+  height: var(--new-agent-button-height);
+  border-top-right-radius: var(--new-agent-button-border-radius) !important;
+  border-bottom-right-radius: var(--new-agent-button-border-radius) !important;
   border-left-color: var(--color-background) !important;
   border-right: none;
   font-size: var(--font-size-14);
@@ -215,7 +218,6 @@ function folderBasename(folder: string): string {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 40px;
   padding: var(--space-4) var(--space-6);
   border-radius: var(--radius-md);
   font-size: var(--font-size-13);
