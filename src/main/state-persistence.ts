@@ -6,11 +6,17 @@ import { defaultTeamColor } from '../shared/team-colors';
 
 type PersistedState = {
   teams: Team[];
-  agents: Agent[];
+  agents: PersistedAgent[];
   bench: BenchTemplate[];
   activeTeamId: string | null;
   activeAgentId: string | null;
   theme: AppSnapshot['theme'];
+};
+
+type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'updatedAt'> & {
+  avatar?: string;
+  codexThreadId?: string;
+  teamId?: string;
 };
 
 export class AppStatePersistence {
@@ -38,11 +44,24 @@ export class AppStatePersistence {
 export function persistedStateFromSnapshot(snapshot: AppSnapshot): PersistedState {
   return {
     teams: snapshot.teams.map((team) => ({ ...team, agentIds: [...team.agentIds] })),
-    agents: snapshot.agents.map((agent) => ({ ...agent })),
+    agents: snapshot.agents.map(persistedAgentFromSnapshot),
     bench: snapshot.bench.map((template) => ({ ...template })),
     activeTeamId: snapshot.activeTeamId,
     activeAgentId: snapshot.activeAgentId,
     theme: { ...snapshot.theme },
+  };
+}
+
+function persistedAgentFromSnapshot(agent: Agent): PersistedAgent {
+  return {
+    id: agent.id,
+    teamId: agent.teamId,
+    name: agent.name,
+    avatar: agent.avatar,
+    folder: agent.folder,
+    codexThreadId: agent.codexThreadId,
+    createdAt: agent.createdAt,
+    updatedAt: agent.updatedAt,
   };
 }
 

@@ -158,6 +158,7 @@ Important notifications:
 
 - `thread/started`
 - `thread/settings/updated`
+- `thread/tokenUsage/updated`
 - `thread/status/changed`
 - `turn/started`
 - `turn/completed`
@@ -201,6 +202,67 @@ and optional `_meta.persist`.
 
 Unhandled notifications should also log `not implemented`, but they do not need
 a response because notifications cannot block the app-server.
+
+### Token Usage And Rate Limits
+
+`thread/tokenUsage/updated` payload:
+
+```ts
+{
+  threadId: string;
+  turnId: string;
+  tokenUsage: {
+    total: {
+      totalTokens: number;
+      inputTokens: number;
+      cachedInputTokens: number;
+      outputTokens: number;
+      reasoningOutputTokens: number;
+    };
+    last: {
+      totalTokens: number;
+      inputTokens: number;
+      cachedInputTokens: number;
+      outputTokens: number;
+      reasoningOutputTokens: number;
+    };
+    modelContextWindow: number | null;
+  };
+}
+```
+
+Main converts this into `thread.tokenUsageUpdated` with an app-owned
+`contextUsage` payload. `total` is cumulative thread/session usage and can
+exceed the model window after a long conversation. Context occupancy uses
+`last.totalTokens`, which is the latest active context size, divided by
+`modelContextWindow`. Tooltip displays should also cap the visible numerator
+to the model window so the UI never shows an impossible `tokens > window`
+context fraction.
+
+`account/rateLimits/updated` payload:
+
+```ts
+{
+  rateLimits: {
+    limitId: string | null;
+    limitName: string | null;
+    primary: {
+      usedPercent: number;
+      windowDurationMins: number | null;
+      resetsAt: number | null;
+    } | null;
+    secondary: RateLimitWindow | null;
+    credits: unknown;
+    individualLimit: unknown;
+    planType: string | null;
+    rateLimitReachedType: string | null;
+  };
+}
+```
+
+The rate-limit notification is a sparse account-level update, not tied to an
+agent. Main emits `account.rateLimitsUpdated` and the reducer stores it as
+global app state.
 
 ## Generated Protocol Types
 

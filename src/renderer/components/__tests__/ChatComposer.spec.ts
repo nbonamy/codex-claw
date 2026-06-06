@@ -2,7 +2,8 @@ import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import ChatComposer from '../ChatComposer.vue';
-import type { CodexModelOption } from '../../../shared/contracts';
+import { i18n } from '../../i18n';
+import type { AgentContextUsage, CodexModelOption } from '../../../shared/contracts';
 
 type ChatComposerProps = {
   disabled: boolean;
@@ -80,9 +81,29 @@ describe('ChatComposer', () => {
     expect(wrapper.text()).toContain('GPT-5.1 Codex Max');
     expect(wrapper.text()).toContain('High');
   });
+
+  it('shows context utilization when Codex reports token usage', () => {
+    const wrapper = mountComposer({
+      contextUsage: {
+        totalTokens: 397_740,
+        inputTokens: 40_000,
+        cachedInputTokens: 10_000,
+        outputTokens: 8_000,
+        reasoningOutputTokens: 2_000,
+        lastTotalTokens: 50_000,
+        modelContextWindow: 200_000,
+        usedPercent: 25,
+      },
+    });
+
+    expect(wrapper.find('.chat-context-usage').exists()).toBe(true);
+    expect(wrapper.find('.chat-context-usage').attributes('title')).toBeUndefined();
+    expect(wrapper.find('.chat-context-usage__popover').text()).toContain('25% used (75% left)');
+  });
 });
 
 function mountComposer(overrides: Partial<ChatComposerProps & {
+  contextUsage: AgentContextUsage;
   models: CodexModelOption[];
   selectedModelId: string;
   selectedReasoningEffort: string;
@@ -95,7 +116,7 @@ function mountComposer(overrides: Partial<ChatComposerProps & {
       ...overrides,
     },
     global: {
-      plugins: [ElementPlus],
+      plugins: [ElementPlus, i18n],
     },
   });
 }

@@ -21,12 +21,41 @@ export type Agent = {
   avatar?: string;
   folder: string;
   codexThreadId?: string;
+  contextUsage?: AgentContextUsage;
   isRegistered?: boolean;
   mcpSessionId?: string;
   statusText?: string;
   status: AgentStatus;
   createdAt: string;
   updatedAt: string;
+};
+
+export type AgentContextUsage = {
+  totalTokens: number;
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  reasoningOutputTokens: number;
+  lastTotalTokens: number;
+  modelContextWindow: number | null;
+  usedPercent: number | null;
+};
+
+export type AccountRateLimitWindow = {
+  usedPercent: number;
+  windowDurationMins: number | null;
+  resetsAt: number | null;
+};
+
+export type AccountRateLimits = {
+  limitId: string | null;
+  limitName: string | null;
+  primary: AccountRateLimitWindow | null;
+  secondary: AccountRateLimitWindow | null;
+  credits: unknown;
+  individualLimit: unknown;
+  planType: string | null;
+  rateLimitReachedType: string | null;
 };
 
 export type BenchTemplate = {
@@ -119,6 +148,7 @@ export type AppSnapshot = {
     status: 'notConfigured' | 'starting' | 'running' | 'error';
     detail?: string;
   };
+  accountRateLimits?: AccountRateLimits;
   theme: {
     id: string;
   };
@@ -136,8 +166,10 @@ export type MainToRendererEvent = {
     | 'thread.started'
     | 'thread.historyLoaded'
     | 'thread.settingsUpdated'
+    | 'thread.tokenUsageUpdated'
     | 'turn.started'
     | 'turn.completed'
+    | 'account.rateLimitsUpdated'
     | 'message.delta'
     | 'item.started'
     | 'item.updated'

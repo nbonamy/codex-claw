@@ -28,6 +28,7 @@
     />
 
     <div class="chat-composer__meta">
+      <ChatContextUsageIndicator :context-usage="contextUsage" />
       <ChatModelReasoningSelector
         :disabled="disabled || isSending"
         :models="models"
@@ -50,12 +51,14 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue';
-import type { CodexModelOption, ReasoningEffort } from '../../shared/contracts';
+import type { AgentContextUsage, CodexModelOption, ReasoningEffort } from '../../shared/contracts';
 import { PlusIcon } from '../shared/icons/app-icons';
 import ChatComposerSendButton from '../shared/chat/ChatComposerSendButton.vue';
+import ChatContextUsageIndicator from './ChatContextUsageIndicator.vue';
 import ChatModelReasoningSelector from './ChatModelReasoningSelector.vue';
 
 const props = defineProps<{
+  contextUsage?: AgentContextUsage;
   disabled: boolean;
   isSending: boolean;
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
@@ -106,6 +109,7 @@ function resizeTextareaSoon(): void {
 .chat-composer {
   --chat-composer-button-size: 36px;
   --chat-composer-input-max-height: 160px;
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-6);

@@ -856,6 +856,114 @@ describe('CodexAgentSessionManager', () => {
     ]);
   });
 
+  it('maps token usage and rate-limit notifications into app-owned events', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+    const events: unknown[] = [];
+    manager.onEvent((event) => events.push({
+      ...event,
+      occurredAt: '<now>',
+    }));
+
+    await resolveStartedPrompt(transport, manager);
+
+    transport.receive({
+      method: 'thread/tokenUsage/updated',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        tokenUsage: {
+          total: {
+            totalTokens: 397_740,
+            inputTokens: 320_000,
+            cachedInputTokens: 80_000,
+            outputTokens: 72_000,
+            reasoningOutputTokens: 24_000,
+          },
+          last: {
+            totalTokens: 64_600,
+            inputTokens: 50_000,
+            cachedInputTokens: 500,
+            outputTokens: 12_000,
+            reasoningOutputTokens: 2_600,
+          },
+          modelContextWindow: 258_400,
+        },
+      },
+    });
+    transport.receive({
+      method: 'account/rateLimits/updated',
+      params: {
+        rateLimits: {
+          limitId: 'codex',
+          limitName: 'Codex',
+          primary: {
+            usedPercent: 25,
+            windowDurationMins: 15,
+            resetsAt: 1_780_000_000,
+          },
+          secondary: null,
+          credits: {
+            hasCredits: true,
+            unlimited: false,
+            balance: '10.00',
+          },
+          individualLimit: null,
+          planType: 'pro',
+          rateLimitReachedType: null,
+        },
+      },
+    });
+
+    expect(events).toStrictEqual([
+      {
+        seq: 1,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        type: 'thread.tokenUsageUpdated',
+        payload: {
+          contextUsage: {
+            totalTokens: 397_740,
+            inputTokens: 320_000,
+            cachedInputTokens: 80_000,
+            outputTokens: 72_000,
+            reasoningOutputTokens: 24_000,
+            lastTotalTokens: 64_600,
+            modelContextWindow: 258_400,
+            usedPercent: 25,
+          },
+        },
+        occurredAt: '<now>',
+      },
+      {
+        seq: 2,
+        type: 'account.rateLimitsUpdated',
+        payload: {
+          rateLimits: {
+            limitId: 'codex',
+            limitName: 'Codex',
+            primary: {
+              usedPercent: 25,
+              windowDurationMins: 15,
+              resetsAt: 1_780_000_000,
+            },
+            secondary: null,
+            credits: {
+              hasCredits: true,
+              unlimited: false,
+              balance: '10.00',
+            },
+            individualLimit: null,
+            planType: 'pro',
+            rateLimitReachedType: null,
+          },
+        },
+        occurredAt: '<now>',
+      },
+    ]);
+  });
+
   it('maps Codex thread status notifications into agent status events', async () => {
     const transport = new FakeTransport();
     const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));

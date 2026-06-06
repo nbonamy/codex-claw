@@ -42,7 +42,24 @@ describe('AppStatePersistence', () => {
     const persistence = new AppStatePersistence(filePath);
     const snapshot = createInitialSnapshot();
     snapshot.appServer = { status: 'running', detail: 'connected' };
-    snapshot.agents[0].codexThreadId = 'thread-dina';
+    snapshot.agents[0] = {
+      ...snapshot.agents[0],
+      codexThreadId: 'thread-dina',
+      contextUsage: {
+        totalTokens: 1200,
+        inputTokens: 900,
+        cachedInputTokens: 100,
+        outputTokens: 300,
+        reasoningOutputTokens: 80,
+        lastTotalTokens: 300,
+        modelContextWindow: 10000,
+        usedPercent: 12,
+      },
+      isRegistered: true,
+      mcpSessionId: 'mcp-session',
+      statusText: 'Registered',
+      status: { type: 'working', detail: 'busy' },
+    };
     appendUserPrompt(snapshot, 'agent-dina', 'do not persist this', '2026-06-05T10:11:12.000Z');
 
     await persistence.save(snapshot);
@@ -51,7 +68,13 @@ describe('AppStatePersistence', () => {
     expect(written).not.toHaveProperty('messages');
     expect(written).not.toHaveProperty('appServer');
     expect(written.activeTeamId).toBe('team-codex-claw');
-    expect((written.agents as Array<Record<string, unknown>>)[0].codexThreadId).toBe('thread-dina');
+    const writtenAgent = (written.agents as Array<Record<string, unknown>>)[0];
+    expect(writtenAgent.codexThreadId).toBe('thread-dina');
+    expect(writtenAgent).not.toHaveProperty('contextUsage');
+    expect(writtenAgent).not.toHaveProperty('isRegistered');
+    expect(writtenAgent).not.toHaveProperty('mcpSessionId');
+    expect(writtenAgent).not.toHaveProperty('statusText');
+    expect(writtenAgent).not.toHaveProperty('status');
   });
 
   it('resets transient agent fields while preserving metadata and thread ids on load', () => {

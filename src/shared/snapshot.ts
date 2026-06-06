@@ -1,6 +1,8 @@
 import type {
   Agent,
+  AgentContextUsage,
   AgentStatus,
+  AccountRateLimits,
   AppSnapshot,
   ClientRequest,
   CreateAgentInput,
@@ -173,6 +175,14 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     return;
   }
 
+  if (event.type === 'account.rateLimitsUpdated') {
+    const rateLimits = accountRateLimits(event.payload);
+    if (rateLimits) {
+      snapshot.accountRateLimits = rateLimits;
+    }
+    return;
+  }
+
   if (!event.agentId) {
     return;
   }
@@ -210,6 +220,15 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     const agent = findAgent(snapshot, event.agentId);
     if (agent) {
       agent.codexThreadId = event.threadId;
+    }
+    return;
+  }
+
+  if (event.type === 'thread.tokenUsageUpdated') {
+    const agent = findAgent(snapshot, event.agentId);
+    const contextUsage = agentContextUsage(event.payload);
+    if (agent && contextUsage) {
+      agent.contextUsage = contextUsage;
     }
     return;
   }
@@ -344,6 +363,71 @@ function rendererToolPart(value: unknown): ToolPart | null {
   }
 
   return value as ToolPart;
+}
+
+function agentContextUsage(value: unknown): AgentContextUsage | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const usage = isRecord(value.contextUsage) ? value.contextUsage : value;
+  const modelContextWindow = typeof usage.modelContextWindow === 'number' ? usage.modelContextWindow : null;
+  const usedPercent = typeof usage.usedPercent === 'number' ? usage.usedPercent : null;
+  if (
+    typeof usage.totalTokens !== 'number' ||
+    typeof usage.inputTokens !== 'number' ||
+    typeof usage.cachedInputTokens !== 'number' ||
+    typeof usage.outputTokens !== 'number' ||
+    typeof usage.reasoningOutputTokens !== 'number' ||
+    typeof usage.lastTotalTokens !== 'number'
+  ) {
+    return null;
+  }
+
+  return {
+    totalTokens: usage.totalTokens,
+    inputTokens: usage.inputTokens,
+    cachedInputTokens: usage.cachedInputTokens,
+    outputTokens: usage.outputTokens,
+    reasoningOutputTokens: usage.reasoningOutputTokens,
+    lastTotalTokens: usage.lastTotalTokens,
+    modelContextWindow,
+    usedPercent,
+  };
+}
+
+function accountRateLimits(value: unknown): AccountRateLimits | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const rateLimits = isRecord(value.rateLimits) ? value.rateLimits : value;
+  return {
+    limitId: nullableString(rateLimits.limitId),
+    limitName: nullableString(rateLimits.limitName),
+    primary: accountRateLimitWindow(rateLimits.primary),
+    secondary: accountRateLimitWindow(rateLimits.secondary),
+    credits: rateLimits.credits ?? null,
+    individualLimit: rateLimits.individualLimit ?? null,
+    planType: nullableString(rateLimits.planType),
+    rateLimitReachedType: nullableString(rateLimits.rateLimitReachedType),
+  };
+}
+
+function accountRateLimitWindow(value: unknown): AccountRateLimits['primary'] {
+  if (!isRecord(value) || typeof value.usedPercent !== 'number') {
+    return null;
+  }
+
+  return {
+    usedPercent: value.usedPercent,
+    windowDurationMins: typeof value.windowDurationMins === 'number' ? value.windowDurationMins : null,
+    resetsAt: typeof value.resetsAt === 'number' ? value.resetsAt : null,
+  };
+}
+
+function nullableString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
 }
 
 function rendererMessages(value: unknown, agentId: string): RendererMessage[] {
@@ -682,6 +766,7 @@ function attachAgentToTeam(snapshot: AppSnapshot, agent: Agent): void {
 
 function clearAgentRuntimeState(agent: Agent): void {
   delete agent.codexThreadId;
+  delete agent.contextUsage;
   delete agent.isRegistered;
   delete agent.mcpSessionId;
   delete agent.statusText;

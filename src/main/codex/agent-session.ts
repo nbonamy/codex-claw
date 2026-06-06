@@ -1,6 +1,6 @@
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, AgentStatus, ClientRequest, ClientRequestResponse, CodexModelOption, ConfirmToolRequest, MainToRendererEvent, SendPromptOptions, ToolConfirmationDecision } from '../../shared/contracts';
+import type { Agent, AgentContextUsage, AgentStatus, ClientRequest, ClientRequestResponse, CodexModelOption, ConfirmToolRequest, MainToRendererEvent, SendPromptOptions, ToolConfirmationDecision } from '../../shared/contracts';
 import { logMain, warnMain } from '../log';
 import { buildCodexClawThreadConfig } from '../mcp/codex-config';
 import type { CodexRpcClient, CodexServerRequest, CodexServerRequestResponder } from './rpc-client';
@@ -14,8 +14,10 @@ import type {
   CodexNotification,
   CodexModelListResponse,
   CodexRawResponseItem,
+  CodexRateLimitSnapshot,
   CodexThread,
   CodexThreadStatus,
+  CodexThreadTokenUsage,
   CodexSessionEvent,
   CodexSessionPromptResult,
   CodexTurn,
@@ -246,6 +248,18 @@ export class CodexAgentSessionManager {
         return;
       }
 
+      case 'thread/tokenUsage/updated': {
+        const params = notification.params as { threadId: string; turnId: string; tokenUsage: CodexThreadTokenUsage };
+        this.emitForThread(params.threadId, {
+          turnId: params.turnId,
+          type: 'thread.tokenUsageUpdated',
+          payload: {
+            contextUsage: contextUsageFromCodexTokenUsage(params.tokenUsage),
+          },
+        });
+        return;
+      }
+
       case 'thread/status/changed': {
         const params = notification.params as { threadId: string; status: CodexThreadStatus };
         this.emitForThread(params.threadId, {
@@ -348,6 +362,17 @@ export class CodexAgentSessionManager {
             payload: { type: 'working' },
           });
         }
+        return;
+      }
+
+      case 'account/rateLimits/updated': {
+        const params = notification.params as { rateLimits: CodexRateLimitSnapshot };
+        this.emit({
+          type: 'account.rateLimitsUpdated',
+          payload: {
+            rateLimits: params.rateLimits,
+          },
+        });
         return;
       }
 
@@ -479,6 +504,25 @@ function codexModelToOption(model: CodexModelListResponse['data'][number]): Code
     })),
     defaultReasoningEffort: model.defaultReasoningEffort,
     isDefault: model.isDefault,
+  };
+}
+
+function contextUsageFromCodexTokenUsage(tokenUsage: CodexThreadTokenUsage): AgentContextUsage {
+  const modelContextWindow = tokenUsage.modelContextWindow;
+  const contextTokens = tokenUsage.last.totalTokens;
+  const usedPercent = typeof modelContextWindow === 'number' && modelContextWindow > 0
+    ? Math.min(100, Math.max(0, (contextTokens / modelContextWindow) * 100))
+    : null;
+
+  return {
+    totalTokens: tokenUsage.total.totalTokens,
+    inputTokens: tokenUsage.total.inputTokens,
+    cachedInputTokens: tokenUsage.total.cachedInputTokens,
+    outputTokens: tokenUsage.total.outputTokens,
+    reasoningOutputTokens: tokenUsage.total.reasoningOutputTokens,
+    lastTotalTokens: tokenUsage.last.totalTokens,
+    modelContextWindow,
+    usedPercent,
   };
 }
 

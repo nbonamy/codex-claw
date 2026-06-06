@@ -1,6 +1,12 @@
 export const messages = {
   en: {
     chat: {
+      contextUsage: {
+        ariaLabel: 'Context usage',
+        title: 'Context window:',
+        usedAndLeft: '{used}% used ({left}% left)',
+        tokensUsed: '{used} / {window} tokens used',
+      },
       tool: {
         fallback: {
           completed: 'Ran {name}',

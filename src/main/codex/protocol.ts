@@ -52,6 +52,37 @@ export type CodexRawResponseItem = {
   [key: string]: unknown;
 };
 
+export type CodexTokenUsageBreakdown = {
+  totalTokens: number;
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  reasoningOutputTokens: number;
+};
+
+export type CodexThreadTokenUsage = {
+  total: CodexTokenUsageBreakdown;
+  last: CodexTokenUsageBreakdown;
+  modelContextWindow: number | null;
+};
+
+export type CodexRateLimitWindow = {
+  usedPercent: number;
+  windowDurationMins: number | null;
+  resetsAt: number | null;
+};
+
+export type CodexRateLimitSnapshot = {
+  limitId: string | null;
+  limitName: string | null;
+  primary: CodexRateLimitWindow | null;
+  secondary: CodexRateLimitWindow | null;
+  credits: unknown;
+  individualLimit: unknown;
+  planType: string | null;
+  rateLimitReachedType: string | null;
+};
+
 export type InitializeResponse = {
   userAgent: string;
   codexHome: string;
@@ -95,6 +126,7 @@ export type CodexReasoningEffortOption = {
 export type CodexNotification =
   | { method: 'thread/started'; params: { thread: CodexThread } }
   | { method: 'thread/settings/updated'; params: { threadId: string; threadSettings: unknown } }
+  | { method: 'thread/tokenUsage/updated'; params: { threadId: string; turnId: string; tokenUsage: CodexThreadTokenUsage } }
   | { method: 'thread/status/changed'; params: { threadId: string; status: CodexThreadStatus } }
   | { method: 'turn/started'; params: { threadId: string; turn: CodexTurn } }
   | { method: 'item/agentMessage/delta'; params: { threadId: string; turnId: string; itemId: string; delta: string } }
@@ -105,12 +137,11 @@ export type CodexNotification =
   | { method: 'item/fileChange/patchUpdated'; params: { threadId: string; turnId: string; itemId: string; changes: unknown[] } }
   | { method: 'item/mcpToolCall/progress'; params: { threadId: string; turnId: string; itemId: string; message: string } }
   | { method: 'serverRequest/resolved'; params: { threadId: string; requestId: JsonRpcId } }
+  | { method: 'account/rateLimits/updated'; params: { rateLimits: CodexRateLimitSnapshot } }
   | { method: 'turn/completed'; params: { threadId: string; turn: CodexTurn } }
   | { method: string; params?: unknown };
 
-export type CodexSessionEvent = MainToRendererEvent & {
-  agentId: string;
-};
+export type CodexSessionEvent = MainToRendererEvent;
 
 export type CodexSessionPromptResult = {
   threadId: string;
