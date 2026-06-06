@@ -43,6 +43,32 @@ describe('tool status helpers', () => {
     expect(getToolFallbackTitle({ ...tool, done: true, state: 'completed' })).toBe('Ran npm test');
   });
 
+  it('formats Codex file creation and deletion titles', () => {
+    const tool: MessageToolCall = {
+      args: undefined,
+      done: true,
+      function: 'fileChange',
+      id: 'tool',
+      result: undefined,
+      state: 'completed',
+      status: 'completed',
+    };
+
+    expect(getToolDisplayTitle(tool, {
+      action: 'create',
+      phase: 'completed',
+      params: { target: 'LISEZMOI.md' },
+      source: 'codex',
+    })).toBe('Created LISEZMOI.md');
+
+    expect(getToolDisplayTitle(tool, {
+      action: 'delete',
+      phase: 'completed',
+      params: { target: 'old.ts' },
+      source: 'codex',
+    })).toBe('Deleted old.ts');
+  });
+
   it.each([
     ['codex_claw.register-agent', { agentId: 'agent-dina' }, 'Registered agent'],
     ['codex_claw.list-agents', { agentId: 'agent-dina' }, 'Listed agents'],

@@ -445,7 +445,7 @@ function updateAssistantTurnDiff(snapshot: AppSnapshot, agentId: string, turnId:
   const existingDescriptor = toolStatusDescriptor(toolPart.statusText);
   const existingParams = isRecord(existingDescriptor?.params) ? existingDescriptor.params : {};
   toolPart.statusText = JSON.stringify({
-    action: 'edit',
+    action: typeof existingDescriptor?.action === 'string' ? existingDescriptor.action : 'edit',
     phase: toolPart.status,
     params: {
       ...existingParams,
@@ -457,7 +457,7 @@ function updateAssistantTurnDiff(snapshot: AppSnapshot, agentId: string, turnId:
   });
 }
 
-function toolStatusDescriptor(statusText: unknown): { params?: unknown } | undefined {
+function toolStatusDescriptor(statusText: unknown): { action?: unknown; params?: unknown } | undefined {
   if (typeof statusText !== 'string' || !statusText.trim().startsWith('{')) {
     return undefined;
   }

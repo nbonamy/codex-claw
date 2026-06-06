@@ -355,7 +355,7 @@ function fileChangeStatusText(status: RendererToolPart['status'], changes: unkno
 }
 
 function fileChangeStatusDescriptor(status: RendererToolPart['status'], changes: unknown[]): {
-  action: 'edit';
+  action: 'create' | 'delete' | 'edit';
   phase: RendererToolPart['status'];
   params: Record<string, unknown>;
   source: 'codex';
@@ -366,10 +366,11 @@ function fileChangeStatusDescriptor(status: RendererToolPart['status'], changes:
     }
 
     const path = typeof change.path === 'string' ? change.path : undefined;
-    const diff = typeof change.diff === 'string' ? change.diff : undefined;
-    const lineDiff = lineDiffFromUnifiedDiff(diff);
+    const kind = patchChangeKind(change.kind) ?? 'update';
+    const lineDiff = lineDiffFromFileChange(change);
     return [{
       addedLines: lineDiff.addedLines,
+      kind,
       path,
       removedLines: lineDiff.removedLines,
     }];
@@ -384,7 +385,7 @@ function fileChangeStatusDescriptor(status: RendererToolPart['status'], changes:
   const paths = uniqueNonEmpty(normalizedChanges.map((change) => change.path));
   const target = paths.length === 1 ? fileName(paths[0]) : `${normalizedChanges.length} files`;
   return {
-    action: 'edit',
+    action: fileChangeAction(normalizedChanges.map((change) => change.kind)),
     phase: status,
     params: {
       addedLines,
@@ -396,7 +397,32 @@ function fileChangeStatusDescriptor(status: RendererToolPart['status'], changes:
   };
 }
 
-function lineDiffFromUnifiedDiff(diff: string | undefined): { addedLines: number; removedLines: number } {
+function fileChangeAction(kinds: Array<'add' | 'delete' | 'update'>): 'create' | 'delete' | 'edit' {
+  if (kinds.length > 0 && kinds.every((kind) => kind === 'add')) {
+    return 'create';
+  }
+
+  if (kinds.length > 0 && kinds.every((kind) => kind === 'delete')) {
+    return 'delete';
+  }
+
+  return 'edit';
+}
+
+function lineDiffFromFileChange(change: Record<string, unknown>): { addedLines: number; removedLines: number } {
+  const diff = typeof change.diff === 'string' ? change.diff : undefined;
+  const kind = patchChangeKind(change.kind);
+  if (kind === 'add') {
+    return { addedLines: rawContentLineCount(diff), removedLines: 0 };
+  }
+  if (kind === 'delete') {
+    return { addedLines: 0, removedLines: rawContentLineCount(diff) };
+  }
+
+  return lineDiffFromUnifiedDiff(diff);
+}
+
+export function lineDiffFromUnifiedDiff(diff: string | undefined): { addedLines: number; removedLines: number } {
   if (!diff) {
     return { addedLines: 0, removedLines: 0 };
   }
@@ -416,6 +442,30 @@ function lineDiffFromUnifiedDiff(diff: string | undefined): { addedLines: number
   }
 
   return { addedLines, removedLines };
+}
+
+function patchChangeKind(kind: unknown): 'add' | 'delete' | 'update' | undefined {
+  if (kind === 'add' || kind === 'delete' || kind === 'update') {
+    return kind;
+  }
+
+  if (isRecord(kind) && typeof kind.type === 'string') {
+    return patchChangeKind(kind.type);
+  }
+
+  return undefined;
+}
+
+function rawContentLineCount(content: string | undefined): number {
+  if (!content) {
+    return 0;
+  }
+
+  const lines = content.split(/\r\n|\r|\n/);
+  while (lines.at(-1) === '') {
+    lines.pop();
+  }
+  return lines.length;
 }
 
 function fileName(path: string): string {
@@ -494,7 +544,7 @@ function fileChangesText(changes: unknown[]): string | undefined {
         return JSON.stringify(change);
       }
 
-      const kind = typeof change.kind === 'string' ? change.kind : 'update';
+      const kind = patchChangeKind(change.kind) ?? 'update';
       const path = typeof change.path === 'string' ? change.path : 'unknown';
       return `${kind} ${path}`;
     })

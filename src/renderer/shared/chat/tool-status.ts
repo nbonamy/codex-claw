@@ -178,8 +178,8 @@ function commandPhase(phase: string) {
   return 'running';
 }
 
-function isCodexToolAction(action: string): action is 'edit' | 'explore' | 'list' | 'read' | 'run' | 'search' {
-  return action === 'edit' || action === 'explore' || action === 'list' || action === 'read' || action === 'run' || action === 'search';
+function isCodexToolAction(action: string): action is 'create' | 'delete' | 'edit' | 'explore' | 'list' | 'read' | 'run' | 'search' {
+  return action === 'create' || action === 'delete' || action === 'edit' || action === 'explore' || action === 'list' || action === 'read' || action === 'run' || action === 'search';
 }
 
 const codexClawTools = new Set([
@@ -209,6 +209,12 @@ function defaultTranslate(key: string, params?: Record<string, unknown>) {
     'chat.tool.command.edit.completed': 'Edited {target}',
     'chat.tool.command.edit.failed': 'Failed editing {target}',
     'chat.tool.command.edit.running': 'Editing {target}',
+    'chat.tool.command.create.completed': 'Created {target}',
+    'chat.tool.command.create.failed': 'Failed creating {target}',
+    'chat.tool.command.create.running': 'Creating {target}',
+    'chat.tool.command.delete.completed': 'Deleted {target}',
+    'chat.tool.command.delete.failed': 'Failed deleting {target}',
+    'chat.tool.command.delete.running': 'Deleting {target}',
     'chat.tool.command.explore.completed': 'Explored',
     'chat.tool.command.explore.failed': 'Failed exploring',
     'chat.tool.command.explore.running': 'Exploring',

@@ -3,6 +3,7 @@ import {
   codexThreadItemToToolPart,
   commandOutputDeltaToToolPartUpdate,
   fileChangePatchToToolPartUpdate,
+  lineDiffFromUnifiedDiff,
   mcpProgressToToolPartUpdate,
   rawOutputToToolPartUpdate,
 } from '../tool-part-adapter';
@@ -324,6 +325,53 @@ describe('tool-part-adapter', () => {
         target: 'tool-part-adapter.ts',
       },
       source: 'codex',
+    });
+  });
+
+  it('counts raw add and delete patch contents as line diffs while streaming', () => {
+    const addUpdate = fileChangePatchToToolPartUpdate('patch-add', [{
+      diff: 'one\ntwo\n',
+      kind: { type: 'add' },
+      path: 'src/new.ts',
+    }]);
+    const deleteUpdate = fileChangePatchToToolPartUpdate('patch-delete', [{
+      diff: 'old one\nold two',
+      kind: { type: 'delete' },
+      path: 'src/old.ts',
+    }]);
+
+    expect(addUpdate.statusText ? JSON.parse(addUpdate.statusText) : null).toMatchObject({
+      action: 'create',
+      params: {
+        addedLines: 2,
+        removedLines: 0,
+        target: 'new.ts',
+      },
+    });
+    expect(addUpdate.body).toBe('add src/new.ts');
+    expect(deleteUpdate.statusText ? JSON.parse(deleteUpdate.statusText) : null).toMatchObject({
+      action: 'delete',
+      params: {
+        addedLines: 0,
+        removedLines: 2,
+        target: 'old.ts',
+      },
+    });
+    expect(deleteUpdate.body).toBe('delete src/old.ts');
+  });
+
+  it('counts turn-level unified diffs', () => {
+    expect(lineDiffFromUnifiedDiff([
+      '--- a/src/app.ts',
+      '+++ b/src/app.ts',
+      '@@ -1,2 +1,3 @@',
+      ' context',
+      '-old',
+      '+new',
+      '+extra',
+    ].join('\n'))).toStrictEqual({
+      addedLines: 2,
+      removedLines: 1,
     });
   });
 });

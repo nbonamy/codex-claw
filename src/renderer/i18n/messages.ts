@@ -39,6 +39,16 @@ export const messages = {
             failed: 'Failed editing {target}',
             running: 'Editing {target}',
           },
+          create: {
+            completed: 'Created {target}',
+            failed: 'Failed creating {target}',
+            running: 'Creating {target}',
+          },
+          delete: {
+            completed: 'Deleted {target}',
+            failed: 'Failed deleting {target}',
+            running: 'Deleting {target}',
+          },
           explore: {
             completed: 'Explored',
             failed: 'Failed exploring',

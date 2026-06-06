@@ -15,6 +15,7 @@ const agent: Agent = {
 describe('codex-config', () => {
   it('builds command-line config overrides that register and auto-approve Claw MCP tools', () => {
     expect(buildCodexClawMcpConfigOverrides('http://127.0.0.1:8767/mcp')).toStrictEqual([
+      'features.apply_patch_streaming_events=true',
       'mcp_servers.codex_claw.url="http://127.0.0.1:8767/mcp"',
       'mcp_servers.codex_claw.default_tools_approval_mode="approve"',
     ]);
