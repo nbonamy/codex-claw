@@ -20,6 +20,14 @@ describe('app menu', () => {
       'Quit',
     ]);
     expect(menuLabels(submenu(menu, 'Edit'))).toStrictEqual([
+      'Undo',
+      'Redo',
+      'Cut',
+      'Copy',
+      'Paste',
+      'Paste and Match Style',
+      'Delete',
+      'Select All',
       'Edit Agent',
       'Duplicate Agent',
       'Restart Agent',
@@ -30,6 +38,21 @@ describe('app menu', () => {
       'Previous Agent',
     ]);
     expect(JSON.stringify(menu)).not.toMatch(/editMenu|viewMenu|reload|forceReload|toggleDevTools/i);
+  });
+
+  it('uses native edit roles before app-owned agent actions', () => {
+    const menu = buildAppMenuTemplate(callbacks(), { debugMode: false }, 'darwin');
+
+    expect(menuRoles(submenu(menu, 'Edit'))).toStrictEqual([
+      'undo',
+      'redo',
+      'cut',
+      'copy',
+      'paste',
+      'pasteAndMatchStyle',
+      'delete',
+      'selectAll',
+    ]);
   });
 
   it('sends app commands from menu items', () => {
@@ -118,6 +141,10 @@ function menuLabels(items: MenuItemConstructorOptions[]): string[] {
     .filter((item) => item.type !== 'separator')
     .map((item) => item.label)
     .filter((label): label is string => typeof label === 'string');
+}
+
+function menuRoles(items: MenuItemConstructorOptions[]): Array<NonNullable<MenuItemConstructorOptions['role']>> {
+  return items.flatMap((item) => item.type !== 'separator' && item.role ? [item.role] : []);
 }
 
 function clickItem(template: MenuItemConstructorOptions[], menuLabel: string, itemLabel: string): void {

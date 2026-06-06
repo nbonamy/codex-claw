@@ -75,6 +75,16 @@ function buildEditMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions 
   return {
     label: 'Edit',
     submenu: [
+      { label: 'Undo', role: 'undo' },
+      { label: 'Redo', role: 'redo' },
+      { type: 'separator' },
+      { label: 'Cut', role: 'cut' },
+      { label: 'Copy', role: 'copy' },
+      { label: 'Paste', role: 'paste' },
+      { label: 'Paste and Match Style', role: 'pasteAndMatchStyle' },
+      { label: 'Delete', role: 'delete' },
+      { label: 'Select All', role: 'selectAll' },
+      { type: 'separator' },
       {
         label: 'Edit Agent',
         accelerator: 'CommandOrControl+E',
