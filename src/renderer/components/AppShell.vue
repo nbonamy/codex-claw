@@ -193,7 +193,7 @@ const emit = defineEmits<{
 }>();
 
 const agentSidebarCollapsed = ref(false);
-const agentSidebarMinWidth = 72;
+const agentSidebarMinWidth = 80;
 const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
 const agentDialogVisible = ref(false);
