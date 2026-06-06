@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { ElMessageBox } from 'element-plus';
 import { nextTick } from 'vue';
@@ -134,6 +134,7 @@ describe('TeamRail', () => {
 
     await wrapper.get('[aria-label="Codex Claw"]').trigger('contextmenu');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Close Team')?.trigger('click');
+    await flushPromises();
 
     expect(confirm).toHaveBeenCalledWith(
       'Agents and messages in Codex Claw will be removed from Codex Claw.',

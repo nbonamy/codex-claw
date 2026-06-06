@@ -241,7 +241,16 @@ export type MainToRendererEvent = {
 };
 
 export type AppCommand =
-  | { type: 'cycle-teams' };
+  | { type: 'close-active-agent' }
+  | { type: 'close-active-team' }
+  | { type: 'cycle-agents'; direction: -1 | 1 }
+  | { type: 'cycle-teams' }
+  | { type: 'duplicate-active-agent' }
+  | { type: 'edit-active-agent' }
+  | { type: 'new-agent' }
+  | { type: 'new-team' }
+  | { type: 'quit' }
+  | { type: 'restart-active-agent' };
 
 export type CreateAgentInput = {
   name: string;

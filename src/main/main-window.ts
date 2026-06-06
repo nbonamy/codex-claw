@@ -1,4 +1,4 @@
-import { BrowserWindow, globalShortcut, Menu, type MenuItemConstructorOptions } from 'electron';
+import { app, BrowserWindow, globalShortcut, type BrowserWindowConstructorOptions } from 'electron';
 import path from 'node:path';
 import {
   appCommandFromInput,
@@ -6,32 +6,20 @@ import {
   registerCycleTeamsShortcut,
   unregisterCycleTeamsShortcut,
 } from './app-shortcuts';
+import { installAppMenu } from './app-menu';
 import { warnMain } from './log';
 import { ipcChannels } from '../shared/ipc';
 
 export function createMainWindow(): BrowserWindow {
-  const window = new BrowserWindow({
-    width: 1440,
-    height: 960,
-    minWidth: 1024,
-    minHeight: 720,
-    titleBarStyle: 'hidden',
-    show: false,
-    backgroundColor: '#061c2a',
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false,
-    },
-  });
+  const releaseMode = isReleaseMode();
+  const window = new BrowserWindow(createMainWindowOptions(releaseMode));
 
   window.once('ready-to-show', () => {
     window.show();
   });
 
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  installAppCommandMenu(window);
+  installAppMenu(window, { debugMode: !releaseMode });
   installFocusedAppShortcuts(window);
   window.webContents.on('before-input-event', (event, input) => {
     const command = appCommandFromInput(input);
@@ -52,38 +40,27 @@ export function createMainWindow(): BrowserWindow {
   return window;
 }
 
-function installAppCommandMenu(window: BrowserWindow): void {
-  const sendCycleTeamsCommand = (): void => {
-    window.webContents.send(ipcChannels.appCommand, { type: 'cycle-teams' });
-  };
-  const template: MenuItemConstructorOptions[] = [
-    ...(process.platform === 'darwin'
-      ? [{ role: 'appMenu' as const }, { role: 'fileMenu' as const }]
-      : [{ role: 'fileMenu' as const }]),
-    {
-      label: 'Window',
-      submenu: [
-        { role: 'minimize' },
-        ...(process.platform === 'darwin' ? [{ role: 'zoom' as const }] : []),
-        { type: 'separator' },
-        {
-          label: 'Cycle Teams',
-          accelerator: cycleTeamsAccelerator,
-          acceleratorWorksWhenHidden: true,
-          visible: false,
-          click: sendCycleTeamsCommand,
-        },
-        ...(process.platform === 'darwin'
-          ? [{ type: 'separator' as const }, { role: 'front' as const }]
-          : [{ role: 'close' as const }]),
-      ],
+export function createMainWindowOptions(releaseMode: boolean): BrowserWindowConstructorOptions {
+  return {
+    width: 1440,
+    height: 960,
+    minWidth: 1024,
+    minHeight: 720,
+    titleBarStyle: 'hidden',
+    show: false,
+    backgroundColor: '#061c2a',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      devTools: !releaseMode,
+      nodeIntegration: false,
+      sandbox: false,
     },
-    { role: 'editMenu' },
-    { role: 'viewMenu' },
-    { role: 'help' },
-  ];
+  };
+}
 
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+function isReleaseMode(): boolean {
+  return app.isPackaged;
 }
 
 function installFocusedAppShortcuts(window: BrowserWindow): void {

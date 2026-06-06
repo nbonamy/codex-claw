@@ -388,6 +388,7 @@ describe('AppShell', () => {
 
     await wrapper.get('[aria-label="Skwad"]').trigger('contextmenu');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Close Team')?.trigger('click');
+    await flushPromises();
 
     expect(confirm).toHaveBeenCalledWith(
       'Agents and messages in Skwad will be removed from Codex Claw.',
@@ -521,7 +522,7 @@ describe('AppShell', () => {
     expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-jesse'], ['agent-dina']]);
   });
 
-  it('cycles teams from the main-process app command channel', () => {
+  it('handles active app commands from the main-process menu channel', async () => {
     let listener: (command: AppCommand) => void = () => undefined;
     const unsubscribe = vi.fn();
     const onAppCommand = vi.fn((nextListener: (command: AppCommand) => void) => {
@@ -531,6 +532,7 @@ describe('AppShell', () => {
     window.codexClaw = {
       onAppCommand,
     } as Partial<CodexClawApi> as CodexClawApi;
+    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
     const snapshot = createInitialSnapshot();
     snapshot.teams.push({
       id: 'team-skwad',
@@ -539,12 +541,48 @@ describe('AppShell', () => {
       color: '#46A857',
       agentIds: [],
     });
-    const wrapper = mountShell({ snapshot });
+    const quit = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, quit });
 
     expect(onAppCommand).toHaveBeenCalledOnce();
+    listener({ type: 'new-team' });
+    await nextTick();
+    expect(wrapper.text()).toContain('New Team');
+    await wrapper.findAll('button').find((button) => button.text() === 'Cancel')?.trigger('click');
+    await nextTick();
+    listener({ type: 'new-agent' });
+    await nextTick();
+    expect(wrapper.text()).toContain('New Agent');
+    await wrapper.findAll('button').find((button) => button.text() === 'Cancel')?.trigger('click');
+    await nextTick();
+    listener({ type: 'close-active-agent' });
+    listener({ type: 'close-active-team' });
+    listener({ type: 'quit' });
     listener({ type: 'cycle-teams' });
+    listener({ type: 'cycle-agents', direction: 1 });
+    listener({ type: 'duplicate-active-agent' });
+    listener({ type: 'restart-active-agent' });
+    listener({ type: 'edit-active-agent' });
+    await nextTick();
+    await flushPromises();
 
     expect(wrapper.emitted('select-team')).toStrictEqual([['team-skwad']]);
+    expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-jesse']]);
+    expect(wrapper.emitted('close-agent')).toStrictEqual([['agent-dina']]);
+    expect(confirm).toHaveBeenCalledWith(
+      'Agents and messages in Codex Claw will be removed from Codex Claw.',
+      'Close Codex Claw?',
+      {
+        cancelButtonText: 'Cancel',
+        confirmButtonText: 'Close Team',
+        type: 'warning',
+      },
+    );
+    expect(wrapper.emitted('close-team')).toStrictEqual([['team-codex-claw']]);
+    expect(quit).toHaveBeenCalledOnce();
+    expect(wrapper.emitted('duplicate-agent')).toStrictEqual([['agent-dina']]);
+    expect(wrapper.emitted('restart-agent')).toStrictEqual([['agent-dina']]);
+    expect(wrapper.text()).toContain('Edit Agent');
 
     wrapper.unmount();
     expect(unsubscribe).toHaveBeenCalledOnce();

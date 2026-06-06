@@ -49,13 +49,13 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import { ElMessageBox } from 'element-plus';
 import type { AccountRateLimits, Team } from '../../shared/contracts';
 import { defaultTeamColor } from '../../shared/team-colors';
 import { teamInitials } from '../../shared/team-manager';
 import { PlusIcon } from '../shared/icons/app-icons';
 import SettingsMenu from './SettingsMenu.vue';
 import TeamContextMenu from './TeamContextMenu.vue';
+import { confirmCloseTeam } from './team-close-confirmation';
 
 const props = defineProps<{
   teams: Team[];
@@ -107,19 +107,8 @@ async function requestCloseTeam(teamId: string): Promise<void> {
   contextMenuTeamId.value = null;
   await nextTick();
 
-  try {
-    await ElMessageBox.confirm(
-      `Agents and messages in ${team.name} will be removed from Codex Claw.`,
-      `Close ${team.name}?`,
-      {
-        cancelButtonText: 'Cancel',
-        confirmButtonText: 'Close Team',
-        type: 'warning',
-      },
-    );
+  if (await confirmCloseTeam(team)) {
     emit('close-team', team.id);
-  } catch {
-    // Element Plus rejects when the user cancels or closes the confirmation.
   }
 }
 

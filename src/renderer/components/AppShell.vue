@@ -128,6 +128,7 @@ import ConversationPane from './ConversationPane.vue';
 import TeamDialog from './TeamDialog.vue';
 import TeamRail from './TeamRail.vue';
 import SettingsDialog from './SettingsDialog.vue';
+import { confirmCloseTeam } from './team-close-confirmation';
 import type { QueuedChatPrompt } from '../shared/chat/queued-prompts';
 
 const props = withDefaults(defineProps<{
@@ -315,7 +316,7 @@ function handleShellShortcut(event: KeyboardEvent): void {
   }
 
   if (event.ctrlKey && !event.metaKey && !event.altKey && event.key === 'Tab') {
-    cycleAgents(event, event.shiftKey ? -1 : 1);
+    cycleAgents(event.shiftKey ? -1 : 1, event);
   }
 }
 
@@ -326,6 +327,51 @@ function handleAppCommand(command: AppCommand): void {
 
   if (command.type === 'cycle-teams') {
     cycleTeams();
+    return;
+  }
+
+  if (command.type === 'new-team') {
+    openNewTeam();
+    return;
+  }
+
+  if (command.type === 'new-agent') {
+    openNewAgent();
+    return;
+  }
+
+  if (command.type === 'close-active-agent') {
+    closeActiveAgent();
+    return;
+  }
+
+  if (command.type === 'close-active-team') {
+    void closeActiveTeam();
+    return;
+  }
+
+  if (command.type === 'quit') {
+    void quit();
+    return;
+  }
+
+  if (command.type === 'cycle-agents') {
+    cycleAgents(command.direction);
+    return;
+  }
+
+  if (command.type === 'edit-active-agent') {
+    editActiveAgent();
+    return;
+  }
+
+  if (command.type === 'duplicate-active-agent') {
+    duplicateActiveAgent();
+    return;
+  }
+
+  if (command.type === 'restart-active-agent') {
+    restartActiveAgent();
   }
 }
 
@@ -337,24 +383,53 @@ async function quit(): Promise<void> {
   await props.quit();
 }
 
-function duplicateActiveAgent(event: KeyboardEvent): void {
+function duplicateActiveAgent(event?: KeyboardEvent): void {
   const agent = currentAgent.value;
   if (!agent) {
     return;
   }
 
-  event.preventDefault();
+  event?.preventDefault();
   emit('duplicate-agent', agent.id);
 }
 
-function closeActiveAgent(event: KeyboardEvent): void {
+function closeActiveAgent(event?: KeyboardEvent): void {
   const agent = currentAgent.value;
   if (!agent) {
     return;
   }
 
-  event.preventDefault();
+  event?.preventDefault();
   emit('close-agent', agent.id);
+}
+
+async function closeActiveTeam(): Promise<void> {
+  const team = activeTeam.value;
+  if (!team || props.snapshot.teams.length <= 1) {
+    return;
+  }
+
+  if (await confirmCloseTeam(team)) {
+    emit('close-team', team.id);
+  }
+}
+
+function restartActiveAgent(): void {
+  const agent = currentAgent.value;
+  if (!agent) {
+    return;
+  }
+
+  emit('restart-agent', agent.id);
+}
+
+function editActiveAgent(): void {
+  const agent = currentAgent.value;
+  if (!agent) {
+    return;
+  }
+
+  openEditAgent(agent.id);
 }
 
 function cycleTeams(): boolean {
@@ -373,7 +448,7 @@ function cycleTeams(): boolean {
   return true;
 }
 
-function cycleAgents(event: KeyboardEvent, direction: 1 | -1): void {
+function cycleAgents(direction: 1 | -1, event?: KeyboardEvent): void {
   const agents = activeTeamAgents.value;
   if (agents.length < 2) {
     return;
@@ -385,7 +460,7 @@ function cycleAgents(event: KeyboardEvent, direction: 1 | -1): void {
     return;
   }
 
-  event.preventDefault();
+  event?.preventDefault();
   emit('select-agent', nextAgent.id);
 }
 

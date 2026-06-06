@@ -26,11 +26,51 @@ describe('appCommandFromInput', () => {
     })).toStrictEqual({ type: 'cycle-teams' });
   });
 
+  it('maps command r to active agent restart', () => {
+    expect(appCommandFromInput({
+      type: 'keyDown',
+      meta: true,
+      key: 'r',
+    })).toStrictEqual({ type: 'restart-active-agent' });
+
+    expect(appCommandFromInput({
+      type: 'keyDown',
+      meta: true,
+      key: 'R',
+    })).toStrictEqual({ type: 'restart-active-agent' });
+  });
+
+  it('maps file and edit menu command shortcuts', () => {
+    expect(appCommandFromInput({ type: 'keyDown', meta: true, key: 'n' })).toStrictEqual({ type: 'new-team' });
+    expect(appCommandFromInput({ type: 'keyDown', meta: true, key: 't' })).toStrictEqual({ type: 'new-agent' });
+    expect(appCommandFromInput({ type: 'keyDown', meta: true, key: 'w' })).toStrictEqual({ type: 'close-active-agent' });
+    expect(appCommandFromInput({ type: 'keyDown', meta: true, shift: true, key: 'w' })).toStrictEqual({ type: 'close-active-team' });
+    expect(appCommandFromInput({ type: 'keyDown', meta: true, key: 'q' })).toStrictEqual({ type: 'quit' });
+    expect(appCommandFromInput({ type: 'keyDown', meta: true, key: 'e' })).toStrictEqual({ type: 'edit-active-agent' });
+    expect(appCommandFromInput({ type: 'keyDown', meta: true, key: 'd' })).toStrictEqual({ type: 'duplicate-active-agent' });
+  });
+
+  it('maps control tab to cycle agents', () => {
+    expect(appCommandFromInput({
+      type: 'keyDown',
+      control: true,
+      key: 'Tab',
+    })).toStrictEqual({ type: 'cycle-agents', direction: 1 });
+
+    expect(appCommandFromInput({
+      type: 'keyDown',
+      control: true,
+      key: 'Tab',
+      shift: true,
+    })).toStrictEqual({ type: 'cycle-agents', direction: -1 });
+  });
+
   it('ignores non-matching shortcut input', () => {
     expect(appCommandFromInput({ type: 'keyUp', meta: true, key: '`' })).toBeNull();
     expect(appCommandFromInput({ type: 'keyDown', meta: true, shift: true, key: '`' })).toBeNull();
+    expect(appCommandFromInput({ type: 'keyDown', meta: true, shift: true, key: 'r' })).toBeNull();
     expect(appCommandFromInput({ type: 'keyDown', meta: false, key: '`' })).toBeNull();
-    expect(appCommandFromInput({ type: 'keyDown', meta: true, key: 'd' })).toBeNull();
+    expect(appCommandFromInput({ type: 'keyDown', meta: true, key: 'x' })).toBeNull();
   });
 
   it('registers command backtick with the native shortcut registrar', () => {
