@@ -46,7 +46,7 @@ const config: ForgeConfig = {
     icon: 'assets/icon',
     appBundleId: 'com.nabocorp.codex-claw',
     executableName: 'codex-claw',
-    // ...(process.env.TEST ? {} : osxPackagerConfig),
+    ...(process.env.TEST ? {} : osxPackagerConfig),
   },
   makers: [
     new MakerZIP({}, ['darwin', 'win32', 'linux']),
