@@ -9,6 +9,10 @@ import { signDarwinBinaries } from './build/sign-binaries';
 import dotenv from 'dotenv';
 dotenv.config();
 
+// macOS signing/notarization is release-only. Agents should set
+// CODEX_CLAW_SKIP_SIGNING=1 for local package/build verification.
+const skipMacSigning = Boolean(process.env.TEST) || process.env.CODEX_CLAW_SKIP_SIGNING === '1';
+
 // osx special configuration
 let osxPackagerConfig = {}
 const isDarwin = process.platform == 'darwin';
@@ -23,7 +27,7 @@ const dmgOptions: MakerDMGConfig = {
   // }
 }
 
-if (isDarwin) {
+if (isDarwin && !skipMacSigning) {
   osxPackagerConfig = {
     osxSign: {
       identity: process.env.IDENTIFY_DARWIN_CODE,
@@ -50,11 +54,11 @@ const config: ForgeConfig = {
     executableName: 'codex-claw',
     extraResource: ['assets/apple-speechanalyzer-cli'],
     extendInfo: 'build/Info.plist',
-    ...(process.env.TEST ? {} : osxPackagerConfig),
+    ...osxPackagerConfig,
     afterCopyExtraResources: [
       (buildPath: string, _electronVersion: string, platform: string, arch: string, callback: (error?: Error) => void) => {
         try {
-          if (platform === 'darwin') {
+          if (platform === 'darwin' && !skipMacSigning) {
             signDarwinBinaries(buildPath, arch);
           }
           callback();

@@ -87,6 +87,17 @@ The app is expected to build through Electron Forge once scaffolded. Keep build
 outputs, generated protocol bindings, copied id8 renderer code, and packaged
 resources clearly separated from source code.
 
+Electron packaging signs and notarizes macOS builds by default. This can take a
+long time and should be reserved for explicit release/signing work. For normal
+agent verification that needs Forge packaging, set
+`CODEX_CLAW_SKIP_SIGNING=1` so Forge skips macOS app signing, notarization, and
+bundled helper signing:
+
+```bash
+CODEX_CLAW_SKIP_SIGNING=1 npm run package
+CODEX_CLAW_SKIP_SIGNING=1 npm run build
+```
+
 When scripts exist, run the relevant focused tests while iterating and the
 relevant build/test gate before handoff. Do not invent server/API integration
 gates for this project; Codex Claw is a desktop app.
