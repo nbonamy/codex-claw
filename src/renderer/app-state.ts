@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue';
-import type { AppSnapshot, ClientRequestResponse, CodexModelOption, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, SendPromptOptions, UpdateAgentInput, UpdateTeamInput } from '../shared/contracts';
+import type { AppSnapshot, ClientRequestResponse, CodexModelOption, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
+import { updateSettingsInSnapshot } from '../shared/settings';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '../shared/snapshot';
 import { createQueuedChatPrompt, type QueuedChatPrompt } from './shared/chat/queued-prompts';
 
@@ -235,6 +236,26 @@ export function useAppState() {
     snapshot.value = await window.codexClaw.updateAgent(input);
   }
 
+  async function updateSettings(input: UpdateSettingsInput): Promise<void> {
+    const previousTheme = { ...snapshot.value.theme };
+    updateSettingsInSnapshot(snapshot.value, input);
+
+    if (!window.codexClaw?.updateSettings) {
+      return;
+    }
+
+    try {
+      snapshot.value = await window.codexClaw.updateSettings(input);
+    } catch (error) {
+      snapshot.value.theme = previousTheme;
+      throw error;
+    }
+  }
+
+  async function quit(): Promise<void> {
+    await window.codexClaw?.quit?.();
+  }
+
   async function duplicateAgent(agentId: string): Promise<void> {
     if (!window.codexClaw?.duplicateAgent) {
       return;
@@ -345,6 +366,7 @@ export function useAppState() {
     updateTeam,
     closeTeam,
     updateAgent,
+    updateSettings,
     duplicateAgent,
     moveAgentToTeam,
     saveAgentToBench,
@@ -361,6 +383,7 @@ export function useAppState() {
     steerPrompt,
     steerQueuedPrompt,
     removeQueuedPrompt,
+    quit,
   };
 }
 

@@ -68,7 +68,7 @@ const emit = defineEmits<{
   white-space: normal;
   overflow-wrap: anywhere;
   line-height: var(--line-height-22);
-  font-size: var(--font-size-15);
+  font-size: var(--chat-font-size, var(--font-size-15));
   opacity: 0.85;
 }
 
@@ -138,7 +138,7 @@ const emit = defineEmits<{
   padding: var(--space-1) var(--space-2);
   background: var(--color-surface-low);
   font-family: var(--font-family-mono);
-  font-size: var(--font-size-14);
+  font-size: calc(var(--code-font-size, var(--font-size-13)) + 1px);
 }
 
 .chat-message-block--text :deep(pre) {
@@ -154,7 +154,7 @@ const emit = defineEmits<{
   background: transparent;
   color: inherit;
   font-family: var(--font-family-mono);
-  font-size: var(--font-size-13);
+  font-size: var(--code-font-size, var(--font-size-13));
   line-height: var(--line-height-20);
 }
 

@@ -18,6 +18,8 @@ export {
   IconPencil as PencilIcon,
   IconRefresh as RefreshIcon,
   IconBookmark as SaveToBenchIcon,
+  IconSettings as SettingsIcon,
+  IconLogout as QuitIcon,
   IconSwitchHorizontal as SwitchHorizontalIcon,
   IconSquareCheck as SquareCheck,
   IconSquareDashed as SquareDashed,

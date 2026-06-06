@@ -13,6 +13,7 @@ import type {
   RendererToolPartUpdate,
   UpdateAgentInput,
 } from './contracts';
+import { defaultThemeSettings } from './settings';
 import { defaultTeamColor } from './team-colors';
 import { toolOutputText } from './tool-output';
 
@@ -34,9 +35,7 @@ export function createEmptySnapshot(): AppSnapshot {
       status: 'notConfigured',
       detail: 'Codex app-server is not connected yet.',
     },
-    theme: {
-      id: 'codex-claw-dark',
-    },
+    theme: { ...defaultThemeSettings },
   };
 }
 
@@ -59,9 +58,7 @@ export function createInitialSnapshot(): AppSnapshot {
       status: 'notConfigured',
       detail: 'Codex app-server is not connected yet.',
     },
-    theme: {
-      id: 'codex-claw-dark',
-    },
+    theme: { ...defaultThemeSettings },
   };
 }
 

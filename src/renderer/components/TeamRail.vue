@@ -28,6 +28,13 @@
       <PlusIcon aria-hidden="true" />
     </button>
 
+    <SettingsMenu
+      class="team-rail__settings"
+      :rate-limits="rateLimits"
+      @open-settings="emit('open-settings')"
+      @quit="emit('quit')"
+    />
+
     <TeamContextMenu
       v-if="contextMenuTeam"
       :team="contextMenuTeam"
@@ -44,21 +51,25 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { ElMessageBox } from 'element-plus';
-import type { Team } from '../../shared/contracts';
+import type { AccountRateLimits, Team } from '../../shared/contracts';
 import { defaultTeamColor } from '../../shared/team-colors';
 import { teamInitials } from '../../shared/team-manager';
 import { PlusIcon } from '../shared/icons/app-icons';
+import SettingsMenu from './SettingsMenu.vue';
 import TeamContextMenu from './TeamContextMenu.vue';
 
 const props = defineProps<{
   teams: Team[];
   activeTeamId: string | null;
+  rateLimits?: AccountRateLimits;
 }>();
 
 const emit = defineEmits<{
   'close-team': [teamId: string];
   'edit-team': [teamId: string];
   'new-team': [];
+  'open-settings': [];
+  quit: [];
   'select-team': [teamId: string];
 }>();
 
@@ -196,6 +207,10 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 .team-rail__new svg {
   width: var(--icon-lg);
   height: var(--icon-lg);
+}
+
+.team-rail__settings {
+  margin-top: auto;
 }
 
 </style>

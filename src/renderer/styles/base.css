@@ -14,7 +14,7 @@ body {
   overflow: hidden;
   background: var(--color-background);
   font-family: var(--font-family-base);
-  font-size: var(--font-size-15);
+  font-size: var(--app-ui-font-size, var(--font-size-15));
   line-height: var(--line-height-20);
 }
 

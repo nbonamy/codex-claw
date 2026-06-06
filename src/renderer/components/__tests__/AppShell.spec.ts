@@ -4,7 +4,7 @@ import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '../../../shared/snapshot';
-import type { Agent, AppCommand, AppSnapshot, CodexClawApi, CreateAgentInput, CreateTeamInput, UpdateAgentInput, UpdateTeamInput } from '../../../shared/contracts';
+import type { Agent, AppCommand, AppSnapshot, CodexClawApi, CreateAgentInput, CreateTeamInput, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../../shared/contracts';
 
 function pointerEvent(type: string, clientX: number): PointerEvent {
   const event = new MouseEvent(type, {
@@ -297,6 +297,38 @@ describe('AppShell', () => {
     });
   });
 
+  it('opens settings from the team rail menu, updates appearance, and quits', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.accountRateLimits = {
+      limitId: 'codex',
+      limitName: 'Codex',
+      primary: {
+        usedPercent: 41,
+        windowDurationMins: 300,
+        resetsAt: null,
+      },
+      secondary: null,
+      credits: null,
+      individualLimit: null,
+      planType: 'pro',
+      rateLimitReachedType: null,
+    };
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const quit = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, updateSettings, quit });
+
+    expect(wrapper.text()).toContain('59%');
+    await wrapper.findAll('button').find((button) => button.text() === 'Settings')?.trigger('click');
+    expect(wrapper.text()).toContain('Configure Codex Claw.');
+
+    await wrapper.findAll('.el-menu-item').find((item) => item.text() === 'Appearance')?.trigger('click');
+    await wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'github-dark');
+    await wrapper.findAll('button').find((button) => button.text() === 'Quit')?.trigger('click');
+
+    expect(updateSettings).toHaveBeenCalledWith({ theme: { id: 'github-dark' } });
+    expect(quit).toHaveBeenCalledOnce();
+  });
+
   it('opens the edit team dialog from the team menu and forwards updates', async () => {
     const snapshot = createInitialSnapshot();
     const updateTeam = vi.fn().mockResolvedValue(undefined);
@@ -533,6 +565,8 @@ function mountShell(overrides: Partial<{
   createTeam: (input: CreateTeamInput) => Promise<void>;
   updateTeam: (input: UpdateTeamInput) => Promise<void>;
   updateAgent: (input: UpdateAgentInput) => Promise<void>;
+  updateSettings: (input: UpdateSettingsInput) => Promise<void>;
+  quit: () => Promise<void>;
 }> = {}) {
   const snapshot = overrides.snapshot ?? createInitialSnapshot();
   return mount(AppShell, {
@@ -547,6 +581,8 @@ function mountShell(overrides: Partial<{
       createTeam: overrides.createTeam ?? vi.fn().mockResolvedValue(undefined),
       updateTeam: overrides.updateTeam ?? vi.fn().mockResolvedValue(undefined),
       updateAgent: overrides.updateAgent ?? vi.fn().mockResolvedValue(undefined),
+      updateSettings: overrides.updateSettings ?? vi.fn().mockResolvedValue(undefined),
+      quit: overrides.quit ?? vi.fn().mockResolvedValue(undefined),
     },
     global: {
       plugins: [ElementPlus],
@@ -560,6 +596,9 @@ function mountShell(overrides: Partial<{
               <slot name="footer" />
             </section>
           `,
+        },
+        ElPopover: {
+          template: '<div><slot name="reference" /><slot /></div>',
         },
       },
     },

@@ -5,10 +5,13 @@
     <TeamRail
       :teams="snapshot.teams"
       :active-team-id="activeTeam?.id ?? null"
+      :rate-limits="snapshot.accountRateLimits"
       class="app-shell__team-rail"
       @close-team="$emit('close-team', $event)"
       @edit-team="openEditTeam"
       @new-team="openNewTeam"
+      @open-settings="settingsDialogVisible = true"
+      @quit="quit"
       @select-team="$emit('select-team', $event)"
     />
     <Transition name="agent-sidebar">
@@ -92,12 +95,17 @@
       :update-team="updateTeam"
       @close="teamDialogVisible = false"
     />
+    <SettingsDialog
+      v-model:visible="settingsDialogVisible"
+      :settings="snapshot.theme"
+      :update-settings="updateSettings"
+    />
   </main>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { Agent, AppCommand, AppSnapshot, ClientRequestResponse, CodexModelOption, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, Team, UpdateAgentInput, UpdateTeamInput } from '../../shared/contracts';
+import type { Agent, AppCommand, AppSnapshot, ClientRequestResponse, CodexModelOption, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, Team, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../shared/contracts';
 import AgentDialog from './AgentDialog.vue';
 import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
@@ -105,6 +113,7 @@ import AgentSidebar from './AgentSidebar.vue';
 import ConversationPane from './ConversationPane.vue';
 import TeamDialog from './TeamDialog.vue';
 import TeamRail from './TeamRail.vue';
+import SettingsDialog from './SettingsDialog.vue';
 import type { QueuedChatPrompt } from '../shared/chat/queued-prompts';
 
 const props = withDefaults(defineProps<{
@@ -124,6 +133,8 @@ const props = withDefaults(defineProps<{
   createTeam?: (input: CreateTeamInput) => Promise<void>;
   updateTeam?: (input: UpdateTeamInput) => Promise<void>;
   updateAgent?: (input: UpdateAgentInput) => Promise<void>;
+  updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
+  quit?: () => Promise<void>;
 }>(), {
   answeredClientRequestIds: () => new Set<string>(),
   codexModels: () => [],
@@ -136,6 +147,8 @@ const props = withDefaults(defineProps<{
   createTeam: async () => undefined,
   updateTeam: async () => undefined,
   updateAgent: async () => undefined,
+  updateSettings: async () => undefined,
+  quit: async () => undefined,
 });
 
 const emit = defineEmits<{
@@ -168,6 +181,7 @@ const editingAgentId = ref<string | null>(null);
 const teamDialogVisible = ref(false);
 const teamDialogMode = ref<'create' | 'edit'>('create');
 const editingTeamId = ref<string | null>(null);
+const settingsDialogVisible = ref(false);
 let unsubscribeAppCommand: (() => void) | null = null;
 const activeTeamAgents = computed(() => {
   const team = activeTeam.value;
@@ -248,7 +262,7 @@ function closeAgentDialog(): void {
 }
 
 function handleShellShortcut(event: KeyboardEvent): void {
-  if (agentDialogVisible.value || teamDialogVisible.value) {
+  if (agentDialogVisible.value || teamDialogVisible.value || settingsDialogVisible.value) {
     return;
   }
 
@@ -275,13 +289,21 @@ function handleShellShortcut(event: KeyboardEvent): void {
 }
 
 function handleAppCommand(command: AppCommand): void {
-  if (agentDialogVisible.value || teamDialogVisible.value) {
+  if (agentDialogVisible.value || teamDialogVisible.value || settingsDialogVisible.value) {
     return;
   }
 
   if (command.type === 'cycle-teams') {
     cycleTeams();
   }
+}
+
+async function updateSettings(input: UpdateSettingsInput): Promise<void> {
+  await props.updateSettings(input);
+}
+
+async function quit(): Promise<void> {
+  await props.quit();
 }
 
 function duplicateActiveAgent(event: KeyboardEvent): void {

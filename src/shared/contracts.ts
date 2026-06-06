@@ -75,6 +75,16 @@ export type BenchTemplate = {
 
 export type ReasoningEffort = string;
 
+export type AppearanceMode = 'dark' | 'light' | 'system';
+
+export type AppThemeSettings = {
+  id: string;
+  mode: AppearanceMode;
+  uiFontSize: number;
+  chatFontSize: number;
+  codeFontSize: number;
+};
+
 export type CodexReasoningEffortOption = {
   reasoningEffort: ReasoningEffort;
   description: string;
@@ -94,6 +104,10 @@ export type CodexModelOption = {
 export type SendPromptOptions = {
   model?: string | null;
   reasoningEffort?: ReasoningEffort | null;
+};
+
+export type UpdateSettingsInput = {
+  theme?: Partial<AppThemeSettings>;
 };
 
 export type RendererMessagePart =
@@ -150,9 +164,7 @@ export type AppSnapshot = {
     detail?: string;
   };
   accountRateLimits?: AccountRateLimits;
-  theme: {
-    id: string;
-  };
+  theme: AppThemeSettings;
 };
 
 export type MainToRendererEvent = {
@@ -267,6 +279,8 @@ export type CodexClawApi = {
   closeAgent(agentId: string): Promise<AppSnapshot>;
   selectAgent(agentId: string): Promise<AppSnapshot>;
   selectAgentFolder(agentId: string): Promise<AppSnapshot | null>;
+  updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>;
+  quit(): Promise<void>;
   sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot>;
   steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot>;
   respondToClientRequest(response: ClientRequestResponse): Promise<AppSnapshot>;

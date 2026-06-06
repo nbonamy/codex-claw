@@ -16,6 +16,8 @@
     :create-team="createTeam"
     :update-team="updateTeam"
     :update-agent="updateAgent"
+    :update-settings="updateSettings"
+    :quit="quit"
     @close-team="closeTeam"
     @close-agent="closeAgent"
     @duplicate-agent="duplicateAgent"
@@ -37,9 +39,10 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onBeforeUnmount, onMounted, watch } from 'vue';
 import AppShell from './components/AppShell.vue';
 import { useAppState } from './app-state';
+import { applyAppTheme, subscribeToSystemAppearance } from './theme/apply-theme';
 
 const {
   snapshot,
@@ -68,6 +71,7 @@ const {
   removeBenchTemplate,
   restartAgent,
   closeAgent,
+  updateSettings,
   respondToClientRequest,
   selectModel,
   selectReasoningEffort,
@@ -77,10 +81,23 @@ const {
   steerPrompt,
   steerQueuedPrompt,
   removeQueuedPrompt,
+  quit,
 } = useAppState();
 
+let unsubscribeSystemAppearance: (() => void) | null = null;
+
 onMounted(() => {
+  unsubscribeSystemAppearance = subscribeToSystemAppearance();
   void loadSnapshot();
   void loadCodexModels();
 });
+
+onBeforeUnmount(() => {
+  unsubscribeSystemAppearance?.();
+  unsubscribeSystemAppearance = null;
+});
+
+watch(() => snapshot.value.theme, (theme) => {
+  applyAppTheme(theme);
+}, { deep: true, immediate: true });
 </script>

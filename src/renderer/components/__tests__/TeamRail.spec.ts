@@ -1,9 +1,10 @@
 import { mount } from '@vue/test-utils';
+import ElementPlus from 'element-plus';
 import { ElMessageBox } from 'element-plus';
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import TeamRail from '../TeamRail.vue';
-import type { Team } from '../../../shared/contracts';
+import type { AccountRateLimits, Team } from '../../../shared/contracts';
 
 let mountedWrappers: ReturnType<typeof mount>[] = [];
 
@@ -45,6 +46,7 @@ describe('TeamRail', () => {
     expect((wrapper.get('[aria-label="Skwad"]').element as HTMLButtonElement).style.backgroundColor).toBe('rgb(70, 168, 87)');
     expect(wrapper.find('.team-rail__window-controls').exists()).toBe(false);
     expect(wrapper.find('[aria-label="Create team"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Settings menu"]').exists()).toBe(true);
   });
 
   it('falls back to team initials when no avatar is set', () => {
@@ -67,6 +69,35 @@ describe('TeamRail', () => {
 
     expect(wrapper.emitted('select-team')).toStrictEqual([['team-claw']]);
     expect(wrapper.emitted('new-team')).toStrictEqual([[]]);
+  });
+
+  it('shows usage remaining and emits settings menu actions', async () => {
+    const wrapper = mountRail({
+      teams,
+      activeTeamId: 'team-sk',
+      rateLimits: {
+        limitId: 'codex',
+        limitName: 'Codex',
+        primary: {
+          usedPercent: 32,
+          windowDurationMins: 300,
+          resetsAt: null,
+        },
+        secondary: null,
+        credits: null,
+        individualLimit: null,
+        planType: 'pro',
+        rateLimitReachedType: null,
+      },
+    });
+
+    expect(wrapper.text()).toContain('Usage remaining');
+    expect(wrapper.text()).toContain('68%');
+    await wrapper.findAll('button').find((button) => button.text() === 'Settings')?.trigger('click');
+    await wrapper.findAll('button').find((button) => button.text() === 'Quit')?.trigger('click');
+
+    expect(wrapper.emitted('open-settings')).toStrictEqual([[]]);
+    expect(wrapper.emitted('quit')).toStrictEqual([[]]);
   });
 
   it('opens the team menu and emits edit team intents', async () => {
@@ -157,10 +188,18 @@ describe('TeamRail', () => {
   });
 });
 
-function mountRail(props: { teams: Team[]; activeTeamId: string | null }) {
+function mountRail(props: { teams: Team[]; activeTeamId: string | null; rateLimits?: AccountRateLimits }) {
   const wrapper = mount(TeamRail, {
     attachTo: document.body,
     props,
+    global: {
+      plugins: [ElementPlus],
+      stubs: {
+        ElPopover: {
+          template: '<div><slot name="reference" /><slot /></div>',
+        },
+      },
+    },
   });
   mountedWrappers.push(wrapper);
   return wrapper;

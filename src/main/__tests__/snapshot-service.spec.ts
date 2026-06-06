@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createAgentFromInput, createInitialSnapshot, selectAgent } from '../snapshot-service';
+import { defaultThemeSettings } from '../../shared/settings';
 
 describe('snapshot service', () => {
   it('creates the phase one app snapshot with two implicit agents', () => {
@@ -43,9 +44,7 @@ describe('snapshot service', () => {
         status: 'notConfigured',
         detail: 'Codex app-server is not connected yet.',
       },
-      theme: {
-        id: 'codex-claw-dark',
-      },
+      theme: defaultThemeSettings,
     });
   });
 

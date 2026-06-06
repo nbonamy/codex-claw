@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { AppStatePersistence, persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 import { appendUserPrompt, createEmptySnapshot, createInitialSnapshot } from '../../shared/snapshot';
+import { defaultThemeSettings } from '../../shared/settings';
 
 let tempDir: string | null = null;
 
@@ -28,7 +29,7 @@ describe('AppStatePersistence', () => {
       bench: [],
       activeTeamId: null,
       activeAgentId: 'agent-dina',
-      theme: { id: 'codex-claw-dark' },
+      theme: defaultThemeSettings,
     });
 
     expect(restored.teams).toStrictEqual(createEmptySnapshot().teams);
@@ -114,7 +115,7 @@ describe('AppStatePersistence', () => {
       bench: [],
       activeTeamId: 'missing-team',
       activeAgentId: 'missing-agent',
-      theme: { id: 'codex-claw-dark' },
+      theme: defaultThemeSettings,
     }), 'utf8');
 
     const restored = await new AppStatePersistence(filePath).load();
@@ -123,6 +124,21 @@ describe('AppStatePersistence', () => {
     expect(restored.activeTeamId).toBe('team-codex-claw');
     expect(restored.teams[0].color).toBe('#1B4FB2');
     expect(restored.teams[0].agentIds).toStrictEqual(['agent-jules']);
+  });
+
+  it('persists and restores normalized appearance settings', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.theme = {
+      id: 'github-dark',
+      mode: 'dark',
+      uiFontSize: 15,
+      chatFontSize: 17,
+      codeFontSize: 14,
+    };
+
+    const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
+
+    expect(restored.theme).toStrictEqual(snapshot.theme);
   });
 });
 

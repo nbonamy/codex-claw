@@ -17,6 +17,8 @@ export const ipcChannels = {
   closeAgent: 'agent:close',
   selectAgent: 'agent:select',
   selectAgentFolder: 'agent:select-folder',
+  updateSettings: 'settings:update',
+  quit: 'app:quit',
   sendPrompt: 'agent:send-prompt',
   steerPrompt: 'agent:steer-prompt',
   respondToClientRequest: 'client-request:respond',

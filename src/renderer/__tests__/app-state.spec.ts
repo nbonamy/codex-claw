@@ -114,6 +114,44 @@ describe('useAppState', () => {
     expect(state.visibleMessages.value).toStrictEqual(remoteSnapshot.messages);
   });
 
+  it('updates settings and forwards quit through the preload bridge', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const updatedSnapshot = createInitialSnapshot();
+    updatedSnapshot.theme = {
+      ...updatedSnapshot.theme,
+      id: 'github-dark',
+      mode: 'dark',
+    };
+    let resolveUpdateSettings: (snapshot: ReturnType<typeof createInitialSnapshot>) => void = () => undefined;
+    const updateSettings = vi.fn().mockReturnValue(new Promise((resolve) => {
+      resolveUpdateSettings = resolve;
+    }));
+    const quit = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        updateSettings,
+        quit,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    const updatePromise = state.updateSettings({ theme: { id: 'github-dark', mode: 'dark' } });
+
+    expect(state.snapshot.value.theme.id).toBe('github-dark');
+    expect(state.snapshot.value.theme.mode).toBe('dark');
+
+    resolveUpdateSettings(updatedSnapshot);
+    await updatePromise;
+    await state.quit();
+
+    expect(updateSettings).toHaveBeenCalledWith({ theme: { id: 'github-dark', mode: 'dark' } });
+    expect(state.snapshot.value.theme.id).toBe('github-dark');
+    expect(quit).toHaveBeenCalledOnce();
+  });
+
   it('hydrates the active persisted thread after subscribing to main events', async () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0].codexThreadId = 'thread-persisted';

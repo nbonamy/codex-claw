@@ -21,6 +21,7 @@ import {
   saveAgentToBench,
 } from '../shared/agent-manager';
 import { closeTeamInSnapshot, createTeamInSnapshot, selectTeam, updateTeamInSnapshot } from '../shared/team-manager';
+import { updateSettingsInSnapshot } from '../shared/settings';
 import {
   applyMainEventToSnapshot,
   createAgentInSnapshot,
@@ -30,7 +31,7 @@ import {
   updateAgentFolder,
 } from './snapshot-service';
 import { AppStatePersistence } from './state-persistence';
-import type { AppSnapshot, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, SendPromptOptions, UpdateAgentInput, UpdateTeamInput } from '../shared/contracts';
+import type { AppSnapshot, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
 import { ipcChannels } from '../shared/ipc';
 import { teamColors } from '../shared/team-colors';
 
@@ -214,6 +215,16 @@ export class AppController {
       updateAgentFolder(this.snapshot, agentId, result.filePaths[0]);
       await this.persistSnapshot();
       return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.updateSettings, async (_event, input: UpdateSettingsInput) => {
+      updateSettingsInSnapshot(this.snapshot, input);
+      await this.persistSnapshot();
+      return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.quit, () => {
+      app.quit();
     });
 
     ipcMain.handle(ipcChannels.sendPrompt, (_event, agentId: string, prompt: string, options?: SendPromptOptions) => {

@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { Agent, AppSnapshot, BenchTemplate, Team } from '../shared/contracts';
+import { normalizeThemeSettings } from '../shared/settings';
 import { createEmptySnapshot } from '../shared/snapshot';
 import { defaultTeamColor } from '../shared/team-colors';
 
@@ -88,7 +89,7 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
       : seed.bench,
     activeTeamId: typeof value.activeTeamId === 'string' ? value.activeTeamId : null,
     activeAgentId: typeof value.activeAgentId === 'string' ? value.activeAgentId : null,
-    theme: isRecord(value.theme) && typeof value.theme.id === 'string' ? { id: value.theme.id } : seed.theme,
+    theme: normalizeThemeSettings(value.theme),
     messages: [],
     appServer: seed.appServer,
   };
