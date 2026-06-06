@@ -58,6 +58,11 @@ doc and update it when behavior changes:
 - `docs/codex.md`: how Electron main communicates with Codex app-server,
   including transport, lifecycle, event adaptation, generated types, and test
   fixtures.
+- `docs/claude.md`: Claude Code websocket/SDK protocol research, support
+  strategy, and current Codex-bias inventory.
+- `docs/backend-agnostic-cleanup.md`: cleanup needed to prepare shared
+  contracts, runtime state, renderer controls, and main-process backend seams
+  for Claude support.
 - `docs/mcp.md`: how the app-owned MCP server exposes agent collaboration
   tools, inbox state, backend enablement, security, and tests.
 - `docs/architecture.md`: product model, process architecture, IPC,
