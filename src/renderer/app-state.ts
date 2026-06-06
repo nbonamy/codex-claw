@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { AppSnapshot, ClientRequestResponse, CodexModelOption, CreateAgentInput, MainToRendererEvent, ReasoningEffort, SendPromptOptions, UpdateAgentInput } from '../shared/contracts';
+import type { AppSnapshot, ClientRequestResponse, CodexModelOption, CreateAgentInput, CreateTeamInput, MainToRendererEvent, ReasoningEffort, SendPromptOptions, UpdateAgentInput } from '../shared/contracts';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '../shared/snapshot';
 
 const snapshot = ref<AppSnapshot>(createEmptySnapshot());
@@ -112,6 +112,28 @@ export function useAppState() {
     snapshot.value = await window.codexClaw.createAgent(input);
   }
 
+  async function createTeam(input: CreateTeamInput): Promise<void> {
+    if (!window.codexClaw?.createTeam) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.createTeam(input);
+  }
+
+  async function selectTeam(teamId: string): Promise<void> {
+    if (!snapshot.value.teams.some((team) => team.id === teamId)) {
+      return;
+    }
+
+    snapshot.value.activeTeamId = teamId;
+    const team = snapshot.value.teams.find((candidate) => candidate.id === teamId);
+    snapshot.value.activeAgentId = team?.activeAgentId ?? team?.agentIds[0] ?? null;
+
+    if (window.codexClaw?.selectTeam) {
+      snapshot.value = await window.codexClaw.selectTeam(teamId);
+    }
+  }
+
   async function updateAgent(input: UpdateAgentInput): Promise<void> {
     if (!window.codexClaw?.updateAgent) {
       return;
@@ -197,6 +219,7 @@ export function useAppState() {
     loadSnapshot,
     chooseAgentFolder,
     createAgent,
+    createTeam,
     updateAgent,
     duplicateAgent,
     saveAgentToBench,
@@ -206,6 +229,7 @@ export function useAppState() {
     selectModel,
     selectReasoningEffort,
     selectAgent,
+    selectTeam,
     sendPrompt,
   };
 }

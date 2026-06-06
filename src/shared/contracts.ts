@@ -112,6 +112,7 @@ export type AppSnapshot = {
   teams: Team[];
   agents: Agent[];
   bench: BenchTemplate[];
+  activeTeamId: string | null;
   activeAgentId: string | null;
   messages: RendererMessage[];
   appServer: {
@@ -151,6 +152,11 @@ export type CreateAgentInput = {
   name: string;
   folder: string;
   avatar?: string;
+};
+
+export type CreateTeamInput = {
+  name: string;
+  color: string;
 };
 
 export type UpdateAgentInput = {
@@ -196,6 +202,8 @@ export type CodexClawApi = {
   getSnapshot(): Promise<AppSnapshot>;
   listCodexModels(): Promise<CodexModelOption[]>;
   chooseAgentFolder(): Promise<string | null>;
+  createTeam(input: CreateTeamInput): Promise<AppSnapshot>;
+  selectTeam(teamId: string): Promise<AppSnapshot>;
   createAgent(input: CreateAgentInput): Promise<AppSnapshot>;
   updateAgent(input: UpdateAgentInput): Promise<AppSnapshot>;
   duplicateAgent(agentId: string): Promise<AppSnapshot>;

@@ -2,11 +2,13 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { Agent, AppSnapshot, BenchTemplate, Team } from '../shared/contracts';
 import { createEmptySnapshot } from '../shared/snapshot';
+import { defaultTeamColor } from '../shared/team-colors';
 
 type PersistedState = {
   teams: Team[];
   agents: Agent[];
   bench: BenchTemplate[];
+  activeTeamId: string | null;
   activeAgentId: string | null;
   theme: AppSnapshot['theme'];
 };
@@ -38,6 +40,7 @@ export function persistedStateFromSnapshot(snapshot: AppSnapshot): PersistedStat
     teams: snapshot.teams.map((team) => ({ ...team, agentIds: [...team.agentIds] })),
     agents: snapshot.agents.map((agent) => ({ ...agent })),
     bench: snapshot.bench.map((template) => ({ ...template })),
+    activeTeamId: snapshot.activeTeamId,
     activeAgentId: snapshot.activeAgentId,
     theme: { ...snapshot.theme },
   };
@@ -62,6 +65,7 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
     bench: Array.isArray(value.bench)
       ? value.bench.map(sanitizeBenchTemplate).filter((template): template is BenchTemplate => Boolean(template))
       : seed.bench,
+    activeTeamId: typeof value.activeTeamId === 'string' ? value.activeTeamId : null,
     activeAgentId: typeof value.activeAgentId === 'string' ? value.activeAgentId : null,
     theme: isRecord(value.theme) && typeof value.theme.id === 'string' ? { id: value.theme.id } : seed.theme,
     messages: [],
@@ -72,6 +76,7 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
   if (!snapshot.activeAgentId || !snapshot.agents.some((agent) => agent.id === snapshot.activeAgentId)) {
     snapshot.activeAgentId = snapshot.agents[0]?.id ?? null;
   }
+  snapshot.activeTeamId = repairedActiveTeamId(snapshot);
 
   return snapshot;
 }
@@ -109,7 +114,7 @@ function sanitizeTeam(value: unknown, agents: Agent[]): Team | null {
     id: value.id,
     name: value.name,
     avatar: typeof value.avatar === 'string' ? value.avatar : undefined,
-    color: typeof value.color === 'string' ? value.color : undefined,
+    color: typeof value.color === 'string' ? value.color : defaultTeamColor,
     agentIds,
     activeAgentId: typeof value.activeAgentId === 'string' && agentIds.includes(value.activeAgentId)
       ? value.activeAgentId
@@ -159,6 +164,19 @@ function repairTeamMembership(snapshot: AppSnapshot): void {
       team.agentIds.push(agent.id);
     }
   }
+}
+
+function repairedActiveTeamId(snapshot: AppSnapshot): string | null {
+  if (snapshot.activeTeamId && snapshot.teams.some((team) => team.id === snapshot.activeTeamId)) {
+    return snapshot.activeTeamId;
+  }
+
+  const activeAgent = snapshot.agents.find((agent) => agent.id === snapshot.activeAgentId);
+  if (activeAgent?.teamId && snapshot.teams.some((team) => team.id === activeAgent.teamId)) {
+    return activeAgent.teamId;
+  }
+
+  return snapshot.teams[0]?.id ?? null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

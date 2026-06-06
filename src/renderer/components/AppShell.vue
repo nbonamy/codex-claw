@@ -6,12 +6,14 @@
       :teams="snapshot.teams"
       :active-team-id="activeTeam?.id ?? null"
       class="app-shell__team-rail"
+      @new-team="openNewTeam"
+      @select-team="$emit('select-team', $event)"
     />
     <Transition name="agent-sidebar">
       <AgentSidebar
         v-if="!agentSidebarCollapsed"
-        :agents="snapshot.agents"
-        :active-agent-id="snapshot.activeAgentId"
+        :agents="activeTeamAgents"
+        :active-agent-id="currentAgent?.id ?? null"
         :team-name="activeTeamName"
         :width="agentSidebarWidth"
         :min-width="agentSidebarMinWidth"
@@ -30,8 +32,8 @@
     </Transition>
     <section class="app-shell__agent">
       <AgentHeader
-        v-if="!isAgentEmpty"
-        :agent="activeAgent"
+        v-if="!isAgentEmpty && currentAgent"
+        :agent="currentAgent"
         :app-server="snapshot.appServer"
         :is-loading="isLoading"
         :sidebar-collapsed="agentSidebarCollapsed"
@@ -45,7 +47,7 @@
         <ConversationPane
           v-else
           :messages="messages"
-          :agent="activeAgent"
+          :agent="currentAgent"
           :is-sending="isSending"
           :answered-client-request-ids="answeredClientRequestIds"
           :codex-models="codexModels"
@@ -68,17 +70,23 @@
       :update-agent="updateAgent"
       @close="closeAgentDialog"
     />
+    <TeamDialog
+      :visible="teamDialogVisible"
+      :create-team="createTeam"
+      @close="teamDialogVisible = false"
+    />
   </main>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Agent, AppSnapshot, ClientRequestResponse, CodexModelOption, CreateAgentInput, ReasoningEffort, RendererMessage, Team, UpdateAgentInput } from '../../shared/contracts';
+import type { Agent, AppSnapshot, ClientRequestResponse, CodexModelOption, CreateAgentInput, CreateTeamInput, ReasoningEffort, RendererMessage, Team, UpdateAgentInput } from '../../shared/contracts';
 import AgentDialog from './AgentDialog.vue';
 import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
 import AgentSidebar from './AgentSidebar.vue';
 import ConversationPane from './ConversationPane.vue';
+import TeamDialog from './TeamDialog.vue';
 import TeamRail from './TeamRail.vue';
 
 const props = withDefaults(defineProps<{
@@ -94,6 +102,7 @@ const props = withDefaults(defineProps<{
   selectedReasoningEffort?: ReasoningEffort | null;
   chooseAgentFolder?: () => Promise<string | null>;
   createAgent?: (input: CreateAgentInput) => Promise<void>;
+  createTeam?: (input: CreateTeamInput) => Promise<void>;
   updateAgent?: (input: UpdateAgentInput) => Promise<void>;
 }>(), {
   answeredClientRequestIds: () => new Set<string>(),
@@ -103,6 +112,7 @@ const props = withDefaults(defineProps<{
   selectedReasoningEffort: null,
   chooseAgentFolder: async () => null,
   createAgent: async () => undefined,
+  createTeam: async () => undefined,
   updateAgent: async () => undefined,
 });
 
@@ -116,6 +126,7 @@ defineEmits<{
   'select-agent': [agentId: string];
   'select-model': [modelId: string];
   'select-reasoning-effort': [reasoningEffort: ReasoningEffort];
+  'select-team': [teamId: string];
   sendPrompt: [prompt: string];
 }>();
 
@@ -126,7 +137,30 @@ const agentSidebarWidth = ref(260);
 const agentDialogVisible = ref(false);
 const agentDialogMode = ref<'create' | 'edit'>('create');
 const editingAgentId = ref<string | null>(null);
-const isAgentEmpty = computed(() => props.snapshot.agents.length === 0);
+const teamDialogVisible = ref(false);
+const activeTeamAgents = computed(() => {
+  const team = activeTeam.value;
+  if (!team) {
+    return [];
+  }
+
+  return team.agentIds
+    .map((agentId) => props.snapshot.agents.find((agent) => agent.id === agentId))
+    .filter((agent): agent is Agent => Boolean(agent));
+});
+const currentAgent = computed(() => {
+  const team = activeTeam.value;
+  if (!team) {
+    return null;
+  }
+
+  if (props.activeAgent && team.agentIds.includes(props.activeAgent.id)) {
+    return props.activeAgent;
+  }
+
+  return activeTeamAgents.value.find((agent) => agent.id === team.activeAgentId) ?? activeTeamAgents.value[0] ?? null;
+});
+const isAgentEmpty = computed(() => activeTeamAgents.value.length === 0);
 const editingAgent = computed(() => (
   editingAgentId.value ? props.snapshot.agents.find((agent) => agent.id === editingAgentId.value) ?? null : null
 ));
@@ -141,6 +175,10 @@ function openNewAgent(): void {
   agentDialogVisible.value = true;
 }
 
+function openNewTeam(): void {
+  teamDialogVisible.value = true;
+}
+
 function openEditAgent(agentId: string): void {
   agentDialogMode.value = 'edit';
   editingAgentId.value = agentId;
@@ -152,6 +190,13 @@ function closeAgentDialog(): void {
 }
 
 const activeTeam = computed<Team | null>(() => {
+  const selectedTeam = props.snapshot.activeTeamId
+    ? props.snapshot.teams.find((team) => team.id === props.snapshot.activeTeamId) ?? null
+    : null;
+  if (selectedTeam) {
+    return selectedTeam;
+  }
+
   if (props.activeAgent?.teamId) {
     return props.snapshot.teams.find((team) => team.id === props.activeAgent?.teamId) ?? props.snapshot.teams[0] ?? null;
   }

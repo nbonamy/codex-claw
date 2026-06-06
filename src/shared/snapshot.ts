@@ -11,6 +11,7 @@ import type {
   RendererToolPartUpdate,
   UpdateAgentInput,
 } from './contracts';
+import { defaultTeamColor } from './team-colors';
 import { toolOutputText } from './tool-output';
 
 const seedCreatedAt = '2026-06-05T00:00:00.000Z';
@@ -24,6 +25,7 @@ export function createEmptySnapshot(): AppSnapshot {
     ],
     agents: [],
     bench: [],
+    activeTeamId: seedTeamId,
     activeAgentId: null,
     messages: [],
     appServer: {
@@ -48,6 +50,7 @@ export function createInitialSnapshot(): AppSnapshot {
     ],
     agents,
     bench: [],
+    activeTeamId: seedTeamId,
     activeAgentId: agents[0]?.id ?? null,
     messages: [],
     appServer: {
@@ -155,6 +158,7 @@ export function selectAgent(snapshot: AppSnapshot, agentId: string): AppSnapshot
     snapshot.activeAgentId = agentId;
     const team = snapshot.teams.find((candidate) => candidate.id === agent.teamId);
     if (team) {
+      snapshot.activeTeamId = team.id;
       team.activeAgentId = agentId;
     }
   }
@@ -566,6 +570,10 @@ function findAgent(snapshot: AppSnapshot, agentId: string): Agent | undefined {
 }
 
 function activeTeamId(snapshot: AppSnapshot): string {
+  if (snapshot.activeTeamId && snapshot.teams.some((team) => team.id === snapshot.activeTeamId)) {
+    return snapshot.activeTeamId;
+  }
+
   const activeAgent = snapshot.activeAgentId ? findAgent(snapshot, snapshot.activeAgentId) : undefined;
   if (activeAgent?.teamId) {
     return activeAgent.teamId;
@@ -629,6 +637,7 @@ function createDefaultTeam(): AppSnapshot['teams'][number] {
     id: seedTeamId,
     name: 'Codex Claw',
     avatar: 'CC',
+    color: defaultTeamColor,
     agentIds: [],
   };
 }

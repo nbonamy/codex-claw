@@ -26,12 +26,14 @@ describe('AppStatePersistence', () => {
       teams: [],
       agents: [],
       bench: [],
+      activeTeamId: null,
       activeAgentId: 'agent-dina',
       theme: { id: 'codex-claw-dark' },
     });
 
     expect(restored.teams).toStrictEqual(createEmptySnapshot().teams);
     expect(restored.agents).toStrictEqual([]);
+    expect(restored.activeTeamId).toBe('team-codex-claw');
     expect(restored.activeAgentId).toBeNull();
   });
 
@@ -48,6 +50,7 @@ describe('AppStatePersistence', () => {
     const written = JSON.parse(await readFile(filePath, 'utf8')) as Record<string, unknown>;
     expect(written).not.toHaveProperty('messages');
     expect(written).not.toHaveProperty('appServer');
+    expect(written.activeTeamId).toBe('team-codex-claw');
     expect((written.agents as Array<Record<string, unknown>>)[0].codexThreadId).toBe('thread-dina');
   });
 
@@ -85,6 +88,7 @@ describe('AppStatePersistence', () => {
       teams: [{ id: 'team-codex-claw', name: 'Codex Claw', agentIds: [] }],
       agents: [{ id: 'agent-jules', teamId: 'team-codex-claw', name: 'Jules', folder: '/tmp/jules', createdAt: 'now', updatedAt: 'now' }],
       bench: [],
+      activeTeamId: 'missing-team',
       activeAgentId: 'missing-agent',
       theme: { id: 'codex-claw-dark' },
     }), 'utf8');
@@ -92,6 +96,8 @@ describe('AppStatePersistence', () => {
     const restored = await new AppStatePersistence(filePath).load();
 
     expect(restored.activeAgentId).toBe('agent-jules');
+    expect(restored.activeTeamId).toBe('team-codex-claw');
+    expect(restored.teams[0].color).toBe('#1B4FB2');
     expect(restored.teams[0].agentIds).toStrictEqual(['agent-jules']);
   });
 });

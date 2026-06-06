@@ -146,6 +146,7 @@ describe('snapshot reducer', () => {
     selectAgent(snapshot, 'agent-jesse');
 
     expect(snapshot.activeAgentId).toBe('agent-jesse');
+    expect(snapshot.activeTeamId).toBe('team-codex-claw');
     expect(snapshot.teams[0].activeAgentId).toBe('agent-jesse');
   });
 

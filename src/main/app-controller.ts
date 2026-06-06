@@ -17,6 +17,7 @@ import {
   restartAgentConversation,
   saveAgentToBench,
 } from '../shared/agent-manager';
+import { createTeamInSnapshot, selectTeam } from '../shared/team-manager';
 import {
   applyMainEventToSnapshot,
   createAgentInSnapshot,
@@ -26,8 +27,9 @@ import {
   updateAgentFolder,
 } from './snapshot-service';
 import { AppStatePersistence } from './state-persistence';
-import type { AppSnapshot, ClientRequestResponse, CreateAgentInput, MainToRendererEvent, SendPromptOptions, UpdateAgentInput } from '../shared/contracts';
+import type { AppSnapshot, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MainToRendererEvent, SendPromptOptions, UpdateAgentInput } from '../shared/contracts';
 import { ipcChannels } from '../shared/ipc';
+import { teamColors } from '../shared/team-colors';
 
 export class AppController {
   private mainWindow: BrowserWindow | null = null;
@@ -70,6 +72,19 @@ export class AppController {
 
     ipcMain.handle(ipcChannels.chooseAgentFolder, async () => {
       return this.chooseAgentFolder();
+    });
+
+    ipcMain.handle(ipcChannels.createTeam, async (_event, input: CreateTeamInput) => {
+      this.validateTeamInput(input);
+      createTeamInSnapshot(this.snapshot, input);
+      await this.persistSnapshot();
+      return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.selectTeam, async (_event, teamId: string) => {
+      selectTeam(this.snapshot, teamId);
+      await this.persistSnapshot();
+      return this.snapshot;
     });
 
     ipcMain.handle(ipcChannels.createAgent, async (_event, input: CreateAgentInput) => {
@@ -197,6 +212,16 @@ export class AppController {
     const folderStat = await stat(folder);
     if (!folderStat.isDirectory()) {
       throw new Error('Agent folder must be a directory.');
+    }
+  }
+
+  private validateTeamInput(input: CreateTeamInput): void {
+    if (!input.name.trim()) {
+      throw new Error('Team name is required.');
+    }
+
+    if (!teamColors.some((color) => color === input.color.trim().toUpperCase())) {
+      throw new Error('Team color is invalid.');
     }
   }
 

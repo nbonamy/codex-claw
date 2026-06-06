@@ -115,6 +115,7 @@ const heroSubhead = computed(() => {
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   background: var(--color-surface-lowest);
+  padding: 0 var(--space-32);
 }
 
 .conversation-pane__layout {
@@ -156,7 +157,7 @@ const heroSubhead = computed(() => {
   width: min(100%, var(--conversation-content-width));
   height: 100%;
   margin: 0 auto;
-  padding: var(--space-8) var(--space-16);
+  padding: var(--space-8) var(--space-32);
   padding-top: 33vh;
 }
 

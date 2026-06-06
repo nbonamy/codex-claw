@@ -19,6 +19,7 @@ export function duplicateAgentInSnapshot(snapshot: AppSnapshot, agentId: string,
 
   snapshot.agents.push(duplicate);
   attachAgentToTeam(snapshot, duplicate);
+  snapshot.activeTeamId = duplicate.teamId ?? snapshot.activeTeamId;
   snapshot.activeAgentId = duplicate.id;
   return duplicate;
 }
@@ -79,6 +80,11 @@ export function closeAgentInSnapshot(snapshot: AppSnapshot, agentId: string): Ag
     snapshot.activeAgentId = sameTeamNextAgent?.id ?? snapshot.agents[0]?.id ?? null;
   }
 
+  if (snapshot.activeTeamId === agent.teamId && snapshot.activeAgentId) {
+    const activeAgent = snapshot.agents.find((candidate) => candidate.id === snapshot.activeAgentId);
+    snapshot.activeTeamId = activeAgent?.teamId ?? snapshot.activeTeamId;
+  }
+
   return agent;
 }
 
@@ -109,6 +115,10 @@ function attachAgentToTeam(snapshot: AppSnapshot, agent: Agent): void {
 }
 
 function activeTeamId(snapshot: AppSnapshot): string | undefined {
+  if (snapshot.activeTeamId) {
+    return snapshot.activeTeamId;
+  }
+
   const activeAgent = snapshot.agents.find((agent) => agent.id === snapshot.activeAgentId);
   return activeAgent?.teamId ?? snapshot.teams[0]?.id;
 }

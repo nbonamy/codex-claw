@@ -12,12 +12,14 @@
     :selected-reasoning-effort="selectedReasoningEffort"
     :choose-agent-folder="chooseAgentFolder"
     :create-agent="createAgent"
+    :create-team="createTeam"
     :update-agent="updateAgent"
     @close-agent="closeAgent"
     @duplicate-agent="duplicateAgent"
     @restart-agent="restartAgent"
     @save-agent-to-bench="saveAgentToBench"
     @select-agent="selectAgent"
+    @select-team="selectTeam"
     @select-model="selectModel"
     @select-reasoning-effort="selectReasoningEffort"
     @client-response="respondToClientRequest"
@@ -45,6 +47,7 @@ const {
   loadSnapshot,
   chooseAgentFolder,
   createAgent,
+  createTeam,
   updateAgent,
   duplicateAgent,
   saveAgentToBench,
@@ -54,6 +57,7 @@ const {
   selectModel,
   selectReasoningEffort,
   selectAgent,
+  selectTeam,
   sendPrompt,
 } = useAppState();
 

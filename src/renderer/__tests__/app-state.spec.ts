@@ -310,6 +310,26 @@ describe('useAppState', () => {
 
   it('chooses folders and replaces the snapshot after agent metadata actions', async () => {
     const remoteSnapshot = createInitialSnapshot();
+    const teamSnapshot = {
+      ...remoteSnapshot,
+      teams: [
+        ...remoteSnapshot.teams,
+        {
+          id: 'team-skwad-core',
+          name: 'Skwad Core',
+          avatar: 'SC',
+          color: '#46A857',
+          agentIds: [],
+        },
+      ],
+      activeTeamId: 'team-skwad-core',
+      activeAgentId: null,
+    };
+    const selectedTeamSnapshot = {
+      ...teamSnapshot,
+      activeTeamId: 'team-codex-claw',
+      activeAgentId: 'agent-dina',
+    };
     const createdSnapshot = createInitialSnapshot();
     createdSnapshot.agents.push({
       id: 'agent-jules',
@@ -354,6 +374,8 @@ describe('useAppState', () => {
       activeAgentId: 'agent-dina',
     };
     const chooseAgentFolder = vi.fn().mockResolvedValue('/Users/nbonamy/src/jules');
+    const createTeam = vi.fn().mockResolvedValue(teamSnapshot);
+    const selectTeam = vi.fn().mockResolvedValue(selectedTeamSnapshot);
     const createAgent = vi.fn().mockResolvedValue(createdSnapshot);
     const updateAgent = vi.fn().mockResolvedValue(updatedSnapshot);
     const duplicateAgent = vi.fn().mockResolvedValue(duplicatedSnapshot);
@@ -366,6 +388,8 @@ describe('useAppState', () => {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         onEvent: vi.fn(),
         chooseAgentFolder,
+        createTeam,
+        selectTeam,
         createAgent,
         updateAgent,
         duplicateAgent,
@@ -379,6 +403,8 @@ describe('useAppState', () => {
     await state.loadSnapshot();
 
     await expect(state.chooseAgentFolder()).resolves.toBe('/Users/nbonamy/src/jules');
+    await state.createTeam({ name: 'Skwad Core', color: '#46A857' });
+    await state.selectTeam('team-codex-claw');
     await state.createAgent({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules' });
     await state.updateAgent({ id: 'agent-jules', name: 'Jules Prime', avatar: '🤖', folder: '/Users/nbonamy/src/jules' });
     await state.duplicateAgent('agent-jules');
@@ -386,6 +412,8 @@ describe('useAppState', () => {
     await state.restartAgent('agent-jules');
     await state.closeAgent('agent-jules');
 
+    expect(createTeam).toHaveBeenCalledWith({ name: 'Skwad Core', color: '#46A857' });
+    expect(selectTeam).toHaveBeenCalledWith('team-codex-claw');
     expect(createAgent).toHaveBeenCalledWith({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules' });
     expect(updateAgent).toHaveBeenCalledWith({ id: 'agent-jules', name: 'Jules Prime', avatar: '🤖', folder: '/Users/nbonamy/src/jules' });
     expect(duplicateAgent).toHaveBeenCalledWith('agent-jules');
@@ -409,6 +437,8 @@ describe('useAppState', () => {
     const before = state.snapshot.value;
 
     await expect(state.chooseAgentFolder()).resolves.toBeNull();
+    await state.createTeam({ name: 'Ignored Team', color: '#46A857' });
+    await state.selectTeam('team-codex-claw');
     await state.createAgent({ name: 'Ignored', folder: '/tmp/ignored' });
     await state.updateAgent({ id: 'agent-dina', name: 'Ignored', folder: '/tmp/ignored' });
     await state.duplicateAgent('agent-dina');

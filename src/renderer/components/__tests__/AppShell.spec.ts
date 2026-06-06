@@ -4,7 +4,7 @@ import { nextTick } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '../../../shared/snapshot';
-import type { Agent, CreateAgentInput, UpdateAgentInput } from '../../../shared/contracts';
+import type { Agent, AppSnapshot, CreateAgentInput, CreateTeamInput, UpdateAgentInput } from '../../../shared/contracts';
 
 function pointerEvent(type: string, clientX: number): PointerEvent {
   const event = new MouseEvent(type, {
@@ -169,8 +169,30 @@ describe('AppShell', () => {
     });
 
     expect(wrapper.text()).toContain('CODEX CLAW');
-    expect(wrapper.text()).toContain('No agent');
+    expect(wrapper.text()).toContain('Dina');
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('true');
+  });
+
+  it('forwards team selection and filters the sidebar to the active team', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.teams.push({
+      id: 'team-empty',
+      name: 'Empty Team',
+      avatar: 'ET',
+      color: '#46A857',
+      agentIds: [],
+    });
+    snapshot.activeTeamId = 'team-empty';
+    snapshot.activeAgentId = null;
+    const wrapper = mountShell({ snapshot });
+
+    expect(wrapper.get('[aria-label="Empty Team"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.findAll('.agent-sidebar__agent')).toHaveLength(0);
+    expect(wrapper.text()).toContain('Welcome to Codex Claw!');
+
+    await wrapper.get('[aria-label="Codex Claw"]').trigger('click');
+
+    expect(wrapper.emitted('select-team')).toStrictEqual([['team-codex-claw']]);
   });
 
   it('shows the empty agent page when the active team has no agents', async () => {
@@ -218,6 +240,27 @@ describe('AppShell', () => {
       name: 'Jules',
       avatar: undefined,
       folder: '/Users/nbonamy/src/new-agent',
+    });
+  });
+
+  it('opens the new team dialog from the team rail and forwards create requests', async () => {
+    const snapshot = createInitialSnapshot();
+    const createTeam = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({
+      snapshot,
+      createTeam,
+    });
+
+    await wrapper.get('[aria-label="Create team"]').trigger('click');
+
+    expect(wrapper.text()).toContain('New Team');
+    await wrapper.get('.team-dialog__text-input').setValue('Skwad Core');
+    await wrapper.findAll('.team-dialog__color')[10]?.trigger('click');
+    await wrapper.findAll('button').find((button) => button.text() === 'Create Team')?.trigger('click');
+
+    expect(createTeam).toHaveBeenCalledWith({
+      name: 'Skwad Core',
+      color: '#46A857',
     });
   });
 
@@ -270,9 +313,10 @@ describe('AppShell', () => {
 });
 
 function mountShell(overrides: Partial<{
-  snapshot: ReturnType<typeof createInitialSnapshot>;
+  snapshot: AppSnapshot;
   chooseAgentFolder: () => Promise<string | null>;
   createAgent: (input: CreateAgentInput) => Promise<void>;
+  createTeam: (input: CreateTeamInput) => Promise<void>;
   updateAgent: (input: UpdateAgentInput) => Promise<void>;
 }> = {}) {
   const snapshot = overrides.snapshot ?? createInitialSnapshot();
@@ -285,6 +329,7 @@ function mountShell(overrides: Partial<{
       isSending: false,
       chooseAgentFolder: overrides.chooseAgentFolder ?? vi.fn().mockResolvedValue(null),
       createAgent: overrides.createAgent ?? vi.fn().mockResolvedValue(undefined),
+      createTeam: overrides.createTeam ?? vi.fn().mockResolvedValue(undefined),
       updateAgent: overrides.updateAgent ?? vi.fn().mockResolvedValue(undefined),
     },
     global: {

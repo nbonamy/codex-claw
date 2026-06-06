@@ -9,6 +9,7 @@ describe('snapshot service', () => {
           id: 'team-codex-claw',
           name: 'Codex Claw',
           avatar: 'CC',
+          color: '#1B4FB2',
           agentIds: ['agent-dina', 'agent-jesse'],
         },
       ],
@@ -35,6 +36,7 @@ describe('snapshot service', () => {
         },
       ],
       bench: [],
+      activeTeamId: 'team-codex-claw',
       activeAgentId: 'agent-dina',
       messages: [],
       appServer: {

@@ -5,8 +5,11 @@ describe('ipc channels', () => {
   it('keeps renderer bridge channels explicit', () => {
     expect(ipcChannels).toStrictEqual({
       getSnapshot: 'app:get-snapshot',
-      createAgent: 'agent:create',
+      listCodexModels: 'codex:models:list',
       chooseAgentFolder: 'agent:choose-folder',
+      createTeam: 'team:create',
+      selectTeam: 'team:select',
+      createAgent: 'agent:create',
       updateAgent: 'agent:update',
       duplicateAgent: 'agent:duplicate',
       saveAgentToBench: 'agent:save-to-bench',
@@ -14,7 +17,6 @@ describe('ipc channels', () => {
       closeAgent: 'agent:close',
       selectAgent: 'agent:select',
       selectAgentFolder: 'agent:select-folder',
-      listCodexModels: 'codex:models:list',
       sendPrompt: 'agent:send-prompt',
       respondToClientRequest: 'client-request:respond',
       event: 'app:event',

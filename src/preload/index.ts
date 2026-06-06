@@ -1,11 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { ClientRequestResponse, CodexClawApi, CreateAgentInput, MainToRendererEvent, SendPromptOptions, UpdateAgentInput } from '../shared/contracts';
+import type { ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateTeamInput, MainToRendererEvent, SendPromptOptions, UpdateAgentInput } from '../shared/contracts';
 import { ipcChannels } from '../shared/ipc';
 
 const api: CodexClawApi = {
   getSnapshot: () => ipcRenderer.invoke(ipcChannels.getSnapshot),
   listCodexModels: () => ipcRenderer.invoke(ipcChannels.listCodexModels),
   chooseAgentFolder: () => ipcRenderer.invoke(ipcChannels.chooseAgentFolder),
+  createTeam: (input: CreateTeamInput) => ipcRenderer.invoke(ipcChannels.createTeam, input),
+  selectTeam: (teamId: string) => ipcRenderer.invoke(ipcChannels.selectTeam, teamId),
   createAgent: (input: CreateAgentInput) => ipcRenderer.invoke(ipcChannels.createAgent, input),
   updateAgent: (input: UpdateAgentInput) => ipcRenderer.invoke(ipcChannels.updateAgent, input),
   duplicateAgent: (agentId: string) => ipcRenderer.invoke(ipcChannels.duplicateAgent, agentId),
