@@ -206,7 +206,7 @@ function isVisibleAssistantBlock(block: MessageBlock) {
 }
 
 .chat-message--user .chat-message__stack {
-  background: var(--color-surface-base);
+  background: var(--color-shell-sidebar);
   border-radius: var(--radius-xl);
   border-bottom-right-radius: var(--radius-xs);
 }

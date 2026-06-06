@@ -161,7 +161,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   align-items: center;
   gap: var(--space-6);
   padding: var(--space-6) var(--space-4);
-  background: var(--color-surface);
+  background: var(--color-shell-rail);
   user-select: none;
 }
 
@@ -180,7 +180,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 .team-rail__team--active {
   color: var(--color-on-primary);
   box-shadow:
-    0 0 0 2px var(--color-surface),
+    0 0 0 2px var(--color-shell-rail),
     0 0 0 3px var(--color-primary);
 }
 
@@ -193,7 +193,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
   color: var(--color-text-muted);
-  background: var(--color-surface-lowest);
+  background: var(--color-surface-low);
   cursor: pointer;
 }
 

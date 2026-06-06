@@ -11,6 +11,22 @@ afterEach(() => {
 });
 
 describe('applyAppTheme', () => {
+  it('keeps light theme sidebars darker than the main chat surface', () => {
+    applyAppTheme({
+      id: 'codex-claw-light',
+      mode: 'light',
+      uiFontSize: 14,
+      chatFontSize: 15,
+      codeFontSize: 13,
+    });
+
+    const root = document.documentElement;
+    expect(root.dataset.effectiveAppearance).toBe('light');
+    expect(root.style.getPropertyValue('--color-shell-main')).toBe('var(--color-surface-lowest)');
+    expect(root.style.getPropertyValue('--color-shell-sidebar')).toBe('var(--color-surface-low)');
+    expect(root.style.getPropertyValue('--color-shell-rail')).toBe('color-mix(in srgb, var(--color-shell-sidebar) 97%, black)');
+  });
+
   it('applies theme color and font tokens to the document root', () => {
     applyAppTheme({
       id: 'github-dark',
@@ -28,6 +44,9 @@ describe('applyAppTheme', () => {
     expect(root.style.colorScheme).toBe('dark');
     expect(root.style.getPropertyValue('--color-surface-lowest')).toBe('#010409');
     expect(root.style.getPropertyValue('--color-text')).toBe('var(--color-on-surface)');
+    expect(root.style.getPropertyValue('--color-shell-main')).toBe('var(--color-surface-low)');
+    expect(root.style.getPropertyValue('--color-shell-sidebar')).toBe('var(--color-surface-lowest)');
+    expect(root.style.getPropertyValue('--color-shell-rail')).toBe('color-mix(in srgb, var(--color-shell-sidebar) 97%, white)');
     expect(root.style.getPropertyValue('--chat-font-size')).toBe('16px');
     expect(root.style.getPropertyValue('--code-font-size')).toBe('12px');
   });
@@ -46,7 +65,7 @@ describe('applyAppTheme', () => {
     expect(root.dataset.effectiveAppearance).toBe('dark');
     expect(root.dataset.theme).toBe('one-dark-pro');
     expect(root.classList.contains('dark')).toBe(true);
-    expect(root.style.getPropertyValue('--color-surface-lowest')).toBe('#1E2227');
+    expect(root.style.getPropertyValue('--color-surface-lowest')).toBe('#21252b');
   });
 
   it('resubscribes system theme changes without throwing when unavailable', () => {

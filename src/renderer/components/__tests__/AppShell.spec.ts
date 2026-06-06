@@ -340,7 +340,8 @@ describe('AppShell', () => {
 
     expect(wrapper.text()).toContain('59%');
     await wrapper.findAll('button').find((button) => button.text() === 'Settings')?.trigger('click');
-    expect(wrapper.text()).toContain('Configure Codex Claw.');
+    expect(wrapper.text()).toContain('Theme');
+    expect(wrapper.text()).toContain('Codex Claw Light');
 
     await wrapper.findAll('.el-menu-item').find((item) => item.text() === 'Appearance')?.trigger('click');
     await wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'github-dark');

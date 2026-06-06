@@ -1,8 +1,15 @@
 import { flushPromises, mount } from '@vue/test-utils';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import MessageList from '../../shared/chat/MessageList.vue';
 import ChatMessage from '../../shared/chat/ChatMessage.vue';
 import type { Message } from '../../shared/chat/types';
+
+const chatMessageSource = readFileSync(
+  join(process.cwd(), 'src/renderer/shared/chat/ChatMessage.vue'),
+  'utf8',
+);
 
 const messages: Message[] = [
   {
@@ -46,6 +53,13 @@ describe('MessageList', () => {
     expect(wrapper.text()).toContain('npm test');
     expect(wrapper.text()).toContain('vitest started');
     expect(wrapper.find('.chat-message__stream-dot').exists()).toBe(true);
+  });
+
+  it('matches user message bubble background to the sidebar surface token', () => {
+    expect(chatMessageSource).toContain(`
+.chat-message--user .chat-message__stack {
+  background: var(--color-shell-sidebar);
+`);
   });
 
   it('renders steered conversation markers between messages', () => {

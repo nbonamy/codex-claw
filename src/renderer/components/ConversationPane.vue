@@ -170,7 +170,7 @@ const heroSubhead = computed(() => {
   overflow: hidden;
   display: grid;
   grid-template-rows: minmax(0, 1fr);
-  background: var(--color-surface-lowest);
+  background: var(--color-shell-main);
 }
 
 .conversation-pane__layout {
@@ -181,7 +181,7 @@ const heroSubhead = computed(() => {
   --workbench-layout-footer-background: linear-gradient(
     to bottom,
     rgb(255 255 255 / 0%),
-    var(--color-surface-lowest) 24%
+    var(--color-shell-main) 24%
   );
   --workbench-layout-scrollbar-gutter: 8px;
 }
@@ -191,7 +191,7 @@ const heroSubhead = computed(() => {
   height: 100%;
   min-height: 0;
   overflow-y: auto;
-  background: var(--color-surface-lowest);
+  background: var(--color-shell-main);
   --message-list-content-width: var(--conversation-content-width);
   --message-list-content-padding-top: var(--space-12);
   --message-list-content-padding-bottom: calc(var(--workbench-layout-footer-offset) + var(--space-12));

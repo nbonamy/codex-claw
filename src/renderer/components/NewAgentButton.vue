@@ -170,9 +170,20 @@ function folderBasename(folder: string): string {
   height: 48px;
   border-top-right-radius: var(--radius-md) !important;
   border-bottom-right-radius: var(--radius-md) !important;
+  border-left-color: var(--color-background) !important;
+  border-right: none;
   font-size: var(--font-size-14);
   font-weight: var(--font-weight-semibold);
   padding: 0 var(--space-4);
+}
+
+.new-agent-button__primary:hover,
+.new-agent-button__primary:focus-visible,
+.new-agent-button__chevron:hover,
+.new-agent-button__chevron:focus-visible {
+  z-index: 0;
+  background: color-mix(in srgb, var(--color-primary) 80%, var(--color-background));
+  border-color: color-mix(in srgb, var(--color-primary) 80%, var(--color-background));
 }
 
 .new-agent-button__label {

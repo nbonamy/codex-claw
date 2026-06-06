@@ -3,6 +3,10 @@
     class="agent-empty-state"
     aria-label="No agents"
   >
+
+    <div class="agent-empty-state__drag">
+    </div>
+
     <div class="agent-empty-state__mark">
       <img
         :src="appIconUrl"
@@ -57,6 +61,14 @@ const bench = computed(() => props.bench ?? []);
   padding: var(--space-16);
   color: var(--color-text);
   background: var(--color-background);
+}
+
+.agent-empty-state__drag {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: 30vh;
+  -webkit-app-region: drag;
 }
 
 .agent-empty-state__mark {

@@ -76,6 +76,7 @@ const usageRemainingLabel = computed(() => {
 .settings-menu__trigger svg {
   width: var(--icon-xl);
   height: var(--icon-xl);
+  stroke-width: 1px;
 }
 
 .settings-menu__usage {
@@ -89,7 +90,7 @@ const usageRemainingLabel = computed(() => {
 
 .settings-menu__usage strong {
   color: var(--color-text);
-  font-weight: var(--font-weight-normal);
+  font-weight: var(--font-weight-regular);
 }
 
 </style>

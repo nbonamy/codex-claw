@@ -404,7 +404,7 @@ const activeTeamName = computed(() => activeTeam.value?.name ?? 'Codex Claw');
   min-height: 0;
   overflow: hidden;
   color: var(--color-text);
-  background: var(--color-background);
+  background: var(--color-shell-main);
 }
 
 .app-shell__team-rail {
@@ -449,7 +449,7 @@ const activeTeamName = computed(() => activeTeam.value?.name ?? 'Codex Claw');
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--color-surface-lowest);
+  background: var(--color-shell-main);
 }
 
 .app-shell__body {

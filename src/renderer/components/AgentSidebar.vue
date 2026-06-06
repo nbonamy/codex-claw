@@ -294,7 +294,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--color-surface-low);
+  background: var(--color-shell-sidebar);
   border-right: 1px solid var(--color-border);
   user-select: none;
 }

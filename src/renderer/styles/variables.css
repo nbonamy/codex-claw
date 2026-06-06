@@ -56,6 +56,9 @@
   --color-background: var(--color-surface);
   --color-border: var(--color-outline-variant);
   --color-border-strong: var(--color-outline);
+  --color-shell-main: var(--color-surface-lowest);
+  --color-shell-sidebar: var(--color-surface-low);
+  --color-shell-rail: var(--color-surface-low);
   --color-overlay: rgba(255, 255, 255, 0.78);
   --color-shine: rgba(255, 255, 255, 0.95);
 

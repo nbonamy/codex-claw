@@ -26,6 +26,20 @@ export function applyAppTheme(settings: AppThemeSettings): void {
   root.style.setProperty('--color-text-muted', 'var(--color-on-surface-variant)');
   root.style.setProperty('--color-border', 'var(--color-outline-variant)');
   root.style.setProperty('--color-border-strong', 'var(--color-outline)');
+  root.style.setProperty(
+    '--color-shell-main',
+    theme.appearance === 'dark' ? 'var(--color-surface-low)' : 'var(--color-surface-lowest)',
+  );
+  root.style.setProperty(
+    '--color-shell-sidebar',
+    theme.appearance === 'dark' ? 'var(--color-surface-lowest)' : 'var(--color-surface-low)',
+  );
+  root.style.setProperty(
+    '--color-shell-rail',
+    theme.appearance === 'dark'
+      ? 'color-mix(in srgb, var(--color-shell-sidebar) 97%, white)'
+      : 'color-mix(in srgb, var(--color-shell-sidebar) 97%, black)',
+  );
   root.style.setProperty('--app-ui-font-size', `${settings.uiFontSize}px`);
   root.style.setProperty('--chat-font-size', `${settings.chatFontSize}px`);
   root.style.setProperty('--code-font-size', `${settings.codeFontSize}px`);

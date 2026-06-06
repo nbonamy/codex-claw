@@ -96,7 +96,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import type { AppThemeSettings, UpdateSettingsInput } from '../../shared/contracts';
-import { appThemes } from '../theme/themes';
+import { appThemes, themeIdForAppearance } from '../theme/themes';
 
 const props = defineProps<{
   settings: AppThemeSettings;
@@ -153,7 +153,7 @@ function updateMode(mode: string | number): void {
   const currentTheme = themes.find((theme) => theme.id === props.settings.id);
   const nextThemeId = currentTheme?.appearance === mode
     ? currentTheme.id
-    : themes.find((theme) => theme.appearance === mode)?.id;
+    : themeIdForAppearance(props.settings.id, mode);
 
   updateTheme({
     mode,

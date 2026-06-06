@@ -1,7 +1,7 @@
 import type { AppSnapshot, AppThemeSettings, UpdateSettingsInput } from './contracts';
 
 export const defaultThemeSettings: AppThemeSettings = {
-  id: 'github-light',
+  id: 'codex-claw-light',
   mode: 'system',
   uiFontSize: 14,
   chatFontSize: 15,
