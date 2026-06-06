@@ -1,4 +1,4 @@
-import type { Agent, MainToRendererEvent } from '../../shared/contracts';
+import type { Agent, CodexSkillSummary, MainToRendererEvent } from '../../shared/contracts';
 
 export type JsonRpcId = number | string;
 
@@ -127,6 +127,36 @@ export type CodexModelListResponse = {
   nextCursor?: string | null;
 };
 
+export type CodexSkillsListResponse = {
+  data: CodexSkillsListEntry[];
+};
+
+export type CodexSkillsListEntry = {
+  cwd: string;
+  skills: CodexSkill[];
+  errors: Array<{
+    path: string;
+    message: string;
+  }>;
+};
+
+export type CodexSkill = {
+  name: string;
+  description: string;
+  shortDescription?: string;
+  interface?: {
+    displayName?: string;
+    shortDescription?: string;
+    iconSmall?: string;
+    iconLarge?: string;
+    brandColor?: string;
+    defaultPrompt?: string;
+  };
+  path: string;
+  scope: string;
+  enabled: boolean;
+};
+
 export type CodexModel = {
   id: string;
   model: string;
@@ -144,6 +174,7 @@ export type CodexReasoningEffortOption = {
 };
 
 export type CodexNotification =
+  | { method: 'skills/changed'; params: Record<string, never> }
   | { method: 'thread/started'; params: { thread: CodexThread } }
   | { method: 'thread/settings/updated'; params: { threadId: string; threadSettings: unknown } }
   | { method: 'thread/goal/updated'; params: { threadId: string; turnId: string | null; goal: CodexThreadGoal } }
@@ -172,6 +203,23 @@ export type CodexSessionPromptResult = {
   threadId: string;
   turnId: string;
 };
+
+export function codexSkillToSummary(skill: CodexSkill): CodexSkillSummary {
+  return {
+    name: skill.name,
+    description: skill.description,
+    ...(skill.shortDescription ? { shortDescription: skill.shortDescription } : {}),
+    ...(skill.interface?.displayName ? { displayName: skill.interface.displayName } : {}),
+    ...(skill.interface?.shortDescription ? { shortDescription: skill.interface.shortDescription } : {}),
+    ...(skill.interface?.iconSmall ? { iconSmall: skill.interface.iconSmall } : {}),
+    ...(skill.interface?.iconLarge ? { iconLarge: skill.interface.iconLarge } : {}),
+    ...(skill.interface?.brandColor ? { brandColor: skill.interface.brandColor } : {}),
+    ...(skill.interface?.defaultPrompt ? { defaultPrompt: skill.interface.defaultPrompt } : {}),
+    path: skill.path,
+    scope: skill.scope,
+    enabled: skill.enabled,
+  };
+}
 
 export type CodexAgentSessionInput = {
   agent: Agent;

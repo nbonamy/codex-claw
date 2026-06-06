@@ -864,6 +864,101 @@ describe('useAppState', () => {
     });
   });
 
+  it('loads active agent skills and includes slash-selected skills in prompt options', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const updatedSnapshot = createInitialSnapshot();
+    const listCodexSkills = vi.fn().mockResolvedValue([
+      {
+        name: 'frontend-design',
+        description: 'Design polished frontend pages and UI.',
+        path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
+        scope: 'project',
+        enabled: true,
+      },
+      {
+        name: 'skill-creator',
+        description: 'Create or update Codex skills.',
+        path: '/Users/nbonamy/.codex/skills/skill-creator/SKILL.md',
+        scope: 'user',
+        enabled: true,
+      },
+    ]);
+    const sendPrompt = vi.fn().mockResolvedValue(updatedSnapshot);
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        listCodexSkills,
+        sendPrompt,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    state.setPlanMode(false);
+    state.setGoalMode(false);
+
+    expect(state.skillCatalogStatus.value).toBe('loaded');
+    expect(listCodexSkills).toHaveBeenCalledWith('agent-dina');
+    expect(state.codexSkills.value.map((skill) => skill.name)).toStrictEqual([
+      'frontend-design',
+      'skill-creator',
+    ]);
+
+    await state.sendPrompt('/frontend-design make the dialog beautiful');
+
+    expect(sendPrompt).toHaveBeenCalledWith('agent-dina', '/frontend-design make the dialog beautiful', {
+      skills: [
+        {
+          name: 'frontend-design',
+          path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
+        },
+      ],
+    });
+  });
+
+  it('refreshes active agent skills after a skills changed event', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    const listCodexSkills = vi.fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          name: 'skill-creator',
+          description: 'Create or update Codex skills.',
+          path: '/Users/nbonamy/.codex/skills/skill-creator/SKILL.md',
+          scope: 'user',
+          enabled: true,
+        },
+      ]);
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        listCodexSkills,
+        onEvent: vi.fn((nextListener) => {
+          listeners.push(nextListener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    listeners[0]?.({
+      seq: 1,
+      type: 'skills.changed',
+      payload: {},
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    await vi.waitFor(() => {
+      expect(listCodexSkills).toHaveBeenCalledTimes(2);
+      expect(state.codexSkills.value.map((skill) => skill.name)).toStrictEqual(['skill-creator']);
+    });
+  });
+
   it('syncs composer modes from app-owned main events', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();

@@ -113,6 +113,42 @@ describe('agent chat service', () => {
       { model: 'gpt-5.1-codex', reasoningEffort: 'high' },
     );
   });
+
+  it('passes selected prompt skills to the session manager', () => {
+    const snapshot = createInitialSnapshot();
+    const sessionManager = {
+      sendPrompt: vi.fn().mockResolvedValue({ threadId: 'thread-1', turnId: 'turn-1' }),
+    } as unknown as CodexAgentSessionManager;
+
+    sendAgentPrompt(
+      snapshot,
+      sessionManager,
+      'agent-dina',
+      '/frontend-design polish the composer',
+      {
+        skills: [
+          {
+            name: 'frontend-design',
+            path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
+          },
+        ],
+      },
+      vi.fn(),
+    );
+
+    expect(sessionManager.sendPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-dina' }),
+      '/frontend-design polish the composer',
+      {
+        skills: [
+          {
+            name: 'frontend-design',
+            path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
+          },
+        ],
+      },
+    );
+  });
 });
 
 function deferred<T>() {

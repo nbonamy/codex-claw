@@ -188,6 +188,49 @@ describe('CodexAgentSessionManager', () => {
     });
   });
 
+  it('passes selected skills as app-server skill input items', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+
+    const prompt = manager.sendPrompt(agent, '/frontend-design polish the composer', {
+      skills: [
+        {
+          name: 'frontend-design',
+          path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
+        },
+      ],
+    });
+    await waitForSentCount(transport, 1);
+    transport.receive({ id: 1, result: { userAgent: 'codex', codexHome: '/tmp/codex-home', platformFamily: 'unix', platformOs: 'macos' } });
+    await waitForSentCount(transport, 3);
+    transport.receive({ id: 2, result: { thread: { id: 'thread-1', cwd: '/Users/nbonamy/src/codex-claw' } } });
+    await waitForSentCount(transport, 4);
+    transport.receive({ id: 3, result: { turn: { id: 'turn-1', status: 'running' } } });
+
+    await prompt;
+
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 3,
+      method: 'turn/start',
+      params: {
+        threadId: 'thread-1',
+        input: [
+          {
+            type: 'text',
+            text: '/frontend-design polish the composer',
+            text_elements: [],
+          },
+          {
+            type: 'skill',
+            name: 'frontend-design',
+            path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
+          },
+        ],
+        cwd: expandHome('~/src/codex-claw'),
+      },
+    });
+  });
+
   it('passes plan mode as a Codex collaboration mode override', async () => {
     const transport = new FakeTransport();
     const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
@@ -552,6 +595,79 @@ describe('CodexAgentSessionManager', () => {
       params: {
         cursor: null,
         includeHidden: false,
+      },
+    });
+  });
+
+  it('lists enabled skills for the agent cwd', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+
+    const skills = manager.listSkills(agent);
+    await waitForSentCount(transport, 1);
+    transport.receive({
+      id: 1,
+      result: {
+        userAgent: 'codex',
+        codexHome: '/tmp/codex-home',
+        platformFamily: 'unix',
+        platformOs: 'macos',
+      },
+    });
+    await waitForSentCount(transport, 3);
+    transport.receive({
+      id: 2,
+      result: {
+        data: [
+          {
+            cwd: expandHome('~/src/codex-claw'),
+            skills: [
+              {
+                name: 'frontend-design',
+                description: 'Design polished frontend pages and UI.',
+                interface: {
+                  displayName: 'Frontend Design',
+                  shortDescription: 'Polish UI',
+                  iconSmall: '/skills/frontend/icon.svg',
+                  defaultPrompt: 'Improve this UI.',
+                },
+                path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
+                scope: 'project',
+                enabled: true,
+              },
+              {
+                name: 'disabled-skill',
+                description: 'Hidden',
+                path: '/Users/nbonamy/.codex/skills/disabled/SKILL.md',
+                scope: 'user',
+                enabled: false,
+              },
+            ],
+            errors: [],
+          },
+        ],
+      },
+    });
+
+    await expect(skills).resolves.toStrictEqual([
+      {
+        name: 'frontend-design',
+        description: 'Design polished frontend pages and UI.',
+        displayName: 'Frontend Design',
+        shortDescription: 'Polish UI',
+        iconSmall: '/skills/frontend/icon.svg',
+        defaultPrompt: 'Improve this UI.',
+        path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
+        scope: 'project',
+        enabled: true,
+      },
+    ]);
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 2,
+      method: 'skills/list',
+      params: {
+        cwds: [expandHome('~/src/codex-claw')],
+        forceReload: false,
       },
     });
   });

@@ -31,7 +31,7 @@ import {
   updateAgentFolder,
 } from './snapshot-service';
 import { AppStatePersistence } from './state-persistence';
-import type { AppSnapshot, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
+import type { AppSnapshot, ClientRequestResponse, CodexSkillSummary, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
 import { ipcChannels } from '../shared/ipc';
 import { teamColors } from '../shared/team-colors';
 
@@ -72,6 +72,10 @@ export class AppController {
 
     ipcMain.handle(ipcChannels.listCodexModels, async () => {
       return (await this.getCodexSessionManager()).listModels();
+    });
+
+    ipcMain.handle(ipcChannels.listCodexSkills, async (_event, agentId: string) => {
+      return this.listCodexSkills(agentId);
     });
 
     ipcMain.handle(ipcChannels.chooseAgentFolder, async () => {
@@ -258,6 +262,15 @@ export class AppController {
     return sendAgentPrompt(this.snapshot, await this.getCodexSessionManager(), agentId, prompt, options, (event) => {
       this.emitAndApply(event);
     });
+  }
+
+  private async listCodexSkills(agentId: string): Promise<CodexSkillSummary[]> {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) {
+      throw new Error(`Agent not found: ${agentId}`);
+    }
+
+    return (await this.getCodexSessionManager()).listSkills(agent);
   }
 
   private async steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot> {

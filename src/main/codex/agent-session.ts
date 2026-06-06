@@ -1,6 +1,6 @@
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, AgentContextUsage, AgentStatus, AskUserAnswers, AskUserQuestion, ClientRequest, ClientRequestResponse, CodexModelOption, ConfirmToolRequest, MainToRendererEvent, SendPromptOptions, ToolConfirmationDecision } from '../../shared/contracts';
+import type { Agent, AgentContextUsage, AgentStatus, AskUserAnswers, AskUserQuestion, ClientRequest, ClientRequestResponse, CodexModelOption, CodexSkillSummary, ConfirmToolRequest, MainToRendererEvent, SendPromptOptions, ToolConfirmationDecision } from '../../shared/contracts';
 import { logMain, warnMain } from '../log';
 import { buildCodexClawThreadConfig } from '../mcp/codex-config';
 import type { CodexRpcClient, CodexServerRequest, CodexServerRequestResponder } from './rpc-client';
@@ -10,11 +10,15 @@ import {
   fileChangePatchToToolPartUpdate,
   mcpProgressToToolPartUpdate,
 } from './tool-part-adapter';
+import {
+  codexSkillToSummary,
+} from './protocol';
 import type {
   CodexNotification,
   CodexModelListResponse,
   CodexRawResponseItem,
   CodexRateLimitSnapshot,
+  CodexSkillsListResponse,
   CodexThread,
   CodexThreadGoal,
   CodexThreadStatus,
@@ -107,6 +111,23 @@ export class CodexAgentSessionManager {
     return models;
   }
 
+  async listSkills(agent: Agent, forceReload = false): Promise<CodexSkillSummary[]> {
+    await this.start();
+
+    const response = await this.client.request<CodexSkillsListResponse>('skills/list', {
+      cwds: [expandHome(agent.folder)],
+      forceReload,
+    });
+    const entry = response.data[0];
+    if (!entry) {
+      return [];
+    }
+
+    return entry.skills
+      .filter((skill) => skill.enabled)
+      .map(codexSkillToSummary);
+  }
+
   async sendPrompt(agent: Agent, prompt: string, options: SendPromptOptions = {}): Promise<CodexSessionPromptResult> {
     await this.start();
 
@@ -119,6 +140,11 @@ export class CodexAgentSessionManager {
           text: prompt,
           text_elements: [],
         },
+        ...(options.skills ?? []).map((skill) => ({
+          type: 'skill',
+          name: skill.name,
+          path: skill.path,
+        })),
       ],
       cwd: expandHome(agent.folder),
     };
@@ -276,6 +302,14 @@ export class CodexAgentSessionManager {
 
   private handleNotification(notification: CodexNotification): void {
     switch (notification.method) {
+      case 'skills/changed': {
+        this.emit({
+          type: 'skills.changed',
+          payload: {},
+        });
+        return;
+      }
+
       case 'thread/started': {
         const params = notification.params as { thread: CodexThread };
         const threadId = params.thread.id;

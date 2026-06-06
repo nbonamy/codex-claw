@@ -64,7 +64,9 @@
           :is-sending="isSending"
           :answered-client-request-ids="answeredClientRequestIds"
           :codex-models="codexModels"
+          :codex-skills="codexSkills"
           :model-catalog-status="modelCatalogStatus"
+          :skill-catalog-status="skillCatalogStatus"
           :goal-mode="goalMode"
           :plan-mode="planMode"
           :selected-model-id="selectedModelId"
@@ -110,7 +112,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { Agent, AppCommand, AppSnapshot, ClientRequestResponse, CodexModelOption, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, Team, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../shared/contracts';
+import type { Agent, AppCommand, AppSnapshot, ClientRequestResponse, CodexModelOption, CodexSkillSummary, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, Team, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../shared/contracts';
 import AgentDialog from './AgentDialog.vue';
 import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
@@ -130,7 +132,9 @@ const props = withDefaults(defineProps<{
   goalMode?: boolean;
   answeredClientRequestIds?: Set<string>;
   codexModels?: CodexModelOption[];
+  codexSkills?: CodexSkillSummary[];
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
+  skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
   planMode?: boolean;
@@ -145,7 +149,9 @@ const props = withDefaults(defineProps<{
 }>(), {
   answeredClientRequestIds: () => new Set<string>(),
   codexModels: () => [],
+  codexSkills: () => [],
   modelCatalogStatus: 'notLoaded',
+  skillCatalogStatus: 'notLoaded',
   selectedModelId: null,
   selectedReasoningEffort: null,
   queuedPrompts: () => [],

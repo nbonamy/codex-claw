@@ -1,0 +1,145 @@
+<template>
+  <div
+    class="chat-composer-skill-menu"
+    role="listbox"
+    aria-label="Skills"
+  >
+    <div class="chat-composer-skill-menu__section">
+      {{ t('chat.skills.title') }}
+    </div>
+    <button
+      v-for="(skill, index) in visibleSkills"
+      :key="skill.path"
+      class="chat-composer-skill-menu__item"
+      :class="{ 'chat-composer-skill-menu__item--active': index === activeIndex }"
+      role="option"
+      type="button"
+      @mousedown.prevent="$emit('select', skill)"
+    >
+      <span
+        class="chat-composer-skill-menu__icon"
+        aria-hidden="true"
+      >/</span>
+      <span class="chat-composer-skill-menu__main">
+        <span class="chat-composer-skill-menu__name">{{ skillDisplayName(skill) }}</span>
+        <span class="chat-composer-skill-menu__description">{{ skillDescription(skill) }}</span>
+      </span>
+    </button>
+    <div
+      v-if="visibleSkills.length === 0"
+      class="chat-composer-skill-menu__empty"
+    >
+      {{ t('chat.skills.empty') }}
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+import type { CodexSkillSummary } from '../../shared/contracts';
+import { skillDescription, skillDisplayName } from '../shared/chat/composer-skills';
+
+defineProps<{
+  activeIndex: number;
+  visibleSkills: CodexSkillSummary[];
+}>();
+
+defineEmits<{
+  select: [skill: CodexSkillSummary];
+}>();
+
+const { t } = useI18n();
+</script>
+
+<style scoped>
+.chat-composer-skill-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + var(--space-4));
+  left: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 280px;
+  overflow-y: auto;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-lowest);
+  box-shadow: var(--shadow-lg);
+}
+
+.chat-composer-skill-menu__section {
+  padding: var(--space-3) var(--space-4) var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  font-weight: var(--font-weight-medium);
+  line-height: normal;
+  text-transform: uppercase;
+}
+
+.chat-composer-skill-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.chat-composer-skill-menu__item:hover,
+.chat-composer-skill-menu__item--active {
+  background: var(--color-surface);
+}
+
+.chat-composer-skill-menu__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-md);
+  height: var(--icon-md);
+  flex: 0 0 var(--icon-md);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-base);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-15);
+  font-weight: var(--font-weight-semibold);
+}
+
+.chat-composer-skill-menu__main {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-1);
+}
+
+.chat-composer-skill-menu__name {
+  overflow: hidden;
+  font-weight: var(--font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-composer-skill-menu__description {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-composer-skill-menu__empty {
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  line-height: normal;
+}
+</style>

@@ -101,11 +101,31 @@ export type CodexModelOption = {
   isDefault: boolean;
 };
 
+export type CodexSkillSummary = {
+  name: string;
+  description: string;
+  shortDescription?: string;
+  displayName?: string;
+  iconSmall?: string;
+  iconLarge?: string;
+  brandColor?: string;
+  defaultPrompt?: string;
+  path: string;
+  scope: string;
+  enabled: boolean;
+};
+
+export type PromptSkillInput = {
+  name: string;
+  path: string;
+};
+
 export type SendPromptOptions = {
   goalMode?: boolean;
   model?: string | null;
   planMode?: boolean;
   reasoningEffort?: ReasoningEffort | null;
+  skills?: PromptSkillInput[];
 };
 
 export type UpdateSettingsInput = {
@@ -191,6 +211,7 @@ export type MainToRendererEvent = {
     | 'message.steer'
     | 'context.compactionStarted'
     | 'account.rateLimitsUpdated'
+    | 'skills.changed'
     | 'message.delta'
     | 'item.started'
     | 'item.updated'
@@ -299,6 +320,7 @@ export type ClientRequestResponse = {
 export type CodexClawApi = {
   getSnapshot(): Promise<AppSnapshot>;
   listCodexModels(): Promise<CodexModelOption[]>;
+  listCodexSkills(agentId: string): Promise<CodexSkillSummary[]>;
   chooseAgentFolder(): Promise<string | null>;
   createTeam(input: CreateTeamInput): Promise<AppSnapshot>;
   updateTeam(input: UpdateTeamInput): Promise<AppSnapshot>;

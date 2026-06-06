@@ -7,6 +7,10 @@ export const messages = {
         usedAndLeft: '{used}% used ({left}% left)',
         tokensUsed: '{used} / {window} tokens used',
       },
+      skills: {
+        empty: 'No matching skills',
+        title: 'Skills',
+      },
       tool: {
         fallback: {
           completed: 'Ran {name}',

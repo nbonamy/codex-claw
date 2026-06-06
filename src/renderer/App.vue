@@ -7,7 +7,9 @@
     :is-sending="isSending"
     :answered-client-request-ids="answeredClientRequestIds"
     :codex-models="codexModels"
+    :codex-skills="codexSkills"
     :model-catalog-status="modelCatalogStatus"
+    :skill-catalog-status="skillCatalogStatus"
     :goal-mode="goalMode"
     :plan-mode="planMode"
     :selected-model-id="selectedModelId"
@@ -58,6 +60,8 @@ const {
   answeredClientRequestIds,
   codexModels,
   modelCatalogStatus,
+  codexSkills,
+  skillCatalogStatus,
   selectedModelId,
   selectedReasoningEffort,
   planMode,

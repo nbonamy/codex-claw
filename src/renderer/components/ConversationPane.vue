@@ -28,7 +28,9 @@
           :is-sending="isSending"
           :placeholder="composerPlaceholder"
           :models="codexModels"
+          :skills="codexSkills"
           :model-catalog-status="modelCatalogStatus"
+          :skill-catalog-status="skillCatalogStatus"
           :goal-mode="goalMode"
           :plan-mode="planMode"
           :selected-model-id="selectedModelId"
@@ -69,7 +71,9 @@
         :is-sending="isSending"
         :placeholder="composerPlaceholder"
         :models="codexModels"
+        :skills="codexSkills"
         :model-catalog-status="modelCatalogStatus"
+        :skill-catalog-status="skillCatalogStatus"
         :goal-mode="goalMode"
         :plan-mode="planMode"
         :selected-model-id="selectedModelId"
@@ -88,7 +92,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Agent, ClientRequestResponse, CodexModelOption, ReasoningEffort, RendererMessage } from '../../shared/contracts';
+import type { Agent, ClientRequestResponse, CodexModelOption, CodexSkillSummary, ReasoningEffort, RendererMessage } from '../../shared/contracts';
 import WorkbenchLayout from './WorkbenchLayout.vue';
 import ChatComposer from './ChatComposer.vue';
 import ConversationHistoryLoader from './ConversationHistoryLoader.vue';
@@ -105,13 +109,17 @@ const props = withDefaults(defineProps<{
   isSending: boolean;
   answeredClientRequestIds?: Set<string>;
   codexModels?: CodexModelOption[];
+  codexSkills?: CodexSkillSummary[];
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
+  skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
   queuedPrompts?: QueuedChatPrompt[];
   planMode?: boolean;
 }>(), {
   queuedPrompts: () => [],
+  codexSkills: () => [],
+  skillCatalogStatus: 'notLoaded',
 });
 
 defineEmits<{

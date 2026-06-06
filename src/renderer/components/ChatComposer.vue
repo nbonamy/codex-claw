@@ -5,6 +5,13 @@
     aria-label="Prompt composer"
     @submit.prevent="submitPrompt"
   >
+    <ChatComposerSkillMenu
+      v-if="skillMenuVisible"
+      :active-index="activeSkillIndex"
+      :visible-skills="visibleSkills"
+      @select="selectSkill"
+    />
+
     <ChatComposerActionMenu
       :disabled="disabled"
       :goal-mode="goalMode"
@@ -22,8 +29,12 @@
       aria-label="Prompt"
       rows="1"
       :disabled="disabled && !isSending"
-      @input="resizeTextarea"
+      @blur="closeSkillMenuSoon"
+      @click="updateCaretPosition"
+      @input="handleTextareaInput"
       @keydown="handleTextareaKeydown"
+      @keyup="updateCaretPosition"
+      @select="updateCaretPosition"
     />
 
     <div class="chat-composer__meta">
@@ -62,12 +73,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue';
-import type { AgentContextUsage, CodexModelOption, ReasoningEffort } from '../../shared/contracts';
+import { computed, nextTick, ref, watch } from 'vue';
+import type { AgentContextUsage, CodexModelOption, CodexSkillSummary, ReasoningEffort } from '../../shared/contracts';
 import ChatComposerSendButton from '../shared/chat/ChatComposerSendButton.vue';
 import ChatComposerActionMenu from './ChatComposerActionMenu.vue';
 import ChatContextUsageIndicator from './ChatContextUsageIndicator.vue';
 import ChatModelReasoningSelector from './ChatModelReasoningSelector.vue';
+import ChatComposerSkillMenu from './ChatComposerSkillMenu.vue';
+import { filterComposerSkills, findActiveSkillSlash, type ActiveSkillSlash } from '../shared/chat/composer-skills';
 
 const props = defineProps<{
   contextUsage?: AgentContextUsage;
@@ -80,6 +93,8 @@ const props = defineProps<{
   planMode?: boolean;
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
+  skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
+  skills?: CodexSkillSummary[];
 }>();
 
 const emit = defineEmits<{
@@ -94,6 +109,9 @@ const emit = defineEmits<{
 
 const prompt = ref('');
 const textareaEl = ref<HTMLTextAreaElement | null>(null);
+const caretPosition = ref(0);
+const skillMenuOpen = ref(false);
+const activeSkillIndex = ref(0);
 
 const hasPrompt = computed(() => Boolean(prompt.value.trim()));
 const canSend = computed(() => Boolean(hasPrompt.value && !props.disabled));
@@ -103,6 +121,18 @@ const activeModes = computed(() => [
   ...(props.planMode ? ['Plan'] : []),
   ...(props.goalMode ? ['Goal'] : []),
 ]);
+const activeSkillSlash = computed<ActiveSkillSlash | null>(() => findActiveSkillSlash(prompt.value, caretPosition.value));
+const visibleSkills = computed(() => filterComposerSkills(props.skills ?? [], activeSkillSlash.value?.query ?? ''));
+const skillMenuVisible = computed(() => (
+  skillMenuOpen.value &&
+  activeSkillSlash.value !== null &&
+  (props.skills ?? []).length > 0 &&
+  !(props.disabled && !props.isSending)
+));
+
+watch([visibleSkills, activeSkillSlash], () => {
+  activeSkillIndex.value = 0;
+});
 
 function submitPrompt(): void {
   submitWithIntent('send');
@@ -119,6 +149,7 @@ function submitWithIntent(intent: 'send' | 'steer'): void {
   }
 
   prompt.value = '';
+  closeSkillMenu();
   if (intent === 'send') {
     emit('send', trimmed);
   } else {
@@ -128,6 +159,32 @@ function submitWithIntent(intent: 'send' | 'steer'): void {
 }
 
 function handleTextareaKeydown(event: KeyboardEvent): void {
+  if (skillMenuVisible.value) {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const count = visibleSkills.value.length;
+      if (count > 0) {
+        activeSkillIndex.value = (activeSkillIndex.value + (event.key === 'ArrowDown' ? 1 : -1) + count) % count;
+      }
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeSkillMenu();
+      return;
+    }
+
+    if (event.key === 'Enter' && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey && visibleSkills.value.length > 0) {
+      event.preventDefault();
+      const skill = visibleSkills.value[activeSkillIndex.value];
+      if (skill) {
+        selectSkill(skill);
+      }
+      return;
+    }
+  }
+
   if (event.key === 'Tab' && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
     event.preventDefault();
     emit('update:planMode', !props.planMode);
@@ -152,6 +209,47 @@ function handleTextareaKeydown(event: KeyboardEvent): void {
   if (!event.metaKey && !event.ctrlKey && !event.altKey) {
     submitPrompt();
   }
+}
+
+function handleTextareaInput(): void {
+  updateCaretPosition();
+  resizeTextarea();
+  skillMenuOpen.value = activeSkillSlash.value !== null;
+}
+
+function selectSkill(skill: CodexSkillSummary): void {
+  const slash = activeSkillSlash.value;
+  const textarea = textareaEl.value;
+  if (!slash || !textarea) {
+    return;
+  }
+
+  const nextText = `${prompt.value.slice(0, slash.start)}/${skill.name} ${prompt.value.slice(slash.end)}`;
+  const nextCaret = slash.start + skill.name.length + 2;
+  prompt.value = nextText;
+  caretPosition.value = nextCaret;
+  closeSkillMenu();
+  void nextTick(() => {
+    textarea.focus();
+    textarea.setSelectionRange(nextCaret, nextCaret);
+    resizeTextarea();
+  });
+}
+
+function updateCaretPosition(): void {
+  const textarea = textareaEl.value;
+  caretPosition.value = textarea?.selectionEnd ?? prompt.value.length;
+  if (activeSkillSlash.value !== null) {
+    skillMenuOpen.value = true;
+  }
+}
+
+function closeSkillMenuSoon(): void {
+  window.setTimeout(closeSkillMenu, 120);
+}
+
+function closeSkillMenu(): void {
+  skillMenuOpen.value = false;
 }
 
 function resizeTextarea(): void {

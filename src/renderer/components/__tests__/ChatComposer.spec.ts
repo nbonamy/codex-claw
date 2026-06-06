@@ -3,7 +3,7 @@ import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import ChatComposer from '../ChatComposer.vue';
 import { i18n } from '../../i18n';
-import type { AgentContextUsage, CodexModelOption } from '../../../shared/contracts';
+import type { AgentContextUsage, CodexModelOption, CodexSkillSummary } from '../../../shared/contracts';
 
 type ChatComposerProps = {
   disabled: boolean;
@@ -24,6 +24,25 @@ const models: CodexModelOption[] = [
     ],
     defaultReasoningEffort: 'high',
     isDefault: true,
+  },
+];
+
+const skills: CodexSkillSummary[] = [
+  {
+    name: 'frontend-design',
+    displayName: 'Frontend Design',
+    description: 'Design polished frontend pages and UI.',
+    shortDescription: 'Design polished UI.',
+    path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
+    scope: 'project',
+    enabled: true,
+  },
+  {
+    name: 'skill-creator',
+    description: 'Create or update Codex skills.',
+    path: '/Users/nbonamy/.codex/skills/skill-creator/SKILL.md',
+    scope: 'user',
+    enabled: true,
   },
 ];
 
@@ -139,6 +158,32 @@ describe('ChatComposer', () => {
     expect(wrapper.find('.chat-context-usage').attributes('title')).toBeUndefined();
     expect(wrapper.find('.chat-context-usage__popover').text()).toContain('25% used (75% left)');
   });
+
+  it('opens a slash skill menu, filters skills, and inserts the selected skill', async () => {
+    const wrapper = mountComposer({ skills });
+
+    await wrapper.get('textarea').setValue('/front');
+    await wrapper.get('textarea').trigger('keyup');
+
+    expect(wrapper.find('.chat-composer-skill-menu').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Frontend Design');
+    expect(wrapper.text()).not.toContain('skill-creator');
+
+    await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
+
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('/frontend-design ');
+  });
+
+  it('navigates slash skills with arrow keys and inserts with enter', async () => {
+    const wrapper = mountComposer({ skills });
+
+    await wrapper.get('textarea').setValue('/');
+    await wrapper.get('textarea').trigger('keyup');
+    await wrapper.get('textarea').trigger('keydown', { key: 'ArrowDown' });
+    await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
+
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('/skill-creator ');
+  });
 });
 
 function mountComposer(overrides: Partial<ChatComposerProps & {
@@ -148,6 +193,7 @@ function mountComposer(overrides: Partial<ChatComposerProps & {
   planMode: boolean;
   selectedModelId: string;
   selectedReasoningEffort: string;
+  skills: CodexSkillSummary[];
 }> = {}) {
   return mount(ChatComposer, {
     props: {

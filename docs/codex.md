@@ -104,6 +104,7 @@ Important requests for the first product:
 - `turn/steer`
 - `turn/interrupt`
 - `model/list`
+- `skills/list`
 
 The main process should expose these through app-level services such as
 `AgentSessionManager`, not directly through renderer IPC.
@@ -123,6 +124,42 @@ effort, and prompt IPC sends `{ model, reasoningEffort }` back to main.
 `turn/start` accepts `model` and `effort` overrides for the current turn and
 subsequent turns, so Codex Claw applies the current picker selection on every
 prompt without requiring a new thread.
+
+## Skills
+
+Codex app-server v2 exposes available skills through `skills/list`.
+Codex Claw treats skills as agent-folder scoped because each agent has its own
+cwd:
+
+```json
+{
+  "method": "skills/list",
+  "params": {
+    "cwds": ["/absolute/agent/folder"],
+    "forceReload": false
+  }
+}
+```
+
+Main adapts the response into `CodexSkillSummary[]` and exposes that through
+typed IPC. The renderer uses this app-owned shape for the composer slash menu;
+it does not import generated app-server skill types.
+
+When a prompt contains `/skill-name`, renderer state resolves the mention
+against the active skill catalog and sends `SendPromptOptions.skills` to main.
+Main then appends Codex `UserInput` skill items to `turn/start`, alongside the
+normal text input:
+
+```json
+[
+  { "type": "text", "text": "/skill-name do the thing", "text_elements": [] },
+  { "type": "skill", "name": "skill-name", "path": "/.../SKILL.md" }
+]
+```
+
+This is preferred over relying on Codex to infer the skill from text alone.
+`skills/changed` is an invalidation notification; main emits app-owned
+`skills.changed`, and the renderer refreshes the active agent's catalog.
 
 ## MCP Enablement
 
@@ -161,6 +198,7 @@ Handled notifications:
 - `thread/goal/updated`
 - `thread/goal/cleared`
 - `thread/tokenUsage/updated`
+- `skills/changed`
 - `thread/status/changed`
 - `turn/started`
 - `turn/plan/updated`
@@ -210,7 +248,6 @@ Thread lifecycle notifications that can wait until thread/history management:
 - `thread/archived`
 - `thread/unarchived`
 - `thread/closed`
-- `skills/changed`
 
 Low-priority protocol surfaces for the current Claw MVP:
 
