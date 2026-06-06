@@ -1,5 +1,5 @@
 <template>
-  <div class="message-list" ref="el" @scroll="updateStickiness">
+  <div class="message-list" ref="el" @scroll="updateStickiness($event)">
     <div class="message-list__content">
       <ChatMessage
         v-for="(msg, index) in messages"
@@ -70,12 +70,8 @@ function scrollToBottom() {
   stickToBottom.value = true
 }
 
-function updateStickiness() {
-  if (!el.value) {
-    return
-  }
-
-  stickToBottom.value = isAtBottom(el.value)
+function updateStickiness(event: Event) {
+  stickToBottom.value = isAtBottom(event.currentTarget as HTMLElement)
 }
 
 onMounted(async () => {

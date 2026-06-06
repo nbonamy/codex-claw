@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import MessageList from '../../shared/chat/MessageList.vue';
+import ChatMessage from '../../shared/chat/ChatMessage.vue';
 import type { Message } from '../../shared/chat/types';
 
 const messages: Message[] = [
@@ -45,6 +46,40 @@ describe('MessageList', () => {
     expect(wrapper.text()).toContain('npm test');
     expect(wrapper.text()).toContain('vitest started');
     expect(wrapper.find('.chat-message__stream-dot').exists()).toBe(true);
+  });
+
+  it('forwards message action events from chat messages', async () => {
+    const wrapper = mount(MessageList, {
+      props: {
+        messages,
+      },
+    });
+    const chatMessage = wrapper.getComponent(ChatMessage);
+    const clientResponse = { id: 'approval-1', payload: { decision: 'allow' } };
+    const editPayload = { content: 'Updated prompt', index: 0 };
+
+    chatMessage.vm.$emit('cancel');
+    chatMessage.vm.$emit('client-response', clientResponse);
+    chatMessage.vm.$emit('copy-message', 0);
+    chatMessage.vm.$emit('delete-message', 0);
+    chatMessage.vm.$emit('edit-message', editPayload);
+    chatMessage.vm.$emit('quote-message', 0);
+    chatMessage.vm.$emit('review-file', '/tmp/app.ts');
+    chatMessage.vm.$emit('retry-message', 1);
+    chatMessage.vm.$emit('send-follow-up', 'Open the failing file');
+    chatMessage.vm.$emit('undo-change-set', 'change-set-1');
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.emitted('cancel')).toStrictEqual([[]]);
+    expect(wrapper.emitted('client-response')).toStrictEqual([[clientResponse]]);
+    expect(wrapper.emitted('copy-message')).toStrictEqual([[0]]);
+    expect(wrapper.emitted('delete-message')).toStrictEqual([[0]]);
+    expect(wrapper.emitted('edit-message')).toStrictEqual([[editPayload]]);
+    expect(wrapper.emitted('quote-message')).toStrictEqual([[0]]);
+    expect(wrapper.emitted('review-file')).toStrictEqual([['/tmp/app.ts']]);
+    expect(wrapper.emitted('retry-message')).toStrictEqual([[1]]);
+    expect(wrapper.emitted('send-follow-up')).toStrictEqual([['Open the failing file']]);
+    expect(wrapper.emitted('undo-change-set')).toStrictEqual([['change-set-1']]);
   });
 
   it('keeps the transcript stuck to the bottom when messages are appended', async () => {
