@@ -179,10 +179,6 @@ const heroSubhead = computed(() => {
   margin-bottom: var(--space-8);
 }
 
-.conversation-pane__queued-prompts {
-  width: min(calc(100% - var(--space-16) * 2), var(--conversation-content-width));
-}
-
 .conversation-pane__hero {
   display: flex;
   flex-direction: column;

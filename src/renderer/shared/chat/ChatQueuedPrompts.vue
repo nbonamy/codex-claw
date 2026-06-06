@@ -17,6 +17,7 @@
           @click="emit('steer', prompt.id)"
         >
           <BoltIcon aria-hidden="true" />
+          <span>Steer</span>
         </button>
         <button
           class="chat-queued-prompt__action"
@@ -50,7 +51,7 @@ const emit = defineEmits<{
 <style scoped>
 
 .chat-queued-prompts {
-  width: 90%;
+  width: 80%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -99,7 +100,7 @@ const emit = defineEmits<{
 }
 
 .chat-queued-prompt__action {
-  width: var(--space-12);
+  width: auto;
   height: var(--space-12);
   display: inline-flex;
   align-items: center;
@@ -108,6 +109,8 @@ const emit = defineEmits<{
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  gap: var(--space-2);
   cursor: pointer;
 }
 
