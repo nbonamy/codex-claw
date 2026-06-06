@@ -115,6 +115,7 @@ export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentIn
 export function appendUserPrompt(snapshot: AppSnapshot, agentId: string, prompt: string, createdAt = new Date().toISOString()): RendererMessage {
   const message = createUserMessage(agentId, prompt, createdAt);
   snapshot.messages.push(message);
+  pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
 
   return message;
 }
@@ -136,6 +137,7 @@ export function appendSteerPrompt(
   const message = createUserMessage(agentId, prompt, createdAt, `steer-${turnId}`, turnId);
   snapshot.messages.push(message);
   ensureAssistantMessage(snapshot, agentId, turnId, assistantSegmentMessageId(turnId, createdAt), createdAt);
+  pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
 
   return message;
 }
@@ -151,6 +153,7 @@ export function appendSystemMessage(snapshot: AppSnapshot, agentId: string, text
   };
 
   snapshot.messages.push(message);
+  pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
 
   return message;
 }
@@ -259,6 +262,7 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   if (event.type === 'turn.started') {
     if (event.turnId) {
       ensureAssistantMessage(snapshot, event.agentId, event.turnId);
+      pruneSupersededEmptyAssistantPlaceholders(snapshot, event.agentId);
     }
     setAgentStatus(snapshot, event.agentId, { type: 'working' });
     return;
@@ -649,10 +653,12 @@ function hydrateAgentMessages(
   const firstAgentMessageIndex = snapshot.messages.findIndex((message) => message.agentId === agentId);
   if (firstAgentMessageIndex === -1) {
     snapshot.messages.push(...messages);
+    pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
     return;
   }
 
   snapshot.messages.splice(firstAgentMessageIndex, 0, ...messages);
+  pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
 }
 
 function rendererToolPartUpdate(value: unknown): RendererToolPartUpdate | null {
@@ -732,10 +738,12 @@ function upsertAssistantToolPart(snapshot: AppSnapshot, agentId: string, turnId:
         ...(toolPart.metadata ?? {}),
       },
     };
+    pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
     return;
   }
 
   message.parts.push(toolPart);
+  pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
 }
 
 function applyApprovalRequest(snapshot: AppSnapshot, agentId: string, turnId: string, payload: unknown): void {
@@ -899,6 +907,9 @@ function parseJsonPreview(preview: string): unknown {
 
 function appendAssistantDelta(snapshot: AppSnapshot, agentId: string, turnId: string, delta: string, itemId?: string): void {
   const message = ensureAssistantMessage(snapshot, agentId, turnId);
+  if (message.status !== 'complete') {
+    message.status = 'streaming';
+  }
 
   const textPart = message.parts.at(-1);
   if (textPart?.type === 'text' && textPart.itemId === itemId) {
@@ -906,6 +917,7 @@ function appendAssistantDelta(snapshot: AppSnapshot, agentId: string, turnId: st
   } else {
     message.parts.push(itemId ? { type: 'text', text: delta, itemId } : { type: 'text', text: delta });
   }
+  pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
 }
 
 function appendCompactionMarker(snapshot: AppSnapshot, agentId: string, turnId: string, createdAt: string): RendererMessage {
@@ -928,13 +940,13 @@ function appendCompactionMarker(snapshot: AppSnapshot, agentId: string, turnId: 
     agentId,
     kind: 'compaction',
     role: 'assistant',
-    status: 'complete',
+    status: 'streaming',
     turnId,
     createdAt,
     parts: [],
   };
   snapshot.messages.push(message);
-  ensureAssistantMessage(snapshot, agentId, turnId, assistantSegmentMessageId(turnId, createdAt), createdAt);
+  pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
 
   return message;
 }
@@ -946,21 +958,30 @@ function ensureAssistantMessage(
   messageId = assistantMessageId(turnId),
   createdAt = new Date().toISOString(),
 ): RendererMessage {
+  let effectiveMessageId = messageId;
+  let effectiveCreatedAt = createdAt;
+  const compactionMessage = messageId === assistantMessageId(turnId)
+    ? findCompactionMessages(snapshot, agentId, turnId).at(-1)
+    : undefined;
   const message = messageId === assistantMessageId(turnId)
-    ? findAssistantMessage(snapshot, agentId, turnId)
+    ? findAssistantMessageForAppend(snapshot, agentId, turnId)
     : snapshot.messages.find((candidate) => candidate.id === messageId && candidate.agentId === agentId);
 
   if (message) {
     return message;
   }
+  if (compactionMessage) {
+    effectiveMessageId = assistantSegmentMessageId(turnId, compactionMessage.createdAt);
+    effectiveCreatedAt = compactionMessage.createdAt;
+  }
 
   const nextMessage: RendererMessage = {
-    id: messageId,
+    id: effectiveMessageId,
     agentId,
     role: 'assistant',
     status: 'streaming',
     turnId,
-    createdAt,
+    createdAt: effectiveCreatedAt,
     parts: [],
   };
   snapshot.messages.push(nextMessage);
@@ -971,14 +992,53 @@ function completeAssistantMessage(snapshot: AppSnapshot, agentId: string, turnId
   for (const message of findAssistantMessages(snapshot, agentId, turnId)) {
     message.status = 'complete';
   }
+  for (const message of findCompactionMessages(snapshot, agentId, turnId)) {
+    message.status = 'complete';
+  }
 
-  const baseId = assistantMessageId(turnId);
   snapshot.messages = snapshot.messages.filter((message) => (
     message.agentId !== agentId ||
-    message.role !== 'assistant' ||
-    message.parts.length > 0 ||
-    !message.id.startsWith(`${baseId}-segment-`)
+    !isAssistantTurnMessage(message, agentId, turnId) ||
+    message.parts.length > 0
   ));
+  pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
+}
+
+function pruneSupersededEmptyAssistantPlaceholders(snapshot: AppSnapshot, agentId: string): void {
+  let lastAgentMessageIndex = -1;
+  for (let index = snapshot.messages.length - 1; index >= 0; index -= 1) {
+    if (snapshot.messages[index]?.agentId === agentId) {
+      lastAgentMessageIndex = index;
+      break;
+    }
+  }
+
+  if (lastAgentMessageIndex === -1) {
+    return;
+  }
+
+  snapshot.messages = snapshot.messages.filter((message, index) => (
+    message.agentId !== agentId ||
+    index === lastAgentMessageIndex ||
+    !isPlainEmptyAssistantPlaceholder(message)
+  ));
+}
+
+function isPlainEmptyAssistantPlaceholder(message: RendererMessage): boolean {
+  return message.role === 'assistant' && message.kind === undefined && message.parts.length === 0;
+}
+
+function findAssistantMessageForAppend(snapshot: AppSnapshot, agentId: string, turnId: string): RendererMessage | undefined {
+  const compactionMessage = findCompactionMessages(snapshot, agentId, turnId).at(-1);
+  if (!compactionMessage) {
+    return findAssistantMessage(snapshot, agentId, turnId);
+  }
+
+  const compactionIndex = snapshot.messages.indexOf(compactionMessage);
+  return snapshot.messages
+    .slice(compactionIndex + 1)
+    .filter((message) => isAssistantTurnMessage(message, agentId, turnId))
+    .at(-1);
 }
 
 function findAssistantMessage(snapshot: AppSnapshot, agentId: string, turnId: string): RendererMessage | undefined {
@@ -986,11 +1046,23 @@ function findAssistantMessage(snapshot: AppSnapshot, agentId: string, turnId: st
 }
 
 function findAssistantMessages(snapshot: AppSnapshot, agentId: string, turnId: string): RendererMessage[] {
+  return snapshot.messages.filter((message) => isAssistantTurnMessage(message, agentId, turnId));
+}
+
+function isAssistantTurnMessage(message: RendererMessage, agentId: string, turnId: string): boolean {
   const baseId = assistantMessageId(turnId);
-  return snapshot.messages.filter((message) => (
+  return (
     message.agentId === agentId &&
     message.role === 'assistant' &&
     (message.id === baseId || message.id.startsWith(`${baseId}-segment-`))
+  );
+}
+
+function findCompactionMessages(snapshot: AppSnapshot, agentId: string, turnId: string): RendererMessage[] {
+  return snapshot.messages.filter((message) => (
+    message.agentId === agentId &&
+    message.kind === 'compaction' &&
+    message.turnId === turnId
   ));
 }
 

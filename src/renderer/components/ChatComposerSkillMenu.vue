@@ -131,6 +131,7 @@ watch(
 
 .chat-composer-skill-menu__main {
   display: flex;
+  align-items: center;
   min-width: 0;
   gap: var(--space-4);
 }

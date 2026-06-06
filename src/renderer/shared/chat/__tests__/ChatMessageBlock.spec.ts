@@ -279,17 +279,34 @@ describe('ChatMessageBlock', () => {
 });
 
 describe('ChatMessage', () => {
-  it('renders compaction messages', () => {
+  it('renders running compaction messages with shimmer copy', () => {
     const wrapper = mount(ChatMessage, {
       props: {
-        message: { role: 'assistant', content: '', type: 'compaction' },
+        message: { role: 'assistant', content: '', compactionStatus: 'running', type: 'compaction' },
       },
       global: {
         plugins: [i18n],
       },
     });
 
-    expect(wrapper.text()).toContain('Automatically compacting context');
+    expect(wrapper.text()).toContain('Compacting context');
+    expect(wrapper.get('.chat-message__compaction-title').classes()).not.toContain('text-shimmer');
+    expect(wrapper.get('.chat-message__compaction-label').classes()).toContain('text-shimmer');
+    expect(wrapper.find('.chat-message__thinking').exists()).toBe(false);
+  });
+
+  it('renders completed compaction messages without the running shimmer', () => {
+    const wrapper = mount(ChatMessage, {
+      props: {
+        message: { role: 'assistant', content: '', compactionStatus: 'completed', type: 'compaction' },
+      },
+      global: {
+        plugins: [i18n],
+      },
+    });
+
+    expect(wrapper.text()).toContain('Context compacted');
+    expect(wrapper.get('.chat-message__compaction-label').classes()).not.toContain('text-shimmer');
   });
 
   it('renders thinking for empty streaming assistant messages', () => {

@@ -575,7 +575,9 @@ describe('ported id8 chat components', () => {
     });
 
     expect(completed.text()).toContain('Ran npm test');
+    expect(completed.find('.chat-fold--open').exists()).toBe(false);
     await completed.get('.chat-tool-group__header').trigger('click');
+    expect(completed.find('.chat-fold--open').exists()).toBe(true);
     expect(completed.text()).toContain('Input');
 
     const empty = mount(ChatToolGroup, {

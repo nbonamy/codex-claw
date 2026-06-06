@@ -168,6 +168,17 @@ export type BackendSkillSummary = {
   providerMetadata?: Record<string, unknown>;
 };
 
+export type BackendCommandSummary = {
+  id: string;
+  backend: AgentBackend;
+  name: string;
+  displayName?: string;
+  description?: string;
+  slashName?: string;
+  submitOnSelect?: boolean;
+  providerMetadata?: Record<string, unknown>;
+};
+
 export type AgentFileSearchItem = {
   name: string;
   path: string;

@@ -1,8 +1,9 @@
 import { computed, ref } from 'vue';
-import type { AgentFileSearchItem, AppSnapshot, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
+import type { AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
 import { updateSettingsInSnapshot } from '../shared/settings';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '../shared/snapshot';
 import { defaultBackendCapabilities } from '../shared/backend-capabilities';
+import { defaultBackendCommands } from '../shared/backend-commands';
 import { createQueuedChatPrompt, type QueuedChatPrompt } from './shared/chat/queued-prompts';
 import { promptSkillInputsFromText } from './shared/chat/composer-skills';
 
@@ -34,6 +35,7 @@ export function useAppState() {
   });
 
   const activeBackendCapabilities = computed(() => defaultBackendCapabilities(activeAgent.value?.backend ?? 'codex'));
+  const activeBackendCommands = computed<BackendCommandSummary[]>(() => defaultBackendCommands(activeAgent.value?.backend ?? 'codex'));
 
   const visibleMessages = computed(() => {
     const agentId = activeAgent.value?.id;
@@ -413,6 +415,7 @@ export function useAppState() {
     isSending,
     answeredClientRequestIds,
     backendModels,
+    activeBackendCommands,
     activeBackendCapabilities,
     modelCatalogStatus,
     modelCatalogError,

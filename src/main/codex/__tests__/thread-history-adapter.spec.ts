@@ -202,4 +202,63 @@ describe('codexThreadHistoryToRendererMessages', () => {
       },
     ]);
   });
+
+  it('hydrates completed review output as assistant text instead of hidden tool output', () => {
+    const thread: CodexThread = {
+      id: 'thread-review',
+      cwd: '/Users/nbonamy/src/codex-claw',
+      turns: [
+        {
+          id: 'turn-review',
+          status: 'completed',
+          startedAt: 1_780_000_000,
+          completedAt: 1_780_000_010,
+          items: [
+            {
+              type: 'userMessage',
+              id: 'user-review',
+              content: [
+                {
+                  type: 'text',
+                  text: 'current changes',
+                  text_elements: [],
+                },
+              ],
+            },
+            {
+              type: 'enteredReviewMode',
+              id: 'review-1',
+              review: 'current changes',
+            },
+            {
+              type: 'exitedReviewMode',
+              id: 'review-1',
+              review: 'Found one issue.',
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(codexThreadHistoryToRendererMessages(thread, 'agent-dina')).toStrictEqual([
+      {
+        id: 'user-thread-review-turn-review-user-review',
+        agentId: 'agent-dina',
+        role: 'user',
+        status: 'complete',
+        turnId: 'turn-review',
+        createdAt: '2026-05-28T20:26:40.000Z',
+        parts: [{ type: 'text', text: 'current changes' }],
+      },
+      {
+        id: 'assistant-turn-review',
+        agentId: 'agent-dina',
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'turn-review',
+        createdAt: '2026-05-28T20:26:40.000Z',
+        parts: [{ type: 'text', text: 'Found one issue.', itemId: 'review-1' }],
+      },
+    ]);
+  });
 });

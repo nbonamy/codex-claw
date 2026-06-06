@@ -43,6 +43,7 @@ export type MessageSuggestedPrompt = {
 };
 
 export type Message = {
+  compactionStatus?: 'completed' | 'running';
   role: 'user' | 'assistant';
   content: string;
   createdAt?: string;

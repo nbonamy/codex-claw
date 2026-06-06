@@ -29,6 +29,7 @@ export function rendererMessageToChatMessage(message: RendererMessage): Message 
     role: message.role === 'user' ? 'user' : 'assistant',
     streaming: message.status === 'streaming',
     toolCalls,
+    ...(message.kind === 'compaction' ? { compactionStatus: message.status === 'streaming' ? 'running' : 'completed' } : {}),
     type: message.kind === 'compaction' ? 'compaction' : message.kind === 'steer' ? 'steer' : 'text',
   };
 }

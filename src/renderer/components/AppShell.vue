@@ -65,6 +65,7 @@
           :is-sending="isSending"
           :answered-client-request-ids="answeredClientRequestIds"
           :backend-models="backendModels"
+          :backend-commands="backendCommands"
           :backend-skills="backendSkills"
           :backend-capabilities="backendCapabilities"
           :model-catalog-status="modelCatalogStatus"
@@ -120,7 +121,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { Agent, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, Team, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../shared/contracts';
+import type { Agent, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, Team, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../shared/contracts';
 import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import AgentDialog from './AgentDialog.vue';
 import AgentEmptyState from './AgentEmptyState.vue';
@@ -143,6 +144,7 @@ const props = withDefaults(defineProps<{
   goalMode?: boolean;
   answeredClientRequestIds?: Set<string>;
   backendModels?: BackendModelOption[];
+  backendCommands?: BackendCommandSummary[];
   backendSkills?: BackendSkillSummary[];
   backendCapabilities?: BackendCapabilities;
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
@@ -162,6 +164,7 @@ const props = withDefaults(defineProps<{
   answeredClientRequestIds: () => new Set<string>(),
   agentFiles: () => [],
   backendModels: () => [],
+  backendCommands: () => [],
   backendSkills: () => [],
   backendCapabilities: () => defaultBackendCapabilities('codex'),
   modelCatalogStatus: 'notLoaded',

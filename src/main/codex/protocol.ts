@@ -106,6 +106,8 @@ export type ThreadRollbackResponse = {
   thread: CodexThread;
 };
 
+export type ThreadCompactStartResponse = Record<string, never>;
+
 export type TurnStartResponse = {
   turn: CodexTurn;
 };
@@ -115,6 +117,17 @@ export type TurnSteerResponse = {
 };
 
 export type TurnInterruptResponse = Record<string, never>;
+
+export type CodexReviewTarget =
+  | { type: 'uncommittedChanges' }
+  | { type: 'baseBranch'; branch: string }
+  | { type: 'commit'; sha: string; title: string | null }
+  | { type: 'custom'; instructions: string };
+
+export type ReviewStartResponse = {
+  turn: CodexTurn;
+  reviewThreadId: string;
+};
 
 export type CodexThreadGoal = {
   threadId: string;

@@ -4,12 +4,13 @@ export type ActiveSkillSlash = {
   end: number;
   query: string;
   start: number;
+  trigger: '$' | '/';
 };
 
-export function findActiveSkillSlash(value: string, caretPosition: number): ActiveSkillSlash | null {
+export function findActiveSkillTrigger(value: string, caretPosition: number, trigger: '$' | '/' = '$'): ActiveSkillSlash | null {
   const safeCaret = Math.max(0, Math.min(caretPosition, value.length));
   const beforeCaret = value.slice(0, safeCaret);
-  const start = beforeCaret.lastIndexOf('/');
+  const start = beforeCaret.lastIndexOf(trigger);
   if (start < 0) {
     return null;
   }
@@ -20,7 +21,7 @@ export function findActiveSkillSlash(value: string, caretPosition: number): Acti
   }
 
   const query = beforeCaret.slice(start + 1);
-  if (/[\s/]/.test(query)) {
+  if (/[\s/$]/.test(query)) {
     return null;
   }
 
@@ -28,7 +29,12 @@ export function findActiveSkillSlash(value: string, caretPosition: number): Acti
     end: safeCaret,
     query,
     start,
+    trigger,
   };
+}
+
+export function findActiveSkillSlash(value: string, caretPosition: number): ActiveSkillSlash | null {
+  return findActiveSkillTrigger(value, caretPosition, '/');
 }
 
 export function filterComposerSkills(skills: BackendSkillSummary[], query: string, maxResults = -1): BackendSkillSummary[] {
@@ -62,7 +68,7 @@ export function skillDescription(skill: BackendSkillSummary): string {
 
 export function promptSkillInputsFromText(text: string, skills: BackendSkillSummary[]): PromptSkillInput[] {
   const names = new Set<string>();
-  const pattern = /(?:^|[^\w.%+-])\/([A-Za-z0-9_.-]+)/g;
+  const pattern = /(?:^|[^\w.%+-])[$/]([A-Za-z0-9_.-]+)/g;
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(text)) !== null) {
     names.add(match[1]);

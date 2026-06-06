@@ -907,7 +907,7 @@ describe('snapshot reducer', () => {
     ]);
   });
 
-  it('inserts compaction markers at the streaming turn position and starts a new assistant segment', () => {
+  it('inserts running compaction markers without showing empty assistant thinking after the boundary', () => {
     const snapshot = createInitialSnapshot();
 
     applyMainEventToSnapshot(snapshot, {
@@ -953,7 +953,7 @@ describe('snapshot reducer', () => {
         agentId: 'agent-dina',
         kind: 'compaction',
         role: 'assistant',
-        status: 'complete',
+        status: 'streaming',
         turnId: 'turn-1',
         createdAt: '2026-06-05T00:00:02.000Z',
         parts: [],
@@ -966,6 +966,159 @@ describe('snapshot reducer', () => {
         turnId: 'turn-1',
         createdAt: '2026-06-05T00:00:02.000Z',
         parts: [{ type: 'text', text: 'After compaction.' }],
+      },
+    ]);
+  });
+
+  it('marks compaction markers complete when the turn completes', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'context.compactionStarted',
+      payload: { itemId: 'compact-1' },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'turn.completed',
+      payload: { status: 'completed' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(snapshot.messages).toStrictEqual([
+      {
+        id: 'compaction-turn-1',
+        agentId: 'agent-dina',
+        kind: 'compaction',
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'turn-1',
+        createdAt: '2026-06-05T00:00:01.000Z',
+        parts: [],
+      },
+    ]);
+  });
+
+  it('removes empty assistant placeholders when turns complete without visible output', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-empty',
+      type: 'turn.started',
+      payload: { status: 'running' },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-empty',
+      type: 'turn.completed',
+      payload: { status: 'completed' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(snapshot.messages).toStrictEqual([]);
+    expect(snapshot.agents[0].status).toStrictEqual({ type: 'idle' });
+  });
+
+  it('removes superseded empty assistant placeholders when later assistant output appears', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-empty',
+      type: 'turn.started',
+      payload: { status: 'running' },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(snapshot.messages.map((message) => message.id)).toStrictEqual(['assistant-turn-empty']);
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-review',
+      type: 'message.delta',
+      payload: { itemId: 'review-result', delta: 'Found one issue.' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(snapshot.messages).toStrictEqual([
+      {
+        id: 'assistant-turn-review',
+        agentId: 'agent-dina',
+        role: 'assistant',
+        status: 'streaming',
+        turnId: 'turn-review',
+        createdAt: expect.any(String),
+        parts: [{ type: 'text', text: 'Found one issue.', itemId: 'review-result' }],
+      },
+    ]);
+  });
+
+  it('does not resurrect completed review text as streaming when late text arrives', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-review',
+      type: 'message.delta',
+      payload: {
+        itemId: 'review-1',
+        delta: 'Found one issue.',
+      },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-review',
+      type: 'turn.completed',
+      payload: { status: 'completed' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 3,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-review',
+      type: 'message.delta',
+      payload: {
+        itemId: 'review-assistant',
+        delta: 'Late assistant copy.',
+      },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+
+    expect(snapshot.messages).toStrictEqual([
+      {
+        id: 'assistant-turn-review',
+        agentId: 'agent-dina',
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'turn-review',
+        createdAt: expect.any(String),
+        parts: [
+          { type: 'text', text: 'Found one issue.', itemId: 'review-1' },
+          { type: 'text', text: 'Late assistant copy.', itemId: 'review-assistant' },
+        ],
       },
     ]);
   });

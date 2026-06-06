@@ -13,11 +13,18 @@ export const messages = {
         resubmit: 'Resubmit',
         retry: 'Retry',
       },
+      compaction: {
+        completed: 'Context compacted',
+        running: 'Compacting context',
+      },
       contextUsage: {
         ariaLabel: 'Context usage',
         title: 'Context window:',
         usedAndLeft: '{used}% used ({left}% left)',
         tokensUsed: '{used} / {window} tokens used',
+      },
+      commands: {
+        title: 'Commands',
       },
       skills: {
         empty: 'No matching skills',

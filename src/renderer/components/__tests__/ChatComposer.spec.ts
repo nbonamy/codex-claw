@@ -4,7 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import ChatComposer from '../ChatComposer.vue';
 import { i18n } from '../../i18n';
-import type { AgentContextUsage, AgentFileSearchItem, BackendModelOption, BackendSkillSummary } from '../../../shared/contracts';
+import { codexBackendCommands } from '../../../shared/backend-commands';
+import type { AgentContextUsage, AgentFileSearchItem, BackendCommandSummary, BackendModelOption, BackendSkillSummary } from '../../../shared/contracts';
 
 vi.mock('fix-webm-duration', () => ({
   default: vi.fn(async (blob: Blob) => blob),
@@ -203,10 +204,10 @@ describe('ChatComposer', () => {
     expect(wrapper.find('.chat-context-usage__popover').text()).toContain('25% used (75% left)');
   });
 
-  it('opens a slash skill menu, filters skills, and inserts the selected skill', async () => {
+  it('opens a dollar skill menu, filters skills, and inserts the selected skill', async () => {
     const wrapper = mountComposer({ skills });
 
-    await wrapper.get('textarea').setValue('/front');
+    await wrapper.get('textarea').setValue('$front');
     await wrapper.get('textarea').trigger('keyup');
 
     expect(wrapper.find('.chat-composer-skill-menu').exists()).toBe(true);
@@ -215,18 +216,78 @@ describe('ChatComposer', () => {
 
     await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
 
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('/frontend-design ');
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('$frontend-design ');
   });
 
-  it('navigates slash skills with arrow keys and inserts with enter', async () => {
+  it('navigates dollar skills with arrow keys and inserts with enter', async () => {
     const wrapper = mountComposer({ skills });
 
-    await wrapper.get('textarea').setValue('/');
+    await wrapper.get('textarea').setValue('$');
     await wrapper.get('textarea').trigger('keyup');
     await wrapper.get('textarea').trigger('keydown', { key: 'ArrowDown' });
     await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
 
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('/skill-creator ');
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('$skill-creator ');
+  });
+
+  it('shows slash commands before skills and submits Codex compact', async () => {
+    const wrapper = mountComposer({
+      commands: codexBackendCommands,
+      skills,
+    });
+
+    await wrapper.get('textarea').setValue('/comp');
+    await wrapper.get('textarea').trigger('keyup');
+
+    expect(wrapper.find('.chat-composer-slash-menu').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Commands');
+    expect(wrapper.text()).toContain('compact');
+    expect(wrapper.text()).not.toContain('/compact');
+    expect(wrapper.text()).not.toContain('/frontend-design');
+
+    await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
+
+    expect(wrapper.emitted('send')).toStrictEqual([['/compact']]);
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('');
+  });
+
+  it('submits Codex review from the slash command menu without showing a slash prefix', async () => {
+    const wrapper = mountComposer({
+      commands: codexBackendCommands,
+      skills,
+    });
+
+    await wrapper.get('textarea').setValue('/rev');
+    await wrapper.get('textarea').trigger('keyup');
+
+    expect(wrapper.find('.chat-composer-slash-menu').exists()).toBe(true);
+    expect(wrapper.text()).toContain('review');
+    expect(wrapper.text()).not.toContain('/review');
+
+    await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
+
+    expect(wrapper.emitted('send')).toStrictEqual([['/review']]);
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('');
+  });
+
+  it('falls through from slash commands to skills after command rows', async () => {
+    const wrapper = mountComposer({
+      commands: codexBackendCommands,
+      skills,
+    });
+
+    await wrapper.get('textarea').setValue('/');
+    await wrapper.get('textarea').trigger('keyup');
+
+    expect(wrapper.text()).toContain('Commands');
+    expect(wrapper.text()).toContain('Skills');
+
+    await wrapper.get('textarea').trigger('keydown', { key: 'ArrowDown' });
+    await wrapper.get('textarea').trigger('keydown', { key: 'ArrowDown' });
+    await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
+
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('/frontend-design ');
+    expect(wrapper.emitted('send')).toBeUndefined();
   });
 
   it('opens an @ file menu, filters files, and inserts the selected relative path', async () => {
@@ -297,6 +358,7 @@ describe('ChatComposer', () => {
 
 function mountComposer(overrides: Partial<ChatComposerProps & {
   contextUsage: AgentContextUsage;
+  commands: BackendCommandSummary[];
   goalMode: boolean;
   models: BackendModelOption[];
   planMode: boolean;

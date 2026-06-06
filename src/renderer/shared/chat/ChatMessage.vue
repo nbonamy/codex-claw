@@ -1,7 +1,21 @@
 <template>
-  <div v-if="message.type === 'compaction'" class="chat-message chat-message--compaction">
+  <div
+    v-if="message.type === 'compaction'"
+    class="chat-message chat-message--compaction"
+    :class="{ 'chat-message--compaction-running': message.compactionStatus === 'running' }"
+  >
     <div class="chat-message__compaction-line" />
-    <span class="chat-message__compaction-title">Automatically compacting context</span>
+    <span
+      class="chat-message__compaction-title"
+      :data-label="compactionTitle"
+    >
+      <span
+        class="chat-message__compaction-label"
+        :class="{ 'text-shimmer': message.compactionStatus === 'running' }"
+      >
+        {{ compactionTitle }}
+      </span>
+    </span>
   </div>
   <!-- <div v-else-if="message.type === 'steer'" class="chat-message chat-message--steer">
     <div class="chat-message__steer-line" />
@@ -146,6 +160,11 @@ const showStreamingDot = computed(() => (
   props.message.streaming === true &&
   hasVisibleAssistantActivity.value
 ))
+const compactionTitle = computed(() => (
+  props.message.compactionStatus === 'running'
+    ? t('chat.compaction.running')
+    : t('chat.compaction.completed')
+))
 
 watch(() => props.message.content, (content) => {
   if (isEditing.value) {
@@ -248,6 +267,10 @@ onBeforeUnmount(() => {
   min-height: 28px;
 }
 
+.chat-message--compaction-running .chat-message__compaction-line {
+  opacity: 0.64;
+}
+
 .chat-message--steer {
   margin-top: var(--space-1);
   color: var(--color-text-muted);
@@ -264,11 +287,14 @@ onBeforeUnmount(() => {
 
 .chat-message__compaction-title {
   z-index: 1;
+  display: inline-block;
   padding: 0 var(--space-6);
   background: var(--color-surface-lowest);
+}
+
+.chat-message__compaction-label {
   color: var(--color-text-muted);
-  font-size: var(--font-size-13);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-14);
 }
 
 .chat-message__steer-line {

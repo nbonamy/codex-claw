@@ -161,8 +161,24 @@ from `/` command search resolves the same way. Main then appends Codex
 
 Composer shortcuts are split by surface: `@` searches files, `$` searches
 skills, and `/` searches backend commands first, then matching skills. The
-initial Codex command catalog includes `/compact`, which submits the canonical
-Codex compact command text.
+initial Codex command catalog includes `compact` and `review` without a visible
+slash prefix in the menu. Selecting one submits the corresponding slash form
+through the normal composer path, but the Codex driver intercepts recognized
+slash commands before appending a visible user message or calling `turn/start`:
+
+- bare `/compact` calls `thread/compact/start` with the active `threadId`;
+- bare `/review` calls `review/start` with `target.type = "uncommittedChanges"`;
+- `/review <instructions>` calls `review/start` with a custom review target;
+- `/compact <text>` remains a normal prompt because Codex's compact RPC does
+  not accept inline instructions.
+
+`review/start` uses `delivery: "inline"`, so app-server should return the same
+`reviewThreadId` as the active thread. Main treats a different review thread id
+as a protocol error instead of moving the agent session. The review lifecycle
+streams `enteredReviewMode`/`exitedReviewMode` items; the final
+`exitedReviewMode.review` string is rendered as assistant text because it is the
+plain-text review body, not hidden tool output. Review-mode markers are not
+tool parts and should not create a tool group in the renderer.
 
 This is preferred over relying on Codex to infer the skill from text alone.
 `skills/changed` is an invalidation notification; main emits app-owned

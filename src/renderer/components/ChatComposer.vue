@@ -20,6 +20,15 @@
       @select="selectSkill"
     />
 
+    <ChatComposerSlashMenu
+      v-if="slashMenuVisible"
+      :active-index="activeSlashIndex"
+      :visible-commands="visibleSlashCommands"
+      :visible-skills="visibleSlashSkills"
+      @select-command="selectCommand"
+      @select-skill="selectSlashSkill"
+    />
+
     <ChatComposerActionMenu
       :disabled="disabled"
       :goal-mode="goalMode"
@@ -116,7 +125,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import type { AgentContextUsage, AgentFileSearchItem, BackendCapabilities, BackendModelOption, BackendSkillSummary, ReasoningEffort } from '../../shared/contracts';
+import type { AgentContextUsage, AgentFileSearchItem, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ReasoningEffort } from '../../shared/contracts';
 import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import ChatComposerSendButton from '../shared/chat/ChatComposerSendButton.vue';
 import ChatComposerActionMenu from './ChatComposerActionMenu.vue';
@@ -124,9 +133,11 @@ import ChatContextUsageIndicator from './ChatContextUsageIndicator.vue';
 import ChatModelReasoningSelector from './ChatModelReasoningSelector.vue';
 import ChatComposerFileMentionMenu from './ChatComposerFileMentionMenu.vue';
 import ChatComposerSkillMenu from './ChatComposerSkillMenu.vue';
+import ChatComposerSlashMenu from './ChatComposerSlashMenu.vue';
 import { findActiveFileMention, type ActiveComposerMention } from '../shared/chat/composer-mentions';
 import { filterFileSearchItems } from '../shared/chat/file-search';
-import { filterComposerSkills, findActiveSkillSlash, type ActiveSkillSlash } from '../shared/chat/composer-skills';
+import { filterComposerCommands, findActiveCommandSlash, type ActiveCommandSlash } from '../shared/chat/composer-commands';
+import { filterComposerSkills, findActiveSkillTrigger, type ActiveSkillSlash } from '../shared/chat/composer-skills';
 import { BrowserAudioRecorder, isBrowserAudioRecordingSupported } from '../shared/audio/browser-audio-recorder';
 import { transcribeRecordedAudio } from '../shared/audio/apple-speech-transcription';
 import { MicrophoneIcon } from '../shared/icons/app-icons';
@@ -140,6 +151,7 @@ const props = defineProps<{
   files?: AgentFileSearchItem[];
   goalMode?: boolean;
   backendCapabilities?: BackendCapabilities;
+  commands?: BackendCommandSummary[];
   isSending: boolean;
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   models?: BackendModelOption[];
@@ -169,6 +181,8 @@ const fileMenuOpen = ref(false);
 const activeFileIndex = ref(0);
 const skillMenuOpen = ref(false);
 const activeSkillIndex = ref(0);
+const slashMenuOpen = ref(false);
+const activeSlashIndex = ref(0);
 const recorder = ref<BrowserAudioRecorder | null>(null);
 const isRecording = ref(false);
 const isTranscribing = ref(false);
@@ -232,7 +246,7 @@ const fileMenuVisible = computed(() => (
   (props.files ?? []).length > 0 &&
   !(props.disabled && !props.isSending)
 ));
-const activeSkillSlash = computed<ActiveSkillSlash | null>(() => findActiveSkillSlash(prompt.value, caretPosition.value));
+const activeSkillSlash = computed<ActiveSkillSlash | null>(() => findActiveSkillTrigger(prompt.value, caretPosition.value, '$'));
 const visibleSkills = computed(() => filterComposerSkills(props.skills ?? [], activeSkillSlash.value?.query ?? ''));
 const skillMenuVisible = computed(() => (
   skillMenuOpen.value &&
@@ -241,9 +255,27 @@ const skillMenuVisible = computed(() => (
   (props.skills ?? []).length > 0 &&
   !(props.disabled && !props.isSending)
 ));
+const activeCommandSlash = computed<ActiveCommandSlash | null>(() => findActiveCommandSlash(prompt.value, caretPosition.value));
+const visibleSlashCommands = computed(() => filterComposerCommands(props.commands ?? [], activeCommandSlash.value?.query ?? ''));
+const visibleSlashSkills = computed(() => (
+  effectiveBackendCapabilities.value.skills
+    ? filterComposerSkills(props.skills ?? [], activeCommandSlash.value?.query ?? '')
+    : []
+));
+const slashItemCount = computed(() => visibleSlashCommands.value.length + visibleSlashSkills.value.length);
+const slashMenuVisible = computed(() => (
+  slashMenuOpen.value &&
+  activeCommandSlash.value !== null &&
+  slashItemCount.value > 0 &&
+  !(props.disabled && !props.isSending)
+));
 
 watch([visibleSkills, activeSkillSlash], () => {
   activeSkillIndex.value = 0;
+});
+
+watch([visibleSlashCommands, visibleSlashSkills, activeCommandSlash], () => {
+  activeSlashIndex.value = 0;
 });
 
 watch([visibleFiles, activeFileMention], () => {
@@ -430,6 +462,29 @@ function handleTextareaKeydown(event: KeyboardEvent): void {
     }
   }
 
+  if (slashMenuVisible.value) {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const count = slashItemCount.value;
+      if (count > 0) {
+        activeSlashIndex.value = (activeSlashIndex.value + (event.key === 'ArrowDown' ? 1 : -1) + count) % count;
+      }
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeComposerMenus();
+      return;
+    }
+
+    if (event.key === 'Enter' && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      event.preventDefault();
+      selectActiveSlashItem();
+      return;
+    }
+  }
+
   if (event.key === 'Tab' && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
     event.preventDefault();
     if (effectiveBackendCapabilities.value.planMode !== 'unsupported') {
@@ -484,14 +539,21 @@ function selectFile(file: AgentFileSearchItem): void {
 }
 
 function selectSkill(skill: BackendSkillSummary): void {
-  const slash = activeSkillSlash.value;
+  selectSkillForMention(skill, activeSkillSlash.value, '$');
+}
+
+function selectSlashSkill(skill: BackendSkillSummary): void {
+  selectSkillForMention(skill, activeCommandSlash.value, '/');
+}
+
+function selectSkillForMention(skill: BackendSkillSummary, mention: ActiveSkillSlash | ActiveCommandSlash | null, trigger: '$' | '/'): void {
   const textarea = textareaEl.value;
-  if (!slash || !textarea) {
+  if (!mention || !textarea) {
     return;
   }
 
-  const nextText = `${prompt.value.slice(0, slash.start)}/${skill.name} ${prompt.value.slice(slash.end)}`;
-  const nextCaret = slash.start + skill.name.length + 2;
+  const nextText = `${prompt.value.slice(0, mention.start)}${trigger}${skill.name} ${prompt.value.slice(mention.end)}`;
+  const nextCaret = mention.start + skill.name.length + 2;
   prompt.value = nextText;
   caretPosition.value = nextCaret;
   closeComposerMenus();
@@ -500,6 +562,50 @@ function selectSkill(skill: BackendSkillSummary): void {
     textarea.setSelectionRange(nextCaret, nextCaret);
     resizeTextarea();
   });
+}
+
+function selectCommand(command: BackendCommandSummary): void {
+  const mention = activeCommandSlash.value;
+  const textarea = textareaEl.value;
+  if (!mention || !textarea) {
+    return;
+  }
+
+  const slashCommand = `/${command.slashName ?? command.name}`;
+  if (command.submitOnSelect) {
+    prompt.value = '';
+    caretPosition.value = 0;
+    closeComposerMenus();
+    emit('send', slashCommand);
+    void nextTick(resizeTextarea);
+    return;
+  }
+
+  const insertion = slashCommand;
+  const nextText = `${prompt.value.slice(0, mention.start)}${insertion} ${prompt.value.slice(mention.end)}`;
+  const nextCaret = mention.start + insertion.length + 1;
+  prompt.value = nextText;
+  caretPosition.value = nextCaret;
+  closeComposerMenus();
+  void nextTick(() => {
+    textarea.focus();
+    textarea.setSelectionRange(nextCaret, nextCaret);
+    resizeTextarea();
+  });
+}
+
+function selectActiveSlashItem(): void {
+  const command = visibleSlashCommands.value[activeSlashIndex.value];
+  if (command) {
+    selectCommand(command);
+    return;
+  }
+
+  const skillIndex = activeSlashIndex.value - visibleSlashCommands.value.length;
+  const skill = visibleSlashSkills.value[skillIndex];
+  if (skill) {
+    selectSlashSkill(skill);
+  }
 }
 
 function updateCaretPosition(): void {
@@ -515,18 +621,28 @@ function closeComposerMenusSoon(): void {
 function closeComposerMenus(): void {
   fileMenuOpen.value = false;
   skillMenuOpen.value = false;
+  slashMenuOpen.value = false;
 }
 
 function syncComposerMenus(): void {
   if (activeFileMention.value !== null) {
     fileMenuOpen.value = true;
     skillMenuOpen.value = false;
+    slashMenuOpen.value = false;
     return;
   }
 
   if (activeSkillSlash.value !== null) {
     skillMenuOpen.value = true;
     fileMenuOpen.value = false;
+    slashMenuOpen.value = false;
+    return;
+  }
+
+  if (activeCommandSlash.value !== null) {
+    slashMenuOpen.value = true;
+    fileMenuOpen.value = false;
+    skillMenuOpen.value = false;
     return;
   }
 

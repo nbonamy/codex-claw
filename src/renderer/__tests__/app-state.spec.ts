@@ -953,7 +953,7 @@ describe('useAppState', () => {
     });
   });
 
-  it('loads active agent skills and includes slash-selected skills in prompt options', async () => {
+  it('loads active agent skills and includes dollar-selected skills in prompt options', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();
     const listBackendSkills = vi.fn().mockResolvedValue([
@@ -995,9 +995,9 @@ describe('useAppState', () => {
       'skill-creator',
     ]);
 
-    await state.sendPrompt('/frontend-design make the dialog beautiful');
+    await state.sendPrompt('$frontend-design make the dialog beautiful');
 
-    expect(sendPrompt).toHaveBeenCalledWith('agent-dina', '/frontend-design make the dialog beautiful', {
+    expect(sendPrompt).toHaveBeenCalledWith('agent-dina', '$frontend-design make the dialog beautiful', {
       backendOptions: {
         kind: 'codex',
         skills: [

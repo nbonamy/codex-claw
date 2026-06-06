@@ -20,15 +20,15 @@ function codexTurnToRendererMessages(threadId: string, turn: CodexThreadTurn, ag
     }
 
     const segmentSuffix = assistantSegmentIndex === 0 ? '' : `-segment-${assistantSegmentIndex}`;
-        messages.push({
-          id: `assistant-${turn.id}${segmentSuffix}`,
-          agentId,
-          role: 'assistant',
-          status: rendererMessageStatus(turn.status),
-          turnId: turn.id,
-          parts: [...assistantParts],
-          createdAt,
-        });
+    messages.push({
+      id: `assistant-${turn.id}${segmentSuffix}`,
+      agentId,
+      role: 'assistant',
+      status: rendererMessageStatus(turn.status),
+      turnId: turn.id,
+      parts: [...assistantParts],
+      createdAt,
+    });
     assistantParts.length = 0;
     assistantSegmentIndex += 1;
   };
@@ -64,6 +64,15 @@ function codexTurnToRendererMessages(threadId: string, turn: CodexThreadTurn, ag
 
     if (item.type === 'plan') {
       const text = typeof item.text === 'string' ? item.text : '';
+      if (text) {
+        sawAssistantActivity = true;
+        assistantParts.push({ type: 'text', text, itemId: item.id });
+      }
+      continue;
+    }
+
+    if (item.type === 'exitedReviewMode') {
+      const text = typeof item.review === 'string' ? item.review : '';
       if (text) {
         sawAssistantActivity = true;
         assistantParts.push({ type: 'text', text, itemId: item.id });

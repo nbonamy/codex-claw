@@ -107,16 +107,17 @@ describe('renderer message adapter', () => {
       kind: 'compaction',
       parts: [],
       role: 'assistant',
-      status: 'complete',
+      status: 'streaming',
     };
 
     expect(rendererMessageToChatMessage(rendererMessage)).toStrictEqual({
+      compactionStatus: 'running',
       content: '',
       createdAt: '2026-06-05T00:00:03.000Z',
       id: 'compaction-turn-1',
       parts: [],
       role: 'assistant',
-      streaming: false,
+      streaming: true,
       toolCalls: [],
       type: 'compaction',
     });

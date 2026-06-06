@@ -11,6 +11,11 @@ import type {
 import { codexBackendCapabilities } from '../../shared/backend-capabilities';
 import type { AgentBackendDriver, BackendEvent, BackendRollbackResult, BackendSendResult } from '../backends/types';
 import type { CodexAgentSessionManager } from './agent-session';
+import type { CodexReviewTarget } from './protocol';
+
+type CodexPromptCommand =
+  | { type: 'compact' }
+  | { type: 'review'; target: CodexReviewTarget };
 
 export class CodexBackendDriver implements AgentBackendDriver {
   readonly backend = 'codex' as const;
@@ -37,8 +42,33 @@ export class CodexBackendDriver implements AgentBackendDriver {
     return this.sessionManager.listSkills(agent);
   }
 
+  tryHandlePromptCommand(agent: Agent, prompt: string): Promise<BackendSendResult> | null {
+    const command = codexPromptCommand(prompt);
+    if (!command) {
+      return null;
+    }
+
+    return this.runPromptCommand(agent, command);
+  }
+
   async sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult> {
     const result = await this.sessionManager.sendPrompt(agent, prompt, options);
+    return {
+      backendSession: codexBackendSession(result.threadId),
+      turnId: result.turnId,
+    };
+  }
+
+  private async runPromptCommand(agent: Agent, command: CodexPromptCommand): Promise<BackendSendResult> {
+    if (command.type === 'compact') {
+      const result = await this.sessionManager.compactThread(agent);
+      return {
+        backendSession: codexBackendSession(result.threadId),
+        turnId: result.turnId,
+      };
+    }
+
+    const result = await this.sessionManager.reviewThread(agent, command.target);
     return {
       backendSession: codexBackendSession(result.threadId),
       turnId: result.turnId,
@@ -92,4 +122,42 @@ function codexBackendSession(threadId: string): BackendSession {
     kind: 'codex',
     threadId,
   };
+}
+
+function codexPromptCommand(prompt: string): CodexPromptCommand | null {
+  const parsed = parseSlashName(prompt);
+  if (!parsed) {
+    return null;
+  }
+
+  if (parsed.name === 'compact') {
+    return parsed.rest ? null : { type: 'compact' };
+  }
+
+  if (parsed.name === 'review') {
+    return {
+      type: 'review',
+      target: parsed.rest
+        ? { type: 'custom', instructions: parsed.rest }
+        : { type: 'uncommittedChanges' },
+    };
+  }
+
+  return null;
+}
+
+function parseSlashName(value: string): { name: string; rest: string } | null {
+  if (!value.startsWith('/')) {
+    return null;
+  }
+
+  const stripped = value.slice(1);
+  const whitespaceIndex = stripped.search(/\s/);
+  const name = whitespaceIndex === -1 ? stripped : stripped.slice(0, whitespaceIndex);
+  if (!name || name.includes('/')) {
+    return null;
+  }
+
+  const rest = whitespaceIndex === -1 ? '' : stripped.slice(whitespaceIndex).trim();
+  return { name, rest };
 }

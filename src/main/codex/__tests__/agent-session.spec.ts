@@ -318,6 +318,178 @@ describe('CodexAgentSessionManager', () => {
     });
   });
 
+  it('starts manual compaction through the app-server compact RPC', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+
+    const compact = manager.compactThread(agent);
+    await waitForSentCount(transport, 1);
+    transport.receive({ id: 1, result: { userAgent: 'codex', codexHome: '/tmp/codex-home', platformFamily: 'unix', platformOs: 'macos' } });
+    await waitForSentCount(transport, 3);
+    transport.receive({ id: 2, result: { thread: { id: 'thread-1', cwd: '/Users/nbonamy/src/codex-claw' } } });
+    await waitForSentCount(transport, 4);
+
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 3,
+      method: 'thread/compact/start',
+      params: {
+        threadId: 'thread-1',
+      },
+    });
+
+    transport.receive({ id: 3, result: {} });
+
+    await expect(compact).resolves.toStrictEqual({
+      threadId: 'thread-1',
+    });
+  });
+
+  it('starts review through the app-server review RPC', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+
+    const review = manager.reviewThread(agent, {
+      type: 'custom',
+      instructions: 'check regressions',
+    });
+    await waitForSentCount(transport, 1);
+    transport.receive({ id: 1, result: { userAgent: 'codex', codexHome: '/tmp/codex-home', platformFamily: 'unix', platformOs: 'macos' } });
+    await waitForSentCount(transport, 3);
+    transport.receive({ id: 2, result: { thread: { id: 'thread-1', cwd: '/Users/nbonamy/src/codex-claw' } } });
+    await waitForSentCount(transport, 4);
+
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 3,
+      method: 'review/start',
+      params: {
+        threadId: 'thread-1',
+        target: {
+          type: 'custom',
+          instructions: 'check regressions',
+        },
+        delivery: 'inline',
+      },
+    });
+
+    transport.receive({
+      id: 3,
+      result: {
+        turn: {
+          id: 'turn-review',
+          status: 'running',
+        },
+        reviewThreadId: 'thread-1',
+      },
+    });
+
+    await expect(review).resolves.toStrictEqual({
+      threadId: 'thread-1',
+      turnId: 'turn-review',
+    });
+  });
+
+  it('rejects unexpected detached review threads for inline app-server reviews', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+
+    const review = manager.reviewThread(agent, {
+      type: 'uncommittedChanges',
+    });
+    await waitForSentCount(transport, 1);
+    transport.receive({ id: 1, result: { userAgent: 'codex', codexHome: '/tmp/codex-home', platformFamily: 'unix', platformOs: 'macos' } });
+    await waitForSentCount(transport, 3);
+    transport.receive({ id: 2, result: { thread: { id: 'thread-1', cwd: '/Users/nbonamy/src/codex-claw' } } });
+    await waitForSentCount(transport, 4);
+    transport.receive({
+      id: 3,
+      result: {
+        turn: {
+          id: 'turn-review',
+          status: 'running',
+        },
+        reviewThreadId: 'thread-detached-review',
+      },
+    });
+
+    await expect(review).rejects.toThrow("Codex review/start returned unexpected review thread 'thread-detached-review'");
+  });
+
+  it('emits exited review-mode text as visible assistant output', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+    const events: unknown[] = [];
+    manager.onEvent((event) => events.push({
+      ...event,
+      occurredAt: '<now>',
+    }));
+
+    await resolveStartedPrompt(transport, manager);
+    transport.receive({
+      method: 'item/completed',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        item: {
+          type: 'exitedReviewMode',
+          id: 'review-1',
+          review: 'Found one issue.',
+        },
+      },
+    });
+
+    expect(events).toStrictEqual([
+      {
+        seq: 1,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        type: 'message.delta',
+        payload: {
+          itemId: 'review-1',
+          delta: 'Found one issue.',
+        },
+        occurredAt: '<now>',
+      },
+      {
+        seq: 2,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        type: 'turn.completed',
+        payload: {
+          status: 'completed',
+        },
+        occurredAt: '<now>',
+      },
+    ]);
+  });
+
+  it('ignores entered review-mode markers instead of emitting a tool group', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+    const events: unknown[] = [];
+    manager.onEvent((event) => events.push({
+      ...event,
+      occurredAt: '<now>',
+    }));
+
+    await resolveStartedPrompt(transport, manager);
+    transport.receive({
+      method: 'item/started',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        item: {
+          type: 'enteredReviewMode',
+          id: 'review-1',
+          review: 'current changes',
+        },
+      },
+    });
+
+    expect(events).toStrictEqual([]);
+  });
+
   it('resumes a persisted agent thread before starting a turn', async () => {
     const transport = new FakeTransport();
     const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));

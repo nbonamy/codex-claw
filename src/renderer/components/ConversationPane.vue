@@ -35,6 +35,7 @@
           :is-sending="isSending"
           :placeholder="composerPlaceholder"
           :models="backendModels"
+          :commands="backendCommands"
           :skills="backendSkills"
           :backend-capabilities="backendCapabilities"
           :model-catalog-status="modelCatalogStatus"
@@ -83,6 +84,7 @@
         :is-sending="isSending"
         :placeholder="composerPlaceholder"
         :models="backendModels"
+        :commands="backendCommands"
         :skills="backendSkills"
         :backend-capabilities="backendCapabilities"
         :model-catalog-status="modelCatalogStatus"
@@ -108,7 +110,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Agent, AgentFileSearchItem, BackendCapabilities, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ReasoningEffort, RendererMessage } from '../../shared/contracts';
+import type { Agent, AgentFileSearchItem, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ReasoningEffort, RendererMessage } from '../../shared/contracts';
 import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import WorkbenchLayout from './WorkbenchLayout.vue';
 import ChatComposer from './ChatComposer.vue';
@@ -127,6 +129,7 @@ const props = withDefaults(defineProps<{
   isSending: boolean;
   answeredClientRequestIds?: Set<string>;
   backendModels?: BackendModelOption[];
+  backendCommands?: BackendCommandSummary[];
   backendSkills?: BackendSkillSummary[];
   backendCapabilities?: BackendCapabilities;
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
@@ -139,6 +142,7 @@ const props = withDefaults(defineProps<{
   queuedPrompts: () => [],
   agentFiles: () => [],
   backendModels: () => [],
+  backendCommands: () => [],
   backendSkills: () => [],
   backendCapabilities: () => defaultBackendCapabilities('codex'),
   skillCatalogStatus: 'notLoaded',

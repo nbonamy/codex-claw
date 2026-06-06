@@ -30,6 +30,7 @@ export type AgentBackendDriver = {
   readonly backend: AgentBackend;
   getRuntimeStatus(): BackendRuntimeStatus;
   getCapabilities(agent: Agent): BackendCapabilities;
+  tryHandlePromptCommand?(agent: Agent, prompt: string): Promise<BackendSendResult> | null;
   sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>;
   interrupt(agent: Agent): Promise<BackendSendResult>;
   respondToRequest(response: ClientRequestResponse): Promise<void>;

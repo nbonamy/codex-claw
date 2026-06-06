@@ -23,7 +23,11 @@ export function sendAgentPrompt(
     return snapshot;
   }
 
-  appendUserPrompt(snapshot, agentId, trimmedPrompt);
+  const promptResult = backendDriver.tryHandlePromptCommand?.(agent, trimmedPrompt) ?? null;
+  if (!promptResult) {
+    appendUserPrompt(snapshot, agentId, trimmedPrompt);
+  }
+
   updateAgentStatus(agentId, { type: 'starting' }, emit, snapshot);
   updateBackendRuntimeStatus({
     backend: backendDriver.backend,
@@ -31,11 +35,12 @@ export function sendAgentPrompt(
     detail: `Starting ${backendDisplayName(backendDriver.backend)} backend...`,
   }, emit, snapshot);
 
-  const promptResult = hasPromptOptions(options)
-    ? backendDriver.sendPrompt(agent, trimmedPrompt, options)
-    : backendDriver.sendPrompt(agent, trimmedPrompt);
+  const sendResult = promptResult
+    ?? (hasPromptOptions(options)
+      ? backendDriver.sendPrompt(agent, trimmedPrompt, options)
+      : backendDriver.sendPrompt(agent, trimmedPrompt));
 
-  void promptResult
+  void sendResult
     .then((result) => {
       agent.backend = backendDriver.backend;
       agent.backendSession = result.backendSession;

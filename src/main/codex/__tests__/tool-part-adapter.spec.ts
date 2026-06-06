@@ -209,6 +209,20 @@ describe('tool-part-adapter', () => {
     });
   });
 
+  it('does not map Codex review-mode markers into tool parts', () => {
+    expect(codexThreadItemToToolPart({
+      type: 'enteredReviewMode',
+      id: 'review-1',
+      review: 'uncommitted changes',
+    })).toBeNull();
+
+    expect(codexThreadItemToToolPart({
+      type: 'exitedReviewMode',
+      id: 'review-1',
+      review: 'Found one issue.',
+    })).toBeNull();
+  });
+
   it('creates app-owned update payloads with fallback tool parts', () => {
     expect(commandOutputDeltaToToolPartUpdate('cmd-1', 'running\n')).toStrictEqual({
       itemId: 'cmd-1',

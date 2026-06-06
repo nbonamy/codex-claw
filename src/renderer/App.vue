@@ -8,6 +8,7 @@
     :answered-client-request-ids="answeredClientRequestIds"
     :agent-files="agentFiles"
     :backend-models="backendModels"
+    :backend-commands="activeBackendCommands"
     :backend-skills="backendSkills"
     :backend-capabilities="activeBackendCapabilities"
     :model-catalog-status="modelCatalogStatus"
@@ -66,6 +67,7 @@ const {
   answeredClientRequestIds,
   agentFiles,
   backendModels,
+  activeBackendCommands,
   activeBackendCapabilities,
   modelCatalogStatus,
   backendSkills,

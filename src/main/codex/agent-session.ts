@@ -19,6 +19,7 @@ import type {
   CodexModelListResponse,
   CodexRawResponseItem,
   CodexRateLimitSnapshot,
+  CodexReviewTarget,
   CodexSkillsListResponse,
   CodexThread,
   CodexThreadGoal,
@@ -27,6 +28,8 @@ import type {
   CodexTurnPlanStep,
   CodexSessionEvent,
   CodexSessionPromptResult,
+  ReviewStartResponse,
+  ThreadCompactStartResponse,
   CodexTurn,
   ThreadReadResponse,
   ThreadResumeResponse,
@@ -55,6 +58,11 @@ type EventListener = (event: CodexSessionEvent) => void;
 
 export type CodexAgentSessionManagerOptions = {
   clawMcpEnabled?: boolean;
+};
+
+export type CodexSessionCommandResult = {
+  threadId: string;
+  turnId?: string;
 };
 
 export class CodexAgentSessionManager {
@@ -182,6 +190,40 @@ export class CodexAgentSessionManager {
     const response = await this.client.request<TurnStartResponse>('turn/start', turnParams);
     this.activeTurnIdsByThreadId.set(session.threadId, response.turn.id);
     this.recordTurnId(session.threadId, response.turn.id);
+
+    return {
+      threadId: session.threadId,
+      turnId: response.turn.id,
+    };
+  }
+
+  async compactThread(agent: Agent): Promise<CodexSessionCommandResult> {
+    await this.start();
+
+    const session = await this.ensureSession(agent);
+    await this.client.request<ThreadCompactStartResponse>('thread/compact/start', {
+      threadId: session.threadId,
+    });
+
+    return {
+      threadId: session.threadId,
+    };
+  }
+
+  async reviewThread(agent: Agent, target: CodexReviewTarget): Promise<CodexSessionCommandResult> {
+    await this.start();
+
+    const session = await this.ensureSession(agent);
+    const response = await this.client.request<ReviewStartResponse>('review/start', {
+      threadId: session.threadId,
+      target,
+      delivery: 'inline',
+    });
+    if (response.reviewThreadId !== session.threadId) {
+      throw new Error(`Codex review/start returned unexpected review thread '${response.reviewThreadId}' for inline review on thread '${session.threadId}'.`);
+    }
+    this.activeTurnIdsByThreadId.set(response.reviewThreadId, response.turn.id);
+    this.recordTurnId(response.reviewThreadId, response.turn.id);
 
     return {
       threadId: session.threadId,
@@ -527,6 +569,7 @@ export class CodexAgentSessionManager {
           });
           return;
         }
+        const reviewText = notification.method === 'item/completed' ? exitedReviewText(params.item) : '';
         this.logMcpToolItem(notification.method, params.threadId, params.item);
         const toolPart = codexThreadItemToToolPart(params.item);
         if (toolPart) {
@@ -534,6 +577,23 @@ export class CodexAgentSessionManager {
             turnId: params.turnId,
             type: notification.method === 'item/started' ? 'item.started' : 'item.completed',
             payload: { toolPart },
+          });
+        }
+        if (reviewText) {
+          this.emitForThread(params.threadId, {
+            turnId: params.turnId,
+            type: 'message.delta',
+            payload: {
+              itemId: codexItemId(params.item),
+              delta: reviewText,
+            },
+          });
+          this.emitForThread(params.threadId, {
+            turnId: params.turnId,
+            type: 'turn.completed',
+            payload: {
+              status: 'completed',
+            },
           });
         }
         return;
@@ -1068,4 +1128,14 @@ function toolRequestUserInputResponseFromAnswers(answers: AskUserAnswers | undef
 
 function isContextCompactionItem(item: unknown): item is { id: string; type: 'contextCompaction' } {
   return isRecord(item) && item.type === 'contextCompaction' && typeof item.id === 'string';
+}
+
+function exitedReviewText(item: unknown): string {
+  return isRecord(item) && item.type === 'exitedReviewMode' && typeof item.review === 'string'
+    ? item.review
+    : '';
+}
+
+function codexItemId(item: unknown): string | undefined {
+  return isRecord(item) && typeof item.id === 'string' ? item.id : undefined;
 }
