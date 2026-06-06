@@ -41,4 +41,15 @@ const visible = computed(() => Boolean(props.goal) || props.queuedPrompts.length
   display: flex;
   flex-direction: column;
 }
+
+.chat-composer-shelf:has(.chat-queued-prompts) {
+  &:deep() {
+    .chat-goal {
+      border-top-left-radius: 0;
+      border-top-right-radius: 0;
+    }
+  }
+}
+
+
 </style>

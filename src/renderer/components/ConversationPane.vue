@@ -259,7 +259,7 @@ function editGoal(): void {
 }
 
 .conversation-pane__composer-shelf {
-  width: min(calc(100% - var(--space-16) * 2), var(--conversation-content-width));
+  width: calc(min(calc(100% - var(--space-16) * 2), var(--conversation-content-width)) * 0.9);
   margin: 0 auto;
 }
 
