@@ -48,6 +48,7 @@
           v-else
           :messages="messages"
           :agent="currentAgent"
+          :is-loading="isLoading"
           :is-sending="isSending"
           :answered-client-request-ids="answeredClientRequestIds"
           :codex-models="codexModels"

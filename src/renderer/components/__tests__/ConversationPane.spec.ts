@@ -92,6 +92,36 @@ describe('ConversationPane', () => {
     expect(wrapper.get('textarea').attributes('placeholder')).toBe('Select an agent');
   });
 
+  it('shows a conversation skeleton while a persisted thread is hydrating', () => {
+    const wrapper = mountPane({
+      agent: {
+        ...agent,
+        codexThreadId: 'thread-persisted',
+      },
+      messages: [],
+      isLoading: true,
+      isSending: false,
+    });
+
+    expect(wrapper.find('.conversation-history-loader').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Loading conversation"]').exists()).toBe(true);
+    expect(wrapper.find('.conversation-pane__hero').exists()).toBe(false);
+    expect(wrapper.find('textarea').exists()).toBe(false);
+  });
+
+  it('keeps the empty hero for new agents without persisted history', () => {
+    const wrapper = mountPane({
+      agent,
+      messages: [],
+      isLoading: true,
+      isSending: false,
+    });
+
+    expect(wrapper.find('.conversation-history-loader').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Chat with Dina');
+    expect(wrapper.find('textarea').exists()).toBe(true);
+  });
+
   it('emits trimmed prompts from the composer', async () => {
     const wrapper = mountPane({
       agent,
@@ -167,9 +197,12 @@ describe('ConversationPane', () => {
   });
 });
 
-function mountPane(props: { messages: RendererMessage[]; agent: Agent | null; isSending: boolean }) {
+function mountPane(props: { messages: RendererMessage[]; agent: Agent | null; isSending: boolean; isLoading?: boolean }) {
   return mount(ConversationPane, {
-    props,
+    props: {
+      isLoading: false,
+      ...props,
+    },
     global: {
       plugins: [ElementPlus],
     },

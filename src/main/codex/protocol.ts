@@ -19,11 +19,18 @@ export type CodexThread = {
   id: string;
   cwd: string;
   status?: string;
+  turns?: CodexThreadTurn[];
 };
 
 export type CodexTurn = {
   id: string;
   status: string;
+};
+
+export type CodexThreadTurn = CodexTurn & {
+  items?: CodexThreadItem[];
+  startedAt?: number | null;
+  completedAt?: number | null;
 };
 
 export type CodexThreadActiveFlag = 'waitingOnApproval' | 'waitingOnUserInput';
@@ -58,6 +65,8 @@ export type ThreadStartResponse = {
   cwd?: string;
 };
 
+export type ThreadResumeResponse = ThreadStartResponse;
+
 export type TurnStartResponse = {
   turn: CodexTurn;
 };
@@ -85,6 +94,7 @@ export type CodexReasoningEffortOption = {
 
 export type CodexNotification =
   | { method: 'thread/started'; params: { thread: CodexThread } }
+  | { method: 'thread/settings/updated'; params: { threadId: string; threadSettings: unknown } }
   | { method: 'thread/status/changed'; params: { threadId: string; status: CodexThreadStatus } }
   | { method: 'turn/started'; params: { threadId: string; turn: CodexTurn } }
   | { method: 'item/agentMessage/delta'; params: { threadId: string; turnId: string; itemId: string; delta: string } }

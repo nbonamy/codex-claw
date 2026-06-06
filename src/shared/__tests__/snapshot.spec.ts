@@ -228,6 +228,151 @@ describe('snapshot reducer', () => {
     expect(snapshot.appServer).toStrictEqual({ status: 'running', detail: 'connected' });
   });
 
+  it('records thread settings updates as durable agent thread mappings', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].codexThreadId = 'thread-old';
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.settingsUpdated',
+      payload: {
+        threadSettings: {
+          cwd: '/Users/nbonamy/src/codex-claw',
+          model: 'gpt-5.5',
+        },
+      },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(snapshot.agents[0].codexThreadId).toBe('thread-1');
+  });
+
+  it('hydrates resumed thread history before current local prompts', () => {
+    const snapshot = createInitialSnapshot();
+
+    appendUserPrompt(snapshot, 'agent-dina', 'continue please', '2026-06-05T00:00:03.000Z');
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.historyLoaded',
+      payload: {
+        messages: [
+          {
+            id: 'user-thread-1-turn-old-user-old',
+            agentId: 'agent-dina',
+            role: 'user',
+            status: 'complete',
+            createdAt: '2026-06-05T00:00:01.000Z',
+            parts: [{ type: 'text', text: 'older prompt' }],
+          },
+          {
+            id: 'assistant-turn-old',
+            agentId: 'agent-dina',
+            role: 'assistant',
+            status: 'complete',
+            createdAt: '2026-06-05T00:00:02.000Z',
+            parts: [{ type: 'text', text: 'older answer' }],
+          },
+        ],
+      },
+      occurredAt: '2026-06-05T00:00:04.000Z',
+    });
+
+    expect(snapshot.messages.map((message) => message.id)).toStrictEqual([
+      'user-thread-1-turn-old-user-old',
+      'assistant-turn-old',
+      'message-20260605t000003000z',
+    ]);
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.historyLoaded',
+      payload: {
+        messages: [
+          {
+            id: 'user-thread-1-turn-old-user-old',
+            agentId: 'agent-dina',
+            role: 'user',
+            status: 'complete',
+            createdAt: '2026-06-05T00:00:01.000Z',
+            parts: [{ type: 'text', text: 'older prompt' }],
+          },
+          {
+            id: 'assistant-turn-old',
+            agentId: 'agent-dina',
+            role: 'assistant',
+            status: 'complete',
+            createdAt: '2026-06-05T00:00:02.000Z',
+            parts: [{ type: 'text', text: 'older answer refreshed' }],
+          },
+        ],
+      },
+      occurredAt: '2026-06-05T00:00:05.000Z',
+    });
+
+    expect(snapshot.messages).toHaveLength(3);
+    expect(snapshot.messages[0].id).toBe('user-thread-1-turn-old-user-old');
+    expect(snapshot.messages[1].parts).toStrictEqual([{ type: 'text', text: 'older answer refreshed' }]);
+    expect(snapshot.messages[2].id).toBe('message-20260605t000003000z');
+  });
+
+  it('ignores malformed resumed history payloads', () => {
+    const snapshot = createInitialSnapshot();
+    appendUserPrompt(snapshot, 'agent-dina', 'keep me', '2026-06-05T00:00:03.000Z');
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.historyLoaded',
+      payload: {
+        messages: [
+          {
+            id: 'wrong-agent-message',
+            agentId: 'agent-jesse',
+            role: 'assistant',
+            status: 'complete',
+            createdAt: '2026-06-05T00:00:02.000Z',
+            parts: [{ type: 'text', text: 'wrong agent' }],
+          },
+          {
+            id: 'bad-role-message',
+            agentId: 'agent-dina',
+            role: 'bot',
+            status: 'complete',
+            createdAt: '2026-06-05T00:00:02.000Z',
+            parts: [{ type: 'text', text: 'bad role' }],
+          },
+          {
+            id: 'bad-part-message',
+            agentId: 'agent-dina',
+            role: 'assistant',
+            status: 'complete',
+            createdAt: '2026-06-05T00:00:02.000Z',
+            parts: [{ type: 'text' }],
+          },
+        ],
+      },
+      occurredAt: '2026-06-05T00:00:04.000Z',
+    });
+
+    expect(snapshot.messages).toStrictEqual([
+      {
+        id: 'message-20260605t000003000z',
+        agentId: 'agent-dina',
+        role: 'user',
+        status: 'complete',
+        createdAt: '2026-06-05T00:00:03.000Z',
+        parts: [{ type: 'text', text: 'keep me' }],
+      },
+    ]);
+  });
+
   it('merges agent updates from main-process collaboration tools', () => {
     const snapshot = createInitialSnapshot();
 

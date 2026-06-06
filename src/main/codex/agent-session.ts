@@ -19,10 +19,12 @@ import type {
   CodexSessionEvent,
   CodexSessionPromptResult,
   CodexTurn,
+  ThreadResumeResponse,
   ThreadStartResponse,
   TurnStartResponse,
 } from './protocol';
 import { rawResponseItemToEvent } from './raw-response-item-adapter';
+import { codexThreadHistoryToRendererMessages } from './thread-history-adapter';
 
 type AgentSession = {
   agentId: string;
@@ -128,6 +130,16 @@ export class CodexAgentSessionManager {
     };
   }
 
+  async hydrateAgent(agent: Agent): Promise<string | null> {
+    if (!agent.codexThreadId) {
+      return null;
+    }
+
+    await this.start();
+    const session = await this.ensureSession(agent);
+    return session.threadId;
+  }
+
   onEvent(listener: EventListener): () => void {
     this.listeners.add(listener);
 
@@ -161,13 +173,24 @@ export class CodexAgentSessionManager {
       return existing;
     }
 
-    const response = await this.client.request<ThreadStartResponse>('thread/start', {
-      cwd: expandHome(agent.folder),
-      approvalPolicy: 'never',
-      sandbox: 'workspace-write',
-      serviceName: 'codex_claw',
-      ...buildCodexClawThreadConfig(agent, this.options.clawMcpEnabled ?? false),
-    });
+    const cwd = expandHome(agent.folder);
+    const threadConfig = buildCodexClawThreadConfig(agent, this.options.clawMcpEnabled ?? false);
+    const shouldResume = Boolean(agent.codexThreadId);
+    const response = shouldResume
+      ? await this.client.request<ThreadResumeResponse>('thread/resume', {
+        threadId: agent.codexThreadId,
+        cwd,
+        approvalPolicy: 'never',
+        sandbox: 'workspace-write',
+        ...threadConfig,
+      })
+      : await this.client.request<ThreadStartResponse>('thread/start', {
+        cwd,
+        approvalPolicy: 'never',
+        sandbox: 'workspace-write',
+        serviceName: 'codex_claw',
+        ...threadConfig,
+      });
 
     const session = {
       agentId: agent.id,
@@ -175,6 +198,20 @@ export class CodexAgentSessionManager {
     };
     this.sessionsByAgentId.set(agent.id, session);
     this.agentIdsByThreadId.set(session.threadId, agent.id);
+
+    if (shouldResume) {
+      const messages = codexThreadHistoryToRendererMessages(response.thread, agent.id);
+      if (messages.length > 0) {
+        this.emit({
+          agentId: agent.id,
+          threadId: session.threadId,
+          type: 'thread.historyLoaded',
+          payload: {
+            messages,
+          },
+        });
+      }
+    }
 
     return session;
   }
@@ -195,6 +232,17 @@ export class CodexAgentSessionManager {
             },
           });
         }
+        return;
+      }
+
+      case 'thread/settings/updated': {
+        const params = notification.params as { threadId: string; threadSettings: unknown };
+        this.emitForThread(params.threadId, {
+          type: 'thread.settingsUpdated',
+          payload: {
+            threadSettings: params.threadSettings,
+          },
+        });
         return;
       }
 

@@ -32,6 +32,11 @@
       </template>
     </WorkbenchLayout>
 
+    <ConversationHistoryLoader
+      v-else-if="isHydratingHistory"
+      class="conversation-pane__history-loader"
+    />
+
     <div
       v-else
       class="conversation-pane__hero"
@@ -62,12 +67,14 @@ import { computed } from 'vue';
 import type { Agent, ClientRequestResponse, CodexModelOption, ReasoningEffort, RendererMessage } from '../../shared/contracts';
 import WorkbenchLayout from './WorkbenchLayout.vue';
 import ChatComposer from './ChatComposer.vue';
+import ConversationHistoryLoader from './ConversationHistoryLoader.vue';
 import MessageList from '../shared/chat/MessageList.vue';
 import { rendererMessagesToChatMessages } from '../shared/chat/renderer-message-adapter';
 
 const props = defineProps<{
   messages: RendererMessage[];
   agent: Agent | null;
+  isLoading: boolean;
   isSending: boolean;
   answeredClientRequestIds?: Set<string>;
   codexModels?: CodexModelOption[];
@@ -93,6 +100,7 @@ const composerPlaceholder = computed(() => {
 
 const chatMessages = computed(() => rendererMessagesToChatMessages(props.messages));
 const started = computed(() => chatMessages.value.length > 0 || props.isSending);
+const isHydratingHistory = computed(() => Boolean(props.agent?.codexThreadId) && props.messages.length === 0 && props.isLoading);
 const heroHeadline = computed(() => (props.agent ? `Chat with ${props.agent.name}` : 'Select an agent'));
 const heroSubhead = computed(() => {
   if (!props.agent) {

@@ -143,6 +143,7 @@ export class AppController {
     ipcMain.handle(ipcChannels.selectAgent, async (_event, agentId: string) => {
       const snapshot = selectAgent(this.snapshot, agentId);
       await this.persistSnapshot();
+      await this.hydrateAgentHistory(agentId);
       return snapshot;
     });
 
@@ -188,6 +189,23 @@ export class AppController {
     return sendAgentPrompt(this.snapshot, await this.getCodexSessionManager(), agentId, prompt, options, (event) => {
       this.emitAndApply(event);
     });
+  }
+
+  private async hydrateAgentHistory(agentId: string): Promise<void> {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent?.codexThreadId) {
+      return;
+    }
+
+    try {
+      await (await this.getCodexSessionManager()).hydrateAgent(agent);
+    } catch (error) {
+      warnMain('codex-history', 'failed to hydrate persisted thread', {
+        agentId,
+        threadId: agent.codexThreadId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   private async chooseAgentFolder(): Promise<string | null> {
@@ -274,7 +292,7 @@ export class AppController {
 
     applyMainEventToSnapshot(this.snapshot, fullEvent);
     this.mainWindow?.webContents.send(ipcChannels.event, fullEvent);
-    if (fullEvent.type === 'thread.started') {
+    if (fullEvent.type === 'thread.started' || fullEvent.type === 'thread.settingsUpdated') {
       void this.persistSnapshot().catch((error: unknown) => {
         warnMain('state', 'failed to persist thread mapping', {
           error: error instanceof Error ? error.message : String(error),

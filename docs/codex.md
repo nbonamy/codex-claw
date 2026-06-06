@@ -79,6 +79,20 @@ the product mapping:
 One app-server process can host many threads. Agents are routed by `threadId`
 and app-owned `agentId`.
 
+If an agent has a persisted Codex thread id, main resumes it with
+`thread/resume` before starting the next turn. New agents without a thread id
+use `thread/start`. `thread/settings/updated` confirms the active thread
+settings and should update the app-owned agent/thread mapping so the id is
+saved in Electron `userData` and reused after relaunch.
+
+`thread/resume` returns the thread's `turns` in app-server protocol v2. Main
+must translate those turns into app-owned `RendererMessage`s and emit a
+history hydration event before the next turn streams. The renderer asks main
+to re-select the active persisted agent after subscribing to main events, so
+relaunch restores visible history without the renderer importing Codex protocol
+types. The same adapter should be reused later for `thread/read` if we add a
+read-only history loading path that does not resume the runtime session.
+
 ## Requests
 
 Important requests for the first product:
@@ -143,6 +157,7 @@ This keeps normal Codex config and normal Codex data untouched, including when
 Important notifications:
 
 - `thread/started`
+- `thread/settings/updated`
 - `thread/status/changed`
 - `turn/started`
 - `turn/completed`

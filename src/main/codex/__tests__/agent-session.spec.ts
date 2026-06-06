@@ -188,6 +188,227 @@ describe('CodexAgentSessionManager', () => {
     });
   });
 
+  it('resumes a persisted agent thread before starting a turn', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+    const events: unknown[] = [];
+    manager.onEvent((event) => events.push({
+      ...event,
+      occurredAt: '<now>',
+    }));
+    const persistedAgent: Agent = {
+      ...agent,
+      codexThreadId: 'thread-persisted',
+    };
+
+    const prompt = manager.sendPrompt(persistedAgent, 'continue');
+    await waitForSentCount(transport, 1);
+    transport.receive({
+      id: 1,
+      result: {
+        userAgent: 'codex',
+        codexHome: '/tmp/codex-home',
+        platformFamily: 'unix',
+        platformOs: 'macos',
+      },
+    });
+    await waitForSentCount(transport, 3);
+    transport.receive({
+      id: 2,
+      result: {
+        thread: {
+          id: 'thread-persisted',
+          cwd: '/Users/nbonamy/src/codex-claw',
+          turns: [
+            {
+              id: 'turn-history',
+              status: 'completed',
+              startedAt: 1_780_000_000,
+              completedAt: 1_780_000_010,
+              items: [
+                {
+                  type: 'userMessage',
+                  id: 'user-history',
+                  content: [
+                    {
+                      type: 'text',
+                      text: 'what did we do?',
+                      text_elements: [],
+                    },
+                  ],
+                },
+                {
+                  type: 'agentMessage',
+                  id: 'message-history',
+                  text: 'We built the first MVP.',
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+    await waitForSentCount(transport, 4);
+    transport.receive({
+      id: 3,
+      result: {
+        turn: {
+          id: 'turn-resumed',
+          status: 'running',
+        },
+      },
+    });
+
+    await expect(prompt).resolves.toStrictEqual({
+      threadId: 'thread-persisted',
+      turnId: 'turn-resumed',
+    });
+    expect(events).toStrictEqual([
+      {
+        seq: 1,
+        agentId: 'agent-dina',
+        threadId: 'thread-persisted',
+        type: 'thread.historyLoaded',
+        payload: {
+          messages: [
+            {
+              id: 'user-thread-persisted-turn-history-user-history',
+              agentId: 'agent-dina',
+              role: 'user',
+              status: 'complete',
+              createdAt: '2026-05-28T20:26:40.000Z',
+              parts: [{ type: 'text', text: 'what did we do?' }],
+            },
+            {
+              id: 'assistant-turn-history',
+              agentId: 'agent-dina',
+              role: 'assistant',
+              status: 'complete',
+              createdAt: '2026-05-28T20:26:40.000Z',
+              parts: [{ type: 'text', text: 'We built the first MVP.', itemId: 'message-history' }],
+            },
+          ],
+        },
+        occurredAt: '<now>',
+      },
+    ]);
+
+    expect(transport.sent).toContainEqual({
+      id: 2,
+      method: 'thread/resume',
+      params: {
+        threadId: 'thread-persisted',
+        cwd: expandHome('~/src/codex-claw'),
+        approvalPolicy: 'never',
+        sandbox: 'workspace-write',
+      },
+    });
+    expect(transport.sent).not.toContainEqual(expect.objectContaining({
+      method: 'thread/start',
+    }));
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 3,
+      method: 'turn/start',
+      params: {
+        threadId: 'thread-persisted',
+        input: [
+          {
+            type: 'text',
+            text: 'continue',
+            text_elements: [],
+          },
+        ],
+        cwd: expandHome('~/src/codex-claw'),
+      },
+    });
+  });
+
+  it('hydrates a persisted agent thread without starting a turn', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+    const events: unknown[] = [];
+    manager.onEvent((event) => events.push({
+      ...event,
+      occurredAt: '<now>',
+    }));
+
+    const hydration = manager.hydrateAgent({
+      ...agent,
+      codexThreadId: 'thread-persisted',
+    });
+    await waitForSentCount(transport, 1);
+    transport.receive({
+      id: 1,
+      result: {
+        userAgent: 'codex',
+        codexHome: '/tmp/codex-home',
+        platformFamily: 'unix',
+        platformOs: 'macos',
+      },
+    });
+    await waitForSentCount(transport, 3);
+    transport.receive({
+      id: 2,
+      result: {
+        thread: {
+          id: 'thread-persisted',
+          cwd: '/Users/nbonamy/src/codex-claw',
+          turns: [
+            {
+              id: 'turn-history',
+              status: 'completed',
+              startedAt: 1_780_000_000,
+              completedAt: 1_780_000_010,
+              items: [
+                {
+                  type: 'agentMessage',
+                  id: 'message-history',
+                  text: 'Restored.',
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+
+    await expect(hydration).resolves.toBe('thread-persisted');
+    expect(transport.sent).toContainEqual({
+      id: 2,
+      method: 'thread/resume',
+      params: {
+        threadId: 'thread-persisted',
+        cwd: expandHome('~/src/codex-claw'),
+        approvalPolicy: 'never',
+        sandbox: 'workspace-write',
+      },
+    });
+    expect(transport.sent).not.toContainEqual(expect.objectContaining({
+      method: 'turn/start',
+    }));
+    expect(events).toStrictEqual([
+      {
+        seq: 1,
+        agentId: 'agent-dina',
+        threadId: 'thread-persisted',
+        type: 'thread.historyLoaded',
+        payload: {
+          messages: [
+            {
+              id: 'assistant-turn-history',
+              agentId: 'agent-dina',
+              role: 'assistant',
+              status: 'complete',
+              createdAt: '2026-05-28T20:26:40.000Z',
+              parts: [{ type: 'text', text: 'Restored.', itemId: 'message-history' }],
+            },
+          ],
+        },
+        occurredAt: '<now>',
+      },
+    ]);
+  });
+
   it('lists Codex models and preserves app-server reasoning effort order', async () => {
     const transport = new FakeTransport();
     const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
@@ -594,6 +815,45 @@ describe('CodexAgentSessionManager', () => {
     });
 
     expect(events).toStrictEqual([]);
+  });
+
+  it('maps Codex thread settings updates into app-owned thread mapping events', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+    const events: unknown[] = [];
+    manager.onEvent((event) => events.push({
+      ...event,
+      occurredAt: '<now>',
+    }));
+
+    await resolveStartedPrompt(transport, manager);
+
+    transport.receive({
+      method: 'thread/settings/updated',
+      params: {
+        threadId: 'thread-1',
+        threadSettings: {
+          cwd: '/Users/nbonamy/src/codex-claw',
+          model: 'gpt-5.5',
+        },
+      },
+    });
+
+    expect(events).toStrictEqual([
+      {
+        seq: 1,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        type: 'thread.settingsUpdated',
+        payload: {
+          threadSettings: {
+            cwd: '/Users/nbonamy/src/codex-claw',
+            model: 'gpt-5.5',
+          },
+        },
+        occurredAt: '<now>',
+      },
+    ]);
   });
 
   it('maps Codex thread status notifications into agent status events', async () => {

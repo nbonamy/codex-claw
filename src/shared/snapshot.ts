@@ -199,6 +199,21 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     return;
   }
 
+  if (event.type === 'thread.historyLoaded') {
+    const payload = event.payload as { messages?: unknown };
+    const messages = rendererMessages(payload.messages, event.agentId);
+    hydrateAgentMessages(snapshot, event.agentId, messages);
+    return;
+  }
+
+  if (event.type === 'thread.settingsUpdated' && event.threadId) {
+    const agent = findAgent(snapshot, event.agentId);
+    if (agent) {
+      agent.codexThreadId = event.threadId;
+    }
+    return;
+  }
+
   if (event.type === 'turn.started') {
     setAgentStatus(snapshot, event.agentId, { type: 'working' });
     return;
@@ -329,6 +344,71 @@ function rendererToolPart(value: unknown): ToolPart | null {
   }
 
   return value as ToolPart;
+}
+
+function rendererMessages(value: unknown, agentId: string): RendererMessage[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((message): message is RendererMessage => {
+    if (
+      !isRecord(message) ||
+      typeof message.id !== 'string' ||
+      message.agentId !== agentId ||
+      !isRendererMessageRole(message.role) ||
+      !isRendererMessageStatus(message.status) ||
+      !Array.isArray(message.parts) ||
+      typeof message.createdAt !== 'string'
+    ) {
+      return false;
+    }
+
+    return message.parts.every(isRendererMessagePart);
+  });
+}
+
+function isRendererMessagePart(value: unknown): value is RendererMessagePart {
+  if (!isRecord(value) || typeof value.type !== 'string') {
+    return false;
+  }
+
+  if (value.type === 'text') {
+    return typeof value.text === 'string';
+  }
+
+  if (value.type === 'status') {
+    return typeof value.text === 'string';
+  }
+
+  return rendererToolPart(value) !== null;
+}
+
+function isRendererMessageRole(value: unknown): value is RendererMessage['role'] {
+  return value === 'user' || value === 'assistant' || value === 'system';
+}
+
+function isRendererMessageStatus(value: unknown): value is RendererMessage['status'] {
+  return value === 'complete' || value === 'streaming' || value === 'error';
+}
+
+function hydrateAgentMessages(snapshot: AppSnapshot, agentId: string, messages: RendererMessage[]): void {
+  if (messages.length === 0) {
+    return;
+  }
+
+  const hydratedIds = new Set(messages.map((message) => message.id));
+  snapshot.messages = snapshot.messages.filter((message) => {
+    return message.agentId !== agentId || !hydratedIds.has(message.id);
+  });
+
+  const firstAgentMessageIndex = snapshot.messages.findIndex((message) => message.agentId === agentId);
+  if (firstAgentMessageIndex === -1) {
+    snapshot.messages.push(...messages);
+    return;
+  }
+
+  snapshot.messages.splice(firstAgentMessageIndex, 0, ...messages);
 }
 
 function rendererToolPartUpdate(value: unknown): RendererToolPartUpdate | null {

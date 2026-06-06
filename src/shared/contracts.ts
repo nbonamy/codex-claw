@@ -134,6 +134,8 @@ export type MainToRendererEvent = {
     | 'agent.updated'
     | 'agent.statusChanged'
     | 'thread.started'
+    | 'thread.historyLoaded'
+    | 'thread.settingsUpdated'
     | 'turn.started'
     | 'turn.completed'
     | 'message.delta'

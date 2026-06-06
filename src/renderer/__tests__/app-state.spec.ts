@@ -114,6 +114,94 @@ describe('useAppState', () => {
     expect(state.visibleMessages.value).toStrictEqual(remoteSnapshot.messages);
   });
 
+  it('hydrates the active persisted thread after subscribing to main events', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0].codexThreadId = 'thread-persisted';
+    const hydratedSnapshot = {
+      ...remoteSnapshot,
+      messages: [
+        {
+          id: 'assistant-turn-history',
+          agentId: 'agent-dina',
+          role: 'assistant' as const,
+          status: 'complete' as const,
+          createdAt: '2026-06-05T00:00:00.000Z',
+          parts: [{ type: 'text' as const, text: 'Restored history.' }],
+        },
+      ],
+    };
+    const selectAgent = vi.fn().mockResolvedValue(hydratedSnapshot);
+    const onEvent = vi.fn();
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        selectAgent,
+        onEvent,
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    expect(onEvent).toHaveBeenCalledOnce();
+    expect(selectAgent).toHaveBeenCalledWith('agent-dina');
+    expect(state.visibleMessages.value).toStrictEqual(hydratedSnapshot.messages);
+  });
+
+  it('does not hydrate startup history for agents without a persisted thread', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const selectAgent = vi.fn();
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        selectAgent,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    expect(selectAgent).not.toHaveBeenCalled();
+    expect(state.activeAgent.value?.id).toBe('agent-dina');
+  });
+
+  it('does not hydrate startup history when no active agent is selected', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.activeAgentId = null;
+    const selectAgent = vi.fn();
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        selectAgent,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    expect(selectAgent).not.toHaveBeenCalled();
+    expect(state.activeAgent.value).toBeNull();
+  });
+
+  it('loads persisted thread metadata without hydration when the preload bridge cannot select agents', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0].codexThreadId = 'thread-persisted';
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    expect(state.activeAgent.value?.codexThreadId).toBe('thread-persisted');
+    expect(state.visibleMessages.value).toStrictEqual([]);
+  });
+
   it('switches active agents and displays that agent conversation only', async () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.messages = [
@@ -159,6 +247,25 @@ describe('useAppState', () => {
     expect(selectAgent).toHaveBeenCalledWith('agent-jesse');
     expect(state.activeAgent.value?.id).toBe('agent-jesse');
     expect(state.visibleMessages.value.map((message) => message.id)).toStrictEqual(['message-jesse']);
+  });
+
+  it('ignores missing team selections without calling main', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const selectTeam = vi.fn();
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        selectTeam,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await state.selectTeam('team-missing');
+
+    expect(selectTeam).not.toHaveBeenCalled();
+    expect(state.snapshot.value.activeTeamId).toBe('team-codex-claw');
   });
 
   it('sends prompts through preload and replaces the snapshot with the main result', async () => {

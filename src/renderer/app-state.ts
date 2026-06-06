@@ -47,6 +47,7 @@ export function useAppState() {
     try {
       snapshot.value = await window.codexClaw.getSnapshot();
       subscribeToMainEvents();
+      await hydrateActiveAgentHistory();
     } finally {
       isLoading.value = false;
     }
@@ -273,6 +274,19 @@ function subscribeToMainEvents(): void {
   unsubscribeMainEvents = window.codexClaw.onEvent((event: MainToRendererEvent) => {
     applyMainEventToSnapshot(snapshot.value, event);
   });
+}
+
+async function hydrateActiveAgentHistory(): Promise<void> {
+  const activeAgentId = snapshot.value.activeAgentId;
+  const activeAgent = activeAgentId
+    ? snapshot.value.agents.find((agent) => agent.id === activeAgentId)
+    : null;
+
+  if (!activeAgent?.codexThreadId || !window.codexClaw?.selectAgent) {
+    return;
+  }
+
+  snapshot.value = await window.codexClaw.selectAgent(activeAgent.id);
 }
 
 function markAgentSending(agentId: string, sending: boolean): void {
