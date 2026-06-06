@@ -19,12 +19,12 @@ export function signDarwinBinaries(
   const logger = deps.logger ?? console;
 
   if (!identify) {
-    logger.log('IDENTIFY_DARWIN_CODE not set, skipping macOS helper signing in afterCopy');
+    logger.log('IDENTIFY_DARWIN_CODE not set, skipping macOS helper signing in afterCopyExtraResources');
     return;
   }
 
-  const helperPath = path.join(buildPath, '../assets/apple-speechanalyzer-cli');
   const existsSync = deps.existsSync ?? fs.existsSync;
+  const helperPath = resolveAppleSpeechHelperPath(buildPath, existsSync);
   if (!existsSync(helperPath)) {
     logger.warn(`Apple speech helper not found for signing: ${helperPath}`);
     return;
@@ -41,4 +41,32 @@ export function signDarwinBinaries(
   ], {
     stdio: 'inherit',
   });
+}
+
+function resolveAppleSpeechHelperPath(
+  buildPath: string,
+  existsSync: (filePath: string) => boolean,
+): string {
+  const normalizedBuildPath = path.normalize(buildPath);
+  const resourcesAppPath = path.basename(normalizedBuildPath) === 'app'
+    && path.basename(path.dirname(normalizedBuildPath)) === 'Resources'
+    ? path.dirname(normalizedBuildPath)
+    : null;
+
+  const resourcePaths = [
+    resourcesAppPath,
+    path.extname(normalizedBuildPath) === '.app'
+      ? path.join(normalizedBuildPath, 'Contents', 'Resources')
+      : null,
+    path.join(normalizedBuildPath, 'Codex Claw.app', 'Contents', 'Resources'),
+    path.join(normalizedBuildPath, 'Electron.app', 'Contents', 'Resources'),
+    path.join(normalizedBuildPath, 'Contents', 'Resources'),
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  const helperPaths = resourcePaths.flatMap((resourcePath) => [
+    path.join(resourcePath, 'apple-speechanalyzer-cli'),
+    path.join(resourcePath, 'assets', 'apple-speechanalyzer-cli'),
+  ]);
+
+  return helperPaths.find((helperPath) => existsSync(helperPath)) ?? helperPaths[0];
 }

@@ -51,7 +51,7 @@ const config: ForgeConfig = {
     extraResource: ['assets/apple-speechanalyzer-cli'],
     extendInfo: 'build/Info.plist',
     ...(process.env.TEST ? {} : osxPackagerConfig),
-    afterCopy: [
+    afterCopyExtraResources: [
       (buildPath: string, _electronVersion: string, platform: string, arch: string, callback: (error?: Error) => void) => {
         try {
           if (platform === 'darwin') {
