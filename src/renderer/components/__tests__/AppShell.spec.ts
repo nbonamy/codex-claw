@@ -4,7 +4,7 @@ import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '../../../shared/snapshot';
-import type { Agent, AppSnapshot, CreateAgentInput, CreateTeamInput, UpdateAgentInput, UpdateTeamInput } from '../../../shared/contracts';
+import type { Agent, AppCommand, AppSnapshot, CodexClawApi, CreateAgentInput, CreateTeamInput, UpdateAgentInput, UpdateTeamInput } from '../../../shared/contracts';
 
 function pointerEvent(type: string, clientX: number): PointerEvent {
   const event = new MouseEvent(type, {
@@ -391,9 +391,87 @@ describe('AppShell', () => {
     }]]);
   });
 
+  it('emits keyboard shortcut actions for active teams and agents', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.teams.push({
+      id: 'team-skwad',
+      name: 'Skwad',
+      avatar: 'SK',
+      color: '#46A857',
+      agentIds: [],
+    });
+    const wrapper = mountShell({ snapshot });
 
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', metaKey: true, cancelable: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', metaKey: true, cancelable: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: '`', code: 'Backquote', metaKey: true, cancelable: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', ctrlKey: true, cancelable: true }));
+    await wrapper.setProps({ activeAgent: snapshot.agents[1] } as Record<string, unknown>);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', ctrlKey: true, shiftKey: true, cancelable: true }));
 
+    expect(wrapper.emitted('duplicate-agent')).toStrictEqual([['agent-dina']]);
+    expect(wrapper.emitted('close-agent')).toStrictEqual([['agent-dina']]);
+    expect(wrapper.emitted('select-team')).toStrictEqual([['team-skwad']]);
+    expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-jesse'], ['agent-dina']]);
+  });
 
+  it('cycles teams from the main-process app command channel', () => {
+    let listener: (command: AppCommand) => void = () => undefined;
+    const unsubscribe = vi.fn();
+    const onAppCommand = vi.fn((nextListener: (command: AppCommand) => void) => {
+      listener = nextListener;
+      return unsubscribe;
+    });
+    window.codexClaw = {
+      onAppCommand,
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const snapshot = createInitialSnapshot();
+    snapshot.teams.push({
+      id: 'team-skwad',
+      name: 'Skwad',
+      avatar: 'SK',
+      color: '#46A857',
+      agentIds: [],
+    });
+    const wrapper = mountShell({ snapshot });
+
+    expect(onAppCommand).toHaveBeenCalledOnce();
+    listener({ type: 'cycle-teams' });
+
+    expect(wrapper.emitted('select-team')).toStrictEqual([['team-skwad']]);
+
+    wrapper.unmount();
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it('ignores active-agent shortcuts when no agent is selected', () => {
+    const snapshot = createEmptySnapshot();
+    const wrapper = mountShell({
+      snapshot,
+    });
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', metaKey: true, cancelable: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', metaKey: true, cancelable: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: '`', code: 'Backquote', metaKey: true, cancelable: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', ctrlKey: true, cancelable: true }));
+
+    expect(wrapper.emitted('duplicate-agent')).toBeUndefined();
+    expect(wrapper.emitted('close-agent')).toBeUndefined();
+    expect(wrapper.emitted('select-team')).toBeUndefined();
+    expect(wrapper.emitted('select-agent')).toBeUndefined();
+  });
+
+  it('does not fire keyboard shortcuts while a dialog is open', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mountShell({ snapshot });
+
+    await wrapper.get('.agent-sidebar__new').trigger('click');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', metaKey: true, cancelable: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', ctrlKey: true, cancelable: true }));
+
+    expect(wrapper.emitted('duplicate-agent')).toBeUndefined();
+    expect(wrapper.emitted('select-agent')).toBeUndefined();
+  });
 });
 
 function mountShell(overrides: Partial<{

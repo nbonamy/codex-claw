@@ -76,6 +76,8 @@ describe('AgentHeader', () => {
     });
 
     expect(wrapper.text()).toContain('Running tests');
+    expect(wrapper.get('.agent-header__activity-line strong').text()).toBe('Running tests');
+    expect(wrapper.get('.agent-header__inline-status').text()).toBe('Running tests');
   });
 
   it.each([

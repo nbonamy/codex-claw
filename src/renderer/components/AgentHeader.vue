@@ -137,7 +137,7 @@ const agentStatusDetail = computed(() => {
       return 'Ready to get going';
   }
 });
-const activityTitle = computed(() => agentStatusLabel.value);
+const activityTitle = computed(() => props.agent?.statusText ?? agentStatusLabel.value);
 const gitStatusLabel = computed(() => 'Git status pending');
 </script>
 

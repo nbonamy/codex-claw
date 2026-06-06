@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, SendPromptOptions, UpdateAgentInput, UpdateTeamInput } from '../shared/contracts';
+import type { AppCommand, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, SendPromptOptions, UpdateAgentInput, UpdateTeamInput } from '../shared/contracts';
 import { ipcChannels } from '../shared/ipc';
 
 const api: CodexClawApi = {
@@ -27,6 +27,14 @@ const api: CodexClawApi = {
 
     return () => {
       ipcRenderer.off(ipcChannels.event, handler);
+    };
+  },
+  onAppCommand: (listener: (command: AppCommand) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: AppCommand) => listener(payload);
+    ipcRenderer.on(ipcChannels.appCommand, handler);
+
+    return () => {
+      ipcRenderer.off(ipcChannels.appCommand, handler);
     };
   },
 };

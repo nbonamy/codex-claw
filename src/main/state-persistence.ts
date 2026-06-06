@@ -16,6 +16,7 @@ type PersistedState = {
 type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'updatedAt'> & {
   avatar?: string;
   codexThreadId?: string;
+  statusText?: string;
   teamId?: string;
 };
 
@@ -60,6 +61,7 @@ function persistedAgentFromSnapshot(agent: Agent): PersistedAgent {
     avatar: agent.avatar,
     folder: agent.folder,
     codexThreadId: agent.codexThreadId,
+    statusText: agent.statusText,
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
   };
@@ -114,6 +116,7 @@ function sanitizeAgent(value: unknown): Agent | null {
     avatar: typeof value.avatar === 'string' ? value.avatar : undefined,
     folder: value.folder,
     codexThreadId: typeof value.codexThreadId === 'string' ? value.codexThreadId : undefined,
+    ...(typeof value.statusText === 'string' ? { statusText: value.statusText } : {}),
     status: { type: 'idle' },
     createdAt,
     updatedAt,

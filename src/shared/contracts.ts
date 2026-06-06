@@ -182,6 +182,9 @@ export type MainToRendererEvent = {
   occurredAt: string;
 };
 
+export type AppCommand =
+  | { type: 'cycle-teams' };
+
 export type CreateAgentInput = {
   name: string;
   folder: string;
@@ -263,4 +266,5 @@ export type CodexClawApi = {
   sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot>;
   respondToClientRequest(response: ClientRequestResponse): Promise<AppSnapshot>;
   onEvent(listener: (event: MainToRendererEvent) => void): () => void;
+  onAppCommand(listener: (command: AppCommand) => void): () => void;
 };

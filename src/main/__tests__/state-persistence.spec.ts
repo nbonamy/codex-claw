@@ -37,7 +37,7 @@ describe('AppStatePersistence', () => {
     expect(restored.activeAgentId).toBeNull();
   });
 
-  it('saves metadata without transcripts or app-server runtime state', async () => {
+  it('saves metadata and collaboration status without transcripts or app-server runtime state', async () => {
     const filePath = await tempStatePath();
     const persistence = new AppStatePersistence(filePath);
     const snapshot = createInitialSnapshot();
@@ -73,11 +73,11 @@ describe('AppStatePersistence', () => {
     expect(writtenAgent).not.toHaveProperty('contextUsage');
     expect(writtenAgent).not.toHaveProperty('isRegistered');
     expect(writtenAgent).not.toHaveProperty('mcpSessionId');
-    expect(writtenAgent).not.toHaveProperty('statusText');
+    expect(writtenAgent.statusText).toBe('Registered');
     expect(writtenAgent).not.toHaveProperty('status');
   });
 
-  it('resets transient agent fields while preserving metadata and thread ids on load', () => {
+  it('resets transient agent fields while preserving metadata, status text, and thread ids on load', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0] = {
       ...snapshot.agents[0],
@@ -97,6 +97,7 @@ describe('AppStatePersistence', () => {
       avatar: 'DI',
       folder: '~/src/codex-claw',
       codexThreadId: 'thread-dina',
+      statusText: 'Registered',
       status: { type: 'idle' },
       createdAt: '2026-06-05T00:00:00.000Z',
       updatedAt: '2026-06-05T00:00:00.000Z',

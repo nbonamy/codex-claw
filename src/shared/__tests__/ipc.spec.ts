@@ -23,6 +23,7 @@ describe('ipc channels', () => {
       sendPrompt: 'agent:send-prompt',
       respondToClientRequest: 'client-request:respond',
       event: 'app:event',
+      appCommand: 'app:command',
     });
   });
 });

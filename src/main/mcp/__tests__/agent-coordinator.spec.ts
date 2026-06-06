@@ -145,14 +145,26 @@ describe('ClawMcpAgentCoordinator', () => {
 
   it('updates and clears short status text', () => {
     const agents = cloneAgents(baseAgents);
+    const updates: Agent[] = [];
     const coordinator = new ClawMcpAgentCoordinator({
       getAgents: () => agents,
+      onAgentUpdated: (agent) => updates.push({ ...agent }),
       now: () => new Date('2026-06-05T00:00:05.000Z'),
     });
 
     expect(coordinator.setStatus('agent-dina', 'Implementing MCP')).toBe('Status updated');
+    expect(updates.at(-1)).toMatchObject({
+      id: 'agent-dina',
+      statusText: 'Implementing MCP',
+      updatedAt: '2026-06-05T00:00:05.000Z',
+    });
     expect(coordinator.listAgents('agent-dina').agents[0].status).toBe('Idle: Implementing MCP');
     expect(coordinator.setStatus('agent-dina', '')).toBe('Status updated');
+    expect(updates.at(-1)).toMatchObject({
+      id: 'agent-dina',
+      statusText: undefined,
+      updatedAt: '2026-06-05T00:00:05.000Z',
+    });
     expect(coordinator.listAgents('agent-dina').agents[0].status).toBe('Idle');
   });
 

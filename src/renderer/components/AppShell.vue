@@ -86,8 +86,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import type { Agent, AppSnapshot, ClientRequestResponse, CodexModelOption, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, Team, UpdateAgentInput, UpdateTeamInput } from '../../shared/contracts';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import type { Agent, AppCommand, AppSnapshot, ClientRequestResponse, CodexModelOption, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, Team, UpdateAgentInput, UpdateTeamInput } from '../../shared/contracts';
 import AgentDialog from './AgentDialog.vue';
 import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
@@ -125,7 +125,7 @@ const props = withDefaults(defineProps<{
   updateAgent: async () => undefined,
 });
 
-defineEmits<{
+const emit = defineEmits<{
   'close-team': [teamId: string];
   'close-agent': [agentId: string];
   'client-response': [response: ClientRequestResponse];
@@ -150,6 +150,7 @@ const editingAgentId = ref<string | null>(null);
 const teamDialogVisible = ref(false);
 const teamDialogMode = ref<'create' | 'edit'>('create');
 const editingTeamId = ref<string | null>(null);
+let unsubscribeAppCommand: (() => void) | null = null;
 const activeTeamAgents = computed(() => {
   const team = activeTeam.value;
   if (!team) {
@@ -181,6 +182,21 @@ const editingTeam = computed(() => (
   editingTeamId.value ? props.snapshot.teams.find((team) => team.id === editingTeamId.value) ?? null : null
 ));
 
+onMounted(() => {
+  if (typeof window.addEventListener === 'function') {
+    window.addEventListener('keydown', handleShellShortcut);
+  }
+  unsubscribeAppCommand = window.codexClaw?.onAppCommand?.(handleAppCommand) ?? null;
+});
+
+onBeforeUnmount(() => {
+  if (typeof window.removeEventListener === 'function') {
+    window.removeEventListener('keydown', handleShellShortcut);
+  }
+  unsubscribeAppCommand?.();
+  unsubscribeAppCommand = null;
+});
+
 function setAgentSidebarWidth(width: number): void {
   agentSidebarWidth.value = Math.min(Math.max(width, agentSidebarMinWidth), agentSidebarMaxWidth);
 }
@@ -211,6 +227,95 @@ function openEditAgent(agentId: string): void {
 
 function closeAgentDialog(): void {
   agentDialogVisible.value = false;
+}
+
+function handleShellShortcut(event: KeyboardEvent): void {
+  if (agentDialogVisible.value || teamDialogVisible.value) {
+    return;
+  }
+
+  if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'd') {
+    duplicateActiveAgent(event);
+    return;
+  }
+
+  if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'w') {
+    closeActiveAgent(event);
+    return;
+  }
+
+  if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && (event.key === '`' || event.code === 'Backquote')) {
+    if (cycleTeams()) {
+      event.preventDefault();
+    }
+    return;
+  }
+
+  if (event.ctrlKey && !event.metaKey && !event.altKey && event.key === 'Tab') {
+    cycleAgents(event, event.shiftKey ? -1 : 1);
+  }
+}
+
+function handleAppCommand(command: AppCommand): void {
+  if (agentDialogVisible.value || teamDialogVisible.value) {
+    return;
+  }
+
+  if (command.type === 'cycle-teams') {
+    cycleTeams();
+  }
+}
+
+function duplicateActiveAgent(event: KeyboardEvent): void {
+  const agent = currentAgent.value;
+  if (!agent) {
+    return;
+  }
+
+  event.preventDefault();
+  emit('duplicate-agent', agent.id);
+}
+
+function closeActiveAgent(event: KeyboardEvent): void {
+  const agent = currentAgent.value;
+  if (!agent) {
+    return;
+  }
+
+  event.preventDefault();
+  emit('close-agent', agent.id);
+}
+
+function cycleTeams(): boolean {
+  const teams = props.snapshot.teams;
+  if (teams.length < 2) {
+    return false;
+  }
+
+  const activeIndex = Math.max(teams.findIndex((team) => team.id === activeTeam.value?.id), 0);
+  const nextTeam = teams[(activeIndex + 1) % teams.length];
+  if (!nextTeam) {
+    return false;
+  }
+
+  emit('select-team', nextTeam.id);
+  return true;
+}
+
+function cycleAgents(event: KeyboardEvent, direction: 1 | -1): void {
+  const agents = activeTeamAgents.value;
+  if (agents.length < 2) {
+    return;
+  }
+
+  const activeIndex = Math.max(agents.findIndex((agent) => agent.id === currentAgent.value?.id), 0);
+  const nextAgent = agents[(activeIndex + direction + agents.length) % agents.length];
+  if (!nextAgent) {
+    return;
+  }
+
+  event.preventDefault();
+  emit('select-agent', nextAgent.id);
 }
 
 const activeTeam = computed<Team | null>(() => {
