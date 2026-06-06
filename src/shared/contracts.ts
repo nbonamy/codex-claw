@@ -131,6 +131,7 @@ export type RendererToolPartUpdate = {
 export type RendererMessage = {
   id: string;
   agentId: string;
+  kind?: 'steer';
   role: 'user' | 'assistant' | 'system';
   status: 'complete' | 'streaming' | 'error';
   parts: RendererMessagePart[];
@@ -169,6 +170,7 @@ export type MainToRendererEvent = {
     | 'thread.tokenUsageUpdated'
     | 'turn.started'
     | 'turn.completed'
+    | 'message.steer'
     | 'account.rateLimitsUpdated'
     | 'message.delta'
     | 'item.started'

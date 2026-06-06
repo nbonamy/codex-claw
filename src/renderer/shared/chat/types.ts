@@ -53,7 +53,7 @@ export type Message = {
   streaming?: boolean;
   suggestedPrompts?: MessageSuggestedPrompt[];
   toolCalls?: MessageToolCall[];
-  type?: 'compaction' | 'display' | 'text';
+  type?: 'compaction' | 'display' | 'steer' | 'text';
 };
 
 export type ChatModelOption = {

@@ -112,16 +112,29 @@ export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentIn
 }
 
 export function appendUserPrompt(snapshot: AppSnapshot, agentId: string, prompt: string, createdAt = new Date().toISOString()): RendererMessage {
-  const message: RendererMessage = {
-    id: `message-${createdAt.replace(/\W/g, '').toLowerCase()}`,
-    agentId,
-    role: 'user',
-    status: 'complete',
-    createdAt,
-    parts: [{ type: 'text', text: prompt }],
-  };
-
+  const message = createUserMessage(agentId, prompt, createdAt);
   snapshot.messages.push(message);
+
+  return message;
+}
+
+export function appendSteerPrompt(
+  snapshot: AppSnapshot,
+  agentId: string,
+  turnId: string,
+  prompt: string,
+  createdAt = new Date().toISOString(),
+): RendererMessage {
+  const activeAssistantMessage = findAssistantMessage(snapshot, agentId, turnId);
+  if (activeAssistantMessage?.parts.length === 0 && activeAssistantMessage.id.startsWith(`${assistantMessageId(turnId)}-segment-`)) {
+    snapshot.messages = snapshot.messages.filter((message) => message.id !== activeAssistantMessage.id);
+  } else if (activeAssistantMessage) {
+    activeAssistantMessage.status = 'complete';
+  }
+
+  const message = createUserMessage(agentId, prompt, createdAt, `steer-${turnId}`);
+  snapshot.messages.push(message);
+  ensureAssistantMessage(snapshot, agentId, turnId, assistantSegmentMessageId(turnId, createdAt), createdAt);
 
   return message;
 }
@@ -253,6 +266,14 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     return;
   }
 
+  if (event.type === 'message.steer' && event.turnId) {
+    const payload = event.payload as { prompt?: unknown };
+    if (typeof payload.prompt === 'string' && payload.prompt.trim()) {
+      appendSteerPrompt(snapshot, event.agentId, event.turnId, payload.prompt, event.occurredAt);
+    }
+    return;
+  }
+
   if ((event.type === 'item.started' || event.type === 'item.completed') && event.turnId) {
     const payload = event.payload as { toolPart?: unknown };
     const toolPart = rendererToolPart(payload.toolPart);
@@ -297,7 +318,7 @@ function updateAssistantToolPart(snapshot: AppSnapshot, agentId: string, turnId:
     return;
   }
 
-  let message = findAssistantMessage(snapshot, agentId, turnId);
+  let message = findAssistantMessageWithToolPart(snapshot, agentId, turnId, update.itemId) ?? findAssistantMessage(snapshot, agentId, turnId);
   let toolPart = message?.parts.find((part): part is ToolPart => {
     return part.type === 'tool' && part.id === update.itemId;
   });
@@ -451,7 +472,10 @@ function rendererMessages(value: unknown, agentId: string): RendererMessage[] {
       return false;
     }
 
-    return message.parts.every(isRendererMessagePart);
+    return (
+      (!('kind' in message) || message.kind === undefined || message.kind === 'steer') &&
+      message.parts.every(isRendererMessagePart)
+    );
   });
 }
 
@@ -540,7 +564,7 @@ function isToolStatus(value: unknown): value is ToolPart['status'] {
 }
 
 function upsertAssistantToolPart(snapshot: AppSnapshot, agentId: string, turnId: string, toolPart: ToolPart): void {
-  const message = ensureAssistantMessage(snapshot, agentId, turnId);
+  const message = findAssistantMessageWithToolPart(snapshot, agentId, turnId, toolPart.id) ?? ensureAssistantMessage(snapshot, agentId, turnId);
   const existingIndex = message.parts.findIndex((part) => part.type === 'tool' && part.id === toolPart.id);
 
   if (existingIndex >= 0) {
@@ -617,18 +641,15 @@ function applyApprovalRequest(snapshot: AppSnapshot, agentId: string, turnId: st
 }
 
 function findPendingMcpToolPart(snapshot: AppSnapshot, agentId: string, turnId: string, server: string, tool: string): ToolPart | undefined {
-  const message = findAssistantMessage(snapshot, agentId, turnId);
-  if (!message) {
-    return undefined;
-  }
+  const runningMcpTools = findAssistantMessages(snapshot, agentId, turnId).flatMap((message) => (
+    message.parts.filter((part): part is ToolPart => {
+      if (part.type !== 'tool' || part.kind !== 'mcp' || part.status !== 'running') {
+        return false;
+      }
 
-  const runningMcpTools = message.parts.filter((part): part is ToolPart => {
-    if (part.type !== 'tool' || part.kind !== 'mcp' || part.status !== 'running') {
-      return false;
-    }
-
-    return true;
-  });
+      return true;
+    })
+  ));
   const exactMatch = runningMcpTools.find((part) => {
     const metadataServer = isRecord(part.metadata) ? stringValue(part.metadata.server) : undefined;
     const metadataTool = isRecord(part.metadata) ? stringValue(part.metadata.tool) : undefined;
@@ -690,19 +711,27 @@ function appendAssistantDelta(snapshot: AppSnapshot, agentId: string, turnId: st
   }
 }
 
-function ensureAssistantMessage(snapshot: AppSnapshot, agentId: string, turnId: string): RendererMessage {
-  const message = findAssistantMessage(snapshot, agentId, turnId);
+function ensureAssistantMessage(
+  snapshot: AppSnapshot,
+  agentId: string,
+  turnId: string,
+  messageId = assistantMessageId(turnId),
+  createdAt = new Date().toISOString(),
+): RendererMessage {
+  const message = messageId === assistantMessageId(turnId)
+    ? findAssistantMessage(snapshot, agentId, turnId)
+    : snapshot.messages.find((candidate) => candidate.id === messageId && candidate.agentId === agentId);
 
   if (message) {
     return message;
   }
 
   const nextMessage: RendererMessage = {
-    id: assistantMessageId(turnId),
+    id: messageId,
     agentId,
     role: 'assistant',
     status: 'streaming',
-    createdAt: new Date().toISOString(),
+    createdAt,
     parts: [],
   };
   snapshot.messages.push(nextMessage);
@@ -710,18 +739,57 @@ function ensureAssistantMessage(snapshot: AppSnapshot, agentId: string, turnId: 
 }
 
 function completeAssistantMessage(snapshot: AppSnapshot, agentId: string, turnId: string): void {
-  const message = findAssistantMessage(snapshot, agentId, turnId);
-  if (message) {
+  for (const message of findAssistantMessages(snapshot, agentId, turnId)) {
     message.status = 'complete';
   }
+
+  const baseId = assistantMessageId(turnId);
+  snapshot.messages = snapshot.messages.filter((message) => (
+    message.agentId !== agentId ||
+    message.role !== 'assistant' ||
+    message.parts.length > 0 ||
+    !message.id.startsWith(`${baseId}-segment-`)
+  ));
 }
 
 function findAssistantMessage(snapshot: AppSnapshot, agentId: string, turnId: string): RendererMessage | undefined {
-  return snapshot.messages.find((message) => message.id === assistantMessageId(turnId) && message.agentId === agentId);
+  return findAssistantMessages(snapshot, agentId, turnId).at(-1);
+}
+
+function findAssistantMessages(snapshot: AppSnapshot, agentId: string, turnId: string): RendererMessage[] {
+  const baseId = assistantMessageId(turnId);
+  return snapshot.messages.filter((message) => (
+    message.agentId === agentId &&
+    message.role === 'assistant' &&
+    (message.id === baseId || message.id.startsWith(`${baseId}-segment-`))
+  ));
+}
+
+function findAssistantMessageWithToolPart(snapshot: AppSnapshot, agentId: string, turnId: string, itemId: string): RendererMessage | undefined {
+  return findAssistantMessages(snapshot, agentId, turnId).find((message) => (
+    message.parts.some((part) => part.type === 'tool' && part.id === itemId)
+  ));
 }
 
 function assistantMessageId(turnId: string): string {
   return `assistant-${turnId}`;
+}
+
+function assistantSegmentMessageId(turnId: string, createdAt: string): string {
+  return `${assistantMessageId(turnId)}-segment-${createdAt.replace(/\W/g, '').toLowerCase()}`;
+}
+
+function createUserMessage(agentId: string, prompt: string, createdAt: string, idPrefix = 'message'): RendererMessage {
+  const isSteer = idPrefix.startsWith('steer-');
+  return {
+    id: `${idPrefix}-${createdAt.replace(/\W/g, '').toLowerCase()}`,
+    agentId,
+    ...(isSteer ? { kind: 'steer' as const } : {}),
+    role: 'user',
+    status: 'complete',
+    createdAt,
+    parts: [{ type: 'text', text: prompt }],
+  };
 }
 
 function setAgentStatus(snapshot: AppSnapshot, agentId: string, status: AgentStatus): void {

@@ -3,6 +3,13 @@
     <div class="chat-message__compaction-line" />
     <span class="chat-message__compaction-title">Automatically compacting context</span>
   </div>
+  <!-- <div v-else-if="message.type === 'steer'" class="chat-message chat-message--steer">
+    <div class="chat-message__steer-line" />
+    <div class="chat-message__steer-body">
+      <span class="chat-message__steer-title">Steered conversation</span>
+      <span class="chat-message__steer-text">{{ message.content }}</span>
+    </div>
+  </div> -->
   <div
     v-else
     class="chat-message"
@@ -32,6 +39,9 @@
           class="chat-message__stream-dot"
           aria-label="Streaming"
         />
+      </div>
+      <div v-if="message.type === 'steer'" class="chat-message--steer">
+        Steered conversation
       </div>
     </div>
   </div>
@@ -109,6 +119,12 @@ function isVisibleAssistantBlock(block: MessageBlock) {
   min-height: 28px;
 }
 
+.chat-message--steer {
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+}
+
 .chat-message__compaction-line {
   position: absolute;
   left: 0;
@@ -124,6 +140,42 @@ function isVisibleAssistantBlock(block: MessageBlock) {
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
   font-weight: var(--font-weight-semibold);
+}
+
+.chat-message__steer-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 1px solid var(--color-border);
+}
+
+.chat-message__steer-body {
+  z-index: 1;
+  display: inline-flex;
+  max-width: min(100%, 640px);
+  align-items: baseline;
+  gap: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: var(--space-2) var(--space-6);
+  background: var(--color-surface-lowest);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-18);
+}
+
+.chat-message__steer-title {
+  flex: 0 0 auto;
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.chat-message__steer-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-message__body {

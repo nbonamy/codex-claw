@@ -233,6 +233,94 @@ describe('snapshot reducer', () => {
     expect(snapshot.messages.at(-1)?.status).toBe('complete');
   });
 
+  it('inserts steer prompts at the streaming point and resumes assistant output in a new segment', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'turn.started',
+      payload: { status: 'running' },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'message.delta',
+      payload: { itemId: 'msg-before', delta: 'I will inventory the Markdown files.' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 3,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'message.steer',
+      payload: { prompt: 'read all the markdown files' },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 4,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'message.delta',
+      payload: { itemId: 'msg-after', delta: 'Reading them now.' },
+      occurredAt: '2026-06-05T00:00:04.000Z',
+    });
+
+    expect(snapshot.messages).toStrictEqual([
+      {
+        id: 'assistant-turn-1',
+        agentId: 'agent-dina',
+        role: 'assistant',
+        status: 'complete',
+        createdAt: expect.any(String),
+        parts: [
+          { type: 'text', text: 'I will inventory the Markdown files.', itemId: 'msg-before' },
+        ],
+      },
+      {
+        id: 'steer-turn-1-20260605t000003000z',
+        agentId: 'agent-dina',
+        kind: 'steer',
+        role: 'user',
+        status: 'complete',
+        createdAt: '2026-06-05T00:00:03.000Z',
+        parts: [{ type: 'text', text: 'read all the markdown files' }],
+      },
+      {
+        id: 'assistant-turn-1-segment-20260605t000003000z',
+        agentId: 'agent-dina',
+        role: 'assistant',
+        status: 'streaming',
+        createdAt: '2026-06-05T00:00:03.000Z',
+        parts: [
+          { type: 'text', text: 'Reading them now.', itemId: 'msg-after' },
+        ],
+      },
+    ]);
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 5,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'turn.completed',
+      payload: { status: 'completed' },
+      occurredAt: '2026-06-05T00:00:05.000Z',
+    });
+
+    expect(snapshot.messages.filter((message) => message.role === 'assistant').map((message) => message.status)).toStrictEqual([
+      'complete',
+      'complete',
+    ]);
+  });
+
   it('records thread starts and app-server status updates', () => {
     const snapshot = createInitialSnapshot();
 
@@ -685,6 +773,68 @@ describe('snapshot reducer', () => {
         },
       },
       { type: 'text', text: 'Read docs/architecture.md.', itemId: 'msg-final' },
+    ]);
+  });
+
+  it('keeps tool updates attached to the segment where the tool originally appeared after steering', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'item.started',
+      payload: toolPartPayload(commandToolPart({
+        id: 'cmd-read',
+        title: 'cat docs/architecture.md',
+        status: 'running',
+        cwd: '/Users/nbonamy/src/codex-claw',
+      })),
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'message.steer',
+      payload: { prompt: 'also read testing.md' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 3,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'item.updated',
+      payload: commandOutputDeltaToToolPartUpdate('cmd-read', 'architecture contents'),
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+
+    expect(snapshot.messages[0].parts.at(0)).toMatchObject({
+      type: 'tool',
+      id: 'cmd-read',
+      body: 'architecture contents',
+    });
+    expect(snapshot.messages[2]).toMatchObject({
+      id: 'assistant-turn-1-segment-20260605t000002000z',
+      parts: [],
+    });
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 4,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'turn.completed',
+      payload: { status: 'completed' },
+      occurredAt: '2026-06-05T00:00:04.000Z',
+    });
+
+    expect(snapshot.messages.map((message) => message.id)).toStrictEqual([
+      'assistant-turn-1',
+      'steer-turn-1-20260605t000002000z',
     ]);
   });
 

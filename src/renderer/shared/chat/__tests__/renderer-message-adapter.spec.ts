@@ -76,6 +76,29 @@ describe('renderer message adapter', () => {
     expect(rendererMessageToChatMessage(rendererMessage).content).toBe('Codex app-server error');
   });
 
+  it('marks steered user messages for timeline rendering', () => {
+    const rendererMessage: RendererMessage = {
+      agentId: 'agent-dina',
+      createdAt: '2026-06-05T00:00:03.000Z',
+      id: 'steer-turn-1',
+      kind: 'steer',
+      parts: [{ type: 'text', text: 'read all the markdown files' }],
+      role: 'user',
+      status: 'complete',
+    };
+
+    expect(rendererMessageToChatMessage(rendererMessage)).toStrictEqual({
+      content: 'read all the markdown files',
+      createdAt: '2026-06-05T00:00:03.000Z',
+      id: 'steer-turn-1',
+      parts: [{ type: 'text', content: 'read all the markdown files' }],
+      role: 'user',
+      streaming: false,
+      toolCalls: [],
+      type: 'steer',
+    });
+  });
+
   it('maps failed and bodyless tools into displayable tool calls', () => {
     const rendererMessage: RendererMessage = {
       agentId: 'agent-dina',

@@ -256,7 +256,16 @@ export class AppController {
       return this.snapshot;
     }
 
-    await (await this.getCodexSessionManager()).steerPrompt(agent, trimmedPrompt);
+    const result = await (await this.getCodexSessionManager()).steerPrompt(agent, trimmedPrompt);
+    this.emitAndApply({
+      agentId,
+      threadId: result.threadId,
+      turnId: result.turnId,
+      type: 'message.steer',
+      payload: {
+        prompt: trimmedPrompt,
+      },
+    });
     return this.snapshot;
   }
 

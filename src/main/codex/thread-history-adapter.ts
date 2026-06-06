@@ -11,14 +11,37 @@ function codexTurnToRendererMessages(threadId: string, turn: CodexThreadTurn, ag
   const messages: RendererMessage[] = [];
   const assistantParts: RendererMessagePart[] = [];
   const createdAt = timestampToIso(turn.startedAt ?? turn.completedAt);
+  let assistantSegmentIndex = 0;
+  let sawAssistantActivity = false;
+
+  const flushAssistantMessage = () => {
+    if (assistantParts.length === 0) {
+      return;
+    }
+
+    const segmentSuffix = assistantSegmentIndex === 0 ? '' : `-segment-${assistantSegmentIndex}`;
+    messages.push({
+      id: `assistant-${turn.id}${segmentSuffix}`,
+      agentId,
+      role: 'assistant',
+      status: rendererMessageStatus(turn.status),
+      parts: [...assistantParts],
+      createdAt,
+    });
+    assistantParts.length = 0;
+    assistantSegmentIndex += 1;
+  };
 
   for (const item of Array.isArray(turn.items) ? turn.items : []) {
     if (item.type === 'userMessage') {
       const text = userMessageText(item);
       if (text) {
+        const isSteerMessage = sawAssistantActivity;
+        flushAssistantMessage();
         messages.push({
           id: `user-${threadId}-${turn.id}-${item.id ?? messages.length}`,
           agentId,
+          ...(isSteerMessage ? { kind: 'steer' as const } : {}),
           role: 'user',
           status: 'complete',
           parts: [{ type: 'text', text }],
@@ -31,6 +54,7 @@ function codexTurnToRendererMessages(threadId: string, turn: CodexThreadTurn, ag
     if (item.type === 'agentMessage') {
       const text = typeof item.text === 'string' ? item.text : '';
       if (text) {
+        sawAssistantActivity = true;
         assistantParts.push({ type: 'text', text, itemId: item.id });
       }
       continue;
@@ -39,6 +63,7 @@ function codexTurnToRendererMessages(threadId: string, turn: CodexThreadTurn, ag
     if (item.type === 'plan') {
       const text = typeof item.text === 'string' ? item.text : '';
       if (text) {
+        sawAssistantActivity = true;
         assistantParts.push({ type: 'text', text, itemId: item.id });
       }
       continue;
@@ -46,20 +71,12 @@ function codexTurnToRendererMessages(threadId: string, turn: CodexThreadTurn, ag
 
     const toolPart = codexThreadItemToToolPart(item);
     if (toolPart) {
+      sawAssistantActivity = true;
       assistantParts.push(toolPart);
     }
   }
 
-  if (assistantParts.length > 0) {
-    messages.push({
-      id: `assistant-${turn.id}`,
-      agentId,
-      role: 'assistant',
-      status: rendererMessageStatus(turn.status),
-      parts: assistantParts,
-      createdAt,
-    });
-  }
+  flushAssistantMessage();
 
   return messages;
 }

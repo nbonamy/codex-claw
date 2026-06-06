@@ -48,6 +48,27 @@ describe('MessageList', () => {
     expect(wrapper.find('.chat-message__stream-dot').exists()).toBe(true);
   });
 
+  it('renders steered conversation markers between messages', () => {
+    const wrapper = mount(MessageList, {
+      props: {
+        messages: [
+          messages[1],
+          {
+            id: 'steer-1',
+            role: 'user',
+            content: 'read every markdown file',
+            createdAt: '2026-06-05T00:00:02.000Z',
+            type: 'steer',
+          },
+        ],
+      },
+    });
+
+    expect(wrapper.text()).toContain('Steered conversation');
+    expect(wrapper.text()).toContain('read every markdown file');
+    expect(wrapper.find('.chat-message--steer').exists()).toBe(true);
+  });
+
   it('forwards message action events from chat messages', async () => {
     const wrapper = mount(MessageList, {
       props: {

@@ -107,4 +107,93 @@ describe('codexThreadHistoryToRendererMessages', () => {
       },
     ]);
   });
+
+  it('preserves mid-turn steering as a visible marker between assistant segments', () => {
+    const thread: CodexThread = {
+      id: 'thread-steered',
+      cwd: '/Users/nbonamy/src/codex-claw',
+      turns: [
+        {
+          id: 'turn-1',
+          status: 'completed',
+          startedAt: 1_780_000_000,
+          completedAt: 1_780_000_010,
+          items: [
+            {
+              type: 'userMessage',
+              id: 'user-1',
+              content: [
+                {
+                  type: 'text',
+                  text: 'read all markdown files',
+                  text_elements: [],
+                },
+              ],
+            },
+            {
+              type: 'agentMessage',
+              id: 'msg-1',
+              text: 'I will inventory the Markdown files.',
+            },
+            {
+              type: 'userMessage',
+              id: 'steer-1',
+              content: [
+                {
+                  type: 'text',
+                  text: 'actually read them too',
+                  text_elements: [],
+                },
+              ],
+            },
+            {
+              type: 'agentMessage',
+              id: 'msg-2',
+              text: 'Reading them now.',
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(codexThreadHistoryToRendererMessages(thread, 'agent-dina')).toStrictEqual([
+      {
+        id: 'user-thread-steered-turn-1-user-1',
+        agentId: 'agent-dina',
+        role: 'user',
+        status: 'complete',
+        createdAt: '2026-05-28T20:26:40.000Z',
+        parts: [{ type: 'text', text: 'read all markdown files' }],
+      },
+      {
+        id: 'assistant-turn-1',
+        agentId: 'agent-dina',
+        role: 'assistant',
+        status: 'complete',
+        createdAt: '2026-05-28T20:26:40.000Z',
+        parts: [
+          { type: 'text', text: 'I will inventory the Markdown files.', itemId: 'msg-1' },
+        ],
+      },
+      {
+        id: 'user-thread-steered-turn-1-steer-1',
+        agentId: 'agent-dina',
+        kind: 'steer',
+        role: 'user',
+        status: 'complete',
+        createdAt: '2026-05-28T20:26:40.000Z',
+        parts: [{ type: 'text', text: 'actually read them too' }],
+      },
+      {
+        id: 'assistant-turn-1-segment-1',
+        agentId: 'agent-dina',
+        role: 'assistant',
+        status: 'complete',
+        createdAt: '2026-05-28T20:26:40.000Z',
+        parts: [
+          { type: 'text', text: 'Reading them now.', itemId: 'msg-2' },
+        ],
+      },
+    ]);
+  });
 });

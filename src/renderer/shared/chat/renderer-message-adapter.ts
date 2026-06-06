@@ -29,7 +29,7 @@ export function rendererMessageToChatMessage(message: RendererMessage): Message 
     role: message.role === 'user' ? 'user' : 'assistant',
     streaming: message.status === 'streaming',
     toolCalls,
-    type: 'text',
+    type: message.kind === 'steer' ? 'steer' : 'text',
   };
 }
 
