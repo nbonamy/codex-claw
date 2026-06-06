@@ -174,15 +174,17 @@ function updateNumericTheme(key: 'chatFontSize' | 'codeFontSize' | 'uiFontSize',
 }
 </script>
 
-<style scoped>
+<style>
 
 .settings-dialog {
-  &:deep() {
-    .el-dialog__header {
-      padding: 0;
-    }
+  .el-dialog__header {
+    padding: var(--space-4) var(--space-16);
   }
 }
+
+</style>
+
+<style scoped>
 
 .settings-dialog__layout {
   display: grid;
@@ -199,14 +201,14 @@ function updateNumericTheme(key: 'chatFontSize' | 'codeFontSize' | 'uiFontSize',
 .settings-dialog__sidebar :deep(.el-menu) {
   border-right: 0;
   background: transparent;
-  padding: var(--space-4);
+  padding: var(--space-8) var(--space-2);
 }
 
 .settings-dialog__sidebar :deep(.el-menu-item) {
   height: 34px;
   border-radius: var(--radius-sm);
   color: var(--color-text-muted);
-  font-size: var(--font-size-14);
+  font-size: var(--font-size-15);
 }
 
 .settings-dialog__sidebar :deep(.el-menu-item:hover) {
@@ -215,12 +217,12 @@ function updateNumericTheme(key: 'chatFontSize' | 'codeFontSize' | 'uiFontSize',
 
 .settings-dialog__sidebar :deep(.el-menu-item.is-active) {
   color: var(--color-text);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-semibold);
 }
 
 .settings-dialog__panel {
   min-width: 0;
-  padding: var(--space-8);
+  padding: var(--space-8) var(--space-12);
   background: var(--color-surface-lowest);
 }
 

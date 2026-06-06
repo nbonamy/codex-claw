@@ -66,8 +66,6 @@ const usageRemainingLabel = computed(() => {
 <style scoped>
 
 .settings-menu__trigger {
-  width: var(--space-24);
-  height: var(--space-24);
   border: 0;
   background: transparent;
   cursor: pointer;
@@ -76,7 +74,8 @@ const usageRemainingLabel = computed(() => {
 .settings-menu__trigger svg {
   width: var(--icon-xl);
   height: var(--icon-xl);
-  stroke-width: 1px;
+  stroke-width: 1.25px;
+  transform: scale(1.15);
 }
 
 .settings-menu__usage {

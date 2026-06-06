@@ -154,6 +154,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   --team-rail-scale: 1.1;
   --team-rail-width: calc(var(--space-24) * var(--team-rail-scale));
   --team-rail-button-size: calc(var(--space-16) * var(--team-rail-scale));
+  --team-text-color: white;
   flex: 0 0 var(--team-rail-width);
   width: var(--team-rail-width);
   display: flex;
@@ -170,7 +171,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   height: var(--team-rail-button-size);
   border: 0;
   border-radius: var(--radius-full);
-  color: var(--color-text);
+  color: var(--team-text-color);
   font-size: var(--font-size-12);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-16);
@@ -178,7 +179,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 }
 
 .team-rail__team--active {
-  color: var(--color-text);
+  color: var(--team-text-color);
   box-shadow:
     0 0 0 2px var(--color-shell-rail),
     0 0 0 3px var(--color-primary);
