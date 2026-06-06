@@ -393,7 +393,9 @@ context fraction.
 
 The rate-limit notification is a sparse account-level update, not tied to an
 agent. Main emits `account.rateLimitsUpdated` and the reducer stores it as
-global app state.
+global app state. Main also persists the latest snapshot to `state.json` when
+this event arrives because the app-server only sends it opportunistically
+during streaming.
 
 ## Generated Protocol Types
 

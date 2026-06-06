@@ -451,6 +451,7 @@ export class AppController {
     this.mainWindow?.webContents.send(ipcChannels.event, fullEvent);
     if (
       fullEvent.type === 'agent.updated' ||
+      fullEvent.type === 'account.rateLimitsUpdated' ||
       fullEvent.type === 'thread.started' ||
       fullEvent.type === 'thread.settingsUpdated' ||
       fullEvent.type === 'thread.tokenUsageUpdated'

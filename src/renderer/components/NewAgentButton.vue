@@ -7,6 +7,7 @@
         aria-label="New Agent"
         @click="emitNewAgent"
       >
+        <PlusCircleIcon class="new-agent-button__icon" />
         <span class="new-agent-button__label">New Agent</span>
       </el-button>
       <el-popover
@@ -24,7 +25,7 @@
             aria-label="Open Bench"
             @click="toggleMenu"
           >
-            <ChevronDown class="new-agent-button__icon" />
+            <ChevronDown />
           </el-button>
         </template>
         <div v-if="menuVisible" class="new-agent-menu" role="menu" aria-label="New agent options">
@@ -85,7 +86,7 @@
 import { nextTick, ref } from 'vue';
 import { ElMessageBox } from 'element-plus';
 import type { BenchTemplate } from '../../shared/contracts';
-import { ChevronDown, PlusIcon, Trash2Icon } from '../shared/icons/app-icons';
+import { ChevronDown, PlusCircleIcon, Trash2Icon } from '../shared/icons/app-icons';
 import AgentAvatar from './AgentAvatar.vue';
 
 const props = defineProps<{
@@ -187,6 +188,10 @@ function folderBasename(folder: string): string {
   z-index: 0;
   background: color-mix(in srgb, var(--color-primary) 80%, var(--color-background));
   border-color: color-mix(in srgb, var(--color-primary) 80%, var(--color-background));
+}
+
+.new-agent-button__icon {
+  display: none;
 }
 
 .new-agent-button__label {
@@ -363,16 +368,18 @@ function folderBasename(folder: string): string {
   background: var(--color-surface-lowest);
 }
 
-@container (max-width: 140px) {
+@container (max-width: 180px) {
+  
   .new-agent-button__group {
     grid-template-columns: 1fr 1fr;
   }
 
-  .new-agent-button__primary,
-  .new-agent-button__chevron {
+  .new-agent-button__primary {
     min-width: 0;
     height: var(--space-20);
     min-height: var(--space-20);
+    border-top-right-radius: var(--new-agent-button-border-radius) !important;
+    border-bottom-right-radius: var(--new-agent-button-border-radius) !important;
     padding: 0;
   }
 
@@ -380,7 +387,15 @@ function folderBasename(folder: string): string {
     justify-content: center;
   }
 
+  .new-agent-button__icon {
+    display: block !important;
+  }
+
   .new-agent-button__label {
+    display: none;
+  }
+
+  .new-agent-button__chevron {
     display: none;
   }
 }

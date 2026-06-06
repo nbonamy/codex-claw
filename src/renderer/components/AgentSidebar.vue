@@ -466,6 +466,7 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 @container (max-width: 140px) {
+  
   .agent-sidebar__header {
     justify-content: center;
     padding: 0;
@@ -486,19 +487,20 @@ function onResizePointerEnd(event: PointerEvent): void {
     align-items: start;
     justify-items: center;
     gap: var(--space-4);
-    padding: var(--space-4) var(--space-2);
   }
 
   .agent-sidebar__agent {
     position: relative;
-    width: var(--space-20);
+    width: 100%;
     min-height: var(--space-20);
     grid-template-columns: var(--agent-sidebar-avatar-size);
     place-items: center;
     gap: 0;
     margin-bottom: 0;
-    padding: var(--space-2);
-    border-radius: var(--radius-full);
+    padding: var(--space-4) var(--space-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .agent-sidebar__meta {
@@ -507,14 +509,13 @@ function onResizePointerEnd(event: PointerEvent): void {
 
   .agent-sidebar__status {
     position: absolute;
-    right: var(--space-2);
-    bottom: var(--space-2);
-    border: 2px solid var(--color-surface-low);
+    left: calc(50% + 10px);
+    bottom: var(--space-4);
+    border: 1px solid var(--color-surface-low);
   }
 
   .agent-sidebar__footer {
     justify-items: center;
-    padding: var(--space-4) var(--space-2);
   }
 
 }

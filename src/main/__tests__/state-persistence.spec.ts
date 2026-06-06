@@ -43,6 +43,24 @@ describe('AppStatePersistence', () => {
     const persistence = new AppStatePersistence(filePath);
     const snapshot = createInitialSnapshot();
     snapshot.appServer = { status: 'running', detail: 'connected' };
+    snapshot.accountRateLimits = {
+      limitId: 'codex',
+      limitName: null,
+      primary: {
+        usedPercent: 62,
+        windowDurationMins: 300,
+        resetsAt: 1_780_756_682,
+      },
+      secondary: {
+        usedPercent: 50,
+        windowDurationMins: 10_080,
+        resetsAt: 1_781_140_878,
+      },
+      credits: null,
+      individualLimit: null,
+      planType: 'pro',
+      rateLimitReachedType: null,
+    };
     snapshot.agents[0] = {
       ...snapshot.agents[0],
       codexThreadId: 'thread-dina',
@@ -68,6 +86,7 @@ describe('AppStatePersistence', () => {
     const written = JSON.parse(await readFile(filePath, 'utf8')) as Record<string, unknown>;
     expect(written).not.toHaveProperty('messages');
     expect(written).not.toHaveProperty('appServer');
+    expect(written.accountRateLimits).toStrictEqual(snapshot.accountRateLimits);
     expect(written.activeTeamId).toBe('team-codex-claw');
     const writtenAgent = (written.agents as Array<Record<string, unknown>>)[0];
     expect(writtenAgent.codexThreadId).toBe('thread-dina');
@@ -89,6 +108,24 @@ describe('AppStatePersistence', () => {
 
   it('resets transient agent fields while preserving metadata, status text, and thread ids on load', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.accountRateLimits = {
+      limitId: 'codex',
+      limitName: null,
+      primary: {
+        usedPercent: 62,
+        windowDurationMins: 300,
+        resetsAt: 1_780_756_682,
+      },
+      secondary: {
+        usedPercent: 50,
+        windowDurationMins: 10_080,
+        resetsAt: 1_781_140_878,
+      },
+      credits: null,
+      individualLimit: null,
+      planType: 'pro',
+      rateLimitReachedType: null,
+    };
     snapshot.agents[0] = {
       ...snapshot.agents[0],
       codexThreadId: 'thread-dina',
@@ -134,6 +171,7 @@ describe('AppStatePersistence', () => {
     });
     expect(restored.messages).toStrictEqual([]);
     expect(restored.appServer.status).toBe('notConfigured');
+    expect(restored.accountRateLimits).toStrictEqual(snapshot.accountRateLimits);
   });
 
   it('drops invalid persisted context usage', () => {

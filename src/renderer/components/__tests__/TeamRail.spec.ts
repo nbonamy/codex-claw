@@ -71,7 +71,7 @@ describe('TeamRail', () => {
     expect(wrapper.emitted('new-team')).toStrictEqual([[]]);
   });
 
-  it('shows usage remaining and emits settings menu actions', async () => {
+  it('shows rate limits and emits settings menu actions', async () => {
     const wrapper = mountRail({
       teams,
       activeTeamId: 'team-sk',
@@ -81,9 +81,13 @@ describe('TeamRail', () => {
         primary: {
           usedPercent: 32,
           windowDurationMins: 300,
-          resetsAt: null,
+          resetsAt: 1_780_756_682,
         },
-        secondary: null,
+        secondary: {
+          usedPercent: 50,
+          windowDurationMins: 10_080,
+          resetsAt: 1_781_140_878,
+        },
         credits: null,
         individualLimit: null,
         planType: 'pro',
@@ -91,8 +95,10 @@ describe('TeamRail', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('Usage remaining');
+    expect(wrapper.text()).toContain('5h');
     expect(wrapper.text()).toContain('68%');
+    expect(wrapper.text()).toContain('Weekly');
+    expect(wrapper.text()).toContain('50%');
     await wrapper.findAll('button').find((button) => button.text() === 'Settings')?.trigger('click');
     await wrapper.findAll('button').find((button) => button.text() === 'Quit')?.trigger('click');
 

@@ -56,6 +56,43 @@ describe('AppController', () => {
     expect(persistence.save).toHaveBeenCalledWith(snapshot);
   });
 
+  it('persists account rate-limit updates emitted by Codex', async () => {
+    const snapshot = createInitialSnapshot();
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const rateLimits = {
+      limitId: 'codex',
+      limitName: null,
+      primary: {
+        usedPercent: 62,
+        windowDurationMins: 300,
+        resetsAt: 1_780_756_682,
+      },
+      secondary: {
+        usedPercent: 50,
+        windowDurationMins: 10_080,
+        resetsAt: 1_781_140_878,
+      },
+      credits: null,
+      individualLimit: null,
+      planType: 'pro',
+      rateLimitReachedType: null,
+    };
+
+    await controller.initialize();
+    emitAndApply(controller, {
+      type: 'account.rateLimitsUpdated',
+      payload: { rateLimits },
+    });
+    await flushMicrotasks();
+
+    expect(snapshot.accountRateLimits).toStrictEqual(rateLimits);
+    expect(persistence.save).toHaveBeenCalledWith(snapshot);
+  });
+
   it('interrupts the active Codex turn and keeps status until completion arrives', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].status = { type: 'working' };

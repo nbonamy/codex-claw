@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { Agent, AgentContextUsage, AppSnapshot, BenchTemplate, Team } from '../shared/contracts';
+import type { AccountRateLimits, Agent, AgentContextUsage, AppSnapshot, BenchTemplate, Team } from '../shared/contracts';
 import { normalizeThemeSettings } from '../shared/settings';
 import { createEmptySnapshot } from '../shared/snapshot';
 import { defaultTeamColor } from '../shared/team-colors';
@@ -11,6 +11,7 @@ type PersistedState = {
   bench: BenchTemplate[];
   activeTeamId: string | null;
   activeAgentId: string | null;
+  accountRateLimits?: AccountRateLimits;
   theme: AppSnapshot['theme'];
 };
 
@@ -51,6 +52,7 @@ export function persistedStateFromSnapshot(snapshot: AppSnapshot): PersistedStat
     bench: snapshot.bench.map((template) => ({ ...template })),
     activeTeamId: snapshot.activeTeamId,
     activeAgentId: snapshot.activeAgentId,
+    ...(snapshot.accountRateLimits ? { accountRateLimits: { ...snapshot.accountRateLimits } } : {}),
     theme: { ...snapshot.theme },
   };
 }
@@ -82,6 +84,7 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
   const teams = Array.isArray(value.teams)
     ? value.teams.map((team) => sanitizeTeam(team, agents)).filter((team): team is Team => Boolean(team))
     : seed.teams;
+  const accountRateLimits = sanitizeAccountRateLimits(value.accountRateLimits);
   const snapshot: AppSnapshot = {
     ...seed,
     teams: teams.length > 0 ? teams : seed.teams,
@@ -91,6 +94,7 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
       : seed.bench,
     activeTeamId: typeof value.activeTeamId === 'string' ? value.activeTeamId : null,
     activeAgentId: typeof value.activeAgentId === 'string' ? value.activeAgentId : null,
+    ...(accountRateLimits ? { accountRateLimits } : {}),
     theme: normalizeThemeSettings(value.theme),
     messages: [],
     appServer: seed.appServer,
@@ -168,6 +172,39 @@ function nullableNumber(value: unknown): number | null | undefined {
   }
 
   return typeof value === 'number' ? value : undefined;
+}
+
+function sanitizeAccountRateLimits(value: unknown): AccountRateLimits | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  return {
+    limitId: nullableString(value.limitId),
+    limitName: nullableString(value.limitName),
+    primary: sanitizeAccountRateLimitWindow(value.primary),
+    secondary: sanitizeAccountRateLimitWindow(value.secondary),
+    credits: value.credits ?? null,
+    individualLimit: value.individualLimit ?? null,
+    planType: nullableString(value.planType),
+    rateLimitReachedType: nullableString(value.rateLimitReachedType),
+  };
+}
+
+function sanitizeAccountRateLimitWindow(value: unknown): AccountRateLimits['primary'] {
+  if (!isRecord(value) || typeof value.usedPercent !== 'number') {
+    return null;
+  }
+
+  return {
+    usedPercent: value.usedPercent,
+    windowDurationMins: typeof value.windowDurationMins === 'number' ? value.windowDurationMins : null,
+    resetsAt: typeof value.resetsAt === 'number' ? value.resetsAt : null,
+  };
+}
+
+function nullableString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
 }
 
 function sanitizeTeam(value: unknown, agents: Agent[]): Team | null {

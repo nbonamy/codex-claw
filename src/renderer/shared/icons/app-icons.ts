@@ -1,6 +1,7 @@
 export {
   IconBolt as BoltIcon,
   IconBookmark as SaveToBenchIcon,
+  IconBrandSpeedtest as BrandSpeedTest,
   IconCheck as CheckIcon,
   IconChevronDown as ChevronDown,
   IconChevronUp as ChevronUp,
@@ -21,6 +22,7 @@ export {
   IconPencil as PencilIcon,
   IconPhoto as PhotoIcon,
   IconPlus as PlusIcon,
+  IconCirclePlus as PlusCircleIcon,
   IconRefresh as RefreshIcon,
   IconSettings as SettingsIcon,
   IconSparkleHighlight as SparklesIcon,
