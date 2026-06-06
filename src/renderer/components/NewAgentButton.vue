@@ -369,7 +369,6 @@ function folderBasename(folder: string): string {
 }
 
 @container (max-width: 180px) {
-  
   .new-agent-button__group {
     grid-template-columns: 1fr 1fr;
   }
@@ -380,11 +379,8 @@ function folderBasename(folder: string): string {
     min-height: var(--space-20);
     border-top-right-radius: var(--new-agent-button-border-radius) !important;
     border-bottom-right-radius: var(--new-agent-button-border-radius) !important;
-    padding: 0;
-  }
-
-  .new-agent-button__primary {
     justify-content: center;
+    padding: 0;
   }
 
   .new-agent-button__icon {
