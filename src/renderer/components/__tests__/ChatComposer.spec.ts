@@ -159,6 +159,20 @@ describe('ChatComposer', () => {
     expect(wrapper.emitted('update:planMode')).toStrictEqual([[false]]);
   });
 
+  it('removes active mode chips through their remove affordance', async () => {
+    const wrapper = mountComposer({
+      goalMode: true,
+      planMode: true,
+    });
+
+    const removeButtons = wrapper.findAll('.chat-composer__mode__remove');
+    await removeButtons[0].trigger('click');
+    await removeButtons[1].trigger('click');
+
+    expect(wrapper.emitted('update:planMode')).toStrictEqual([[false]]);
+    expect(wrapper.emitted('update:goalMode')).toStrictEqual([[false]]);
+  });
+
   it('disables sending without text or without an agent but keeps busy drafts submittable', async () => {
     const empty = mountComposer();
     expect(empty.get('.chat-composer__send').attributes()).toHaveProperty('disabled');
@@ -270,6 +284,25 @@ describe('ChatComposer', () => {
     expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('');
   });
 
+  it('submits Codex plan from the slash command menu without showing a slash prefix', async () => {
+    const wrapper = mountComposer({
+      commands: codexBackendCommands,
+      skills,
+    });
+
+    await wrapper.get('textarea').setValue('/pla');
+    await wrapper.get('textarea').trigger('keyup');
+
+    expect(wrapper.find('.chat-composer-slash-menu').exists()).toBe(true);
+    expect(wrapper.text()).toContain('plan');
+    expect(wrapper.text()).not.toContain('/plan');
+
+    await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
+
+    expect(wrapper.emitted('send')).toStrictEqual([['/plan']]);
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('');
+  });
+
   it('falls through from slash commands to skills after command rows', async () => {
     const wrapper = mountComposer({
       commands: codexBackendCommands,
@@ -282,6 +315,7 @@ describe('ChatComposer', () => {
     expect(wrapper.text()).toContain('Commands');
     expect(wrapper.text()).toContain('Skills');
 
+    await wrapper.get('textarea').trigger('keydown', { key: 'ArrowDown' });
     await wrapper.get('textarea').trigger('keydown', { key: 'ArrowDown' });
     await wrapper.get('textarea').trigger('keydown', { key: 'ArrowDown' });
     await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });

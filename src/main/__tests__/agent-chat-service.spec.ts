@@ -118,6 +118,28 @@ describe('agent chat service', () => {
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
   });
 
+  it('routes backend review instructions without appending visible user prompts', async () => {
+    const snapshot = createInitialSnapshot();
+    const completion = deferred<BackendSendResult>();
+    const backendDriver = createFakeBackendDriver(Promise.resolve({ backendSession: { kind: 'codex', threadId: 'thread-ignored' } }));
+    backendDriver.tryHandlePromptCommand = vi.fn().mockReturnValue(completion.promise);
+
+    sendAgentPrompt(snapshot, backendDriver, 'agent-dina', '/review check regressions', undefined, vi.fn());
+
+    expect(backendDriver.tryHandlePromptCommand).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), '/review check regressions');
+    expect(backendDriver.sendPrompt).not.toHaveBeenCalled();
+    expect(snapshot.messages).toHaveLength(0);
+    expect(snapshot.agents[0].status).toStrictEqual({ type: 'starting' });
+
+    completion.resolve({
+      backendSession: { kind: 'codex', threadId: 'thread-review' },
+    });
+    await flushMicrotasks();
+
+    expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-review' });
+    expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
+  });
+
   it('passes selected model and reasoning effort to the session manager', () => {
     const snapshot = createInitialSnapshot();
     const backendDriver = createFakeBackendDriver(Promise.resolve({ backendSession: { kind: 'codex', threadId: 'thread-1' }, turnId: 'turn-1' }));

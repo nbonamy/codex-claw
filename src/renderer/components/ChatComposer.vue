@@ -82,10 +82,13 @@
       >
         <span
           v-for="mode in activeModes"
-          :key="mode"
+          :key="mode.label"
           class="chat-composer__mode"
+          :class="[`chat-composer__mode__${mode.tint}`]"
         >
-          {{ mode }}
+          <component :is="mode.icon" class="chat-composer__mode__icon" />
+          <CircleXIcon class="chat-composer__mode__remove" @click="removeActiveMode(mode.mode)" />
+          {{ mode.label }}
         </span>
       </div>
       <ChatContextUsageIndicator :context-usage="contextUsage" />
@@ -140,7 +143,7 @@ import { filterComposerCommands, findActiveCommandSlash, type ActiveCommandSlash
 import { filterComposerSkills, findActiveSkillTrigger, type ActiveSkillSlash } from '../shared/chat/composer-skills';
 import { BrowserAudioRecorder, isBrowserAudioRecordingSupported } from '../shared/audio/browser-audio-recorder';
 import { transcribeRecordedAudio } from '../shared/audio/apple-speech-transcription';
-import { MicrophoneIcon } from '../shared/icons/app-icons';
+import { CircleXIcon, ListDetailsIcon, MicrophoneIcon, TargetArrowIcon } from '../shared/icons/app-icons';
 import ChatComposerWaveform from '../shared/chat/ChatComposerWaveform.vue';
 
 const props = defineProps<{
@@ -222,10 +225,24 @@ const voiceButtonTitle = computed(() => {
 
   return voiceButtonLabel.value;
 });
-const activeModes = computed(() => [
-  ...(effectiveBackendCapabilities.value.planMode !== 'unsupported' && props.planMode ? ['Plan'] : []),
-  ...(effectiveBackendCapabilities.value.goalMode && props.goalMode ? ['Goal'] : []),
-]);
+type ActiveComposerMode = {
+  icon: typeof ListDetailsIcon;
+  label: string;
+  mode: 'goal' | 'plan';
+  tint: 'info' | 'success';
+};
+
+const activeModes = computed<ActiveComposerMode[]>(() => {
+  const modes: ActiveComposerMode[] = [];
+  if (effectiveBackendCapabilities.value.planMode !== 'unsupported' && props.planMode) {
+    modes.push({ mode: 'plan', label: 'Plan', tint: 'info', icon: ListDetailsIcon });
+  }
+  if (effectiveBackendCapabilities.value.goalMode && props.goalMode) {
+    modes.push({ mode: 'goal', label: 'Goal', tint: 'success', icon: TargetArrowIcon });
+  }
+
+  return modes;
+});
 const activeFileMention = computed<ActiveComposerMention | null>(() => findActiveFileMention(prompt.value, caretPosition.value));
 const visibleFiles = computed(() => {
   const mention = activeFileMention.value;
@@ -513,6 +530,15 @@ function handleTextareaKeydown(event: KeyboardEvent): void {
   }
 }
 
+function removeActiveMode(mode: ActiveComposerMode['mode']): void {
+  if (mode === 'plan') {
+    emit('update:planMode', false);
+    return;
+  }
+
+  emit('update:goalMode', false);
+}
+
 function handleTextareaInput(): void {
   updateCaretPosition();
   resizeTextarea();
@@ -742,6 +768,7 @@ function resizeTextareaSoon(): void {
 .chat-composer__mode {
   display: inline-flex;
   align-items: center;
+  gap: var(--space-2);
   min-height: 24px;
   padding: 0 var(--space-4);
   border-radius: var(--radius-full);
@@ -750,6 +777,29 @@ function resizeTextareaSoon(): void {
   font-size: var(--font-size-13);
   font-weight: var(--font-weight-medium);
   line-height: var(--line-height-18);
+}
+
+.chat-composer__mode svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+.chat-composer__mode .chat-composer__mode__remove {
+  display: none;
+}
+
+.chat-composer__mode:hover .chat-composer__mode__icon {
+  display: none;
+}
+
+.chat-composer__mode:hover .chat-composer__mode__remove {
+  cursor: pointer;
+  display: inline;
+}
+
+.chat-composer__mode.chat-composer__mode__info {
+  background-color: var(--color-secondary-container);
+  color: var(--color-on-secondary-container);
 }
 
 .chat-composer__voice {

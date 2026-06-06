@@ -161,16 +161,28 @@ from `/` command search resolves the same way. Main then appends Codex
 
 Composer shortcuts are split by surface: `@` searches files, `$` searches
 skills, and `/` searches backend commands first, then matching skills. The
-initial Codex command catalog includes `compact` and `review` without a visible
-slash prefix in the menu. Selecting one submits the corresponding slash form
-through the normal composer path, but the Codex driver intercepts recognized
-slash commands before appending a visible user message or calling `turn/start`:
+initial Codex command catalog includes `compact`, `review`, and `plan` without
+a visible slash prefix in the menu. Selecting one submits the corresponding
+slash form through the normal composer path.
+
+`compact` and `review` are backend prompt commands. The Codex driver intercepts
+recognized slash commands before appending a visible user message or calling
+`turn/start`:
 
 - bare `/compact` calls `thread/compact/start` with the active `threadId`;
 - bare `/review` calls `review/start` with `target.type = "uncommittedChanges"`;
 - `/review <instructions>` calls `review/start` with a custom review target;
 - `/compact <text>` remains a normal prompt because Codex's compact RPC does
   not accept inline instructions.
+
+`plan` is handled earlier in the renderer/app prompt path because Codex CLI
+semantics change the composer mode, then optionally submit stripped text:
+
+- bare `/plan` enables Plan mode, clears the composer, and does not call
+  `sendPrompt`;
+- `/plan <prompt>` enables Plan mode and submits `<prompt>` as a normal visible
+  user prompt with `planMode: true`;
+- `/plan` while Plan mode is already enabled keeps Plan mode enabled.
 
 `review/start` uses `delivery: "inline"`, so app-server should return the same
 `reviewThreadId` as the active thread. Main treats a different review thread id

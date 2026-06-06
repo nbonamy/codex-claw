@@ -19,6 +19,15 @@ export const codexBackendCommands: BackendCommandSummary[] = [
     slashName: 'review',
     submitOnSelect: true,
   },
+  {
+    id: 'codex.plan',
+    backend: 'codex',
+    name: 'plan',
+    displayName: 'Plan',
+    description: 'Switch to Codex Plan mode.',
+    slashName: 'plan',
+    submitOnSelect: true,
+  },
 ];
 
 export const claudeBackendCommands: BackendCommandSummary[] = [];

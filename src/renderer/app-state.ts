@@ -82,7 +82,15 @@ export function useAppState() {
       return;
     }
 
-    const trimmed = prompt.trim();
+    const parsedPlanCommand = parsePlanSlashCommand(prompt);
+    if (parsedPlanCommand) {
+      planMode.value = true;
+      if (!parsedPlanCommand.prompt) {
+        return;
+      }
+    }
+
+    const trimmed = parsedPlanCommand?.prompt ?? prompt.trim();
     if (!trimmed) {
       return;
     }
@@ -556,6 +564,19 @@ function codexPromptOptions(input: {
 
 function selectedPromptSkills(prompt: string) {
   return promptSkillInputsFromText(prompt, backendSkills.value);
+}
+
+function parsePlanSlashCommand(prompt: string): { prompt: string | null } | null {
+  const trimmed = prompt.trim();
+  const match = /^\/plan(?:\s+(.*))?$/s.exec(trimmed);
+  if (!match) {
+    return null;
+  }
+
+  const planPrompt = match[1]?.trim() ?? '';
+  return {
+    prompt: planPrompt || null,
+  };
 }
 
 function subscribeToMainEvents(): void {

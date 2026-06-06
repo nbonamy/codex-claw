@@ -953,6 +953,90 @@ describe('useAppState', () => {
     });
   });
 
+  it('enables plan mode from bare slash plan without sending a prompt', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const sendPrompt = vi.fn().mockResolvedValue(createInitialSnapshot());
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        sendPrompt,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    state.backendModels.value = [];
+    state.selectedModelId.value = null;
+    state.selectedReasoningEffort.value = null;
+    state.setPlanMode(false);
+    state.setGoalMode(false);
+
+    await state.sendPrompt('/plan');
+
+    expect(state.planMode.value).toBe(true);
+    expect(sendPrompt).not.toHaveBeenCalled();
+    expect(state.activeQueuedPrompts.value).toStrictEqual([]);
+  });
+
+  it('strips slash plan arguments and submits the prompt in plan mode', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const updatedSnapshot = createInitialSnapshot();
+    const sendPrompt = vi.fn().mockResolvedValue(updatedSnapshot);
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        sendPrompt,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    state.backendModels.value = [];
+    state.selectedModelId.value = null;
+    state.selectedReasoningEffort.value = null;
+    state.setPlanMode(false);
+    state.setGoalMode(false);
+
+    await state.sendPrompt('/plan build the plan');
+
+    expect(state.planMode.value).toBe(true);
+    expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'build the plan', {
+      planMode: true,
+    });
+  });
+
+  it('does not queue or send bare slash plan while an agent is busy', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0].status = { type: 'working' };
+    const sendPrompt = vi.fn().mockResolvedValue(createInitialSnapshot());
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        sendPrompt,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    state.backendModels.value = [];
+    state.selectedModelId.value = null;
+    state.selectedReasoningEffort.value = null;
+    state.setPlanMode(false);
+    state.setGoalMode(false);
+
+    await state.sendPrompt('/plan');
+
+    expect(state.planMode.value).toBe(true);
+    expect(sendPrompt).not.toHaveBeenCalled();
+    expect(state.activeQueuedPrompts.value).toStrictEqual([]);
+  });
+
   it('loads active agent skills and includes dollar-selected skills in prompt options', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();
