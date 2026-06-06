@@ -232,6 +232,7 @@ describe('ChatMessage', () => {
     });
 
     expect(wrapper.text()).toContain('Thinking');
+    expect(wrapper.get('.chat-message__thinking').classes()).toContain('text-shimmer');
   });
 });
 

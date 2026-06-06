@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getToolFallbackTitle, getToolLineDiff, parseToolStatusDescriptor } from '../tool-status';
+import { getToolDisplayTitle, getToolFallbackTitle, getToolLineDiff, parseToolStatusDescriptor } from '../tool-status';
 import type { MessageToolCall } from '../types';
 
 describe('tool status helpers', () => {
@@ -41,5 +41,40 @@ describe('tool status helpers', () => {
 
     expect(getToolFallbackTitle(tool)).toBe('Running npm test');
     expect(getToolFallbackTitle({ ...tool, done: true, state: 'completed' })).toBe('Ran npm test');
+  });
+
+  it.each([
+    ['codex_claw.register-agent', { agentId: 'agent-dina' }, 'Registered agent'],
+    ['codex_claw.list-agents', { agentId: 'agent-dina' }, 'Listed agents'],
+    ['codex_claw.check-messages', { agentId: 'agent-dina' }, 'Checked messages'],
+    ['codex_claw.send-message', { to: 'Manny' }, 'Sent message to Manny'],
+    ['codex_claw.broadcast-message', { from: 'agent-dina' }, 'Broadcast message'],
+    ['codex_claw.set-status', { status: 'Running tests' }, 'Updated status'],
+    ['codex_claw.set-status', { status: '' }, 'Cleared status'],
+  ])('formats Codex Claw MCP %s titles', (name, args, expected) => {
+    expect(getToolDisplayTitle({
+      args,
+      done: true,
+      function: name,
+      id: 'tool',
+      result: undefined,
+      state: 'completed',
+      status: 'completed',
+    }, undefined)).toBe(expected);
+  });
+
+  it('formats Codex Claw MCP titles by running and failed state', () => {
+    const tool: MessageToolCall = {
+      args: { to: 'Manny' },
+      done: false,
+      function: 'codex_claw.send-message',
+      id: 'tool',
+      result: undefined,
+      state: 'running',
+      status: 'running',
+    };
+
+    expect(getToolDisplayTitle(tool, undefined)).toBe('Sending message to Manny');
+    expect(getToolDisplayTitle({ ...tool, done: true, state: 'error', status: 'failed' }, undefined)).toBe('Failed sending message to Manny');
   });
 });

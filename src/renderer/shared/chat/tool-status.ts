@@ -1,4 +1,4 @@
-import { getMessageToolCallName, type MessageToolCall, type ToolStatusDescriptor } from './types';
+import { getMessageToolCallArgs, getMessageToolCallName, type MessageToolCall, type ToolStatusDescriptor } from './types';
 
 type Translate = (key: string, params?: Record<string, unknown>) => string;
 
@@ -44,6 +44,11 @@ export function getToolDisplayTitle(
   descriptor: ToolStatusDescriptor | undefined,
   t: Translate = defaultTranslate,
 ) {
+  const codexClawTitle = getCodexClawMcpTitle(toolCall, descriptor, t);
+  if (codexClawTitle) {
+    return codexClawTitle;
+  }
+
   if (descriptor?.source === 'codex' && isCodexToolAction(descriptor.action)) {
     const phase = commandPhase(descriptor.phase);
     const target = descriptor.action === 'explore' ? undefined : commandTarget(descriptor, getMessageToolCallName(toolCall));
@@ -79,6 +84,87 @@ export function getToolFallbackTitle(toolCall: MessageToolCall, t: Translate = d
   });
 }
 
+function getCodexClawMcpTitle(
+  toolCall: MessageToolCall,
+  descriptor: ToolStatusDescriptor | undefined,
+  t: Translate,
+): string | undefined {
+  const toolName = codexClawToolName(toolCall);
+  if (!toolName) {
+    return undefined;
+  }
+
+  const phase = toolPhase(toolCall, descriptor);
+  const args = getRecord(getMessageToolCallArgs(toolCall));
+  if (toolName === 'set-status' && phase === 'completed' && hasStringParam(args, 'status') && !stringParam(args, 'status')) {
+    return t('chat.tool.mcp.codexClaw.setStatus.cleared');
+  }
+
+  const params = codexClawToolParams(toolName, args);
+  return t(`chat.tool.mcp.codexClaw.${codexClawToolKey(toolName)}.${phase}`, params);
+}
+
+function codexClawToolName(toolCall: MessageToolCall): CodexClawToolName | undefined {
+  const name = getMessageToolCallName(toolCall);
+  const prefix = 'codex_claw.';
+  if (!name.startsWith(prefix)) {
+    return undefined;
+  }
+
+  const toolName = name.slice(prefix.length);
+  return isCodexClawTool(toolName) ? toolName : undefined;
+}
+
+function codexClawToolParams(toolName: CodexClawToolName, args: Record<string, unknown> | undefined) {
+  if (toolName === 'send-message') {
+    const target = stringParam(args, 'to');
+    return target ? { target } : undefined;
+  }
+
+  return undefined;
+}
+
+function codexClawToolKey(toolName: CodexClawToolName) {
+  const keys: Record<CodexClawToolName, string> = {
+    'broadcast-message': 'broadcastMessage',
+    'check-messages': 'checkMessages',
+    'list-agents': 'listAgents',
+    'register-agent': 'registerAgent',
+    'send-message': 'sendMessage',
+    'set-status': 'setStatus',
+  };
+  return keys[toolName];
+}
+
+function toolPhase(toolCall: MessageToolCall, descriptor: ToolStatusDescriptor | undefined): 'completed' | 'failed' | 'running' {
+  if (descriptor?.phase === 'completed' || descriptor?.phase === 'failed' || descriptor?.phase === 'running') {
+    return descriptor.phase;
+  }
+
+  if (toolCall.state === 'error' || toolCall.status === 'failed') {
+    return 'failed';
+  }
+
+  if (!toolCall.done && toolCall.state !== 'completed') {
+    return 'running';
+  }
+
+  return 'completed';
+}
+
+function getRecord(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+}
+
+function stringParam(value: Record<string, unknown> | undefined, key: string): string | undefined {
+  const param = value?.[key];
+  return typeof param === 'string' && param.trim() ? param.trim() : undefined;
+}
+
+function hasStringParam(value: Record<string, unknown> | undefined, key: string): boolean {
+  return typeof value?.[key] === 'string';
+}
+
 function commandTarget(descriptor: ToolStatusDescriptor, fallback: string) {
   const target = descriptor.params?.target;
   return typeof target === 'string' && target.trim() ? target : fallback;
@@ -94,6 +180,27 @@ function commandPhase(phase: string) {
 
 function isCodexToolAction(action: string): action is 'edit' | 'explore' | 'list' | 'read' | 'run' | 'search' {
   return action === 'edit' || action === 'explore' || action === 'list' || action === 'read' || action === 'run' || action === 'search';
+}
+
+const codexClawTools = new Set([
+  'broadcast-message',
+  'check-messages',
+  'list-agents',
+  'register-agent',
+  'send-message',
+  'set-status',
+]);
+
+type CodexClawToolName =
+  | 'broadcast-message'
+  | 'check-messages'
+  | 'list-agents'
+  | 'register-agent'
+  | 'send-message'
+  | 'set-status';
+
+function isCodexClawTool(value: string): value is CodexClawToolName {
+  return codexClawTools.has(value);
 }
 
 function defaultTranslate(key: string, params?: Record<string, unknown>) {
@@ -119,6 +226,25 @@ function defaultTranslate(key: string, params?: Record<string, unknown>) {
     'chat.tool.command.search.running': 'Searching {target}',
     'chat.tool.fallback.completed': 'Ran {name}',
     'chat.tool.fallback.running': 'Running {name}',
+    'chat.tool.mcp.codexClaw.broadcastMessage.completed': 'Broadcast message',
+    'chat.tool.mcp.codexClaw.broadcastMessage.failed': 'Failed broadcasting message',
+    'chat.tool.mcp.codexClaw.broadcastMessage.running': 'Broadcasting message',
+    'chat.tool.mcp.codexClaw.checkMessages.completed': 'Checked messages',
+    'chat.tool.mcp.codexClaw.checkMessages.failed': 'Failed checking messages',
+    'chat.tool.mcp.codexClaw.checkMessages.running': 'Checking messages',
+    'chat.tool.mcp.codexClaw.listAgents.completed': 'Listed agents',
+    'chat.tool.mcp.codexClaw.listAgents.failed': 'Failed listing agents',
+    'chat.tool.mcp.codexClaw.listAgents.running': 'Listing agents',
+    'chat.tool.mcp.codexClaw.registerAgent.completed': 'Registered agent',
+    'chat.tool.mcp.codexClaw.registerAgent.failed': 'Failed registering agent',
+    'chat.tool.mcp.codexClaw.registerAgent.running': 'Registering agent',
+    'chat.tool.mcp.codexClaw.sendMessage.completed': 'Sent message to {target}',
+    'chat.tool.mcp.codexClaw.sendMessage.failed': 'Failed sending message to {target}',
+    'chat.tool.mcp.codexClaw.sendMessage.running': 'Sending message to {target}',
+    'chat.tool.mcp.codexClaw.setStatus.cleared': 'Cleared status',
+    'chat.tool.mcp.codexClaw.setStatus.completed': 'Updated status',
+    'chat.tool.mcp.codexClaw.setStatus.failed': 'Failed updating status',
+    'chat.tool.mcp.codexClaw.setStatus.running': 'Updating status',
   };
 
   return (templates[key] ?? key).replace(/\{(\w+)\}/g, (_, name: string) => String(values[name] ?? ''));

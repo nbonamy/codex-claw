@@ -119,6 +119,8 @@ describe('ported id8 chat components', () => {
         },
       },
     });
+    expect(structuredResult.text()).toContain('Updated status');
+    expect(structuredResult.text()).not.toContain('Ran codex_claw.set-status');
     await structuredResult.get('.chat-tool-call__header').trigger('click');
     expect(structuredResult.text()).toContain('"status": "Registered and idle"');
   });

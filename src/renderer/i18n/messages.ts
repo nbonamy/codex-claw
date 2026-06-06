@@ -44,6 +44,41 @@ export const messages = {
             running: 'Searching {target}',
           },
         },
+        mcp: {
+          codexClaw: {
+            broadcastMessage: {
+              completed: 'Broadcast message',
+              failed: 'Failed broadcasting message',
+              running: 'Broadcasting message',
+            },
+            checkMessages: {
+              completed: 'Checked messages',
+              failed: 'Failed checking messages',
+              running: 'Checking messages',
+            },
+            listAgents: {
+              completed: 'Listed agents',
+              failed: 'Failed listing agents',
+              running: 'Listing agents',
+            },
+            registerAgent: {
+              completed: 'Registered agent',
+              failed: 'Failed registering agent',
+              running: 'Registering agent',
+            },
+            sendMessage: {
+              completed: 'Sent message to {target}',
+              failed: 'Failed sending message to {target}',
+              running: 'Sending message to {target}',
+            },
+            setStatus: {
+              cleared: 'Cleared status',
+              completed: 'Updated status',
+              failed: 'Failed updating status',
+              running: 'Updating status',
+            },
+          },
+        },
       },
     },
   },

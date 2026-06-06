@@ -28,6 +28,31 @@ textarea {
   --el-dialog-padding-primary: 0;
 }
 
+.text-shimmer {
+  color: transparent;
+  background:
+    linear-gradient(
+      110deg,
+      var(--color-text-muted) 20%,
+      var(--color-background) 45%,
+      var(--color-text-muted) 70%
+    );
+  background-size: 300% 100%;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: text-shimmer 4.5s linear infinite;
+}
+
+@keyframes text-shimmer {
+  0% {
+    background-position: 150% 0;
+  }
+
+  100% {
+    background-position: -150% 0;
+  }
+}
+
 .claw-dialog.el-dialog {
   overflow: visible;
   border-radius: var(--radius-xl);

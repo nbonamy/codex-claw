@@ -234,6 +234,9 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   }
 
   if (event.type === 'turn.started') {
+    if (event.turnId) {
+      ensureAssistantMessage(snapshot, event.agentId, event.turnId);
+    }
     setAgentStatus(snapshot, event.agentId, { type: 'working' });
     return;
   }

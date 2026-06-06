@@ -195,6 +195,27 @@ describe('ConversationPane', () => {
     expect(wrapper.get('textarea').attributes('placeholder')).toBe('Codex is working...');
     expect(wrapper.get('.chat-composer__send').attributes()).toHaveProperty('disabled');
   });
+
+  it('shows the thinking shimmer for a started turn before content or tools stream', () => {
+    const wrapper = mountPane({
+      agent,
+      messages: [
+        messages[0],
+        {
+          id: 'assistant-turn-started',
+          agentId: agent.id,
+          role: 'assistant',
+          status: 'streaming',
+          createdAt: '2026-06-05T00:00:01.000Z',
+          parts: [],
+        },
+      ],
+      isSending: true,
+    });
+
+    expect(wrapper.get('.chat-message__thinking').text()).toBe('Thinking');
+    expect(wrapper.get('.chat-message__thinking').classes()).toContain('text-shimmer');
+  });
 });
 
 function mountPane(props: { messages: RendererMessage[]; agent: Agent | null; isSending: boolean; isLoading?: boolean }) {

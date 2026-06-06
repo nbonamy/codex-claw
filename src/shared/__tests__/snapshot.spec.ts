@@ -183,6 +183,13 @@ describe('snapshot reducer', () => {
       payload: { status: 'running' },
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
+    expect(snapshot.messages.at(-1)).toMatchObject({
+      id: 'assistant-turn-1',
+      agentId: 'agent-dina',
+      role: 'assistant',
+      status: 'streaming',
+      parts: [],
+    });
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
