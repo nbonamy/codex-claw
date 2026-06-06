@@ -11,6 +11,7 @@ import { ClawMcpAgentCoordinator } from './mcp/agent-coordinator';
 import { CHECK_INBOX_PROMPT } from './mcp/agent-prompts';
 import { buildCodexClawMcpConfigOverrides } from './mcp/codex-config';
 import { ClawMcpHttpServer } from './mcp/http-server';
+import { transcribeWithAppleSpeechAnalyzer } from './transcription/apple-speech';
 import {
   closeAgentInSnapshot,
   deployBenchTemplateInSnapshot,
@@ -31,7 +32,7 @@ import {
   updateAgentFolder,
 } from './snapshot-service';
 import { AppStatePersistence } from './state-persistence';
-import type { AppSnapshot, ClientRequestResponse, CodexSkillSummary, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
+import type { AppleSpeechTranscriptionOptions, AppSnapshot, ClientRequestResponse, CodexSkillSummary, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
 import { ipcChannels } from '../shared/ipc';
 import { teamColors } from '../shared/team-colors';
 
@@ -225,6 +226,12 @@ export class AppController {
       updateSettingsInSnapshot(this.snapshot, input);
       await this.persistSnapshot();
       return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.transcribeAppleSpeech, async (_event, audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions) => {
+      return transcribeWithAppleSpeechAnalyzer(Buffer.from(audioData), options, {
+        assetsPath: app.isPackaged ? process.resourcesPath : path.resolve(process.cwd(), 'assets'),
+      });
     });
 
     ipcMain.handle(ipcChannels.quit, () => {

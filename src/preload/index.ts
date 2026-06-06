@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AppCommand, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
+import type { AppleSpeechTranscriptionOptions, AppCommand, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
 import { ipcChannels } from '../shared/ipc';
 
 const api: CodexClawApi = {
@@ -23,6 +23,7 @@ const api: CodexClawApi = {
   selectAgent: (agentId: string) => ipcRenderer.invoke(ipcChannels.selectAgent, agentId),
   selectAgentFolder: (agentId: string) => ipcRenderer.invoke(ipcChannels.selectAgentFolder, agentId),
   updateSettings: (input: UpdateSettingsInput) => ipcRenderer.invoke(ipcChannels.updateSettings, input),
+  transcribeAppleSpeech: (audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions) => ipcRenderer.invoke(ipcChannels.transcribeAppleSpeech, audioData, options),
   quit: () => ipcRenderer.invoke(ipcChannels.quit),
   sendPrompt: (agentId: string, prompt: string, options?: SendPromptOptions) => ipcRenderer.invoke(ipcChannels.sendPrompt, agentId, prompt, options),
   steerPrompt: (agentId: string, prompt: string) => ipcRenderer.invoke(ipcChannels.steerPrompt, agentId, prompt),

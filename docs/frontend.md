@@ -101,6 +101,8 @@ Token categories should include:
 - borders and dividers;
 - accent, danger, success, warning, and working/status colors;
 - composer and input surfaces;
+- composer voice dictation, where the renderer records browser audio and sends
+  audio bytes through preload for main-process transcription;
 - tool call, approval, plan, and reasoning surfaces;
 - diff added, removed, changed, and gutter colors;
 - code and syntax colors.

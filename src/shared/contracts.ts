@@ -128,6 +128,16 @@ export type SendPromptOptions = {
   skills?: PromptSkillInput[];
 };
 
+export type AppleSpeechTranscriptionOptions = {
+  locale?: string;
+  live?: boolean;
+};
+
+export type AppleSpeechTranscriptionResult = {
+  text: string;
+  error?: string;
+};
+
 export type UpdateSettingsInput = {
   theme?: Partial<AppThemeSettings>;
 };
@@ -338,6 +348,7 @@ export type CodexClawApi = {
   selectAgent(agentId: string): Promise<AppSnapshot>;
   selectAgentFolder(agentId: string): Promise<AppSnapshot | null>;
   updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>;
+  transcribeAppleSpeech(audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions): Promise<AppleSpeechTranscriptionResult>;
   quit(): Promise<void>;
   sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot>;
   steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot>;

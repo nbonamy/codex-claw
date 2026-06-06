@@ -19,6 +19,7 @@ export const ipcChannels = {
   selectAgent: 'agent:select',
   selectAgentFolder: 'agent:select-folder',
   updateSettings: 'settings:update',
+  transcribeAppleSpeech: 'transcription:apple-speech',
   quit: 'app:quit',
   sendPrompt: 'agent:send-prompt',
   steerPrompt: 'agent:steer-prompt',

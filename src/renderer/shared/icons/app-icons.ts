@@ -14,6 +14,7 @@ export {
   IconLayoutSidebarLeftCollapse as PanelLeftCloseIcon,
   IconLayoutSidebarLeftExpand as PanelLeftOpenIcon,
   IconMaximize as Maximize2,
+  IconMicrophone as MicrophoneIcon,
   IconPhoto as PhotoIcon,
   IconPlus as PlusIcon,
   IconPencil as PencilIcon,

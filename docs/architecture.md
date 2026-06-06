@@ -22,6 +22,9 @@ renders structured events in the renderer.
 - Use the Codex app-server protocol as the long-term integration boundary.
 - Keep all app-server communication in Electron main. Renderer code never owns
   Codex process lifecycle, JSON-RPC request IDs, approval callbacks, or auth.
+- Keep native helper execution in Electron main as well. For example, composer
+  voice dictation records browser audio in the renderer, sends audio bytes
+  through typed IPC, and lets main invoke the Apple speech helper.
 - Reuse id8 renderer primitives for messages, streaming text, tool calls,
   approvals, markdown, mermaid, media, and diffs.
 - Build theme support from day one with semantic tokens, not hardcoded colors.

@@ -21,7 +21,25 @@
       @update:plan-mode="$emit('update:planMode', $event)"
     />
 
+    <div
+      v-if="isRecording || isTranscribing"
+      class="chat-composer__audio-field"
+    >
+      <ChatComposerWaveform
+        v-if="isRecording"
+        :active="isRecording"
+        :audio-recorder="recorder"
+        label="Audio waveform"
+      />
+      <span
+        v-else
+        class="chat-composer__audio-status"
+      >
+        Transcribing...
+      </span>
+    </div>
     <textarea
+      v-else
       ref="textareaEl"
       v-model="prompt"
       class="chat-composer__input"
@@ -61,6 +79,18 @@
         @update:model-id="$emit('update:modelId', $event)"
         @update:reasoning-effort="$emit('update:reasoningEffort', $event)"
       />
+      <button
+        class="chat-composer__voice"
+        :class="{ 'chat-composer__voice--recording': isRecording }"
+        type="button"
+        :disabled="voiceButtonDisabled"
+        :aria-pressed="isRecording"
+        :aria-label="voiceButtonLabel"
+        :title="voiceButtonTitle"
+        @click="toggleRecording"
+      >
+        <MicrophoneIcon aria-hidden="true" />
+      </button>
       <ChatComposerSendButton
         :disabled="!canSend"
         :loading="sendButtonLoading"
@@ -81,6 +111,10 @@ import ChatContextUsageIndicator from './ChatContextUsageIndicator.vue';
 import ChatModelReasoningSelector from './ChatModelReasoningSelector.vue';
 import ChatComposerSkillMenu from './ChatComposerSkillMenu.vue';
 import { filterComposerSkills, findActiveSkillSlash, type ActiveSkillSlash } from '../shared/chat/composer-skills';
+import { BrowserAudioRecorder, isBrowserAudioRecordingSupported } from '../shared/audio/browser-audio-recorder';
+import { transcribeRecordedAudio } from '../shared/audio/apple-speech-transcription';
+import { MicrophoneIcon } from '../shared/icons/app-icons';
+import ChatComposerWaveform from '../shared/chat/ChatComposerWaveform.vue';
 
 const props = defineProps<{
   contextUsage?: AgentContextUsage;
@@ -112,11 +146,42 @@ const textareaEl = ref<HTMLTextAreaElement | null>(null);
 const caretPosition = ref(0);
 const skillMenuOpen = ref(false);
 const activeSkillIndex = ref(0);
+const recorder = ref<BrowserAudioRecorder | null>(null);
+const isRecording = ref(false);
+const isTranscribing = ref(false);
+const voiceError = ref<string | null>(null);
 
 const hasPrompt = computed(() => Boolean(prompt.value.trim()));
 const canSend = computed(() => Boolean(hasPrompt.value && !props.disabled));
 const sendButtonLoading = computed(() => props.isSending && !hasPrompt.value);
 const sendButtonLabel = computed(() => (props.isSending ? 'Queue prompt' : 'Send prompt'));
+const voiceSupported = computed(() => isBrowserAudioRecordingSupported());
+const voiceButtonDisabled = computed(() => (
+  isTranscribing.value ||
+  (props.disabled && !props.isSending) ||
+  !voiceSupported.value ||
+  !window.codexClaw?.transcribeAppleSpeech
+));
+const voiceButtonLabel = computed(() => (isRecording.value ? 'Stop recording' : 'Record voice prompt'));
+const voiceButtonTitle = computed(() => {
+  if (voiceError.value) {
+    return voiceError.value;
+  }
+
+  if (!voiceSupported.value) {
+    return 'Audio recording is not available.';
+  }
+
+  if (!window.codexClaw?.transcribeAppleSpeech) {
+    return 'Apple speech transcription is not available.';
+  }
+
+  if (isTranscribing.value) {
+    return 'Transcribing...';
+  }
+
+  return voiceButtonLabel.value;
+});
 const activeModes = computed(() => [
   ...(props.planMode ? ['Plan'] : []),
   ...(props.goalMode ? ['Goal'] : []),
@@ -156,6 +221,84 @@ function submitWithIntent(intent: 'send' | 'steer'): void {
     emit('steer', trimmed);
   }
   void nextTick(resizeTextarea);
+}
+
+async function toggleRecording(): Promise<void> {
+  voiceError.value = null;
+  if (isRecording.value) {
+    await stopRecording();
+    return;
+  }
+
+  await startRecording();
+}
+
+async function startRecording(): Promise<void> {
+  if (voiceButtonDisabled.value) {
+    return;
+  }
+
+  try {
+    const nextRecorder = new BrowserAudioRecorder();
+    await nextRecorder.start();
+    recorder.value = nextRecorder;
+    isRecording.value = true;
+  } catch (error) {
+    recorder.value?.release();
+    recorder.value = null;
+    voiceError.value = error instanceof Error ? error.message : String(error);
+  }
+}
+
+async function stopRecording(): Promise<void> {
+  const activeRecorder = recorder.value;
+  if (!activeRecorder) {
+    return;
+  }
+
+  isRecording.value = false;
+  isTranscribing.value = true;
+  recorder.value = null;
+
+  try {
+    const recording = await activeRecorder.stop();
+    const result = await transcribeRecordedAudio(recording);
+    if (result.error) {
+      voiceError.value = result.error;
+      return;
+    }
+
+    insertTranscript(result.text);
+  } catch (error) {
+    voiceError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    isTranscribing.value = false;
+  }
+}
+
+function insertTranscript(text: string): void {
+  const transcript = text.trim();
+  if (!transcript) {
+    return;
+  }
+
+  const textarea = textareaEl.value;
+  const start = textarea?.selectionStart ?? caretPosition.value;
+  const end = textarea?.selectionEnd ?? caretPosition.value;
+  const before = prompt.value.slice(0, start);
+  const after = prompt.value.slice(end);
+  const prefix = before && !/\s$/.test(before) ? ' ' : '';
+  const suffix = after && !/^\s/.test(after) ? ' ' : '';
+  const insertion = `${prefix}${transcript}${suffix}`;
+  const nextCaret = before.length + insertion.length;
+  prompt.value = `${before}${insertion}${after}`;
+  caretPosition.value = nextCaret;
+  closeSkillMenu();
+  void nextTick(() => {
+    textareaEl.value?.focus();
+    textareaEl.value?.setSelectionRange(nextCaret, nextCaret);
+    resizeTextarea();
+  });
 }
 
 function handleTextareaKeydown(event: KeyboardEvent): void {
@@ -312,6 +455,22 @@ function resizeTextareaSoon(): void {
   color: var(--color-text-muted);
 }
 
+.chat-composer__audio-field {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 28px;
+  padding: 0 var(--space-2);
+}
+
+.chat-composer__audio-status {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-14);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-20);
+}
+
 .chat-composer__meta {
   display: flex;
   align-items: center;
@@ -336,6 +495,36 @@ function resizeTextareaSoon(): void {
   font-size: var(--font-size-13);
   font-weight: var(--font-weight-medium);
   line-height: var(--line-height-18);
+}
+
+.chat-composer__voice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--chat-composer-button-size);
+  height: var(--chat-composer-button-size);
+  border: 0;
+  border-radius: var(--radius-full);
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.chat-composer__voice:hover:not(:disabled),
+.chat-composer__voice--recording {
+  color: var(--color-text);
+  background: var(--color-surface-base);
+}
+
+.chat-composer__voice:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.chat-composer__voice svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.8;
 }
 
 @media (max-width: 720px) {

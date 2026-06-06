@@ -1,9 +1,17 @@
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import ChatComposer from '../ChatComposer.vue';
 import { i18n } from '../../i18n';
 import type { AgentContextUsage, CodexModelOption, CodexSkillSummary } from '../../../shared/contracts';
+
+vi.mock('fix-webm-duration', () => ({
+  default: vi.fn(async (blob: Blob) => blob),
+}));
+
+vi.mock('webm-to-wav-converter', () => ({
+  getWaveBlob: vi.fn(async (blob: Blob) => new Blob([blob], { type: 'audio/wav' })),
+}));
 
 type ChatComposerProps = {
   disabled: boolean;
@@ -47,6 +55,11 @@ const skills: CodexSkillSummary[] = [
 ];
 
 describe('ChatComposer', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete window.codexClaw;
+  });
+
   it('emits a trimmed prompt and clears the textarea', async () => {
     const wrapper = mountComposer();
 
@@ -184,6 +197,34 @@ describe('ChatComposer', () => {
 
     expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('/skill-creator ');
   });
+
+  it('records audio and inserts the Apple speech transcript at the caret', async () => {
+    installAudioRecordingMocks();
+    const transcribeAppleSpeech = vi.fn(async () => ({ text: 'dictated change' }));
+    window.codexClaw = {
+      transcribeAppleSpeech,
+    } as unknown as typeof window.codexClaw;
+    const wrapper = mountComposer();
+
+    await wrapper.get('textarea').setValue('please');
+    const textarea = wrapper.get('textarea').element as HTMLTextAreaElement;
+    textarea.setSelectionRange(6, 6);
+    await wrapper.get('textarea').trigger('select');
+    await wrapper.get('.chat-composer__voice').trigger('click');
+    await vi.waitFor(() => {
+      expect(wrapper.get('.chat-composer__voice').attributes('aria-pressed')).toBe('true');
+    });
+    expect(wrapper.find('.chat-composer-waveform').exists()).toBe(true);
+
+    await wrapper.get('.chat-composer__voice').trigger('click');
+    await vi.waitFor(() => {
+      expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('please dictated change');
+    });
+
+    expect(transcribeAppleSpeech).toHaveBeenCalledWith(expect.any(ArrayBuffer), {
+      locale: navigator.language,
+    });
+  });
 });
 
 function mountComposer(overrides: Partial<ChatComposerProps & {
@@ -206,4 +247,67 @@ function mountComposer(overrides: Partial<ChatComposerProps & {
       plugins: [ElementPlus, i18n],
     },
   });
+}
+
+function installAudioRecordingMocks(): void {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => ({
+    clearRect: vi.fn(),
+    fillRect: vi.fn(),
+    fillStyle: '',
+  }) as unknown as CanvasRenderingContext2D);
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 1);
+  vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+  vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+    color: 'rgb(10, 20, 30)',
+  } as CSSStyleDeclaration);
+  const analyser = {
+    disconnect: vi.fn(),
+    fftSize: 0,
+    frequencyBinCount: 4,
+    getByteTimeDomainData: vi.fn((target: Uint8Array) => {
+      target.fill(128);
+    }),
+  };
+  const source = {
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  };
+  class FakeAudioContext {
+    close = vi.fn(async () => undefined);
+    createAnalyser = vi.fn(() => analyser);
+    createMediaStreamSource = vi.fn(() => source);
+    resume = vi.fn(async () => undefined);
+  }
+
+  vi.stubGlobal('AudioContext', FakeAudioContext);
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: {
+      getUserMedia: vi.fn(async () => ({
+        getTracks: () => [{ stop: vi.fn() }],
+      })),
+    },
+  });
+
+  class FakeMediaRecorder {
+    static isTypeSupported = vi.fn(() => true);
+
+    mimeType = 'audio/webm;codecs=opus';
+    ondataavailable: ((event: BlobEvent) => void) | null = null;
+    onerror: (() => void) | null = null;
+    onstop: (() => void) | null = null;
+    state: RecordingState = 'inactive';
+
+    start(): void {
+      this.state = 'recording';
+    }
+
+    stop(): void {
+      this.ondataavailable?.({ data: new Blob(['audio'], { type: this.mimeType }) } as BlobEvent);
+      this.state = 'inactive';
+      this.onstop?.();
+    }
+  }
+
+  vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
 }

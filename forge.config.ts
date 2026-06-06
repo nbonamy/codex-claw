@@ -4,6 +4,7 @@ import { MakerZIP } from '@electron-forge/maker-zip';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import { signDarwinBinaries } from './build/sign-binaries';
 
 import dotenv from 'dotenv';
 dotenv.config();
@@ -29,7 +30,8 @@ if (isDarwin) {
       // provisioningProfile: './build/Witsy_Darwin.provisionprofile',
       optionsForFile: () => { return {
         hardenedRuntime: true,
-        // entitlements: './build/Entitlements.darwin.plist'
+        entitlements: './build/Entitlements.darwin.plist',
+        'entitlements-inherit': './build/Entitlements.darwin.plist',
       }; },
     },
     osxNotarize: {
@@ -46,7 +48,21 @@ const config: ForgeConfig = {
     icon: 'assets/icon',
     appBundleId: 'com.nabocorp.codex-claw',
     executableName: 'codex-claw',
+    extraResource: ['assets/apple-speechanalyzer-cli'],
+    extendInfo: 'build/Info.plist',
     ...(process.env.TEST ? {} : osxPackagerConfig),
+    afterCopy: [
+      (buildPath: string, _electronVersion: string, platform: string, arch: string, callback: (error?: Error) => void) => {
+        try {
+          if (platform === 'darwin') {
+            signDarwinBinaries(buildPath, arch);
+          }
+          callback();
+        } catch (error) {
+          callback(error instanceof Error ? error : new Error(String(error)));
+        }
+      },
+    ],
   },
   makers: [
     new MakerZIP({}, ['darwin', 'win32', 'linux']),
