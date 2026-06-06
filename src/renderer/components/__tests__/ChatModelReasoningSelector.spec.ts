@@ -90,12 +90,12 @@ describe('ChatModelReasoningSelector', () => {
     expect(wrapper.find('.chat-model-selector__menu').text()).not.toContain('Fast implementation work');
   });
 
-  it('groups reasoning and model choices in one menu', () => {
+  it('groups model choices above reasoning choices in one menu', () => {
     const wrapper = mountSelector();
 
     expect(wrapper.findAll('.chat-model-selector__section-label').map((label) => label.text())).toStrictEqual([
-      'Reasoning',
       'Model',
+      'Reasoning',
     ]);
     expect(wrapper.findAllComponents({ name: 'ElDropdown' })).toHaveLength(1);
   });

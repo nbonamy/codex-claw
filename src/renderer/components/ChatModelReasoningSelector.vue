@@ -32,6 +32,24 @@
 
       <template #dropdown>
         <el-dropdown-menu class="chat-model-selector__menu" role="listbox">
+          <li class="chat-model-selector__section-label" role="presentation">Model</li>
+          <el-dropdown-item
+            v-for="model in models"
+            :key="model.id"
+            class="chat-model-selector__option"
+            :class="{ 'chat-model-selector__option--selected': model.id === selectedModel?.id }"
+            :command="{ kind: 'model', value: model.id }"
+            role="option"
+            :aria-selected="model.id === selectedModel?.id"
+          >
+            <span class="chat-model-selector__option-label">{{ model.displayName }}</span>
+            <CheckIcon
+              v-if="model.id === selectedModel?.id"
+              class="chat-model-selector__check"
+              aria-hidden="true"
+            />
+          </el-dropdown-item>
+          <li class="chat-model-selector__divider" role="presentation"></li>
           <li class="chat-model-selector__section-label" role="presentation">Reasoning</li>
           <el-dropdown-item
             v-for="effort in reasoningEfforts"
@@ -45,25 +63,6 @@
             <span class="chat-model-selector__option-label">{{ effortLabel(effort.reasoningEffort) }}</span>
             <CheckIcon
               v-if="effort.reasoningEffort === effectiveReasoningEffort"
-              class="chat-model-selector__check"
-              aria-hidden="true"
-            />
-          </el-dropdown-item>
-          <li class="chat-model-selector__divider" role="presentation"></li>
-          <li class="chat-model-selector__section-label" role="presentation">Model</li>
-          <el-dropdown-item
-            v-for="model in models"
-            :key="model.id"
-            class="chat-model-selector__option"
-            :class="{ 'chat-model-selector__option--selected': model.id === selectedModel?.id }"
-            :command="{ kind: 'model', value: model.id }"
-            role="option"
-            :aria-selected="model.id === selectedModel?.id"
-          >
-            <BoltIcon class="chat-model-selector__option-icon" aria-hidden="true" />
-            <span class="chat-model-selector__option-label">{{ model.displayName }}</span>
-            <CheckIcon
-              v-if="model.id === selectedModel?.id"
               class="chat-model-selector__check"
               aria-hidden="true"
             />
