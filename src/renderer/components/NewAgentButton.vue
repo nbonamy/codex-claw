@@ -35,7 +35,7 @@
             role="menuitem"
             @click="createFromMenu"
           >
-            <PlusIcon class="new-agent-menu__create-icon" />
+            <PlusCircleIcon class="new-agent-menu__create-icon" />
             <span>Create New Agent</span>
           </button>
 
@@ -234,7 +234,7 @@ function folderBasename(folder: string): string {
 .new-agent-menu__create:focus-visible,
 .new-agent-menu__template-row:hover,
 .new-agent-menu__template-row:focus-within {
-  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+  background: var(--color-surface-low);
   outline: none;
 }
 

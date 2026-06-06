@@ -156,6 +156,9 @@ button {
 
 .claw-popover {
   padding: var(--space-2) !important;
+  border-radius: var(--radius-lg) !important;
+  background-color: var(--color-background) !important;
+  border-color: var(--color-border) !important;
 }
 
 .claw-popover__menu {
@@ -193,7 +196,9 @@ button {
 }
 
 .claw-context-menu__action:hover,
-.claw-context-menu__action:focus-visible {
+.claw-context-menu__action:focus-visible,
+.claw-popover__action:hover,
+.claw-popover__action:focus-visible {
   background: var(--color-surface-low);
 }
 
