@@ -193,11 +193,22 @@ export type CreateTeamInput = {
   color: string;
 };
 
+export type UpdateTeamInput = {
+  id: string;
+  name: string;
+  color: string;
+};
+
 export type UpdateAgentInput = {
   id: string;
   name: string;
   folder: string;
   avatar?: string;
+};
+
+export type MoveAgentToTeamInput = {
+  agentId: string;
+  teamId: string;
 };
 
 export type ToolConfirmationDecision =
@@ -237,10 +248,13 @@ export type CodexClawApi = {
   listCodexModels(): Promise<CodexModelOption[]>;
   chooseAgentFolder(): Promise<string | null>;
   createTeam(input: CreateTeamInput): Promise<AppSnapshot>;
+  updateTeam(input: UpdateTeamInput): Promise<AppSnapshot>;
+  closeTeam(teamId: string): Promise<AppSnapshot>;
   selectTeam(teamId: string): Promise<AppSnapshot>;
   createAgent(input: CreateAgentInput): Promise<AppSnapshot>;
   updateAgent(input: UpdateAgentInput): Promise<AppSnapshot>;
   duplicateAgent(agentId: string): Promise<AppSnapshot>;
+  moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot>;
   saveAgentToBench(agentId: string): Promise<AppSnapshot>;
   restartAgent(agentId: string): Promise<AppSnapshot>;
   closeAgent(agentId: string): Promise<AppSnapshot>;

@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { AppSnapshot, ClientRequestResponse, CodexModelOption, CreateAgentInput, CreateTeamInput, MainToRendererEvent, ReasoningEffort, SendPromptOptions, UpdateAgentInput } from '../shared/contracts';
+import type { AppSnapshot, ClientRequestResponse, CodexModelOption, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, SendPromptOptions, UpdateAgentInput, UpdateTeamInput } from '../shared/contracts';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '../shared/snapshot';
 
 const snapshot = ref<AppSnapshot>(createEmptySnapshot());
@@ -121,6 +121,22 @@ export function useAppState() {
     snapshot.value = await window.codexClaw.createTeam(input);
   }
 
+  async function updateTeam(input: UpdateTeamInput): Promise<void> {
+    if (!window.codexClaw?.updateTeam || !snapshot.value.teams.some((team) => team.id === input.id)) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.updateTeam(input);
+  }
+
+  async function closeTeam(teamId: string): Promise<void> {
+    if (!window.codexClaw?.closeTeam || snapshot.value.teams.length <= 1 || !snapshot.value.teams.some((team) => team.id === teamId)) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.closeTeam(teamId);
+  }
+
   async function selectTeam(teamId: string): Promise<void> {
     if (!snapshot.value.teams.some((team) => team.id === teamId)) {
       return;
@@ -149,6 +165,18 @@ export function useAppState() {
     }
 
     snapshot.value = await window.codexClaw.duplicateAgent(agentId);
+  }
+
+  async function moveAgentToTeam(input: MoveAgentToTeamInput): Promise<void> {
+    if (
+      !window.codexClaw?.moveAgentToTeam ||
+      !snapshot.value.agents.some((agent) => agent.id === input.agentId) ||
+      !snapshot.value.teams.some((team) => team.id === input.teamId)
+    ) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.moveAgentToTeam(input);
   }
 
   async function saveAgentToBench(agentId: string): Promise<void> {
@@ -221,8 +249,11 @@ export function useAppState() {
     chooseAgentFolder,
     createAgent,
     createTeam,
+    updateTeam,
+    closeTeam,
     updateAgent,
     duplicateAgent,
+    moveAgentToTeam,
     saveAgentToBench,
     restartAgent,
     closeAgent,

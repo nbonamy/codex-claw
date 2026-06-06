@@ -437,18 +437,29 @@ describe('useAppState', () => {
       activeTeamId: 'team-codex-claw',
       activeAgentId: 'agent-dina',
     };
-    const createdSnapshot = createInitialSnapshot();
-    createdSnapshot.agents.push({
-      id: 'agent-jules',
-      teamId: 'team-codex-claw',
-      name: 'Jules',
-      avatar: '🤖',
-      folder: '/Users/nbonamy/src/jules',
-      status: { type: 'idle' },
-      createdAt: '2026-06-05T00:00:00.000Z',
-      updatedAt: '2026-06-05T00:00:00.000Z',
-    });
-    createdSnapshot.activeAgentId = 'agent-jules';
+    const updatedTeamSnapshot = {
+      ...selectedTeamSnapshot,
+      teams: selectedTeamSnapshot.teams.map((team) => team.id === 'team-codex-claw'
+        ? { ...team, name: 'Core Team', avatar: 'CT', color: '#46A857' }
+        : team),
+    };
+    const createdSnapshot = {
+      ...updatedTeamSnapshot,
+      agents: [
+        ...updatedTeamSnapshot.agents,
+        {
+          id: 'agent-jules',
+          teamId: 'team-codex-claw',
+          name: 'Jules',
+          avatar: '🤖',
+          folder: '/Users/nbonamy/src/jules',
+          status: { type: 'idle' as const },
+          createdAt: '2026-06-05T00:00:00.000Z',
+          updatedAt: '2026-06-05T00:00:00.000Z',
+        },
+      ],
+      activeAgentId: 'agent-jules',
+    };
     const updatedSnapshot = {
       ...createdSnapshot,
       agents: createdSnapshot.agents.map((agent) => agent.id === 'agent-jules' ? { ...agent, name: 'Jules Prime' } : agent),
@@ -457,8 +468,15 @@ describe('useAppState', () => {
       ...updatedSnapshot,
       activeAgentId: 'agent-jules-copy',
     };
-    const benchSnapshot = {
+    const movedSnapshot = {
       ...duplicatedSnapshot,
+      activeTeamId: 'team-skwad-core',
+      agents: duplicatedSnapshot.agents.map((agent) => agent.id === 'agent-jules'
+        ? { ...agent, teamId: 'team-skwad-core' }
+        : agent),
+    };
+    const benchSnapshot = {
+      ...movedSnapshot,
       bench: [
         {
           id: 'bench-jules-prime',
@@ -480,12 +498,20 @@ describe('useAppState', () => {
       agents: restartedSnapshot.agents.filter((agent) => agent.id !== 'agent-jules'),
       activeAgentId: 'agent-dina',
     };
+    const closedTeamSnapshot = {
+      ...closedSnapshot,
+      teams: closedSnapshot.teams.filter((team) => team.id !== 'team-skwad-core'),
+      activeTeamId: 'team-codex-claw',
+    };
     const chooseAgentFolder = vi.fn().mockResolvedValue('/Users/nbonamy/src/jules');
     const createTeam = vi.fn().mockResolvedValue(teamSnapshot);
+    const updateTeam = vi.fn().mockResolvedValue(updatedTeamSnapshot);
+    const closeTeam = vi.fn().mockResolvedValue(closedTeamSnapshot);
     const selectTeam = vi.fn().mockResolvedValue(selectedTeamSnapshot);
     const createAgent = vi.fn().mockResolvedValue(createdSnapshot);
     const updateAgent = vi.fn().mockResolvedValue(updatedSnapshot);
     const duplicateAgent = vi.fn().mockResolvedValue(duplicatedSnapshot);
+    const moveAgentToTeam = vi.fn().mockResolvedValue(movedSnapshot);
     const saveAgentToBench = vi.fn().mockResolvedValue(benchSnapshot);
     const restartAgent = vi.fn().mockResolvedValue(restartedSnapshot);
     const closeAgent = vi.fn().mockResolvedValue(closedSnapshot);
@@ -496,10 +522,13 @@ describe('useAppState', () => {
         onEvent: vi.fn(),
         chooseAgentFolder,
         createTeam,
+        updateTeam,
+        closeTeam,
         selectTeam,
         createAgent,
         updateAgent,
         duplicateAgent,
+        moveAgentToTeam,
         saveAgentToBench,
         restartAgent,
         closeAgent,
@@ -512,22 +541,28 @@ describe('useAppState', () => {
     await expect(state.chooseAgentFolder()).resolves.toBe('/Users/nbonamy/src/jules');
     await state.createTeam({ name: 'Skwad Core', color: '#46A857' });
     await state.selectTeam('team-codex-claw');
+    await state.updateTeam({ id: 'team-codex-claw', name: 'Core Team', color: '#46A857' });
     await state.createAgent({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules' });
     await state.updateAgent({ id: 'agent-jules', name: 'Jules Prime', avatar: '🤖', folder: '/Users/nbonamy/src/jules' });
     await state.duplicateAgent('agent-jules');
+    await state.moveAgentToTeam({ agentId: 'agent-jules', teamId: 'team-skwad-core' });
     await state.saveAgentToBench('agent-jules');
     await state.restartAgent('agent-jules');
     await state.closeAgent('agent-jules');
+    await state.closeTeam('team-skwad-core');
 
     expect(createTeam).toHaveBeenCalledWith({ name: 'Skwad Core', color: '#46A857' });
     expect(selectTeam).toHaveBeenCalledWith('team-codex-claw');
+    expect(updateTeam).toHaveBeenCalledWith({ id: 'team-codex-claw', name: 'Core Team', color: '#46A857' });
     expect(createAgent).toHaveBeenCalledWith({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules' });
     expect(updateAgent).toHaveBeenCalledWith({ id: 'agent-jules', name: 'Jules Prime', avatar: '🤖', folder: '/Users/nbonamy/src/jules' });
     expect(duplicateAgent).toHaveBeenCalledWith('agent-jules');
+    expect(moveAgentToTeam).toHaveBeenCalledWith({ agentId: 'agent-jules', teamId: 'team-skwad-core' });
     expect(saveAgentToBench).toHaveBeenCalledWith('agent-jules');
     expect(restartAgent).toHaveBeenCalledWith('agent-jules');
     expect(closeAgent).toHaveBeenCalledWith('agent-jules');
-    expect(state.snapshot.value).toStrictEqual(closedSnapshot);
+    expect(closeTeam).toHaveBeenCalledWith('team-skwad-core');
+    expect(state.snapshot.value).toStrictEqual(closedTeamSnapshot);
   });
 
   it('returns safe defaults when optional agent preload helpers are unavailable', async () => {
@@ -545,10 +580,13 @@ describe('useAppState', () => {
 
     await expect(state.chooseAgentFolder()).resolves.toBeNull();
     await state.createTeam({ name: 'Ignored Team', color: '#46A857' });
+    await state.updateTeam({ id: 'team-codex-claw', name: 'Ignored Team', color: '#46A857' });
+    await state.closeTeam('team-codex-claw');
     await state.selectTeam('team-codex-claw');
     await state.createAgent({ name: 'Ignored', folder: '/tmp/ignored' });
     await state.updateAgent({ id: 'agent-dina', name: 'Ignored', folder: '/tmp/ignored' });
     await state.duplicateAgent('agent-dina');
+    await state.moveAgentToTeam({ agentId: 'agent-dina', teamId: 'team-codex-claw' });
     await state.saveAgentToBench('agent-dina');
     await state.restartAgent('agent-dina');
     await state.closeAgent('agent-dina');

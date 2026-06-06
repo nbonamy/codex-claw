@@ -13,9 +13,12 @@
     :choose-agent-folder="chooseAgentFolder"
     :create-agent="createAgent"
     :create-team="createTeam"
+    :update-team="updateTeam"
     :update-agent="updateAgent"
+    @close-team="closeTeam"
     @close-agent="closeAgent"
     @duplicate-agent="duplicateAgent"
+    @move-agent-to-team="moveAgentToTeam"
     @restart-agent="restartAgent"
     @save-agent-to-bench="saveAgentToBench"
     @select-agent="selectAgent"
@@ -48,8 +51,11 @@ const {
   chooseAgentFolder,
   createAgent,
   createTeam,
+  updateTeam,
+  closeTeam,
   updateAgent,
   duplicateAgent,
+  moveAgentToTeam,
   saveAgentToBench,
   restartAgent,
   closeAgent,

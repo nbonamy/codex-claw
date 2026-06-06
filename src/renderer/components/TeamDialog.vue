@@ -10,8 +10,8 @@
   >
     <template #header>
       <div class="claw-dialog__header--centered">
-        <h2 class="claw-dialog__title">New Team</h2>
-        <p class="claw-dialog__subtitle">Add a team to Codex Claw</p>
+        <h2 class="claw-dialog__title">{{ dialogTitle }}</h2>
+        <p class="claw-dialog__subtitle">{{ dialogSubtitle }}</p>
       </div>
     </template>
 
@@ -76,7 +76,7 @@
           :disabled="!canSave"
           @click="submit"
         >
-          Create Team
+          {{ submitLabel }}
         </el-button>
       </div>
     </template>
@@ -85,14 +85,21 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { CreateTeamInput } from '../../shared/contracts';
+import type { CreateTeamInput, Team, UpdateTeamInput } from '../../shared/contracts';
 import { defaultTeamColor, teamColors } from '../../shared/team-colors';
 import { CheckIcon } from '../shared/icons/app-icons';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   createTeam: (input: CreateTeamInput) => Promise<void>;
+  mode?: 'create' | 'edit';
+  team?: Team | null;
+  updateTeam?: (input: UpdateTeamInput) => Promise<void>;
   visible: boolean;
-}>();
+}>(), {
+  mode: 'create',
+  team: null,
+  updateTeam: async () => undefined,
+});
 
 const emit = defineEmits<{
   close: [];
@@ -104,6 +111,9 @@ const errorMessage = ref<string | null>(null);
 const submitting = ref(false);
 
 const canSave = computed(() => name.value.trim().length > 0 && !submitting.value);
+const dialogTitle = computed(() => props.mode === 'edit' ? 'Edit Team' : 'New Team');
+const dialogSubtitle = computed(() => props.mode === 'edit' ? 'Update team identity' : 'Add a team to Codex Claw');
+const submitLabel = computed(() => props.mode === 'edit' ? 'Save' : 'Create Team');
 
 watch(() => props.visible, (visible) => {
   if (visible) {
@@ -119,10 +129,18 @@ async function submit(): Promise<void> {
   submitting.value = true;
   errorMessage.value = null;
   try {
-    await props.createTeam({
-      name: name.value,
-      color: selectedColor.value,
-    });
+    if (props.mode === 'edit' && props.team) {
+      await props.updateTeam({
+        id: props.team.id,
+        name: name.value,
+        color: selectedColor.value,
+      });
+    } else {
+      await props.createTeam({
+        name: name.value,
+        color: selectedColor.value,
+      });
+    }
     close();
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : String(error);
@@ -143,8 +161,8 @@ function close(): void {
 }
 
 function resetForm(): void {
-  name.value = '';
-  selectedColor.value = defaultTeamColor;
+  name.value = props.mode === 'edit' ? props.team?.name ?? '' : '';
+  selectedColor.value = props.mode === 'edit' ? props.team?.color ?? defaultTeamColor : defaultTeamColor;
   errorMessage.value = null;
   submitting.value = false;
 }

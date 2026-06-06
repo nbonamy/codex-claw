@@ -44,6 +44,33 @@ export function saveAgentToBench(snapshot: AppSnapshot, agentId: string, created
   return template;
 }
 
+export function moveAgentToTeamInSnapshot(snapshot: AppSnapshot, agentId: string, teamId: string, updatedAt = new Date().toISOString()): Agent | null {
+  const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
+  const targetTeam = snapshot.teams.find((candidate) => candidate.id === teamId);
+  if (!agent || !targetTeam) {
+    return null;
+  }
+
+  ensureAgentCanChange(agent, 'Agent must be idle before moving.');
+  for (const team of snapshot.teams) {
+    team.agentIds = team.agentIds.filter((candidate) => candidate !== agentId);
+    if (team.activeAgentId === agentId) {
+      team.activeAgentId = team.agentIds[0];
+    }
+  }
+
+  agent.teamId = targetTeam.id;
+  agent.updatedAt = updatedAt;
+  if (!targetTeam.agentIds.includes(agent.id)) {
+    targetTeam.agentIds.push(agent.id);
+  }
+  targetTeam.activeAgentId = agent.id;
+  snapshot.activeTeamId = targetTeam.id;
+  snapshot.activeAgentId = agent.id;
+
+  return agent;
+}
+
 export function restartAgentConversation(snapshot: AppSnapshot, agentId: string, updatedAt = new Date().toISOString()): Agent | null {
   const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
   if (!agent) {
@@ -96,6 +123,7 @@ function ensureAgentCanChange(agent: Agent, message: string): void {
 
 function clearRuntimeState(agent: Agent): void {
   delete agent.codexThreadId;
+  delete agent.contextUsage;
   delete agent.isRegistered;
   delete agent.mcpSessionId;
   delete agent.statusText;

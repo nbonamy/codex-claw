@@ -30,15 +30,43 @@
       role="separator"
     />
 
-    <button
-      class="claw-context-menu__action"
-      type="button"
-      role="menuitem"
-      @click="selectAction('move-agent-to-team')"
+    <div
+      class="claw-context-menu__submenu"
     >
-      <SwitchHorizontalIcon class="claw-context-menu__icon" />
-      <span>Move to Other Team</span>
-    </button>
+      <button
+        class="claw-context-menu__action"
+        type="button"
+        role="menuitem"
+        aria-haspopup="menu"
+        :aria-expanded="canMoveToTeam"
+        :disabled="!canMoveToTeam"
+      >
+        <SwitchHorizontalIcon class="claw-context-menu__icon" />
+        <span>Move to Other Team</span>
+      </button>
+      <div
+        v-if="canMoveToTeam"
+        class="claw-context-menu__submenu-menu"
+        role="menu"
+        aria-label="Move to team"
+      >
+        <button
+          v-for="team in moveTargets"
+          :key="team.id"
+          class="claw-context-menu__action agent-context-menu__team-action"
+          type="button"
+          role="menuitem"
+          @click="selectMoveTarget(team.id)"
+        >
+          <span
+            class="agent-context-menu__team-dot"
+            :style="{ backgroundColor: team.color ?? defaultTeamColor }"
+            aria-hidden="true"
+          />
+          <span>{{ team.name }}</span>
+        </button>
+      </div>
+    </div>
     <button
       class="claw-context-menu__action"
       type="button"
@@ -77,6 +105,8 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import type { Team } from '../../shared/contracts';
+import { defaultTeamColor } from '../../shared/team-colors';
 import {
   CopyIcon,
   PencilIcon,
@@ -90,11 +120,11 @@ export type AgentContextMenuAction =
   | 'close-agent'
   | 'duplicate-agent'
   | 'edit-agent'
-  | 'move-agent-to-team'
   | 'restart-agent'
   | 'save-agent-to-bench';
 
 const props = defineProps<{
+  moveTargets?: Team[];
   x: number;
   y: number;
 }>();
@@ -102,9 +132,12 @@ const props = defineProps<{
 const emit = defineEmits<{
   action: [action: AgentContextMenuAction];
   close: [];
+  'move-agent-to-team': [teamId: string];
 }>();
 
 const menuRoot = ref<HTMLElement | null>(null);
+const moveTargets = computed(() => props.moveTargets ?? []);
+const canMoveToTeam = computed(() => moveTargets.value.length > 0);
 const menuStyle = computed<Record<string, string>>(() => ({
   left: `${props.x}px`,
   top: `${props.y}px`,
@@ -124,6 +157,10 @@ function selectAction(action: AgentContextMenuAction): void {
   emit('action', action);
 }
 
+function selectMoveTarget(teamId: string): void {
+  emit('move-agent-to-team', teamId);
+}
+
 function closeOnDocumentClick(event: MouseEvent): void {
   if (event.target instanceof Node && menuRoot.value?.contains(event.target)) {
     return;
@@ -138,3 +175,16 @@ function closeOnEscape(event: KeyboardEvent): void {
   }
 }
 </script>
+
+<style scoped>
+.agent-context-menu__team-action {
+  gap: var(--space-6);
+}
+
+.agent-context-menu__team-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-full);
+}
+</style>

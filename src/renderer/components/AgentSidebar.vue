@@ -35,7 +35,8 @@
         />
         <span class="agent-sidebar__meta">
           <strong>{{ agent.name }}</strong>
-          <span>{{ agent.statusText || agent.folder }}</span>
+          <span class="agent-sidebar__status-text">{{ agentStatusText(agent) }}</span>
+          <span class="agent-sidebar__folder">{{ folderBasename(agent.folder) }}</span>
         </span>
         <span
           class="agent-sidebar__status"
@@ -47,9 +48,11 @@
 
     <AgentContextMenu
       v-if="contextMenuAgentId"
+      :move-targets="contextMenuMoveTargets"
       :x="contextMenuPosition.x"
       :y="contextMenuPosition.y"
       @action="emitContextAgentAction"
+      @move-agent-to-team="emitContextAgentMove"
       @close="closeContextMenu"
     />
 
@@ -86,7 +89,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Agent, AgentStatus } from '../../shared/contracts';
+import type { Agent, AgentStatus, Team } from '../../shared/contracts';
 import {
   PanelLeftCloseIcon,
   PlusIcon,
@@ -98,6 +101,7 @@ import AgentAvatar from './AgentAvatar.vue';
 const props = defineProps<{
   agents: Agent[];
   activeAgentId: string | null;
+  teams?: Team[];
   teamName: string;
   width?: number;
   minWidth?: number;
@@ -109,7 +113,7 @@ const emit = defineEmits<{
   'close-agent': [agentId: string];
   'duplicate-agent': [agentId: string];
   'edit-agent': [agentId: string];
-  'move-agent-to-team': [agentId: string];
+  'move-agent-to-team': [payload: { agentId: string; teamId: string }];
   'new-agent': [];
   'resize-sidebar': [width: number];
   'restart-agent': [agentId: string];
@@ -124,6 +128,17 @@ const currentWidth = computed(() => clampWidth(props.width ?? 260));
 const teamTitle = computed(() => props.teamName.toUpperCase());
 const contextMenuAgentId = ref<string | null>(null);
 const contextMenuPosition = ref({ x: 0, y: 0 });
+const contextMenuAgent = computed(() => (
+  contextMenuAgentId.value ? props.agents.find((agent) => agent.id === contextMenuAgentId.value) ?? null : null
+));
+const contextMenuMoveTargets = computed(() => {
+  const agent = contextMenuAgent.value;
+  if (!agent) {
+    return [];
+  }
+
+  return (props.teams ?? []).filter((team) => team.id !== agent.teamId);
+});
 const sidebarStyle = computed<Record<string, string>>(() => ({
   '--agent-sidebar-width': `${currentWidth.value}px`,
   '--agent-sidebar-min-width': `${minWidth.value}px`,
@@ -144,6 +159,28 @@ function agentStatusLabel(status: AgentStatus['type']): string {
     case 'idle':
       return 'Idle';
   }
+}
+
+function agentStatusText(agent: Agent): string {
+  if (agent.statusText) {
+    return agent.statusText;
+  }
+
+  switch (agent.status.type) {
+    case 'working':
+      return agent.status.detail ?? agentStatusLabel(agent.status.type);
+    case 'awaitingInput':
+      return agent.status.detail ?? agentStatusLabel(agent.status.type);
+    case 'error':
+      return agent.status.message ?? agentStatusLabel(agent.status.type);
+    case 'starting':
+    case 'idle':
+      return agentStatusLabel(agent.status.type);
+  }
+}
+
+function folderBasename(folder: string): string {
+  return folder.trim().split(/[\\/]/).filter(Boolean).at(-1) ?? folder;
 }
 
 function clampWidth(width: number): number {
@@ -182,9 +219,6 @@ function emitContextAgentAction(action: AgentContextMenuAction): void {
     case 'edit-agent':
       emit('edit-agent', agentId);
       break;
-    case 'move-agent-to-team':
-      emit('move-agent-to-team', agentId);
-      break;
     case 'restart-agent':
       emit('restart-agent', agentId);
       break;
@@ -192,6 +226,16 @@ function emitContextAgentAction(action: AgentContextMenuAction): void {
       emit('save-agent-to-bench', agentId);
       break;
   }
+  closeContextMenu();
+}
+
+function emitContextAgentMove(teamId: string): void {
+  const agentId = contextMenuAgentId.value;
+  if (!agentId) {
+    return;
+  }
+
+  emit('move-agent-to-team', { agentId, teamId });
   closeContextMenu();
 }
 
@@ -236,7 +280,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   --agent-sidebar-width: 260px;
   --agent-sidebar-min-width: 72px;
   --agent-sidebar-max-width: 420px;
-  --agent-sidebar-avatar-size: var(--space-16);
+  --agent-sidebar-avatar-size: 36px;
   --agent-sidebar-row-min-height: 64px;
   --agent-sidebar-status-column-width: 12px;
   --agent-status-dot-size: 10px;
@@ -315,9 +359,9 @@ function onResizePointerEnd(event: PointerEvent): void {
   display: grid;
   grid-template-columns: var(--agent-sidebar-avatar-size) minmax(0, 1fr) var(--agent-sidebar-status-column-width);
   align-items: center;
-  gap: var(--space-6);
+  gap: var(--space-8);
   margin-bottom: var(--space-1);
-  padding: var(--space-6);
+  padding: var(--space-4) var(--space-6);
   border: 1px solid transparent;
   border-radius: var(--radius-lg);
   color: var(--color-text);
@@ -339,7 +383,7 @@ function onResizePointerEnd(event: PointerEvent): void {
 .agent-sidebar__meta {
   min-width: 0;
   display: grid;
-  gap: 0;
+  gap: 1.5px;
 }
 
 .agent-sidebar__meta strong,
@@ -352,11 +396,19 @@ function onResizePointerEnd(event: PointerEvent): void {
 .agent-sidebar__meta strong {
   font-size: var(--font-size-14);
   font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-18);
 }
 
-.agent-sidebar__meta span {
+.agent-sidebar__status-text {
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
+  line-height: var(--line-height-16);
+}
+
+.agent-sidebar__folder {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-16);
 }
 
 .agent-sidebar__status {

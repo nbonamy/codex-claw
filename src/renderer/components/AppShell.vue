@@ -6,14 +6,17 @@
       :teams="snapshot.teams"
       :active-team-id="activeTeam?.id ?? null"
       class="app-shell__team-rail"
+      @close-team="$emit('close-team', $event)"
+      @edit-team="openEditTeam"
       @new-team="openNewTeam"
       @select-team="$emit('select-team', $event)"
     />
     <Transition name="agent-sidebar">
       <AgentSidebar
-        v-if="!agentSidebarCollapsed"
+        v-if="showAgentSidebar"
         :agents="activeTeamAgents"
         :active-agent-id="currentAgent?.id ?? null"
+        :teams="snapshot.teams"
         :team-name="activeTeamName"
         :width="agentSidebarWidth"
         :min-width="agentSidebarMinWidth"
@@ -73,7 +76,10 @@
     />
     <TeamDialog
       :visible="teamDialogVisible"
+      :mode="teamDialogMode"
+      :team="editingTeam"
       :create-team="createTeam"
+      :update-team="updateTeam"
       @close="teamDialogVisible = false"
     />
   </main>
@@ -81,7 +87,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Agent, AppSnapshot, ClientRequestResponse, CodexModelOption, CreateAgentInput, CreateTeamInput, ReasoningEffort, RendererMessage, Team, UpdateAgentInput } from '../../shared/contracts';
+import type { Agent, AppSnapshot, ClientRequestResponse, CodexModelOption, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, Team, UpdateAgentInput, UpdateTeamInput } from '../../shared/contracts';
 import AgentDialog from './AgentDialog.vue';
 import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
@@ -104,6 +110,7 @@ const props = withDefaults(defineProps<{
   chooseAgentFolder?: () => Promise<string | null>;
   createAgent?: (input: CreateAgentInput) => Promise<void>;
   createTeam?: (input: CreateTeamInput) => Promise<void>;
+  updateTeam?: (input: UpdateTeamInput) => Promise<void>;
   updateAgent?: (input: UpdateAgentInput) => Promise<void>;
 }>(), {
   answeredClientRequestIds: () => new Set<string>(),
@@ -114,14 +121,16 @@ const props = withDefaults(defineProps<{
   chooseAgentFolder: async () => null,
   createAgent: async () => undefined,
   createTeam: async () => undefined,
+  updateTeam: async () => undefined,
   updateAgent: async () => undefined,
 });
 
 defineEmits<{
+  'close-team': [teamId: string];
   'close-agent': [agentId: string];
   'client-response': [response: ClientRequestResponse];
   'duplicate-agent': [agentId: string];
-  'move-agent-to-team': [agentId: string];
+  'move-agent-to-team': [input: MoveAgentToTeamInput];
   'restart-agent': [agentId: string];
   'save-agent-to-bench': [agentId: string];
   'select-agent': [agentId: string];
@@ -139,6 +148,8 @@ const agentDialogVisible = ref(false);
 const agentDialogMode = ref<'create' | 'edit'>('create');
 const editingAgentId = ref<string | null>(null);
 const teamDialogVisible = ref(false);
+const teamDialogMode = ref<'create' | 'edit'>('create');
+const editingTeamId = ref<string | null>(null);
 const activeTeamAgents = computed(() => {
   const team = activeTeam.value;
   if (!team) {
@@ -162,8 +173,12 @@ const currentAgent = computed(() => {
   return activeTeamAgents.value.find((agent) => agent.id === team.activeAgentId) ?? activeTeamAgents.value[0] ?? null;
 });
 const isAgentEmpty = computed(() => activeTeamAgents.value.length === 0);
+const showAgentSidebar = computed(() => !agentSidebarCollapsed.value && !isAgentEmpty.value);
 const editingAgent = computed(() => (
   editingAgentId.value ? props.snapshot.agents.find((agent) => agent.id === editingAgentId.value) ?? null : null
+));
+const editingTeam = computed(() => (
+  editingTeamId.value ? props.snapshot.teams.find((team) => team.id === editingTeamId.value) ?? null : null
 ));
 
 function setAgentSidebarWidth(width: number): void {
@@ -177,6 +192,14 @@ function openNewAgent(): void {
 }
 
 function openNewTeam(): void {
+  teamDialogMode.value = 'create';
+  editingTeamId.value = null;
+  teamDialogVisible.value = true;
+}
+
+function openEditTeam(teamId: string): void {
+  teamDialogMode.value = 'edit';
+  editingTeamId.value = teamId;
   teamDialogVisible.value = true;
 }
 

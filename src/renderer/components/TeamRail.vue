@@ -1,5 +1,6 @@
 <template>
   <aside
+    ref="railRoot"
     class="team-rail"
     aria-label="Teams"
   >
@@ -13,6 +14,7 @@
       :aria-label="team.name"
       :aria-pressed="team.id === activeTeamId"
       @click="emit('select-team', team.id)"
+      @contextmenu.prevent="openTeamMenu(team.id, $event)"
     >
       {{ team.avatar ?? teamInitials(team.name) }}
     </button>
@@ -25,24 +27,115 @@
     >
       <PlusIcon aria-hidden="true" />
     </button>
+
+    <TeamContextMenu
+      v-if="contextMenuTeam"
+      :team="contextMenuTeam"
+      :can-close="canCloseContextTeam"
+      :x="contextMenuPosition.x"
+      :y="contextMenuPosition.y"
+      @edit-team="selectEditTeam"
+      @request-close-team="requestCloseTeam"
+      @close="contextMenuTeamId = null"
+    />
   </aside>
 </template>
 
 <script setup lang="ts">
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { ElMessageBox } from 'element-plus';
 import type { Team } from '../../shared/contracts';
 import { defaultTeamColor } from '../../shared/team-colors';
 import { teamInitials } from '../../shared/team-manager';
 import { PlusIcon } from '../shared/icons/app-icons';
+import TeamContextMenu from './TeamContextMenu.vue';
 
-defineProps<{
+const props = defineProps<{
   teams: Team[];
   activeTeamId: string | null;
 }>();
 
 const emit = defineEmits<{
+  'close-team': [teamId: string];
+  'edit-team': [teamId: string];
   'new-team': [];
   'select-team': [teamId: string];
 }>();
+
+const railRoot = ref<HTMLElement | null>(null);
+const contextMenuTeamId = ref<string | null>(null);
+const contextMenuPosition = ref({ x: 0, y: 0 });
+const contextMenuTeam = computed(() => (
+  contextMenuTeamId.value ? props.teams.find((team) => team.id === contextMenuTeamId.value) ?? null : null
+));
+const canCloseContextTeam = computed(() => Boolean(contextMenuTeam.value) && props.teams.length > 1);
+onMounted(() => {
+  document.addEventListener('click', closeFloatingUiOnDocumentClick);
+  document.addEventListener('keydown', closeFloatingUiOnEscape);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', closeFloatingUiOnDocumentClick);
+  document.removeEventListener('keydown', closeFloatingUiOnEscape);
+});
+
+function selectEditTeam(teamId: string): void {
+  emit('edit-team', teamId);
+  contextMenuTeamId.value = null;
+}
+
+async function requestCloseTeam(teamId: string): Promise<void> {
+  if (props.teams.length <= 1) {
+    return;
+  }
+
+  const team = props.teams.find((candidate) => candidate.id === teamId);
+  if (!team) {
+    return;
+  }
+
+  contextMenuTeamId.value = null;
+  await nextTick();
+
+  try {
+    await ElMessageBox.confirm(
+      `Agents and messages in ${team.name} will be removed from Codex Claw.`,
+      `Close ${team.name}?`,
+      {
+        cancelButtonText: 'Cancel',
+        confirmButtonText: 'Close Team',
+        type: 'warning',
+      },
+    );
+    emit('close-team', team.id);
+  } catch {
+    // Element Plus rejects when the user cancels or closes the confirmation.
+  }
+}
+
+function openTeamMenu(teamId: string, event: MouseEvent): void {
+  contextMenuTeamId.value = teamId;
+  contextMenuPosition.value = {
+    x: event.clientX,
+    y: event.clientY,
+  };
+}
+
+function closeFloatingUiOnDocumentClick(event: MouseEvent): void {
+  if (event.target instanceof Node && railRoot.value?.contains(event.target)) {
+    return;
+  }
+
+  contextMenuTeamId.value = null;
+}
+
+function closeFloatingUiOnEscape(event: KeyboardEvent): void {
+  if (event.key !== 'Escape') {
+    return;
+  }
+
+  contextMenuTeamId.value = null;
+}
 </script>
 
 <style scoped>
@@ -59,6 +152,7 @@ const emit = defineEmits<{
   gap: var(--space-6);
   padding: var(--space-6) var(--space-4);
   background: var(--color-surface);
+  user-select: none;
 }
 
 .team-rail__team {
@@ -103,4 +197,5 @@ const emit = defineEmits<{
   width: var(--icon-lg);
   height: var(--icon-lg);
 }
+
 </style>

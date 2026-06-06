@@ -1,4 +1,4 @@
-import type { AppSnapshot, CreateTeamInput, Team } from './contracts';
+import type { AppSnapshot, CreateTeamInput, Team, UpdateTeamInput } from './contracts';
 import { defaultTeamColor, teamColors } from './team-colors';
 
 export function createTeamInSnapshot(snapshot: AppSnapshot, input: CreateTeamInput, createdAt = new Date().toISOString()): Team {
@@ -33,6 +33,51 @@ export function selectTeam(snapshot: AppSnapshot, teamId: string): AppSnapshot {
     team.activeAgentId = activeAgentId;
   }
   return snapshot;
+}
+
+export function updateTeamInSnapshot(snapshot: AppSnapshot, input: UpdateTeamInput): Team | null {
+  const team = snapshot.teams.find((candidate) => candidate.id === input.id);
+  if (!team) {
+    return null;
+  }
+
+  team.name = normalizedTeamName(input.name);
+  team.avatar = teamInitials(team.name);
+  team.color = normalizedTeamColor(input.color);
+  return team;
+}
+
+export function closeTeamInSnapshot(snapshot: AppSnapshot, teamId: string): Team | null {
+  if (snapshot.teams.length <= 1) {
+    throw new Error('At least one team must remain open.');
+  }
+
+  const team = snapshot.teams.find((candidate) => candidate.id === teamId);
+  if (!team) {
+    return null;
+  }
+
+  const closedAgentIds = new Set(team.agentIds);
+  snapshot.teams = snapshot.teams.filter((candidate) => candidate.id !== teamId);
+  snapshot.agents = snapshot.agents.filter((agent) => !closedAgentIds.has(agent.id));
+  snapshot.messages = snapshot.messages.filter((message) => !closedAgentIds.has(message.agentId));
+
+  if (snapshot.activeTeamId === teamId || !snapshot.teams.some((candidate) => candidate.id === snapshot.activeTeamId)) {
+    snapshot.activeTeamId = snapshot.teams[0]?.id ?? null;
+  }
+
+  const activeTeam = snapshot.teams.find((candidate) => candidate.id === snapshot.activeTeamId) ?? snapshot.teams[0] ?? null;
+  if (closedAgentIds.has(snapshot.activeAgentId ?? '') || !snapshot.agents.some((agent) => agent.id === snapshot.activeAgentId)) {
+    snapshot.activeAgentId = activeTeam?.activeAgentId && activeTeam.agentIds.includes(activeTeam.activeAgentId)
+      ? activeTeam.activeAgentId
+      : activeTeam?.agentIds[0] ?? null;
+  }
+
+  if (activeTeam && snapshot.activeAgentId) {
+    activeTeam.activeAgentId = snapshot.activeAgentId;
+  }
+
+  return team;
 }
 
 export function teamInitials(name: string): string {

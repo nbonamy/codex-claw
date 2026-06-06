@@ -14,10 +14,11 @@ import { ClawMcpHttpServer } from './mcp/http-server';
 import {
   closeAgentInSnapshot,
   duplicateAgentInSnapshot,
+  moveAgentToTeamInSnapshot,
   restartAgentConversation,
   saveAgentToBench,
 } from '../shared/agent-manager';
-import { createTeamInSnapshot, selectTeam } from '../shared/team-manager';
+import { closeTeamInSnapshot, createTeamInSnapshot, selectTeam, updateTeamInSnapshot } from '../shared/team-manager';
 import {
   applyMainEventToSnapshot,
   createAgentInSnapshot,
@@ -27,7 +28,7 @@ import {
   updateAgentFolder,
 } from './snapshot-service';
 import { AppStatePersistence } from './state-persistence';
-import type { AppSnapshot, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MainToRendererEvent, SendPromptOptions, UpdateAgentInput } from '../shared/contracts';
+import type { AppSnapshot, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, SendPromptOptions, UpdateAgentInput, UpdateTeamInput } from '../shared/contracts';
 import { ipcChannels } from '../shared/ipc';
 import { teamColors } from '../shared/team-colors';
 
@@ -81,6 +82,25 @@ export class AppController {
       return this.snapshot;
     });
 
+    ipcMain.handle(ipcChannels.updateTeam, async (_event, input: UpdateTeamInput) => {
+      this.validateTeamInput(input);
+      const team = updateTeamInSnapshot(this.snapshot, input);
+      if (!team) {
+        throw new Error(`Team not found: ${input.id}`);
+      }
+      await this.persistSnapshot();
+      return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.closeTeam, async (_event, teamId: string) => {
+      const team = closeTeamInSnapshot(this.snapshot, teamId);
+      if (!team) {
+        throw new Error(`Team not found: ${teamId}`);
+      }
+      await this.persistSnapshot();
+      return this.snapshot;
+    });
+
     ipcMain.handle(ipcChannels.selectTeam, async (_event, teamId: string) => {
       selectTeam(this.snapshot, teamId);
       await this.persistSnapshot();
@@ -108,6 +128,15 @@ export class AppController {
       const agent = duplicateAgentInSnapshot(this.snapshot, agentId);
       if (!agent) {
         throw new Error(`Agent not found: ${agentId}`);
+      }
+      await this.persistSnapshot();
+      return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.moveAgentToTeam, async (_event, input: MoveAgentToTeamInput) => {
+      const agent = moveAgentToTeamInSnapshot(this.snapshot, input.agentId, input.teamId);
+      if (!agent) {
+        throw new Error(`Agent or team not found: ${input.agentId} -> ${input.teamId}`);
       }
       await this.persistSnapshot();
       return this.snapshot;

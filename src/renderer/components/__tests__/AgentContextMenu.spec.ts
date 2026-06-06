@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
 import AgentContextMenu from '../AgentContextMenu.vue';
+import type { Team } from '../../../shared/contracts';
 
 let mountedWrappers: ReturnType<typeof mount>[] = [];
 
@@ -36,6 +37,31 @@ describe('AgentContextMenu', () => {
     expect(wrapper.emitted('action')).toStrictEqual([['save-agent-to-bench']]);
   });
 
+  it('disables move targets when no other teams are available', () => {
+    const wrapper = mountMenu();
+
+    const moveItem = wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Move to Other Team');
+    expect(moveItem?.attributes()).toHaveProperty('disabled');
+  });
+
+  it('emits the selected move target from the submenu', async () => {
+    const wrapper = mountMenu({
+      moveTargets: [
+        {
+          id: 'team-skwad',
+          name: 'Skwad',
+          avatar: 'SK',
+          color: '#46A857',
+          agentIds: [],
+        },
+      ],
+    });
+
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Skwad')?.trigger('click');
+
+    expect(wrapper.emitted('move-agent-to-team')).toStrictEqual([['team-skwad']]);
+  });
+
   it('requests close when the user clicks elsewhere or presses escape', async () => {
     const wrapper = mountMenu();
 
@@ -54,11 +80,12 @@ describe('AgentContextMenu', () => {
   });
 });
 
-function mountMenu() {
+function mountMenu(props: { moveTargets?: Team[] } = {}) {
   const wrapper = mount(AgentContextMenu, {
     props: {
       x: 120,
       y: 80,
+      ...props,
     },
     attachTo: document.body,
   });

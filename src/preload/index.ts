@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateTeamInput, MainToRendererEvent, SendPromptOptions, UpdateAgentInput } from '../shared/contracts';
+import type { ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, SendPromptOptions, UpdateAgentInput, UpdateTeamInput } from '../shared/contracts';
 import { ipcChannels } from '../shared/ipc';
 
 const api: CodexClawApi = {
@@ -7,10 +7,13 @@ const api: CodexClawApi = {
   listCodexModels: () => ipcRenderer.invoke(ipcChannels.listCodexModels),
   chooseAgentFolder: () => ipcRenderer.invoke(ipcChannels.chooseAgentFolder),
   createTeam: (input: CreateTeamInput) => ipcRenderer.invoke(ipcChannels.createTeam, input),
+  updateTeam: (input: UpdateTeamInput) => ipcRenderer.invoke(ipcChannels.updateTeam, input),
+  closeTeam: (teamId: string) => ipcRenderer.invoke(ipcChannels.closeTeam, teamId),
   selectTeam: (teamId: string) => ipcRenderer.invoke(ipcChannels.selectTeam, teamId),
   createAgent: (input: CreateAgentInput) => ipcRenderer.invoke(ipcChannels.createAgent, input),
   updateAgent: (input: UpdateAgentInput) => ipcRenderer.invoke(ipcChannels.updateAgent, input),
   duplicateAgent: (agentId: string) => ipcRenderer.invoke(ipcChannels.duplicateAgent, agentId),
+  moveAgentToTeam: (input: MoveAgentToTeamInput) => ipcRenderer.invoke(ipcChannels.moveAgentToTeam, input),
   saveAgentToBench: (agentId: string) => ipcRenderer.invoke(ipcChannels.saveAgentToBench, agentId),
   restartAgent: (agentId: string) => ipcRenderer.invoke(ipcChannels.restartAgent, agentId),
   closeAgent: (agentId: string) => ipcRenderer.invoke(ipcChannels.closeAgent, agentId),

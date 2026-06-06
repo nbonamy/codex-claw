@@ -3,7 +3,7 @@ import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import TeamDialog from '../TeamDialog.vue';
 import { teamColors } from '../../../shared/team-colors';
-import type { CreateTeamInput } from '../../../shared/contracts';
+import type { CreateTeamInput, Team, UpdateTeamInput } from '../../../shared/contracts';
 
 describe('TeamDialog', () => {
   it('renders the Skwad-style create team layout and disables save until named', () => {
@@ -32,6 +32,35 @@ describe('TeamDialog', () => {
     expect(wrapper.emitted('close')).toStrictEqual([[]]);
   });
 
+  it('edits an existing team with prefilled values', async () => {
+    const updateTeam = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountDialog({
+      mode: 'edit',
+      team: {
+        id: 'team-codex-claw',
+        name: 'Codex Claw',
+        avatar: 'CC',
+        color: '#1B4FB2',
+        agentIds: ['agent-dina'],
+      },
+      updateTeam,
+    });
+
+    expect(wrapper.get('.claw-dialog__title').text()).toBe('Edit Team');
+    expect((wrapper.get('.team-dialog__text-input').element as HTMLInputElement).value).toBe('Codex Claw');
+
+    await wrapper.get('.team-dialog__text-input').setValue('Skwad Core');
+    await wrapper.findAll('.team-dialog__color')[10]?.trigger('click');
+    await saveButton(wrapper, 'Save').trigger('click');
+
+    expect(updateTeam).toHaveBeenCalledWith({
+      id: 'team-codex-claw',
+      name: 'Skwad Core',
+      color: '#46A857',
+    });
+    expect(wrapper.emitted('close')).toStrictEqual([[]]);
+  });
+
   it('keeps the dialog open and shows create errors', async () => {
     const createTeam = vi.fn().mockRejectedValue(new Error('Team color is invalid.'));
     const wrapper = mountDialog({ createTeam });
@@ -46,6 +75,9 @@ describe('TeamDialog', () => {
 
 function mountDialog(overrides: Partial<{
   createTeam: (input: CreateTeamInput) => Promise<void>;
+  mode: 'create' | 'edit';
+  team: Team | null;
+  updateTeam: (input: UpdateTeamInput) => Promise<void>;
 }> = {}) {
   return mount(TeamDialog, {
     props: {
@@ -71,10 +103,10 @@ function mountDialog(overrides: Partial<{
   });
 }
 
-function saveButton(wrapper: ReturnType<typeof mountDialog>) {
-  const button = wrapper.findAll('button').find((candidate) => candidate.text() === 'Create Team');
+function saveButton(wrapper: ReturnType<typeof mountDialog>, label = 'Create Team') {
+  const button = wrapper.findAll('button').find((candidate) => candidate.text() === label);
   if (!button) {
-    throw new Error('Create Team button not found');
+    throw new Error(`${label} button not found`);
   }
 
   return button;

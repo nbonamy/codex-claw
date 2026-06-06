@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import AgentSidebar from '../AgentSidebar.vue';
-import type { Agent } from '../../../shared/contracts';
+import type { Agent, Team } from '../../../shared/contracts';
 
 function pointerEvent(type: string, clientX: number): PointerEvent {
   const event = new MouseEvent(type, {
@@ -33,8 +33,25 @@ const agents: Agent[] = [
   },
 ];
 
+const teams: Team[] = [
+  {
+    id: 'team-codex-claw',
+    name: 'Codex Claw',
+    avatar: 'CC',
+    color: '#1B4FB2',
+    agentIds: ['agent-dina', 'agent-jesse'],
+  },
+  {
+    id: 'team-skwad',
+    name: 'Skwad',
+    avatar: 'SK',
+    color: '#46A857',
+    agentIds: [],
+  },
+];
+
 describe('AgentSidebar', () => {
-  it('renders the team header, agents, folders, and active selection without Bench chrome', () => {
+  it('renders the team header, agents, statuses, folder basenames, and active selection without Bench chrome', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents,
@@ -50,9 +67,13 @@ describe('AgentSidebar', () => {
     expect(wrapper.text()).toContain('CODEX CLAW');
     expect(wrapper.text()).not.toContain('Bench');
     expect(wrapper.text()).toContain('Dina');
-    expect(wrapper.text()).toContain('~/src/id8');
+    expect(wrapper.text()).toContain('Idle');
+    expect(wrapper.text()).toContain('id8');
+    expect(wrapper.text()).not.toContain('~/src/id8');
     expect(wrapper.text()).toContain('Jesse');
-    expect(wrapper.text()).toContain('~/src/multi-llm-ts');
+    expect(wrapper.text()).toContain('Testing');
+    expect(wrapper.text()).toContain('multi-llm-ts');
+    expect(wrapper.text()).not.toContain('~/src/multi-llm-ts');
     expect(wrapper.find('.agent-sidebar__agent--active').text()).toContain('Dina');
     expect(wrapper.find('.agent-sidebar__agent--active').attributes('aria-pressed')).toBe('true');
     expect(wrapper.find('[aria-label="Working"]').exists()).toBe(true);
@@ -111,7 +132,7 @@ describe('AgentSidebar', () => {
     expect(wrapper.find('[aria-label="Error"]').exists()).toBe(true);
   });
 
-  it('surfaces short collaboration statuses in compact rows', () => {
+  it('surfaces short collaboration statuses while keeping folder basenames visible in compact rows', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents: [
@@ -126,6 +147,7 @@ describe('AgentSidebar', () => {
     });
 
     expect(wrapper.text()).toContain('Running tests');
+    expect(wrapper.text()).toContain('id8');
     expect(wrapper.text()).not.toContain('~/src/id8');
   });
 
@@ -196,7 +218,6 @@ describe('AgentSidebar', () => {
 
     const expectedActions = [
       ['Duplicate Agent', 'duplicate-agent'],
-      ['Move to Other Team', 'move-agent-to-team'],
       ['Save to Bench', 'save-agent-to-bench'],
       ['Restart Agent', 'restart-agent'],
       ['Close Agent', 'close-agent'],
@@ -210,6 +231,31 @@ describe('AgentSidebar', () => {
       await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === label)?.trigger('click');
       expect(wrapper.emitted(eventName)).toStrictEqual([['agent-dina']]);
     }
+  });
+
+  it('emits move targets from the context menu submenu', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: agents.map((agent) => ({ ...agent, teamId: 'team-codex-claw' })),
+        activeAgentId: 'agent-dina',
+        teams,
+        teamName: 'Codex Claw',
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    await wrapper.findAll('.agent-sidebar__agent')[0].trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80,
+    });
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Skwad')?.trigger('click');
+
+    expect(wrapper.emitted('move-agent-to-team')).toStrictEqual([[{
+      agentId: 'agent-dina',
+      teamId: 'team-skwad',
+    }]]);
   });
 
   it('closes the context menu when the menu emits close', async () => {

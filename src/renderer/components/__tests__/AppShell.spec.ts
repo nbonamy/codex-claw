@@ -1,10 +1,10 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
+import ElementPlus, { ElMessageBox } from 'element-plus';
 import { nextTick } from 'vue';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '../../../shared/snapshot';
-import type { Agent, AppSnapshot, CreateAgentInput, CreateTeamInput, UpdateAgentInput } from '../../../shared/contracts';
+import type { Agent, AppSnapshot, CreateAgentInput, CreateTeamInput, UpdateAgentInput, UpdateTeamInput } from '../../../shared/contracts';
 
 function pointerEvent(type: string, clientX: number): PointerEvent {
   const event = new MouseEvent(type, {
@@ -14,6 +14,11 @@ function pointerEvent(type: string, clientX: number): PointerEvent {
   Object.defineProperty(event, 'pointerId', { value: 1 });
   return event as PointerEvent;
 }
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  delete window.codexClaw;
+});
 
 describe('AppShell', () => {
   it('composes the phase zero shell around the active agent', () => {
@@ -187,6 +192,7 @@ describe('AppShell', () => {
     const wrapper = mountShell({ snapshot });
 
     expect(wrapper.get('[aria-label="Empty Team"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
     expect(wrapper.findAll('.agent-sidebar__agent')).toHaveLength(0);
     expect(wrapper.text()).toContain('Welcome to Codex Claw!');
 
@@ -213,6 +219,7 @@ describe('AppShell', () => {
     expect(wrapper.text()).toContain('Welcome to Codex Claw!');
     expect(wrapper.text()).toContain('Add an agent to your team');
     expect(wrapper.find('.agent-header').exists()).toBe(false);
+    expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
     expect(wrapper.find('.conversation-pane').exists()).toBe(false);
 
     await wrapper.get('.agent-empty-state__new').trigger('click');
@@ -264,6 +271,56 @@ describe('AppShell', () => {
     });
   });
 
+  it('opens the edit team dialog from the team menu and forwards updates', async () => {
+    const snapshot = createInitialSnapshot();
+    const updateTeam = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({
+      snapshot,
+      updateTeam,
+    });
+
+    await wrapper.get('[aria-label="Codex Claw"]').trigger('contextmenu');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Edit Team')?.trigger('click');
+
+    expect(wrapper.text()).toContain('Edit Team');
+    await wrapper.get('.team-dialog__text-input').setValue('Skwad Core');
+    await wrapper.findAll('.team-dialog__color')[10]?.trigger('click');
+    await wrapper.findAll('button').find((button) => button.text() === 'Save')?.trigger('click');
+
+    expect(updateTeam).toHaveBeenCalledWith({
+      id: 'team-codex-claw',
+      name: 'Skwad Core',
+      color: '#46A857',
+    });
+  });
+
+  it('confirms before forwarding close team requests', async () => {
+    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
+    const snapshot = createInitialSnapshot();
+    snapshot.teams.push({
+      id: 'team-skwad',
+      name: 'Skwad',
+      avatar: 'SK',
+      color: '#46A857',
+      agentIds: [],
+    });
+    const wrapper = mountShell({ snapshot });
+
+    await wrapper.get('[aria-label="Skwad"]').trigger('contextmenu');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Close Team')?.trigger('click');
+
+    expect(confirm).toHaveBeenCalledWith(
+      'Agents and messages in Skwad will be removed from Codex Claw.',
+      'Close Skwad?',
+      {
+        cancelButtonText: 'Cancel',
+        confirmButtonText: 'Close Team',
+        type: 'warning',
+      },
+    );
+    expect(wrapper.emitted('close-team')).toStrictEqual([['team-skwad']]);
+  });
+
   it('opens the edit agent dialog from the sidebar context menu and forwards updates', async () => {
     const snapshot = createInitialSnapshot();
     const updateAgent = vi.fn().mockResolvedValue(undefined);
@@ -310,6 +367,33 @@ describe('AppShell', () => {
 
     expect(wrapper.emitted('restart-agent')).toStrictEqual([['agent-dina']]);
   });
+
+  it('forwards agent move targets from the context menu', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.teams.push({
+      id: 'team-skwad',
+      name: 'Skwad',
+      avatar: 'SK',
+      color: '#46A857',
+      agentIds: [],
+    });
+    const wrapper = mountShell({ snapshot });
+
+    await wrapper.findAll('.agent-sidebar__agent')[0].trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80,
+    });
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Skwad')?.trigger('click');
+
+    expect(wrapper.emitted('move-agent-to-team')).toStrictEqual([[{
+      agentId: 'agent-dina',
+      teamId: 'team-skwad',
+    }]]);
+  });
+
+
+
+
 });
 
 function mountShell(overrides: Partial<{
@@ -317,6 +401,7 @@ function mountShell(overrides: Partial<{
   chooseAgentFolder: () => Promise<string | null>;
   createAgent: (input: CreateAgentInput) => Promise<void>;
   createTeam: (input: CreateTeamInput) => Promise<void>;
+  updateTeam: (input: UpdateTeamInput) => Promise<void>;
   updateAgent: (input: UpdateAgentInput) => Promise<void>;
 }> = {}) {
   const snapshot = overrides.snapshot ?? createInitialSnapshot();
@@ -330,6 +415,7 @@ function mountShell(overrides: Partial<{
       chooseAgentFolder: overrides.chooseAgentFolder ?? vi.fn().mockResolvedValue(null),
       createAgent: overrides.createAgent ?? vi.fn().mockResolvedValue(undefined),
       createTeam: overrides.createTeam ?? vi.fn().mockResolvedValue(undefined),
+      updateTeam: overrides.updateTeam ?? vi.fn().mockResolvedValue(undefined),
       updateAgent: overrides.updateAgent ?? vi.fn().mockResolvedValue(undefined),
     },
     global: {
