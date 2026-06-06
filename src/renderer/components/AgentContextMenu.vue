@@ -92,7 +92,7 @@
       <span>Restart Agent</span>
     </button>
     <button
-      class="claw-context-menu__action"
+      class="claw-context-menu__action claw-context-menu__action--danger"
       type="button"
       role="menuitem"
       @click="selectAction('close-agent')"

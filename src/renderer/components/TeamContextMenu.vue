@@ -15,6 +15,12 @@
       <PencilIcon class="claw-context-menu__icon" />
       <span>Edit Team</span>
     </button>
+
+    <div
+      class="claw-context-menu__separator"
+      role="separator"
+    />
+
     <button
       class="claw-context-menu__action claw-context-menu__action--danger"
       type="button"
