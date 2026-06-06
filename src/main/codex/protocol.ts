@@ -140,6 +140,7 @@ export type CodexNotification =
   | { method: 'item/commandExecution/outputDelta'; params: { threadId: string; turnId: string; itemId: string; delta: string } }
   | { method: 'item/fileChange/patchUpdated'; params: { threadId: string; turnId: string; itemId: string; changes: unknown[] } }
   | { method: 'item/mcpToolCall/progress'; params: { threadId: string; turnId: string; itemId: string; message: string } }
+  | { method: 'thread/compacted'; params: { threadId: string; turnId: string } }
   | { method: 'serverRequest/resolved'; params: { threadId: string; requestId: JsonRpcId } }
   | { method: 'account/rateLimits/updated'; params: { rateLimits: CodexRateLimitSnapshot } }
   | { method: 'turn/completed'; params: { threadId: string; turn: CodexTurn } }

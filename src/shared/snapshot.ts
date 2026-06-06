@@ -271,6 +271,11 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     return;
   }
 
+  if (event.type === 'context.compactionStarted' && event.turnId) {
+    appendCompactionMarker(snapshot, event.agentId, event.turnId, event.occurredAt);
+    return;
+  }
+
   if ((event.type === 'item.started' || event.type === 'item.completed') && event.turnId) {
     const payload = event.payload as { toolPart?: unknown };
     const toolPart = rendererToolPart(payload.toolPart);
@@ -291,6 +296,16 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     setAgentStatus(snapshot, event.agentId, {
       type: 'awaitingInput',
       detail: confirmation?.payload.confirmation.summary,
+    });
+    return;
+  }
+
+  if (event.type === 'toolInput.requested' && event.turnId) {
+    applyToolInputRequest(snapshot, event.agentId, event.turnId, event.payload);
+    const request = askUserRequest(event.payload);
+    setAgentStatus(snapshot, event.agentId, {
+      type: 'awaitingInput',
+      detail: request?.payload.request.questions[0]?.question ?? 'Waiting for user input',
     });
     return;
   }
@@ -470,7 +485,7 @@ function rendererMessages(value: unknown, agentId: string): RendererMessage[] {
     }
 
     return (
-      (!('kind' in message) || message.kind === undefined || message.kind === 'steer') &&
+      (!('kind' in message) || message.kind === undefined || message.kind === 'compaction' || message.kind === 'steer') &&
       message.parts.every(isRendererMessagePart)
     );
   });
@@ -637,6 +652,36 @@ function applyApprovalRequest(snapshot: AppSnapshot, agentId: string, turnId: st
   });
 }
 
+function applyToolInputRequest(snapshot: AppSnapshot, agentId: string, turnId: string, payload: unknown): void {
+  const request = askUserRequest(payload);
+  if (!request) {
+    return;
+  }
+
+  const question = request.payload.request.questions[0];
+  upsertAssistantToolPart(snapshot, agentId, turnId, {
+    type: 'tool',
+    id: request.payload.request.itemId,
+    kind: 'generic',
+    title: 'ask_user_question',
+    status: 'running',
+    statusText: JSON.stringify({
+      source: 'codex',
+      action: 'ask_user_question',
+      phase: 'running',
+      params: {
+        requestId: request.id,
+        questions: request.payload.request.questions,
+      },
+    }),
+    input: request.payload.request.questions,
+    metadata: {
+      requestId: request.id,
+      question: question?.question,
+    },
+  });
+}
+
 function findPendingMcpToolPart(snapshot: AppSnapshot, agentId: string, turnId: string, server: string, tool: string): ToolPart | undefined {
   const runningMcpTools = findAssistantMessages(snapshot, agentId, turnId).flatMap((message) => (
     message.parts.filter((part): part is ToolPart => {
@@ -660,7 +705,7 @@ function findPendingMcpToolPart(snapshot: AppSnapshot, agentId: string, turnId: 
   return exactMatch ?? (runningMcpTools.length === 1 ? runningMcpTools[0] : undefined);
 }
 
-function confirmToolRequest(payload: unknown): ClientRequest | null {
+function confirmToolRequest(payload: unknown): Extract<ClientRequest, { kind: 'confirm_tool' }> | null {
   if (
     !isRecord(payload) ||
     payload.kind !== 'confirm_tool' ||
@@ -682,7 +727,23 @@ function confirmToolRequest(payload: unknown): ClientRequest | null {
     return null;
   }
 
-  return payload as ClientRequest;
+  return payload as Extract<ClientRequest, { kind: 'confirm_tool' }>;
+}
+
+function askUserRequest(payload: unknown): Extract<ClientRequest, { kind: 'ask_user' }> | null {
+  if (
+    !isRecord(payload) ||
+    payload.kind !== 'ask_user' ||
+    typeof payload.id !== 'string' ||
+    !isRecord(payload.payload) ||
+    !isRecord(payload.payload.request) ||
+    typeof payload.payload.request.itemId !== 'string' ||
+    !Array.isArray(payload.payload.request.questions)
+  ) {
+    return null;
+  }
+
+  return payload as Extract<ClientRequest, { kind: 'ask_user' }>;
 }
 
 function parseJsonPreview(preview: string): unknown {
@@ -706,6 +767,36 @@ function appendAssistantDelta(snapshot: AppSnapshot, agentId: string, turnId: st
   } else {
     message.parts.push(itemId ? { type: 'text', text: delta, itemId } : { type: 'text', text: delta });
   }
+}
+
+function appendCompactionMarker(snapshot: AppSnapshot, agentId: string, turnId: string, createdAt: string): RendererMessage {
+  const existing = snapshot.messages.find((message) => {
+    return message.agentId === agentId && message.id === compactionMessageId(turnId);
+  });
+  if (existing) {
+    return existing;
+  }
+
+  const activeAssistantMessage = findAssistantMessage(snapshot, agentId, turnId);
+  if (activeAssistantMessage?.parts.length === 0 && activeAssistantMessage.id === assistantMessageId(turnId)) {
+    snapshot.messages = snapshot.messages.filter((message) => message !== activeAssistantMessage);
+  } else if (activeAssistantMessage) {
+    activeAssistantMessage.status = 'complete';
+  }
+
+  const message: RendererMessage = {
+    id: compactionMessageId(turnId),
+    agentId,
+    kind: 'compaction',
+    role: 'assistant',
+    status: 'complete',
+    createdAt,
+    parts: [],
+  };
+  snapshot.messages.push(message);
+  ensureAssistantMessage(snapshot, agentId, turnId, assistantSegmentMessageId(turnId, createdAt), createdAt);
+
+  return message;
 }
 
 function ensureAssistantMessage(
@@ -774,6 +865,10 @@ function assistantMessageId(turnId: string): string {
 
 function assistantSegmentMessageId(turnId: string, createdAt: string): string {
   return `${assistantMessageId(turnId)}-segment-${createdAt.replace(/\W/g, '').toLowerCase()}`;
+}
+
+function compactionMessageId(turnId: string): string {
+  return `compaction-${turnId}`;
 }
 
 function createUserMessage(agentId: string, prompt: string, createdAt: string, idPrefix = 'message'): RendererMessage {

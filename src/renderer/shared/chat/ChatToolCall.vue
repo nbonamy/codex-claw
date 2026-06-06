@@ -5,6 +5,12 @@
     :tool-call="toolCall"
     @client-response="emit('client-response', $event)"
   />
+  <ChatToolUserInputRequest
+    v-else-if="isUserInputRequest"
+    :answered-client-request-ids="answeredClientRequestIds"
+    :tool-call="toolCall"
+    @client-response="emit('client-response', $event)"
+  />
   <section v-else class="chat-tool-call" :class="{ 'chat-tool-call--open': isOpen, [`chat-tool-call--${toolCall.state}`]: true }">
     <div v-if="summaryOnly" class="chat-tool-call__summary">
       <ChatToolCallTitle
@@ -66,6 +72,7 @@ import type { ClientRequestResponse } from '../../../shared/contracts'
 import ChatFoldTransition from './ChatFoldTransition.vue'
 import ChatToolConfirmation from './ChatToolConfirmation.vue'
 import ChatToolCallTitle from './ChatToolCallTitle.vue'
+import ChatToolUserInputRequest from './ChatToolUserInputRequest.vue'
 import { getToolDisplayTitleParts, getToolLineDiff, parseToolStatusDescriptor } from './tool-status'
 import { getMessageToolCallArgs, type MessageToolCall } from './types'
 
@@ -93,6 +100,12 @@ const confirmationParams = computed(() => (
 ))
 const isToolConfirmation = computed(() => (
   (statusDescriptor.value?.source === 'mcp' || statusDescriptor.value?.source === 'home') &&
+  typeof confirmationParams.value.requestId === 'string' &&
+  props.toolCall.state === 'running'
+))
+const isUserInputRequest = computed(() => (
+  statusDescriptor.value?.source === 'codex' &&
+  statusDescriptor.value.action === 'ask_user_question' &&
   typeof confirmationParams.value.requestId === 'string' &&
   props.toolCall.state === 'running'
 ))

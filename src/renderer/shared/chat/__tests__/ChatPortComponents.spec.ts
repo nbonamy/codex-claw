@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import ChatQueuedPrompts from '../ChatQueuedPrompts.vue';
 import ChatAnimatedDiffStat from '../ChatAnimatedDiffStat.vue';
 import ChatToolConfirmation from '../ChatToolConfirmation.vue';
+import ChatToolUserInputRequest from '../ChatToolUserInputRequest.vue';
 import ChatToolCall from '../ChatToolCall.vue';
 import ChatToolGroup from '../ChatToolGroup.vue';
 import type { MessageToolCall } from '../types';
@@ -44,6 +45,52 @@ const confirmationTool: MessageToolCall = {
       argumentsPreview: '{\n  "agentId": "agent-dina"\n}',
       confirmationSummary: 'Allow codex_claw to register this agent?',
       requestId: 'approval-1',
+    },
+  }),
+};
+
+const userInputTool: MessageToolCall = {
+  args: [
+    {
+      id: 'target_file',
+      header: 'Target',
+      question: 'Which file should I inspect?',
+      isOther: true,
+      isSecret: false,
+      options: [
+        {
+          label: 'README.md',
+          description: 'Read the project README.',
+        },
+      ],
+    },
+  ],
+  done: false,
+  function: 'ask_user_question',
+  id: 'ask-user-item',
+  result: undefined,
+  state: 'running',
+  status: JSON.stringify({
+    source: 'codex',
+    action: 'ask_user_question',
+    phase: 'running',
+    params: {
+      requestId: 'ask-1',
+      questions: [
+        {
+          id: 'target_file',
+          header: 'Target',
+          question: 'Which file should I inspect?',
+          isOther: true,
+          isSecret: false,
+          options: [
+            {
+              label: 'README.md',
+              description: 'Read the project README.',
+            },
+          ],
+        },
+      ],
     },
   }),
 };
@@ -328,6 +375,46 @@ describe('ported id8 chat components', () => {
     });
 
     expect(wrapper.find('.chat-tool-confirmation').exists()).toBe(true);
+    expect(wrapper.find('.chat-tool-call').exists()).toBe(false);
+  });
+
+  it('renders app-server user input requests and emits answers', async () => {
+    const wrapper = mount(ChatToolUserInputRequest, {
+      props: {
+        toolCall: userInputTool,
+      },
+    });
+
+    expect(wrapper.text()).toContain('User input required');
+    expect(wrapper.text()).toContain('Which file should I inspect?');
+    await wrapper.get('.chat-tool-user-input__option').trigger('click');
+    await wrapper.get('.chat-tool-user-input__button--primary').trigger('click');
+
+    expect(wrapper.emitted('client-response')).toStrictEqual([
+      [
+        {
+          id: 'ask-1',
+          payload: {
+            answers: {
+              target_file: {
+                answers: ['README.md'],
+              },
+            },
+          },
+        },
+      ],
+    ]);
+    expect(wrapper.text()).toContain('Answered user question');
+  });
+
+  it('switches running app-server user input tools to the user input renderer', () => {
+    const wrapper = mount(ChatToolCall, {
+      props: {
+        toolCall: userInputTool,
+      },
+    });
+
+    expect(wrapper.find('.chat-tool-user-input').exists()).toBe(true);
     expect(wrapper.find('.chat-tool-call').exists()).toBe(false);
   });
 

@@ -137,6 +137,7 @@ export class CodexRpcClient {
   private handleServerRequest(request: JsonRpcServerRequest): void {
     switch (request.method) {
       case 'mcpServer/elicitation/request':
+      case 'item/tool/requestUserInput':
         if (this.dispatchServerRequest(request)) {
           return;
         }
@@ -144,7 +145,6 @@ export class CodexRpcClient {
         return;
       case 'item/commandExecution/requestApproval':
       case 'item/fileChange/requestApproval':
-      case 'item/tool/requestUserInput':
       case 'item/permissions/requestApproval':
       case 'item/tool/call':
       case 'account/chatgptAuthTokens/refresh':

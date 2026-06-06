@@ -1,6 +1,6 @@
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, AgentContextUsage, AgentStatus, ClientRequest, ClientRequestResponse, CodexModelOption, ConfirmToolRequest, MainToRendererEvent, SendPromptOptions, ToolConfirmationDecision } from '../../shared/contracts';
+import type { Agent, AgentContextUsage, AgentStatus, AskUserAnswers, AskUserQuestion, ClientRequest, ClientRequestResponse, CodexModelOption, ConfirmToolRequest, MainToRendererEvent, SendPromptOptions, ToolConfirmationDecision } from '../../shared/contracts';
 import { logMain, warnMain } from '../log';
 import { buildCodexClawThreadConfig } from '../mcp/codex-config';
 import type { CodexRpcClient, CodexServerRequest, CodexServerRequestResponder } from './rpc-client';
@@ -35,6 +35,7 @@ type AgentSession = {
 };
 
 type PendingClientRequest = {
+  kind: 'ask_user' | 'mcp_tool_approval';
   responder: CodexServerRequestResponder;
   threadId: string;
   turnId?: string;
@@ -192,7 +193,11 @@ export class CodexAgentSessionManager {
     }
 
     this.pendingClientRequests.delete(response.id);
-    pending.responder.resolve(mcpServerElicitationResponseFromDecision(response.payload?.decision ?? 'deny'));
+    if (pending.kind === 'ask_user') {
+      pending.responder.resolve(toolRequestUserInputResponseFromAnswers(response.payload?.answers));
+    } else {
+      pending.responder.resolve(mcpServerElicitationResponseFromDecision(response.payload?.decision ?? 'deny'));
+    }
     this.emitForThread(pending.threadId, {
       turnId: pending.turnId,
       type: 'agent.statusChanged',
@@ -329,6 +334,16 @@ export class CodexAgentSessionManager {
       case 'item/started':
       case 'item/completed': {
         const params = notification.params as { threadId: string; turnId: string; item: unknown };
+        if (notification.method === 'item/started' && isContextCompactionItem(params.item)) {
+          this.emitForThread(params.threadId, {
+            turnId: params.turnId,
+            type: 'context.compactionStarted',
+            payload: {
+              itemId: params.item.id,
+            },
+          });
+          return;
+        }
         this.logMcpToolItem(notification.method, params.threadId, params.item);
         const toolPart = codexThreadItemToToolPart(params.item);
         if (toolPart) {
@@ -338,6 +353,16 @@ export class CodexAgentSessionManager {
             payload: { toolPart },
           });
         }
+        return;
+      }
+
+      case 'thread/compacted': {
+        const params = notification.params as { threadId: string; turnId: string };
+        this.emitForThread(params.threadId, {
+          turnId: params.turnId,
+          type: 'context.compactionStarted',
+          payload: {},
+        });
         return;
       }
 
@@ -435,6 +460,8 @@ export class CodexAgentSessionManager {
     switch (request.method) {
       case 'mcpServer/elicitation/request':
         return this.handleMcpServerElicitationRequest(request, responder);
+      case 'item/tool/requestUserInput':
+        return this.handleToolRequestUserInput(request, responder);
       default:
         return false;
     }
@@ -453,6 +480,7 @@ export class CodexAgentSessionManager {
     }
 
     this.pendingClientRequests.set(clientRequest.id, {
+      kind: 'mcp_tool_approval',
       responder,
       threadId,
       turnId,
@@ -461,6 +489,34 @@ export class CodexAgentSessionManager {
     this.emitForThread(threadId, {
       turnId,
       type: 'approval.requested',
+      payload: clientRequest,
+    });
+
+    return true;
+  }
+
+  private handleToolRequestUserInput(request: CodexServerRequest, responder: CodexServerRequestResponder): boolean {
+    const clientRequest = clientRequestFromToolRequestUserInput(request);
+    if (!clientRequest || !isRecord(request.params) || typeof request.params.threadId !== 'string') {
+      return false;
+    }
+
+    const threadId = request.params.threadId;
+    const turnId = typeof request.params.turnId === 'string' ? request.params.turnId : undefined;
+    if (!this.agentIdsByThreadId.has(threadId)) {
+      return false;
+    }
+
+    this.pendingClientRequests.set(clientRequest.id, {
+      kind: 'ask_user',
+      responder,
+      threadId,
+      turnId,
+    });
+
+    this.emitForThread(threadId, {
+      turnId,
+      type: 'toolInput.requested',
       payload: clientRequest,
     });
 
@@ -635,6 +691,75 @@ function clientRequestFromMcpServerElicitation(request: CodexServerRequest): Cli
   };
 }
 
+function clientRequestFromToolRequestUserInput(request: CodexServerRequest): ClientRequest | null {
+  if (!isRecord(request.params)) {
+    return null;
+  }
+
+  const params = request.params;
+  if (
+    typeof params.itemId !== 'string' ||
+    !Array.isArray(params.questions)
+  ) {
+    return null;
+  }
+
+  const questions = params.questions.map(toolRequestUserInputQuestion).filter((question): question is AskUserQuestion => question !== null);
+  if (questions.length === 0) {
+    return null;
+  }
+
+  return {
+    id: String(request.id),
+    kind: 'ask_user',
+    payload: {
+      request: {
+        itemId: params.itemId,
+        questions,
+      },
+    },
+  };
+}
+
+function toolRequestUserInputQuestion(value: unknown): AskUserQuestion | null {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== 'string' ||
+    typeof value.header !== 'string' ||
+    typeof value.question !== 'string' ||
+    typeof value.isOther !== 'boolean' ||
+    typeof value.isSecret !== 'boolean'
+  ) {
+    return null;
+  }
+
+  return {
+    id: value.id,
+    header: value.header,
+    question: value.question,
+    isOther: value.isOther,
+    isSecret: value.isSecret,
+    options: toolRequestUserInputOptions(value.options),
+  };
+}
+
+function toolRequestUserInputOptions(value: unknown): AskUserQuestion['options'] {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  return value.map((entry) => {
+    if (!isRecord(entry) || typeof entry.label !== 'string' || typeof entry.description !== 'string') {
+      return null;
+    }
+
+    return {
+      label: entry.label,
+      description: entry.description,
+    };
+  }).filter((entry): entry is NonNullable<AskUserQuestion['options']>[number] => entry !== null);
+}
+
 function argumentsPreviewFromMcpToolApprovalMeta(meta: Record<string, unknown>): string {
   const displayParams = displayParamsPreview(meta.tool_params_display);
   if (displayParams) {
@@ -704,4 +829,14 @@ function mcpServerElicitationResponseFromDecision(decision: ToolConfirmationDeci
     case 'deny':
       return { action: 'decline', content: null, _meta: null };
   }
+}
+
+function toolRequestUserInputResponseFromAnswers(answers: AskUserAnswers | undefined): { answers: AskUserAnswers } {
+  return {
+    answers: answers ?? {},
+  };
+}
+
+function isContextCompactionItem(item: unknown): item is { id: string; type: 'contextCompaction' } {
+  return isRecord(item) && item.type === 'contextCompaction' && typeof item.id === 'string';
 }

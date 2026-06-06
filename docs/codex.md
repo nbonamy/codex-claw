@@ -171,6 +171,9 @@ Important notifications:
 - `item/plan/delta`
 - `item/commandExecution/outputDelta`
 - `item/fileChange/patchUpdated`
+- `item/mcpToolCall/progress`
+- `thread/compacted` as a deprecated compatibility notification; prefer the
+  `contextCompaction` item emitted through `item/started`.
 - `turn/diff/updated`
 
 Current server-initiated request methods:
@@ -199,6 +202,21 @@ name, tool name, arguments preview, and supported persistence choices. The
 renderer returns `allow`, `allow_conversation`, `always_allow`, or `deny`;
 main translates that back to Codex's `accept`/`decline` elicitation response
 and optional `_meta.persist`.
+
+`item/tool/requestUserInput` maps to an app-owned `ask_user` client request.
+The request carries Codex's `questions[]` shape with stable question ids,
+headers, option lists, and secret/free-form flags. The renderer answers with
+`{ answers: { [questionId]: { answers: string[] } } }`, and main resolves the
+original JSON-RPC request with that exact response shape. This is separate from
+tool approvals because the request is asking Nicolas for information, not for
+permission.
+
+Context compaction is primarily represented by the `contextCompaction`
+`ThreadItem`. Main converts the item into a `context.compactionStarted`
+app-owned event so the reducer can split the active assistant message and insert
+the visible compaction marker exactly where the item arrived in the stream. The
+deprecated `thread/compacted` notification maps to the same app-owned event for
+compatibility.
 
 Unhandled notifications should also log `not implemented`, but they do not need
 a response because notifications cannot block the app-server.

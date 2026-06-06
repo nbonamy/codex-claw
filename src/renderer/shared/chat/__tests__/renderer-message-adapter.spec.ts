@@ -99,6 +99,30 @@ describe('renderer message adapter', () => {
     });
   });
 
+  it('marks compaction messages for timeline rendering', () => {
+    const rendererMessage: RendererMessage = {
+      agentId: 'agent-dina',
+      createdAt: '2026-06-05T00:00:03.000Z',
+      id: 'compaction-turn-1',
+      kind: 'compaction',
+      parts: [],
+      role: 'assistant',
+      status: 'complete',
+    };
+
+    expect(rendererMessageToChatMessage(rendererMessage)).toStrictEqual({
+      content: '',
+      createdAt: '2026-06-05T00:00:03.000Z',
+      id: 'compaction-turn-1',
+      parts: [],
+      role: 'assistant',
+      streaming: false,
+      toolCalls: [],
+      type: 'compaction',
+    });
+  });
+
+
   it('maps failed and bodyless tools into displayable tool calls', () => {
     const rendererMessage: RendererMessage = {
       agentId: 'agent-dina',

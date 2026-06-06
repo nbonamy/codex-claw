@@ -838,6 +838,66 @@ describe('snapshot reducer', () => {
     ]);
   });
 
+  it('inserts compaction markers at the streaming turn position and starts a new assistant segment', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'message.delta',
+      payload: { delta: 'Before compaction.' },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'context.compactionStarted',
+      payload: { itemId: 'compact-1' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 3,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'message.delta',
+      payload: { delta: 'After compaction.' },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+
+    expect(snapshot.messages).toStrictEqual([
+      {
+        id: 'assistant-turn-1',
+        agentId: 'agent-dina',
+        role: 'assistant',
+        status: 'complete',
+        createdAt: expect.any(String),
+        parts: [{ type: 'text', text: 'Before compaction.' }],
+      },
+      {
+        id: 'compaction-turn-1',
+        agentId: 'agent-dina',
+        kind: 'compaction',
+        role: 'assistant',
+        status: 'complete',
+        createdAt: '2026-06-05T00:00:02.000Z',
+        parts: [],
+      },
+      {
+        id: 'assistant-turn-1-segment-20260605t000002000z',
+        agentId: 'agent-dina',
+        role: 'assistant',
+        status: 'streaming',
+        createdAt: '2026-06-05T00:00:02.000Z',
+        parts: [{ type: 'text', text: 'After compaction.' }],
+      },
+    ]);
+  });
+
   it('keeps separate assistant message items as separate text parts', () => {
     const snapshot = createInitialSnapshot();
 
@@ -1592,6 +1652,84 @@ describe('snapshot reducer', () => {
         },
       },
     ]);
+  });
+
+  it('creates an inline user-input prompt from app-server tool input requests', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'toolInput.requested',
+      payload: {
+        id: 'ask-1',
+        kind: 'ask_user',
+        payload: {
+          request: {
+            itemId: 'ask-user-item',
+            questions: [
+              {
+                id: 'target_file',
+                header: 'Target',
+                question: 'Which file should I inspect?',
+                isOther: true,
+                isSecret: false,
+                options: null,
+              },
+            ],
+          },
+        },
+      },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([
+      {
+        type: 'tool',
+        id: 'ask-user-item',
+        kind: 'generic',
+        title: 'ask_user_question',
+        status: 'running',
+        statusText: JSON.stringify({
+          source: 'codex',
+          action: 'ask_user_question',
+          phase: 'running',
+          params: {
+            requestId: 'ask-1',
+            questions: [
+              {
+                id: 'target_file',
+                header: 'Target',
+                question: 'Which file should I inspect?',
+                isOther: true,
+                isSecret: false,
+                options: null,
+              },
+            ],
+          },
+        }),
+        input: [
+          {
+            id: 'target_file',
+            header: 'Target',
+            question: 'Which file should I inspect?',
+            isOther: true,
+            isSecret: false,
+            options: null,
+          },
+        ],
+        metadata: {
+          requestId: 'ask-1',
+          question: 'Which file should I inspect?',
+        },
+      },
+    ]);
+    expect(snapshot.agents[0].status).toStrictEqual({
+      type: 'awaitingInput',
+      detail: 'Which file should I inspect?',
+    });
   });
 
   it('attaches approval requests to the only running MCP tool when metadata is incomplete', () => {

@@ -145,7 +145,7 @@ export type RendererToolPartUpdate = {
 export type RendererMessage = {
   id: string;
   agentId: string;
-  kind?: 'steer';
+  kind?: 'compaction' | 'steer';
   role: 'user' | 'assistant' | 'system';
   status: 'complete' | 'streaming' | 'error';
   parts: RendererMessagePart[];
@@ -183,6 +183,7 @@ export type MainToRendererEvent = {
     | 'turn.started'
     | 'turn.completed'
     | 'message.steer'
+    | 'context.compactionStarted'
     | 'account.rateLimitsUpdated'
     | 'message.delta'
     | 'item.started'
@@ -244,6 +245,27 @@ export type ConfirmToolRequest = {
   allowAlways?: boolean;
 };
 
+export type AskUserQuestionOption = {
+  label: string;
+  description: string;
+};
+
+export type AskUserQuestion = {
+  id: string;
+  header: string;
+  question: string;
+  isOther: boolean;
+  isSecret: boolean;
+  options: AskUserQuestionOption[] | null;
+};
+
+export type AskUserRequest = {
+  itemId: string;
+  questions: AskUserQuestion[];
+};
+
+export type AskUserAnswers = Record<string, { answers: string[] }>;
+
 export type ClientRequest =
   | {
     id: string;
@@ -251,11 +273,19 @@ export type ClientRequest =
     payload: {
       confirmation: ConfirmToolRequest;
     };
+  }
+  | {
+    id: string;
+    kind: 'ask_user';
+    payload: {
+      request: AskUserRequest;
+    };
   };
 
 export type ClientRequestResponse = {
   id: string;
   payload?: {
+    answers?: AskUserAnswers;
     decision?: ToolConfirmationDecision | null;
   };
 };

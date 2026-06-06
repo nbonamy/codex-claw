@@ -1184,6 +1184,153 @@ describe('CodexAgentSessionManager', () => {
       .rejects.toThrow("Unknown client request 'approval-denied'.");
   });
 
+  it('turns app-server user input requests into client requests and resolves answers', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+    const events: unknown[] = [];
+    manager.onEvent((event) => events.push({
+      ...event,
+      occurredAt: '<now>',
+    }));
+
+    await resolveStartedPrompt(transport, manager);
+
+    transport.receive({
+      id: 'ask-1',
+      method: 'item/tool/requestUserInput',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        itemId: 'ask-user-item',
+        questions: [
+          {
+            id: 'target_file',
+            header: 'Target',
+            question: 'Which file should I inspect?',
+            isOther: true,
+            isSecret: false,
+            options: [
+              {
+                label: 'README.md',
+                description: 'Read the project README.',
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    expect(events).toStrictEqual([
+      {
+        seq: 1,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        type: 'toolInput.requested',
+        payload: {
+          id: 'ask-1',
+          kind: 'ask_user',
+          payload: {
+            request: {
+              itemId: 'ask-user-item',
+              questions: [
+                {
+                  id: 'target_file',
+                  header: 'Target',
+                  question: 'Which file should I inspect?',
+                  isOther: true,
+                  isSecret: false,
+                  options: [
+                    {
+                      label: 'README.md',
+                      description: 'Read the project README.',
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+        occurredAt: '<now>',
+      },
+    ]);
+
+    await manager.respondToClientRequest({
+      id: 'ask-1',
+      payload: {
+        answers: {
+          target_file: {
+            answers: ['README.md'],
+          },
+        },
+      },
+    });
+
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 'ask-1',
+      result: {
+        answers: {
+          target_file: {
+            answers: ['README.md'],
+          },
+        },
+      },
+    });
+  });
+
+  it('maps context compaction items and deprecated compaction notifications into timeline events', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+    const events: unknown[] = [];
+    manager.onEvent((event) => events.push({
+      ...event,
+      occurredAt: '<now>',
+    }));
+
+    await resolveStartedPrompt(transport, manager);
+    transport.receive({
+      method: 'item/started',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        item: {
+          type: 'contextCompaction',
+          id: 'compact-1',
+        },
+      },
+    });
+    transport.receive({
+      method: 'thread/compacted',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-2',
+      },
+    });
+
+    expect(events).toStrictEqual([
+      {
+        seq: 1,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        type: 'context.compactionStarted',
+        payload: {
+          itemId: 'compact-1',
+        },
+        occurredAt: '<now>',
+      },
+      {
+        seq: 2,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        turnId: 'turn-2',
+        type: 'context.compactionStarted',
+        payload: {},
+        occurredAt: '<now>',
+      },
+    ]);
+  });
+
   it('consumes server request resolved notifications after pending approvals clear', async () => {
     const transport = new FakeTransport();
     const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
