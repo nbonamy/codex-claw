@@ -967,6 +967,7 @@ function toolRequestUserInputQuestion(value: unknown): AskUserQuestion | null {
     question: value.question,
     isOther: value.isOther,
     isSecret: value.isSecret,
+    ...(typeof value.multiSelect === 'boolean' ? { multiSelect: value.multiSelect } : {}),
     options: toolRequestUserInputOptions(value.options),
   };
 }

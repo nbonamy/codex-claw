@@ -1617,6 +1617,7 @@ describe('CodexAgentSessionManager', () => {
             question: 'Which file should I inspect?',
             isOther: true,
             isSecret: false,
+            multiSelect: true,
             options: [
               {
                 label: 'README.md',
@@ -1648,6 +1649,7 @@ describe('CodexAgentSessionManager', () => {
                   question: 'Which file should I inspect?',
                   isOther: true,
                   isSecret: false,
+                  multiSelect: true,
                   options: [
                     {
                       label: 'README.md',
@@ -1682,6 +1684,48 @@ describe('CodexAgentSessionManager', () => {
             answers: ['README.md'],
           },
         },
+      },
+    });
+  });
+
+  it('resolves app-server user input cancellations with empty answers', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+
+    await resolveStartedPrompt(transport, manager);
+
+    transport.receive({
+      id: 'ask-cancel',
+      method: 'item/tool/requestUserInput',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        itemId: 'ask-user-item',
+        questions: [
+          {
+            id: 'target_file',
+            header: 'Target',
+            question: 'Which file should I inspect?',
+            isOther: true,
+            isSecret: false,
+            options: [],
+          },
+        ],
+      },
+    });
+
+    await manager.respondToClientRequest({
+      id: 'ask-cancel',
+      payload: {
+        answers: {},
+        cancelled: true,
+      },
+    });
+
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 'ask-cancel',
+      result: {
+        answers: {},
       },
     });
   });

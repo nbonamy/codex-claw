@@ -377,6 +377,7 @@ export type AskUserQuestion = {
   question: string;
   isOther: boolean;
   isSecret: boolean;
+  multiSelect?: boolean;
   options: AskUserQuestionOption[] | null;
 };
 
@@ -407,6 +408,7 @@ export type ClientRequestResponse = {
   id: string;
   payload?: {
     answers?: AskUserAnswers;
+    cancelled?: boolean;
     decision?: ToolConfirmationDecision | null;
   };
 };

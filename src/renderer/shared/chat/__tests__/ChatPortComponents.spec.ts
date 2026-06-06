@@ -95,6 +95,51 @@ const userInputTool: MessageToolCall = {
   }),
 };
 
+const paginatedUserInputTool: MessageToolCall = {
+  ...userInputTool,
+  status: JSON.stringify({
+    source: 'codex',
+    action: 'ask_user_question',
+    phase: 'running',
+    params: {
+      requestId: 'ask-paged',
+      questions: [
+        {
+          id: 'target_file',
+          header: 'Target',
+          question: 'Which file should I inspect?',
+          isOther: true,
+          isSecret: false,
+          options: [
+            {
+              label: 'README.md',
+              description: 'Read the project README.',
+            },
+          ],
+        },
+        {
+          id: 'depth',
+          header: 'Depth',
+          question: 'How deep should I go?',
+          isOther: false,
+          isSecret: false,
+          multiSelect: true,
+          options: [
+            {
+              label: 'Summary',
+              description: 'Keep it high level.',
+            },
+            {
+              label: 'Tests',
+              description: 'Include test details.',
+            },
+          ],
+        },
+      ],
+    },
+  }),
+};
+
 const editingTool: MessageToolCall = {
   args: { changes: [{ path: 'src/main/codex/tool-part-adapter.ts' }] },
   done: false,
@@ -385,7 +430,7 @@ describe('ported id8 chat components', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('User input required');
+    expect(wrapper.text()).toContain('Target');
     expect(wrapper.text()).toContain('Which file should I inspect?');
     await wrapper.get('.chat-tool-user-input__option').trigger('click');
     await wrapper.get('.chat-tool-user-input__button--primary').trigger('click');
@@ -405,6 +450,98 @@ describe('ported id8 chat components', () => {
       ],
     ]);
     expect(wrapper.text()).toContain('Answered user question');
+    expect(wrapper.text()).toContain('README.md');
+  });
+
+  it('paginates app-server user input requests and preserves multi-select answers', async () => {
+    const wrapper = mount(ChatToolUserInputRequest, {
+      props: {
+        toolCall: paginatedUserInputTool,
+      },
+    });
+
+    expect(wrapper.text()).toContain('1 / 2');
+    expect(wrapper.text()).toContain('Which file should I inspect?');
+    expect(wrapper.text()).not.toContain('How deep should I go?');
+
+    await wrapper.findAll('.chat-tool-user-input__option')[0].trigger('click');
+    await wrapper.get('.chat-tool-user-input__button--primary').trigger('click');
+
+    expect(wrapper.text()).toContain('2 / 2');
+    expect(wrapper.text()).toContain('How deep should I go?');
+    await wrapper.findAll('.chat-tool-user-input__option')[0].trigger('click');
+    await wrapper.findAll('.chat-tool-user-input__option')[1].trigger('click');
+    await wrapper.get('.chat-tool-user-input__button--primary').trigger('click');
+
+    expect(wrapper.emitted('client-response')).toStrictEqual([
+      [
+        {
+          id: 'ask-paged',
+          payload: {
+            answers: {
+              target_file: {
+                answers: ['README.md'],
+              },
+              depth: {
+                answers: ['Summary', 'Tests'],
+              },
+            },
+          },
+        },
+      ],
+    ]);
+    expect(wrapper.text()).toContain('Answered user question');
+    expect(wrapper.text()).toContain('Summary, Tests');
+  });
+
+  it('supports app-server user input cancellation with empty answers', async () => {
+    const wrapper = mount(ChatToolUserInputRequest, {
+      props: {
+        toolCall: paginatedUserInputTool,
+      },
+    });
+
+    await wrapper.findAll('.chat-tool-user-input__button').at(-1)?.trigger('click');
+
+    expect(wrapper.emitted('client-response')).toStrictEqual([
+      [
+        {
+          id: 'ask-paged',
+          payload: {
+            answers: {},
+            cancelled: true,
+          },
+        },
+      ],
+    ]);
+    expect(wrapper.text()).toContain('Cancelled user question');
+  });
+
+  it('supports free-form app-server user input answers', async () => {
+    const wrapper = mount(ChatToolUserInputRequest, {
+      props: {
+        toolCall: userInputTool,
+      },
+    });
+
+    await wrapper.find('.chat-tool-user-input__option--other').trigger('click');
+    await wrapper.find('.chat-tool-user-input__other-input').setValue('docs/frontend.md');
+    await wrapper.get('.chat-tool-user-input__button--primary').trigger('click');
+
+    expect(wrapper.emitted('client-response')).toStrictEqual([
+      [
+        {
+          id: 'ask-1',
+          payload: {
+            answers: {
+              target_file: {
+                answers: ['docs/frontend.md'],
+              },
+            },
+          },
+        },
+      ],
+    ]);
   });
 
   it('switches running app-server user input tools to the user input renderer', () => {
