@@ -76,18 +76,18 @@ describe('AgentHeader', () => {
     });
 
     expect(wrapper.text()).toContain('Running tests');
-    expect(wrapper.get('.agent-header__activity-line strong').text()).toBe('Running tests');
+    expect(wrapper.get('.agent-header__activity-line strong').text()).toBe('Idle');
     expect(wrapper.get('.agent-header__inline-status').text()).toBe('Running tests');
   });
 
   it.each([
     [{ type: 'working' as const, detail: 'Getting stats...' }, 'Working', 'Getting stats...'],
     [{ type: 'working' as const }, 'Working', 'Working'],
-    [{ type: 'starting' as const }, 'Starting', 'Starting'],
-    [{ type: 'awaitingInput' as const, detail: 'Approval needed' }, 'Awaiting input', 'Approval needed'],
-    [{ type: 'awaitingInput' as const }, 'Awaiting input', 'Awaiting input'],
-    [{ type: 'error' as const, message: 'Tool failed' }, 'Error', 'Tool failed'],
-  ])('renders expanded status label and detail for %s', (status, label, detail) => {
+    [{ type: 'starting' as const }, 'Working', 'Starting'],
+    [{ type: 'awaitingInput' as const, detail: 'Approval needed' }, 'Blocked', 'Approval needed'],
+    [{ type: 'awaitingInput' as const }, 'Blocked', 'Awaiting input'],
+    [{ type: 'error' as const, message: 'Tool failed' }, 'Blocked', 'Tool failed'],
+  ])('renders expanded state label and status detail for %s', (status, stateLabel, detail) => {
     const wrapper = mount(AgentHeader, {
       props: {
         agent: {
@@ -103,7 +103,7 @@ describe('AgentHeader', () => {
       },
     });
 
-    expect(wrapper.text()).toContain(label);
+    expect(wrapper.get('.agent-header__activity-line strong').text()).toBe(stateLabel);
     expect(wrapper.text()).toContain(detail);
     expect(wrapper.text()).toContain('Git status pending');
   });

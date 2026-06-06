@@ -99,16 +99,14 @@ const statusLabel = computed(() => {
 
   return 'Codex pending';
 });
-const agentStatusLabel = computed(() => {
+const agentStateLabel = computed(() => {
   switch (props.agent?.status.type) {
     case 'working':
-      return 'Working';
     case 'starting':
-      return 'Starting';
+      return 'Working';
     case 'awaitingInput':
-      return 'Awaiting input';
     case 'error':
-      return 'Error';
+      return 'Blocked';
     case 'idle':
       return 'Idle';
     default:
@@ -137,7 +135,7 @@ const agentStatusDetail = computed(() => {
       return 'Ready to get going';
   }
 });
-const activityTitle = computed(() => props.agent?.statusText ?? agentStatusLabel.value);
+const activityTitle = computed(() => agentStateLabel.value);
 const gitStatusLabel = computed(() => 'Git status pending');
 </script>
 
