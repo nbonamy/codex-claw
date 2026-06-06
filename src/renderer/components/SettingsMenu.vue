@@ -162,7 +162,7 @@ function rateLimitReset(window: AccountRateLimitWindow): string {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: var(--font-size-12);
+  font-size: var(--font-size-13);
   text-transform: uppercase;
   color: var(--color-text-muted);
   font-weight: var(--font-weight-medium);
@@ -178,6 +178,7 @@ function rateLimitReset(window: AccountRateLimitWindow): string {
   align-items: baseline;
   column-gap: var(--space-4);
   min-width: 0;
+  font-size: calc(var(--font-size-13) + 0.5px);
 }
 
 .settings-menu__rate-limit-label {
