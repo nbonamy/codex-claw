@@ -28,6 +28,15 @@ export const codexBackendCommands: BackendCommandSummary[] = [
     slashName: 'plan',
     submitOnSelect: true,
   },
+  {
+    id: 'codex.goal',
+    backend: 'codex',
+    name: 'goal',
+    displayName: 'Goal',
+    description: 'Set or view the Codex thread goal.',
+    slashName: 'goal',
+    submitOnSelect: true,
+  },
 ];
 
 export const claudeBackendCommands: BackendCommandSummary[] = [];

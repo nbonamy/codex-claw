@@ -47,7 +47,7 @@ Before the Claude driver starts, the codebase should make these statements true:
 - Backend runtime status is not named `appServer`.
 - Sending prompts, answering approvals, interrupting, and loading backend
   capabilities route through a backend-neutral main-process interface.
-- Backend-specific actions such as steer, goal mode, rollback, edit, and retry
+- Backend-specific actions such as steer, goals, rollback, edit, and retry
   are represented as backend capabilities instead of universal commands. Plan
   mode remains a universal product concept, but each backend declares whether
   it supports plan mode natively, through prompt shaping, or not at all.
@@ -61,7 +61,7 @@ Before the Claude driver starts, the codebase should make these statements true:
 - Do not move process lifecycle, websocket handling, JSON-RPC ids, or SDK
   control envelopes out of Electron main.
 - Do not block the Claude driver on full parity with Codex thread rollback,
-  active-turn steering, skills, or goal mode.
+  active-turn steering, skills, or goals.
 - Do not hide product-specific features behind vague names when they are
   genuinely Codex-specific. Make them capability-gated instead.
 
@@ -276,7 +276,7 @@ type BackendCapabilities = {
   reasoningEffort: boolean
   thinkingBudget: boolean
   planMode: 'native' | 'prompted' | 'unsupported'
-  goalMode: boolean
+  goals: boolean
   steerPrompt: boolean
   interrupt: boolean
   history: boolean
@@ -297,7 +297,7 @@ Renderer behavior:
 Important distinction:
 
 - `planMode` is a universal product feature with backend-specific execution.
-- `goalMode` is Codex-specific until another backend proves an equivalent
+- `goals` is Codex-specific until another backend proves an equivalent
   durable mechanism.
 - Claude thinking budget is not Codex reasoning effort.
 - Claude permission persistence is not automatically the same as Codex
@@ -325,7 +325,7 @@ type SendPromptOptions = {
 type BackendPromptOptions =
   | {
       kind: 'codex'
-      goalMode?: boolean
+      goals?: boolean
       reasoningEffort?: string | null
       skills?: PromptSkillInput[]
     }

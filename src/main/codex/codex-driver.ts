@@ -9,7 +9,7 @@ import type {
   SendPromptOptions,
 } from '../../shared/contracts';
 import { codexBackendCapabilities } from '../../shared/backend-capabilities';
-import type { AgentBackendDriver, BackendEvent, BackendRollbackResult, BackendSendResult } from '../backends/types';
+import type { AgentBackendDriver, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '../backends/types';
 import type { CodexAgentSessionManager } from './agent-session';
 import type { CodexReviewTarget } from './protocol';
 
@@ -56,6 +56,22 @@ export class CodexBackendDriver implements AgentBackendDriver {
     return {
       backendSession: codexBackendSession(result.threadId),
       turnId: result.turnId,
+    };
+  }
+
+  async setGoal(agent: Agent, objective: string): Promise<BackendGoalResult> {
+    const result = await this.sessionManager.setThreadGoal(agent, objective);
+    return {
+      backendSession: codexBackendSession(result.threadId),
+      goal: result.goal,
+    };
+  }
+
+  async clearGoal(agent: Agent): Promise<BackendGoalResult> {
+    const result = await this.sessionManager.clearThreadGoal(agent);
+    return {
+      backendSession: codexBackendSession(result.threadId),
+      cleared: result.cleared,
     };
   }
 

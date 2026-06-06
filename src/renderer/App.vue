@@ -13,7 +13,7 @@
     :backend-capabilities="activeBackendCapabilities"
     :model-catalog-status="modelCatalogStatus"
     :skill-catalog-status="skillCatalogStatus"
-    :goal-mode="goalMode"
+    :goal="activeGoal"
     :plan-mode="planMode"
     :selected-model-id="selectedModelId"
     :selected-reasoning-effort="selectedReasoningEffort"
@@ -37,8 +37,8 @@
     @select-team="selectTeam"
     @select-model="selectModel"
     @select-reasoning-effort="selectReasoningEffort"
-    @update:goal-mode="setGoalMode"
     @update:plan-mode="setPlanMode"
+    @clear-goal="clearActiveGoal"
     @client-response="respondToClientRequest"
     @delete-queued-prompt="removeQueuedPrompt"
     @delete-message="deleteMessage"
@@ -60,6 +60,7 @@ import { applyAppTheme, subscribeToSystemAppearance } from './theme/apply-theme'
 const {
   snapshot,
   activeAgent,
+  activeGoal,
   visibleMessages,
   activeQueuedPrompts,
   isLoading,
@@ -75,7 +76,6 @@ const {
   selectedModelId,
   selectedReasoningEffort,
   planMode,
-  goalMode,
   loadBackendModels,
   loadSnapshot,
   chooseAgentFolder,
@@ -96,7 +96,7 @@ const {
   selectModel,
   selectReasoningEffort,
   setPlanMode,
-  setGoalMode,
+  clearActiveGoal,
   selectAgent,
   selectTeam,
   sendPrompt,

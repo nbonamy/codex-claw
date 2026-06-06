@@ -1,4 +1,4 @@
-import type { Agent, BackendSkillSummary, MainToRendererEvent } from '../../shared/contracts';
+import type { Agent, BackendSkillSummary, MainToRendererEvent, ThreadGoal } from '../../shared/contracts';
 
 export type JsonRpcId = number | string;
 
@@ -129,16 +129,7 @@ export type ReviewStartResponse = {
   reviewThreadId: string;
 };
 
-export type CodexThreadGoal = {
-  threadId: string;
-  objective: string;
-  status: string;
-  tokenBudget: number | null;
-  tokensUsed: number;
-  timeUsedSeconds: number;
-  createdAt: number;
-  updatedAt: number;
-};
+export type CodexThreadGoal = ThreadGoal;
 
 export type CodexTurnPlanStep = {
   step: string;

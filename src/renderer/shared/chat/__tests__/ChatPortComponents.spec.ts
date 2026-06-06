@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
+import ChatComposerShelf from '../ChatComposerShelf.vue';
 import ChatQueuedPrompts from '../ChatQueuedPrompts.vue';
 import ChatAnimatedDiffStat from '../ChatAnimatedDiffStat.vue';
 import ChatToolConfirmation from '../ChatToolConfirmation.vue';
@@ -186,6 +187,38 @@ describe('ported id8 chat components', () => {
     await wrapper.get('[aria-label="Delete queued prompt"]').trigger('click');
     expect(wrapper.emitted('steer')).toStrictEqual([['prompt-1']]);
     expect(wrapper.emitted('delete')).toStrictEqual([['prompt-1']]);
+  });
+
+  it('stacks queued prompts above the active goal', async () => {
+    const wrapper = mount(ChatComposerShelf, {
+      props: {
+        queuedPrompts: [{ id: 'prompt-1', text: 'Run the tests after this turn' }],
+        goal: {
+          threadId: 'thread-1',
+          objective: 'Ship the goal surface',
+          status: 'active',
+          tokenBudget: null,
+          tokensUsed: 0,
+          timeUsedSeconds: 0,
+          createdAt: 0,
+          updatedAt: 0,
+        },
+      },
+    });
+
+    const shelfItems = wrapper.findAll('.chat-composer-shelf > *');
+    expect(shelfItems[0]?.classes()).toContain('chat-queued-prompts');
+    expect(shelfItems[1]?.classes()).toContain('chat-goal');
+    expect(wrapper.text()).toContain('Run the tests after this turn');
+    expect(wrapper.text()).toContain('Ship the goal surface');
+
+    await wrapper.get('[aria-label="Steer queued prompt now"]').trigger('click');
+    await wrapper.get('[aria-label="Clear goal"]').trigger('click');
+    await wrapper.get('[aria-label="Edit goal"]').trigger('click');
+
+    expect(wrapper.emitted('steerQueuedPrompt')).toStrictEqual([['prompt-1']]);
+    expect(wrapper.emitted('clearGoal')).toStrictEqual([[]]);
+    expect(wrapper.emitted('editGoal')).toStrictEqual([[]]);
   });
 
   it('renders collapsible tool calls with params and result', async () => {

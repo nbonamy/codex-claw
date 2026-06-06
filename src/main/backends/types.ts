@@ -12,6 +12,7 @@ import type {
   MainToRendererEvent,
   RendererMessage,
   SendPromptOptions,
+  ThreadGoal,
 } from '../../shared/contracts';
 
 export type BackendEvent = Omit<MainToRendererEvent, 'seq' | 'occurredAt'> & Partial<Pick<MainToRendererEvent, 'seq' | 'occurredAt'>>;
@@ -26,12 +27,20 @@ export type BackendRollbackResult = {
   messages: RendererMessage[];
 };
 
+export type BackendGoalResult = {
+  backendSession: BackendSession;
+  goal?: ThreadGoal;
+  cleared?: boolean;
+};
+
 export type AgentBackendDriver = {
   readonly backend: AgentBackend;
   getRuntimeStatus(): BackendRuntimeStatus;
   getCapabilities(agent: Agent): BackendCapabilities;
   tryHandlePromptCommand?(agent: Agent, prompt: string): Promise<BackendSendResult> | null;
   sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>;
+  setGoal?(agent: Agent, objective: string): Promise<BackendGoalResult>;
+  clearGoal?(agent: Agent): Promise<BackendGoalResult>;
   interrupt(agent: Agent): Promise<BackendSendResult>;
   respondToRequest(response: ClientRequestResponse): Promise<void>;
   hydrateAgent?(agent: Agent): Promise<BackendSession | null>;

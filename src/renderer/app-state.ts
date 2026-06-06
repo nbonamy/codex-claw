@@ -24,7 +24,6 @@ const fileCatalogError = ref<string | null>(null);
 const selectedModelId = ref<string | null>(null);
 const selectedReasoningEffort = ref<ReasoningEffort | null>(null);
 const planMode = ref(false);
-const goalMode = ref(false);
 let unsubscribeMainEvents: (() => void) | null = null;
 
 export function useAppState() {
@@ -46,6 +45,8 @@ export function useAppState() {
     const agentId = activeAgent.value?.id;
     return agentId ? queuedPromptsByAgentId.value[agentId] ?? [] : [];
   });
+
+  const activeGoal = computed(() => activeAgent.value?.goal ?? null);
 
   const isSending = computed(() => {
     const agent = activeAgent.value;
@@ -79,6 +80,12 @@ export function useAppState() {
   async function sendPrompt(prompt: string): Promise<void> {
     const agentId = activeAgent.value?.id;
     if (!agentId || !window.codexClaw) {
+      return;
+    }
+
+    const parsedGoalCommand = parseGoalSlashCommand(prompt);
+    if (parsedGoalCommand) {
+      await handleGoalSlashCommand(agentId, parsedGoalCommand);
       return;
     }
 
@@ -410,13 +417,10 @@ export function useAppState() {
     planMode.value = enabled;
   }
 
-  function setGoalMode(enabled: boolean): void {
-    goalMode.value = enabled;
-  }
-
   return {
     snapshot,
     activeAgent,
+    activeGoal,
     visibleMessages,
     activeQueuedPrompts,
     isLoading,
@@ -436,7 +440,6 @@ export function useAppState() {
     selectedModelId,
     selectedReasoningEffort,
     planMode,
-    goalMode,
     loadBackendModels: loadBackendModelsForActiveAgent,
     loadBackendSkills: loadBackendSkillsForActiveAgent,
     loadAgentFiles: loadAgentFilesForActiveAgent,
@@ -459,9 +462,9 @@ export function useAppState() {
     selectModel,
     selectReasoningEffort,
     setPlanMode,
-    setGoalMode,
     selectAgent,
     selectTeam,
+    clearActiveGoal,
     sendPrompt,
     steerPrompt,
     interruptActiveAgent,
@@ -549,14 +552,12 @@ function codexPromptOptions(input: {
   const reasoningEffort = input.capabilities.reasoningEffort && input.model
     ? selectedReasoningEffort.value ?? defaultReasoningEffort(input.model)
     : null;
-  const wantsGoalMode = input.capabilities.goalMode && goalMode.value;
-  if (!wantsGoalMode && !reasoningEffort && selectedSkills.length === 0) {
+  if (!reasoningEffort && selectedSkills.length === 0) {
     return undefined;
   }
 
   return {
     kind: 'codex',
-    ...(wantsGoalMode ? { goalMode: true } : {}),
     ...(reasoningEffort ? { reasoningEffort } : {}),
     ...(selectedSkills.length > 0 ? { skills: selectedSkills } : {}),
   };
@@ -579,6 +580,69 @@ function parsePlanSlashCommand(prompt: string): { prompt: string | null } | null
   };
 }
 
+type GoalSlashCommand =
+  | { action: 'clear' }
+  | { action: 'edit' }
+  | { action: 'set'; objective: string }
+  | { action: 'show' }
+  | { action: 'unsupported' };
+
+function parseGoalSlashCommand(prompt: string): GoalSlashCommand | null {
+  const trimmed = prompt.trim();
+  const match = /^\/goal(?:\s+(.*))?$/s.exec(trimmed);
+  if (!match) {
+    return null;
+  }
+
+  const rest = match[1]?.trim() ?? '';
+  if (!rest) {
+    return { action: 'show' };
+  }
+
+  const normalized = rest.toLowerCase();
+  if (normalized === 'clear') {
+    return { action: 'clear' };
+  }
+  if (normalized === 'edit') {
+    return { action: 'edit' };
+  }
+  if (normalized === 'pause' || normalized === 'resume') {
+    return { action: 'unsupported' };
+  }
+
+  return { action: 'set', objective: rest };
+}
+
+async function handleGoalSlashCommand(agentId: string, command: GoalSlashCommand): Promise<void> {
+  if (!window.codexClaw) {
+    return;
+  }
+
+  if (command.action === 'clear') {
+    await clearGoalForAgent(agentId);
+    return;
+  }
+
+  if (command.action === 'set') {
+    snapshot.value = await window.codexClaw.setAgentGoal(agentId, command.objective);
+  }
+}
+
+async function clearActiveGoal(): Promise<void> {
+  const agentId = snapshot.value.activeAgentId;
+  if (agentId) {
+    await clearGoalForAgent(agentId);
+  }
+}
+
+async function clearGoalForAgent(agentId: string): Promise<void> {
+  if (!window.codexClaw?.clearAgentGoal) {
+    return;
+  }
+
+  snapshot.value = await window.codexClaw.clearAgentGoal(agentId);
+}
+
 function subscribeToMainEvents(): void {
   if (!window.codexClaw || typeof window.codexClaw.onEvent !== 'function') {
     return;
@@ -587,7 +651,7 @@ function subscribeToMainEvents(): void {
   unsubscribeMainEvents?.();
   unsubscribeMainEvents = window.codexClaw.onEvent((event: MainToRendererEvent) => {
     applyMainEventToSnapshot(snapshot.value, event);
-    syncComposerModesFromMainEvent(event);
+    syncComposerModeFromMainEvent(event);
     if (event.type === 'turn.completed' && event.agentId) {
       void drainQueuedPrompts(event.agentId);
     }
@@ -679,7 +743,7 @@ async function loadAgentFilesForActiveAgent(): Promise<void> {
   }
 }
 
-function syncComposerModesFromMainEvent(event: MainToRendererEvent): void {
+function syncComposerModeFromMainEvent(event: MainToRendererEvent): void {
   if (event.agentId && event.agentId !== snapshot.value.activeAgentId) {
     return;
   }
@@ -694,14 +758,6 @@ function syncComposerModesFromMainEvent(event: MainToRendererEvent): void {
     return;
   }
 
-  if (event.type === 'thread.goalUpdated') {
-    goalMode.value = true;
-    return;
-  }
-
-  if (event.type === 'thread.goalCleared') {
-    goalMode.value = false;
-  }
 }
 
 async function hydrateActiveAgentHistory(): Promise<void> {

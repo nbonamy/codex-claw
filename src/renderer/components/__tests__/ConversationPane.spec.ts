@@ -3,7 +3,7 @@ import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import ConversationPane from '../ConversationPane.vue';
 import { i18n } from '../../i18n';
-import type { Agent, RendererMessage } from '../../../shared/contracts';
+import type { Agent, RendererMessage, ThreadGoal } from '../../../shared/contracts';
 
 const agent: Agent = {
   id: 'agent-dina',
@@ -161,6 +161,33 @@ describe('ConversationPane', () => {
     expect(wrapper.emitted('delete-queued-prompt')).toStrictEqual([['queued-1']]);
   });
 
+  it('renders the goal closest to the composer and bubbles goal actions', async () => {
+    const goal = createGoal('Keep the MVP sharp');
+    const wrapper = mountPane({
+      agent,
+      messages,
+      isSending: true,
+      goal,
+      queuedPrompts: [
+        {
+          id: 'queued-1',
+          text: 'Run the focused tests next',
+        },
+      ],
+    });
+
+    const shelfItems = wrapper.findAll('.chat-composer-shelf > *');
+    expect(shelfItems[0]?.classes()).toContain('chat-queued-prompts');
+    expect(shelfItems[1]?.classes()).toContain('chat-goal');
+    expect(wrapper.text()).toContain('Keep the MVP sharp');
+
+    await wrapper.get('[aria-label="Edit goal"]').trigger('click');
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('/goal Keep the MVP sharp');
+
+    await wrapper.get('[aria-label="Clear goal"]').trigger('click');
+    expect(wrapper.emitted('clear-goal')).toStrictEqual([[]]);
+  });
+
   it('bubbles Command Enter as a steer prompt', async () => {
     const wrapper = mountPane({
       agent,
@@ -293,6 +320,7 @@ function mountPane(props: {
   messages: RendererMessage[];
   agent: Agent | null;
   isSending: boolean;
+  goal?: ThreadGoal | null;
   isLoading?: boolean;
   queuedPrompts?: Array<{ id: string; text: string }>;
 }) {
@@ -305,4 +333,17 @@ function mountPane(props: {
       plugins: [ElementPlus, i18n],
     },
   });
+}
+
+function createGoal(objective: string): ThreadGoal {
+  return {
+    threadId: 'thread-1',
+    objective,
+    status: 'active',
+    tokenBudget: null,
+    tokensUsed: 0,
+    timeUsedSeconds: 0,
+    createdAt: 0,
+    updatedAt: 0,
+  };
 }

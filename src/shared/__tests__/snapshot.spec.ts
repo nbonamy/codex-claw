@@ -25,6 +25,16 @@ describe('snapshot reducer', () => {
       modelContextWindow: 258_400,
       usedPercent: 25,
     };
+    snapshot.agents[0].goal = {
+      threadId: 'thread-old',
+      objective: 'Old goal',
+      status: 'active',
+      tokenBudget: null,
+      tokensUsed: 100,
+      timeUsedSeconds: 5,
+      createdAt: 1,
+      updatedAt: 2,
+    };
     snapshot.agents[0].isRegistered = true;
     snapshot.agents[0].mcpSessionId = 'mcp-session';
     snapshot.agents[0].statusText = 'Registered';
@@ -94,6 +104,16 @@ describe('snapshot reducer', () => {
       lastTotalTokens: 64_600,
       modelContextWindow: 258_400,
       usedPercent: 25,
+    };
+    agent.goal = {
+      threadId: 'thread-old',
+      objective: 'Old goal',
+      status: 'active',
+      tokenBudget: null,
+      tokensUsed: 100,
+      timeUsedSeconds: 5,
+      createdAt: 1,
+      updatedAt: 2,
     };
     agent.isRegistered = true;
     agent.mcpSessionId = 'mcp-session';
@@ -372,6 +392,52 @@ describe('snapshot reducer', () => {
     });
 
     expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-1' });
+  });
+
+  it('records thread goal updates and clears them from agent metadata', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.goalUpdated',
+      payload: {
+        goal: {
+          threadId: 'thread-1',
+          objective: 'Ship the goal shelf',
+          status: 'active',
+          tokenBudget: null,
+          tokensUsed: 1200,
+          timeUsedSeconds: 30,
+          createdAt: 1_780_000_000,
+          updatedAt: 1_780_000_030,
+        },
+      },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(snapshot.agents[0].goal).toStrictEqual({
+      threadId: 'thread-1',
+      objective: 'Ship the goal shelf',
+      status: 'active',
+      tokenBudget: null,
+      tokensUsed: 1200,
+      timeUsedSeconds: 30,
+      createdAt: 1_780_000_000,
+      updatedAt: 1_780_000_030,
+    });
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.goalCleared',
+      payload: {},
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(snapshot.agents[0].goal).toBeUndefined();
   });
 
   it('records token usage updates as transient agent context usage', () => {

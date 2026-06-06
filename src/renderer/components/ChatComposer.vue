@@ -31,12 +31,9 @@
 
     <ChatComposerActionMenu
       :disabled="disabled"
-      :goal-mode="goalMode"
       :plan-mode="planMode"
-      :show-goal-mode="effectiveBackendCapabilities.goalMode"
       :show-plan-mode="effectiveBackendCapabilities.planMode !== 'unsupported'"
       @attach="$emit('attach')"
-      @update:goal-mode="$emit('update:goalMode', $event)"
       @update:plan-mode="$emit('update:planMode', $event)"
     />
 
@@ -143,7 +140,7 @@ import { filterComposerCommands, findActiveCommandSlash, type ActiveCommandSlash
 import { filterComposerSkills, findActiveSkillTrigger, type ActiveSkillSlash } from '../shared/chat/composer-skills';
 import { BrowserAudioRecorder, isBrowserAudioRecordingSupported } from '../shared/audio/browser-audio-recorder';
 import { transcribeRecordedAudio } from '../shared/audio/apple-speech-transcription';
-import { CircleXIcon, ListDetailsIcon, MicrophoneIcon, TargetArrowIcon } from '../shared/icons/app-icons';
+import { CircleXIcon, ListDetailsIcon, MicrophoneIcon } from '../shared/icons/app-icons';
 import ChatComposerWaveform from '../shared/chat/ChatComposerWaveform.vue';
 
 const props = defineProps<{
@@ -152,7 +149,6 @@ const props = defineProps<{
   draft?: string;
   draftRevision?: number;
   files?: AgentFileSearchItem[];
-  goalMode?: boolean;
   backendCapabilities?: BackendCapabilities;
   commands?: BackendCommandSummary[];
   isSending: boolean;
@@ -171,7 +167,6 @@ const emit = defineEmits<{
   steer: [prompt: string];
   attach: [];
   interrupt: [];
-  'update:goalMode': [enabled: boolean];
   'update:modelId': [modelId: string];
   'update:planMode': [enabled: boolean];
   'update:reasoningEffort': [reasoningEffort: ReasoningEffort];
@@ -228,17 +223,14 @@ const voiceButtonTitle = computed(() => {
 type ActiveComposerMode = {
   icon: typeof ListDetailsIcon;
   label: string;
-  mode: 'goal' | 'plan';
-  tint: 'info' | 'success';
+  mode: 'plan';
+  tint: 'info';
 };
 
 const activeModes = computed<ActiveComposerMode[]>(() => {
   const modes: ActiveComposerMode[] = [];
   if (effectiveBackendCapabilities.value.planMode !== 'unsupported' && props.planMode) {
     modes.push({ mode: 'plan', label: 'Plan', tint: 'info', icon: ListDetailsIcon });
-  }
-  if (effectiveBackendCapabilities.value.goalMode && props.goalMode) {
-    modes.push({ mode: 'goal', label: 'Goal', tint: 'success', icon: TargetArrowIcon });
   }
 
   return modes;
@@ -533,10 +525,7 @@ function handleTextareaKeydown(event: KeyboardEvent): void {
 function removeActiveMode(mode: ActiveComposerMode['mode']): void {
   if (mode === 'plan') {
     emit('update:planMode', false);
-    return;
   }
-
-  emit('update:goalMode', false);
 }
 
 function handleTextareaInput(): void {

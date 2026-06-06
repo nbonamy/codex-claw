@@ -572,7 +572,7 @@ Claude work is listed in "Remaining Claude Driver Work".
 - Previously, `CodexModelOption`, `CodexSkillSummary`, and `ReasoningEffort`
   were shared renderer-facing types.
 - Previously, `SendPromptOptions` mixed Codex-specific `reasoningEffort`,
-  `planMode`, `goalMode`, and `skills`.
+  `planMode`, `goals`, and `skills`.
 - Previously, `AppSnapshot.appServer` described a single Codex app-server
   instead of a generic backend runtime.
 - Previously, `CodexClawApi` exposed `listCodexModels()` and
@@ -633,7 +633,7 @@ Recommended next steps:
 3. Map Claude assistant/result/tool/permission events to app-owned
    `BackendEvent`, `ClientRequest`, and `RendererMessage` shapes.
 4. Implement interrupt and clear unsupported behavior for steering, rollback,
-   edit, retry, goal mode, and skills until Claude support is verified.
+   edit, retry, goals, and skills until Claude support is verified.
 5. Add main-process and renderer tests proving Codex agents keep working while
    Claude agents use only Claude-supported capabilities.
 
@@ -654,7 +654,7 @@ The smallest useful Claude milestone:
 Explicit non-goals for the first milestone:
 
 - Codex-style active-turn steering;
-- Codex-style goal mode;
+- Codex-style goals;
 - Codex `skills/list` parity;
 - rollback/edit/delete/retry parity;
 - hosted CCR remote sessions;

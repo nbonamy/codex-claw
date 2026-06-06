@@ -56,12 +56,52 @@ describe('CodexBackendDriver', () => {
       instructions: 'check regressions',
     });
   });
+
+  it('sets and clears goals through the session manager', async () => {
+    const sessionManager = createSessionManager();
+    const driver = new CodexBackendDriver(sessionManager);
+
+    await expect(driver.setGoal(agent, 'ship the shelf')).resolves.toStrictEqual({
+      backendSession: { kind: 'codex', threadId: 'thread-goal' },
+      goal: {
+        threadId: 'thread-goal',
+        objective: 'ship the shelf',
+        status: 'active',
+        tokenBudget: null,
+        tokensUsed: 0,
+        timeUsedSeconds: 0,
+        createdAt: 0,
+        updatedAt: 0,
+      },
+    });
+    expect(sessionManager.setThreadGoal).toHaveBeenCalledWith(agent, 'ship the shelf');
+
+    await expect(driver.clearGoal(agent)).resolves.toStrictEqual({
+      backendSession: { kind: 'codex', threadId: 'thread-goal' },
+      cleared: true,
+    });
+    expect(sessionManager.clearThreadGoal).toHaveBeenCalledWith(agent);
+  });
 });
 
 function createSessionManager(): CodexAgentSessionManager {
   return {
     compactThread: vi.fn().mockResolvedValue({ threadId: 'thread-compact' }),
+    clearThreadGoal: vi.fn().mockResolvedValue({ threadId: 'thread-goal', cleared: true }),
     reviewThread: vi.fn().mockResolvedValue({ threadId: 'thread-review', turnId: 'turn-review' }),
     sendPrompt: vi.fn(),
+    setThreadGoal: vi.fn().mockResolvedValue({
+      threadId: 'thread-goal',
+      goal: {
+        threadId: 'thread-goal',
+        objective: 'ship the shelf',
+        status: 'active',
+        tokenBudget: null,
+        tokensUsed: 0,
+        timeUsedSeconds: 0,
+        createdAt: 0,
+        updatedAt: 0,
+      },
+    }),
   } as unknown as CodexAgentSessionManager;
 }

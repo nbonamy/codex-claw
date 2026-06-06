@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Team } from '../shared/contracts';
+import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Team, ThreadGoal } from '../shared/contracts';
 import { normalizeThemeSettings } from '../shared/settings';
 import { createEmptySnapshot } from '../shared/snapshot';
 import { defaultTeamColor } from '../shared/team-colors';
@@ -21,6 +21,7 @@ type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'upda
   backendSession?: BackendSession;
   backendDefaults?: BackendDefaults;
   contextUsage?: AgentContextUsage;
+  goal?: ThreadGoal;
   statusText?: string;
   teamId?: string;
 };
@@ -70,6 +71,7 @@ function persistedAgentFromSnapshot(agent: Agent): PersistedAgent {
     ...(agent.backendSession ? { backendSession: cloneBackendSession(agent.backendSession) } : {}),
     ...(agent.backendDefaults ? { backendDefaults: cloneBackendDefaults(agent.backendDefaults) } : {}),
     ...(agent.contextUsage ? { contextUsage: { ...agent.contextUsage } } : {}),
+    ...(agent.goal ? { goal: { ...agent.goal } } : {}),
     statusText: agent.statusText,
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
@@ -124,6 +126,7 @@ function sanitizeAgent(value: unknown): Agent | null {
   const backend = sanitizeBackend(value.backend) ?? 'codex';
   const backendSession = sanitizeBackendSession(value.backendSession, backend);
   const backendDefaults = sanitizeBackendDefaults(value.backendDefaults, backend);
+  const goal = sanitizeThreadGoal(value.goal);
   return {
     id: value.id,
     teamId: typeof value.teamId === 'string' ? value.teamId : undefined,
@@ -134,11 +137,48 @@ function sanitizeAgent(value: unknown): Agent | null {
     ...(backendSession ? { backendSession } : {}),
     ...(backendDefaults ? { backendDefaults } : {}),
     ...(contextUsage ? { contextUsage } : {}),
+    ...(goal ? { goal } : {}),
     ...(typeof value.statusText === 'string' ? { statusText: value.statusText } : {}),
     status: { type: 'idle' },
     createdAt,
     updatedAt,
   };
+}
+
+function sanitizeThreadGoal(value: unknown): ThreadGoal | undefined {
+  if (
+    !isRecord(value) ||
+    typeof value.threadId !== 'string' ||
+    typeof value.objective !== 'string' ||
+    !isThreadGoalStatus(value.status) ||
+    (value.tokenBudget !== null && typeof value.tokenBudget !== 'number') ||
+    typeof value.tokensUsed !== 'number' ||
+    typeof value.timeUsedSeconds !== 'number' ||
+    typeof value.createdAt !== 'number' ||
+    typeof value.updatedAt !== 'number'
+  ) {
+    return undefined;
+  }
+
+  return {
+    threadId: value.threadId,
+    objective: value.objective,
+    status: value.status,
+    tokenBudget: value.tokenBudget,
+    tokensUsed: value.tokensUsed,
+    timeUsedSeconds: value.timeUsedSeconds,
+    createdAt: value.createdAt,
+    updatedAt: value.updatedAt,
+  };
+}
+
+function isThreadGoalStatus(value: unknown): value is ThreadGoal['status'] {
+  return value === 'active' ||
+    value === 'paused' ||
+    value === 'blocked' ||
+    value === 'usageLimited' ||
+    value === 'budgetLimited' ||
+    value === 'complete';
 }
 
 function sanitizeContextUsage(value: unknown): AgentContextUsage | undefined {

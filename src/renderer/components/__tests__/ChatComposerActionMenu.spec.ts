@@ -27,13 +27,11 @@ describe('ChatComposerActionMenu', () => {
 
 function mountMenu(props: Partial<{
   disabled: boolean;
-  goalMode: boolean;
   planMode: boolean;
 }> = {}) {
   return mount(ChatComposerActionMenu, {
     props: {
       disabled: false,
-      goalMode: false,
       planMode: false,
       ...props,
     },

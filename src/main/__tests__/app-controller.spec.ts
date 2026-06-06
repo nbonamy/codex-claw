@@ -95,6 +95,48 @@ describe('AppController', () => {
     expect(persistence.save).toHaveBeenCalledWith(snapshot);
   });
 
+  it('sets and clears an agent goal through the backend driver', async () => {
+    const snapshot = createInitialSnapshot();
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const backendDriver = createFakeCodexBackendDriver({
+      setGoal: vi.fn().mockResolvedValue({
+        backendSession: { kind: 'codex', threadId: 'thread-dina' },
+        goal: {
+          threadId: 'thread-dina',
+          objective: 'Ship the goal shelf',
+          status: 'active',
+          tokenBudget: null,
+          tokensUsed: 0,
+          timeUsedSeconds: 0,
+          createdAt: 0,
+          updatedAt: 0,
+        },
+      }),
+      clearGoal: vi.fn().mockResolvedValue({
+        backendSession: { kind: 'codex', threadId: 'thread-dina' },
+        cleared: true,
+      }),
+    });
+
+    await controller.initialize();
+    setCodexBackendDriver(controller, backendDriver);
+    await setAgentGoal(controller, 'agent-dina', ' Ship the goal shelf ');
+
+    expect(backendDriver.setGoal).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'Ship the goal shelf');
+    expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-dina' });
+    expect(snapshot.agents[0].goal?.objective).toBe('Ship the goal shelf');
+    expect(persistence.save).toHaveBeenCalledWith(snapshot);
+
+    await clearAgentGoal(controller, 'agent-dina');
+
+    expect(backendDriver.clearGoal).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(snapshot.agents[0].goal).toBeUndefined();
+  });
+
   it('interrupts the active Codex turn and keeps status until completion arrives', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].status = { type: 'working' };
@@ -269,6 +311,18 @@ async function editMessage(controller: AppController, agentId: string, messageId
   await (controller as unknown as {
     editMessage(agentId: string, messageId: string, prompt: string): Promise<void>;
   }).editMessage(agentId, messageId, prompt);
+}
+
+async function setAgentGoal(controller: AppController, agentId: string, objective: string): Promise<void> {
+  await (controller as unknown as {
+    setAgentGoal(agentId: string, objective: string): Promise<void>;
+  }).setAgentGoal(agentId, objective);
+}
+
+async function clearAgentGoal(controller: AppController, agentId: string): Promise<void> {
+  await (controller as unknown as {
+    clearAgentGoal(agentId: string): Promise<void>;
+  }).clearAgentGoal(agentId);
 }
 
 function userMessage(id: string, turnId: string, text: string) {

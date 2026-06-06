@@ -70,7 +70,7 @@
           :backend-capabilities="backendCapabilities"
           :model-catalog-status="modelCatalogStatus"
           :skill-catalog-status="skillCatalogStatus"
-          :goal-mode="goalMode"
+          :goal="goal"
           :plan-mode="planMode"
           :selected-model-id="selectedModelId"
           :selected-reasoning-effort="selectedReasoningEffort"
@@ -86,10 +86,10 @@
           @retry-message="$emit('retry-message', $event)"
           @select-model="$emit('select-model', $event)"
           @select-reasoning-effort="$emit('select-reasoning-effort', $event)"
+          @clear-goal="$emit('clear-goal')"
           @send-prompt="$emit('sendPrompt', $event)"
           @steer-prompt="$emit('steerPrompt', $event)"
           @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
-          @update:goal-mode="$emit('update:goalMode', $event)"
           @update:plan-mode="$emit('update:planMode', $event)"
         />
       </div>
@@ -121,7 +121,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { Agent, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, Team, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../shared/contracts';
+import type { Agent, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, Team, ThreadGoal, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../shared/contracts';
 import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import AgentDialog from './AgentDialog.vue';
 import AgentEmptyState from './AgentEmptyState.vue';
@@ -141,7 +141,7 @@ const props = withDefaults(defineProps<{
   messages: RendererMessage[];
   isLoading: boolean;
   isSending: boolean;
-  goalMode?: boolean;
+  goal?: ThreadGoal | null;
   answeredClientRequestIds?: Set<string>;
   backendModels?: BackendModelOption[];
   backendCommands?: BackendCommandSummary[];
@@ -185,6 +185,7 @@ const emit = defineEmits<{
   'close-team': [teamId: string];
   'close-agent': [agentId: string];
   attach: [];
+  'clear-goal': [];
   'client-response': [response: ClientRequestResponse];
   'copy-message': [index: number];
   'delete-message': [index: number];
@@ -204,7 +205,6 @@ const emit = defineEmits<{
   'select-reasoning-effort': [reasoningEffort: ReasoningEffort];
   'select-team': [teamId: string];
   'steer-queued-prompt': [promptId: string];
-  'update:goalMode': [enabled: boolean];
   'update:planMode': [enabled: boolean];
   sendPrompt: [prompt: string];
   steerPrompt: [prompt: string];

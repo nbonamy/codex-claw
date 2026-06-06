@@ -47,6 +47,19 @@ export type BackendDefaults =
     };
   };
 
+export type ThreadGoalStatus = 'active' | 'paused' | 'blocked' | 'usageLimited' | 'budgetLimited' | 'complete';
+
+export type ThreadGoal = {
+  threadId: string;
+  objective: string;
+  status: ThreadGoalStatus;
+  tokenBudget: number | null;
+  tokensUsed: number;
+  timeUsedSeconds: number;
+  createdAt: number;
+  updatedAt: number;
+};
+
 export type Agent = {
   id: string;
   teamId?: string;
@@ -57,6 +70,7 @@ export type Agent = {
   backendSession?: BackendSession;
   backendDefaults?: BackendDefaults;
   contextUsage?: AgentContextUsage;
+  goal?: ThreadGoal;
   isRegistered?: boolean;
   mcpSessionId?: string;
   statusText?: string;
@@ -114,7 +128,7 @@ export type BackendCapabilities = {
   reasoningEffort: boolean;
   thinkingBudget: boolean;
   planMode: BackendPlanModeSupport;
-  goalMode: boolean;
+  goals: boolean;
   steerPrompt: boolean;
   interrupt: boolean;
   history: boolean;
@@ -198,7 +212,6 @@ export type SendPromptOptions = {
 export type BackendPromptOptions =
   | {
     kind: 'codex';
-    goalMode?: boolean;
     reasoningEffort?: ReasoningEffort | null;
     skills?: PromptSkillInput[];
   }
@@ -448,6 +461,8 @@ export type CodexClawApi = {
   updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>;
   transcribeAppleSpeech(audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions): Promise<AppleSpeechTranscriptionResult>;
   quit(): Promise<void>;
+  setAgentGoal(agentId: string, objective: string): Promise<AppSnapshot>;
+  clearAgentGoal(agentId: string): Promise<AppSnapshot>;
   sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot>;
   steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot>;
   interruptAgent(agentId: string): Promise<AppSnapshot>;

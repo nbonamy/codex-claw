@@ -922,7 +922,7 @@ describe('useAppState', () => {
     });
   });
 
-  it('includes selected plan and goal modes in prompt options', async () => {
+  it('includes selected plan mode in prompt options', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();
     const sendPrompt = vi.fn().mockResolvedValue(updatedSnapshot);
@@ -940,17 +940,86 @@ describe('useAppState', () => {
     state.selectedModelId.value = null;
     state.selectedReasoningEffort.value = null;
     state.setPlanMode(true);
-    state.setGoalMode(true);
 
     await state.sendPrompt('make a plan and keep going');
 
     expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'make a plan and keep going', {
       planMode: true,
-      backendOptions: {
-        kind: 'codex',
-        goalMode: true,
-      },
     });
+  });
+
+  it('sets a Codex goal from slash goal without sending a prompt', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const updatedSnapshot = createInitialSnapshot();
+    updatedSnapshot.agents[0].goal = {
+      threadId: 'thread-1',
+      objective: 'ship the feature',
+      status: 'active',
+      tokenBudget: null,
+      tokensUsed: 0,
+      timeUsedSeconds: 0,
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    const sendPrompt = vi.fn().mockResolvedValue(createInitialSnapshot());
+    const setAgentGoal = vi.fn().mockResolvedValue(updatedSnapshot);
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        sendPrompt,
+        setAgentGoal,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    await state.sendPrompt('/goal ship the feature');
+
+    expect(setAgentGoal).toHaveBeenCalledWith('agent-dina', 'ship the feature');
+    expect(sendPrompt).not.toHaveBeenCalled();
+    expect(state.activeGoal.value?.objective).toBe('ship the feature');
+    expect(state.activeQueuedPrompts.value).toStrictEqual([]);
+  });
+
+  it('clears a Codex goal from slash goal clear even while busy', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0].status = { type: 'working' };
+    remoteSnapshot.agents[0].goal = {
+      threadId: 'thread-1',
+      objective: 'ship the feature',
+      status: 'active',
+      tokenBudget: null,
+      tokensUsed: 0,
+      timeUsedSeconds: 0,
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    const updatedSnapshot = createInitialSnapshot();
+    updatedSnapshot.agents[0].status = { type: 'working' };
+    const sendPrompt = vi.fn().mockResolvedValue(createInitialSnapshot());
+    const clearAgentGoal = vi.fn().mockResolvedValue(updatedSnapshot);
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        clearAgentGoal,
+        sendPrompt,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    await state.sendPrompt('/goal clear');
+
+    expect(clearAgentGoal).toHaveBeenCalledWith('agent-dina');
+    expect(sendPrompt).not.toHaveBeenCalled();
+    expect(state.activeGoal.value).toBeNull();
+    expect(state.activeQueuedPrompts.value).toStrictEqual([]);
   });
 
   it('enables plan mode from bare slash plan without sending a prompt', async () => {
@@ -971,7 +1040,6 @@ describe('useAppState', () => {
     state.selectedModelId.value = null;
     state.selectedReasoningEffort.value = null;
     state.setPlanMode(false);
-    state.setGoalMode(false);
 
     await state.sendPrompt('/plan');
 
@@ -999,7 +1067,6 @@ describe('useAppState', () => {
     state.selectedModelId.value = null;
     state.selectedReasoningEffort.value = null;
     state.setPlanMode(false);
-    state.setGoalMode(false);
 
     await state.sendPrompt('/plan build the plan');
 
@@ -1028,7 +1095,6 @@ describe('useAppState', () => {
     state.selectedModelId.value = null;
     state.selectedReasoningEffort.value = null;
     state.setPlanMode(false);
-    state.setGoalMode(false);
 
     await state.sendPrompt('/plan');
 
@@ -1070,7 +1136,6 @@ describe('useAppState', () => {
     const state = useAppState();
     await state.loadSnapshot();
     state.setPlanMode(false);
-    state.setGoalMode(false);
 
     expect(state.skillCatalogStatus.value).toBe('loaded');
     expect(listBackendSkills).toHaveBeenCalledWith('agent-dina');
@@ -1161,7 +1226,7 @@ describe('useAppState', () => {
     });
   });
 
-  it('syncs composer modes from app-owned main events', async () => {
+  it('syncs composer mode and active goal from app-owned main events', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
 
@@ -1191,12 +1256,23 @@ describe('useAppState', () => {
       agentId: 'agent-dina',
       threadId: 'thread-1',
       type: 'thread.goalUpdated',
-      payload: { goal: { objective: 'ship it' } },
+      payload: {
+        goal: {
+          threadId: 'thread-1',
+          objective: 'ship it',
+          status: 'active',
+          tokenBudget: null,
+          tokensUsed: 0,
+          timeUsedSeconds: 0,
+          createdAt: 0,
+          updatedAt: 0,
+        },
+      },
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
 
     expect(state.planMode.value).toBe(true);
-    expect(state.goalMode.value).toBe(true);
+    expect(state.activeGoal.value?.objective).toBe('ship it');
 
     listeners[0]?.({
       seq: 3,
@@ -1216,7 +1292,7 @@ describe('useAppState', () => {
     });
 
     expect(state.planMode.value).toBe(false);
-    expect(state.goalMode.value).toBe(false);
+    expect(state.activeGoal.value).toBeNull();
   });
 
   it('handles model catalog loading guards, errors, and invalid selections', async () => {

@@ -178,6 +178,16 @@ describe('agent-manager', () => {
       modelContextWindow: 258_400,
       usedPercent: 25,
     };
+    agent.goal = {
+      threadId: 'thread-old',
+      objective: 'Old goal',
+      status: 'active',
+      tokenBudget: null,
+      tokensUsed: 100,
+      timeUsedSeconds: 5,
+      createdAt: 1,
+      updatedAt: 2,
+    };
     agent.isRegistered = true;
     agent.mcpSessionId = 'mcp-session';
     agent.statusText = 'Registered';
@@ -191,6 +201,7 @@ describe('agent-manager', () => {
     });
     expect(snapshot.agents[0].backendSession).toBeUndefined();
     expect(snapshot.agents[0].contextUsage).toBeUndefined();
+    expect(snapshot.agents[0].goal).toBeUndefined();
     expect(snapshot.agents[0].isRegistered).toBeUndefined();
     expect(snapshot.agents[0].mcpSessionId).toBeUndefined();
     expect(snapshot.agents[0].statusText).toBeUndefined();

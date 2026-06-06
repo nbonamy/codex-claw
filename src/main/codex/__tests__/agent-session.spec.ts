@@ -281,13 +281,11 @@ describe('CodexAgentSessionManager', () => {
     });
   });
 
-  it('sets a thread goal before starting a goal-mode prompt', async () => {
+  it('sets a thread goal without starting a turn', async () => {
     const transport = new FakeTransport();
     const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
 
-    const prompt = manager.sendPrompt(agent, 'ship the feature', {
-      backendOptions: { kind: 'codex', goalMode: true },
-    });
+    const goal = manager.setThreadGoal(agent, 'ship the feature');
     await waitForSentCount(transport, 1);
     transport.receive({ id: 1, result: { userAgent: 'codex', codexHome: '/tmp/codex-home', platformFamily: 'unix', platformOs: 'macos' } });
     await waitForSentCount(transport, 3);
@@ -305,17 +303,21 @@ describe('CodexAgentSessionManager', () => {
     });
 
     transport.receive({ id: 3, result: { goal: { threadId: 'thread-1', objective: 'ship the feature', status: 'active', tokenBudget: null, tokensUsed: 0, timeUsedSeconds: 0, createdAt: 0, updatedAt: 0 } } });
-    await waitForSentCount(transport, 5);
-    transport.receive({ id: 4, result: { turn: { id: 'turn-1', status: 'running' } } });
 
-    await expect(prompt).resolves.toStrictEqual({
+    await expect(goal).resolves.toStrictEqual({
       threadId: 'thread-1',
-      turnId: 'turn-1',
+      goal: {
+        threadId: 'thread-1',
+        objective: 'ship the feature',
+        status: 'active',
+        tokenBudget: null,
+        tokensUsed: 0,
+        timeUsedSeconds: 0,
+        createdAt: 0,
+        updatedAt: 0,
+      },
     });
-    expect(transport.sent.at(-1)).toMatchObject({
-      id: 4,
-      method: 'turn/start',
-    });
+    expect(transport.sent).toHaveLength(4);
   });
 
   it('starts manual compaction through the app-server compact RPC', async () => {

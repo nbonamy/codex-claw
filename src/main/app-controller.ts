@@ -247,6 +247,14 @@ export class AppController {
       app.quit();
     });
 
+    ipcMain.handle(ipcChannels.setAgentGoal, (_event, agentId: string, objective: string) => {
+      return this.setAgentGoal(agentId, objective);
+    });
+
+    ipcMain.handle(ipcChannels.clearAgentGoal, (_event, agentId: string) => {
+      return this.clearAgentGoal(agentId);
+    });
+
     ipcMain.handle(ipcChannels.sendPrompt, (_event, agentId: string, prompt: string, options?: SendPromptOptions) => {
       return this.sendPrompt(agentId, prompt, options);
     });
@@ -301,6 +309,59 @@ export class AppController {
     return sendAgentPrompt(this.snapshot, await this.getBackendDriverForAgent(agent), agentId, prompt, options, (event) => {
       this.emitAndApply(event);
     });
+  }
+
+  private async setAgentGoal(agentId: string, objective: string): Promise<AppSnapshot> {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    const trimmedObjective = objective.trim();
+    if (!agent || !trimmedObjective) {
+      return this.snapshot;
+    }
+
+    const driver = await this.getBackendDriverForAgent(agent);
+    if (!driver.setGoal) {
+      throw new Error(`${agent.backend} does not support goals.`);
+    }
+
+    const result = await driver.setGoal(agent, trimmedObjective);
+    agent.backendSession = result.backendSession;
+    if (result.goal) {
+      this.emitAndApply({
+        agentId,
+        threadId: result.goal.threadId,
+        type: 'thread.goalUpdated',
+        payload: { goal: result.goal },
+      });
+    }
+    await this.persistSnapshot();
+
+    return this.snapshot;
+  }
+
+  private async clearAgentGoal(agentId: string): Promise<AppSnapshot> {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) {
+      return this.snapshot;
+    }
+
+    const driver = await this.getBackendDriverForAgent(agent);
+    if (!driver.clearGoal) {
+      throw new Error(`${agent.backend} does not support goals.`);
+    }
+
+    const result = await driver.clearGoal(agent);
+    agent.backendSession = result.backendSession;
+    if (result.cleared) {
+      this.emitAndApply({
+        agentId,
+        threadId: result.backendSession.kind === 'codex' ? result.backendSession.threadId : undefined,
+        type: 'thread.goalCleared',
+        payload: {},
+      });
+    }
+    await this.persistSnapshot();
+
+    return this.snapshot;
   }
 
   private async listBackendModels(agentId: string): Promise<BackendModelOption[]> {

@@ -22,11 +22,14 @@
       />
 
       <template #footer>
-        <ChatQueuedPrompts
-          class="conversation-pane__queued-prompts"
-          :prompts="queuedPrompts"
-          @delete="$emit('delete-queued-prompt', $event)"
-          @steer="$emit('steer-queued-prompt', $event)"
+        <ChatComposerShelf
+          class="conversation-pane__composer-shelf"
+          :goal="goal ?? null"
+          :queued-prompts="queuedPrompts"
+          @clear-goal="$emit('clear-goal')"
+          @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
+          @edit-goal="editGoal"
+          @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
         />
         <ChatComposer
           class="conversation-pane__composer"
@@ -42,12 +45,10 @@
           :skill-catalog-status="skillCatalogStatus"
           :draft="composerDraft"
           :draft-revision="composerDraftRevision"
-          :goal-mode="goalMode"
           :plan-mode="planMode"
           :selected-model-id="selectedModelId"
           :selected-reasoning-effort="selectedReasoningEffort"
           @attach="$emit('attach')"
-          @update:goal-mode="$emit('update:goalMode', $event)"
           @update:model-id="$emit('select-model', $event)"
           @update:plan-mode="$emit('update:planMode', $event)"
           @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
@@ -71,11 +72,14 @@
         <h1>{{ heroHeadline }}</h1>
         <p>{{ heroSubhead }}</p>
       </div>
-      <ChatQueuedPrompts
-        class="conversation-pane__queued-prompts"
-        :prompts="queuedPrompts"
-        @delete="$emit('delete-queued-prompt', $event)"
-        @steer="$emit('steer-queued-prompt', $event)"
+      <ChatComposerShelf
+        class="conversation-pane__composer-shelf"
+        :goal="goal ?? null"
+        :queued-prompts="queuedPrompts"
+        @clear-goal="$emit('clear-goal')"
+        @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
+        @edit-goal="editGoal"
+        @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
       />
       <ChatComposer
         class="conversation-pane__composer"
@@ -91,12 +95,10 @@
         :skill-catalog-status="skillCatalogStatus"
         :draft="composerDraft"
         :draft-revision="composerDraftRevision"
-        :goal-mode="goalMode"
         :plan-mode="planMode"
         :selected-model-id="selectedModelId"
         :selected-reasoning-effort="selectedReasoningEffort"
         @attach="$emit('attach')"
-        @update:goal-mode="$emit('update:goalMode', $event)"
         @update:model-id="$emit('select-model', $event)"
         @update:plan-mode="$emit('update:planMode', $event)"
         @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
@@ -115,7 +117,7 @@ import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import WorkbenchLayout from './WorkbenchLayout.vue';
 import ChatComposer from './ChatComposer.vue';
 import ConversationHistoryLoader from './ConversationHistoryLoader.vue';
-import ChatQueuedPrompts from '../shared/chat/ChatQueuedPrompts.vue';
+import ChatComposerShelf from '../shared/chat/ChatComposerShelf.vue';
 import MessageList from '../shared/chat/MessageList.vue';
 import { rendererMessagesToChatMessages } from '../shared/chat/renderer-message-adapter';
 import type { QueuedChatPrompt } from '../shared/chat/queued-prompts';
@@ -124,7 +126,7 @@ const props = withDefaults(defineProps<{
   messages: RendererMessage[];
   agent: Agent | null;
   agentFiles?: AgentFileSearchItem[];
-  goalMode?: boolean;
+  goal?: Agent['goal'] | null;
   isLoading: boolean;
   isSending: boolean;
   answeredClientRequestIds?: Set<string>;
@@ -150,6 +152,7 @@ const props = withDefaults(defineProps<{
 
 defineEmits<{
   attach: [];
+  'clear-goal': [];
   'client-response': [response: ClientRequestResponse];
   'copy-message': [index: number];
   'delete-message': [index: number];
@@ -161,7 +164,6 @@ defineEmits<{
   'select-model': [modelId: string];
   'select-reasoning-effort': [reasoningEffort: ReasoningEffort];
   'steer-queued-prompt': [promptId: string];
-  'update:goalMode': [enabled: boolean];
   'update:planMode': [enabled: boolean];
   sendPrompt: [prompt: string];
   steerPrompt: [prompt: string];
@@ -197,6 +199,15 @@ function quoteMessage(index: number): void {
   }
 
   composerDraft.value = message.content;
+  composerDraftRevision.value += 1;
+}
+
+function editGoal(): void {
+  if (!props.goal?.objective.trim()) {
+    return;
+  }
+
+  composerDraft.value = `/goal ${props.goal.objective}`;
   composerDraftRevision.value += 1;
 }
 </script>
@@ -245,6 +256,11 @@ function quoteMessage(index: number): void {
   width: min(calc(100% - var(--space-16) * 2), var(--conversation-content-width));
   margin: 0 auto;
   margin-bottom: var(--space-8);
+}
+
+.conversation-pane__composer-shelf {
+  width: min(calc(100% - var(--space-16) * 2), var(--conversation-content-width));
+  margin: 0 auto;
 }
 
 .conversation-pane__hero {

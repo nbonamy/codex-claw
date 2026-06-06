@@ -21,18 +21,17 @@
       role="menu"
     >
       <button
-        v-if="showPlanMode"
         class="chat-composer-action-menu__item"
         type="button"
         role="menuitem"
         disabled
         @click="emit('attach')"
       >
-          <PaperclipIcon />
-          <span>Attach</span>
+        <PaperclipIcon />
+        <span>Attach</span>
       </button>
       <button
-        v-if="showGoalMode"
+        v-if="showPlanMode"
         class="chat-composer-action-menu__item"
         type="button"
         role="menuitemcheckbox"
@@ -47,21 +46,6 @@
           @change="emit('update:planMode', Boolean($event))"
         />
       </button>
-      <button
-        class="chat-composer-action-menu__item"
-        type="button"
-        role="menuitemcheckbox"
-        :aria-checked="goalMode"
-        @click="emit('update:goalMode', !goalMode)"
-      >
-        <span class="chat-composer-action-menu__label">Goal mode</span>
-        <el-switch
-          :model-value="goalMode"
-          size="small"
-          @click.stop
-          @change="emit('update:goalMode', Boolean($event))"
-        />
-      </button>
     </div>
   </div>
 </template>
@@ -72,19 +56,15 @@ import { PaperclipIcon, PlusIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
   disabled?: boolean;
-  goalMode: boolean;
   planMode: boolean;
-  showGoalMode?: boolean;
   showPlanMode?: boolean;
 }>(), {
   disabled: false,
-  showGoalMode: true,
   showPlanMode: true,
 });
 
 const emit = defineEmits<{
   attach: [];
-  'update:goalMode': [enabled: boolean];
   'update:planMode': [enabled: boolean];
 }>();
 
@@ -121,8 +101,9 @@ function closeOnOutsideClick(event: MouseEvent): void {
 }
 
 .chat-composer-action-menu__button {
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: var(--chat-composer-button-size, 36px);
   height: var(--chat-composer-button-size, 36px);
   border: 0;

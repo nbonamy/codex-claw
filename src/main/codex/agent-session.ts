@@ -65,6 +65,16 @@ export type CodexSessionCommandResult = {
   turnId?: string;
 };
 
+export type CodexSessionGoalSetResult = {
+  threadId: string;
+  goal: CodexThreadGoal;
+};
+
+export type CodexSessionGoalClearResult = {
+  threadId: string;
+  cleared: boolean;
+};
+
 export class CodexAgentSessionManager {
   private seq = 0;
   private readonly sessionsByAgentId = new Map<string, AgentSession>();
@@ -179,14 +189,6 @@ export class CodexAgentSessionManager {
       };
     }
 
-    if (codexOptions?.goalMode) {
-      await this.client.request('thread/goal/set', {
-        threadId: session.threadId,
-        objective: prompt,
-        status: 'active',
-      });
-    }
-
     const response = await this.client.request<TurnStartResponse>('turn/start', turnParams);
     this.activeTurnIdsByThreadId.set(session.threadId, response.turn.id);
     this.recordTurnId(session.threadId, response.turn.id);
@@ -207,6 +209,36 @@ export class CodexAgentSessionManager {
 
     return {
       threadId: session.threadId,
+    };
+  }
+
+  async setThreadGoal(agent: Agent, objective: string): Promise<CodexSessionGoalSetResult> {
+    await this.start();
+
+    const session = await this.ensureSession(agent);
+    const response = await this.client.request<{ goal: CodexThreadGoal }>('thread/goal/set', {
+      threadId: session.threadId,
+      objective,
+      status: 'active',
+    });
+
+    return {
+      threadId: session.threadId,
+      goal: response.goal,
+    };
+  }
+
+  async clearThreadGoal(agent: Agent): Promise<CodexSessionGoalClearResult> {
+    await this.start();
+
+    const session = await this.ensureSession(agent);
+    const response = await this.client.request<{ cleared: boolean }>('thread/goal/clear', {
+      threadId: session.threadId,
+    });
+
+    return {
+      threadId: session.threadId,
+      cleared: response.cleared,
     };
   }
 

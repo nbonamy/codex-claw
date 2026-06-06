@@ -27,6 +27,8 @@ describe('ipc channels', () => {
       updateSettings: 'settings:update',
       transcribeAppleSpeech: 'transcription:apple-speech',
       quit: 'app:quit',
+      setAgentGoal: 'agent:goal:set',
+      clearAgentGoal: 'agent:goal:clear',
       sendPrompt: 'agent:send-prompt',
       steerPrompt: 'agent:steer-prompt',
       interruptAgent: 'agent:interrupt',

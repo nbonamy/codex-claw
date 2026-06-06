@@ -161,7 +161,7 @@ from `/` command search resolves the same way. Main then appends Codex
 
 Composer shortcuts are split by surface: `@` searches files, `$` searches
 skills, and `/` searches backend commands first, then matching skills. The
-initial Codex command catalog includes `compact`, `review`, and `plan` without
+initial Codex command catalog includes `compact`, `review`, `plan`, and `goal` without
 a visible slash prefix in the menu. Selecting one submits the corresponding
 slash form through the normal composer path.
 
@@ -183,6 +183,13 @@ semantics change the composer mode, then optionally submit stripped text:
 - `/plan <prompt>` enables Plan mode and submits `<prompt>` as a normal visible
   user prompt with `planMode: true`;
 - `/plan` while Plan mode is already enabled keeps Plan mode enabled.
+
+`goal` is also handled in the renderer/app prompt path because it mutates
+thread metadata instead of starting a visible prompt turn:
+
+- `/goal <objective>` sets or replaces the active thread goal;
+- `/goal clear` clears the active thread goal;
+- bare `/goal` and `/goal edit` are reserved for the goal shelf/editor surface.
 
 `review/start` uses `delivery: "inline"`, so app-server should return the same
 `reviewThreadId` as the active thread. Main treats a different review thread id
@@ -354,9 +361,21 @@ Composer Plan mode is sent through Codex's experimental
 object from app-owned prompt options and the selected model/reasoning effort;
 renderer code only sees a boolean Plan toggle.
 
-Composer Goal mode creates or updates the Codex thread goal before starting the
-turn by calling `thread/goal/set` with the submitted prompt as the objective and
-`active` status.
+Codex goals are thread metadata, not composer modes. The renderer handles
+`/goal` commands before prompt submission:
+
+- `/goal <objective>` calls `thread/goal/set` through main, strips the slash
+  command, and does not start a turn or add a visible user prompt.
+- `/goal clear` calls `thread/goal/clear`, even when the agent is busy.
+- Bare `/goal` and `/goal edit` do not submit a turn yet; goal editing is
+  exposed from the goal surface above the composer and currently loads
+  `/goal <objective>` into the composer as the editing draft.
+- `/goal pause` and `/goal resume` are intentionally unsupported for now.
+
+The active goal is displayed by `ChatComposerShelf`, below queued prompts and
+closest to the composer. That keeps the future editor/clear controls out of
+the composer mode chip row and avoids mixing durable thread state with
+per-turn prompt options.
 
 Mode notifications stay app-owned:
 
@@ -364,7 +383,7 @@ Mode notifications stay app-owned:
 - If the thread settings include `collaborationMode.mode`, main also emits
   `thread.modeUpdated` with `default` or `plan`.
 - `thread/goal/updated` and `thread/goal/cleared` become app-owned goal events
-  so the composer indicator can stay in sync.
+  so the agent metadata and shelf stay in sync.
 - `turn/plan/updated` becomes transcript text for now; this is the rendering
   hook for a richer native plan component later.
 - `item/plan/delta` is accepted as an assistant delta so streaming plan text can

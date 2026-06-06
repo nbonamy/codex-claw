@@ -132,27 +132,23 @@ describe('ChatComposer', () => {
     expect(wrapper.emitted('send')).toBeUndefined();
   });
 
-  it('opens the composer action menu and toggles modes', async () => {
+  it('opens the composer action menu and toggles plan mode', async () => {
     const wrapper = mountComposer();
 
     await wrapper.get('.chat-composer-action-menu__button').trigger('click');
 
     expect(wrapper.find('.chat-composer-action-menu').exists()).toBe(true);
     await wrapper.findAll('.chat-composer-action-menu__item')[1]?.trigger('click');
-    await wrapper.findAll('.chat-composer-action-menu__item')[2]?.trigger('click');
 
     expect(wrapper.emitted('update:planMode')).toStrictEqual([[true]]);
-    expect(wrapper.emitted('update:goalMode')).toStrictEqual([[true]]);
   });
 
   it('toggles plan mode with Shift Tab and renders active mode chips', async () => {
     const wrapper = mountComposer({
-      goalMode: true,
       planMode: true,
     });
 
     expect(wrapper.text()).toContain('Plan');
-    expect(wrapper.text()).toContain('Goal');
 
     await wrapper.get('textarea').trigger('keydown', { key: 'Tab', shiftKey: true });
 
@@ -161,16 +157,13 @@ describe('ChatComposer', () => {
 
   it('removes active mode chips through their remove affordance', async () => {
     const wrapper = mountComposer({
-      goalMode: true,
       planMode: true,
     });
 
     const removeButtons = wrapper.findAll('.chat-composer__mode__remove');
     await removeButtons[0].trigger('click');
-    await removeButtons[1].trigger('click');
 
     expect(wrapper.emitted('update:planMode')).toStrictEqual([[false]]);
-    expect(wrapper.emitted('update:goalMode')).toStrictEqual([[false]]);
   });
 
   it('disables sending without text or without an agent but keeps busy drafts submittable', async () => {
@@ -303,6 +296,25 @@ describe('ChatComposer', () => {
     expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('');
   });
 
+  it('submits Codex goal from the slash command menu without showing a slash prefix', async () => {
+    const wrapper = mountComposer({
+      commands: codexBackendCommands,
+      skills,
+    });
+
+    await wrapper.get('textarea').setValue('/goa');
+    await wrapper.get('textarea').trigger('keyup');
+
+    expect(wrapper.find('.chat-composer-slash-menu').exists()).toBe(true);
+    expect(wrapper.text()).toContain('goal');
+    expect(wrapper.text()).not.toContain('/goal');
+
+    await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
+
+    expect(wrapper.emitted('send')).toStrictEqual([['/goal']]);
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('');
+  });
+
   it('falls through from slash commands to skills after command rows', async () => {
     const wrapper = mountComposer({
       commands: codexBackendCommands,
@@ -315,6 +327,7 @@ describe('ChatComposer', () => {
     expect(wrapper.text()).toContain('Commands');
     expect(wrapper.text()).toContain('Skills');
 
+    await wrapper.get('textarea').trigger('keydown', { key: 'ArrowDown' });
     await wrapper.get('textarea').trigger('keydown', { key: 'ArrowDown' });
     await wrapper.get('textarea').trigger('keydown', { key: 'ArrowDown' });
     await wrapper.get('textarea').trigger('keydown', { key: 'ArrowDown' });
@@ -393,7 +406,6 @@ describe('ChatComposer', () => {
 function mountComposer(overrides: Partial<ChatComposerProps & {
   contextUsage: AgentContextUsage;
   commands: BackendCommandSummary[];
-  goalMode: boolean;
   models: BackendModelOption[];
   planMode: boolean;
   selectedModelId: string;

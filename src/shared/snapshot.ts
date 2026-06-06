@@ -11,6 +11,7 @@ import type {
   RendererMessagePart,
   RendererToolPart,
   RendererToolPartUpdate,
+  ThreadGoal,
   UpdateAgentInput,
 } from './contracts';
 import { defaultThemeSettings } from './settings';
@@ -277,7 +278,24 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     return;
   }
 
-  if (event.type === 'thread.modeUpdated' || event.type === 'thread.goalUpdated' || event.type === 'thread.goalCleared') {
+  if (event.type === 'thread.goalUpdated') {
+    const agent = findAgent(snapshot, event.agentId);
+    const goal = threadGoal(event.payload);
+    if (agent && goal) {
+      agent.goal = goal;
+    }
+    return;
+  }
+
+  if (event.type === 'thread.goalCleared') {
+    const agent = findAgent(snapshot, event.agentId);
+    if (agent) {
+      delete agent.goal;
+    }
+    return;
+  }
+
+  if (event.type === 'thread.modeUpdated') {
     return;
   }
 
@@ -580,6 +598,43 @@ function accountRateLimitWindow(value: unknown): AccountRateLimits['primary'] {
 
 function nullableString(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
+}
+
+function threadGoal(value: unknown): ThreadGoal | null {
+  const goal = isRecord(value) && isRecord(value.goal) ? value.goal : value;
+  if (
+    !isRecord(goal) ||
+    typeof goal.threadId !== 'string' ||
+    typeof goal.objective !== 'string' ||
+    !isThreadGoalStatus(goal.status) ||
+    (goal.tokenBudget !== null && typeof goal.tokenBudget !== 'number') ||
+    typeof goal.tokensUsed !== 'number' ||
+    typeof goal.timeUsedSeconds !== 'number' ||
+    typeof goal.createdAt !== 'number' ||
+    typeof goal.updatedAt !== 'number'
+  ) {
+    return null;
+  }
+
+  return {
+    threadId: goal.threadId,
+    objective: goal.objective,
+    status: goal.status,
+    tokenBudget: goal.tokenBudget,
+    tokensUsed: goal.tokensUsed,
+    timeUsedSeconds: goal.timeUsedSeconds,
+    createdAt: goal.createdAt,
+    updatedAt: goal.updatedAt,
+  };
+}
+
+function isThreadGoalStatus(value: unknown): value is ThreadGoal['status'] {
+  return value === 'active' ||
+    value === 'paused' ||
+    value === 'blocked' ||
+    value === 'usageLimited' ||
+    value === 'budgetLimited' ||
+    value === 'complete';
 }
 
 function rendererMessages(value: unknown, agentId: string): RendererMessage[] {
@@ -1145,6 +1200,7 @@ function attachAgentToTeam(snapshot: AppSnapshot, agent: Agent): void {
 function clearAgentRuntimeState(agent: Agent): void {
   delete agent.backendSession;
   delete agent.contextUsage;
+  delete agent.goal;
   delete agent.isRegistered;
   delete agent.mcpSessionId;
   delete agent.statusText;
