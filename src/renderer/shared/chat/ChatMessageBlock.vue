@@ -67,8 +67,8 @@ const emit = defineEmits<{
 .chat-message-block--text {
   white-space: normal;
   overflow-wrap: anywhere;
-  line-height: var(--line-height-24);
-  font-size: var(--font-size-16);
+  line-height: var(--line-height-22);
+  font-size: 15.5px;
   opacity: 0.85;
 }
 
