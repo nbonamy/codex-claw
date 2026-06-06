@@ -98,7 +98,8 @@ defineProps<{
 .chat-tool-call__title-target {
   min-width: 0;
   overflow: hidden;
-  color: var(--color-primary);
+  color: var(--color-secondary);
+  font-weight: var(--font-weight-regular);
   text-overflow: ellipsis;
 }
 </style>
