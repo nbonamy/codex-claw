@@ -154,7 +154,7 @@ This keeps normal Codex config and normal Codex data untouched, including when
 
 ## Notifications And Server Requests
 
-Important notifications:
+Handled notifications:
 
 - `thread/started`
 - `thread/settings/updated`
@@ -167,27 +167,80 @@ Important notifications:
 - `rawResponseItem/completed` as a compatibility/fallback path for raw
   Responses items that are not projected into `ThreadItem`s.
 - `item/agentMessage/delta`
-- `item/reasoning/*`
-- `item/plan/delta`
 - `item/commandExecution/outputDelta`
 - `item/fileChange/patchUpdated`
 - `item/mcpToolCall/progress`
 - `thread/compacted` as a deprecated compatibility notification; prefer the
   `contextCompaction` item emitted through `item/started`.
-- `turn/diff/updated`
+
+High-priority missing notifications:
+
+- `error`: should become an app-owned error event and visible system message.
+- `turn/plan/updated`: needed for plan mode rendering.
+- `item/plan/delta`: needed for streaming plan deltas.
+- `item/reasoning/summaryTextDelta`: needed for reasoning summary rendering.
+- `item/reasoning/summaryPartAdded`: needed for reasoning summary rendering.
+- `item/reasoning/textDelta`: needed for reasoning text rendering.
+- `turn/diff/updated`: needed for git/diff status and the future environment
+  panel.
+- `item/commandExecution/terminalInteraction`: useful once native terminal or
+  process interaction UI exists.
+- `item/fileChange/outputDelta`: deprecated legacy apply-patch output stream,
+  but worth accepting for compatibility.
+
+Useful app/account/config notifications that should be logged or surfaced once
+we add the matching UI:
+
+- `account/updated`
+- `mcpServer/startupStatus/updated`
+- `mcpServer/oauthLogin/completed`
+- `configWarning`
+- `warning`
+- `guardianWarning`
+- `deprecationNotice`
+- `model/rerouted`
+- `model/verification`
+- `turn/moderationMetadata`
+
+Thread lifecycle notifications that can wait until thread/history management:
+
+- `thread/name/updated`
+- `thread/goal/updated`
+- `thread/goal/cleared`
+- `thread/archived`
+- `thread/unarchived`
+- `thread/closed`
+- `skills/changed`
+
+Low-priority protocol surfaces for the current Claw MVP:
+
+- `app/list/updated`
+- `remoteControl/status/changed`
+- `externalAgentConfig/import/completed`
+- `fs/changed`
+- `fuzzyFileSearch/sessionUpdated`
+- `fuzzyFileSearch/sessionCompleted`
+- `thread/realtime/*`
+- `windows/worldWritableWarning`
+- `windowsSandbox/setupCompleted`
+- `hook/started`
+- `hook/completed`
+- `command/exec/*`
+- `process/*`
 
 Current server-initiated request methods:
 
-- `item/commandExecution/requestApproval`
-- `item/fileChange/requestApproval`
-- `item/tool/requestUserInput`
-- `mcpServer/elicitation/request`
-- `item/permissions/requestApproval`
-- `item/tool/call`
-- `account/chatgptAuthTokens/refresh`
-- `attestation/generate`
-- `applyPatchApproval`
-- `execCommandApproval`
+- `mcpServer/elicitation/request`: implemented for MCP tool approval
+  confirmation.
+- `item/tool/requestUserInput`: implemented for app-server user questions.
+- `item/commandExecution/requestApproval`: not implemented.
+- `item/fileChange/requestApproval`: not implemented.
+- `item/permissions/requestApproval`: not implemented.
+- `item/tool/call`: not implemented.
+- `account/chatgptAuthTokens/refresh`: not implemented.
+- `attestation/generate`: not implemented.
+- `applyPatchApproval`: legacy-ish and not implemented.
+- `execCommandApproval`: legacy-ish and not implemented.
 
 Server requests are not renderer implementation details. Main stores the
 pending request, emits an app-owned prompt event, and resolves or rejects the
