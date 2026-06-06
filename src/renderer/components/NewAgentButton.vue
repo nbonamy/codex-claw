@@ -147,7 +147,7 @@ function folderBasename(folder: string): string {
 <style scoped>
 
 .new-agent-button {
-  --new-agent-button-height: 40px;
+  --new-agent-button-height: 44px;
   --new-agent-button-border-radius: var(--radius-lg);
   width: 100%;
 }
