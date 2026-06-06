@@ -103,10 +103,7 @@ watch(() => props.messages, async (messages) => {
   min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
-  padding:
-    var(--message-list-padding-inline-end, var(--space-8))
-    0
-    var(--message-list-padding-inline-start, var(--space-8));
+  padding: var(--space-8) var(--space-16);
 }
 
 .message-list__content {

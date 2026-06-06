@@ -25,7 +25,6 @@
           :model-catalog-status="modelCatalogStatus"
           :selected-model-id="selectedModelId"
           :selected-reasoning-effort="selectedReasoningEffort"
-          :context-usage="agent?.contextUsage"
           @update:model-id="$emit('select-model', $event)"
           @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
           @send="$emit('sendPrompt', $event)"
@@ -55,7 +54,6 @@
         :model-catalog-status="modelCatalogStatus"
         :selected-model-id="selectedModelId"
         :selected-reasoning-effort="selectedReasoningEffort"
-        :context-usage="agent?.contextUsage"
         @update:model-id="$emit('select-model', $event)"
         @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
         @send="$emit('sendPrompt', $event)"
@@ -154,19 +152,20 @@ const heroSubhead = computed(() => {
 }
 
 .conversation-pane__composer {
-  width: min(100%, var(--conversation-content-width));
+  width: min(calc(100% - var(--space-16) * 2), var(--conversation-content-width));
   margin: 0 auto;
+  margin-bottom: var(--space-8);
 }
 
 .conversation-pane__hero {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  gap: var(--space-12);
-  width: min(100%, var(--conversation-content-width));
+  gap: var(--space-24);
+  width: min(calc(100% - var(--space-16) * 2), var(--conversation-content-width));
   height: 100%;
   margin: 0 auto;
-  padding: var(--space-8) var(--space-32);
+  padding: var(--space-8) 0;
   padding-top: 33vh;
 }
 

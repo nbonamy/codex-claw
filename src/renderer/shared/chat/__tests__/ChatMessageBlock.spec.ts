@@ -3,6 +3,8 @@ import { markRaw } from 'vue';
 import { afterEach, describe, expect, it } from 'vitest';
 import ChatMessageBlock from '../ChatMessageBlock.vue';
 import ChatMessage from '../ChatMessage.vue';
+import ChatToolCall from '../ChatToolCall.vue';
+import ChatToolGroup from '../ChatToolGroup.vue';
 import ChatToolCallTitle from '../ChatToolCallTitle.vue';
 import type { MessageBlock } from '../message-blocks';
 
@@ -86,6 +88,53 @@ describe('ChatMessageBlock', () => {
       },
     });
     expect(group.text()).toContain('2 actions done');
+  });
+
+  it('forwards tool cancellation and client response events', async () => {
+    const tool = {
+      args: { command: 'npm test' },
+      done: false,
+      function: 'npm test',
+      id: 'tool-1',
+      result: undefined,
+      state: 'running' as const,
+      status: JSON.stringify({
+        action: 'run',
+        phase: 'running',
+        source: 'codex',
+      }),
+    };
+    const response = {
+      id: 'approval-1',
+      payload: {
+        decision: 'allow',
+      },
+    };
+    const single = mount(ChatMessageBlock, {
+      props: {
+        block: { type: 'tool', toolCall: tool },
+      },
+    });
+
+    single.getComponent(ChatToolCall).vm.$emit('cancel');
+    single.getComponent(ChatToolCall).vm.$emit('client-response', response);
+    await single.vm.$nextTick();
+
+    expect(single.emitted('cancel')).toStrictEqual([[]]);
+    expect(single.emitted('client-response')).toStrictEqual([[response]]);
+
+    const group = mount(ChatMessageBlock, {
+      props: {
+        block: { type: 'tool-group', toolCalls: [tool] },
+      },
+    });
+
+    group.getComponent(ChatToolGroup).vm.$emit('cancel');
+    group.getComponent(ChatToolGroup).vm.$emit('client-response', response);
+    await group.vm.$nextTick();
+
+    expect(group.emitted('cancel')).toStrictEqual([[]]);
+    expect(group.emitted('client-response')).toStrictEqual([[response]]);
   });
 
   it('renders mermaid blocks as SVG diagrams and toggles source code', async () => {
