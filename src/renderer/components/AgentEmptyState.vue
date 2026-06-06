@@ -4,7 +4,10 @@
     aria-label="No agents"
   >
     <div class="agent-empty-state__mark">
-      <span>CC</span>
+      <img
+        :src="appIconUrl"
+        alt="Codex Claw"
+      >
     </div>
 
     <div class="agent-empty-state__copy">
@@ -27,6 +30,8 @@
 import { computed } from 'vue';
 import type { BenchTemplate } from '../../shared/contracts';
 import NewAgentButton from './NewAgentButton.vue';
+
+const appIconUrl = new URL('../../../assets/icon.png', import.meta.url).href;
 
 const props = defineProps<{
   bench?: BenchTemplate[];
@@ -59,17 +64,15 @@ const bench = computed(() => props.bench ?? []);
   height: 112px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-2xl);
   color: var(--color-text);
-  background: var(--color-surface-low);
-  box-shadow: var(--shadow-lg);
+  overflow: hidden;
 }
 
-.agent-empty-state__mark span {
-  font-size: var(--font-size-24);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-28);
+.agent-empty-state__mark img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 
 .agent-empty-state__copy {

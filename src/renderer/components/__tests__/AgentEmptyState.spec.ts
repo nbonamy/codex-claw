@@ -30,6 +30,7 @@ describe('AgentEmptyState', () => {
 
     expect(wrapper.text()).toContain('Welcome to Codex Claw!');
     expect(wrapper.text()).toContain('Add an agent to your team');
+    expect(wrapper.get('.agent-empty-state__mark img').attributes('alt')).toBe('Codex Claw');
 
     await wrapper.get('.agent-sidebar__new').trigger('click');
 
