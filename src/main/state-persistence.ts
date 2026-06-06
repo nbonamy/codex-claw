@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { Agent, AppSnapshot, BenchTemplate, Team } from '../shared/contracts';
+import type { Agent, AgentContextUsage, AppSnapshot, BenchTemplate, Team } from '../shared/contracts';
 import { normalizeThemeSettings } from '../shared/settings';
 import { createEmptySnapshot } from '../shared/snapshot';
 import { defaultTeamColor } from '../shared/team-colors';
@@ -17,6 +17,7 @@ type PersistedState = {
 type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'updatedAt'> & {
   avatar?: string;
   codexThreadId?: string;
+  contextUsage?: AgentContextUsage;
   statusText?: string;
   teamId?: string;
 };
@@ -62,6 +63,7 @@ function persistedAgentFromSnapshot(agent: Agent): PersistedAgent {
     avatar: agent.avatar,
     folder: agent.folder,
     codexThreadId: agent.codexThreadId,
+    ...(agent.contextUsage ? { contextUsage: { ...agent.contextUsage } } : {}),
     statusText: agent.statusText,
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
@@ -110,6 +112,7 @@ function sanitizeAgent(value: unknown): Agent | null {
 
   const createdAt = typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString();
   const updatedAt = typeof value.updatedAt === 'string' ? value.updatedAt : createdAt;
+  const contextUsage = sanitizeContextUsage(value.contextUsage);
   return {
     id: value.id,
     teamId: typeof value.teamId === 'string' ? value.teamId : undefined,
@@ -117,11 +120,54 @@ function sanitizeAgent(value: unknown): Agent | null {
     avatar: typeof value.avatar === 'string' ? value.avatar : undefined,
     folder: value.folder,
     codexThreadId: typeof value.codexThreadId === 'string' ? value.codexThreadId : undefined,
+    ...(contextUsage ? { contextUsage } : {}),
     ...(typeof value.statusText === 'string' ? { statusText: value.statusText } : {}),
     status: { type: 'idle' },
     createdAt,
     updatedAt,
   };
+}
+
+function sanitizeContextUsage(value: unknown): AgentContextUsage | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  if (
+    typeof value.totalTokens !== 'number' ||
+    typeof value.inputTokens !== 'number' ||
+    typeof value.cachedInputTokens !== 'number' ||
+    typeof value.outputTokens !== 'number' ||
+    typeof value.reasoningOutputTokens !== 'number' ||
+    typeof value.lastTotalTokens !== 'number'
+  ) {
+    return undefined;
+  }
+
+  const modelContextWindow = nullableNumber(value.modelContextWindow);
+  const usedPercent = nullableNumber(value.usedPercent);
+  if (modelContextWindow === undefined || usedPercent === undefined) {
+    return undefined;
+  }
+
+  return {
+    totalTokens: value.totalTokens,
+    inputTokens: value.inputTokens,
+    cachedInputTokens: value.cachedInputTokens,
+    outputTokens: value.outputTokens,
+    reasoningOutputTokens: value.reasoningOutputTokens,
+    lastTotalTokens: value.lastTotalTokens,
+    modelContextWindow,
+    usedPercent,
+  };
+}
+
+function nullableNumber(value: unknown): number | null | undefined {
+  if (value === null) {
+    return null;
+  }
+
+  return typeof value === 'number' ? value : undefined;
 }
 
 function sanitizeTeam(value: unknown, agents: Agent[]): Team | null {

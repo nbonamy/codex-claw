@@ -38,7 +38,7 @@ describe('AppStatePersistence', () => {
     expect(restored.activeAgentId).toBeNull();
   });
 
-  it('saves metadata and collaboration status without transcripts or app-server runtime state', async () => {
+  it('saves metadata, context usage, and collaboration status without transcripts or app-server runtime state', async () => {
     const filePath = await tempStatePath();
     const persistence = new AppStatePersistence(filePath);
     const snapshot = createInitialSnapshot();
@@ -71,7 +71,16 @@ describe('AppStatePersistence', () => {
     expect(written.activeTeamId).toBe('team-codex-claw');
     const writtenAgent = (written.agents as Array<Record<string, unknown>>)[0];
     expect(writtenAgent.codexThreadId).toBe('thread-dina');
-    expect(writtenAgent).not.toHaveProperty('contextUsage');
+    expect(writtenAgent.contextUsage).toStrictEqual({
+      totalTokens: 1200,
+      inputTokens: 900,
+      cachedInputTokens: 100,
+      outputTokens: 300,
+      reasoningOutputTokens: 80,
+      lastTotalTokens: 300,
+      modelContextWindow: 10000,
+      usedPercent: 12,
+    });
     expect(writtenAgent).not.toHaveProperty('isRegistered');
     expect(writtenAgent).not.toHaveProperty('mcpSessionId');
     expect(writtenAgent.statusText).toBe('Registered');
@@ -83,6 +92,16 @@ describe('AppStatePersistence', () => {
     snapshot.agents[0] = {
       ...snapshot.agents[0],
       codexThreadId: 'thread-dina',
+      contextUsage: {
+        totalTokens: 1200,
+        inputTokens: 900,
+        cachedInputTokens: 100,
+        outputTokens: 300,
+        reasoningOutputTokens: 80,
+        lastTotalTokens: 300,
+        modelContextWindow: 10000,
+        usedPercent: 12,
+      },
       isRegistered: true,
       mcpSessionId: 'mcp-session',
       statusText: 'Registered',
@@ -98,6 +117,16 @@ describe('AppStatePersistence', () => {
       avatar: 'DI',
       folder: '~/src/codex-claw',
       codexThreadId: 'thread-dina',
+      contextUsage: {
+        totalTokens: 1200,
+        inputTokens: 900,
+        cachedInputTokens: 100,
+        outputTokens: 300,
+        reasoningOutputTokens: 80,
+        lastTotalTokens: 300,
+        modelContextWindow: 10000,
+        usedPercent: 12,
+      },
       statusText: 'Registered',
       status: { type: 'idle' },
       createdAt: '2026-06-05T00:00:00.000Z',
@@ -105,6 +134,37 @@ describe('AppStatePersistence', () => {
     });
     expect(restored.messages).toStrictEqual([]);
     expect(restored.appServer.status).toBe('notConfigured');
+  });
+
+  it('drops invalid persisted context usage', () => {
+    const restored = snapshotFromPersistedState({
+      teams: [{ id: 'team-codex-claw', name: 'Codex Claw', agentIds: ['agent-dina'] }],
+      agents: [{
+        id: 'agent-dina',
+        teamId: 'team-codex-claw',
+        name: 'Dina',
+        folder: '~/src/codex-claw',
+        codexThreadId: 'thread-dina',
+        contextUsage: {
+          totalTokens: 1200,
+          inputTokens: 900,
+          cachedInputTokens: 100,
+          outputTokens: 300,
+          reasoningOutputTokens: 80,
+          lastTotalTokens: 300,
+          modelContextWindow: '10000',
+          usedPercent: 12,
+        },
+        createdAt: '2026-06-05T00:00:00.000Z',
+        updatedAt: '2026-06-05T00:00:00.000Z',
+      }],
+      bench: [],
+      activeTeamId: 'team-codex-claw',
+      activeAgentId: 'agent-dina',
+      theme: defaultThemeSettings,
+    });
+
+    expect(restored.agents[0].contextUsage).toBeUndefined();
   });
 
   it('repairs team membership and selected agent when persisted ids drift', async () => {
