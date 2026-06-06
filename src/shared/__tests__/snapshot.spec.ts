@@ -50,13 +50,13 @@ describe('snapshot reducer', () => {
       name: ' Jules ',
       avatar: '🤖',
       folder: '/Users/nbonamy/src/id8',
-    }, '2026-06-05T10:11:12.000Z');
+    }, '2026-06-05T10:11:12.000Z', 'agent-new-jules');
 
-    expect(snapshot.activeAgentId).toBe('agent-jules-20260605t101112000z');
-    expect(snapshot.teams[0].agentIds).toContain('agent-jules-20260605t101112000z');
-    expect(snapshot.teams[0].activeAgentId).toBe('agent-jules-20260605t101112000z');
+    expect(snapshot.activeAgentId).toBe('agent-new-jules');
+    expect(snapshot.teams[0].agentIds).toContain('agent-new-jules');
+    expect(snapshot.teams[0].activeAgentId).toBe('agent-new-jules');
     expect(snapshot.agents.at(-1)).toStrictEqual({
-      id: 'agent-jules-20260605t101112000z',
+      id: 'agent-new-jules',
       teamId: 'team-codex-claw',
       name: 'Jules',
       avatar: '🤖',
@@ -75,10 +75,10 @@ describe('snapshot reducer', () => {
     createAgentInSnapshot(snapshot, {
       name: ' ',
       folder: '/tmp/codex-claw',
-    }, '2026-06-05T10:11:12.000Z');
+    }, '2026-06-05T10:11:12.000Z', 'agent-new-codex-claw');
 
     expect(snapshot.agents.at(-1)?.name).toBe('codex-claw');
-    expect(snapshot.agents.at(-1)?.id).toBe('agent-codex-claw-20260605t101112000z');
+    expect(snapshot.agents.at(-1)?.id).toBe('agent-new-codex-claw');
   });
 
   it('updates idle agents and clears Codex runtime state when the folder changes', () => {

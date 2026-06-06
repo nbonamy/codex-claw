@@ -14,6 +14,7 @@ import type {
   UpdateAgentInput,
 } from './contracts';
 import { defaultThemeSettings } from './settings';
+import { createEntityId } from './ids';
 import { defaultTeamColor } from './team-colors';
 import { toolOutputText } from './tool-output';
 
@@ -64,11 +65,11 @@ export function createInitialSnapshot(): AppSnapshot {
   };
 }
 
-export function createAgentFromInput(input: CreateAgentInput, createdAt = new Date().toISOString(), teamId = seedTeamId): Agent {
+export function createAgentFromInput(input: CreateAgentInput, createdAt = new Date().toISOString(), teamId = seedTeamId, id = createEntityId('agent')): Agent {
   const name = normalizedAgentName(input.name, input.folder);
 
   return {
-    id: `agent-${slug(name)}-${createdAt.replace(/\W/g, '').toLowerCase()}`,
+    id,
     teamId,
     name,
     avatar: normalizedOptionalString(input.avatar),
@@ -81,8 +82,8 @@ export function createAgentFromInput(input: CreateAgentInput, createdAt = new Da
   };
 }
 
-export function createAgentInSnapshot(snapshot: AppSnapshot, input: CreateAgentInput, createdAt = new Date().toISOString()): AppSnapshot {
-  const agent = createAgentFromInput(input, createdAt, activeTeamId(snapshot));
+export function createAgentInSnapshot(snapshot: AppSnapshot, input: CreateAgentInput, createdAt = new Date().toISOString(), id = createEntityId('agent')): AppSnapshot {
+  const agent = createAgentFromInput(input, createdAt, activeTeamId(snapshot), id);
   snapshot.agents.push(agent);
   attachAgentToTeam(snapshot, agent);
   snapshot.activeAgentId = agent.id;
@@ -1211,14 +1212,4 @@ function createSeedAgents(): Agent[] {
       updatedAt: seedCreatedAt,
     },
   ];
-}
-
-function slug(value: string): string {
-  const normalized = value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-
-  return normalized || 'codex';
 }

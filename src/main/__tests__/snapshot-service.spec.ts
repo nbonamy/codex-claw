@@ -65,8 +65,8 @@ describe('snapshot service', () => {
       name: ' Jules ',
       avatar: 'JU',
       folder: '/Users/nbonamy/src/id8',
-    }, '2026-06-05T10:11:12.000Z')).toStrictEqual({
-      id: 'agent-jules-20260605t101112000z',
+    }, '2026-06-05T10:11:12.000Z', 'team-codex-claw', 'agent-new-jules')).toStrictEqual({
+      id: 'agent-new-jules',
       teamId: 'team-codex-claw',
       name: 'Jules',
       avatar: 'JU',
@@ -79,10 +79,10 @@ describe('snapshot service', () => {
     });
   });
 
-  it('uses a stable fallback slug for blank agent names', () => {
+  it('uses the provided id for blank agent names', () => {
     expect(createAgentFromInput({
       name: ' ',
       folder: '/tmp/project',
-    }, '2026-06-05T10:11:12.000Z').id).toBe('agent-project-20260605t101112000z');
+    }, '2026-06-05T10:11:12.000Z', 'team-codex-claw', 'agent-new-project').id).toBe('agent-new-project');
   });
 });

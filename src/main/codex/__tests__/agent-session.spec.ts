@@ -932,7 +932,7 @@ describe('CodexAgentSessionManager', () => {
   it('injects Codex Claw agent instructions when MCP is enabled', async () => {
     const transport = new FakeTransport();
     const manager = new CodexAgentSessionManager(new CodexRpcClient(transport), {
-      clawMcpEnabled: true,
+      clawMcpServerUrl: 'http://127.0.0.1:8767/mcp',
     });
 
     const prompt = manager.sendPrompt(agent, 'hello codex');
@@ -956,6 +956,10 @@ describe('CodexAgentSessionManager', () => {
         approvalPolicy: 'never',
         sandbox: 'workspace-write',
         serviceName: 'codex_claw',
+        config: {
+          'mcp_servers.codex_claw.url': 'http://127.0.0.1:8767/mcp?agentId=agent-dina',
+          'mcp_servers.codex_claw.default_tools_approval_mode': 'approve',
+        },
         developerInstructions: expect.stringContaining('Your Codex Claw agent ID is agent-dina.'),
       },
     });
@@ -1973,10 +1977,10 @@ describe('CodexAgentSessionManager', () => {
         turnId: 'turn-1',
         serverName: 'codex_claw',
         mode: 'form',
-        message: 'Allow codex_claw to run tool "register-agent"?',
+        message: 'Allow codex_claw to run tool "send-message"?',
         _meta: {
           codex_approval_kind: 'mcp_tool_call',
-          tool_name: 'register-agent',
+          tool_name: 'send-message',
         },
         requestedSchema: {
           type: 'object',

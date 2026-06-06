@@ -57,7 +57,7 @@ type PendingClientRequest = {
 type EventListener = (event: CodexSessionEvent) => void;
 
 export type CodexAgentSessionManagerOptions = {
-  clawMcpEnabled?: boolean;
+  clawMcpServerUrl?: string | null;
 };
 
 export type CodexSessionCommandResult = {
@@ -367,7 +367,7 @@ export class CodexAgentSessionManager {
     }
 
     const cwd = expandHome(agent.folder);
-    const threadConfig = buildCodexClawThreadConfig(agent, this.options.clawMcpEnabled ?? false);
+    const threadConfig = buildCodexClawThreadConfig(agent, this.options.clawMcpServerUrl ?? null);
     const existingThreadId = codexThreadId(agent);
     const shouldResume = Boolean(existingThreadId);
     const response = shouldResume

@@ -14,10 +14,10 @@ import { createTeamInSnapshot } from '../team-manager';
 describe('agent-manager', () => {
   it('duplicates an agent in the same team and selects the copy', () => {
     const snapshot = createInitialSnapshot();
-    const duplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z');
+    const duplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z', () => 'agent-duplicate-dina');
 
     expect(duplicate).toStrictEqual({
-      id: 'agent-dina-copy-20260605t101112000z',
+      id: 'agent-duplicate-dina',
       teamId: 'team-codex-claw',
       name: 'Dina (copy)',
       avatar: 'DI',
@@ -35,13 +35,14 @@ describe('agent-manager', () => {
   it('generates collision-safe ids for duplicated agents and bench templates', () => {
     const snapshot = createInitialSnapshot();
 
-    const firstDuplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z');
-    const secondDuplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z');
+    const duplicateIds = ['agent-duplicate-dina', 'agent-duplicate-dina', 'agent-duplicate-dina-2'];
+    const firstDuplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z', () => duplicateIds.shift() ?? 'agent-fallback');
+    const secondDuplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z', () => duplicateIds.shift() ?? 'agent-fallback');
     const firstTemplate = saveAgentToBench(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z');
     const secondTemplate = saveAgentToBench(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z');
 
-    expect(firstDuplicate?.id).toBe('agent-dina-copy-20260605t101112000z');
-    expect(secondDuplicate?.id).toBe('agent-dina-copy-20260605t101112000z-2');
+    expect(firstDuplicate?.id).toBe('agent-duplicate-dina');
+    expect(secondDuplicate?.id).toBe('agent-duplicate-dina-2');
     expect(firstTemplate?.id).toBe('bench-dina-20260605t101112000z');
     expect(secondTemplate?.id).toBe('bench-dina-20260605t101112000z-2');
   });
@@ -50,7 +51,7 @@ describe('agent-manager', () => {
     const snapshot = createInitialSnapshot();
     delete snapshot.agents[0].teamId;
 
-    const duplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z');
+    const duplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z', () => 'agent-duplicate-dina');
 
     expect(duplicate?.teamId).toBe('team-codex-claw');
     expect(snapshot.teams[0].agentIds).toContain(duplicate?.id);
@@ -78,10 +79,10 @@ describe('agent-manager', () => {
     const snapshot = createInitialSnapshot();
     const template = saveAgentToBench(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z');
 
-    const agent = deployBenchTemplateInSnapshot(snapshot, template?.id ?? '', undefined, '2026-06-05T10:12:13.000Z');
+    const agent = deployBenchTemplateInSnapshot(snapshot, template?.id ?? '', undefined, '2026-06-05T10:12:13.000Z', () => 'agent-bench-dina');
 
     expect(agent).toStrictEqual({
-      id: 'agent-dina-20260605t101213000z',
+      id: 'agent-bench-dina',
       teamId: 'team-codex-claw',
       name: 'Dina',
       avatar: 'DI',
@@ -97,6 +98,19 @@ describe('agent-manager', () => {
     expect(snapshot.teams[0].agentIds).toContain(agent?.id);
   });
 
+  it('deploys the same Bench template multiple times with distinct agent ids', () => {
+    const snapshot = createInitialSnapshot();
+    const template = saveAgentToBench(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z');
+
+    const firstAgent = deployBenchTemplateInSnapshot(snapshot, template?.id ?? '', undefined, '2026-06-05T10:12:13.000Z', () => 'agent-bench-dina-1');
+    const secondAgent = deployBenchTemplateInSnapshot(snapshot, template?.id ?? '', undefined, '2026-06-05T10:12:13.000Z', () => 'agent-bench-dina-2');
+
+    expect(firstAgent?.id).toBe('agent-bench-dina-1');
+    expect(secondAgent?.id).toBe('agent-bench-dina-2');
+    expect(snapshot.agents.filter((agent) => agent.name === 'Dina')).toHaveLength(3);
+    expect(new Set(snapshot.agents.map((agent) => agent.id)).size).toBe(snapshot.agents.length);
+  });
+
   it('deploys a Bench template into an explicit target team', () => {
     const snapshot = createInitialSnapshot();
     snapshot.teams.push({
@@ -108,7 +122,7 @@ describe('agent-manager', () => {
     });
     const template = saveAgentToBench(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z');
 
-    const agent = deployBenchTemplateInSnapshot(snapshot, template?.id ?? '', 'team-skwad', '2026-06-05T10:12:13.000Z');
+    const agent = deployBenchTemplateInSnapshot(snapshot, template?.id ?? '', 'team-skwad', '2026-06-05T10:12:13.000Z', () => 'agent-bench-dina');
 
     expect(agent?.teamId).toBe('team-skwad');
     expect(snapshot.teams[1].agentIds).toStrictEqual([agent?.id]);

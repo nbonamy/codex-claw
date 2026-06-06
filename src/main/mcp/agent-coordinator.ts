@@ -6,7 +6,6 @@ export type McpAgentInfo = {
   name: string;
   folder: string;
   status: string;
-  isRegistered: boolean;
 };
 
 export type McpMessage = {
@@ -23,13 +22,6 @@ export type MessageInfo = {
   from: string;
   content: string;
   timestamp: string;
-};
-
-export type RegisterAgentResponse = {
-  success: boolean;
-  message: string;
-  unreadMessageCount: number;
-  skwadMembers: McpAgentInfo[];
 };
 
 export type ListAgentsResponse = {
@@ -81,7 +73,7 @@ export class ClawMcpAgentCoordinator {
     this.now = options.now ?? (() => new Date());
   }
 
-  registerAgent(agentId: string, sessionId?: string): RegisterAgentResponse {
+  connectAgent(agentId: string, sessionId?: string): Agent {
     const agent = this.requireAgent(agentId);
     const updatedAt = this.now().toISOString();
     agent.isRegistered = true;
@@ -89,12 +81,7 @@ export class ClawMcpAgentCoordinator {
     agent.updatedAt = updatedAt;
     this.onAgentUpdated?.(agent);
 
-    return {
-      success: true,
-      message: 'Successfully registered with Codex Claw team. Note: team members can change over time as agents join or leave. Use list-agents to get the current list.',
-      unreadMessageCount: this.unreadMessagesFor(agent.id).length,
-      skwadMembers: this.listVisibleAgents(agent),
-    };
+    return agent;
   }
 
   listAgents(callerAgentId: string): ListAgentsResponse {
@@ -107,10 +94,6 @@ export class ClawMcpAgentCoordinator {
 
   sendMessage(from: string, to: string, content: string): SendMessageResponse {
     const sender = this.requireAgent(from);
-    if (!sender.isRegistered) {
-      throw new McpToolError('Failed to send message: Sender not registered');
-    }
-
     const recipient = this.findAgentInSameTeam(sender, to);
     if (!recipient) {
       throw new McpToolError('Failed to send message: Recipient not found');
@@ -147,14 +130,8 @@ export class ClawMcpAgentCoordinator {
 
   broadcastMessage(from: string, content: string): BroadcastResponse {
     const sender = this.requireAgent(from);
-    if (!sender.isRegistered) {
-      throw new McpToolError('Sender not registered');
-    }
-
-    const recipients = this.listVisibleAgents(sender)
-      .filter((agent) => agent.id !== sender.id)
-      .map((agent) => this.findAgent(agent.id))
-      .filter((agent): agent is Agent => Boolean(agent?.isRegistered));
+    const recipients = this.agentsInSameTeam(sender)
+      .filter((agent) => agent.id !== sender.id && agent.isRegistered);
 
     for (const recipient of recipients) {
       const message = this.storeMessage(sender.id, recipient.id, content);
@@ -218,7 +195,24 @@ export class ClawMcpAgentCoordinator {
   }
 
   private findAgentInSameTeam(caller: Agent, identifier: string): Agent | null {
-    return this.agentsInSameTeam(caller).find((agent) => matchesAgent(agent, identifier)) ?? null;
+    const visibleAgents = this.agentsInSameTeam(caller);
+    const exactId = visibleAgents.find((agent) => agent.id === identifier);
+    if (exactId) {
+      return exactId;
+    }
+
+    const exactFolder = visibleAgents.find((agent) => agent.folder === identifier);
+    if (exactFolder) {
+      return exactFolder;
+    }
+
+    const normalized = identifier.toLowerCase();
+    const nameMatches = visibleAgents.filter((agent) => agent.name.toLowerCase() === normalized);
+    if (nameMatches.length > 1) {
+      throw new McpToolError(`Failed to send message: Recipient name '${identifier}' is ambiguous. Use the recipient ID from list-agents.`);
+    }
+
+    return nameMatches[0] ?? null;
   }
 
   private requireAgent(identifier: string): Agent {
@@ -244,7 +238,6 @@ export class ClawMcpAgentCoordinator {
       name: agent.name,
       folder: agent.folder,
       status: agent.statusText ? `${agentStatusLabel(agent.status)}: ${agent.statusText}` : agentStatusLabel(agent.status),
-      isRegistered: Boolean(agent.isRegistered),
     };
   }
 
@@ -272,11 +265,11 @@ export class ClawMcpAgentCoordinator {
   private agentNotFoundMessage(identifier: string): string {
     const agents = this.getAgents();
     if (agents.length === 0) {
-      return `Agent ID '${identifier}' not found. No agents are currently available.`;
+      return `Agent '${identifier}' not found. No agents are currently available.`;
     }
 
-    const entries = agents.map((agent) => `- ${agent.name}: ${agent.folder} (ID: ${agent.id})`).join('\n');
-    return `Agent ID '${identifier}' not found. You may have forgotten your ID due to context loss. Here are all agents - find yourself by matching your working directory:\n\n${entries}`;
+    const entries = agents.map((agent) => `- ${agent.id}: ${agent.name} (${agent.folder})`).join('\n');
+    return `Agent '${identifier}' not found. Visible agents:\n\n${entries}`;
   }
 }
 

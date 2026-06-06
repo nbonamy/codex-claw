@@ -1,13 +1,14 @@
 import type { Agent, AppSnapshot, BenchTemplate } from './contracts';
+import { createEntityId, createUniqueEntityId, type IdGenerator } from './ids';
 
-export function duplicateAgentInSnapshot(snapshot: AppSnapshot, agentId: string, createdAt = new Date().toISOString()): Agent | null {
+export function duplicateAgentInSnapshot(snapshot: AppSnapshot, agentId: string, createdAt = new Date().toISOString(), createId: IdGenerator = () => createEntityId('agent')): Agent | null {
   const source = snapshot.agents.find((agent) => agent.id === agentId);
   if (!source) {
     return null;
   }
 
   const duplicate: Agent = {
-    id: uniqueAgentId(snapshot, `${source.name} copy`, createdAt),
+    id: uniqueAgentId(snapshot, createId),
     teamId: source.teamId ?? activeTeamId(snapshot),
     name: `${source.name} (copy)`,
     avatar: source.avatar,
@@ -47,7 +48,7 @@ export function saveAgentToBench(snapshot: AppSnapshot, agentId: string, created
   return template;
 }
 
-export function deployBenchTemplateInSnapshot(snapshot: AppSnapshot, templateId: string, teamId?: string, createdAt = new Date().toISOString()): Agent | null {
+export function deployBenchTemplateInSnapshot(snapshot: AppSnapshot, templateId: string, teamId?: string, createdAt = new Date().toISOString(), createId: IdGenerator = () => createEntityId('agent')): Agent | null {
   const template = snapshot.bench.find((candidate) => candidate.id === templateId);
   const targetTeam = teamId
     ? snapshot.teams.find((team) => team.id === teamId)
@@ -57,7 +58,7 @@ export function deployBenchTemplateInSnapshot(snapshot: AppSnapshot, templateId:
   }
 
   const agent: Agent = {
-    id: uniqueAgentId(snapshot, template.name, createdAt),
+    id: uniqueAgentId(snapshot, createId),
     teamId: targetTeam.id,
     name: template.name,
     avatar: template.avatar,
@@ -193,8 +194,8 @@ function activeTeamId(snapshot: AppSnapshot): string | undefined {
   return activeAgent?.teamId ?? snapshot.teams[0]?.id;
 }
 
-function uniqueAgentId(snapshot: AppSnapshot, name: string, createdAt: string): string {
-  return uniqueId(snapshot.agents.map((agent) => agent.id), `agent-${slug(name)}-${timestampSlug(createdAt)}`);
+function uniqueAgentId(snapshot: AppSnapshot, createId: IdGenerator): string {
+  return createUniqueEntityId('agent', snapshot.agents.map((agent) => agent.id), createId);
 }
 
 function uniqueBenchId(snapshot: AppSnapshot, name: string, createdAt: string): string {

@@ -190,24 +190,26 @@ The Claw MCP server is documented in `docs/mcp.md`. It is an app-owned
 collaboration server, not a Codex-specific subsystem.
 
 For Codex, do not rely on a global `codex mcp add` entry for the product path.
-Codex Claw starts the app-server process with command-line config overrides for
-the local Claw MCP server:
+Codex Claw starts the app-server process with process-wide feature overrides,
+then passes the local Claw MCP server through each agent's thread config:
 
-```bash
-codex \
-  -c 'mcp_servers.codex_claw.url="http://127.0.0.1:<port>/mcp"' \
-  app-server --listen stdio://
+```json
+{
+  "mcp_servers.codex_claw.url": "http://127.0.0.1:<port>/mcp?agentId=<agent-id>",
+  "mcp_servers.codex_claw.default_tools_approval_mode": "approve"
+}
 ```
 
-During MCP elicitation development, Claw intentionally does not pass
-`mcp_servers.codex_claw.default_tools_approval_mode = "approve"` so the
-renderer approval flow is exercised. We expect to bring that scoped override
-back for normal Claw MCP collaboration once the flow is proven. The override is
-scoped to `codex_claw`; it does not put the entire Codex session into
-full-access/yolo mode.
+The `agentId` query parameter is session-local caller identity for the MCP
+server, not a tool argument the model has to provide for itself. The same
+unique ID is injected into the agent's developer instructions and returned by
+`list-agents` so duplicated Bench agents can still coordinate precisely. The
+approval override is scoped to `codex_claw`; it does not put the entire Codex
+session into full-access/yolo mode.
 
 Each `thread/start` still receives agent-specific developer instructions, such
-as the Claw agent ID and guidance to register with the MCP server.
+as the Claw agent ID/name/folder and guidance to use the MCP server without
+passing its own caller ID to each tool.
 
 This keeps normal Codex config and normal Codex data untouched, including when
 `CODEX_CLAW_CODEX_HOME` is used for an isolated Codex home.

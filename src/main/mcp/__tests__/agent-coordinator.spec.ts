@@ -28,7 +28,7 @@ const baseAgents: Agent[] = [
 ];
 
 describe('ClawMcpAgentCoordinator', () => {
-  it('registers an agent and lists same-team members with Skwad-shaped fields', () => {
+  it('connects an agent and lists same-team members with Skwad-shaped fields', () => {
     const agents = cloneAgents(baseAgents);
     const updates: Agent[] = [];
     const coordinator = new ClawMcpAgentCoordinator({
@@ -37,26 +37,11 @@ describe('ClawMcpAgentCoordinator', () => {
       now: () => new Date('2026-06-05T00:00:01.000Z'),
     });
 
-    expect(coordinator.registerAgent('agent-dina', 'session-1')).toStrictEqual({
-      success: true,
-      message: 'Successfully registered with Codex Claw team. Note: team members can change over time as agents join or leave. Use list-agents to get the current list.',
-      unreadMessageCount: 0,
-      skwadMembers: [
-        {
-          id: 'agent-dina',
-          name: 'Dina',
-          folder: '~/src/codex-claw',
-          status: 'Idle',
-          isRegistered: true,
-        },
-        {
-          id: 'agent-jesse',
-          name: 'Jesse',
-          folder: '~/src/id8',
-          status: 'Porting chat',
-          isRegistered: false,
-        },
-      ],
+    expect(coordinator.connectAgent('agent-dina', 'session-1')).toMatchObject({
+      id: 'agent-dina',
+      isRegistered: true,
+      mcpSessionId: 'session-1',
+      updatedAt: '2026-06-05T00:00:01.000Z',
     });
 
     expect(agents[0]).toMatchObject({
@@ -65,6 +50,20 @@ describe('ClawMcpAgentCoordinator', () => {
       updatedAt: '2026-06-05T00:00:01.000Z',
     });
     expect(updates).toHaveLength(1);
+    expect(coordinator.listAgents('agent-dina').agents).toStrictEqual([
+      {
+        id: 'agent-dina',
+        name: 'Dina',
+        folder: '~/src/codex-claw',
+        status: 'Idle',
+      },
+      {
+        id: 'agent-jesse',
+        name: 'Jesse',
+        folder: '~/src/id8',
+        status: 'Porting chat',
+      },
+    ]);
   });
 
   it('sends, notifies, reads, and marks messages as read', () => {
@@ -97,7 +96,7 @@ describe('ClawMcpAgentCoordinator', () => {
     expect(coordinator.checkMessages('agent-jesse')).toStrictEqual({ messages: [] });
   });
 
-  it('supports unread peeking and broadcast only to registered same-team agents', () => {
+  it('supports unread peeking and broadcast only to connected same-team agents', () => {
     const agents = [
       { ...baseAgents[0], isRegistered: true, teamId: 'team-1' },
       { ...baseAgents[1], isRegistered: true, teamId: 'team-1' },
@@ -134,17 +133,42 @@ describe('ClawMcpAgentCoordinator', () => {
     expect(coordinator.checkMessages('agent-other-team')).toStrictEqual({ messages: [] });
   });
 
-  it('rejects unknown agents, missing recipients, and unregistered senders with useful messages', () => {
+  it('rejects unknown agents and missing recipients with useful messages', () => {
     const agents = cloneAgents(baseAgents);
     const coordinator = new ClawMcpAgentCoordinator({
       getAgents: () => agents,
     });
 
-    expect(() => coordinator.listAgents('missing')).toThrow("Agent ID 'missing' not found.");
-    expect(() => coordinator.sendMessage('agent-dina', 'Jesse', 'hello')).toThrow('Failed to send message: Sender not registered');
-    agents[0].isRegistered = true;
+    expect(() => coordinator.listAgents('missing')).toThrow("Agent 'missing' not found.");
     expect(() => coordinator.sendMessage('agent-dina', 'Missing', 'hello')).toThrow('Failed to send message: Recipient not found');
-    expect(() => coordinator.broadcastMessage('agent-jesse', 'hello')).toThrow('Sender not registered');
+  });
+
+  it('rejects ambiguous recipient names and allows id disambiguation', () => {
+    const agents = [
+      { ...baseAgents[0], isRegistered: true, teamId: 'team-1' },
+      { ...baseAgents[1], name: 'Dina', folder: '~/src/id8', isRegistered: true, teamId: 'team-1' },
+    ];
+    const coordinator = new ClawMcpAgentCoordinator({
+      getAgents: () => agents,
+      createId: () => 'message-direct',
+      now: () => new Date('2026-06-05T00:00:04.000Z'),
+    });
+
+    expect(() => coordinator.sendMessage('agent-dina', 'Dina', 'hello')).toThrow("Failed to send message: Recipient name 'Dina' is ambiguous. Use the recipient ID from list-agents.");
+    expect(coordinator.sendMessage('agent-dina', 'agent-jesse', 'hello')).toStrictEqual({
+      success: true,
+      message: "Message sent successfully. Don't check for a response right away - you will be notified when the other agent responds.",
+    });
+    expect(coordinator.checkMessages('agent-jesse')).toStrictEqual({
+      messages: [
+        {
+          id: 'message-direct',
+          from: 'Dina',
+          content: 'hello',
+          timestamp: '2026-06-05T00:00:04.000Z',
+        },
+      ],
+    });
   });
 
   it('updates and clears short status text', () => {
@@ -177,7 +201,7 @@ describe('ClawMcpAgentCoordinator', () => {
       getAgents: () => [],
     });
 
-    expect(() => coordinator.listAgents('missing')).toThrow("Agent ID 'missing' not found. No agents are currently available.");
+    expect(() => coordinator.listAgents('missing')).toThrow("Agent 'missing' not found. No agents are currently available.");
     expect(coordinator.latestUnreadMessageId('missing')).toBeNull();
     expect(coordinator.debugAgents()).toStrictEqual([]);
   });

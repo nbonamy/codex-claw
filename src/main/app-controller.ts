@@ -629,10 +629,10 @@ export class AppController {
     const mcpServerUrl = await this.ensureMcpServer();
     const transport = new CodexProcessTransport({
       codexHome: process.env.CODEX_CLAW_CODEX_HOME,
-      configOverrides: buildCodexClawMcpConfigOverrides(mcpServerUrl),
+      configOverrides: buildCodexClawMcpConfigOverrides(),
     });
     const sessionManager = new CodexAgentSessionManager(new CodexRpcClient(transport), {
-      clawMcpEnabled: true,
+      clawMcpServerUrl: mcpServerUrl,
     });
     this.codexBackendDriver = new CodexBackendDriver(sessionManager);
     this.codexBackendDriver.onEvent((event) => {

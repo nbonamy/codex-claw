@@ -85,7 +85,7 @@ export class ClawMcpHttpServer {
       }
 
       if (request.method === 'POST' && url.pathname === '/mcp') {
-        await this.handleMcpPost(request, response);
+        await this.handleMcpPost(request, response, url);
         return;
       }
 
@@ -109,18 +109,25 @@ export class ClawMcpHttpServer {
     }
   }
 
-  private async handleMcpPost(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  private async handleMcpPost(request: IncomingMessage, response: ServerResponse, url: URL): Promise<void> {
     const body = await readJsonBody(request);
-    const requestSummary = summarizeMcpRequest(body);
+    const agentId = url.searchParams.get('agentId');
+    const requestSummary = summarizeMcpRequest(body, agentId ?? undefined);
     const startedAt = Date.now();
     logMain('mcp-http', 'request', requestSummary);
+    if (!agentId) {
+      writeJsonRpcError(response, 400, -32000, 'Bad Request: missing Codex Claw agent identity');
+      warnMain('mcp-http', 'rejected request', requestSummary);
+      return;
+    }
     if (!request.headers['mcp-session-id'] && !isInitializeRequest(body) && !isStatelessMcpRequest(body)) {
       writeJsonRpcError(response, 400, -32000, 'Bad Request: invalid MCP request');
       warnMain('mcp-http', 'rejected request', requestSummary);
       return;
     }
 
-    const mcpServer = createCodexClawMcpServer(this.coordinator);
+    this.coordinator.connectAgent(agentId);
+    const mcpServer = createCodexClawMcpServer(this.coordinator, agentId);
     const transport = new StreamableHTTPServerTransport({
       enableJsonResponse: true,
       sessionIdGenerator: undefined,
@@ -181,9 +188,9 @@ function isStatelessMcpRequest(body: unknown): boolean {
   return method === 'tools/list' || method === 'tools/call' || method === 'notifications/initialized' || method === 'shutdown';
 }
 
-function summarizeMcpRequest(body: unknown): Record<string, unknown> {
+function summarizeMcpRequest(body: unknown, urlAgentId?: string): Record<string, unknown> {
   if (!body || typeof body !== 'object') {
-    return { method: 'unknown' };
+    return { method: 'unknown', agentId: urlAgentId };
   }
 
   const record = body as {
@@ -202,8 +209,7 @@ function summarizeMcpRequest(body: unknown): Record<string, unknown> {
     id: typeof record.id === 'string' || typeof record.id === 'number' ? record.id : undefined,
     method: typeof record.method === 'string' ? record.method : 'unknown',
     tool: typeof record.params?.name === 'string' ? record.params.name : undefined,
-    agentId: typeof toolArgs?.agentId === 'string' ? toolArgs.agentId : undefined,
-    from: typeof toolArgs?.from === 'string' ? toolArgs.from : undefined,
+    agentId: urlAgentId,
     to: typeof toolArgs?.to === 'string' ? toolArgs.to : undefined,
   };
 }

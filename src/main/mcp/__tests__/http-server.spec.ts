@@ -21,6 +21,7 @@ describe('ClawMcpHttpServer', () => {
     });
     server = new ClawMcpHttpServer({ coordinator });
     const url = await server.start();
+    const dinaUrl = agentUrl(url, 'agent-dina');
     await expect(server.start()).resolves.toBe(url);
 
     await expect(fetch(url.replace('/mcp', '/health')).then((response) => response.text())).resolves.toBe('OK');
@@ -30,18 +31,16 @@ describe('ClawMcpHttpServer', () => {
         name: 'Dina',
         folder: '~/src/codex-claw',
         status: 'Idle',
-        isRegistered: true,
       },
       {
         id: 'agent-jesse',
         name: 'Jesse',
         folder: '~/src/id8',
         status: 'Idle',
-        isRegistered: false,
       },
     ]);
 
-    const initializeResponse = await postJson(url, {
+    const initializeResponse = await postJson(dinaUrl, {
       jsonrpc: '2.0',
       id: 1,
       method: 'initialize',
@@ -59,14 +58,13 @@ describe('ClawMcpHttpServer', () => {
       version: '1.0.0',
     });
 
-    const toolsResponse = await postJson(url, {
+    const toolsResponse = await postJson(dinaUrl, {
       jsonrpc: '2.0',
       id: 2,
       method: 'tools/list',
       params: {},
     });
     expect(toolsResponse.result.tools.map((tool: { name: string }) => tool.name)).toStrictEqual([
-      'register-agent',
       'list-agents',
       'send-message',
       'check-messages',
@@ -74,14 +72,13 @@ describe('ClawMcpHttpServer', () => {
       'set-status',
     ]);
 
-    const callResponse = await postJson(url, {
+    const callResponse = await postJson(dinaUrl, {
       jsonrpc: '2.0',
       id: 3,
       method: 'tools/call',
       params: {
         name: 'set-status',
         arguments: {
-          agentId: 'agent-dina',
           status: 'Running tests',
         },
       },
@@ -100,15 +97,13 @@ describe('ClawMcpHttpServer', () => {
     });
     expect(agents[0].statusText).toBe('Running tests');
 
-    const rawCallResponse = await postJsonResponse(url, {
+    const rawCallResponse = await postJsonResponse(dinaUrl, {
       jsonrpc: '2.0',
       id: 4,
       method: 'tools/call',
       params: {
         name: 'list-agents',
-        arguments: {
-          agentId: 'agent-dina',
-        },
+        arguments: {},
       },
     });
     expect(rawCallResponse.response.headers.get('content-type')).toContain('application/json');
@@ -126,35 +121,33 @@ describe('ClawMcpHttpServer', () => {
     });
     server = new ClawMcpHttpServer({ coordinator });
     const url = await server.start();
+    const dinaUrl = agentUrl(url, 'agent-dina');
+    const jesseUrl = agentUrl(url, 'agent-jesse');
 
-    await callTool(url, 'register-agent', { agentId: 'agent-dina', sessionId: 'session-dina' });
-    await callTool(url, 'register-agent', { agentId: 'agent-jesse', sessionId: 'session-jesse' });
+    await callTool(dinaUrl, 'list-agents', {});
+    await callTool(jesseUrl, 'list-agents', {});
 
-    const listResponse = await callTool(url, 'list-agents', { agentId: 'agent-dina' });
+    const listResponse = await callTool(dinaUrl, 'list-agents', {});
     expect(listResponse.result.structuredContent.agents).toStrictEqual([
       {
         id: 'agent-dina',
         name: 'Dina',
         folder: '~/src/codex-claw',
         status: 'Idle',
-        isRegistered: true,
       },
       {
         id: 'agent-jesse',
         name: 'Jesse',
         folder: '~/src/id8',
         status: 'Idle',
-        isRegistered: true,
       },
     ]);
 
-    await callTool(url, 'send-message', {
-      from: 'agent-dina',
+    await callTool(dinaUrl, 'send-message', {
       to: 'Jesse',
       content: 'Can you review this?',
     });
-    const checkResponse = await callTool(url, 'check-messages', {
-      agentId: 'agent-jesse',
+    const checkResponse = await callTool(jesseUrl, 'check-messages', {
       markAsRead: false,
     });
     expect(checkResponse.result.structuredContent.messages).toStrictEqual([
@@ -166,8 +159,7 @@ describe('ClawMcpHttpServer', () => {
       },
     ]);
 
-    const broadcastResponse = await callTool(url, 'broadcast-message', {
-      from: 'agent-jesse',
+    const broadcastResponse = await callTool(jesseUrl, 'broadcast-message', {
       content: 'Review started',
     });
     expect(broadcastResponse.result.structuredContent).toStrictEqual({
@@ -188,15 +180,13 @@ describe('ClawMcpHttpServer', () => {
       name: 'codex-claw-test-client',
       version: '1.0.0',
     });
-    const transport = new StreamableHTTPClientTransport(new URL(url));
+    const transport = new StreamableHTTPClientTransport(new URL(agentUrl(url, 'agent-dina')));
 
     try {
       await client.connect(transport);
       const result = await client.callTool({
-        name: 'register-agent',
-        arguments: {
-          agentId: 'agent-dina',
-        },
+        name: 'list-agents',
+        arguments: {},
       });
 
       expect(result).toStrictEqual({
@@ -207,23 +197,18 @@ describe('ClawMcpHttpServer', () => {
           },
         ],
         structuredContent: {
-          success: true,
-          message: 'Successfully registered with Codex Claw team. Note: team members can change over time as agents join or leave. Use list-agents to get the current list.',
-          unreadMessageCount: 0,
-          skwadMembers: [
+          agents: [
             {
               id: 'agent-dina',
               name: 'Dina',
               folder: '~/src/codex-claw',
               status: 'Idle',
-              isRegistered: true,
             },
             {
               id: 'agent-jesse',
               name: 'Jesse',
               folder: '~/src/id8',
               status: 'Idle',
-              isRegistered: false,
             },
           ],
         },
@@ -242,20 +227,54 @@ describe('ClawMcpHttpServer', () => {
     server = new ClawMcpHttpServer({ coordinator });
     const url = await server.start();
 
-    const callResponse = await postJson(url, {
+    const callResponse = await postJson(agentUrl(url, 'agent-dina'), {
       jsonrpc: '2.0',
       id: 1,
       method: 'tools/call',
       params: {
-        name: 'list-agents',
+        name: 'send-message',
         arguments: {
-          agentId: 'missing',
+          to: 'Missing',
+          content: 'hello',
         },
       },
     });
 
-    expect(callResponse.result.content[0].text).toContain("Agent ID 'missing' not found.");
+    expect(callResponse.result.content[0].text).toContain('Failed to send message: Recipient not found');
     expect(callResponse.result.isError).toBe(true);
+  });
+
+  it('rejects MCP calls without session-scoped agent identity', async () => {
+    const agents = createAgents();
+    const coordinator = new ClawMcpAgentCoordinator({
+      getAgents: () => agents,
+    });
+    server = new ClawMcpHttpServer({ coordinator });
+    const url = await server.start();
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/list',
+        params: {},
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toStrictEqual({
+      jsonrpc: '2.0',
+      error: {
+        code: -32000,
+        message: 'Bad Request: missing Codex Claw agent identity',
+      },
+      id: null,
+    });
   });
 
   it('rejects unsupported MCP methods on the stateless endpoint', async () => {
@@ -266,7 +285,7 @@ describe('ClawMcpHttpServer', () => {
     server = new ClawMcpHttpServer({ coordinator });
     const url = await server.start();
 
-    const response = await fetch(url, {
+    const response = await fetch(agentUrl(url, 'agent-dina'), {
       method: 'DELETE',
     });
 
@@ -291,7 +310,7 @@ describe('ClawMcpHttpServer', () => {
 
     await expect(fetch(url.replace('/mcp', '/missing')).then((response) => response.text())).resolves.toBe('Not found');
 
-    const response = await fetch(url, {
+    const response = await fetch(agentUrl(url, 'agent-dina'), {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -336,6 +355,12 @@ async function callTool(url: string, name: string, args: Record<string, unknown>
       arguments: args,
     },
   });
+}
+
+function agentUrl(url: string, agentId: string): string {
+  const parsed = new URL(url);
+  parsed.searchParams.set('agentId', agentId);
+  return parsed.toString();
 }
 
 async function postJson(url: string, body: unknown): Promise<any> {

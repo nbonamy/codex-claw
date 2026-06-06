@@ -7,75 +7,58 @@ import { McpToolError } from './agent-coordinator';
 import { CHECK_INBOX_PROMPT } from './agent-prompts';
 import { errorToolResult, structuredToolResult } from './tool-result';
 
-export function createCodexClawMcpServer(coordinator: ClawMcpAgentCoordinator): McpServer {
+export function createCodexClawMcpServer(coordinator: ClawMcpAgentCoordinator, callerAgentId: string): McpServer {
   const server = new McpServer({
     name: 'codex-claw-mcp',
     version: '1.0.0',
   });
 
-  server.registerTool('register-agent', {
-    description: 'Register this agent with the Codex Claw team. Call this first before using other collaboration tools.',
-    inputSchema: {
-      agentId: z.string().describe('The agent ID provided by Codex Claw'),
-      sessionId: z.string().optional().describe('Your internal session ID.'),
-    },
-  }, ({ agentId, sessionId }) => toolResult('register-agent', {
-    agentId,
-    hasSessionId: Boolean(sessionId),
-  }, () => coordinator.registerAgent(agentId, sessionId)));
-
   server.registerTool('list-agents', {
-    description: 'List all registered agents with their status (name, folder, working/idle)',
-    inputSchema: {
-      agentId: z.string().describe('Your agent ID'),
-    },
-  }, ({ agentId }) => toolResult('list-agents', { agentId }, () => coordinator.listAgents(agentId)));
+    description: 'List all visible agents with their ID, status, name, and folder.',
+    inputSchema: {},
+  }, () => toolResult('list-agents', { callerAgentId }, () => coordinator.listAgents(callerAgentId)));
 
   server.registerTool('send-message', {
-    description: 'Send a message to another agent by name or ID',
+    description: 'Send a message to another visible agent by ID or unambiguous name.',
     inputSchema: {
-      from: z.string().describe('Your agent ID'),
-      to: z.string().describe('Recipient agent name or ID'),
+      to: z.string().describe('Recipient agent ID, or agent name when names are unambiguous.'),
       content: z.string().describe('Message content'),
     },
-  }, ({ from, to, content }) => toolResult('send-message', {
-    from,
+  }, ({ to, content }) => toolResult('send-message', {
+    from: callerAgentId,
     to,
     contentLength: content.length,
-  }, () => coordinator.sendMessage(from, to, content)));
+  }, () => coordinator.sendMessage(callerAgentId, to, content)));
 
   server.registerTool('check-messages', {
     description: CHECK_INBOX_PROMPT,
     inputSchema: {
-      agentId: z.string().describe('Your agent ID'),
       markAsRead: z.boolean().optional().describe('Mark messages as read (default: true)'),
     },
-  }, ({ agentId, markAsRead }) => toolResult('check-messages', {
-    agentId,
+  }, ({ markAsRead }) => toolResult('check-messages', {
+    agentId: callerAgentId,
     markAsRead: markAsRead ?? true,
-  }, () => coordinator.checkMessages(agentId, markAsRead ?? true)));
+  }, () => coordinator.checkMessages(callerAgentId, markAsRead ?? true)));
 
   server.registerTool('broadcast-message', {
-    description: 'Send a message to all other registered agents',
+    description: 'Send a message to all other connected visible agents.',
     inputSchema: {
-      from: z.string().describe('Your agent ID'),
       content: z.string().describe('Message content'),
     },
-  }, ({ from, content }) => toolResult('broadcast-message', {
-    from,
+  }, ({ content }) => toolResult('broadcast-message', {
+    from: callerAgentId,
     contentLength: content.length,
-  }, () => coordinator.broadcastMessage(from, content)));
+  }, () => coordinator.broadcastMessage(callerAgentId, content)));
 
   server.registerTool('set-status', {
     description: "MANDATORY: Set your status so other agents know what you are doing. Call before starting any task, after completing it, and when changing direction. Keep it short and specific (e.g. 'Implementing auth module', 'Running tests', 'Done - PR ready'). Use empty string to clear.",
     inputSchema: {
-      agentId: z.string().describe('Your agent ID'),
       status: z.string().describe('Short status text describing what you are currently doing. Use empty string to clear.'),
     },
-  }, ({ agentId, status }) => toolResult('set-status', {
-    agentId,
+  }, ({ status }) => toolResult('set-status', {
+    agentId: callerAgentId,
     statusLength: status.length,
-  }, () => coordinator.setStatus(agentId, status)));
+  }, () => coordinator.setStatus(callerAgentId, status)));
 
   return server;
 }

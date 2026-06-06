@@ -14,7 +14,7 @@ Main responsibilities:
 
 - start and stop the MCP server;
 - expose only tools backed by real Claw product behavior;
-- keep message inboxes and registration state;
+- keep message inboxes and connection state;
 - enforce team visibility;
 - notify the right agent when inbox work arrives;
 - translate status updates into app-owned `agent.updated` events.
@@ -60,62 +60,53 @@ Backends should receive the MCP server through request-local or session-local
 configuration. Do not mutate a user's global tool configuration as part of the
 normal app path.
 
-For Codex, main starts `codex app-server` with process-local config overrides:
+For Codex, main starts `codex app-server` with only process-wide feature
+overrides, then passes the Claw MCP server through each agent's
+`thread/start.config` or `thread/resume.config`:
 
-```bash
-codex \
-  -c 'mcp_servers.codex_claw.url="http://127.0.0.1:<port>/mcp"' \
-  app-server --listen stdio://
+```json
+{
+  "mcp_servers.codex_claw.url": "http://127.0.0.1:<port>/mcp?agentId=<agent-id>",
+  "mcp_servers.codex_claw.default_tools_approval_mode": "approve"
+}
 ```
 
-While the MCP elicitation flow is under active test, Claw only injects the
-server URL so Codex asks the app to approve tool calls. We expect to bring back
-the scoped `mcp_servers.codex_claw.default_tools_approval_mode = "approve"`
-override for normal collaboration once the approval UI path is proven. That
+The agent id in the MCP URL is the app's session-local caller identity. Tool
+calls infer the caller from the URL instead of asking the model to provide its
+own `agentId` or `from`. The same unique ID is also injected into the agent's
+developer instructions and returned by `list-agents`, so agents can coordinate
+with duplicates created from the same Bench template.
+
+The scoped `mcp_servers.codex_claw.default_tools_approval_mode = "approve"`
 override authorizes only Claw's own collaboration tools; it does not authorize
 all Codex shell/file operations and does not mutate the user's global MCP
 config.
 
 Main also adds developer instructions that give the backend agent its Claw
-agent ID and tell it to register, set status, list agents, send messages, and
-check inboxes through the `codex_claw` MCP server.
+agent ID/name/folder and tell it to set status, list agents, send messages,
+and check inboxes through the `codex_claw` MCP server. Agents do not need to
+register or pass their own agent ID to tools.
 
 For another backend, keep the tool semantics below unchanged and implement the
 smallest equivalent enablement path for that backend.
 
 ## Tools
 
-The first collaboration tools copy Skwad's names and rough parameter shape so
-agents can transfer habits across Skwad and Claw.
-
-### `register-agent`
-
-Registers the running backend agent with Claw.
-
-Input:
-
-- `agentId`: Claw agent ID.
-- `sessionId`: optional backend session ID.
-
-Effects:
-
-- marks the agent registered;
-- stores the optional MCP/backend session ID;
-- emits `agent.updated`;
-- returns unread message count and visible team members.
-
-Agents should call this before using other collaboration tools.
+The first collaboration tools copy Skwad's names where they still fit, but the
+caller identity is app-owned and inferred from the backend session.
 
 ### `list-agents`
 
 Lists visible agents for the caller.
 
-Input:
-
-- `agentId`: caller Claw agent ID.
+Input: none.
 
 Visibility is team-scoped. Agents with a `teamId` see agents in the same team.
 Agents without a team see other no-team agents.
+
+Output uses unique agent IDs, display names, folders, and status. If several
+visible agents share the same display name, `send-message` uses the agent ID as
+the disambiguator.
 
 ### `set-status`
 
@@ -123,7 +114,6 @@ Updates the caller's short collaboration status.
 
 Input:
 
-- `agentId`: caller Claw agent ID.
 - `status`: short status text; an empty string clears the status.
 
 Effects:
@@ -141,14 +131,14 @@ Sends a direct message to another visible agent.
 
 Input:
 
-- `from`: sender Claw agent ID.
-- `to`: recipient agent name or ID.
+- `to`: recipient agent ID, or recipient name if visible names are unique.
 - `content`: message content.
 
 Effects:
 
-- requires the sender to be registered;
 - resolves the recipient inside the sender's visibility scope;
+- rejects ambiguous recipient names and asks the agent to use the ID from
+  `list-agents`;
 - stores an unread inbox message;
 - notifies main so the recipient can be prompted.
 
@@ -158,23 +148,22 @@ Returns unread messages for the caller.
 
 Input:
 
-- `agentId`: caller Claw agent ID.
 - `markAsRead`: optional boolean, default `true`.
 
-Returned messages include ID, sender display name, content, and timestamp.
-When `markAsRead` is true, returned messages are marked read immediately.
+Returned messages include message ID, sender display name, content, and
+timestamp. Message IDs are inbox item IDs, not agent IDs. When `markAsRead` is
+true, returned messages are marked read immediately.
 
 ### `broadcast-message`
 
-Sends a message to every other registered visible agent.
+Sends a message to every other connected visible agent.
 
 Input:
 
-- `from`: sender Claw agent ID.
 - `content`: message content.
 
-Effects are the same as `send-message`, repeated for each registered recipient.
-Unregistered visible agents are skipped.
+Effects are the same as `send-message`, repeated for each connected recipient.
+Visible agents without an active MCP session are skipped internally.
 
 ## Inbox Prompting
 
@@ -214,7 +203,7 @@ the matching item is already present. The decision maps back to Codex as:
 
 MCP collaboration state is process-local runtime state for now:
 
-- agent registration and session IDs live on the app `Agent` objects;
+- agent connection state lives on the app `Agent` objects;
 - short statuses live as `agent.statusText`;
 - inbox messages live in the MCP coordinator;
 - unread messages stay until checked;
@@ -229,8 +218,9 @@ state, not Codex transcript duplication.
 
 Tool errors return MCP tool results with `isError: true` and plain text
 messages. Useful recovery messages matter because agents may need to repair
-their own context after compaction. For example, an unknown `agentId` error
-includes visible agents and folders so the agent can identify itself.
+their own context after compaction. Model-facing agent lists include unique
+agent IDs alongside names and folders. Unknown or ambiguous recipients include
+visible IDs, names, and folders so the agent can recover cleanly.
 
 ## Security
 
@@ -245,7 +235,7 @@ includes visible agents and folders so the agent can identify itself.
 
 Cover MCP behavior at three layers:
 
-- coordinator contract tests for registration, visibility, messaging,
+- coordinator contract tests for session connection, visibility, messaging,
   broadcasts, status, and errors;
 - Streamable HTTP MCP round-trip tests for tool listing and tool calls;
 - backend session tests proving the MCP server URL and developer instructions

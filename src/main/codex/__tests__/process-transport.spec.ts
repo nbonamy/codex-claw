@@ -67,8 +67,7 @@ describe('CodexProcessTransport', () => {
     spawnMock.mockReturnValue(child);
     const transport = new CodexProcessTransport({
       configOverrides: [
-        'mcp_servers.codex_claw.url="http://127.0.0.1:1234/mcp"',
-        'mcp_servers.codex_claw.default_tools_approval_mode="approve"',
+        'features.apply_patch_streaming_events=true',
       ],
     });
 
@@ -76,9 +75,7 @@ describe('CodexProcessTransport', () => {
 
     expect(spawnMock.mock.calls[0][1]).toStrictEqual([
       '-c',
-      'mcp_servers.codex_claw.url="http://127.0.0.1:1234/mcp"',
-      '-c',
-      'mcp_servers.codex_claw.default_tools_approval_mode="approve"',
+      'features.apply_patch_streaming_events=true',
       'app-server',
       '--listen',
       'stdio://',
