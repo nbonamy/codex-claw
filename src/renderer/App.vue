@@ -38,6 +38,7 @@
     @update:plan-mode="setPlanMode"
     @client-response="respondToClientRequest"
     @delete-queued-prompt="removeQueuedPrompt"
+    @interrupt-agent="interruptActiveAgent"
     @send-prompt="sendPrompt"
     @steer-prompt="steerPrompt"
     @steer-queued-prompt="steerQueuedPrompt"
@@ -91,6 +92,7 @@ const {
   selectTeam,
   sendPrompt,
   steerPrompt,
+  interruptActiveAgent,
   steerQueuedPrompt,
   removeQueuedPrompt,
   quit,

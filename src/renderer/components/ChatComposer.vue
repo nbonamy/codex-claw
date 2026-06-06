@@ -92,11 +92,11 @@
         <MicrophoneIcon aria-hidden="true" />
       </button>
       <ChatComposerSendButton
-        :disabled="!canSend"
+        :disabled="sendButtonDisabled"
         :loading="sendButtonLoading"
         :label="sendButtonLabel"
         cancel-label="Codex is working"
-        @click="submitPrompt"
+        @click="handleSendButtonClick"
       />
     </div>
   </form>
@@ -135,6 +135,7 @@ const emit = defineEmits<{
   send: [prompt: string];
   steer: [prompt: string];
   attach: [];
+  interrupt: [];
   'update:goalMode': [enabled: boolean];
   'update:modelId': [modelId: string];
   'update:planMode': [enabled: boolean];
@@ -153,7 +154,9 @@ const voiceError = ref<string | null>(null);
 
 const hasPrompt = computed(() => Boolean(prompt.value.trim()));
 const canSend = computed(() => Boolean(hasPrompt.value && !props.disabled));
-const sendButtonLoading = computed(() => props.isSending && !hasPrompt.value);
+const canInterrupt = computed(() => Boolean(props.isSending && !hasPrompt.value && !props.disabled));
+const sendButtonLoading = computed(() => canInterrupt.value);
+const sendButtonDisabled = computed(() => !canSend.value && !canInterrupt.value);
 const sendButtonLabel = computed(() => (props.isSending ? 'Queue prompt' : 'Send prompt'));
 const voiceSupported = computed(() => isBrowserAudioRecordingSupported());
 const voiceButtonDisabled = computed(() => (
@@ -201,6 +204,15 @@ watch([visibleSkills, activeSkillSlash], () => {
 
 function submitPrompt(): void {
   submitWithIntent('send');
+}
+
+function handleSendButtonClick(): void {
+  if (canInterrupt.value) {
+    emit('interrupt');
+    return;
+  }
+
+  submitPrompt();
 }
 
 function submitSteer(): void {

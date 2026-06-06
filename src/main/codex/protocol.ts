@@ -106,6 +106,8 @@ export type TurnSteerResponse = {
   turnId: string;
 };
 
+export type TurnInterruptResponse = Record<string, never>;
+
 export type CodexThreadGoal = {
   threadId: string;
   objective: string;

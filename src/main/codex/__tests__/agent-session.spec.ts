@@ -1851,6 +1851,47 @@ describe('CodexAgentSessionManager', () => {
 
     await expect(manager.steerPrompt(agent, 'too late')).rejects.toThrow('No active Codex turn to steer.');
   });
+
+  it('interrupts the active turn', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+
+    await resolveStartedPrompt(transport, manager);
+
+    const interrupt = manager.interruptTurn(agent);
+    await waitForSentCount(transport, 5);
+
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 4,
+      method: 'turn/interrupt',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+      },
+    });
+
+    transport.receive({
+      id: 4,
+      result: {},
+    });
+
+    await expect(interrupt).resolves.toStrictEqual({
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+    });
+
+    transport.receive({
+      method: 'turn/completed',
+      params: {
+        threadId: 'thread-1',
+        turn: {
+          id: 'turn-1',
+          status: 'interrupted',
+        },
+      },
+    });
+    await expect(manager.interruptTurn(agent)).rejects.toThrow('No active Codex turn to interrupt.');
+  });
 });
 
 async function resolveStartedPrompt(transport: FakeTransport, manager: CodexAgentSessionManager): Promise<void> {

@@ -40,6 +40,7 @@
           @update:model-id="$emit('select-model', $event)"
           @update:plan-mode="$emit('update:planMode', $event)"
           @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
+          @interrupt="$emit('interrupt-agent')"
           @send="$emit('sendPrompt', $event)"
           @steer="$emit('steerPrompt', $event)"
         />
@@ -83,6 +84,7 @@
         @update:model-id="$emit('select-model', $event)"
         @update:plan-mode="$emit('update:planMode', $event)"
         @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
+        @interrupt="$emit('interrupt-agent')"
         @send="$emit('sendPrompt', $event)"
         @steer="$emit('steerPrompt', $event)"
       />
@@ -126,6 +128,7 @@ defineEmits<{
   attach: [];
   'client-response': [response: ClientRequestResponse];
   'delete-queued-prompt': [promptId: string];
+  'interrupt-agent': [];
   'select-model': [modelId: string];
   'select-reasoning-effort': [reasoningEffort: ReasoningEffort];
   'steer-queued-prompt': [promptId: string];

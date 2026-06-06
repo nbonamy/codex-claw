@@ -23,6 +23,7 @@ export const ipcChannels = {
   quit: 'app:quit',
   sendPrompt: 'agent:send-prompt',
   steerPrompt: 'agent:steer-prompt',
+  interruptAgent: 'agent:interrupt',
   respondToClientRequest: 'client-request:respond',
   event: 'app:event',
   appCommand: 'app:command',

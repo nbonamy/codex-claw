@@ -5,7 +5,7 @@ import { sendAgentPrompt } from './agent-chat-service';
 import { CodexAgentSessionManager } from './codex/agent-session';
 import { CodexProcessTransport } from './codex/process-transport';
 import { CodexRpcClient } from './codex/rpc-client';
-import { warnMain } from './log';
+import { logMain, warnMain } from './log';
 import { createMainWindow } from './main-window';
 import { ClawMcpAgentCoordinator } from './mcp/agent-coordinator';
 import { CHECK_INBOX_PROMPT } from './mcp/agent-prompts';
@@ -246,6 +246,10 @@ export class AppController {
       return this.steerPrompt(agentId, prompt);
     });
 
+    ipcMain.handle(ipcChannels.interruptAgent, (_event, agentId: string) => {
+      return this.interruptAgent(agentId);
+    });
+
     ipcMain.handle(ipcChannels.respondToClientRequest, async (_event, response: ClientRequestResponse) => {
       if (!this.codexSessionManager) {
         throw new Error('No active Codex session can receive this client response.');
@@ -297,6 +301,36 @@ export class AppController {
         prompt: trimmedPrompt,
       },
     });
+    return this.snapshot;
+  }
+
+  private async interruptAgent(agentId: string): Promise<AppSnapshot> {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) {
+      return this.snapshot;
+    }
+
+    logMain('agent-interrupt', 'requested', {
+      agentId,
+      status: agent.status.type,
+    });
+
+    try {
+      await (await this.getCodexSessionManager()).interruptTurn(agent);
+      logMain('agent-interrupt', 'acknowledged', { agentId });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      warnMain('agent-interrupt', 'failed', {
+        agentId,
+        error: message,
+      });
+      this.emitAndApply({
+        agentId,
+        type: 'error',
+        payload: { message: `Failed to interrupt Codex: ${message}` },
+      });
+    }
+
     return this.snapshot;
   }
 

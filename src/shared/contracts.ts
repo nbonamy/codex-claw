@@ -352,6 +352,7 @@ export type CodexClawApi = {
   quit(): Promise<void>;
   sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot>;
   steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot>;
+  interruptAgent(agentId: string): Promise<AppSnapshot>;
   respondToClientRequest(response: ClientRequestResponse): Promise<AppSnapshot>;
   onEvent(listener: (event: MainToRendererEvent) => void): () => void;
   onAppCommand(listener: (command: AppCommand) => void): () => void;

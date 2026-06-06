@@ -75,6 +75,7 @@
           @attach="$emit('attach')"
           @client-response="$emit('client-response', $event)"
           @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
+          @interrupt-agent="$emit('interrupt-agent')"
           @select-model="$emit('select-model', $event)"
           @select-reasoning-effort="$emit('select-reasoning-effort', $event)"
           @send-prompt="$emit('sendPrompt', $event)"
@@ -172,6 +173,7 @@ const emit = defineEmits<{
   'delete-queued-prompt': [promptId: string];
   'deploy-bench-template': [templateId: string];
   'duplicate-agent': [agentId: string];
+  'interrupt-agent': [];
   'move-agent-to-team': [input: MoveAgentToTeamInput];
   'restart-agent': [agentId: string];
   'remove-bench-template': [templateId: string];

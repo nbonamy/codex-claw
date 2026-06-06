@@ -172,6 +172,18 @@ describe('ConversationPane', () => {
     expect(wrapper.emitted('sendPrompt')).toBeUndefined();
   });
 
+  it('bubbles interrupt from the composer stop button', async () => {
+    const wrapper = mountPane({
+      agent,
+      messages,
+      isSending: true,
+    });
+
+    await wrapper.get('.chat-composer__send').trigger('click');
+
+    expect(wrapper.emitted('interrupt-agent')).toStrictEqual([[]]);
+  });
+
   it('bubbles tool confirmation responses from the message list', async () => {
     const wrapper = mountPane({
       agent,

@@ -422,6 +422,29 @@ describe('useAppState', () => {
     expect(state.activeQueuedPrompts.value).toStrictEqual([]);
   });
 
+  it('interrupts the active busy agent through preload', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0].status = { type: 'working' };
+    const interruptedSnapshot = createInitialSnapshot();
+    interruptedSnapshot.agents[0].status = { type: 'working' };
+    const interruptAgent = vi.fn().mockResolvedValue(interruptedSnapshot);
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        interruptAgent,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await state.interruptActiveAgent();
+
+    expect(interruptAgent).toHaveBeenCalledWith('agent-dina');
+    expect(state.snapshot.value.agents[0].status).toStrictEqual({ type: 'working' });
+  });
+
   it('removes queued prompts locally', async () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0].status = { type: 'working' };

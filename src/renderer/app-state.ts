@@ -129,6 +129,15 @@ export function useAppState() {
     snapshot.value = await window.codexClaw.steerPrompt(agentId, trimmed);
   }
 
+  async function interruptActiveAgent(): Promise<void> {
+    const agentId = activeAgent.value?.id;
+    if (!agentId || !window.codexClaw?.interruptAgent || !isAgentSending(agentId)) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.interruptAgent(agentId);
+  }
+
   async function steerQueuedPrompt(promptId: string): Promise<void> {
     const agentId = activeAgent.value?.id;
     if (!agentId) {
@@ -406,6 +415,7 @@ export function useAppState() {
     selectTeam,
     sendPrompt,
     steerPrompt,
+    interruptActiveAgent,
     steerQueuedPrompt,
     removeQueuedPrompt,
     quit,

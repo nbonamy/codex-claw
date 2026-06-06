@@ -29,6 +29,7 @@ import type {
   CodexTurn,
   ThreadResumeResponse,
   ThreadStartResponse,
+  TurnInterruptResponse,
   TurnStartResponse,
   TurnSteerResponse,
 } from './protocol';
@@ -207,6 +208,38 @@ export class CodexAgentSessionManager {
     return {
       threadId: session.threadId,
       turnId: response.turnId,
+    };
+  }
+
+  async interruptTurn(agent: Agent): Promise<CodexSessionPromptResult> {
+    await this.start();
+
+    const session = await this.ensureSession(agent);
+    const turnId = this.activeTurnIdsByThreadId.get(session.threadId);
+    if (!turnId) {
+      throw new Error('No active Codex turn to interrupt.');
+    }
+
+    logMain('codex-interrupt', 'sending turn/interrupt', {
+      agentId: agent.id,
+      threadId: session.threadId,
+      turnId,
+    });
+
+    await this.client.request<TurnInterruptResponse>('turn/interrupt', {
+      threadId: session.threadId,
+      turnId,
+    });
+
+    logMain('codex-interrupt', 'turn/interrupt acknowledged', {
+      agentId: agent.id,
+      threadId: session.threadId,
+      turnId,
+    });
+
+    return {
+      threadId: session.threadId,
+      turnId,
     };
   }
 

@@ -79,6 +79,18 @@ describe('ChatComposer', () => {
     expect(wrapper.emitted('send')).toStrictEqual([['ship it']]);
   });
 
+  it('interrupts from the shared send button while Codex is working without a draft', async () => {
+    const wrapper = mountComposer({ isSending: true });
+
+    expect(wrapper.get('.chat-composer__send').attributes()).not.toHaveProperty('disabled');
+    expect(wrapper.get('.chat-composer__send').attributes('aria-label')).toBe('Codex is working');
+
+    await wrapper.get('.chat-composer__send').trigger('click');
+
+    expect(wrapper.emitted('interrupt')).toStrictEqual([[]]);
+    expect(wrapper.emitted('send')).toBeUndefined();
+  });
+
   it('submits with Enter and preserves Shift Enter for multiline drafts', async () => {
     const wrapper = mountComposer();
 

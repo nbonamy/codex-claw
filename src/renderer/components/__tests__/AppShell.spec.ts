@@ -67,6 +67,27 @@ describe('AppShell', () => {
     expect(wrapper.emitted('sendPrompt')).toStrictEqual([['hello']]);
   });
 
+  it('forwards interrupts from the composer stop button', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].status = { type: 'working' };
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [],
+        isLoading: false,
+        isSending: true,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    await wrapper.get('.chat-composer__send').trigger('click');
+
+    expect(wrapper.emitted('interrupt-agent')).toStrictEqual([[]]);
+  });
+
   it('forwards agent selection from the sidebar', async () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mount(AppShell, {

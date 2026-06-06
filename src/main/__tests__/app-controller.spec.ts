@@ -55,6 +55,26 @@ describe('AppController', () => {
     expect(snapshot.agents[0].contextUsage).toStrictEqual(contextUsage);
     expect(persistence.save).toHaveBeenCalledWith(snapshot);
   });
+
+  it('interrupts the active Codex turn and keeps status until completion arrives', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].status = { type: 'working' };
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const sessionManager = {
+      interruptTurn: vi.fn().mockResolvedValue({ threadId: 'thread-dina', turnId: 'turn-1' }),
+    };
+
+    await controller.initialize();
+    setCodexSessionManager(controller, sessionManager);
+    await interruptAgent(controller, 'agent-dina');
+
+    expect(sessionManager.interruptTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
+  });
 });
 
 function mcpCoordinator(controller: AppController): {
@@ -76,6 +96,21 @@ function emitAndApply(
       event: Omit<MainToRendererEvent, 'seq' | 'occurredAt'> & Partial<Pick<MainToRendererEvent, 'seq' | 'occurredAt'>>,
     ): void;
   }).emitAndApply(event);
+}
+
+function setCodexSessionManager(
+  controller: AppController,
+  sessionManager: { interruptTurn(agent: unknown): Promise<{ threadId: string; turnId: string }> },
+): void {
+  (controller as unknown as {
+    codexSessionManager: typeof sessionManager;
+  }).codexSessionManager = sessionManager;
+}
+
+async function interruptAgent(controller: AppController, agentId: string): Promise<void> {
+  await (controller as unknown as {
+    interruptAgent(agentId: string): Promise<void>;
+  }).interruptAgent(agentId);
 }
 
 async function flushMicrotasks(): Promise<void> {
