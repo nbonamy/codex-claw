@@ -9,7 +9,6 @@
       <div class="claw-dialog__header">
         <div>
           <h2>Settings</h2>
-          <p>Configure Codex Claw.</p>
         </div>
       </div>
     </template>
@@ -176,6 +175,15 @@ function updateNumericTheme(key: 'chatFontSize' | 'codeFontSize' | 'uiFontSize',
 </script>
 
 <style scoped>
+
+.settings-dialog {
+  &:deep() {
+    .el-dialog__header {
+      padding: 0;
+    }
+  }
+}
+
 .settings-dialog__layout {
   display: grid;
   min-height: 360px;

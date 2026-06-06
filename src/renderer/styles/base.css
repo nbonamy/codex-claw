@@ -137,6 +137,16 @@ button {
   border-radius: var(--radius-md);
 }
 
+.claw-popover {
+  padding: var(--space-2) !important;
+}
+
+.claw-popover__menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
 .claw-context-menu {
   position: fixed;
   z-index: 20;
@@ -149,7 +159,8 @@ button {
   font-size: var(--font-size-13);
 }
 
-.claw-context-menu__action {
+.claw-context-menu__action,
+.claw-popover__action {
   width: 100%;
   display: flex;
   align-items: center;
@@ -169,23 +180,27 @@ button {
   background: var(--color-surface-low);
 }
 
-.claw-context-menu__action:disabled {
+.claw-context-menu__action:disabled,
+.claw-popover__action:disabled {
   color: var(--color-text-muted);
   cursor: not-allowed;
   opacity: 0.58;
 }
 
-.claw-context-menu__action--danger:not(:disabled) {
+.claw-context-menu__action--danger:not(:disabled),
+.claw-popover__action--danger:not(:disabled) {
   color: var(--color-error);
 }
 
-.claw-context-menu__icon {
+.claw-context-menu__icon,
+.claw-popover__action svg {
   width: var(--icon-sm);
   height: var(--icon-sm);
   stroke-width: 2.5px;
 }
 
-.claw-context-menu__separator {
+.claw-context-menu__separator,
+.claw-popover__separator {
   height: 1px;
   margin: var(--space-2) var(--space-1);
   background: var(--color-border);

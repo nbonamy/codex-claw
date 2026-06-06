@@ -419,8 +419,7 @@ function resizeTextareaSoon(): void {
   align-items: center;
   gap: var(--space-6);
   width: 100%;
-  min-height: 60px;
-  padding: var(--space-6);
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
   background: var(--color-surface-lowest);

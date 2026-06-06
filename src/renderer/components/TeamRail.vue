@@ -29,7 +29,6 @@
     </button>
 
     <SettingsMenu
-      class="team-rail__settings"
       :rate-limits="rateLimits"
       @open-settings="emit('open-settings')"
       @quit="emit('quit')"
@@ -209,7 +208,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   height: var(--icon-lg);
 }
 
-.team-rail__settings {
+:deep() .settings-menu__trigger {
   margin-top: auto;
 }
 
