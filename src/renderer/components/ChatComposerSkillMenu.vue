@@ -40,17 +40,17 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { CodexSkillSummary } from '../../shared/contracts';
+import type { BackendSkillSummary } from '../../shared/contracts';
 import { skillDescription, skillDisplayName } from '../shared/chat/composer-skills';
 import { SparklesIcon } from '../shared/icons/app-icons';
 
 const props = defineProps<{
   activeIndex: number;
-  visibleSkills: CodexSkillSummary[];
+  visibleSkills: BackendSkillSummary[];
 }>();
 
 defineEmits<{
-  select: [skill: CodexSkillSummary];
+  select: [skill: BackendSkillSummary];
 }>();
 
 const { t } = useI18n();

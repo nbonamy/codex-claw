@@ -7,8 +7,9 @@
     :is-sending="isSending"
     :answered-client-request-ids="answeredClientRequestIds"
     :agent-files="agentFiles"
-    :codex-models="codexModels"
-    :codex-skills="codexSkills"
+    :backend-models="backendModels"
+    :backend-skills="backendSkills"
+    :backend-capabilities="activeBackendCapabilities"
     :model-catalog-status="modelCatalogStatus"
     :skill-catalog-status="skillCatalogStatus"
     :goal-mode="goalMode"
@@ -64,15 +65,16 @@ const {
   isSending,
   answeredClientRequestIds,
   agentFiles,
-  codexModels,
+  backendModels,
+  activeBackendCapabilities,
   modelCatalogStatus,
-  codexSkills,
+  backendSkills,
   skillCatalogStatus,
   selectedModelId,
   selectedReasoningEffort,
   planMode,
   goalMode,
-  loadCodexModels,
+  loadBackendModels,
   loadSnapshot,
   chooseAgentFolder,
   createAgent,
@@ -111,7 +113,7 @@ let unsubscribeSystemAppearance: (() => void) | null = null;
 onMounted(() => {
   unsubscribeSystemAppearance = subscribeToSystemAppearance();
   void loadSnapshot();
-  void loadCodexModels();
+  void loadBackendModels();
 });
 
 onBeforeUnmount(() => {

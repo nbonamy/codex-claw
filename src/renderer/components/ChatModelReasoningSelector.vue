@@ -49,24 +49,26 @@
               aria-hidden="true"
             />
           </el-dropdown-item>
-          <li class="chat-model-selector__divider" role="presentation"></li>
-          <li class="chat-model-selector__section-label" role="presentation">Reasoning</li>
-          <el-dropdown-item
-            v-for="effort in reasoningEfforts"
-            :key="effort.reasoningEffort"
-            class="chat-model-selector__option"
-            :class="{ 'chat-model-selector__option--selected': effort.reasoningEffort === effectiveReasoningEffort }"
-            :command="{ kind: 'reasoning', value: effort.reasoningEffort }"
-            role="option"
-            :aria-selected="effort.reasoningEffort === effectiveReasoningEffort"
-          >
-            <span class="chat-model-selector__option-label">{{ effortLabel(effort.reasoningEffort) }}</span>
-            <CheckIcon
-              v-if="effort.reasoningEffort === effectiveReasoningEffort"
-              class="chat-model-selector__check"
-              aria-hidden="true"
-            />
-          </el-dropdown-item>
+          <li v-if="showReasoning" class="chat-model-selector__divider" role="presentation"></li>
+          <li v-if="showReasoning" class="chat-model-selector__section-label" role="presentation">Reasoning</li>
+          <template v-if="showReasoning">
+            <el-dropdown-item
+              v-for="effort in reasoningEfforts"
+              :key="effort.reasoningEffort"
+              class="chat-model-selector__option"
+              :class="{ 'chat-model-selector__option--selected': effort.reasoningEffort === effectiveReasoningEffort }"
+              :command="{ kind: 'reasoning', value: effort.reasoningEffort }"
+              role="option"
+              :aria-selected="effort.reasoningEffort === effectiveReasoningEffort"
+            >
+              <span class="chat-model-selector__option-label">{{ effortLabel(effort.reasoningEffort) }}</span>
+              <CheckIcon
+                v-if="effort.reasoningEffort === effectiveReasoningEffort"
+                class="chat-model-selector__check"
+                aria-hidden="true"
+              />
+            </el-dropdown-item>
+          </template>
         </el-dropdown-menu>
       </template>
     </el-dropdown>
@@ -75,7 +77,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { CodexModelOption, ReasoningEffort } from '../../shared/contracts';
+import type { BackendModelOption, ReasoningEffort } from '../../shared/contracts';
 import { BoltIcon, CheckIcon, ChevronDown } from '../shared/icons/app-icons';
 
 type SelectorCommand = {
@@ -87,14 +89,16 @@ const props = withDefaults(defineProps<{
   disabled?: boolean;
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   modelId?: string | null;
-  models?: CodexModelOption[];
+  models?: BackendModelOption[];
   reasoningEffort?: ReasoningEffort | null;
+  showReasoning?: boolean;
 }>(), {
   disabled: false,
   modelCatalogStatus: 'notLoaded',
   modelId: null,
   models: () => [],
   reasoningEffort: null,
+  showReasoning: true,
 });
 
 const emit = defineEmits<{
@@ -111,6 +115,8 @@ const selectedModel = computed(() => (
 
 const reasoningEfforts = computed(() => selectedModel.value?.supportedReasoningEfforts ?? []);
 
+const showReasoning = computed(() => props.showReasoning && reasoningEfforts.value.length > 0);
+
 const effectiveReasoningEffort = computed(() => (
   props.reasoningEffort ??
   selectedModel.value?.defaultReasoningEffort ??
@@ -123,6 +129,10 @@ const controlDisabled = computed(() => props.disabled);
 const selectorLabel = computed(() => {
   if (!selectedModel.value) {
     return modelFallbackLabel.value;
+  }
+
+  if (!showReasoning.value) {
+    return compactModelLabel(selectedModel.value.displayName);
   }
 
   const effort = effectiveReasoningEffort.value ? effortLabel(effectiveReasoningEffort.value) : effortFallbackLabel.value;
@@ -176,7 +186,7 @@ function onCommand(command: unknown): void {
 
   if (command.kind === 'model') {
     emit('update:modelId', command.value);
-  } else {
+  } else if (showReasoning.value) {
     emit('update:reasoningEffort', command.value);
   }
 }

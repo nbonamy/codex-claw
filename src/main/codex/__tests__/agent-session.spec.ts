@@ -36,6 +36,8 @@ const agent: Agent = {
   name: 'Dina',
   avatar: 'DI',
   folder: '~/src/codex-claw',
+  backend: 'codex',
+  backendDefaults: { kind: 'codex' },
   status: { type: 'idle' },
   createdAt: '2026-06-05T00:00:00.000Z',
   updatedAt: '2026-06-05T00:00:00.000Z',
@@ -134,7 +136,7 @@ describe('CodexAgentSessionManager', () => {
 
     const prompt = manager.sendPrompt(agent, 'hello codex', {
       model: 'gpt-5.1-codex',
-      reasoningEffort: 'high',
+      backendOptions: { kind: 'codex', reasoningEffort: 'high' },
     });
     await waitForSentCount(transport, 1);
     transport.receive({
@@ -193,12 +195,15 @@ describe('CodexAgentSessionManager', () => {
     const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
 
     const prompt = manager.sendPrompt(agent, '/frontend-design polish the composer', {
-      skills: [
-        {
-          name: 'frontend-design',
-          path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
-        },
-      ],
+      backendOptions: {
+        kind: 'codex',
+        skills: [
+          {
+            name: 'frontend-design',
+            path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
+          },
+        ],
+      },
     });
     await waitForSentCount(transport, 1);
     transport.receive({ id: 1, result: { userAgent: 'codex', codexHome: '/tmp/codex-home', platformFamily: 'unix', platformOs: 'macos' } });
@@ -238,7 +243,7 @@ describe('CodexAgentSessionManager', () => {
     const prompt = manager.sendPrompt(agent, 'plan the work', {
       model: 'gpt-5.1-codex',
       planMode: true,
-      reasoningEffort: 'high',
+      backendOptions: { kind: 'codex', reasoningEffort: 'high' },
     });
     await waitForSentCount(transport, 1);
     transport.receive({ id: 1, result: { userAgent: 'codex', codexHome: '/tmp/codex-home', platformFamily: 'unix', platformOs: 'macos' } });
@@ -281,7 +286,7 @@ describe('CodexAgentSessionManager', () => {
     const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
 
     const prompt = manager.sendPrompt(agent, 'ship the feature', {
-      goalMode: true,
+      backendOptions: { kind: 'codex', goalMode: true },
     });
     await waitForSentCount(transport, 1);
     transport.receive({ id: 1, result: { userAgent: 'codex', codexHome: '/tmp/codex-home', platformFamily: 'unix', platformOs: 'macos' } });
@@ -323,7 +328,7 @@ describe('CodexAgentSessionManager', () => {
     }));
     const persistedAgent: Agent = {
       ...agent,
-      codexThreadId: 'thread-persisted',
+      backendSession: { kind: 'codex', threadId: 'thread-persisted' },
     };
 
     const prompt = manager.sendPrompt(persistedAgent, 'continue');
@@ -461,7 +466,7 @@ describe('CodexAgentSessionManager', () => {
 
     const hydration = manager.hydrateAgent({
       ...agent,
-      codexThreadId: 'thread-persisted',
+      backendSession: { kind: 'codex', threadId: 'thread-persisted' },
     });
     await waitForSentCount(transport, 1);
     transport.receive({
@@ -542,7 +547,7 @@ describe('CodexAgentSessionManager', () => {
     const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
     const persistedAgent: Agent = {
       ...agent,
-      codexThreadId: 'thread-persisted',
+      backendSession: { kind: 'codex', threadId: 'thread-persisted' },
     };
 
     const rollback = manager.rollbackToTurn(persistedAgent, 'turn-1');

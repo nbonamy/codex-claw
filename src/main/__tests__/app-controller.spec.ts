@@ -3,6 +3,8 @@ import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '../../shared/snapshot';
 import type { MainToRendererEvent } from '../../shared/contracts';
 import type { AppStatePersistence } from '../state-persistence';
+import type { AgentBackendDriver } from '../backends/types';
+import { codexBackendCapabilities } from '../../shared/backend-capabilities';
 
 describe('AppController', () => {
   it('persists collaboration status updates emitted by MCP tools', async () => {
@@ -101,21 +103,21 @@ describe('AppController', () => {
       save: vi.fn().mockResolvedValue(undefined),
     } as unknown as AppStatePersistence;
     const controller = new AppController(persistence);
-    const sessionManager = {
-      interruptTurn: vi.fn().mockResolvedValue({ threadId: 'thread-dina', turnId: 'turn-1' }),
-    };
+    const backendDriver = createFakeCodexBackendDriver({
+      interrupt: vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'thread-dina' }, turnId: 'turn-1' }),
+    });
 
     await controller.initialize();
-    setCodexSessionManager(controller, sessionManager);
+    setCodexBackendDriver(controller, backendDriver);
     await interruptAgent(controller, 'agent-dina');
 
-    expect(sessionManager.interruptTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(backendDriver.interrupt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
   });
 
   it('deletes a message by rolling back from its Codex turn and replacing history', async () => {
     const snapshot = createInitialSnapshot();
-    snapshot.agents[0].codexThreadId = 'thread-dina';
+    snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
     snapshot.messages = [
       userMessage('user-turn-1', 'turn-1', 'first prompt'),
       assistantMessage('assistant-turn-1', 'turn-1', 'first answer'),
@@ -127,25 +129,25 @@ describe('AppController', () => {
       save: vi.fn().mockResolvedValue(undefined),
     } as unknown as AppStatePersistence;
     const controller = new AppController(persistence);
-    const sessionManager = {
+    const backendDriver = createFakeCodexBackendDriver({
       rollbackToTurn: vi.fn().mockResolvedValue({
-        threadId: 'thread-dina',
+        backendSession: { kind: 'codex', threadId: 'thread-dina' },
         messages: snapshot.messages.slice(0, 2),
       }),
-    };
+    });
 
     await controller.initialize();
-    setCodexSessionManager(controller, sessionManager);
+    setCodexBackendDriver(controller, backendDriver);
     await deleteMessage(controller, 'agent-dina', 'user-turn-2');
 
-    expect(sessionManager.rollbackToTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-2');
+    expect(backendDriver.rollbackToTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-2');
     expect(snapshot.messages.map((message) => message.id)).toStrictEqual(['user-turn-1', 'assistant-turn-1']);
     expect(persistence.save).toHaveBeenCalledWith(snapshot);
   });
 
   it('retries an assistant message by rolling back and resending the matching user prompt', async () => {
     const snapshot = createInitialSnapshot();
-    snapshot.agents[0].codexThreadId = 'thread-dina';
+    snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
     snapshot.messages = [
       userMessage('user-turn-1', 'turn-1', 'first prompt'),
       assistantMessage('assistant-turn-1', 'turn-1', 'first answer'),
@@ -155,25 +157,25 @@ describe('AppController', () => {
       save: vi.fn().mockResolvedValue(undefined),
     } as unknown as AppStatePersistence;
     const controller = new AppController(persistence);
-    const sessionManager = {
+    const backendDriver = createFakeCodexBackendDriver({
       rollbackToTurn: vi.fn().mockResolvedValue({
-        threadId: 'thread-dina',
+        backendSession: { kind: 'codex', threadId: 'thread-dina' },
         messages: [],
       }),
-      sendPrompt: vi.fn().mockResolvedValue({ threadId: 'thread-dina', turnId: 'turn-retry' }),
-    };
+      sendPrompt: vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'thread-dina' }, turnId: 'turn-retry' }),
+    });
 
     await controller.initialize();
-    setCodexSessionManager(controller, sessionManager);
+    setCodexBackendDriver(controller, backendDriver);
     await retryMessage(controller, 'agent-dina', 'assistant-turn-1');
 
-    expect(sessionManager.rollbackToTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-1');
-    expect(sessionManager.sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'first prompt');
+    expect(backendDriver.rollbackToTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-1');
+    expect(backendDriver.sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'first prompt');
   });
 
   it('edits a user message by rolling back and resending the edited prompt', async () => {
     const snapshot = createInitialSnapshot();
-    snapshot.agents[0].codexThreadId = 'thread-dina';
+    snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
     snapshot.messages = [
       userMessage('user-turn-1', 'turn-1', 'first prompt'),
       assistantMessage('assistant-turn-1', 'turn-1', 'first answer'),
@@ -183,20 +185,20 @@ describe('AppController', () => {
       save: vi.fn().mockResolvedValue(undefined),
     } as unknown as AppStatePersistence;
     const controller = new AppController(persistence);
-    const sessionManager = {
+    const backendDriver = createFakeCodexBackendDriver({
       rollbackToTurn: vi.fn().mockResolvedValue({
-        threadId: 'thread-dina',
+        backendSession: { kind: 'codex', threadId: 'thread-dina' },
         messages: [],
       }),
-      sendPrompt: vi.fn().mockResolvedValue({ threadId: 'thread-dina', turnId: 'turn-edit' }),
-    };
+      sendPrompt: vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'thread-dina' }, turnId: 'turn-edit' }),
+    });
 
     await controller.initialize();
-    setCodexSessionManager(controller, sessionManager);
+    setCodexBackendDriver(controller, backendDriver);
     await editMessage(controller, 'agent-dina', 'user-turn-1', ' edited prompt ');
 
-    expect(sessionManager.rollbackToTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-1');
-    expect(sessionManager.sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'edited prompt');
+    expect(backendDriver.rollbackToTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-1');
+    expect(backendDriver.sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'edited prompt');
   });
 });
 
@@ -221,17 +223,28 @@ function emitAndApply(
   }).emitAndApply(event);
 }
 
-function setCodexSessionManager(
+function setCodexBackendDriver(
   controller: AppController,
-  sessionManager: Partial<{
-    interruptTurn(agent: unknown): Promise<{ threadId: string; turnId: string }>;
-    rollbackToTurn(agent: unknown, turnId: string): Promise<{ threadId: string; messages: unknown[] }>;
-    sendPrompt(agent: unknown, prompt: string): Promise<{ threadId: string; turnId: string }>;
-  }>,
+  backendDriver: AgentBackendDriver,
 ): void {
   (controller as unknown as {
-    codexSessionManager: typeof sessionManager;
-  }).codexSessionManager = sessionManager;
+    codexBackendDriver: AgentBackendDriver;
+  }).codexBackendDriver = backendDriver;
+}
+
+function createFakeCodexBackendDriver(overrides: Partial<AgentBackendDriver> = {}): AgentBackendDriver {
+  return {
+    backend: 'codex',
+    getRuntimeStatus: () => ({ backend: 'codex', status: 'notConfigured' }),
+    getCapabilities: () => codexBackendCapabilities,
+    sendPrompt: vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'thread-dina' }, turnId: 'turn-1' }),
+    interrupt: vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'thread-dina' }, turnId: 'turn-1' }),
+    respondToRequest: vi.fn().mockResolvedValue(undefined),
+    rollbackToTurn: vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'thread-dina' }, messages: [] }),
+    onEvent: vi.fn(() => () => undefined),
+    close: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  };
 }
 
 async function interruptAgent(controller: AppController, agentId: string): Promise<void> {

@@ -1,6 +1,6 @@
 # Backend Agnostic Cleanup
 
-Status: implementation prep, 2026-06-06.
+Status: pre-Claude cleanup implemented, 2026-06-06.
 
 This document describes the cleanup needed before adding a Claude Code driver.
 The goal is not to turn Codex Claw into a generic lowest-common-denominator
@@ -14,6 +14,24 @@ Related docs:
 - `docs/codex.md`: current Codex app-server integration.
 - `docs/claude.md`: Claude Code websocket/SDK research and Codex-bias
   inventory.
+
+## Implementation Status
+
+The pre-Claude cleanup in this document has been implemented for the existing
+Codex path:
+
+- Agents and Bench templates use `backend`, `backendSession`, and
+  `backendDefaults`.
+- Persisted snapshots no longer write new `codexThreadId` or `codexDefaults`
+  fields; migration from old state is intentionally out of scope.
+- Runtime status is stored as `backendRuntimes` and emitted as
+  `backend.statusChanged`.
+- Prompt sending, interrupts, request responses, history hydration, rollback,
+  model loading, and skill loading route through a backend driver seam.
+- Renderer catalogs, composer controls, and prompt options use backend-neutral
+  names with Codex-specific options nested under `backendOptions`.
+
+The Claude driver itself remains out of scope for this cleanup pass.
 
 ## Target Outcome
 

@@ -1,7 +1,7 @@
 export const ipcChannels = {
   getSnapshot: 'app:get-snapshot',
-  listCodexModels: 'codex:models:list',
-  listCodexSkills: 'codex:skills:list',
+  listBackendModels: 'backend:models:list',
+  listBackendSkills: 'backend:skills:list',
   listAgentFiles: 'agent:files:list',
   chooseAgentFolder: 'agent:choose-folder',
   createTeam: 'team:create',

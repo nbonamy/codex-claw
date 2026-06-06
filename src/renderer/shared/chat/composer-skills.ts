@@ -1,4 +1,4 @@
-import type { CodexSkillSummary, PromptSkillInput } from '../../../shared/contracts';
+import type { BackendSkillSummary, PromptSkillInput } from '../../../shared/contracts';
 
 export type ActiveSkillSlash = {
   end: number;
@@ -31,7 +31,7 @@ export function findActiveSkillSlash(value: string, caretPosition: number): Acti
   };
 }
 
-export function filterComposerSkills(skills: CodexSkillSummary[], query: string, maxResults = -1): CodexSkillSummary[] {
+export function filterComposerSkills(skills: BackendSkillSummary[], query: string, maxResults = -1): BackendSkillSummary[] {
   const value = query.trim().toLowerCase();
   if (!value) {
     return limitSkills(skills, maxResults);
@@ -43,7 +43,7 @@ export function filterComposerSkills(skills: CodexSkillSummary[], query: string,
       score: Math.max(
         fuzzyScore(value, skill.name.toLowerCase()),
         fuzzyScore(value, (skill.displayName ?? '').toLowerCase()),
-        fuzzyScore(value, (skill.shortDescription ?? skill.description).toLowerCase()),
+        fuzzyScore(value, (skill.shortDescription ?? skill.description ?? '').toLowerCase()),
       ),
     }))
     .filter((entry) => entry.score > 0)
@@ -52,15 +52,15 @@ export function filterComposerSkills(skills: CodexSkillSummary[], query: string,
   return limitSkills(matches.map((entry) => entry.skill), maxResults);
 }
 
-export function skillDisplayName(skill: CodexSkillSummary): string {
+export function skillDisplayName(skill: BackendSkillSummary): string {
   return skill.displayName || skill.name;
 }
 
-export function skillDescription(skill: CodexSkillSummary): string {
-  return skill.shortDescription || skill.description;
+export function skillDescription(skill: BackendSkillSummary): string {
+  return skill.shortDescription || skill.description || '';
 }
 
-export function promptSkillInputsFromText(text: string, skills: CodexSkillSummary[]): PromptSkillInput[] {
+export function promptSkillInputsFromText(text: string, skills: BackendSkillSummary[]): PromptSkillInput[] {
   const names = new Set<string>();
   const pattern = /(?:^|[^\w.%+-])\/([A-Za-z0-9_.-]+)/g;
   let match: RegExpExecArray | null;
@@ -69,7 +69,7 @@ export function promptSkillInputsFromText(text: string, skills: CodexSkillSummar
   }
 
   return skills
-    .filter((skill) => names.has(skill.name))
+    .filter((skill) => names.has(skill.name) && Boolean(skill.path))
     .map((skill) => ({
       name: skill.name,
       path: skill.path,
@@ -101,6 +101,6 @@ function fuzzyScore(pattern: string, target: string): number {
   return patternIndex === pattern.length ? score : 0;
 }
 
-function limitSkills(skills: CodexSkillSummary[], maxResults: number): CodexSkillSummary[] {
+function limitSkills(skills: BackendSkillSummary[], maxResults: number): BackendSkillSummary[] {
   return maxResults >= 0 ? skills.slice(0, maxResults) : skills;
 }

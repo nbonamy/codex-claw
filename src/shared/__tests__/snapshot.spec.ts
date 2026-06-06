@@ -14,7 +14,7 @@ import { toolOutputText } from '../tool-output';
 describe('snapshot reducer', () => {
   it('updates the agent folder and clears the old thread mapping', () => {
     const snapshot = createInitialSnapshot();
-    snapshot.agents[0].codexThreadId = 'thread-old';
+    snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-old' };
     snapshot.agents[0].contextUsage = {
       totalTokens: 397_740,
       inputTokens: 320_000,
@@ -35,6 +35,8 @@ describe('snapshot reducer', () => {
       name: 'Dina',
       avatar: 'DI',
       folder: '/Users/nbonamy/src/id8',
+      backend: 'codex',
+      backendDefaults: { kind: 'codex' },
       status: { type: 'idle' },
       createdAt: '2026-06-05T00:00:00.000Z',
       updatedAt: '2026-06-05T00:00:01.000Z',
@@ -59,6 +61,8 @@ describe('snapshot reducer', () => {
       name: 'Jules',
       avatar: '🤖',
       folder: '/Users/nbonamy/src/id8',
+      backend: 'codex',
+      backendDefaults: { kind: 'codex' },
       status: { type: 'idle' },
       createdAt: '2026-06-05T10:11:12.000Z',
       updatedAt: '2026-06-05T10:11:12.000Z',
@@ -80,7 +84,7 @@ describe('snapshot reducer', () => {
   it('updates idle agents and clears Codex runtime state when the folder changes', () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0];
-    agent.codexThreadId = 'thread-old';
+    agent.backendSession = { kind: 'codex', threadId: 'thread-old' };
     agent.contextUsage = {
       totalTokens: 397_740,
       inputTokens: 320_000,
@@ -106,6 +110,8 @@ describe('snapshot reducer', () => {
       name: 'Dina Prime',
       avatar: 'DP',
       folder: '/Users/nbonamy/src/id8',
+      backend: 'codex',
+      backendDefaults: { kind: 'codex' },
       status: { type: 'idle' },
       createdAt: '2026-06-05T00:00:00.000Z',
       updatedAt: '2026-06-05T10:11:12.000Z',
@@ -114,7 +120,7 @@ describe('snapshot reducer', () => {
 
   it('updates idle agents without clearing the thread when the folder is unchanged', () => {
     const snapshot = createInitialSnapshot();
-    snapshot.agents[0].codexThreadId = 'thread-existing';
+    snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-existing' };
 
     updateAgentFromInput(snapshot, {
       id: 'agent-dina',
@@ -123,7 +129,7 @@ describe('snapshot reducer', () => {
       folder: '~/src/codex-claw',
     }, '2026-06-05T10:11:12.000Z');
 
-    expect(snapshot.agents[0].codexThreadId).toBe('thread-existing');
+    expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-existing' });
     expect(snapshot.agents[0].avatar).toBeUndefined();
   });
 
@@ -324,7 +330,7 @@ describe('snapshot reducer', () => {
     ]);
   });
 
-  it('records thread starts and app-server status updates', () => {
+  it('records thread starts and backend runtime status updates', () => {
     const snapshot = createInitialSnapshot();
 
     applyMainEventToSnapshot(snapshot, {
@@ -337,18 +343,19 @@ describe('snapshot reducer', () => {
     });
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
-      type: 'appServer.statusChanged',
-      payload: { status: 'running', detail: 'connected' },
+      type: 'backend.statusChanged',
+      backend: 'codex',
+      payload: { backend: 'codex', status: 'running', detail: 'connected' },
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
 
-    expect(snapshot.agents[0].codexThreadId).toBe('thread-1');
-    expect(snapshot.appServer).toStrictEqual({ status: 'running', detail: 'connected' });
+    expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-1' });
+    expect(snapshot.backendRuntimes).toContainEqual({ backend: 'codex', status: 'running', detail: 'connected' });
   });
 
   it('records thread settings updates as durable agent thread mappings', () => {
     const snapshot = createInitialSnapshot();
-    snapshot.agents[0].codexThreadId = 'thread-old';
+    snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-old' };
 
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
@@ -364,7 +371,7 @@ describe('snapshot reducer', () => {
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
 
-    expect(snapshot.agents[0].codexThreadId).toBe('thread-1');
+    expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-1' });
   });
 
   it('records token usage updates as transient agent context usage', () => {
@@ -656,6 +663,8 @@ describe('snapshot reducer', () => {
       name: 'Dina',
       avatar: 'DI',
       folder: '~/src/codex-claw',
+      backend: 'codex',
+      backendDefaults: { kind: 'codex' },
       isRegistered: true,
       mcpSessionId: 'mcp-session-1',
       statusText: 'Reviewing MCP shape',
@@ -1959,8 +1968,8 @@ describe('snapshot reducer', () => {
       occurredAt: '2026-06-05T00:00:03.000Z',
     });
 
-    expect(snapshot.agents[0].status).toStrictEqual({ type: 'error', message: 'Codex app-server error' });
-    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([{ type: 'status', text: 'Codex app-server error' }]);
+    expect(snapshot.agents[0].status).toStrictEqual({ type: 'error', message: 'Backend error' });
+    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([{ type: 'status', text: 'Backend error' }]);
   });
 });
 

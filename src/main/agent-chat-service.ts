@@ -1,8 +1,9 @@
 import {
   appendUserPrompt,
 } from './snapshot-service';
-import type { CodexAgentSessionManager } from './codex/agent-session';
 import type { AgentStatus, AppSnapshot, MainToRendererEvent, SendPromptOptions } from '../shared/contracts';
+import type { AgentBackendDriver } from './backends/types';
+import { backendDisplayName } from './backends/types';
 
 export type AgentChatEventEmitter = (
   event: Omit<MainToRendererEvent, 'seq' | 'occurredAt'> & Partial<Pick<MainToRendererEvent, 'seq' | 'occurredAt'>>,
@@ -10,7 +11,7 @@ export type AgentChatEventEmitter = (
 
 export function sendAgentPrompt(
   snapshot: AppSnapshot,
-  sessionManager: CodexAgentSessionManager,
+  backendDriver: AgentBackendDriver,
   agentId: string,
   prompt: string,
   options: SendPromptOptions | undefined,
@@ -24,29 +25,33 @@ export function sendAgentPrompt(
 
   appendUserPrompt(snapshot, agentId, trimmedPrompt);
   updateAgentStatus(agentId, { type: 'starting' }, emit, snapshot);
-  updateAppServerStatus({
+  updateBackendRuntimeStatus({
+    backend: backendDriver.backend,
     status: 'starting',
-    detail: 'Starting Codex app-server...',
+    detail: `Starting ${backendDisplayName(backendDriver.backend)} backend...`,
   }, emit, snapshot);
 
   const promptResult = hasPromptOptions(options)
-    ? sessionManager.sendPrompt(agent, trimmedPrompt, options)
-    : sessionManager.sendPrompt(agent, trimmedPrompt);
+    ? backendDriver.sendPrompt(agent, trimmedPrompt, options)
+    : backendDriver.sendPrompt(agent, trimmedPrompt);
 
   void promptResult
     .then((result) => {
-      agent.codexThreadId = result.threadId;
+      agent.backend = backendDriver.backend;
+      agent.backendSession = result.backendSession;
       if (agent.status.type === 'starting') {
         updateAgentStatus(agentId, { type: 'working' }, emit, snapshot);
       }
-      updateAppServerStatus({
+      updateBackendRuntimeStatus({
+        backend: backendDriver.backend,
         status: 'running',
-        detail: 'Codex app-server connected.',
+        detail: `${backendDisplayName(backendDriver.backend)} backend connected.`,
       }, emit, snapshot);
     })
     .catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
-      updateAppServerStatus({
+      updateBackendRuntimeStatus({
+        backend: backendDriver.backend,
         status: 'error',
         detail: message,
       }, emit, snapshot);
@@ -61,7 +66,7 @@ export function sendAgentPrompt(
 }
 
 function hasPromptOptions(options: SendPromptOptions | undefined): options is SendPromptOptions {
-  return Boolean(options?.goalMode || options?.model || options?.planMode || options?.reasoningEffort || options?.skills?.length);
+  return Boolean(options?.model || options?.planMode || options?.backendOptions);
 }
 
 function isBusy(status: AgentStatus): boolean {
@@ -86,15 +91,21 @@ function updateAgentStatus(
   });
 }
 
-function updateAppServerStatus(
-  status: AppSnapshot['appServer'],
+function updateBackendRuntimeStatus(
+  status: AppSnapshot['backendRuntimes'][number],
   emit: AgentChatEventEmitter,
   snapshot: AppSnapshot,
 ): void {
-  snapshot.appServer = status;
+  const existingIndex = snapshot.backendRuntimes.findIndex((runtime) => runtime.backend === status.backend);
+  if (existingIndex === -1) {
+    snapshot.backendRuntimes.push(status);
+  } else {
+    snapshot.backendRuntimes[existingIndex] = status;
+  }
 
   emit({
-    type: 'appServer.statusChanged',
+    backend: status.backend,
+    type: 'backend.statusChanged',
     payload: status,
   });
 }

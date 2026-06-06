@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import ChatComposer from '../ChatComposer.vue';
 import { i18n } from '../../i18n';
-import type { AgentContextUsage, AgentFileSearchItem, CodexModelOption, CodexSkillSummary } from '../../../shared/contracts';
+import type { AgentContextUsage, AgentFileSearchItem, BackendModelOption, BackendSkillSummary } from '../../../shared/contracts';
 
 vi.mock('fix-webm-duration', () => ({
   default: vi.fn(async (blob: Blob) => blob),
@@ -22,7 +22,7 @@ type ChatComposerProps = {
   placeholder: string;
 };
 
-const models: CodexModelOption[] = [
+const models: BackendModelOption[] = [
   {
     id: 'codex-max',
     model: 'gpt-5.1-codex-max',
@@ -38,7 +38,7 @@ const models: CodexModelOption[] = [
   },
 ];
 
-const skills: CodexSkillSummary[] = [
+const skills: BackendSkillSummary[] = [
   {
     name: 'frontend-design',
     displayName: 'Frontend Design',
@@ -298,12 +298,12 @@ describe('ChatComposer', () => {
 function mountComposer(overrides: Partial<ChatComposerProps & {
   contextUsage: AgentContextUsage;
   goalMode: boolean;
-  models: CodexModelOption[];
+  models: BackendModelOption[];
   planMode: boolean;
   selectedModelId: string;
   selectedReasoningEffort: string;
   files: AgentFileSearchItem[];
-  skills: CodexSkillSummary[];
+  skills: BackendSkillSummary[];
 }> = {}) {
   return mount(ChatComposer, {
     props: {

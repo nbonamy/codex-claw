@@ -21,6 +21,8 @@ describe('snapshot service', () => {
           name: 'Dina',
           avatar: 'DI',
           folder: '~/src/codex-claw',
+          backend: 'codex',
+          backendDefaults: { kind: 'codex' },
           status: { type: 'idle' },
           createdAt: '2026-06-05T00:00:00.000Z',
           updatedAt: '2026-06-05T00:00:00.000Z',
@@ -31,6 +33,8 @@ describe('snapshot service', () => {
           name: 'Jesse',
           avatar: 'JE',
           folder: '~/src/codex-claw',
+          backend: 'codex',
+          backendDefaults: { kind: 'codex' },
           status: { type: 'idle' },
           createdAt: '2026-06-05T00:00:00.000Z',
           updatedAt: '2026-06-05T00:00:00.000Z',
@@ -40,10 +44,11 @@ describe('snapshot service', () => {
       activeTeamId: 'team-codex-claw',
       activeAgentId: 'agent-dina',
       messages: [],
-      appServer: {
+      backendRuntimes: [{
+        backend: 'codex',
         status: 'notConfigured',
-        detail: 'Codex app-server is not connected yet.',
-      },
+        detail: 'Codex backend is not connected yet.',
+      }],
       theme: defaultThemeSettings,
     });
   });
@@ -66,6 +71,8 @@ describe('snapshot service', () => {
       name: 'Jules',
       avatar: 'JU',
       folder: '/Users/nbonamy/src/id8',
+      backend: 'codex',
+      backendDefaults: { kind: 'codex' },
       status: { type: 'idle' },
       createdAt: '2026-06-05T10:11:12.000Z',
       updatedAt: '2026-06-05T10:11:12.000Z',

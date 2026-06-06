@@ -21,6 +21,8 @@ describe('agent-manager', () => {
       name: 'Dina (copy)',
       avatar: 'DI',
       folder: '~/src/codex-claw',
+      backend: 'codex',
+      backendDefaults: { kind: 'codex' },
       status: { type: 'idle' },
       createdAt: '2026-06-05T10:11:12.000Z',
       updatedAt: '2026-06-05T10:11:12.000Z',
@@ -63,6 +65,7 @@ describe('agent-manager', () => {
       avatar: 'DI',
       folder: '~/src/codex-claw',
       backend: 'codex',
+      backendDefaults: { kind: 'codex' },
       createdAt: '2026-06-05T10:11:12.000Z',
       updatedAt: '2026-06-05T10:11:12.000Z',
     });
@@ -82,6 +85,8 @@ describe('agent-manager', () => {
       name: 'Dina',
       avatar: 'DI',
       folder: '~/src/codex-claw',
+      backend: 'codex',
+      backendDefaults: { kind: 'codex' },
       status: { type: 'idle' },
       createdAt: '2026-06-05T10:12:13.000Z',
       updatedAt: '2026-06-05T10:12:13.000Z',
@@ -147,7 +152,7 @@ describe('agent-manager', () => {
   it('restarts an idle agent by clearing conversation and runtime state', () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0];
-    agent.codexThreadId = 'thread-old';
+    agent.backendSession = { kind: 'codex', threadId: 'thread-old' };
     agent.contextUsage = {
       totalTokens: 397_740,
       inputTokens: 320_000,
@@ -169,7 +174,7 @@ describe('agent-manager', () => {
       status: { type: 'idle' },
       updatedAt: '2026-06-05T10:11:12.000Z',
     });
-    expect(snapshot.agents[0].codexThreadId).toBeUndefined();
+    expect(snapshot.agents[0].backendSession).toBeUndefined();
     expect(snapshot.agents[0].contextUsage).toBeUndefined();
     expect(snapshot.agents[0].isRegistered).toBeUndefined();
     expect(snapshot.agents[0].mcpSessionId).toBeUndefined();

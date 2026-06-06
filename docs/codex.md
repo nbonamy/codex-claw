@@ -73,17 +73,17 @@ the product mapping:
 - folder;
 - display name and avatar;
 - current status;
-- Codex thread id;
+- `backendSession` with `{ kind: "codex", threadId }`;
 - local UI preferences.
 
 One app-server process can host many threads. Agents are routed by `threadId`
 and app-owned `agentId`.
 
-If an agent has a persisted Codex thread id, main resumes it with
-`thread/resume` before starting the next turn. New agents without a thread id
-use `thread/start`. `thread/settings/updated` confirms the active thread
-settings and should update the app-owned agent/thread mapping so the id is
-saved in Electron `userData` and reused after relaunch.
+If an agent has a persisted Codex `backendSession`, main resumes it with
+`thread/resume` before starting the next turn. New agents without a Codex
+session use `thread/start`. `thread/settings/updated` confirms the active
+thread settings and should update the app-owned agent/session mapping so the
+id is saved in Electron `userData` and reused after relaunch.
 
 `thread/resume` returns the thread's `turns` in app-server protocol v2. Main
 must translate those turns into app-owned `RendererMessage`s and emit a
@@ -118,8 +118,9 @@ level options. The response includes visible model entries, each model's
 the model's `defaultReasoningEffort`.
 
 The renderer consumes an app-owned picker shape only. Main fetches and adapts
-the Codex catalog, the renderer stores the selected catalog model and reasoning
-effort, and prompt IPC sends `{ model, reasoningEffort }` back to main.
+the Codex catalog to `BackendModelOption[]`, the renderer stores the selected
+catalog model and reasoning effort, and prompt IPC sends the model plus
+Codex-specific reasoning under `backendOptions`.
 
 `turn/start` accepts `model` and `effort` overrides for the current turn and
 subsequent turns, so Codex Claw applies the current picker selection on every
@@ -141,14 +142,14 @@ cwd:
 }
 ```
 
-Main adapts the response into `CodexSkillSummary[]` and exposes that through
+Main adapts the response into `BackendSkillSummary[]` and exposes that through
 typed IPC. The renderer uses this app-owned shape for the composer slash menu;
 it does not import generated app-server skill types.
 
 When a prompt contains `/skill-name`, renderer state resolves the mention
-against the active skill catalog and sends `SendPromptOptions.skills` to main.
-Main then appends Codex `UserInput` skill items to `turn/start`, alongside the
-normal text input:
+against the active skill catalog and sends those skills under
+`SendPromptOptions.backendOptions` with `kind: "codex"`. Main then appends
+Codex `UserInput` skill items to `turn/start`, alongside the normal text input:
 
 ```json
 [

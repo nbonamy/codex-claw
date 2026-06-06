@@ -9,6 +9,8 @@ const idleAgent: Agent = {
   name: 'Dina',
   avatar: 'DI',
   folder: '/Users/nbonamy/src/codex-claw',
+  backend: 'codex',
+  backendDefaults: { kind: 'codex' },
   status: { type: 'idle' },
   createdAt: '2026-06-05T00:00:00.000Z',
   updatedAt: '2026-06-05T00:00:00.000Z',

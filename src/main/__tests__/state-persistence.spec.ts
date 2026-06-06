@@ -38,11 +38,11 @@ describe('AppStatePersistence', () => {
     expect(restored.activeAgentId).toBeNull();
   });
 
-  it('saves metadata, context usage, and collaboration status without transcripts or app-server runtime state', async () => {
+  it('saves metadata, backend session, context usage, and collaboration status without transcripts or runtime state', async () => {
     const filePath = await tempStatePath();
     const persistence = new AppStatePersistence(filePath);
     const snapshot = createInitialSnapshot();
-    snapshot.appServer = { status: 'running', detail: 'connected' };
+    snapshot.backendRuntimes = [{ backend: 'codex', status: 'running', detail: 'connected' }];
     snapshot.accountRateLimits = {
       limitId: 'codex',
       limitName: null,
@@ -63,7 +63,7 @@ describe('AppStatePersistence', () => {
     };
     snapshot.agents[0] = {
       ...snapshot.agents[0],
-      codexThreadId: 'thread-dina',
+      backendSession: { kind: 'codex', threadId: 'thread-dina' },
       contextUsage: {
         totalTokens: 1200,
         inputTokens: 900,
@@ -85,11 +85,14 @@ describe('AppStatePersistence', () => {
 
     const written = JSON.parse(await readFile(filePath, 'utf8')) as Record<string, unknown>;
     expect(written).not.toHaveProperty('messages');
+    expect(written).not.toHaveProperty('backendRuntimes');
     expect(written).not.toHaveProperty('appServer');
     expect(written.accountRateLimits).toStrictEqual(snapshot.accountRateLimits);
     expect(written.activeTeamId).toBe('team-codex-claw');
     const writtenAgent = (written.agents as Array<Record<string, unknown>>)[0];
-    expect(writtenAgent.codexThreadId).toBe('thread-dina');
+    expect(writtenAgent.backend).toBe('codex');
+    expect(writtenAgent.backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-dina' });
+    expect(writtenAgent).not.toHaveProperty('codexThreadId');
     expect(writtenAgent.contextUsage).toStrictEqual({
       totalTokens: 1200,
       inputTokens: 900,
@@ -106,7 +109,7 @@ describe('AppStatePersistence', () => {
     expect(writtenAgent).not.toHaveProperty('status');
   });
 
-  it('resets transient agent fields while preserving metadata, status text, and thread ids on load', () => {
+  it('resets transient agent fields while preserving metadata, status text, and backend session on load', () => {
     const snapshot = createInitialSnapshot();
     snapshot.accountRateLimits = {
       limitId: 'codex',
@@ -128,7 +131,7 @@ describe('AppStatePersistence', () => {
     };
     snapshot.agents[0] = {
       ...snapshot.agents[0],
-      codexThreadId: 'thread-dina',
+      backendSession: { kind: 'codex', threadId: 'thread-dina' },
       contextUsage: {
         totalTokens: 1200,
         inputTokens: 900,
@@ -153,7 +156,9 @@ describe('AppStatePersistence', () => {
       name: 'Dina',
       avatar: 'DI',
       folder: '~/src/codex-claw',
-      codexThreadId: 'thread-dina',
+      backend: 'codex',
+      backendDefaults: { kind: 'codex' },
+      backendSession: { kind: 'codex', threadId: 'thread-dina' },
       contextUsage: {
         totalTokens: 1200,
         inputTokens: 900,
@@ -170,7 +175,7 @@ describe('AppStatePersistence', () => {
       updatedAt: '2026-06-05T00:00:00.000Z',
     });
     expect(restored.messages).toStrictEqual([]);
-    expect(restored.appServer.status).toBe('notConfigured');
+    expect(restored.backendRuntimes).toStrictEqual(createEmptySnapshot().backendRuntimes);
     expect(restored.accountRateLimits).toStrictEqual(snapshot.accountRateLimits);
   });
 
@@ -182,7 +187,8 @@ describe('AppStatePersistence', () => {
         teamId: 'team-codex-claw',
         name: 'Dina',
         folder: '~/src/codex-claw',
-        codexThreadId: 'thread-dina',
+        backend: 'codex',
+        backendSession: { kind: 'codex', threadId: 'thread-dina' },
         contextUsage: {
           totalTokens: 1200,
           inputTokens: 900,
@@ -203,6 +209,31 @@ describe('AppStatePersistence', () => {
     });
 
     expect(restored.agents[0].contextUsage).toBeUndefined();
+  });
+
+  it('drops backend sessions and defaults that do not match the agent backend', () => {
+    const restored = snapshotFromPersistedState({
+      teams: [{ id: 'team-codex-claw', name: 'Codex Claw', agentIds: ['agent-dina'] }],
+      agents: [{
+        id: 'agent-dina',
+        teamId: 'team-codex-claw',
+        name: 'Dina',
+        folder: '~/src/codex-claw',
+        backend: 'claude',
+        backendSession: { kind: 'codex', threadId: 'thread-dina' },
+        backendDefaults: { kind: 'codex', model: 'gpt-5.1-codex' },
+        createdAt: '2026-06-05T00:00:00.000Z',
+        updatedAt: '2026-06-05T00:00:00.000Z',
+      }],
+      bench: [],
+      activeTeamId: 'team-codex-claw',
+      activeAgentId: 'agent-dina',
+      theme: defaultThemeSettings,
+    });
+
+    expect(restored.agents[0].backend).toBe('claude');
+    expect(restored.agents[0].backendSession).toBeUndefined();
+    expect(restored.agents[0].backendDefaults).toBeUndefined();
   });
 
   it('repairs team membership and selected agent when persisted ids drift', async () => {

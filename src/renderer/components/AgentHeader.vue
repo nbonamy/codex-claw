@@ -52,7 +52,7 @@
     <div class="agent-header__activity">
       <div class="agent-header__activity-line">
         <span
-          :data-status="agent?.status.type ?? appServer.status"
+          :data-status="agent?.status.type ?? backendRuntime.status"
           aria-hidden="true"
         />
         <strong>{{ activityTitle }}</strong>
@@ -69,13 +69,13 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Agent, AppSnapshot } from '../../shared/contracts';
+import type { Agent, BackendRuntimeStatus } from '../../shared/contracts';
 import { PanelLeftOpenIcon } from '../shared/icons/app-icons';
 import AgentAvatar from './AgentAvatar.vue';
 
 const props = defineProps<{
   agent: Agent | null;
-  appServer: AppSnapshot['appServer'];
+  backendRuntime: BackendRuntimeStatus;
   isLoading: boolean;
   sidebarCollapsed: boolean;
 }>();
@@ -89,16 +89,17 @@ const statusLabel = computed(() => {
     return 'Loading';
   }
 
-  if (props.appServer.status === 'running') {
+  if (props.backendRuntime.status === 'running') {
     return 'Connected';
   }
 
-  if (props.appServer.status === 'error') {
-    return 'Codex error';
+  if (props.backendRuntime.status === 'error') {
+    return `${backendLabel.value} error`;
   }
 
-  return 'Codex pending';
+  return `${backendLabel.value} pending`;
 });
+const backendLabel = computed(() => (props.backendRuntime.backend === 'claude' ? 'Claude' : 'Codex'));
 const agentStateLabel = computed(() => {
   switch (props.agent?.status.type) {
     case 'working':

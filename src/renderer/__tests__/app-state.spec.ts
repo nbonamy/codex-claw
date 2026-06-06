@@ -154,7 +154,7 @@ describe('useAppState', () => {
 
   it('hydrates the active persisted thread after subscribing to main events', async () => {
     const remoteSnapshot = createInitialSnapshot();
-    remoteSnapshot.agents[0].codexThreadId = 'thread-persisted';
+    remoteSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-persisted' };
     const hydratedSnapshot = {
       ...remoteSnapshot,
       messages: [
@@ -225,7 +225,7 @@ describe('useAppState', () => {
 
   it('loads persisted thread metadata without hydration when the preload bridge cannot select agents', async () => {
     const remoteSnapshot = createInitialSnapshot();
-    remoteSnapshot.agents[0].codexThreadId = 'thread-persisted';
+    remoteSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-persisted' };
     vi.stubGlobal('window', {
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
@@ -236,7 +236,7 @@ describe('useAppState', () => {
     const state = useAppState();
     await state.loadSnapshot();
 
-    expect(state.activeAgent.value?.codexThreadId).toBe('thread-persisted');
+    expect(state.activeAgent.value?.backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-persisted' });
     expect(state.visibleMessages.value).toStrictEqual([]);
   });
 
@@ -851,7 +851,7 @@ describe('useAppState', () => {
     expect(state.snapshot.value).toBe(before);
   });
 
-  it('loads Codex models, selects the default reasoning effort, and sends it with prompts', async () => {
+  it('loads backend models, selects the default reasoning effort, and sends it with prompts', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();
     updatedSnapshot.messages.push({
@@ -862,7 +862,7 @@ describe('useAppState', () => {
       createdAt: '2026-06-05T00:00:01.000Z',
       parts: [{ type: 'text', text: 'use the selected model' }],
     });
-    const listCodexModels = vi.fn().mockResolvedValue([
+    const listBackendModels = vi.fn().mockResolvedValue([
       {
         id: 'codex-fast',
         model: 'gpt-5.1-codex-fast',
@@ -895,7 +895,7 @@ describe('useAppState', () => {
     vi.stubGlobal('window', {
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
-        listCodexModels,
+        listBackendModels,
         sendPrompt,
         onEvent: vi.fn(),
       } satisfies Partial<CodexClawApi>,
@@ -903,7 +903,7 @@ describe('useAppState', () => {
 
     const state = useAppState();
     await state.loadSnapshot();
-    await state.loadCodexModels();
+    await state.loadBackendModels();
 
     expect(state.modelCatalogStatus.value).toBe('loaded');
     expect(state.selectedModelId.value).toBe('codex-max');
@@ -915,7 +915,10 @@ describe('useAppState', () => {
 
     expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'use the selected model', {
       model: 'gpt-5.1-codex-fast',
-      reasoningEffort: 'low',
+      backendOptions: {
+        kind: 'codex',
+        reasoningEffort: 'low',
+      },
     });
   });
 
@@ -942,15 +945,18 @@ describe('useAppState', () => {
     await state.sendPrompt('make a plan and keep going');
 
     expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'make a plan and keep going', {
-      goalMode: true,
       planMode: true,
+      backendOptions: {
+        kind: 'codex',
+        goalMode: true,
+      },
     });
   });
 
   it('loads active agent skills and includes slash-selected skills in prompt options', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();
-    const listCodexSkills = vi.fn().mockResolvedValue([
+    const listBackendSkills = vi.fn().mockResolvedValue([
       {
         name: 'frontend-design',
         description: 'Design polished frontend pages and UI.',
@@ -971,7 +977,7 @@ describe('useAppState', () => {
     vi.stubGlobal('window', {
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
-        listCodexSkills,
+        listBackendSkills,
         sendPrompt,
         onEvent: vi.fn(),
       } satisfies Partial<CodexClawApi>,
@@ -983,8 +989,8 @@ describe('useAppState', () => {
     state.setGoalMode(false);
 
     expect(state.skillCatalogStatus.value).toBe('loaded');
-    expect(listCodexSkills).toHaveBeenCalledWith('agent-dina');
-    expect(state.codexSkills.value.map((skill) => skill.name)).toStrictEqual([
+    expect(listBackendSkills).toHaveBeenCalledWith('agent-dina');
+    expect(state.backendSkills.value.map((skill) => skill.name)).toStrictEqual([
       'frontend-design',
       'skill-creator',
     ]);
@@ -992,12 +998,15 @@ describe('useAppState', () => {
     await state.sendPrompt('/frontend-design make the dialog beautiful');
 
     expect(sendPrompt).toHaveBeenCalledWith('agent-dina', '/frontend-design make the dialog beautiful', {
-      skills: [
-        {
-          name: 'frontend-design',
-          path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
-        },
-      ],
+      backendOptions: {
+        kind: 'codex',
+        skills: [
+          {
+            name: 'frontend-design',
+            path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
+          },
+        ],
+      },
     });
   });
 
@@ -1030,7 +1039,7 @@ describe('useAppState', () => {
   it('refreshes active agent skills after a skills changed event', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
-    const listCodexSkills = vi.fn()
+    const listBackendSkills = vi.fn()
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         {
@@ -1045,7 +1054,7 @@ describe('useAppState', () => {
     vi.stubGlobal('window', {
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
-        listCodexSkills,
+        listBackendSkills,
         onEvent: vi.fn((nextListener) => {
           listeners.push(nextListener);
           return () => undefined;
@@ -1063,8 +1072,8 @@ describe('useAppState', () => {
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
     await vi.waitFor(() => {
-      expect(listCodexSkills).toHaveBeenCalledTimes(2);
-      expect(state.codexSkills.value.map((skill) => skill.name)).toStrictEqual(['skill-creator']);
+      expect(listBackendSkills).toHaveBeenCalledTimes(2);
+      expect(state.backendSkills.value.map((skill) => skill.name)).toStrictEqual(['skill-creator']);
     });
   });
 
@@ -1127,22 +1136,22 @@ describe('useAppState', () => {
   });
 
   it('handles model catalog loading guards, errors, and invalid selections', async () => {
-    const listCodexModels = vi.fn().mockRejectedValue(new Error('models unavailable'));
+    const listBackendModels = vi.fn().mockRejectedValue(new Error('models unavailable'));
     vi.stubGlobal('window', {
       codexClaw: {
-        listCodexModels,
+        listBackendModels,
       } satisfies Partial<CodexClawApi>,
     });
 
     const state = useAppState();
     state.modelCatalogStatus.value = 'loading';
-    await state.loadCodexModels();
+    await state.loadBackendModels();
 
-    expect(listCodexModels).not.toHaveBeenCalled();
+    expect(listBackendModels).not.toHaveBeenCalled();
 
     state.modelCatalogStatus.value = 'notLoaded';
     state.modelCatalogError.value = null;
-    await state.loadCodexModels();
+    await state.loadBackendModels();
 
     expect(state.modelCatalogStatus.value).toBe('error');
     expect(state.modelCatalogError.value).toBe('models unavailable');
@@ -1159,7 +1168,7 @@ describe('useAppState', () => {
   it('keeps an already selected model when the catalog reloads', async () => {
     vi.stubGlobal('window', {
       codexClaw: {
-        listCodexModels: vi.fn().mockResolvedValue([
+        listBackendModels: vi.fn().mockResolvedValue([
           {
             id: 'codex-existing',
             model: 'gpt-5.1-codex-existing',
@@ -1186,7 +1195,7 @@ describe('useAppState', () => {
     state.selectedModelId.value = 'codex-existing';
     state.selectedReasoningEffort.value = null;
 
-    await state.loadCodexModels();
+    await state.loadBackendModels();
 
     expect(state.selectedModelId.value).toBe('codex-existing');
     expect(state.selectedReasoningEffort.value).toBeNull();

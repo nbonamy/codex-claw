@@ -1,6 +1,13 @@
 # Claude Code Integration Research
 
-Status: research notes, 2026-06-06.
+Status: research notes with historical bias inventory, 2026-06-06.
+
+Update, 2026-06-06: the Codex-bias inventory in this document was written
+before the backend-agnostic cleanup landed. The current code now has
+`backendSession`, `backendDefaults`, `backendRuntimes`, backend-neutral model
+and skill catalogs, and a main-process backend driver seam. The Claude protocol
+research below still applies; the old-field bias list is retained as historical
+context.
 
 This document summarizes findings from
 `/Users/nbonamy/src/claude-code-source-code-full-main` and maps them against

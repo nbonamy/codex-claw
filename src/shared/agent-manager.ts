@@ -12,6 +12,8 @@ export function duplicateAgentInSnapshot(snapshot: AppSnapshot, agentId: string,
     name: `${source.name} (copy)`,
     avatar: source.avatar,
     folder: source.folder,
+    backend: source.backend,
+    backendDefaults: source.backendDefaults ? { ...source.backendDefaults } : undefined,
     status: { type: 'idle' },
     createdAt,
     updatedAt: createdAt,
@@ -35,7 +37,8 @@ export function saveAgentToBench(snapshot: AppSnapshot, agentId: string, created
     name: agent.name,
     avatar: agent.avatar,
     folder: agent.folder,
-    backend: 'codex',
+    backend: agent.backend,
+    backendDefaults: agent.backendDefaults ? { ...agent.backendDefaults } : undefined,
     createdAt,
     updatedAt: createdAt,
   };
@@ -59,6 +62,8 @@ export function deployBenchTemplateInSnapshot(snapshot: AppSnapshot, templateId:
     name: template.name,
     avatar: template.avatar,
     folder: template.folder,
+    backend: template.backend,
+    backendDefaults: template.backendDefaults ? { ...template.backendDefaults } : undefined,
     status: { type: 'idle' },
     createdAt,
     updatedAt: createdAt,
@@ -159,7 +164,7 @@ function ensureAgentCanChange(agent: Agent, message: string): void {
 }
 
 function clearRuntimeState(agent: Agent): void {
-  delete agent.codexThreadId;
+  delete agent.backendSession;
   delete agent.contextUsage;
   delete agent.isRegistered;
   delete agent.mcpSessionId;

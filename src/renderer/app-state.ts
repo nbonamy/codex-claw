@@ -1,7 +1,8 @@
 import { computed, ref } from 'vue';
-import type { AgentFileSearchItem, AppSnapshot, ClientRequestResponse, CodexModelOption, CodexSkillSummary, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
+import type { AgentFileSearchItem, AppSnapshot, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
 import { updateSettingsInSnapshot } from '../shared/settings';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '../shared/snapshot';
+import { defaultBackendCapabilities } from '../shared/backend-capabilities';
 import { createQueuedChatPrompt, type QueuedChatPrompt } from './shared/chat/queued-prompts';
 import { promptSkillInputsFromText } from './shared/chat/composer-skills';
 
@@ -10,10 +11,10 @@ const isLoading = ref(false);
 const sendingAgentIds = ref(new Set<string>());
 const queuedPromptsByAgentId = ref<Record<string, QueuedChatPrompt[]>>({});
 const answeredClientRequestIds = ref(new Set<string>());
-const codexModels = ref<CodexModelOption[]>([]);
+const backendModels = ref<BackendModelOption[]>([]);
 const modelCatalogStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
 const modelCatalogError = ref<string | null>(null);
-const codexSkills = ref<CodexSkillSummary[]>([]);
+const backendSkills = ref<BackendSkillSummary[]>([]);
 const skillCatalogStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
 const skillCatalogError = ref<string | null>(null);
 const agentFiles = ref<AgentFileSearchItem[]>([]);
@@ -31,6 +32,8 @@ export function useAppState() {
   const activeAgent = computed(() => {
     return snapshot.value.agents.find((agent) => agent.id === snapshot.value.activeAgentId) ?? null;
   });
+
+  const activeBackendCapabilities = computed(() => defaultBackendCapabilities(activeAgent.value?.backend ?? 'codex'));
 
   const visibleMessages = computed(() => {
     const agentId = activeAgent.value?.id;
@@ -68,24 +71,6 @@ export function useAppState() {
       await loadActiveAgentCatalogs();
     } finally {
       isLoading.value = false;
-    }
-  }
-
-  async function loadCodexModels(): Promise<void> {
-    if (!window.codexClaw?.listCodexModels || modelCatalogStatus.value === 'loading') {
-      return;
-    }
-
-    modelCatalogStatus.value = 'loading';
-    modelCatalogError.value = null;
-
-    try {
-      codexModels.value = await window.codexClaw.listCodexModels();
-      modelCatalogStatus.value = 'loaded';
-      selectDefaultModelIfNeeded();
-    } catch (error) {
-      modelCatalogStatus.value = 'error';
-      modelCatalogError.value = error instanceof Error ? error.message : String(error);
     }
   }
 
@@ -393,7 +378,7 @@ export function useAppState() {
   }
 
   function selectModel(modelId: string): void {
-    const model = codexModels.value.find((candidate) => candidate.id === modelId);
+    const model = backendModels.value.find((candidate) => candidate.id === modelId);
     if (!model) {
       return;
     }
@@ -404,7 +389,7 @@ export function useAppState() {
 
   function selectReasoningEffort(reasoningEffort: ReasoningEffort): void {
     const model = selectedModel.value;
-    if (!model || !model.supportedReasoningEfforts.some((option) => option.reasoningEffort === reasoningEffort)) {
+    if (!model || !model.supportedReasoningEfforts?.some((option) => option.reasoningEffort === reasoningEffort)) {
       return;
     }
 
@@ -427,10 +412,11 @@ export function useAppState() {
     isLoading,
     isSending,
     answeredClientRequestIds,
-    codexModels,
+    backendModels,
+    activeBackendCapabilities,
     modelCatalogStatus,
     modelCatalogError,
-    codexSkills,
+    backendSkills,
     skillCatalogStatus,
     skillCatalogError,
     agentFiles,
@@ -440,8 +426,8 @@ export function useAppState() {
     selectedReasoningEffort,
     planMode,
     goalMode,
-    loadCodexModels,
-    loadCodexSkills: loadCodexSkillsForActiveAgent,
+    loadBackendModels: loadBackendModelsForActiveAgent,
+    loadBackendSkills: loadBackendSkillsForActiveAgent,
     loadAgentFiles: loadAgentFilesForActiveAgent,
     loadSnapshot,
     chooseAgentFolder,
@@ -499,37 +485,74 @@ function selectDefaultModelIfNeeded(): void {
     return;
   }
 
-  const defaultModel = codexModels.value.find((model) => model.isDefault) ?? codexModels.value[0] ?? null;
+  const defaultModel = backendModels.value.find((model) => model.isDefault) ?? backendModels.value[0] ?? null;
   selectedModelId.value = defaultModel?.id ?? null;
   selectedReasoningEffort.value = defaultModel ? defaultReasoningEffort(defaultModel) : null;
 }
 
-function selectedModelFromCatalog(): CodexModelOption | null {
-  return codexModels.value.find((model) => model.id === selectedModelId.value) ?? null;
+function selectedModelFromCatalog(): BackendModelOption | null {
+  return backendModels.value.find((model) => model.id === selectedModelId.value) ?? null;
 }
 
-function defaultReasoningEffort(model: CodexModelOption): ReasoningEffort | null {
-  return model.defaultReasoningEffort || (model.supportedReasoningEfforts[0]?.reasoningEffort ?? null);
+function defaultReasoningEffort(model: BackendModelOption): ReasoningEffort | null {
+  return model.defaultReasoningEffort || (model.supportedReasoningEfforts?.[0]?.reasoningEffort ?? null);
 }
 
 function selectedPromptOptions(prompt: string): SendPromptOptions | undefined {
   const model = selectedModelFromCatalog();
   const skills = selectedPromptSkills(prompt);
-  if (!model && !planMode.value && !goalMode.value && skills.length === 0) {
+  const agent = snapshot.value.activeAgentId
+    ? snapshot.value.agents.find((candidate) => candidate.id === snapshot.value.activeAgentId)
+    : undefined;
+  const capabilities = agent ? defaultBackendCapabilities(agent.backend) : defaultBackendCapabilities('codex');
+  const promptModel = capabilities.models ? model : null;
+  const codexBackendOptions = codexPromptOptions({
+    backend: agent?.backend,
+    capabilities,
+    model: promptModel,
+    skills,
+  });
+
+  if (!promptModel && (capabilities.planMode === 'unsupported' || !planMode.value) && !codexBackendOptions) {
     return undefined;
   }
 
   return {
-    ...(goalMode.value ? { goalMode: true } : {}),
-    ...(model ? { model: model.model } : {}),
-    ...(planMode.value ? { planMode: true } : {}),
-    ...(model ? { reasoningEffort: selectedReasoningEffort.value ?? defaultReasoningEffort(model) } : {}),
-    ...(skills.length > 0 ? { skills } : {}),
+    ...(promptModel ? { model: promptModel.model } : {}),
+    ...(capabilities.planMode !== 'unsupported' && planMode.value ? { planMode: true } : {}),
+    ...(codexBackendOptions ? { backendOptions: codexBackendOptions } : {}),
+  };
+}
+
+function codexPromptOptions(input: {
+  backend?: string;
+  capabilities: ReturnType<typeof defaultBackendCapabilities>;
+  model: BackendModelOption | null;
+  skills: ReturnType<typeof selectedPromptSkills>;
+}): SendPromptOptions['backendOptions'] | undefined {
+  if (input.backend !== 'codex') {
+    return undefined;
+  }
+
+  const selectedSkills = input.capabilities.skills ? input.skills : [];
+  const reasoningEffort = input.capabilities.reasoningEffort && input.model
+    ? selectedReasoningEffort.value ?? defaultReasoningEffort(input.model)
+    : null;
+  const wantsGoalMode = input.capabilities.goalMode && goalMode.value;
+  if (!wantsGoalMode && !reasoningEffort && selectedSkills.length === 0) {
+    return undefined;
+  }
+
+  return {
+    kind: 'codex',
+    ...(wantsGoalMode ? { goalMode: true } : {}),
+    ...(reasoningEffort ? { reasoningEffort } : {}),
+    ...(selectedSkills.length > 0 ? { skills: selectedSkills } : {}),
   };
 }
 
 function selectedPromptSkills(prompt: string) {
-  return promptSkillInputsFromText(prompt, codexSkills.value);
+  return promptSkillInputsFromText(prompt, backendSkills.value);
 }
 
 function subscribeToMainEvents(): void {
@@ -545,23 +568,50 @@ function subscribeToMainEvents(): void {
       void drainQueuedPrompts(event.agentId);
     }
     if (event.type === 'skills.changed') {
-      void loadCodexSkillsForActiveAgent();
+      void loadBackendSkillsForActiveAgent();
     }
   });
 }
 
 async function loadActiveAgentCatalogs(): Promise<void> {
   await Promise.all([
-    loadCodexSkillsForActiveAgent(),
+    loadBackendModelsForActiveAgent(),
+    loadBackendSkillsForActiveAgent(),
     loadAgentFilesForActiveAgent(),
   ]);
 }
 
-async function loadCodexSkillsForActiveAgent(): Promise<void> {
+async function loadBackendModelsForActiveAgent(): Promise<void> {
   const agentId = snapshot.value.activeAgentId;
-  if (!agentId || !window.codexClaw?.listCodexSkills || skillCatalogStatus.value === 'loading') {
+  if (!agentId || !window.codexClaw?.listBackendModels) {
+    backendModels.value = [];
+    modelCatalogStatus.value = 'notLoaded';
+    return;
+  }
+
+  if (modelCatalogStatus.value === 'loading') {
+    return;
+  }
+
+  modelCatalogStatus.value = 'loading';
+  modelCatalogError.value = null;
+
+  try {
+    backendModels.value = await window.codexClaw.listBackendModels(agentId);
+    modelCatalogStatus.value = 'loaded';
+    selectDefaultModelIfNeeded();
+  } catch (error) {
+    backendModels.value = [];
+    modelCatalogStatus.value = 'error';
+    modelCatalogError.value = error instanceof Error ? error.message : String(error);
+  }
+}
+
+async function loadBackendSkillsForActiveAgent(): Promise<void> {
+  const agentId = snapshot.value.activeAgentId;
+  if (!agentId || !window.codexClaw?.listBackendSkills || skillCatalogStatus.value === 'loading') {
     if (!agentId) {
-      codexSkills.value = [];
+      backendSkills.value = [];
       skillCatalogStatus.value = 'notLoaded';
     }
     return;
@@ -571,10 +621,10 @@ async function loadCodexSkillsForActiveAgent(): Promise<void> {
   skillCatalogError.value = null;
 
   try {
-    codexSkills.value = await window.codexClaw.listCodexSkills(agentId);
+    backendSkills.value = await window.codexClaw.listBackendSkills(agentId);
     skillCatalogStatus.value = 'loaded';
   } catch (error) {
-    codexSkills.value = [];
+    backendSkills.value = [];
     skillCatalogStatus.value = 'error';
     skillCatalogError.value = error instanceof Error ? error.message : String(error);
   }
@@ -636,7 +686,7 @@ async function hydrateActiveAgentHistory(): Promise<void> {
     ? snapshot.value.agents.find((agent) => agent.id === activeAgentId)
     : null;
 
-  if (!activeAgent?.codexThreadId || !window.codexClaw?.selectAgent) {
+  if (!activeAgent?.backendSession || !window.codexClaw?.selectAgent) {
     return;
   }
 

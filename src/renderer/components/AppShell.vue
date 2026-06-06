@@ -43,7 +43,7 @@
       <AgentHeader
         v-if="!isAgentEmpty && currentAgent"
         :agent="currentAgent"
-        :app-server="snapshot.appServer"
+        :backend-runtime="currentBackendRuntime"
         :is-loading="isLoading"
         :sidebar-collapsed="agentSidebarCollapsed"
         @expand-sidebar="agentSidebarCollapsed = false"
@@ -64,8 +64,9 @@
           :is-loading="isLoading"
           :is-sending="isSending"
           :answered-client-request-ids="answeredClientRequestIds"
-          :codex-models="codexModels"
-          :codex-skills="codexSkills"
+          :backend-models="backendModels"
+          :backend-skills="backendSkills"
+          :backend-capabilities="backendCapabilities"
           :model-catalog-status="modelCatalogStatus"
           :skill-catalog-status="skillCatalogStatus"
           :goal-mode="goalMode"
@@ -119,7 +120,8 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { Agent, AgentFileSearchItem, AppCommand, AppSnapshot, ClientRequestResponse, CodexModelOption, CodexSkillSummary, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, Team, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../shared/contracts';
+import type { Agent, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, Team, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../shared/contracts';
+import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import AgentDialog from './AgentDialog.vue';
 import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
@@ -140,8 +142,9 @@ const props = withDefaults(defineProps<{
   isSending: boolean;
   goalMode?: boolean;
   answeredClientRequestIds?: Set<string>;
-  codexModels?: CodexModelOption[];
-  codexSkills?: CodexSkillSummary[];
+  backendModels?: BackendModelOption[];
+  backendSkills?: BackendSkillSummary[];
+  backendCapabilities?: BackendCapabilities;
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   selectedModelId?: string | null;
@@ -158,8 +161,9 @@ const props = withDefaults(defineProps<{
 }>(), {
   answeredClientRequestIds: () => new Set<string>(),
   agentFiles: () => [],
-  codexModels: () => [],
-  codexSkills: () => [],
+  backendModels: () => [],
+  backendSkills: () => [],
+  backendCapabilities: () => defaultBackendCapabilities('codex'),
   modelCatalogStatus: 'notLoaded',
   skillCatalogStatus: 'notLoaded',
   selectedModelId: null,
@@ -236,6 +240,13 @@ const currentAgent = computed(() => {
   }
 
   return activeTeamAgents.value.find((agent) => agent.id === team.activeAgentId) ?? activeTeamAgents.value[0] ?? null;
+});
+const currentBackendRuntime = computed<BackendRuntimeStatus>(() => {
+  const backend = currentAgent.value?.backend ?? 'codex';
+  return props.snapshot.backendRuntimes.find((runtime) => runtime.backend === backend) ?? {
+    backend,
+    status: 'notConfigured',
+  };
 });
 const isAgentEmpty = computed(() => activeTeamAgents.value.length === 0);
 const showAgentSidebar = computed(() => !agentSidebarCollapsed.value && !isAgentEmpty.value);

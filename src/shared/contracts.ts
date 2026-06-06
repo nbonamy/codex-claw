@@ -14,13 +14,48 @@ export type Team = {
   activeAgentId?: string;
 };
 
+export type AgentBackend = 'codex' | 'claude';
+
+export type BackendSession =
+  | {
+    kind: 'codex';
+    threadId: string;
+  }
+  | {
+    kind: 'claude';
+    sessionId: string;
+    transport: 'stdio' | 'websocket';
+    transcriptSessionId?: string;
+    serverUrl?: string;
+  };
+
+export type BackendDefaults =
+  | {
+    kind: 'codex';
+    model?: string;
+    approvalPolicy?: string;
+    sandboxMode?: string;
+    reasoningEffort?: string;
+  }
+  | {
+    kind: 'claude';
+    model?: string;
+    permissionMode?: string;
+    thinking?: {
+      type: 'enabled' | 'disabled';
+      budgetTokens?: number;
+    };
+  };
+
 export type Agent = {
   id: string;
   teamId?: string;
   name: string;
   avatar?: string;
   folder: string;
-  codexThreadId?: string;
+  backend: AgentBackend;
+  backendSession?: BackendSession;
+  backendDefaults?: BackendDefaults;
   contextUsage?: AgentContextUsage;
   isRegistered?: boolean;
   mcpSessionId?: string;
@@ -63,17 +98,31 @@ export type BenchTemplate = {
   name: string;
   avatar?: string;
   folder: string;
-  backend: 'codex';
-  codexDefaults?: {
-    model?: string;
-    approvalPolicy?: string;
-    sandboxMode?: string;
-  };
+  backend: AgentBackend;
+  backendDefaults?: BackendDefaults;
   createdAt: string;
   updatedAt: string;
 };
 
 export type ReasoningEffort = string;
+
+export type BackendPlanModeSupport = 'native' | 'prompted' | 'unsupported';
+
+export type BackendCapabilities = {
+  models: boolean;
+  skills: boolean;
+  reasoningEffort: boolean;
+  thinkingBudget: boolean;
+  planMode: BackendPlanModeSupport;
+  goalMode: boolean;
+  steerPrompt: boolean;
+  interrupt: boolean;
+  history: boolean;
+  rollback: boolean;
+  editMessage: boolean;
+  retryMessage: boolean;
+  approvals: boolean;
+};
 
 export type AppearanceMode = 'dark' | 'light' | 'system';
 
@@ -85,25 +134,28 @@ export type AppThemeSettings = {
   codeFontSize: number;
 };
 
-export type CodexReasoningEffortOption = {
+export type BackendReasoningEffortOption = {
   reasoningEffort: ReasoningEffort;
   description: string;
 };
 
-export type CodexModelOption = {
+export type BackendModelOption = {
   id: string;
   model: string;
   displayName: string;
-  description: string;
-  hidden: boolean;
-  supportedReasoningEfforts: CodexReasoningEffortOption[];
-  defaultReasoningEffort: ReasoningEffort;
-  isDefault: boolean;
+  description?: string;
+  hidden?: boolean;
+  supportedReasoningEfforts?: BackendReasoningEffortOption[];
+  defaultReasoningEffort?: ReasoningEffort | null;
+  isDefault?: boolean;
+  capabilities?: Partial<BackendCapabilities>;
+  providerMetadata?: Record<string, unknown>;
 };
 
-export type CodexSkillSummary = {
+export type BackendSkillSummary = {
+  id?: string;
   name: string;
-  description: string;
+  description?: string;
   shortDescription?: string;
   displayName?: string;
   iconSmall?: string;
@@ -111,8 +163,9 @@ export type CodexSkillSummary = {
   brandColor?: string;
   defaultPrompt?: string;
   path: string;
-  scope: string;
+  scope?: string;
   enabled: boolean;
+  providerMetadata?: Record<string, unknown>;
 };
 
 export type AgentFileSearchItem = {
@@ -126,12 +179,23 @@ export type PromptSkillInput = {
 };
 
 export type SendPromptOptions = {
-  goalMode?: boolean;
   model?: string | null;
   planMode?: boolean;
-  reasoningEffort?: ReasoningEffort | null;
-  skills?: PromptSkillInput[];
+  backendOptions?: BackendPromptOptions;
 };
+
+export type BackendPromptOptions =
+  | {
+    kind: 'codex';
+    goalMode?: boolean;
+    reasoningEffort?: ReasoningEffort | null;
+    skills?: PromptSkillInput[];
+  }
+  | {
+    kind: 'claude';
+    thinkingBudgetTokens?: number | null;
+    permissionMode?: string | null;
+  };
 
 export type AppleSpeechTranscriptionOptions = {
   locale?: string;
@@ -197,21 +261,26 @@ export type AppSnapshot = {
   activeTeamId: string | null;
   activeAgentId: string | null;
   messages: RendererMessage[];
-  appServer: {
-    status: 'notConfigured' | 'starting' | 'running' | 'error';
-    detail?: string;
-  };
+  backendRuntimes: BackendRuntimeStatus[];
   accountRateLimits?: AccountRateLimits;
   theme: AppThemeSettings;
+};
+
+export type BackendRuntimeStatus = {
+  backend: AgentBackend;
+  status: 'notConfigured' | 'starting' | 'running' | 'error';
+  detail?: string;
 };
 
 export type MainToRendererEvent = {
   seq: number;
   agentId?: string;
+  backend?: AgentBackend;
+  backendSessionId?: string;
   threadId?: string;
   turnId?: string;
   type:
-    | 'appServer.statusChanged'
+    | 'backend.statusChanged'
     | 'agent.updated'
     | 'agent.statusChanged'
     | 'thread.started'
@@ -344,8 +413,8 @@ export type ClientRequestResponse = {
 
 export type CodexClawApi = {
   getSnapshot(): Promise<AppSnapshot>;
-  listCodexModels(): Promise<CodexModelOption[]>;
-  listCodexSkills(agentId: string): Promise<CodexSkillSummary[]>;
+  listBackendModels(agentId: string): Promise<BackendModelOption[]>;
+  listBackendSkills(agentId: string): Promise<BackendSkillSummary[]>;
   listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]>;
   chooseAgentFolder(): Promise<string | null>;
   createTeam(input: CreateTeamInput): Promise<AppSnapshot>;

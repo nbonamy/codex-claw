@@ -34,8 +34,9 @@
           :files="agentFiles"
           :is-sending="isSending"
           :placeholder="composerPlaceholder"
-          :models="codexModels"
-          :skills="codexSkills"
+          :models="backendModels"
+          :skills="backendSkills"
+          :backend-capabilities="backendCapabilities"
           :model-catalog-status="modelCatalogStatus"
           :skill-catalog-status="skillCatalogStatus"
           :draft="composerDraft"
@@ -81,8 +82,9 @@
         :files="agentFiles"
         :is-sending="isSending"
         :placeholder="composerPlaceholder"
-        :models="codexModels"
-        :skills="codexSkills"
+        :models="backendModels"
+        :skills="backendSkills"
+        :backend-capabilities="backendCapabilities"
         :model-catalog-status="modelCatalogStatus"
         :skill-catalog-status="skillCatalogStatus"
         :draft="composerDraft"
@@ -106,7 +108,8 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Agent, AgentFileSearchItem, ClientRequestResponse, CodexModelOption, CodexSkillSummary, ReasoningEffort, RendererMessage } from '../../shared/contracts';
+import type { Agent, AgentFileSearchItem, BackendCapabilities, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ReasoningEffort, RendererMessage } from '../../shared/contracts';
+import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import WorkbenchLayout from './WorkbenchLayout.vue';
 import ChatComposer from './ChatComposer.vue';
 import ConversationHistoryLoader from './ConversationHistoryLoader.vue';
@@ -123,8 +126,9 @@ const props = withDefaults(defineProps<{
   isLoading: boolean;
   isSending: boolean;
   answeredClientRequestIds?: Set<string>;
-  codexModels?: CodexModelOption[];
-  codexSkills?: CodexSkillSummary[];
+  backendModels?: BackendModelOption[];
+  backendSkills?: BackendSkillSummary[];
+  backendCapabilities?: BackendCapabilities;
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   selectedModelId?: string | null;
@@ -134,7 +138,9 @@ const props = withDefaults(defineProps<{
 }>(), {
   queuedPrompts: () => [],
   agentFiles: () => [],
-  codexSkills: () => [],
+  backendModels: () => [],
+  backendSkills: () => [],
+  backendCapabilities: () => defaultBackendCapabilities('codex'),
   skillCatalogStatus: 'notLoaded',
 });
 
@@ -162,18 +168,19 @@ const composerPlaceholder = computed(() => {
     return 'Select an agent';
   }
 
-  return props.isSending ? 'Codex is working...' : 'Ask for follow-up changes';
+  return props.isSending ? `${backendLabel.value} is working...` : 'Ask for follow-up changes';
 });
+const backendLabel = computed(() => (props.agent?.backend === 'claude' ? 'Claude' : 'Codex'));
 
 const chatMessages = computed(() => rendererMessagesToChatMessages(props.messages));
 const composerDraft = ref('');
 const composerDraftRevision = ref(0);
 const started = computed(() => chatMessages.value.length > 0 || props.isSending);
-const isHydratingHistory = computed(() => Boolean(props.agent?.codexThreadId) && props.messages.length === 0 && props.isLoading);
+const isHydratingHistory = computed(() => Boolean(props.agent?.backendSession) && props.messages.length === 0 && props.isLoading);
 const heroHeadline = computed(() => (props.agent ? `Chat with ${props.agent.name}` : 'Select an agent'));
 const heroSubhead = computed(() => {
   if (!props.agent) {
-    return 'Choose an agent from the left to start a native Codex session.';
+    return 'Choose an agent from the left to start a native backend session.';
   }
 
   return props.agent.folder;

@@ -8,10 +8,11 @@ import type { CodexClawApi } from '../../shared/contracts';
 describe('App', () => {
   it('loads the main-process snapshot on mount', async () => {
     const snapshot = createInitialSnapshot();
-    snapshot.appServer = {
+    snapshot.backendRuntimes = [{
+      backend: 'codex',
       status: 'running',
       detail: 'ready',
-    };
+    }];
 
     const getSnapshot = vi.fn().mockResolvedValue(snapshot);
     vi.stubGlobal('window', {

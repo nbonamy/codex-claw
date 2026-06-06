@@ -1,6 +1,6 @@
 # Codex Claw Architecture
 
-Status: initial draft, 2026-06-05.
+Status: updated for backend seam cleanup, 2026-06-06.
 
 Codex Claw is an Electron app that merges the team/agent product model from
 Skwad with the native chat and artifact rendering already built in id8. The app
@@ -64,7 +64,9 @@ type Agent = {
   name: string
   avatar?: string
   folder: string
-  codexThreadId?: string
+  backend: "codex" | "claude"
+  backendSession?: BackendSession
+  backendDefaults?: BackendDefaults
   status: AgentStatus
   createdAt: string
   updatedAt: string
@@ -75,15 +77,21 @@ type BenchTemplate = {
   name: string
   avatar?: string
   folder: string
-  backend: "codex"
-  codexDefaults?: {
-    model?: string
-    approvalPolicy?: string
-    sandboxMode?: string
-  }
+  backend: "codex" | "claude"
+  backendDefaults?: BackendDefaults
   createdAt: string
   updatedAt: string
 }
+
+type BackendSession =
+  | { kind: "codex"; threadId: string }
+  | {
+      kind: "claude"
+      sessionId: string
+      transport: "stdio" | "websocket"
+      transcriptSessionId?: string
+      serverUrl?: string
+    }
 
 type AgentStatus =
   | { type: "idle" }
@@ -95,8 +103,8 @@ type AgentStatus =
 
 Codex app-server owns the conversation transcript and thread history in
 `CODEX_HOME`. Codex Claw owns only product state: teams, agents, selected
-folders, Bench templates, view preferences, theme preference, and the mapping
-from an agent to a Codex thread id.
+folders, Bench templates, view preferences, theme preference, and backend
+session metadata such as the Codex thread id.
 
 Bench templates are reusable saved agents, not active sessions. Saving an agent
 to Bench captures the deployable shape: name, avatar, folder, backend, and
@@ -138,12 +146,13 @@ Modules:
 - `CodexRpcClient`: owns the app-server JSON-RPC transport, request IDs,
   request/response matching, notifications, server-initiated requests, and
   backpressure.
-- `AgentSessionManager`: maps app agents to Codex threads and active turns.
+- `CodexAgentSessionManager`: maps app agents to Codex threads and active turns.
   It starts/resumes/forks threads, starts turns, steers active turns,
   interrupts turns, and routes events back to the right agent.
-- `AgentBackendDriver`: backend-facing interface used by `AgentSessionManager`.
-  The first concrete driver is `CodexAppServerDriver`; future drivers could
-  wrap Claude Code or another agent without changing renderer IPC.
+- `AgentBackendDriver`: backend-facing interface used by app-level chat and
+  controller services. The first concrete driver wraps
+  `CodexAgentSessionManager`; future drivers can wrap Claude Code or another
+  agent without changing renderer IPC.
 - `CodexEventAdapter`: converts app-server notifications into the smaller
   renderer event protocol. This is where app-server churn is contained.
 - `ApprovalCoordinator`: stores pending approval and user-input requests from
@@ -177,13 +186,17 @@ our app, not by Codex. Keep one narrow main-process interface:
 
 ```ts
 type AgentBackendDriver = {
-  startSession(agent: Agent): Promise<BackendSession>
-  resumeSession(agent: Agent, threadId: string): Promise<BackendSession>
-  sendPrompt(sessionId: string, input: PromptInput): Promise<void>
-  steerTurn(sessionId: string, input: PromptInput): Promise<void>
-  interruptTurn(sessionId: string): Promise<void>
-  answerRequest(requestId: string, payload: unknown): Promise<void>
+  backend: AgentBackend
+  sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>
+  interrupt(agent: Agent): Promise<BackendSendResult>
+  respondToRequest(response: ClientRequestResponse): Promise<void>
+  hydrateAgent?(agent: Agent): Promise<BackendSession | null>
+  steerPrompt?(agent: Agent, prompt: string): Promise<BackendSendResult>
+  rollbackToTurn?(agent: Agent, turnId: string): Promise<BackendRollbackResult>
+  listModels?(agent: Agent): Promise<BackendModelOption[]>
+  listSkills?(agent: Agent): Promise<BackendSkillSummary[]>
   onEvent(listener: (event: BackendEvent) => void): () => void
+  close(): Promise<void>
 }
 ```
 
@@ -208,6 +221,8 @@ type CodexClawApi = {
   removeBenchTemplate(templateId: string): Promise<void>
   selectFolder(): Promise<string | null>
   startAgent(agentId: string): Promise<void>
+  listBackendModels(agentId: string): Promise<BackendModelOption[]>
+  listBackendSkills(agentId: string): Promise<BackendSkillSummary[]>
   sendPrompt(agentId: string, prompt: string): Promise<void>
   steerTurn(agentId: string, prompt: string): Promise<void>
   interruptTurn(agentId: string): Promise<void>
@@ -247,10 +262,12 @@ after reloads.
 type MainToRendererEvent = {
   seq: number
   agentId?: string
+  backend?: AgentBackend
+  backendSessionId?: string
   threadId?: string
   turnId?: string
   type:
-    | "appServer.statusChanged"
+    | "backend.statusChanged"
     | "agent.statusChanged"
     | "thread.started"
     | "turn.started"

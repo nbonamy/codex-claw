@@ -4,6 +4,7 @@ import path from 'node:path';
 import { listAgentFolderFiles } from './agent-files';
 import { sendAgentPrompt } from './agent-chat-service';
 import { CodexAgentSessionManager } from './codex/agent-session';
+import { CodexBackendDriver } from './codex/codex-driver';
 import { CodexProcessTransport } from './codex/process-transport';
 import { CodexRpcClient } from './codex/rpc-client';
 import { logMain, warnMain } from './log';
@@ -33,9 +34,11 @@ import {
   updateAgentFolder,
 } from './snapshot-service';
 import { AppStatePersistence } from './state-persistence';
-import type { Agent, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, ClientRequestResponse, CodexSkillSummary, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
+import type { Agent, AgentBackend, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
 import { ipcChannels } from '../shared/ipc';
 import { teamColors } from '../shared/team-colors';
+import type { AgentBackendDriver } from './backends/types';
+import { backendDisplayName, unsupportedBackendFeature } from './backends/types';
 
 export class AppController {
   private mainWindow: BrowserWindow | null = null;
@@ -58,7 +61,8 @@ export class AppController {
   private mcpServer: ClawMcpHttpServer | null = null;
   private mcpServerUrl: string | null = null;
   private mcpServerStartPromise: Promise<string> | null = null;
-  private codexSessionManager: CodexAgentSessionManager | null = null;
+  private codexBackendDriver: CodexBackendDriver | null = null;
+  private readonly clientRequestBackends = new Map<string, AgentBackend>();
   private seq = 0;
 
   constructor(persistence = new AppStatePersistence(path.join(app.getPath('userData'), 'state.json'))) {
@@ -72,12 +76,12 @@ export class AppController {
   registerIpcHandlers(): void {
     ipcMain.handle(ipcChannels.getSnapshot, () => this.snapshot);
 
-    ipcMain.handle(ipcChannels.listCodexModels, async () => {
-      return (await this.getCodexSessionManager()).listModels();
+    ipcMain.handle(ipcChannels.listBackendModels, async (_event, agentId: string) => {
+      return this.listBackendModels(agentId);
     });
 
-    ipcMain.handle(ipcChannels.listCodexSkills, async (_event, agentId: string) => {
-      return this.listCodexSkills(agentId);
+    ipcMain.handle(ipcChannels.listBackendSkills, async (_event, agentId: string) => {
+      return this.listBackendSkills(agentId);
     });
 
     ipcMain.handle(ipcChannels.listAgentFiles, async (_event, agentId: string) => {
@@ -268,11 +272,13 @@ export class AppController {
     });
 
     ipcMain.handle(ipcChannels.respondToClientRequest, async (_event, response: ClientRequestResponse) => {
-      if (!this.codexSessionManager) {
-        throw new Error('No active Codex session can receive this client response.');
+      const backend = this.clientRequestBackends.get(response.id);
+      if (!backend) {
+        throw new Error(`No backend owns client request '${response.id}'.`);
       }
 
-      await this.codexSessionManager.respondToClientRequest(response);
+      await (await this.getBackendDriver(backend)).respondToRequest(response);
+      this.clientRequestBackends.delete(response.id);
       return this.snapshot;
     });
   }
@@ -282,23 +288,47 @@ export class AppController {
   }
 
   async shutdown(): Promise<void> {
-    await this.codexSessionManager?.close();
+    await this.codexBackendDriver?.close();
     await this.mcpServer?.stop();
   }
 
   private async sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot> {
-    return sendAgentPrompt(this.snapshot, await this.getCodexSessionManager(), agentId, prompt, options, (event) => {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) {
+      return this.snapshot;
+    }
+
+    return sendAgentPrompt(this.snapshot, await this.getBackendDriverForAgent(agent), agentId, prompt, options, (event) => {
       this.emitAndApply(event);
     });
   }
 
-  private async listCodexSkills(agentId: string): Promise<CodexSkillSummary[]> {
+  private async listBackendModels(agentId: string): Promise<BackendModelOption[]> {
     const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
     if (!agent) {
       throw new Error(`Agent not found: ${agentId}`);
     }
 
-    return (await this.getCodexSessionManager()).listSkills(agent);
+    const driver = await this.getBackendDriverForAgent(agent);
+    if (!driver.listModels) {
+      return [];
+    }
+
+    return driver.listModels(agent);
+  }
+
+  private async listBackendSkills(agentId: string): Promise<BackendSkillSummary[]> {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) {
+      throw new Error(`Agent not found: ${agentId}`);
+    }
+
+    const driver = await this.getBackendDriverForAgent(agent);
+    if (!driver.listSkills) {
+      return [];
+    }
+
+    return driver.listSkills(agent);
   }
 
   private async listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]> {
@@ -317,10 +347,16 @@ export class AppController {
       return this.snapshot;
     }
 
-    const result = await (await this.getCodexSessionManager()).steerPrompt(agent, trimmedPrompt);
+    const driver = await this.getBackendDriverForAgent(agent);
+    if (!driver.steerPrompt) {
+      throw unsupportedBackendFeature(agent, 'active-turn steering');
+    }
+
+    const result = await driver.steerPrompt(agent, trimmedPrompt);
+    agent.backendSession = result.backendSession;
     this.emitAndApply({
       agentId,
-      threadId: result.threadId,
+      ...(result.backendSession.kind === 'codex' ? { threadId: result.backendSession.threadId } : {}),
       turnId: result.turnId,
       type: 'message.steer',
       payload: {
@@ -342,7 +378,9 @@ export class AppController {
     });
 
     try {
-      await (await this.getCodexSessionManager()).interruptTurn(agent);
+      const driver = await this.getBackendDriverForAgent(agent);
+      const result = await driver.interrupt(agent);
+      agent.backendSession = result.backendSession;
       logMain('agent-interrupt', 'acknowledged', { agentId });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -353,7 +391,7 @@ export class AppController {
       this.emitAndApply({
         agentId,
         type: 'error',
-        payload: { message: `Failed to interrupt Codex: ${message}` },
+        payload: { message: `Failed to interrupt ${backendDisplayName(agent.backend)}: ${message}` },
       });
     }
 
@@ -395,10 +433,16 @@ export class AppController {
   }
 
   private async rollbackAgentToTurn(agent: Agent, turnId: string): Promise<void> {
-    const result = await (await this.getCodexSessionManager()).rollbackToTurn(agent, turnId);
+    const driver = await this.getBackendDriverForAgent(agent);
+    if (!driver.rollbackToTurn) {
+      throw unsupportedBackendFeature(agent, 'message rollback');
+    }
+
+    const result = await driver.rollbackToTurn(agent, turnId);
+    agent.backendSession = result.backendSession;
     this.emitAndApply({
       agentId: agent.id,
-      threadId: result.threadId,
+      ...(result.backendSession.kind === 'codex' ? { threadId: result.backendSession.threadId } : {}),
       type: 'thread.historyLoaded',
       payload: {
         messages: result.messages,
@@ -407,7 +451,7 @@ export class AppController {
     });
     this.emitAndApply({
       agentId: agent.id,
-      threadId: result.threadId,
+      ...(result.backendSession.kind === 'codex' ? { threadId: result.backendSession.threadId } : {}),
       type: 'agent.statusChanged',
       payload: { type: 'idle' },
     });
@@ -503,16 +547,24 @@ export class AppController {
 
   private async hydrateAgentHistory(agentId: string): Promise<void> {
     const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent?.codexThreadId) {
+    if (!agent?.backendSession) {
       return;
     }
 
     try {
-      await (await this.getCodexSessionManager()).hydrateAgent(agent);
+      const driver = await this.getBackendDriverForAgent(agent);
+      if (!driver.hydrateAgent) {
+        return;
+      }
+
+      const backendSession = await driver.hydrateAgent(agent);
+      if (backendSession) {
+        agent.backendSession = backendSession;
+      }
     } catch (error) {
-      warnMain('codex-history', 'failed to hydrate persisted thread', {
+      warnMain('backend-history', 'failed to hydrate persisted session', {
         agentId,
-        threadId: agent.codexThreadId,
+        backend: agent.backend,
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -553,9 +605,25 @@ export class AppController {
     }
   }
 
-  private async getCodexSessionManager(): Promise<CodexAgentSessionManager> {
-    if (this.codexSessionManager) {
-      return this.codexSessionManager;
+  private async getBackendDriverForAgent(agent: Agent): Promise<AgentBackendDriver> {
+    if (agent.backendSession && agent.backendSession.kind !== agent.backend) {
+      throw new Error(`Agent '${agent.id}' has mismatched backend session '${agent.backendSession.kind}' for backend '${agent.backend}'.`);
+    }
+
+    return this.getBackendDriver(agent.backend);
+  }
+
+  private async getBackendDriver(backend: AgentBackend): Promise<AgentBackendDriver> {
+    if (backend === 'codex') {
+      return this.getCodexBackendDriver();
+    }
+
+    throw new Error(`${backendDisplayName(backend)} backend is not implemented yet.`);
+  }
+
+  private async getCodexBackendDriver(): Promise<CodexBackendDriver> {
+    if (this.codexBackendDriver) {
+      return this.codexBackendDriver;
     }
 
     const mcpServerUrl = await this.ensureMcpServer();
@@ -563,14 +631,15 @@ export class AppController {
       codexHome: process.env.CODEX_CLAW_CODEX_HOME,
       configOverrides: buildCodexClawMcpConfigOverrides(mcpServerUrl),
     });
-    this.codexSessionManager = new CodexAgentSessionManager(new CodexRpcClient(transport), {
+    const sessionManager = new CodexAgentSessionManager(new CodexRpcClient(transport), {
       clawMcpEnabled: true,
     });
-    this.codexSessionManager.onEvent((event) => {
+    this.codexBackendDriver = new CodexBackendDriver(sessionManager);
+    this.codexBackendDriver.onEvent((event) => {
       this.emitAndApply(event);
     });
 
-    return this.codexSessionManager;
+    return this.codexBackendDriver;
   }
 
   private async ensureMcpServer(): Promise<string> {
@@ -599,10 +668,15 @@ export class AppController {
       seq: event.seq ?? ++this.seq,
       occurredAt: event.occurredAt ?? new Date().toISOString(),
     };
+    if (!fullEvent.backend && fullEvent.agentId) {
+      fullEvent.backend = this.snapshot.agents.find((agent) => agent.id === fullEvent.agentId)?.backend;
+    }
 
+    this.recordClientRequestOwner(fullEvent);
     applyMainEventToSnapshot(this.snapshot, fullEvent);
     this.mainWindow?.webContents.send(ipcChannels.event, fullEvent);
     if (
+      fullEvent.type === 'backend.statusChanged' ||
       fullEvent.type === 'agent.updated' ||
       fullEvent.type === 'account.rateLimitsUpdated' ||
       fullEvent.type === 'thread.started' ||
@@ -619,6 +693,22 @@ export class AppController {
 
     if (fullEvent.type === 'turn.completed' && fullEvent.agentId) {
       this.promptLatestUnreadMessage(fullEvent.agentId);
+    }
+  }
+
+  private recordClientRequestOwner(event: MainToRendererEvent): void {
+    if (event.type !== 'approval.requested' && event.type !== 'toolInput.requested') {
+      return;
+    }
+
+    const request = clientRequest(event.payload);
+    if (!request) {
+      return;
+    }
+
+    const backend = event.backend ?? (event.agentId ? this.snapshot.agents.find((agent) => agent.id === event.agentId)?.backend : undefined);
+    if (backend) {
+      this.clientRequestBackends.set(request.id, backend);
     }
   }
 
@@ -692,4 +782,20 @@ function turnIdFromRendererMessageId(messageId: string): string | null {
   }
 
   return null;
+}
+
+function clientRequest(value: unknown): ClientRequest | null {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    !('id' in value) ||
+    !('kind' in value) ||
+    typeof value.id !== 'string' ||
+    (value.kind !== 'confirm_tool' && value.kind !== 'ask_user')
+  ) {
+    return null;
+  }
+
+  return value as ClientRequest;
 }

@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AccountRateLimits, Agent, AgentContextUsage, AppSnapshot, BenchTemplate, Team } from '../shared/contracts';
+import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Team } from '../shared/contracts';
 import { normalizeThemeSettings } from '../shared/settings';
 import { createEmptySnapshot } from '../shared/snapshot';
 import { defaultTeamColor } from '../shared/team-colors';
@@ -17,7 +17,9 @@ type PersistedState = {
 
 type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'updatedAt'> & {
   avatar?: string;
-  codexThreadId?: string;
+  backend: AgentBackend;
+  backendSession?: BackendSession;
+  backendDefaults?: BackendDefaults;
   contextUsage?: AgentContextUsage;
   statusText?: string;
   teamId?: string;
@@ -64,7 +66,9 @@ function persistedAgentFromSnapshot(agent: Agent): PersistedAgent {
     name: agent.name,
     avatar: agent.avatar,
     folder: agent.folder,
-    codexThreadId: agent.codexThreadId,
+    backend: agent.backend,
+    ...(agent.backendSession ? { backendSession: cloneBackendSession(agent.backendSession) } : {}),
+    ...(agent.backendDefaults ? { backendDefaults: cloneBackendDefaults(agent.backendDefaults) } : {}),
     ...(agent.contextUsage ? { contextUsage: { ...agent.contextUsage } } : {}),
     statusText: agent.statusText,
     createdAt: agent.createdAt,
@@ -97,7 +101,7 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
     ...(accountRateLimits ? { accountRateLimits } : {}),
     theme: normalizeThemeSettings(value.theme),
     messages: [],
-    appServer: seed.appServer,
+    backendRuntimes: seed.backendRuntimes.map((runtime) => ({ ...runtime })),
   };
 
   repairTeamMembership(snapshot);
@@ -117,13 +121,18 @@ function sanitizeAgent(value: unknown): Agent | null {
   const createdAt = typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString();
   const updatedAt = typeof value.updatedAt === 'string' ? value.updatedAt : createdAt;
   const contextUsage = sanitizeContextUsage(value.contextUsage);
+  const backend = sanitizeBackend(value.backend) ?? 'codex';
+  const backendSession = sanitizeBackendSession(value.backendSession, backend);
+  const backendDefaults = sanitizeBackendDefaults(value.backendDefaults, backend);
   return {
     id: value.id,
     teamId: typeof value.teamId === 'string' ? value.teamId : undefined,
     name: value.name,
     avatar: typeof value.avatar === 'string' ? value.avatar : undefined,
     folder: value.folder,
-    codexThreadId: typeof value.codexThreadId === 'string' ? value.codexThreadId : undefined,
+    backend,
+    ...(backendSession ? { backendSession } : {}),
+    ...(backendDefaults ? { backendDefaults } : {}),
     ...(contextUsage ? { contextUsage } : {}),
     ...(typeof value.statusText === 'string' ? { statusText: value.statusText } : {}),
     status: { type: 'idle' },
@@ -229,31 +238,117 @@ function sanitizeTeam(value: unknown, agents: Agent[]): Team | null {
 }
 
 function sanitizeBenchTemplate(value: unknown): BenchTemplate | null {
+  const backend = isRecord(value) ? sanitizeBackend(value.backend) : null;
   if (
     !isRecord(value) ||
     typeof value.id !== 'string' ||
     typeof value.name !== 'string' ||
     typeof value.folder !== 'string' ||
-    value.backend !== 'codex' ||
+    !backend ||
     typeof value.createdAt !== 'string' ||
     typeof value.updatedAt !== 'string'
   ) {
     return null;
   }
 
+  const backendDefaults = sanitizeBackendDefaults(value.backendDefaults, backend);
   return {
     id: value.id,
     name: value.name,
     avatar: typeof value.avatar === 'string' ? value.avatar : undefined,
     folder: value.folder,
-    backend: 'codex',
-    codexDefaults: isRecord(value.codexDefaults) ? {
-      model: typeof value.codexDefaults.model === 'string' ? value.codexDefaults.model : undefined,
-      approvalPolicy: typeof value.codexDefaults.approvalPolicy === 'string' ? value.codexDefaults.approvalPolicy : undefined,
-      sandboxMode: typeof value.codexDefaults.sandboxMode === 'string' ? value.codexDefaults.sandboxMode : undefined,
-    } : undefined,
+    backend,
+    ...(backendDefaults ? { backendDefaults } : {}),
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
+  };
+}
+
+function cloneBackendSession(session: BackendSession): BackendSession {
+  return { ...session };
+}
+
+function cloneBackendDefaults(defaults: BackendDefaults): BackendDefaults {
+  return defaults.kind === 'claude' && defaults.thinking
+    ? { ...defaults, thinking: { ...defaults.thinking } }
+    : { ...defaults };
+}
+
+function sanitizeBackend(value: unknown): AgentBackend | null {
+  return value === 'codex' || value === 'claude' ? value : null;
+}
+
+function sanitizeBackendSession(value: unknown, expectedBackend: AgentBackend): BackendSession | undefined {
+  if (!isRecord(value) || typeof value.kind !== 'string') {
+    return undefined;
+  }
+
+  if (value.kind === 'codex') {
+    const session = typeof value.threadId === 'string'
+      ? { kind: 'codex' as const, threadId: value.threadId }
+      : undefined;
+    return session?.kind === expectedBackend ? session : undefined;
+  }
+
+  if (value.kind === 'claude') {
+    if (
+      typeof value.sessionId !== 'string' ||
+      (value.transport !== 'stdio' && value.transport !== 'websocket')
+    ) {
+      return undefined;
+    }
+
+    const session = {
+      kind: 'claude',
+      sessionId: value.sessionId,
+      transport: value.transport,
+      ...(typeof value.transcriptSessionId === 'string' ? { transcriptSessionId: value.transcriptSessionId } : {}),
+      ...(typeof value.serverUrl === 'string' ? { serverUrl: value.serverUrl } : {}),
+    } satisfies BackendSession;
+    return session.kind === expectedBackend ? session : undefined;
+  }
+
+  return undefined;
+}
+
+function sanitizeBackendDefaults(value: unknown, expectedBackend: AgentBackend): BackendDefaults | undefined {
+  if (!isRecord(value) || typeof value.kind !== 'string') {
+    return undefined;
+  }
+
+  if (value.kind === 'codex') {
+    const defaults = {
+      kind: 'codex',
+      ...(typeof value.model === 'string' ? { model: value.model } : {}),
+      ...(typeof value.approvalPolicy === 'string' ? { approvalPolicy: value.approvalPolicy } : {}),
+      ...(typeof value.sandboxMode === 'string' ? { sandboxMode: value.sandboxMode } : {}),
+      ...(typeof value.reasoningEffort === 'string' ? { reasoningEffort: value.reasoningEffort } : {}),
+    } satisfies BackendDefaults;
+    return defaults.kind === expectedBackend ? defaults : undefined;
+  }
+
+  if (value.kind === 'claude') {
+    const thinking = sanitizeClaudeThinking(value.thinking);
+    const defaults = {
+      kind: 'claude',
+      ...(typeof value.model === 'string' ? { model: value.model } : {}),
+      ...(typeof value.permissionMode === 'string' ? { permissionMode: value.permissionMode } : {}),
+      ...(thinking ? { thinking } : {}),
+    } satisfies BackendDefaults;
+    return defaults.kind === expectedBackend ? defaults : undefined;
+  }
+
+  return undefined;
+}
+
+function sanitizeClaudeThinking(value: unknown): Extract<BackendDefaults, { kind: 'claude' }>['thinking'] | undefined {
+  if (!isRecord(value) || (value.type !== 'enabled' && value.type !== 'disabled')) {
+    return undefined;
+  }
+
+  return {
+    type: value.type,
+    ...(typeof value.budgetTokens === 'number' ? { budgetTokens: value.budgetTokens } : {}),
   };
 }
 

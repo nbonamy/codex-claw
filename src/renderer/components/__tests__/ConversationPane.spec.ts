@@ -10,6 +10,8 @@ const agent: Agent = {
   name: 'Dina',
   avatar: 'DI',
   folder: '~/src/id8',
+  backend: 'codex',
+  backendDefaults: { kind: 'codex' },
   status: { type: 'idle' },
   createdAt: '2026-06-05T00:00:00.000Z',
   updatedAt: '2026-06-05T00:00:00.000Z',
@@ -97,7 +99,7 @@ describe('ConversationPane', () => {
     const wrapper = mountPane({
       agent: {
         ...agent,
-        codexThreadId: 'thread-persisted',
+        backendSession: { kind: 'codex', threadId: 'thread-persisted' },
       },
       messages: [],
       isLoading: true,

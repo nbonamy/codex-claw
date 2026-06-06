@@ -2,23 +2,25 @@ import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import AgentHeader from '../AgentHeader.vue';
-import type { Agent, AppSnapshot } from '../../../shared/contracts';
+import type { Agent, BackendRuntimeStatus } from '../../../shared/contracts';
 
 const agent: Agent = {
   id: 'agent-dina',
   name: 'Dina',
   avatar: 'DI',
   folder: '~/src/id8',
+  backend: 'codex',
+  backendDefaults: { kind: 'codex' },
   status: { type: 'idle' },
   createdAt: '2026-06-05T00:00:00.000Z',
   updatedAt: '2026-06-05T00:00:00.000Z',
 };
 
-function mountHeader(appServer: AppSnapshot['appServer'], isLoading = false) {
+function mountHeader(backendRuntime: BackendRuntimeStatus, isLoading = false) {
   return mount(AgentHeader, {
     props: {
       agent,
-      appServer,
+      backendRuntime,
       isLoading,
       sidebarCollapsed: false,
     },
@@ -30,7 +32,7 @@ function mountHeader(appServer: AppSnapshot['appServer'], isLoading = false) {
 
 describe('AgentHeader', () => {
   it('renders the expanded active agent identity and activity block', () => {
-    const wrapper = mountHeader({ status: 'notConfigured' });
+    const wrapper = mountHeader({ backend: 'codex', status: 'notConfigured' });
 
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('~/src/id8');
@@ -46,15 +48,15 @@ describe('AgentHeader', () => {
     };
 
     expect(mount(AgentHeader, {
-      props: { ...props, appServer: { status: 'notConfigured' }, isLoading: true },
+      props: { ...props, backendRuntime: { backend: 'codex', status: 'notConfigured' }, isLoading: true },
       global: { plugins: [ElementPlus] },
     }).text()).toContain('Loading');
     expect(mount(AgentHeader, {
-      props: { ...props, appServer: { status: 'running' }, isLoading: false },
+      props: { ...props, backendRuntime: { backend: 'codex', status: 'running' }, isLoading: false },
       global: { plugins: [ElementPlus] },
     }).text()).toContain('Connected');
     expect(mount(AgentHeader, {
-      props: { ...props, appServer: { status: 'error', detail: 'failed' }, isLoading: false },
+      props: { ...props, backendRuntime: { backend: 'codex', status: 'error', detail: 'failed' }, isLoading: false },
       global: { plugins: [ElementPlus] },
     }).text()).toContain('Codex error');
   });
@@ -66,7 +68,7 @@ describe('AgentHeader', () => {
           ...agent,
           statusText: 'Running tests',
         },
-        appServer: { status: 'running' },
+        backendRuntime: { backend: 'codex', status: 'running' },
         isLoading: false,
         sidebarCollapsed: false,
       },
@@ -94,7 +96,7 @@ describe('AgentHeader', () => {
           ...agent,
           status,
         },
-        appServer: { status: 'running' },
+        backendRuntime: { backend: 'codex', status: 'running' },
         isLoading: false,
         sidebarCollapsed: false,
       },
@@ -112,7 +114,7 @@ describe('AgentHeader', () => {
     const wrapper = mount(AgentHeader, {
       props: {
         agent: null,
-        appServer: { status: 'notConfigured' },
+        backendRuntime: { backend: 'codex', status: 'notConfigured' },
         isLoading: false,
         sidebarCollapsed: true,
       },
@@ -129,7 +131,7 @@ describe('AgentHeader', () => {
     const wrapper = mount(AgentHeader, {
       props: {
         agent,
-        appServer: { status: 'running' },
+        backendRuntime: { backend: 'codex', status: 'running' },
         isLoading: false,
         sidebarCollapsed: true,
       },

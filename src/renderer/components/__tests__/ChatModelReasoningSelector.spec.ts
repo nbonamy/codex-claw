@@ -2,17 +2,17 @@ import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import ChatModelReasoningSelector from '../ChatModelReasoningSelector.vue';
-import type { CodexModelOption, ReasoningEffort } from '../../../shared/contracts';
+import type { BackendModelOption, ReasoningEffort } from '../../../shared/contracts';
 
 type SelectorProps = {
   disabled?: boolean;
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   modelId?: string | null;
-  models?: CodexModelOption[];
+  models?: BackendModelOption[];
   reasoningEffort?: ReasoningEffort | null;
 };
 
-const models: CodexModelOption[] = [
+const models: BackendModelOption[] = [
   {
     id: 'codex-fast',
     model: 'gpt-5.1-codex-fast',

@@ -1,6 +1,6 @@
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, AgentContextUsage, AgentStatus, AskUserAnswers, AskUserQuestion, ClientRequest, ClientRequestResponse, CodexModelOption, CodexSkillSummary, ConfirmToolRequest, MainToRendererEvent, RendererMessage, SendPromptOptions, ToolConfirmationDecision } from '../../shared/contracts';
+import type { Agent, AgentContextUsage, AgentStatus, AskUserAnswers, AskUserQuestion, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, ConfirmToolRequest, MainToRendererEvent, RendererMessage, SendPromptOptions, ToolConfirmationDecision } from '../../shared/contracts';
 import { logMain, warnMain } from '../log';
 import { buildCodexClawThreadConfig } from '../mcp/codex-config';
 import type { CodexRpcClient, CodexServerRequest, CodexServerRequestResponder } from './rpc-client';
@@ -98,10 +98,10 @@ export class CodexAgentSessionManager {
     }
   }
 
-  async listModels(includeHidden = false): Promise<CodexModelOption[]> {
+  async listModels(includeHidden = false): Promise<BackendModelOption[]> {
     await this.start();
 
-    const models: CodexModelOption[] = [];
+    const models: BackendModelOption[] = [];
     let cursor: string | null | undefined = null;
 
     do {
@@ -116,7 +116,7 @@ export class CodexAgentSessionManager {
     return models;
   }
 
-  async listSkills(agent: Agent, forceReload = false): Promise<CodexSkillSummary[]> {
+  async listSkills(agent: Agent, forceReload = false): Promise<BackendSkillSummary[]> {
     await this.start();
 
     const response = await this.client.request<CodexSkillsListResponse>('skills/list', {
@@ -137,6 +137,7 @@ export class CodexAgentSessionManager {
     await this.start();
 
     const session = await this.ensureSession(agent);
+    const codexOptions = options.backendOptions?.kind === 'codex' ? options.backendOptions : undefined;
     const turnParams: Record<string, unknown> = {
       threadId: session.threadId,
       input: [
@@ -145,7 +146,7 @@ export class CodexAgentSessionManager {
           text: prompt,
           text_elements: [],
         },
-        ...(options.skills ?? []).map((skill) => ({
+        ...(codexOptions?.skills ?? []).map((skill) => ({
           type: 'skill',
           name: skill.name,
           path: skill.path,
@@ -156,21 +157,21 @@ export class CodexAgentSessionManager {
     if (options.model) {
       turnParams.model = options.model;
     }
-    if (options.reasoningEffort) {
-      turnParams.effort = options.reasoningEffort;
+    if (codexOptions?.reasoningEffort) {
+      turnParams.effort = codexOptions.reasoningEffort;
     }
     if (options.planMode && options.model) {
       turnParams.collaborationMode = {
         mode: 'plan',
         settings: {
           model: options.model,
-          reasoning_effort: options.reasoningEffort ?? null,
+          reasoning_effort: codexOptions?.reasoningEffort ?? null,
           developer_instructions: null,
         },
       };
     }
 
-    if (options.goalMode) {
+    if (codexOptions?.goalMode) {
       await this.client.request('thread/goal/set', {
         threadId: session.threadId,
         objective: prompt,
@@ -277,7 +278,7 @@ export class CodexAgentSessionManager {
   }
 
   async hydrateAgent(agent: Agent): Promise<string | null> {
-    if (!agent.codexThreadId) {
+    if (!codexThreadId(agent)) {
       return null;
     }
 
@@ -325,10 +326,11 @@ export class CodexAgentSessionManager {
 
     const cwd = expandHome(agent.folder);
     const threadConfig = buildCodexClawThreadConfig(agent, this.options.clawMcpEnabled ?? false);
-    const shouldResume = Boolean(agent.codexThreadId);
+    const existingThreadId = codexThreadId(agent);
+    const shouldResume = Boolean(existingThreadId);
     const response = shouldResume
       ? await this.client.request<ThreadResumeResponse>('thread/resume', {
-        threadId: agent.codexThreadId,
+        threadId: existingThreadId,
         cwd,
         approvalPolicy: 'never',
         sandbox: 'workspace-write',
@@ -779,6 +781,10 @@ export class CodexAgentSessionManager {
   }
 }
 
+function codexThreadId(agent: Agent): string | undefined {
+  return agent.backendSession?.kind === 'codex' ? agent.backendSession.threadId : undefined;
+}
+
 export function expandHome(folder: string): string {
   if (folder === '~') {
     return os.homedir();
@@ -804,7 +810,7 @@ function collaborationModeFromThreadSettings(threadSettings: unknown): 'default'
   return mode === 'default' || mode === 'plan' ? mode : null;
 }
 
-function codexModelToOption(model: CodexModelListResponse['data'][number]): CodexModelOption {
+function codexModelToOption(model: CodexModelListResponse['data'][number]): BackendModelOption {
   return {
     id: model.id,
     model: model.model,

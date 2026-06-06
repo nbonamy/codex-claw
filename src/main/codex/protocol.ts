@@ -1,4 +1,4 @@
-import type { Agent, CodexSkillSummary, MainToRendererEvent } from '../../shared/contracts';
+import type { Agent, BackendSkillSummary, MainToRendererEvent } from '../../shared/contracts';
 
 export type JsonRpcId = number | string;
 
@@ -215,7 +215,7 @@ export type CodexSessionPromptResult = {
   turnId: string;
 };
 
-export function codexSkillToSummary(skill: CodexSkill): CodexSkillSummary {
+export function codexSkillToSummary(skill: CodexSkill): BackendSkillSummary {
   return {
     name: skill.name,
     description: skill.description,

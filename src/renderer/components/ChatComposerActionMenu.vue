@@ -21,6 +21,7 @@
       role="menu"
     >
       <button
+        v-if="showPlanMode"
         class="chat-composer-action-menu__item"
         type="button"
         role="menuitem"
@@ -31,6 +32,7 @@
           <span>Attach</span>
       </button>
       <button
+        v-if="showGoalMode"
         class="chat-composer-action-menu__item"
         type="button"
         role="menuitemcheckbox"
@@ -72,8 +74,12 @@ const props = withDefaults(defineProps<{
   disabled?: boolean;
   goalMode: boolean;
   planMode: boolean;
+  showGoalMode?: boolean;
+  showPlanMode?: boolean;
 }>(), {
   disabled: false,
+  showGoalMode: true,
+  showPlanMode: true,
 });
 
 const emit = defineEmits<{

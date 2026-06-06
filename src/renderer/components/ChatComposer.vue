@@ -24,6 +24,8 @@
       :disabled="disabled"
       :goal-mode="goalMode"
       :plan-mode="planMode"
+      :show-goal-mode="effectiveBackendCapabilities.goalMode"
+      :show-plan-mode="effectiveBackendCapabilities.planMode !== 'unsupported'"
       @attach="$emit('attach')"
       @update:goal-mode="$emit('update:goalMode', $event)"
       @update:plan-mode="$emit('update:planMode', $event)"
@@ -79,11 +81,13 @@
       </div>
       <ChatContextUsageIndicator :context-usage="contextUsage" />
       <ChatModelReasoningSelector
+        v-if="effectiveBackendCapabilities.models"
         :disabled="disabled || isSending"
         :models="models"
         :model-catalog-status="modelCatalogStatus"
         :model-id="selectedModelId"
         :reasoning-effort="selectedReasoningEffort"
+        :show-reasoning="effectiveBackendCapabilities.reasoningEffort"
         @update:model-id="$emit('update:modelId', $event)"
         @update:reasoning-effort="$emit('update:reasoningEffort', $event)"
       />
@@ -112,7 +116,8 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import type { AgentContextUsage, AgentFileSearchItem, CodexModelOption, CodexSkillSummary, ReasoningEffort } from '../../shared/contracts';
+import type { AgentContextUsage, AgentFileSearchItem, BackendCapabilities, BackendModelOption, BackendSkillSummary, ReasoningEffort } from '../../shared/contracts';
+import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import ChatComposerSendButton from '../shared/chat/ChatComposerSendButton.vue';
 import ChatComposerActionMenu from './ChatComposerActionMenu.vue';
 import ChatContextUsageIndicator from './ChatContextUsageIndicator.vue';
@@ -134,15 +139,16 @@ const props = defineProps<{
   draftRevision?: number;
   files?: AgentFileSearchItem[];
   goalMode?: boolean;
+  backendCapabilities?: BackendCapabilities;
   isSending: boolean;
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
-  models?: CodexModelOption[];
+  models?: BackendModelOption[];
   placeholder: string;
   planMode?: boolean;
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
   skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
-  skills?: CodexSkillSummary[];
+  skills?: BackendSkillSummary[];
 }>();
 
 const emit = defineEmits<{
@@ -167,6 +173,7 @@ const recorder = ref<BrowserAudioRecorder | null>(null);
 const isRecording = ref(false);
 const isTranscribing = ref(false);
 const voiceError = ref<string | null>(null);
+const effectiveBackendCapabilities = computed(() => props.backendCapabilities ?? defaultBackendCapabilities('codex'));
 
 const hasPrompt = computed(() => Boolean(prompt.value.trim()));
 const canSend = computed(() => Boolean(hasPrompt.value && !props.disabled));
@@ -202,8 +209,8 @@ const voiceButtonTitle = computed(() => {
   return voiceButtonLabel.value;
 });
 const activeModes = computed(() => [
-  ...(props.planMode ? ['Plan'] : []),
-  ...(props.goalMode ? ['Goal'] : []),
+  ...(effectiveBackendCapabilities.value.planMode !== 'unsupported' && props.planMode ? ['Plan'] : []),
+  ...(effectiveBackendCapabilities.value.goalMode && props.goalMode ? ['Goal'] : []),
 ]);
 const activeFileMention = computed<ActiveComposerMention | null>(() => findActiveFileMention(prompt.value, caretPosition.value));
 const visibleFiles = computed(() => {
@@ -229,6 +236,7 @@ const activeSkillSlash = computed<ActiveSkillSlash | null>(() => findActiveSkill
 const visibleSkills = computed(() => filterComposerSkills(props.skills ?? [], activeSkillSlash.value?.query ?? ''));
 const skillMenuVisible = computed(() => (
   skillMenuOpen.value &&
+  effectiveBackendCapabilities.value.skills &&
   activeSkillSlash.value !== null &&
   (props.skills ?? []).length > 0 &&
   !(props.disabled && !props.isSending)
@@ -424,7 +432,9 @@ function handleTextareaKeydown(event: KeyboardEvent): void {
 
   if (event.key === 'Tab' && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
     event.preventDefault();
-    emit('update:planMode', !props.planMode);
+    if (effectiveBackendCapabilities.value.planMode !== 'unsupported') {
+      emit('update:planMode', !props.planMode);
+    }
     return;
   }
 
@@ -473,7 +483,7 @@ function selectFile(file: AgentFileSearchItem): void {
   });
 }
 
-function selectSkill(skill: CodexSkillSummary): void {
+function selectSkill(skill: BackendSkillSummary): void {
   const slash = activeSkillSlash.value;
   const textarea = textareaEl.value;
   if (!slash || !textarea) {

@@ -31,10 +31,11 @@ export function createEmptySnapshot(): AppSnapshot {
     activeTeamId: seedTeamId,
     activeAgentId: null,
     messages: [],
-    appServer: {
+    backendRuntimes: [{
+      backend: 'codex',
       status: 'notConfigured',
-      detail: 'Codex app-server is not connected yet.',
-    },
+      detail: 'Codex backend is not connected yet.',
+    }],
     theme: { ...defaultThemeSettings },
   };
 }
@@ -54,10 +55,11 @@ export function createInitialSnapshot(): AppSnapshot {
     activeTeamId: seedTeamId,
     activeAgentId: agents[0]?.id ?? null,
     messages: [],
-    appServer: {
+    backendRuntimes: [{
+      backend: 'codex',
       status: 'notConfigured',
-      detail: 'Codex app-server is not connected yet.',
-    },
+      detail: 'Codex backend is not connected yet.',
+    }],
     theme: { ...defaultThemeSettings },
   };
 }
@@ -71,6 +73,8 @@ export function createAgentFromInput(input: CreateAgentInput, createdAt = new Da
     name,
     avatar: normalizedOptionalString(input.avatar),
     folder: normalizedFolder(input.folder),
+    backend: 'codex',
+    backendDefaults: { kind: 'codex' },
     status: { type: 'idle' },
     createdAt,
     updatedAt: createdAt,
@@ -179,9 +183,15 @@ export function selectAgent(snapshot: AppSnapshot, agentId: string): AppSnapshot
 }
 
 export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRendererEvent): void {
-  if (event.type === 'appServer.statusChanged') {
-    const payload = event.payload as AppSnapshot['appServer'];
-    snapshot.appServer = payload;
+  if (event.type === 'backend.statusChanged') {
+    const payload = event.payload as unknown;
+    if (isRecord(payload) && isBackend(payload.backend) && isBackendRuntimeStatus(payload.status)) {
+      setBackendRuntimeStatus(snapshot, {
+        backend: payload.backend,
+        status: payload.status,
+        detail: typeof payload.detail === 'string' ? payload.detail : undefined,
+      });
+    }
     return;
   }
 
@@ -213,7 +223,8 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   if (event.type === 'thread.started' && event.threadId) {
     const agent = findAgent(snapshot, event.agentId);
     if (agent) {
-      agent.codexThreadId = event.threadId;
+      agent.backend = 'codex';
+      agent.backendSession = { kind: 'codex', threadId: event.threadId };
       agent.status = { type: 'idle' };
     }
     return;
@@ -230,7 +241,8 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   if (event.type === 'thread.settingsUpdated' && event.threadId) {
     const agent = findAgent(snapshot, event.agentId);
     if (agent) {
-      agent.codexThreadId = event.threadId;
+      agent.backend = 'codex';
+      agent.backendSession = { kind: 'codex', threadId: event.threadId };
     }
     return;
   }
@@ -336,7 +348,7 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
 
   if (event.type === 'error') {
     const payload = event.payload as { message?: unknown };
-    const message = typeof payload.message === 'string' ? payload.message : 'Codex app-server error';
+    const message = typeof payload.message === 'string' ? payload.message : 'Backend error';
     appendSystemMessage(snapshot, event.agentId, message);
     setAgentStatus(snapshot, event.agentId, { type: 'error', message });
   }
@@ -682,6 +694,24 @@ function rendererToolPartUpdate(value: unknown): RendererToolPartUpdate | null {
 
 function isToolStatus(value: unknown): value is ToolPart['status'] {
   return value === 'running' || value === 'completed' || value === 'failed';
+}
+
+function setBackendRuntimeStatus(snapshot: AppSnapshot, status: AppSnapshot['backendRuntimes'][number]): void {
+  const existingIndex = snapshot.backendRuntimes.findIndex((candidate) => candidate.backend === status.backend);
+  if (existingIndex === -1) {
+    snapshot.backendRuntimes.push(status);
+    return;
+  }
+
+  snapshot.backendRuntimes[existingIndex] = status;
+}
+
+function isBackend(value: unknown): value is AppSnapshot['backendRuntimes'][number]['backend'] {
+  return value === 'codex' || value === 'claude';
+}
+
+function isBackendRuntimeStatus(value: unknown): value is AppSnapshot['backendRuntimes'][number]['status'] {
+  return value === 'notConfigured' || value === 'starting' || value === 'running' || value === 'error';
 }
 
 function upsertAssistantToolPart(snapshot: AppSnapshot, agentId: string, turnId: string, toolPart: ToolPart): void {
@@ -1040,7 +1070,7 @@ function attachAgentToTeam(snapshot: AppSnapshot, agent: Agent): void {
 }
 
 function clearAgentRuntimeState(agent: Agent): void {
-  delete agent.codexThreadId;
+  delete agent.backendSession;
   delete agent.contextUsage;
   delete agent.isRegistered;
   delete agent.mcpSessionId;
@@ -1090,6 +1120,8 @@ function createSeedAgents(): Agent[] {
       name: 'Dina',
       avatar: 'DI',
       folder: '~/src/codex-claw',
+      backend: 'codex',
+      backendDefaults: { kind: 'codex' },
       status: { type: 'idle' },
       createdAt: seedCreatedAt,
       updatedAt: seedCreatedAt,
@@ -1100,6 +1132,8 @@ function createSeedAgents(): Agent[] {
       name: 'Jesse',
       avatar: 'JE',
       folder: '~/src/codex-claw',
+      backend: 'codex',
+      backendDefaults: { kind: 'codex' },
       status: { type: 'idle' },
       createdAt: seedCreatedAt,
       updatedAt: seedCreatedAt,

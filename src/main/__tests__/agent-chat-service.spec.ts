@@ -1,19 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import { sendAgentPrompt } from '../agent-chat-service';
 import { applyMainEventToSnapshot, createInitialSnapshot } from '../../shared/snapshot';
-import type { CodexAgentSessionManager } from '../codex/agent-session';
 import type { MainToRendererEvent } from '../../shared/contracts';
+import type { AgentBackendDriver, BackendSendResult } from '../backends/types';
+import { codexBackendCapabilities } from '../../shared/backend-capabilities';
 
 describe('agent chat service', () => {
   it('queues a prompt immediately and records the returned thread id later', async () => {
     const snapshot = createInitialSnapshot();
-    const completion = deferred<{ threadId: string; turnId: string }>();
-    const sessionManager = {
-      sendPrompt: vi.fn().mockReturnValue(completion.promise),
-    } as unknown as CodexAgentSessionManager;
+    const completion = deferred<BackendSendResult>();
+    const backendDriver = createFakeBackendDriver(completion.promise);
     const events: MainToRendererEvent[] = [];
 
-    const result = sendAgentPrompt(snapshot, sessionManager, 'agent-dina', ' hello ', undefined, (event) => {
+    const result = sendAgentPrompt(snapshot, backendDriver, 'agent-dina', ' hello ', undefined, (event) => {
       const fullEvent = {
         ...event,
         seq: events.length + 1,
@@ -24,7 +23,7 @@ describe('agent chat service', () => {
     });
 
     expect(result).toBe(snapshot);
-    expect(sessionManager.sendPrompt).toHaveBeenCalledWith(expect.objectContaining({
+    expect(backendDriver.sendPrompt).toHaveBeenCalledWith(expect.objectContaining({
       id: 'agent-dina',
       folder: '~/src/codex-claw',
     }), 'hello');
@@ -32,34 +31,32 @@ describe('agent chat service', () => {
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'starting' });
     expect(events.map((event) => event.payload)).toStrictEqual([
       { type: 'starting' },
-      { status: 'starting', detail: 'Starting Codex app-server...' },
+      { backend: 'codex', status: 'starting', detail: 'Starting Codex backend...' },
     ]);
 
     completion.resolve({
-      threadId: 'thread-1',
+      backendSession: { kind: 'codex', threadId: 'thread-1' },
       turnId: 'turn-1',
     });
     await flushMicrotasks();
 
-    expect(snapshot.agents[0].codexThreadId).toBe('thread-1');
+    expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-1' });
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
     expect(events.map((event) => event.payload)).toStrictEqual([
       { type: 'starting' },
-      { status: 'starting', detail: 'Starting Codex app-server...' },
+      { backend: 'codex', status: 'starting', detail: 'Starting Codex backend...' },
       { type: 'working' },
-      { status: 'running', detail: 'Codex app-server connected.' },
+      { backend: 'codex', status: 'running', detail: 'Codex backend connected.' },
     ]);
   });
 
-  it('records visible app-server errors without throwing through IPC', async () => {
+  it('records visible backend errors without throwing through IPC', async () => {
     const snapshot = createInitialSnapshot();
-    const completion = deferred<{ threadId: string; turnId: string }>();
-    const sessionManager = {
-      sendPrompt: vi.fn().mockReturnValue(completion.promise),
-    } as unknown as CodexAgentSessionManager;
+    const completion = deferred<BackendSendResult>();
+    const backendDriver = createFakeBackendDriver(completion.promise);
     const events: MainToRendererEvent[] = [];
 
-    sendAgentPrompt(snapshot, sessionManager, 'agent-dina', 'hello', undefined, (event) => {
+    sendAgentPrompt(snapshot, backendDriver, 'agent-dina', 'hello', undefined, (event) => {
       const fullEvent = {
         ...event,
         seq: events.length + 1,
@@ -72,84 +69,97 @@ describe('agent chat service', () => {
     completion.reject(new Error('not authenticated'));
     await flushMicrotasks();
 
-    expect(snapshot.appServer).toStrictEqual({ status: 'error', detail: 'not authenticated' });
+    expect(snapshot.backendRuntimes).toContainEqual({ backend: 'codex', status: 'error', detail: 'not authenticated' });
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'error', message: 'not authenticated' });
     expect(snapshot.messages.at(-1)?.parts).toStrictEqual([{ type: 'status', text: 'not authenticated' }]);
   });
 
   it('ignores blank prompts, missing agents, and busy agents', () => {
     const snapshot = createInitialSnapshot();
-    const sessionManager = {
-      sendPrompt: vi.fn(),
-    } as unknown as CodexAgentSessionManager;
+    const backendDriver = createFakeBackendDriver(Promise.resolve({ backendSession: { kind: 'codex', threadId: 'thread-1' }, turnId: 'turn-1' }));
 
-    sendAgentPrompt(snapshot, sessionManager, 'agent-dina', '   ', undefined, vi.fn());
-    sendAgentPrompt(snapshot, sessionManager, 'missing-agent', 'hello', undefined, vi.fn());
+    sendAgentPrompt(snapshot, backendDriver, 'agent-dina', '   ', undefined, vi.fn());
+    sendAgentPrompt(snapshot, backendDriver, 'missing-agent', 'hello', undefined, vi.fn());
     snapshot.agents[0].status = { type: 'working' };
-    sendAgentPrompt(snapshot, sessionManager, 'agent-dina', 'hello', undefined, vi.fn());
+    sendAgentPrompt(snapshot, backendDriver, 'agent-dina', 'hello', undefined, vi.fn());
 
-    expect(sessionManager.sendPrompt).not.toHaveBeenCalled();
+    expect(backendDriver.sendPrompt).not.toHaveBeenCalled();
     expect(snapshot.messages).toHaveLength(0);
   });
 
   it('passes selected model and reasoning effort to the session manager', () => {
     const snapshot = createInitialSnapshot();
-    const sessionManager = {
-      sendPrompt: vi.fn().mockResolvedValue({ threadId: 'thread-1', turnId: 'turn-1' }),
-    } as unknown as CodexAgentSessionManager;
+    const backendDriver = createFakeBackendDriver(Promise.resolve({ backendSession: { kind: 'codex', threadId: 'thread-1' }, turnId: 'turn-1' }));
 
     sendAgentPrompt(
       snapshot,
-      sessionManager,
+      backendDriver,
       'agent-dina',
       'hello',
-      { model: 'gpt-5.1-codex', reasoningEffort: 'high' },
+      { model: 'gpt-5.1-codex', backendOptions: { kind: 'codex', reasoningEffort: 'high' } },
       vi.fn(),
     );
 
-    expect(sessionManager.sendPrompt).toHaveBeenCalledWith(
+    expect(backendDriver.sendPrompt).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'agent-dina' }),
       'hello',
-      { model: 'gpt-5.1-codex', reasoningEffort: 'high' },
+      { model: 'gpt-5.1-codex', backendOptions: { kind: 'codex', reasoningEffort: 'high' } },
     );
   });
 
   it('passes selected prompt skills to the session manager', () => {
     const snapshot = createInitialSnapshot();
-    const sessionManager = {
-      sendPrompt: vi.fn().mockResolvedValue({ threadId: 'thread-1', turnId: 'turn-1' }),
-    } as unknown as CodexAgentSessionManager;
+    const backendDriver = createFakeBackendDriver(Promise.resolve({ backendSession: { kind: 'codex', threadId: 'thread-1' }, turnId: 'turn-1' }));
 
     sendAgentPrompt(
       snapshot,
-      sessionManager,
+      backendDriver,
       'agent-dina',
       '/frontend-design polish the composer',
       {
-        skills: [
-          {
-            name: 'frontend-design',
-            path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
-          },
-        ],
+        backendOptions: {
+          kind: 'codex',
+          skills: [
+            {
+              name: 'frontend-design',
+              path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
+            },
+          ],
+        },
       },
       vi.fn(),
     );
 
-    expect(sessionManager.sendPrompt).toHaveBeenCalledWith(
+    expect(backendDriver.sendPrompt).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'agent-dina' }),
       '/frontend-design polish the composer',
       {
-        skills: [
-          {
-            name: 'frontend-design',
-            path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
-          },
-        ],
+        backendOptions: {
+          kind: 'codex',
+          skills: [
+            {
+              name: 'frontend-design',
+              path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
+            },
+          ],
+        },
       },
     );
   });
 });
+
+function createFakeBackendDriver(sendResult: Promise<BackendSendResult>): AgentBackendDriver {
+  return {
+    backend: 'codex',
+    getRuntimeStatus: () => ({ backend: 'codex', status: 'notConfigured' }),
+    getCapabilities: () => codexBackendCapabilities,
+    sendPrompt: vi.fn().mockReturnValue(sendResult),
+    interrupt: vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'thread-1' } }),
+    respondToRequest: vi.fn().mockResolvedValue(undefined),
+    onEvent: vi.fn(() => () => undefined),
+    close: vi.fn().mockResolvedValue(undefined),
+  };
+}
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
