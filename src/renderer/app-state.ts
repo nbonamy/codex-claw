@@ -149,6 +149,10 @@ export function useAppState() {
       return;
     }
 
+    if (!messageActionCapabilities(action.agentId).rollback) {
+      return;
+    }
+
     snapshot.value = await window.codexClaw.deleteMessage(action.agentId, action.messageId);
   }
 
@@ -156,6 +160,10 @@ export function useAppState() {
     const action = activeMessageAction(payload.index);
     const trimmed = payload.content.trim();
     if (!action || !trimmed || !window.codexClaw?.editMessage || isAgentSending(action.agentId)) {
+      return;
+    }
+
+    if (!messageActionCapabilities(action.agentId).editMessage) {
       return;
     }
 
@@ -170,6 +178,10 @@ export function useAppState() {
   async function retryMessage(index: number): Promise<void> {
     const action = activeMessageAction(index);
     if (!action || !window.codexClaw?.retryMessage || isAgentSending(action.agentId)) {
+      return;
+    }
+
+    if (!messageActionCapabilities(action.agentId).retryMessage) {
       return;
     }
 
@@ -492,6 +504,11 @@ function activeMessageAction(index: number): { agentId: string; messageId: strin
     agentId,
     messageId: message.id,
   };
+}
+
+function messageActionCapabilities(agentId: string) {
+  const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
+  return defaultBackendCapabilities(agent?.backend ?? 'codex');
 }
 
 function selectDefaultModelIfNeeded(): void {

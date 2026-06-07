@@ -399,6 +399,56 @@ describe('useAppState', () => {
     expect(retryMessage).toHaveBeenCalledWith('agent-dina', 'assistant-turn-1');
   });
 
+  it('blocks message actions when the active backend does not support them', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0].backend = 'claude';
+    remoteSnapshot.agents[0].backendDefaults = { kind: 'claude' };
+    remoteSnapshot.messages = [
+      {
+        id: 'user-turn-1',
+        agentId: 'agent-dina',
+        role: 'user',
+        status: 'complete',
+        turnId: 'turn-1',
+        createdAt: '2026-06-05T00:00:01.000Z',
+        parts: [{ type: 'text', text: 'original prompt' }],
+      },
+      {
+        id: 'assistant-turn-1',
+        agentId: 'agent-dina',
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'turn-1',
+        createdAt: '2026-06-05T00:00:02.000Z',
+        parts: [{ type: 'text', text: 'original answer' }],
+      },
+    ];
+    const deleteMessage = vi.fn().mockResolvedValue(remoteSnapshot);
+    const editMessage = vi.fn().mockResolvedValue(remoteSnapshot);
+    const retryMessage = vi.fn().mockResolvedValue(remoteSnapshot);
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        deleteMessage,
+        editMessage,
+        retryMessage,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    await state.deleteMessage(0);
+    await state.editMessage({ content: 'edited prompt', index: 0 });
+    await state.retryMessage(1);
+
+    expect(deleteMessage).not.toHaveBeenCalled();
+    expect(editMessage).not.toHaveBeenCalled();
+    expect(retryMessage).not.toHaveBeenCalled();
+  });
+
   it('queues busy prompts and drains them after the active turn completes', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();

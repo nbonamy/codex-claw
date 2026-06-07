@@ -83,13 +83,16 @@
         :class="{ 'chat-message__actions--reserved': reserveActionSlot }"
         :aria-hidden="reserveActionSlot ? 'true' : undefined"
         :inert="reserveActionSlot ? '' : undefined"
+        :can-delete="canDeleteMessage"
+        :can-edit="canEditMessage"
+        :can-retry="canRetryMessage"
         :copied="copied"
         :message="message"
         @copy="copyMessage"
-        @delete="emit('delete-message', index)"
+        @delete="deleteMessage"
         @edit="startEdit"
         @quote="emit('quote-message', index)"
-        @retry="emit('retry-message', index)"
+        @retry="retryMessage"
       />
       <div v-if="message.type === 'steer'" class="chat-message--steer">
         Steered conversation
@@ -112,10 +115,16 @@ import { copyMessageToClipboard } from './message-actions'
 const props = withDefaults(defineProps<{
   actionsDisabled?: boolean
   answeredClientRequestIds?: Set<string>
+  canDeleteMessage?: boolean
+  canEditMessage?: boolean
+  canRetryMessage?: boolean
   followUpsDisabled?: boolean
   index?: number
   message: Message
 }>(), {
+  canDeleteMessage: true,
+  canEditMessage: true,
+  canRetryMessage: true,
   index: 0,
 })
 const emit = defineEmits<{
@@ -173,7 +182,7 @@ watch(() => props.message.content, (content) => {
 })
 
 function startEdit() {
-  if (props.message.role !== 'user') {
+  if (props.message.role !== 'user' || !props.canEditMessage) {
     return
   }
 
@@ -202,6 +211,22 @@ function saveEdit() {
 
   emit('edit-message', { content, index: props.index })
   cancelEdit()
+}
+
+function deleteMessage() {
+  if (!props.canDeleteMessage) {
+    return
+  }
+
+  emit('delete-message', props.index)
+}
+
+function retryMessage() {
+  if (!props.canRetryMessage) {
+    return
+  }
+
+  emit('retry-message', props.index)
 }
 
 async function copyMessage() {

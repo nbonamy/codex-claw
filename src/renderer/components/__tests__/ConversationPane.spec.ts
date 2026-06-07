@@ -3,7 +3,7 @@ import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import ConversationPane from '../ConversationPane.vue';
 import { i18n } from '../../i18n';
-import type { Agent, RendererMessage, ThreadGoal } from '../../../shared/contracts';
+import type { Agent, BackendCapabilities, RendererMessage, ThreadGoal } from '../../../shared/contracts';
 
 const agent: Agent = {
   id: 'agent-dina',
@@ -279,6 +279,39 @@ describe('ConversationPane', () => {
     expect(wrapper.emitted('retry-message')).toStrictEqual([[1]]);
   });
 
+  it('hides backend message actions that the active provider cannot support', () => {
+    const wrapper = mountPane({
+      agent: {
+        ...agent,
+        backend: 'claude',
+        backendDefaults: { kind: 'claude' },
+      },
+      backendCapabilities: {
+        approvals: false,
+        editMessage: false,
+        goals: false,
+        history: true,
+        interrupt: true,
+        models: true,
+        planMode: 'prompted',
+        reasoningEffort: false,
+        retryMessage: false,
+        rollback: false,
+        skills: false,
+        steerPrompt: false,
+        thinkingBudget: false,
+      },
+      messages,
+      isSending: false,
+    });
+
+    expect(wrapper.find('[aria-label="Copy"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Quote"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Edit"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Retry"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Delete"]').exists()).toBe(false);
+  });
+
   it('keeps composer drafts submittable while sending', async () => {
     const wrapper = mountPane({
       agent,
@@ -320,6 +353,7 @@ function mountPane(props: {
   messages: RendererMessage[];
   agent: Agent | null;
   isSending: boolean;
+  backendCapabilities?: BackendCapabilities;
   goal?: ThreadGoal | null;
   isLoading?: boolean;
   queuedPrompts?: Array<{ id: string; text: string }>;

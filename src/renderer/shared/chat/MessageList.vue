@@ -6,6 +6,9 @@
         :key="index"
         :actions-disabled="actionsDisabled"
         :answered-client-request-ids="answeredClientRequestIds"
+        :can-delete-message="canDeleteMessage"
+        :can-edit-message="canEditMessage"
+        :can-retry-message="canRetryMessage"
         :follow-ups-disabled="followUpsDisabled"
         :index="index"
         :message="msg"
@@ -31,13 +34,20 @@ import type { ClientRequestResponse } from '../../../shared/contracts'
 import type { Message } from './types'
 import ChatMessage from './ChatMessage.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   actionsDisabled?: boolean
   answeredClientRequestIds?: Set<string>
+  canDeleteMessage?: boolean
+  canEditMessage?: boolean
+  canRetryMessage?: boolean
   followUpsDisabled?: boolean
   messages: Message[]
   undoingChangeSetId?: string | null
-}>()
+}>(), {
+  canDeleteMessage: true,
+  canEditMessage: true,
+  canRetryMessage: true,
+})
 const emit = defineEmits<{
   cancel: []
   'client-response': [response: ClientRequestResponse]

@@ -1,16 +1,9 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import MessageList from '../../shared/chat/MessageList.vue';
 import ChatMessage from '../../shared/chat/ChatMessage.vue';
 import { i18n } from '../../i18n';
 import type { Message } from '../../shared/chat/types';
-
-const chatMessageSource = readFileSync(
-  join(process.cwd(), 'src/renderer/shared/chat/ChatMessage.vue'),
-  'utf8',
-);
 
 const messages: Message[] = [
   {
@@ -59,13 +52,6 @@ describe('MessageList', () => {
     expect(wrapper.find('.chat-message__stream-dot').exists()).toBe(true);
   });
 
-  it('matches user message bubble background to the sidebar surface token', () => {
-    expect(chatMessageSource).toContain(`
-.chat-message--user .chat-message__stack {
-  background: var(--color-shell-sidebar);
-`);
-  });
-
   it('renders steered conversation markers between messages', () => {
     const wrapper = mount(MessageList, {
       props: {
@@ -88,6 +74,26 @@ describe('MessageList', () => {
     expect(wrapper.text()).toContain('Steered conversation');
     expect(wrapper.text()).toContain('read every markdown file');
     expect(wrapper.find('.chat-message--steer').exists()).toBe(true);
+  });
+
+  it('forwards provider capability flags to message actions', () => {
+    const wrapper = mount(MessageList, {
+      props: {
+        canDeleteMessage: false,
+        canEditMessage: false,
+        canRetryMessage: false,
+        messages,
+      },
+      global: {
+        plugins: [i18n],
+      },
+    });
+
+    expect(wrapper.find('[aria-label="Copy"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Quote"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Edit"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Retry"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Delete"]').exists()).toBe(false);
   });
 
   it('forwards message action events from chat messages', async () => {

@@ -19,7 +19,7 @@
       <CopyIcon v-else />
     </ChatIconButton>
     <ChatIconButton
-      v-if="message.role === 'user'"
+      v-if="message.role === 'user' && canEdit"
       :label="t('chat.actions.edit')"
       @click="emit('edit')"
     >
@@ -33,13 +33,14 @@
       <QuoteIcon />
     </ChatIconButton>
     <ChatIconButton
-      v-if="message.role === 'assistant'"
+      v-if="message.role === 'assistant' && canRetry"
       :label="t('chat.actions.retry')"
       @click="emit('retry')"
     >
       <RotateClockwiseIcon />
     </ChatIconButton>
     <ChatIconButton
+      v-if="canDelete"
       danger
       :label="t('chat.actions.delete')"
       @click="emit('delete')"
@@ -64,10 +65,17 @@ import ChatIconButton from './ChatIconButton.vue'
 import { formatMessageSentAt, fullMessageSentAt } from './message-time'
 import type { Message } from './types'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
+  canDelete?: boolean
+  canEdit?: boolean
+  canRetry?: boolean
   copied?: boolean
   message: Message
-}>()
+}>(), {
+  canDelete: true,
+  canEdit: true,
+  canRetry: true,
+})
 
 const emit = defineEmits<{
   copy: []

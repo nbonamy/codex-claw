@@ -279,6 +279,53 @@ describe('ChatMessageBlock', () => {
 });
 
 describe('ChatMessage', () => {
+  it('hides unsupported user message mutation actions while keeping copy and quote', () => {
+    const wrapper = mount(ChatMessage, {
+      props: {
+        canDeleteMessage: false,
+        canEditMessage: false,
+        index: 0,
+        message: {
+          id: 'user-1',
+          role: 'user',
+          content: 'Please inspect the composer.',
+        },
+      },
+      global: {
+        plugins: [i18n],
+      },
+    });
+
+    expect(wrapper.find('[aria-label="Copy"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Quote"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Edit"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Delete"]').exists()).toBe(false);
+  });
+
+  it('hides unsupported assistant retry and delete actions while keeping copy', () => {
+    const wrapper = mount(ChatMessage, {
+      props: {
+        canDeleteMessage: false,
+        canRetryMessage: false,
+        index: 1,
+        message: {
+          id: 'assistant-1',
+          role: 'assistant',
+          content: 'I am checking it now.',
+        },
+      },
+      global: {
+        plugins: [i18n],
+      },
+    });
+
+    expect(wrapper.find('[aria-label="Copy"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Retry"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Delete"]').exists()).toBe(false);
+  });
+});
+
+describe('ChatMessage', () => {
   it('renders running compaction messages with shimmer copy', () => {
     const wrapper = mount(ChatMessage, {
       props: {
