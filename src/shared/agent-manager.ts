@@ -134,7 +134,6 @@ export function closeAgentInSnapshot(snapshot: AppSnapshot, agentId: string): Ag
     return null;
   }
 
-  ensureAgentCanChange(agent, 'Agent must be idle before closing.');
   snapshot.agents = snapshot.agents.filter((candidate) => candidate.id !== agentId);
   snapshot.messages = snapshot.messages.filter((message) => message.agentId !== agentId);
 

@@ -251,13 +251,16 @@ describe('agent-manager', () => {
     expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-dina']);
   });
 
-  it('rejects restart and close while an agent is busy', () => {
+  it('rejects restart and move while an agent is busy but still allows close', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].status = { type: 'working' };
+    appendUserPrompt(snapshot, 'agent-dina', 'busy prompt');
 
     expect(() => restartAgentConversation(snapshot, 'agent-dina')).toThrow('Agent must be idle before restarting.');
-    expect(() => closeAgentInSnapshot(snapshot, 'agent-dina')).toThrow('Agent must be idle before closing.');
     expect(() => moveAgentToTeamInSnapshot(snapshot, 'agent-dina', 'team-codex-claw')).toThrow('Agent must be idle before moving.');
+    expect(closeAgentInSnapshot(snapshot, 'agent-dina')).toMatchObject({ id: 'agent-dina' });
+    expect(snapshot.agents.map((agent) => agent.id)).toStrictEqual(['agent-jesse']);
+    expect(snapshot.messages.map((message) => message.agentId)).toStrictEqual([]);
   });
 
   it('returns null for missing agents', () => {
