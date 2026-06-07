@@ -15,6 +15,9 @@ export type ClaudeTurnParams = {
   sessionId?: string;
   model?: string | null;
   permissionMode?: string | null;
+  appendSystemPrompt?: string | null;
+  mcpServerUrl?: string | null;
+  allowedTools?: string[];
 };
 
 export type ClaudeTurnHandle = {
@@ -37,7 +40,7 @@ export class ClaudeCliTransport implements ClaudeTurnTransport {
     const args = claudeArgs(params);
     const cwd = expandHome(params.cwd);
     const path = claudePath(this.options.env?.PATH ?? process.env.PATH);
-    console.log(`[codex-claw:claude:cli-transport] starting ${command} ${args.join(' ')} in ${cwd} with PATH=${path}`);
+    console.log(`[codex-claw:claude:cli-transport] starting ${command} ${redactedClaudeArgs(args).join(' ')} in ${cwd} with PATH=${path}`);
     const child = spawn(command, args, {
       cwd,
       env: claudeEnv(this.options.env, path),
@@ -150,6 +153,22 @@ function claudeArgs(params: ClaudeTurnParams): string[] {
     '--include-partial-messages',
     '--verbose',
   ];
+  if (params.mcpServerUrl) {
+    args.push('--mcp-config', JSON.stringify({
+      mcpServers: {
+        codex_claw: {
+          type: 'http',
+          url: params.mcpServerUrl,
+        },
+      },
+    }));
+  }
+  if (params.allowedTools?.length) {
+    args.push('--allowed-tools', params.allowedTools.join(','));
+  }
+  if (params.appendSystemPrompt) {
+    args.push('--append-system-prompt', params.appendSystemPrompt);
+  }
   if (params.sessionId) {
     args.push('--resume', params.sessionId);
   }
@@ -161,6 +180,26 @@ function claudeArgs(params: ClaudeTurnParams): string[] {
   }
 
   return args;
+}
+
+function redactedClaudeArgs(args: string[]): string[] {
+  const sensitiveFlags = new Set(['-p', '--append-system-prompt']);
+  return args.map((arg, index) => {
+    const previous = args[index - 1];
+    if (previous && sensitiveFlags.has(previous)) {
+      return '<redacted>';
+    }
+
+    return shellQuoteForLog(arg);
+  });
+}
+
+function shellQuoteForLog(value: string): string {
+  if (/^[A-Za-z0-9_./:=@,+-]+$/.test(value)) {
+    return value;
+  }
+
+  return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
 function expandHome(value: string): string {

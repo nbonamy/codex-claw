@@ -1,6 +1,7 @@
 import type {
   Agent,
   BackendCapabilities,
+  BackendModelOption,
   BackendRuntimeStatus,
   BackendSession,
   ClientRequestResponse,
@@ -9,7 +10,10 @@ import type {
 } from '../../shared/contracts';
 import { claudeBackendCapabilities } from '../../shared/backend-capabilities';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '../backends/types';
+import { agentScopedMcpUrl } from '../mcp/codex-config';
+import { codexClawDeveloperInstructions } from '../mcp/agent-prompts';
 import { ClaudeCliTransport, type ClaudeTurnHandle, type ClaudeTurnParams, type ClaudeTurnTransport } from './cli-transport';
+import { claudeModelOptions } from './models';
 import { loadClaudeTranscriptHistory, type ClaudeTranscriptHistory } from './transcript-history-adapter';
 import {
   claudeMessageContentBlocks,
@@ -38,6 +42,9 @@ type ActiveClaudeTurn = {
 
 type EventListener = (event: BackendEvent) => void;
 type ClaudeHistoryLoader = (agent: Agent) => Promise<ClaudeTranscriptHistory | null>;
+type ClaudeBackendDriverOptions = {
+  clawMcpServerUrl?: string | null;
+};
 
 export class ClaudeBackendDriver implements AgentBackendDriver {
   readonly backend = 'claude' as const;
@@ -49,6 +56,7 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
   constructor(
     private readonly transport: ClaudeTurnTransport = new ClaudeCliTransport(),
     private readonly historyLoader: ClaudeHistoryLoader = loadClaudeTranscriptHistory,
+    private readonly driverOptions: ClaudeBackendDriverOptions = {},
   ) {}
 
   getRuntimeStatus(): BackendRuntimeStatus {
@@ -63,6 +71,10 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
     return claudeBackendCapabilities;
   }
 
+  async listModels(_agent: Agent): Promise<BackendModelOption[]> {
+    return claudeModelOptions.map((model) => ({ ...model }));
+  }
+
   async sendPrompt(agent: Agent, prompt: string, options: SendPromptOptions = {}): Promise<BackendSendResult> {
     if (this.activeTurnsByAgentId.has(agent.id)) {
       throw new Error('Claude already has an active turn for this agent.');
@@ -72,7 +84,13 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
     const existingSessionId = claudeSessionId(agent);
     let activeTurn: ActiveClaudeTurn | null = null;
     const started = new Promise<BackendSendResult>((resolve, reject) => {
-      const handle = this.transport.startTurn(claudeTurnParams(agent, prompt, options, existingSessionId), (message) => {
+      const handle = this.transport.startTurn(claudeTurnParams(
+        agent,
+        prompt,
+        options,
+        existingSessionId,
+        this.driverOptions.clawMcpServerUrl,
+      ), (message) => {
         if (activeTurn) {
           this.handleSdkMessage(activeTurn, message);
         }
@@ -430,15 +448,25 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
   }
 }
 
-function claudeTurnParams(agent: Agent, prompt: string, options: SendPromptOptions, existingSessionId: string | null): ClaudeTurnParams {
+function claudeTurnParams(
+  agent: Agent,
+  prompt: string,
+  options: SendPromptOptions,
+  existingSessionId: string | null,
+  clawMcpServerUrl: string | null | undefined,
+): ClaudeTurnParams {
   const claudeOptions = options.backendOptions?.kind === 'claude' ? options.backendOptions : undefined;
   const defaults = agent.backendDefaults?.kind === 'claude' ? agent.backendDefaults : undefined;
+  const mcpServerUrl = clawMcpServerUrl ? agentScopedMcpUrl(clawMcpServerUrl, agent.id) : null;
   return {
     cwd: agent.folder,
     prompt: claudePrompt(prompt, options),
     sessionId: existingSessionId ?? undefined,
     model: options.model ?? defaults?.model ?? null,
     permissionMode: claudeOptions?.permissionMode ?? defaults?.permissionMode ?? null,
+    appendSystemPrompt: codexClawDeveloperInstructions(agent),
+    mcpServerUrl,
+    allowedTools: mcpServerUrl ? ['mcp__codex_claw__*'] : [],
   };
 }
 

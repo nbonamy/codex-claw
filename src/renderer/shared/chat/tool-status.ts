@@ -106,13 +106,18 @@ function getCodexClawMcpTitle(
 
 function codexClawToolName(toolCall: MessageToolCall): CodexClawToolName | undefined {
   const name = getMessageToolCallName(toolCall);
-  const prefix = 'codex_claw.';
-  if (!name.startsWith(prefix)) {
-    return undefined;
-  }
-
-  const toolName = name.slice(prefix.length);
+  const toolName = codexClawToolNameFromBackendName(name);
   return isCodexClawTool(toolName) ? toolName : undefined;
+}
+
+function codexClawToolNameFromBackendName(name: string): string {
+  const prefixes = [
+    'codex_claw.',
+    'mcp__codex_claw__',
+    'mcp_codex_claw_',
+  ];
+  const prefix = prefixes.find((candidate) => name.startsWith(candidate));
+  return prefix ? name.slice(prefix.length) : '';
 }
 
 function codexClawToolParams(toolName: CodexClawToolName, args: Record<string, unknown> | undefined) {

@@ -682,15 +682,19 @@ export class AppController {
       return this.getCodexBackendDriver();
     }
 
-    return this.getClaudeBackendDriver();
-  }
-
-  private getClaudeBackendDriver(): ClaudeBackendDriver {
     if (this.claudeBackendDriver) {
       return this.claudeBackendDriver;
     }
 
-    this.claudeBackendDriver = new ClaudeBackendDriver();
+    return this.getClaudeBackendDriver(await this.ensureMcpServer());
+  }
+
+  private getClaudeBackendDriver(clawMcpServerUrl: string): ClaudeBackendDriver {
+    if (this.claudeBackendDriver) {
+      return this.claudeBackendDriver;
+    }
+
+    this.claudeBackendDriver = new ClaudeBackendDriver(undefined, undefined, { clawMcpServerUrl });
     this.claudeBackendDriver.onEvent((event) => {
       this.emitAndApply(event);
     });

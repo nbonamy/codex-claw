@@ -77,6 +77,8 @@ describe('tool status helpers', () => {
     ['codex_claw.broadcast-message', { from: 'agent-dina' }, 'Broadcast message'],
     ['codex_claw.set-status', { status: 'Running tests' }, 'Updated status'],
     ['codex_claw.set-status', { status: '' }, 'Cleared status'],
+    ['mcp__codex_claw__send-message', { to: 'Manny' }, 'Sent message to Manny'],
+    ['mcp_codex_claw_send-message', { to: 'Manny' }, 'Sent message to Manny'],
   ])('formats Codex Claw MCP %s titles', (name, args, expected) => {
     expect(getToolDisplayTitle({
       args,

@@ -17,7 +17,7 @@ export const codexBackendCapabilities: BackendCapabilities = {
 };
 
 export const claudeBackendCapabilities: BackendCapabilities = {
-  models: false,
+  models: true,
   skills: false,
   reasoningEffort: false,
   thinkingBudget: false,

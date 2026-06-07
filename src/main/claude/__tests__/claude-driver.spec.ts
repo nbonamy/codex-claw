@@ -26,13 +26,14 @@ describe('ClaudeBackendDriver', () => {
       model: 'claude-sonnet-4-5',
       backendOptions: { kind: 'claude', permissionMode: 'acceptEdits' },
     });
-    expect(transport.startTurn).toHaveBeenCalledWith({
+    expect(transport.startTurn).toHaveBeenCalledWith(expect.objectContaining({
       cwd: '/Users/nbonamy/src/codex-claw',
       prompt: 'hello claude',
       sessionId: undefined,
       model: 'claude-sonnet-4-5',
       permissionMode: 'acceptEdits',
-    }, expect.any(Function));
+      appendSystemPrompt: expect.stringContaining('Your Codex Claw agent ID is agent-claude.'),
+    }), expect.any(Function));
 
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-1' });
     await expect(sendResult).resolves.toStrictEqual({
@@ -130,6 +131,49 @@ describe('ClaudeBackendDriver', () => {
       type: 'turn.completed',
       payload: { turn: { id: sendResult.turnId, status: 'interrupted' } },
     }));
+  });
+
+  it('lists the Claude model aliases used by the CLI', async () => {
+    const transport = createFakeTransport();
+    const driver = new ClaudeBackendDriver(transport);
+
+    await expect(driver.listModels(agent)).resolves.toStrictEqual([
+      {
+        id: 'opus',
+        model: 'opus',
+        displayName: 'Opus',
+      },
+      {
+        id: 'sonnet',
+        model: 'sonnet',
+        displayName: 'Sonnet',
+        isDefault: true,
+      },
+      {
+        id: 'haiku',
+        model: 'haiku',
+        displayName: 'Haiku',
+      },
+    ]);
+  });
+
+  it('passes Claw MCP config and allows Claw MCP tools by default', async () => {
+    const transport = createFakeTransport();
+    const driver = new ClaudeBackendDriver(transport, async () => null, {
+      clawMcpServerUrl: 'http://127.0.0.1:4321/mcp',
+    });
+
+    const sendResult = driver.sendPrompt(agent, 'coordinate with the team');
+
+    expect(transport.startTurn.mock.calls[0]?.[0]).toMatchObject({
+      mcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-claude',
+      allowedTools: ['mcp__codex_claw__*'],
+      appendSystemPrompt: expect.stringContaining('Use the codex_claw MCP server for agent collaboration.'),
+    });
+    transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-mcp' });
+    await expect(sendResult).resolves.toMatchObject({
+      backendSession: { kind: 'claude', sessionId: 'claude-session-mcp', transport: 'stdio' },
+    });
   });
 
   it('hydrates persisted Claude transcript history through the driver', async () => {

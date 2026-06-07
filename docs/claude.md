@@ -71,7 +71,10 @@ under `src/main/claude/`. The driver uses the local Claude Code CLI print-mode
 streaming JSON surface instead of the direct-connect websocket path:
 
 ```text
-claude -p "<prompt>" --output-format stream-json --include-partial-messages --verbose
+claude -p "<prompt>" --output-format stream-json --include-partial-messages --verbose \
+  --mcp-config '{"mcpServers":{"codex_claw":{"type":"http","url":"http://127.0.0.1:<port>/mcp?agentId=<agent-id>"}}}' \
+  --allowed-tools 'mcp__codex_claw__*' \
+  --append-system-prompt "<Codex Claw developer instructions>"
 ```
 
 Persisted Claude agents resume with `--resume <session_id>`. The driver maps
@@ -115,6 +118,14 @@ displayable records:
 On agent selection or startup active-agent hydration, `ClaudeBackendDriver`
 emits `thread.historyLoaded` through the same app-owned event path used by
 Codex, so the renderer remains backend-agnostic.
+
+The actual Electron process uses `spawn(command, args)`, not shell string
+execution, so `-p` and `--append-system-prompt` values are passed as single argv
+entries even when they contain quotes, shell metacharacters, or newlines. Logs
+redact those two values.
+
+Claude model listing is local for now. The driver returns the CLI aliases
+`opus`, `sonnet`, and `haiku`, with `sonnet` as the default visible option.
 
 The transport prepends common user binary folders such as `~/.local/bin`,
 `~/bin`, `/opt/homebrew/bin`, and `/usr/local/bin` to `PATH` because packaged or
