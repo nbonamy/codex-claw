@@ -3,6 +3,7 @@ import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { listAgentFolderFiles } from './agent-files';
 import { sendAgentPrompt } from './agent-chat-service';
+import { ClaudeBackendDriver } from './claude/claude-driver';
 import { CodexAgentSessionManager } from './codex/agent-session';
 import { CodexBackendDriver } from './codex/codex-driver';
 import { CodexProcessTransport } from './codex/process-transport';
@@ -62,6 +63,7 @@ export class AppController {
   private mcpServerUrl: string | null = null;
   private mcpServerStartPromise: Promise<string> | null = null;
   private codexBackendDriver: CodexBackendDriver | null = null;
+  private claudeBackendDriver: ClaudeBackendDriver | null = null;
   private readonly clientRequestBackends = new Map<string, AgentBackend>();
   private seq = 0;
 
@@ -297,6 +299,7 @@ export class AppController {
 
   async shutdown(): Promise<void> {
     await this.codexBackendDriver?.close();
+    await this.claudeBackendDriver?.close();
     await this.mcpServer?.stop();
   }
 
@@ -679,7 +682,20 @@ export class AppController {
       return this.getCodexBackendDriver();
     }
 
-    throw new Error(`${backendDisplayName(backend)} backend is not implemented yet.`);
+    return this.getClaudeBackendDriver();
+  }
+
+  private getClaudeBackendDriver(): ClaudeBackendDriver {
+    if (this.claudeBackendDriver) {
+      return this.claudeBackendDriver;
+    }
+
+    this.claudeBackendDriver = new ClaudeBackendDriver();
+    this.claudeBackendDriver.onEvent((event) => {
+      this.emitAndApply(event);
+    });
+
+    return this.claudeBackendDriver;
   }
 
   private async getCodexBackendDriver(): Promise<CodexBackendDriver> {

@@ -48,6 +48,10 @@ describe('snapshot service', () => {
         backend: 'codex',
         status: 'notConfigured',
         detail: 'Codex backend is not connected yet.',
+      }, {
+        backend: 'claude',
+        status: 'notConfigured',
+        detail: 'Claude backend has not been started yet.',
       }],
       theme: defaultThemeSettings,
     });
@@ -76,6 +80,18 @@ describe('snapshot service', () => {
       status: { type: 'idle' },
       createdAt: '2026-06-05T10:11:12.000Z',
       updatedAt: '2026-06-05T10:11:12.000Z',
+    });
+  });
+
+  it('creates Claude agents from UI input', () => {
+    expect(createAgentFromInput({
+      name: ' Claude Pal ',
+      folder: '/Users/nbonamy/src/id8',
+      backend: 'claude',
+    }, '2026-06-05T10:11:12.000Z', 'team-codex-claw', 'agent-new-claude')).toMatchObject({
+      id: 'agent-new-claude',
+      backend: 'claude',
+      backendDefaults: { kind: 'claude' },
     });
   });
 

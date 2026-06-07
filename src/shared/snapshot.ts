@@ -1,5 +1,6 @@
 import type {
   Agent,
+  AgentBackend,
   AgentContextUsage,
   AgentStatus,
   AccountRateLimits,
@@ -37,6 +38,10 @@ export function createEmptySnapshot(): AppSnapshot {
       backend: 'codex',
       status: 'notConfigured',
       detail: 'Codex backend is not connected yet.',
+    }, {
+      backend: 'claude',
+      status: 'notConfigured',
+      detail: 'Claude backend has not been started yet.',
     }],
     theme: { ...defaultThemeSettings },
   };
@@ -61,6 +66,10 @@ export function createInitialSnapshot(): AppSnapshot {
       backend: 'codex',
       status: 'notConfigured',
       detail: 'Codex backend is not connected yet.',
+    }, {
+      backend: 'claude',
+      status: 'notConfigured',
+      detail: 'Claude backend has not been started yet.',
     }],
     theme: { ...defaultThemeSettings },
   };
@@ -68,6 +77,7 @@ export function createInitialSnapshot(): AppSnapshot {
 
 export function createAgentFromInput(input: CreateAgentInput, createdAt = new Date().toISOString(), teamId = seedTeamId, id = createEntityId('agent')): Agent {
   const name = normalizedAgentName(input.name, input.folder);
+  const backend = normalizedBackend(input.backend);
 
   return {
     id,
@@ -75,8 +85,8 @@ export function createAgentFromInput(input: CreateAgentInput, createdAt = new Da
     name,
     avatar: normalizedOptionalString(input.avatar),
     folder: normalizedFolder(input.folder),
-    backend: 'codex',
-    backendDefaults: { kind: 'codex' },
+    backend,
+    backendDefaults: defaultBackendDefaults(backend),
     status: { type: 'idle' },
     createdAt,
     updatedAt: createdAt,
@@ -103,10 +113,16 @@ export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentIn
 
   const nextFolder = normalizedFolder(input.folder);
   const folderChanged = nextFolder !== agent.folder;
+  const nextBackend = normalizedBackend(input.backend ?? agent.backend);
+  const backendChanged = nextBackend !== agent.backend;
   agent.name = normalizedAgentName(input.name, nextFolder);
   agent.avatar = normalizedOptionalString(input.avatar);
   agent.folder = nextFolder;
-  if (folderChanged) {
+  agent.backend = nextBackend;
+  if (backendChanged) {
+    agent.backendDefaults = defaultBackendDefaults(nextBackend);
+  }
+  if (folderChanged || backendChanged) {
     clearAgentRuntimeState(agent);
   }
   agent.updatedAt = updatedAt;
@@ -225,9 +241,15 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     return;
   }
 
-  if (event.type === 'thread.started' && event.threadId) {
+  if (event.type === 'thread.started') {
     const agent = findAgent(snapshot, event.agentId);
-    if (agent) {
+    if (agent && event.backend === 'claude' && typeof event.backendSessionId === 'string') {
+      agent.backend = 'claude';
+      agent.backendSession = { kind: 'claude', sessionId: event.backendSessionId, transport: 'stdio' };
+      return;
+    }
+
+    if (agent && event.threadId) {
       agent.backend = 'codex';
       agent.backendSession = { kind: 'codex', threadId: event.threadId };
       agent.status = { type: 'idle' };
@@ -427,7 +449,9 @@ function updateAssistantToolPart(snapshot: AppSnapshot, agentId: string, turnId:
     toolPart.status = update.status;
   }
 
-  if (update.statusText !== undefined) {
+  if (update.statusText === null) {
+    delete toolPart.statusText;
+  } else if (update.statusText !== undefined) {
     toolPart.statusText = update.statusText;
   }
 
@@ -735,7 +759,7 @@ function rendererToolPartUpdate(value: unknown): RendererToolPartUpdate | null {
     itemId: value.itemId,
     title: typeof value.title === 'string' ? value.title : undefined,
     status: isToolStatus(value.status) ? value.status : undefined,
-    statusText: typeof value.statusText === 'string' ? value.statusText : undefined,
+    statusText: value.statusText === null || typeof value.statusText === 'string' ? value.statusText : undefined,
     body: typeof value.body === 'string' ? value.body : undefined,
     bodyDelta: typeof value.bodyDelta === 'string' ? value.bodyDelta : undefined,
     bodyAppend: typeof value.bodyAppend === 'string' ? value.bodyAppend : undefined,
@@ -1204,6 +1228,14 @@ function clearAgentRuntimeState(agent: Agent): void {
   delete agent.isRegistered;
   delete agent.mcpSessionId;
   delete agent.statusText;
+}
+
+function normalizedBackend(value: AgentBackend | undefined): AgentBackend {
+  return value === 'claude' ? 'claude' : 'codex';
+}
+
+function defaultBackendDefaults(backend: AgentBackend): Agent['backendDefaults'] {
+  return backend === 'claude' ? { kind: 'claude' } : { kind: 'codex' };
 }
 
 function normalizedAgentName(name: string, folder: string): string {

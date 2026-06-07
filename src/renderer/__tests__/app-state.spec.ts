@@ -793,8 +793,8 @@ describe('useAppState', () => {
     await state.createTeam({ name: 'Skwad Core', color: '#46A857' });
     await state.selectTeam('team-codex-claw');
     await state.updateTeam({ id: 'team-codex-claw', name: 'Core Team', color: '#46A857' });
-    await state.createAgent({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules' });
-    await state.updateAgent({ id: 'agent-jules', name: 'Jules Prime', avatar: '🤖', folder: '/Users/nbonamy/src/jules' });
+    await state.createAgent({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules', backend: 'claude' });
+    await state.updateAgent({ id: 'agent-jules', name: 'Jules Prime', avatar: '🤖', folder: '/Users/nbonamy/src/jules', backend: 'claude' });
     await state.duplicateAgent('agent-jules');
     await state.moveAgentToTeam({ agentId: 'agent-jules', teamId: 'team-skwad-core' });
     await state.saveAgentToBench('agent-jules');
@@ -807,8 +807,8 @@ describe('useAppState', () => {
     expect(createTeam).toHaveBeenCalledWith({ name: 'Skwad Core', color: '#46A857' });
     expect(selectTeam).toHaveBeenCalledWith('team-codex-claw');
     expect(updateTeam).toHaveBeenCalledWith({ id: 'team-codex-claw', name: 'Core Team', color: '#46A857' });
-    expect(createAgent).toHaveBeenCalledWith({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules' });
-    expect(updateAgent).toHaveBeenCalledWith({ id: 'agent-jules', name: 'Jules Prime', avatar: '🤖', folder: '/Users/nbonamy/src/jules' });
+    expect(createAgent).toHaveBeenCalledWith({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules', backend: 'claude' });
+    expect(updateAgent).toHaveBeenCalledWith({ id: 'agent-jules', name: 'Jules Prime', avatar: '🤖', folder: '/Users/nbonamy/src/jules', backend: 'claude' });
     expect(duplicateAgent).toHaveBeenCalledWith('agent-jules');
     expect(moveAgentToTeam).toHaveBeenCalledWith({ agentId: 'agent-jules', teamId: 'team-skwad-core' });
     expect(saveAgentToBench).toHaveBeenCalledWith('agent-jules');
@@ -944,6 +944,34 @@ describe('useAppState', () => {
     await state.sendPrompt('make a plan and keep going');
 
     expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'make a plan and keep going', {
+      planMode: true,
+    });
+  });
+
+  it('includes prompted plan mode for Claude agents', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0].backend = 'claude';
+    remoteSnapshot.agents[0].backendDefaults = { kind: 'claude' };
+    const updatedSnapshot = createInitialSnapshot();
+    updatedSnapshot.agents[0].backend = 'claude';
+    updatedSnapshot.agents[0].backendDefaults = { kind: 'claude' };
+    const sendPrompt = vi.fn().mockResolvedValue(updatedSnapshot);
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        sendPrompt,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    state.setPlanMode(true);
+
+    await state.sendPrompt('make a Claude plan');
+
+    expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'make a Claude plan', {
       planMode: true,
     });
   });

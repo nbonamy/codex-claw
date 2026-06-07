@@ -257,7 +257,7 @@ export type RendererToolPartUpdate = {
   itemId: string;
   title?: string;
   status?: RendererToolPart['status'];
-  statusText?: string;
+  statusText?: string | null;
   body?: string;
   bodyDelta?: string;
   bodyAppend?: string;
@@ -349,6 +349,7 @@ export type CreateAgentInput = {
   name: string;
   folder: string;
   avatar?: string;
+  backend?: AgentBackend;
 };
 
 export type CreateTeamInput = {
@@ -367,6 +368,7 @@ export type UpdateAgentInput = {
   name: string;
   folder: string;
   avatar?: string;
+  backend?: AgentBackend;
 };
 
 export type MoveAgentToTeamInput = {

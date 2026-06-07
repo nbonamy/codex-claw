@@ -4,8 +4,8 @@ Status: updated for backend seam cleanup, 2026-06-06.
 
 Codex Claw is an Electron app that merges the team/agent product model from
 Skwad with the native chat and artifact rendering already built in id8. The app
-currently implements Codex through Codex app-server and has a backend-aware
-main-process seam for future drivers such as Claude Code. It does not launch a
+implements Codex through Codex app-server and Claude through the local Claude
+Code CLI stream-json surface behind a backend-aware main-process seam. It does not launch a
 terminal emulator as the primary user experience; main-process backend drivers
 own protocol/process communication and the renderer displays app-owned events.
 
@@ -17,9 +17,9 @@ own protocol/process communication and the renderer displays app-owned events.
   document/artifact panes.
 - Treat Bench as a first-class product primitive: saved agent templates that
   can be deployed into a team quickly.
-- Keep Codex as the implemented backend for the current product. Do not carry
+- Keep Codex as the primary implemented backend for the current product. Do not carry
   Skwad's full multi-provider abstraction forward, but keep the narrow backend
-  seam so another coding backend can be added later without rewriting the UI.
+  seam so coding backends such as Claude can be added without rewriting the UI.
 - Use the Codex app-server protocol as the long-term integration boundary.
 - Keep all app-server communication in Electron main. Renderer code never owns
   Codex process lifecycle, JSON-RPC request IDs, approval callbacks, or auth.

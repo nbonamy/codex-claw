@@ -1,6 +1,6 @@
 # Claude Code Integration Research
 
-Status: research notes with historical bias inventory, 2026-06-06.
+Status: implementation notes plus historical research, 2026-06-06.
 
 Update, 2026-06-06: the Codex-bias inventory in this document was written
 before the backend-agnostic cleanup landed. The current code now has
@@ -64,7 +64,45 @@ type AgentBackendDriver = {
 `CodexBackendDriver` wraps `CodexAgentSessionManager`; `AppController` routes
 prompt send, interrupt, history hydration, rollback, request responses, model
 loading, and skill loading through the backend driver. Claude is represented in
-shared contracts and capabilities, but no Claude driver is implemented yet.
+shared contracts and capabilities.
+
+Update, 2026-06-06: Codex Claw now has a first Claude driver implementation
+under `src/main/claude/`. The driver uses the local Claude Code CLI print-mode
+streaming JSON surface instead of the direct-connect websocket path:
+
+```text
+claude -p "<prompt>" --output-format stream-json --include-partial-messages --verbose
+```
+
+Persisted Claude agents resume with `--resume <session_id>`. The driver maps
+Claude SDK stream messages into app-owned backend events:
+
+- `system/init` or any message with `session_id` records a Claude
+  `BackendSession`.
+- `stream_event` text deltas become incremental `message.delta` events.
+- `stream_event` tool starts and input JSON deltas create and update running
+  tool cards before the final assistant message arrives.
+- assistant text blocks become `message.delta`.
+- `tool_use` blocks become generic running tool cards.
+- `tool_result` blocks update those tool cards.
+- `result` completes the turn or emits an app error.
+
+This gives Claude agents local prompt send, streaming display, session resume,
+and process interrupt through the same `AgentBackendDriver` seam as Codex.
+Capabilities intentionally do not advertise approvals, history hydration,
+rollback, model listing, or skills until those surfaces are implemented for
+Claude.
+Claude advertises `planMode: "prompted"`: when the renderer sends
+`planMode: true`, the driver wraps the user request with concise plan-mode
+instructions before passing it to Claude Code.
+
+The transport prepends common user binary folders such as `~/.local/bin`,
+`~/bin`, `/opt/homebrew/bin`, and `/usr/local/bin` to `PATH` because packaged or
+GUI-launched Electron processes often do not inherit the user's shell PATH. Set
+`CODEX_CLAW_CLAUDE_COMMAND=/absolute/path/to/claude` to override executable
+resolution. If Claude Code emits the common unauthenticated stream result, Claw
+normalizes it to an actionable app error telling the user to open Claude Code
+and run `/login`.
 
 ## Claude Websocket Surfaces
 

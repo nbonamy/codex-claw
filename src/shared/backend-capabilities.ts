@@ -29,7 +29,7 @@ export const claudeBackendCapabilities: BackendCapabilities = {
   rollback: false,
   editMessage: false,
   retryMessage: false,
-  approvals: true,
+  approvals: false,
 };
 
 export function defaultBackendCapabilities(backend: AgentBackend): BackendCapabilities {

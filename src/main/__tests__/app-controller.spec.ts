@@ -4,7 +4,7 @@ import { createInitialSnapshot } from '../../shared/snapshot';
 import type { MainToRendererEvent } from '../../shared/contracts';
 import type { AppStatePersistence } from '../state-persistence';
 import type { AgentBackendDriver } from '../backends/types';
-import { codexBackendCapabilities } from '../../shared/backend-capabilities';
+import { claudeBackendCapabilities, codexBackendCapabilities } from '../../shared/backend-capabilities';
 
 describe('AppController', () => {
   it('persists collaboration status updates emitted by MCP tools', async () => {
@@ -157,6 +157,36 @@ describe('AppController', () => {
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
   });
 
+  it('routes Claude prompts through the Claude backend driver', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].backend = 'claude';
+    snapshot.agents[0].backendDefaults = { kind: 'claude' };
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const backendDriver = createFakeClaudeBackendDriver({
+      sendPrompt: vi.fn().mockResolvedValue({
+        backendSession: { kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' },
+        turnId: 'claude-turn-1',
+      }),
+    });
+
+    await controller.initialize();
+    setClaudeBackendDriver(controller, backendDriver);
+    await sendPrompt(controller, 'agent-dina', 'hello claude');
+    await flushMicrotasks();
+
+    expect(backendDriver.sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina', backend: 'claude' }), 'hello claude');
+    expect(snapshot.messages.at(-1)).toMatchObject({
+      agentId: 'agent-dina',
+      role: 'user',
+      parts: [{ type: 'text', text: 'hello claude' }],
+    });
+    expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' });
+  });
+
   it('deletes a message by rolling back from its Codex turn and replacing history', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
@@ -274,6 +304,15 @@ function setCodexBackendDriver(
   }).codexBackendDriver = backendDriver;
 }
 
+function setClaudeBackendDriver(
+  controller: AppController,
+  backendDriver: AgentBackendDriver,
+): void {
+  (controller as unknown as {
+    claudeBackendDriver: AgentBackendDriver;
+  }).claudeBackendDriver = backendDriver;
+}
+
 function createFakeCodexBackendDriver(overrides: Partial<AgentBackendDriver> = {}): AgentBackendDriver {
   return {
     backend: 'codex',
@@ -287,6 +326,26 @@ function createFakeCodexBackendDriver(overrides: Partial<AgentBackendDriver> = {
     close: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
+}
+
+function createFakeClaudeBackendDriver(overrides: Partial<AgentBackendDriver> = {}): AgentBackendDriver {
+  return {
+    backend: 'claude',
+    getRuntimeStatus: () => ({ backend: 'claude', status: 'notConfigured' }),
+    getCapabilities: () => claudeBackendCapabilities,
+    sendPrompt: vi.fn().mockResolvedValue({ backendSession: { kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' }, turnId: 'claude-turn-1' }),
+    interrupt: vi.fn().mockResolvedValue({ backendSession: { kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' }, turnId: 'claude-turn-1' }),
+    respondToRequest: vi.fn().mockResolvedValue(undefined),
+    onEvent: vi.fn(() => () => undefined),
+    close: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  };
+}
+
+async function sendPrompt(controller: AppController, agentId: string, prompt: string): Promise<void> {
+  await (controller as unknown as {
+    sendPrompt(agentId: string, prompt: string): Promise<void>;
+  }).sendPrompt(agentId, prompt);
 }
 
 async function interruptAgent(controller: AppController, agentId: string): Promise<void> {

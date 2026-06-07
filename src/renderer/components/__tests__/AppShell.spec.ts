@@ -294,6 +294,7 @@ describe('AppShell', () => {
       name: 'Jules',
       avatar: undefined,
       folder: '/Users/nbonamy/src/new-agent',
+      backend: 'codex',
     });
   });
 
@@ -425,6 +426,7 @@ describe('AppShell', () => {
       name: 'Dina Prime',
       avatar: 'DI',
       folder: '~/src/codex-claw',
+      backend: 'codex',
     });
   });
 

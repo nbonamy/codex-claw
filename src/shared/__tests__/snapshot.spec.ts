@@ -373,6 +373,24 @@ describe('snapshot reducer', () => {
     expect(snapshot.backendRuntimes).toContainEqual({ backend: 'codex', status: 'running', detail: 'connected' });
   });
 
+  it('records Claude session starts without requiring a Codex thread id', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].backend = 'claude';
+    snapshot.agents[0].backendDefaults = { kind: 'claude' };
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      backend: 'claude',
+      backendSessionId: 'claude-session-1',
+      type: 'thread.started',
+      payload: { sessionId: 'claude-session-1', transport: 'stdio' },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' });
+  });
+
   it('records thread settings updates as durable agent thread mappings', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-old' };
@@ -846,6 +864,49 @@ describe('snapshot reducer', () => {
         },
       ],
     });
+  });
+
+  it('clears tool status text when an update explicitly sends null', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'item.started',
+      payload: toolPartPayload(dynamicToolPart({
+        id: 'tool-1',
+        title: 'Bash',
+        status: 'running',
+        statusText: 'Preparing tool input...',
+      })),
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'item.updated',
+      payload: {
+        itemId: 'tool-1',
+        statusText: null,
+        input: { command: 'npm test' },
+      },
+      occurredAt: '2026-06-05T00:00:04.000Z',
+    });
+
+    const part = snapshot.messages.at(-1)?.parts[0];
+    expect(part).toMatchObject({
+      type: 'tool',
+      id: 'tool-1',
+      kind: 'dynamic',
+      title: 'Bash',
+      status: 'running',
+      input: { command: 'npm test' },
+    });
+    expect(part && 'statusText' in part).toBe(false);
   });
 
   it('preserves assistant stream order across tool calls', () => {
@@ -2255,6 +2316,7 @@ function dynamicToolPart(input: {
   id: string;
   title: string;
   status: RendererToolPart['status'];
+  statusText?: string;
   body?: string;
   input?: unknown;
   output?: unknown;
@@ -2266,6 +2328,7 @@ function dynamicToolPart(input: {
     kind: 'dynamic',
     title: input.title,
     status: input.status,
+    ...(input.statusText !== undefined ? { statusText: input.statusText } : {}),
     body: input.body,
     input: input.input,
     output: input.output,

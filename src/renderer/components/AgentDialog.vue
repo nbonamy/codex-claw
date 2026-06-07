@@ -43,6 +43,20 @@
       </section>
 
       <section class="agent-dialog__section">
+        <label class="agent-dialog__row">
+          <span class="agent-dialog__label">Backend</span>
+          <select
+            v-model="backend"
+            class="agent-dialog__select"
+            :disabled="!canEdit"
+          >
+            <option value="codex">Codex</option>
+            <option value="claude">Claude</option>
+          </select>
+        </label>
+
+        <div class="agent-dialog__divider" />
+
         <button
           class="agent-dialog__row agent-dialog__row--button"
           type="button"
@@ -95,7 +109,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { Agent, CreateAgentInput, UpdateAgentInput } from '../../shared/contracts';
+import type { Agent, AgentBackend, CreateAgentInput, UpdateAgentInput } from '../../shared/contracts';
 import { ChevronDown } from '../shared/icons/app-icons';
 import AgentAvatarPicker from './AgentAvatarPicker.vue';
 
@@ -115,6 +129,7 @@ const emit = defineEmits<{
 const name = ref('');
 const folder = ref('');
 const avatar = ref<string | undefined>(undefined);
+const backend = ref<AgentBackend>('codex');
 const errorMessage = ref<string | null>(null);
 const choosingFolder = ref(false);
 const submitting = ref(false);
@@ -123,7 +138,7 @@ const isEditing = computed(() => props.mode === 'edit');
 const canEdit = computed(() => !isEditing.value || props.agent?.status.type === 'idle');
 const folderName = computed(() => folder.value.split(/[\\/]/).filter(Boolean).at(-1) ?? '');
 const title = computed(() => isEditing.value ? 'Edit Agent' : 'New Agent');
-const subtitle = computed(() => isEditing.value ? 'Update Codex agent settings' : 'Add a Codex agent to Skwad');
+const subtitle = computed(() => isEditing.value ? 'Update agent settings' : 'Add an agent to Skwad');
 const submitLabel = computed(() => isEditing.value ? 'Save' : 'Add Agent');
 const folderLabel = computed(() => folder.value ? shortenFolder(folder.value) : 'Select folder');
 const canSave = computed(() => (
@@ -177,12 +192,14 @@ async function submit(): Promise<void> {
         name: name.value,
         folder: folder.value,
         avatar: avatar.value,
+        backend: backend.value,
       });
     } else {
       await props.createAgent({
         name: name.value,
         folder: folder.value,
         avatar: avatar.value,
+        backend: backend.value,
       });
     }
     close();
@@ -212,12 +229,14 @@ function resetForm(): void {
     name.value = props.agent.name;
     folder.value = props.agent.folder;
     avatar.value = props.agent.avatar;
+    backend.value = props.agent.backend;
     return;
   }
 
   name.value = '';
   folder.value = '';
   avatar.value = undefined;
+  backend.value = 'codex';
 }
 
 function shortenFolder(value: string): string {
@@ -292,6 +311,19 @@ function shortenFolder(value: string): string {
 .agent-dialog__text-input::placeholder,
 .agent-dialog__repository-value--empty {
   color: var(--color-text-muted);
+}
+
+.agent-dialog__select {
+  min-width: 0;
+  border: 0;
+  color: var(--color-text);
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-size-14);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-20);
+  text-align: right;
+  outline: none;
 }
 
 .agent-dialog__repository-value {

@@ -22,14 +22,15 @@ describe('AgentDialog', () => {
 
     expect(wrapper.get('.claw-dialog__header--centered').text()).toContain('New Agent');
     expect(wrapper.get('.claw-dialog__title').text()).toBe('New Agent');
-    expect(wrapper.get('.claw-dialog__subtitle').text()).toBe('Add a Codex agent to Skwad');
-    expect(wrapper.text()).toContain('Add a Codex agent to Skwad');
+    expect(wrapper.get('.claw-dialog__subtitle').text()).toBe('Add an agent to Skwad');
+    expect(wrapper.text()).toContain('Add an agent to Skwad');
     expect(wrapper.findAll('.agent-dialog__section')).toHaveLength(2);
     expect(wrapper.text()).toContain('Name');
     expect(wrapper.text()).toContain('Avatar');
     expect(wrapper.text()).not.toContain('Coding Agent');
     expect(wrapper.text()).not.toContain('Persona');
     expect(wrapper.text()).toContain('Folder');
+    expect(wrapper.text()).toContain('Backend');
     expect(saveButton(wrapper).attributes()).toHaveProperty('disabled');
   });
 
@@ -47,6 +48,7 @@ describe('AgentDialog', () => {
       name: 'new-agent',
       avatar: '🤖',
       folder: '/Users/nbonamy/src/new-agent',
+      backend: 'codex',
     });
     expect(wrapper.emitted('close')).toStrictEqual([[]]);
   });
@@ -69,6 +71,26 @@ describe('AgentDialog', () => {
       name: 'Dina Prime',
       avatar: 'DI',
       folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+    });
+  });
+
+  it('creates Claude agents when Claude is selected', async () => {
+    const createAgent = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountDialog({
+      chooseAgentFolder: vi.fn().mockResolvedValue('/Users/nbonamy/src/claude-project'),
+      createAgent,
+    });
+
+    await wrapper.get('.agent-dialog__row--button').trigger('click');
+    await wrapper.get('.agent-dialog__select').setValue('claude');
+    await saveButton(wrapper).trigger('click');
+
+    expect(createAgent).toHaveBeenCalledWith({
+      name: 'claude-project',
+      avatar: undefined,
+      folder: '/Users/nbonamy/src/claude-project',
+      backend: 'claude',
     });
   });
 
