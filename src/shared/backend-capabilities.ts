@@ -25,7 +25,7 @@ export const claudeBackendCapabilities: BackendCapabilities = {
   goals: false,
   steerPrompt: false,
   interrupt: true,
-  history: false,
+  history: true,
   rollback: false,
   editMessage: false,
   retryMessage: false,

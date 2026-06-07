@@ -10,6 +10,7 @@ import type {
 import { claudeBackendCapabilities } from '../../shared/backend-capabilities';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '../backends/types';
 import { ClaudeCliTransport, type ClaudeTurnHandle, type ClaudeTurnParams, type ClaudeTurnTransport } from './cli-transport';
+import { loadClaudeTranscriptHistory, type ClaudeTranscriptHistory } from './transcript-history-adapter';
 import {
   claudeMessageContentBlocks,
   claudeMessageSessionId,
@@ -36,6 +37,7 @@ type ActiveClaudeTurn = {
 };
 
 type EventListener = (event: BackendEvent) => void;
+type ClaudeHistoryLoader = (agent: Agent) => Promise<ClaudeTranscriptHistory | null>;
 
 export class ClaudeBackendDriver implements AgentBackendDriver {
   readonly backend = 'claude' as const;
@@ -44,7 +46,10 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
   private readonly activeTurnsByAgentId = new Map<string, ActiveClaudeTurn>();
   private turnCounter = 0;
 
-  constructor(private readonly transport: ClaudeTurnTransport = new ClaudeCliTransport()) {}
+  constructor(
+    private readonly transport: ClaudeTurnTransport = new ClaudeCliTransport(),
+    private readonly historyLoader: ClaudeHistoryLoader = loadClaudeTranscriptHistory,
+  ) {}
 
   getRuntimeStatus(): BackendRuntimeStatus {
     return {
@@ -125,6 +130,27 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
 
   async respondToRequest(_response: ClientRequestResponse): Promise<void> {
     throw new Error('Claude CLI permission responses are not supported yet.');
+  }
+
+  async hydrateAgent(agent: Agent): Promise<BackendSession | null> {
+    const history = await this.historyLoader(agent);
+    if (!history) {
+      return null;
+    }
+
+    if (history.messages.length > 0) {
+      this.emit({
+        agentId: agent.id,
+        backend: this.backend,
+        backendSessionId: history.backendSession.kind === 'claude' ? history.backendSession.sessionId : undefined,
+        type: 'thread.historyLoaded',
+        payload: {
+          messages: history.messages,
+        },
+      });
+    }
+
+    return history.backendSession;
   }
 
   onEvent(listener: EventListener): () => void {

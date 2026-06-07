@@ -89,12 +89,32 @@ Claude SDK stream messages into app-owned backend events:
 
 This gives Claude agents local prompt send, streaming display, session resume,
 and process interrupt through the same `AgentBackendDriver` seam as Codex.
-Capabilities intentionally do not advertise approvals, history hydration,
-rollback, model listing, or skills until those surfaces are implemented for
-Claude.
+Capabilities intentionally do not advertise approvals, rollback, edit/retry,
+model listing, or skills until those surfaces are implemented for Claude.
 Claude advertises `planMode: "prompted"`: when the renderer sends
 `planMode: true`, the driver wraps the user request with concise plan-mode
 instructions before passing it to Claude Code.
+
+Claude transcript history is loaded from Claude Code's local JSONL transcripts,
+not from the CLI. Claude stores project transcripts under
+`~/.claude/projects/<project-directory>/<session-id>.jsonl`, where the project
+directory is the absolute folder path with path separators replaced by `-`
+(`"/Users/nbonamy/src/id8"` becomes `"-Users-nbonamy-src-id8"`). A
+`sessions-index.json` file can also point to the transcript path.
+
+The Claw transcript adapter lives in `src/main/claude/` and reads only the
+displayable records:
+
+- `type: "user"` entries with non-meta text become user `RendererMessage`s.
+- `type: "assistant"` text blocks become assistant message text parts.
+- assistant `tool_use` blocks become generic Claude tool cards.
+- user `tool_result` blocks complete the matching tool cards.
+- Claude queue operations, attachments, `last-prompt`, sidechains, and meta
+  local-command records are ignored.
+
+On agent selection or startup active-agent hydration, `ClaudeBackendDriver`
+emits `thread.historyLoaded` through the same app-owned event path used by
+Codex, so the renderer remains backend-agnostic.
 
 The transport prepends common user binary folders such as `~/.local/bin`,
 `~/bin`, `/opt/homebrew/bin`, and `/usr/local/bin` to `PATH` because packaged or
@@ -707,8 +727,6 @@ Explicit non-goals for the first milestone:
 - Is direct-connect websocket exactly one JSON object per frame, NDJSON per
   frame, or both? The client accepts NDJSON frames; outgoing direct-connect
   messages are single JSON strings.
-- How should Claude transcript history be loaded without relying on missing
-  direct-connect server files?
 - Which Claude permission persistence options should map to Claw's
   `allow_conversation` and `always_allow` buttons?
 - Does Claude have a safe equivalent to Codex `turn/rollback`, or should edit

@@ -132,6 +132,53 @@ describe('ClaudeBackendDriver', () => {
     }));
   });
 
+  it('hydrates persisted Claude transcript history through the driver', async () => {
+    const transport = createFakeTransport();
+    const driver = new ClaudeBackendDriver(transport, async () => ({
+      backendSession: { kind: 'claude', sessionId: 'claude-session-existing', transcriptSessionId: 'claude-session-existing', transport: 'stdio' },
+      messages: [
+        {
+          id: 'user-claude-session-existing-user-1',
+          agentId: 'agent-claude',
+          role: 'user',
+          status: 'complete',
+          turnId: 'claude-prompt-1',
+          createdAt: '2026-06-06T22:33:42.809Z',
+          parts: [{ type: 'text', text: 'hello' }],
+        },
+      ],
+    }));
+    const events: unknown[] = [];
+    driver.onEvent((event) => events.push(event));
+    const persistedAgent: Agent = {
+      ...agent,
+      backendSession: { kind: 'claude', sessionId: 'claude-session-existing', transport: 'stdio' },
+    };
+
+    await expect(driver.hydrateAgent(persistedAgent)).resolves.toStrictEqual({
+      kind: 'claude',
+      sessionId: 'claude-session-existing',
+      transcriptSessionId: 'claude-session-existing',
+      transport: 'stdio',
+    });
+    expect(events).toStrictEqual([
+      expect.objectContaining({
+        agentId: 'agent-claude',
+        backend: 'claude',
+        backendSessionId: 'claude-session-existing',
+        type: 'thread.historyLoaded',
+        payload: {
+          messages: [
+            expect.objectContaining({
+              id: 'user-claude-session-existing-user-1',
+              parts: [{ type: 'text', text: 'hello' }],
+            }),
+          ],
+        },
+      }),
+    ]);
+  });
+
   it('converts prompted plan mode into Claude instructions', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
