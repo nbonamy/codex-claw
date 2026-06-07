@@ -4,6 +4,7 @@ import type {
   BackendModelOption,
   BackendRuntimeStatus,
   BackendSession,
+  BackendSkillSummary,
   ClientRequestResponse,
   RendererToolPart,
   SendPromptOptions,
@@ -14,6 +15,7 @@ import { agentScopedMcpUrl } from '../mcp/codex-config';
 import { codexClawDeveloperInstructions } from '../mcp/agent-prompts';
 import { ClaudeCliTransport, type ClaudeTurnHandle, type ClaudeTurnParams, type ClaudeTurnTransport } from './cli-transport';
 import { claudeModelOptions } from './models';
+import { listClaudeSkills } from './skills';
 import { loadClaudeTranscriptHistory, type ClaudeTranscriptHistory } from './transcript-history-adapter';
 import {
   claudeMessageContentBlocks,
@@ -44,6 +46,7 @@ type EventListener = (event: BackendEvent) => void;
 type ClaudeHistoryLoader = (agent: Agent) => Promise<ClaudeTranscriptHistory | null>;
 type ClaudeBackendDriverOptions = {
   clawMcpServerUrl?: string | null;
+  homeDir?: string;
 };
 
 export class ClaudeBackendDriver implements AgentBackendDriver {
@@ -73,6 +76,10 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
 
   async listModels(_agent: Agent): Promise<BackendModelOption[]> {
     return claudeModelOptions.map((model) => ({ ...model }));
+  }
+
+  async listSkills(agent: Agent): Promise<BackendSkillSummary[]> {
+    return listClaudeSkills(agent, { homeDir: this.driverOptions.homeDir });
   }
 
   async sendPrompt(agent: Agent, prompt: string, options: SendPromptOptions = {}): Promise<BackendSendResult> {

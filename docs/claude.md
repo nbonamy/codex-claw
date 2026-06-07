@@ -92,8 +92,12 @@ Claude SDK stream messages into app-owned backend events:
 
 This gives Claude agents local prompt send, streaming display, session resume,
 and process interrupt through the same `AgentBackendDriver` seam as Codex.
-Capabilities intentionally do not advertise approvals, rollback, edit/retry,
-model listing, or skills until those surfaces are implemented for Claude.
+Capabilities intentionally do not advertise approvals, rollback, or edit/retry
+until those surfaces are implemented for Claude. Model listing is local. Skill
+listing is filesystem-derived: Claw reads user skills from `~/.claude/skills`
+and project skills from `<agent-folder>/.claude/skills`, parses each
+`SKILL.md` frontmatter, and lets project skills override global skills with the
+same name.
 Claude advertises `planMode: "prompted"`: when the renderer sends
 `planMode: true`, the driver wraps the user request with concise plan-mode
 instructions before passing it to Claude Code.
@@ -622,8 +626,10 @@ Claude `system/init` contains `skills`, `plugins`, `slash_commands`, and
 to Codex `skills/list` scoped by cwd. Composer command and skill menus should
 either:
 
-- become provider-aware behind a generic `BackendSkillSummary`, or
-- hide provider-specific skills until the Claude driver can supply them.
+- become provider-aware behind a generic `BackendSkillSummary`, and
+- keep provider-specific skills behind the backend skill catalog. Codex uses
+  `skills/list`; Claude currently supplies the same app contract by parsing
+  `~/.claude/skills` and `<agent-folder>/.claude/skills`.
 
 ## Historical Codex Bias Inventory
 
@@ -702,7 +708,7 @@ Recommended next steps:
 3. Map Claude assistant/result/tool/permission events to app-owned
    `BackendEvent`, `ClientRequest`, and `RendererMessage` shapes.
 4. Implement interrupt and clear unsupported behavior for steering, rollback,
-   edit, retry, goals, and skills until Claude support is verified.
+   edit, retry, and goals until Claude support is verified.
 5. Add main-process and renderer tests proving Codex agents keep working while
    Claude agents use only Claude-supported capabilities.
 
@@ -724,7 +730,8 @@ Explicit non-goals for the first milestone:
 
 - Codex-style active-turn steering;
 - Codex-style goals;
-- Codex `skills/list` parity;
+- Codex `skills/list` parity beyond filesystem parsing, if Claude exposes a
+  richer runtime catalog later;
 - rollback/edit/delete/retry parity;
 - hosted CCR remote sessions;
 - PTY terminal embedding.
@@ -742,5 +749,5 @@ Explicit non-goals for the first milestone:
   `allow_conversation` and `always_allow` buttons?
 - Does Claude have a safe equivalent to Codex `turn/rollback`, or should edit
   and retry start as unsupported for Claude agents?
-- Can Claude skills be listed without launching a session, or should the first
-  Claude composer omit the skills menu?
+- Does Claude expose a richer runtime skills catalog than the filesystem
+  `SKILL.md` sources Claw currently parses?
