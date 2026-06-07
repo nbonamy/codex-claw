@@ -164,7 +164,7 @@ const gitStatusLabel = computed(() => 'Git status pending');
   align-items: center;
   gap: var(--space-6);
   padding-left: var(--space-16);
-  border-bottom-color: transparent;
+  border-bottom-color: var(--color-outline-subtle);
 }
 
 .agent-header__identity {

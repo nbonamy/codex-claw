@@ -72,7 +72,7 @@ function initials(name: string): string {
 }
 
 .agent-avatar--sm {
-  --agent-avatar-size: var(--space-12);
+  --agent-avatar-size: var(--space-10);
   --agent-avatar-font-size: var(--font-size-11);
 }
 
