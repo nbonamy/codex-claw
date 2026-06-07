@@ -287,11 +287,6 @@ function folderBasename(folder: string): string {
   outline: none;
 }
 
-.new-agent-menu__avatar {
-  --agent-avatar-size: 28px;
-  --agent-avatar-font-size: var(--font-size-10);
-}
-
 .new-agent-menu__template-meta {
   min-width: 0;
   display: flex;

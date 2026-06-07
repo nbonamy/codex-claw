@@ -168,8 +168,6 @@ function applyCroppedAvatar(nextAvatar: string): void {
 }
 
 .agent-avatar-picker__trigger .agent-avatar-picker__preview {
-  --agent-avatar-size: var(--space-12);
-  --agent-avatar-font-size: var(--font-size-13);
   border-radius: var(--radius-md);
 }
 
@@ -230,9 +228,10 @@ function applyCroppedAvatar(nextAvatar: string): void {
 }
 
 .agent-avatar-picker__choose-image {
-  justify-self: center;
+  justify-self: stretch;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-3);
   min-height: 32px;
   padding: 0 var(--space-8);

@@ -19,3 +19,20 @@
   --el-fill-color-lighter: var(--color-surface-lowest);
   --el-fill-color-blank: var(--color-surface-lowest);
 }
+
+.el-dialog {
+  --el-dialog-padding-primary: 0;
+}
+
+.el-button {
+  border-radius: var(--radius-md);
+}
+
+.el-popper {
+  --el-popper-bg-color-light: var(--color-surface-lowest);
+}
+
+.el-select-dropdown__list {
+  padding-top: 0px;
+  padding-bottom: 0px;
+}

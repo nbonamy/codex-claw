@@ -285,8 +285,8 @@ describe('AppShell', () => {
 
     await wrapper.get('.agent-sidebar__new').trigger('click');
 
-    expect(wrapper.text()).toContain('New Agent');
-    await wrapper.get('.agent-dialog__row--button').trigger('click');
+    expect(wrapper.text()).toContain('Create Agent');
+    await wrapper.get('.agent-dialog__folder-control').trigger('click');
     await wrapper.get('.agent-dialog__text-input').setValue('Jules');
     await wrapper.findAll('button').find((button) => button.text() === 'Add Agent')?.trigger('click');
 
@@ -308,7 +308,7 @@ describe('AppShell', () => {
 
     await wrapper.get('[aria-label="Create team"]').trigger('click');
 
-    expect(wrapper.text()).toContain('New Team');
+    expect(wrapper.text()).toContain('Create Team');
     await wrapper.get('.team-dialog__text-input').setValue('Skwad Core');
     await wrapper.findAll('.team-dialog__color')[10]?.trigger('click');
     await wrapper.findAll('button').find((button) => button.text() === 'Create Team')?.trigger('click');
@@ -549,7 +549,7 @@ describe('AppShell', () => {
     expect(onAppCommand).toHaveBeenCalledOnce();
     listener({ type: 'new-team' });
     await nextTick();
-    expect(wrapper.text()).toContain('New Team');
+    expect(wrapper.text()).toContain('Create Team');
     await wrapper.findAll('button').find((button) => button.text() === 'Cancel')?.trigger('click');
     await nextTick();
     listener({ type: 'new-agent' });

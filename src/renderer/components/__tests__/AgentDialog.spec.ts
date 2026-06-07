@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import AgentDialog from '../AgentDialog.vue';
@@ -20,17 +20,20 @@ describe('AgentDialog', () => {
   it('renders the Skwad-style create layout and disables save until name and folder are set', () => {
     const wrapper = mountDialog();
 
-    expect(wrapper.get('.claw-dialog__header--centered').text()).toContain('New Agent');
-    expect(wrapper.get('.claw-dialog__title').text()).toBe('New Agent');
-    expect(wrapper.get('.claw-dialog__subtitle').text()).toBe('Add an agent to Skwad');
-    expect(wrapper.text()).toContain('Add an agent to Skwad');
-    expect(wrapper.findAll('.agent-dialog__section')).toHaveLength(2);
-    expect(wrapper.text()).toContain('Name');
-    expect(wrapper.text()).toContain('Avatar');
+    expect(wrapper.get('.agent-dialog__header').text()).toContain('Create Agent');
+    expect(wrapper.get('.claw-dialog__title').text()).toBe('Create Agent');
+    expect(wrapper.get('.claw-dialog__subtitle').text()).toBe('Add a teammate to Skwad');
+    expect(wrapper.text()).toContain('Add a teammate to Skwad');
+    expect(wrapper.findAll('.agent-dialog__field')).toHaveLength(3);
+    expect(wrapper.text()).toContain('Identity');
     expect(wrapper.text()).not.toContain('Coding Agent');
     expect(wrapper.text()).not.toContain('Persona');
-    expect(wrapper.text()).toContain('Folder');
+    expect(wrapper.text()).toContain('Workspace folder');
     expect(wrapper.text()).toContain('Backend');
+    expect(wrapper.text()).toContain('Claude Code');
+    expect(wrapper.get('.agent-dialog__text-input').attributes('placeholder')).toBe('Enter agent name');
+    expect(wrapper.findComponent({ name: 'CodexBackendIcon' }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: 'ClaudeCodeBackendIcon' }).exists()).toBe(true);
     expect(saveButton(wrapper).attributes()).toHaveProperty('disabled');
   });
 
@@ -39,7 +42,7 @@ describe('AgentDialog', () => {
     const createAgent = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountDialog({ chooseAgentFolder, createAgent });
 
-    await wrapper.get('.agent-dialog__row--button').trigger('click');
+    await wrapper.get('.agent-dialog__folder-control').trigger('click');
     await wrapper.get('.agent-avatar-picker__trigger').trigger('click');
     await wrapper.findAll('.agent-avatar-picker__preset').find((button) => button.text() === '🤖')?.trigger('click');
     await saveButton(wrapper).trigger('click');
@@ -53,6 +56,37 @@ describe('AgentDialog', () => {
     expect(wrapper.emitted('close')).toStrictEqual([[]]);
   });
 
+  it('keeps a typed name when choosing a folder', async () => {
+    const createAgent = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountDialog({
+      chooseAgentFolder: vi.fn().mockResolvedValue('/Users/nbonamy/src/new-agent'),
+      createAgent,
+    });
+
+    await wrapper.get('.agent-dialog__text-input').setValue('Custom Agent');
+    await wrapper.get('.agent-dialog__folder-control').trigger('click');
+    await saveButton(wrapper).trigger('click');
+
+    expect(createAgent).toHaveBeenCalledWith({
+      name: 'Custom Agent',
+      avatar: undefined,
+      folder: '/Users/nbonamy/src/new-agent',
+      backend: 'codex',
+    });
+  });
+
+  it('keeps the folder empty when folder selection is cancelled', async () => {
+    const wrapper = mountDialog({
+      chooseAgentFolder: vi.fn().mockResolvedValue(null),
+    });
+
+    await wrapper.get('.agent-dialog__text-input').setValue('Waiting');
+    await wrapper.get('.agent-dialog__folder-control').trigger('click');
+
+    expect(wrapper.text()).toContain('Select folder');
+    expect(saveButton(wrapper).attributes()).toHaveProperty('disabled');
+  });
+
   it('prefills edit mode and updates an idle agent', async () => {
     const updateAgent = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountDialog({
@@ -61,7 +95,7 @@ describe('AgentDialog', () => {
       updateAgent,
     });
 
-    expect(wrapper.get('.claw-dialog__header--centered').text()).toContain('Edit Agent');
+    expect(wrapper.get('.agent-dialog__header').text()).toContain('Edit Agent');
     expect((wrapper.get('.agent-dialog__text-input').element as HTMLInputElement).value).toBe('Dina');
     await wrapper.get('.agent-dialog__text-input').setValue('Dina Prime');
     await saveButton(wrapper).trigger('click');
@@ -82,8 +116,8 @@ describe('AgentDialog', () => {
       createAgent,
     });
 
-    await wrapper.get('.agent-dialog__row--button').trigger('click');
-    await wrapper.get('.agent-dialog__select').setValue('claude');
+    await wrapper.get('.agent-dialog__folder-control').trigger('click');
+    await wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'claude');
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
@@ -115,12 +149,27 @@ describe('AgentDialog', () => {
       createAgent,
     });
 
-    await wrapper.get('.agent-dialog__row--button').trigger('click');
+    await wrapper.get('.agent-dialog__folder-control').trigger('click');
     await wrapper.get('.agent-dialog__text-input').setValue('Broken');
     await saveButton(wrapper).trigger('click');
 
     expect(wrapper.text()).toContain('Agent folder must be a directory.');
     expect(wrapper.emitted('close')).toBeUndefined();
+  });
+
+  it('shows folder selection errors and closes from dialog visibility changes', async () => {
+    const wrapper = mountDialog({
+      chooseAgentFolder: vi.fn().mockRejectedValue('Folder dialog failed.'),
+    });
+
+    await wrapper.get('.agent-dialog__folder-control').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Folder dialog failed.');
+
+    await wrapper.findComponent({ name: 'ElDialog' }).vm.$emit('update:modelValue', false);
+
+    expect(wrapper.emitted('close')).toStrictEqual([[]]);
   });
 });
 
@@ -145,6 +194,7 @@ function mountDialog(overrides: Partial<{
       plugins: [ElementPlus],
       stubs: {
         ElDialog: {
+          name: 'ElDialog',
           props: ['modelValue'],
           template: `
             <section v-if="modelValue" class="agent-dialog-test-shell">

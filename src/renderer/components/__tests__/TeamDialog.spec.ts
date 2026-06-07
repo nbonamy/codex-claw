@@ -9,9 +9,12 @@ describe('TeamDialog', () => {
   it('renders the Skwad-style create team layout and disables save until named', () => {
     const wrapper = mountDialog();
 
-    expect(wrapper.get('.claw-dialog__title').text()).toBe('New Team');
+    expect(wrapper.get('.claw-dialog__title').text()).toBe('Create Team');
     expect(wrapper.get('.claw-dialog__subtitle').text()).toBe('Add a team to Codex Claw');
+    expect(wrapper.findAll('.team-dialog__field')).toHaveLength(2);
     expect(wrapper.text()).toContain('Name');
+    expect(wrapper.text()).toContain('Color');
+    expect(wrapper.get('.team-dialog__text-input').attributes('placeholder')).toBe('Enter team name');
     expect(wrapper.findAll('.team-dialog__color')).toHaveLength(teamColors.length);
     expect(wrapper.find('.team-dialog__preview').exists()).toBe(false);
     expect(saveButton(wrapper).attributes()).toHaveProperty('disabled');

@@ -50,7 +50,7 @@ function initials(name: string): string {
 <style scoped>
 .agent-avatar {
   --agent-avatar-size: var(--space-16);
-  --agent-avatar-font-size: var(--font-size-13);
+  --agent-avatar-font-size: var(--font-size-18);
   display: grid;
   place-items: center;
   flex: 0 0 auto;
@@ -58,8 +58,9 @@ function initials(name: string): string {
   height: var(--agent-avatar-size);
   overflow: hidden;
   border-radius: var(--radius-full);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+  /* background: var(--color-primary); */
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
   font-size: var(--agent-avatar-font-size);
   font-weight: var(--font-weight-semibold);
   line-height: 1;
@@ -77,7 +78,7 @@ function initials(name: string): string {
 
 .agent-avatar--lg {
   --agent-avatar-size: var(--space-20);
-  --agent-avatar-font-size: var(--font-size-15);
+  --agent-avatar-font-size: var(--font-size-18);
 }
 
 .agent-avatar--xl {

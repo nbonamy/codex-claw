@@ -3,38 +3,53 @@
     class="claw-dialog team-dialog"
     :model-value="visible"
     :teleported="false"
-    width="440px"
+    width="520px"
     :show-close="false"
     destroy-on-close
     @update:model-value="onVisibilityChanged"
   >
     <template #header>
-      <div class="claw-dialog__header--centered">
+      <div class="claw-form-dialog__header team-dialog__header">
         <h2 class="claw-dialog__title">{{ dialogTitle }}</h2>
         <p class="claw-dialog__subtitle">{{ dialogSubtitle }}</p>
       </div>
     </template>
 
     <form
-      class="team-dialog__form"
+      class="claw-form-dialog team-dialog__form"
       @submit.prevent="submit"
     >
-      <section class="team-dialog__section">
-        <label class="team-dialog__row">
-          <span class="team-dialog__label">Name</span>
+      <section class="claw-form-dialog__field team-dialog__field">
+        <div class="claw-form-dialog__field-heading team-dialog__field-heading">
+          <label
+            class="claw-form-dialog__label team-dialog__label"
+            for="team-dialog-name"
+          >
+            Name
+          </label>
+          <span class="claw-form-dialog__heading-separator team-dialog__heading-separator">•</span>
+          <p class="claw-form-dialog__help team-dialog__help">Give this team a name for the sidebar.</p>
+        </div>
+        <div class="claw-form-dialog__control claw-form-dialog__input-control team-dialog__input-shell">
           <input
+            id="team-dialog-name"
             v-model="name"
-            class="team-dialog__text-input"
+            class="claw-form-dialog__text-input team-dialog__text-input"
             type="text"
-            placeholder="Team name"
+            placeholder="Enter team name"
             autofocus
           />
-        </label>
+        </div>
       </section>
 
-      <section class="team-dialog__section team-dialog__section--colors">
+      <section class="claw-form-dialog__field team-dialog__field">
+        <div class="claw-form-dialog__field-heading team-dialog__field-heading">
+          <span class="claw-form-dialog__label team-dialog__label">Color</span>
+          <span class="claw-form-dialog__heading-separator team-dialog__heading-separator">•</span>
+          <p class="claw-form-dialog__help team-dialog__help">Choose the team rail color.</p>
+        </div>
         <div
-          class="team-dialog__colors"
+          class="claw-form-dialog__control team-dialog__colors"
           role="radiogroup"
           aria-label="Team color"
         >
@@ -111,7 +126,7 @@ const errorMessage = ref<string | null>(null);
 const submitting = ref(false);
 
 const canSave = computed(() => name.value.trim().length > 0 && !submitting.value);
-const dialogTitle = computed(() => props.mode === 'edit' ? 'Edit Team' : 'New Team');
+const dialogTitle = computed(() => props.mode === 'edit' ? 'Edit Team' : 'Create Team');
 const dialogSubtitle = computed(() => props.mode === 'edit' ? 'Update team identity' : 'Add a team to Codex Claw');
 const submitLabel = computed(() => props.mode === 'edit' ? 'Save' : 'Create Team');
 
@@ -169,66 +184,16 @@ function resetForm(): void {
 </script>
 
 <style scoped>
-.team-dialog__form {
-  display: grid;
-  gap: var(--space-8);
-}
-
-.team-dialog__section {
-  display: grid;
-  padding: 0 var(--space-6);
-  border-radius: var(--radius-xl);
-  background: var(--color-surface-low);
-}
-
-.team-dialog__section--colors {
-  justify-items: center;
-  gap: var(--space-8);
-  padding-top: var(--space-8);
-  padding-bottom: var(--space-8);
-}
-
-.team-dialog__row {
-  min-height: 56px;
-  display: grid;
-  grid-template-columns: 112px minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-8);
-}
-
-.team-dialog__label {
-  color: var(--color-text);
-  font-size: var(--font-size-14);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-20);
-}
-
-.team-dialog__text-input {
-  min-width: 0;
-  border: 0;
-  color: var(--color-text);
-  background: transparent;
-  font: inherit;
-  font-size: var(--font-size-14);
-  line-height: var(--line-height-20);
-  text-align: right;
-  outline: none;
-}
-
-.team-dialog__text-input::placeholder {
-  color: var(--color-text-muted);
-}
-
 .team-dialog__colors {
-  padding: var(--space-8) 0;
   display: grid;
   grid-template-columns: repeat(6, 32px);
-  gap: var(--space-12);
+  justify-content: center;
+  gap: var(--space-8);
+  padding: var(--space-16);
 }
 
 .team-dialog__color {
   --team-color: var(--color-primary);
-
   width: 32px;
   height: 32px;
   display: grid;

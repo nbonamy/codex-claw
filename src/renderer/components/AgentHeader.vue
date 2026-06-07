@@ -21,7 +21,7 @@
         class="agent-header__avatar"
         :avatar="agent.avatar"
         :name="agent.name"
-        :size="sidebarCollapsed ? 'xs' : 'md'"
+        :size="sidebarCollapsed ? 'sm' : 'lg'"
       />
       <div class="agent-header__agent-line">
         <strong>{{ agent.name }}</strong>
@@ -173,16 +173,6 @@ const gitStatusLabel = computed(() => 'Git status pending');
   align-items: center;
   gap: var(--space-6);
   min-width: 0;
-}
-
-.agent-header__avatar {
-  --agent-avatar-size: var(--agent-header-avatar-size);
-  --agent-avatar-font-size: var(--font-size-15);
-}
-
-.agent-header--sidebar-collapsed .agent-header__avatar {
-  --agent-avatar-size: var(--space-8);
-  --agent-avatar-font-size: var(--font-size-8);
 }
 
 .agent-header__agent-line {

@@ -31,7 +31,7 @@
           class="agent-sidebar__avatar"
           :avatar="agent.avatar"
           :name="agent.name"
-          size="md"
+          size="xl"
         />
         <span class="agent-sidebar__meta">
           <strong>{{ agent.name }}</strong>
@@ -374,11 +374,6 @@ function onResizePointerEnd(event: PointerEvent): void {
 .agent-sidebar__agent--active {
   background: color-mix(in srgb, var(--color-primary) 8%, transparent);
   border-color: var(--color-primary);
-}
-
-.agent-sidebar__avatar {
-  --agent-avatar-size: var(--agent-sidebar-avatar-size);
-  --agent-avatar-font-size: var(--font-size-13);
 }
 
 .agent-sidebar__meta {

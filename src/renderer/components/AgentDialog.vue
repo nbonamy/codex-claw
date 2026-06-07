@@ -3,67 +3,116 @@
     class="claw-dialog agent-dialog"
     :model-value="visible"
     :teleported="false"
-    width="480px"
+    width="620px"
     :show-close="false"
     destroy-on-close
     @update:model-value="onVisibilityChanged"
   >
     <template #header>
-      <div class="claw-dialog__header--centered">
+      <div class="claw-form-dialog__header agent-dialog__header">
         <h2 class="claw-dialog__title">{{ title }}</h2>
         <p class="claw-dialog__subtitle">{{ subtitle }}</p>
       </div>
     </template>
 
-    <form
-      class="agent-dialog__form"
+    <el-form
+      class="claw-form-dialog agent-dialog__form"
       @submit.prevent="submit"
     >
-      <section class="agent-dialog__section">
-        <label class="agent-dialog__row">
-          <span class="agent-dialog__label">Name</span>
-          <input
-            v-model="name"
-            class="agent-dialog__text-input"
-            type="text"
-            placeholder="Agent name"
-            :disabled="!canEdit"
-          />
-        </label>
-
-        <div class="agent-dialog__divider" />
-
-        <div class="agent-dialog__row">
-          <span class="agent-dialog__label">Avatar</span>
-          <AgentAvatarPicker
-            v-model="avatar"
-            :name="name || folderName || 'Agent'"
-          />
+      <section class="claw-form-dialog__field agent-dialog__field">
+        <div class="claw-form-dialog__field-heading agent-dialog__field-heading">
+          <span class="claw-form-dialog__label agent-dialog__label">Identity</span>
+          <span class="claw-form-dialog__heading-separator agent-dialog__heading-separator">•</span>
+          <p class="claw-form-dialog__help agent-dialog__help">Set the avatar and sidebar name.</p>
+        </div>
+        <div style="display:flex; align-items: center; gap: var(--space-4);">
+            <AgentAvatarPicker
+              v-model="avatar"
+              :name="name || folderName || 'Agent'"
+              class="agent-dialog__identity-avatar"
+            />
+          <div class="claw-form-dialog__control agent-dialog__identity-control">
+            <input
+              id="agent-dialog-name"
+              v-model="name"
+              class="claw-form-dialog__text-input agent-dialog__text-input"
+              type="text"
+              aria-label="Agent name"
+              placeholder="Enter agent name"
+              :disabled="!canEdit"
+            />
+          </div>
         </div>
       </section>
 
-      <section class="agent-dialog__section">
-        <label class="agent-dialog__row">
-          <span class="agent-dialog__label">Backend</span>
-          <select
-            v-model="backend"
-            class="agent-dialog__select"
-            :disabled="!canEdit"
+      <section class="claw-form-dialog__field agent-dialog__field">
+        <div class="claw-form-dialog__field-heading agent-dialog__field-heading">
+          <label
+            class="claw-form-dialog__label agent-dialog__label"
+            for="agent-dialog-backend"
           >
-            <option value="codex">Codex</option>
-            <option value="claude">Claude</option>
-          </select>
-        </label>
+            Backend
+          </label>
+          <span class="claw-form-dialog__heading-separator agent-dialog__heading-separator">•</span>
+          <p class="claw-form-dialog__help agent-dialog__help">Choose the coding backend this agent will use.</p>
+        </div>
+        <div class="claw-form-dialog__control agent-dialog__input-shell agent-dialog__input-shell--select">
+          <el-select
+            id="agent-dialog-backend"
+            v-model="backend"
+            class="agent-dialog__backend-select"
+            :disabled="!canEdit"
+            :teleported="false"
+            popper-class="agent-dialog__backend-popper"
+          >
+            <template #prefix>
+              <component
+                :is="selectedBackendOption.icon"
+                class="agent-dialog__backend-selected-icon"
+                :class="selectedBackendOption.iconClass"
+                aria-hidden="true"
+              />
+            </template>
 
-        <div class="agent-dialog__divider" />
+            <el-option
+              v-for="option in backendOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            >
+              <span class="agent-dialog__backend-option">
+                <span
+                  class="agent-dialog__backend-icon-frame"
+                  :class="option.iconClass"
+                >
+                  <component
+                    :is="option.icon"
+                    class="agent-dialog__backend-option-icon"
+                    aria-hidden="true"
+                  />
+                </span>
+                <span class="agent-dialog__backend-copy">
+                  <span class="agent-dialog__backend-name">{{ option.label }}</span>
+                  <!-- <span class="agent-dialog__backend-provider">{{ option.provider }}</span> -->
+                </span>
+              </span>
+            </el-option>
+          </el-select>
+        </div>
+      </section>
 
+      <section class="claw-form-dialog__field agent-dialog__field">
+        <div class="claw-form-dialog__field-heading agent-dialog__field-heading">
+          <span class="claw-form-dialog__label agent-dialog__label">Workspace folder</span>
+          <span class="claw-form-dialog__heading-separator agent-dialog__heading-separator">•</span>
+          <p class="claw-form-dialog__help agent-dialog__help">Select the repository or project directory.</p>
+        </div>
         <button
-          class="agent-dialog__row agent-dialog__row--button"
+          class="claw-form-dialog__control claw-form-dialog__button-control agent-dialog__folder-control"
           type="button"
           :disabled="!canEdit || choosingFolder"
           @click="chooseFolder"
         >
-          <span class="agent-dialog__label">Folder</span>
           <span
             class="agent-dialog__repository-value"
             :class="{ 'agent-dialog__repository-value--empty': !folder }"
@@ -89,7 +138,7 @@
         :closable="false"
         show-icon
       />
-    </form>
+    </el-form>
 
     <template #footer>
       <div class="claw-dialog__footer">
@@ -109,7 +158,9 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import type { Component } from 'vue';
 import type { Agent, AgentBackend, CreateAgentInput, UpdateAgentInput } from '../../shared/contracts';
+import { ClaudeCodeBackendIcon, CodexBackendIcon } from '../shared/icons/backend-icons';
 import { ChevronDown } from '../shared/icons/app-icons';
 import AgentAvatarPicker from './AgentAvatarPicker.vue';
 
@@ -134,13 +185,41 @@ const errorMessage = ref<string | null>(null);
 const choosingFolder = ref(false);
 const submitting = ref(false);
 
+type BackendOption = {
+  icon: Component;
+  iconClass: string;
+  label: string;
+  provider: string;
+  value: AgentBackend;
+};
+
+const backendOptions: BackendOption[] = [
+  {
+    icon: CodexBackendIcon,
+    iconClass: 'agent-dialog__backend-icon--codex',
+    label: 'Codex',
+    provider: 'OpenAI',
+    value: 'codex',
+  },
+  {
+    icon: ClaudeCodeBackendIcon,
+    iconClass: 'agent-dialog__backend-icon--claude',
+    label: 'Claude Code',
+    provider: 'Anthropic',
+    value: 'claude',
+  },
+];
+
 const isEditing = computed(() => props.mode === 'edit');
 const canEdit = computed(() => !isEditing.value || props.agent?.status.type === 'idle');
 const folderName = computed(() => folder.value.split(/[\\/]/).filter(Boolean).at(-1) ?? '');
-const title = computed(() => isEditing.value ? 'Edit Agent' : 'New Agent');
-const subtitle = computed(() => isEditing.value ? 'Update agent settings' : 'Add an agent to Skwad');
+const title = computed(() => isEditing.value ? 'Edit Agent' : 'Create Agent');
+const subtitle = computed(() => isEditing.value ? 'Update agent settings' : 'Add a teammate to your Codex Claw team');
 const submitLabel = computed(() => isEditing.value ? 'Save' : 'Add Agent');
 const folderLabel = computed(() => folder.value ? shortenFolder(folder.value) : 'Select folder');
+const selectedBackendOption = computed(() => (
+  backendOptions.find((option) => option.value === backend.value) ?? backendOptions[0]
+));
 const canSave = computed(() => (
   canEdit.value &&
   !submitting.value &&
@@ -235,7 +314,7 @@ function resetForm(): void {
 
   name.value = '';
   folder.value = '';
-  avatar.value = undefined;
+  avatar.value = '🤖';
   backend.value = 'codex';
 }
 
@@ -250,91 +329,149 @@ function shortenFolder(value: string): string {
 </script>
 
 <style scoped>
-.agent-dialog__form {
-  display: grid;
-  gap: var(--space-8);
-}
-
-.agent-dialog__section {
-  display: grid;
-  padding: 0 var(--space-6);
-  border-radius: var(--radius-xl);
-  background: var(--color-surface-low);
-}
-
-.agent-dialog__row {
-  min-height: 56px;
-  display: grid;
-  grid-template-columns: 128px minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-8);
-  width: 100%;
-  padding: 0;
-  border: 0;
-  color: var(--color-text);
-  background: transparent;
-  text-align: left;
-}
-
-.agent-dialog__row--button {
-  cursor: pointer;
-}
-
-.agent-dialog__row--button:disabled {
-  cursor: default;
-}
-
-.agent-dialog__label {
-  color: var(--color-text);
-  font-size: var(--font-size-14);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-20);
-}
-
-.agent-dialog__divider {
-  height: 1px;
-  background: var(--color-border);
-}
-
-.agent-dialog__text-input {
-  min-width: 0;
-  border: 0;
-  color: var(--color-text);
-  background: transparent;
-  font: inherit;
-  font-size: var(--font-size-14);
-  line-height: var(--line-height-20);
-  text-align: right;
-  outline: none;
-}
-
-.agent-dialog__text-input::placeholder,
 .agent-dialog__repository-value--empty {
   color: var(--color-text-muted);
 }
 
-.agent-dialog__select {
-  min-width: 0;
-  border: 0;
-  color: var(--color-text);
+.agent-dialog__identity-control {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--space-6);
+}
+
+.agent-dialog__identity-control:focus-within {
+  /* border-color: var(--color-primary); */
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+.agent-dialog__identity-avatar :deep(.agent-avatar-picker) {
+  justify-self: start;
+  justify-content: flex-start;
+}
+
+.agent-dialog__identity-avatar :deep(.agent-avatar-picker__trigger) {
+  width: var(--space-20);
+  height: var(--space-20);
+  border-radius: 0;
   background: transparent;
-  font: inherit;
+}
+
+.agent-dialog__identity-avatar :deep(.agent-avatar-picker__trigger .agent-avatar-picker__preview) {
+  --agent-avatar-size: var(--space-20);
+}
+
+.agent-dialog__identity-avatar :deep(.agent-avatar-picker__hint) {
+  display: none;
+}
+
+.agent-dialog__backend-select {
+  width: 100%;
   font-size: var(--font-size-14);
   font-weight: var(--font-weight-semibold);
+}
+
+.agent-dialog__input-shell--select {
+  display: block;
+}
+
+.agent-dialog__backend-select :deep(.el-select__wrapper) {
+  min-height: 42px;
+  padding: 0 var(--space-6);
+  border-radius: calc(var(--radius-lg) - 1px);
+  background: transparent;
+  box-shadow: none;
+}
+
+.agent-dialog__backend-select :deep(.el-select__wrapper:hover),
+.agent-dialog__backend-select :deep(.el-select__wrapper.is-focused) {
+  box-shadow: none;
+}
+
+.agent-dialog__backend-select :deep(.el-select__placeholder),
+.agent-dialog__backend-select :deep(.el-select__selected-item) {
+  color: var(--color-text);
+}
+
+.agent-dialog__backend-selected-icon {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+.agent-dialog__backend-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.agent-dialog__backend-icon-frame {
+  width: var(--space-12);
+  height: var(--space-12);
+}
+
+.agent-dialog__backend-option-icon {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+.agent-dialog__backend-icon--codex {
+  color: var(--color-text);
+}
+
+.agent-dialog__backend-icon--claude {
+  color: #d97757;
+}
+
+.agent-dialog__backend-copy {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.agent-dialog__backend-name,
+.agent-dialog__backend-provider {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-dialog__backend-provider {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-16);
+}
+
+.agent-dialog :deep(.agent-dialog__backend-popper .el-select-dropdown__item) {
+  height: auto;
+  padding: var(--space-4) var(--space-6);
   line-height: var(--line-height-20);
-  text-align: right;
-  outline: none;
+}
+
+.agent-dialog :deep(.agent-dialog__backend-popper),
+.agent-dialog :deep(.agent-dialog__backend-popper .el-select-dropdown) {
+  background: var(--color-surface-lowest);
+}
+
+.agent-dialog :deep(.agent-dialog__backend-popper .el-popper__arrow::before) {
+  background: var(--color-surface-lowest);
+}
+
+.agent-dialog :deep(.agent-dialog__backend-popper .el-select-dropdown__item.is-selected .agent-dialog__backend-icon-frame) {
+  border-color: var(--color-primary);
+  background: var(--color-surface);
 }
 
 .agent-dialog__repository-value {
   min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-4);
+  justify-content: space-between;
+  gap: var(--space-6);
+  width: 100%;
   color: var(--color-text);
   font-size: var(--font-size-14);
-  font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-20);
 }
 
