@@ -1304,6 +1304,127 @@ describe('useAppState', () => {
     });
   });
 
+  it('captures markdown side panel requests from main events', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn((nextListener) => {
+          listeners.push(nextListener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    state.sidePanelMarkdownRequest.value = null;
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'sidePanel.markdownRequested',
+      payload: {
+        kind: 'markdown',
+        title: 'Architecture',
+        path: 'docs/architecture.md',
+        content: '# Architecture',
+      },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(state.sidePanelMarkdownRequest.value).toStrictEqual({
+      kind: 'markdown',
+      title: 'Architecture',
+      path: 'docs/architecture.md',
+      content: '# Architecture',
+    });
+
+    listeners[0]?.({
+      seq: 2,
+      agentId: 'agent-jesse',
+      type: 'sidePanel.markdownRequested',
+      payload: {
+        kind: 'markdown',
+        content: '# Other',
+      },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    const markdownRequest = state.sidePanelMarkdownRequest.value as { content: string } | null;
+    expect(markdownRequest?.content).toBe('# Architecture');
+  });
+
+  it('ignores malformed markdown side panel events', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn((nextListener) => {
+          listeners.push(nextListener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    state.sidePanelMarkdownRequest.value = null;
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'thread.statusChanged',
+      payload: { kind: 'markdown', content: '# Wrong event' },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    } as unknown as MainToRendererEvent);
+    listeners[0]?.({
+      seq: 2,
+      agentId: 'agent-dina',
+      type: 'sidePanel.markdownRequested',
+      payload: null,
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    } as MainToRendererEvent);
+    listeners[0]?.({
+      seq: 3,
+      agentId: 'agent-dina',
+      type: 'sidePanel.markdownRequested',
+      payload: { kind: 'diff', content: '# Wrong kind' },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    } as MainToRendererEvent);
+    listeners[0]?.({
+      seq: 4,
+      agentId: 'agent-dina',
+      type: 'sidePanel.markdownRequested',
+      payload: { kind: 'markdown', content: 123 },
+      occurredAt: '2026-06-05T00:00:04.000Z',
+    } as MainToRendererEvent);
+
+    expect(state.sidePanelMarkdownRequest.value).toBeNull();
+
+    listeners[0]?.({
+      seq: 5,
+      agentId: 'agent-dina',
+      type: 'sidePanel.markdownRequested',
+      payload: {
+        kind: 'markdown',
+        title: 123,
+        path: false,
+        content: '# Valid',
+      },
+      occurredAt: '2026-06-05T00:00:05.000Z',
+    } as MainToRendererEvent);
+
+    expect(state.sidePanelMarkdownRequest.value).toStrictEqual({
+      kind: 'markdown',
+      content: '# Valid',
+    });
+  });
+
   it('syncs composer mode and active goal from app-owned main events', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();

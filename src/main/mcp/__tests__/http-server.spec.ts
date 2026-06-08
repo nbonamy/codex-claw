@@ -70,6 +70,7 @@ describe('ClawMcpHttpServer', () => {
       'check-messages',
       'broadcast-message',
       'set-status',
+      'display-markdown',
     ]);
 
     const callResponse = await postJson(dinaUrl, {
@@ -112,8 +113,14 @@ describe('ClawMcpHttpServer', () => {
 
   it('routes all collaboration tools through the official MCP SDK transport', async () => {
     const agents = createAgents();
+    const displayMarkdown = vi.fn().mockResolvedValue({
+      success: true,
+      message: 'Displayed Markdown in the side panel.',
+      title: 'Plan',
+    });
     const coordinator = new ClawMcpAgentCoordinator({
       getAgents: () => agents,
+      onDisplayMarkdown: displayMarkdown,
       createId: vi.fn()
         .mockReturnValueOnce('message-direct')
         .mockReturnValueOnce('message-broadcast'),
@@ -165,6 +172,29 @@ describe('ClawMcpHttpServer', () => {
     expect(broadcastResponse.result.structuredContent).toStrictEqual({
       success: true,
       recipientCount: 1,
+    });
+
+    const displayResponse = await callTool(dinaUrl, 'display-markdown', {
+      markdown: '# Plan',
+      title: 'Plan',
+    });
+    expect(displayResponse.result.structuredContent).toStrictEqual({
+      success: true,
+      message: 'Displayed Markdown in the side panel.',
+      title: 'Plan',
+    });
+    expect(displayMarkdown).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), {
+      markdown: '# Plan',
+      title: 'Plan',
+    });
+
+    await callTool(dinaUrl, 'display-markdown', {
+      path: 'docs/mcp.md',
+    });
+    expect(displayMarkdown).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'agent-dina' }), {
+      path: 'docs/mcp.md',
+      markdown: undefined,
+      title: undefined,
     });
   });
 

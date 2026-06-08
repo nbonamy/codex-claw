@@ -3,6 +3,7 @@ export const ipcChannels = {
   listBackendModels: 'backend:models:list',
   listBackendSkills: 'backend:skills:list',
   listAgentFiles: 'agent:files:list',
+  readAgentFile: 'agent:file:read',
   chooseAgentFolder: 'agent:choose-folder',
   createTeam: 'team:create',
   updateTeam: 'team:update',

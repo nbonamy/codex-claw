@@ -82,6 +82,7 @@
           @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
           @edit-message="$emit('edit-message', $event)"
           @interrupt-agent="$emit('interrupt-agent')"
+          @open-markdown-file="openMarkdownFile"
           @quote-message="$emit('quote-message', $event)"
           @retry-message="$emit('retry-message', $event)"
           @select-model="$emit('select-model', $event)"
@@ -91,6 +92,11 @@
           @steer-prompt="$emit('steerPrompt', $event)"
           @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
           @update:plan-mode="$emit('update:planMode', $event)"
+        />
+        <SidePanel
+          v-if="sidePanel"
+          :panel="sidePanel"
+          @close="closeSidePanel"
         />
       </div>
     </section>
@@ -120,19 +126,21 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { Agent, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, Team, ThreadGoal, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../shared/contracts';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, SidePanelMarkdownRequest, Team, ThreadGoal, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../shared/contracts';
 import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import AgentDialog from './AgentDialog.vue';
 import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
 import AgentSidebar from './AgentSidebar.vue';
 import ConversationPane from './ConversationPane.vue';
+import SidePanel from './SidePanel.vue';
 import TeamDialog from './TeamDialog.vue';
 import TeamRail from './TeamRail.vue';
 import SettingsDialog from './SettingsDialog.vue';
 import { confirmCloseTeam } from './team-close-confirmation';
 import type { QueuedChatPrompt } from '../shared/chat/queued-prompts';
+import type { SidePanelState } from './side-panel';
 
 const props = withDefaults(defineProps<{
   snapshot: AppSnapshot;
@@ -153,7 +161,9 @@ const props = withDefaults(defineProps<{
   selectedReasoningEffort?: ReasoningEffort | null;
   planMode?: boolean;
   queuedPrompts?: QueuedChatPrompt[];
+  sidePanelMarkdownRequest?: SidePanelMarkdownRequest | null;
   chooseAgentFolder?: () => Promise<string | null>;
+  readAgentFile?: (agentId: string, filePath: string) => Promise<AgentFileReadResult>;
   createAgent?: (input: CreateAgentInput) => Promise<void>;
   createTeam?: (input: CreateTeamInput) => Promise<void>;
   updateTeam?: (input: UpdateTeamInput) => Promise<void>;
@@ -172,7 +182,11 @@ const props = withDefaults(defineProps<{
   selectedModelId: null,
   selectedReasoningEffort: null,
   queuedPrompts: () => [],
+  sidePanelMarkdownRequest: null,
   chooseAgentFolder: async () => null,
+  readAgentFile: async () => {
+    throw new Error('File preview is not available.');
+  },
   createAgent: async () => undefined,
   createTeam: async () => undefined,
   updateTeam: async () => undefined,
@@ -221,6 +235,8 @@ const teamDialogVisible = ref(false);
 const teamDialogMode = ref<'create' | 'edit'>('create');
 const editingTeamId = ref<string | null>(null);
 const settingsDialogVisible = ref(false);
+const sidePanel = ref<SidePanelState | null>(null);
+let sidePanelRequestId = 0;
 let unsubscribeAppCommand: (() => void) | null = null;
 const activeTeamAgents = computed(() => {
   const team = activeTeam.value;
@@ -305,6 +321,57 @@ function openEditAgent(agentId: string): void {
 
 function closeAgentDialog(): void {
   agentDialogVisible.value = false;
+}
+
+function closeSidePanel(): void {
+  sidePanelRequestId += 1;
+  sidePanel.value = null;
+}
+
+async function openMarkdownFile(filePath: string): Promise<void> {
+  const agent = currentAgent.value;
+  const trimmedPath = filePath.trim();
+  if (!agent || !trimmedPath) {
+    return;
+  }
+
+  const requestId = sidePanelRequestId + 1;
+  sidePanelRequestId = requestId;
+  sidePanel.value = {
+    kind: 'markdown',
+    title: fileBasename(trimmedPath),
+    subtitle: trimmedPath,
+    content: '',
+    state: 'loading',
+    error: null,
+  };
+
+  try {
+    const result = await props.readAgentFile(agent.id, trimmedPath);
+    if (requestId !== sidePanelRequestId) {
+      return;
+    }
+    sidePanel.value = {
+      kind: 'markdown',
+      title: fileBasename(result.path),
+      subtitle: result.path,
+      content: result.content,
+      state: 'idle',
+      error: null,
+    };
+  } catch (error) {
+    if (requestId !== sidePanelRequestId) {
+      return;
+    }
+    sidePanel.value = {
+      kind: 'markdown',
+      title: fileBasename(trimmedPath),
+      subtitle: trimmedPath,
+      content: '',
+      state: 'error',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 function handleShellShortcut(event: KeyboardEvent): void {
@@ -446,6 +513,10 @@ function editActiveAgent(): void {
   openEditAgent(agent.id);
 }
 
+function fileBasename(filePath: string): string {
+  return filePath.split('/').filter(Boolean).at(-1) ?? filePath;
+}
+
 function cycleTeams(): boolean {
   const teams = props.snapshot.teams;
   if (teams.length < 2) {
@@ -497,6 +568,31 @@ const activeTeam = computed<Team | null>(() => {
   return props.snapshot.teams[0] ?? null;
 });
 const activeTeamName = computed(() => activeTeam.value?.name ?? 'Codex Claw');
+
+watch(() => currentAgent.value?.id ?? null, () => {
+  closeSidePanel();
+});
+
+watch(() => props.sidePanelMarkdownRequest, (request) => {
+  if (!request) {
+    return;
+  }
+
+  openMarkdownRequest(request);
+}, { immediate: true });
+
+function openMarkdownRequest(request: SidePanelMarkdownRequest): void {
+  sidePanelRequestId += 1;
+  const subtitle = request.path;
+  sidePanel.value = {
+    kind: 'markdown',
+    title: request.title ?? (subtitle ? fileBasename(subtitle) : 'Markdown'),
+    ...(subtitle ? { subtitle } : {}),
+    content: request.content,
+    state: 'idle',
+    error: null,
+  };
+}
 </script>
 
 <style scoped>
@@ -559,5 +655,6 @@ const activeTeamName = computed(() => activeTeam.value?.name ?? 'Codex Claw');
   min-height: 0;
   min-width: 0;
   overflow: hidden;
+  display: flex;
 }
 </style>

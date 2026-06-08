@@ -95,6 +95,20 @@ describe('ConversationPane', () => {
     expect(wrapper.get('textarea').attributes('placeholder')).toBe('Select an agent');
   });
 
+  it('uses backend-specific working placeholder copy', () => {
+    const wrapper = mountPane({
+      agent: {
+        ...agent,
+        backend: 'claude',
+        backendDefaults: { kind: 'claude' },
+      },
+      messages: [],
+      isSending: true,
+    });
+
+    expect(wrapper.get('textarea').attributes('placeholder')).toBe('Claude is working...');
+  });
+
   it('shows a conversation skeleton while a persisted thread is hydrating', () => {
     const wrapper = mountPane({
       agent: {
@@ -214,6 +228,104 @@ describe('ConversationPane', () => {
     expect(wrapper.emitted('interrupt-agent')).toStrictEqual([[]]);
   });
 
+  it('bubbles local markdown link clicks for side panel previews', async () => {
+    const wrapper = mountPane({
+      agent,
+      messages: [
+        {
+          id: 'message-doc-link',
+          agentId: agent.id,
+          role: 'assistant',
+          status: 'complete',
+          createdAt: '2026-06-05T00:00:01.000Z',
+          parts: [{ type: 'text', text: 'Read [architecture](docs/architecture.md).' }],
+        },
+      ],
+      isSending: false,
+    });
+
+    await wrapper.get('a[href="docs/architecture.md"]').trigger('click');
+
+    expect(wrapper.emitted('open-markdown-file')).toStrictEqual([['docs/architecture.md']]);
+  });
+
+  it('leaves remote markdown links to the browser', async () => {
+    const wrapper = mountPane({
+      agent,
+      messages: [
+        {
+          id: 'message-remote-link',
+          agentId: agent.id,
+          role: 'assistant',
+          status: 'complete',
+          createdAt: '2026-06-05T00:00:01.000Z',
+          parts: [{ type: 'text', text: 'Read [remote](https://example.com/notes.md).' }],
+        },
+      ],
+      isSending: false,
+    });
+
+    await wrapper.get('a[href="https://example.com/notes.md"]').trigger('click');
+
+    expect(wrapper.emitted('open-markdown-file')).toBeUndefined();
+  });
+
+  it('normalizes markdown links and ignores non-preview links', async () => {
+    const wrapper = mountPane({
+      agent,
+      messages: [
+        {
+          id: 'message-mixed-links',
+          agentId: agent.id,
+          role: 'assistant',
+          status: 'complete',
+          createdAt: '2026-06-05T00:00:01.000Z',
+          parts: [{
+            type: 'text',
+            text: [
+              '[Guide](docs/guide.markdown?tab=1#intro)',
+              '[Anchor](#local)',
+              '[Mail](mailto:nicolas@example.com)',
+              '[Call](tel:+15551234567)',
+              '[Text](notes.txt)',
+            ].join(' '),
+          }],
+        },
+      ],
+      isSending: false,
+    });
+
+    await wrapper.get('a[href="docs/guide.markdown?tab=1#intro"]').trigger('click');
+    await wrapper.get('a[href="#local"]').trigger('click');
+    await wrapper.get('a[href="mailto:nicolas@example.com"]').trigger('click');
+    await wrapper.get('a[href="tel:+15551234567"]').trigger('click');
+    await wrapper.get('a[href="notes.txt"]').trigger('click');
+
+    expect(wrapper.emitted('open-markdown-file')).toStrictEqual([['docs/guide.markdown']]);
+  });
+
+  it('handles bare pane clicks and file markdown links without leaking browser navigation', async () => {
+    const wrapper = mountPane({
+      agent,
+      messages: [
+        {
+          id: 'message-file-link',
+          agentId: agent.id,
+          role: 'assistant',
+          status: 'complete',
+          createdAt: '2026-06-05T00:00:01.000Z',
+          parts: [{ type: 'text', text: 'Read [local file](file:///Users/nbonamy/src/codex-claw/README.md).' }],
+        },
+      ],
+      isSending: false,
+    });
+
+    await wrapper.get('.conversation-pane').trigger('click');
+    await wrapper.get('a[href="file:///Users/nbonamy/src/codex-claw/README.md"]').trigger('click');
+
+    expect(wrapper.emitted('open-markdown-file')).toStrictEqual([['file:///Users/nbonamy/src/codex-claw/README.md']]);
+  });
+
   it('bubbles tool confirmation responses from the message list', async () => {
     const wrapper = mountPane({
       agent,
@@ -277,6 +389,38 @@ describe('ConversationPane', () => {
 
     expect(wrapper.emitted('delete-message')).toStrictEqual([[0]]);
     expect(wrapper.emitted('retry-message')).toStrictEqual([[1]]);
+  });
+
+  it('ignores quote and goal edit requests that have no usable text', async () => {
+    const wrapper = mountPane({
+      agent,
+      goal: createGoal('   '),
+      messages: [
+        {
+          id: 'assistant-only',
+          agentId: agent.id,
+          role: 'assistant',
+          status: 'complete',
+          createdAt: '2026-06-05T00:00:01.000Z',
+          parts: [{ type: 'text', text: 'Nothing to quote.' }],
+        },
+        {
+          id: 'empty-user',
+          agentId: agent.id,
+          role: 'user',
+          status: 'complete',
+          createdAt: '2026-06-05T00:00:02.000Z',
+          parts: [{ type: 'text', text: '   ' }],
+        },
+      ],
+      isSending: false,
+    });
+
+    await wrapper.findAll('[aria-label="Quote"]')[0]?.trigger('click');
+    await wrapper.findAll('[aria-label="Quote"]')[1]?.trigger('click');
+    await wrapper.get('[aria-label="Edit goal"]').trigger('click');
+
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('');
   });
 
   it('hides backend message actions that the active provider cannot support', () => {

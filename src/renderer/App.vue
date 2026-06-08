@@ -18,7 +18,9 @@
     :selected-model-id="selectedModelId"
     :selected-reasoning-effort="selectedReasoningEffort"
     :queued-prompts="activeQueuedPrompts"
+    :side-panel-markdown-request="sidePanelMarkdownRequest"
     :choose-agent-folder="chooseAgentFolder"
+    :read-agent-file="readAgentFile"
     :create-agent="createAgent"
     :create-team="createTeam"
     :update-team="updateTeam"
@@ -76,9 +78,11 @@ const {
   selectedModelId,
   selectedReasoningEffort,
   planMode,
+  sidePanelMarkdownRequest,
   loadBackendModels,
   loadSnapshot,
   chooseAgentFolder,
+  readAgentFile,
   createAgent,
   createTeam,
   updateTeam,

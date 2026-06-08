@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '../../shared/snapshot';
 import type { MainToRendererEvent } from '../../shared/contracts';
@@ -187,6 +190,80 @@ describe('AppController', () => {
     expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' });
   });
 
+  it('reads text files inside the active agent folder and rejects traversal', async () => {
+    const folder = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-agent-files-'));
+    try {
+      const snapshot = createInitialSnapshot();
+      snapshot.agents[0].folder = folder;
+      const persistence = {
+        load: vi.fn().mockResolvedValue(snapshot),
+        save: vi.fn().mockResolvedValue(undefined),
+      } as unknown as AppStatePersistence;
+      const controller = new AppController(persistence);
+      await writeFile(path.join(folder, 'README.md'), '# Read me\n', 'utf8');
+
+      await controller.initialize();
+
+      await expect(readAgentFile(controller, 'agent-dina', 'README.md')).resolves.toStrictEqual({
+        path: 'README.md',
+        content: '# Read me\n',
+      });
+      await expect(readAgentFile(controller, 'agent-missing', 'README.md')).rejects.toThrow('Agent not found');
+      await expect(readAgentFile(controller, 'agent-dina', '../outside.md')).rejects.toThrow('outside the agent folder');
+      await expect(readAgentFile(controller, 'agent-dina', '.')).rejects.toThrow('Path is not a file');
+
+      await writeFile(path.join(folder, 'large.md'), 'x'.repeat((2 * 1024 * 1024) + 1), 'utf8');
+      await expect(readAgentFile(controller, 'agent-dina', 'large.md')).rejects.toThrow('File is too large');
+    } finally {
+      await rm(folder, { force: true, recursive: true });
+    }
+  });
+
+  it('serves MCP display-markdown requests as side panel events', async () => {
+    const folder = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-display-markdown-'));
+    try {
+      const snapshot = createInitialSnapshot();
+      snapshot.agents[0].folder = folder;
+      const persistence = {
+        load: vi.fn().mockResolvedValue(snapshot),
+        save: vi.fn().mockResolvedValue(undefined),
+      } as unknown as AppStatePersistence;
+      const controller = new AppController(persistence);
+      const emittedEvents: Array<Omit<MainToRendererEvent, 'seq' | 'occurredAt'> & Partial<Pick<MainToRendererEvent, 'seq' | 'occurredAt'>>> = [];
+      (controller as unknown as {
+        emitAndApply(event: Omit<MainToRendererEvent, 'seq' | 'occurredAt'> & Partial<Pick<MainToRendererEvent, 'seq' | 'occurredAt'>>): void;
+      }).emitAndApply = (event) => {
+        emittedEvents.push(event);
+      };
+      await writeFile(path.join(folder, 'README.md'), '# Read me\n', 'utf8');
+
+      await controller.initialize();
+      await expect(mcpCoordinator(controller).displayMarkdown('agent-dina', {
+        path: 'README.md',
+      })).resolves.toStrictEqual({
+        success: true,
+        message: 'Displayed README.md in the side panel.',
+        path: 'README.md',
+        title: 'README.md',
+      });
+
+      expect(emittedEvents).toStrictEqual([
+        {
+          agentId: 'agent-dina',
+          type: 'sidePanel.markdownRequested',
+          payload: {
+            kind: 'markdown',
+            title: 'README.md',
+            path: 'README.md',
+            content: '# Read me\n',
+          },
+        },
+      ]);
+    } finally {
+      await rm(folder, { force: true, recursive: true });
+    }
+  });
+
   it('deletes a message by rolling back from its Codex turn and replacing history', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
@@ -276,10 +353,12 @@ describe('AppController', () => {
 
 function mcpCoordinator(controller: AppController): {
   setStatus(agentId: string, status: string): string;
+  displayMarkdown(agentId: string, input: { markdown?: string; path?: string; title?: string }): Promise<unknown>;
 } {
   return (controller as unknown as {
     mcpCoordinator: {
       setStatus(agentId: string, status: string): string;
+      displayMarkdown(agentId: string, input: { markdown?: string; path?: string; title?: string }): Promise<unknown>;
     };
   }).mcpCoordinator;
 }
@@ -382,6 +461,12 @@ async function clearAgentGoal(controller: AppController, agentId: string): Promi
   await (controller as unknown as {
     clearAgentGoal(agentId: string): Promise<void>;
   }).clearAgentGoal(agentId);
+}
+
+async function readAgentFile(controller: AppController, agentId: string, filePath: string): Promise<unknown> {
+  return (controller as unknown as {
+    readAgentFile(agentId: string, filePath: string): Promise<unknown>;
+  }).readAgentFile(agentId, filePath);
 }
 
 function userMessage(id: string, turnId: string, text: string) {

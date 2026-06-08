@@ -7,6 +7,7 @@ import ChatToolConfirmation from '../ChatToolConfirmation.vue';
 import ChatToolUserInputRequest from '../ChatToolUserInputRequest.vue';
 import ChatToolCall from '../ChatToolCall.vue';
 import ChatToolGroup from '../ChatToolGroup.vue';
+import { i18n } from '../../../i18n';
 import type { MessageToolCall } from '../types';
 
 const completedTool: MessageToolCall = {
@@ -250,6 +251,28 @@ describe('ported id8 chat components', () => {
     expect(structuredResult.text()).not.toContain('Ran codex_claw.set-status');
     await structuredResult.get('.chat-tool-call__header').trigger('click');
     expect(structuredResult.text()).toContain('"status": "Registered and idle"');
+  });
+
+  it('renders display-markdown MCP calls with a human title', () => {
+    const wrapper = mount(ChatToolCall, {
+      global: {
+        plugins: [i18n],
+      },
+      props: {
+        toolCall: {
+          args: { path: 'docs/mcp.md' },
+          done: true,
+          function: 'mcp__codex_claw__display-markdown',
+          id: 'tool-markdown',
+          result: undefined,
+          state: 'completed',
+          status: 'completed',
+        },
+      },
+    });
+
+    expect(wrapper.text()).toContain('Displayed mcp.md');
+    expect(wrapper.text()).not.toContain('mcp__codex_claw__display-markdown');
   });
 
   it('renders headerless, summary-only, descriptor, and bare tool states', async () => {

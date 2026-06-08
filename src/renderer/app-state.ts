@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
+import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, SendPromptOptions, SidePanelMarkdownRequest, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
 import { updateSettingsInSnapshot } from '../shared/settings';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '../shared/snapshot';
 import { defaultBackendCapabilities } from '../shared/backend-capabilities';
@@ -24,6 +24,7 @@ const fileCatalogError = ref<string | null>(null);
 const selectedModelId = ref<string | null>(null);
 const selectedReasoningEffort = ref<ReasoningEffort | null>(null);
 const planMode = ref(false);
+const sidePanelMarkdownRequest = ref<SidePanelMarkdownRequest | null>(null);
 let unsubscribeMainEvents: (() => void) | null = null;
 
 export function useAppState() {
@@ -254,6 +255,14 @@ export function useAppState() {
     return await window.codexClaw?.chooseAgentFolder?.() ?? null;
   }
 
+  async function readAgentFile(agentId: string, filePath: string): Promise<AgentFileReadResult> {
+    if (!window.codexClaw?.readAgentFile) {
+      throw new Error('File preview is not available.');
+    }
+
+    return window.codexClaw.readAgentFile(agentId, filePath);
+  }
+
   async function createAgent(input: CreateAgentInput): Promise<void> {
     if (!window.codexClaw?.createAgent) {
       return;
@@ -452,11 +461,13 @@ export function useAppState() {
     selectedModelId,
     selectedReasoningEffort,
     planMode,
+    sidePanelMarkdownRequest,
     loadBackendModels: loadBackendModelsForActiveAgent,
     loadBackendSkills: loadBackendSkillsForActiveAgent,
     loadAgentFiles: loadAgentFilesForActiveAgent,
     loadSnapshot,
     chooseAgentFolder,
+    readAgentFile,
     createAgent,
     createTeam,
     updateTeam,
@@ -669,6 +680,7 @@ function subscribeToMainEvents(): void {
   unsubscribeMainEvents = window.codexClaw.onEvent((event: MainToRendererEvent) => {
     applyMainEventToSnapshot(snapshot.value, event);
     syncComposerModeFromMainEvent(event);
+    syncSidePanelFromMainEvent(event);
     if (event.type === 'turn.completed' && event.agentId) {
       void drainQueuedPrompts(event.agentId);
     }
@@ -775,6 +787,25 @@ function syncComposerModeFromMainEvent(event: MainToRendererEvent): void {
     return;
   }
 
+}
+
+function syncSidePanelFromMainEvent(event: MainToRendererEvent): void {
+  if (event.agentId && event.agentId !== snapshot.value.activeAgentId) {
+    return;
+  }
+  if (event.type !== 'sidePanel.markdownRequested' || !isRecord(event.payload)) {
+    return;
+  }
+  if (event.payload.kind !== 'markdown' || typeof event.payload.content !== 'string') {
+    return;
+  }
+
+  sidePanelMarkdownRequest.value = {
+    kind: 'markdown',
+    content: event.payload.content,
+    ...(typeof event.payload.title === 'string' ? { title: event.payload.title } : {}),
+    ...(typeof event.payload.path === 'string' ? { path: event.payload.path } : {}),
+  };
 }
 
 async function hydrateActiveAgentHistory(): Promise<void> {

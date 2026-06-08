@@ -10,5 +10,6 @@ export function codexClawDeveloperInstructions(agent: Agent): string {
     'Codex Claw infers your identity from this backend session, so collaboration tools do not need you to pass your own agent ID.',
     'MANDATORY: before starting work, changing direction, or finishing, call set-status with a short status. Use an empty status to clear it.',
     'Use list-agents to discover teammate IDs, send-message or broadcast-message to coordinate, and check-messages when Claw tells you there are inbox messages.',
+    'Use display-markdown to show Markdown files or generated Markdown in the Codex Claw side panel when the user should inspect structured content.',
   ].join(' ');
 }

@@ -94,6 +94,11 @@ export const messages = {
               failed: 'Failed checking messages',
               running: 'Checking messages',
             },
+            displayMarkdown: {
+              completed: 'Displayed {target}',
+              failed: 'Failed displaying {target}',
+              running: 'Displaying {target}',
+            },
             listAgents: {
               completed: 'Listed agents',
               failed: 'Failed listing agents',

@@ -198,6 +198,18 @@ export type AgentFileSearchItem = {
   path: string;
 };
 
+export type AgentFileReadResult = {
+  path: string;
+  content: string;
+};
+
+export type SidePanelMarkdownRequest = {
+  kind: 'markdown';
+  title?: string;
+  path?: string;
+  content: string;
+};
+
 export type PromptSkillInput = {
   name: string;
   path: string;
@@ -321,6 +333,7 @@ export type MainToRendererEvent = {
     | 'context.compactionStarted'
     | 'account.rateLimitsUpdated'
     | 'skills.changed'
+    | 'sidePanel.markdownRequested'
     | 'message.delta'
     | 'item.started'
     | 'item.updated'
@@ -444,6 +457,7 @@ export type CodexClawApi = {
   listBackendModels(agentId: string): Promise<BackendModelOption[]>;
   listBackendSkills(agentId: string): Promise<BackendSkillSummary[]>;
   listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]>;
+  readAgentFile(agentId: string, filePath: string): Promise<AgentFileReadResult>;
   chooseAgentFolder(): Promise<string | null>;
   createTeam(input: CreateTeamInput): Promise<AppSnapshot>;
   updateTeam(input: UpdateTeamInput): Promise<AppSnapshot>;

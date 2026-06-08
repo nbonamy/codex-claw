@@ -2,6 +2,7 @@
   <section
     class="conversation-pane"
     aria-label="Conversation"
+    @click="handleConversationClick"
   >
     <WorkbenchLayout
       v-if="started"
@@ -153,7 +154,7 @@ const props = withDefaults(defineProps<{
   skillCatalogStatus: 'notLoaded',
 });
 
-defineEmits<{
+const emit = defineEmits<{
   attach: [];
   'clear-goal': [];
   'client-response': [response: ClientRequestResponse];
@@ -164,6 +165,7 @@ defineEmits<{
   'interrupt-agent': [];
   'quote-message': [index: number];
   'retry-message': [index: number];
+  'open-markdown-file': [filePath: string];
   'select-model': [modelId: string];
   'select-reasoning-effort': [reasoningEffort: ReasoningEffort];
   'steer-queued-prompt': [promptId: string];
@@ -212,6 +214,45 @@ function editGoal(): void {
 
   composerDraft.value = `/goal ${props.goal.objective}`;
   composerDraftRevision.value += 1;
+}
+
+function handleConversationClick(event: MouseEvent): void {
+  const target = event.target instanceof Element ? event.target : null;
+  const anchor = target?.closest('a[href]');
+  if (!anchor) {
+    return;
+  }
+
+  const href = anchor.getAttribute('href') ?? '';
+  if (!isLocalMarkdownHref(href)) {
+    return;
+  }
+
+  event.preventDefault();
+  emit('open-markdown-file', stripLinkFragment(href));
+}
+
+function isLocalMarkdownHref(href: string): boolean {
+  const trimmedHref = href.trim();
+  if (!trimmedHref || trimmedHref.startsWith('#')) {
+    return false;
+  }
+
+  try {
+    const url = new URL(trimmedHref);
+    if (url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'mailto:' || url.protocol === 'tel:') {
+      return false;
+    }
+  } catch {
+    // Relative links land here.
+  }
+
+  const pathname = stripLinkFragment(trimmedHref).toLowerCase();
+  return pathname.endsWith('.md') || pathname.endsWith('.markdown');
+}
+
+function stripLinkFragment(href: string): string {
+  return href.split('#')[0]?.split('?')[0] ?? href;
 }
 </script>
 

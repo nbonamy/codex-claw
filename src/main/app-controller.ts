@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
-import { stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { listAgentFolderFiles } from './agent-files';
 import { sendAgentPrompt } from './agent-chat-service';
@@ -35,11 +35,14 @@ import {
   updateAgentFolder,
 } from './snapshot-service';
 import { AppStatePersistence } from './state-persistence';
-import type { Agent, AgentBackend, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
+import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
 import { ipcChannels } from '../shared/ipc';
 import { teamColors } from '../shared/team-colors';
 import type { AgentBackendDriver } from './backends/types';
 import { backendDisplayName, unsupportedBackendFeature } from './backends/types';
+import type { DisplayMarkdownInput, DisplayMarkdownResponse } from './mcp/agent-coordinator';
+
+const MAX_AGENT_FILE_READ_BYTES = 2 * 1024 * 1024;
 
 export class AppController {
   private mainWindow: BrowserWindow | null = null;
@@ -58,6 +61,7 @@ export class AppController {
     onInboxMessage: (agentId, messageId) => {
       this.promptAgentToCheckInbox(agentId, messageId);
     },
+    onDisplayMarkdown: (agent, input) => this.displayMarkdownForAgent(agent, input),
   });
   private mcpServer: ClawMcpHttpServer | null = null;
   private mcpServerUrl: string | null = null;
@@ -88,6 +92,10 @@ export class AppController {
 
     ipcMain.handle(ipcChannels.listAgentFiles, async (_event, agentId: string) => {
       return this.listAgentFiles(agentId);
+    });
+
+    ipcMain.handle(ipcChannels.readAgentFile, async (_event, agentId: string, filePath: string) => {
+      return this.readAgentFile(agentId, filePath);
     });
 
     ipcMain.handle(ipcChannels.chooseAgentFolder, async () => {
@@ -402,6 +410,51 @@ export class AppController {
     }
 
     return listAgentFolderFiles(agent.folder);
+  }
+
+  private async readAgentFile(agentId: string, filePath: string): Promise<AgentFileReadResult> {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) {
+      throw new Error(`Agent not found: ${agentId}`);
+    }
+
+    const resolvedPath = resolveAgentFilePath(agent.folder, filePath);
+    const fileStat = await stat(resolvedPath.absolutePath);
+    if (!fileStat.isFile()) {
+      throw new Error(`Path is not a file: ${resolvedPath.relativePath}`);
+    }
+    if (fileStat.size > MAX_AGENT_FILE_READ_BYTES) {
+      throw new Error(`File is too large to preview: ${resolvedPath.relativePath}`);
+    }
+
+    return {
+      path: resolvedPath.relativePath,
+      content: await readFile(resolvedPath.absolutePath, 'utf8'),
+    };
+  }
+
+  private async displayMarkdownForAgent(agent: Agent, input: DisplayMarkdownInput): Promise<DisplayMarkdownResponse> {
+    const content = input.markdown ?? (input.path ? (await this.readAgentFile(agent.id, input.path)).content : '');
+    const resolvedPath = input.path ? resolveAgentFilePath(agent.folder, input.path).relativePath : undefined;
+    const title = input.title ?? (resolvedPath ? fileBasename(resolvedPath) : 'Markdown');
+
+    this.emitAndApply({
+      agentId: agent.id,
+      type: 'sidePanel.markdownRequested',
+      payload: {
+        kind: 'markdown',
+        title,
+        ...(resolvedPath ? { path: resolvedPath } : {}),
+        content,
+      },
+    });
+
+    return {
+      success: true,
+      message: resolvedPath ? `Displayed ${resolvedPath} in the side panel.` : 'Displayed Markdown in the side panel.',
+      ...(resolvedPath ? { path: resolvedPath } : {}),
+      title,
+    };
   }
 
   private async steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot> {
@@ -863,6 +916,38 @@ function turnIdFromRendererMessageId(messageId: string): string | null {
   }
 
   return null;
+}
+
+function resolveAgentFilePath(folder: string, filePath: string): { absolutePath: string; relativePath: string } {
+  const root = resolveUserPath(folder);
+  const target = path.isAbsolute(filePath)
+    ? path.resolve(filePath)
+    : path.resolve(root, filePath);
+  const relativePath = path.relative(root, target);
+
+  if (relativePath === '..' || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath)) {
+    throw new Error(`File is outside the agent folder: ${filePath}`);
+  }
+
+  return {
+    absolutePath: target,
+    relativePath: relativePath.split(path.sep).join('/'),
+  };
+}
+
+function resolveUserPath(value: string): string {
+  if (value === '~') {
+    return app.getPath('home');
+  }
+  if (value.startsWith(`~${path.sep}`) || value.startsWith('~/')) {
+    return path.join(app.getPath('home'), value.slice(2));
+  }
+
+  return path.resolve(value);
+}
+
+function fileBasename(filePath: string): string {
+  return filePath.split('/').filter(Boolean).at(-1) ?? filePath;
 }
 
 function clientRequest(value: unknown): ClientRequest | null {

@@ -73,6 +73,9 @@ describe('tool status helpers', () => {
     ['codex_claw.register-agent', { agentId: 'agent-dina' }, 'Registered agent'],
     ['codex_claw.list-agents', { agentId: 'agent-dina' }, 'Listed agents'],
     ['codex_claw.check-messages', { agentId: 'agent-dina' }, 'Checked messages'],
+    ['codex_claw.display-markdown', { path: 'docs/mcp.md' }, 'Displayed mcp.md'],
+    ['mcp__codex_claw__display-markdown', { markdown: '# Plan', title: 'Plan' }, 'Displayed Plan'],
+    ['mcp_codex_claw_display-markdown', { markdown: '# Notes' }, 'Displayed Markdown'],
     ['codex_claw.send-message', { to: 'Manny' }, 'Sent message to Manny'],
     ['codex_claw.broadcast-message', { from: 'agent-dina' }, 'Broadcast message'],
     ['codex_claw.set-status', { status: 'Running tests' }, 'Updated status'],
@@ -104,5 +107,43 @@ describe('tool status helpers', () => {
 
     expect(getToolDisplayTitle(tool, undefined)).toBe('Sending message to Manny');
     expect(getToolDisplayTitle({ ...tool, done: true, state: 'error', status: 'failed' }, undefined)).toBe('Failed sending message to Manny');
+  });
+
+  it('formats Codex Claw display markdown titles by running and failed state', () => {
+    const tool: MessageToolCall = {
+      args: { path: '/Users/nbonamy/src/codex-claw/README.md' },
+      done: false,
+      function: 'mcp__codex_claw__display-markdown',
+      id: 'tool',
+      result: undefined,
+      state: 'running',
+      status: 'running',
+    };
+
+    expect(getToolDisplayTitle(tool, undefined)).toBe('Displaying README.md');
+    expect(getToolDisplayTitle({ ...tool, done: true, state: 'error', status: 'failed' }, undefined)).toBe('Failed displaying README.md');
+  });
+
+  it('honors descriptor phases for Codex Claw MCP titles', () => {
+    const tool: MessageToolCall = {
+      args: {},
+      done: true,
+      function: 'codex_claw.list-agents',
+      id: 'tool',
+      result: undefined,
+      state: 'completed',
+      status: 'completed',
+    };
+
+    expect(getToolDisplayTitle(tool, {
+      action: 'run',
+      phase: 'running',
+      source: 'mcp',
+    })).toBe('Listing agents');
+    expect(getToolDisplayTitle(tool, {
+      action: 'run',
+      phase: 'failed',
+      source: 'mcp',
+    })).toBe('Failed listing agents');
   });
 });

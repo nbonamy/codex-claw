@@ -126,6 +126,10 @@ function codexClawToolParams(toolName: CodexClawToolName, args: Record<string, u
     return target ? { target } : undefined;
   }
 
+  if (toolName === 'display-markdown') {
+    return { target: displayMarkdownTarget(args) };
+  }
+
   return undefined;
 }
 
@@ -133,6 +137,7 @@ function codexClawToolKey(toolName: CodexClawToolName) {
   const keys: Record<CodexClawToolName, string> = {
     'broadcast-message': 'broadcastMessage',
     'check-messages': 'checkMessages',
+    'display-markdown': 'displayMarkdown',
     'list-agents': 'listAgents',
     'register-agent': 'registerAgent',
     'send-message': 'sendMessage',
@@ -166,6 +171,20 @@ function stringParam(value: Record<string, unknown> | undefined, key: string): s
   return typeof param === 'string' && param.trim() ? param.trim() : undefined;
 }
 
+function displayMarkdownTarget(args: Record<string, unknown> | undefined): string {
+  const title = stringParam(args, 'title');
+  if (title) {
+    return title;
+  }
+
+  const path = stringParam(args, 'path');
+  if (!path) {
+    return 'Markdown';
+  }
+
+  return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+}
+
 function hasStringParam(value: Record<string, unknown> | undefined, key: string): boolean {
   return typeof value?.[key] === 'string';
 }
@@ -190,6 +209,7 @@ function isCodexToolAction(action: string): action is 'create' | 'delete' | 'edi
 const codexClawTools = new Set([
   'broadcast-message',
   'check-messages',
+  'display-markdown',
   'list-agents',
   'register-agent',
   'send-message',
@@ -199,6 +219,7 @@ const codexClawTools = new Set([
 type CodexClawToolName =
   | 'broadcast-message'
   | 'check-messages'
+  | 'display-markdown'
   | 'list-agents'
   | 'register-agent'
   | 'send-message'
@@ -243,6 +264,9 @@ function defaultTranslate(key: string, params?: Record<string, unknown>) {
     'chat.tool.mcp.codexClaw.checkMessages.completed': 'Checked messages',
     'chat.tool.mcp.codexClaw.checkMessages.failed': 'Failed checking messages',
     'chat.tool.mcp.codexClaw.checkMessages.running': 'Checking messages',
+    'chat.tool.mcp.codexClaw.displayMarkdown.completed': 'Displayed {target}',
+    'chat.tool.mcp.codexClaw.displayMarkdown.failed': 'Failed displaying {target}',
+    'chat.tool.mcp.codexClaw.displayMarkdown.running': 'Displaying {target}',
     'chat.tool.mcp.codexClaw.listAgents.completed': 'Listed agents',
     'chat.tool.mcp.codexClaw.listAgents.failed': 'Failed listing agents',
     'chat.tool.mcp.codexClaw.listAgents.running': 'Listing agents',

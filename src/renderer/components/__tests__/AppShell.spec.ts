@@ -67,6 +67,255 @@ describe('AppShell', () => {
     expect(wrapper.emitted('sendPrompt')).toStrictEqual([['hello']]);
   });
 
+  it('opens markdown links in the side panel through the agent file bridge', async () => {
+    const snapshot = createInitialSnapshot();
+    let resolveReadAgentFile: (result: { content: string; path: string }) => void = () => undefined;
+    const readAgentFile = vi.fn().mockReturnValue(new Promise((resolve) => {
+      resolveReadAgentFile = resolve;
+    }));
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [
+          {
+            id: 'message-doc-link',
+            agentId: 'agent-dina',
+            role: 'assistant',
+            status: 'complete',
+            createdAt: '2026-06-05T00:00:00.000Z',
+            parts: [{ type: 'text', text: 'Open [architecture](docs/architecture.md).' }],
+          },
+        ],
+        isLoading: false,
+        isSending: false,
+        readAgentFile,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    await wrapper.get('a[href="docs/architecture.md"]').trigger('click');
+
+    expect(readAgentFile).toHaveBeenCalledWith('agent-dina', 'docs/architecture.md');
+    expect(wrapper.text()).toContain('Loading markdown...');
+
+    resolveReadAgentFile({
+      path: 'docs/architecture.md',
+      content: '# Architecture\n\nThis is the side panel.',
+    });
+    await flushPromises();
+
+    expect(wrapper.find('.side-panel').exists()).toBe(true);
+    expect(wrapper.text()).toContain('docs/architecture.md');
+    expect(wrapper.text()).toContain('This is the side panel.');
+
+    await wrapper.get('[aria-label="Close side panel"]').trigger('click');
+    expect(wrapper.find('.side-panel').exists()).toBe(false);
+  });
+
+  it('ignores stale markdown reads after the side panel changes', async () => {
+    const snapshot = createInitialSnapshot();
+    let resolveReadAgentFile: (result: { content: string; path: string }) => void = () => undefined;
+    const readAgentFile = vi.fn().mockReturnValue(new Promise((resolve) => {
+      resolveReadAgentFile = resolve;
+    }));
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [
+          {
+            id: 'message-doc-link',
+            agentId: 'agent-dina',
+            role: 'assistant',
+            status: 'complete',
+            createdAt: '2026-06-05T00:00:00.000Z',
+            parts: [{ type: 'text', text: 'Open [architecture](docs/architecture.md).' }],
+          },
+        ],
+        isLoading: false,
+        isSending: false,
+        readAgentFile,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    await wrapper.get('a[href="docs/architecture.md"]').trigger('click');
+    await wrapper.get('[aria-label="Close side panel"]').trigger('click');
+
+    resolveReadAgentFile({
+      path: 'docs/architecture.md',
+      content: '# Architecture\n\nThis result is stale.',
+    });
+    await flushPromises();
+
+    expect(wrapper.find('.side-panel').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('This result is stale.');
+  });
+
+  it('ignores stale markdown read errors after switching agents', async () => {
+    const snapshot = createInitialSnapshot();
+    let rejectReadAgentFile: (error: Error) => void = () => undefined;
+    const readAgentFile = vi.fn().mockReturnValue(new Promise((_resolve, reject) => {
+      rejectReadAgentFile = reject;
+    }));
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [
+          {
+            id: 'message-doc-link',
+            agentId: 'agent-dina',
+            role: 'assistant',
+            status: 'complete',
+            createdAt: '2026-06-05T00:00:00.000Z',
+            parts: [{ type: 'text', text: 'Open [architecture](docs/architecture.md).' }],
+          },
+        ],
+        isLoading: false,
+        isSending: false,
+        readAgentFile,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    await wrapper.get('a[href="docs/architecture.md"]').trigger('click');
+    await wrapper.setProps({ activeAgent: snapshot.agents[1] } as Record<string, unknown>);
+
+    rejectReadAgentFile(new Error('This error is stale.'));
+    await flushPromises();
+
+    expect(wrapper.find('.side-panel').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('This error is stale.');
+  });
+
+  it('shows markdown side panel read errors', async () => {
+    const snapshot = createInitialSnapshot();
+    const readAgentFile = vi.fn().mockRejectedValue(new Error('File is outside the agent folder.'));
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [
+          {
+            id: 'message-doc-link',
+            agentId: 'agent-dina',
+            role: 'assistant',
+            status: 'complete',
+            createdAt: '2026-06-05T00:00:00.000Z',
+            parts: [{ type: 'text', text: 'Open [secret](../secret.md).' }],
+          },
+        ],
+        isLoading: false,
+        isSending: false,
+        readAgentFile,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    await wrapper.get('a[href="../secret.md"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('.side-panel').exists()).toBe(true);
+    expect(wrapper.text()).toContain('File is outside the agent folder.');
+  });
+
+  it('ignores blank markdown file preview requests', async () => {
+    const snapshot = createInitialSnapshot();
+    const readAgentFile = vi.fn().mockResolvedValue({
+      path: 'docs/architecture.md',
+      content: '# Architecture',
+    });
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [],
+        isLoading: false,
+        isSending: false,
+        readAgentFile,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    wrapper.findComponent({ name: 'ConversationPane' }).vm.$emit('open-markdown-file', '   ');
+    await flushPromises();
+
+    expect(readAgentFile).not.toHaveBeenCalled();
+    expect(wrapper.find('.side-panel').exists()).toBe(false);
+  });
+
+  it('opens markdown side panel requests from main events', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [],
+        isLoading: false,
+        isSending: false,
+        sidePanelMarkdownRequest: {
+          kind: 'markdown',
+          title: 'Generated Plan',
+          content: '# Plan\n\nShip it.',
+        },
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.find('.side-panel').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Generated Plan');
+    expect(wrapper.text()).toContain('Ship it.');
+
+    await wrapper.setProps({
+      sidePanelMarkdownRequest: {
+        kind: 'markdown',
+        path: 'docs/mcp.md',
+        content: '# MCP',
+      },
+    } as Record<string, unknown>);
+
+    expect(wrapper.text()).toContain('docs/mcp.md');
+    expect(wrapper.text()).toContain('MCP');
+  });
+
+  it('opens generated markdown requests with fallback title and no subtitle', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [],
+        isLoading: false,
+        isSending: false,
+        sidePanelMarkdownRequest: {
+          kind: 'markdown',
+          content: '# Generated',
+        },
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.get('.side-panel h2').text()).toBe('Markdown');
+    expect(wrapper.find('.side-panel__copy p').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Generated');
+  });
+
   it('forwards interrupts from the composer stop button', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].status = { type: 'working' };
@@ -158,6 +407,7 @@ describe('AppShell', () => {
 
   it('resolves the active team from legacy agent membership when teamId is missing', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.activeTeamId = null;
     const activeAgent: Agent = {
       ...snapshot.agents[0],
       teamId: undefined,
@@ -179,6 +429,62 @@ describe('AppShell', () => {
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('true');
   });
 
+  it('resolves the active team from the active agent team id when no team is selected', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.teams.push({
+      id: 'team-skwad',
+      name: 'Skwad',
+      avatar: 'SK',
+      color: '#46A857',
+      agentIds: ['agent-dina'],
+      activeAgentId: 'agent-dina',
+    });
+    snapshot.activeTeamId = null;
+    const activeAgent: Agent = {
+      ...snapshot.agents[0],
+      teamId: 'team-skwad',
+    };
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent,
+        messages: [],
+        isLoading: false,
+        isSending: false,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.get('[aria-label="Skwad"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.text()).toContain('SKWAD');
+  });
+
+  it('falls back to the first team when active agent team references are stale', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.activeTeamId = null;
+    const activeAgent: Agent = {
+      ...snapshot.agents[0],
+      id: 'agent-stale',
+      teamId: 'team-missing',
+    };
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent,
+        messages: [],
+        isLoading: false,
+        isSending: false,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('true');
+  });
+
   it('falls back to the first team when no active agent is selected', () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mount(AppShell, {
@@ -197,6 +503,47 @@ describe('AppShell', () => {
     expect(wrapper.text()).toContain('CODEX CLAW');
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('true');
+  });
+
+  it('uses product fallback title when no teams exist', () => {
+    const snapshot = createEmptySnapshot();
+    snapshot.teams = [];
+    snapshot.activeTeamId = null;
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: null,
+        messages: [],
+        isLoading: false,
+        isSending: false,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.text()).toContain('Welcome to Codex Claw!');
+    expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
+  });
+
+  it('falls back when backend runtime status is missing', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.backendRuntimes = [];
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [],
+        isLoading: false,
+        isSending: false,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.text()).toContain('Dina');
+    expect(wrapper.find('.agent-header').exists()).toBe(true);
   });
 
   it('forwards team selection and filters the sidebar to the active team', async () => {
@@ -292,7 +639,7 @@ describe('AppShell', () => {
 
     expect(createAgent).toHaveBeenCalledWith({
       name: 'Jules',
-      avatar: undefined,
+      avatar: '🤖',
       folder: '/Users/nbonamy/src/new-agent',
       backend: 'codex',
     });
@@ -401,6 +748,25 @@ describe('AppShell', () => {
       },
     );
     expect(wrapper.emitted('close-team')).toStrictEqual([['team-skwad']]);
+  });
+
+  it('does not close a team when confirmation is canceled', async () => {
+    vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue(new Error('cancel'));
+    const snapshot = createInitialSnapshot();
+    snapshot.teams.push({
+      id: 'team-skwad',
+      name: 'Skwad',
+      avatar: 'SK',
+      color: '#46A857',
+      agentIds: [],
+    });
+    const wrapper = mountShell({ snapshot });
+
+    await wrapper.get('[aria-label="Skwad"]').trigger('contextmenu');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Close Team')?.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.emitted('close-team')).toBeUndefined();
   });
 
   it('opens the edit agent dialog from the sidebar context menu and forwards updates', async () => {
@@ -607,6 +973,32 @@ describe('AppShell', () => {
     expect(wrapper.emitted('select-agent')).toBeUndefined();
   });
 
+  it('ignores active-agent app commands when no agent or team can handle them', () => {
+    let listener: (command: AppCommand) => void = () => undefined;
+    window.codexClaw = {
+      onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
+        listener = nextListener;
+        return () => undefined;
+      }),
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const snapshot = createEmptySnapshot();
+    snapshot.teams = [];
+    snapshot.activeTeamId = null;
+    const wrapper = mountShell({ snapshot });
+
+    listener({ type: 'close-active-agent' });
+    listener({ type: 'duplicate-active-agent' });
+    listener({ type: 'restart-active-agent' });
+    listener({ type: 'edit-active-agent' });
+    listener({ type: 'close-active-team' });
+
+    expect(wrapper.emitted('close-agent')).toBeUndefined();
+    expect(wrapper.emitted('duplicate-agent')).toBeUndefined();
+    expect(wrapper.emitted('restart-agent')).toBeUndefined();
+    expect(wrapper.text()).not.toContain('Edit Agent');
+    expect(wrapper.emitted('close-team')).toBeUndefined();
+  });
+
   it('does not fire keyboard shortcuts while a dialog is open', async () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mountShell({ snapshot });
@@ -614,6 +1006,25 @@ describe('AppShell', () => {
     await wrapper.get('.agent-sidebar__new').trigger('click');
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', metaKey: true, cancelable: true }));
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', ctrlKey: true, cancelable: true }));
+
+    expect(wrapper.emitted('duplicate-agent')).toBeUndefined();
+    expect(wrapper.emitted('select-agent')).toBeUndefined();
+  });
+
+  it('does not fire app commands while a dialog is open', async () => {
+    let listener: (command: AppCommand) => void = () => undefined;
+    window.codexClaw = {
+      onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
+        listener = nextListener;
+        return () => undefined;
+      }),
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const snapshot = createInitialSnapshot();
+    const wrapper = mountShell({ snapshot });
+
+    await wrapper.get('.agent-sidebar__new').trigger('click');
+    listener({ type: 'duplicate-active-agent' });
+    listener({ type: 'cycle-agents', direction: 1 });
 
     expect(wrapper.emitted('duplicate-agent')).toBeUndefined();
     expect(wrapper.emitted('select-agent')).toBeUndefined();

@@ -196,6 +196,49 @@ describe('ClawMcpAgentCoordinator', () => {
     expect(coordinator.listAgents('agent-dina').agents[0].status).toBe('Idle');
   });
 
+  it('requests markdown display with exactly one content source', async () => {
+    const agents = cloneAgents(baseAgents);
+    const onDisplayMarkdown = vi.fn().mockResolvedValue({
+      success: true,
+      message: 'Displayed README.md in the side panel.',
+      path: 'README.md',
+      title: 'README.md',
+    });
+    const coordinator = new ClawMcpAgentCoordinator({
+      getAgents: () => agents,
+      onDisplayMarkdown,
+    });
+
+    await expect(coordinator.displayMarkdown('agent-dina', {
+      path: ' README.md ',
+      title: ' Readme ',
+    })).resolves.toStrictEqual({
+      success: true,
+      message: 'Displayed README.md in the side panel.',
+      path: 'README.md',
+      title: 'README.md',
+    });
+    expect(onDisplayMarkdown).toHaveBeenCalledWith(agents[0], {
+      path: 'README.md',
+      title: 'Readme',
+    });
+    await expect(coordinator.displayMarkdown('agent-dina', {})).rejects.toThrow('Provide exactly one of markdown or path.');
+    await expect(coordinator.displayMarkdown('agent-dina', {
+      markdown: '# Inline',
+      path: 'README.md',
+    })).rejects.toThrow('Provide exactly one of markdown or path.');
+  });
+
+  it('rejects markdown display when the app callback is unavailable', async () => {
+    const coordinator = new ClawMcpAgentCoordinator({
+      getAgents: () => cloneAgents(baseAgents),
+    });
+
+    await expect(coordinator.displayMarkdown('agent-dina', {
+      markdown: '# Inline',
+    })).rejects.toThrow('Markdown display is not available.');
+  });
+
   it('reports recovery context when no agents exist', () => {
     const coordinator = new ClawMcpAgentCoordinator({
       getAgents: () => [],

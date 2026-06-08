@@ -42,10 +42,24 @@ export type BroadcastResponse = {
   recipientCount: number;
 };
 
+export type DisplayMarkdownInput = {
+  markdown?: string;
+  path?: string;
+  title?: string;
+};
+
+export type DisplayMarkdownResponse = {
+  success: true;
+  message: string;
+  path?: string;
+  title?: string;
+};
+
 export type ClawMcpAgentCoordinatorOptions = {
   getAgents: () => Agent[];
   onAgentUpdated?: (agent: Agent) => void;
   onInboxMessage?: (agentId: string, messageId: string) => void;
+  onDisplayMarkdown?: (agent: Agent, input: DisplayMarkdownInput) => DisplayMarkdownResponse | Promise<DisplayMarkdownResponse>;
   createId?: () => string;
   now?: () => Date;
 };
@@ -62,6 +76,7 @@ export class ClawMcpAgentCoordinator {
   private readonly getAgents: () => Agent[];
   private readonly onAgentUpdated?: (agent: Agent) => void;
   private readonly onInboxMessage?: (agentId: string, messageId: string) => void;
+  private readonly onDisplayMarkdown?: (agent: Agent, input: DisplayMarkdownInput) => DisplayMarkdownResponse | Promise<DisplayMarkdownResponse>;
   private readonly createId: () => string;
   private readonly now: () => Date;
 
@@ -69,6 +84,7 @@ export class ClawMcpAgentCoordinator {
     this.getAgents = options.getAgents;
     this.onAgentUpdated = options.onAgentUpdated;
     this.onInboxMessage = options.onInboxMessage;
+    this.onDisplayMarkdown = options.onDisplayMarkdown;
     this.createId = options.createId ?? randomUUID;
     this.now = options.now ?? (() => new Date());
   }
@@ -151,6 +167,25 @@ export class ClawMcpAgentCoordinator {
     this.onAgentUpdated?.(agent);
 
     return 'Status updated';
+  }
+
+  async displayMarkdown(agentId: string, input: DisplayMarkdownInput): Promise<DisplayMarkdownResponse> {
+    const agent = this.requireAgent(agentId);
+    const markdown = input.markdown?.trim() ?? '';
+    const filePath = input.path?.trim() ?? '';
+    const title = input.title?.trim();
+    if (Boolean(markdown) === Boolean(filePath)) {
+      throw new McpToolError('Provide exactly one of markdown or path.');
+    }
+    if (!this.onDisplayMarkdown) {
+      throw new McpToolError('Markdown display is not available.');
+    }
+
+    return this.onDisplayMarkdown(agent, {
+      ...(markdown ? { markdown } : {}),
+      ...(filePath ? { path: filePath } : {}),
+      ...(title ? { title } : {}),
+    });
   }
 
   latestUnreadMessageId(agentId: string): string | null {

@@ -22,8 +22,8 @@ describe('AgentDialog', () => {
 
     expect(wrapper.get('.agent-dialog__header').text()).toContain('Create Agent');
     expect(wrapper.get('.claw-dialog__title').text()).toBe('Create Agent');
-    expect(wrapper.get('.claw-dialog__subtitle').text()).toBe('Add a teammate to Skwad');
-    expect(wrapper.text()).toContain('Add a teammate to Skwad');
+    expect(wrapper.get('.claw-dialog__subtitle').text()).toBe('Add a teammate to your Codex Claw team');
+    expect(wrapper.text()).toContain('Add a teammate to your Codex Claw team');
     expect(wrapper.findAll('.agent-dialog__field')).toHaveLength(3);
     expect(wrapper.text()).toContain('Identity');
     expect(wrapper.text()).not.toContain('Coding Agent');
@@ -69,7 +69,7 @@ describe('AgentDialog', () => {
 
     expect(createAgent).toHaveBeenCalledWith({
       name: 'Custom Agent',
-      avatar: undefined,
+      avatar: '🤖',
       folder: '/Users/nbonamy/src/new-agent',
       backend: 'codex',
     });
@@ -122,7 +122,7 @@ describe('AgentDialog', () => {
 
     expect(createAgent).toHaveBeenCalledWith({
       name: 'claude-project',
-      avatar: undefined,
+      avatar: '🤖',
       folder: '/Users/nbonamy/src/claude-project',
       backend: 'claude',
     });

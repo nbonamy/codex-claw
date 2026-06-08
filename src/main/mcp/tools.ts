@@ -60,13 +60,27 @@ export function createCodexClawMcpServer(coordinator: ClawMcpAgentCoordinator, c
     statusLength: status.length,
   }, () => coordinator.setStatus(callerAgentId, status)));
 
+  server.registerTool('display-markdown', {
+    description: 'Display Markdown in the Codex Claw side panel. Provide exactly one of path or markdown. Use path for Markdown files in your agent folder; use markdown for inline generated content.',
+    inputSchema: {
+      path: z.string().optional().describe('Markdown file path relative to your agent folder, or an absolute path inside it.'),
+      markdown: z.string().optional().describe('Inline Markdown content to display.'),
+      title: z.string().optional().describe('Optional title for the side panel.'),
+    },
+  }, ({ path, markdown, title }) => toolResult('display-markdown', {
+    agentId: callerAgentId,
+    hasPath: Boolean(path),
+    hasMarkdown: Boolean(markdown),
+    titleLength: title?.length ?? 0,
+  }, () => coordinator.displayMarkdown(callerAgentId, { path, markdown, title })));
+
   return server;
 }
 
-function toolResult(tool: string, details: Record<string, unknown>, run: () => unknown): CallToolResult {
+async function toolResult(tool: string, details: Record<string, unknown>, run: () => unknown): Promise<CallToolResult> {
   logMain('mcp-tool', 'start', { tool, ...details });
   try {
-    const result = structuredToolResult(run());
+    const result = structuredToolResult(await run());
     logMain('mcp-tool', 'success', {
       tool,
       structuredKeys: Object.keys(result.structuredContent ?? {}),

@@ -178,6 +178,29 @@ Input:
 Effects are the same as `send-message`, repeated for each connected recipient.
 Visible agents without an active MCP session are skipped internally.
 
+### `display-markdown`
+
+Displays Markdown in Codex Claw's right side panel.
+
+Input:
+
+- `path`: optional Markdown file path relative to the caller agent's folder, or
+  an absolute path inside that folder.
+- `markdown`: optional inline Markdown content.
+- `title`: optional side panel title.
+
+Exactly one of `path` or `markdown` must be provided. Path reads use the same
+agent-folder boundary as renderer file previews: files must resolve inside the
+caller agent folder, must be regular files, and must fit the app preview size
+limit. Inline Markdown is emitted directly as app-owned renderer content.
+
+Effects:
+
+- emits `sidePanel.markdownRequested`;
+- renderer opens the Markdown side panel for the active agent;
+- returns a structured success result with the displayed title and path when
+  available.
+
 ## Inbox Prompting
 
 When a recipient receives a direct or broadcast message:
@@ -239,7 +262,9 @@ visible IDs, names, and folders so the agent can recover cleanly.
 
 - Bind to `127.0.0.1`.
 - Do not expose filesystem, worktree, panel, or process-control tools until
-  Claw owns those product capabilities.
+  Claw owns those product capabilities. `display-markdown` is allowed because
+  Claw now owns a constrained Markdown side panel and agent-folder-limited file
+  preview path.
 - Do not advertise copied Skwad tools unless Claw can actually perform them.
 - Do not let renderer code call MCP directly.
 - Prefer request-local backend configuration over global user config mutation.
