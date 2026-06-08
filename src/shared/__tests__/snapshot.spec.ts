@@ -25,6 +25,14 @@ describe('snapshot reducer', () => {
       modelContextWindow: 258_400,
       usedPercent: 25,
     };
+    snapshot.agents[0].plan = {
+      threadId: 'thread-old',
+      turnId: 'turn-plan',
+      explanation: 'Old plan',
+      steps: [{ step: 'Do old work', status: 'pending' }],
+      markdown: 'Old plan\n- [ ] Do old work',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    };
     snapshot.agents[0].goal = {
       threadId: 'thread-old',
       objective: 'Old goal',
@@ -104,6 +112,14 @@ describe('snapshot reducer', () => {
       lastTotalTokens: 64_600,
       modelContextWindow: 258_400,
       usedPercent: 25,
+    };
+    agent.plan = {
+      threadId: 'thread-old',
+      turnId: 'turn-plan',
+      explanation: 'Old plan',
+      steps: [{ step: 'Do old work', status: 'pending' }],
+      markdown: 'Old plan\n- [ ] Do old work',
+      updatedAt: '2026-06-05T00:00:00.000Z',
     };
     agent.goal = {
       threadId: 'thread-old',
@@ -2189,7 +2205,7 @@ describe('snapshot reducer', () => {
     });
   });
 
-  it('renders app-owned plan updates as transcript text', () => {
+  it('stores app-owned plan updates on the agent without duplicating transcript text', () => {
     const snapshot = createInitialSnapshot();
 
     applyMainEventToSnapshot(snapshot, {
@@ -2208,12 +2224,157 @@ describe('snapshot reducer', () => {
       occurredAt: '2026-06-05T00:00:00.000Z',
     });
 
-    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([
-      {
-        type: 'text',
-        text: 'Current plan\n- [x] Inspect composer\n- [ ] Wire Plan mode',
+    expect(snapshot.agents[0].plan).toStrictEqual({
+      threadId: 'thread-1',
+      turnId: 'turn-plan',
+      explanation: 'Current plan',
+      steps: [
+        { step: 'Inspect composer', status: 'completed' },
+        { step: 'Wire Plan mode', status: 'inProgress' },
+      ],
+      markdown: 'Current plan\n- [x] Inspect composer\n- [ ] Wire Plan mode',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    });
+    expect(snapshot.messages).toStrictEqual([]);
+  });
+
+  it('sanitizes partial plan updates before storing them on the agent', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 0,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-plan',
+      type: 'turn.planUpdated',
+      payload: {
+        explanation: ' ',
+        plan: [
+          null,
+          { step: ' ', status: 'completed' },
+          { step: 'Use fallback status', status: 'unknown' },
+        ],
       },
-    ]);
+      occurredAt: '2026-06-05T00:00:00.000Z',
+    });
+
+    expect(snapshot.agents[0].plan).toStrictEqual({
+      threadId: 'thread-1',
+      turnId: 'turn-plan',
+      explanation: '',
+      steps: [
+        { step: 'Use fallback status', status: 'pending' },
+      ],
+      markdown: '- [ ] Use fallback status',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    });
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-empty-plan',
+      type: 'turn.planUpdated',
+      payload: {},
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(snapshot.agents[0].plan?.turnId).toBe('turn-plan');
+  });
+
+  it('stores proposed plan deltas and overwrites them with completed plan item text', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 0,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-plan',
+      type: 'turn.proposedPlanDelta',
+      payload: {
+        itemId: 'turn-plan-plan',
+        delta: '# Draft Plan\n',
+      },
+      occurredAt: '2026-06-05T00:00:00.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-plan',
+      type: 'turn.proposedPlanDelta',
+      payload: {
+        itemId: 'turn-plan-plan',
+        delta: '- draft step\n',
+      },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(snapshot.agents[0].plan?.markdown).toBe('# Draft Plan\n- draft step\n');
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-plan',
+      type: 'turn.proposedPlanCompleted',
+      payload: {
+        itemId: 'turn-plan-plan',
+        markdown: '# Final Plan\n\n- final step\n',
+      },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(snapshot.agents[0].plan).toStrictEqual({
+      threadId: 'thread-1',
+      turnId: 'turn-plan',
+      explanation: '',
+      steps: [],
+      markdown: '# Final Plan\n\n- final step',
+      updatedAt: '2026-06-05T00:00:02.000Z',
+    });
+  });
+
+  it('extracts proposed plan tags from assistant deltas into agent plan state', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 0,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-plan',
+      type: 'message.delta',
+      payload: {
+        delta: '<proposed_plan>\n# Dummy Plan',
+      },
+      occurredAt: '2026-06-05T00:00:00.000Z',
+    });
+    expect(snapshot.agents[0].plan).toBeUndefined();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-plan',
+      type: 'message.delta',
+      payload: {
+        delta: '\n\n- [ ] Do nothing\n</proposed_plan>',
+      },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(snapshot.agents[0].plan).toStrictEqual({
+      threadId: 'thread-1',
+      turnId: 'turn-plan',
+      explanation: '',
+      steps: [],
+      markdown: '# Dummy Plan\n\n- [ ] Do nothing',
+      updatedAt: '2026-06-05T00:00:01.000Z',
+    });
+    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([{
+      type: 'text',
+      text: '<proposed_plan>\n# Dummy Plan\n\n- [ ] Do nothing\n</proposed_plan>',
+    }]);
   });
 
   it('handles reducer fallback and error events without Codex protocol leaking into UI state', () => {

@@ -166,6 +166,7 @@ function ensureAgentCanChange(agent: Agent, message: string): void {
 function clearRuntimeState(agent: Agent): void {
   delete agent.backendSession;
   delete agent.contextUsage;
+  delete agent.plan;
   delete agent.goal;
   delete agent.isRegistered;
   delete agent.mcpSessionId;

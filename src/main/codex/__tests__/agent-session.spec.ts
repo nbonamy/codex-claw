@@ -281,6 +281,91 @@ describe('CodexAgentSessionManager', () => {
     });
   });
 
+  it('passes plan mode even when no model is selected', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+
+    const prompt = manager.sendPrompt(agent, 'plan the work', {
+      planMode: true,
+    });
+    await waitForSentCount(transport, 1);
+    transport.receive({ id: 1, result: { userAgent: 'codex', codexHome: '/tmp/codex-home', platformFamily: 'unix', platformOs: 'macos' } });
+    await waitForSentCount(transport, 3);
+    transport.receive({ id: 2, result: { thread: { id: 'thread-1', cwd: '/Users/nbonamy/src/codex-claw' } } });
+    await waitForSentCount(transport, 4);
+    transport.receive({ id: 3, result: { turn: { id: 'turn-1', status: 'running' } } });
+
+    await prompt;
+
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 3,
+      method: 'turn/start',
+      params: {
+        threadId: 'thread-1',
+        input: [
+          {
+            type: 'text',
+            text: 'plan the work',
+            text_elements: [],
+          },
+        ],
+        cwd: expandHome('~/src/codex-claw'),
+        collaborationMode: {
+          mode: 'plan',
+          settings: {
+            reasoning_effort: 'medium',
+            developer_instructions: null,
+          },
+        },
+      },
+    });
+  });
+
+  it('passes disabled plan mode as a Codex default collaboration mode override', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+
+    const prompt = manager.sendPrompt(agent, 'back to normal work', {
+      model: 'gpt-5.1-codex',
+      planMode: false,
+      backendOptions: { kind: 'codex', reasoningEffort: 'high' },
+    });
+    await waitForSentCount(transport, 1);
+    transport.receive({ id: 1, result: { userAgent: 'codex', codexHome: '/tmp/codex-home', platformFamily: 'unix', platformOs: 'macos' } });
+    await waitForSentCount(transport, 3);
+    transport.receive({ id: 2, result: { thread: { id: 'thread-1', cwd: '/Users/nbonamy/src/codex-claw' } } });
+    await waitForSentCount(transport, 4);
+    transport.receive({ id: 3, result: { turn: { id: 'turn-1', status: 'running' } } });
+
+    await prompt;
+
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 3,
+      method: 'turn/start',
+      params: {
+        threadId: 'thread-1',
+        input: [
+          {
+            type: 'text',
+            text: 'back to normal work',
+            text_elements: [],
+          },
+        ],
+        cwd: expandHome('~/src/codex-claw'),
+        model: 'gpt-5.1-codex',
+        effort: 'high',
+        collaborationMode: {
+          mode: 'default',
+          settings: {
+            model: 'gpt-5.1-codex',
+            reasoning_effort: 'high',
+            developer_instructions: null,
+          },
+        },
+      },
+    });
+  });
+
   it('sets a thread goal without starting a turn', async () => {
     const transport = new FakeTransport();
     const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
@@ -1442,6 +1527,67 @@ describe('CodexAgentSessionManager', () => {
     ]);
   });
 
+  it('maps Codex plan item streaming and completion into app-owned plan artifact events', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+    const events: unknown[] = [];
+    manager.onEvent((event) => events.push({
+      ...event,
+      occurredAt: '<now>',
+    }));
+
+    await resolveStartedPrompt(transport, manager);
+
+    transport.receive({
+      method: 'item/plan/delta',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        itemId: 'turn-1-plan',
+        delta: '# Draft plan\n',
+      },
+    });
+    transport.receive({
+      method: 'item/completed',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        item: {
+          type: 'plan',
+          id: 'turn-1-plan',
+          text: '# Final plan\n\n- first\n- second\n',
+        },
+      },
+    });
+
+    expect(events).toStrictEqual([
+      {
+        seq: 1,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        type: 'turn.proposedPlanDelta',
+        payload: {
+          itemId: 'turn-1-plan',
+          delta: '# Draft plan\n',
+        },
+        occurredAt: '<now>',
+      },
+      {
+        seq: 2,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        type: 'turn.proposedPlanCompleted',
+        payload: {
+          itemId: 'turn-1-plan',
+          markdown: '# Final plan\n\n- first\n- second\n',
+        },
+        occurredAt: '<now>',
+      },
+    ]);
+  });
+
   it('maps token usage and rate-limit notifications into app-owned events', async () => {
     const transport = new FakeTransport();
     const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
@@ -2122,6 +2268,37 @@ describe('CodexAgentSessionManager', () => {
         occurredAt: '<now>',
       },
     ]);
+  });
+
+  it('does not render raw response assistant messages because app-server emits typed plan and message items', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+    const events: unknown[] = [];
+    manager.onEvent((event) => events.push({
+      ...event,
+      occurredAt: '<now>',
+    }));
+
+    await resolveStartedPrompt(transport, manager);
+
+    transport.receive({
+      method: 'rawResponseItem/completed',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        item: {
+          type: 'message',
+          id: 'raw-message-plan',
+          role: 'assistant',
+          content: [{
+            type: 'output_text',
+            text: '<proposed_plan>\n# Dummy False Plan\n\n- [ ] Do nothing\n</proposed_plan>',
+          }],
+        },
+      },
+    });
+
+    expect(events).toStrictEqual([]);
   });
 
   it('reuses an existing thread for follow-up prompts', async () => {

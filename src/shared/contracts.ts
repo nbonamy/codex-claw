@@ -60,6 +60,22 @@ export type ThreadGoal = {
   updatedAt: number;
 };
 
+export type ThreadPlanStepStatus = 'pending' | 'inProgress' | 'completed';
+
+export type ThreadPlanStep = {
+  step: string;
+  status: ThreadPlanStepStatus;
+};
+
+export type ThreadPlan = {
+  threadId: string;
+  turnId: string;
+  explanation: string;
+  steps: ThreadPlanStep[];
+  markdown: string;
+  updatedAt: string;
+};
+
 export type Agent = {
   id: string;
   teamId?: string;
@@ -70,6 +86,7 @@ export type Agent = {
   backendSession?: BackendSession;
   backendDefaults?: BackendDefaults;
   contextUsage?: AgentContextUsage;
+  plan?: ThreadPlan;
   goal?: ThreadGoal;
   isRegistered?: boolean;
   mcpSessionId?: string;
@@ -328,6 +345,8 @@ export type MainToRendererEvent = {
     | 'thread.tokenUsageUpdated'
     | 'turn.started'
     | 'turn.planUpdated'
+    | 'turn.proposedPlanDelta'
+    | 'turn.proposedPlanCompleted'
     | 'turn.completed'
     | 'message.steer'
     | 'context.compactionStarted'

@@ -561,7 +561,8 @@ function selectedPromptOptions(prompt: string): SendPromptOptions | undefined {
 
   return {
     ...(promptModel ? { model: promptModel.model } : {}),
-    ...(capabilities.planMode !== 'unsupported' && planMode.value ? { planMode: true } : {}),
+    ...(capabilities.planMode === 'native' ? { planMode: planMode.value } : {}),
+    ...(capabilities.planMode === 'prompted' && planMode.value ? { planMode: true } : {}),
     ...(codexBackendOptions ? { backendOptions: codexBackendOptions } : {}),
   };
 }

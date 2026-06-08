@@ -74,6 +74,17 @@ describe('AppStatePersistence', () => {
         modelContextWindow: 10000,
         usedPercent: 12,
       },
+      plan: {
+        threadId: 'thread-dina',
+        turnId: 'turn-plan',
+        explanation: 'Current plan',
+        steps: [
+          { step: 'Inspect composer', status: 'completed' },
+          { step: 'Wire preview', status: 'inProgress' },
+        ],
+        markdown: 'Current plan\n- [x] Inspect composer\n- [ ] Wire preview',
+        updatedAt: '2026-06-05T10:11:12.000Z',
+      },
       goal: {
         threadId: 'thread-dina',
         objective: 'Ship the goal shelf',
@@ -112,6 +123,17 @@ describe('AppStatePersistence', () => {
       lastTotalTokens: 300,
       modelContextWindow: 10000,
       usedPercent: 12,
+    });
+    expect(writtenAgent.plan).toStrictEqual({
+      threadId: 'thread-dina',
+      turnId: 'turn-plan',
+      explanation: 'Current plan',
+      steps: [
+        { step: 'Inspect composer', status: 'completed' },
+        { step: 'Wire preview', status: 'inProgress' },
+      ],
+      markdown: 'Current plan\n- [x] Inspect composer\n- [ ] Wire preview',
+      updatedAt: '2026-06-05T10:11:12.000Z',
     });
     expect(writtenAgent.goal).toStrictEqual({
       threadId: 'thread-dina',
@@ -162,6 +184,17 @@ describe('AppStatePersistence', () => {
         modelContextWindow: 10000,
         usedPercent: 12,
       },
+      plan: {
+        threadId: 'thread-dina',
+        turnId: 'turn-plan',
+        explanation: 'Current plan',
+        steps: [
+          { step: 'Inspect composer', status: 'completed' },
+          { step: 'Wire preview', status: 'inProgress' },
+        ],
+        markdown: 'Current plan\n- [x] Inspect composer\n- [ ] Wire preview',
+        updatedAt: '2026-06-05T10:11:12.000Z',
+      },
       goal: {
         threadId: 'thread-dina',
         objective: 'Ship the goal shelf',
@@ -199,6 +232,17 @@ describe('AppStatePersistence', () => {
         modelContextWindow: 10000,
         usedPercent: 12,
       },
+      plan: {
+        threadId: 'thread-dina',
+        turnId: 'turn-plan',
+        explanation: 'Current plan',
+        steps: [
+          { step: 'Inspect composer', status: 'completed' },
+          { step: 'Wire preview', status: 'inProgress' },
+        ],
+        markdown: 'Current plan\n- [x] Inspect composer\n- [ ] Wire preview',
+        updatedAt: '2026-06-05T10:11:12.000Z',
+      },
       goal: {
         threadId: 'thread-dina',
         objective: 'Ship the goal shelf',
@@ -217,6 +261,36 @@ describe('AppStatePersistence', () => {
     expect(restored.messages).toStrictEqual([]);
     expect(restored.backendRuntimes).toStrictEqual(createEmptySnapshot().backendRuntimes);
     expect(restored.accountRateLimits).toStrictEqual(snapshot.accountRateLimits);
+  });
+
+  it('drops invalid persisted plan state', () => {
+    const restored = snapshotFromPersistedState({
+      teams: [{ id: 'team-codex-claw', name: 'Codex Claw', agentIds: ['agent-dina'] }],
+      agents: [{
+        id: 'agent-dina',
+        teamId: 'team-codex-claw',
+        name: 'Dina',
+        folder: '~/src/codex-claw',
+        backend: 'codex',
+        backendSession: { kind: 'codex', threadId: 'thread-dina' },
+        plan: {
+          threadId: 'thread-dina',
+          turnId: 'turn-plan',
+          explanation: 'Current plan',
+          steps: [{ step: 'Inspect composer', status: 'done' }],
+          markdown: 'Current plan',
+          updatedAt: '2026-06-05T10:11:12.000Z',
+        },
+        createdAt: '2026-06-05T00:00:00.000Z',
+        updatedAt: '2026-06-05T00:00:00.000Z',
+      }],
+      bench: [],
+      activeTeamId: 'team-codex-claw',
+      activeAgentId: 'agent-dina',
+      theme: defaultThemeSettings,
+    });
+
+    expect(restored.agents[0].plan?.steps).toStrictEqual([]);
   });
 
   it('drops invalid persisted context usage', () => {

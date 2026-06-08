@@ -110,6 +110,51 @@ describe('codexThreadHistoryToRendererMessages', () => {
     ]);
   });
 
+  it('does not replay Codex plan items as normal assistant text', () => {
+    const thread: CodexThread = {
+      id: 'thread-resumed',
+      cwd: '/Users/nbonamy/src/codex-claw',
+      turns: [
+        {
+          id: 'turn-1',
+          status: 'completed',
+          startedAt: 1_780_000_000,
+          completedAt: 1_780_000_010,
+          items: [
+            {
+              type: 'userMessage',
+              id: 'user-1',
+              content: [
+                {
+                  type: 'text',
+                  text: 'write a dummy false plan this is a test',
+                  text_elements: [],
+                },
+              ],
+            },
+            {
+              type: 'plan',
+              id: 'turn-1-plan',
+              text: '# Dummy False Plan\n\n- [ ] Do not implement\n',
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(codexThreadHistoryToRendererMessages(thread, 'agent-dina')).toStrictEqual([
+      {
+        id: 'user-thread-resumed-turn-1-user-1',
+        agentId: 'agent-dina',
+        role: 'user',
+        status: 'complete',
+        turnId: 'turn-1',
+        createdAt: '2026-05-28T20:26:40.000Z',
+        parts: [{ type: 'text', text: 'write a dummy false plan this is a test' }],
+      },
+    ]);
+  });
+
   it('preserves mid-turn steering as a visible marker between assistant segments', () => {
     const thread: CodexThread = {
       id: 'thread-steered',

@@ -815,7 +815,10 @@ export class AppController {
       fullEvent.type === 'account.rateLimitsUpdated' ||
       fullEvent.type === 'thread.started' ||
       fullEvent.type === 'thread.settingsUpdated' ||
-      fullEvent.type === 'thread.tokenUsageUpdated'
+      fullEvent.type === 'thread.tokenUsageUpdated' ||
+      fullEvent.type === 'turn.planUpdated' ||
+      fullEvent.type === 'turn.proposedPlanCompleted' ||
+      this.eventCompletesSavedPlan(fullEvent)
     ) {
       void this.persistSnapshot().catch((error: unknown) => {
         warnMain('state', 'failed to persist snapshot event', {
@@ -826,8 +829,41 @@ export class AppController {
     }
 
     if (fullEvent.type === 'turn.completed' && fullEvent.agentId) {
+      this.promptCompletedPlanPreview(fullEvent);
       this.promptLatestUnreadMessage(fullEvent.agentId);
     }
+  }
+
+  private eventCompletesSavedPlan(event: MainToRendererEvent): boolean {
+    if (event.type !== 'turn.completed' || !event.agentId || !event.turnId) {
+      return false;
+    }
+
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === event.agentId);
+    return agent?.plan?.turnId === event.turnId && Boolean(agent.plan.markdown.trim());
+  }
+
+  private promptCompletedPlanPreview(event: MainToRendererEvent): void {
+    if (event.type !== 'turn.completed' || !event.agentId || !event.turnId) {
+      return;
+    }
+
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === event.agentId);
+    if (!agent?.plan || agent.plan.turnId !== event.turnId || !agent.plan.markdown.trim()) {
+      return;
+    }
+
+    this.emitAndApply({
+      agentId: event.agentId,
+      threadId: agent.plan.threadId,
+      turnId: event.turnId,
+      type: 'sidePanel.markdownRequested',
+      payload: {
+        kind: 'markdown',
+        title: 'Plan',
+        content: agent.plan.markdown,
+      },
+    });
   }
 
   private recordClientRequestOwner(event: MainToRendererEvent): void {

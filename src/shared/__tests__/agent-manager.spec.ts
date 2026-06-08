@@ -178,6 +178,14 @@ describe('agent-manager', () => {
       modelContextWindow: 258_400,
       usedPercent: 25,
     };
+    agent.plan = {
+      threadId: 'thread-old',
+      turnId: 'turn-plan',
+      explanation: 'Old plan',
+      steps: [{ step: 'Do old work', status: 'pending' }],
+      markdown: 'Old plan\n- [ ] Do old work',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    };
     agent.goal = {
       threadId: 'thread-old',
       objective: 'Old goal',
@@ -201,6 +209,7 @@ describe('agent-manager', () => {
     });
     expect(snapshot.agents[0].backendSession).toBeUndefined();
     expect(snapshot.agents[0].contextUsage).toBeUndefined();
+    expect(snapshot.agents[0].plan).toBeUndefined();
     expect(snapshot.agents[0].goal).toBeUndefined();
     expect(snapshot.agents[0].isRegistered).toBeUndefined();
     expect(snapshot.agents[0].mcpSessionId).toBeUndefined();

@@ -178,9 +178,21 @@ export class CodexAgentSessionManager {
     if (codexOptions?.reasoningEffort) {
       turnParams.effort = codexOptions.reasoningEffort;
     }
-    if (options.planMode && options.model) {
+    if (options.planMode) {
+      const collaborationSettings: Record<string, unknown> = {
+        reasoning_effort: codexOptions?.reasoningEffort ?? 'medium',
+        developer_instructions: null,
+      };
+      if (options.model) {
+        collaborationSettings.model = options.model;
+      }
       turnParams.collaborationMode = {
         mode: 'plan',
+        settings: collaborationSettings,
+      };
+    } else if (options.planMode === false && options.model) {
+      turnParams.collaborationMode = {
+        mode: 'default',
         settings: {
           model: options.model,
           reasoning_effort: codexOptions?.reasoningEffort ?? null,
@@ -546,12 +558,24 @@ export class CodexAgentSessionManager {
         return;
       }
 
-      case 'item/agentMessage/delta':
-      case 'item/plan/delta': {
+      case 'item/agentMessage/delta': {
         const params = notification.params as { threadId: string; turnId: string; itemId: string; delta: string };
         this.emitForThread(params.threadId, {
           turnId: params.turnId,
           type: 'message.delta',
+          payload: {
+            itemId: params.itemId,
+            delta: params.delta,
+          },
+        });
+        return;
+      }
+
+      case 'item/plan/delta': {
+        const params = notification.params as { threadId: string; turnId: string; itemId: string; delta: string };
+        this.emitForThread(params.threadId, {
+          turnId: params.turnId,
+          type: 'turn.proposedPlanDelta',
           payload: {
             itemId: params.itemId,
             delta: params.delta,
@@ -602,6 +626,7 @@ export class CodexAgentSessionManager {
           return;
         }
         const reviewText = notification.method === 'item/completed' ? exitedReviewText(params.item) : '';
+        const planText = notification.method === 'item/completed' ? completedPlanText(params.item) : '';
         this.logMcpToolItem(notification.method, params.threadId, params.item);
         const toolPart = codexThreadItemToToolPart(params.item);
         if (toolPart) {
@@ -609,6 +634,16 @@ export class CodexAgentSessionManager {
             turnId: params.turnId,
             type: notification.method === 'item/started' ? 'item.started' : 'item.completed',
             payload: { toolPart },
+          });
+        }
+        if (planText) {
+          this.emitForThread(params.threadId, {
+            turnId: params.turnId,
+            type: 'turn.proposedPlanCompleted',
+            payload: {
+              itemId: codexItemId(params.item),
+              markdown: planText,
+            },
           });
         }
         if (reviewText) {
@@ -644,6 +679,7 @@ export class CodexAgentSessionManager {
       case 'rawResponseItem/completed': {
         const params = notification.params as { threadId: string; turnId: string; item: CodexRawResponseItem };
         const event = rawResponseItemToEvent(params.item);
+        this.logRawResponseItem(params.threadId, params.item, event);
         if (event) {
           this.emitForThread(params.threadId, {
             turnId: params.turnId,
@@ -815,6 +851,17 @@ export class CodexAgentSessionManager {
     });
   }
 
+  private logRawResponseItem(threadId: string, item: CodexRawResponseItem, event: Pick<MainToRendererEvent, 'type' | 'payload'> | null): void {
+    logMain('codex-raw-response', event ? 'adapted' : 'ignored', {
+      agentId: this.agentIdsByThreadId.get(threadId),
+      itemId: rawItemString(item.id) ?? rawItemString(item.call_id),
+      itemType: rawItemString(item.type),
+      role: rawItemString(item.role),
+      eventType: event?.type,
+      textLength: rawResponseTextLength(item),
+    });
+  }
+
   private emitForThread(threadId: string, event: Omit<MainToRendererEvent, 'seq' | 'agentId' | 'threadId' | 'occurredAt'>): void {
     const agentId = this.agentIdsByThreadId.get(threadId);
     if (!agentId) {
@@ -891,6 +938,22 @@ export function expandHome(folder: string): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function rawItemString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function rawResponseTextLength(item: CodexRawResponseItem): number | undefined {
+  const content = Array.isArray(item.content) ? item.content : [];
+  const length = content.reduce((total, part) => {
+    if (!isRecord(part) || typeof part.text !== 'string') {
+      return total;
+    }
+
+    return total + part.text.length;
+  }, 0);
+  return length > 0 ? length : undefined;
 }
 
 function collaborationModeFromThreadSettings(threadSettings: unknown): 'default' | 'plan' | null {
@@ -1165,6 +1228,12 @@ function isContextCompactionItem(item: unknown): item is { id: string; type: 'co
 function exitedReviewText(item: unknown): string {
   return isRecord(item) && item.type === 'exitedReviewMode' && typeof item.review === 'string'
     ? item.review
+    : '';
+}
+
+function completedPlanText(item: unknown): string {
+  return isRecord(item) && item.type === 'plan' && typeof item.text === 'string'
+    ? item.text
     : '';
 }
 

@@ -360,6 +360,15 @@ Composer Plan mode is sent through Codex's experimental
 `turn/start.collaborationMode` override. Main builds the `collaborationMode`
 object from app-owned prompt options and the selected model/reasoning effort;
 renderer code only sees a boolean Plan toggle.
+Plan mode must be sent even when no model is selected in the renderer. In that
+case main omits `settings.model` and uses Codex's Plan preset default reasoning
+effort of `medium`, with `developer_instructions: null` so the app-server keeps
+its built-in Plan instructions.
+Because Codex persists the thread collaboration mode, disabling Plan mode is
+also an app-server operation: native Codex prompts send `planMode: false`, and
+main maps that to `turn/start.collaborationMode.mode = "default"` with the
+selected model/reasoning settings. Omitting `collaborationMode` would leave the
+thread in its previous mode.
 
 Codex goals are thread metadata, not composer modes. The renderer handles
 `/goal` commands before prompt submission:
@@ -384,10 +393,18 @@ Mode notifications stay app-owned:
   `thread.modeUpdated` with `default` or `plan`.
 - `thread/goal/updated` and `thread/goal/cleared` become app-owned goal events
   so the agent metadata and shelf stay in sync.
-- `turn/plan/updated` becomes transcript text for now; this is the rendering
-  hook for a richer native plan component later.
-- `item/plan/delta` is accepted as an assistant delta so streaming plan text can
-  appear at the point Codex emits it.
+- `turn/plan/updated` is the structured plan artifact event. Main stores it as
+  `agent.plan`, persists it to `state.json`, and opens it in the markdown side
+  panel when the corresponding turn completes.
+- Codex plan-mode output is a separate `ThreadItem` with `type: "plan"`, not a
+  normal assistant message. Main stores `item/plan/delta` as a draft
+  `agent.plan` artifact only; the app-server marks those deltas experimental.
+- `item/completed` with `item.type === "plan"` is authoritative. Main overwrites
+  any draft plan with the completed item text, persists it to `state.json`, and
+  opens it in the markdown side panel when the corresponding turn completes.
+- Raw response assistant messages are diagnostic only for this path. Do not use
+  them as the primary plan renderer; Codex core already parses
+  `<proposed_plan>...</proposed_plan>` into typed plan item notifications.
 
 ### Token Usage And Rate Limits
 
@@ -501,6 +518,9 @@ Mapping sketch:
 - `FileChange` and `FileChangePatchUpdated` become file-change tool/diff
   state.
 - `TurnDiffUpdated` updates the turn-level diff panel.
+- `PlanDelta` updates a draft plan artifact, and completed `Plan` items update
+  the authoritative plan artifact. They are not replayed as normal assistant
+  chat text.
 - MCP and dynamic tool calls become renderer tool calls.
 - `rawResponseItem/completed` is adapted in main into the same app-owned tool
   events when the app-server exposes raw function, shell, custom-tool, search,

@@ -8,6 +8,7 @@ import type { MainToRendererEvent } from '../../shared/contracts';
 import type { AppStatePersistence } from '../state-persistence';
 import type { AgentBackendDriver } from '../backends/types';
 import { claudeBackendCapabilities, codexBackendCapabilities } from '../../shared/backend-capabilities';
+import { ipcChannels } from '../../shared/ipc';
 
 describe('AppController', () => {
   it('persists collaboration status updates emitted by MCP tools', async () => {
@@ -96,6 +97,125 @@ describe('AppController', () => {
 
     expect(snapshot.accountRateLimits).toStrictEqual(rateLimits);
     expect(persistence.save).toHaveBeenCalledWith(snapshot);
+  });
+
+  it('persists Codex plan updates and previews the completed plan as markdown', async () => {
+    const snapshot = createInitialSnapshot();
+    const send = vi.fn();
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+
+    await controller.initialize();
+    setMainWindowSend(controller, send);
+    emitAndApply(controller, {
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-plan',
+      type: 'turn.planUpdated',
+      payload: {
+        explanation: 'Current plan',
+        plan: [
+          { step: 'Inspect app-server event', status: 'completed' },
+          { step: 'Preview markdown', status: 'inProgress' },
+        ],
+      },
+      occurredAt: '2026-06-05T10:11:12.000Z',
+    });
+    await flushMicrotasks();
+
+    expect(snapshot.agents[0].plan).toStrictEqual({
+      threadId: 'thread-dina',
+      turnId: 'turn-plan',
+      explanation: 'Current plan',
+      steps: [
+        { step: 'Inspect app-server event', status: 'completed' },
+        { step: 'Preview markdown', status: 'inProgress' },
+      ],
+      markdown: 'Current plan\n- [x] Inspect app-server event\n- [ ] Preview markdown',
+      updatedAt: '2026-06-05T10:11:12.000Z',
+    });
+    expect(persistence.save).toHaveBeenCalledWith(snapshot);
+
+    emitAndApply(controller, {
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-plan',
+      type: 'turn.completed',
+      payload: { status: 'completed' },
+      occurredAt: '2026-06-05T10:11:20.000Z',
+    });
+
+    expect(send).toHaveBeenLastCalledWith(ipcChannels.event, expect.objectContaining({
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-plan',
+      type: 'sidePanel.markdownRequested',
+      payload: {
+        kind: 'markdown',
+        title: 'Plan',
+        content: 'Current plan\n- [x] Inspect app-server event\n- [ ] Preview markdown',
+      },
+    }));
+  });
+
+  it('persists and previews completed Codex plan items', async () => {
+    const snapshot = createInitialSnapshot();
+    const send = vi.fn();
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+
+    await controller.initialize();
+    setMainWindowSend(controller, send);
+    emitAndApply(controller, {
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-plan',
+      type: 'turn.proposedPlanCompleted',
+      payload: {
+        itemId: 'turn-plan-plan',
+        markdown: '# Dummy False Plan\n\n- [ ] Do not implement',
+      },
+      occurredAt: '2026-06-05T10:11:12.000Z',
+    });
+
+    expect(snapshot.agents[0].plan).toStrictEqual({
+      threadId: 'thread-dina',
+      turnId: 'turn-plan',
+      explanation: '',
+      steps: [],
+      markdown: '# Dummy False Plan\n\n- [ ] Do not implement',
+      updatedAt: '2026-06-05T10:11:12.000Z',
+    });
+    await flushMicrotasks();
+    expect(persistence.save).toHaveBeenCalledWith(snapshot);
+
+    emitAndApply(controller, {
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-plan',
+      type: 'turn.completed',
+      payload: { status: 'completed' },
+      occurredAt: '2026-06-05T10:11:20.000Z',
+    });
+    await flushMicrotasks();
+
+    expect(send).toHaveBeenLastCalledWith(ipcChannels.event, expect.objectContaining({
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-plan',
+      type: 'sidePanel.markdownRequested',
+      payload: {
+        kind: 'markdown',
+        title: 'Plan',
+        content: '# Dummy False Plan\n\n- [ ] Do not implement',
+      },
+    }));
   });
 
   it('sets and clears an agent goal through the backend driver', async () => {
@@ -390,6 +510,16 @@ function setClaudeBackendDriver(
   (controller as unknown as {
     claudeBackendDriver: AgentBackendDriver;
   }).claudeBackendDriver = backendDriver;
+}
+
+function setMainWindowSend(controller: AppController, send: ReturnType<typeof vi.fn>): void {
+  (controller as unknown as {
+    mainWindow: { webContents: { send: ReturnType<typeof vi.fn> } };
+  }).mainWindow = {
+    webContents: {
+      send,
+    },
+  };
 }
 
 function createFakeCodexBackendDriver(overrides: Partial<AgentBackendDriver> = {}): AgentBackendDriver {

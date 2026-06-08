@@ -62,15 +62,6 @@ function codexTurnToRendererMessages(threadId: string, turn: CodexThreadTurn, ag
       continue;
     }
 
-    if (item.type === 'plan') {
-      const text = typeof item.text === 'string' ? item.text : '';
-      if (text) {
-        sawAssistantActivity = true;
-        assistantParts.push({ type: 'text', text, itemId: item.id });
-      }
-      continue;
-    }
-
     if (item.type === 'exitedReviewMode') {
       const text = typeof item.review === 'string' ? item.review : '';
       if (text) {

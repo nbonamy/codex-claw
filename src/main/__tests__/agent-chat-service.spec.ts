@@ -160,6 +160,26 @@ describe('agent chat service', () => {
     );
   });
 
+  it('passes explicit disabled plan mode to the session manager', () => {
+    const snapshot = createInitialSnapshot();
+    const backendDriver = createFakeBackendDriver(Promise.resolve({ backendSession: { kind: 'codex', threadId: 'thread-1' }, turnId: 'turn-1' }));
+
+    sendAgentPrompt(
+      snapshot,
+      backendDriver,
+      'agent-dina',
+      'hello',
+      { planMode: false },
+      vi.fn(),
+    );
+
+    expect(backendDriver.sendPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-dina' }),
+      'hello',
+      { planMode: false },
+    );
+  });
+
   it('passes selected prompt skills to the session manager', () => {
     const snapshot = createInitialSnapshot();
     const backendDriver = createFakeBackendDriver(Promise.resolve({ backendSession: { kind: 'codex', threadId: 'thread-1' }, turnId: 'turn-1' }));

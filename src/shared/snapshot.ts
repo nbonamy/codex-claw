@@ -13,6 +13,8 @@ import type {
   RendererToolPart,
   RendererToolPartUpdate,
   ThreadGoal,
+  ThreadPlan,
+  ThreadPlanStep,
   UpdateAgentInput,
 } from './contracts';
 import { defaultThemeSettings } from './settings';
@@ -292,11 +294,22 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     return;
   }
 
-  if (event.type === 'turn.planUpdated' && event.turnId) {
-    const text = formatTurnPlanUpdate(event.payload);
-    if (text) {
-      appendAssistantDelta(snapshot, event.agentId, event.turnId, text);
+  if (event.type === 'turn.planUpdated' && event.threadId && event.turnId) {
+    const agent = findAgent(snapshot, event.agentId);
+    const plan = threadPlan(event.payload, event.threadId, event.turnId, event.occurredAt);
+    if (agent && plan) {
+      agent.plan = plan;
     }
+    return;
+  }
+
+  if (event.type === 'turn.proposedPlanDelta' && event.threadId && event.turnId) {
+    appendAgentPlanMarkdownDelta(snapshot, event.agentId, event.threadId, event.turnId, event.payload, event.occurredAt);
+    return;
+  }
+
+  if (event.type === 'turn.proposedPlanCompleted' && event.threadId && event.turnId) {
+    updateAgentPlanMarkdown(snapshot, event.agentId, event.threadId, event.turnId, event.payload, event.occurredAt);
     return;
   }
 
@@ -330,6 +343,9 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
       typeof payload.delta === 'string' ? payload.delta : '',
       typeof payload.itemId === 'string' ? payload.itemId : undefined,
     );
+    if (event.threadId) {
+      updateAgentPlanFromAssistantText(snapshot, event.agentId, event.threadId, event.turnId, event.occurredAt);
+    }
     return;
   }
 
@@ -399,25 +415,154 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   }
 }
 
-function formatTurnPlanUpdate(payload: unknown): string {
+export function formatThreadPlanMarkdown(input: Pick<ThreadPlan, 'explanation' | 'steps'>): string {
+  const explanation = input.explanation.trim();
+  const steps = input.steps.map((entry) => {
+    const marker = entry.status === 'completed' ? '- [x]' : '- [ ]';
+    return `${marker} ${entry.step}`;
+  });
+
+  return [explanation, ...steps].filter(Boolean).join('\n');
+}
+
+function threadPlan(payload: unknown, threadId: string, turnId: string, updatedAt: string): ThreadPlan | null {
   if (!isRecord(payload)) {
-    return '';
+    return null;
   }
 
   const explanation = typeof payload.explanation === 'string' && payload.explanation.trim()
     ? payload.explanation.trim()
     : '';
   const plan = Array.isArray(payload.plan) ? payload.plan : [];
-  const steps = plan.map((entry) => {
+  const steps = plan.map((entry): ThreadPlanStep | null => {
     if (!isRecord(entry) || typeof entry.step !== 'string') {
-      return '';
+      return null;
     }
 
-    const marker = entry.status === 'completed' ? '- [x]' : '- [ ]';
-    return `${marker} ${entry.step}`;
-  }).filter(Boolean);
+    const step = entry.step.trim();
+    if (!step) {
+      return null;
+    }
 
-  return [explanation, ...steps].filter(Boolean).join('\n');
+    return {
+      step,
+      status: isThreadPlanStepStatus(entry.status) ? entry.status : 'pending',
+    };
+  }).filter((step): step is ThreadPlanStep => Boolean(step));
+
+  const markdown = formatThreadPlanMarkdown({ explanation, steps });
+  if (!markdown) {
+    return null;
+  }
+
+  return {
+    threadId,
+    turnId,
+    explanation,
+    steps,
+    markdown,
+    updatedAt,
+  };
+}
+
+function isThreadPlanStepStatus(value: unknown): value is ThreadPlanStep['status'] {
+  return value === 'pending' || value === 'inProgress' || value === 'completed';
+}
+
+function appendAgentPlanMarkdownDelta(
+  snapshot: AppSnapshot,
+  agentId: string,
+  threadId: string,
+  turnId: string,
+  payload: unknown,
+  updatedAt: string,
+): void {
+  if (!isRecord(payload) || typeof payload.delta !== 'string' || !payload.delta) {
+    return;
+  }
+
+  const agent = findAgent(snapshot, agentId);
+  if (!agent) {
+    return;
+  }
+
+  const existingMarkdown = agent.plan?.turnId === turnId ? agent.plan.markdown : '';
+  setAgentPlanMarkdown(agent, threadId, turnId, `${existingMarkdown}${payload.delta}`, updatedAt, { trim: false });
+}
+
+function updateAgentPlanMarkdown(
+  snapshot: AppSnapshot,
+  agentId: string,
+  threadId: string,
+  turnId: string,
+  payload: unknown,
+  updatedAt: string,
+): void {
+  if (!isRecord(payload) || typeof payload.markdown !== 'string') {
+    return;
+  }
+
+  const agent = findAgent(snapshot, agentId);
+  if (!agent) {
+    return;
+  }
+
+  setAgentPlanMarkdown(agent, threadId, turnId, payload.markdown, updatedAt);
+}
+
+function setAgentPlanMarkdown(agent: Agent, threadId: string, turnId: string, markdown: string, updatedAt: string, options: { trim?: boolean } = {}): void {
+  const content = markdown.trim();
+  if (!content) {
+    return;
+  }
+  const nextMarkdown = options.trim === false ? markdown : content;
+
+  if (agent.plan?.turnId === turnId && agent.plan.markdown === nextMarkdown) {
+    return;
+  }
+
+  agent.plan = {
+    threadId,
+    turnId,
+    explanation: '',
+    steps: [],
+    markdown: nextMarkdown,
+    updatedAt,
+  };
+}
+
+function updateAgentPlanFromAssistantText(
+  snapshot: AppSnapshot,
+  agentId: string,
+  threadId: string,
+  turnId: string,
+  updatedAt: string,
+): void {
+  const agent = findAgent(snapshot, agentId);
+  if (!agent) {
+    return;
+  }
+
+  const markdown = extractProposedPlanMarkdown(assistantTurnText(snapshot, agentId, turnId));
+  if (!markdown) {
+    return;
+  }
+
+  setAgentPlanMarkdown(agent, threadId, turnId, markdown, updatedAt);
+}
+
+function extractProposedPlanMarkdown(content: string): string | null {
+  const matches = [...content.matchAll(/<proposed_plan>([\s\S]*?)<\/proposed_plan>/gi)];
+  const markdown = matches.at(-1)?.[1]?.trim() ?? '';
+  return markdown || null;
+}
+
+function assistantTurnText(snapshot: AppSnapshot, agentId: string, turnId: string): string {
+  return findAssistantMessages(snapshot, agentId, turnId)
+    .flatMap((message) => message.parts)
+    .filter((part): part is Extract<RendererMessagePart, { type: 'text' }> => part.type === 'text')
+    .map((part) => part.text)
+    .join('');
 }
 
 function updateAssistantToolPart(snapshot: AppSnapshot, agentId: string, turnId: string, payload: unknown): void {
@@ -1224,6 +1369,7 @@ function attachAgentToTeam(snapshot: AppSnapshot, agent: Agent): void {
 function clearAgentRuntimeState(agent: Agent): void {
   delete agent.backendSession;
   delete agent.contextUsage;
+  delete agent.plan;
   delete agent.goal;
   delete agent.isRegistered;
   delete agent.mcpSessionId;

@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Team, ThreadGoal } from '../shared/contracts';
+import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Team, ThreadGoal, ThreadPlan, ThreadPlanStep } from '../shared/contracts';
 import { normalizeThemeSettings } from '../shared/settings';
 import { createEmptySnapshot } from '../shared/snapshot';
 import { defaultTeamColor } from '../shared/team-colors';
@@ -21,6 +21,7 @@ type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'upda
   backendSession?: BackendSession;
   backendDefaults?: BackendDefaults;
   contextUsage?: AgentContextUsage;
+  plan?: ThreadPlan;
   goal?: ThreadGoal;
   statusText?: string;
   teamId?: string;
@@ -71,6 +72,7 @@ function persistedAgentFromSnapshot(agent: Agent): PersistedAgent {
     ...(agent.backendSession ? { backendSession: cloneBackendSession(agent.backendSession) } : {}),
     ...(agent.backendDefaults ? { backendDefaults: cloneBackendDefaults(agent.backendDefaults) } : {}),
     ...(agent.contextUsage ? { contextUsage: { ...agent.contextUsage } } : {}),
+    ...(agent.plan ? { plan: cloneThreadPlan(agent.plan) } : {}),
     ...(agent.goal ? { goal: { ...agent.goal } } : {}),
     statusText: agent.statusText,
     createdAt: agent.createdAt,
@@ -126,6 +128,7 @@ function sanitizeAgent(value: unknown): Agent | null {
   const backend = sanitizeBackend(value.backend) ?? 'codex';
   const backendSession = sanitizeBackendSession(value.backendSession, backend);
   const backendDefaults = sanitizeBackendDefaults(value.backendDefaults, backend);
+  const plan = sanitizeThreadPlan(value.plan);
   const goal = sanitizeThreadGoal(value.goal);
   return {
     id: value.id,
@@ -137,12 +140,56 @@ function sanitizeAgent(value: unknown): Agent | null {
     ...(backendSession ? { backendSession } : {}),
     ...(backendDefaults ? { backendDefaults } : {}),
     ...(contextUsage ? { contextUsage } : {}),
+    ...(plan ? { plan } : {}),
     ...(goal ? { goal } : {}),
     ...(typeof value.statusText === 'string' ? { statusText: value.statusText } : {}),
     status: { type: 'idle' },
     createdAt,
     updatedAt,
   };
+}
+
+function sanitizeThreadPlan(value: unknown): ThreadPlan | undefined {
+  if (
+    !isRecord(value) ||
+    typeof value.threadId !== 'string' ||
+    typeof value.turnId !== 'string' ||
+    typeof value.explanation !== 'string' ||
+    typeof value.markdown !== 'string' ||
+    typeof value.updatedAt !== 'string' ||
+    !Array.isArray(value.steps)
+  ) {
+    return undefined;
+  }
+
+  const steps = value.steps.map(sanitizeThreadPlanStep).filter((step): step is ThreadPlanStep => Boolean(step));
+  if (!value.markdown.trim() && !value.explanation.trim() && steps.length === 0) {
+    return undefined;
+  }
+
+  return {
+    threadId: value.threadId,
+    turnId: value.turnId,
+    explanation: value.explanation,
+    steps,
+    markdown: value.markdown,
+    updatedAt: value.updatedAt,
+  };
+}
+
+function sanitizeThreadPlanStep(value: unknown): ThreadPlanStep | null {
+  if (!isRecord(value) || typeof value.step !== 'string' || !isThreadPlanStepStatus(value.status)) {
+    return null;
+  }
+
+  return {
+    step: value.step,
+    status: value.status,
+  };
+}
+
+function isThreadPlanStepStatus(value: unknown): value is ThreadPlanStep['status'] {
+  return value === 'pending' || value === 'inProgress' || value === 'completed';
 }
 
 function sanitizeThreadGoal(value: unknown): ThreadGoal | undefined {
@@ -312,6 +359,13 @@ function cloneBackendDefaults(defaults: BackendDefaults): BackendDefaults {
   return defaults.kind === 'claude' && defaults.thinking
     ? { ...defaults, thinking: { ...defaults.thinking } }
     : { ...defaults };
+}
+
+function cloneThreadPlan(plan: ThreadPlan): ThreadPlan {
+  return {
+    ...plan,
+    steps: plan.steps.map((step) => ({ ...step })),
+  };
 }
 
 function sanitizeBackend(value: unknown): AgentBackend | null {

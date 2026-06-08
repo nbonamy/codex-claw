@@ -965,6 +965,7 @@ describe('useAppState', () => {
 
     expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'use the selected model', {
       model: 'gpt-5.1-codex-fast',
+      planMode: false,
       backendOptions: {
         kind: 'codex',
         reasoningEffort: 'low',
@@ -1225,6 +1226,7 @@ describe('useAppState', () => {
     await state.sendPrompt('$frontend-design make the dialog beautiful');
 
     expect(sendPrompt).toHaveBeenCalledWith('agent-dina', '$frontend-design make the dialog beautiful', {
+      planMode: false,
       backendOptions: {
         kind: 'codex',
         skills: [
