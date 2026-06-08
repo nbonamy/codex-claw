@@ -31,7 +31,7 @@
           class="agent-sidebar__avatar"
           :avatar="agent.avatar"
           :name="agent.name"
-          size="xl"
+          size="lg"
         />
         <span class="agent-sidebar__meta">
           <strong>{{ agent.name }}</strong>
