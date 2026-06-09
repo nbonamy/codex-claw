@@ -8,6 +8,7 @@
       @select="selectTab"
     >
       <el-menu-item index="general">General</el-menu-item>
+      <el-menu-item index="integrations">Integrations</el-menu-item>
       <el-menu-item index="appearance">Appearance</el-menu-item>
     </el-menu>
   </aside>
@@ -25,7 +26,7 @@ const emit = defineEmits<{
 }>();
 
 function selectTab(tab: string): void {
-  if (tab === 'general' || tab === 'appearance') {
+  if (tab === 'general' || tab === 'appearance' || tab === 'integrations') {
     emit('select', tab);
   }
 }

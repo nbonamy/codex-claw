@@ -1,9 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AppleSpeechTranscriptionOptions, AppCommand, ClientRequestResponse, CodexApprovalPreset, CodexClawApi, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
+import type { AppleSpeechTranscriptionOptions, AppCommand, ClientRequestResponse, CodexApprovalPreset, CodexClawApi, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput, WorkProviderKind } from '../shared/contracts';
 import { ipcChannels } from '../shared/ipc';
 
 const api: CodexClawApi = {
   getSnapshot: () => ipcRenderer.invoke(ipcChannels.getSnapshot),
+  connectWorkProvider: (provider: WorkProviderKind) => ipcRenderer.invoke(ipcChannels.connectWorkProvider, provider),
+  completeWorkProviderConnection: (provider: WorkProviderKind) => ipcRenderer.invoke(ipcChannels.completeWorkProviderConnection, provider),
+  disconnectWorkProvider: (provider: WorkProviderKind) => ipcRenderer.invoke(ipcChannels.disconnectWorkProvider, provider),
+  listWorkRepositories: (provider: WorkProviderKind) => ipcRenderer.invoke(ipcChannels.listWorkRepositories, provider),
+  selectWorkRepository: (provider: WorkProviderKind, repositoryId: string | null) => ipcRenderer.invoke(ipcChannels.selectWorkRepository, provider, repositoryId),
+  listWorkItems: (provider: WorkProviderKind, repositoryId: string) => ipcRenderer.invoke(ipcChannels.listWorkItems, provider, repositoryId),
   listBackendModels: (agentId: string) => ipcRenderer.invoke(ipcChannels.listBackendModels, agentId),
   listBackendSkills: (agentId: string) => ipcRenderer.invoke(ipcChannels.listBackendSkills, agentId),
   listAgentFiles: (agentId: string) => ipcRenderer.invoke(ipcChannels.listAgentFiles, agentId),

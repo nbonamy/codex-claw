@@ -531,6 +531,30 @@ Move to SQLite only when we need local queryable app state beyond what
 app-server already persists. Conversation history should not be duplicated in
 Codex Claw unless we need an app-specific cache for performance.
 
+## Work Backlog Integrations
+
+Work backlog providers are app-owned integrations, not agent backend features.
+The renderer consumes provider-neutral `WorkRepository` and `WorkItem`
+contracts and emits assignment intents. GitHub-specific OAuth, REST payloads,
+and token handling stay in Electron main behind the work-integration manager.
+
+Provider tokens must not be stored in the persisted app snapshot. The snapshot
+can persist safe metadata such as connection status, account label, and selected
+repository id. Secret material belongs in the main-process token store, using
+Electron encrypted storage when available.
+
+GitHub uses OAuth device flow for the desktop app. It requires a public client
+ID but no client secret or localhost callback route. The main process reads
+`CODEX_CLAW_GITHUB_CLIENT_ID` from the environment as the default client ID,
+and Settings can persist a per-provider client ID override. Actual GitHub
+access tokens remain in the encrypted token store.
+
+Dragging a work item onto an agent currently assigns the work by sending a
+deterministic prompt to that agent through the existing prompt path. Future
+provider-specific actions, such as claiming tickets, commenting, or changing
+status, should be added behind the work-provider seam without changing cockpit
+tiles into provider-aware UI.
+
 ## Testing Strategy
 
 - Unit-test `CodexRpcClient` with JSON-RPC fixtures and malformed responses.
@@ -560,6 +584,9 @@ Implemented product surfaces:
 - Renderer displays ordered chat/tool parts, Markdown, links, diff stats,
   queued prompts, ask-user prompts, approvals, context usage, rate limits,
   file mentions, skills, plan/goal controls, and voice transcription controls.
+- Settings can connect work backlog integrations, starting with GitHub OAuth.
+- Cockpit can show connected repository issues and assign them to agents by
+  drag and drop.
 - Claw's local MCP server supports agent registration, status, listing,
   direct messages, broadcast, and inbox checks.
 

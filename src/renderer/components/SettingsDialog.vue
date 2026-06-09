@@ -21,6 +21,18 @@
       <SettingsGeneralPanel
         v-if="activeTab === 'general'"
       />
+      <SettingsIntegrationsPanel
+        v-else-if="activeTab === 'integrations'"
+        :authorization="workProviderAuthorization"
+        :connections="workBacklogConnections"
+        :error="workBacklogError"
+        :provider-settings="workProviderSettings"
+        :status="workBacklogStatus"
+        :update-settings="updateSettings"
+        @complete="completeWorkProviderConnection"
+        @connect="connectWorkProvider"
+        @disconnect="disconnectWorkProvider"
+      />
       <SettingsAppearancePanel
         v-else
         :settings="settings"
@@ -32,17 +44,35 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { AppThemeSettings, UpdateSettingsInput } from '../../shared/contracts';
+import type { AppThemeSettings, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '../../shared/contracts';
 import SettingsAppearancePanel from './SettingsAppearancePanel.vue';
 import SettingsDialogSidebar from './SettingsDialogSidebar.vue';
 import SettingsGeneralPanel from './SettingsGeneralPanel.vue';
+import SettingsIntegrationsPanel from './SettingsIntegrationsPanel.vue';
 import type { SettingsTab } from './settings-dialog-tabs';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   settings: AppThemeSettings;
+  workBacklogConnections?: WorkIntegrationConnection[];
+  workBacklogError?: string | null;
+  workBacklogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
+  workProviderSettings?: WorkBacklogState['providerSettings'];
+  workProviderAuthorization?: WorkProviderAuthorization | null;
+  completeWorkProviderConnection?: (provider: WorkProviderKind) => Promise<void>;
+  connectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
+  disconnectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
   visible: boolean;
-}>();
+}>(), {
+  workBacklogConnections: () => [],
+  workBacklogError: null,
+  workBacklogStatus: 'notLoaded',
+  workProviderSettings: () => ({}),
+  workProviderAuthorization: null,
+  completeWorkProviderConnection: async () => undefined,
+  connectWorkProvider: async () => undefined,
+  disconnectWorkProvider: async () => undefined,
+});
 
 const emit = defineEmits<{
   'update:visible': [visible: boolean];

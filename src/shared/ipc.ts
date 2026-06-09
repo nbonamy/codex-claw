@@ -1,5 +1,11 @@
 export const ipcChannels = {
   getSnapshot: 'app:get-snapshot',
+  connectWorkProvider: 'work-provider:connect',
+  completeWorkProviderConnection: 'work-provider:connection-complete',
+  disconnectWorkProvider: 'work-provider:disconnect',
+  listWorkRepositories: 'work-provider:repositories:list',
+  selectWorkRepository: 'work-provider:repository:select',
+  listWorkItems: 'work-provider:items:list',
   listBackendModels: 'backend:models:list',
   listBackendSkills: 'backend:skills:list',
   listAgentFiles: 'agent:files:list',

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { listAgentFolderFiles } from './agent-files';
@@ -15,6 +15,9 @@ import { CHECK_INBOX_PROMPT } from './mcp/agent-prompts';
 import { buildCodexClawMcpConfigOverrides } from './mcp/codex-config';
 import { ClawMcpHttpServer } from './mcp/http-server';
 import { transcribeWithAppleSpeechAnalyzer } from './transcription/apple-speech';
+import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
+import { WorkIntegrationManager } from './work-integrations/manager';
+import { SafeStorageWorkIntegrationTokenStore } from './work-integrations/token-store';
 import {
   closeAgentInSnapshot,
   deployBenchTemplateInSnapshot,
@@ -36,7 +39,7 @@ import {
   updateAgentFolder,
 } from './snapshot-service';
 import { AppStatePersistence } from './state-persistence';
-import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
+import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput, WorkProviderKind } from '../shared/contracts';
 import { codexBackendDefaultsWithApprovalPreset, isCodexApprovalPreset } from '../shared/codex-approval-presets';
 import { ipcChannels } from '../shared/ipc';
 import { teamColors } from '../shared/team-colors';
@@ -73,16 +76,53 @@ export class AppController {
   private readonly clientRequestBackends = new Map<string, AgentBackend>();
   private seq = 0;
 
-  constructor(persistence = new AppStatePersistence(path.join(app.getPath('userData'), 'state.json'))) {
+  private readonly workIntegrations: WorkIntegrationManager;
+
+  constructor(
+    persistence = new AppStatePersistence(path.join(defaultUserDataPath(), 'state.json')),
+    workIntegrations?: WorkIntegrationManager,
+  ) {
     this.persistence = persistence;
+    this.workIntegrations = workIntegrations ?? new WorkIntegrationManager({
+      drivers: [new GitHubWorkProviderDriver(() => githubOAuthClientId(this.snapshot))],
+      getSnapshot: () => this.snapshot,
+      openExternal: (url) => shell.openExternal(url),
+      saveSnapshot: () => this.persistSnapshot(),
+      tokenStore: new SafeStorageWorkIntegrationTokenStore(path.join(defaultUserDataPath(), 'work-integration-tokens.json')),
+    });
   }
 
   async initialize(): Promise<void> {
     this.snapshot = await this.persistence.load();
+    await this.workIntegrations.hydrateConnections();
   }
 
   registerIpcHandlers(): void {
     ipcMain.handle(ipcChannels.getSnapshot, () => this.snapshot);
+
+    ipcMain.handle(ipcChannels.connectWorkProvider, async (_event, provider: WorkProviderKind) => {
+      return this.workIntegrations.connect(provider);
+    });
+
+    ipcMain.handle(ipcChannels.completeWorkProviderConnection, async (_event, provider: WorkProviderKind) => {
+      return this.workIntegrations.completeConnection(provider);
+    });
+
+    ipcMain.handle(ipcChannels.disconnectWorkProvider, async (_event, provider: WorkProviderKind) => {
+      return this.workIntegrations.disconnect(provider);
+    });
+
+    ipcMain.handle(ipcChannels.listWorkRepositories, async (_event, provider: WorkProviderKind) => {
+      return this.workIntegrations.listRepositories(provider);
+    });
+
+    ipcMain.handle(ipcChannels.selectWorkRepository, async (_event, provider: WorkProviderKind, repositoryId: string | null) => {
+      return this.workIntegrations.selectRepository(provider, repositoryId);
+    });
+
+    ipcMain.handle(ipcChannels.listWorkItems, async (_event, provider: WorkProviderKind, repositoryId: string) => {
+      return this.workIntegrations.listItems(provider, repositoryId);
+    });
 
     ipcMain.handle(ipcChannels.listBackendModels, async (_event, agentId: string) => {
       return this.listBackendModels(agentId);
@@ -262,7 +302,12 @@ export class AppController {
     });
 
     ipcMain.handle(ipcChannels.updateSettings, async (_event, input: UpdateSettingsInput) => {
+      const previousGitHubClientId = githubOAuthClientId(this.snapshot);
       updateSettingsInSnapshot(this.snapshot, input);
+      if (previousGitHubClientId && previousGitHubClientId !== githubOAuthClientId(this.snapshot)) {
+        await this.workIntegrations.disconnect('github');
+      }
+      await this.workIntegrations.hydrateConnections();
       await this.persistSnapshot();
       return this.snapshot;
     });
@@ -1063,4 +1108,20 @@ function clientRequest(value: unknown): ClientRequest | null {
   }
 
   return value as ClientRequest;
+}
+
+function defaultUserDataPath(): string {
+  if (app?.getPath) {
+    try {
+      return app.getPath('userData');
+    } catch {
+      return path.join(process.cwd(), '.codex-claw-test');
+    }
+  }
+
+  return path.join(process.cwd(), '.codex-claw-test');
+}
+
+function githubOAuthClientId(snapshot: AppSnapshot): string {
+  return snapshot.workBacklog.providerSettings.github?.oauthClientId ?? process.env.CODEX_CLAW_GITHUB_CLIENT_ID ?? '';
 }

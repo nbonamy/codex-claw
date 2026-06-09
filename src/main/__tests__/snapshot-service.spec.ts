@@ -53,6 +53,14 @@ describe('snapshot service', () => {
         status: 'notConfigured',
         detail: 'Claude backend has not been started yet.',
       }],
+      workBacklog: {
+        connections: [{
+          provider: 'github',
+          status: 'disconnected',
+        }],
+        selectedRepositoryIds: {},
+        providerSettings: {},
+      },
       theme: defaultThemeSettings,
     });
   });

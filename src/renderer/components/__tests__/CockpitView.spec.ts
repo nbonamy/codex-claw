@@ -1,7 +1,9 @@
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
-import { describe, expect, it } from 'vitest';
+import { nextTick } from 'vue';
+import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '../../../shared/snapshot';
+import type { WorkItem } from '../../../shared/contracts';
 import CockpitView from '../CockpitView.vue';
 
 describe('CockpitView', () => {
@@ -123,6 +125,24 @@ describe('CockpitView', () => {
     expect(wrapper.get<HTMLButtonElement>('[aria-label="Send prompt to Dina"]').element.disabled).toBe(true);
   });
 
+  it('ignores blank cockpit prompt submissions and supports missing Bench prop', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mount(CockpitView, {
+      props: {
+        agents: snapshot.agents,
+        teams: snapshot.teams,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    await wrapper.get('.cockpit-view__prompt').trigger('submit');
+
+    expect(wrapper.text()).toContain('Cockpit');
+    expect(wrapper.emitted('prompt-agent')).toBeUndefined();
+  });
+
   it('keeps the Bench dropdown in add controls and deploys templates into that team', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.bench.push({
@@ -144,17 +164,270 @@ describe('CockpitView', () => {
       teamId: 'team-codex-claw',
     }]]);
   });
+
+  it('renders connected backlog issues and forwards repository actions', async () => {
+    const snapshot = createInitialSnapshot();
+    const item = workItem();
+    const wrapper = mountCockpit(snapshot, {
+      workBacklog: {
+        connection: {
+          provider: 'github',
+          status: 'connected',
+          accountLabel: 'nbonamy',
+        },
+        repositories: [{
+          provider: 'github',
+          id: 'nbonamy/codex-claw',
+          owner: 'nbonamy',
+          name: 'codex-claw',
+          fullName: 'nbonamy/codex-claw',
+          url: 'https://github.com/nbonamy/codex-claw',
+          isPrivate: true,
+        }],
+        selectedRepositoryId: 'nbonamy/codex-claw',
+        items: [item],
+        status: 'loaded',
+        error: null,
+      },
+    });
+
+    expect(wrapper.text()).toContain('Backlog');
+    expect(wrapper.text()).toContain('Fix cockpit drag target');
+
+    await wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'nbonamy/codex-claw');
+    await wrapper.get('[aria-label="Refresh backlog"]').trigger('click');
+
+    expect(wrapper.emitted('select-work-repository')).toStrictEqual([['nbonamy/codex-claw']]);
+    expect(wrapper.emitted('refresh-work-items')).toStrictEqual([['nbonamy/codex-claw']]);
+  });
+
+  it('forwards backlog menu assignment intents', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.bench.push({
+      id: 'bench-dina',
+      name: 'Dina',
+      avatar: 'DI',
+      folder: '/Users/nbonamy/src/id8',
+      backend: 'codex',
+      createdAt: '2026-06-05T00:00:00.000Z',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    });
+    const item = workItem();
+    const wrapper = mountCockpit(snapshot, {
+      workBacklog: {
+        connection: {
+          provider: 'github',
+          status: 'connected',
+          accountLabel: 'nbonamy',
+        },
+        repositories: [],
+        selectedRepositoryId: 'nbonamy/codex-claw',
+        items: [item],
+        status: 'loaded',
+        error: null,
+      },
+    });
+
+    wrapper.findComponent({ name: 'WorkBacklogPanel' }).vm.$emit('assign-to-new-agent', item);
+    wrapper.findComponent({ name: 'WorkBacklogPanel' }).vm.$emit('assign-to-bench-agent', item);
+
+    expect(wrapper.emitted('assign-work-item-to-new-agent')).toStrictEqual([[item]]);
+    expect(wrapper.emitted('assign-work-item-to-bench-agent')).toStrictEqual([[item]]);
+  });
+
+  it('assigns a dragged work item to an idle agent without selecting the card', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].status = { type: 'idle' };
+    const item = workItem();
+    const wrapper = mountCockpit(snapshot, {
+      workBacklog: {
+        connection: {
+          provider: 'github',
+          status: 'connected',
+          accountLabel: 'nbonamy',
+        },
+        repositories: [],
+        selectedRepositoryId: 'nbonamy/codex-claw',
+        items: [item],
+        status: 'loaded',
+        error: null,
+      },
+    });
+
+    wrapper.get('.work-backlog-panel__item').element.dispatchEvent(dragEvent('dragstart'));
+    await nextTick();
+    wrapper.get('.cockpit-view__agent-card').element.dispatchEvent(dragEvent('drop'));
+    await nextTick();
+
+    expect(wrapper.emitted('assign-work-item')).toStrictEqual([[{
+      agentId: 'agent-dina',
+      item,
+    }]]);
+    expect(wrapper.emitted('select-agent')).toBeUndefined();
+  });
+
+  it('does not assign dropped work items to busy agents', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].status = { type: 'working' };
+    const wrapper = mountCockpit(snapshot, {
+      workBacklog: {
+        connection: {
+          provider: 'github',
+          status: 'connected',
+        },
+        repositories: [],
+        selectedRepositoryId: 'nbonamy/codex-claw',
+        items: [workItem()],
+        status: 'loaded',
+        error: null,
+      },
+    });
+
+    wrapper.get('.work-backlog-panel__item').element.dispatchEvent(dragEvent('dragstart'));
+    await nextTick();
+    wrapper.get('.cockpit-view__agent-card').element.dispatchEvent(dragEvent('drop'));
+    await nextTick();
+
+    expect(wrapper.emitted('assign-work-item')).toBeUndefined();
+  });
+
+  it('shows and clears the agent drop target while dragging work items', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].status = { type: 'idle' };
+    const wrapper = mountCockpit(snapshot, {
+      workBacklog: {
+        connection: {
+          provider: 'github',
+          status: 'connected',
+        },
+        repositories: [],
+        selectedRepositoryId: 'nbonamy/codex-claw',
+        items: [workItem()],
+        status: 'loaded',
+        error: null,
+      },
+    });
+
+    const card = wrapper.get('.cockpit-view__agent-card');
+    const ignoredDragOver = dragEvent('dragover');
+    card.element.dispatchEvent(ignoredDragOver);
+    await nextTick();
+    expect(ignoredDragOver.defaultPrevented).toBe(false);
+
+    wrapper.get('.work-backlog-panel__item').element.dispatchEvent(dragEvent('dragstart'));
+    await nextTick();
+
+    const dragEnter = dragEvent('dragenter');
+    card.element.dispatchEvent(dragEnter);
+    await nextTick();
+    expect(dragEnter.defaultPrevented).toBe(true);
+    expect(card.classes()).toContain('cockpit-view__agent-card--drop-target');
+
+    const dragOver = dragEvent('dragover');
+    card.element.dispatchEvent(dragOver);
+    expect(dragOver.defaultPrevented).toBe(true);
+    expect(dragOver.dataTransfer?.dropEffect).toBe('copy');
+
+    card.element.dispatchEvent(dragEvent('dragleave'));
+    await nextTick();
+    expect(card.classes()).not.toContain('cockpit-view__agent-card--drop-target');
+
+    card.element.dispatchEvent(dragEvent('dragenter'));
+    await nextTick();
+    wrapper.findAll('.cockpit-view__agent-card')[1].element.dispatchEvent(dragEvent('dragleave'));
+    await nextTick();
+    expect(card.classes()).toContain('cockpit-view__agent-card--drop-target');
+  });
+
+  it('observes cockpit grids and tolerates drag events without dataTransfer', async () => {
+    const callbacks: ResizeObserverCallback[] = [];
+    class FakeResizeObserver {
+      observe = vi.fn();
+      unobserve = vi.fn();
+      disconnect = vi.fn();
+
+      constructor(callback: ResizeObserverCallback) {
+        callbacks.push(callback);
+      }
+    }
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].status = { type: 'idle' };
+    snapshot.agents[1].status = { type: 'working' };
+    const wrapper = mountCockpit(snapshot, {
+      workBacklog: {
+        connection: {
+          provider: 'github',
+          status: 'connected',
+        },
+        repositories: [],
+        selectedRepositoryId: 'nbonamy/codex-claw',
+        items: [workItem()],
+        status: 'loaded',
+        error: null,
+      },
+    });
+
+    expect(callbacks.length).toBeGreaterThan(0);
+    callbacks.at(-1)?.([
+      { target: wrapper.get('.cockpit-view__grid').element } as unknown as ResizeObserverEntry,
+      { target: document.createElement('div') } as unknown as ResizeObserverEntry,
+    ], {} as ResizeObserver);
+
+    const card = wrapper.get('.cockpit-view__agent-card');
+    wrapper.get('.work-backlog-panel__item').element.dispatchEvent(dragEvent('dragstart'));
+    await nextTick();
+
+    const dragOver = new Event('dragover', { bubbles: true, cancelable: true }) as DragEvent;
+    card.element.dispatchEvent(dragOver);
+    expect(dragOver.defaultPrevented).toBe(true);
+
+    const ignoredDragEnter = dragEvent('dragenter');
+    await wrapper.findAll('.cockpit-view__agent-card')[1].element.dispatchEvent(ignoredDragEnter);
+    expect(wrapper.findAll('.cockpit-view__agent-card')[1].classes()).not.toContain('cockpit-view__agent-card--drop-target');
+  });
 });
 
-function mountCockpit(snapshot: ReturnType<typeof createInitialSnapshot>) {
+function mountCockpit(snapshot: ReturnType<typeof createInitialSnapshot>, props: Record<string, unknown> = {}) {
   return mount(CockpitView, {
     props: {
       agents: snapshot.agents,
       bench: snapshot.bench,
       teams: snapshot.teams,
+      ...props,
     },
     global: {
       plugins: [ElementPlus],
     },
   });
+}
+
+function workItem(): WorkItem {
+  return {
+    provider: 'github',
+    id: 'nbonamy/codex-claw#12',
+    repositoryId: 'nbonamy/codex-claw',
+    repositoryFullName: 'nbonamy/codex-claw',
+    number: 12,
+    title: 'Fix cockpit drag target',
+    url: 'https://github.com/nbonamy/codex-claw/issues/12',
+    state: 'open',
+    authorName: 'nbonamy',
+    body: 'Make issue assignment feel obvious.',
+    labels: [{ name: 'bug', color: 'ff0000' }],
+    createdAt: '2026-06-09T12:00:00.000Z',
+    updatedAt: '2026-06-09T12:30:00.000Z',
+  };
+}
+
+function dragEvent(type: string): DragEvent {
+  const event = new Event(type, { bubbles: true, cancelable: true }) as DragEvent;
+  Object.defineProperty(event, 'dataTransfer', {
+    value: {
+      dropEffect: 'copy',
+      setData: vi.fn(),
+      setDragImage: vi.fn(),
+    },
+  });
+  return event;
 }

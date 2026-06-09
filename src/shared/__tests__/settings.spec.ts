@@ -40,4 +40,42 @@ describe('settings contracts', () => {
     });
     expect(snapshot.teams).toHaveLength(1);
   });
+
+  it('updates GitHub provider settings without replacing connection state', () => {
+    const snapshot = createEmptySnapshot();
+    snapshot.workBacklog.connections[0] = {
+      provider: 'github',
+      status: 'connected',
+      accountLabel: 'nbonamy',
+    };
+
+    updateSettingsInSnapshot(snapshot, {
+      workProviders: {
+        github: {
+          oauthClientId: ' client-id ',
+        },
+      },
+    });
+
+    expect(snapshot.workBacklog.providerSettings).toStrictEqual({
+      github: {
+        oauthClientId: 'client-id',
+      },
+    });
+    expect(snapshot.workBacklog.connections[0]).toStrictEqual({
+      provider: 'github',
+      status: 'connected',
+      accountLabel: 'nbonamy',
+    });
+
+    updateSettingsInSnapshot(snapshot, {
+      workProviders: {
+        github: {
+          oauthClientId: '',
+        },
+      },
+    });
+
+    expect(snapshot.workBacklog.providerSettings).toStrictEqual({});
+  });
 });

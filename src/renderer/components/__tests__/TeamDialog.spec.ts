@@ -77,7 +77,7 @@ describe('TeamDialog', () => {
 });
 
 function mountDialog(overrides: Partial<{
-  createTeam: (input: CreateTeamInput) => Promise<void>;
+  createTeam: (input: CreateTeamInput) => Promise<Team | null | void>;
   mode: 'create' | 'edit';
   team: Team | null;
   updateTeam: (input: UpdateTeamInput) => Promise<void>;

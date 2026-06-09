@@ -46,6 +46,7 @@ export function createEmptySnapshot(): AppSnapshot {
       status: 'notConfigured',
       detail: 'Claude backend has not been started yet.',
     }],
+    workBacklog: createDefaultWorkBacklogState(),
     theme: { ...defaultThemeSettings },
   };
 }
@@ -74,7 +75,19 @@ export function createInitialSnapshot(): AppSnapshot {
       status: 'notConfigured',
       detail: 'Claude backend has not been started yet.',
     }],
+    workBacklog: createDefaultWorkBacklogState(),
     theme: { ...defaultThemeSettings },
+  };
+}
+
+function createDefaultWorkBacklogState(): AppSnapshot['workBacklog'] {
+  return {
+    connections: [{
+      provider: 'github',
+      status: 'disconnected',
+    }],
+    selectedRepositoryIds: {},
+    providerSettings: {},
   };
 }
 

@@ -1,5 +1,6 @@
 export {
   IconBolt as BoltIcon,
+  IconBrandGithub as GitHubIcon,
   IconBookmark as SaveToBenchIcon,
   IconBrandSpeedtest as BrandSpeedTest,
   IconCheck as CheckIcon,
@@ -13,7 +14,9 @@ export {
   IconCompass as CompassIcon,
   IconCopy as CopyIcon,
   IconDownload as Download,
+  IconDotsVertical as DotsVerticalIcon,
   IconEye as EyeIcon,
+  IconExternalLink as ExternalLinkIcon,
   IconFileText as FileTextIcon,
   IconFolder as FolderIcon,
   IconHandStop as HandStopIcon,

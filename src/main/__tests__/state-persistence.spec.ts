@@ -283,6 +283,92 @@ describe('AppStatePersistence', () => {
     expect(restored.accountRateLimits).toStrictEqual(snapshot.accountRateLimits);
   });
 
+  it('persists work integration metadata without token material', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.workBacklog = {
+      connections: [{
+        provider: 'github',
+        status: 'connected',
+        accountLabel: 'nbonamy',
+        connectedAt: '2026-06-09T12:00:00.000Z',
+      }],
+      selectedRepositoryIds: {
+        github: 'nbonamy/codex-claw',
+      },
+      providerSettings: {
+        github: {
+          oauthClientId: 'client-id',
+        },
+      },
+    };
+
+    const persisted = persistedStateFromSnapshot(snapshot);
+
+    expect(persisted.workBacklog).toStrictEqual({
+      connections: [{
+        provider: 'github',
+        status: 'connected',
+        accountLabel: 'nbonamy',
+        connectedAt: '2026-06-09T12:00:00.000Z',
+      }],
+      selectedRepositoryIds: {
+        github: 'nbonamy/codex-claw',
+      },
+      providerSettings: {
+        github: {
+          oauthClientId: 'client-id',
+        },
+      },
+    });
+    expect(JSON.stringify(persisted)).not.toContain('accessToken');
+    expect(JSON.stringify(persisted)).not.toContain('encryptedAccessToken');
+
+    const restored = snapshotFromPersistedState(persisted);
+    expect(restored.workBacklog).toStrictEqual(snapshot.workBacklog);
+  });
+
+  it('sanitizes invalid work integration metadata', () => {
+    const restored = snapshotFromPersistedState({
+      teams: [],
+      agents: [],
+      bench: [],
+      activeTeamId: null,
+      activeAgentId: null,
+      theme: defaultThemeSettings,
+      workBacklog: {
+        connections: [
+          { provider: 'github', status: 'connected', accountLabel: 'nbonamy' },
+          { provider: 'jira', status: 'connected', accountLabel: 'example' },
+          { provider: 'github', status: 'done' },
+        ],
+        selectedRepositoryIds: {
+          github: 'nbonamy/codex-claw',
+          jira: 'TEAM-1',
+        },
+        providerSettings: {
+          github: { oauthClientId: ' client-id ' },
+          jira: { oauthClientId: 'jira-client-id' },
+        },
+      },
+    });
+
+    expect(restored.workBacklog).toStrictEqual({
+      connections: [{
+        provider: 'github',
+        status: 'connected',
+        accountLabel: 'nbonamy',
+      }],
+      selectedRepositoryIds: {
+        github: 'nbonamy/codex-claw',
+      },
+      providerSettings: {
+        github: {
+          oauthClientId: 'client-id',
+        },
+      },
+    });
+  });
+
   it('drops invalid persisted plan state', () => {
     const restored = snapshotFromPersistedState({
       teams: [{ id: 'team-codex-claw', name: 'Codex Claw', agentIds: ['agent-dina'] }],

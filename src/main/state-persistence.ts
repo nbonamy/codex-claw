@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Team, ThreadGoal, ThreadPlan, ThreadPlanStep } from '../shared/contracts';
+import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Team, ThreadGoal, ThreadPlan, ThreadPlanStep, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '../shared/contracts';
 import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '../shared/codex-approval-presets';
 import { normalizeThemeSettings } from '../shared/settings';
 import { createEmptySnapshot } from '../shared/snapshot';
@@ -13,6 +13,7 @@ type PersistedState = {
   activeTeamId: string | null;
   activeAgentId: string | null;
   accountRateLimits?: AccountRateLimits;
+  workBacklog?: WorkBacklogState;
   theme: AppSnapshot['theme'];
 };
 
@@ -58,6 +59,7 @@ export function persistedStateFromSnapshot(snapshot: AppSnapshot): PersistedStat
     activeTeamId: snapshot.activeTeamId,
     activeAgentId: snapshot.activeAgentId,
     ...(snapshot.accountRateLimits ? { accountRateLimits: { ...snapshot.accountRateLimits } } : {}),
+    workBacklog: cloneWorkBacklogState(snapshot.workBacklog),
     theme: { ...snapshot.theme },
   };
 }
@@ -104,6 +106,7 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
     activeTeamId: typeof value.activeTeamId === 'string' ? value.activeTeamId : null,
     activeAgentId: typeof value.activeAgentId === 'string' ? value.activeAgentId : null,
     ...(accountRateLimits ? { accountRateLimits } : {}),
+    workBacklog: sanitizeWorkBacklogState(value.workBacklog, seed.workBacklog),
     theme: normalizeThemeSettings(value.theme),
     messages: [],
     backendRuntimes: seed.backendRuntimes.map((runtime) => ({ ...runtime })),
@@ -302,6 +305,103 @@ function sanitizeAccountRateLimitWindow(value: unknown): AccountRateLimits['prim
 
 function nullableString(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
+}
+
+function cloneWorkBacklogState(state: WorkBacklogState): WorkBacklogState {
+  return {
+    connections: state.connections.map((connection) => ({ ...connection })),
+    selectedRepositoryIds: { ...state.selectedRepositoryIds },
+    providerSettings: cloneWorkProviderSettings(state.providerSettings),
+  };
+}
+
+function sanitizeWorkBacklogState(value: unknown, seed: WorkBacklogState): WorkBacklogState {
+  if (!isRecord(value)) {
+    return cloneWorkBacklogState(seed);
+  }
+
+  const connections = Array.isArray(value.connections)
+    ? value.connections.map(sanitizeWorkIntegrationConnection).filter((connection): connection is WorkIntegrationConnection => Boolean(connection))
+    : [];
+  const selectedRepositoryIds = sanitizeSelectedRepositoryIds(value.selectedRepositoryIds);
+  const providers = new Set<WorkProviderKind>();
+  const sanitizedConnections: WorkIntegrationConnection[] = [];
+
+  for (const connection of [...connections, ...seed.connections]) {
+    if (providers.has(connection.provider)) {
+      continue;
+    }
+    providers.add(connection.provider);
+    sanitizedConnections.push(connection);
+  }
+
+  return {
+    connections: sanitizedConnections,
+    selectedRepositoryIds,
+    providerSettings: sanitizeWorkProviderSettings(value.providerSettings),
+  };
+}
+
+function sanitizeWorkIntegrationConnection(value: unknown): WorkIntegrationConnection | null {
+  if (!isRecord(value) || !isWorkProvider(value.provider) || !isWorkIntegrationStatus(value.status)) {
+    return null;
+  }
+
+  return {
+    provider: value.provider,
+    status: value.status,
+    ...(typeof value.accountLabel === 'string' ? { accountLabel: value.accountLabel } : {}),
+    ...(typeof value.detail === 'string' ? { detail: value.detail } : {}),
+    ...(typeof value.connectedAt === 'string' ? { connectedAt: value.connectedAt } : {}),
+  };
+}
+
+function sanitizeSelectedRepositoryIds(value: unknown): WorkBacklogState['selectedRepositoryIds'] {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  return {
+    ...(typeof value.github === 'string' ? { github: value.github } : {}),
+  };
+}
+
+function cloneWorkProviderSettings(value: WorkBacklogState['providerSettings']): WorkBacklogState['providerSettings'] {
+  return {
+    ...(value.github ? { github: { ...value.github } } : {}),
+  };
+}
+
+function sanitizeWorkProviderSettings(value: unknown): WorkBacklogState['providerSettings'] {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  const github = sanitizeWorkProviderSetting(value.github);
+  return {
+    ...(github ? { github } : {}),
+  };
+}
+
+function sanitizeWorkProviderSetting(value: unknown): WorkProviderSettings | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const oauthClientId = typeof value.oauthClientId === 'string' ? value.oauthClientId.trim() : '';
+  return oauthClientId ? { oauthClientId } : null;
+}
+
+function isWorkProvider(value: unknown): value is WorkProviderKind {
+  return value === 'github';
+}
+
+function isWorkIntegrationStatus(value: unknown): value is WorkIntegrationStatus {
+  return value === 'notConfigured' ||
+    value === 'disconnected' ||
+    value === 'connecting' ||
+    value === 'connected' ||
+    value === 'error';
 }
 
 function sanitizeTeam(value: unknown, agents: Agent[]): Team | null {

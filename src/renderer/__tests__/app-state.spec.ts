@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
-import { useAppState } from '../app-state';
+import { useAppState, workItemAssignmentPrompt } from '../app-state';
 import { createEmptySnapshot, createInitialSnapshot } from '../../shared/snapshot';
-import type { CodexClawApi, MainToRendererEvent } from '../../shared/contracts';
+import type { CodexClawApi, MainToRendererEvent, WorkItem, WorkRepository } from '../../shared/contracts';
 
 describe('useAppState', () => {
   it('uses the local empty snapshot before preload is available', () => {
@@ -178,6 +178,303 @@ describe('useAppState', () => {
     expect(updateSettings).toHaveBeenCalledWith({ theme: { id: 'github-dark', mode: 'dark' } });
     expect(state.snapshot.value.theme.id).toBe('github-dark');
     expect(quit).toHaveBeenCalledOnce();
+  });
+
+  it('connects work providers and hydrates the selected repository backlog', async () => {
+    const initialSnapshot = createInitialSnapshot();
+    const connectingSnapshot = createInitialSnapshot();
+    connectingSnapshot.workBacklog.connections = [{
+      provider: 'github',
+      status: 'connecting',
+      detail: 'Enter code ABCD-1234 in GitHub.',
+    }];
+    const connectedSnapshot = createInitialSnapshot();
+    connectedSnapshot.workBacklog.connections = [{
+      provider: 'github',
+      status: 'connected',
+      accountLabel: 'nbonamy',
+    }];
+    const selectedSnapshot = createInitialSnapshot();
+    selectedSnapshot.workBacklog.connections = connectedSnapshot.workBacklog.connections;
+    selectedSnapshot.workBacklog.selectedRepositoryIds.github = 'nbonamy/codex-claw';
+    const repository = workRepository();
+    const item = workItem();
+    const connectWorkProvider = vi.fn().mockResolvedValue({
+      snapshot: connectingSnapshot,
+      authorization: {
+        provider: 'github',
+        userCode: 'ABCD-1234',
+        verificationUri: 'https://github.com/login/device',
+        expiresAt: '2026-06-09T12:05:00.000Z',
+      },
+    });
+    const completeWorkProviderConnection = vi.fn().mockResolvedValue(connectedSnapshot);
+    const listWorkRepositories = vi.fn().mockResolvedValue([repository]);
+    const selectWorkRepository = vi.fn().mockResolvedValue(selectedSnapshot);
+    const listWorkItems = vi.fn().mockResolvedValue([item]);
+    vi.stubGlobal('window', {
+      codexClaw: {
+        connectWorkProvider,
+        completeWorkProviderConnection,
+        listWorkRepositories,
+        selectWorkRepository,
+        listWorkItems,
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    state.snapshot.value = initialSnapshot;
+
+    await state.connectWorkProvider('github');
+    expect(state.snapshot.value).toStrictEqual(connectingSnapshot);
+    expect(state.workProviderAuthorization.value?.userCode).toBe('ABCD-1234');
+
+    await state.completeWorkProviderConnection('github');
+
+    expect(completeWorkProviderConnection).toHaveBeenCalledWith('github');
+    expect(listWorkRepositories).toHaveBeenCalledWith('github');
+    expect(selectWorkRepository).toHaveBeenCalledWith('github', 'nbonamy/codex-claw');
+    expect(listWorkItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw');
+    expect(state.workProviderAuthorization.value).toBeNull();
+    expect(state.workRepositoriesByProvider.value.github).toStrictEqual([repository]);
+    expect(state.workItemsByRepository.value['github:nbonamy/codex-claw']).toStrictEqual([item]);
+  });
+
+  it('assigns work items through the existing agent prompt path', async () => {
+    const snapshot = createInitialSnapshot();
+    const updatedSnapshot = createInitialSnapshot();
+    const sendPrompt = vi.fn().mockResolvedValue(updatedSnapshot);
+    vi.stubGlobal('window', {
+      codexClaw: {
+        sendPrompt,
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    state.snapshot.value = snapshot;
+
+    await state.assignWorkItemToAgent({
+      agentId: 'agent-dina',
+      item: workItem(),
+    });
+
+    expect(sendPrompt.mock.calls[0]?.[0]).toBe('agent-dina');
+    expect(sendPrompt.mock.calls[0]?.[1]).toContain('Issue: #12 Fix cockpit drag target');
+    expect(sendPrompt.mock.calls[0]?.[1]).toContain('URL: https://github.com/nbonamy/codex-claw/issues/12');
+  });
+
+  it('formats deterministic work item assignment prompts', () => {
+    expect(workItemAssignmentPrompt(workItem())).toBe([
+      'Please take this GitHub issue and drive it to completion.',
+      '',
+      'Repository: nbonamy/codex-claw',
+      'Issue: #12 Fix cockpit drag target',
+      'URL: https://github.com/nbonamy/codex-claw/issues/12',
+      'Labels: bug',
+      'Author: nbonamy',
+      'Body:',
+      'Make issue assignment feel obvious.',
+    ].join('\n'));
+  });
+
+  it('handles missing work provider bridge methods as no-ops', async () => {
+    vi.stubGlobal('window', { codexClaw: {} satisfies Partial<CodexClawApi> });
+    const state = useAppState();
+    state.snapshot.value = createInitialSnapshot();
+
+    await state.connectWorkProvider('github');
+    await state.completeWorkProviderConnection('github');
+    await state.disconnectWorkProvider('github');
+    await state.loadWorkRepositories('github');
+    await state.selectWorkRepository('github', null);
+    await state.loadWorkItems('github', '');
+
+    expect(state.workBacklogStatus.value).toBe('notLoaded');
+  });
+
+  it('records work provider bridge errors without marking integrations connected', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.connections = [{
+      provider: 'github',
+      status: 'connected',
+      accountLabel: 'nbonamy',
+    }];
+    const connectWorkProvider = vi.fn().mockRejectedValue('connect failed');
+    const completeWorkProviderConnection = vi.fn().mockRejectedValue('finish failed');
+    const listWorkRepositories = vi.fn().mockRejectedValue('repos failed');
+    const listWorkItems = vi.fn().mockRejectedValue('items failed');
+    vi.stubGlobal('window', {
+      codexClaw: {
+        connectWorkProvider,
+        completeWorkProviderConnection,
+        listWorkRepositories,
+        listWorkItems,
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    state.snapshot.value = snapshot;
+
+    await expect(state.connectWorkProvider('github')).rejects.toBe('connect failed');
+    expect(state.workBacklogStatus.value).toBe('error');
+    expect(state.workBacklogError.value).toBe('connect failed');
+
+    await expect(state.completeWorkProviderConnection('github')).rejects.toBe('finish failed');
+    expect(state.workBacklogError.value).toBe('finish failed');
+
+    await state.loadWorkRepositories('github');
+    expect(state.workRepositoriesByProvider.value.github).toStrictEqual([]);
+    expect(state.workBacklogError.value).toBe('repos failed');
+
+    await state.loadWorkItems('github', 'nbonamy/codex-claw');
+    expect(state.workBacklogError.value).toBe('items failed');
+  });
+
+  it('records Error objects from work provider bridge failures', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.connections = [{
+      provider: 'github',
+      status: 'connected',
+      accountLabel: 'nbonamy',
+    }];
+    vi.stubGlobal('window', {
+      codexClaw: {
+        connectWorkProvider: vi.fn().mockRejectedValue(new Error('connect object failed')),
+        listWorkRepositories: vi.fn().mockRejectedValue(new Error('repo object failed')),
+        listWorkItems: vi.fn().mockRejectedValue(new Error('item object failed')),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    state.snapshot.value = snapshot;
+
+    await expect(state.connectWorkProvider('github')).rejects.toThrow('connect object failed');
+    expect(state.workBacklogError.value).toBe('connect object failed');
+
+    await state.loadWorkRepositories('github');
+    expect(state.workBacklogError.value).toBe('repo object failed');
+
+    await state.loadWorkItems('github', 'nbonamy/codex-claw');
+    expect(state.workBacklogError.value).toBe('item object failed');
+  });
+
+  it('keeps pending work provider completion in a loaded state', async () => {
+    const connectingSnapshot = createInitialSnapshot();
+    connectingSnapshot.workBacklog.connections = [{
+      provider: 'github',
+      status: 'connecting',
+      detail: 'GitHub authorization is still pending.',
+    }];
+    const completeWorkProviderConnection = vi.fn().mockResolvedValue(connectingSnapshot);
+    const listWorkRepositories = vi.fn();
+    vi.stubGlobal('window', {
+      codexClaw: {
+        completeWorkProviderConnection,
+        listWorkRepositories,
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+
+    await state.completeWorkProviderConnection('github');
+
+    expect(state.snapshot.value.workBacklog.connections[0]?.status).toBe('connecting');
+    expect(state.workBacklogStatus.value).toBe('loaded');
+    expect(listWorkRepositories).not.toHaveBeenCalled();
+  });
+
+  it('disconnects work providers and handles null repository selection', async () => {
+    const connectedSnapshot = createInitialSnapshot();
+    connectedSnapshot.workBacklog.connections = [{
+      provider: 'github',
+      status: 'connected',
+      accountLabel: 'nbonamy',
+    }];
+    connectedSnapshot.workBacklog.selectedRepositoryIds.github = 'nbonamy/codex-claw';
+    const disconnectedSnapshot = createInitialSnapshot();
+    disconnectedSnapshot.workBacklog.connections = [{
+      provider: 'github',
+      status: 'disconnected',
+    }];
+    const disconnectWorkProvider = vi.fn().mockResolvedValue(disconnectedSnapshot);
+    const selectWorkRepository = vi.fn().mockResolvedValue(disconnectedSnapshot);
+    const listWorkItems = vi.fn();
+    vi.stubGlobal('window', {
+      codexClaw: {
+        disconnectWorkProvider,
+        selectWorkRepository,
+        listWorkItems,
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    state.snapshot.value = connectedSnapshot;
+    state.workProviderAuthorization.value = {
+      provider: 'github',
+      userCode: 'ABCD-1234',
+      verificationUri: 'https://github.com/login/device',
+      expiresAt: '2026-06-09T12:05:00.000Z',
+    };
+    state.workRepositoriesByProvider.value = { github: [workRepository()] };
+    state.workItemsByRepository.value = { 'github:nbonamy/codex-claw': [workItem()] };
+
+    await state.selectWorkRepository('github', null);
+    await state.disconnectWorkProvider('github');
+
+    expect(selectWorkRepository).toHaveBeenCalledWith('github', null);
+    expect(listWorkItems).not.toHaveBeenCalled();
+    expect(disconnectWorkProvider).toHaveBeenCalledWith('github');
+    expect(state.workProviderAuthorization.value).toBeNull();
+    expect(state.workRepositoriesByProvider.value.github).toStrictEqual([]);
+    expect(state.workItemsByRepository.value).toStrictEqual({});
+    expect(state.workBacklogStatus.value).toBe('notLoaded');
+  });
+
+  it('loads selected work repositories and empty repository lists', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.connections = [{
+      provider: 'github',
+      status: 'connected',
+      accountLabel: 'nbonamy',
+    }];
+    snapshot.workBacklog.selectedRepositoryIds.github = 'nbonamy/codex-claw';
+    const listWorkRepositories = vi.fn()
+      .mockResolvedValueOnce([workRepository()])
+      .mockResolvedValueOnce([]);
+    const listWorkItems = vi.fn().mockResolvedValue([workItem()]);
+    const selectWorkRepository = vi.fn();
+    vi.stubGlobal('window', {
+      codexClaw: {
+        listWorkRepositories,
+        listWorkItems,
+        selectWorkRepository,
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    state.snapshot.value = snapshot;
+
+    await state.loadWorkRepositories('github');
+    expect(listWorkItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw');
+    expect(selectWorkRepository).not.toHaveBeenCalled();
+
+    delete state.snapshot.value.workBacklog.selectedRepositoryIds.github;
+    await state.loadWorkRepositories('github');
+    expect(state.workRepositoriesByProvider.value.github).toStrictEqual([]);
+  });
+
+  it('omits optional work item prompt fields and truncates long bodies', () => {
+    expect(workItemAssignmentPrompt({
+      ...workItem(),
+      authorName: undefined,
+      body: '',
+      labels: [],
+    })).toBe([
+      'Please take this GitHub issue and drive it to completion.',
+      '',
+      'Repository: nbonamy/codex-claw',
+      'Issue: #12 Fix cockpit drag target',
+      'URL: https://github.com/nbonamy/codex-claw/issues/12',
+    ].join('\n'));
+
+    expect(workItemAssignmentPrompt({
+      ...workItem(),
+      body: 'x'.repeat(4100),
+    })).toContain('[Body truncated]');
   });
 
   it('hydrates the active persisted thread after subscribing to main events', async () => {
@@ -1671,6 +1968,36 @@ describe('useAppState', () => {
     expect(state.selectedReasoningEffort.value).toBeNull();
   });
 });
+
+function workRepository(): WorkRepository {
+  return {
+    provider: 'github',
+    id: 'nbonamy/codex-claw',
+    owner: 'nbonamy',
+    name: 'codex-claw',
+    fullName: 'nbonamy/codex-claw',
+    url: 'https://github.com/nbonamy/codex-claw',
+    isPrivate: true,
+  };
+}
+
+function workItem(): WorkItem {
+  return {
+    provider: 'github',
+    id: 'nbonamy/codex-claw#12',
+    repositoryId: 'nbonamy/codex-claw',
+    repositoryFullName: 'nbonamy/codex-claw',
+    number: 12,
+    title: 'Fix cockpit drag target',
+    url: 'https://github.com/nbonamy/codex-claw/issues/12',
+    state: 'open',
+    authorName: 'nbonamy',
+    body: 'Make issue assignment feel obvious.',
+    labels: [{ name: 'bug', color: 'ff0000' }],
+    createdAt: '2026-06-09T12:00:00.000Z',
+    updatedAt: '2026-06-09T12:30:00.000Z',
+  };
+}
 
 function deferred<T>() {
   let resolve!: (value: T) => void;

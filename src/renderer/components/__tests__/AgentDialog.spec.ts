@@ -1,8 +1,9 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
+import { nextTick } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import AgentDialog from '../AgentDialog.vue';
-import type { Agent, CreateAgentInput, UpdateAgentInput } from '../../../shared/contracts';
+import type { Agent, CreateAgentInput, Team, UpdateAgentInput } from '../../../shared/contracts';
 
 const idleAgent: Agent = {
   id: 'agent-dina',
@@ -128,6 +129,76 @@ describe('AgentDialog', () => {
     });
   });
 
+  it('creates ticket-driven agents in a selected or new team', async () => {
+    const createAgent = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountDialog({
+      chooseAgentFolder: vi.fn().mockResolvedValue('/Users/nbonamy/src/issue-agent'),
+      createAgent,
+      initialNewTeamName: 'GitHub #12',
+      initialTeamId: 'team-codex-claw',
+      showTeamField: true,
+      teams: [{
+        id: 'team-codex-claw',
+        name: 'Codex Claw',
+        color: '#1B4FB2',
+        agentIds: [],
+      }],
+    });
+
+    expect(wrapper.findAll('.agent-dialog__field')).toHaveLength(4);
+    await wrapper.get('.agent-dialog__folder-control').trigger('click');
+    await wrapper.findAllComponents({ name: 'ElSelect' })[0]?.vm.$emit('update:modelValue', '__new_team__');
+    await nextTick();
+
+    const newTeamInput = wrapper.get<HTMLInputElement>('[aria-label="New team name"]');
+    expect(newTeamInput.element.value).toBe('GitHub #12');
+
+    await saveButton(wrapper).trigger('click');
+
+    expect(createAgent).toHaveBeenCalledWith({
+      name: 'issue-agent',
+      avatar: '🤖',
+      folder: '/Users/nbonamy/src/issue-agent',
+      backend: 'codex',
+      newTeamName: 'GitHub #12',
+    });
+  });
+
+  it('creates ticket-driven agents in an existing selected team', async () => {
+    const createAgent = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountDialog({
+      chooseAgentFolder: vi.fn().mockResolvedValue('/Users/nbonamy/src/existing-team-agent'),
+      createAgent,
+      initialTeamId: 'team-skwad',
+      showTeamField: true,
+      teams: [
+        {
+          id: 'team-codex-claw',
+          name: 'Codex Claw',
+          color: '#1B4FB2',
+          agentIds: [],
+        },
+        {
+          id: 'team-skwad',
+          name: 'Skwad',
+          color: '#46A857',
+          agentIds: [],
+        },
+      ],
+    });
+
+    await wrapper.get('.agent-dialog__folder-control').trigger('click');
+    await saveButton(wrapper).trigger('click');
+
+    expect(createAgent).toHaveBeenCalledWith({
+      name: 'existing-team-agent',
+      avatar: '🤖',
+      folder: '/Users/nbonamy/src/existing-team-agent',
+      backend: 'codex',
+      teamId: 'team-skwad',
+    });
+  });
+
   it('disables editing for non-idle agents', () => {
     const wrapper = mountDialog({
       agent: {
@@ -176,8 +247,12 @@ describe('AgentDialog', () => {
 function mountDialog(overrides: Partial<{
   agent: Agent | null;
   chooseAgentFolder: () => Promise<string | null>;
-  createAgent: (input: CreateAgentInput) => Promise<void>;
+  createAgent: (input: CreateAgentInput & { newTeamName?: string; teamId?: string }) => Promise<void>;
+  initialNewTeamName: string;
+  initialTeamId: string | null;
   mode: 'create' | 'edit';
+  showTeamField: boolean;
+  teams: Team[];
   updateAgent: (input: UpdateAgentInput) => Promise<void>;
 }> = {}) {
   return mount(AgentDialog, {

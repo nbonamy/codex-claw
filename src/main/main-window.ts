@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, type BrowserWindowConstructorOptions } from 'electron';
+import { app, BrowserWindow, globalShortcut, shell, type BrowserWindowConstructorOptions } from 'electron';
 import path from 'node:path';
 import {
   appCommandFromInput,
@@ -18,7 +18,7 @@ export function createMainWindow(): BrowserWindow {
     window.show();
   });
 
-  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.setWindowOpenHandler(({ url }) => handleExternalWindowOpen(url, (targetUrl) => shell.openExternal(targetUrl)));
   installAppMenu(window, { debugMode: !releaseMode });
   installFocusedAppShortcuts(window);
   window.webContents.on('before-input-event', (event, input) => {
@@ -57,6 +57,23 @@ export function createMainWindowOptions(releaseMode: boolean): BrowserWindowCons
       sandbox: false,
     },
   };
+}
+
+export function handleExternalWindowOpen(url: string, openExternal: (url: string) => Promise<unknown> | void): { action: 'deny' } {
+  if (isExternalHttpUrl(url)) {
+    void openExternal(url);
+  }
+
+  return { action: 'deny' };
+}
+
+function isExternalHttpUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 function isReleaseMode(): boolean {

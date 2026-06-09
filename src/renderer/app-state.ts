@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelMarkdownRequest, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
+import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelMarkdownRequest, Team, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../shared/contracts';
 import { updateSettingsInSnapshot } from '../shared/settings';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '../shared/snapshot';
 import { defaultBackendCapabilities } from '../shared/backend-capabilities';
@@ -26,6 +26,11 @@ const selectedModelId = ref<string | null>(null);
 const selectedReasoningEffort = ref<ReasoningEffort | null>(null);
 const planMode = ref(false);
 const sidePanelMarkdownRequest = ref<SidePanelMarkdownRequest | null>(null);
+const workProviderAuthorization = ref<WorkProviderAuthorization | null>(null);
+const workRepositoriesByProvider = ref<Partial<Record<WorkProviderKind, WorkRepository[]>>>({});
+const workItemsByRepository = ref<Record<string, WorkItem[]>>({});
+const workBacklogStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
+const workBacklogError = ref<string | null>(null);
 let unsubscribeMainEvents: (() => void) | null = null;
 
 export function useAppState() {
@@ -77,7 +82,10 @@ export function useAppState() {
       snapshot.value = await window.codexClaw.getSnapshot();
       subscribeToMainEvents();
       await hydrateActiveAgentHistory();
-      await loadActiveAgentCatalogs();
+      await Promise.all([
+        loadActiveAgentCatalogs(),
+        loadConnectedWorkBacklogs(),
+      ]);
     } finally {
       isLoading.value = false;
     }
@@ -283,22 +291,26 @@ export function useAppState() {
     return window.codexClaw.readAgentFile(agentId, filePath);
   }
 
-  async function createAgent(input: CreateAgentInput): Promise<void> {
+  async function createAgent(input: CreateAgentInput): Promise<Agent | null> {
     if (!window.codexClaw?.createAgent) {
-      return;
+      return null;
     }
 
+    const previousAgentIds = new Set(snapshot.value.agents.map((agent) => agent.id));
     snapshot.value = await window.codexClaw.createAgent(input);
     await loadActiveAgentCatalogs();
+    return snapshot.value.agents.find((agent) => !previousAgentIds.has(agent.id)) ?? activeAgent.value;
   }
 
-  async function createTeam(input: CreateTeamInput): Promise<void> {
+  async function createTeam(input: CreateTeamInput): Promise<Team | null> {
     if (!window.codexClaw?.createTeam) {
-      return;
+      return null;
     }
 
+    const previousTeamIds = new Set(snapshot.value.teams.map((team) => team.id));
     snapshot.value = await window.codexClaw.createTeam(input);
     await loadActiveAgentCatalogs();
+    return snapshot.value.teams.find((team) => !previousTeamIds.has(team.id)) ?? null;
   }
 
   async function updateTeam(input: UpdateTeamInput): Promise<void> {
@@ -374,6 +386,134 @@ export function useAppState() {
     await window.codexClaw?.quit?.();
   }
 
+  async function connectWorkProvider(provider: WorkProviderKind): Promise<void> {
+    if (!window.codexClaw?.connectWorkProvider) {
+      return;
+    }
+
+    workBacklogStatus.value = 'loading';
+    workBacklogError.value = null;
+    try {
+      const result = await window.codexClaw.connectWorkProvider(provider);
+      snapshot.value = result.snapshot;
+      workProviderAuthorization.value = result.authorization ?? null;
+      workBacklogStatus.value = 'loaded';
+    } catch (error) {
+      workBacklogStatus.value = 'error';
+      workBacklogError.value = error instanceof Error ? error.message : String(error);
+      throw error;
+    }
+  }
+
+  async function completeWorkProviderConnection(provider: WorkProviderKind): Promise<void> {
+    if (!window.codexClaw?.completeWorkProviderConnection) {
+      return;
+    }
+
+    workBacklogStatus.value = 'loading';
+    workBacklogError.value = null;
+    try {
+      snapshot.value = await window.codexClaw.completeWorkProviderConnection(provider);
+      if (workProviderConnection(provider)?.status === 'connected') {
+        workProviderAuthorization.value = null;
+        await loadWorkRepositories(provider);
+      } else {
+        workBacklogStatus.value = 'loaded';
+      }
+    } catch (error) {
+      workBacklogStatus.value = 'error';
+      workBacklogError.value = error instanceof Error ? error.message : String(error);
+      throw error;
+    }
+  }
+
+  async function disconnectWorkProvider(provider: WorkProviderKind): Promise<void> {
+    if (!window.codexClaw?.disconnectWorkProvider) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.disconnectWorkProvider(provider);
+    workProviderAuthorization.value = null;
+    workRepositoriesByProvider.value = {
+      ...workRepositoriesByProvider.value,
+      [provider]: [],
+    };
+    workItemsByRepository.value = {};
+    workBacklogStatus.value = 'notLoaded';
+    workBacklogError.value = null;
+  }
+
+  async function loadWorkRepositories(provider: WorkProviderKind): Promise<void> {
+    if (!window.codexClaw?.listWorkRepositories || workProviderConnection(provider)?.status !== 'connected') {
+      workRepositoriesByProvider.value = {
+        ...workRepositoriesByProvider.value,
+        [provider]: [],
+      };
+      workBacklogStatus.value = 'notLoaded';
+      return;
+    }
+
+    workBacklogStatus.value = 'loading';
+    workBacklogError.value = null;
+    try {
+      const repositories = await window.codexClaw.listWorkRepositories(provider);
+      workRepositoriesByProvider.value = {
+        ...workRepositoriesByProvider.value,
+        [provider]: repositories,
+      };
+      workBacklogStatus.value = 'loaded';
+
+      const selectedRepositoryId = snapshot.value.workBacklog.selectedRepositoryIds[provider] ?? repositories[0]?.id ?? null;
+      if (selectedRepositoryId && !snapshot.value.workBacklog.selectedRepositoryIds[provider]) {
+        await selectWorkRepository(provider, selectedRepositoryId);
+      } else if (selectedRepositoryId) {
+        await loadWorkItems(provider, selectedRepositoryId);
+      }
+    } catch (error) {
+      workRepositoriesByProvider.value = {
+        ...workRepositoriesByProvider.value,
+        [provider]: [],
+      };
+      workBacklogStatus.value = 'error';
+      workBacklogError.value = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  async function selectWorkRepository(provider: WorkProviderKind, repositoryId: string | null): Promise<void> {
+    if (!window.codexClaw?.selectWorkRepository) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.selectWorkRepository(provider, repositoryId);
+    if (repositoryId) {
+      await loadWorkItems(provider, repositoryId);
+    }
+  }
+
+  async function loadWorkItems(provider: WorkProviderKind, repositoryId: string): Promise<void> {
+    if (!window.codexClaw?.listWorkItems || !repositoryId) {
+      return;
+    }
+
+    workBacklogStatus.value = 'loading';
+    workBacklogError.value = null;
+    try {
+      const items = await window.codexClaw.listWorkItems(provider, repositoryId);
+      workItemsByRepository.value = {
+        ...workItemsByRepository.value,
+        [workItemsKey(provider, repositoryId)]: items,
+      };
+      workBacklogStatus.value = 'loaded';
+    } catch (error) {
+      workBacklogStatus.value = 'error';
+      workBacklogError.value = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  async function assignWorkItemToAgent(payload: { agentId: string; item: WorkItem }): Promise<void> {
+    await sendAgentPrompt(payload.agentId, workItemAssignmentPrompt(payload.item));
+  }
+
   async function duplicateAgent(agentId: string): Promise<void> {
     if (!window.codexClaw?.duplicateAgent) {
       return;
@@ -416,15 +556,17 @@ export function useAppState() {
     snapshot.value = await window.codexClaw.saveAgentToBench(agentId);
   }
 
-  async function deployBenchTemplate(input: string | DeployBenchTemplateInput): Promise<void> {
+  async function deployBenchTemplate(input: string | DeployBenchTemplateInput): Promise<Agent | null> {
     const templateId = typeof input === 'string' ? input : input.templateId;
     const teamId = typeof input === 'string' ? snapshot.value.activeTeamId ?? undefined : input.teamId;
     if (!window.codexClaw?.deployBenchTemplate || !snapshot.value.bench.some((template) => template.id === templateId)) {
-      return;
+      return null;
     }
 
+    const previousAgentIds = new Set(snapshot.value.agents.map((agent) => agent.id));
     snapshot.value = await window.codexClaw.deployBenchTemplate(templateId, teamId);
     await loadActiveAgentCatalogs();
+    return snapshot.value.agents.find((agent) => !previousAgentIds.has(agent.id)) ?? activeAgent.value;
   }
 
   async function removeBenchTemplate(templateId: string): Promise<void> {
@@ -519,9 +661,16 @@ export function useAppState() {
     selectedReasoningEffort,
     planMode,
     sidePanelMarkdownRequest,
+    workProviderAuthorization,
+    workRepositoriesByProvider,
+    workItemsByRepository,
+    workBacklogStatus,
+    workBacklogError,
     loadBackendModels: loadBackendModelsForActiveAgent,
     loadBackendSkills: loadBackendSkillsForActiveAgent,
     loadAgentFiles: loadAgentFilesForActiveAgent,
+    loadWorkRepositories,
+    loadWorkItems,
     loadSnapshot,
     chooseAgentFolder,
     readAgentFile,
@@ -532,6 +681,11 @@ export function useAppState() {
     closeTeam,
     updateAgent,
     updateSettings,
+    connectWorkProvider,
+    completeWorkProviderConnection,
+    disconnectWorkProvider,
+    selectWorkRepository,
+    assignWorkItemToAgent,
     duplicateAgent,
     moveAgentToTeam,
     reorderAgents,
@@ -559,6 +713,20 @@ export function useAppState() {
     removeQueuedPrompt,
     quit,
   };
+}
+
+export function workItemAssignmentPrompt(item: WorkItem): string {
+  const body = truncateWorkItemBody(item.body?.trim() ?? '');
+  return [
+    `Please take this ${workProviderLabel(item.provider)} issue and drive it to completion.`,
+    '',
+    `Repository: ${item.repositoryFullName}`,
+    `Issue: #${item.number} ${item.title}`,
+    `URL: ${item.url}`,
+    item.labels.length > 0 ? `Labels: ${item.labels.map((label) => label.name).join(', ')}` : null,
+    item.authorName ? `Author: ${item.authorName}` : null,
+    body ? ['Body:', body].join('\n') : null,
+  ].filter((line): line is string => line !== null).join('\n');
 }
 
 function activeMessageAction(index: number): { agentId: string; messageId: string } | null {
@@ -758,6 +926,48 @@ async function loadActiveAgentCatalogs(): Promise<void> {
     loadBackendSkillsForActiveAgent(),
     loadAgentFilesForActiveAgent(),
   ]);
+}
+
+async function loadConnectedWorkBacklogs(): Promise<void> {
+  const connectedProviders = snapshot.value.workBacklog.connections
+    .filter((connection) => connection.status === 'connected')
+    .map((connection) => connection.provider);
+
+  await Promise.all(connectedProviders.map((provider) => loadWorkRepositoriesForProvider(provider)));
+}
+
+async function loadWorkRepositoriesForProvider(provider: WorkProviderKind): Promise<void> {
+  if (!window.codexClaw?.listWorkRepositories) {
+    return;
+  }
+
+  try {
+    const repositories = await window.codexClaw.listWorkRepositories(provider);
+    workRepositoriesByProvider.value = {
+      ...workRepositoriesByProvider.value,
+      [provider]: repositories,
+    };
+    const selectedRepositoryId = snapshot.value.workBacklog.selectedRepositoryIds[provider] ?? repositories[0]?.id ?? null;
+    if (selectedRepositoryId) {
+      await loadWorkItemsForRepository(provider, selectedRepositoryId);
+    }
+    workBacklogStatus.value = 'loaded';
+  } catch (error) {
+    workBacklogStatus.value = 'error';
+    workBacklogError.value = error instanceof Error ? error.message : String(error);
+  }
+}
+
+async function loadWorkItemsForRepository(provider: WorkProviderKind, repositoryId: string): Promise<void> {
+  if (!window.codexClaw?.listWorkItems) {
+    return;
+  }
+
+  const items = await window.codexClaw.listWorkItems(provider, repositoryId);
+  workItemsByRepository.value = {
+    ...workItemsByRepository.value,
+    [workItemsKey(provider, repositoryId)]: items,
+  };
 }
 
 async function loadBackendModelsForActiveAgent(): Promise<void> {
@@ -971,4 +1181,25 @@ function markClientRequestAnswered(requestId: string): void {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function workProviderConnection(provider: WorkProviderKind) {
+  return snapshot.value.workBacklog.connections.find((connection) => connection.provider === provider) ?? null;
+}
+
+function workItemsKey(provider: WorkProviderKind, repositoryId: string): string {
+  return `${provider}:${repositoryId}`;
+}
+
+function workProviderLabel(provider: WorkProviderKind): string {
+  return provider === 'github' ? 'GitHub' : provider;
+}
+
+function truncateWorkItemBody(body: string): string {
+  const limit = 4000;
+  if (body.length <= limit) {
+    return body;
+  }
+
+  return `${body.slice(0, limit).trimEnd()}\n\n[Body truncated]`;
 }

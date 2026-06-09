@@ -1,4 +1,4 @@
-import type { AppSnapshot, AppThemeSettings, UpdateSettingsInput } from './contracts';
+import type { AppSnapshot, AppThemeSettings, UpdateSettingsInput, WorkProviderSettings } from './contracts';
 
 export const defaultThemeSettings: AppThemeSettings = {
   id: 'codex-claw-light',
@@ -14,6 +14,18 @@ export function updateSettingsInSnapshot(snapshot: AppSnapshot, input: UpdateSet
       ...snapshot.theme,
       ...input.theme,
     });
+  }
+
+  if (input.workProviders?.github) {
+    const githubSettings = normalizeWorkProviderSettings({
+      ...snapshot.workBacklog.providerSettings.github,
+      ...input.workProviders.github,
+    });
+    if (githubSettings.oauthClientId) {
+      snapshot.workBacklog.providerSettings.github = githubSettings;
+    } else {
+      delete snapshot.workBacklog.providerSettings.github;
+    }
   }
 
   return snapshot;
@@ -43,6 +55,22 @@ function normalizeFontSize(value: unknown, fallback: number): number {
 
 function isAppearanceMode(value: unknown): value is AppThemeSettings['mode'] {
   return value === 'dark' || value === 'light' || value === 'system';
+}
+
+function normalizeWorkProviderSettings(value: unknown): WorkProviderSettings {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  const oauthClientId = normalizeOptionalString(value.oauthClientId);
+  return oauthClientId ? { oauthClientId } : {};
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

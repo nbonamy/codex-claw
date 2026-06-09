@@ -20,13 +20,25 @@
     :selected-reasoning-effort="selectedReasoningEffort"
     :queued-prompts="activeQueuedPrompts"
     :side-panel-markdown-request="sidePanelMarkdownRequest"
+    :work-provider-authorization="workProviderAuthorization"
+    :work-repositories-by-provider="workRepositoriesByProvider"
+    :work-items-by-repository="workItemsByRepository"
+    :work-backlog-status="workBacklogStatus"
+    :work-backlog-error="workBacklogError"
     :choose-agent-folder="chooseAgentFolder"
     :read-agent-file="readAgentFile"
     :create-agent="createAgent"
     :create-team="createTeam"
+    :deploy-bench-template-action="deployBenchTemplate"
     :update-team="updateTeam"
     :update-agent="updateAgent"
     :update-settings="updateSettings"
+    :connect-work-provider="connectWorkProvider"
+    :complete-work-provider-connection="completeWorkProviderConnection"
+    :disconnect-work-provider="disconnectWorkProvider"
+    :select-work-repository="selectWorkRepository"
+    :load-work-repositories="loadWorkRepositories"
+    :load-work-items="loadWorkItems"
     :quit="quit"
     @close-team="closeTeam"
     @close-agent="closeAgent"
@@ -34,6 +46,7 @@
     @move-agent-to-team="moveAgentToTeam"
     @reorder-agents="reorderAgents"
     @reorder-teams="reorderTeams"
+    @assign-work-item="assignWorkItemToAgent"
     @deploy-bench-template="deployBenchTemplate"
     @remove-bench-template="removeBenchTemplate"
     @restart-agent="restartAgent"
@@ -85,6 +98,11 @@ const {
   selectedReasoningEffort,
   planMode,
   sidePanelMarkdownRequest,
+  workProviderAuthorization,
+  workRepositoriesByProvider,
+  workItemsByRepository,
+  workBacklogStatus,
+  workBacklogError,
   loadBackendModels,
   loadSnapshot,
   chooseAgentFolder,
@@ -104,6 +122,13 @@ const {
   restartAgent,
   closeAgent,
   updateSettings,
+  connectWorkProvider,
+  completeWorkProviderConnection,
+  disconnectWorkProvider,
+  selectWorkRepository,
+  loadWorkRepositories,
+  loadWorkItems,
+  assignWorkItemToAgent,
   respondToClientRequest,
   selectModel,
   selectReasoningEffort,

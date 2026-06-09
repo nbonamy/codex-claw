@@ -29,130 +29,157 @@
       </div>
     </header>
 
-    <div class="cockpit-view__sections">
-      <section
-        v-for="section in teamSections"
-        :key="section.team.id"
-        class="cockpit-view__team"
-      >
-        <header class="cockpit-view__team-header">
-          <span
-            class="cockpit-view__team-marker"
-            :style="{ backgroundColor: section.team.color ?? defaultTeamColor }"
-            aria-hidden="true"
-          />
-          <button
-            class="cockpit-view__team-title"
-            type="button"
-            @click="emit('select-team', section.team.id)"
-          >
-            {{ section.team.name }}
-          </button>
-          <div class="cockpit-view__team-summary">
+    <div class="cockpit-view__content">
+      <WorkBacklogPanel
+        v-if="workBacklog"
+        :connection="workBacklog.connection"
+        :error="workBacklog.error"
+        :items="workBacklog.items"
+        :repositories="workBacklog.repositories"
+        :selected-repository-id="workBacklog.selectedRepositoryId"
+        :status="workBacklog.status"
+        :can-assign-to-bench="bench.length > 0"
+        @assign-to-bench-agent="emit('assign-work-item-to-bench-agent', $event)"
+        @assign-to-new-agent="emit('assign-work-item-to-new-agent', $event)"
+        @refresh="emit('refresh-work-items', $event)"
+        @select-repository="emit('select-work-repository', $event)"
+        @work-item-drag-end="clearDraggedWorkItem"
+        @work-item-drag-start="draggedWorkItem = $event"
+      />
+
+      <div class="cockpit-view__sections">
+        <section
+          v-for="section in teamSections"
+          :key="section.team.id"
+          class="cockpit-view__team"
+        >
+          <header class="cockpit-view__team-header">
             <span
-              v-for="item in section.statusSummary"
-              :key="item.status"
-              class="cockpit-view__summary-item"
+              class="cockpit-view__team-marker"
+              :style="{ backgroundColor: section.team.color ?? defaultTeamColor }"
+              aria-hidden="true"
+            />
+            <button
+              class="cockpit-view__team-title"
+              type="button"
+              @click="emit('select-team', section.team.id)"
             >
+              {{ section.team.name }}
+            </button>
+            <div class="cockpit-view__team-summary">
               <span
-                class="cockpit-view__status-dot"
-                :data-status="item.status"
-                aria-hidden="true"
-              />
-              {{ item.count }} {{ item.label }}
-            </span>
-          </div>
-          <NewAgentButton
-            v-if="section.showHeaderAdd"
-            class="cockpit-view__header-add"
-            label="Add Agent"
-            size="small"
-            tone="ghost"
-            :bench="bench"
-            @deploy-bench-template="emit('deploy-bench-template', { templateId: $event, teamId: section.team.id })"
-            @new-agent="emit('add-agent', section.team.id)"
-            @remove-bench-template="emit('remove-bench-template', $event)"
-          />
-        </header>
-
-        <p
-          v-if="section.agents.length === 0"
-          class="cockpit-view__empty-team"
-        >
-          No agents
-        </p>
-
-        <div
-          :ref="(element) => setGridRef(section.team.id, element)"
-          class="cockpit-view__grid"
-        >
-          <article
-            v-for="agent in section.agents"
-            :key="agent.id"
-            class="cockpit-view__agent-card"
-            @click="emit('select-agent', { agentId: agent.id, teamId: section.team.id })"
-          >
-            <header class="cockpit-view__agent-header">
-              <AgentAvatar
-                :avatar="agent.avatar"
-                :name="agent.name"
-                size="lg"
-              />
-              <div class="cockpit-view__agent-title">
-                <strong>{{ agent.name }}</strong>
-                <span>{{ folderBasename(agent.folder) }}</span>
-              </div>
-              <span
-                class="cockpit-view__agent-state"
-                :data-status="agent.status.type"
+                v-for="item in section.statusSummary"
+                :key="item.status"
+                class="cockpit-view__summary-item"
               >
-                {{ agentStatusLabel(agent.status.type) }}
+                <span
+                  class="cockpit-view__status-dot"
+                  :data-status="item.status"
+                  aria-hidden="true"
+                />
+                {{ item.count }} {{ item.label }}
               </span>
-            </header>
-
-            <div class="cockpit-view__agent-body">
-              <strong>{{ agentStatusText(agent) }}</strong>
-              <span>{{ agent.backend }}</span>
             </div>
-
-            <form
-              class="cockpit-view__prompt"
-              @click.stop
-              @submit.prevent="submitPrompt(agent)"
-            >
-              <input
-                v-model="promptDrafts[agent.id]"
-                :disabled="!agentCanReceivePrompt(agent)"
-                :placeholder="agentCanReceivePrompt(agent) ? 'Send prompt...' : 'Working...'"
-                :aria-label="`Prompt ${agent.name}`"
-              >
-              <button
-                type="submit"
-                :disabled="!canSubmitPrompt(agent)"
-                :aria-label="`Send prompt to ${agent.name}`"
-              >
-                <SendIcon aria-hidden="true" />
-              </button>
-            </form>
-          </article>
-
-          <div
-            v-if="section.showGridAdd"
-            class="cockpit-view__add-card"
-          >
             <NewAgentButton
-              class="cockpit-view__add-button"
+              v-if="section.showHeaderAdd"
+              class="cockpit-view__header-add"
               label="Add Agent"
-              presentation="tile"
-              tone="muted"
+              size="small"
+              tone="ghost"
               :bench="bench"
               @deploy-bench-template="emit('deploy-bench-template', { templateId: $event, teamId: section.team.id })"
               @new-agent="emit('add-agent', section.team.id)"
               @remove-bench-template="emit('remove-bench-template', $event)"
             />
+          </header>
+
+          <p
+            v-if="section.agents.length === 0"
+            class="cockpit-view__empty-team"
+          >
+            No agents
+          </p>
+
+          <div
+            :ref="(element) => setGridRef(section.team.id, element)"
+            class="cockpit-view__grid"
+          >
+            <article
+              v-for="agent in section.agents"
+              :key="agent.id"
+              class="cockpit-view__agent-card"
+              :class="{
+                'cockpit-view__agent-card--drop-ready': draggedWorkItem && agentCanReceivePrompt(agent),
+                'cockpit-view__agent-card--drop-target': dropTargetAgentId === agent.id,
+              }"
+              @click="emit('select-agent', { agentId: agent.id, teamId: section.team.id })"
+              @dragenter="enterAgentDropTarget($event, agent)"
+              @dragleave="leaveAgentDropTarget(agent)"
+              @dragover="allowAgentDrop($event, agent)"
+              @drop="dropWorkItem($event, agent)"
+            >
+              <header class="cockpit-view__agent-header">
+                <AgentAvatar
+                  :avatar="agent.avatar"
+                  :name="agent.name"
+                  size="lg"
+                />
+                <div class="cockpit-view__agent-title">
+                  <strong>{{ agent.name }}</strong>
+                  <span>{{ folderBasename(agent.folder) }}</span>
+                </div>
+                <span
+                  class="cockpit-view__agent-state"
+                  :data-status="agent.status.type"
+                >
+                  {{ agentStatusLabel(agent.status.type) }}
+                </span>
+              </header>
+
+              <div class="cockpit-view__agent-body">
+                <strong>{{ agentStatusText(agent) }}</strong>
+                <span>{{ agent.backend }}</span>
+              </div>
+
+              <form
+                class="cockpit-view__prompt"
+                @click.stop
+                @submit.prevent="submitPrompt(agent)"
+              >
+                <input
+                  v-model="promptDrafts[agent.id]"
+                  :disabled="!agentCanReceivePrompt(agent)"
+                  :placeholder="agentCanReceivePrompt(agent) ? 'Send prompt...' : 'Working...'"
+                  :aria-label="`Prompt ${agent.name}`"
+                >
+                <button
+                  type="submit"
+                  :disabled="!canSubmitPrompt(agent)"
+                  :aria-label="`Send prompt to ${agent.name}`"
+                >
+                  <SendIcon aria-hidden="true" />
+                </button>
+              </form>
+            </article>
+
+            <div
+              v-if="section.showGridAdd"
+              class="cockpit-view__add-card"
+            >
+              <NewAgentButton
+                class="cockpit-view__add-button"
+                label="Add Agent"
+                presentation="tile"
+                tone="muted"
+                :bench="bench"
+                @deploy-bench-template="emit('deploy-bench-template', { templateId: $event, teamId: section.team.id })"
+                @new-agent="emit('add-agent', section.team.id)"
+                @remove-bench-template="emit('remove-bench-template', $event)"
+              />
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
   </section>
 </template>
@@ -160,12 +187,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { ComponentPublicInstance } from 'vue';
-import type { Agent, AgentStatus, BenchTemplate, DeployBenchTemplateInput, Team } from '../../shared/contracts';
+import type { Agent, AgentStatus, BenchTemplate, DeployBenchTemplateInput, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '../../shared/contracts';
 import { defaultTeamColor } from '../../shared/team-colors';
 import { agentCanReceivePrompt, agentStatusLabel, agentStatusText, folderBasename } from '../shared/agent-display';
 import { SendIcon } from '../shared/icons/app-icons';
 import AgentAvatar from './AgentAvatar.vue';
 import NewAgentButton from './NewAgentButton.vue';
+import WorkBacklogPanel from './WorkBacklogPanel.vue';
 
 type StatusSummaryItem = {
   status: AgentStatus['type'];
@@ -181,24 +209,41 @@ type TeamSection = {
   team: Team;
 };
 
+type CockpitWorkBacklog = {
+  connection: WorkIntegrationConnection;
+  error: string | null;
+  items: WorkItem[];
+  repositories: WorkRepository[];
+  selectedRepositoryId: string | null;
+  status: 'notLoaded' | 'loading' | 'loaded' | 'error';
+};
+
 const DEFAULT_GRID_COLUMNS = 3;
 
 const props = defineProps<{
   agents: Agent[];
   bench?: BenchTemplate[];
   teams: Team[];
+  workBacklog?: CockpitWorkBacklog | null;
 }>();
 
 const emit = defineEmits<{
   'add-agent': [teamId: string];
+  'assign-work-item-to-bench-agent': [item: WorkItem];
+  'assign-work-item-to-new-agent': [item: WorkItem];
+  'assign-work-item': [payload: { agentId: string; item: WorkItem }];
   'deploy-bench-template': [input: DeployBenchTemplateInput];
   'prompt-agent': [payload: { agentId: string; prompt: string }];
+  'refresh-work-items': [repositoryId: string | null];
   'remove-bench-template': [templateId: string];
+  'select-work-repository': [repositoryId: string | null];
   'select-agent': [payload: { agentId: string; teamId: string }];
   'select-team': [teamId: string];
 }>();
 
 const promptDrafts = ref<Record<string, string>>({});
+const draggedWorkItem = ref<WorkItem | null>(null);
+const dropTargetAgentId = ref<string | null>(null);
 const columnsByTeam = ref<Record<string, number>>({});
 const gridElements = new Map<string, HTMLElement>();
 let resizeObserver: ResizeObserver | null = null;
@@ -336,6 +381,52 @@ function submitPrompt(agent: Agent): void {
   });
 }
 
+function allowAgentDrop(event: DragEvent, agent: Agent): void {
+  if (!draggedWorkItem.value || !agentCanReceivePrompt(agent)) {
+    return;
+  }
+
+  event.preventDefault();
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'copy';
+  }
+}
+
+function enterAgentDropTarget(event: DragEvent, agent: Agent): void {
+  if (!draggedWorkItem.value || !agentCanReceivePrompt(agent)) {
+    return;
+  }
+
+  event.preventDefault();
+  dropTargetAgentId.value = agent.id;
+}
+
+function leaveAgentDropTarget(agent: Agent): void {
+  if (dropTargetAgentId.value === agent.id) {
+    dropTargetAgentId.value = null;
+  }
+}
+
+function dropWorkItem(event: DragEvent, agent: Agent): void {
+  const item = draggedWorkItem.value;
+  if (!item || !agentCanReceivePrompt(agent)) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  emit('assign-work-item', {
+    agentId: agent.id,
+    item,
+  });
+  clearDraggedWorkItem();
+}
+
+function clearDraggedWorkItem(): void {
+  draggedWorkItem.value = null;
+  dropTargetAgentId.value = null;
+}
+
 function statusCounts(agents: Agent[]): StatusSummaryItem[] {
   const order: AgentStatus['type'][] = ['awaitingInput', 'working', 'starting', 'idle', 'error'];
   const counts = new Map<AgentStatus['type'], number>();
@@ -372,7 +463,7 @@ function summaryLabel(status: AgentStatus['type'], count: number): string {
 .cockpit-view {
   min-height: 0;
   flex: 1 1 auto;
-  overflow: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   color: var(--color-text);
@@ -451,12 +542,23 @@ function summaryLabel(status: AgentStatus['type'], count: number): string {
   background: var(--color-error);
 }
 
+.cockpit-view__content {
+  min-height: 0;
+  flex: 1 1 auto;
+  display: flex;
+  overflow: hidden;
+}
+
 .cockpit-view__sections {
   width: min(100%, 1220px);
+  min-width: 0;
+  flex: 1 1 auto;
   display: grid;
+  align-content: start;
   gap: var(--space-20);
   margin: 0 auto;
   padding: var(--space-24) var(--space-20) var(--space-24);
+  overflow: auto;
 }
 
 .cockpit-view__team {
@@ -532,6 +634,16 @@ function summaryLabel(status: AgentStatus['type'], count: number): string {
 .cockpit-view__agent-card:focus-visible {
   border-color: var(--color-border-strong);
   background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-low));
+}
+
+.cockpit-view__agent-card--drop-ready {
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+}
+
+.cockpit-view__agent-card--drop-target {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface-low));
+  box-shadow: inset 0 0 0 1px var(--color-primary);
 }
 
 .cockpit-view__agent-card:focus-visible,
@@ -679,6 +791,24 @@ function summaryLabel(status: AgentStatus['type'], count: number): string {
 }
 
 @media (max-width: 780px) {
+  .cockpit-view__content {
+    flex-direction: column;
+    overflow: auto;
+  }
+
+  .cockpit-view__content :deep(.work-backlog-panel) {
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    min-height: 220px;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .cockpit-view__sections {
+    overflow: visible;
+  }
+
   .cockpit-view__header {
     align-items: flex-start;
     flex-direction: column;

@@ -1,1 +1,1 @@
-export type SettingsTab = 'appearance' | 'general';
+export type SettingsTab = 'appearance' | 'general' | 'integrations';

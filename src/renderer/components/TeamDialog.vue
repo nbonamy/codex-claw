@@ -105,7 +105,7 @@ import { defaultTeamColor, teamColors } from '../../shared/team-colors';
 import { CheckIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
-  createTeam: (input: CreateTeamInput) => Promise<void>;
+  createTeam: (input: CreateTeamInput) => Promise<Team | null | void>;
   mode?: 'create' | 'edit';
   team?: Team | null;
   updateTeam?: (input: UpdateTeamInput) => Promise<void>;

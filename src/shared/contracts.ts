@@ -130,6 +130,74 @@ export type AccountRateLimits = {
   rateLimitReachedType: string | null;
 };
 
+export type WorkProviderKind = 'github';
+
+export type WorkIntegrationStatus = 'notConfigured' | 'disconnected' | 'connecting' | 'connected' | 'error';
+
+export type WorkIntegrationConnection = {
+  provider: WorkProviderKind;
+  status: WorkIntegrationStatus;
+  accountLabel?: string;
+  detail?: string;
+  connectedAt?: string;
+};
+
+export type WorkProviderSettings = {
+  oauthClientId?: string;
+};
+
+export type WorkBacklogState = {
+  connections: WorkIntegrationConnection[];
+  selectedRepositoryIds: Partial<Record<WorkProviderKind, string>>;
+  providerSettings: Partial<Record<WorkProviderKind, WorkProviderSettings>>;
+};
+
+export type WorkProviderAuthorization = {
+  provider: WorkProviderKind;
+  userCode: string;
+  verificationUri: string;
+  expiresAt: string;
+};
+
+export type WorkProviderConnectResult = {
+  snapshot: AppSnapshot;
+  authorization?: WorkProviderAuthorization;
+};
+
+export type WorkRepository = {
+  provider: WorkProviderKind;
+  id: string;
+  owner: string;
+  name: string;
+  fullName: string;
+  url: string;
+  isPrivate: boolean;
+  updatedAt?: string;
+};
+
+export type WorkItemLabel = {
+  name: string;
+  color?: string;
+};
+
+export type WorkItemState = 'open' | 'closed';
+
+export type WorkItem = {
+  provider: WorkProviderKind;
+  id: string;
+  repositoryId: string;
+  repositoryFullName: string;
+  number: number;
+  title: string;
+  url: string;
+  state: WorkItemState;
+  authorName?: string;
+  body?: string;
+  labels: WorkItemLabel[];
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type BenchTemplate = {
   id: string;
   name: string;
@@ -274,6 +342,7 @@ export type AppleSpeechTranscriptionResult = {
 
 export type UpdateSettingsInput = {
   theme?: Partial<AppThemeSettings>;
+  workProviders?: Partial<Record<WorkProviderKind, WorkProviderSettings>>;
 };
 
 export type RendererMessagePart =
@@ -328,6 +397,7 @@ export type AppSnapshot = {
   messages: RendererMessage[];
   backendRuntimes: BackendRuntimeStatus[];
   accountRateLimits?: AccountRateLimits;
+  workBacklog: WorkBacklogState;
   theme: AppThemeSettings;
 };
 
@@ -497,6 +567,12 @@ export type ClientRequestResponse = {
 
 export type CodexClawApi = {
   getSnapshot(): Promise<AppSnapshot>;
+  connectWorkProvider(provider: WorkProviderKind): Promise<WorkProviderConnectResult>;
+  completeWorkProviderConnection(provider: WorkProviderKind): Promise<AppSnapshot>;
+  disconnectWorkProvider(provider: WorkProviderKind): Promise<AppSnapshot>;
+  listWorkRepositories(provider: WorkProviderKind): Promise<WorkRepository[]>;
+  selectWorkRepository(provider: WorkProviderKind, repositoryId: string | null): Promise<AppSnapshot>;
+  listWorkItems(provider: WorkProviderKind, repositoryId: string): Promise<WorkItem[]>;
   listBackendModels(agentId: string): Promise<BackendModelOption[]>;
   listBackendSkills(agentId: string): Promise<BackendSkillSummary[]>;
   listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]>;

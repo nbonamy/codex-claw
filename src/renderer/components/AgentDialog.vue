@@ -45,6 +45,54 @@
         </div>
       </section>
 
+      <section
+        v-if="showTeamSelector"
+        class="claw-form-dialog__field agent-dialog__field"
+      >
+        <div class="claw-form-dialog__field-heading agent-dialog__field-heading">
+          <label
+            class="claw-form-dialog__label agent-dialog__label"
+            for="agent-dialog-team"
+          >
+            Team
+          </label>
+          <span class="claw-form-dialog__heading-separator agent-dialog__heading-separator">•</span>
+          <p class="claw-form-dialog__help agent-dialog__help">Choose where this agent will live.</p>
+        </div>
+        <div class="claw-form-dialog__control agent-dialog__input-shell agent-dialog__input-shell--select">
+          <el-select
+            id="agent-dialog-team"
+            v-model="teamSelection"
+            class="agent-dialog__team-select"
+            :teleported="false"
+          >
+            <el-option
+              v-for="team in teams"
+              :key="team.id"
+              :label="team.name"
+              :value="team.id"
+            />
+            <el-option
+              label="New team"
+              :value="newTeamOptionId"
+            />
+          </el-select>
+        </div>
+        <div
+          v-if="teamSelection === newTeamOptionId"
+          class="claw-form-dialog__control claw-form-dialog__input-control agent-dialog__new-team-control"
+        >
+          <input
+            id="agent-dialog-new-team"
+            v-model="newTeamName"
+            class="claw-form-dialog__text-input agent-dialog__text-input"
+            type="text"
+            aria-label="New team name"
+            placeholder="Enter team name"
+          />
+        </div>
+      </section>
+
       <section class="claw-form-dialog__field agent-dialog__field">
         <div class="claw-form-dialog__field-heading agent-dialog__field-heading">
           <label
@@ -159,19 +207,33 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { Component } from 'vue';
-import type { Agent, AgentBackend, CreateAgentInput, UpdateAgentInput } from '../../shared/contracts';
+import type { Agent, AgentBackend, CreateAgentInput, Team, UpdateAgentInput } from '../../shared/contracts';
 import { ClaudeCodeBackendIcon, CodexBackendIcon } from '../shared/icons/backend-icons';
 import { ChevronDown } from '../shared/icons/app-icons';
 import AgentAvatarPicker from './AgentAvatarPicker.vue';
 
-const props = defineProps<{
+export type AgentDialogCreateInput = CreateAgentInput & {
+  newTeamName?: string;
+  teamId?: string;
+};
+
+const props = withDefaults(defineProps<{
   agent: Agent | null;
   chooseAgentFolder: () => Promise<string | null>;
-  createAgent: (input: CreateAgentInput) => Promise<void>;
+  createAgent: (input: AgentDialogCreateInput) => Promise<Agent | null | void>;
+  initialNewTeamName?: string;
+  initialTeamId?: string | null;
   mode: 'create' | 'edit';
+  showTeamField?: boolean;
+  teams?: Team[];
   updateAgent: (input: UpdateAgentInput) => Promise<void>;
   visible: boolean;
-}>();
+}>(), {
+  initialNewTeamName: '',
+  initialTeamId: null,
+  showTeamField: false,
+  teams: () => [],
+});
 
 const emit = defineEmits<{
   close: [];
@@ -181,9 +243,12 @@ const name = ref('');
 const folder = ref('');
 const avatar = ref<string | undefined>(undefined);
 const backend = ref<AgentBackend>('codex');
+const teamSelection = ref('');
+const newTeamName = ref('');
 const errorMessage = ref<string | null>(null);
 const choosingFolder = ref(false);
 const submitting = ref(false);
+const newTeamOptionId = '__new_team__';
 
 type BackendOption = {
   icon: Component;
@@ -220,14 +285,21 @@ const folderLabel = computed(() => folder.value ? shortenFolder(folder.value) : 
 const selectedBackendOption = computed(() => (
   backendOptions.find((option) => option.value === backend.value) ?? backendOptions[0]
 ));
+const teams = computed(() => props.teams);
+const showTeamSelector = computed(() => props.showTeamField && !isEditing.value);
+const teamCanSave = computed(() => (
+  !showTeamSelector.value ||
+  (teamSelection.value === newTeamOptionId ? newTeamName.value.trim().length > 0 : teamSelection.value.trim().length > 0)
+));
 const canSave = computed(() => (
   canEdit.value &&
   !submitting.value &&
   name.value.trim().length > 0 &&
-  folder.value.trim().length > 0
+  folder.value.trim().length > 0 &&
+  teamCanSave.value
 ));
 
-watch(() => [props.visible, props.mode, props.agent?.id] as const, () => {
+watch(() => [props.visible, props.mode, props.agent?.id, props.initialNewTeamName, props.initialTeamId, props.teams.length] as const, () => {
   if (props.visible) {
     resetForm();
   }
@@ -274,12 +346,21 @@ async function submit(): Promise<void> {
         backend: backend.value,
       });
     } else {
-      await props.createAgent({
+      const createInput: AgentDialogCreateInput = {
         name: name.value,
         folder: folder.value,
         avatar: avatar.value,
         backend: backend.value,
-      });
+      };
+      if (showTeamSelector.value) {
+        if (teamSelection.value === newTeamOptionId) {
+          createInput.newTeamName = newTeamName.value;
+        } else {
+          createInput.teamId = teamSelection.value;
+        }
+      }
+
+      await props.createAgent(createInput);
     }
     close();
   } catch (error) {
@@ -316,6 +397,20 @@ function resetForm(): void {
   folder.value = '';
   avatar.value = '🤖';
   backend.value = 'codex';
+  teamSelection.value = initialTeamSelection();
+  newTeamName.value = props.initialNewTeamName;
+}
+
+function initialTeamSelection(): string {
+  if (!showTeamSelector.value) {
+    return '';
+  }
+
+  if (props.initialTeamId && teams.value.some((team) => team.id === props.initialTeamId)) {
+    return props.initialTeamId;
+  }
+
+  return teams.value[0]?.id ?? newTeamOptionId;
 }
 
 function shortenFolder(value: string): string {
@@ -365,7 +460,8 @@ function shortenFolder(value: string): string {
   display: none;
 }
 
-.agent-dialog__backend-select {
+.agent-dialog__backend-select,
+.agent-dialog__team-select {
   width: 100%;
   font-size: var(--font-size-14);
   font-weight: var(--font-weight-semibold);
@@ -375,7 +471,8 @@ function shortenFolder(value: string): string {
   display: block;
 }
 
-.agent-dialog__backend-select :deep(.el-select__wrapper) {
+.agent-dialog__backend-select :deep(.el-select__wrapper),
+.agent-dialog__team-select :deep(.el-select__wrapper) {
   min-height: 42px;
   padding: 0 var(--space-6);
   border-radius: calc(var(--radius-lg) - 1px);
@@ -384,13 +481,21 @@ function shortenFolder(value: string): string {
 }
 
 .agent-dialog__backend-select :deep(.el-select__wrapper:hover),
-.agent-dialog__backend-select :deep(.el-select__wrapper.is-focused) {
+.agent-dialog__backend-select :deep(.el-select__wrapper.is-focused),
+.agent-dialog__team-select :deep(.el-select__wrapper:hover),
+.agent-dialog__team-select :deep(.el-select__wrapper.is-focused) {
   box-shadow: none;
 }
 
 .agent-dialog__backend-select :deep(.el-select__placeholder),
-.agent-dialog__backend-select :deep(.el-select__selected-item) {
+.agent-dialog__backend-select :deep(.el-select__selected-item),
+.agent-dialog__team-select :deep(.el-select__placeholder),
+.agent-dialog__team-select :deep(.el-select__selected-item) {
   color: var(--color-text);
+}
+
+.agent-dialog__new-team-control {
+  margin-top: var(--space-8);
 }
 
 .agent-dialog__backend-selected-icon {

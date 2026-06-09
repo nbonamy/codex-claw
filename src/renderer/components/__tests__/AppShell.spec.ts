@@ -4,7 +4,7 @@ import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '../../../shared/snapshot';
-import type { Agent, AppCommand, AppSnapshot, CodexClawApi, CreateAgentInput, CreateTeamInput, RendererMessage, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../../shared/contracts';
+import type { Agent, AppCommand, AppSnapshot, CodexClawApi, CreateAgentInput, CreateTeamInput, DeployBenchTemplateInput, RendererMessage, Team, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput, WorkItem, WorkProviderKind, WorkRepository } from '../../../shared/contracts';
 import { i18n } from '../../i18n';
 
 function pointerEvent(type: string, clientX: number): PointerEvent {
@@ -762,6 +762,45 @@ describe('AppShell', () => {
     }]]);
   });
 
+  it('forwards cockpit work item assignments', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.connections = [{
+      provider: 'github',
+      status: 'connected',
+      accountLabel: 'nbonamy',
+    }];
+    snapshot.workBacklog.selectedRepositoryIds.github = 'nbonamy/codex-claw';
+    const item = workItem();
+    const wrapper = mountShell({
+      snapshot,
+      workRepositoriesByProvider: {
+        github: [{
+          provider: 'github',
+          id: 'nbonamy/codex-claw',
+          owner: 'nbonamy',
+          name: 'codex-claw',
+          fullName: 'nbonamy/codex-claw',
+          url: 'https://github.com/nbonamy/codex-claw',
+          isPrivate: true,
+        }],
+      },
+      workItemsByRepository: {
+        'github:nbonamy/codex-claw': [item],
+      },
+    });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('assign-work-item', {
+      agentId: 'agent-dina',
+      item,
+    });
+
+    expect(wrapper.emitted('assign-work-item')).toStrictEqual([[{
+      agentId: 'agent-dina',
+      item,
+    }]]);
+  });
+
   it('shows the empty agent page when the active team has no agents', async () => {
     const snapshot = createEmptySnapshot();
     const wrapper = mount(AppShell, {
@@ -826,6 +865,7 @@ describe('AppShell', () => {
     await wrapper.get('.agent-sidebar__new').trigger('click');
 
     expect(wrapper.text()).toContain('Create Agent');
+    expect(wrapper.find('#agent-dialog-team').exists()).toBe(false);
     await wrapper.get('.agent-dialog__folder-control').trigger('click');
     await wrapper.get('.agent-dialog__text-input').setValue('Jules');
     await wrapper.find('.claw-dialog__footer .el-button--primary').trigger('click');
@@ -872,6 +912,133 @@ describe('AppShell', () => {
       backend: 'codex',
       teamId: 'team-skwad',
     });
+  });
+
+  it('assigns a ticket to a new agent and can create a ticket-named team', async () => {
+    const snapshot = createInitialSnapshot();
+    const item = workItem();
+    const createdTeam: Team = {
+      id: 'team-github-12',
+      name: 'GitHub #12',
+      color: '#1B4FB2',
+      agentIds: [],
+    };
+    const createdAgent: Agent = {
+      id: 'agent-issue',
+      teamId: 'team-github-12',
+      name: 'issue-agent',
+      avatar: '🤖',
+      folder: '/Users/nbonamy/src/issue-agent',
+      backend: 'codex',
+      backendDefaults: { kind: 'codex' },
+      status: { type: 'idle' },
+      createdAt: '2026-06-09T12:00:00.000Z',
+      updatedAt: '2026-06-09T12:00:00.000Z',
+    };
+    const createTeam = vi.fn().mockResolvedValue(createdTeam);
+    const createAgent = vi.fn().mockResolvedValue(createdAgent);
+    const wrapper = mountShell({
+      snapshot,
+      chooseAgentFolder: vi.fn().mockResolvedValue('/Users/nbonamy/src/issue-agent'),
+      createAgent,
+      createTeam,
+    });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('assign-work-item-to-new-agent', item);
+    await nextTick();
+
+    const agentDialog = wrapper.findComponent({ name: 'AgentDialog' });
+    expect(agentDialog.find('#agent-dialog-team').exists()).toBe(true);
+
+    await wrapper.get('.agent-dialog__folder-control').trigger('click');
+    await agentDialog.findAllComponents({ name: 'ElSelect' })[0]?.vm.$emit('update:modelValue', '__new_team__');
+    await nextTick();
+    expect(agentDialog.get<HTMLInputElement>('[aria-label="New team name"]').element.value).toBe('GitHub #12');
+    await wrapper.find('.claw-dialog__footer .el-button--primary').trigger('click');
+    await flushPromises();
+
+    expect(createTeam).toHaveBeenCalledWith({
+      name: 'GitHub #12',
+      color: '#1B4FB2',
+    });
+    expect(createAgent).toHaveBeenCalledWith({
+      name: 'issue-agent',
+      avatar: '🤖',
+      folder: '/Users/nbonamy/src/issue-agent',
+      backend: 'codex',
+      teamId: 'team-github-12',
+    });
+    expect(wrapper.emitted('assign-work-item')).toStrictEqual([[{
+      agentId: 'agent-issue',
+      item,
+    }]]);
+  });
+
+  it('assigns a ticket to a Bench agent with a selected or new team', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.bench.push({
+      id: 'bench-dina',
+      name: 'Dina',
+      avatar: 'DI',
+      folder: '/Users/nbonamy/src/id8',
+      backend: 'codex',
+      createdAt: '2026-06-05T00:00:00.000Z',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    });
+    const item = workItem();
+    const createdTeam: Team = {
+      id: 'team-github-12',
+      name: 'GitHub #12',
+      color: '#1B4FB2',
+      agentIds: [],
+    };
+    const deployedAgent: Agent = {
+      id: 'agent-dina-copy',
+      teamId: 'team-github-12',
+      name: 'Dina',
+      avatar: 'DI',
+      folder: '/Users/nbonamy/src/id8',
+      backend: 'codex',
+      backendDefaults: { kind: 'codex' },
+      status: { type: 'idle' },
+      createdAt: '2026-06-09T12:00:00.000Z',
+      updatedAt: '2026-06-09T12:00:00.000Z',
+    };
+    const createTeam = vi.fn().mockResolvedValue(createdTeam);
+    const deployBenchTemplateAction = vi.fn().mockResolvedValue(deployedAgent);
+    const wrapper = mountShell({
+      snapshot,
+      createTeam,
+      deployBenchTemplateAction,
+    });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('assign-work-item-to-bench-agent', item);
+    await nextTick();
+
+    const benchAgentAssignmentDialog = wrapper.findComponent({ name: 'BenchAgentAssignmentDialog' });
+    expect(benchAgentAssignmentDialog.text()).toContain('Dina');
+    expect(benchAgentAssignmentDialog.text()).toContain('id8');
+
+    await benchAgentAssignmentDialog.findAllComponents({ name: 'ElSelect' })[1]?.vm.$emit('update:modelValue', '__new_team__');
+    await nextTick();
+    expect(benchAgentAssignmentDialog.get<HTMLInputElement>('[aria-label="New team name"]').element.value).toBe('GitHub #12');
+    await wrapper.findAll('button').find((button) => button.text() === 'Assign')?.trigger('click');
+    await flushPromises();
+
+    expect(createTeam).toHaveBeenCalledWith({
+      name: 'GitHub #12',
+      color: '#1B4FB2',
+    });
+    expect(deployBenchTemplateAction).toHaveBeenCalledWith({
+      templateId: 'bench-dina',
+      teamId: 'team-github-12',
+    });
+    expect(wrapper.emitted('assign-work-item')).toStrictEqual([[{
+      agentId: 'agent-dina-copy',
+      item,
+    }]]);
   });
 
   it('opens the new team dialog from the team rail and forwards create requests', async () => {
@@ -1263,12 +1430,15 @@ describe('AppShell', () => {
 function mountShell(overrides: Partial<{
   snapshot: AppSnapshot;
   chooseAgentFolder: () => Promise<string | null>;
-  createAgent: (input: CreateAgentInput) => Promise<void>;
-  createTeam: (input: CreateTeamInput) => Promise<void>;
+  createAgent: (input: CreateAgentInput) => Promise<Agent | null | void>;
+  createTeam: (input: CreateTeamInput) => Promise<Team | null | void>;
+  deployBenchTemplateAction: (input: string | DeployBenchTemplateInput) => Promise<Agent | null | void>;
   updateTeam: (input: UpdateTeamInput) => Promise<void>;
   updateAgent: (input: UpdateAgentInput) => Promise<void>;
   updateSettings: (input: UpdateSettingsInput) => Promise<void>;
   quit: () => Promise<void>;
+  workRepositoriesByProvider: Partial<Record<WorkProviderKind, WorkRepository[]>>;
+  workItemsByRepository: Record<string, WorkItem[]>;
 }> = {}) {
   const snapshot = overrides.snapshot ?? createInitialSnapshot();
   return mount(AppShell, {
@@ -1281,9 +1451,12 @@ function mountShell(overrides: Partial<{
       chooseAgentFolder: overrides.chooseAgentFolder ?? vi.fn().mockResolvedValue(null),
       createAgent: overrides.createAgent ?? vi.fn().mockResolvedValue(undefined),
       createTeam: overrides.createTeam ?? vi.fn().mockResolvedValue(undefined),
+      deployBenchTemplateAction: overrides.deployBenchTemplateAction ?? vi.fn().mockResolvedValue(undefined),
       updateTeam: overrides.updateTeam ?? vi.fn().mockResolvedValue(undefined),
       updateAgent: overrides.updateAgent ?? vi.fn().mockResolvedValue(undefined),
       updateSettings: overrides.updateSettings ?? vi.fn().mockResolvedValue(undefined),
+      workRepositoriesByProvider: overrides.workRepositoriesByProvider ?? {},
+      workItemsByRepository: overrides.workItemsByRepository ?? {},
       quit: overrides.quit ?? vi.fn().mockResolvedValue(undefined),
     },
     global: {
@@ -1305,4 +1478,22 @@ function mountShell(overrides: Partial<{
       },
     },
   });
+}
+
+function workItem(): WorkItem {
+  return {
+    provider: 'github',
+    id: 'nbonamy/codex-claw#12',
+    repositoryId: 'nbonamy/codex-claw',
+    repositoryFullName: 'nbonamy/codex-claw',
+    number: 12,
+    title: 'Fix cockpit drag target',
+    url: 'https://github.com/nbonamy/codex-claw/issues/12',
+    state: 'open',
+    authorName: 'nbonamy',
+    body: 'Make issue assignment feel obvious.',
+    labels: [],
+    createdAt: '2026-06-09T12:00:00.000Z',
+    updatedAt: '2026-06-09T12:30:00.000Z',
+  };
 }

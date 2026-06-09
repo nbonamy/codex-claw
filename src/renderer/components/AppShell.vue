@@ -50,10 +50,16 @@
         :agents="snapshot.agents"
         :bench="snapshot.bench"
         :teams="snapshot.teams"
+        :work-backlog="cockpitWorkBacklog"
         @add-agent="openNewAgent"
+        @assign-work-item-to-bench-agent="openBenchAgentAssignmentDialog"
+        @assign-work-item-to-new-agent="openNewAgentForWorkItem"
+        @assign-work-item="$emit('assign-work-item', $event)"
         @deploy-bench-template="$emit('deploy-bench-template', $event)"
         @prompt-agent="$emit('send-agent-prompt', $event)"
         @remove-bench-template="$emit('remove-bench-template', $event)"
+        @refresh-work-items="refreshWorkItems"
+        @select-work-repository="selectWorkRepositoryForCockpit"
         @select-agent="selectAgentFromCockpit"
         @select-team="selectTeamFromRail"
       />
@@ -131,8 +137,24 @@
       :agent="editingAgent"
       :choose-agent-folder="chooseAgentFolder"
       :create-agent="createAgentFromDialog"
+      :initial-new-team-name="pendingNewAgentTeamName"
+      :initial-team-id="agentDialogTeamId"
       :update-agent="updateAgent"
+      :teams="snapshot.teams"
+      :show-team-field="showAgentDialogTeamSelector"
       @close="closeAgentDialog"
+    />
+    <BenchAgentAssignmentDialog
+      :visible="benchAssignmentDialogVisible"
+      title="Assign to Bench Agent"
+      subtitle="Choose a Bench agent and target team."
+      confirm-label="Assign"
+      :bench-templates="snapshot.bench"
+      :initial-new-team-name="pendingBenchAgentTeamName"
+      :initial-team-id="activeTeam?.id ?? snapshot.activeTeamId"
+      :teams="snapshot.teams"
+      @close="closeBenchAssignmentDialog"
+      @submit="assignWorkItemToBenchAgent"
     />
     <TeamDialog
       :visible="teamDialogVisible"
@@ -145,6 +167,14 @@
     <SettingsDialog
       v-model:visible="settingsDialogVisible"
       :settings="snapshot.theme"
+      :work-backlog-connections="snapshot.workBacklog.connections"
+      :work-backlog-error="workBacklogError"
+      :work-backlog-status="workBacklogStatus"
+      :work-provider-settings="snapshot.workBacklog.providerSettings"
+      :work-provider-authorization="workProviderAuthorization"
+      :connect-work-provider="connectWorkProvider"
+      :complete-work-provider-connection="completeWorkProviderConnection"
+      :disconnect-work-provider="disconnectWorkProvider"
       :update-settings="updateSettings"
     />
   </main>
@@ -152,8 +182,9 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, Team, ThreadGoal, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../shared/contracts';
+import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, Team, ThreadGoal, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../../shared/contracts';
 import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
+import { defaultTeamColor } from '../../shared/team-colors';
 import AgentDialog from './AgentDialog.vue';
 import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
@@ -163,6 +194,7 @@ import ConversationPane from './ConversationPane.vue';
 import SidePanel from './SidePanel.vue';
 import TeamDialog from './TeamDialog.vue';
 import TeamRail from './TeamRail.vue';
+import BenchAgentAssignmentDialog from './BenchAgentAssignmentDialog.vue';
 import SettingsDialog from './SettingsDialog.vue';
 import { confirmCloseTeam } from './team-close-confirmation';
 import type { QueuedChatPrompt } from '../shared/chat/queued-prompts';
@@ -189,13 +221,25 @@ const props = withDefaults(defineProps<{
   planMode?: boolean;
   queuedPrompts?: QueuedChatPrompt[];
   sidePanelMarkdownRequest?: SidePanelMarkdownRequest | null;
+  workProviderAuthorization?: WorkProviderAuthorization | null;
+  workRepositoriesByProvider?: Partial<Record<WorkProviderKind, WorkRepository[]>>;
+  workItemsByRepository?: Record<string, WorkItem[]>;
+  workBacklogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
+  workBacklogError?: string | null;
   chooseAgentFolder?: () => Promise<string | null>;
   readAgentFile?: (agentId: string, filePath: string) => Promise<AgentFileReadResult>;
-  createAgent?: (input: CreateAgentInput) => Promise<void>;
-  createTeam?: (input: CreateTeamInput) => Promise<void>;
+  createAgent?: (input: CreateAgentInput) => Promise<Agent | null | void>;
+  createTeam?: (input: CreateTeamInput) => Promise<Team | null | void>;
+  deployBenchTemplateAction?: (input: string | DeployBenchTemplateInput) => Promise<Agent | null | void>;
   updateTeam?: (input: UpdateTeamInput) => Promise<void>;
   updateAgent?: (input: UpdateAgentInput) => Promise<void>;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
+  connectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
+  completeWorkProviderConnection?: (provider: WorkProviderKind) => Promise<void>;
+  disconnectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
+  selectWorkRepository?: (provider: WorkProviderKind, repositoryId: string | null) => Promise<void>;
+  loadWorkRepositories?: (provider: WorkProviderKind) => Promise<void>;
+  loadWorkItems?: (provider: WorkProviderKind, repositoryId: string) => Promise<void>;
   quit?: () => Promise<void>;
 }>(), {
   answeredClientRequestIds: () => new Set<string>(),
@@ -211,15 +255,27 @@ const props = withDefaults(defineProps<{
   codexApprovalPreset: null,
   queuedPrompts: () => [],
   sidePanelMarkdownRequest: null,
+  workProviderAuthorization: null,
+  workRepositoriesByProvider: () => ({}),
+  workItemsByRepository: () => ({}),
+  workBacklogStatus: 'notLoaded',
+  workBacklogError: null,
   chooseAgentFolder: async () => null,
   readAgentFile: async () => {
     throw new Error('File preview is not available.');
   },
   createAgent: async () => undefined,
   createTeam: async () => undefined,
+  deployBenchTemplateAction: async () => undefined,
   updateTeam: async () => undefined,
   updateAgent: async () => undefined,
   updateSettings: async () => undefined,
+  connectWorkProvider: async () => undefined,
+  completeWorkProviderConnection: async () => undefined,
+  disconnectWorkProvider: async () => undefined,
+  selectWorkRepository: async () => undefined,
+  loadWorkRepositories: async () => undefined,
+  loadWorkItems: async () => undefined,
   quit: async () => undefined,
 });
 
@@ -240,6 +296,7 @@ const emit = defineEmits<{
   'quote-message': [index: number];
   'reorder-agents': [input: ReorderAgentsInput];
   'reorder-teams': [input: ReorderTeamsInput];
+  'assign-work-item': [payload: { agentId: string; item: WorkItem }];
   'restart-agent': [agentId: string];
   'remove-bench-template': [templateId: string];
   'retry-message': [index: number];
@@ -265,6 +322,9 @@ const agentDialogVisible = ref(false);
 const agentDialogMode = ref<'create' | 'edit'>('create');
 const editingAgentId = ref<string | null>(null);
 const agentDialogTeamId = ref<string | null>(null);
+const pendingNewAgentWorkItem = ref<WorkItem | null>(null);
+const pendingBenchAgentWorkItem = ref<WorkItem | null>(null);
+const benchAssignmentDialogVisible = ref(false);
 const teamDialogVisible = ref(false);
 const teamDialogMode = ref<'create' | 'edit'>('create');
 const editingTeamId = ref<string | null>(null);
@@ -301,6 +361,28 @@ const currentBackendRuntime = computed<BackendRuntimeStatus>(() => {
     status: 'notConfigured',
   };
 });
+const cockpitWorkBacklog = computed(() => {
+  const connection = props.snapshot.workBacklog.connections.find((candidate) => candidate.provider === 'github');
+  if (!connection || connection.status !== 'connected') {
+    return null;
+  }
+
+  const provider = connection.provider;
+  const repositories = props.workRepositoriesByProvider[provider] ?? [];
+  const selectedRepositoryId = props.snapshot.workBacklog.selectedRepositoryIds[provider] ?? repositories[0]?.id ?? null;
+
+  return {
+    connection,
+    repositories,
+    selectedRepositoryId,
+    items: selectedRepositoryId ? props.workItemsByRepository[workItemsKey(provider, selectedRepositoryId)] ?? [] : [],
+    status: props.workBacklogStatus,
+    error: props.workBacklogError,
+  };
+});
+const showAgentDialogTeamSelector = computed(() => agentDialogMode.value === 'create' && pendingNewAgentWorkItem.value !== null);
+const pendingNewAgentTeamName = computed(() => pendingNewAgentWorkItem.value ? workItemTeamName(pendingNewAgentWorkItem.value) : '');
+const pendingBenchAgentTeamName = computed(() => pendingBenchAgentWorkItem.value ? workItemTeamName(pendingBenchAgentWorkItem.value) : '');
 const isAgentEmpty = computed(() => activeTeamAgents.value.length === 0);
 const showAgentSidebar = computed(() => !cockpitVisible.value && !agentSidebarCollapsed.value && !isAgentEmpty.value);
 const editingAgent = computed(() => (
@@ -355,6 +437,24 @@ function openNewAgent(teamId?: string): void {
   agentDialogVisible.value = true;
 }
 
+function openNewAgentForWorkItem(item: WorkItem): void {
+  pendingNewAgentWorkItem.value = item;
+  openNewAgent(activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined);
+}
+
+function openBenchAgentAssignmentDialog(item: WorkItem): void {
+  pendingBenchAgentWorkItem.value = item;
+  benchAssignmentDialogVisible.value = true;
+}
+
+function workItemTeamName(item: WorkItem): string {
+  return `${workProviderTitle(item.provider)} #${item.number}`;
+}
+
+function workProviderTitle(provider: WorkItem['provider']): string {
+  return provider === 'github' ? 'GitHub' : provider;
+}
+
 function openNewTeam(): void {
   teamDialogMode.value = 'create';
   editingTeamId.value = null;
@@ -378,11 +478,60 @@ function closeAgentDialog(): void {
   agentDialogVisible.value = false;
   editingAgentId.value = null;
   agentDialogTeamId.value = null;
+  pendingNewAgentWorkItem.value = null;
 }
 
-async function createAgentFromDialog(input: CreateAgentInput): Promise<void> {
-  const teamId = agentDialogMode.value === 'create' ? agentDialogTeamId.value : null;
-  await props.createAgent(teamId ? { ...input, teamId } : input);
+async function createAgentFromDialog(input: CreateAgentInput & { newTeamName?: string; teamId?: string }): Promise<void> {
+  const { newTeamName, ...agentInput } = input;
+  const targetTeamId = agentDialogMode.value === 'create'
+    ? await resolveSelectedTeam(input.teamId ?? agentDialogTeamId.value, newTeamName)
+    : null;
+  const agent = await props.createAgent(targetTeamId ? { ...agentInput, teamId: targetTeamId } : agentInput);
+  if (agent && pendingNewAgentWorkItem.value) {
+    emit('assign-work-item', {
+      agentId: agent.id,
+      item: pendingNewAgentWorkItem.value,
+    });
+  }
+  pendingNewAgentWorkItem.value = null;
+}
+
+function closeBenchAssignmentDialog(): void {
+  benchAssignmentDialogVisible.value = false;
+  pendingBenchAgentWorkItem.value = null;
+}
+
+async function assignWorkItemToBenchAgent(input: { benchTemplateId?: string; newTeamName?: string; teamId?: string }): Promise<void> {
+  const item = pendingBenchAgentWorkItem.value;
+  if (!item || !input.benchTemplateId) {
+    return;
+  }
+
+  const targetTeamId = await resolveSelectedTeam(input.teamId ?? null, input.newTeamName);
+  const agent = await props.deployBenchTemplateAction({
+    templateId: input.benchTemplateId,
+    ...(targetTeamId ? { teamId: targetTeamId } : {}),
+  });
+  if (agent) {
+    emit('assign-work-item', {
+      agentId: agent.id,
+      item,
+    });
+  }
+  closeBenchAssignmentDialog();
+}
+
+async function resolveSelectedTeam(teamId: string | null | undefined, newTeamName?: string): Promise<string | null> {
+  const trimmedNewTeamName = newTeamName?.trim() ?? '';
+  if (trimmedNewTeamName) {
+    const team = await props.createTeam({
+      name: trimmedNewTeamName,
+      color: defaultTeamColor,
+    });
+    return team?.id ?? props.snapshot.activeTeamId ?? null;
+  }
+
+  return teamId?.trim() || props.snapshot.activeTeamId;
 }
 
 function openCockpit(): void {
@@ -561,6 +710,30 @@ async function updateSettings(input: UpdateSettingsInput): Promise<void> {
   await props.updateSettings(input);
 }
 
+async function connectWorkProvider(provider: WorkProviderKind): Promise<void> {
+  await props.connectWorkProvider(provider);
+}
+
+async function completeWorkProviderConnection(provider: WorkProviderKind): Promise<void> {
+  await props.completeWorkProviderConnection(provider);
+}
+
+async function disconnectWorkProvider(provider: WorkProviderKind): Promise<void> {
+  await props.disconnectWorkProvider(provider);
+}
+
+async function selectWorkRepositoryForCockpit(repositoryId: string | null): Promise<void> {
+  await props.selectWorkRepository('github', repositoryId);
+}
+
+async function refreshWorkItems(repositoryId: string | null): Promise<void> {
+  if (repositoryId) {
+    await props.loadWorkItems('github', repositoryId);
+  } else {
+    await props.loadWorkRepositories('github');
+  }
+}
+
 async function quit(): Promise<void> {
   await props.quit();
 }
@@ -616,6 +789,10 @@ function editActiveAgent(): void {
 
 function fileBasename(filePath: string): string {
   return filePath.split('/').filter(Boolean).at(-1) ?? filePath;
+}
+
+function workItemsKey(provider: WorkProviderKind, repositoryId: string): string {
+  return `${provider}:${repositoryId}`;
 }
 
 function cycleTeams(): boolean {
