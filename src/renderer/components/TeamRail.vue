@@ -5,6 +5,17 @@
     aria-label="Teams"
   >
     <button
+      class="team-rail__cockpit"
+      :class="{ 'team-rail__cockpit--active': cockpitActive }"
+      type="button"
+      aria-label="Cockpit"
+      :aria-pressed="cockpitActive"
+      @click="emit('select-cockpit')"
+    >
+      <CompassIcon aria-hidden="true" />
+    </button>
+
+    <button
       v-for="team in teams"
       :key="team.id"
       class="team-rail__team"
@@ -61,7 +72,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { AccountRateLimits, ReorderTeamsInput, Team } from '../../shared/contracts';
 import { defaultTeamColor } from '../../shared/team-colors';
 import { teamInitials } from '../../shared/team-manager';
-import { PlusIcon } from '../shared/icons/app-icons';
+import { CompassIcon, PlusIcon } from '../shared/icons/app-icons';
 import { useListReorderDrag } from '../shared/use-list-reorder-drag';
 import SettingsMenu from './SettingsMenu.vue';
 import TeamContextMenu from './TeamContextMenu.vue';
@@ -70,6 +81,7 @@ import { confirmCloseTeam } from './team-close-confirmation';
 const props = defineProps<{
   teams: Team[];
   activeTeamId: string | null;
+  cockpitActive?: boolean;
   rateLimits?: AccountRateLimits;
 }>();
 
@@ -80,6 +92,7 @@ const emit = defineEmits<{
   'open-settings': [];
   quit: [];
   'reorder-teams': [input: ReorderTeamsInput];
+  'select-cockpit': [];
   'select-team': [teamId: string];
 }>();
 
@@ -186,6 +199,31 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-16);
   cursor: pointer;
+}
+
+.team-rail__cockpit {
+  width: var(--team-rail-button-size);
+  height: var(--team-rail-button-size);
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  color: var(--color-text-muted);
+  background: var(--color-surface-low);
+  cursor: pointer;
+}
+
+.team-rail__cockpit:hover,
+.team-rail__cockpit:focus-visible,
+.team-rail__cockpit--active {
+  color: white;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.team-rail__cockpit svg {
+  width: var(--icon-lg);
+  height: var(--icon-lg);
 }
 
 .team-rail__team::before,

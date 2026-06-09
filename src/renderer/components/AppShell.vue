@@ -5,6 +5,7 @@
     <TeamRail
       :teams="snapshot.teams"
       :active-team-id="activeTeam?.id ?? null"
+      :cockpit-active="cockpitVisible"
       :rate-limits="snapshot.accountRateLimits"
       class="app-shell__team-rail"
       @close-team="$emit('close-team', $event)"
@@ -13,7 +14,8 @@
       @open-settings="settingsDialogVisible = true"
       @quit="quit"
       @reorder-teams="$emit('reorder-teams', $event)"
-      @select-team="$emit('select-team', $event)"
+      @select-cockpit="openCockpit"
+      @select-team="selectTeamFromRail"
     />
     <Transition name="agent-sidebar">
       <AgentSidebar
@@ -39,82 +41,96 @@
         @resize-sidebar="setAgentSidebarWidth"
         @remove-bench-template="$emit('remove-bench-template', $event)"
         @save-agent-to-bench="$emit('save-agent-to-bench', $event)"
-        @select-agent="$emit('select-agent', $event)"
+        @select-agent="selectAgentFromShell"
       />
     </Transition>
     <section class="app-shell__agent">
-      <AgentHeader
-        v-if="!isAgentEmpty && currentAgent"
-        :agent="currentAgent"
-        :backend-runtime="currentBackendRuntime"
-        :is-loading="isLoading"
-        :sidebar-collapsed="agentSidebarCollapsed"
-        @expand-sidebar="agentSidebarCollapsed = false"
+      <CockpitView
+        v-if="cockpitVisible"
+        :agents="snapshot.agents"
+        :bench="snapshot.bench"
+        :teams="snapshot.teams"
+        @add-agent="openNewAgent"
+        @deploy-bench-template="$emit('deploy-bench-template', $event)"
+        @prompt-agent="$emit('send-agent-prompt', $event)"
+        @remove-bench-template="$emit('remove-bench-template', $event)"
+        @select-agent="selectAgentFromCockpit"
+        @select-team="selectTeamFromRail"
       />
-      <div class="app-shell__body">
-        <AgentEmptyState
-          v-if="isAgentEmpty"
-          :bench="snapshot.bench"
-          @deploy-bench-template="$emit('deploy-bench-template', $event)"
-          @new-agent="openNewAgent"
-          @remove-bench-template="$emit('remove-bench-template', $event)"
-        />
-        <ConversationPane
-          v-else
-          :messages="messages"
+      <template v-else>
+        <AgentHeader
+          v-if="!isAgentEmpty && currentAgent"
           :agent="currentAgent"
-          :agent-files="agentFiles"
+          :backend-runtime="currentBackendRuntime"
           :is-loading="isLoading"
-          :is-sending="isSending"
-          :answered-client-request-ids="answeredClientRequestIds"
-          :backend-models="backendModels"
-          :backend-commands="backendCommands"
-          :backend-skills="backendSkills"
-          :backend-capabilities="backendCapabilities"
-          :model-catalog-status="modelCatalogStatus"
-          :skill-catalog-status="skillCatalogStatus"
-          :goal="goal"
-          :codex-approval-preset="codexApprovalPreset"
-          :plan-mode="planMode"
-          :selected-model-id="selectedModelId"
-          :selected-reasoning-effort="selectedReasoningEffort"
-          :queued-prompts="queuedPrompts"
-          @attach="$emit('attach')"
-          @client-response="$emit('client-response', $event)"
-          @copy-message="$emit('copy-message', $event)"
-          @delete-message="$emit('delete-message', $event)"
-          @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
-          @edit-message="$emit('edit-message', $event)"
-          @interrupt-agent="$emit('interrupt-agent')"
-          @open-markdown-file="openMarkdownFile"
-          @quote-message="$emit('quote-message', $event)"
-          @retry-message="$emit('retry-message', $event)"
-          @select-model="$emit('select-model', $event)"
-          @select-reasoning-effort="$emit('select-reasoning-effort', $event)"
-          @select-codex-approval-preset="$emit('select-codex-approval-preset', $event)"
-          @clear-goal="$emit('clear-goal')"
-          @send-prompt="$emit('sendPrompt', $event)"
-          @steer-prompt="$emit('steerPrompt', $event)"
-          @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
-          @update:plan-mode="$emit('update:planMode', $event)"
+          :sidebar-collapsed="agentSidebarCollapsed"
+          @expand-sidebar="agentSidebarCollapsed = false"
         />
-        <SidePanel
-          v-if="sidePanel"
-          :panel="sidePanel"
-          :plan-updating="isPlanPreviewUpdating"
-          @cancel-plan="cancelPlanReview"
-          @close="closeSidePanel"
-          @comment-plan="commentOnPlan"
-          @confirm-plan="confirmPlan"
-        />
-      </div>
+        <div class="app-shell__body">
+          <AgentEmptyState
+            v-if="isAgentEmpty"
+            :bench="snapshot.bench"
+            @deploy-bench-template="$emit('deploy-bench-template', $event)"
+            @new-agent="openNewAgent"
+            @remove-bench-template="$emit('remove-bench-template', $event)"
+          />
+          <ConversationPane
+            v-else
+            :messages="messages"
+            :agent="currentAgent"
+            :agent-files="agentFiles"
+            :is-loading="isLoading"
+            :is-sending="isSending"
+            :answered-client-request-ids="answeredClientRequestIds"
+            :backend-models="backendModels"
+            :backend-commands="backendCommands"
+            :backend-skills="backendSkills"
+            :backend-capabilities="backendCapabilities"
+            :model-catalog-status="modelCatalogStatus"
+            :skill-catalog-status="skillCatalogStatus"
+            :goal="goal"
+            :codex-approval-preset="codexApprovalPreset"
+            :plan-mode="planMode"
+            :selected-model-id="selectedModelId"
+            :selected-reasoning-effort="selectedReasoningEffort"
+            :queued-prompts="queuedPrompts"
+            @attach="$emit('attach')"
+            @client-response="$emit('client-response', $event)"
+            @copy-message="$emit('copy-message', $event)"
+            @delete-message="$emit('delete-message', $event)"
+            @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
+            @edit-message="$emit('edit-message', $event)"
+            @interrupt-agent="$emit('interrupt-agent')"
+            @open-markdown-file="openMarkdownFile"
+            @quote-message="$emit('quote-message', $event)"
+            @retry-message="$emit('retry-message', $event)"
+            @select-model="$emit('select-model', $event)"
+            @select-reasoning-effort="$emit('select-reasoning-effort', $event)"
+            @select-codex-approval-preset="$emit('select-codex-approval-preset', $event)"
+            @clear-goal="$emit('clear-goal')"
+            @send-prompt="$emit('sendPrompt', $event)"
+            @steer-prompt="$emit('steerPrompt', $event)"
+            @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
+            @update:plan-mode="$emit('update:planMode', $event)"
+          />
+          <SidePanel
+            v-if="sidePanel"
+            :panel="sidePanel"
+            :plan-updating="isPlanPreviewUpdating"
+            @cancel-plan="cancelPlanReview"
+            @close="closeSidePanel"
+            @comment-plan="commentOnPlan"
+            @confirm-plan="confirmPlan"
+          />
+        </div>
+      </template>
     </section>
     <AgentDialog
       :visible="agentDialogVisible"
       :mode="agentDialogMode"
       :agent="editingAgent"
       :choose-agent-folder="chooseAgentFolder"
-      :create-agent="createAgent"
+      :create-agent="createAgentFromDialog"
       :update-agent="updateAgent"
       @close="closeAgentDialog"
     />
@@ -136,12 +152,13 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, Team, ThreadGoal, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../shared/contracts';
+import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, Team, ThreadGoal, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../shared/contracts';
 import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import AgentDialog from './AgentDialog.vue';
 import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
 import AgentSidebar from './AgentSidebar.vue';
+import CockpitView from './CockpitView.vue';
 import ConversationPane from './ConversationPane.vue';
 import SidePanel from './SidePanel.vue';
 import TeamDialog from './TeamDialog.vue';
@@ -215,7 +232,7 @@ const emit = defineEmits<{
   'copy-message': [index: number];
   'delete-message': [index: number];
   'delete-queued-prompt': [promptId: string];
-  'deploy-bench-template': [templateId: string];
+  'deploy-bench-template': [input: string | DeployBenchTemplateInput];
   'duplicate-agent': [agentId: string];
   'edit-message': [payload: { content: string; index: number }];
   'interrupt-agent': [];
@@ -227,6 +244,7 @@ const emit = defineEmits<{
   'remove-bench-template': [templateId: string];
   'retry-message': [index: number];
   'save-agent-to-bench': [agentId: string];
+  'send-agent-prompt': [payload: { agentId: string; prompt: string }];
   'select-agent': [agentId: string];
   'select-model': [modelId: string];
   'select-reasoning-effort': [reasoningEffort: ReasoningEffort];
@@ -242,9 +260,11 @@ const agentSidebarCollapsed = ref(false);
 const agentSidebarMinWidth = 80;
 const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
+const cockpitVisible = ref(false);
 const agentDialogVisible = ref(false);
 const agentDialogMode = ref<'create' | 'edit'>('create');
 const editingAgentId = ref<string | null>(null);
+const agentDialogTeamId = ref<string | null>(null);
 const teamDialogVisible = ref(false);
 const teamDialogMode = ref<'create' | 'edit'>('create');
 const editingTeamId = ref<string | null>(null);
@@ -282,7 +302,7 @@ const currentBackendRuntime = computed<BackendRuntimeStatus>(() => {
   };
 });
 const isAgentEmpty = computed(() => activeTeamAgents.value.length === 0);
-const showAgentSidebar = computed(() => !agentSidebarCollapsed.value && !isAgentEmpty.value);
+const showAgentSidebar = computed(() => !cockpitVisible.value && !agentSidebarCollapsed.value && !isAgentEmpty.value);
 const editingAgent = computed(() => (
   editingAgentId.value ? props.snapshot.agents.find((agent) => agent.id === editingAgentId.value) ?? null : null
 ));
@@ -328,9 +348,10 @@ function setAgentSidebarWidth(width: number): void {
   agentSidebarWidth.value = Math.min(Math.max(width, agentSidebarMinWidth), agentSidebarMaxWidth);
 }
 
-function openNewAgent(): void {
+function openNewAgent(teamId?: string): void {
   agentDialogMode.value = 'create';
   editingAgentId.value = null;
+  agentDialogTeamId.value = teamId ?? activeTeam.value?.id ?? null;
   agentDialogVisible.value = true;
 }
 
@@ -349,11 +370,40 @@ function openEditTeam(teamId: string): void {
 function openEditAgent(agentId: string): void {
   agentDialogMode.value = 'edit';
   editingAgentId.value = agentId;
+  agentDialogTeamId.value = null;
   agentDialogVisible.value = true;
 }
 
 function closeAgentDialog(): void {
   agentDialogVisible.value = false;
+  editingAgentId.value = null;
+  agentDialogTeamId.value = null;
+}
+
+async function createAgentFromDialog(input: CreateAgentInput): Promise<void> {
+  const teamId = agentDialogMode.value === 'create' ? agentDialogTeamId.value : null;
+  await props.createAgent(teamId ? { ...input, teamId } : input);
+}
+
+function openCockpit(): void {
+  closeSidePanel();
+  cockpitVisible.value = true;
+}
+
+function selectTeamFromRail(teamId: string): void {
+  cockpitVisible.value = false;
+  emit('select-team', teamId);
+}
+
+function selectAgentFromShell(agentId: string): void {
+  cockpitVisible.value = false;
+  emit('select-agent', agentId);
+}
+
+function selectAgentFromCockpit(payload: { agentId: string; teamId: string }): void {
+  cockpitVisible.value = false;
+  emit('select-team', payload.teamId);
+  emit('select-agent', payload.agentId);
 }
 
 function closeSidePanel(): void {
@@ -580,7 +630,7 @@ function cycleTeams(): boolean {
     return false;
   }
 
-  emit('select-team', nextTeam.id);
+  selectTeamFromRail(nextTeam.id);
   return true;
 }
 
@@ -597,7 +647,7 @@ function cycleAgents(direction: 1 | -1, event?: KeyboardEvent): void {
   }
 
   event?.preventDefault();
-  emit('select-agent', nextAgent.id);
+  selectAgentFromShell(nextAgent.id);
 }
 
 const activeTeam = computed<Team | null>(() => {

@@ -51,6 +51,7 @@
     @edit-message="editMessage"
     @interrupt-agent="interruptActiveAgent"
     @retry-message="retryMessage"
+    @send-agent-prompt="sendAgentPrompt($event.agentId, $event.prompt)"
     @send-prompt="sendPrompt"
     @steer-prompt="steerPrompt"
     @steer-queued-prompt="steerQueuedPrompt"
@@ -112,6 +113,7 @@ const {
   selectAgent,
   selectTeam,
   sendPrompt,
+  sendAgentPrompt,
   steerPrompt,
   interruptActiveAgent,
   deleteMessage,

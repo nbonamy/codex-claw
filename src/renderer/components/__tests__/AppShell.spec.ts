@@ -706,6 +706,62 @@ describe('AppShell', () => {
     expect(wrapper.emitted('select-team')).toStrictEqual([['team-codex-claw']]);
   });
 
+  it('opens cockpit from the first rail item and navigates back to an agent', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mountShell({ snapshot });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+
+    expect(wrapper.find('.cockpit-view').exists()).toBe(true);
+    expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
+    expect(wrapper.find('.conversation-pane').exists()).toBe(false);
+
+    await wrapper.findAll('.cockpit-view__agent-card')[1].trigger('click');
+
+    expect(wrapper.find('.cockpit-view').exists()).toBe(false);
+    expect(wrapper.emitted('select-team')).toStrictEqual([['team-codex-claw']]);
+    expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-jesse']]);
+  });
+
+  it('forwards cockpit prompts for the targeted agent', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[1].status = { type: 'idle' };
+    const wrapper = mountShell({ snapshot });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    await wrapper.get('[aria-label="Prompt Jesse"]').setValue('  check the tests  ');
+    await wrapper.findAll('.cockpit-view__prompt')[1].trigger('submit');
+
+    expect(wrapper.emitted('send-agent-prompt')).toStrictEqual([[{
+      agentId: 'agent-jesse',
+      prompt: 'check the tests',
+    }]]);
+  });
+
+  it('forwards cockpit Bench deploys with the target team', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.bench.push({
+      id: 'bench-dina',
+      name: 'Dina',
+      avatar: 'DI',
+      folder: '~/src/codex-claw',
+      backend: 'codex',
+      createdAt: '2026-06-05T00:00:00.000Z',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    });
+    const wrapper = mountShell({ snapshot });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    await wrapper.get('.cockpit-view__add-card [aria-label="Open Bench"]').trigger('click');
+    await flushPromises();
+    await wrapper.findAll('.new-agent-menu__template').find((row) => row.text().includes('Dina'))?.trigger('click');
+
+    expect(wrapper.emitted('deploy-bench-template')).toStrictEqual([[{
+      templateId: 'bench-dina',
+      teamId: 'team-codex-claw',
+    }]]);
+  });
+
   it('shows the empty agent page when the active team has no agents', async () => {
     const snapshot = createEmptySnapshot();
     const wrapper = mount(AppShell, {
@@ -772,13 +828,49 @@ describe('AppShell', () => {
     expect(wrapper.text()).toContain('Create Agent');
     await wrapper.get('.agent-dialog__folder-control').trigger('click');
     await wrapper.get('.agent-dialog__text-input').setValue('Jules');
-    await wrapper.findAll('button').find((button) => button.text() === 'Add Agent')?.trigger('click');
+    await wrapper.find('.claw-dialog__footer .el-button--primary').trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
       name: 'Jules',
       avatar: '🤖',
       folder: '/Users/nbonamy/src/new-agent',
       backend: 'codex',
+      teamId: 'team-codex-claw',
+    });
+  });
+
+  it('creates agents in the team selected from the cockpit add card', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.teams.push({
+      id: 'team-skwad',
+      name: 'Skwad',
+      avatar: 'SK',
+      color: '#46A857',
+      agentIds: [],
+    });
+    const chooseAgentFolder = vi.fn().mockResolvedValue('/Users/nbonamy/src/skwad');
+    const createAgent = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({
+      snapshot,
+      chooseAgentFolder,
+      createAgent,
+    });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    await wrapper.findAll('.cockpit-view__add-card .new-agent-button__primary')[1].trigger('click');
+
+    expect(wrapper.text()).toContain('Create Agent');
+    await wrapper.get('.agent-dialog__folder-control').trigger('click');
+    await flushPromises();
+    await wrapper.get('.agent-dialog__text-input').setValue('Abby');
+    await wrapper.find('.claw-dialog__footer .el-button--primary').trigger('click');
+
+    expect(createAgent).toHaveBeenCalledWith({
+      name: 'Abby',
+      avatar: '🤖',
+      folder: '/Users/nbonamy/src/skwad',
+      backend: 'codex',
+      teamId: 'team-skwad',
     });
   });
 

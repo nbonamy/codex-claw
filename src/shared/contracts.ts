@@ -141,6 +141,11 @@ export type BenchTemplate = {
   updatedAt: string;
 };
 
+export type DeployBenchTemplateInput = {
+  templateId: string;
+  teamId?: string;
+};
+
 export type ReasoningEffort = string;
 
 export type BackendPlanModeSupport = 'native' | 'prompted' | 'unsupported';
@@ -389,6 +394,7 @@ export type CreateAgentInput = {
   folder: string;
   avatar?: string;
   backend?: AgentBackend;
+  teamId?: string;
 };
 
 export type CreateTeamInput = {

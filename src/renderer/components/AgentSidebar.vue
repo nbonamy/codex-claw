@@ -95,7 +95,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Agent, AgentStatus, BenchTemplate, ReorderAgentsInput, Team } from '../../shared/contracts';
+import type { Agent, BenchTemplate, ReorderAgentsInput, Team } from '../../shared/contracts';
 import {
   PanelLeftCloseIcon,
 } from '../shared/icons/app-icons';
@@ -103,6 +103,7 @@ import AgentContextMenu from './AgentContextMenu.vue';
 import type { AgentContextMenuAction } from './AgentContextMenu.vue';
 import AgentAvatar from './AgentAvatar.vue';
 import NewAgentButton from './NewAgentButton.vue';
+import { agentStatusLabel, agentStatusText, folderBasename } from '../shared/agent-display';
 import { useListReorderDrag } from '../shared/use-list-reorder-drag';
 
 const props = defineProps<{
@@ -172,43 +173,6 @@ const sidebarStyle = computed<Record<string, string>>(() => ({
   '--agent-sidebar-max-width': `${maxWidth.value}px`,
 }));
 let resizeStart: { pointerId: number; clientX: number; width: number } | null = null;
-
-function agentStatusLabel(status: AgentStatus['type']): string {
-  switch (status) {
-    case 'working':
-      return 'Working';
-    case 'starting':
-      return 'Starting';
-    case 'awaitingInput':
-      return 'Awaiting input';
-    case 'error':
-      return 'Error';
-    case 'idle':
-      return 'Idle';
-  }
-}
-
-function agentStatusText(agent: Agent): string {
-  if (agent.statusText) {
-    return agent.statusText;
-  }
-
-  switch (agent.status.type) {
-    case 'working':
-      return agent.status.detail ?? agentStatusLabel(agent.status.type);
-    case 'awaitingInput':
-      return agent.status.detail ?? agentStatusLabel(agent.status.type);
-    case 'error':
-      return agent.status.message ?? agentStatusLabel(agent.status.type);
-    case 'starting':
-    case 'idle':
-      return agentStatusLabel(agent.status.type);
-  }
-}
-
-function folderBasename(folder: string): string {
-  return folder.trim().split(/[\\/]/).filter(Boolean).at(-1) ?? folder;
-}
 
 function clampWidth(width: number): number {
   return Math.min(Math.max(Math.round(width), minWidth.value), maxWidth.value);

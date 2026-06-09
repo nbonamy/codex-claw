@@ -24,6 +24,14 @@ const bench: BenchTemplate[] = [
   },
 ];
 
+type NewAgentButtonMountProps = {
+  label?: string;
+  presentation?: 'default' | 'tile';
+  showBenchMenu?: boolean;
+  size?: 'regular' | 'small';
+  tone?: 'primary' | 'muted' | 'ghost';
+};
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -67,6 +75,37 @@ describe('NewAgentButton', () => {
 
     expect(wrapper.emitted('new-agent')).toStrictEqual([[], []]);
     expect(popoverVisible(wrapper)).toBe(false);
+  });
+
+  it('renders a muted tile variant without the Bench menu', async () => {
+    const wrapper = mountButton([], {
+      label: 'Add Agent',
+      presentation: 'tile',
+      showBenchMenu: false,
+      tone: 'muted',
+    });
+
+    expect(wrapper.classes()).toContain('new-agent-button--muted');
+    expect(wrapper.classes()).toContain('new-agent-button--tile');
+    expect(wrapper.get('.agent-sidebar__new').text()).toContain('Add Agent');
+    expect(wrapper.find('[aria-label="Open Bench"]').exists()).toBe(false);
+
+    await wrapper.get('.agent-sidebar__new').trigger('click');
+
+    expect(wrapper.emitted('new-agent')).toStrictEqual([[]]);
+  });
+
+  it('renders a small ghost variant for compact headers', () => {
+    const wrapper = mountButton([], {
+      label: 'Add Agent',
+      showBenchMenu: false,
+      size: 'small',
+      tone: 'ghost',
+    });
+
+    expect(wrapper.classes()).toContain('new-agent-button--ghost');
+    expect(wrapper.classes()).toContain('new-agent-button--small');
+    expect(wrapper.find('[aria-label="Open Bench"]').exists()).toBe(false);
   });
 
   it('deploys a Bench template and hides the menu', async () => {
@@ -117,10 +156,11 @@ describe('NewAgentButton', () => {
   });
 });
 
-function mountButton(templates = bench) {
+function mountButton(templates = bench, props: NewAgentButtonMountProps = {}) {
   return mount(NewAgentButton, {
     props: {
       bench: templates,
+      ...props,
     },
     global: {
       plugins: [ElementPlus],

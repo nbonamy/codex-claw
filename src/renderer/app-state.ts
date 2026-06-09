@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelMarkdownRequest, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
+import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelMarkdownRequest, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
 import { updateSettingsInSnapshot } from '../shared/settings';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '../shared/snapshot';
 import { defaultBackendCapabilities } from '../shared/backend-capabilities';
@@ -243,6 +243,21 @@ export function useAppState() {
     }
   }
 
+  async function sendAgentPrompt(agentId: string, prompt: string): Promise<void> {
+    const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
+    const trimmed = prompt.trim();
+    if (!agent || !trimmed || !window.codexClaw) {
+      return;
+    }
+
+    if (isAgentSending(agent.id)) {
+      enqueuePrompt(agent.id, trimmed);
+      return;
+    }
+
+    await sendPromptForAgent(agent.id, trimmed);
+  }
+
   async function selectAgent(agentId: string): Promise<void> {
     if (!snapshot.value.agents.some((agent) => agent.id === agentId)) {
       return;
@@ -401,12 +416,14 @@ export function useAppState() {
     snapshot.value = await window.codexClaw.saveAgentToBench(agentId);
   }
 
-  async function deployBenchTemplate(templateId: string): Promise<void> {
+  async function deployBenchTemplate(input: string | DeployBenchTemplateInput): Promise<void> {
+    const templateId = typeof input === 'string' ? input : input.templateId;
+    const teamId = typeof input === 'string' ? snapshot.value.activeTeamId ?? undefined : input.teamId;
     if (!window.codexClaw?.deployBenchTemplate || !snapshot.value.bench.some((template) => template.id === templateId)) {
       return;
     }
 
-    snapshot.value = await window.codexClaw.deployBenchTemplate(templateId, snapshot.value.activeTeamId ?? undefined);
+    snapshot.value = await window.codexClaw.deployBenchTemplate(templateId, teamId);
     await loadActiveAgentCatalogs();
   }
 
@@ -532,6 +549,7 @@ export function useAppState() {
     selectTeam,
     clearActiveGoal,
     sendPrompt,
+    sendAgentPrompt,
     steerPrompt,
     interruptActiveAgent,
     deleteMessage,

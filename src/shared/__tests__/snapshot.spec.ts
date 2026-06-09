@@ -87,6 +87,34 @@ describe('snapshot reducer', () => {
     });
   });
 
+  it('creates agents in a requested team from overview add actions', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.teams.push({
+      id: 'team-skwad',
+      name: 'Skwad',
+      color: '#46A857',
+      agentIds: [],
+    });
+
+    createAgentInSnapshot(snapshot, {
+      name: 'Abby',
+      folder: '/Users/nbonamy/src/skwad',
+      teamId: 'team-skwad',
+    }, '2026-06-05T10:11:12.000Z', 'agent-new-abby');
+
+    expect(snapshot.activeTeamId).toBe('team-skwad');
+    expect(snapshot.activeAgentId).toBe('agent-new-abby');
+    expect(snapshot.teams[0].agentIds).not.toContain('agent-new-abby');
+    expect(snapshot.teams[1].agentIds).toStrictEqual(['agent-new-abby']);
+    expect(snapshot.teams[1].activeAgentId).toBe('agent-new-abby');
+    expect(snapshot.agents.at(-1)).toMatchObject({
+      id: 'agent-new-abby',
+      teamId: 'team-skwad',
+      name: 'Abby',
+      folder: '/Users/nbonamy/src/skwad',
+    });
+  });
+
   it('defaults a blank created agent name from the folder basename', () => {
     const snapshot = createInitialSnapshot();
 

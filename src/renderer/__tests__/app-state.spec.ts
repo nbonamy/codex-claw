@@ -367,6 +367,35 @@ describe('useAppState', () => {
     expect(state.visibleMessages.value.at(-1)?.parts).toStrictEqual([{ type: 'text', text: 'hello' }]);
   });
 
+  it('can send prompts to a specific agent from overview surfaces', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const updatedSnapshot = createInitialSnapshot();
+    updatedSnapshot.messages.push({
+      id: 'message-jesse',
+      agentId: 'agent-jesse',
+      role: 'user',
+      status: 'complete',
+      createdAt: '2026-06-05T00:00:01.000Z',
+      parts: [{ type: 'text', text: 'ship this' }],
+    });
+
+    const sendPrompt = vi.fn().mockResolvedValue(updatedSnapshot);
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        sendPrompt,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await state.sendAgentPrompt('agent-jesse', '  ship this  ');
+
+    expect(sendPrompt).toHaveBeenCalledWith('agent-jesse', 'ship this');
+    expect(state.snapshot.value).toStrictEqual(updatedSnapshot);
+  });
+
   it('deletes, edits, and retries active messages through preload message actions', async () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.messages = [
@@ -896,6 +925,7 @@ describe('useAppState', () => {
     await state.saveAgentToBench('agent-jules');
     await state.restartAgent('agent-jules');
     await state.deployBenchTemplate('bench-jules-prime');
+    await state.deployBenchTemplate({ templateId: 'bench-jules-prime', teamId: 'team-codex-claw' });
     await state.removeBenchTemplate('bench-jules-prime');
     await state.closeAgent('agent-jules');
     await state.closeTeam('team-skwad-core');
@@ -911,7 +941,8 @@ describe('useAppState', () => {
     expect(moveAgentToTeam).toHaveBeenCalledWith({ agentId: 'agent-jules', teamId: 'team-skwad-core' });
     expect(saveAgentToBench).toHaveBeenCalledWith('agent-jules');
     expect(restartAgent).toHaveBeenCalledWith('agent-jules');
-    expect(deployBenchTemplate).toHaveBeenCalledWith('bench-jules-prime', 'team-skwad-core');
+    expect(deployBenchTemplate).toHaveBeenNthCalledWith(1, 'bench-jules-prime', 'team-skwad-core');
+    expect(deployBenchTemplate).toHaveBeenNthCalledWith(2, 'bench-jules-prime', 'team-codex-claw');
     expect(removeBenchTemplate).toHaveBeenCalledWith('bench-jules-prime');
     expect(closeAgent).toHaveBeenCalledWith('agent-jules');
     expect(closeTeam).toHaveBeenCalledWith('team-skwad-core');

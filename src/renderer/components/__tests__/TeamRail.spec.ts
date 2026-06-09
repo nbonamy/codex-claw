@@ -39,6 +39,7 @@ describe('TeamRail', () => {
       activeTeamId: 'team-claw',
     });
 
+    expect(wrapper.get('[aria-label="Cockpit"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.get('[aria-label="Skwad"]').text()).toBe('SK');
     expect(wrapper.get('[aria-label="Codex Claw"]').text()).toBe('CC');
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('true');
@@ -83,6 +84,19 @@ describe('TeamRail', () => {
 
     expect(wrapper.emitted('select-team')).toStrictEqual([['team-claw']]);
     expect(wrapper.emitted('new-team')).toStrictEqual([[]]);
+  });
+
+  it('emits cockpit selection and marks it active', async () => {
+    const wrapper = mountRail({
+      teams,
+      activeTeamId: 'team-sk',
+      cockpitActive: true,
+    });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+
+    expect(wrapper.get('[aria-label="Cockpit"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.emitted('select-cockpit')).toStrictEqual([[]]);
   });
 
   it('emits team reorder drops and marks the drop location', async () => {
@@ -238,7 +252,12 @@ describe('TeamRail', () => {
   });
 });
 
-function mountRail(props: { teams: Team[]; activeTeamId: string | null; rateLimits?: AccountRateLimits }) {
+function mountRail(props: {
+  teams: Team[];
+  activeTeamId: string | null;
+  cockpitActive?: boolean;
+  rateLimits?: AccountRateLimits;
+}) {
   const wrapper = mount(TeamRail, {
     attachTo: document.body,
     props,

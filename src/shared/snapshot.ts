@@ -97,9 +97,10 @@ export function createAgentFromInput(input: CreateAgentInput, createdAt = new Da
 }
 
 export function createAgentInSnapshot(snapshot: AppSnapshot, input: CreateAgentInput, createdAt = new Date().toISOString(), id = createEntityId('agent')): AppSnapshot {
-  const agent = createAgentFromInput(input, createdAt, activeTeamId(snapshot), id);
+  const agent = createAgentFromInput(input, createdAt, targetTeamId(snapshot, input.teamId), id);
   snapshot.agents.push(agent);
   attachAgentToTeam(snapshot, agent);
+  snapshot.activeTeamId = agent.teamId ?? snapshot.activeTeamId;
   snapshot.activeAgentId = agent.id;
   return snapshot;
 }
@@ -1462,6 +1463,14 @@ function activeTeamId(snapshot: AppSnapshot): string {
 
   const activeTeam = snapshot.teams.find((team) => activeAgent && team.agentIds.includes(activeAgent.id));
   return activeTeam?.id ?? snapshot.teams[0]?.id ?? seedTeamId;
+}
+
+function targetTeamId(snapshot: AppSnapshot, teamId: string | undefined): string {
+  if (teamId && snapshot.teams.some((team) => team.id === teamId)) {
+    return teamId;
+  }
+
+  return activeTeamId(snapshot);
 }
 
 function attachAgentToTeam(snapshot: AppSnapshot, agent: Agent): void {
