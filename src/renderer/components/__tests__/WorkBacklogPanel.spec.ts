@@ -1,7 +1,8 @@
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { WorkItem, WorkRepository } from '../../../shared/contracts';
+import type { Agent, WorkItem, WorkRepository } from '../../../shared/contracts';
+import { workItemAssignmentKey } from '../../../shared/work-assignments';
 import WorkBacklogPanel from '../WorkBacklogPanel.vue';
 
 describe('WorkBacklogPanel', () => {
@@ -57,6 +58,25 @@ describe('WorkBacklogPanel', () => {
     expect(card.text()).not.toContain('nbonamy/codex-claw');
   });
 
+  it('renders assigned agent context instead of labels and opens the assigned agent on click', async () => {
+    const item = workItem();
+    const wrapper = mountPanel({
+      assignedAgentsByWorkItemKey: {
+        [workItemAssignmentKey(item)]: assignedAgent(),
+      },
+      items: [item],
+    });
+
+    const card = wrapper.get('.work-backlog-panel__item');
+    expect(card.text()).toContain('Dina');
+    expect(card.text()).toContain('Idle');
+    expect(card.text()).not.toContain('bug');
+
+    await card.trigger('click');
+
+    expect(wrapper.emitted('select-assigned-agent')).toStrictEqual([['agent-dina']]);
+  });
+
   it('opens issue actions and routes menu selections', async () => {
     const open = vi.spyOn(window, 'open').mockImplementation(() => null);
     const wrapper = mountPanel({
@@ -67,6 +87,7 @@ describe('WorkBacklogPanel', () => {
 
     expect(wrapper.text()).toContain('Assign to New Agent');
     expect(wrapper.text()).toContain('Assign to Bench Agent');
+    expect(wrapper.text()).not.toContain('Remove Assignment');
     expect(wrapper.text()).toContain('Open');
 
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Assign to New Agent')?.trigger('click');
@@ -78,6 +99,25 @@ describe('WorkBacklogPanel', () => {
     expect(wrapper.emitted('assign-to-new-agent')).toStrictEqual([[workItem()]]);
     expect(wrapper.emitted('assign-to-bench-agent')).toStrictEqual([[workItem()]]);
     expect(open).toHaveBeenCalledWith('https://github.com/nbonamy/codex-claw/issues/12', '_blank', 'noreferrer');
+  });
+
+  it('routes remove assignment from assigned issue actions', async () => {
+    const item = workItem();
+    const wrapper = mountPanel({
+      assignedAgentsByWorkItemKey: {
+        [workItemAssignmentKey(item)]: assignedAgent(),
+      },
+      items: [item],
+    });
+
+    await wrapper.get('[aria-label="Issue #12 actions"]').trigger('click');
+
+    expect(wrapper.text()).toContain('Remove Assignment');
+
+    await wrapper.findAll('[role="menuitem"]').find((menuItem) => menuItem.text() === 'Remove Assignment')?.trigger('click');
+
+    expect(wrapper.emitted('remove-assignment')).toStrictEqual([[item]]);
+    expect(wrapper.emitted('select-assigned-agent')).toBeUndefined();
   });
 
   it('disables Bench assignment when there are no Bench agents', async () => {
@@ -123,6 +163,21 @@ function workRepository(): WorkRepository {
     fullName: 'nbonamy/codex-claw',
     url: 'https://github.com/nbonamy/codex-claw',
     isPrivate: true,
+  };
+}
+
+function assignedAgent(): Agent {
+  return {
+    id: 'agent-dina',
+    teamId: 'team-codex-claw',
+    name: 'Dina',
+    avatar: 'DI',
+    folder: '/Users/nbonamy/src/codex-claw',
+    backend: 'codex',
+    backendDefaults: { kind: 'codex' },
+    status: { type: 'idle' },
+    createdAt: '2026-06-05T00:00:00.000Z',
+    updatedAt: '2026-06-09T13:00:00.000Z',
   };
 }
 

@@ -4,6 +4,7 @@ import { nextTick } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '../../../shared/snapshot';
 import type { WorkItem } from '../../../shared/contracts';
+import { workItemAssignmentKey } from '../../../shared/work-assignments';
 import CockpitView from '../CockpitView.vue';
 
 describe('CockpitView', () => {
@@ -170,6 +171,7 @@ describe('CockpitView', () => {
     const item = workItem();
     const wrapper = mountCockpit(snapshot, {
       workBacklog: {
+        assignments: {},
         connection: {
           provider: 'github',
           status: 'connected',
@@ -201,6 +203,41 @@ describe('CockpitView', () => {
     expect(wrapper.emitted('refresh-work-items')).toStrictEqual([['nbonamy/codex-claw']]);
   });
 
+  it('opens assigned agents from backlog items', async () => {
+    const snapshot = createInitialSnapshot();
+    const item = workItem();
+    snapshot.workBacklog.assignments = {
+      [workItemAssignmentKey(item)]: {
+        provider: item.provider,
+        itemId: item.id,
+        agentId: 'agent-dina',
+        assignedAt: '2026-06-09T13:00:00.000Z',
+      },
+    };
+    const wrapper = mountCockpit(snapshot, {
+      workBacklog: {
+        assignments: snapshot.workBacklog.assignments,
+        connection: {
+          provider: 'github',
+          status: 'connected',
+          accountLabel: 'nbonamy',
+        },
+        repositories: [],
+        selectedRepositoryId: 'nbonamy/codex-claw',
+        items: [item],
+        status: 'loaded',
+        error: null,
+      },
+    });
+
+    await wrapper.get('.work-backlog-panel__item').trigger('click');
+
+    expect(wrapper.emitted('select-agent')).toStrictEqual([[{
+      agentId: 'agent-dina',
+      teamId: 'team-codex-claw',
+    }]]);
+  });
+
   it('forwards backlog menu assignment intents', () => {
     const snapshot = createInitialSnapshot();
     snapshot.bench.push({
@@ -215,6 +252,7 @@ describe('CockpitView', () => {
     const item = workItem();
     const wrapper = mountCockpit(snapshot, {
       workBacklog: {
+        assignments: {},
         connection: {
           provider: 'github',
           status: 'connected',
@@ -230,9 +268,11 @@ describe('CockpitView', () => {
 
     wrapper.findComponent({ name: 'WorkBacklogPanel' }).vm.$emit('assign-to-new-agent', item);
     wrapper.findComponent({ name: 'WorkBacklogPanel' }).vm.$emit('assign-to-bench-agent', item);
+    wrapper.findComponent({ name: 'WorkBacklogPanel' }).vm.$emit('remove-assignment', item);
 
     expect(wrapper.emitted('assign-work-item-to-new-agent')).toStrictEqual([[{ item }]]);
     expect(wrapper.emitted('assign-work-item-to-bench-agent')).toStrictEqual([[{ item }]]);
+    expect(wrapper.emitted('remove-work-item-assignment')).toStrictEqual([[item]]);
   });
 
   it('turns the add tile into split assignment targets while dragging work items', async () => {
@@ -249,6 +289,7 @@ describe('CockpitView', () => {
     const item = workItem();
     const wrapper = mountCockpit(snapshot, {
       workBacklog: {
+        assignments: {},
         connection: {
           provider: 'github',
           status: 'connected',
@@ -308,6 +349,7 @@ describe('CockpitView', () => {
     const item = workItem();
     const wrapper = mountCockpit(snapshot, {
       workBacklog: {
+        assignments: {},
         connection: {
           provider: 'github',
           status: 'connected',
@@ -338,6 +380,7 @@ describe('CockpitView', () => {
     snapshot.agents[0].status = { type: 'working' };
     const wrapper = mountCockpit(snapshot, {
       workBacklog: {
+        assignments: {},
         connection: {
           provider: 'github',
           status: 'connected',
@@ -363,6 +406,7 @@ describe('CockpitView', () => {
     snapshot.agents[0].status = { type: 'idle' };
     const wrapper = mountCockpit(snapshot, {
       workBacklog: {
+        assignments: {},
         connection: {
           provider: 'github',
           status: 'connected',
@@ -395,6 +439,12 @@ describe('CockpitView', () => {
     expect(dragOver.defaultPrevented).toBe(true);
     expect(dragOver.dataTransfer?.dropEffect).toBe('copy');
 
+    const cardChild = document.createElement('div');
+    card.element.appendChild(cardChild);
+    card.element.dispatchEvent(dragEvent('dragleave', { relatedTarget: cardChild }));
+    await nextTick();
+    expect(card.classes()).toContain('cockpit-view__agent-card--drop-target');
+
     card.element.dispatchEvent(dragEvent('dragleave'));
     await nextTick();
     expect(card.classes()).not.toContain('cockpit-view__agent-card--drop-target');
@@ -423,6 +473,7 @@ describe('CockpitView', () => {
     snapshot.agents[1].status = { type: 'working' };
     const wrapper = mountCockpit(snapshot, {
       workBacklog: {
+        assignments: {},
         connection: {
           provider: 'github',
           status: 'connected',
@@ -487,7 +538,7 @@ function workItem(): WorkItem {
   };
 }
 
-function dragEvent(type: string): DragEvent {
+function dragEvent(type: string, options: { relatedTarget?: EventTarget | null } = {}): DragEvent {
   const event = new Event(type, { bubbles: true, cancelable: true }) as DragEvent;
   Object.defineProperty(event, 'dataTransfer', {
     value: {
@@ -496,5 +547,10 @@ function dragEvent(type: string): DragEvent {
       setDragImage: vi.fn(),
     },
   });
+  if ('relatedTarget' in options) {
+    Object.defineProperty(event, 'relatedTarget', {
+      value: options.relatedTarget,
+    });
+  }
   return event;
 }

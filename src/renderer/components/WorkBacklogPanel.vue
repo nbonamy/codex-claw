@@ -68,29 +68,31 @@
       class="work-backlog-panel__items"
     >
       <article
-        v-for="item in items"
-        :key="item.id"
+        v-for="row in itemRows"
+        :key="row.item.id"
         class="work-backlog-panel__item"
+        :class="{ 'work-backlog-panel__item--assigned': row.assignedAgent }"
         draggable="true"
-        @dragstart="startDrag($event, item)"
-        @dragend="emit('work-item-drag-end')"
+        @click="selectAssignedAgent(row.assignedAgent)"
+        @dragstart="startDrag($event, row.item)"
+        @dragend="endDrag"
       >
         <el-popover
-          :visible="openMenuItemId === item.id"
+          :visible="openMenuItemId === row.item.id"
           placement="bottom-end"
           trigger="manual"
           width="220"
           :teleported="false"
           popper-class="work-backlog-panel__menu-popover"
-          @update:visible="setMenuVisible(item.id, $event)"
+          @update:visible="setMenuVisible(row.item.id, $event)"
         >
           <template #reference>
             <button
               class="work-backlog-panel__item-menu"
               type="button"
-              :aria-label="`Issue #${item.number} actions`"
+              :aria-label="`Issue #${row.item.number} actions`"
               draggable="false"
-              @click.stop="setMenuVisible(item.id, openMenuItemId !== item.id)"
+              @click.stop="setMenuVisible(row.item.id, openMenuItemId !== row.item.id)"
               @dragstart.stop
             >
               <DotsVerticalIcon aria-hidden="true" />
@@ -99,19 +101,37 @@
           <AppMenu
             class="app-menu--embedded"
             ariaLabel="Issue actions"
-            :items="menuItems"
-            @select="selectMenuItem(item, $event)"
+            :items="menuItemsForRow(row)"
+            @click.stop
+            @select="selectMenuItem(row.item, $event)"
           />
         </el-popover>
         <div class="work-backlog-panel__item-title">
-          <span>#{{ item.number }}</span>
-          <strong>{{ item.title }}</strong>
+          <span>#{{ row.item.number }}</span>
+          <strong>{{ row.item.title }}</strong>
         </div>
         <div
-          v-if="item.labels.length > 0"
+          v-if="row.assignedAgent"
+          class="work-backlog-panel__item-assignee"
+        >
+          <AgentAvatar
+            :avatar="row.assignedAgent.avatar"
+            :name="row.assignedAgent.name"
+            size="sm"
+          />
+          <span>{{ row.assignedAgent.name }}</span>
+          <span
+            class="work-backlog-panel__assignee-status"
+            :data-status="row.assignedAgent.status.type"
+          >
+            {{ agentStatusLabel(row.assignedAgent.status.type) }}
+          </span>
+        </div>
+        <div
+          v-else-if="row.item.labels.length > 0"
           class="work-backlog-panel__item-meta"
         >
-          <span>{{ item.labels[0]?.name }}</span>
+          <span>{{ row.item.labels[0]?.name }}</span>
         </div>
       </article>
     </div>
@@ -120,12 +140,21 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { WorkIntegrationConnection, WorkItem, WorkRepository } from '../../shared/contracts';
+import type { Agent, WorkIntegrationConnection, WorkItem, WorkRepository } from '../../shared/contracts';
+import { workItemAssignmentKey } from '../../shared/work-assignments';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
-import { DotsVerticalIcon, ExternalLinkIcon, GitHubIcon, PlusCircleIcon, RefreshIcon, SaveToBenchIcon } from '../shared/icons/app-icons';
+import { CircleXIcon, DotsVerticalIcon, ExternalLinkIcon, GitHubIcon, PlusCircleIcon, RefreshIcon, SaveToBenchIcon } from '../shared/icons/app-icons';
+import { agentStatusLabel } from '../shared/agent-display';
+import AgentAvatar from './AgentAvatar.vue';
+
+type WorkBacklogItemRow = {
+  assignedAgent: Agent | null;
+  item: WorkItem;
+};
 
 const props = withDefaults(defineProps<{
+  assignedAgentsByWorkItemKey?: Record<string, Agent>;
   canAssignToBench?: boolean;
   connection: WorkIntegrationConnection;
   error: string | null;
@@ -134,6 +163,7 @@ const props = withDefaults(defineProps<{
   selectedRepositoryId: string | null;
   status: 'notLoaded' | 'loading' | 'loaded' | 'error';
 }>(), {
+  assignedAgentsByWorkItemKey: () => ({}),
   canAssignToBench: true,
 });
 
@@ -141,35 +171,49 @@ const emit = defineEmits<{
   'assign-to-bench-agent': [item: WorkItem];
   'assign-to-new-agent': [item: WorkItem];
   refresh: [repositoryId: string | null];
+  'remove-assignment': [item: WorkItem];
+  'select-assigned-agent': [agentId: string];
   'select-repository': [repositoryId: string | null];
   'work-item-drag-end': [];
   'work-item-drag-start': [item: WorkItem];
 }>();
 
 const openMenuItemId = ref<string | null>(null);
+const itemRows = computed<WorkBacklogItemRow[]>(() => props.items.map((item) => ({
+  assignedAgent: props.assignedAgentsByWorkItemKey[workItemAssignmentKey(item)] ?? null,
+  item,
+})));
 
-const menuItems = computed<AppMenuItem[]>(() => [
-  {
-    id: 'assign-to-new-agent',
-    type: 'action',
-    label: 'Assign to New Agent',
-    icon: PlusCircleIcon,
-  },
-  {
-    id: 'assign-to-bench',
-    type: 'action',
-    label: 'Assign to Bench Agent',
-    icon: SaveToBenchIcon,
-    disabled: !props.canAssignToBench,
-  },
-  { id: 'group-open', type: 'separator' },
-  {
-    id: 'open',
-    type: 'action',
-    label: 'Open',
-    icon: ExternalLinkIcon,
-  },
-]);
+function menuItemsForRow(row: WorkBacklogItemRow): AppMenuItem[] {
+  return [
+    {
+      id: 'assign-to-new-agent',
+      type: 'action',
+      label: 'Assign to New Agent',
+      icon: PlusCircleIcon,
+    },
+    {
+      id: 'assign-to-bench',
+      type: 'action',
+      label: 'Assign to Bench Agent',
+      icon: SaveToBenchIcon,
+      disabled: !props.canAssignToBench,
+    },
+    ...(row.assignedAgent ? [{
+      id: 'remove-assignment',
+      type: 'action',
+      label: 'Remove Assignment',
+      icon: CircleXIcon,
+    } satisfies AppMenuItem] : []),
+    { id: 'group-open', type: 'separator' },
+    {
+      id: 'open',
+      type: 'action',
+      label: 'Open',
+      icon: ExternalLinkIcon,
+    },
+  ];
+}
 
 function selectRepository(value: string | number | boolean | Record<string, unknown> | null | undefined): void {
   emit('select-repository', typeof value === 'string' ? value : null);
@@ -185,8 +229,16 @@ function selectMenuItem(item: WorkItem, itemId: string): void {
     emit('assign-to-new-agent', item);
   } else if (itemId === 'assign-to-bench' && props.canAssignToBench) {
     emit('assign-to-bench-agent', item);
+  } else if (itemId === 'remove-assignment') {
+    emit('remove-assignment', item);
   } else if (itemId === 'open') {
     window.open(item.url, '_blank', 'noreferrer');
+  }
+}
+
+function selectAssignedAgent(agent: Agent | null): void {
+  if (agent) {
+    emit('select-assigned-agent', agent.id);
   }
 }
 
@@ -195,6 +247,10 @@ function startDrag(event: DragEvent, item: WorkItem): void {
   event.dataTransfer?.setData('application/x-codex-claw-work-item', item.id);
   event.dataTransfer?.setDragImage?.(event.currentTarget as Element, 12, 12);
   emit('work-item-drag-start', item);
+}
+
+function endDrag(): void {
+  emit('work-item-drag-end');
 }
 </script>
 
@@ -248,6 +304,7 @@ function startDrag(event: DragEvent, item: WorkItem): void {
 }
 
 .work-backlog-panel__title span,
+.work-backlog-panel__item-assignee,
 .work-backlog-panel__item-meta,
 .work-backlog-panel__state {
   color: var(--color-text-muted);
@@ -311,6 +368,14 @@ function startDrag(event: DragEvent, item: WorkItem): void {
   cursor: grabbing;
 }
 
+.work-backlog-panel__item--assigned {
+  cursor: pointer;
+}
+
+.work-backlog-panel__item--assigned:active {
+  cursor: grabbing;
+}
+
 .work-backlog-panel__item-menu {
   position: absolute;
   top: var(--space-6);
@@ -371,6 +436,37 @@ function startDrag(event: DragEvent, item: WorkItem): void {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.work-backlog-panel__item-assignee {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-6);
+  margin-top: var(--space-6);
+}
+
+.work-backlog-panel__item-assignee span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-backlog-panel__assignee-status {
+  color: var(--color-success);
+  font-weight: var(--font-weight-semibold);
+}
+
+.work-backlog-panel__assignee-status[data-status='working'],
+.work-backlog-panel__assignee-status[data-status='starting'],
+.work-backlog-panel__assignee-status[data-status='awaitingInput'] {
+  color: var(--color-warning);
+}
+
+.work-backlog-panel__assignee-status[data-status='error'] {
+  color: var(--color-error);
 }
 
 .work-backlog-panel__state {

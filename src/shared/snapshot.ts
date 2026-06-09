@@ -88,6 +88,7 @@ function createDefaultWorkBacklogState(): AppSnapshot['workBacklog'] {
     }],
     selectedRepositoryIds: {},
     providerSettings: {},
+    assignments: {},
   };
 }
 

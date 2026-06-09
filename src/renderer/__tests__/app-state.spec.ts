@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { nextTick } from 'vue';
+import { nextTick, reactive } from 'vue';
 import { useAppState, workItemAssignmentPrompt } from '../app-state';
 import { createEmptySnapshot, createInitialSnapshot } from '../../shared/snapshot';
 import type { CodexClawApi, MainToRendererEvent, WorkItem, WorkRepository } from '../../shared/contracts';
+import { workItemAssignmentKey } from '../../shared/work-assignments';
 
 describe('useAppState', () => {
   it('uses the local empty snapshot before preload is available', () => {
@@ -242,24 +243,72 @@ describe('useAppState', () => {
 
   it('assigns work items through the existing agent prompt path', async () => {
     const snapshot = createInitialSnapshot();
+    const assignment = {
+      provider: 'github' as const,
+      itemId: 'nbonamy/codex-claw#12',
+      agentId: 'agent-dina',
+      assignedAt: '2026-06-09T13:00:00.000Z',
+    };
+    const assignedSnapshot = createInitialSnapshot();
+    assignedSnapshot.workBacklog.assignments = {
+      'github:nbonamy/codex-claw#12': assignment,
+    };
     const updatedSnapshot = createInitialSnapshot();
+    updatedSnapshot.workBacklog.assignments = assignedSnapshot.workBacklog.assignments;
+    const assignWorkItemToAgent = vi.fn().mockResolvedValue(assignedSnapshot);
     const sendPrompt = vi.fn().mockResolvedValue(updatedSnapshot);
     vi.stubGlobal('window', {
       codexClaw: {
+        assignWorkItemToAgent,
         sendPrompt,
       } satisfies Partial<CodexClawApi>,
     });
     const state = useAppState();
     state.snapshot.value = snapshot;
 
+    const item = reactive(workItem());
     await state.assignWorkItemToAgent({
       agentId: 'agent-dina',
-      item: workItem(),
+      item,
     });
 
+    expect(assignWorkItemToAgent).toHaveBeenCalledWith('agent-dina', workItem());
+    expect(assignWorkItemToAgent.mock.calls[0]?.[1]).not.toBe(item);
     expect(sendPrompt.mock.calls[0]?.[0]).toBe('agent-dina');
     expect(sendPrompt.mock.calls[0]?.[1]).toContain('Issue: #12 Fix cockpit drag target');
     expect(sendPrompt.mock.calls[0]?.[1]).toContain('URL: https://github.com/nbonamy/codex-claw/issues/12');
+    expect(state.snapshot.value.workBacklog.assignments).toStrictEqual(assignedSnapshot.workBacklog.assignments);
+  });
+
+  it('removes work item assignments through preload without prompting the agent', async () => {
+    const assignedSnapshot = createInitialSnapshot();
+    const item = reactive(workItem());
+    assignedSnapshot.workBacklog.assignments = {
+      [workItemAssignmentKey(item)]: {
+        provider: 'github',
+        itemId: item.id,
+        agentId: 'agent-dina',
+        assignedAt: '2026-06-09T13:00:00.000Z',
+      },
+    };
+    const unassignedSnapshot = createInitialSnapshot();
+    const removeWorkItemAssignment = vi.fn().mockResolvedValue(unassignedSnapshot);
+    const sendPrompt = vi.fn();
+    vi.stubGlobal('window', {
+      codexClaw: {
+        removeWorkItemAssignment,
+        sendPrompt,
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    state.snapshot.value = assignedSnapshot;
+
+    await state.removeWorkItemAssignment(item);
+
+    expect(removeWorkItemAssignment).toHaveBeenCalledWith(workItem());
+    expect(removeWorkItemAssignment.mock.calls[0]?.[0]).not.toBe(item);
+    expect(sendPrompt).not.toHaveBeenCalled();
+    expect(state.snapshot.value).toStrictEqual(unassignedSnapshot);
   });
 
   it('formats deterministic work item assignment prompts', () => {

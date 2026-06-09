@@ -1,9 +1,10 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Team, ThreadGoal, ThreadPlan, ThreadPlanStep, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '../shared/contracts';
+import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Team, ThreadGoal, ThreadPlan, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '../shared/contracts';
 import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '../shared/codex-approval-presets';
 import { normalizeThemeSettings } from '../shared/settings';
 import { createEmptySnapshot } from '../shared/snapshot';
+import { workItemAssignmentKey } from '../shared/work-assignments';
 import { defaultTeamColor } from '../shared/team-colors';
 
 type PersistedState = {
@@ -96,6 +97,11 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
     ? value.teams.map((team) => sanitizeTeam(team, agents)).filter((team): team is Team => Boolean(team))
     : seed.teams;
   const accountRateLimits = sanitizeAccountRateLimits(value.accountRateLimits);
+  const workBacklog = sanitizeWorkBacklogState(value.workBacklog, seed.workBacklog);
+  workBacklog.assignments = sanitizeAssignmentsForExistingAgents({
+    ...legacyWorkBacklogAssignments(value.agents, agents),
+    ...workBacklog.assignments,
+  }, agents);
   const snapshot: AppSnapshot = {
     ...seed,
     teams: teams.length > 0 ? teams : seed.teams,
@@ -106,7 +112,7 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
     activeTeamId: typeof value.activeTeamId === 'string' ? value.activeTeamId : null,
     activeAgentId: typeof value.activeAgentId === 'string' ? value.activeAgentId : null,
     ...(accountRateLimits ? { accountRateLimits } : {}),
-    workBacklog: sanitizeWorkBacklogState(value.workBacklog, seed.workBacklog),
+    workBacklog,
     theme: normalizeThemeSettings(value.theme),
     messages: [],
     backendRuntimes: seed.backendRuntimes.map((runtime) => ({ ...runtime })),
@@ -312,6 +318,7 @@ function cloneWorkBacklogState(state: WorkBacklogState): WorkBacklogState {
     connections: state.connections.map((connection) => ({ ...connection })),
     selectedRepositoryIds: { ...state.selectedRepositoryIds },
     providerSettings: cloneWorkProviderSettings(state.providerSettings),
+    assignments: Object.fromEntries(Object.entries(state.assignments).map(([key, assignment]) => [key, { ...assignment }])),
   };
 }
 
@@ -339,7 +346,90 @@ function sanitizeWorkBacklogState(value: unknown, seed: WorkBacklogState): WorkB
     connections: sanitizedConnections,
     selectedRepositoryIds,
     providerSettings: sanitizeWorkProviderSettings(value.providerSettings),
+    assignments: sanitizeWorkBacklogAssignments(value.assignments),
   };
+}
+
+function sanitizeWorkBacklogAssignments(value: unknown): WorkBacklogState['assignments'] {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  const assignments: WorkBacklogState['assignments'] = {};
+  for (const assignment of Object.values(value)) {
+    const sanitized = sanitizeWorkBacklogAssignment(assignment);
+    if (sanitized) {
+      assignments[workItemAssignmentKey({ provider: sanitized.provider, itemId: sanitized.itemId })] = sanitized;
+    }
+  }
+  return assignments;
+}
+
+function sanitizeWorkBacklogAssignment(value: unknown): WorkBacklogAssignment | null {
+  if (
+    !isRecord(value) ||
+    !isWorkProvider(value.provider) ||
+    typeof value.itemId !== 'string' ||
+    typeof value.agentId !== 'string' ||
+    typeof value.assignedAt !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    provider: value.provider,
+    itemId: value.itemId,
+    agentId: value.agentId,
+    assignedAt: value.assignedAt,
+  };
+}
+
+function legacyWorkBacklogAssignments(value: unknown, agents: Agent[]): WorkBacklogState['assignments'] {
+  if (!Array.isArray(value)) {
+    return {};
+  }
+
+  const agentIds = new Set(agents.map((agent) => agent.id));
+  const assignments: WorkBacklogState['assignments'] = {};
+  for (const candidate of value) {
+    if (!isRecord(candidate) || typeof candidate.id !== 'string' || !agentIds.has(candidate.id) || !Array.isArray(candidate.assignedWorkItems)) {
+      continue;
+    }
+
+    for (const item of candidate.assignedWorkItems) {
+      const assignment = legacyWorkBacklogAssignment(candidate.id, item);
+      if (assignment) {
+        const key = workItemAssignmentKey({ provider: assignment.provider, itemId: assignment.itemId });
+        if (!assignments[key]) {
+          assignments[key] = assignment;
+        }
+      }
+    }
+  }
+  return assignments;
+}
+
+function legacyWorkBacklogAssignment(agentId: string, value: unknown): WorkBacklogAssignment | null {
+  if (
+    !isRecord(value) ||
+    !isWorkProvider(value.provider) ||
+    typeof value.id !== 'string' ||
+    typeof value.assignedAt !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    provider: value.provider,
+    itemId: value.id,
+    agentId,
+    assignedAt: value.assignedAt,
+  };
+}
+
+function sanitizeAssignmentsForExistingAgents(assignments: WorkBacklogState['assignments'], agents: Agent[]): WorkBacklogState['assignments'] {
+  const agentIds = new Set(agents.map((agent) => agent.id));
+  return Object.fromEntries(Object.entries(assignments).filter(([, assignment]) => agentIds.has(assignment.agentId)));
 }
 
 function sanitizeWorkIntegrationConnection(value: unknown): WorkIntegrationConnection | null {

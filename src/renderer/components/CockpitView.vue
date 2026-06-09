@@ -38,10 +38,13 @@
         :repositories="workBacklog.repositories"
         :selected-repository-id="workBacklog.selectedRepositoryId"
         :status="workBacklog.status"
+        :assigned-agents-by-work-item-key="assignedAgentsByWorkItemKey"
         :can-assign-to-bench="bench.length > 0"
         @assign-to-bench-agent="emit('assign-work-item-to-bench-agent', { item: $event })"
         @assign-to-new-agent="emit('assign-work-item-to-new-agent', { item: $event })"
         @refresh="emit('refresh-work-items', $event)"
+        @remove-assignment="emit('remove-work-item-assignment', $event)"
+        @select-assigned-agent="selectAssignedAgent"
         @select-repository="emit('select-work-repository', $event)"
         @work-item-drag-end="clearDraggedWorkItem"
         @work-item-drag-start="draggedWorkItem = $event"
@@ -140,8 +143,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { ComponentPublicInstance } from 'vue';
-import type { Agent, AgentStatus, BenchTemplate, DeployBenchTemplateInput, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '../../shared/contracts';
+import type { Agent, AgentStatus, BenchTemplate, DeployBenchTemplateInput, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '../../shared/contracts';
 import { defaultTeamColor } from '../../shared/team-colors';
+import { assignedAgentsByWorkItemKey as collectAssignedAgentsByWorkItemKey } from '../../shared/work-assignments';
 import CockpitAddAgentTile from './CockpitAddAgentTile.vue';
 import CockpitAgentCard from './CockpitAgentCard.vue';
 import NewAgentButton from './NewAgentButton.vue';
@@ -162,6 +166,7 @@ type TeamSection = {
 };
 
 type CockpitWorkBacklog = {
+  assignments: Record<string, WorkBacklogAssignment>;
   connection: WorkIntegrationConnection;
   error: string | null;
   items: WorkItem[];
@@ -193,6 +198,7 @@ const emit = defineEmits<{
   'prompt-agent': [payload: { agentId: string; prompt: string }];
   'refresh-work-items': [repositoryId: string | null];
   'remove-bench-template': [templateId: string];
+  'remove-work-item-assignment': [item: WorkItem];
   'select-work-repository': [repositoryId: string | null];
   'select-agent': [payload: { agentId: string; teamId: string }];
   'select-team': [teamId: string];
@@ -206,6 +212,9 @@ let resizeObserver: ResizeObserver | null = null;
 const bench = computed(() => props.bench ?? []);
 
 const agentsById = computed(() => new Map(props.agents.map((agent) => [agent.id, agent])));
+const assignedAgentsByWorkItemKey = computed<Record<string, Agent>>(() => (
+  collectAssignedAgentsByWorkItemKey(props.agents, props.workBacklog?.assignments ?? {})
+));
 const teamSections = computed<TeamSection[]>(() => props.teams.map((team) => {
   const agents = team.agentIds
     .map((agentId) => agentsById.value.get(agentId))
@@ -339,6 +348,16 @@ function assignDraggedWorkItemToNewAgent(intent: WorkItemAssignmentIntent): void
 function assignDraggedWorkItemToBenchAgent(intent: WorkItemAssignmentIntent): void {
   emit('assign-work-item-to-bench-agent', intent);
   clearDraggedWorkItem();
+}
+
+function selectAssignedAgent(agentId: string): void {
+  const agent = agentsById.value.get(agentId);
+  if (agent?.teamId) {
+    emit('select-agent', {
+      agentId,
+      teamId: agent.teamId,
+    });
+  }
 }
 
 function clearDraggedWorkItem(): void {

@@ -47,6 +47,7 @@
     @reorder-agents="reorderAgents"
     @reorder-teams="reorderTeams"
     @assign-work-item="assignWorkItemToAgent"
+    @remove-work-item-assignment="removeWorkItemAssignment"
     @deploy-bench-template="deployBenchTemplate"
     @remove-bench-template="removeBenchTemplate"
     @restart-agent="restartAgent"
@@ -129,6 +130,7 @@ const {
   loadWorkRepositories,
   loadWorkItems,
   assignWorkItemToAgent,
+  removeWorkItemAssignment,
   respondToClientRequest,
   selectModel,
   selectReasoningEffort,

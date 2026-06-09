@@ -1,16 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
+  assignWorkItemToAgentInSnapshot,
   closeAgentInSnapshot,
   deployBenchTemplateInSnapshot,
   duplicateAgentInSnapshot,
   moveAgentToTeamInSnapshot,
   removeBenchTemplateFromSnapshot,
+  removeWorkItemAssignmentFromSnapshot,
   reorderAgentInTeam,
   restartAgentConversation,
   saveAgentToBench,
 } from '../agent-manager';
 import { appendUserPrompt, createInitialSnapshot } from '../snapshot';
 import { createTeamInSnapshot } from '../team-manager';
+import type { WorkItem } from '../contracts';
+import { workItemAssignmentKey } from '../work-assignments';
 
 describe('agent-manager', () => {
   it('duplicates an agent in the same team and selects the copy', () => {
@@ -141,6 +145,61 @@ describe('agent-manager', () => {
     expect(snapshot.bench).toStrictEqual([]);
     expect(snapshot.agents.map((agent) => agent.id)).toStrictEqual(['agent-dina', 'agent-jesse']);
     expect(snapshot.activeAgentId).toBe('agent-dina');
+  });
+
+  it('assigns each work item key to one agent at a time', () => {
+    const snapshot = createInitialSnapshot();
+    const firstItem = workItem(12, 'Fix cockpit drag target');
+    const secondItem = workItem(13, 'Polish backlog panel');
+
+    expect(assignWorkItemToAgentInSnapshot(snapshot, 'agent-dina', firstItem, '2026-06-09T13:00:00.000Z')).toMatchObject({
+      id: 'agent-dina',
+      updatedAt: '2026-06-09T13:00:00.000Z',
+    });
+    expect(snapshot.workBacklog.assignments[workItemAssignmentKey(firstItem)]).toStrictEqual({
+      provider: 'github',
+      itemId: 'nbonamy/codex-claw#12',
+      agentId: 'agent-dina',
+      assignedAt: '2026-06-09T13:00:00.000Z',
+    });
+
+    assignWorkItemToAgentInSnapshot(snapshot, 'agent-dina', secondItem, '2026-06-09T13:05:00.000Z');
+    expect(Object.keys(snapshot.workBacklog.assignments).sort()).toStrictEqual([
+      'github:nbonamy/codex-claw#12',
+      'github:nbonamy/codex-claw#13',
+    ]);
+
+    assignWorkItemToAgentInSnapshot(snapshot, 'agent-jesse', firstItem, '2026-06-09T13:10:00.000Z');
+
+    expect(snapshot.workBacklog.assignments[workItemAssignmentKey(firstItem)]).toStrictEqual({
+      provider: 'github',
+      itemId: 'nbonamy/codex-claw#12',
+      agentId: 'agent-jesse',
+      assignedAt: '2026-06-09T13:10:00.000Z',
+    });
+  });
+
+  it('removes assigned work item keys', () => {
+    const snapshot = createInitialSnapshot();
+    const firstItem = workItem(12, 'Fix cockpit drag target');
+    const secondItem = workItem(13, 'Polish backlog panel');
+
+    assignWorkItemToAgentInSnapshot(snapshot, 'agent-dina', firstItem, '2026-06-09T13:00:00.000Z');
+    assignWorkItemToAgentInSnapshot(snapshot, 'agent-dina', secondItem, '2026-06-09T13:05:00.000Z');
+
+    expect(removeWorkItemAssignmentFromSnapshot(snapshot, firstItem)).toBe(true);
+
+    expect(snapshot.workBacklog.assignments).toStrictEqual({
+      'github:nbonamy/codex-claw#13': {
+        provider: 'github',
+        itemId: 'nbonamy/codex-claw#13',
+        agentId: 'agent-dina',
+        assignedAt: '2026-06-09T13:05:00.000Z',
+      },
+    });
+    expect(removeWorkItemAssignmentFromSnapshot(snapshot, secondItem)).toBe(true);
+    expect(snapshot.workBacklog.assignments).toStrictEqual({});
+    expect(removeWorkItemAssignmentFromSnapshot(snapshot, firstItem)).toBe(false);
   });
 
   it('moves an idle agent to another team and selects it there', () => {
@@ -320,5 +379,23 @@ describe('agent-manager', () => {
     expect(moveAgentToTeamInSnapshot(snapshot, 'agent-dina', 'missing-team')).toBeNull();
     expect(restartAgentConversation(snapshot, 'missing-agent')).toBeNull();
     expect(closeAgentInSnapshot(snapshot, 'missing-agent')).toBeNull();
+    expect(assignWorkItemToAgentInSnapshot(snapshot, 'missing-agent', workItem(12, 'Fix cockpit drag target'))).toBeNull();
+    expect(removeWorkItemAssignmentFromSnapshot(snapshot, workItem(12, 'Fix cockpit drag target'))).toBe(false);
   });
 });
+
+function workItem(number: number, title: string): WorkItem {
+  return {
+    provider: 'github',
+    id: `nbonamy/codex-claw#${number}`,
+    repositoryId: 'nbonamy/codex-claw',
+    repositoryFullName: 'nbonamy/codex-claw',
+    number,
+    title,
+    url: `https://github.com/nbonamy/codex-claw/issues/${number}`,
+    state: 'open',
+    labels: [],
+    createdAt: '2026-06-09T12:00:00.000Z',
+    updatedAt: '2026-06-09T12:30:00.000Z',
+  };
+}

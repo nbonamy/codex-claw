@@ -1,5 +1,6 @@
 import type { Agent, AppSnapshot, BenchTemplate } from './contracts';
 import { createEntityId, createUniqueEntityId, type IdGenerator } from './ids';
+import { workBacklogAssignmentFromWorkItem, workItemAssignmentKey, type WorkItemAssignmentSource } from './work-assignments';
 
 export function duplicateAgentInSnapshot(snapshot: AppSnapshot, agentId: string, createdAt = new Date().toISOString(), createId: IdGenerator = () => createEntityId('agent')): Agent | null {
   const source = snapshot.agents.find((agent) => agent.id === agentId);
@@ -85,6 +86,32 @@ export function removeBenchTemplateFromSnapshot(snapshot: AppSnapshot, templateI
 
   snapshot.bench = snapshot.bench.filter((candidate) => candidate.id !== templateId);
   return template;
+}
+
+export function assignWorkItemToAgentInSnapshot(snapshot: AppSnapshot, agentId: string, item: WorkItemAssignmentSource, assignedAt = new Date().toISOString()): Agent | null {
+  const targetAgent = snapshot.agents.find((candidate) => candidate.id === agentId);
+  if (!targetAgent) {
+    return null;
+  }
+
+  snapshot.workBacklog.assignments = {
+    ...snapshot.workBacklog.assignments,
+    [workItemAssignmentKey(item)]: workBacklogAssignmentFromWorkItem(item, agentId, assignedAt),
+  };
+  targetAgent.updatedAt = assignedAt;
+  return targetAgent;
+}
+
+export function removeWorkItemAssignmentFromSnapshot(snapshot: AppSnapshot, item: WorkItemAssignmentSource): boolean {
+  const assignmentKey = workItemAssignmentKey(item);
+  if (!snapshot.workBacklog.assignments[assignmentKey]) {
+    return false;
+  }
+
+  const nextAssignments = { ...snapshot.workBacklog.assignments };
+  delete nextAssignments[assignmentKey];
+  snapshot.workBacklog.assignments = nextAssignments;
+  return true;
 }
 
 export function moveAgentToTeamInSnapshot(snapshot: AppSnapshot, agentId: string, teamId: string, updatedAt = new Date().toISOString()): Agent | null {

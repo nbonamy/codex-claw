@@ -23,6 +23,8 @@ describe('ipc channels', () => {
       selectTeam: 'team:select',
       createAgent: 'agent:create',
       updateAgent: 'agent:update',
+      assignWorkItemToAgent: 'agent:work-item:assign',
+      removeWorkItemAssignment: 'agent:work-item:unassign',
       duplicateAgent: 'agent:duplicate',
       moveAgentToTeam: 'agent:move-to-team',
       reorderAgents: 'agent:reorder',

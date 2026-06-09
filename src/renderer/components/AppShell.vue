@@ -54,10 +54,11 @@
         @add-agent="openNewAgent"
         @assign-work-item-to-bench-agent="openBenchAgentAssignmentDialog"
         @assign-work-item-to-new-agent="openNewAgentForWorkItem"
-        @assign-work-item="$emit('assign-work-item', $event)"
+        @assign-work-item="assignExistingAgentWorkItem"
         @deploy-bench-template="$emit('deploy-bench-template', $event)"
         @prompt-agent="$emit('send-agent-prompt', $event)"
         @remove-bench-template="$emit('remove-bench-template', $event)"
+        @remove-work-item-assignment="$emit('remove-work-item-assignment', $event)"
         @refresh-work-items="refreshWorkItems"
         @select-work-repository="selectWorkRepositoryForCockpit"
         @select-agent="selectAgentFromCockpit"
@@ -181,10 +182,12 @@
 </template>
 
 <script setup lang="ts">
+import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, Team, ThreadGoal, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../../shared/contracts';
 import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import { defaultTeamColor } from '../../shared/team-colors';
+import { findAssignedAgentForWorkItem } from '../../shared/work-assignments';
 import AgentDialog from './AgentDialog.vue';
 import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
@@ -297,6 +300,7 @@ const emit = defineEmits<{
   'reorder-agents': [input: ReorderAgentsInput];
   'reorder-teams': [input: ReorderTeamsInput];
   'assign-work-item': [payload: { agentId: string; item: WorkItem }];
+  'remove-work-item-assignment': [item: WorkItem];
   'restart-agent': [agentId: string];
   'remove-bench-template': [templateId: string];
   'retry-message': [index: number];
@@ -378,6 +382,7 @@ const cockpitWorkBacklog = computed(() => {
   const selectedRepositoryId = props.snapshot.workBacklog.selectedRepositoryIds[provider] ?? repositories[0]?.id ?? null;
 
   return {
+    assignments: props.snapshot.workBacklog.assignments,
     connection,
     repositories,
     selectedRepositoryId,
@@ -443,12 +448,20 @@ function openNewAgent(teamId?: string): void {
   agentDialogVisible.value = true;
 }
 
-function openNewAgentForWorkItem(intent: WorkItemAssignmentIntent): void {
+async function openNewAgentForWorkItem(intent: WorkItemAssignmentIntent): Promise<void> {
+  if (!await confirmAssignedWorkItemOverride(intent.item, 'a new agent')) {
+    return;
+  }
+
   pendingNewAgentWorkItem.value = intent.item;
   openNewAgent(intent.teamId ?? activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined);
 }
 
-function openBenchAgentAssignmentDialog(intent: WorkItemAssignmentIntent): void {
+async function openBenchAgentAssignmentDialog(intent: WorkItemAssignmentIntent): Promise<void> {
+  if (!await confirmAssignedWorkItemOverride(intent.item, 'a Bench agent')) {
+    return;
+  }
+
   pendingBenchAgentWorkItem.value = intent.item;
   pendingBenchAgentTeamId.value = intent.teamId ?? null;
   benchAssignmentDialogVisible.value = true;
@@ -460,6 +473,41 @@ function workItemTeamName(item: WorkItem): string {
 
 function workProviderTitle(provider: WorkItem['provider']): string {
   return provider === 'github' ? 'GitHub' : provider;
+}
+
+async function assignExistingAgentWorkItem(payload: { agentId: string; item: WorkItem }): Promise<void> {
+  const targetAgent = props.snapshot.agents.find((agent) => agent.id === payload.agentId);
+  if (!await confirmAssignedWorkItemOverride(payload.item, targetAgent?.name ?? 'this agent', payload.agentId)) {
+    return;
+  }
+
+  emit('assign-work-item', payload);
+}
+
+async function confirmAssignedWorkItemOverride(item: WorkItem, targetLabel: string, targetAgentId?: string): Promise<boolean> {
+  const assignedAgent = assignedAgentForWorkItem(item);
+  if (!assignedAgent || assignedAgent.id === targetAgentId) {
+    return true;
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `${workProviderTitle(item.provider)} #${item.number} is already assigned to ${assignedAgent.name}. We don't know if ${assignedAgent.name} is still working on it. Assign it to ${targetLabel} anyway?`,
+      'Assign anyway?',
+      {
+        cancelButtonText: 'Cancel',
+        confirmButtonText: 'Assign Anyway',
+        type: 'warning',
+      },
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function assignedAgentForWorkItem(item: WorkItem): Agent | null {
+  return findAssignedAgentForWorkItem(props.snapshot.agents, props.snapshot.workBacklog.assignments, item);
 }
 
 function openNewTeam(): void {

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '../../../shared/snapshot';
 import type { Agent, AppCommand, AppSnapshot, CodexClawApi, CreateAgentInput, CreateTeamInput, DeployBenchTemplateInput, RendererMessage, Team, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput, WorkItem, WorkProviderKind, WorkRepository } from '../../../shared/contracts';
+import { workItemAssignmentKey } from '../../../shared/work-assignments';
 import { i18n } from '../../i18n';
 
 function pointerEvent(type: string, clientX: number): PointerEvent {
@@ -794,11 +795,64 @@ describe('AppShell', () => {
       agentId: 'agent-dina',
       item,
     });
+    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('remove-work-item-assignment', item);
+    await flushPromises();
 
     expect(wrapper.emitted('assign-work-item')).toStrictEqual([[{
       agentId: 'agent-dina',
       item,
     }]]);
+    expect(wrapper.emitted('remove-work-item-assignment')).toStrictEqual([[item]]);
+  });
+
+  it('confirms before assigning an already assigned cockpit work item to another agent', async () => {
+    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
+    const snapshot = createInitialSnapshot();
+    const item = workItem();
+    snapshot.workBacklog.assignments = {
+      [workItemAssignmentKey(item)]: workItemAssignment(item, 'agent-jesse'),
+    };
+    const wrapper = mountShell({ snapshot });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('assign-work-item', {
+      agentId: 'agent-dina',
+      item,
+    });
+    await flushPromises();
+
+    expect(confirm).toHaveBeenCalledWith(
+      "GitHub #12 is already assigned to Jesse. We don't know if Jesse is still working on it. Assign it to Dina anyway?",
+      'Assign anyway?',
+      {
+        cancelButtonText: 'Cancel',
+        confirmButtonText: 'Assign Anyway',
+        type: 'warning',
+      },
+    );
+    expect(wrapper.emitted('assign-work-item')).toStrictEqual([[{
+      agentId: 'agent-dina',
+      item,
+    }]]);
+  });
+
+  it('keeps an assigned cockpit work item on the current agent when overriding is canceled', async () => {
+    vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue(new Error('cancel'));
+    const snapshot = createInitialSnapshot();
+    const item = workItem();
+    snapshot.workBacklog.assignments = {
+      [workItemAssignmentKey(item)]: workItemAssignment(item, 'agent-jesse'),
+    };
+    const wrapper = mountShell({ snapshot });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('assign-work-item', {
+      agentId: 'agent-dina',
+      item,
+    });
+    await flushPromises();
+
+    expect(wrapper.emitted('assign-work-item')).toBeUndefined();
   });
 
   it('shows the empty agent page when the active team has no agents', async () => {
@@ -946,7 +1000,7 @@ describe('AppShell', () => {
 
     await wrapper.get('[aria-label="Cockpit"]').trigger('click');
     wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('assign-work-item-to-new-agent', { item });
-    await nextTick();
+    await flushPromises();
 
     const agentDialog = wrapper.findComponent({ name: 'AgentDialog' });
     expect(agentDialog.find('#agent-dialog-team').exists()).toBe(true);
@@ -1015,7 +1069,7 @@ describe('AppShell', () => {
 
     await wrapper.get('[aria-label="Cockpit"]').trigger('click');
     wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('assign-work-item-to-bench-agent', { item });
-    await nextTick();
+    await flushPromises();
 
     const benchAgentAssignmentDialog = wrapper.findComponent({ name: 'BenchAgentAssignmentDialog' });
     expect(benchAgentAssignmentDialog.text()).toContain('Dina');
@@ -1082,7 +1136,7 @@ describe('AppShell', () => {
       item,
       teamId: 'team-skwad',
     });
-    await nextTick();
+    await flushPromises();
 
     await wrapper.findAll('button').find((button) => button.text() === 'Assign')?.trigger('click');
     await flushPromises();
@@ -1551,5 +1605,14 @@ function workItem(): WorkItem {
     labels: [],
     createdAt: '2026-06-09T12:00:00.000Z',
     updatedAt: '2026-06-09T12:30:00.000Z',
+  };
+}
+
+function workItemAssignment(item: WorkItem, agentId: string) {
+  return {
+    provider: item.provider,
+    itemId: item.id,
+    agentId,
+    assignedAt: '2026-06-09T13:00:00.000Z',
   };
 }

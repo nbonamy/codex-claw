@@ -146,10 +146,18 @@ export type WorkProviderSettings = {
   oauthClientId?: string;
 };
 
+export type WorkBacklogAssignment = {
+  provider: WorkProviderKind;
+  itemId: string;
+  agentId: string;
+  assignedAt: string;
+};
+
 export type WorkBacklogState = {
   connections: WorkIntegrationConnection[];
   selectedRepositoryIds: Partial<Record<WorkProviderKind, string>>;
   providerSettings: Partial<Record<WorkProviderKind, WorkProviderSettings>>;
+  assignments: Record<string, WorkBacklogAssignment>;
 };
 
 export type WorkProviderAuthorization = {
@@ -585,6 +593,8 @@ export type CodexClawApi = {
   selectTeam(teamId: string): Promise<AppSnapshot>;
   createAgent(input: CreateAgentInput): Promise<AppSnapshot>;
   updateAgent(input: UpdateAgentInput): Promise<AppSnapshot>;
+  assignWorkItemToAgent(agentId: string, item: WorkItem): Promise<AppSnapshot>;
+  removeWorkItemAssignment(item: WorkItem): Promise<AppSnapshot>;
   duplicateAgent(agentId: string): Promise<AppSnapshot>;
   moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot>;
   reorderAgents(input: ReorderAgentsInput): Promise<AppSnapshot>;

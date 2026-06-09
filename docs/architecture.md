@@ -549,11 +549,15 @@ ID but no client secret or localhost callback route. The main process reads
 and Settings can persist a per-provider client ID override. Actual GitHub
 access tokens remain in the encrypted token store.
 
-Dragging a work item onto an agent currently assigns the work by sending a
-deterministic prompt to that agent through the existing prompt path. Future
-provider-specific actions, such as claiming tickets, commenting, or changing
-status, should be added behind the work-provider seam without changing cockpit
-tiles into provider-aware UI.
+Dragging a work item onto an agent records provider-neutral assignment metadata
+in `workBacklog.assignments`, keyed by provider and provider-generated item id,
+then sends a deterministic prompt through the existing prompt path. Assigning
+the same work item to another agent overwrites that key. If the stored agent id
+no longer exists, the ticket is treated as unassigned. Removing an assignment
+clears only Codex Claw's local backlog metadata.
+Future provider-specific actions, such as claiming tickets, commenting, or
+changing status, should be added behind the work-provider seam without changing
+cockpit tiles into provider-aware UI.
 
 ## Testing Strategy
 

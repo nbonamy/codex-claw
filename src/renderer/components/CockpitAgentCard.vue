@@ -7,7 +7,7 @@
     }"
     @click="emit('select')"
     @dragenter="enterDropTarget"
-    @dragleave="emit('drop-target-leave', agent.id)"
+    @dragleave="leaveDropTarget"
     @dragover="allowDrop"
     @drop="dropWorkItem"
   >
@@ -114,6 +114,37 @@ function enterDropTarget(event: DragEvent): void {
 
   event.preventDefault();
   emit('drop-target-enter', props.agent.id);
+}
+
+function leaveDropTarget(event: DragEvent): void {
+  if (isInternalDragLeave(event)) {
+    return;
+  }
+
+  emit('drop-target-leave', props.agent.id);
+}
+
+function isInternalDragLeave(event: DragEvent): boolean {
+  const currentTarget = event.currentTarget;
+  const relatedTarget = event.relatedTarget;
+
+  if (!(currentTarget instanceof HTMLElement)) {
+    return false;
+  }
+
+  if (relatedTarget instanceof Node && currentTarget.contains(relatedTarget)) {
+    return true;
+  }
+
+  const rect = currentTarget.getBoundingClientRect();
+  if (rect.right <= rect.left || rect.bottom <= rect.top) {
+    return false;
+  }
+
+  return event.clientX >= rect.left
+    && event.clientX <= rect.right
+    && event.clientY >= rect.top
+    && event.clientY <= rect.bottom;
 }
 
 function dropWorkItem(event: DragEvent): void {

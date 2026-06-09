@@ -60,6 +60,7 @@ describe('snapshot service', () => {
         }],
         selectedRepositoryIds: {},
         providerSettings: {},
+        assignments: {},
       },
       theme: defaultThemeSettings,
     });

@@ -107,6 +107,14 @@ describe('AppStatePersistence', () => {
       statusText: 'Registered',
       status: { type: 'working', detail: 'busy' },
     };
+    snapshot.workBacklog.assignments = {
+      'github:nbonamy/codex-claw#12': {
+        provider: 'github',
+        itemId: 'nbonamy/codex-claw#12',
+        agentId: 'agent-dina',
+        assignedAt: '2026-06-09T13:00:00.000Z',
+      },
+    };
     appendUserPrompt(snapshot, 'agent-dina', 'do not persist this', '2026-06-05T10:11:12.000Z');
 
     await persistence.save(snapshot);
@@ -151,6 +159,15 @@ describe('AppStatePersistence', () => {
       timeUsedSeconds: 30,
       createdAt: 1_780_000_000,
       updatedAt: 1_780_000_030,
+    });
+    expect(writtenAgent).not.toHaveProperty('assignedWorkItems');
+    expect((written.workBacklog as Record<string, unknown>).assignments).toStrictEqual({
+      'github:nbonamy/codex-claw#12': {
+        provider: 'github',
+        itemId: 'nbonamy/codex-claw#12',
+        agentId: 'agent-dina',
+        assignedAt: '2026-06-09T13:00:00.000Z',
+      },
     });
     expect(writtenAgent).not.toHaveProperty('isRegistered');
     expect(writtenAgent).not.toHaveProperty('mcpSessionId');
@@ -225,7 +242,40 @@ describe('AppStatePersistence', () => {
       status: { type: 'working', detail: 'busy' },
     };
 
-    const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
+    const persisted = persistedStateFromSnapshot(snapshot);
+    (persisted.agents[0] as Record<string, unknown>).assignedWorkItems = [
+      {
+        provider: 'github',
+        id: 'nbonamy/codex-claw#12',
+        repositoryId: 'nbonamy/codex-claw',
+        repositoryFullName: 'nbonamy/codex-claw',
+        number: 12,
+        title: 'Fix cockpit drag target',
+        url: 'https://github.com/nbonamy/codex-claw/issues/12',
+        assignedAt: '2026-06-09T13:00:00.000Z',
+      },
+      {
+        provider: 'github',
+        id: 'nbonamy/codex-claw#12',
+        repositoryId: 'nbonamy/codex-claw',
+        repositoryFullName: 'nbonamy/codex-claw',
+        number: 12,
+        title: 'Duplicate should be dropped',
+        url: 'https://github.com/nbonamy/codex-claw/issues/12',
+        assignedAt: '2026-06-09T13:01:00.000Z',
+      },
+      {
+        provider: 'jira',
+        id: 'TEAM-1',
+        repositoryId: 'TEAM',
+        repositoryFullName: 'TEAM',
+        number: 1,
+        title: 'Invalid provider',
+        url: 'https://example.com/TEAM-1',
+        assignedAt: '2026-06-09T13:02:00.000Z',
+      },
+    ];
+    const restored = snapshotFromPersistedState(persisted);
 
     expect(restored.agents[0]).toStrictEqual({
       id: 'agent-dina',
@@ -281,6 +331,14 @@ describe('AppStatePersistence', () => {
     expect(restored.messages).toStrictEqual([]);
     expect(restored.backendRuntimes).toStrictEqual(createEmptySnapshot().backendRuntimes);
     expect(restored.accountRateLimits).toStrictEqual(snapshot.accountRateLimits);
+    expect(restored.workBacklog.assignments).toStrictEqual({
+      'github:nbonamy/codex-claw#12': {
+        provider: 'github',
+        itemId: 'nbonamy/codex-claw#12',
+        agentId: 'agent-dina',
+        assignedAt: '2026-06-09T13:00:00.000Z',
+      },
+    });
   });
 
   it('persists work integration metadata without token material', () => {
@@ -300,6 +358,14 @@ describe('AppStatePersistence', () => {
           oauthClientId: 'client-id',
         },
       },
+      assignments: {
+        'github:nbonamy/codex-claw#12': {
+          provider: 'github',
+          itemId: 'nbonamy/codex-claw#12',
+          agentId: 'agent-dina',
+          assignedAt: '2026-06-09T13:00:00.000Z',
+        },
+      },
     };
 
     const persisted = persistedStateFromSnapshot(snapshot);
@@ -317,6 +383,14 @@ describe('AppStatePersistence', () => {
       providerSettings: {
         github: {
           oauthClientId: 'client-id',
+        },
+      },
+      assignments: {
+        'github:nbonamy/codex-claw#12': {
+          provider: 'github',
+          itemId: 'nbonamy/codex-claw#12',
+          agentId: 'agent-dina',
+          assignedAt: '2026-06-09T13:00:00.000Z',
         },
       },
     });
@@ -349,6 +423,20 @@ describe('AppStatePersistence', () => {
           github: { oauthClientId: ' client-id ' },
           jira: { oauthClientId: 'jira-client-id' },
         },
+        assignments: {
+          'github:nbonamy/codex-claw#12': {
+            provider: 'github',
+            itemId: 'nbonamy/codex-claw#12',
+            agentId: 'missing-agent',
+            assignedAt: '2026-06-09T13:00:00.000Z',
+          },
+          'jira:TEAM-1': {
+            provider: 'jira',
+            itemId: 'TEAM-1',
+            agentId: 'missing-agent',
+            assignedAt: '2026-06-09T13:00:00.000Z',
+          },
+        },
       },
     });
 
@@ -366,6 +454,7 @@ describe('AppStatePersistence', () => {
           oauthClientId: 'client-id',
         },
       },
+      assignments: {},
     });
   });
 

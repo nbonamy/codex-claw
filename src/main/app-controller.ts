@@ -19,11 +19,13 @@ import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
 import { WorkIntegrationManager } from './work-integrations/manager';
 import { SafeStorageWorkIntegrationTokenStore } from './work-integrations/token-store';
 import {
+  assignWorkItemToAgentInSnapshot,
   closeAgentInSnapshot,
   deployBenchTemplateInSnapshot,
   duplicateAgentInSnapshot,
   moveAgentToTeamInSnapshot,
   removeBenchTemplateFromSnapshot,
+  removeWorkItemAssignmentFromSnapshot,
   reorderAgentInTeam,
   restartAgentConversation,
   saveAgentToBench,
@@ -43,6 +45,7 @@ import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, App
 import { codexBackendDefaultsWithApprovalPreset, isCodexApprovalPreset } from '../shared/codex-approval-presets';
 import { ipcChannels } from '../shared/ipc';
 import { teamColors } from '../shared/team-colors';
+import { sanitizeWorkItemAssignmentSource } from '../shared/work-assignments';
 import type { AgentBackendDriver } from './backends/types';
 import { backendDisplayName, unsupportedBackendFeature } from './backends/types';
 import type { DisplayMarkdownInput, DisplayMarkdownResponse } from './mcp/agent-coordinator';
@@ -199,6 +202,32 @@ export class AppController {
         throw new Error(`Agent not found: ${input.id}`);
       }
       await this.persistSnapshot();
+      return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.assignWorkItemToAgent, async (_event, agentId: string, item: unknown) => {
+      const assignmentSource = sanitizeWorkItemAssignmentSource(item);
+      if (!assignmentSource) {
+        throw new Error('Invalid work item assignment.');
+      }
+
+      const agent = assignWorkItemToAgentInSnapshot(this.snapshot, agentId, assignmentSource);
+      if (!agent) {
+        throw new Error(`Agent not found: ${agentId}`);
+      }
+      await this.persistSnapshot();
+      return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.removeWorkItemAssignment, async (_event, item: unknown) => {
+      const assignmentSource = sanitizeWorkItemAssignmentSource(item);
+      if (!assignmentSource) {
+        throw new Error('Invalid work item assignment.');
+      }
+
+      if (removeWorkItemAssignmentFromSnapshot(this.snapshot, assignmentSource)) {
+        await this.persistSnapshot();
+      }
       return this.snapshot;
     });
 

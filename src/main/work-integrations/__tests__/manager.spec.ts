@@ -157,6 +157,7 @@ describe('WorkIntegrationManager', () => {
       }],
       selectedRepositoryIds: {},
       providerSettings: {},
+      assignments: {},
     });
   });
 });

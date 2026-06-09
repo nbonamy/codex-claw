@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AppleSpeechTranscriptionOptions, AppCommand, ClientRequestResponse, CodexApprovalPreset, CodexClawApi, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput, WorkProviderKind } from '../shared/contracts';
+import type { AppleSpeechTranscriptionOptions, AppCommand, ClientRequestResponse, CodexApprovalPreset, CodexClawApi, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput, WorkItem, WorkProviderKind } from '../shared/contracts';
 import { ipcChannels } from '../shared/ipc';
 
 const api: CodexClawApi = {
@@ -22,6 +22,8 @@ const api: CodexClawApi = {
   selectTeam: (teamId: string) => ipcRenderer.invoke(ipcChannels.selectTeam, teamId),
   createAgent: (input: CreateAgentInput) => ipcRenderer.invoke(ipcChannels.createAgent, input),
   updateAgent: (input: UpdateAgentInput) => ipcRenderer.invoke(ipcChannels.updateAgent, input),
+  assignWorkItemToAgent: (agentId: string, item: WorkItem) => ipcRenderer.invoke(ipcChannels.assignWorkItemToAgent, agentId, item),
+  removeWorkItemAssignment: (item: WorkItem) => ipcRenderer.invoke(ipcChannels.removeWorkItemAssignment, item),
   duplicateAgent: (agentId: string) => ipcRenderer.invoke(ipcChannels.duplicateAgent, agentId),
   moveAgentToTeam: (input: MoveAgentToTeamInput) => ipcRenderer.invoke(ipcChannels.moveAgentToTeam, input),
   reorderAgents: (input: ReorderAgentsInput) => ipcRenderer.invoke(ipcChannels.reorderAgents, input),

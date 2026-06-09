@@ -511,7 +511,21 @@ export function useAppState() {
   }
 
   async function assignWorkItemToAgent(payload: { agentId: string; item: WorkItem }): Promise<void> {
-    await sendAgentPrompt(payload.agentId, workItemAssignmentPrompt(payload.item));
+    if (!window.codexClaw?.assignWorkItemToAgent) {
+      return;
+    }
+
+    const item = cloneWorkItemForIpc(payload.item);
+    snapshot.value = await window.codexClaw.assignWorkItemToAgent(payload.agentId, item);
+    await sendAgentPrompt(payload.agentId, workItemAssignmentPrompt(item));
+  }
+
+  async function removeWorkItemAssignment(item: WorkItem): Promise<void> {
+    if (!window.codexClaw?.removeWorkItemAssignment) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.removeWorkItemAssignment(cloneWorkItemForIpc(item));
   }
 
   async function duplicateAgent(agentId: string): Promise<void> {
@@ -686,6 +700,7 @@ export function useAppState() {
     disconnectWorkProvider,
     selectWorkRepository,
     assignWorkItemToAgent,
+    removeWorkItemAssignment,
     duplicateAgent,
     moveAgentToTeam,
     reorderAgents,
@@ -727,6 +742,27 @@ export function workItemAssignmentPrompt(item: WorkItem): string {
     item.authorName ? `Author: ${item.authorName}` : null,
     body ? ['Body:', body].join('\n') : null,
   ].filter((line): line is string => line !== null).join('\n');
+}
+
+function cloneWorkItemForIpc(item: WorkItem): WorkItem {
+  return {
+    provider: item.provider,
+    id: item.id,
+    repositoryId: item.repositoryId,
+    repositoryFullName: item.repositoryFullName,
+    number: item.number,
+    title: item.title,
+    url: item.url,
+    state: item.state,
+    ...(typeof item.authorName === 'string' ? { authorName: item.authorName } : {}),
+    ...(typeof item.body === 'string' ? { body: item.body } : {}),
+    labels: item.labels.map((label) => ({
+      name: label.name,
+      ...(typeof label.color === 'string' ? { color: label.color } : {}),
+    })),
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+  };
 }
 
 function activeMessageAction(index: number): { agentId: string; messageId: string } | null {

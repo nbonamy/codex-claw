@@ -46,6 +46,38 @@ describe('CockpitAgentCard', () => {
     expect(wrapper.emitted('clear-dragged-work-item')).toStrictEqual([[]]);
   });
 
+  it('keeps the drop target active while dragging across card children', () => {
+    const wrapper = mountCard({
+      agent: idleAgent(),
+      draggedWorkItem: workItem(),
+    });
+    const card = wrapper.get('.cockpit-view__agent-card');
+    const child = document.createElement('div');
+    card.element.appendChild(child);
+    vi.spyOn(card.element, 'getBoundingClientRect').mockReturnValue({
+      bottom: 100,
+      height: 100,
+      left: 0,
+      right: 100,
+      toJSON: vi.fn(),
+      top: 0,
+      width: 100,
+      x: 0,
+      y: 0,
+    });
+
+    card.element.dispatchEvent(dragEvent('dragenter'));
+    card.element.dispatchEvent(dragEvent('dragleave', { relatedTarget: child }));
+    card.element.dispatchEvent(dragEvent('dragleave', { clientX: 50, clientY: 50 }));
+
+    expect(wrapper.emitted('drop-target-enter')).toStrictEqual([['agent-dina']]);
+    expect(wrapper.emitted('drop-target-leave')).toBeUndefined();
+
+    card.element.dispatchEvent(dragEvent('dragleave', { clientX: 150, clientY: 50 }));
+
+    expect(wrapper.emitted('drop-target-leave')).toStrictEqual([['agent-dina']]);
+  });
+
   it('does not accept prompts or drops while the agent is busy', async () => {
     const agent = idleAgent();
     agent.status = { type: 'working' };
@@ -100,12 +132,33 @@ function workItem(): WorkItem {
   };
 }
 
-function dragEvent(type: string): DragEvent {
+type DragEventOptions = {
+  clientX?: number;
+  clientY?: number;
+  relatedTarget?: EventTarget | null;
+};
+
+function dragEvent(type: string, options: DragEventOptions = {}): DragEvent {
   const event = new Event(type, { bubbles: true, cancelable: true }) as DragEvent;
   Object.defineProperty(event, 'dataTransfer', {
     value: {
       dropEffect: 'copy',
     },
   });
+  if ('clientX' in options) {
+    Object.defineProperty(event, 'clientX', {
+      value: options.clientX,
+    });
+  }
+  if ('clientY' in options) {
+    Object.defineProperty(event, 'clientY', {
+      value: options.clientY,
+    });
+  }
+  if ('relatedTarget' in options) {
+    Object.defineProperty(event, 'relatedTarget', {
+      value: options.relatedTarget,
+    });
+  }
   return event;
 }
