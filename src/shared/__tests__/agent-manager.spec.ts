@@ -5,6 +5,7 @@ import {
   duplicateAgentInSnapshot,
   moveAgentToTeamInSnapshot,
   removeBenchTemplateFromSnapshot,
+  reorderAgentInTeam,
   restartAgentConversation,
   saveAgentToBench,
 } from '../agent-manager';
@@ -162,6 +163,41 @@ describe('agent-manager', () => {
     expect(snapshot.teams[1].activeAgentId).toBe('agent-dina');
     expect(snapshot.activeTeamId).toBe('team-skwad');
     expect(snapshot.activeAgentId).toBe('agent-dina');
+  });
+
+  it('reorders agents within a team before a target or to the end', () => {
+    const snapshot = createInitialSnapshot();
+    const duplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z', () => 'agent-abby');
+    expect(duplicate?.id).toBe('agent-abby');
+    expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-dina', 'agent-jesse', 'agent-abby']);
+
+    expect(reorderAgentInTeam(snapshot, 'team-codex-claw', 'agent-abby', 'agent-dina')).toStrictEqual(duplicate);
+    expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-abby', 'agent-dina', 'agent-jesse']);
+
+    expect(reorderAgentInTeam(snapshot, 'team-codex-claw', 'agent-abby', null)).toStrictEqual(duplicate);
+    expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-dina', 'agent-jesse', 'agent-abby']);
+    expect(snapshot.activeAgentId).toBe('agent-abby');
+  });
+
+  it('keeps agent order unchanged when dropping an agent onto itself', () => {
+    const snapshot = createInitialSnapshot();
+
+    expect(reorderAgentInTeam(snapshot, 'team-codex-claw', 'agent-dina', 'agent-dina')).toStrictEqual(snapshot.agents[0]);
+    expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-dina', 'agent-jesse']);
+  });
+
+  it('ignores agent reorders outside the requested team', () => {
+    const snapshot = createInitialSnapshot();
+    const otherTeam = createTeamInSnapshot(snapshot, {
+      name: 'Skwad Core',
+      color: '#46A857',
+    }, '2026-06-05T10:11:12.000Z');
+
+    expect(reorderAgentInTeam(snapshot, otherTeam.id, 'agent-dina', null)).toBeNull();
+    expect(reorderAgentInTeam(snapshot, 'team-codex-claw', 'agent-dina', 'missing-agent')).toBeNull();
+    expect(reorderAgentInTeam(snapshot, 'missing-team', 'agent-dina', null)).toBeNull();
+    expect(reorderAgentInTeam(snapshot, 'team-codex-claw', 'missing-agent', null)).toBeNull();
+    expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-dina', 'agent-jesse']);
   });
 
   it('restarts an idle agent by clearing conversation and runtime state', () => {

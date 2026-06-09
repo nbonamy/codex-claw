@@ -21,10 +21,11 @@ import {
   duplicateAgentInSnapshot,
   moveAgentToTeamInSnapshot,
   removeBenchTemplateFromSnapshot,
+  reorderAgentInTeam,
   restartAgentConversation,
   saveAgentToBench,
 } from '../shared/agent-manager';
-import { closeTeamInSnapshot, createTeamInSnapshot, selectTeam, updateTeamInSnapshot } from '../shared/team-manager';
+import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selectTeam, updateTeamInSnapshot } from '../shared/team-manager';
 import { updateSettingsInSnapshot } from '../shared/settings';
 import {
   applyMainEventToSnapshot,
@@ -35,7 +36,7 @@ import {
   updateAgentFolder,
 } from './snapshot-service';
 import { AppStatePersistence } from './state-persistence';
-import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
+import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
 import { codexBackendDefaultsWithApprovalPreset, isCodexApprovalPreset } from '../shared/codex-approval-presets';
 import { ipcChannels } from '../shared/ipc';
 import { teamColors } from '../shared/team-colors';
@@ -120,6 +121,15 @@ export class AppController {
       return this.snapshot;
     });
 
+    ipcMain.handle(ipcChannels.reorderTeams, async (_event, input: ReorderTeamsInput) => {
+      const team = reorderTeamInSnapshot(this.snapshot, input.teamId, input.beforeTeamId);
+      if (!team) {
+        throw new Error(`Team reorder target not found: ${input.teamId}`);
+      }
+      await this.persistSnapshot();
+      return this.snapshot;
+    });
+
     ipcMain.handle(ipcChannels.closeTeam, async (_event, teamId: string) => {
       const team = closeTeamInSnapshot(this.snapshot, teamId);
       if (!team) {
@@ -165,6 +175,15 @@ export class AppController {
       const agent = moveAgentToTeamInSnapshot(this.snapshot, input.agentId, input.teamId);
       if (!agent) {
         throw new Error(`Agent or team not found: ${input.agentId} -> ${input.teamId}`);
+      }
+      await this.persistSnapshot();
+      return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.reorderAgents, async (_event, input: ReorderAgentsInput) => {
+      const agent = reorderAgentInTeam(this.snapshot, input.teamId, input.agentId, input.beforeAgentId);
+      if (!agent) {
+        throw new Error(`Agent reorder target not found: ${input.agentId}`);
       }
       await this.persistSnapshot();
       return this.snapshot;

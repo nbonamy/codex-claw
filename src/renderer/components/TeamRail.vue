@@ -8,13 +8,22 @@
       v-for="team in teams"
       :key="team.id"
       class="team-rail__team"
-      :class="{ 'team-rail__team--active': team.id === activeTeamId }"
+      :class="[
+        { 'team-rail__team--active': team.id === activeTeamId },
+        teamReorder.dropTargetClass(team.id),
+      ]"
       type="button"
+      v-bind="teamReorder.dragItemAttributes(team.id)"
       :style="{ backgroundColor: team.color ?? defaultTeamColor }"
       :aria-label="team.name"
       :aria-pressed="team.id === activeTeamId"
       @click="emit('select-team', team.id)"
       @contextmenu.prevent="openTeamMenu(team.id, $event)"
+      @dragstart="teamReorder.onDragStart(team.id, $event)"
+      @dragover="teamReorder.onDragOver(team.id, $event)"
+      @dragleave="teamReorder.onDragLeave(team.id, $event)"
+      @drop="teamReorder.onDrop(team.id, $event)"
+      @dragend="teamReorder.onDragEnd"
     >
       {{ team.avatar ?? teamInitials(team.name) }}
     </button>
@@ -49,10 +58,11 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { AccountRateLimits, Team } from '../../shared/contracts';
+import type { AccountRateLimits, ReorderTeamsInput, Team } from '../../shared/contracts';
 import { defaultTeamColor } from '../../shared/team-colors';
 import { teamInitials } from '../../shared/team-manager';
 import { PlusIcon } from '../shared/icons/app-icons';
+import { useListReorderDrag } from '../shared/use-list-reorder-drag';
 import SettingsMenu from './SettingsMenu.vue';
 import TeamContextMenu from './TeamContextMenu.vue';
 import { confirmCloseTeam } from './team-close-confirmation';
@@ -69,6 +79,7 @@ const emit = defineEmits<{
   'new-team': [];
   'open-settings': [];
   quit: [];
+  'reorder-teams': [input: ReorderTeamsInput];
   'select-team': [teamId: string];
 }>();
 
@@ -79,6 +90,15 @@ const contextMenuTeam = computed(() => (
   contextMenuTeamId.value ? props.teams.find((team) => team.id === contextMenuTeamId.value) ?? null : null
 ));
 const canCloseContextTeam = computed(() => Boolean(contextMenuTeam.value) && props.teams.length > 1);
+const teamReorder = useListReorderDrag<string>({
+  itemIds: () => props.teams.map((team) => team.id),
+  onDrop: ({ draggedId, beforeId }) => {
+    emit('reorder-teams', {
+      teamId: draggedId,
+      beforeTeamId: beforeId,
+    });
+  },
+});
 onMounted(() => {
   document.addEventListener('click', closeFloatingUiOnDocumentClick);
   document.addEventListener('keydown', closeFloatingUiOnEscape);
@@ -156,6 +176,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 }
 
 .team-rail__team {
+  position: relative;
   width: var(--team-rail-button-size);
   height: var(--team-rail-button-size);
   border: 0;
@@ -165,6 +186,42 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-16);
   cursor: pointer;
+}
+
+.team-rail__team::before,
+.team-rail__team::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: calc(var(--team-rail-button-size) * 0.72);
+  height: 3px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-shell-rail);
+  transform: translateX(-50%) scaleX(0);
+  opacity: 0;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+  pointer-events: none;
+}
+
+.team-rail__team::before {
+  top: calc(var(--space-6) * -0.5);
+}
+
+.team-rail__team::after {
+  bottom: calc(var(--space-6) * -0.5);
+}
+
+.team-rail__team.list-reorder-drag--drop-before::before,
+.team-rail__team.list-reorder-drag--drop-after::after {
+  opacity: 1;
+  transform: translateX(-50%) scaleX(1);
+}
+
+.team-rail__team.list-reorder-drag--dragging {
+  opacity: 0.46;
 }
 
 .team-rail__team--active {

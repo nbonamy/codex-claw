@@ -114,6 +114,25 @@ export function moveAgentToTeamInSnapshot(snapshot: AppSnapshot, agentId: string
   return agent;
 }
 
+export function reorderAgentInTeam(snapshot: AppSnapshot, teamId: string, agentId: string, beforeAgentId: string | null): Agent | null {
+  const team = snapshot.teams.find((candidate) => candidate.id === teamId);
+  const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
+  if (!team || !agent || !team.agentIds.includes(agentId)) {
+    return null;
+  }
+
+  if (beforeAgentId === agentId) {
+    return agent;
+  }
+
+  if (beforeAgentId !== null && !team.agentIds.includes(beforeAgentId)) {
+    return null;
+  }
+
+  team.agentIds = reorderIdsByBeforeId(team.agentIds, agentId, beforeAgentId);
+  return agent;
+}
+
 export function restartAgentConversation(snapshot: AppSnapshot, agentId: string, updatedAt = new Date().toISOString()): Agent | null {
   const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
   if (!agent) {
@@ -213,6 +232,13 @@ function uniqueId(existingIds: string[], baseId: string): string {
     counter += 1;
   }
   return `${baseId}-${counter}`;
+}
+
+function reorderIdsByBeforeId(ids: string[], id: string, beforeId: string | null): string[] {
+  const nextIds = ids.filter((candidate) => candidate !== id);
+  const insertIndex = beforeId === null ? nextIds.length : nextIds.indexOf(beforeId);
+  nextIds.splice(insertIndex, 0, id);
+  return nextIds;
 }
 
 function slug(value: string): string {

@@ -21,11 +21,20 @@
         v-for="agent in agents"
         :key="agent.id"
         class="agent-sidebar__agent"
-        :class="{ 'agent-sidebar__agent--active': agent.id === activeAgentId }"
+        :class="[
+          { 'agent-sidebar__agent--active': agent.id === activeAgentId },
+          agentReorder.dropTargetClass(agent.id),
+        ]"
         type="button"
+        v-bind="agentReorder.dragItemAttributes(agent.id)"
         :aria-pressed="agent.id === activeAgentId"
         @click="selectAgent(agent.id)"
         @contextmenu.prevent="openAgentMenu(agent.id, $event)"
+        @dragstart="agentReorder.onDragStart(agent.id, $event)"
+        @dragover="agentReorder.onDragOver(agent.id, $event)"
+        @dragleave="agentReorder.onDragLeave(agent.id, $event)"
+        @drop="agentReorder.onDrop(agent.id, $event)"
+        @dragend="agentReorder.onDragEnd"
       >
         <AgentAvatar
           class="agent-sidebar__avatar"
@@ -86,7 +95,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Agent, AgentStatus, BenchTemplate, Team } from '../../shared/contracts';
+import type { Agent, AgentStatus, BenchTemplate, ReorderAgentsInput, Team } from '../../shared/contracts';
 import {
   PanelLeftCloseIcon,
 } from '../shared/icons/app-icons';
@@ -94,12 +103,14 @@ import AgentContextMenu from './AgentContextMenu.vue';
 import type { AgentContextMenuAction } from './AgentContextMenu.vue';
 import AgentAvatar from './AgentAvatar.vue';
 import NewAgentButton from './NewAgentButton.vue';
+import { useListReorderDrag } from '../shared/use-list-reorder-drag';
 
 const props = defineProps<{
   agents: Agent[];
   activeAgentId: string | null;
   bench?: BenchTemplate[];
   teams?: Team[];
+  teamId?: string | null;
   teamName: string;
   width?: number;
   minWidth?: number;
@@ -114,6 +125,7 @@ const emit = defineEmits<{
   'edit-agent': [agentId: string];
   'move-agent-to-team': [payload: { agentId: string; teamId: string }];
   'new-agent': [];
+  'reorder-agents': [payload: ReorderAgentsInput];
   'resize-sidebar': [width: number];
   'restart-agent': [agentId: string];
   'save-agent-to-bench': [agentId: string];
@@ -139,6 +151,20 @@ const contextMenuMoveTargets = computed(() => {
   }
 
   return (props.teams ?? []).filter((team) => team.id !== agent.teamId);
+});
+const agentReorder = useListReorderDrag<string>({
+  itemIds: () => props.agents.map((agent) => agent.id),
+  onDrop: ({ draggedId, beforeId }) => {
+    if (!props.teamId) {
+      return;
+    }
+
+    emit('reorder-agents', {
+      teamId: props.teamId,
+      agentId: draggedId,
+      beforeAgentId: beforeId,
+    });
+  },
 });
 const sidebarStyle = computed<Record<string, string>>(() => ({
   '--agent-sidebar-width': `${currentWidth.value}px`,
@@ -355,6 +381,7 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__agent {
+  position: relative;
   width: 100%;
   min-height: var(--agent-sidebar-row-min-height);
   display: grid;
@@ -369,6 +396,42 @@ function onResizePointerEnd(event: PointerEvent): void {
   background: transparent;
   text-align: left;
   cursor: pointer;
+}
+
+.agent-sidebar__agent::before,
+.agent-sidebar__agent::after {
+  content: "";
+  position: absolute;
+  left: var(--space-6);
+  right: var(--space-6);
+  height: 3px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-shell-sidebar);
+  opacity: 0;
+  transform: scaleX(0.92);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+  pointer-events: none;
+}
+
+.agent-sidebar__agent::before {
+  top: -2px;
+}
+
+.agent-sidebar__agent::after {
+  bottom: -2px;
+}
+
+.agent-sidebar__agent.list-reorder-drag--drop-before::before,
+.agent-sidebar__agent.list-reorder-drag--drop-after::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+.agent-sidebar__agent.list-reorder-drag--dragging {
+  opacity: 0.48;
 }
 
 .agent-sidebar__agent--active {

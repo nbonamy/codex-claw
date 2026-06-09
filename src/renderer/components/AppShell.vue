@@ -12,6 +12,7 @@
       @new-team="openNewTeam"
       @open-settings="settingsDialogVisible = true"
       @quit="quit"
+      @reorder-teams="$emit('reorder-teams', $event)"
       @select-team="$emit('select-team', $event)"
     />
     <Transition name="agent-sidebar">
@@ -21,6 +22,7 @@
         :active-agent-id="currentAgent?.id ?? null"
         :bench="snapshot.bench"
         :teams="snapshot.teams"
+        :team-id="activeTeam?.id ?? null"
         :team-name="activeTeamName"
         :width="agentSidebarWidth"
         :min-width="agentSidebarMinWidth"
@@ -32,6 +34,7 @@
         @edit-agent="openEditAgent"
         @move-agent-to-team="$emit('move-agent-to-team', $event)"
         @new-agent="openNewAgent"
+        @reorder-agents="$emit('reorder-agents', $event)"
         @restart-agent="$emit('restart-agent', $event)"
         @resize-sidebar="setAgentSidebarWidth"
         @remove-bench-template="$emit('remove-bench-template', $event)"
@@ -133,7 +136,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, SidePanelMarkdownRequest, Team, ThreadGoal, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../shared/contracts';
+import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, Team, ThreadGoal, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../shared/contracts';
 import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import AgentDialog from './AgentDialog.vue';
 import AgentEmptyState from './AgentEmptyState.vue';
@@ -218,6 +221,8 @@ const emit = defineEmits<{
   'interrupt-agent': [];
   'move-agent-to-team': [input: MoveAgentToTeamInput];
   'quote-message': [index: number];
+  'reorder-agents': [input: ReorderAgentsInput];
+  'reorder-teams': [input: ReorderTeamsInput];
   'restart-agent': [agentId: string];
   'remove-bench-template': [templateId: string];
   'retry-message': [index: number];

@@ -58,6 +58,20 @@ describe('TeamRail', () => {
     expect(wrapper.get('[aria-label="Codex Claw"]').text()).toBe('CC');
   });
 
+  it('falls back to the default team color when none is set', () => {
+    const wrapper = mountRail({
+      teams: [{
+        id: 'team-plain',
+        name: 'Plain Team',
+        agentIds: [],
+      }],
+      activeTeamId: null,
+    });
+
+    expect(wrapper.get('[aria-label="Plain Team"]').text()).toBe('PT');
+    expect((wrapper.get('[aria-label="Plain Team"]').element as HTMLButtonElement).style.backgroundColor).toBe('rgb(27, 79, 178)');
+  });
+
   it('emits team selection and new team intents', async () => {
     const wrapper = mountRail({
       teams,
@@ -69,6 +83,34 @@ describe('TeamRail', () => {
 
     expect(wrapper.emitted('select-team')).toStrictEqual([['team-claw']]);
     expect(wrapper.emitted('new-team')).toStrictEqual([[]]);
+  });
+
+  it('emits team reorder drops and marks the drop location', async () => {
+    const wrapper = mountRail({
+      teams,
+      activeTeamId: 'team-sk',
+    });
+    const buttons = wrapper.findAll('.team-rail__team');
+    const skwadButton = buttons[0];
+    const clawButton = buttons[1];
+    expect(skwadButton.attributes('draggable')).toBe('true');
+    mockRect(clawButton.element, { top: 100, height: 44 });
+
+    skwadButton.element.dispatchEvent(dragEvent('dragstart', 0));
+    clawButton.element.dispatchEvent(dragEvent('dragover', 132));
+    await nextTick();
+
+    expect(clawButton.classes()).toContain('list-reorder-drag--drop-after');
+
+    clawButton.element.dispatchEvent(dragEvent('drop', 132));
+    await nextTick();
+
+    expect(wrapper.emitted('reorder-teams')).toStrictEqual([[
+      {
+        teamId: 'team-sk',
+        beforeTeamId: null,
+      },
+    ]]);
   });
 
   it('shows rate limits and emits settings menu actions', async () => {
@@ -211,4 +253,34 @@ function mountRail(props: { teams: Team[]; activeTeamId: string | null; rateLimi
   });
   mountedWrappers.push(wrapper);
   return wrapper;
+}
+
+function dragEvent(type: string, clientY: number): DragEvent {
+  const event = new Event(type, {
+    bubbles: true,
+    cancelable: true,
+  }) as DragEvent;
+  const dataTransfer = {
+    dropEffect: '',
+    effectAllowed: '',
+    setData: vi.fn(),
+  };
+
+  Object.defineProperty(event, 'clientY', { value: clientY });
+  Object.defineProperty(event, 'dataTransfer', { value: dataTransfer });
+  return event;
+}
+
+function mockRect(element: Element, rect: { top: number; height: number }): void {
+  vi.spyOn(element, 'getBoundingClientRect').mockReturnValue({
+    top: rect.top,
+    bottom: rect.top + rect.height,
+    height: rect.height,
+    left: 0,
+    right: 44,
+    width: 44,
+    x: 0,
+    y: rect.top,
+    toJSON: () => undefined,
+  });
 }

@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, SendPromptOptions, SidePanelMarkdownRequest, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
+import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelMarkdownRequest, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
 import { updateSettingsInSnapshot } from '../shared/settings';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '../shared/snapshot';
 import { defaultBackendCapabilities } from '../shared/backend-capabilities';
@@ -294,6 +294,18 @@ export function useAppState() {
     snapshot.value = await window.codexClaw.updateTeam(input);
   }
 
+  async function reorderTeams(input: ReorderTeamsInput): Promise<void> {
+    if (
+      !window.codexClaw?.reorderTeams ||
+      !snapshot.value.teams.some((team) => team.id === input.teamId) ||
+      (input.beforeTeamId !== null && !snapshot.value.teams.some((team) => team.id === input.beforeTeamId))
+    ) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.reorderTeams(input);
+  }
+
   async function closeTeam(teamId: string): Promise<void> {
     if (!window.codexClaw?.closeTeam || snapshot.value.teams.length <= 1 || !snapshot.value.teams.some((team) => team.id === teamId)) {
       return;
@@ -366,6 +378,19 @@ export function useAppState() {
     }
 
     snapshot.value = await window.codexClaw.moveAgentToTeam(input);
+  }
+
+  async function reorderAgents(input: ReorderAgentsInput): Promise<void> {
+    const team = snapshot.value.teams.find((candidate) => candidate.id === input.teamId);
+    if (
+      !window.codexClaw?.reorderAgents ||
+      !team?.agentIds.includes(input.agentId) ||
+      (input.beforeAgentId !== null && !team.agentIds.includes(input.beforeAgentId))
+    ) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.reorderAgents(input);
   }
 
   async function saveAgentToBench(agentId: string): Promise<void> {
@@ -486,11 +511,13 @@ export function useAppState() {
     createAgent,
     createTeam,
     updateTeam,
+    reorderTeams,
     closeTeam,
     updateAgent,
     updateSettings,
     duplicateAgent,
     moveAgentToTeam,
+    reorderAgents,
     saveAgentToBench,
     deployBenchTemplate,
     removeBenchTemplate,

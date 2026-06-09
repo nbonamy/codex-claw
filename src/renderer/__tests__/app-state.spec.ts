@@ -737,19 +737,31 @@ describe('useAppState', () => {
     };
     const selectedTeamSnapshot = {
       ...teamSnapshot,
+      teams: [teamSnapshot.teams[1]!, teamSnapshot.teams[0]!],
+      activeTeamId: 'team-skwad-core',
+      activeAgentId: null,
+    };
+    const selectedCoreTeamSnapshot = {
+      ...selectedTeamSnapshot,
       activeTeamId: 'team-codex-claw',
       activeAgentId: 'agent-dina',
     };
     const updatedTeamSnapshot = {
-      ...selectedTeamSnapshot,
-      teams: selectedTeamSnapshot.teams.map((team) => team.id === 'team-codex-claw'
+      ...selectedCoreTeamSnapshot,
+      teams: selectedCoreTeamSnapshot.teams.map((team) => team.id === 'team-codex-claw'
         ? { ...team, name: 'Core Team', avatar: 'CT', color: '#46A857' }
         : team),
     };
-    const createdSnapshot = {
+    const reorderedAgentsSnapshot = {
       ...updatedTeamSnapshot,
+      teams: updatedTeamSnapshot.teams.map((team) => team.id === 'team-codex-claw'
+        ? { ...team, agentIds: ['agent-jesse', 'agent-dina'] }
+        : team),
+    };
+    const createdSnapshot = {
+      ...reorderedAgentsSnapshot,
       agents: [
-        ...updatedTeamSnapshot.agents,
+        ...reorderedAgentsSnapshot.agents,
         {
           id: 'agent-jules',
           teamId: 'team-codex-claw',
@@ -831,8 +843,10 @@ describe('useAppState', () => {
     const chooseAgentFolder = vi.fn().mockResolvedValue('/Users/nbonamy/src/jules');
     const createTeam = vi.fn().mockResolvedValue(teamSnapshot);
     const updateTeam = vi.fn().mockResolvedValue(updatedTeamSnapshot);
+    const reorderTeams = vi.fn().mockResolvedValue(selectedTeamSnapshot);
+    const reorderAgents = vi.fn().mockResolvedValue(reorderedAgentsSnapshot);
     const closeTeam = vi.fn().mockResolvedValue(closedTeamSnapshot);
-    const selectTeam = vi.fn().mockResolvedValue(selectedTeamSnapshot);
+    const selectTeam = vi.fn().mockResolvedValue(selectedCoreTeamSnapshot);
     const createAgent = vi.fn().mockResolvedValue(createdSnapshot);
     const updateAgent = vi.fn().mockResolvedValue(updatedSnapshot);
     const duplicateAgent = vi.fn().mockResolvedValue(duplicatedSnapshot);
@@ -850,12 +864,14 @@ describe('useAppState', () => {
         chooseAgentFolder,
         createTeam,
         updateTeam,
+        reorderTeams,
         closeTeam,
         selectTeam,
         createAgent,
         updateAgent,
         duplicateAgent,
         moveAgentToTeam,
+        reorderAgents,
         saveAgentToBench,
         restartAgent,
         deployBenchTemplate,
@@ -869,8 +885,10 @@ describe('useAppState', () => {
 
     await expect(state.chooseAgentFolder()).resolves.toBe('/Users/nbonamy/src/jules');
     await state.createTeam({ name: 'Skwad Core', color: '#46A857' });
+    await state.reorderTeams({ teamId: 'team-skwad-core', beforeTeamId: 'team-codex-claw' });
     await state.selectTeam('team-codex-claw');
     await state.updateTeam({ id: 'team-codex-claw', name: 'Core Team', color: '#46A857' });
+    await state.reorderAgents({ teamId: 'team-codex-claw', agentId: 'agent-jesse', beforeAgentId: 'agent-dina' });
     await state.createAgent({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules', backend: 'claude' });
     await state.updateAgent({ id: 'agent-jules', name: 'Jules Prime', avatar: '🤖', folder: '/Users/nbonamy/src/jules', backend: 'claude' });
     await state.duplicateAgent('agent-jules');
@@ -883,8 +901,10 @@ describe('useAppState', () => {
     await state.closeTeam('team-skwad-core');
 
     expect(createTeam).toHaveBeenCalledWith({ name: 'Skwad Core', color: '#46A857' });
+    expect(reorderTeams).toHaveBeenCalledWith({ teamId: 'team-skwad-core', beforeTeamId: 'team-codex-claw' });
     expect(selectTeam).toHaveBeenCalledWith('team-codex-claw');
     expect(updateTeam).toHaveBeenCalledWith({ id: 'team-codex-claw', name: 'Core Team', color: '#46A857' });
+    expect(reorderAgents).toHaveBeenCalledWith({ teamId: 'team-codex-claw', agentId: 'agent-jesse', beforeAgentId: 'agent-dina' });
     expect(createAgent).toHaveBeenCalledWith({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules', backend: 'claude' });
     expect(updateAgent).toHaveBeenCalledWith({ id: 'agent-jules', name: 'Jules Prime', avatar: '🤖', folder: '/Users/nbonamy/src/jules', backend: 'claude' });
     expect(duplicateAgent).toHaveBeenCalledWith('agent-jules');
@@ -914,12 +934,14 @@ describe('useAppState', () => {
     await expect(state.chooseAgentFolder()).resolves.toBeNull();
     await state.createTeam({ name: 'Ignored Team', color: '#46A857' });
     await state.updateTeam({ id: 'team-codex-claw', name: 'Ignored Team', color: '#46A857' });
+    await state.reorderTeams({ teamId: 'team-codex-claw', beforeTeamId: null });
     await state.closeTeam('team-codex-claw');
     await state.selectTeam('team-codex-claw');
     await state.createAgent({ name: 'Ignored', folder: '/tmp/ignored' });
     await state.updateAgent({ id: 'agent-dina', name: 'Ignored', folder: '/tmp/ignored' });
     await state.duplicateAgent('agent-dina');
     await state.moveAgentToTeam({ agentId: 'agent-dina', teamId: 'team-codex-claw' });
+    await state.reorderAgents({ teamId: 'team-codex-claw', agentId: 'agent-dina', beforeAgentId: null });
     await state.saveAgentToBench('agent-dina');
     await state.deployBenchTemplate('missing-template');
     await state.removeBenchTemplate('missing-template');
@@ -927,6 +949,32 @@ describe('useAppState', () => {
     await state.closeAgent('agent-dina');
 
     expect(state.snapshot.value).toBe(before);
+  });
+
+  it('ignores invalid reorder requests before calling main', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const reorderTeams = vi.fn().mockResolvedValue(remoteSnapshot);
+    const reorderAgents = vi.fn().mockResolvedValue(remoteSnapshot);
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn(),
+        reorderTeams,
+        reorderAgents,
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    await state.reorderTeams({ teamId: 'missing-team', beforeTeamId: null });
+    await state.reorderTeams({ teamId: 'team-codex-claw', beforeTeamId: 'missing-team' });
+    await state.reorderAgents({ teamId: 'missing-team', agentId: 'agent-dina', beforeAgentId: null });
+    await state.reorderAgents({ teamId: 'team-codex-claw', agentId: 'missing-agent', beforeAgentId: null });
+    await state.reorderAgents({ teamId: 'team-codex-claw', agentId: 'agent-dina', beforeAgentId: 'missing-agent' });
+
+    expect(reorderTeams).not.toHaveBeenCalled();
+    expect(reorderAgents).not.toHaveBeenCalled();
   });
 
   it('loads backend models, selects the default reasoning effort, and sends it with prompts', async () => {

@@ -402,6 +402,11 @@ export type UpdateTeamInput = {
   color: string;
 };
 
+export type ReorderTeamsInput = {
+  teamId: string;
+  beforeTeamId: string | null;
+};
+
 export type UpdateAgentInput = {
   id: string;
   name: string;
@@ -413,6 +418,12 @@ export type UpdateAgentInput = {
 export type MoveAgentToTeamInput = {
   agentId: string;
   teamId: string;
+};
+
+export type ReorderAgentsInput = {
+  teamId: string;
+  agentId: string;
+  beforeAgentId: string | null;
 };
 
 export type ToolConfirmationDecision =
@@ -487,12 +498,14 @@ export type CodexClawApi = {
   chooseAgentFolder(): Promise<string | null>;
   createTeam(input: CreateTeamInput): Promise<AppSnapshot>;
   updateTeam(input: UpdateTeamInput): Promise<AppSnapshot>;
+  reorderTeams(input: ReorderTeamsInput): Promise<AppSnapshot>;
   closeTeam(teamId: string): Promise<AppSnapshot>;
   selectTeam(teamId: string): Promise<AppSnapshot>;
   createAgent(input: CreateAgentInput): Promise<AppSnapshot>;
   updateAgent(input: UpdateAgentInput): Promise<AppSnapshot>;
   duplicateAgent(agentId: string): Promise<AppSnapshot>;
   moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot>;
+  reorderAgents(input: ReorderAgentsInput): Promise<AppSnapshot>;
   saveAgentToBench(agentId: string): Promise<AppSnapshot>;
   deployBenchTemplate(templateId: string, teamId?: string): Promise<AppSnapshot>;
   removeBenchTemplate(templateId: string): Promise<AppSnapshot>;

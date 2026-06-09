@@ -13,6 +13,36 @@ function pointerEvent(type: string, clientX: number): PointerEvent {
   return event as PointerEvent;
 }
 
+function dragEvent(type: string, clientY: number): DragEvent {
+  const event = new Event(type, {
+    bubbles: true,
+    cancelable: true,
+  }) as DragEvent;
+  const dataTransfer = {
+    dropEffect: '',
+    effectAllowed: '',
+    setData: vi.fn(),
+  };
+
+  Object.defineProperty(event, 'clientY', { value: clientY });
+  Object.defineProperty(event, 'dataTransfer', { value: dataTransfer });
+  return event;
+}
+
+function mockRect(element: Element, rect: { top: number; height: number }): void {
+  vi.spyOn(element, 'getBoundingClientRect').mockReturnValue({
+    top: rect.top,
+    bottom: rect.top + rect.height,
+    height: rect.height,
+    left: 0,
+    right: 280,
+    width: 280,
+    x: 0,
+    y: rect.top,
+    toJSON: () => undefined,
+  });
+}
+
 const agents: Agent[] = [
   {
     id: 'agent-dina',
@@ -116,6 +146,64 @@ describe('AgentSidebar', () => {
     expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-jesse']]);
   });
 
+  it('emits agent reorder drops and marks the drop location', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        teamId: 'team-codex-claw',
+        teamName: 'Codex Claw',
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+    const rows = wrapper.findAll('.agent-sidebar__agent');
+    const dinaRow = rows[0];
+    const jesseRow = rows[1];
+    expect(jesseRow.attributes('draggable')).toBe('true');
+    mockRect(dinaRow.element, { top: 100, height: 64 });
+
+    jesseRow.element.dispatchEvent(dragEvent('dragstart', 0));
+    dinaRow.element.dispatchEvent(dragEvent('dragover', 108));
+    await wrapper.vm.$nextTick();
+
+    expect(dinaRow.classes()).toContain('list-reorder-drag--drop-before');
+
+    dinaRow.element.dispatchEvent(dragEvent('drop', 108));
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.emitted('reorder-agents')).toStrictEqual([[
+      {
+        teamId: 'team-codex-claw',
+        agentId: 'agent-jesse',
+        beforeAgentId: 'agent-dina',
+      },
+    ]]);
+  });
+
+  it('does not emit agent reorder drops without a team id', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+    const rows = wrapper.findAll('.agent-sidebar__agent');
+    mockRect(rows[0].element, { top: 100, height: 64 });
+
+    rows[1].element.dispatchEvent(dragEvent('dragstart', 0));
+    rows[0].element.dispatchEvent(dragEvent('dragover', 108));
+    rows[0].element.dispatchEvent(dragEvent('drop', 108));
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.emitted('reorder-agents')).toBeUndefined();
+  });
+
   it('falls back to name initials when an avatar is not set', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
@@ -169,6 +257,23 @@ describe('AgentSidebar', () => {
     expect(wrapper.text()).toContain('Running tests');
     expect(wrapper.text()).toContain('id8');
     expect(wrapper.text()).not.toContain('~/src/id8');
+  });
+
+  it('keeps blank folders blank instead of inventing a basename', () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: [
+          { ...agents[0], folder: '' },
+        ],
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.get('.agent-sidebar__folder').text()).toBe('');
   });
 
   it('renders a taller rounded new agent action', () => {

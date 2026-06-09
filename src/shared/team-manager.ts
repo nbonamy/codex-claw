@@ -47,6 +47,24 @@ export function updateTeamInSnapshot(snapshot: AppSnapshot, input: UpdateTeamInp
   return team;
 }
 
+export function reorderTeamInSnapshot(snapshot: AppSnapshot, teamId: string, beforeTeamId: string | null): Team | null {
+  const team = snapshot.teams.find((candidate) => candidate.id === teamId);
+  if (!team) {
+    return null;
+  }
+
+  if (beforeTeamId === teamId) {
+    return team;
+  }
+
+  if (beforeTeamId !== null && !snapshot.teams.some((candidate) => candidate.id === beforeTeamId)) {
+    return null;
+  }
+
+  snapshot.teams = reorderByBeforeId(snapshot.teams, team, beforeTeamId);
+  return team;
+}
+
 export function closeTeamInSnapshot(snapshot: AppSnapshot, teamId: string): Team | null {
   if (snapshot.teams.length <= 1) {
     throw new Error('At least one team must remain open.');
@@ -114,6 +132,16 @@ function uniqueTeamId(snapshot: AppSnapshot, name: string, createdAt: string): s
     counter += 1;
   }
   return `${baseId}-${counter}`;
+}
+
+function reorderByBeforeId<T extends { id: string }>(items: T[], item: T, beforeItemId: string | null): T[] {
+  const nextItems = items.filter((candidate) => candidate.id !== item.id);
+  const insertIndex = beforeItemId === null
+    ? nextItems.length
+    : nextItems.findIndex((candidate) => candidate.id === beforeItemId);
+
+  nextItems.splice(insertIndex, 0, item);
+  return nextItems;
 }
 
 function slug(value: string): string {

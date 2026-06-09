@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptySnapshot, createInitialSnapshot } from '../snapshot';
-import { closeTeamInSnapshot, createTeamInSnapshot, selectTeam, teamInitials, updateTeamInSnapshot } from '../team-manager';
+import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selectTeam, teamInitials, updateTeamInSnapshot } from '../team-manager';
 
 describe('team-manager', () => {
   it('creates a team with initials, selected color, and no default agent', () => {
@@ -46,6 +46,15 @@ describe('team-manager', () => {
     expect(snapshot.activeAgentId).toBeNull();
   });
 
+  it('selects a remembered active agent when the team still contains it', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.teams[0].activeAgentId = 'agent-jesse';
+
+    selectTeam(snapshot, 'team-codex-claw');
+
+    expect(snapshot.activeAgentId).toBe('agent-jesse');
+  });
+
   it('ignores missing team selection and repairs stale active agent ids', () => {
     const snapshot = createInitialSnapshot();
     snapshot.teams[0].activeAgentId = 'missing-agent';
@@ -73,6 +82,41 @@ describe('team-manager', () => {
       color: '#46A857',
       agentIds: ['agent-dina', 'agent-jesse'],
     });
+  });
+
+  it('reorders teams before a target or to the end without changing selection', () => {
+    const snapshot = createInitialSnapshot();
+    const skwadTeam = createTeamInSnapshot(snapshot, {
+      name: 'Skwad',
+      color: '#46A857',
+    }, '2026-06-05T10:11:12.000Z');
+    const toolsTeam = createTeamInSnapshot(snapshot, {
+      name: 'Tools',
+      color: '#0093FF',
+    }, '2026-06-05T10:11:13.000Z');
+    selectTeam(snapshot, 'team-codex-claw');
+
+    expect(reorderTeamInSnapshot(snapshot, toolsTeam.id, 'team-codex-claw')).toStrictEqual(toolsTeam);
+    expect(snapshot.teams.map((team) => team.id)).toStrictEqual([toolsTeam.id, 'team-codex-claw', skwadTeam.id]);
+    expect(snapshot.activeTeamId).toBe('team-codex-claw');
+
+    expect(reorderTeamInSnapshot(snapshot, toolsTeam.id, null)).toStrictEqual(toolsTeam);
+    expect(snapshot.teams.map((team) => team.id)).toStrictEqual(['team-codex-claw', skwadTeam.id, toolsTeam.id]);
+  });
+
+  it('keeps team order unchanged when dropping a team onto itself', () => {
+    const snapshot = createInitialSnapshot();
+
+    expect(reorderTeamInSnapshot(snapshot, 'team-codex-claw', 'team-codex-claw')).toStrictEqual(snapshot.teams[0]);
+    expect(snapshot.teams.map((team) => team.id)).toStrictEqual(['team-codex-claw']);
+  });
+
+  it('ignores missing team reorder targets', () => {
+    const snapshot = createInitialSnapshot();
+
+    expect(reorderTeamInSnapshot(snapshot, 'missing-team', null)).toBeNull();
+    expect(reorderTeamInSnapshot(snapshot, 'team-codex-claw', 'missing-team')).toBeNull();
+    expect(snapshot.teams.map((team) => team.id)).toStrictEqual(['team-codex-claw']);
   });
 
   it('closes a team with its agents and selects the next team', () => {

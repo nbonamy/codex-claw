@@ -32,6 +32,8 @@
     @close-agent="closeAgent"
     @duplicate-agent="duplicateAgent"
     @move-agent-to-team="moveAgentToTeam"
+    @reorder-agents="reorderAgents"
+    @reorder-teams="reorderTeams"
     @deploy-bench-template="deployBenchTemplate"
     @remove-bench-template="removeBenchTemplate"
     @restart-agent="restartAgent"
@@ -89,10 +91,12 @@ const {
   createAgent,
   createTeam,
   updateTeam,
+  reorderTeams,
   closeTeam,
   updateAgent,
   duplicateAgent,
   moveAgentToTeam,
+  reorderAgents,
   saveAgentToBench,
   deployBenchTemplate,
   removeBenchTemplate,
