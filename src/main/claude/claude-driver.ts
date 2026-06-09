@@ -28,15 +28,25 @@ import {
   type ClaudeSdkMessage,
 } from './protocol';
 
+type StreamedClaudeTool = {
+  id: string;
+  name: string;
+  inputJson: string;
+  emitted: boolean;
+  planContent: string;
+};
+
 type ActiveClaudeTurn = {
   agentId: string;
   turnId: string;
   sessionId: string | null;
   handle: ClaudeTurnHandle;
+  planMode: boolean;
   completed: boolean;
   interrupted: boolean;
   streamedText: string;
-  streamedToolsByIndex: Map<number, { id: string; inputJson: string }>;
+  streamedToolsByIndex: Map<number, StreamedClaudeTool>;
+  completedPlanMarkdown: string | null;
   resolveStart: (result: BackendSendResult) => void;
   rejectStart: (error: Error) => void;
   startResolved: boolean;
@@ -107,10 +117,12 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
         turnId,
         sessionId: existingSessionId,
         handle,
+        planMode: Boolean(options.planMode),
         completed: false,
         interrupted: false,
         streamedText: '',
         streamedToolsByIndex: new Map(),
+        completedPlanMarkdown: null,
         resolveStart: resolve,
         rejectStart: reject,
         startResolved: false,
@@ -201,6 +213,11 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
       this.resolveTurnStart(activeTurn, sessionId);
     }
 
+    if (message.type === 'system') {
+      this.emitPermissionModeStatus(activeTurn, message);
+      return;
+    }
+
     if (message.type === 'assistant') {
       if (typeof message.error === 'string' && message.error.trim()) {
         return;
@@ -242,6 +259,10 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
       }
 
       if (isClaudeToolUseBlock(block)) {
+        if (this.handlePlanToolBlock(activeTurn, block)) {
+          continue;
+        }
+
         this.emit({
           agentId: activeTurn.agentId,
           backend: this.backend,
@@ -266,10 +287,18 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
 
     const toolUseStart = claudeStreamToolUseStart(message);
     if (toolUseStart) {
+      const suppressToolPart = this.shouldSuppressPlanTool(activeTurn, toolUseStart.name);
       activeTurn.streamedToolsByIndex.set(toolUseStart.index, {
         id: toolUseStart.id,
+        name: toolUseStart.name,
         inputJson: '',
+        emitted: !suppressToolPart,
+        planContent: '',
       });
+      if (suppressToolPart) {
+        return;
+      }
+
       this.emit({
         agentId: activeTurn.agentId,
         backend: this.backend,
@@ -335,6 +364,13 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
 
     streamedTool.inputJson += partialJson;
     const input = parseJsonObject(streamedTool.inputJson);
+    if (this.handlePlanToolInput(activeTurn, streamedTool, input)) {
+      return;
+    }
+    if (!streamedTool.emitted) {
+      return;
+    }
+
     this.emit({
       agentId: activeTurn.agentId,
       backend: this.backend,
@@ -345,6 +381,144 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
         itemId: streamedTool.id,
         statusText: input ? null : 'Preparing tool input...',
         ...(input ? { input } : {}),
+      },
+    });
+  }
+
+  private emitPermissionModeStatus(activeTurn: ActiveClaudeTurn, message: ClaudeSdkMessage): void {
+    const messageRecord = message as Record<string, unknown>;
+    const subtype = messageRecord.subtype;
+    const permissionMode = messageRecord.permissionMode;
+    if (subtype !== 'status' || typeof permissionMode !== 'string') {
+      return;
+    }
+
+    this.emit({
+      agentId: activeTurn.agentId,
+      backend: this.backend,
+      backendSessionId: activeTurn.sessionId ?? undefined,
+      threadId: activeTurn.sessionId ?? undefined,
+      turnId: activeTurn.turnId,
+      type: 'thread.modeUpdated',
+      payload: {
+        mode: permissionMode === 'plan' ? 'plan' : 'default',
+        provider: 'claude',
+        permissionMode,
+      },
+    });
+  }
+
+  private shouldSuppressPlanTool(activeTurn: ActiveClaudeTurn, toolName: string): boolean {
+    if (toolName === 'EnterPlanMode' || toolName === 'ExitPlanMode') {
+      return true;
+    }
+
+    if (!activeTurn.planMode) {
+      return false;
+    }
+
+    return toolName === 'ToolSearch' || toolName === 'Write';
+  }
+
+  private handlePlanToolBlock(
+    activeTurn: ActiveClaudeTurn,
+    block: Extract<ClaudeSdkContentBlock, { type: 'tool_use' }>,
+  ): boolean {
+    if (this.shouldSuppressPlanTool(activeTurn, block.name)) {
+      const streamedTool = Array.from(activeTurn.streamedToolsByIndex.values()).find((tool) => tool.id === block.id) ?? {
+        id: block.id,
+        name: block.name,
+        inputJson: '',
+        emitted: false,
+        planContent: '',
+      };
+      this.handlePlanToolInput(activeTurn, streamedTool, recordValue(block.input));
+      return true;
+    }
+
+    return false;
+  }
+
+  private handlePlanToolInput(
+    activeTurn: ActiveClaudeTurn,
+    streamedTool: StreamedClaudeTool,
+    input: Record<string, unknown> | null,
+  ): boolean {
+    if (streamedTool.name === 'EnterPlanMode') {
+      return true;
+    }
+
+    if (streamedTool.name === 'ExitPlanMode') {
+      const plan = typeof input?.plan === 'string' ? input.plan : '';
+      if (plan.trim()) {
+        this.emitProposedPlanCompleted(activeTurn, streamedTool.id, plan);
+      }
+      return true;
+    }
+
+    if (activeTurn.planMode && streamedTool.name === 'ToolSearch') {
+      return true;
+    }
+
+    if (activeTurn.planMode && streamedTool.name === 'Write') {
+      const content = isClaudePlanWriteInput(input) ? input.content : '';
+      if (content) {
+        this.emitProposedPlanContentDelta(activeTurn, streamedTool, content);
+      }
+      return true;
+    }
+
+    return false;
+  }
+
+  private emitProposedPlanContentDelta(
+    activeTurn: ActiveClaudeTurn,
+    streamedTool: StreamedClaudeTool,
+    content: string,
+  ): void {
+    if (content === streamedTool.planContent) {
+      return;
+    }
+
+    const delta = content.startsWith(streamedTool.planContent)
+      ? content.slice(streamedTool.planContent.length)
+      : content;
+    streamedTool.planContent = content;
+    if (!delta) {
+      return;
+    }
+
+    this.emit({
+      agentId: activeTurn.agentId,
+      backend: this.backend,
+      backendSessionId: activeTurn.sessionId ?? undefined,
+      threadId: claudeThreadId(activeTurn),
+      turnId: activeTurn.turnId,
+      type: 'turn.proposedPlanDelta',
+      payload: {
+        itemId: streamedTool.id,
+        delta,
+      },
+    });
+  }
+
+  private emitProposedPlanCompleted(activeTurn: ActiveClaudeTurn, itemId: string, markdown: string): void {
+    const normalizedMarkdown = markdown.trim();
+    if (!normalizedMarkdown || activeTurn.completedPlanMarkdown === normalizedMarkdown) {
+      return;
+    }
+
+    activeTurn.completedPlanMarkdown = normalizedMarkdown;
+    this.emit({
+      agentId: activeTurn.agentId,
+      backend: this.backend,
+      backendSessionId: activeTurn.sessionId ?? undefined,
+      threadId: claudeThreadId(activeTurn),
+      turnId: activeTurn.turnId,
+      type: 'turn.proposedPlanCompleted',
+      payload: {
+        itemId,
+        markdown: normalizedMarkdown,
       },
     });
   }
@@ -482,13 +656,8 @@ function claudePrompt(prompt: string, options: SendPromptOptions): string {
     return prompt;
   }
 
-  return [
-    'Work in plan mode for this request.',
-    'First create a concise plan with the steps you intend to take. Then carry out the work unless the user explicitly asks only for the plan.',
-    '',
-    'User request:',
-    prompt,
-  ].join('\n');
+  const trimmed = prompt.trim();
+  return trimmed.startsWith('/plan') ? trimmed : `/plan ${trimmed}`;
 }
 
 function claudeSessionId(agent: Agent): string | null {
@@ -573,10 +742,24 @@ function claudeToolResultText(value: unknown): string {
 function parseJsonObject(value: string): Record<string, unknown> | null {
   try {
     const parsed = JSON.parse(value) as unknown;
-    return isRecord(parsed) ? parsed : null;
+    return recordValue(parsed);
   } catch {
     return null;
   }
+}
+
+function recordValue(value: unknown): Record<string, unknown> | null {
+  return isRecord(value) ? value : null;
+}
+
+function claudeThreadId(activeTurn: ActiveClaudeTurn): string {
+  return activeTurn.sessionId ?? activeTurn.agentId;
+}
+
+function isClaudePlanWriteInput(input: Record<string, unknown> | null): input is { file_path: string; content: string } {
+  return typeof input?.file_path === 'string' &&
+    input.file_path.includes('/.claude/plans/') &&
+    typeof input.content === 'string';
 }
 
 function normalizeProcessError(error: unknown): Error {

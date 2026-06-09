@@ -44,6 +44,23 @@ describe('AgentContextMenu', () => {
     expect(moveItem?.attributes()).toHaveProperty('disabled');
   });
 
+  it('renders a submenu chevron for move targets', () => {
+    const wrapper = mountMenu({
+      moveTargets: [
+        {
+          id: 'team-skwad',
+          name: 'Skwad',
+          avatar: 'SK',
+          color: '#46A857',
+          agentIds: [],
+        },
+      ],
+    });
+
+    const moveItem = wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Move to Other Team');
+    expect(moveItem?.find('.app-menu__chevron').exists()).toBe(true);
+  });
+
   it('emits the selected move target from the submenu', async () => {
     const wrapper = mountMenu({
       moveTargets: [

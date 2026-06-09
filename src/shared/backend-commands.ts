@@ -39,7 +39,17 @@ export const codexBackendCommands: BackendCommandSummary[] = [
   },
 ];
 
-export const claudeBackendCommands: BackendCommandSummary[] = [];
+export const claudeBackendCommands: BackendCommandSummary[] = [
+  {
+    id: 'claude.plan',
+    backend: 'claude',
+    name: 'plan',
+    displayName: 'Plan',
+    description: 'Switch to Claude Plan mode.',
+    slashName: 'plan',
+    submitOnSelect: true,
+  },
+];
 
 export function defaultBackendCommands(backend: AgentBackend): BackendCommandSummary[] {
   return backend === 'claude' ? claudeBackendCommands : codexBackendCommands;

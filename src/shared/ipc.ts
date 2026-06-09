@@ -25,6 +25,7 @@ export const ipcChannels = {
   quit: 'app:quit',
   setAgentGoal: 'agent:goal:set',
   clearAgentGoal: 'agent:goal:clear',
+  setAgentCodexApprovalPreset: 'agent:codex-approval-preset:set',
   sendPrompt: 'agent:send-prompt',
   steerPrompt: 'agent:steer-prompt',
   interruptAgent: 'agent:interrupt',

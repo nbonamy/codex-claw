@@ -286,6 +286,36 @@ describe('AppController', () => {
     expect(snapshot.agents[0].goal).toBeUndefined();
   });
 
+  it('sets a Codex approval preset through the backend driver', async () => {
+    const snapshot = createInitialSnapshot();
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const backendDriver = createFakeCodexBackendDriver({
+      setCodexApprovalPreset: vi.fn().mockResolvedValue({
+        backendSession: { kind: 'codex', threadId: 'thread-dina' },
+        approvalPreset: 'approve-for-me',
+      }),
+    });
+
+    await controller.initialize();
+    setCodexBackendDriver(controller, backendDriver);
+    await setAgentCodexApprovalPreset(controller, 'agent-dina', 'approve-for-me');
+
+    expect(backendDriver.setCodexApprovalPreset).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'approve-for-me');
+    expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-dina' });
+    expect(snapshot.agents[0].backendDefaults).toStrictEqual({
+      kind: 'codex',
+      approvalPreset: 'approve-for-me',
+      approvalPolicy: 'on-request',
+      approvalsReviewer: 'auto_review',
+      sandboxMode: 'workspace-write',
+    });
+    expect(persistence.save).toHaveBeenCalledWith(snapshot);
+  });
+
   it('interrupts the active Codex turn and keeps status until completion arrives', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].status = { type: 'working' };
@@ -617,6 +647,12 @@ async function clearAgentGoal(controller: AppController, agentId: string): Promi
   await (controller as unknown as {
     clearAgentGoal(agentId: string): Promise<void>;
   }).clearAgentGoal(agentId);
+}
+
+async function setAgentCodexApprovalPreset(controller: AppController, agentId: string, preset: 'ask-for-approval' | 'approve-for-me' | 'full-access'): Promise<void> {
+  await (controller as unknown as {
+    setAgentCodexApprovalPreset(agentId: string, preset: 'ask-for-approval' | 'approve-for-me' | 'full-access'): Promise<void>;
+  }).setAgentCodexApprovalPreset(agentId, preset);
 }
 
 async function readAgentFile(controller: AppController, agentId: string, filePath: string): Promise<unknown> {

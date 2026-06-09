@@ -3,6 +3,7 @@ import type {
   AgentBackend,
   AppSnapshot,
   BackendCapabilities,
+  CodexApprovalPreset,
   BackendModelOption,
   BackendPromptOptions,
   BackendRuntimeStatus,
@@ -33,6 +34,11 @@ export type BackendGoalResult = {
   cleared?: boolean;
 };
 
+export type BackendCodexApprovalPresetResult = {
+  backendSession: Extract<BackendSession, { kind: 'codex' }>;
+  approvalPreset: CodexApprovalPreset;
+};
+
 export type AgentBackendDriver = {
   readonly backend: AgentBackend;
   getRuntimeStatus(): BackendRuntimeStatus;
@@ -41,6 +47,7 @@ export type AgentBackendDriver = {
   sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>;
   setGoal?(agent: Agent, objective: string): Promise<BackendGoalResult>;
   clearGoal?(agent: Agent): Promise<BackendGoalResult>;
+  setCodexApprovalPreset?(agent: Agent, preset: CodexApprovalPreset): Promise<BackendCodexApprovalPresetResult>;
   interrupt(agent: Agent): Promise<BackendSendResult>;
   respondToRequest(response: ClientRequestResponse): Promise<void>;
   hydrateAgent?(agent: Agent): Promise<BackendSession | null>;

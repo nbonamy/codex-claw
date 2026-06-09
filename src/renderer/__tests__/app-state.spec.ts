@@ -114,6 +114,34 @@ describe('useAppState', () => {
     expect(state.visibleMessages.value).toStrictEqual(remoteSnapshot.messages);
   });
 
+  it('sets the active Codex approval preset through the preload bridge', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const updatedSnapshot = createInitialSnapshot();
+    updatedSnapshot.agents[0].backendDefaults = {
+      kind: 'codex',
+      approvalPreset: 'approve-for-me',
+      approvalPolicy: 'on-request',
+      approvalsReviewer: 'auto_review',
+      sandboxMode: 'workspace-write',
+    };
+    const setAgentCodexApprovalPreset = vi.fn().mockResolvedValue(updatedSnapshot);
+    vi.stubGlobal('window', {
+      codexClaw: {
+        setAgentCodexApprovalPreset,
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    state.snapshot.value = remoteSnapshot;
+
+    expect(state.activeCodexApprovalPreset.value).toBe('full-access');
+    await state.setCodexApprovalPreset('approve-for-me');
+
+    expect(setAgentCodexApprovalPreset).toHaveBeenCalledWith('agent-dina', 'approve-for-me');
+    expect(state.snapshot.value).toStrictEqual(updatedSnapshot);
+    expect(state.activeCodexApprovalPreset.value).toBe('approve-for-me');
+  });
+
   it('updates settings and forwards quit through the preload bridge', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();

@@ -108,7 +108,8 @@ describe('CodexAgentSessionManager', () => {
         params: {
           cwd: expandHome('~/src/codex-claw'),
           approvalPolicy: 'never',
-          sandbox: 'workspace-write',
+          approvalsReviewer: 'user',
+          sandbox: 'danger-full-access',
           serviceName: 'codex_claw',
         },
       },
@@ -128,6 +129,59 @@ describe('CodexAgentSessionManager', () => {
         },
       },
     ]);
+  });
+
+  it('updates the running thread approval preset through thread settings', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+
+    const update = manager.setApprovalPreset(agent, 'approve-for-me');
+    await waitForSentCount(transport, 1);
+    transport.receive({
+      id: 1,
+      result: {
+        userAgent: 'codex',
+        codexHome: '/tmp/codex-home',
+        platformFamily: 'unix',
+        platformOs: 'macos',
+      },
+    });
+    await waitForSentCount(transport, 3);
+    transport.receive({
+      id: 2,
+      result: {
+        thread: {
+          id: 'thread-approval',
+          cwd: expandHome('~/src/codex-claw'),
+        },
+      },
+    });
+    await waitForSentCount(transport, 4);
+    transport.receive({
+      id: 3,
+      result: {},
+    });
+
+    await expect(update).resolves.toStrictEqual({
+      threadId: 'thread-approval',
+      approvalPreset: 'approve-for-me',
+    });
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 3,
+      method: 'thread/settings/update',
+      params: {
+        threadId: 'thread-approval',
+        approvalPolicy: 'on-request',
+        approvalsReviewer: 'auto_review',
+        sandboxPolicy: {
+          type: 'workspaceWrite',
+          writableRoots: [expandHome('~/src/codex-claw')],
+          networkAccess: false,
+          excludeTmpdirEnvVar: false,
+          excludeSlashTmp: false,
+        },
+      },
+    });
   });
 
   it('passes selected model and reasoning effort to turn start', async () => {
@@ -691,7 +745,8 @@ describe('CodexAgentSessionManager', () => {
         threadId: 'thread-persisted',
         cwd: expandHome('~/src/codex-claw'),
         approvalPolicy: 'never',
-        sandbox: 'workspace-write',
+        approvalsReviewer: 'user',
+        sandbox: 'danger-full-access',
       },
     });
     expect(transport.sent).not.toContainEqual(expect.objectContaining({
@@ -771,7 +826,8 @@ describe('CodexAgentSessionManager', () => {
         threadId: 'thread-persisted',
         cwd: expandHome('~/src/codex-claw'),
         approvalPolicy: 'never',
-        sandbox: 'workspace-write',
+        approvalsReviewer: 'user',
+        sandbox: 'danger-full-access',
       },
     });
     expect(transport.sent).not.toContainEqual(expect.objectContaining({
@@ -1041,7 +1097,8 @@ describe('CodexAgentSessionManager', () => {
       params: {
         cwd: expandHome('~/src/codex-claw'),
         approvalPolicy: 'never',
-        sandbox: 'workspace-write',
+        approvalsReviewer: 'user',
+        sandbox: 'danger-full-access',
         serviceName: 'codex_claw',
         config: {
           'mcp_servers.codex_claw.url': 'http://127.0.0.1:8767/mcp?agentId=agent-dina',

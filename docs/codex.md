@@ -85,6 +85,13 @@ session use `thread/start`. `thread/settings/updated` confirms the active
 thread settings and should update the app-owned agent/session mapping so the
 id is saved in Electron `userData` and reused after relaunch.
 
+Codex approval presets are app-owned shortcuts over Codex thread settings. The
+renderer only sees the Codex preset id; Electron main maps it to
+`approvalPolicy`, `approvalsReviewer`, and sandbox settings for `thread/start`,
+`thread/resume`, and live `thread/settings/update` calls. Do not reuse these
+three Codex presets for Claude permission modes; Claude should expose its own
+backend-specific option set.
+
 `thread/resume` returns the thread's `turns` in app-server protocol v2. Main
 must translate those turns into app-owned `RendererMessage`s and emit a
 history hydration event before the next turn streams. The renderer asks main

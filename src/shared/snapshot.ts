@@ -21,6 +21,7 @@ import { defaultThemeSettings } from './settings';
 import { createEntityId } from './ids';
 import { defaultTeamColor } from './team-colors';
 import { toolOutputText } from './tool-output';
+import { codexApprovalPresetFromThreadSettings, codexBackendDefaultsWithApprovalPreset } from './codex-approval-presets';
 
 const seedCreatedAt = '2026-06-05T00:00:00.000Z';
 const seedTeamId = 'team-codex-claw';
@@ -272,6 +273,11 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     if (agent) {
       agent.backend = 'codex';
       agent.backendSession = { kind: 'codex', threadId: event.threadId };
+      const payload = isRecord(event.payload) ? event.payload : {};
+      const approvalPreset = codexApprovalPresetFromThreadSettings(payload.threadSettings);
+      if (approvalPreset) {
+        agent.backendDefaults = codexBackendDefaultsWithApprovalPreset(agent.backendDefaults, approvalPreset);
+      }
     }
     return;
   }

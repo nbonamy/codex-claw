@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Team, ThreadGoal, ThreadPlan, ThreadPlanStep } from '../shared/contracts';
+import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '../shared/codex-approval-presets';
 import { normalizeThemeSettings } from '../shared/settings';
 import { createEmptySnapshot } from '../shared/snapshot';
 import { defaultTeamColor } from '../shared/team-colors';
@@ -414,7 +415,9 @@ function sanitizeBackendDefaults(value: unknown, expectedBackend: AgentBackend):
     const defaults = {
       kind: 'codex',
       ...(typeof value.model === 'string' ? { model: value.model } : {}),
+      ...(isCodexApprovalPreset(value.approvalPreset) ? { approvalPreset: value.approvalPreset } : {}),
       ...(typeof value.approvalPolicy === 'string' ? { approvalPolicy: value.approvalPolicy } : {}),
+      ...(isCodexApprovalsReviewer(value.approvalsReviewer) ? { approvalsReviewer: value.approvalsReviewer } : {}),
       ...(typeof value.sandboxMode === 'string' ? { sandboxMode: value.sandboxMode } : {}),
       ...(typeof value.reasoningEffort === 'string' ? { reasoningEffort: value.reasoningEffort } : {}),
     } satisfies BackendDefaults;

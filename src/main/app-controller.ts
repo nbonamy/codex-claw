@@ -35,7 +35,8 @@ import {
   updateAgentFolder,
 } from './snapshot-service';
 import { AppStatePersistence } from './state-persistence';
-import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
+import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
+import { codexBackendDefaultsWithApprovalPreset, isCodexApprovalPreset } from '../shared/codex-approval-presets';
 import { ipcChannels } from '../shared/ipc';
 import { teamColors } from '../shared/team-colors';
 import type { AgentBackendDriver } from './backends/types';
@@ -265,6 +266,10 @@ export class AppController {
       return this.clearAgentGoal(agentId);
     });
 
+    ipcMain.handle(ipcChannels.setAgentCodexApprovalPreset, (_event, agentId: string, preset: CodexApprovalPreset) => {
+      return this.setAgentCodexApprovalPreset(agentId, preset);
+    });
+
     ipcMain.handle(ipcChannels.sendPrompt, (_event, agentId: string, prompt: string, options?: SendPromptOptions) => {
       return this.sendPrompt(agentId, prompt, options);
     });
@@ -370,6 +375,29 @@ export class AppController {
         payload: {},
       });
     }
+    await this.persistSnapshot();
+
+    return this.snapshot;
+  }
+
+  private async setAgentCodexApprovalPreset(agentId: string, preset: CodexApprovalPreset): Promise<AppSnapshot> {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent || !isCodexApprovalPreset(preset)) {
+      return this.snapshot;
+    }
+
+    if (agent.backend !== 'codex') {
+      throw unsupportedBackendFeature(agent, 'Codex approval presets');
+    }
+
+    const driver = await this.getBackendDriverForAgent(agent);
+    if (!driver.setCodexApprovalPreset) {
+      throw unsupportedBackendFeature(agent, 'Codex approval presets');
+    }
+
+    const result = await driver.setCodexApprovalPreset(agent, preset);
+    agent.backendSession = result.backendSession;
+    agent.backendDefaults = codexBackendDefaultsWithApprovalPreset(agent.backendDefaults, result.approvalPreset);
     await this.persistSnapshot();
 
     return this.snapshot;

@@ -1,9 +1,10 @@
 import { computed, ref } from 'vue';
-import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, SendPromptOptions, SidePanelMarkdownRequest, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
+import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, SendPromptOptions, SidePanelMarkdownRequest, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../shared/contracts';
 import { updateSettingsInSnapshot } from '../shared/settings';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '../shared/snapshot';
 import { defaultBackendCapabilities } from '../shared/backend-capabilities';
 import { defaultBackendCommands } from '../shared/backend-commands';
+import { codexApprovalPresetFromDefaults } from '../shared/codex-approval-presets';
 import { createQueuedChatPrompt, type QueuedChatPrompt } from './shared/chat/queued-prompts';
 import { promptSkillInputsFromText } from './shared/chat/composer-skills';
 
@@ -48,6 +49,10 @@ export function useAppState() {
   });
 
   const activeGoal = computed(() => activeAgent.value?.goal ?? null);
+  const activeCodexApprovalPreset = computed<CodexApprovalPreset | null>(() => {
+    const agent = activeAgent.value;
+    return agent?.backend === 'codex' ? codexApprovalPresetFromDefaults(agent.backendDefaults) : null;
+  });
 
   const isSending = computed(() => {
     const agent = activeAgent.value;
@@ -438,10 +443,20 @@ export function useAppState() {
     planMode.value = enabled;
   }
 
+  async function setCodexApprovalPreset(preset: CodexApprovalPreset): Promise<void> {
+    const agent = activeAgent.value;
+    if (!agent || agent.backend !== 'codex' || !window.codexClaw?.setAgentCodexApprovalPreset) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.setAgentCodexApprovalPreset(agent.id, preset);
+  }
+
   return {
     snapshot,
     activeAgent,
     activeGoal,
+    activeCodexApprovalPreset,
     visibleMessages,
     activeQueuedPrompts,
     isLoading,
@@ -485,6 +500,7 @@ export function useAppState() {
     selectModel,
     selectReasoningEffort,
     setPlanMode,
+    setCodexApprovalPreset,
     selectAgent,
     selectTeam,
     clearActiveGoal,

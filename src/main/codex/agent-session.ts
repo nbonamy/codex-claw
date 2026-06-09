@@ -1,6 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, AgentContextUsage, AgentStatus, AskUserAnswers, AskUserQuestion, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, ConfirmToolRequest, MainToRendererEvent, RendererMessage, SendPromptOptions, ToolConfirmationDecision } from '../../shared/contracts';
+import type { Agent, AgentContextUsage, AgentStatus, AskUserAnswers, AskUserQuestion, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CodexApprovalPreset, ConfirmToolRequest, MainToRendererEvent, RendererMessage, SendPromptOptions, ToolConfirmationDecision } from '../../shared/contracts';
+import { codexApprovalPresetFromDefaults } from '../../shared/codex-approval-presets';
 import { logMain, warnMain } from '../log';
 import { buildCodexClawThreadConfig } from '../mcp/codex-config';
 import type { CodexRpcClient, CodexServerRequest, CodexServerRequestResponder } from './rpc-client';
@@ -73,6 +74,11 @@ export type CodexSessionGoalSetResult = {
 export type CodexSessionGoalClearResult = {
   threadId: string;
   cleared: boolean;
+};
+
+export type CodexSessionApprovalPresetResult = {
+  threadId: string;
+  approvalPreset: CodexApprovalPreset;
 };
 
 export class CodexAgentSessionManager {
@@ -254,6 +260,21 @@ export class CodexAgentSessionManager {
     };
   }
 
+  async setApprovalPreset(agent: Agent, preset: CodexApprovalPreset): Promise<CodexSessionApprovalPresetResult> {
+    await this.start();
+
+    const session = await this.ensureSession(agent);
+    await this.client.request('thread/settings/update', {
+      threadId: session.threadId,
+      ...codexApprovalThreadSettingsUpdateParams(preset, expandHome(agent.folder)),
+    });
+
+    return {
+      threadId: session.threadId,
+      approvalPreset: preset,
+    };
+  }
+
   async reviewThread(agent: Agent, target: CodexReviewTarget): Promise<CodexSessionCommandResult> {
     await this.start();
 
@@ -411,6 +432,7 @@ export class CodexAgentSessionManager {
     }
 
     const cwd = expandHome(agent.folder);
+    const approvalSettings = codexApprovalThreadStartParams(codexApprovalPresetFromDefaults(agent.backendDefaults));
     const threadConfig = buildCodexClawThreadConfig(agent, this.options.clawMcpServerUrl ?? null);
     const existingThreadId = codexThreadId(agent);
     const shouldResume = Boolean(existingThreadId);
@@ -418,14 +440,12 @@ export class CodexAgentSessionManager {
       ? await this.client.request<ThreadResumeResponse>('thread/resume', {
         threadId: existingThreadId,
         cwd,
-        approvalPolicy: 'never',
-        sandbox: 'workspace-write',
+        ...approvalSettings,
         ...threadConfig,
       })
       : await this.client.request<ThreadStartResponse>('thread/start', {
         cwd,
-        approvalPolicy: 'never',
-        sandbox: 'workspace-write',
+        ...approvalSettings,
         serviceName: 'codex_claw',
         ...threadConfig,
       });
@@ -963,6 +983,54 @@ function collaborationModeFromThreadSettings(threadSettings: unknown): 'default'
 
   const mode = threadSettings.collaborationMode.mode;
   return mode === 'default' || mode === 'plan' ? mode : null;
+}
+
+function codexApprovalThreadStartParams(preset: CodexApprovalPreset): {
+  approvalPolicy: 'never' | 'on-request';
+  approvalsReviewer: 'user' | 'auto_review';
+  sandbox: 'danger-full-access' | 'workspace-write';
+} {
+  if (preset === 'full-access') {
+    return {
+      approvalPolicy: 'never',
+      approvalsReviewer: 'user',
+      sandbox: 'danger-full-access',
+    };
+  }
+
+  return {
+    approvalPolicy: 'on-request',
+    approvalsReviewer: preset === 'approve-for-me' ? 'auto_review' : 'user',
+    sandbox: 'workspace-write',
+  };
+}
+
+function codexApprovalThreadSettingsUpdateParams(preset: CodexApprovalPreset, cwd: string): {
+  approvalPolicy: 'never' | 'on-request';
+  approvalsReviewer: 'user' | 'auto_review';
+  sandboxPolicy: Record<string, unknown>;
+} {
+  if (preset === 'full-access') {
+    return {
+      approvalPolicy: 'never',
+      approvalsReviewer: 'user',
+      sandboxPolicy: {
+        type: 'dangerFullAccess',
+      },
+    };
+  }
+
+  return {
+    approvalPolicy: 'on-request',
+    approvalsReviewer: preset === 'approve-for-me' ? 'auto_review' : 'user',
+    sandboxPolicy: {
+      type: 'workspaceWrite',
+      writableRoots: [cwd],
+      networkAccess: false,
+      excludeTmpdirEnvVar: false,
+      excludeSlashTmp: false,
+    },
+  };
 }
 
 function codexModelToOption(model: CodexModelListResponse['data'][number]): BackendModelOption {

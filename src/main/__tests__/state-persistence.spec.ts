@@ -64,6 +64,13 @@ describe('AppStatePersistence', () => {
     snapshot.agents[0] = {
       ...snapshot.agents[0],
       backendSession: { kind: 'codex', threadId: 'thread-dina' },
+      backendDefaults: {
+        kind: 'codex',
+        approvalPreset: 'approve-for-me',
+        approvalPolicy: 'on-request',
+        approvalsReviewer: 'auto_review',
+        sandboxMode: 'workspace-write',
+      },
       contextUsage: {
         totalTokens: 1200,
         inputTokens: 900,
@@ -174,6 +181,13 @@ describe('AppStatePersistence', () => {
     snapshot.agents[0] = {
       ...snapshot.agents[0],
       backendSession: { kind: 'codex', threadId: 'thread-dina' },
+      backendDefaults: {
+        kind: 'codex',
+        approvalPreset: 'approve-for-me',
+        approvalPolicy: 'on-request',
+        approvalsReviewer: 'auto_review',
+        sandboxMode: 'workspace-write',
+      },
       contextUsage: {
         totalTokens: 1200,
         inputTokens: 900,
@@ -220,7 +234,13 @@ describe('AppStatePersistence', () => {
       avatar: 'DI',
       folder: '~/src/codex-claw',
       backend: 'codex',
-      backendDefaults: { kind: 'codex' },
+      backendDefaults: {
+        kind: 'codex',
+        approvalPreset: 'approve-for-me',
+        approvalPolicy: 'on-request',
+        approvalsReviewer: 'auto_review',
+        sandboxMode: 'workspace-write',
+      },
       backendSession: { kind: 'codex', threadId: 'thread-dina' },
       contextUsage: {
         totalTokens: 1200,

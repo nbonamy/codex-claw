@@ -22,10 +22,10 @@ afterEach(() => {
 });
 
 describe('TeamContextMenu', () => {
-  it('renders team actions with shared context menu styling at the requested position', () => {
+  it('renders team actions with shared app menu styling at the requested position', () => {
     const wrapper = mountMenu();
 
-    expect(wrapper.classes()).toContain('claw-context-menu');
+    expect(wrapper.find('.app-menu').exists()).toBe(true);
     expect(wrapper.attributes('style')).toContain('left: 120px');
     expect(wrapper.attributes('style')).toContain('top: 80px');
     expect(wrapper.findAll('[role="menuitem"]').map((item) => item.text())).toStrictEqual([

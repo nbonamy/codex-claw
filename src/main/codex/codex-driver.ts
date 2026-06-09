@@ -5,11 +5,12 @@ import type {
   BackendRuntimeStatus,
   BackendSession,
   BackendSkillSummary,
+  CodexApprovalPreset,
   ClientRequestResponse,
   SendPromptOptions,
 } from '../../shared/contracts';
 import { codexBackendCapabilities } from '../../shared/backend-capabilities';
-import type { AgentBackendDriver, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '../backends/types';
+import type { AgentBackendDriver, BackendCodexApprovalPresetResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '../backends/types';
 import type { CodexAgentSessionManager } from './agent-session';
 import type { CodexReviewTarget } from './protocol';
 
@@ -75,6 +76,14 @@ export class CodexBackendDriver implements AgentBackendDriver {
     };
   }
 
+  async setCodexApprovalPreset(agent: Agent, preset: CodexApprovalPreset): Promise<BackendCodexApprovalPresetResult> {
+    const result = await this.sessionManager.setApprovalPreset(agent, preset);
+    return {
+      backendSession: codexBackendSession(result.threadId),
+      approvalPreset: result.approvalPreset,
+    };
+  }
+
   private async runPromptCommand(agent: Agent, command: CodexPromptCommand): Promise<BackendSendResult> {
     if (command.type === 'compact') {
       const result = await this.sessionManager.compactThread(agent);
@@ -133,7 +142,7 @@ export class CodexBackendDriver implements AgentBackendDriver {
   }
 }
 
-function codexBackendSession(threadId: string): BackendSession {
+function codexBackendSession(threadId: string): Extract<BackendSession, { kind: 'codex' }> {
   return {
     kind: 'codex',
     threadId,

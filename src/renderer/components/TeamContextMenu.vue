@@ -1,42 +1,22 @@
 <template>
   <div
     ref="menuRoot"
-    class="claw-context-menu team-context-menu"
+    class="team-context-menu"
     :style="menuStyle"
-    role="menu"
-    aria-label="Team actions"
   >
-    <button
-      class="claw-context-menu__action"
-      type="button"
-      role="menuitem"
-      @click="emit('edit-team', team.id)"
-    >
-      <PencilIcon class="claw-context-menu__icon" />
-      <span>Edit Team</span>
-    </button>
-
-    <div
-      class="claw-context-menu__separator"
-      role="separator"
+    <AppMenu
+      ariaLabel="Team actions"
+      :items="menuItems"
+      @select="selectMenuItem"
     />
-
-    <button
-      class="claw-context-menu__action claw-context-menu__action--danger"
-      type="button"
-      role="menuitem"
-      :disabled="!canClose"
-      @click="requestCloseTeam"
-    >
-      <X class="claw-context-menu__icon" />
-      <span>Close Team</span>
-    </button>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { Team } from '../../shared/contracts';
+import AppMenu from '../shared/menu/AppMenu.vue';
+import type { AppMenuItem } from '../shared/menu/app-menu';
 import { PencilIcon, X } from '../shared/icons/app-icons';
 
 const props = defineProps<{
@@ -57,6 +37,23 @@ const menuStyle = computed<Record<string, string>>(() => ({
   left: `${props.x}px`,
   top: `${props.y}px`,
 }));
+const menuItems = computed<AppMenuItem[]>(() => [
+  {
+    id: 'edit-team',
+    type: 'action',
+    label: 'Edit Team',
+    icon: PencilIcon,
+  },
+  { id: 'group-danger', type: 'separator' },
+  {
+    id: 'close-team',
+    type: 'action',
+    label: 'Close Team',
+    icon: X,
+    danger: true,
+    disabled: !props.canClose,
+  },
+]);
 
 onMounted(() => {
   document.addEventListener('click', closeOnDocumentClick);
@@ -68,12 +65,12 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', closeOnEscape);
 });
 
-function requestCloseTeam(): void {
-  if (!props.canClose) {
-    return;
+function selectMenuItem(itemId: string): void {
+  if (itemId === 'edit-team') {
+    emit('edit-team', props.team.id);
+  } else if (itemId === 'close-team' && props.canClose) {
+    emit('request-close-team', props.team.id);
   }
-
-  emit('request-close-team', props.team.id);
 }
 
 function closeOnDocumentClick(event: MouseEvent): void {
@@ -90,3 +87,10 @@ function closeOnEscape(event: KeyboardEvent): void {
   }
 }
 </script>
+
+<style scoped>
+.team-context-menu {
+  position: fixed;
+  z-index: 20;
+}
+</style>

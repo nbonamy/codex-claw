@@ -1,105 +1,14 @@
 <template>
   <div
     ref="menuRoot"
-    class="claw-context-menu agent-context-menu"
+    class="agent-context-menu"
     :style="menuStyle"
-    role="menu"
-    aria-label="Agent actions"
   >
-    <button
-      class="claw-context-menu__action"
-      type="button"
-      role="menuitem"
-      @click="selectAction('edit-agent')"
-    >
-      <PencilIcon class="claw-context-menu__icon" />
-      <span>Edit Agent</span>
-    </button>
-    <button
-      class="claw-context-menu__action"
-      type="button"
-      role="menuitem"
-      @click="selectAction('duplicate-agent')"
-    >
-      <CopyIcon class="claw-context-menu__icon" />
-      <span>Duplicate Agent</span>
-    </button>
-
-    <div
-      class="claw-context-menu__separator"
-      role="separator"
+    <AppMenu
+      ariaLabel="Agent actions"
+      :items="menuItems"
+      @select="selectMenuItem"
     />
-
-    <div
-      class="claw-context-menu__submenu"
-    >
-      <button
-        class="claw-context-menu__action"
-        type="button"
-        role="menuitem"
-        aria-haspopup="menu"
-        :aria-expanded="canMoveToTeam"
-        :disabled="!canMoveToTeam"
-      >
-        <SwitchHorizontalIcon class="claw-context-menu__icon" />
-        <span>Move to Other Team</span>
-      </button>
-      <div
-        v-if="canMoveToTeam"
-        class="claw-context-menu__submenu-menu"
-        role="menu"
-        aria-label="Move to team"
-      >
-        <button
-          v-for="team in moveTargets"
-          :key="team.id"
-          class="claw-context-menu__action agent-context-menu__team-action"
-          type="button"
-          role="menuitem"
-          @click="selectMoveTarget(team.id)"
-        >
-          <span
-            class="agent-context-menu__team-dot"
-            :style="{ backgroundColor: team.color ?? defaultTeamColor }"
-            aria-hidden="true"
-          />
-          <span>{{ team.name }}</span>
-        </button>
-      </div>
-    </div>
-    <button
-      class="claw-context-menu__action"
-      type="button"
-      role="menuitem"
-      @click="selectAction('save-agent-to-bench')"
-    >
-      <SaveToBenchIcon class="claw-context-menu__icon" />
-      <span>Save to Bench</span>
-    </button>
-
-    <div
-      class="claw-context-menu__separator"
-      role="separator"
-    />
-
-    <button
-      class="claw-context-menu__action"
-      type="button"
-      role="menuitem"
-      @click="selectAction('restart-agent')"
-    >
-      <RefreshIcon class="claw-context-menu__icon" />
-      <span>Restart Agent</span>
-    </button>
-    <button
-      class="claw-context-menu__action claw-context-menu__action--danger"
-      type="button"
-      role="menuitem"
-      @click="selectAction('close-agent')"
-    >
-      <X class="claw-context-menu__icon" />
-      <span>Close Agent</span>
-    </button>
   </div>
 </template>
 
@@ -107,6 +16,8 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { Team } from '../../shared/contracts';
 import { defaultTeamColor } from '../../shared/team-colors';
+import AppMenu from '../shared/menu/AppMenu.vue';
+import type { AppMenuItem } from '../shared/menu/app-menu';
 import {
   CopyIcon,
   PencilIcon,
@@ -137,11 +48,58 @@ const emit = defineEmits<{
 
 const menuRoot = ref<HTMLElement | null>(null);
 const moveTargets = computed(() => props.moveTargets ?? []);
-const canMoveToTeam = computed(() => moveTargets.value.length > 0);
 const menuStyle = computed<Record<string, string>>(() => ({
   left: `${props.x}px`,
   top: `${props.y}px`,
 }));
+const menuItems = computed<AppMenuItem[]>(() => [
+  {
+    id: 'edit-agent',
+    type: 'action',
+    label: 'Edit Agent',
+    icon: PencilIcon,
+  },
+  {
+    id: 'duplicate-agent',
+    type: 'action',
+    label: 'Duplicate Agent',
+    icon: CopyIcon,
+  },
+  { id: 'group-primary', type: 'separator' },
+  {
+    id: 'move-to-team',
+    type: 'submenu',
+    label: 'Move to Other Team',
+    icon: SwitchHorizontalIcon,
+    disabled: moveTargets.value.length === 0,
+    items: moveTargets.value.map((team) => ({
+      id: moveTeamItemId(team.id),
+      type: 'action',
+      label: team.name,
+      leadingColor: team.color ?? defaultTeamColor,
+    })),
+  },
+  {
+    id: 'save-agent-to-bench',
+    type: 'action',
+    label: 'Save to Bench',
+    icon: SaveToBenchIcon,
+  },
+  { id: 'group-danger', type: 'separator' },
+  {
+    id: 'restart-agent',
+    type: 'action',
+    label: 'Restart Agent',
+    icon: RefreshIcon,
+  },
+  {
+    id: 'close-agent',
+    type: 'action',
+    label: 'Close Agent',
+    icon: X,
+    danger: true,
+  },
+]);
 
 onMounted(() => {
   document.addEventListener('click', closeOnDocumentClick);
@@ -153,12 +111,16 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', closeOnEscape);
 });
 
-function selectAction(action: AgentContextMenuAction): void {
-  emit('action', action);
-}
+function selectMenuItem(itemId: string): void {
+  const teamId = teamIdFromMoveItemId(itemId);
+  if (teamId) {
+    emit('move-agent-to-team', teamId);
+    return;
+  }
 
-function selectMoveTarget(teamId: string): void {
-  emit('move-agent-to-team', teamId);
+  if (isAgentContextMenuAction(itemId)) {
+    emit('action', itemId);
+  }
 }
 
 function closeOnDocumentClick(event: MouseEvent): void {
@@ -174,17 +136,27 @@ function closeOnEscape(event: KeyboardEvent): void {
     emit('close');
   }
 }
+
+function moveTeamItemId(teamId: string): string {
+  return `move-to-team:${teamId}`;
+}
+
+function teamIdFromMoveItemId(itemId: string): string | null {
+  return itemId.startsWith('move-to-team:') ? itemId.slice('move-to-team:'.length) : null;
+}
+
+function isAgentContextMenuAction(itemId: string): itemId is AgentContextMenuAction {
+  return itemId === 'close-agent' ||
+    itemId === 'duplicate-agent' ||
+    itemId === 'edit-agent' ||
+    itemId === 'restart-agent' ||
+    itemId === 'save-agent-to-bench';
+}
 </script>
 
 <style scoped>
-.agent-context-menu__team-action {
-  gap: var(--space-6);
-}
-
-.agent-context-menu__team-dot {
-  width: 10px;
-  height: 10px;
-  flex: 0 0 auto;
-  border-radius: var(--radius-full);
+.agent-context-menu {
+  position: fixed;
+  z-index: 20;
 }
 </style>

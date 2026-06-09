@@ -223,23 +223,129 @@ describe('ClaudeBackendDriver', () => {
     ]);
   });
 
-  it('converts prompted plan mode into Claude instructions', async () => {
+  it('converts prompted plan mode into Claude slash plan commands', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
     const sendResult = driver.sendPrompt(agent, 'build the thing', { planMode: true });
 
-    expect(transport.startTurn.mock.calls[0]?.[0].prompt).toBe([
-      'Work in plan mode for this request.',
-      'First create a concise plan with the steps you intend to take. Then carry out the work unless the user explicitly asks only for the plan.',
-      '',
-      'User request:',
-      'build the thing',
-    ].join('\n'));
+    expect(transport.startTurn.mock.calls[0]?.[0].prompt).toBe('/plan build the thing');
 
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-plan' });
     await expect(sendResult).resolves.toMatchObject({
       backendSession: { kind: 'claude', sessionId: 'claude-session-plan', transport: 'stdio' },
     });
+  });
+
+  it('maps Claude plan-mode tool flow into app-owned proposed plan events', async () => {
+    const transport = createFakeTransport();
+    const driver = new ClaudeBackendDriver(transport);
+    const events: Array<{ type?: string; turnId?: string; threadId?: string; payload?: unknown }> = [];
+    driver.onEvent((event) => events.push(event));
+
+    const sendResult = driver.sendPrompt(agent, 'draft the plan', { planMode: true });
+    transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-plan' });
+    const turnId = (await sendResult).turnId;
+
+    transport.emit({
+      type: 'system',
+      subtype: 'status',
+      session_id: 'claude-session-plan',
+      permissionMode: 'plan',
+    });
+    transport.emit({
+      type: 'stream_event',
+      session_id: 'claude-session-plan',
+      event: {
+        type: 'content_block_start',
+        index: 0,
+        content_block: { type: 'tool_use', id: 'tool-search-plan', name: 'ToolSearch', input: {} },
+      },
+    });
+    transport.emit({
+      type: 'stream_event',
+      session_id: 'claude-session-plan',
+      event: {
+        type: 'content_block_start',
+        index: 1,
+        content_block: { type: 'tool_use', id: 'write-plan', name: 'Write', input: {} },
+      },
+    });
+    const writeInput = JSON.stringify({
+      file_path: '/Users/nbonamy/.claude/plans/test-plan.md',
+      content: '# Draft Plan\n\n- inspect\n',
+    });
+    transport.emit({
+      type: 'stream_event',
+      session_id: 'claude-session-plan',
+      event: {
+        type: 'content_block_delta',
+        index: 1,
+        delta: { type: 'input_json_delta', partial_json: writeInput.slice(0, 30) },
+      },
+    });
+    transport.emit({
+      type: 'stream_event',
+      session_id: 'claude-session-plan',
+      event: {
+        type: 'content_block_delta',
+        index: 1,
+        delta: { type: 'input_json_delta', partial_json: writeInput.slice(30) },
+      },
+    });
+    transport.emit({
+      type: 'assistant',
+      session_id: 'claude-session-plan',
+      message: {
+        content: [
+          {
+            type: 'tool_use',
+            id: 'exit-plan',
+            name: 'ExitPlanMode',
+            input: {
+              plan: '# Final Plan\n\n- inspect\n- implement\n',
+              planFilePath: '/Users/nbonamy/.claude/plans/test-plan.md',
+            },
+          },
+        ],
+      },
+    });
+
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'thread.modeUpdated',
+      turnId,
+      threadId: 'claude-session-plan',
+      payload: {
+        mode: 'plan',
+        provider: 'claude',
+        permissionMode: 'plan',
+      },
+    }));
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'turn.proposedPlanDelta',
+      turnId,
+      threadId: 'claude-session-plan',
+      payload: {
+        itemId: 'write-plan',
+        delta: '# Draft Plan\n\n- inspect\n',
+      },
+    }));
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'turn.proposedPlanCompleted',
+      turnId,
+      threadId: 'claude-session-plan',
+      payload: {
+        itemId: 'exit-plan',
+        markdown: '# Final Plan\n\n- inspect\n- implement',
+      },
+    }));
+    expect(events).not.toContainEqual(expect.objectContaining({
+      type: 'item.started',
+      payload: expect.objectContaining({
+        toolPart: expect.objectContaining({
+          title: expect.stringMatching(/EnterPlanMode|ExitPlanMode|ToolSearch|Write/),
+        }),
+      }),
+    }));
   });
 
   it('streams partial text deltas and suppresses the duplicate final assistant text', async () => {

@@ -15,61 +15,96 @@
       <PlusIcon />
     </button>
 
-    <div
+    <AppMenu
       v-if="menuOpen"
       class="chat-composer-action-menu"
-      role="menu"
-    >
-      <button
-        class="chat-composer-action-menu__item"
-        type="button"
-        role="menuitem"
-        disabled
-        @click="emit('attach')"
-      >
-        <PaperclipIcon />
-        <span>Attach</span>
-      </button>
-      <button
-        v-if="showPlanMode"
-        class="chat-composer-action-menu__item"
-        type="button"
-        role="menuitemcheckbox"
-        :aria-checked="planMode"
-        @click="emit('update:planMode', !planMode)"
-      >
-        <span class="chat-composer-action-menu__label">Plan mode</span>
-        <el-switch
-          :model-value="planMode"
-          size="small"
-          @click.stop
-          @change="emit('update:planMode', Boolean($event))"
-        />
-      </button>
-    </div>
+      ariaLabel="Composer actions"
+      :items="menuItems"
+      @select="selectMenuItem"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
-import { PaperclipIcon, PlusIcon } from '../shared/icons/app-icons';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import type { Component } from 'vue';
+import type { CodexApprovalPreset } from '../../shared/contracts';
+import { codexApprovalPresetOptions } from '../../shared/codex-approval-presets';
+import AppMenu from '../shared/menu/AppMenu.vue';
+import type { AppMenuItem } from '../shared/menu/app-menu';
+import { HandStopIcon, ListDetailsIcon, PaperclipIcon, PlusIcon, ShieldCheckIcon, Sparkles } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
   disabled?: boolean;
+  codexApprovalPreset?: CodexApprovalPreset | null;
   planMode: boolean;
+  showCodexApprovalMenu?: boolean;
   showPlanMode?: boolean;
 }>(), {
   disabled: false,
+  codexApprovalPreset: null,
+  showCodexApprovalMenu: false,
   showPlanMode: true,
 });
 
 const emit = defineEmits<{
   attach: [];
+  'selectCodexApprovalPreset': [preset: CodexApprovalPreset];
   'update:planMode': [enabled: boolean];
 }>();
 
 const rootEl = ref<HTMLElement | null>(null);
 const menuOpen = ref(false);
+const codexApprovalOptions = codexApprovalPresetOptions;
+const selectedCodexApprovalLabel = computed(() => (
+  codexApprovalOptions.find((option) => option.id === props.codexApprovalPreset)?.label ?? 'Approval'
+));
+const menuItems = computed<AppMenuItem[]>(() => {
+  const items: AppMenuItem[] = []
+
+  if (props.showCodexApprovalMenu) {
+    items.push({
+      id: 'codex-approval',
+      type: 'submenu',
+      label: 'Approval',
+      // value: selectedCodexApprovalLabel.value,
+      icon: ShieldCheckIcon,
+      submenuWidth: 'wide',
+      items: codexApprovalOptions.map((option) => ({
+        id: codexApprovalItemId(option.id),
+        type: 'radio',
+        label: option.label,
+        description: option.description,
+        icon: codexApprovalIcon(option.id),
+        checked: option.id === props.codexApprovalPreset,
+      })),
+    });
+  }
+
+  if (props.showPlanMode) {
+    items.push({
+      id: 'plan-mode',
+      type: 'checkbox',
+      label: 'Plan mode',
+      accessory: 'switch',
+      checked: props.planMode,
+      icon: ListDetailsIcon
+    });
+  }
+
+  items.push(  { id: 'group-attach', type: 'separator' });
+
+  items.push({
+      id: 'attach',
+      type: 'action',
+      label: 'Add Files & Photos',
+      icon: PaperclipIcon,
+      disabled: true,
+    },
+  );
+
+  return items;
+});
 
 onMounted(() => {
   document.addEventListener('click', closeOnOutsideClick);
@@ -91,6 +126,40 @@ function closeOnOutsideClick(event: MouseEvent): void {
   if (root && event.target && !root.contains(event.target as Node)) {
     menuOpen.value = false;
   }
+}
+
+function codexApprovalIcon(preset: CodexApprovalPreset): Component {
+  if (preset === 'ask-for-approval') {
+    return HandStopIcon;
+  }
+  if (preset === 'approve-for-me') {
+    return Sparkles;
+  }
+  return ShieldCheckIcon;
+}
+
+function selectMenuItem(itemId: string): void {
+  if (itemId === 'plan-mode') {
+    emit('update:planMode', !props.planMode);
+    return;
+  }
+
+  const codexApprovalPreset = codexApprovalPresetFromItemId(itemId);
+  if (codexApprovalPreset) {
+    emit('selectCodexApprovalPreset', codexApprovalPreset);
+    menuOpen.value = false;
+  }
+}
+
+function codexApprovalItemId(preset: CodexApprovalPreset): string {
+  return `codex-approval:${preset}`;
+}
+
+function codexApprovalPresetFromItemId(itemId: string): CodexApprovalPreset | null {
+  const preset = itemId.replace(/^codex-approval:/, '');
+  return preset === 'ask-for-approval' || preset === 'approve-for-me' || preset === 'full-access'
+    ? preset
+    : null;
 }
 </script>
 
@@ -132,47 +201,5 @@ function closeOnOutsideClick(event: MouseEvent): void {
   left: 0;
   bottom: calc(100% + var(--space-4));
   z-index: 10;
-  display: grid;
-  gap: var(--space-1);
-  min-width: 188px;
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-lowest);
-  box-shadow: var(--shadow-lg);
-}
-
-.chat-composer-action-menu__item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  width: 100%;
-  min-height: 34px;
-  padding: 0 var(--space-4);
-  border: 0;
-  border-radius: var(--radius-md);
-  color: var(--color-text);
-  background: transparent;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.chat-composer-action-menu__item:hover:not(:disabled) {
-  background: var(--color-surface-base);
-}
-
-.chat-composer-action-menu__item:disabled {
-  color: var(--color-text-muted);
-  cursor: default;
-}
-
-.chat-composer-action-menu__item svg {
-  width: var(--icon-md);
-  height: var(--icon-md);
-}
-
-.chat-composer-action-menu__label {
-  flex: 1 1 auto;
 }
 </style>

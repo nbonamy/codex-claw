@@ -116,7 +116,8 @@ describe('TeamRail', () => {
       clientX: 42,
       clientY: 64,
     });
-    expect(wrapper.get('[aria-label="Team actions"]').attributes('style')).toContain('left: 42px');
+    expect(wrapper.get('.team-context-menu').attributes('style')).toContain('left: 42px');
+    expect(wrapper.find('[aria-label="Team actions"]').exists()).toBe(true);
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Edit Team')?.trigger('click');
 
     expect(wrapper.emitted('edit-team')).toStrictEqual([['team-claw']]);

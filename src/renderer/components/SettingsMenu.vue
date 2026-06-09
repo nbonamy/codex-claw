@@ -15,7 +15,7 @@
       </button>
     </template>
 
-    <nav class="claw-popover__menu settings-menu" aria-label="Settings menu">
+    <div class="settings-menu" aria-label="Settings menu">
 
       <div class="settings-menu__rate-limits" aria-label="Rate limits">
         <div class="settings-menu__rate-limits-header">
@@ -33,26 +33,21 @@
         </div>
       </div>
 
-      <div
-        class="claw-popover__separator"
-        role="separator"
+      <AppMenu
+        class="app-menu--embedded settings-menu__actions"
+        ariaLabel="Settings actions"
+        :items="menuItems"
+        @select="selectMenuItem"
       />
-
-      <button type="button" class="claw-popover__action" @click="emit('open-settings')">
-        <SettingsIcon aria-hidden="true" />
-        <span>Settings</span>
-      </button>
-      <button type="button" class="claw-popover__action claw-popover__action--danger" @click="emit('quit')">
-        <QuitIcon aria-hidden="true" />
-        <span>Quit</span>
-      </button>
-    </nav>
+    </div>
   </el-popover>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { AccountRateLimitWindow, AccountRateLimits } from '../../shared/contracts';
+import AppMenu from '../shared/menu/AppMenu.vue';
+import type { AppMenuItem } from '../shared/menu/app-menu';
 import { BrandSpeedTest, QuitIcon, SettingsIcon } from '../shared/icons/app-icons';
 
 const props = defineProps<{
@@ -63,6 +58,22 @@ const emit = defineEmits<{
   'open-settings': [];
   quit: [];
 }>();
+const menuItems: AppMenuItem[] = [
+  { id: 'settings-separator', type: 'separator' },
+  {
+    id: 'open-settings',
+    type: 'action',
+    label: 'Settings',
+    icon: SettingsIcon,
+  },
+  {
+    id: 'quit',
+    type: 'action',
+    label: 'Quit',
+    icon: QuitIcon,
+    danger: true,
+  },
+];
 
 type RateLimitRow = {
   label: string;
@@ -133,6 +144,14 @@ function rateLimitReset(window: AccountRateLimitWindow): string {
     minute: '2-digit',
   }).format(date);
 }
+
+function selectMenuItem(itemId: string): void {
+  if (itemId === 'open-settings') {
+    emit('open-settings');
+  } else if (itemId === 'quit') {
+    emit('quit');
+  }
+}
 </script>
 
 <style scoped>
@@ -148,6 +167,12 @@ function rateLimitReset(window: AccountRateLimitWindow): string {
   height: var(--icon-xl);
   stroke-width: 1.25px;
   transform: scale(1.15);
+}
+
+.settings-menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
 }
 
 .settings-menu__rate-limits {
@@ -192,6 +217,10 @@ function rateLimitReset(window: AccountRateLimitWindow): string {
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.settings-menu__actions {
+  padding-bottom: var(--space-2);
 }
 
 </style>

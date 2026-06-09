@@ -420,12 +420,24 @@ describe('snapshot reducer', () => {
         threadSettings: {
           cwd: '/Users/nbonamy/src/codex-claw',
           model: 'gpt-5.5',
+          approvalPolicy: 'on-request',
+          approvalsReviewer: 'auto_review',
+          sandboxPolicy: {
+            type: 'workspaceWrite',
+          },
         },
       },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
 
     expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-1' });
+    expect(snapshot.agents[0].backendDefaults).toStrictEqual({
+      kind: 'codex',
+      approvalPreset: 'approve-for-me',
+      approvalPolicy: 'on-request',
+      approvalsReviewer: 'auto_review',
+      sandboxMode: 'workspace-write',
+    });
   });
 
   it('records thread goal updates and clears them from agent metadata', () => {

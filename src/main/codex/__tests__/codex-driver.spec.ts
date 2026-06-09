@@ -82,6 +82,17 @@ describe('CodexBackendDriver', () => {
     });
     expect(sessionManager.clearThreadGoal).toHaveBeenCalledWith(agent);
   });
+
+  it('sets Codex approval presets through the session manager', async () => {
+    const sessionManager = createSessionManager();
+    const driver = new CodexBackendDriver(sessionManager);
+
+    await expect(driver.setCodexApprovalPreset(agent, 'full-access')).resolves.toStrictEqual({
+      backendSession: { kind: 'codex', threadId: 'thread-approval' },
+      approvalPreset: 'full-access',
+    });
+    expect(sessionManager.setApprovalPreset).toHaveBeenCalledWith(agent, 'full-access');
+  });
 });
 
 function createSessionManager(): CodexAgentSessionManager {
@@ -90,6 +101,7 @@ function createSessionManager(): CodexAgentSessionManager {
     clearThreadGoal: vi.fn().mockResolvedValue({ threadId: 'thread-goal', cleared: true }),
     reviewThread: vi.fn().mockResolvedValue({ threadId: 'thread-review', turnId: 'turn-review' }),
     sendPrompt: vi.fn(),
+    setApprovalPreset: vi.fn().mockResolvedValue({ threadId: 'thread-approval', approvalPreset: 'full-access' }),
     setThreadGoal: vi.fn().mockResolvedValue({
       threadId: 'thread-goal',
       goal: {

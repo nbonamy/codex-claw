@@ -98,9 +98,25 @@ listing is filesystem-derived: Claw reads user skills from `~/.claude/skills`
 and project skills from `<agent-folder>/.claude/skills`, parses each
 `SKILL.md` frontmatter, and lets project skills override global skills with the
 same name.
-Claude advertises `planMode: "prompted"`: when the renderer sends
-`planMode: true`, the driver wraps the user request with concise plan-mode
-instructions before passing it to Claude Code.
+Claude advertises `planMode: "prompted"`: Claw owns the composer Plan-mode
+flag, and when the renderer sends `planMode: true`, the driver passes the next
+prompt to Claude Code as a native `/plan <prompt>` command. Claude's stream-json
+output then exposes a provider-specific plan flow:
+
+- `EnterPlanMode` marks the Claude session as planning.
+- `system/status.permissionMode: "plan"` is normalized to
+  `thread.modeUpdated`.
+- Claude may write a private plan file under `~/.claude/plans/...`; Claw treats
+  that `Write` tool's streamed `content` as `turn.proposedPlanDelta` and does
+  not render the private write as a generic chat tool.
+- `ExitPlanMode` carries the final `input.plan`; Claw normalizes it to
+  `turn.proposedPlanCompleted` and opens the app-owned plan preview.
+
+Claude's plan file is a provider artifact, not Claw's source of truth. The
+source of truth for the UI is the app-owned agent plan stored from normalized
+plan events. Plan comments keep `planMode` enabled and send a follow-up prompt
+so Claude can emit a new `ExitPlanMode` plan; confirming clears Plan mode and
+sends the implementation prompt through the normal Claude path.
 
 Claude transcript history is loaded from Claude Code's local JSONL transcripts,
 not from the CLI. Claude stores project transcripts under

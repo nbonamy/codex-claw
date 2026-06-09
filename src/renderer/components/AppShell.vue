@@ -71,6 +71,7 @@
           :model-catalog-status="modelCatalogStatus"
           :skill-catalog-status="skillCatalogStatus"
           :goal="goal"
+          :codex-approval-preset="codexApprovalPreset"
           :plan-mode="planMode"
           :selected-model-id="selectedModelId"
           :selected-reasoning-effort="selectedReasoningEffort"
@@ -87,6 +88,7 @@
           @retry-message="$emit('retry-message', $event)"
           @select-model="$emit('select-model', $event)"
           @select-reasoning-effort="$emit('select-reasoning-effort', $event)"
+          @select-codex-approval-preset="$emit('select-codex-approval-preset', $event)"
           @clear-goal="$emit('clear-goal')"
           @send-prompt="$emit('sendPrompt', $event)"
           @steer-prompt="$emit('steerPrompt', $event)"
@@ -131,7 +133,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, SidePanelMarkdownRequest, Team, ThreadGoal, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../shared/contracts';
+import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, SidePanelMarkdownRequest, Team, ThreadGoal, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../shared/contracts';
 import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import AgentDialog from './AgentDialog.vue';
 import AgentEmptyState from './AgentEmptyState.vue';
@@ -154,6 +156,7 @@ const props = withDefaults(defineProps<{
   isLoading: boolean;
   isSending: boolean;
   goal?: ThreadGoal | null;
+  codexApprovalPreset?: CodexApprovalPreset | null;
   answeredClientRequestIds?: Set<string>;
   backendModels?: BackendModelOption[];
   backendCommands?: BackendCommandSummary[];
@@ -185,6 +188,7 @@ const props = withDefaults(defineProps<{
   skillCatalogStatus: 'notLoaded',
   selectedModelId: null,
   selectedReasoningEffort: null,
+  codexApprovalPreset: null,
   queuedPrompts: () => [],
   sidePanelMarkdownRequest: null,
   chooseAgentFolder: async () => null,
@@ -221,6 +225,7 @@ const emit = defineEmits<{
   'select-agent': [agentId: string];
   'select-model': [modelId: string];
   'select-reasoning-effort': [reasoningEffort: ReasoningEffort];
+  'select-codex-approval-preset': [preset: CodexApprovalPreset];
   'select-team': [teamId: string];
   'steer-queued-prompt': [promptId: string];
   'update:planMode': [enabled: boolean];

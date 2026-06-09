@@ -49,11 +49,13 @@
           :skill-catalog-status="skillCatalogStatus"
           :draft="composerDraft"
           :draft-revision="composerDraftRevision"
+          :codex-approval-preset="codexApprovalPreset"
           :plan-mode="planMode"
           :selected-model-id="selectedModelId"
           :selected-reasoning-effort="selectedReasoningEffort"
           @attach="$emit('attach')"
           @update:model-id="$emit('select-model', $event)"
+          @select-codex-approval-preset="$emit('select-codex-approval-preset', $event)"
           @update:plan-mode="$emit('update:planMode', $event)"
           @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
           @interrupt="$emit('interrupt-agent')"
@@ -99,11 +101,13 @@
         :skill-catalog-status="skillCatalogStatus"
         :draft="composerDraft"
         :draft-revision="composerDraftRevision"
+        :codex-approval-preset="codexApprovalPreset"
         :plan-mode="planMode"
         :selected-model-id="selectedModelId"
         :selected-reasoning-effort="selectedReasoningEffort"
         @attach="$emit('attach')"
         @update:model-id="$emit('select-model', $event)"
+        @select-codex-approval-preset="$emit('select-codex-approval-preset', $event)"
         @update:plan-mode="$emit('update:planMode', $event)"
         @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
         @interrupt="$emit('interrupt-agent')"
@@ -116,7 +120,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Agent, AgentFileSearchItem, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ReasoningEffort, RendererMessage } from '../../shared/contracts';
+import type { Agent, AgentFileSearchItem, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, ReasoningEffort, RendererMessage } from '../../shared/contracts';
 import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import WorkbenchLayout from './WorkbenchLayout.vue';
 import ChatComposer from './ChatComposer.vue';
@@ -142,6 +146,7 @@ const props = withDefaults(defineProps<{
   skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
+  codexApprovalPreset?: CodexApprovalPreset | null;
   queuedPrompts?: QueuedChatPrompt[];
   planMode?: boolean;
 }>(), {
@@ -152,6 +157,7 @@ const props = withDefaults(defineProps<{
   backendSkills: () => [],
   backendCapabilities: () => defaultBackendCapabilities('codex'),
   skillCatalogStatus: 'notLoaded',
+  codexApprovalPreset: null,
 });
 
 const emit = defineEmits<{
@@ -168,6 +174,7 @@ const emit = defineEmits<{
   'open-markdown-file': [filePath: string];
   'select-model': [modelId: string];
   'select-reasoning-effort': [reasoningEffort: ReasoningEffort];
+  'select-codex-approval-preset': [preset: CodexApprovalPreset];
   'steer-queued-prompt': [promptId: string];
   'update:planMode': [enabled: boolean];
   sendPrompt: [prompt: string];
