@@ -35,6 +35,20 @@ export const messages = {
         hint: 'Start typing to search files in this agent folder.',
         title: 'Files',
       },
+      planReview: {
+        cancel: 'Cancel',
+        comment: 'Comment',
+        confirm: 'Confirm',
+        commentHelp: 'Select text in the plan to add an inline comment.',
+        commentLabel: 'Plan comment',
+        commentPlaceholder: 'What should change?',
+        deleteComment: 'Delete comment',
+        editComment: 'Edit comment',
+        commentSave: 'Save comment',
+        commentCancel: 'Cancel',
+        commentsCount: '{count} comment | {count} comments',
+        updating: 'Updating plan...',
+      },
       tool: {
         fallback: {
           completed: 'Ran {name}',
@@ -65,6 +79,18 @@ export const messages = {
             completed: 'Listed {target}',
             failed: 'Failed listing {target}',
             running: 'Listing {target}',
+          },
+          plan: {
+            update: {
+              completed: 'Updated plan',
+              failed: 'Failed updating plan',
+              running: 'Updating plan',
+            },
+            write: {
+              completed: 'Wrote plan',
+              failed: 'Failed writing plan',
+              running: 'Writing plan',
+            },
           },
           read: {
             completed: 'Read {target}',

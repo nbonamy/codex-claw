@@ -4,7 +4,8 @@ import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '../../../shared/snapshot';
-import type { Agent, AppCommand, AppSnapshot, CodexClawApi, CreateAgentInput, CreateTeamInput, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../../shared/contracts';
+import type { Agent, AppCommand, AppSnapshot, CodexClawApi, CreateAgentInput, CreateTeamInput, RendererMessage, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput } from '../../../shared/contracts';
+import { i18n } from '../../i18n';
 
 function pointerEvent(type: string, clientX: number): PointerEvent {
   const event = new MouseEvent(type, {
@@ -34,7 +35,7 @@ describe('AppShell', () => {
         isSending: false,
       },
       global: {
-        plugins: [ElementPlus],
+        plugins: [ElementPlus, i18n],
       },
     });
 
@@ -57,7 +58,7 @@ describe('AppShell', () => {
         isSending: false,
       },
       global: {
-        plugins: [ElementPlus],
+        plugins: [ElementPlus, i18n],
       },
     });
 
@@ -92,7 +93,7 @@ describe('AppShell', () => {
         readAgentFile,
       },
       global: {
-        plugins: [ElementPlus],
+        plugins: [ElementPlus, i18n],
       },
     });
 
@@ -140,7 +141,7 @@ describe('AppShell', () => {
         readAgentFile,
       },
       global: {
-        plugins: [ElementPlus],
+        plugins: [ElementPlus, i18n],
       },
     });
 
@@ -182,7 +183,7 @@ describe('AppShell', () => {
         readAgentFile,
       },
       global: {
-        plugins: [ElementPlus],
+        plugins: [ElementPlus, i18n],
       },
     });
 
@@ -314,6 +315,142 @@ describe('AppShell', () => {
     expect(wrapper.get('.side-panel h2').text()).toBe('Markdown');
     expect(wrapper.find('.side-panel__copy p').exists()).toBe(false);
     expect(wrapper.text()).toContain('Generated');
+  });
+
+  it('confirms a plan by exiting plan mode and sending the implementation prompt', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [],
+        isLoading: false,
+        isSending: false,
+        planMode: true,
+        sidePanelMarkdownRequest: {
+          kind: 'markdown',
+          purpose: 'plan',
+          title: 'Plan',
+          content: '# Plan\n\n- [ ] Build it',
+        },
+      },
+      global: {
+        plugins: [ElementPlus, i18n],
+      },
+    });
+
+    await wrapper.get('button.plan-review-footer__button--primary').trigger('click');
+
+    expect(wrapper.emitted('update:planMode')).toStrictEqual([[false]]);
+    expect(wrapper.emitted('sendPrompt')).toStrictEqual([['implement the plan']]);
+  });
+
+  it('cancels a plan by exiting plan mode and closing the preview', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [],
+        isLoading: false,
+        isSending: false,
+        planMode: true,
+        sidePanelMarkdownRequest: {
+          kind: 'markdown',
+          purpose: 'plan',
+          title: 'Plan',
+          content: '# Plan',
+        },
+      },
+      global: {
+        plugins: [ElementPlus, i18n],
+      },
+    });
+
+    await wrapper.findAll('.plan-review-footer__button')[2].trigger('click');
+
+    expect(wrapper.emitted('update:planMode')).toStrictEqual([[false]]);
+    expect(wrapper.emitted('sendPrompt')).toBeUndefined();
+    expect(wrapper.find('.side-panel').exists()).toBe(false);
+  });
+
+  it('sends saved plan comments as a refinement prompt', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [],
+        isLoading: false,
+        isSending: false,
+        planMode: true,
+        sidePanelMarkdownRequest: {
+          kind: 'markdown',
+          purpose: 'plan',
+          title: 'Plan',
+          content: '# Plan',
+        },
+      },
+      global: {
+        plugins: [ElementPlus, i18n],
+      },
+    });
+
+    wrapper.findComponent({ name: 'SidePanel' }).vm.$emit('commentPlan', [
+      {
+        id: 'comment-1',
+        quote: 'Build it',
+        body: 'Split this into smaller steps.',
+      },
+    ]);
+
+    expect(wrapper.emitted('sendPrompt')).toStrictEqual([[
+      'Refine the plan using these comments:\n\n1. On: "Build it"\n   Comment: Split this into smaller steps.',
+    ]]);
+    expect(wrapper.emitted('update:planMode')).toBeUndefined();
+  });
+
+  it('shows the plan preview updating overlay while a plan progress tool is running', () => {
+    const snapshot = createInitialSnapshot();
+    const planProgressMessage: RendererMessage = {
+      id: 'assistant-turn-plan',
+      agentId: snapshot.agents[0].id,
+      role: 'assistant',
+      status: 'streaming',
+      turnId: 'turn-plan',
+      createdAt: '2026-06-05T00:00:00.000Z',
+      parts: [{
+        type: 'tool',
+        id: 'plan-turn-plan',
+        kind: 'generic',
+        title: 'plan',
+        status: 'running',
+        metadata: {
+          planProgress: true,
+        },
+      }],
+    };
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [planProgressMessage],
+        isLoading: false,
+        isSending: true,
+        planMode: true,
+        sidePanelMarkdownRequest: {
+          kind: 'markdown',
+          purpose: 'plan',
+          title: 'Plan',
+          content: '# Previous Plan',
+        },
+      },
+      global: {
+        plugins: [ElementPlus, i18n],
+      },
+    });
+
+    expect(wrapper.get('.side-panel__plan-overlay').text()).toBe('Updating plan...');
   });
 
   it('forwards interrupts from the composer stop button', async () => {

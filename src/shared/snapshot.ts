@@ -298,18 +298,32 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     const agent = findAgent(snapshot, event.agentId);
     const plan = threadPlan(event.payload, event.threadId, event.turnId, event.occurredAt);
     if (agent && plan) {
+      const operation = planProgressOperation(agent, event.turnId);
       agent.plan = plan;
+      upsertPlanProgressToolPart(snapshot, event.agentId, event.turnId, plan.markdown, 'completed', operation);
     }
     return;
   }
 
   if (event.type === 'turn.proposedPlanDelta' && event.threadId && event.turnId) {
+    const agent = findAgent(snapshot, event.agentId);
+    const operation = agent ? planProgressOperation(agent, event.turnId) : 'write';
     appendAgentPlanMarkdownDelta(snapshot, event.agentId, event.threadId, event.turnId, event.payload, event.occurredAt);
+    const updatedAgent = findAgent(snapshot, event.agentId);
+    if (updatedAgent?.plan?.turnId === event.turnId) {
+      upsertPlanProgressToolPart(snapshot, event.agentId, event.turnId, updatedAgent.plan.markdown, 'running', operation);
+    }
     return;
   }
 
   if (event.type === 'turn.proposedPlanCompleted' && event.threadId && event.turnId) {
+    const agent = findAgent(snapshot, event.agentId);
+    const operation = agent ? planProgressOperation(agent, event.turnId) : 'write';
     updateAgentPlanMarkdown(snapshot, event.agentId, event.threadId, event.turnId, event.payload, event.occurredAt);
+    const updatedAgent = findAgent(snapshot, event.agentId);
+    if (updatedAgent?.plan?.turnId === event.turnId) {
+      upsertPlanProgressToolPart(snapshot, event.agentId, event.turnId, updatedAgent.plan.markdown, 'completed', operation);
+    }
     return;
   }
 
@@ -336,16 +350,15 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
 
   if (event.type === 'message.delta' && event.turnId) {
     const payload = event.payload as { delta?: unknown; itemId?: unknown };
-    appendAssistantDelta(
+    appendAssistantDeltaWithPlanFilter(
       snapshot,
       event.agentId,
+      typeof event.threadId === 'string' ? event.threadId : undefined,
       event.turnId,
       typeof payload.delta === 'string' ? payload.delta : '',
       typeof payload.itemId === 'string' ? payload.itemId : undefined,
+      event.occurredAt,
     );
-    if (event.threadId) {
-      updateAgentPlanFromAssistantText(snapshot, event.agentId, event.threadId, event.turnId, event.occurredAt);
-    }
     return;
   }
 
@@ -531,38 +544,134 @@ function setAgentPlanMarkdown(agent: Agent, threadId: string, turnId: string, ma
   };
 }
 
-function updateAgentPlanFromAssistantText(
+function appendAssistantDeltaWithPlanFilter(
   snapshot: AppSnapshot,
   agentId: string,
-  threadId: string,
+  threadId: string | undefined,
   turnId: string,
+  delta: string,
+  itemId: string | undefined,
   updatedAt: string,
 ): void {
+  if (!delta) {
+    return;
+  }
+
+  if (!threadId) {
+    appendAssistantDelta(snapshot, agentId, turnId, delta, itemId);
+    return;
+  }
+
   const agent = findAgent(snapshot, agentId);
   if (!agent) {
+    appendAssistantDelta(snapshot, agentId, turnId, delta, itemId);
     return;
   }
 
-  const markdown = extractProposedPlanMarkdown(assistantTurnText(snapshot, agentId, turnId));
-  if (!markdown) {
-    return;
+  let remaining = delta;
+  let capturing = isCapturingProposedPlan(snapshot, agentId, turnId);
+  const operation = planProgressOperation(agent, turnId);
+
+  while (remaining) {
+    if (capturing) {
+      const closeIndex = lowerIndexOf(remaining, '</proposed_plan>');
+      const planDelta = closeIndex >= 0 ? remaining.slice(0, closeIndex) : remaining;
+      if (planDelta) {
+        appendAgentPlanMarkdownText(agent, threadId, turnId, planDelta, updatedAt);
+      }
+      if (closeIndex >= 0 && agent.plan?.turnId === turnId) {
+        setAgentPlanMarkdown(agent, threadId, turnId, agent.plan.markdown, updatedAt);
+      }
+      if (agent.plan?.turnId === turnId) {
+        upsertPlanProgressToolPart(snapshot, agentId, turnId, agent.plan.markdown, closeIndex >= 0 ? 'completed' : 'running', operation, closeIndex < 0);
+      }
+
+      if (closeIndex < 0) {
+        return;
+      }
+
+      remaining = remaining.slice(closeIndex + '</proposed_plan>'.length);
+      capturing = false;
+      continue;
+    }
+
+    const openIndex = lowerIndexOf(remaining, '<proposed_plan>');
+    if (openIndex < 0) {
+      appendAssistantDelta(snapshot, agentId, turnId, remaining, itemId);
+      return;
+    }
+
+    const visibleDelta = remaining.slice(0, openIndex);
+    if (visibleDelta) {
+      appendAssistantDelta(snapshot, agentId, turnId, visibleDelta, itemId);
+    }
+
+    remaining = remaining.slice(openIndex + '<proposed_plan>'.length);
+    capturing = true;
+    upsertPlanProgressToolPart(snapshot, agentId, turnId, agent.plan?.turnId === turnId ? agent.plan.markdown : '', 'running', operation, true);
   }
-
-  setAgentPlanMarkdown(agent, threadId, turnId, markdown, updatedAt);
 }
 
-function extractProposedPlanMarkdown(content: string): string | null {
-  const matches = [...content.matchAll(/<proposed_plan>([\s\S]*?)<\/proposed_plan>/gi)];
-  const markdown = matches.at(-1)?.[1]?.trim() ?? '';
-  return markdown || null;
+function appendAgentPlanMarkdownText(agent: Agent, threadId: string, turnId: string, delta: string, updatedAt: string): void {
+  const existingMarkdown = agent.plan?.turnId === turnId ? agent.plan.markdown : '';
+  setAgentPlanMarkdown(agent, threadId, turnId, `${existingMarkdown}${delta}`, updatedAt, { trim: false });
 }
 
-function assistantTurnText(snapshot: AppSnapshot, agentId: string, turnId: string): string {
-  return findAssistantMessages(snapshot, agentId, turnId)
-    .flatMap((message) => message.parts)
-    .filter((part): part is Extract<RendererMessagePart, { type: 'text' }> => part.type === 'text')
-    .map((part) => part.text)
-    .join('');
+function lowerIndexOf(value: string, search: string): number {
+  return value.toLowerCase().indexOf(search.toLowerCase());
+}
+
+function planProgressOperation(agent: Agent, turnId: string): 'update' | 'write' {
+  return agent.plan && agent.plan.turnId !== turnId ? 'update' : 'write';
+}
+
+function isCapturingProposedPlan(snapshot: AppSnapshot, agentId: string, turnId: string): boolean {
+  return Boolean(planProgressToolPart(snapshot, agentId, turnId)?.metadata?.capturingProposedPlan);
+}
+
+function planProgressToolPart(snapshot: AppSnapshot, agentId: string, turnId: string): ToolPart | undefined {
+  const message = findAssistantMessageWithToolPart(snapshot, agentId, turnId, planProgressToolPartId(turnId));
+  return message?.parts.find((part): part is ToolPart => part.type === 'tool' && part.id === planProgressToolPartId(turnId));
+}
+
+function upsertPlanProgressToolPart(
+  snapshot: AppSnapshot,
+  agentId: string,
+  turnId: string,
+  markdown: string,
+  status: ToolPart['status'],
+  operation: 'update' | 'write',
+  capturingProposedPlan = false,
+): void {
+  upsertAssistantToolPart(snapshot, agentId, turnId, {
+    type: 'tool',
+    id: planProgressToolPartId(turnId),
+    kind: 'generic',
+    title: 'plan',
+    status,
+    statusText: JSON.stringify({
+      source: 'codex',
+      action: 'plan',
+      phase: status,
+      params: {
+        addedLines: planLineCount(markdown),
+        operation,
+        target: 'plan',
+      },
+    }),
+    metadata: {
+      capturingProposedPlan,
+      planProgress: true,
+    },
+  });
+}
+
+function planProgressToolPartId(turnId: string): string {
+  return `plan-${turnId}`;
+}
+
+function planLineCount(markdown: string): number {
+  return markdown.split(/\r?\n/).filter((line) => line.trim()).length;
 }
 
 function updateAssistantToolPart(snapshot: AppSnapshot, agentId: string, turnId: string, payload: unknown): void {

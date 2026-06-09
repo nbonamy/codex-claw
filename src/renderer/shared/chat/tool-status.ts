@@ -51,6 +51,11 @@ export function getToolDisplayTitle(
 
   if (descriptor?.source === 'codex' && isCodexToolAction(descriptor.action)) {
     const phase = commandPhase(descriptor.phase);
+    if (descriptor.action === 'plan') {
+      const operation = descriptor.params?.operation === 'update' ? 'update' : 'write';
+      return t(`chat.tool.command.plan.${operation}.${phase}`);
+    }
+
     const target = descriptor.action === 'explore' ? undefined : commandTarget(descriptor, getMessageToolCallName(toolCall));
     return t(`chat.tool.command.${descriptor.action}.${phase}`, target ? { target } : undefined);
   }
@@ -202,8 +207,8 @@ function commandPhase(phase: string) {
   return 'running';
 }
 
-function isCodexToolAction(action: string): action is 'create' | 'delete' | 'edit' | 'explore' | 'list' | 'read' | 'run' | 'search' {
-  return action === 'create' || action === 'delete' || action === 'edit' || action === 'explore' || action === 'list' || action === 'read' || action === 'run' || action === 'search';
+function isCodexToolAction(action: string): action is 'create' | 'delete' | 'edit' | 'explore' | 'list' | 'plan' | 'read' | 'run' | 'search' {
+  return action === 'create' || action === 'delete' || action === 'edit' || action === 'explore' || action === 'list' || action === 'plan' || action === 'read' || action === 'run' || action === 'search';
 }
 
 const codexClawTools = new Set([
@@ -247,6 +252,12 @@ function defaultTranslate(key: string, params?: Record<string, unknown>) {
     'chat.tool.command.list.completed': 'Listed {target}',
     'chat.tool.command.list.failed': 'Failed listing {target}',
     'chat.tool.command.list.running': 'Listing {target}',
+    'chat.tool.command.plan.update.completed': 'Updated plan',
+    'chat.tool.command.plan.update.failed': 'Failed updating plan',
+    'chat.tool.command.plan.update.running': 'Updating plan',
+    'chat.tool.command.plan.write.completed': 'Wrote plan',
+    'chat.tool.command.plan.write.failed': 'Failed writing plan',
+    'chat.tool.command.plan.write.running': 'Writing plan',
     'chat.tool.command.read.completed': 'Read {target}',
     'chat.tool.command.read.failed': 'Failed reading {target}',
     'chat.tool.command.read.running': 'Reading {target}',

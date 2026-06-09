@@ -405,6 +405,20 @@ Mode notifications stay app-owned:
 - Raw response assistant messages are diagnostic only for this path. Do not use
   them as the primary plan renderer; Codex core already parses
   `<proposed_plan>...</proposed_plan>` into typed plan item notifications.
+- The transcript must not render the markdown between `<proposed_plan>` and
+  `</proposed_plan>` as normal assistant text. While a plan streams, the
+  snapshot reducer inserts a normal ungrouped tool-style progress row with
+  `Writing plan` or `Updating plan` and live line stats; the side panel remains
+  the place where the full plan markdown is rendered.
+
+Plan previews use the markdown side panel with plan-specific review actions:
+
+- Confirm exits Plan mode and sends `implement the plan` as a normal prompt.
+- Cancel exits Plan mode and closes the preview without sending another prompt.
+- Comment keeps Plan mode active. The user selects text in the plan, adds one or
+  more inline comments, then sends those comments as a plan-refinement prompt.
+  Saved comments can be edited or deleted before submission and are reset after
+  the refinement prompt is sent.
 
 ### Token Usage And Rate Limits
 

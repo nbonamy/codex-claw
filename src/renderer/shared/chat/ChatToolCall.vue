@@ -24,6 +24,20 @@
       <component :is="isOpen ? ChevronUp : ChevronDown" class="chat-tool-group__chevron" :size="15" />
     </div>
 
+    <div
+      v-else-if="isStaticPlanProgress"
+      class="chat-tool-call__header chat-tool-call__header--static"
+    >
+      <ChatToolCallTitle
+        :icon="titleIcon"
+        :line-diff="lineDiff"
+        :running="isRunning"
+        :title="titleParts.title"
+        :title-prefix="titleParts.prefix"
+        :title-target="titleParts.target"
+      />
+    </div>
+
     <button v-else-if="!headerless" class="chat-tool-call__header" type="button" @click="toggleOpen">
       <ChatToolCallTitle
         :icon="titleIcon"
@@ -48,7 +62,7 @@
       </div>
     </div>
 
-    <ChatFoldTransition v-else :open="isOpen">
+    <ChatFoldTransition v-else-if="!isStaticPlanProgress" :open="isOpen">
       <div class="chat-tool-call__body">
         <div v-if="hasParams" class="chat-tool-call__section">
           <div class="chat-tool-call__section-title">Input</div>
@@ -67,7 +81,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronDown, ChevronUp, PencilIcon } from '../icons/app-icons'
+import { ChevronDown, ChevronUp, ListDetailsIcon, PencilIcon } from '../icons/app-icons'
 import type { ClientRequestResponse } from '../../../shared/contracts'
 import ChatFoldTransition from './ChatFoldTransition.vue'
 import ChatToolConfirmation from './ChatToolConfirmation.vue'
@@ -116,10 +130,23 @@ const titleParts = computed(() => {
   }
   return getToolDisplayTitleParts(props.toolCall, descriptor, t)
 })
-const titleIcon = computed(() => statusDescriptor.value?.source === 'codex' && statusDescriptor.value.action === 'edit' ? PencilIcon : undefined)
+const titleIcon = computed(() => {
+  if (statusDescriptor.value?.source !== 'codex') {
+    return undefined
+  }
+  if (statusDescriptor.value.action === 'edit') {
+    return PencilIcon
+  }
+  if (statusDescriptor.value.action === 'plan') {
+    return ListDetailsIcon
+  }
+  return undefined
+})
 const lineDiff = computed(() => getToolLineDiff(statusDescriptor.value))
 const hasParams = computed(() => toolCallArgs.value !== undefined)
 const hasResult = computed(() => props.toolCall.result !== undefined && props.toolCall.result !== null)
+const isPlanProgress = computed(() => statusDescriptor.value?.source === 'codex' && statusDescriptor.value.action === 'plan')
+const isStaticPlanProgress = computed(() => isPlanProgress.value && !hasParams.value && !hasResult.value && !props.headerless && !props.summaryOnly)
 
 function toggleOpen() {
   isOpen.value = !isOpen.value
@@ -165,6 +192,10 @@ function formatValue(value: unknown) {
   border-radius: var(--radius-sm);
   background: transparent;
   cursor: pointer;
+}
+
+.chat-tool-call__header--static {
+  cursor: default;
 }
 
 .chat-tool-call__header:focus-visible {

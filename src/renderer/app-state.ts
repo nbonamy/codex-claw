@@ -804,6 +804,7 @@ function syncSidePanelFromMainEvent(event: MainToRendererEvent): void {
   sidePanelMarkdownRequest.value = {
     kind: 'markdown',
     content: event.payload.content,
+    ...(event.payload.purpose === 'plan' ? { purpose: 'plan' } : {}),
     ...(typeof event.payload.title === 'string' ? { title: event.payload.title } : {}),
     ...(typeof event.payload.path === 'string' ? { path: event.payload.path } : {}),
   };

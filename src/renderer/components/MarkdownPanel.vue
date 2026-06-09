@@ -44,7 +44,7 @@ withDefaults(defineProps<{
 
 <style scoped>
 .markdown-panel {
-  height: 100%;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
   padding: var(--space-8);

@@ -311,6 +311,23 @@ describe('ported id8 chat components', () => {
     });
     expect(completedRead.text()).toContain('Read README.md');
 
+    const writingPlan = mount(ChatToolCall, {
+      props: {
+        toolCall: {
+          args: undefined,
+          done: false,
+          function: 'plan',
+          id: 'plan-tool',
+          result: undefined,
+          state: 'running',
+          status: '{"source":"codex","action":"plan","phase":"running","params":{"addedLines":3,"operation":"write"}}',
+        },
+      },
+    });
+    expect(writingPlan.text()).toContain('Writing plan');
+    expect(writingPlan.find('.chat-tool-call__chevron').exists()).toBe(false);
+    expect(writingPlan.find('.chat-tool-call__header').element.tagName).toBe('DIV');
+
     const editing = mount(ChatToolCall, {
       props: {
         summaryOnly: true,

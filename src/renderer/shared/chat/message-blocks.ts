@@ -173,6 +173,10 @@ function isUngroupedTool(toolCall: MessageToolCall) {
   }
 
   const status = parseToolStatus(toolCall.status)
+  if (status?.source === 'codex' && status.action === 'plan') {
+    return true
+  }
+
   return (status?.source === 'mcp' || status?.source === 'home') &&
     typeof status.params?.requestId === 'string' &&
     toolCall.state === 'running'

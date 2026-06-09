@@ -2235,7 +2235,27 @@ describe('snapshot reducer', () => {
       markdown: 'Current plan\n- [x] Inspect composer\n- [ ] Wire Plan mode',
       updatedAt: '2026-06-05T00:00:00.000Z',
     });
-    expect(snapshot.messages).toStrictEqual([]);
+    expect(snapshot.messages).toHaveLength(1);
+    expect(snapshot.messages[0].parts).toStrictEqual([
+      expect.objectContaining({
+        id: 'plan-turn-plan',
+        kind: 'generic',
+        status: 'completed',
+        statusText: JSON.stringify({
+          source: 'codex',
+          action: 'plan',
+          phase: 'completed',
+          params: {
+            addedLines: 3,
+            operation: 'write',
+            target: 'plan',
+          },
+        }),
+        title: 'plan',
+        type: 'tool',
+      }),
+    ]);
+    expect(JSON.stringify(snapshot.messages[0].parts)).not.toContain('Current plan');
   });
 
   it('sanitizes partial plan updates before storing them on the agent', () => {
@@ -2349,7 +2369,30 @@ describe('snapshot reducer', () => {
       },
       occurredAt: '2026-06-05T00:00:00.000Z',
     });
-    expect(snapshot.agents[0].plan).toBeUndefined();
+    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([
+      expect.objectContaining({
+        type: 'tool',
+        id: 'plan-turn-plan',
+        kind: 'generic',
+        title: 'plan',
+        status: 'running',
+        statusText: JSON.stringify({
+          source: 'codex',
+          action: 'plan',
+          phase: 'running',
+          params: {
+            addedLines: 1,
+            operation: 'write',
+            target: 'plan',
+          },
+        }),
+        metadata: {
+          capturingProposedPlan: true,
+          planProgress: true,
+        },
+      }),
+    ]);
+    expect(snapshot.agents[0].plan?.markdown).toBe('\n# Dummy Plan');
 
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
@@ -2371,10 +2414,122 @@ describe('snapshot reducer', () => {
       markdown: '# Dummy Plan\n\n- [ ] Do nothing',
       updatedAt: '2026-06-05T00:00:01.000Z',
     });
-    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([{
-      type: 'text',
-      text: '<proposed_plan>\n# Dummy Plan\n\n- [ ] Do nothing\n</proposed_plan>',
-    }]);
+    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([
+      expect.objectContaining({
+        type: 'tool',
+        id: 'plan-turn-plan',
+        kind: 'generic',
+        title: 'plan',
+        status: 'completed',
+        statusText: JSON.stringify({
+          source: 'codex',
+          action: 'plan',
+          phase: 'completed',
+          params: {
+            addedLines: 2,
+            operation: 'write',
+            target: 'plan',
+          },
+        }),
+        metadata: {
+          capturingProposedPlan: false,
+          planProgress: true,
+        },
+      }),
+    ]);
+  });
+
+  it('keeps text around proposed plan tags while hiding the plan body from chat', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 0,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-plan',
+      type: 'message.delta',
+      payload: {
+        delta: 'I will draft this.\n<proposed_plan>\n# Plan\n',
+      },
+      occurredAt: '2026-06-05T00:00:00.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-plan',
+      type: 'message.delta',
+      payload: {
+        delta: '- [ ] Do it\n</proposed_plan>\nReady for review.',
+      },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([
+      { type: 'text', text: 'I will draft this.\n' },
+      expect.objectContaining({
+        type: 'tool',
+        id: 'plan-turn-plan',
+        status: 'completed',
+        title: 'plan',
+      }),
+      { type: 'text', text: '\nReady for review.' },
+    ]);
+    expect(JSON.stringify(snapshot.messages.at(-1)?.parts)).not.toContain('<proposed_plan>');
+    expect(JSON.stringify(snapshot.messages.at(-1)?.parts)).not.toContain('- [ ] Do it');
+  });
+
+  it('renders typed proposed plan deltas as an ungrouped plan progress tool with line stats', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 0,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-plan',
+      type: 'turn.proposedPlanDelta',
+      payload: {
+        itemId: 'plan-item',
+        delta: '# Plan\n',
+      },
+      occurredAt: '2026-06-05T00:00:00.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-plan',
+      type: 'turn.proposedPlanDelta',
+      payload: {
+        itemId: 'plan-item',
+        delta: '- [ ] Do it\n',
+      },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([
+      expect.objectContaining({
+        type: 'tool',
+        id: 'plan-turn-plan',
+        kind: 'generic',
+        title: 'plan',
+        status: 'running',
+        statusText: JSON.stringify({
+          source: 'codex',
+          action: 'plan',
+          phase: 'running',
+          params: {
+            addedLines: 2,
+            operation: 'write',
+            target: 'plan',
+          },
+        }),
+        metadata: {
+          capturingProposedPlan: false,
+          planProgress: true,
+        },
+      }),
+    ]);
   });
 
   it('handles reducer fallback and error events without Codex protocol leaking into UI state', () => {
@@ -2399,7 +2554,7 @@ describe('snapshot reducer', () => {
       payload: { delta: 123 },
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
-    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([{ type: 'text', text: '' }]);
+    expect(snapshot.messages).toHaveLength(0);
 
     applyMainEventToSnapshot(snapshot, {
       seq: 3,

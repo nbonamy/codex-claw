@@ -1330,6 +1330,7 @@ describe('useAppState', () => {
       type: 'sidePanel.markdownRequested',
       payload: {
         kind: 'markdown',
+        purpose: 'plan',
         title: 'Architecture',
         path: 'docs/architecture.md',
         content: '# Architecture',
@@ -1339,6 +1340,7 @@ describe('useAppState', () => {
 
     expect(state.sidePanelMarkdownRequest.value).toStrictEqual({
       kind: 'markdown',
+      purpose: 'plan',
       title: 'Architecture',
       path: 'docs/architecture.md',
       content: '# Architecture',

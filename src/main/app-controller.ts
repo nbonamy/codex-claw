@@ -828,8 +828,15 @@ export class AppController {
       });
     }
 
+    if (
+      fullEvent.type === 'turn.planUpdated' ||
+      fullEvent.type === 'turn.proposedPlanCompleted'
+    ) {
+      this.promptPlanPreview(fullEvent);
+    }
+
     if (fullEvent.type === 'turn.completed' && fullEvent.agentId) {
-      this.promptCompletedPlanPreview(fullEvent);
+      this.promptPlanPreview(fullEvent);
       this.promptLatestUnreadMessage(fullEvent.agentId);
     }
   }
@@ -843,8 +850,16 @@ export class AppController {
     return agent?.plan?.turnId === event.turnId && Boolean(agent.plan.markdown.trim());
   }
 
-  private promptCompletedPlanPreview(event: MainToRendererEvent): void {
-    if (event.type !== 'turn.completed' || !event.agentId || !event.turnId) {
+  private promptPlanPreview(event: MainToRendererEvent): void {
+    if (
+      !event.agentId ||
+      !event.turnId ||
+      (
+        event.type !== 'turn.completed' &&
+        event.type !== 'turn.planUpdated' &&
+        event.type !== 'turn.proposedPlanCompleted'
+      )
+    ) {
       return;
     }
 
@@ -860,6 +875,7 @@ export class AppController {
       type: 'sidePanel.markdownRequested',
       payload: {
         kind: 'markdown',
+        purpose: 'plan',
         title: 'Plan',
         content: agent.plan.markdown,
       },

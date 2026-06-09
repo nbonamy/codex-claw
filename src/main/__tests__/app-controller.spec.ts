@@ -138,6 +138,18 @@ describe('AppController', () => {
       updatedAt: '2026-06-05T10:11:12.000Z',
     });
     expect(persistence.save).toHaveBeenCalledWith(snapshot);
+    expect(send).toHaveBeenLastCalledWith(ipcChannels.event, expect.objectContaining({
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-plan',
+      type: 'sidePanel.markdownRequested',
+      payload: {
+        kind: 'markdown',
+        purpose: 'plan',
+        title: 'Plan',
+        content: 'Current plan\n- [x] Inspect app-server event\n- [ ] Preview markdown',
+      },
+    }));
 
     emitAndApply(controller, {
       agentId: 'agent-dina',
@@ -155,6 +167,7 @@ describe('AppController', () => {
       type: 'sidePanel.markdownRequested',
       payload: {
         kind: 'markdown',
+        purpose: 'plan',
         title: 'Plan',
         content: 'Current plan\n- [x] Inspect app-server event\n- [ ] Preview markdown',
       },
@@ -194,6 +207,18 @@ describe('AppController', () => {
     });
     await flushMicrotasks();
     expect(persistence.save).toHaveBeenCalledWith(snapshot);
+    expect(send).toHaveBeenLastCalledWith(ipcChannels.event, expect.objectContaining({
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-plan',
+      type: 'sidePanel.markdownRequested',
+      payload: {
+        kind: 'markdown',
+        purpose: 'plan',
+        title: 'Plan',
+        content: '# Dummy False Plan\n\n- [ ] Do not implement',
+      },
+    }));
 
     emitAndApply(controller, {
       agentId: 'agent-dina',
@@ -212,6 +237,7 @@ describe('AppController', () => {
       type: 'sidePanel.markdownRequested',
       payload: {
         kind: 'markdown',
+        purpose: 'plan',
         title: 'Plan',
         content: '# Dummy False Plan\n\n- [ ] Do not implement',
       },

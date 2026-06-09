@@ -123,13 +123,21 @@ describe('message block computation', () => {
       id: 'mcp',
       status: '{"source":"mcp","action":"confirm","phase":"pending","params":{"requestId":"r1"}}',
     };
+    const planTool: MessageToolCall = {
+      ...runningTool,
+      id: 'plan',
+      function: 'plan',
+      status: '{"source":"codex","action":"plan","phase":"running","params":{"addedLines":2,"operation":"write"}}',
+    };
 
     expect(groupToolBlocks([
       { type: 'tool', toolCall: completedTool },
+      { type: 'tool', toolCall: planTool },
       { type: 'tool', toolCall: askTool },
       { type: 'tool', toolCall: mcpTool },
     ])).toStrictEqual([
       { type: 'tool-group', toolCalls: [completedTool] },
+      { type: 'tool', toolCall: planTool },
       { type: 'tool', toolCall: askTool },
       { type: 'tool', toolCall: mcpTool },
     ]);

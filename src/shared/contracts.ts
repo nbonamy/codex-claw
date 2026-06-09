@@ -222,6 +222,7 @@ export type AgentFileReadResult = {
 
 export type SidePanelMarkdownRequest = {
   kind: 'markdown';
+  purpose?: 'plan';
   title?: string;
   path?: string;
   content: string;

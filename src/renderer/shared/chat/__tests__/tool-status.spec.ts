@@ -69,6 +69,31 @@ describe('tool status helpers', () => {
     })).toBe('Deleted old.ts');
   });
 
+  it('formats Codex plan progress titles by operation and phase', () => {
+    const tool: MessageToolCall = {
+      args: undefined,
+      done: false,
+      function: 'plan',
+      id: 'tool',
+      result: undefined,
+      state: 'running',
+      status: 'running',
+    };
+
+    expect(getToolDisplayTitle(tool, {
+      action: 'plan',
+      phase: 'running',
+      params: { operation: 'write' },
+      source: 'codex',
+    })).toBe('Writing plan');
+    expect(getToolDisplayTitle({ ...tool, done: true, state: 'completed', status: 'completed' }, {
+      action: 'plan',
+      phase: 'completed',
+      params: { operation: 'update' },
+      source: 'codex',
+    })).toBe('Updated plan');
+  });
+
   it.each([
     ['codex_claw.register-agent', { agentId: 'agent-dina' }, 'Registered agent'],
     ['codex_claw.list-agents', { agentId: 'agent-dina' }, 'Listed agents'],

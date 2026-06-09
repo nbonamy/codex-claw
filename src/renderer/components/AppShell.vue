@@ -96,7 +96,11 @@
         <SidePanel
           v-if="sidePanel"
           :panel="sidePanel"
+          :plan-updating="isPlanPreviewUpdating"
+          @cancel-plan="cancelPlanReview"
           @close="closeSidePanel"
+          @comment-plan="commentOnPlan"
+          @confirm-plan="confirmPlan"
         />
       </div>
     </section>
@@ -140,7 +144,7 @@ import TeamRail from './TeamRail.vue';
 import SettingsDialog from './SettingsDialog.vue';
 import { confirmCloseTeam } from './team-close-confirmation';
 import type { QueuedChatPrompt } from '../shared/chat/queued-prompts';
-import type { SidePanelState } from './side-panel';
+import type { PlanReviewComment, SidePanelState } from './side-panel';
 
 const props = withDefaults(defineProps<{
   snapshot: AppSnapshot;
@@ -275,6 +279,25 @@ const editingAgent = computed(() => (
 const editingTeam = computed(() => (
   editingTeamId.value ? props.snapshot.teams.find((team) => team.id === editingTeamId.value) ?? null : null
 ));
+const isPlanPreviewUpdating = computed(() => {
+  if (sidePanel.value?.kind !== 'markdown' || sidePanel.value.purpose !== 'plan') {
+    return false;
+  }
+
+  const agentId = currentAgent.value?.id;
+  if (!agentId) {
+    return false;
+  }
+
+  return props.messages.some((message) => (
+    message.agentId === agentId &&
+    message.parts.some((part) => (
+      part.type === 'tool' &&
+      part.status === 'running' &&
+      part.metadata?.planProgress === true
+    ))
+  ));
+});
 
 onMounted(() => {
   if (typeof window.addEventListener === 'function') {
@@ -326,6 +349,24 @@ function closeAgentDialog(): void {
 function closeSidePanel(): void {
   sidePanelRequestId += 1;
   sidePanel.value = null;
+}
+
+function confirmPlan(): void {
+  emit('update:planMode', false);
+  emit('sendPrompt', 'implement the plan');
+}
+
+function cancelPlanReview(): void {
+  emit('update:planMode', false);
+  closeSidePanel();
+}
+
+function commentOnPlan(comments: PlanReviewComment[]): void {
+  if (comments.length === 0) {
+    return;
+  }
+
+  emit('sendPrompt', formatPlanCommentPrompt(comments));
 }
 
 async function openMarkdownFile(filePath: string): Promise<void> {
@@ -586,12 +627,26 @@ function openMarkdownRequest(request: SidePanelMarkdownRequest): void {
   const subtitle = request.path;
   sidePanel.value = {
     kind: 'markdown',
+    ...(request.purpose ? { purpose: request.purpose } : {}),
     title: request.title ?? (subtitle ? fileBasename(subtitle) : 'Markdown'),
     ...(subtitle ? { subtitle } : {}),
     content: request.content,
     state: 'idle',
     error: null,
   };
+}
+
+function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
+  const formattedComments = comments.map((comment, index) => [
+    `${index + 1}. On: "${comment.quote}"`,
+    `   Comment: ${comment.body}`,
+  ].join('\n')).join('\n\n');
+
+  return [
+    'Refine the plan using these comments:',
+    '',
+    formattedComments,
+  ].join('\n');
 }
 </script>
 
