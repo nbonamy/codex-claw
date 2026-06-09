@@ -231,8 +231,75 @@ describe('CockpitView', () => {
     wrapper.findComponent({ name: 'WorkBacklogPanel' }).vm.$emit('assign-to-new-agent', item);
     wrapper.findComponent({ name: 'WorkBacklogPanel' }).vm.$emit('assign-to-bench-agent', item);
 
-    expect(wrapper.emitted('assign-work-item-to-new-agent')).toStrictEqual([[item]]);
-    expect(wrapper.emitted('assign-work-item-to-bench-agent')).toStrictEqual([[item]]);
+    expect(wrapper.emitted('assign-work-item-to-new-agent')).toStrictEqual([[{ item }]]);
+    expect(wrapper.emitted('assign-work-item-to-bench-agent')).toStrictEqual([[{ item }]]);
+  });
+
+  it('turns the add tile into split assignment targets while dragging work items', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.bench.push({
+      id: 'bench-dina',
+      name: 'Dina',
+      avatar: 'DI',
+      folder: '/Users/nbonamy/src/id8',
+      backend: 'codex',
+      createdAt: '2026-06-05T00:00:00.000Z',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    });
+    const item = workItem();
+    const wrapper = mountCockpit(snapshot, {
+      workBacklog: {
+        connection: {
+          provider: 'github',
+          status: 'connected',
+          accountLabel: 'nbonamy',
+        },
+        repositories: [],
+        selectedRepositoryId: 'nbonamy/codex-claw',
+        items: [item],
+        status: 'loaded',
+        error: null,
+      },
+    });
+
+    wrapper.get('.work-backlog-panel__item').element.dispatchEvent(dragEvent('dragstart'));
+    await nextTick();
+
+    const dragEnter = dragEvent('dragenter');
+    wrapper.get('.cockpit-view__add-card').element.dispatchEvent(dragEnter);
+    await nextTick();
+
+    expect(dragEnter.defaultPrevented).toBe(true);
+    expect(wrapper.get('.cockpit-view__add-card').text()).toContain('Assign to New Agent');
+    expect(wrapper.get('.cockpit-view__add-card').text()).toContain('Assign to Bench Agent');
+    expect(wrapper.find('.cockpit-view__add-drop-target--active').exists()).toBe(false);
+
+    const newAgentTarget = wrapper.get('[aria-label="Assign issue to a new agent in Codex Claw"]');
+    newAgentTarget.element.dispatchEvent(dragEvent('dragover'));
+    await nextTick();
+    expect(newAgentTarget.classes()).toContain('cockpit-view__add-drop-target--active');
+    expect(wrapper.get('[aria-label="Assign issue to a Bench agent in Codex Claw"]').classes()).not.toContain('cockpit-view__add-drop-target--active');
+
+    newAgentTarget.element.dispatchEvent(dragEvent('drop'));
+    await nextTick();
+
+    expect(wrapper.emitted('assign-work-item-to-new-agent')).toStrictEqual([[{
+      item,
+      teamId: 'team-codex-claw',
+    }]]);
+    expect(wrapper.get('.cockpit-view__add-card').text()).toContain('Add Agent');
+
+    wrapper.get('.work-backlog-panel__item').element.dispatchEvent(dragEvent('dragstart'));
+    await nextTick();
+    wrapper.get('.cockpit-view__add-card').element.dispatchEvent(dragEvent('dragenter'));
+    await nextTick();
+    wrapper.get('[aria-label="Assign issue to a Bench agent in Codex Claw"]').element.dispatchEvent(dragEvent('drop'));
+    await nextTick();
+
+    expect(wrapper.emitted('assign-work-item-to-bench-agent')).toStrictEqual([[{
+      item,
+      teamId: 'team-codex-claw',
+    }]]);
   });
 
   it('assigns a dragged work item to an idle agent without selecting the card', async () => {

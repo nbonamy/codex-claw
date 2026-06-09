@@ -945,7 +945,7 @@ describe('AppShell', () => {
     });
 
     await wrapper.get('[aria-label="Cockpit"]').trigger('click');
-    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('assign-work-item-to-new-agent', item);
+    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('assign-work-item-to-new-agent', { item });
     await nextTick();
 
     const agentDialog = wrapper.findComponent({ name: 'AgentDialog' });
@@ -1014,7 +1014,7 @@ describe('AppShell', () => {
     });
 
     await wrapper.get('[aria-label="Cockpit"]').trigger('click');
-    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('assign-work-item-to-bench-agent', item);
+    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('assign-work-item-to-bench-agent', { item });
     await nextTick();
 
     const benchAgentAssignmentDialog = wrapper.findComponent({ name: 'BenchAgentAssignmentDialog' });
@@ -1034,6 +1034,62 @@ describe('AppShell', () => {
     expect(deployBenchTemplateAction).toHaveBeenCalledWith({
       templateId: 'bench-dina',
       teamId: 'team-github-12',
+    });
+    expect(wrapper.emitted('assign-work-item')).toStrictEqual([[{
+      agentId: 'agent-dina-copy',
+      item,
+    }]]);
+  });
+
+  it('uses dragged team context when assigning a ticket to a Bench agent', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.teams.push({
+      id: 'team-skwad',
+      name: 'Skwad',
+      color: '#46A857',
+      agentIds: [],
+    });
+    snapshot.bench.push({
+      id: 'bench-dina',
+      name: 'Dina',
+      avatar: 'DI',
+      folder: '/Users/nbonamy/src/id8',
+      backend: 'codex',
+      createdAt: '2026-06-05T00:00:00.000Z',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    });
+    const item = workItem();
+    const deployedAgent: Agent = {
+      id: 'agent-dina-copy',
+      teamId: 'team-skwad',
+      name: 'Dina',
+      avatar: 'DI',
+      folder: '/Users/nbonamy/src/id8',
+      backend: 'codex',
+      backendDefaults: { kind: 'codex' },
+      status: { type: 'idle' },
+      createdAt: '2026-06-09T12:00:00.000Z',
+      updatedAt: '2026-06-09T12:00:00.000Z',
+    };
+    const deployBenchTemplateAction = vi.fn().mockResolvedValue(deployedAgent);
+    const wrapper = mountShell({
+      snapshot,
+      deployBenchTemplateAction,
+    });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('assign-work-item-to-bench-agent', {
+      item,
+      teamId: 'team-skwad',
+    });
+    await nextTick();
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Assign')?.trigger('click');
+    await flushPromises();
+
+    expect(deployBenchTemplateAction).toHaveBeenCalledWith({
+      templateId: 'bench-dina',
+      teamId: 'team-skwad',
     });
     expect(wrapper.emitted('assign-work-item')).toStrictEqual([[{
       agentId: 'agent-dina-copy',

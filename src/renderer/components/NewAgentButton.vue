@@ -197,7 +197,6 @@ function folderBasename(folder: string): string {
   --new-agent-button-hover-bg: color-mix(in srgb, var(--color-primary) 80%, var(--color-background));
   --new-agent-button-hover-border: color-mix(in srgb, var(--color-primary) 80%, var(--color-background));
   --new-agent-button-padding-inline: var(--space-8);
-  --new-agent-button-padding-chevron: 0 var(--space-3);
   --new-agent-button-icon-display: none;
   --new-agent-button-label-display: inline;
   width: 100%;
@@ -211,14 +210,13 @@ function folderBasename(folder: string): string {
 }
 
 .new-agent-button--muted {
-  --new-agent-button-height: 28px;
+  --new-agent-button-height: 24px;
   --new-agent-button-color: var(--color-text-muted);
   --new-agent-button-bg: transparent;
   --new-agent-button-border: transparent;
   --new-agent-button-hover-bg: transparent;
   --new-agent-button-hover-border: transparent;
   --new-agent-button-icon-display: block;
-  --new-agent-button-padding-chevron: 0 var(--space-6);
 }
 
 .new-agent-button--ghost {
@@ -293,7 +291,7 @@ function folderBasename(folder: string): string {
   background: var(--new-agent-button-bg);
   font-size: var(--font-size-14);
   font-weight: var(--font-weight-semibold);
-  padding: var(--new-agent-button-padding-chevron);
+  padding: 0 var(--space-3);
 }
 
 .new-agent-button--ghost .new-agent-button__chevron {
@@ -306,7 +304,7 @@ function folderBasename(folder: string): string {
 
 .new-agent-button--muted .new-agent-button__chevron,
 .new-agent-button--ghost .new-agent-button__chevron {
-  width: var(--space-12);
+  width: var(--space-16);
   padding-inline: var(--space-2);
 }
 

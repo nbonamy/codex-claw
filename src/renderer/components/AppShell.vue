@@ -151,7 +151,7 @@
       confirm-label="Assign"
       :bench-templates="snapshot.bench"
       :initial-new-team-name="pendingBenchAgentTeamName"
-      :initial-team-id="activeTeam?.id ?? snapshot.activeTeamId"
+      :initial-team-id="pendingBenchAgentTeamId ?? activeTeam?.id ?? snapshot.activeTeamId"
       :teams="snapshot.teams"
       @close="closeBenchAssignmentDialog"
       @submit="assignWorkItemToBenchAgent"
@@ -313,6 +313,11 @@ const emit = defineEmits<{
   steerPrompt: [prompt: string];
 }>();
 
+type WorkItemAssignmentIntent = {
+  item: WorkItem;
+  teamId?: string;
+};
+
 const agentSidebarCollapsed = ref(false);
 const agentSidebarMinWidth = 80;
 const agentSidebarMaxWidth = 420;
@@ -324,6 +329,7 @@ const editingAgentId = ref<string | null>(null);
 const agentDialogTeamId = ref<string | null>(null);
 const pendingNewAgentWorkItem = ref<WorkItem | null>(null);
 const pendingBenchAgentWorkItem = ref<WorkItem | null>(null);
+const pendingBenchAgentTeamId = ref<string | null>(null);
 const benchAssignmentDialogVisible = ref(false);
 const teamDialogVisible = ref(false);
 const teamDialogMode = ref<'create' | 'edit'>('create');
@@ -437,13 +443,14 @@ function openNewAgent(teamId?: string): void {
   agentDialogVisible.value = true;
 }
 
-function openNewAgentForWorkItem(item: WorkItem): void {
-  pendingNewAgentWorkItem.value = item;
-  openNewAgent(activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined);
+function openNewAgentForWorkItem(intent: WorkItemAssignmentIntent): void {
+  pendingNewAgentWorkItem.value = intent.item;
+  openNewAgent(intent.teamId ?? activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined);
 }
 
-function openBenchAgentAssignmentDialog(item: WorkItem): void {
-  pendingBenchAgentWorkItem.value = item;
+function openBenchAgentAssignmentDialog(intent: WorkItemAssignmentIntent): void {
+  pendingBenchAgentWorkItem.value = intent.item;
+  pendingBenchAgentTeamId.value = intent.teamId ?? null;
   benchAssignmentDialogVisible.value = true;
 }
 
@@ -499,6 +506,7 @@ async function createAgentFromDialog(input: CreateAgentInput & { newTeamName?: s
 function closeBenchAssignmentDialog(): void {
   benchAssignmentDialogVisible.value = false;
   pendingBenchAgentWorkItem.value = null;
+  pendingBenchAgentTeamId.value = null;
 }
 
 async function assignWorkItemToBenchAgent(input: { benchTemplateId?: string; newTeamName?: string; teamId?: string }): Promise<void> {

@@ -39,8 +39,8 @@
         :selected-repository-id="workBacklog.selectedRepositoryId"
         :status="workBacklog.status"
         :can-assign-to-bench="bench.length > 0"
-        @assign-to-bench-agent="emit('assign-work-item-to-bench-agent', $event)"
-        @assign-to-new-agent="emit('assign-work-item-to-new-agent', $event)"
+        @assign-to-bench-agent="emit('assign-work-item-to-bench-agent', { item: $event })"
+        @assign-to-new-agent="emit('assign-work-item-to-new-agent', { item: $event })"
         @refresh="emit('refresh-work-items', $event)"
         @select-repository="emit('select-work-repository', $event)"
         @work-item-drag-end="clearDraggedWorkItem"
@@ -104,79 +104,32 @@
             :ref="(element) => setGridRef(section.team.id, element)"
             class="cockpit-view__grid"
           >
-            <article
+            <CockpitAgentCard
               v-for="agent in section.agents"
               :key="agent.id"
-              class="cockpit-view__agent-card"
-              :class="{
-                'cockpit-view__agent-card--drop-ready': draggedWorkItem && agentCanReceivePrompt(agent),
-                'cockpit-view__agent-card--drop-target': dropTargetAgentId === agent.id,
-              }"
-              @click="emit('select-agent', { agentId: agent.id, teamId: section.team.id })"
-              @dragenter="enterAgentDropTarget($event, agent)"
-              @dragleave="leaveAgentDropTarget(agent)"
-              @dragover="allowAgentDrop($event, agent)"
-              @drop="dropWorkItem($event, agent)"
-            >
-              <header class="cockpit-view__agent-header">
-                <AgentAvatar
-                  :avatar="agent.avatar"
-                  :name="agent.name"
-                  size="lg"
-                />
-                <div class="cockpit-view__agent-title">
-                  <strong>{{ agent.name }}</strong>
-                  <span>{{ folderBasename(agent.folder) }}</span>
-                </div>
-                <span
-                  class="cockpit-view__agent-state"
-                  :data-status="agent.status.type"
-                >
-                  {{ agentStatusLabel(agent.status.type) }}
-                </span>
-              </header>
+              :agent="agent"
+              :dragged-work-item="draggedWorkItem"
+              :drop-target="dropTargetAgentId === agent.id"
+              @assign-work-item="assignDraggedWorkItemToAgent"
+              @clear-dragged-work-item="clearDraggedWorkItem"
+              @drop-target-enter="dropTargetAgentId = $event"
+              @drop-target-leave="leaveAgentDropTarget"
+              @prompt="emit('prompt-agent', $event)"
+              @select="emit('select-agent', { agentId: agent.id, teamId: section.team.id })"
+            />
 
-              <div class="cockpit-view__agent-body">
-                <strong>{{ agentStatusText(agent) }}</strong>
-                <span>{{ agent.backend }}</span>
-              </div>
-
-              <form
-                class="cockpit-view__prompt"
-                @click.stop
-                @submit.prevent="submitPrompt(agent)"
-              >
-                <input
-                  v-model="promptDrafts[agent.id]"
-                  :disabled="!agentCanReceivePrompt(agent)"
-                  :placeholder="agentCanReceivePrompt(agent) ? 'Send prompt...' : 'Working...'"
-                  :aria-label="`Prompt ${agent.name}`"
-                >
-                <button
-                  type="submit"
-                  :disabled="!canSubmitPrompt(agent)"
-                  :aria-label="`Send prompt to ${agent.name}`"
-                >
-                  <SendIcon aria-hidden="true" />
-                </button>
-              </form>
-            </article>
-
-            <div
+            <CockpitAddAgentTile
               v-if="section.showGridAdd"
-              class="cockpit-view__add-card"
-            >
-              <NewAgentButton
-                class="cockpit-view__add-button"
-                label="Add Agent"
-                presentation="tile"
-                tone="muted"
-                :bench="bench"
-                @deploy-bench-template="emit('deploy-bench-template', { templateId: $event, teamId: section.team.id })"
-                @new-agent="emit('add-agent', section.team.id)"
-                @remove-bench-template="emit('remove-bench-template', $event)"
-              />
-            </div>
+              :bench="bench"
+              :dragged-work-item="draggedWorkItem"
+              :team-id="section.team.id"
+              :team-name="section.team.name"
+              @assign-to-bench-agent="assignDraggedWorkItemToBenchAgent"
+              @assign-to-new-agent="assignDraggedWorkItemToNewAgent"
+              @deploy-bench-template="emit('deploy-bench-template', $event)"
+              @new-agent="emit('add-agent', $event)"
+              @remove-bench-template="emit('remove-bench-template', $event)"
+            />
           </div>
         </section>
       </div>
@@ -189,9 +142,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { ComponentPublicInstance } from 'vue';
 import type { Agent, AgentStatus, BenchTemplate, DeployBenchTemplateInput, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '../../shared/contracts';
 import { defaultTeamColor } from '../../shared/team-colors';
-import { agentCanReceivePrompt, agentStatusLabel, agentStatusText, folderBasename } from '../shared/agent-display';
-import { SendIcon } from '../shared/icons/app-icons';
-import AgentAvatar from './AgentAvatar.vue';
+import CockpitAddAgentTile from './CockpitAddAgentTile.vue';
+import CockpitAgentCard from './CockpitAgentCard.vue';
 import NewAgentButton from './NewAgentButton.vue';
 import WorkBacklogPanel from './WorkBacklogPanel.vue';
 
@@ -218,6 +170,11 @@ type CockpitWorkBacklog = {
   status: 'notLoaded' | 'loading' | 'loaded' | 'error';
 };
 
+type WorkItemAssignmentIntent = {
+  item: WorkItem;
+  teamId?: string;
+};
+
 const DEFAULT_GRID_COLUMNS = 3;
 
 const props = defineProps<{
@@ -229,8 +186,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'add-agent': [teamId: string];
-  'assign-work-item-to-bench-agent': [item: WorkItem];
-  'assign-work-item-to-new-agent': [item: WorkItem];
+  'assign-work-item-to-bench-agent': [intent: WorkItemAssignmentIntent];
+  'assign-work-item-to-new-agent': [intent: WorkItemAssignmentIntent];
   'assign-work-item': [payload: { agentId: string; item: WorkItem }];
   'deploy-bench-template': [input: DeployBenchTemplateInput];
   'prompt-agent': [payload: { agentId: string; prompt: string }];
@@ -241,7 +198,6 @@ const emit = defineEmits<{
   'select-team': [teamId: string];
 }>();
 
-const promptDrafts = ref<Record<string, string>>({});
 const draggedWorkItem = ref<WorkItem | null>(null);
 const dropTargetAgentId = ref<string | null>(null);
 const columnsByTeam = ref<Record<string, number>>({});
@@ -364,61 +320,24 @@ function shouldShowHeaderAdd(agentCount: number, columns: number): boolean {
   return agentCount > 0 && agentCount % columns === 0;
 }
 
-function canSubmitPrompt(agent: Agent): boolean {
-  return agentCanReceivePrompt(agent) && Boolean(promptDrafts.value[agent.id]?.trim());
-}
-
-function submitPrompt(agent: Agent): void {
-  if (!canSubmitPrompt(agent)) {
-    return;
-  }
-
-  const prompt = (promptDrafts.value[agent.id] ?? '').trim();
-  promptDrafts.value[agent.id] = '';
-  emit('prompt-agent', {
-    agentId: agent.id,
-    prompt,
-  });
-}
-
-function allowAgentDrop(event: DragEvent, agent: Agent): void {
-  if (!draggedWorkItem.value || !agentCanReceivePrompt(agent)) {
-    return;
-  }
-
-  event.preventDefault();
-  if (event.dataTransfer) {
-    event.dataTransfer.dropEffect = 'copy';
-  }
-}
-
-function enterAgentDropTarget(event: DragEvent, agent: Agent): void {
-  if (!draggedWorkItem.value || !agentCanReceivePrompt(agent)) {
-    return;
-  }
-
-  event.preventDefault();
-  dropTargetAgentId.value = agent.id;
-}
-
-function leaveAgentDropTarget(agent: Agent): void {
-  if (dropTargetAgentId.value === agent.id) {
+function leaveAgentDropTarget(agentId: string): void {
+  if (dropTargetAgentId.value === agentId) {
     dropTargetAgentId.value = null;
   }
 }
 
-function dropWorkItem(event: DragEvent, agent: Agent): void {
-  const item = draggedWorkItem.value;
-  if (!item || !agentCanReceivePrompt(agent)) {
-    return;
-  }
+function assignDraggedWorkItemToAgent(payload: { agentId: string; item: WorkItem }): void {
+  emit('assign-work-item', payload);
+  clearDraggedWorkItem();
+}
 
-  event.preventDefault();
-  event.stopPropagation();
-  emit('assign-work-item', {
-    agentId: agent.id,
-    item,
-  });
+function assignDraggedWorkItemToNewAgent(intent: WorkItemAssignmentIntent): void {
+  emit('assign-work-item-to-new-agent', intent);
+  clearDraggedWorkItem();
+}
+
+function assignDraggedWorkItemToBenchAgent(intent: WorkItemAssignmentIntent): void {
+  emit('assign-work-item-to-bench-agent', intent);
   clearDraggedWorkItem();
 }
 
@@ -598,6 +517,11 @@ function summaryLabel(status: AgentStatus['type'], count: number): string {
   color: var(--color-primary);
 }
 
+.cockpit-view__team-title:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .cockpit-view__header-add {
   margin-left: auto;
 }
@@ -614,180 +538,6 @@ function summaryLabel(status: AgentStatus['type'], count: number): string {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--cockpit-tile-width)), var(--cockpit-tile-width)));
   gap: var(--space-12);
-}
-
-.cockpit-view__agent-card {
-  width: min(100%, var(--cockpit-tile-width));
-  min-height: 172px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--color-surface-low) 70%, transparent);
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: var(--space-8);
-  padding: var(--space-10);
-  text-align: left;
-  cursor: pointer;
-}
-
-.cockpit-view__agent-card:hover,
-.cockpit-view__agent-card:focus-visible {
-  border-color: var(--color-border-strong);
-  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-low));
-}
-
-.cockpit-view__agent-card--drop-ready {
-  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
-}
-
-.cockpit-view__agent-card--drop-target {
-  border-color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface-low));
-  box-shadow: inset 0 0 0 1px var(--color-primary);
-}
-
-.cockpit-view__agent-card:focus-visible,
-.cockpit-view__prompt button:focus-visible,
-.cockpit-view__team-title:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-}
-
-.cockpit-view__agent-header {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-8);
-  padding-bottom: var(--space-8);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.cockpit-view__agent-title {
-  min-width: 0;
-  display: grid;
-  gap: 1px;
-}
-
-.cockpit-view__agent-title strong,
-.cockpit-view__agent-title span,
-.cockpit-view__agent-body strong,
-.cockpit-view__agent-body span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cockpit-view__agent-title strong {
-  color: var(--color-text);
-  font-size: var(--font-size-15);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-20);
-}
-
-.cockpit-view__agent-title span,
-.cockpit-view__agent-body span {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-13);
-  line-height: var(--line-height-18);
-}
-
-.cockpit-view__agent-state {
-  color: var(--color-success);
-  font-size: var(--font-size-13);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-18);
-}
-
-.cockpit-view__agent-state[data-status='working'],
-.cockpit-view__agent-state[data-status='starting'],
-.cockpit-view__agent-state[data-status='awaitingInput'] {
-  color: var(--color-warning);
-}
-
-.cockpit-view__agent-state[data-status='error'] {
-  color: var(--color-error);
-}
-
-.cockpit-view__agent-body {
-  min-width: 0;
-  display: grid;
-  align-content: start;
-  gap: var(--space-3);
-}
-
-.cockpit-view__agent-body strong {
-  color: var(--color-text);
-  font-size: var(--font-size-14);
-  font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-20);
-}
-
-.cockpit-view__prompt {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 28px;
-  align-items: center;
-  gap: var(--space-4);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-lowest);
-}
-
-.cockpit-view__prompt input {
-  min-width: 0;
-  height: 34px;
-  border: 0;
-  padding: 0 0 0 var(--space-8);
-  color: var(--color-text);
-  background: transparent;
-  outline: none;
-}
-
-.cockpit-view__prompt input::placeholder {
-  color: var(--color-text-muted);
-}
-
-.cockpit-view__prompt input:disabled {
-  opacity: 0.6;
-}
-
-.cockpit-view__prompt button {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: var(--radius-md);
-  color: var(--color-primary);
-  background: transparent;
-  cursor: pointer;
-}
-
-.cockpit-view__prompt button:disabled {
-  color: var(--color-text-muted);
-  cursor: default;
-  opacity: 0.45;
-}
-
-.cockpit-view__prompt svg {
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-}
-
-.cockpit-view__add-card {
-  width: min(100%, var(--cockpit-tile-width));
-  min-height: 172px;
-  display: grid;
-  place-items: center;
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--color-surface-low) 48%, transparent);
-}
-
-.cockpit-view__add-card:hover,
-.cockpit-view__add-card:focus-within {
-  border-color: var(--color-border-strong);
-  background: color-mix(in srgb, var(--color-surface-low) 80%, transparent);
 }
 
 @media (max-width: 780px) {
