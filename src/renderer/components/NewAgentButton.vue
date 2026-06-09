@@ -197,6 +197,7 @@ function folderBasename(folder: string): string {
   --new-agent-button-hover-bg: color-mix(in srgb, var(--color-primary) 80%, var(--color-background));
   --new-agent-button-hover-border: color-mix(in srgb, var(--color-primary) 80%, var(--color-background));
   --new-agent-button-padding-inline: var(--space-8);
+  --new-agent-button-padding-chevron: 0 var(--space-3);
   --new-agent-button-icon-display: none;
   --new-agent-button-label-display: inline;
   width: 100%;
@@ -217,6 +218,7 @@ function folderBasename(folder: string): string {
   --new-agent-button-hover-bg: transparent;
   --new-agent-button-hover-border: transparent;
   --new-agent-button-icon-display: block;
+  --new-agent-button-padding-chevron: 0 var(--space-6);
 }
 
 .new-agent-button--ghost {
@@ -291,7 +293,7 @@ function folderBasename(folder: string): string {
   background: var(--new-agent-button-bg);
   font-size: var(--font-size-14);
   font-weight: var(--font-weight-semibold);
-  padding: 0 var(--space-3);
+  padding: var(--new-agent-button-padding-chevron);
 }
 
 .new-agent-button--ghost .new-agent-button__chevron {
