@@ -210,7 +210,7 @@ function folderBasename(folder: string): string {
 }
 
 .new-agent-button--muted {
-  --new-agent-button-height: 36px;
+  --new-agent-button-height: 28px;
   --new-agent-button-color: var(--color-text-muted);
   --new-agent-button-bg: transparent;
   --new-agent-button-border: transparent;
@@ -262,6 +262,7 @@ function folderBasename(folder: string): string {
   color: var(--new-agent-button-color);
   background: var(--new-agent-button-bg);
   font-size: var(--font-size-14);
+  line-height: var(--line-height-22);
   font-weight: var(--font-weight-semibold);
   justify-content: center;
   gap: var(--space-6);
