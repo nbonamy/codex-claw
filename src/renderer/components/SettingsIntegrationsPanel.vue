@@ -11,7 +11,7 @@
           class="settings-integrations-panel__icon"
           aria-hidden="true"
         >
-          <GitHubIcon />
+          <img src="https://cdn.brandfetch.io/idZAyF9rlg/theme/dark/symbol.svg?c=1bxid64Mup7aczewSAYMX&t=1779162684348">
         </span>
         <div>
           <strong>GitHub</strong>
@@ -42,7 +42,7 @@
       </div>
     </article>
 
-    <div
+    <!-- <div
       v-if="githubConnection.status !== 'connected'"
       class="settings-integrations-panel__config"
     >
@@ -65,7 +65,7 @@
           Save
         </el-button>
       </div>
-    </div>
+    </div> -->
 
     <div
       v-if="authorization?.provider === 'github' && githubConnection.status === 'connecting'"
@@ -75,7 +75,6 @@
       <span class="settings-integrations-panel__code">{{ authorization.userCode }}</span>
       <el-button
         :loading="status === 'loading'"
-        size="small"
         type="primary"
         @click="emit('complete', 'github')"
       >
@@ -84,7 +83,7 @@
     </div>
 
     <p
-      v-if="configurationError || githubConnection.detail || error"
+      v-if="configurationError || error"
       class="settings-integrations-panel__detail"
     >
       {{ configurationError ?? error ?? githubConnection.detail }}
@@ -95,7 +94,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '../../shared/contracts';
-import { GitHubIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
   authorization?: WorkProviderAuthorization | null;
@@ -234,18 +232,16 @@ async function connectGithub(): Promise<void> {
 }
 
 .settings-integrations-panel__icon {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-md);
-  color: var(--color-text);
-  background: var(--color-surface-low);
+  margin-left: var(--space-8);
+  width: var(--space-16);
+  height: var(--space-16);
+  display: flex;
+  align-items: center;
 }
 
-.settings-integrations-panel__icon svg {
-  width: var(--icon-md);
-  height: var(--icon-md);
+.settings-integrations-panel__icon img {
+  width: 100%;
+  height: 100%;
 }
 
 .settings-integrations-panel__actions {
@@ -282,6 +278,7 @@ async function connectGithub(): Promise<void> {
 
 .settings-integrations-panel__authorization {
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: var(--space-10);
   padding: var(--space-10) 0 0;
