@@ -260,8 +260,8 @@ function initialTeamSelection(): string {
 
 .bench-agent-assignment-dialog__bench-copy {
   min-width: 0;
-  display: grid;
-  gap: 1px;
+  display: flex;
+  gap: var(--space-4);
   line-height: var(--line-height-18);
 }
 

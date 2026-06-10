@@ -8,7 +8,7 @@
         <GitHubIcon aria-hidden="true" />
         <div>
           <strong>Backlog</strong>
-          <span>{{ connection.accountLabel ?? 'GitHub' }}</span>
+          <!-- <span>{{ connection.accountLabel ?? 'GitHub' }}</span> -->
         </div>
       </div>
       <button
@@ -431,8 +431,9 @@ function workProviderLabel(provider: WorkIntegrationConnection['provider']): str
 }
 
 .work-backlog-panel__filters {
-  display: grid;
-  gap: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
 .work-backlog-panel__select {
