@@ -8,6 +8,8 @@ Meet your native Codex coding crew. Codex Claw is a desktop app that lets you
 run a team of Codex agents, each with its own folder, identity, thread, tools,
 and inbox, while rendering the work as a real app instead of a terminal stream.
 
+[Lire la version française](README.fr.md)
+
 ![Electron](https://img.shields.io/badge/Electron-42+-47848F)
 ![Vue](https://img.shields.io/badge/Vue-3-42b883)
 ![TypeScript](https://img.shields.io/badge/TypeScript-6+-3178c6)
