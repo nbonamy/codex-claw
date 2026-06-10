@@ -66,6 +66,7 @@
         @refresh-work-items="refreshWorkItems"
         @restart-agent="$emit('restart-agent', $event)"
         @save-agent-to-bench="$emit('save-agent-to-bench', $event)"
+        @select-work-tag="selectWorkTagForCockpit"
         @select-work-repository="selectWorkRepositoryForCockpit"
         @select-agent="selectAgentFromCockpit"
         @select-team="selectTeamFromRail"
@@ -190,7 +191,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, Team, ThreadGoal, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../../shared/contracts';
+import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, Team, ThreadGoal, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../../shared/contracts';
 import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import { defaultTeamColor } from '../../shared/team-colors';
 import { findAssignedAgentForWorkItem } from '../../shared/work-assignments';
@@ -246,7 +247,7 @@ const props = withDefaults(defineProps<{
   connectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   completeWorkProviderConnection?: (provider: WorkProviderKind) => Promise<void>;
   disconnectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
-  selectWorkRepository?: (provider: WorkProviderKind, repositoryId: string | null) => Promise<void>;
+  configureWorkBacklog?: (input: WorkBacklogConfigurationInput) => Promise<void>;
   loadWorkRepositories?: (provider: WorkProviderKind) => Promise<void>;
   loadWorkItems?: (provider: WorkProviderKind, repositoryId: string) => Promise<void>;
   quit?: () => Promise<void>;
@@ -282,7 +283,7 @@ const props = withDefaults(defineProps<{
   connectWorkProvider: async () => undefined,
   completeWorkProviderConnection: async () => undefined,
   disconnectWorkProvider: async () => undefined,
-  selectWorkRepository: async () => undefined,
+  configureWorkBacklog: async () => undefined,
   loadWorkRepositories: async () => undefined,
   loadWorkItems: async () => undefined,
   quit: async () => undefined,
@@ -385,13 +386,15 @@ const cockpitWorkBacklog = computed(() => {
 
   const provider = connection.provider;
   const repositories = props.workRepositoriesByProvider[provider] ?? [];
-  const selectedRepositoryId = props.snapshot.workBacklog.selectedRepositoryIds[provider] ?? repositories[0]?.id ?? null;
+  const configuration = props.snapshot.workBacklog.providerConfigurations[provider] ?? {};
+  const selectedRepositoryId = configuration.repositoryId ?? repositories[0]?.id ?? null;
 
   return {
     assignments: props.snapshot.workBacklog.assignments,
     connection,
     repositories,
     selectedRepositoryId,
+    selectedTagName: configuration.tagName ?? null,
     items: selectedRepositoryId ? props.workItemsByRepository[workItemsKey(provider, selectedRepositoryId)] ?? [] : [],
     status: props.workBacklogStatus,
     error: props.workBacklogError,
@@ -785,7 +788,27 @@ async function disconnectWorkProvider(provider: WorkProviderKind): Promise<void>
 }
 
 async function selectWorkRepositoryForCockpit(repositoryId: string | null): Promise<void> {
-  await props.selectWorkRepository('github', repositoryId);
+  await props.configureWorkBacklog({
+    provider: 'github',
+    configuration: {
+      repositoryId,
+      tagName: null,
+    },
+  });
+  if (repositoryId) {
+    await props.loadWorkItems('github', repositoryId);
+  }
+}
+
+async function selectWorkTagForCockpit(tagName: string | null): Promise<void> {
+  const repositoryId = cockpitWorkBacklog.value?.selectedRepositoryId ?? null;
+  await props.configureWorkBacklog({
+    provider: 'github',
+    configuration: {
+      repositoryId,
+      tagName,
+    },
+  });
 }
 
 async function refreshWorkItems(repositoryId: string | null): Promise<void> {

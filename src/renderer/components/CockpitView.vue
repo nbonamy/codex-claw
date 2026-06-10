@@ -37,6 +37,7 @@
         :items="workBacklog.items"
         :repositories="workBacklog.repositories"
         :selected-repository-id="workBacklog.selectedRepositoryId"
+        :selected-tag-name="workBacklog.selectedTagName ?? null"
         :status="workBacklog.status"
         :assigned-agents-by-work-item-key="assignedAgentsByWorkItemKey"
         :assignments="workBacklog.assignments"
@@ -47,6 +48,7 @@
         @remove-assignment="emit('remove-work-item-assignment', $event)"
         @select-assigned-agent="selectAssignedAgent"
         @select-repository="emit('select-work-repository', $event)"
+        @select-tag="emit('select-work-tag', $event)"
         @work-item-drag-end="clearDraggedWorkItem"
         @work-item-drag-start="draggedWorkItem = $event"
       />
@@ -186,6 +188,7 @@ type CockpitWorkBacklog = {
   items: WorkItem[];
   repositories: WorkRepository[];
   selectedRepositoryId: string | null;
+  selectedTagName?: string | null;
   status: 'notLoaded' | 'loading' | 'loaded' | 'error';
 };
 
@@ -220,6 +223,7 @@ const emit = defineEmits<{
   'restart-agent': [agentId: string];
   'save-agent-to-bench': [agentId: string];
   'select-work-repository': [repositoryId: string | null];
+  'select-work-tag': [tagName: string | null];
   'select-agent': [payload: { agentId: string; teamId: string }];
   'select-team': [teamId: string];
 }>();

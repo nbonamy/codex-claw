@@ -216,10 +216,13 @@ describe('CockpitView', () => {
     expect(wrapper.text()).toContain('Backlog');
     expect(wrapper.text()).toContain('Fix cockpit drag target');
 
-    await wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'nbonamy/codex-claw');
+    const selects = wrapper.findAllComponents({ name: 'ElSelect' });
+    await selects[0]?.vm.$emit('update:modelValue', 'nbonamy/codex-claw');
+    await selects[1]?.vm.$emit('update:modelValue', 'bug');
     await wrapper.get('[aria-label="Refresh backlog"]').trigger('click');
 
     expect(wrapper.emitted('select-work-repository')).toStrictEqual([['nbonamy/codex-claw']]);
+    expect(wrapper.emitted('select-work-tag')).toStrictEqual([['bug']]);
     expect(wrapper.emitted('refresh-work-items')).toStrictEqual([['nbonamy/codex-claw']]);
   });
 

@@ -129,14 +129,63 @@ describe('WorkIntegrationManager', () => {
     await expect(manager.listItems('github', 'nbonamy/codex-claw')).resolves.toStrictEqual([item]);
   });
 
-  it('disconnects providers and clears selected repository state', async () => {
+  it('persists GitHub backlog provider configuration', async () => {
+    const snapshot = createInitialSnapshot();
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const manager = createManager({ snapshot, saveSnapshot });
+
+    await manager.configureBacklog({
+      provider: 'github',
+      configuration: {
+        repositoryId: ' nbonamy/codex-claw ',
+        tagName: ' bug ',
+      },
+    });
+
+    expect(snapshot.workBacklog.providerConfigurations).toStrictEqual({
+      github: {
+        repositoryId: 'nbonamy/codex-claw',
+        tagName: 'bug',
+      },
+    });
+    expect(saveSnapshot).toHaveBeenCalledOnce();
+
+    await manager.configureBacklog({
+      provider: 'github',
+      configuration: {
+        repositoryId: 'nbonamy/codex-claw',
+        tagName: null,
+      },
+    });
+
+    expect(snapshot.workBacklog.providerConfigurations).toStrictEqual({
+      github: {
+        repositoryId: 'nbonamy/codex-claw',
+      },
+    });
+
+    await manager.configureBacklog({
+      provider: 'github',
+      configuration: {
+        repositoryId: null,
+        tagName: 'bug',
+      },
+    });
+
+    expect(snapshot.workBacklog.providerConfigurations).toStrictEqual({});
+  });
+
+  it('disconnects providers and clears backlog configuration state', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.workBacklog.connections = [{
       provider: 'github',
       status: 'connected',
       accountLabel: 'nbonamy',
     }];
-    snapshot.workBacklog.selectedRepositoryIds.github = 'nbonamy/codex-claw';
+    snapshot.workBacklog.providerConfigurations.github = {
+      repositoryId: 'nbonamy/codex-claw',
+      tagName: 'bug',
+    };
     const tokenStore = new MemoryWorkIntegrationTokenStore();
     await tokenStore.set({
       provider: 'github',
@@ -155,7 +204,7 @@ describe('WorkIntegrationManager', () => {
         provider: 'github',
         status: 'disconnected',
       }],
-      selectedRepositoryIds: {},
+      providerConfigurations: {},
       providerSettings: {},
       assignments: {},
     });

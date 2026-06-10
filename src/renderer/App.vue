@@ -36,7 +36,7 @@
     :connect-work-provider="connectWorkProvider"
     :complete-work-provider-connection="completeWorkProviderConnection"
     :disconnect-work-provider="disconnectWorkProvider"
-    :select-work-repository="selectWorkRepository"
+    :configure-work-backlog="configureWorkBacklog"
     :load-work-repositories="loadWorkRepositories"
     :load-work-items="loadWorkItems"
     :quit="quit"
@@ -126,7 +126,7 @@ const {
   connectWorkProvider,
   completeWorkProviderConnection,
   disconnectWorkProvider,
-  selectWorkRepository,
+  configureWorkBacklog,
   loadWorkRepositories,
   loadWorkItems,
   assignWorkItemToAgent,

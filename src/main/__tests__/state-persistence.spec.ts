@@ -355,8 +355,11 @@ describe('AppStatePersistence', () => {
         accountLabel: 'nbonamy',
         connectedAt: '2026-06-09T12:00:00.000Z',
       }],
-      selectedRepositoryIds: {
-        github: 'nbonamy/codex-claw',
+      providerConfigurations: {
+        github: {
+          repositoryId: 'nbonamy/codex-claw',
+          tagName: 'bug',
+        },
       },
       providerSettings: {
         github: {
@@ -384,8 +387,11 @@ describe('AppStatePersistence', () => {
         accountLabel: 'nbonamy',
         connectedAt: '2026-06-09T12:00:00.000Z',
       }],
-      selectedRepositoryIds: {
-        github: 'nbonamy/codex-claw',
+      providerConfigurations: {
+        github: {
+          repositoryId: 'nbonamy/codex-claw',
+          tagName: 'bug',
+        },
       },
       providerSettings: {
         github: {
@@ -424,9 +430,14 @@ describe('AppStatePersistence', () => {
           { provider: 'jira', status: 'connected', accountLabel: 'example' },
           { provider: 'github', status: 'done' },
         ],
-        selectedRepositoryIds: {
-          github: 'nbonamy/codex-claw',
-          jira: 'TEAM-1',
+        providerConfigurations: {
+          github: {
+            repositoryId: ' nbonamy/codex-claw ',
+            tagName: ' bug ',
+          },
+          jira: {
+            repositoryId: 'TEAM-1',
+          },
         },
         providerSettings: {
           github: { oauthClientId: ' client-id ' },
@@ -455,8 +466,11 @@ describe('AppStatePersistence', () => {
         status: 'connected',
         accountLabel: 'nbonamy',
       }],
-      selectedRepositoryIds: {
-        github: 'nbonamy/codex-claw',
+      providerConfigurations: {
+        github: {
+          repositoryId: 'nbonamy/codex-claw',
+          tagName: 'bug',
+        },
       },
       providerSettings: {
         github: {

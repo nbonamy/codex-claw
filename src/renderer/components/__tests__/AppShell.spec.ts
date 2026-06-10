@@ -4,7 +4,7 @@ import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '../../../shared/snapshot';
-import type { Agent, AppCommand, AppSnapshot, CodexClawApi, CreateAgentInput, CreateTeamInput, DeployBenchTemplateInput, RendererMessage, Team, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput, WorkItem, WorkProviderKind, WorkRepository } from '../../../shared/contracts';
+import type { Agent, AppCommand, AppSnapshot, CodexClawApi, CreateAgentInput, CreateTeamInput, DeployBenchTemplateInput, RendererMessage, Team, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '../../../shared/contracts';
 import { workItemAssignmentKey } from '../../../shared/work-assignments';
 import { i18n } from '../../i18n';
 
@@ -786,7 +786,9 @@ describe('AppShell', () => {
       status: 'connected',
       accountLabel: 'nbonamy',
     }];
-    snapshot.workBacklog.selectedRepositoryIds.github = 'nbonamy/codex-claw';
+    snapshot.workBacklog.providerConfigurations.github = {
+      repositoryId: 'nbonamy/codex-claw',
+    };
     const item = workItem();
     const wrapper = mountShell({
       snapshot,
@@ -819,6 +821,58 @@ describe('AppShell', () => {
       item,
     }]]);
     expect(wrapper.emitted('remove-work-item-assignment')).toStrictEqual([[item]]);
+  });
+
+  it('persists cockpit backlog repository and tag configuration', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.connections = [{
+      provider: 'github',
+      status: 'connected',
+      accountLabel: 'nbonamy',
+    }];
+    const configureWorkBacklog = vi.fn().mockResolvedValue(undefined);
+    const loadWorkItems = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({
+      snapshot,
+      configureWorkBacklog,
+      loadWorkItems,
+      workRepositoriesByProvider: {
+        github: [{
+          provider: 'github',
+          id: 'nbonamy/codex-claw',
+          owner: 'nbonamy',
+          name: 'codex-claw',
+          fullName: 'nbonamy/codex-claw',
+          url: 'https://github.com/nbonamy/codex-claw',
+          isPrivate: true,
+        }],
+      },
+      workItemsByRepository: {
+        'github:nbonamy/codex-claw': [workItem()],
+      },
+    });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    const cockpit = wrapper.findComponent({ name: 'CockpitView' });
+    cockpit.vm.$emit('select-work-repository', 'nbonamy/codex-claw');
+    cockpit.vm.$emit('select-work-tag', 'bug');
+    await flushPromises();
+
+    expect(configureWorkBacklog).toHaveBeenNthCalledWith(1, {
+      provider: 'github',
+      configuration: {
+        repositoryId: 'nbonamy/codex-claw',
+        tagName: null,
+      },
+    });
+    expect(configureWorkBacklog).toHaveBeenNthCalledWith(2, {
+      provider: 'github',
+      configuration: {
+        repositoryId: 'nbonamy/codex-claw',
+        tagName: 'bug',
+      },
+    });
+    expect(loadWorkItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw');
   });
 
   it('confirms before assigning an already assigned cockpit work item to another agent', async () => {
@@ -1562,6 +1616,8 @@ function mountShell(overrides: Partial<{
   updateTeam: (input: UpdateTeamInput) => Promise<void>;
   updateAgent: (input: UpdateAgentInput) => Promise<void>;
   updateSettings: (input: UpdateSettingsInput) => Promise<void>;
+  configureWorkBacklog: (input: WorkBacklogConfigurationInput) => Promise<void>;
+  loadWorkItems: (provider: WorkProviderKind, repositoryId: string) => Promise<void>;
   quit: () => Promise<void>;
   workRepositoriesByProvider: Partial<Record<WorkProviderKind, WorkRepository[]>>;
   workItemsByRepository: Record<string, WorkItem[]>;
@@ -1581,6 +1637,8 @@ function mountShell(overrides: Partial<{
       updateTeam: overrides.updateTeam ?? vi.fn().mockResolvedValue(undefined),
       updateAgent: overrides.updateAgent ?? vi.fn().mockResolvedValue(undefined),
       updateSettings: overrides.updateSettings ?? vi.fn().mockResolvedValue(undefined),
+      configureWorkBacklog: overrides.configureWorkBacklog ?? vi.fn().mockResolvedValue(undefined),
+      loadWorkItems: overrides.loadWorkItems ?? vi.fn().mockResolvedValue(undefined),
       workRepositoriesByProvider: overrides.workRepositoriesByProvider ?? {},
       workItemsByRepository: overrides.workItemsByRepository ?? {},
       quit: overrides.quit ?? vi.fn().mockResolvedValue(undefined),

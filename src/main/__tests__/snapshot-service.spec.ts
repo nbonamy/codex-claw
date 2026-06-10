@@ -58,7 +58,7 @@ describe('snapshot service', () => {
           provider: 'github',
           status: 'disconnected',
         }],
-        selectedRepositoryIds: {},
+        providerConfigurations: {},
         providerSettings: {},
         assignments: {},
       },

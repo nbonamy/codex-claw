@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelMarkdownRequest, Team, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../shared/contracts';
+import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelMarkdownRequest, Team, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../shared/contracts';
 import { updateSettingsInSnapshot } from '../shared/settings';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '../shared/snapshot';
 import { defaultBackendCapabilities } from '../shared/backend-capabilities';
@@ -464,9 +464,17 @@ export function useAppState() {
       };
       workBacklogStatus.value = 'loaded';
 
-      const selectedRepositoryId = snapshot.value.workBacklog.selectedRepositoryIds[provider] ?? repositories[0]?.id ?? null;
-      if (selectedRepositoryId && !snapshot.value.workBacklog.selectedRepositoryIds[provider]) {
-        await selectWorkRepository(provider, selectedRepositoryId);
+      const configuredRepositoryId = snapshot.value.workBacklog.providerConfigurations[provider]?.repositoryId ?? null;
+      const selectedRepositoryId = configuredRepositoryId ?? repositories[0]?.id ?? null;
+      if (selectedRepositoryId && !configuredRepositoryId) {
+        await configureWorkBacklog({
+          provider,
+          configuration: {
+            repositoryId: selectedRepositoryId,
+            tagName: null,
+          },
+        });
+        await loadWorkItems(provider, selectedRepositoryId);
       } else if (selectedRepositoryId) {
         await loadWorkItems(provider, selectedRepositoryId);
       }
@@ -480,15 +488,12 @@ export function useAppState() {
     }
   }
 
-  async function selectWorkRepository(provider: WorkProviderKind, repositoryId: string | null): Promise<void> {
-    if (!window.codexClaw?.selectWorkRepository) {
+  async function configureWorkBacklog(input: WorkBacklogConfigurationInput): Promise<void> {
+    if (!window.codexClaw?.configureWorkBacklog) {
       return;
     }
 
-    snapshot.value = await window.codexClaw.selectWorkRepository(provider, repositoryId);
-    if (repositoryId) {
-      await loadWorkItems(provider, repositoryId);
-    }
+    snapshot.value = await window.codexClaw.configureWorkBacklog(input);
   }
 
   async function loadWorkItems(provider: WorkProviderKind, repositoryId: string): Promise<void> {
@@ -699,7 +704,7 @@ export function useAppState() {
     connectWorkProvider,
     completeWorkProviderConnection,
     disconnectWorkProvider,
-    selectWorkRepository,
+    configureWorkBacklog,
     assignWorkItemToAgent,
     removeWorkItemAssignment,
     duplicateAgent,
@@ -988,7 +993,17 @@ async function loadWorkRepositoriesForProvider(provider: WorkProviderKind): Prom
       ...workRepositoriesByProvider.value,
       [provider]: repositories,
     };
-    const selectedRepositoryId = snapshot.value.workBacklog.selectedRepositoryIds[provider] ?? repositories[0]?.id ?? null;
+    const configuredRepositoryId = snapshot.value.workBacklog.providerConfigurations[provider]?.repositoryId ?? null;
+    const selectedRepositoryId = configuredRepositoryId ?? repositories[0]?.id ?? null;
+    if (selectedRepositoryId && !configuredRepositoryId && window.codexClaw.configureWorkBacklog) {
+      snapshot.value = await window.codexClaw.configureWorkBacklog({
+        provider,
+        configuration: {
+          repositoryId: selectedRepositoryId,
+          tagName: null,
+        },
+      });
+    }
     if (selectedRepositoryId) {
       await loadWorkItemsForRepository(provider, selectedRepositoryId);
     }

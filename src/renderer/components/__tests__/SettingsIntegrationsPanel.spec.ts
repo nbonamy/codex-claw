@@ -52,7 +52,7 @@ describe('SettingsIntegrationsPanel', () => {
     expect(wrapper.emitted('disconnect')).toStrictEqual([['github']]);
   });
 
-  it('saves a client ID before connecting an unconfigured GitHub provider', async () => {
+  it('keeps unconfigured GitHub disabled when no client ID is saved', async () => {
     const updateSettings = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountPanel({
       connections: [{
@@ -66,21 +66,14 @@ describe('SettingsIntegrationsPanel', () => {
     const connectButton = wrapper.findAll('button').find((button) => button.text() === 'Connect');
     expect(connectButton?.attributes('disabled')).toBeDefined();
 
-    await wrapper.find('input').setValue(' client-id ');
     await connectButton?.trigger('click');
     await flushPromises();
 
-    expect(updateSettings).toHaveBeenCalledWith({
-      workProviders: {
-        github: {
-          oauthClientId: 'client-id',
-        },
-      },
-    });
-    expect(wrapper.emitted('connect')).toStrictEqual([['github']]);
+    expect(updateSettings).not.toHaveBeenCalled();
+    expect(wrapper.emitted('connect')).toBeUndefined();
   });
 
-  it('shows saved client ID without forcing a settings update on connect', async () => {
+  it('uses a saved client ID without forcing a settings update on connect', async () => {
     const updateSettings = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountPanel({
       connections: [{ provider: 'github', status: 'disconnected' }],
@@ -91,8 +84,6 @@ describe('SettingsIntegrationsPanel', () => {
       },
       updateSettings,
     });
-
-    expect((wrapper.find('input').element as HTMLInputElement).value).toBe('client-id');
 
     await wrapper.findAll('button').find((button) => button.text() === 'Connect')?.trigger('click');
     await flushPromises();

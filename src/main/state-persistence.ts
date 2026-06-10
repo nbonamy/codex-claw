@@ -316,7 +316,7 @@ function nullableString(value: unknown): string | null {
 function cloneWorkBacklogState(state: WorkBacklogState): WorkBacklogState {
   return {
     connections: state.connections.map((connection) => ({ ...connection })),
-    selectedRepositoryIds: { ...state.selectedRepositoryIds },
+    providerConfigurations: cloneWorkBacklogProviderConfigurations(state.providerConfigurations),
     providerSettings: cloneWorkProviderSettings(state.providerSettings),
     assignments: Object.fromEntries(Object.entries(state.assignments).map(([key, assignment]) => [key, { ...assignment }])),
   };
@@ -330,7 +330,6 @@ function sanitizeWorkBacklogState(value: unknown, seed: WorkBacklogState): WorkB
   const connections = Array.isArray(value.connections)
     ? value.connections.map(sanitizeWorkIntegrationConnection).filter((connection): connection is WorkIntegrationConnection => Boolean(connection))
     : [];
-  const selectedRepositoryIds = sanitizeSelectedRepositoryIds(value.selectedRepositoryIds);
   const providers = new Set<WorkProviderKind>();
   const sanitizedConnections: WorkIntegrationConnection[] = [];
 
@@ -344,7 +343,7 @@ function sanitizeWorkBacklogState(value: unknown, seed: WorkBacklogState): WorkB
 
   return {
     connections: sanitizedConnections,
-    selectedRepositoryIds,
+    providerConfigurations: sanitizeWorkBacklogProviderConfigurations(value.providerConfigurations),
     providerSettings: sanitizeWorkProviderSettings(value.providerSettings),
     assignments: sanitizeWorkBacklogAssignments(value.assignments),
   };
@@ -449,13 +448,37 @@ function sanitizeWorkIntegrationConnection(value: unknown): WorkIntegrationConne
   };
 }
 
-function sanitizeSelectedRepositoryIds(value: unknown): WorkBacklogState['selectedRepositoryIds'] {
+function cloneWorkBacklogProviderConfigurations(value: WorkBacklogState['providerConfigurations']): WorkBacklogState['providerConfigurations'] {
+  return {
+    ...(value.github ? { github: { ...value.github } } : {}),
+  };
+}
+
+function sanitizeWorkBacklogProviderConfigurations(value: unknown): WorkBacklogState['providerConfigurations'] {
   if (!isRecord(value)) {
     return {};
   }
 
+  const github = sanitizeGitHubWorkBacklogConfiguration(value.github);
   return {
-    ...(typeof value.github === 'string' ? { github: value.github } : {}),
+    ...(github ? { github } : {}),
+  };
+}
+
+function sanitizeGitHubWorkBacklogConfiguration(value: unknown): WorkBacklogState['providerConfigurations']['github'] | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const repositoryId = optionalTrimmedString(value.repositoryId);
+  if (!repositoryId) {
+    return null;
+  }
+  const tagName = optionalTrimmedString(value.tagName);
+
+  return {
+    repositoryId,
+    ...(tagName ? { tagName } : {}),
   };
 }
 
@@ -481,8 +504,17 @@ function sanitizeWorkProviderSetting(value: unknown): WorkProviderSettings | nul
     return null;
   }
 
-  const oauthClientId = typeof value.oauthClientId === 'string' ? value.oauthClientId.trim() : '';
+  const oauthClientId = optionalTrimmedString(value.oauthClientId) ?? '';
   return oauthClientId ? { oauthClientId } : null;
+}
+
+function optionalTrimmedString(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
 }
 
 function isWorkProvider(value: unknown): value is WorkProviderKind {

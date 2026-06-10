@@ -197,7 +197,9 @@ describe('useAppState', () => {
     }];
     const selectedSnapshot = createInitialSnapshot();
     selectedSnapshot.workBacklog.connections = connectedSnapshot.workBacklog.connections;
-    selectedSnapshot.workBacklog.selectedRepositoryIds.github = 'nbonamy/codex-claw';
+    selectedSnapshot.workBacklog.providerConfigurations.github = {
+      repositoryId: 'nbonamy/codex-claw',
+    };
     const repository = workRepository();
     const item = workItem();
     const connectWorkProvider = vi.fn().mockResolvedValue({
@@ -211,14 +213,14 @@ describe('useAppState', () => {
     });
     const completeWorkProviderConnection = vi.fn().mockResolvedValue(connectedSnapshot);
     const listWorkRepositories = vi.fn().mockResolvedValue([repository]);
-    const selectWorkRepository = vi.fn().mockResolvedValue(selectedSnapshot);
+    const configureWorkBacklog = vi.fn().mockResolvedValue(selectedSnapshot);
     const listWorkItems = vi.fn().mockResolvedValue([item]);
     vi.stubGlobal('window', {
       codexClaw: {
         connectWorkProvider,
         completeWorkProviderConnection,
         listWorkRepositories,
-        selectWorkRepository,
+        configureWorkBacklog,
         listWorkItems,
       } satisfies Partial<CodexClawApi>,
     });
@@ -234,7 +236,13 @@ describe('useAppState', () => {
 
     expect(completeWorkProviderConnection).toHaveBeenCalledWith('github');
     expect(listWorkRepositories).toHaveBeenCalledWith('github');
-    expect(selectWorkRepository).toHaveBeenCalledWith('github', 'nbonamy/codex-claw');
+    expect(configureWorkBacklog).toHaveBeenCalledWith({
+      provider: 'github',
+      configuration: {
+        repositoryId: 'nbonamy/codex-claw',
+        tagName: null,
+      },
+    });
     expect(listWorkItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw');
     expect(state.workProviderAuthorization.value).toBeNull();
     expect(state.workRepositoriesByProvider.value.github).toStrictEqual([repository]);
@@ -339,7 +347,13 @@ describe('useAppState', () => {
     await state.completeWorkProviderConnection('github');
     await state.disconnectWorkProvider('github');
     await state.loadWorkRepositories('github');
-    await state.selectWorkRepository('github', null);
+    await state.configureWorkBacklog({
+      provider: 'github',
+      configuration: {
+        repositoryId: null,
+        tagName: null,
+      },
+    });
     await state.loadWorkItems('github', '');
 
     expect(state.workBacklogStatus.value).toBe('notLoaded');
@@ -440,19 +454,22 @@ describe('useAppState', () => {
       status: 'connected',
       accountLabel: 'nbonamy',
     }];
-    connectedSnapshot.workBacklog.selectedRepositoryIds.github = 'nbonamy/codex-claw';
+    connectedSnapshot.workBacklog.providerConfigurations.github = {
+      repositoryId: 'nbonamy/codex-claw',
+      tagName: 'bug',
+    };
     const disconnectedSnapshot = createInitialSnapshot();
     disconnectedSnapshot.workBacklog.connections = [{
       provider: 'github',
       status: 'disconnected',
     }];
     const disconnectWorkProvider = vi.fn().mockResolvedValue(disconnectedSnapshot);
-    const selectWorkRepository = vi.fn().mockResolvedValue(disconnectedSnapshot);
+    const configureWorkBacklog = vi.fn().mockResolvedValue(disconnectedSnapshot);
     const listWorkItems = vi.fn();
     vi.stubGlobal('window', {
       codexClaw: {
         disconnectWorkProvider,
-        selectWorkRepository,
+        configureWorkBacklog,
         listWorkItems,
       } satisfies Partial<CodexClawApi>,
     });
@@ -467,10 +484,22 @@ describe('useAppState', () => {
     state.workRepositoriesByProvider.value = { github: [workRepository()] };
     state.workItemsByRepository.value = { 'github:nbonamy/codex-claw': [workItem()] };
 
-    await state.selectWorkRepository('github', null);
+    await state.configureWorkBacklog({
+      provider: 'github',
+      configuration: {
+        repositoryId: null,
+        tagName: null,
+      },
+    });
     await state.disconnectWorkProvider('github');
 
-    expect(selectWorkRepository).toHaveBeenCalledWith('github', null);
+    expect(configureWorkBacklog).toHaveBeenCalledWith({
+      provider: 'github',
+      configuration: {
+        repositoryId: null,
+        tagName: null,
+      },
+    });
     expect(listWorkItems).not.toHaveBeenCalled();
     expect(disconnectWorkProvider).toHaveBeenCalledWith('github');
     expect(state.workProviderAuthorization.value).toBeNull();
@@ -486,17 +515,19 @@ describe('useAppState', () => {
       status: 'connected',
       accountLabel: 'nbonamy',
     }];
-    snapshot.workBacklog.selectedRepositoryIds.github = 'nbonamy/codex-claw';
+    snapshot.workBacklog.providerConfigurations.github = {
+      repositoryId: 'nbonamy/codex-claw',
+    };
     const listWorkRepositories = vi.fn()
       .mockResolvedValueOnce([workRepository()])
       .mockResolvedValueOnce([]);
     const listWorkItems = vi.fn().mockResolvedValue([workItem()]);
-    const selectWorkRepository = vi.fn();
+    const configureWorkBacklog = vi.fn();
     vi.stubGlobal('window', {
       codexClaw: {
         listWorkRepositories,
         listWorkItems,
-        selectWorkRepository,
+        configureWorkBacklog,
       } satisfies Partial<CodexClawApi>,
     });
     const state = useAppState();
@@ -504,9 +535,9 @@ describe('useAppState', () => {
 
     await state.loadWorkRepositories('github');
     expect(listWorkItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw');
-    expect(selectWorkRepository).not.toHaveBeenCalled();
+    expect(configureWorkBacklog).not.toHaveBeenCalled();
 
-    delete state.snapshot.value.workBacklog.selectedRepositoryIds.github;
+    delete state.snapshot.value.workBacklog.providerConfigurations.github;
     await state.loadWorkRepositories('github');
     expect(state.workRepositoriesByProvider.value.github).toStrictEqual([]);
   });

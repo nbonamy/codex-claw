@@ -157,9 +157,28 @@ export type WorkBacklogAssignment = {
   completedAt?: string;
 };
 
+export type GitHubWorkBacklogConfiguration = {
+  repositoryId?: string;
+  tagName?: string;
+};
+
+export type GitHubWorkBacklogConfigurationInput = {
+  repositoryId?: string | null;
+  tagName?: string | null;
+};
+
+export type WorkBacklogProviderConfigurations = {
+  github?: GitHubWorkBacklogConfiguration;
+};
+
+export type WorkBacklogConfigurationInput = {
+  provider: 'github';
+  configuration: GitHubWorkBacklogConfigurationInput;
+};
+
 export type WorkBacklogState = {
   connections: WorkIntegrationConnection[];
-  selectedRepositoryIds: Partial<Record<WorkProviderKind, string>>;
+  providerConfigurations: WorkBacklogProviderConfigurations;
   providerSettings: Partial<Record<WorkProviderKind, WorkProviderSettings>>;
   assignments: Record<string, WorkBacklogAssignment>;
 };
@@ -584,7 +603,7 @@ export type CodexClawApi = {
   completeWorkProviderConnection(provider: WorkProviderKind): Promise<AppSnapshot>;
   disconnectWorkProvider(provider: WorkProviderKind): Promise<AppSnapshot>;
   listWorkRepositories(provider: WorkProviderKind): Promise<WorkRepository[]>;
-  selectWorkRepository(provider: WorkProviderKind, repositoryId: string | null): Promise<AppSnapshot>;
+  configureWorkBacklog(input: WorkBacklogConfigurationInput): Promise<AppSnapshot>;
   listWorkItems(provider: WorkProviderKind, repositoryId: string): Promise<WorkItem[]>;
   listBackendModels(agentId: string): Promise<BackendModelOption[]>;
   listBackendSkills(agentId: string): Promise<BackendSkillSummary[]>;

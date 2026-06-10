@@ -9,7 +9,7 @@ describe('ipc channels', () => {
       completeWorkProviderConnection: 'work-provider:connection-complete',
       disconnectWorkProvider: 'work-provider:disconnect',
       listWorkRepositories: 'work-provider:repositories:list',
-      selectWorkRepository: 'work-provider:repository:select',
+      configureWorkBacklog: 'work-provider:backlog:configure',
       listWorkItems: 'work-provider:items:list',
       listBackendModels: 'backend:models:list',
       listBackendSkills: 'backend:skills:list',

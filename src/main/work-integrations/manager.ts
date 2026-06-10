@@ -1,4 +1,4 @@
-import type { AppSnapshot, WorkIntegrationConnection, WorkItem, WorkProviderAuthorization, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '../../shared/contracts';
+import type { AppSnapshot, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkProviderAuthorization, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '../../shared/contracts';
 import type { WorkIntegrationTokenStore, WorkProviderToken } from './token-store';
 import type { WorkProviderDeviceAuthorization, WorkProviderDriver } from './types';
 
@@ -182,7 +182,7 @@ export class WorkIntegrationManager {
   async disconnect(provider: WorkProviderKind): Promise<AppSnapshot> {
     this.pendingAuthorizations.delete(provider);
     await this.options.tokenStore.delete(provider);
-    delete this.snapshot().workBacklog.selectedRepositoryIds[provider];
+    delete this.snapshot().workBacklog.providerConfigurations[provider];
     this.setConnection({
       provider,
       status: this.driver(provider).configured() ? 'disconnected' : 'notConfigured',
@@ -196,11 +196,20 @@ export class WorkIntegrationManager {
     return this.driver(provider).listRepositories(token);
   }
 
-  async selectRepository(provider: WorkProviderKind, repositoryId: string | null): Promise<AppSnapshot> {
-    if (repositoryId) {
-      this.snapshot().workBacklog.selectedRepositoryIds[provider] = repositoryId;
+  async configureBacklog(input: WorkBacklogConfigurationInput): Promise<AppSnapshot> {
+    if (input.provider === 'github') {
+      const repositoryId = normalizedOptionalString(input.configuration.repositoryId);
+      if (repositoryId) {
+        const tagName = normalizedOptionalString(input.configuration.tagName);
+        this.snapshot().workBacklog.providerConfigurations.github = {
+          repositoryId,
+          ...(tagName ? { tagName } : {}),
+        };
+      } else {
+        delete this.snapshot().workBacklog.providerConfigurations.github;
+      }
     } else {
-      delete this.snapshot().workBacklog.selectedRepositoryIds[provider];
+      input.provider satisfies never;
     }
     await this.options.saveSnapshot();
     return this.snapshot();
@@ -254,6 +263,11 @@ export class WorkIntegrationManager {
     snapshot.workBacklog.connections[index] = connection;
     return true;
   }
+}
+
+function normalizedOptionalString(value: string | null | undefined): string | null {
+  const trimmed = typeof value === 'string' ? value.trim() : '';
+  return trimmed ? trimmed : null;
 }
 
 function publicAuthorization(authorization: WorkProviderDeviceAuthorization): WorkProviderAuthorization {

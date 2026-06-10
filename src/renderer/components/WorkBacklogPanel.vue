@@ -22,22 +22,42 @@
       </button>
     </header>
 
-    <el-select
-      class="work-backlog-panel__repo-select"
-      :model-value="selectedRepositoryId"
-      placeholder="Select repo"
-      :disabled="repositories.length === 0"
-      filterable
-      aria-label="Backlog repository"
-      @update:model-value="selectRepository"
-    >
-      <el-option
-        v-for="repository in sortedRepositories"
-        :key="repository.id"
-        :label="repository.fullName"
-        :value="repository.id"
-      />
-    </el-select>
+    <div class="work-backlog-panel__filters">
+      <el-select
+        class="work-backlog-panel__select"
+        :model-value="selectedRepositoryId"
+        placeholder="Select repo"
+        :disabled="repositories.length === 0"
+        filterable
+        aria-label="Backlog repository"
+        @update:model-value="selectRepository"
+      >
+        <el-option
+          v-for="repository in sortedRepositories"
+          :key="repository.id"
+          :label="repository.fullName"
+          :value="repository.id"
+        />
+      </el-select>
+
+      <el-select
+        class="work-backlog-panel__select"
+        :model-value="selectedTagName"
+        placeholder="All tags"
+        :disabled="!selectedRepositoryId || tagOptions.length === 0"
+        clearable
+        filterable
+        aria-label="Backlog tag"
+        @update:model-value="selectTag"
+      >
+        <el-option
+          v-for="tag in tagOptions"
+          :key="tag"
+          :label="tag"
+          :value="tag"
+        />
+      </el-select>
+    </div>
 
     <div
       v-if="status === 'loading'"
@@ -63,6 +83,12 @@
     >
       No open issues
     </div>
+    <div
+      v-else-if="itemRows.length === 0"
+      class="work-backlog-panel__state"
+    >
+      No issues with this tag
+    </div>
 
     <div
       v-else
@@ -87,8 +113,8 @@
           placement="bottom-end"
           trigger="manual"
           width="220"
-          :teleported="false"
-          popper-class="work-backlog-panel__menu-popover"
+          :teleported="true"
+          popper-class="claw-popover work-backlog-panel__menu-popover"
           @update:visible="setMenuVisible(row.item.id, $event)"
         >
           <template #reference>
@@ -167,11 +193,13 @@ const props = withDefaults(defineProps<{
   items: WorkItem[];
   repositories: WorkRepository[];
   selectedRepositoryId: string | null;
+  selectedTagName?: string | null;
   status: 'notLoaded' | 'loading' | 'loaded' | 'error';
 }>(), {
   assignedAgentsByWorkItemKey: () => ({}),
   assignments: () => ({}),
   canAssignToBench: true,
+  selectedTagName: null,
 });
 
 const emit = defineEmits<{
@@ -181,15 +209,35 @@ const emit = defineEmits<{
   'remove-assignment': [item: WorkItem];
   'select-assigned-agent': [agentId: string];
   'select-repository': [repositoryId: string | null];
+  'select-tag': [tagName: string | null];
   'work-item-drag-end': [];
   'work-item-drag-start': [item: WorkItem];
 }>();
 
 const openMenuItemId = ref<string | null>(null);
+const integrationLabel = computed(() => workProviderLabel(props.connection.provider));
 const sortedRepositories = computed<WorkRepository[]>(() => [...props.repositories].sort((left, right) => (
   left.fullName.localeCompare(right.fullName) || left.id.localeCompare(right.id)
 )));
-const itemRows = computed<WorkBacklogItemRow[]>(() => props.items.map((item) => {
+const tagOptions = computed<string[]>(() => {
+  const tags = new Set<string>();
+  for (const item of props.items) {
+    for (const label of item.labels) {
+      if (label.name) {
+        tags.add(label.name);
+      }
+    }
+  }
+  return [...tags].sort((left, right) => left.localeCompare(right));
+});
+const filteredItems = computed<WorkItem[]>(() => {
+  const selectedTagName = props.selectedTagName;
+  if (!selectedTagName) {
+    return props.items;
+  }
+  return props.items.filter((item) => item.labels.some((label) => label.name === selectedTagName));
+});
+const itemRows = computed<WorkBacklogItemRow[]>(() => filteredItems.value.map((item) => {
   const assignmentKey = workItemAssignmentKey(item);
   const assignedAgent = props.assignedAgentsByWorkItemKey[assignmentKey] ?? null;
   return {
@@ -222,24 +270,32 @@ function menuItemsForRow(row: WorkBacklogItemRow): AppMenuItem[] {
       icon: SaveToBenchIcon,
       disabled: !props.canAssignToBench,
     },
-    ...(row.assignedAgent ? [{
-      id: 'remove-assignment',
-      type: 'action',
-      label: 'Remove Assignment',
-      icon: CircleXIcon,
-    } satisfies AppMenuItem] : []),
-    { id: 'group-open', type: 'separator' },
+    { id: 'group-view', type: 'separator' },
     {
       id: 'open',
       type: 'action',
-      label: 'Open',
+      label: `View on ${integrationLabel.value}`,
       icon: ExternalLinkIcon,
     },
+    ...(row.assignedAgent ? [
+      { id: 'group-reset', type: 'separator' } satisfies AppMenuItem,
+      {
+        id: 'reset-assignment',
+        type: 'action',
+        label: 'Reset',
+        icon: CircleXIcon,
+        danger: true,
+      } satisfies AppMenuItem,
+    ] : []),
   ];
 }
 
 function selectRepository(value: string | number | boolean | Record<string, unknown> | null | undefined): void {
   emit('select-repository', typeof value === 'string' ? value : null);
+}
+
+function selectTag(value: string | number | boolean | Record<string, unknown> | null | undefined): void {
+  emit('select-tag', typeof value === 'string' ? value : null);
 }
 
 function setMenuVisible(itemId: string, visible: boolean): void {
@@ -256,7 +312,7 @@ function selectMenuItem(item: WorkItem, itemId: string): void {
     emit('assign-to-new-agent', item);
   } else if (itemId === 'assign-to-bench' && props.canAssignToBench) {
     emit('assign-to-bench-agent', item);
-  } else if (itemId === 'remove-assignment') {
+  } else if (itemId === 'reset-assignment') {
     emit('remove-assignment', item);
   } else if (itemId === 'open') {
     window.open(item.url, '_blank', 'noreferrer');
@@ -278,6 +334,14 @@ function startDrag(event: DragEvent, item: WorkItem): void {
 
 function endDrag(): void {
   emit('work-item-drag-end');
+}
+
+function workProviderLabel(provider: WorkIntegrationConnection['provider']): string {
+  if (provider === 'github') {
+    return 'GitHub';
+  }
+  provider satisfies never;
+  return 'Integration';
 }
 </script>
 
@@ -366,7 +430,12 @@ function endDrag(): void {
   height: var(--icon-sm);
 }
 
-.work-backlog-panel__repo-select {
+.work-backlog-panel__filters {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.work-backlog-panel__select {
   width: 100%;
 }
 

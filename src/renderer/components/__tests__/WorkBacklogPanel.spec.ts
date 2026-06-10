@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
+import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Agent, WorkItem, WorkRepository } from '../../../shared/contracts';
 import { workItemAssignmentKey } from '../../../shared/work-assignments';
@@ -7,6 +8,7 @@ import WorkBacklogPanel from '../WorkBacklogPanel.vue';
 
 describe('WorkBacklogPanel', () => {
   afterEach(() => {
+    document.body.innerHTML = '';
     vi.restoreAllMocks();
   });
 
@@ -25,12 +27,15 @@ describe('WorkBacklogPanel', () => {
       selectedRepositoryId: 'nbonamy/codex-claw',
     });
 
-    await wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'nbonamy/codex-claw');
+    const selects = wrapper.findAllComponents({ name: 'ElSelect' });
+    await selects[0]?.vm.$emit('update:modelValue', 'nbonamy/codex-claw');
+    await selects[1]?.vm.$emit('update:modelValue', 'bug');
     await wrapper.get('[aria-label="Refresh backlog"]').trigger('click');
     wrapper.get('.work-backlog-panel__item').element.dispatchEvent(dragEvent('dragstart'));
     await wrapper.get('.work-backlog-panel__item').trigger('dragend');
 
     expect(wrapper.emitted('select-repository')).toStrictEqual([['nbonamy/codex-claw']]);
+    expect(wrapper.emitted('select-tag')).toStrictEqual([['bug']]);
     expect(wrapper.emitted('refresh')).toStrictEqual([['nbonamy/codex-claw']]);
     expect(wrapper.emitted('work-item-drag-start')).toStrictEqual([[item]]);
     expect(wrapper.emitted('work-item-drag-end')).toStrictEqual([[]]);
@@ -46,6 +51,7 @@ describe('WorkBacklogPanel', () => {
 
   it('renders the repository selector as searchable and sorted alphabetically', () => {
     const wrapper = mountPanel({
+      items: [],
       repositories: [
         workRepository({ id: 'zeta/api', fullName: 'zeta/api', name: 'api', owner: 'zeta' }),
         workRepository({ id: 'alpha/web', fullName: 'alpha/web', name: 'web', owner: 'alpha' }),
@@ -53,12 +59,53 @@ describe('WorkBacklogPanel', () => {
       ],
     });
 
-    expect(wrapper.getComponent({ name: 'ElSelect' }).props('filterable')).toBe(true);
+    expect(wrapper.findAllComponents({ name: 'ElSelect' })[0]?.props('filterable')).toBe(true);
     expect(wrapper.findAllComponents({ name: 'ElOption' }).map((option) => option.props('label'))).toStrictEqual([
       'alpha/app',
       'alpha/web',
       'zeta/api',
     ]);
+  });
+
+  it('renders the tag selector as searchable, clearable, and sorted alphabetically', () => {
+    const wrapper = mountPanel({
+      items: [
+        workItem({ labels: [{ name: 'zeta' }, { name: 'bug' }] }),
+        workItem({ id: 'nbonamy/codex-claw#13', number: 13, title: 'Document filters', labels: [{ name: 'alpha' }, { name: 'bug' }] }),
+      ],
+      repositories: [],
+    });
+    const tagSelect = wrapper.findAllComponents({ name: 'ElSelect' })[1];
+
+    expect(tagSelect?.props('filterable')).toBe(true);
+    expect(tagSelect?.props('clearable')).toBe(true);
+    expect(wrapper.findAllComponents({ name: 'ElOption' }).map((option) => option.props('label'))).toStrictEqual([
+      'alpha',
+      'bug',
+      'zeta',
+    ]);
+  });
+
+  it('filters issue cards by the selected tag', () => {
+    const wrapper = mountPanel({
+      selectedTagName: 'docs',
+      items: [
+        workItem({ labels: [{ name: 'bug' }] }),
+        workItem({ id: 'nbonamy/codex-claw#13', number: 13, title: 'Document backlog filters', labels: [{ name: 'docs' }] }),
+      ],
+    });
+
+    expect(wrapper.text()).toContain('Document backlog filters');
+    expect(wrapper.text()).not.toContain('Fix cockpit drag target');
+  });
+
+  it('shows an empty filter state when the selected tag has no issues', () => {
+    const wrapper = mountPanel({
+      selectedTagName: 'docs',
+      items: [workItem({ labels: [{ name: 'bug' }] })],
+    });
+
+    expect(wrapper.text()).toContain('No issues with this tag');
   });
 
   it('does not repeat the selected repository name on issue cards', () => {
@@ -124,18 +171,24 @@ describe('WorkBacklogPanel', () => {
       items: [workItem()],
     });
 
-    await wrapper.get('[aria-label="Issue #12 actions"]').trigger('click');
+    expect(wrapper.getComponent({ name: 'ElPopover' }).props('popperClass')).toBe('claw-popover work-backlog-panel__menu-popover');
 
-    expect(wrapper.text()).toContain('Assign to New Agent');
-    expect(wrapper.text()).toContain('Assign to Bench Agent');
-    expect(wrapper.text()).not.toContain('Remove Assignment');
-    expect(wrapper.text()).toContain('Open');
+    await wrapper.get('[aria-label="Issue #12 actions"]').trigger('click');
+    await nextTick();
 
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Assign to New Agent')?.trigger('click');
+    expect(menuText()).toContain('Assign to New Agent');
+    expect(menuText()).toContain('Assign to Bench Agent');
+    expect(menuText()).not.toContain('Remove Assignment');
+    expect(menuText()).not.toContain('Reset');
+    expect(menuText()).toContain('View on GitHub');
+    expect(menuTextIndex('Assign to New Agent')).toBeLessThan(menuTextIndex('Assign to Bench Agent'));
+    expect(menuTextIndex('Assign to Bench Agent')).toBeLessThan(menuTextIndex('View on GitHub'));
+
+    await clickMenuItem('Assign to New Agent');
     await wrapper.get('[aria-label="Issue #12 actions"]').trigger('click');
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Assign to Bench Agent')?.trigger('click');
+    await clickMenuItem('Assign to Bench Agent');
     await wrapper.get('[aria-label="Issue #12 actions"]').trigger('click');
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Open')?.trigger('click');
+    await clickMenuItem('View on GitHub');
 
     expect(wrapper.emitted('assign-to-new-agent')).toStrictEqual([[workItem()]]);
     expect(wrapper.emitted('assign-to-bench-agent')).toStrictEqual([[workItem()]]);
@@ -149,16 +202,17 @@ describe('WorkBacklogPanel', () => {
     });
 
     await wrapper.get('.work-backlog-panel__item').trigger('contextmenu');
+    await nextTick();
 
-    expect(wrapper.text()).toContain('Assign to New Agent');
-    expect(wrapper.text()).toContain('Assign to Bench Agent');
+    expect(menuText()).toContain('Assign to New Agent');
+    expect(menuText()).toContain('Assign to Bench Agent');
 
-    await wrapper.findAll('[role="menuitem"]').find((menuItem) => menuItem.text() === 'Assign to New Agent')?.trigger('click');
+    await clickMenuItem('Assign to New Agent');
 
     expect(wrapper.emitted('assign-to-new-agent')).toStrictEqual([[item]]);
   });
 
-  it('routes remove assignment from assigned issue actions', async () => {
+  it('routes reset from assigned issue actions as a danger action', async () => {
     const item = workItem();
     const wrapper = mountPanel({
       assignedAgentsByWorkItemKey: {
@@ -168,10 +222,15 @@ describe('WorkBacklogPanel', () => {
     });
 
     await wrapper.get('[aria-label="Issue #12 actions"]').trigger('click');
+    await nextTick();
 
-    expect(wrapper.text()).toContain('Remove Assignment');
+    expect(menuText()).toContain('Reset');
+    expect(document.body.querySelector('.app-menu__item--danger')?.textContent).toContain('Reset');
+    expect(menuTextIndex('Assign to New Agent')).toBeLessThan(menuTextIndex('Assign to Bench Agent'));
+    expect(menuTextIndex('Assign to Bench Agent')).toBeLessThan(menuTextIndex('View on GitHub'));
+    expect(menuTextIndex('View on GitHub')).toBeLessThan(menuTextIndex('Reset'));
 
-    await wrapper.findAll('[role="menuitem"]').find((menuItem) => menuItem.text() === 'Remove Assignment')?.trigger('click');
+    await clickMenuItem('Reset');
 
     expect(wrapper.emitted('remove-assignment')).toStrictEqual([[item]]);
     expect(wrapper.emitted('select-assigned-agent')).toBeUndefined();
@@ -184,7 +243,7 @@ describe('WorkBacklogPanel', () => {
     });
 
     await wrapper.get('[aria-label="Issue #12 actions"]').trigger('click');
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Assign to Bench Agent')?.trigger('click');
+    await clickMenuItem('Assign to Bench Agent');
 
     expect(wrapper.emitted('assign-to-bench-agent')).toBeUndefined();
   });
@@ -209,6 +268,25 @@ function mountPanel(props: Record<string, unknown> = {}) {
       plugins: [ElementPlus],
     },
   });
+}
+
+function menuText(): string {
+  return document.body.textContent ?? '';
+}
+
+function menuTextIndex(label: string): number {
+  return menuText().indexOf(label);
+}
+
+async function clickMenuItem(label: string): Promise<void> {
+  const item = Array.from(document.body.querySelectorAll<HTMLElement>('[role="menuitem"]'))
+    .find((element) => {
+      const text = element.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+      return text === label || text.startsWith(`${label} `);
+    });
+  expect(item).toBeTruthy();
+  item?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  await nextTick();
 }
 
 function workRepository(overrides: Partial<WorkRepository> = {}): WorkRepository {
@@ -239,7 +317,7 @@ function assignedAgent(): Agent {
   };
 }
 
-function workItem(): WorkItem {
+function workItem(overrides: Partial<WorkItem> = {}): WorkItem {
   return {
     provider: 'github',
     id: 'nbonamy/codex-claw#12',
@@ -252,6 +330,7 @@ function workItem(): WorkItem {
     labels: [{ name: 'bug' }],
     createdAt: '2026-06-09T12:00:00.000Z',
     updatedAt: '2026-06-09T12:30:00.000Z',
+    ...overrides,
   };
 }
 

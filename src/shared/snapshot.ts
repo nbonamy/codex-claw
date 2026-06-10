@@ -88,7 +88,7 @@ function createDefaultWorkBacklogState(): AppSnapshot['workBacklog'] {
       provider: 'github',
       status: 'disconnected',
     }],
-    selectedRepositoryIds: {},
+    providerConfigurations: {},
     providerSettings: {},
     assignments: {},
   };

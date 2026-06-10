@@ -539,9 +539,11 @@ contracts and emits assignment intents. GitHub-specific OAuth, REST payloads,
 and token handling stay in Electron main behind the work-integration manager.
 
 Provider tokens must not be stored in the persisted app snapshot. The snapshot
-can persist safe metadata such as connection status, account label, and selected
-repository id. Secret material belongs in the main-process token store, using
-Electron encrypted storage when available.
+can persist safe metadata such as connection status, account label, and
+provider-specific backlog configuration. GitHub currently stores the selected
+repository id and optional tag name as its backlog configuration. Secret
+material belongs in the main-process token store, using Electron encrypted
+storage when available.
 
 GitHub uses OAuth device flow for the desktop app. It requires a public client
 ID but no client secret or localhost callback route. The main process reads
@@ -556,8 +558,9 @@ state is local and provider-neutral: newly assigned items are `working`, and
 agents mark them `completed` through the `mark-work-item-completed` Claw MCP
 tool using the exact work item id from that prompt. Assigning the same work
 item to another agent overwrites that key and resets it to `working`. If the
-stored agent id no longer exists, the ticket is treated as unassigned. Removing
-an assignment clears only Codex Claw's local backlog metadata.
+stored agent id no longer exists, the ticket is treated as unassigned. Resetting
+an assignment clears Codex Claw's local assignment metadata and its local
+working/completed state.
 Future provider-specific actions, such as claiming tickets, commenting, or
 changing status, should be added behind the work-provider seam without changing
 cockpit tiles into provider-aware UI.
