@@ -634,7 +634,7 @@ function summaryLabel(status: AgentStatus['type'], count: number): string {
 }
 
 .cockpit-view__grid {
-  --cockpit-tile-width: 360px;
+  --cockpit-tile-width: 320px;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--cockpit-tile-width)), var(--cockpit-tile-width)));
   gap: var(--space-12);

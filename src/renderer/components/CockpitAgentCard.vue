@@ -32,7 +32,6 @@
 
     <div class="cockpit-view__agent-body">
       <strong>{{ agentStatusText(agent) }}</strong>
-      <span>{{ agent.backend }}</span>
     </div>
 
     <form
@@ -175,15 +174,14 @@ function dropWorkItem(event: DragEvent): void {
 
 <style scoped>
 .cockpit-view__agent-card {
-  width: min(100%, 360px);
-  min-height: 172px;
+  width: min(100%, 320px);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--color-surface-low) 70%, transparent);
-  display: grid;
-  grid-template-rows: auto 1fr auto;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-8);
-  padding: var(--space-10);
+  padding: var(--space-8);
   text-align: left;
   cursor: pointer;
 }
