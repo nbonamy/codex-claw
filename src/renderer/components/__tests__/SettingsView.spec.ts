@@ -26,7 +26,7 @@ describe('SettingsView', () => {
     expect(updateSettings).toHaveBeenCalledWith({ theme: { chatFontSize: 17 } });
   });
 
-  it('keeps the empty general tab reachable', async () => {
+  it('keeps the general permissions tab reachable', async () => {
     const wrapper = mount(SettingsView, {
       props: {
         settings: defaultThemeSettings,
@@ -38,6 +38,7 @@ describe('SettingsView', () => {
 
     await wrapper.findAll('.el-menu-item').find((item) => item.text() === 'General')?.trigger('click');
 
-    expect(wrapper.text()).toContain('No general settings yet.');
+    expect(wrapper.text()).toContain('System permissions');
+    expect(wrapper.text()).toContain('Accessibility');
   });
 });

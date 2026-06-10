@@ -31,6 +31,8 @@ export const ipcChannels = {
   selectAgent: 'agent:select',
   selectAgentFolder: 'agent:select-folder',
   updateSettings: 'settings:update',
+  getSystemPermissions: 'system-permissions:get',
+  openAccessibilitySettings: 'system-permissions:accessibility:open',
   transcribeAppleSpeech: 'transcription:apple-speech',
   quit: 'app:quit',
   setAgentGoal: 'agent:goal:set',

@@ -14,6 +14,7 @@ import { ClawMcpAgentCoordinator } from './mcp/agent-coordinator';
 import { CHECK_INBOX_PROMPT } from './mcp/agent-prompts';
 import { buildCodexClawMcpConfigOverrides } from './mcp/codex-config';
 import { ClawMcpHttpServer } from './mcp/http-server';
+import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-permissions';
 import { transcribeWithAppleSpeechAnalyzer } from './transcription/apple-speech';
 import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
 import { WorkIntegrationManager } from './work-integrations/manager';
@@ -342,6 +343,10 @@ export class AppController {
       await this.persistSnapshot();
       return this.snapshot;
     });
+
+    ipcMain.handle(ipcChannels.getSystemPermissions, () => getSystemPermissionsStatus());
+
+    ipcMain.handle(ipcChannels.openAccessibilitySettings, () => openAccessibilitySettings());
 
     ipcMain.handle(ipcChannels.transcribeAppleSpeech, async (_event, audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions) => {
       return transcribeWithAppleSpeechAnalyzer(Buffer.from(audioData), options, {

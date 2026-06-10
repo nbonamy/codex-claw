@@ -371,6 +371,14 @@ export type AppleSpeechTranscriptionResult = {
   error?: string;
 };
 
+export type SystemPermissionsStatus = {
+  platform: string;
+  accessibility: {
+    required: boolean;
+    trusted: boolean;
+  };
+};
+
 export type UpdateSettingsInput = {
   theme?: Partial<AppThemeSettings>;
   workProviders?: Partial<Record<WorkProviderKind, WorkProviderSettings>>;
@@ -630,6 +638,8 @@ export type CodexClawApi = {
   selectAgent(agentId: string): Promise<AppSnapshot>;
   selectAgentFolder(agentId: string): Promise<AppSnapshot | null>;
   updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>;
+  getSystemPermissions(): Promise<SystemPermissionsStatus>;
+  openAccessibilitySettings(): Promise<SystemPermissionsStatus>;
   transcribeAppleSpeech(audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions): Promise<AppleSpeechTranscriptionResult>;
   quit(): Promise<void>;
   setAgentGoal(agentId: string, objective: string): Promise<AppSnapshot>;
