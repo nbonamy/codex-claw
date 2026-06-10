@@ -30,6 +30,7 @@ import {
   completeWorkItemAssignmentInSnapshot,
   deployBenchTemplateInSnapshot,
   duplicateAgentInSnapshot,
+  markWorkItemCompletionInstructionsDeliveredInSnapshot,
   moveAgentToTeamInSnapshot,
   removeBenchTemplateFromSnapshot,
   removeWorkItemAssignmentFromSnapshot,
@@ -49,7 +50,7 @@ import {
   updateAgentFolder,
 } from './snapshot-service';
 import { AppStatePersistence } from './state-persistence';
-import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkProviderKind } from '../shared/contracts';
+import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogAssignment, WorkBacklogConfigurationInput, WorkProviderKind } from '../shared/contracts';
 import { codexBackendDefaultsWithApprovalPreset, isCodexApprovalPreset } from '../shared/codex-approval-presets';
 import { ipcChannels } from '../shared/ipc';
 import { teamColors } from '../shared/team-colors';
@@ -60,6 +61,17 @@ import { formatConversationTitle } from './backends/conversation-title';
 import { McpToolError, type DisplayMarkdownInput, type DisplayMarkdownResponse, type MarkWorkItemCompletedResponse } from './mcp/agent-coordinator';
 
 const MAX_AGENT_FILE_READ_BYTES = 2 * 1024 * 1024;
+
+function completionInstructionsResponse(workItemId: string, instructions: string): MarkWorkItemCompletedResponse {
+  return {
+    success: true,
+    workItemId,
+    status: 'completion-instructions-required',
+    instructions,
+    message: 'Follow these completion instructions, then call mark-work-item-completed again with confirmCompletion set to true.',
+    confirmCompletionRequired: true,
+  };
+}
 
 export class AppController {
   private mainWindow: BrowserWindow | null = null;
@@ -79,7 +91,7 @@ export class AppController {
       this.promptAgentToCheckInbox(agentId, messageId);
     },
     onDisplayMarkdown: (agent, input) => this.displayMarkdownForAgent(agent, input),
-    onMarkWorkItemCompleted: (agent, workItemId) => this.markWorkItemCompletedForAgent(agent, workItemId),
+    onMarkWorkItemCompleted: (agent, workItemId, confirmCompletion) => this.markWorkItemCompletedForAgent(agent, workItemId, confirmCompletion),
     onListSourceRepositories: () => this.listSourceRepositories(),
     onCreateSourceWorktree: (input) => this.createSourceWorktree(input),
     onCreateAgent: (agent, input) => this.createAgentFromMcp(agent, input),
@@ -737,7 +749,7 @@ export class AppController {
     };
   }
 
-  private markWorkItemCompletedForAgent(agent: Agent, workItemId: string): MarkWorkItemCompletedResponse {
+  private markWorkItemCompletedForAgent(agent: Agent, workItemId: string, confirmCompletion = false): MarkWorkItemCompletedResponse {
     const assignment = this.snapshot.workBacklog.assignments[workItemId];
     if (!assignment) {
       throw new McpToolError(`Work item '${workItemId}' is not currently assigned. Use the exact Work item ID from your assignment prompt.`);
@@ -745,6 +757,26 @@ export class AppController {
     if (assignment.agentId !== agent.id) {
       const assignedAgent = this.snapshot.agents.find((candidate) => candidate.id === assignment.agentId);
       throw new McpToolError(`Work item '${workItemId}' is assigned to ${assignedAgent?.name ?? assignment.agentId}, not ${agent.name}.`);
+    }
+
+    const completionInstructions = this.loopCompletionInstructionsForAssignment(assignment.loopId);
+    if (completionInstructions) {
+      if (!assignment.completionInstructionsDeliveredAt) {
+        const deliveredAssignment = markWorkItemCompletionInstructionsDeliveredInSnapshot(this.snapshot, agent.id, workItemId, new Date().toISOString());
+        if (!deliveredAssignment) {
+          throw new McpToolError(`Completion instructions for work item '${workItemId}' could not be recorded.`);
+        }
+        this.emitAndApply({
+          agentId: agent.id,
+          type: 'workBacklog.assignmentUpdated',
+          payload: deliveredAssignment,
+        });
+        return completionInstructionsResponse(workItemId, completionInstructions);
+      }
+
+      if (!confirmCompletion) {
+        return completionInstructionsResponse(workItemId, completionInstructions);
+      }
     }
 
     const completedAt = new Date().toISOString();
@@ -758,6 +790,12 @@ export class AppController {
       type: 'workBacklog.assignmentUpdated',
       payload: completedAssignment,
     });
+    if (this.cleanupCompletedLoopAssignment(agent, completedAssignment)) {
+      this.emitAndApply({
+        type: 'snapshot.updated',
+        payload: this.snapshot,
+      });
+    }
 
     return {
       success: true,
@@ -765,6 +803,37 @@ export class AppController {
       status: 'completed',
       completedAt: completedAssignment.completedAt,
     };
+  }
+
+  private loopCompletionInstructionsForAssignment(loopId?: string): string {
+    if (!loopId) {
+      return '';
+    }
+
+    const loop = this.snapshot.loops.find((candidate) => candidate.id === loopId);
+    return loop?.instructions.beforeCompletion?.trim() ?? '';
+  }
+
+  private cleanupCompletedLoopAssignment(agent: Agent, assignment: WorkBacklogAssignment): boolean {
+    if (!assignment.loopId) {
+      return false;
+    }
+
+    const loop = this.snapshot.loops.find((candidate) => candidate.id === assignment.loopId);
+    if (!loop) {
+      return false;
+    }
+
+    const teamId = agent.teamId;
+    if (loop.action.teamTarget.mode === 'dedicated' && loop.action.cleanup?.deleteTeam !== false && teamId && this.snapshot.teams.length > 1) {
+      return Boolean(closeTeamInSnapshot(this.snapshot, teamId));
+    }
+
+    if (loop.action.teamTarget.mode === 'existing' && loop.action.cleanup?.deleteAgent !== false) {
+      return Boolean(closeAgentInSnapshot(this.snapshot, agent.id));
+    }
+
+    return false;
   }
 
   private async steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot> {

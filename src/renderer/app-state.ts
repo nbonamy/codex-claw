@@ -578,6 +578,7 @@ export function useAppState() {
           provider,
           configuration: {
             repositoryId: selectedRepositoryId,
+            assigneeLogin: null,
             tagName: null,
           },
         });
@@ -1102,6 +1103,7 @@ async function loadWorkRepositoriesForProvider(provider: WorkProviderKind): Prom
         provider,
         configuration: {
           repositoryId: selectedRepositoryId,
+          assigneeLogin: null,
           tagName: null,
         },
       });

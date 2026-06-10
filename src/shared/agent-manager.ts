@@ -97,7 +97,18 @@ export function removeBenchTemplateFromSnapshot(snapshot: AppSnapshot, templateI
   return template;
 }
 
-export function assignWorkItemToAgentInSnapshot(snapshot: AppSnapshot, agentId: string, item: WorkItemAssignmentSource, assignedAt = new Date().toISOString()): Agent | null {
+export type AssignWorkItemOptions = {
+  loopExecutionId?: string;
+  loopId?: string;
+};
+
+export function assignWorkItemToAgentInSnapshot(
+  snapshot: AppSnapshot,
+  agentId: string,
+  item: WorkItemAssignmentSource,
+  assignedAt = new Date().toISOString(),
+  options: AssignWorkItemOptions = {},
+): Agent | null {
   const targetAgent = snapshot.agents.find((candidate) => candidate.id === agentId);
   if (!targetAgent) {
     return null;
@@ -105,7 +116,7 @@ export function assignWorkItemToAgentInSnapshot(snapshot: AppSnapshot, agentId: 
 
   snapshot.workBacklog.assignments = {
     ...snapshot.workBacklog.assignments,
-    [workItemAssignmentKey(item)]: workBacklogAssignmentFromWorkItem(item, agentId, assignedAt),
+    [workItemAssignmentKey(item)]: workBacklogAssignmentFromWorkItem(item, agentId, assignedAt, options),
   };
   targetAgent.updatedAt = assignedAt;
   return targetAgent;
@@ -144,6 +155,33 @@ export function completeWorkItemAssignmentInSnapshot(snapshot: AppSnapshot, agen
     agent.updatedAt = completedAt;
   }
   return completedAssignment;
+}
+
+export function markWorkItemCompletionInstructionsDeliveredInSnapshot(
+  snapshot: AppSnapshot,
+  agentId: string,
+  workItemId: string,
+  deliveredAt = new Date().toISOString(),
+): WorkBacklogAssignment | null {
+  const assignment = snapshot.workBacklog.assignments[workItemId];
+  if (!assignment || assignment.agentId !== agentId) {
+    return null;
+  }
+
+  const updatedAssignment: WorkBacklogAssignment = {
+    ...assignment,
+    completionInstructionsDeliveredAt: deliveredAt,
+  };
+  snapshot.workBacklog.assignments = {
+    ...snapshot.workBacklog.assignments,
+    [workItemId]: updatedAssignment,
+  };
+
+  const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
+  if (agent) {
+    agent.updatedAt = deliveredAt;
+  }
+  return updatedAssignment;
 }
 
 export function moveAgentToTeamInSnapshot(snapshot: AppSnapshot, agentId: string, teamId: string, updatedAt = new Date().toISOString()): Agent | null {

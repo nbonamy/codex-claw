@@ -249,11 +249,16 @@ function githubIssue(value: unknown, repositoryId: string, repositoryFullName: s
     url: value.html_url,
     state: value.state === 'closed' ? 'closed' : 'open',
     ...(isRecord(value.user) && typeof value.user.login === 'string' ? { authorName: value.user.login } : {}),
+    ...(Array.isArray(value.assignees) ? { assignees: value.assignees.map(githubIssueAssignee).filter((login): login is string => Boolean(login)) } : {}),
     ...(typeof value.body === 'string' ? { body: value.body } : {}),
     labels: Array.isArray(value.labels) ? value.labels.map(githubIssueLabel).filter((label): label is WorkItemLabel => Boolean(label)) : [],
     createdAt: value.created_at,
     updatedAt: value.updated_at,
   };
+}
+
+function githubIssueAssignee(value: unknown): string | null {
+  return isRecord(value) && typeof value.login === 'string' && value.login.trim() ? value.login : null;
 }
 
 function githubIssueLabel(value: unknown): WorkItemLabel | null {

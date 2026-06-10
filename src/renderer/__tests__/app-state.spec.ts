@@ -356,6 +356,7 @@ describe('useAppState', () => {
       provider: 'github',
       configuration: {
         repositoryId: 'nbonamy/codex-claw',
+        assigneeLogin: null,
         tagName: null,
       },
     });
@@ -452,6 +453,10 @@ describe('useAppState', () => {
       'Body:',
       'Make issue assignment feel obvious.',
     ].join('\n'));
+
+    expect(workItemAssignmentPrompt(workItem(), {
+      assignment: 'Start by reproducing the issue.',
+    })).toContain('Assignment instructions:\nStart by reproducing the issue.');
   });
 
   it('handles missing work provider bridge methods as no-ops', async () => {
@@ -1513,7 +1518,7 @@ describe('useAppState', () => {
       loops: [{
         id: 'loop-bugs',
         enabled: true,
-        processedWorkItemIds: [],
+        instructions: {},
         executionLog: [],
         createdAt: '2026-06-09T10:01:00.000Z',
         updatedAt: '2026-06-09T10:01:00.000Z',

@@ -209,11 +209,20 @@ Input:
 
 - `workItemId`: exact Work item ID from the assignment prompt, such as
   `github:owner/repo#123`.
+- `confirmCompletion`: optional boolean. Use `true` only after following any
+  completion instructions returned by the first call.
 
 Effects:
 
 - verifies that the work item is currently assigned to the caller;
+- if the assignment came from a loop with before-completion instructions, the
+  first call records that those instructions were delivered and returns them
+  without completing the work item;
+- if loop completion instructions were already delivered, requires
+  `confirmCompletion: true` before completing;
 - updates `workBacklog.assignments[workItemId].status` to `completed`;
+- applies any loop cleanup configured for the assignment after confirmed
+  completion;
 - emits `workBacklog.assignmentUpdated` so the cockpit backlog reflects the
   completed state;
 - persists the updated assignment.

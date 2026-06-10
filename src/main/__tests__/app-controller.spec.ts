@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '../../shared/snapshot';
-import type { MainToRendererEvent } from '../../shared/contracts';
+import type { Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent } from '../../shared/contracts';
 import type { AppStatePersistence } from '../state-persistence';
 import type { AgentBackendDriver, BackendSendResult } from '../backends/types';
 import { claudeBackendCapabilities, codexBackendCapabilities } from '../../shared/backend-capabilities';
@@ -71,6 +71,191 @@ describe('AppController', () => {
       }),
     }));
     expect(persistence.save).toHaveBeenCalledWith(snapshot);
+  });
+
+  it('requires latest loop completion instructions before completing loop-assigned work', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.loops = [{
+      id: 'loop-bugs',
+      name: 'GitHub bugs',
+      enabled: true,
+      source: {
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
+        tagName: 'bug',
+      },
+      action: {
+        type: 'create-agent-from-bench',
+        benchTemplateId: 'bench-dina',
+        teamTarget: {
+          mode: 'existing',
+          teamId: 'team-codex-claw',
+        },
+        cleanup: {
+          deleteAgent: false,
+        },
+      },
+      instructions: {
+        beforeCompletion: 'Old instructions',
+      },
+      executionLog: [],
+      createdAt: '2026-06-09T12:00:00.000Z',
+      updatedAt: '2026-06-09T12:00:00.000Z',
+    }];
+    snapshot.workBacklog.assignments = {
+      'github:nbonamy/codex-claw#12': {
+        provider: 'github',
+        itemId: 'nbonamy/codex-claw#12',
+        agentId: 'agent-dina',
+        assignedAt: '2026-06-09T13:00:00.000Z',
+        loopExecutionId: 'loop-exec-1',
+        loopId: 'loop-bugs',
+        status: 'working',
+      },
+    };
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const send = vi.fn();
+
+    await controller.initialize();
+    snapshot.loops[0]!.instructions.beforeCompletion = 'Remove the bug tag before completing.';
+    setMainWindowSend(controller, send);
+
+    await expect(mcpCoordinator(controller).markWorkItemCompleted('agent-dina', 'github:nbonamy/codex-claw#12', true)).resolves.toStrictEqual({
+      success: true,
+      workItemId: 'github:nbonamy/codex-claw#12',
+      status: 'completion-instructions-required',
+      instructions: 'Remove the bug tag before completing.',
+      message: 'Follow these completion instructions, then call mark-work-item-completed again with confirmCompletion set to true.',
+      confirmCompletionRequired: true,
+    });
+    expect(snapshot.workBacklog.assignments['github:nbonamy/codex-claw#12']).toMatchObject({
+      status: 'working',
+      completionInstructionsDeliveredAt: expect.any(String),
+    });
+
+    await expect(mcpCoordinator(controller).markWorkItemCompleted('agent-dina', 'github:nbonamy/codex-claw#12')).resolves.toMatchObject({
+      status: 'completion-instructions-required',
+      instructions: 'Remove the bug tag before completing.',
+    });
+    expect(snapshot.workBacklog.assignments['github:nbonamy/codex-claw#12']?.status).toBe('working');
+
+    await expect(mcpCoordinator(controller).markWorkItemCompleted('agent-dina', 'github:nbonamy/codex-claw#12', true)).resolves.toMatchObject({
+      status: 'completed',
+      completedAt: expect.any(String),
+    });
+    expect(snapshot.workBacklog.assignments['github:nbonamy/codex-claw#12']).toMatchObject({
+      status: 'completed',
+      completedAt: expect.any(String),
+      completionInstructionsDeliveredAt: expect.any(String),
+    });
+    expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
+      type: 'workBacklog.assignmentUpdated',
+      payload: expect.objectContaining({
+        status: 'working',
+        completionInstructionsDeliveredAt: expect.any(String),
+      }),
+    }));
+    expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
+      type: 'workBacklog.assignmentUpdated',
+      payload: expect.objectContaining({
+        status: 'completed',
+      }),
+    }));
+  });
+
+  it('deletes loop-created agents on confirmed completion when cleanup is enabled for an existing team', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.loops = [loopFixture({
+      cleanup: {
+        deleteAgent: true,
+      },
+      teamTarget: {
+        mode: 'existing',
+        teamId: 'team-codex-claw',
+      },
+    })];
+    snapshot.workBacklog.assignments = {
+      'github:nbonamy/codex-claw#12': {
+        provider: 'github',
+        itemId: 'nbonamy/codex-claw#12',
+        agentId: 'agent-dina',
+        assignedAt: '2026-06-09T13:00:00.000Z',
+        loopExecutionId: 'loop-exec-1',
+        loopId: 'loop-bugs',
+        status: 'working',
+      },
+    };
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const send = vi.fn();
+
+    await controller.initialize();
+    setMainWindowSend(controller, send);
+    await mcpCoordinator(controller).markWorkItemCompleted('agent-dina', 'github:nbonamy/codex-claw#12');
+
+    expect(snapshot.workBacklog.assignments['github:nbonamy/codex-claw#12']).toMatchObject({
+      status: 'completed',
+    });
+    expect(snapshot.agents.some((agent) => agent.id === 'agent-dina')).toBe(false);
+    expect(snapshot.teams[0]?.agentIds).not.toContain('agent-dina');
+    expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
+      type: 'snapshot.updated',
+      payload: snapshot,
+    }));
+  });
+
+  it('deletes dedicated loop teams on confirmed completion when cleanup is enabled', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.teams[0]!.agentIds = snapshot.teams[0]!.agentIds.filter((agentId) => agentId !== 'agent-dina');
+    snapshot.teams.push({
+      id: 'team-loop-12',
+      name: 'GitHub #12',
+      avatar: 'G1',
+      color: '#1B4FB2',
+      agentIds: ['agent-dina'],
+      activeAgentId: 'agent-dina',
+    });
+    snapshot.agents[0]!.teamId = 'team-loop-12';
+    snapshot.loops = [loopFixture({
+      cleanup: {
+        deleteTeam: true,
+      },
+      teamTarget: {
+        mode: 'dedicated',
+      },
+    })];
+    snapshot.workBacklog.assignments = {
+      'github:nbonamy/codex-claw#12': {
+        provider: 'github',
+        itemId: 'nbonamy/codex-claw#12',
+        agentId: 'agent-dina',
+        assignedAt: '2026-06-09T13:00:00.000Z',
+        loopExecutionId: 'loop-exec-1',
+        loopId: 'loop-bugs',
+        status: 'working',
+      },
+    };
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+
+    await controller.initialize();
+    await mcpCoordinator(controller).markWorkItemCompleted('agent-dina', 'github:nbonamy/codex-claw#12');
+
+    expect(snapshot.workBacklog.assignments['github:nbonamy/codex-claw#12']).toMatchObject({
+      status: 'completed',
+    });
+    expect(snapshot.teams.some((team) => team.id === 'team-loop-12')).toBe(false);
+    expect(snapshot.agents.some((agent) => agent.id === 'agent-dina')).toBe(false);
   });
 
   it('persists token usage updates emitted by Codex', async () => {
@@ -541,7 +726,7 @@ describe('AppController', () => {
           teamId: 'team-codex-claw',
         },
       },
-      processedWorkItemIds: ['github:nbonamy/codex-claw#12'],
+      instructions: {},
       executionLog: [{
         id: 'loop-exec-1',
         loopId: 'loop-bugs',
@@ -755,15 +940,38 @@ describe('AppController', () => {
 function mcpCoordinator(controller: AppController): {
   setStatus(agentId: string, status: string): string;
   displayMarkdown(agentId: string, input: { markdown?: string; path?: string; title?: string }): Promise<unknown>;
-  markWorkItemCompleted(agentId: string, workItemId: string): Promise<unknown>;
+  markWorkItemCompleted(agentId: string, workItemId: string, confirmCompletion?: boolean): Promise<unknown>;
 } {
   return (controller as unknown as {
     mcpCoordinator: {
       setStatus(agentId: string, status: string): string;
       displayMarkdown(agentId: string, input: { markdown?: string; path?: string; title?: string }): Promise<unknown>;
-      markWorkItemCompleted(agentId: string, workItemId: string): Promise<unknown>;
+      markWorkItemCompleted(agentId: string, workItemId: string, confirmCompletion?: boolean): Promise<unknown>;
     };
   }).mcpCoordinator;
+}
+
+function loopFixture(input: { cleanup: LoopCleanup; teamTarget: LoopTeamTarget }): Loop {
+  return {
+    id: 'loop-bugs',
+    name: 'GitHub bugs',
+    enabled: true,
+    source: {
+      provider: 'github',
+      repositoryId: 'nbonamy/codex-claw',
+      tagName: 'bug',
+    },
+    action: {
+      type: 'create-agent-from-bench',
+      benchTemplateId: 'bench-dina',
+      teamTarget: input.teamTarget,
+      cleanup: input.cleanup,
+    },
+    instructions: {},
+    executionLog: [],
+    createdAt: '2026-06-09T12:00:00.000Z',
+    updatedAt: '2026-06-09T12:00:00.000Z',
+  };
 }
 
 function emitAndApply(

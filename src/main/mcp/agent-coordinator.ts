@@ -55,12 +55,21 @@ export type DisplayMarkdownResponse = {
   title?: string;
 };
 
-export type MarkWorkItemCompletedResponse = {
-  success: true;
-  workItemId: string;
-  status: 'completed';
-  completedAt: string;
-};
+export type MarkWorkItemCompletedResponse =
+  | {
+    success: true;
+    workItemId: string;
+    status: 'completion-instructions-required';
+    instructions: string;
+    message: string;
+    confirmCompletionRequired: true;
+  }
+  | {
+    success: true;
+    workItemId: string;
+    status: 'completed';
+    completedAt: string;
+  };
 
 export type McpCreateAgentInput = {
   avatar?: string;
@@ -83,7 +92,7 @@ export type ClawMcpAgentCoordinatorOptions = {
   onAgentUpdated?: (agent: Agent) => void;
   onInboxMessage?: (agentId: string, messageId: string) => void;
   onDisplayMarkdown?: (agent: Agent, input: DisplayMarkdownInput) => DisplayMarkdownResponse | Promise<DisplayMarkdownResponse>;
-  onMarkWorkItemCompleted?: (agent: Agent, workItemId: string) => MarkWorkItemCompletedResponse | Promise<MarkWorkItemCompletedResponse>;
+  onMarkWorkItemCompleted?: (agent: Agent, workItemId: string, confirmCompletion: boolean) => MarkWorkItemCompletedResponse | Promise<MarkWorkItemCompletedResponse>;
   onListSourceRepositories?: () => SourceRepository[] | Promise<SourceRepository[]>;
   onCreateSourceWorktree?: (input: CreateSourceWorktreeInput) => SourceWorktree | Promise<SourceWorktree>;
   onCreateAgent?: (agent: Agent, input: McpCreateAgentInput & { backend: AgentBackend; teamId?: string }) => McpCreateAgentResponse | Promise<McpCreateAgentResponse>;
@@ -104,7 +113,7 @@ export class ClawMcpAgentCoordinator {
   private readonly onAgentUpdated?: (agent: Agent) => void;
   private readonly onInboxMessage?: (agentId: string, messageId: string) => void;
   private readonly onDisplayMarkdown?: (agent: Agent, input: DisplayMarkdownInput) => DisplayMarkdownResponse | Promise<DisplayMarkdownResponse>;
-  private readonly onMarkWorkItemCompleted?: (agent: Agent, workItemId: string) => MarkWorkItemCompletedResponse | Promise<MarkWorkItemCompletedResponse>;
+  private readonly onMarkWorkItemCompleted?: (agent: Agent, workItemId: string, confirmCompletion: boolean) => MarkWorkItemCompletedResponse | Promise<MarkWorkItemCompletedResponse>;
   private readonly onListSourceRepositories?: () => SourceRepository[] | Promise<SourceRepository[]>;
   private readonly onCreateSourceWorktree?: (input: CreateSourceWorktreeInput) => SourceWorktree | Promise<SourceWorktree>;
   private readonly onCreateAgent?: (agent: Agent, input: McpCreateAgentInput & { backend: AgentBackend; teamId?: string }) => McpCreateAgentResponse | Promise<McpCreateAgentResponse>;
@@ -223,7 +232,7 @@ export class ClawMcpAgentCoordinator {
     });
   }
 
-  async markWorkItemCompleted(agentId: string, workItemId: string): Promise<MarkWorkItemCompletedResponse> {
+  async markWorkItemCompleted(agentId: string, workItemId: string, confirmCompletion = false): Promise<MarkWorkItemCompletedResponse> {
     const agent = this.requireAgent(agentId);
     const normalizedWorkItemId = workItemId.trim();
     if (!normalizedWorkItemId) {
@@ -233,7 +242,7 @@ export class ClawMcpAgentCoordinator {
       throw new McpToolError('Work item completion is not available.');
     }
 
-    return this.onMarkWorkItemCompleted(agent, normalizedWorkItemId);
+    return this.onMarkWorkItemCompleted(agent, normalizedWorkItemId, confirmCompletion);
   }
 
   async listSourceRepositories(agentId: string): Promise<{ repos: SourceRepository[] }> {

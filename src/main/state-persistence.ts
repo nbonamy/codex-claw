@@ -396,6 +396,9 @@ function sanitizeWorkBacklogAssignment(value: unknown): WorkBacklogAssignment | 
     assignedAt: value.assignedAt,
     status: isWorkBacklogAssignmentStatus(value.status) ? value.status : 'working',
     ...(typeof value.completedAt === 'string' ? { completedAt: value.completedAt } : {}),
+    ...(typeof value.loopId === 'string' && value.loopId.trim() ? { loopId: value.loopId.trim() } : {}),
+    ...(typeof value.loopExecutionId === 'string' && value.loopExecutionId.trim() ? { loopExecutionId: value.loopExecutionId.trim() } : {}),
+    ...(typeof value.completionInstructionsDeliveredAt === 'string' ? { completionInstructionsDeliveredAt: value.completionInstructionsDeliveredAt } : {}),
   };
 }
 
@@ -483,10 +486,12 @@ function sanitizeGitHubWorkBacklogConfiguration(value: unknown): WorkBacklogStat
   if (!repositoryId) {
     return null;
   }
+  const assigneeLogin = optionalTrimmedString(value.assigneeLogin);
   const tagName = optionalTrimmedString(value.tagName);
 
   return {
     repositoryId,
+    ...(assigneeLogin ? { assigneeLogin } : {}),
     ...(tagName ? { tagName } : {}),
   };
 }
@@ -522,7 +527,7 @@ function cloneLoop(loop: Loop): Loop {
     ...loop,
     source: { ...loop.source },
     action: cloneLoopAction(loop.action),
-    processedWorkItemIds: [...(loop.processedWorkItemIds ?? [])],
+    instructions: { ...(loop.instructions ?? {}) },
     executionLog: (loop.executionLog ?? []).map(cloneLoopExecutionEntry),
   };
 }
@@ -540,6 +545,7 @@ function cloneLoopAction(action: LoopAction): LoopAction {
       type: action.type,
       benchTemplateId: action.benchTemplateId,
       teamTarget: { ...action.teamTarget },
+      ...(action.cleanup ? { cleanup: { ...action.cleanup } } : {}),
     };
   }
   return action;
@@ -569,9 +575,6 @@ function sanitizeLoop(value: unknown): Loop | null {
   const executionLog = Array.isArray(value.executionLog)
     ? value.executionLog.map((entry) => sanitizeLoopExecutionEntry(entry, loopId)).filter((entry): entry is LoopExecutionLogEntry => Boolean(entry))
     : [];
-  const processedWorkItemIds = Array.isArray(value.processedWorkItemIds)
-    ? [...new Set(value.processedWorkItemIds.filter((itemId): itemId is string => typeof itemId === 'string' && Boolean(itemId.trim())).map((itemId) => itemId.trim()))]
-    : [];
 
   return {
     id: value.id,
@@ -579,13 +582,26 @@ function sanitizeLoop(value: unknown): Loop | null {
     enabled: typeof value.enabled === 'boolean' ? value.enabled : true,
     source,
     action,
-    processedWorkItemIds,
+    instructions: sanitizeLoopInstructions(value.instructions),
     executionLog,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     ...(typeof value.lastRunAt === 'string' ? { lastRunAt: value.lastRunAt } : {}),
     ...(typeof value.lastError === 'string' && value.lastError.trim() ? { lastError: value.lastError } : {}),
     ...(lastCreatedCount !== undefined ? { lastCreatedCount } : {}),
+  };
+}
+
+function sanitizeLoopInstructions(value: unknown): Loop['instructions'] {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  const assignment = optionalTrimmedString(value.assignment);
+  const beforeCompletion = optionalTrimmedString(value.beforeCompletion);
+  return {
+    ...(assignment ? { assignment } : {}),
+    ...(beforeCompletion ? { beforeCompletion } : {}),
   };
 }
 
@@ -661,10 +677,12 @@ function sanitizeLoopSource(value: unknown): LoopSourceConfiguration | null {
     return null;
   }
 
+  const assigneeLogin = optionalTrimmedString(value.assigneeLogin);
   const tagName = optionalTrimmedString(value.tagName);
   return {
     provider: 'github',
     repositoryId,
+    ...(assigneeLogin ? { assigneeLogin } : {}),
     ...(tagName ? { tagName } : {}),
   };
 }
@@ -684,6 +702,19 @@ function sanitizeLoopAction(value: unknown): LoopAction | null {
     type: 'create-agent-from-bench',
     benchTemplateId,
     teamTarget,
+    cleanup: sanitizeLoopCleanup(value.cleanup, teamTarget),
+  };
+}
+
+function sanitizeLoopCleanup(value: unknown, teamTarget: LoopTeamTarget): LoopAction['cleanup'] {
+  if (teamTarget.mode === 'dedicated') {
+    return {
+      deleteTeam: !isRecord(value) || value.deleteTeam !== false,
+    };
+  }
+
+  return {
+    deleteAgent: !isRecord(value) || value.deleteAgent !== false,
   };
 }
 

@@ -248,7 +248,7 @@ describe('ClawMcpAgentCoordinator', () => {
       status: 'completed',
       completedAt: '2026-06-09T13:30:00.000Z',
     });
-    expect(onMarkWorkItemCompleted).toHaveBeenCalledWith(agents[0], 'github:nbonamy/codex-claw#12');
+    expect(onMarkWorkItemCompleted).toHaveBeenCalledWith(agents[0], 'github:nbonamy/codex-claw#12', false);
   });
 
   it('lists source repositories and worktrees through app callbacks', async () => {

@@ -26,7 +26,7 @@ describe('WorkBacklogPanel', () => {
   });
 
   it('emits repository selection, refresh, drag start, and drag end', async () => {
-    const item = workItem();
+    const item = workItem({ assignees: ['nbonamy'] });
     const wrapper = mountPanel({
       items: [item],
       repositories: [workRepository()],
@@ -35,12 +35,14 @@ describe('WorkBacklogPanel', () => {
 
     const selects = wrapper.findAllComponents({ name: 'ElSelect' });
     await selects[0]?.vm.$emit('update:modelValue', 'nbonamy/codex-claw');
-    await selects[1]?.vm.$emit('update:modelValue', 'bug');
+    await selects[1]?.vm.$emit('update:modelValue', 'nbonamy');
+    await selects[2]?.vm.$emit('update:modelValue', 'bug');
     await wrapper.get('[aria-label="Refresh backlog"]').trigger('click');
     wrapper.get('.work-backlog-panel__item').element.dispatchEvent(dragEvent('dragstart'));
     await wrapper.get('.work-backlog-panel__item').trigger('dragend');
 
     expect(wrapper.emitted('select-repository')).toStrictEqual([['nbonamy/codex-claw']]);
+    expect(wrapper.emitted('select-assignee')).toStrictEqual([['nbonamy']]);
     expect(wrapper.emitted('select-tag')).toStrictEqual([['bug']]);
     expect(wrapper.emitted('refresh')).toStrictEqual([['nbonamy/codex-claw']]);
     expect(wrapper.emitted('work-item-drag-start')).toStrictEqual([[item]]);
@@ -81,7 +83,7 @@ describe('WorkBacklogPanel', () => {
       ],
       repositories: [],
     });
-    const tagSelect = wrapper.findAllComponents({ name: 'ElSelect' })[1];
+    const tagSelect = wrapper.findAllComponents({ name: 'ElSelect' })[2];
 
     expect(tagSelect?.props('filterable')).toBe(true);
     expect(tagSelect?.props('clearable')).toBe(true);
@@ -90,6 +92,38 @@ describe('WorkBacklogPanel', () => {
       'bug',
       'zeta',
     ]);
+  });
+
+  it('renders a searchable assignee selector with a Me option', () => {
+    const wrapper = mountPanel({
+      items: [
+        workItem({ assignees: ['zara', 'nbonamy'] }),
+        workItem({ id: 'nbonamy/codex-claw#13', number: 13, title: 'Document filters', assignees: ['alex'] }),
+      ],
+    });
+    const assigneeSelect = wrapper.findAllComponents({ name: 'ElSelect' })[1];
+
+    expect(assigneeSelect?.props('filterable')).toBe(true);
+    expect(assigneeSelect?.props('clearable')).toBe(true);
+    expect(wrapper.findAllComponents({ name: 'ElOption' }).map((option) => option.props('label'))).toContain('Me');
+    expect(wrapper.findAllComponents({ name: 'ElOption' }).map((option) => option.props('label'))).toContain('alex');
+    expect(wrapper.findAllComponents({ name: 'ElOption' }).map((option) => option.props('label'))).toContain('zara');
+  });
+
+  it('filters issue cards by selected assignee and tag', () => {
+    const wrapper = mountPanel({
+      selectedAssigneeLogin: 'alex',
+      selectedTagName: 'docs',
+      items: [
+        workItem({ labels: [{ name: 'docs' }], assignees: ['nbonamy'] }),
+        workItem({ id: 'nbonamy/codex-claw#13', number: 13, title: 'Document backlog filters', labels: [{ name: 'docs' }], assignees: ['alex'] }),
+        workItem({ id: 'nbonamy/codex-claw#14', number: 14, title: 'Alex bug', labels: [{ name: 'bug' }], assignees: ['alex'] }),
+      ],
+    });
+
+    expect(wrapper.text()).toContain('Document backlog filters');
+    expect(wrapper.text()).not.toContain('Fix cockpit drag target');
+    expect(wrapper.text()).not.toContain('Alex bug');
   });
 
   it('filters issue cards by the selected tag', () => {
@@ -111,7 +145,7 @@ describe('WorkBacklogPanel', () => {
       items: [workItem({ labels: [{ name: 'bug' }] })],
     });
 
-    expect(wrapper.text()).toContain('No issues with this tag');
+    expect(wrapper.text()).toContain('No issues with these filters');
   });
 
   it('does not repeat the selected repository name on issue cards', () => {

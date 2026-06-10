@@ -138,6 +138,7 @@ describe('WorkIntegrationManager', () => {
       provider: 'github',
       configuration: {
         repositoryId: ' nbonamy/codex-claw ',
+        assigneeLogin: ' nbonamy ',
         tagName: ' bug ',
       },
     });
@@ -145,6 +146,7 @@ describe('WorkIntegrationManager', () => {
     expect(snapshot.workBacklog.providerConfigurations).toStrictEqual({
       github: {
         repositoryId: 'nbonamy/codex-claw',
+        assigneeLogin: 'nbonamy',
         tagName: 'bug',
       },
     });
@@ -154,6 +156,7 @@ describe('WorkIntegrationManager', () => {
       provider: 'github',
       configuration: {
         repositoryId: 'nbonamy/codex-claw',
+        assigneeLogin: null,
         tagName: null,
       },
     });

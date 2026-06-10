@@ -36,6 +36,7 @@
         :error="workBacklog.error"
         :items="workBacklog.items"
         :repositories="workBacklog.repositories"
+        :selected-assignee-login="workBacklog.selectedAssigneeLogin ?? null"
         :selected-repository-id="workBacklog.selectedRepositoryId"
         :selected-tag-name="workBacklog.selectedTagName ?? null"
         :status="workBacklog.status"
@@ -47,6 +48,7 @@
         @refresh="emit('refresh-work-items', $event)"
         @remove-assignment="emit('remove-work-item-assignment', $event)"
         @select-assigned-agent="selectAssignedAgent"
+        @select-assignee="emit('select-work-assignee', $event)"
         @select-repository="emit('select-work-repository', $event)"
         @select-tag="emit('select-work-tag', $event)"
         @work-item-drag-end="clearDraggedWorkItem"
@@ -187,6 +189,7 @@ type CockpitWorkBacklog = {
   error: string | null;
   items: WorkItem[];
   repositories: WorkRepository[];
+  selectedAssigneeLogin?: string | null;
   selectedRepositoryId: string | null;
   selectedTagName?: string | null;
   status: 'notLoaded' | 'loading' | 'loaded' | 'error';
@@ -223,6 +226,7 @@ const emit = defineEmits<{
   'restart-agent': [agentId: string];
   'save-agent-to-bench': [agentId: string];
   'select-work-repository': [repositoryId: string | null];
+  'select-work-assignee': [assigneeLogin: string | null];
   'select-work-tag': [tagName: string | null];
   'select-agent': [payload: { agentId: string; teamId: string }];
   'select-team': [teamId: string];

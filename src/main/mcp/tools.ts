@@ -61,14 +61,16 @@ export function createCodexClawMcpServer(coordinator: ClawMcpAgentCoordinator, c
   }, () => coordinator.setStatus(callerAgentId, status)));
 
   server.registerTool('mark-work-item-completed', {
-    description: 'Mark one of your assigned backlog work items as completed. Call this when you have finished the work, using the exact workItemId from the assignment prompt.',
+    description: 'Mark one of your assigned backlog work items as completed. Call this when you have finished the work, using the exact workItemId from the assignment prompt. If the result asks for completion instructions, follow them and call again with confirmCompletion true.',
     inputSchema: {
       workItemId: z.string().describe('Exact Work item ID from the assignment prompt, for example github:owner/repo#123.'),
+      confirmCompletion: z.boolean().optional().describe('Set to true only after following any completion instructions returned by the first call.'),
     },
-  }, ({ workItemId }) => toolResult('mark-work-item-completed', {
+  }, ({ workItemId, confirmCompletion }) => toolResult('mark-work-item-completed', {
     agentId: callerAgentId,
+    confirmCompletion: confirmCompletion === true,
     workItemIdLength: workItemId.length,
-  }, () => coordinator.markWorkItemCompleted(callerAgentId, workItemId)));
+  }, () => coordinator.markWorkItemCompleted(callerAgentId, workItemId, confirmCompletion === true)));
 
   server.registerTool('list-repos', {
     description: 'List all git repositories in the configured source folder.',

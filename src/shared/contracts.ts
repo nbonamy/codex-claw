@@ -155,15 +155,20 @@ export type WorkBacklogAssignment = {
   assignedAt: string;
   status: WorkBacklogAssignmentStatus;
   completedAt?: string;
+  loopId?: string;
+  loopExecutionId?: string;
+  completionInstructionsDeliveredAt?: string;
 };
 
 export type GitHubWorkBacklogConfiguration = {
   repositoryId?: string;
+  assigneeLogin?: string;
   tagName?: string;
 };
 
 export type GitHubWorkBacklogConfigurationInput = {
   repositoryId?: string | null;
+  assigneeLogin?: string | null;
   tagName?: string | null;
 };
 
@@ -223,6 +228,7 @@ export type WorkItem = {
   url: string;
   state: WorkItemState;
   authorName?: string;
+  assignees?: string[];
   body?: string;
   labels: WorkItemLabel[];
   createdAt: string;
@@ -233,6 +239,7 @@ export type LoopSourceConfiguration =
   | {
     provider: 'github';
     repositoryId: string;
+    assigneeLogin?: string;
     tagName?: string;
   };
 
@@ -250,7 +257,18 @@ export type LoopAction =
     type: 'create-agent-from-bench';
     benchTemplateId: string;
     teamTarget: LoopTeamTarget;
+    cleanup?: LoopCleanup;
   };
+
+export type LoopCleanup = {
+  deleteAgent?: boolean;
+  deleteTeam?: boolean;
+};
+
+export type LoopInstructions = {
+  assignment?: string;
+  beforeCompletion?: string;
+};
 
 export type LoopExecutionStatus = 'completed' | 'failed';
 
@@ -281,7 +299,7 @@ export type Loop = {
   enabled: boolean;
   source: LoopSourceConfiguration;
   action: LoopAction;
-  processedWorkItemIds: string[];
+  instructions: LoopInstructions;
   executionLog: LoopExecutionLogEntry[];
   createdAt: string;
   updatedAt: string;
@@ -295,6 +313,7 @@ export type CreateLoopInput = {
   enabled?: boolean;
   source: LoopSourceConfiguration;
   action: LoopAction;
+  instructions?: LoopInstructions;
 };
 
 export type UpdateLoopInput = CreateLoopInput & {

@@ -358,6 +358,7 @@ describe('AppStatePersistence', () => {
       providerConfigurations: {
         github: {
           repositoryId: 'nbonamy/codex-claw',
+          assigneeLogin: 'nbonamy',
           tagName: 'bug',
         },
       },
@@ -374,6 +375,9 @@ describe('AppStatePersistence', () => {
           assignedAt: '2026-06-09T13:00:00.000Z',
           status: 'completed',
           completedAt: '2026-06-09T13:30:00.000Z',
+          loopId: 'loop-bugs',
+          loopExecutionId: 'loop-exec-1',
+          completionInstructionsDeliveredAt: '2026-06-09T13:20:00.000Z',
         },
       },
     };
@@ -390,6 +394,7 @@ describe('AppStatePersistence', () => {
       providerConfigurations: {
         github: {
           repositoryId: 'nbonamy/codex-claw',
+          assigneeLogin: 'nbonamy',
           tagName: 'bug',
         },
       },
@@ -406,6 +411,9 @@ describe('AppStatePersistence', () => {
           assignedAt: '2026-06-09T13:00:00.000Z',
           status: 'completed',
           completedAt: '2026-06-09T13:30:00.000Z',
+          loopId: 'loop-bugs',
+          loopExecutionId: 'loop-exec-1',
+          completionInstructionsDeliveredAt: '2026-06-09T13:20:00.000Z',
         },
       },
     });
@@ -484,12 +492,18 @@ describe('AppStatePersistence', () => {
         teamTarget: {
           mode: 'dedicated',
         },
+        cleanup: {
+          deleteTeam: true,
+        },
       },
       createdAt: '2026-06-09T10:00:00.000Z',
       updatedAt: '2026-06-09T10:01:00.000Z',
       lastRunAt: '2026-06-09T10:02:00.000Z',
       lastCreatedCount: 1,
-      processedWorkItemIds: ['github:nbonamy/codex-claw#12'],
+      instructions: {
+        assignment: 'Start by reproducing the issue.',
+        beforeCompletion: 'Remove the bug tag before completing.',
+      },
       executionLog: [{
         id: 'loop-exec-1',
         loopId: 'loop-bugs',
@@ -514,6 +528,13 @@ describe('AppStatePersistence', () => {
 
     expect(persisted.loops).toStrictEqual(snapshot.loops);
     expect(restored.loops).toStrictEqual(snapshot.loops);
+
+    const legacyPersisted = JSON.parse(JSON.stringify(persisted)) as Record<string, unknown>;
+    legacyPersisted.loops = [{
+      ...snapshot.loops[0],
+      processedWorkItemIds: ['github:nbonamy/codex-claw#12'],
+    }];
+    expect(snapshotFromPersistedState(legacyPersisted).loops[0]).not.toHaveProperty('processedWorkItemIds');
   });
 
   it('sanitizes invalid work integration metadata', () => {
@@ -533,6 +554,7 @@ describe('AppStatePersistence', () => {
         providerConfigurations: {
           github: {
             repositoryId: ' nbonamy/codex-claw ',
+            assigneeLogin: ' nbonamy ',
             tagName: ' bug ',
           },
           jira: {
@@ -569,6 +591,7 @@ describe('AppStatePersistence', () => {
       providerConfigurations: {
         github: {
           repositoryId: 'nbonamy/codex-claw',
+          assigneeLogin: 'nbonamy',
           tagName: 'bug',
         },
       },

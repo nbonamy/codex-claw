@@ -52,7 +52,7 @@ export class LoopRunner {
     const startedAt = this.now().toISOString();
     const createdAssignments: CreatedLoopAssignment[] = [];
     try {
-      await this.createAssignmentsForLoop(loop, startedAt, createdAssignments);
+      await this.createAssignmentsForLoop(loop, executionId, startedAt, createdAssignments);
       if (createdAssignments.length === 0) {
         return;
       }
@@ -64,7 +64,7 @@ export class LoopRunner {
       let promptError: string | null = null;
       for (const assignment of createdAssignments) {
         try {
-          await this.options.sendPrompt(assignment.agent.id, workItemAssignmentPrompt(assignment.item), {
+          await this.options.sendPrompt(assignment.agent.id, workItemAssignmentPrompt(assignment.item, loop.instructions), {
             loopId: loop.id,
             executionId,
             workItemId: workItemAssignmentKey(assignment.item),
@@ -97,12 +97,12 @@ export class LoopRunner {
     }
   }
 
-  private async createAssignmentsForLoop(loop: Loop, createdAt: string, createdAssignments: CreatedLoopAssignment[]): Promise<void> {
+  private async createAssignmentsForLoop(loop: Loop, executionId: string, createdAt: string, createdAssignments: CreatedLoopAssignment[]): Promise<void> {
     const items = await this.options.listWorkItems.listItems(loop.source.provider, loop.source.repositoryId);
 
     for (const item of matchingLoopItems(items, loop)) {
       const assignmentKey = workItemAssignmentKey(item);
-      if (this.snapshot().workBacklog.assignments[assignmentKey] || (loop.processedWorkItemIds ?? []).includes(assignmentKey)) {
+      if (this.snapshot().workBacklog.assignments[assignmentKey]?.status === 'working') {
         continue;
       }
 
@@ -119,7 +119,10 @@ export class LoopRunner {
         throw new Error(`Bench agent is no longer available for loop "${loop.name}".`);
       }
 
-      assignWorkItemToAgentInSnapshot(this.snapshot(), agent.id, item, createdAt);
+      assignWorkItemToAgentInSnapshot(this.snapshot(), agent.id, item, createdAt, {
+        loopExecutionId: executionId,
+        loopId: loop.id,
+      });
       createdAssignments.push({ agent, item });
     }
   }
@@ -160,9 +163,14 @@ export class LoopRunner {
 }
 
 export function matchingLoopItems(items: WorkItem[], loop: Loop): WorkItem[] {
+  const selectedAssigneeLogin = loop.source.assigneeLogin;
   const selectedTagName = loop.source.tagName;
   return items.filter((item) => {
     if (item.provider !== loop.source.provider || item.repositoryId !== loop.source.repositoryId || item.state !== 'open') {
+      return false;
+    }
+
+    if (selectedAssigneeLogin && !(item.assignees ?? []).includes(selectedAssigneeLogin)) {
       return false;
     }
 

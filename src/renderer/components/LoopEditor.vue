@@ -64,6 +64,26 @@
     </section>
 
     <section class="loop-editor__section">
+      <label for="loop-editor-assignee">Assigned to</label>
+      <el-select
+        id="loop-editor-assignee"
+        v-model="form.assigneeLogin"
+        clearable
+        filterable
+        placeholder="Anyone"
+        aria-label="Loop assignee"
+        :disabled="!form.repositoryId || assigneeOptions.length === 0"
+      >
+        <el-option
+          v-for="assignee in assigneeOptions"
+          :key="assignee.value"
+          :label="assignee.label"
+          :value="assignee.value"
+        />
+      </el-select>
+    </section>
+
+    <section class="loop-editor__section">
       <label for="loop-editor-tag">Tag</label>
       <el-select
         id="loop-editor-tag"
@@ -81,6 +101,28 @@
           :value="tag"
         />
       </el-select>
+    </section>
+
+    <section class="loop-editor__section">
+      <label for="loop-editor-assignment-instructions">Assignment instructions</label>
+      <el-input
+        id="loop-editor-assignment-instructions"
+        v-model="form.assignmentInstructions"
+        type="textarea"
+        :rows="3"
+        placeholder="Optional instructions to include when the ticket is assigned"
+      />
+    </section>
+
+    <section class="loop-editor__section">
+      <label for="loop-editor-completion-instructions">Before completion</label>
+      <el-input
+        id="loop-editor-completion-instructions"
+        v-model="form.beforeCompletionInstructions"
+        type="textarea"
+        :rows="3"
+        placeholder="Optional instructions to show when the agent marks the ticket complete"
+      />
     </section>
 
     <section class="loop-editor__section">
@@ -149,6 +191,21 @@
       </div>
     </section>
 
+    <section class="loop-editor__section loop-editor__section--compact">
+      <el-checkbox
+        v-if="form.teamMode === 'existing'"
+        v-model="form.cleanupDeleteAgent"
+      >
+        Delete agent when work item completes
+      </el-checkbox>
+      <el-checkbox
+        v-else
+        v-model="form.cleanupDeleteTeam"
+      >
+        Delete team when work item completes
+      </el-checkbox>
+    </section>
+
     <footer class="loop-editor__footer">
       <el-button @click="emit('cancel')">Cancel</el-button>
       <el-button
@@ -195,12 +252,21 @@ const form = reactive({
   enabled: props.loop?.enabled ?? true,
   provider: 'github' as const,
   repositoryId: props.loop?.source.repositoryId ?? props.repositories[0]?.id ?? '',
+  assigneeLogin: props.loop?.source.assigneeLogin ?? '',
   tagName: props.loop?.source.tagName ?? '',
+  assignmentInstructions: props.loop?.instructions.assignment ?? '',
+  beforeCompletionInstructions: props.loop?.instructions.beforeCompletion ?? '',
   benchTemplateId: props.loop?.action.benchTemplateId ?? props.benchTemplates[0]?.id ?? '',
   teamMode: (props.loop?.action.teamTarget.mode ?? 'existing') as TeamMode,
   teamId: props.loop?.action.teamTarget.mode === 'existing'
     ? props.loop.action.teamTarget.teamId
     : props.teams[0]?.id ?? '',
+  cleanupDeleteAgent: props.loop?.action.teamTarget.mode === 'existing'
+    ? props.loop.action.cleanup?.deleteAgent !== false
+    : true,
+  cleanupDeleteTeam: props.loop?.action.teamTarget.mode === 'dedicated'
+    ? props.loop.action.cleanup?.deleteTeam !== false
+    : true,
 });
 
 const githubConnected = computed(() => props.connection?.provider === 'github' && props.connection.status === 'connected');
@@ -208,6 +274,27 @@ const sortedRepositories = computed(() => [...props.repositories].sort((left, ri
   left.fullName.localeCompare(right.fullName) || left.id.localeCompare(right.id)
 )));
 const currentItems = computed(() => form.repositoryId ? props.itemsByRepository[workItemsKey(form.provider, form.repositoryId)] ?? [] : []);
+const assigneeOptions = computed(() => {
+  const assignees = new Set<string>();
+  if (form.assigneeLogin) {
+    assignees.add(form.assigneeLogin);
+  }
+  for (const item of currentItems.value) {
+    for (const assignee of item.assignees ?? []) {
+      if (assignee) {
+        assignees.add(assignee);
+      }
+    }
+  }
+
+  const accountLabel = props.connection?.accountLabel?.trim();
+  return [...assignees]
+    .sort((left, right) => left.localeCompare(right))
+    .map((assignee) => ({
+      label: accountLabel && assignee === accountLabel ? 'Me' : assignee,
+      value: assignee,
+    }));
+});
 const tagOptions = computed(() => {
   const tags = new Set<string>();
   if (form.tagName) {
@@ -222,12 +309,19 @@ const tagOptions = computed(() => {
   }
   return [...tags].sort((left, right) => left.localeCompare(right));
 });
+const suggestedBeforeCompletionInstructions = computed(() => (
+  form.tagName ? `Before marking this work item complete, remove the "${form.tagName}" tag from the GitHub issue.` : ''
+));
 const canSubmit = computed(() => (
   githubConnected.value &&
   Boolean(form.repositoryId) &&
   Boolean(form.benchTemplateId) &&
   (form.teamMode === 'dedicated' || Boolean(form.teamId))
 ));
+
+if (!form.beforeCompletionInstructions.trim() && suggestedBeforeCompletionInstructions.value) {
+  form.beforeCompletionInstructions = suggestedBeforeCompletionInstructions.value;
+}
 
 onMounted(() => {
   if (githubConnected.value && props.repositories.length === 0) {
@@ -245,6 +339,8 @@ watch(() => props.repositories, (repositories) => {
   }
 });
 
+let lastSuggestedBeforeCompletionInstructions = suggestedBeforeCompletionInstructions.value;
+
 watch(() => props.benchTemplates, (templates) => {
   if (!form.benchTemplateId && templates[0]) {
     form.benchTemplateId = templates[0].id;
@@ -257,7 +353,17 @@ watch(() => props.teams, (teams) => {
   }
 });
 
+watch(suggestedBeforeCompletionInstructions, (suggestion, previousSuggestion) => {
+  const currentValue = form.beforeCompletionInstructions.trim();
+  const canApplySuggestion = !currentValue || currentValue === previousSuggestion || currentValue === lastSuggestedBeforeCompletionInstructions;
+  lastSuggestedBeforeCompletionInstructions = suggestion;
+  if (suggestion && canApplySuggestion) {
+    form.beforeCompletionInstructions = suggestion;
+  }
+});
+
 function repositoryChanged(): void {
+  form.assigneeLogin = '';
   form.tagName = '';
   if (form.repositoryId) {
     emit('load-items', form.repositoryId);
@@ -275,7 +381,12 @@ function submit(): void {
     source: {
       provider: 'github',
       repositoryId: form.repositoryId,
+      ...(form.assigneeLogin ? { assigneeLogin: form.assigneeLogin } : {}),
       ...(form.tagName ? { tagName: form.tagName } : {}),
+    },
+    instructions: {
+      assignment: form.assignmentInstructions,
+      beforeCompletion: form.beforeCompletionInstructions,
     },
     action: {
       type: 'create-agent-from-bench',
@@ -283,6 +394,9 @@ function submit(): void {
       teamTarget: form.teamMode === 'dedicated'
         ? { mode: 'dedicated' }
         : { mode: 'existing', teamId: form.teamId },
+      cleanup: form.teamMode === 'dedicated'
+        ? { deleteTeam: form.cleanupDeleteTeam }
+        : { deleteAgent: form.cleanupDeleteAgent },
     },
   });
 }
@@ -346,6 +460,10 @@ function workItemsKey(provider: 'github', repositoryId: string): string {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
+}
+
+.loop-editor__section--compact {
+  gap: 0;
 }
 
 .loop-editor__section label {

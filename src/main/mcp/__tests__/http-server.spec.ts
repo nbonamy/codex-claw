@@ -276,7 +276,7 @@ describe('ClawMcpHttpServer', () => {
       status: 'completed',
       completedAt: '2026-06-09T13:30:00.000Z',
     });
-    expect(markWorkItemCompleted).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'github:nbonamy/codex-claw#12');
+    expect(markWorkItemCompleted).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'github:nbonamy/codex-claw#12', false);
   });
 
   it('supports the official MCP client connect and callTool flow', async () => {

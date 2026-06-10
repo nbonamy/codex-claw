@@ -869,6 +869,7 @@ describe('AppShell', () => {
     await wrapper.get('[aria-label="Cockpit"]').trigger('click');
     const cockpit = wrapper.findComponent({ name: 'CockpitView' });
     cockpit.vm.$emit('select-work-repository', 'nbonamy/codex-claw');
+    cockpit.vm.$emit('select-work-assignee', 'nbonamy');
     cockpit.vm.$emit('select-work-tag', 'bug');
     await flushPromises();
 
@@ -876,6 +877,7 @@ describe('AppShell', () => {
       provider: 'github',
       configuration: {
         repositoryId: 'nbonamy/codex-claw',
+        assigneeLogin: null,
         tagName: null,
       },
     });
@@ -883,6 +885,15 @@ describe('AppShell', () => {
       provider: 'github',
       configuration: {
         repositoryId: 'nbonamy/codex-claw',
+        assigneeLogin: 'nbonamy',
+        tagName: null,
+      },
+    });
+    expect(configureWorkBacklog).toHaveBeenNthCalledWith(3, {
+      provider: 'github',
+      configuration: {
+        repositoryId: 'nbonamy/codex-claw',
+        assigneeLogin: null,
         tagName: 'bug',
       },
     });

@@ -941,6 +941,9 @@ function workBacklogAssignment(value: unknown): WorkBacklogAssignment | null {
     assignedAt: value.assignedAt,
     status: value.status,
     ...(typeof value.completedAt === 'string' ? { completedAt: value.completedAt } : {}),
+    ...(typeof value.loopId === 'string' && value.loopId.trim() ? { loopId: value.loopId.trim() } : {}),
+    ...(typeof value.loopExecutionId === 'string' && value.loopExecutionId.trim() ? { loopExecutionId: value.loopExecutionId.trim() } : {}),
+    ...(typeof value.completionInstructionsDeliveredAt === 'string' ? { completionInstructionsDeliveredAt: value.completionInstructionsDeliveredAt } : {}),
   };
 }
 

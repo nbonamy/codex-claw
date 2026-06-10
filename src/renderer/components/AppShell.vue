@@ -106,6 +106,7 @@
         @restart-agent="$emit('restart-agent', $event)"
         @save-agent-to-bench="$emit('save-agent-to-bench', $event)"
         @select-work-tag="selectWorkTagForCockpit"
+        @select-work-assignee="selectWorkAssigneeForCockpit"
         @select-work-repository="selectWorkRepositoryForCockpit"
         @select-agent="selectAgentFromCockpit"
         @select-team="selectTeamFromRail"
@@ -449,6 +450,7 @@ const cockpitWorkBacklog = computed(() => {
     assignments: props.snapshot.workBacklog.assignments,
     connection,
     repositories,
+    selectedAssigneeLogin: configuration.assigneeLogin ?? null,
     selectedRepositoryId,
     selectedTagName: configuration.tagName ?? null,
     items: selectedRepositoryId ? props.workItemsByRepository[workItemsKey(provider, selectedRepositoryId)] ?? [] : [],
@@ -904,6 +906,7 @@ async function selectWorkRepositoryForCockpit(repositoryId: string | null): Prom
     provider: 'github',
     configuration: {
       repositoryId,
+      assigneeLogin: null,
       tagName: null,
     },
   });
@@ -912,12 +915,25 @@ async function selectWorkRepositoryForCockpit(repositoryId: string | null): Prom
   }
 }
 
+async function selectWorkAssigneeForCockpit(assigneeLogin: string | null): Promise<void> {
+  const repositoryId = cockpitWorkBacklog.value?.selectedRepositoryId ?? null;
+  await props.configureWorkBacklog({
+    provider: 'github',
+    configuration: {
+      repositoryId,
+      assigneeLogin,
+      tagName: cockpitWorkBacklog.value?.selectedTagName ?? null,
+    },
+  });
+}
+
 async function selectWorkTagForCockpit(tagName: string | null): Promise<void> {
   const repositoryId = cockpitWorkBacklog.value?.selectedRepositoryId ?? null;
   await props.configureWorkBacklog({
     provider: 'github',
     configuration: {
       repositoryId,
+      assigneeLogin: cockpitWorkBacklog.value?.selectedAssigneeLogin ?? null,
       tagName,
     },
   });

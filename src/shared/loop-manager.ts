@@ -35,7 +35,7 @@ export function createLoopInSnapshot(
     enabled: normalized.enabled,
     source: normalized.source,
     action: normalized.action,
-    processedWorkItemIds: [],
+    instructions: normalized.instructions,
     executionLog: [],
     createdAt,
     updatedAt: createdAt,
@@ -60,6 +60,7 @@ export function updateLoopInSnapshot(
   loop.enabled = normalized.enabled;
   loop.source = normalized.source;
   loop.action = normalized.action;
+  loop.instructions = normalized.instructions;
   loop.updatedAt = updatedAt;
   delete loop.lastError;
 
@@ -101,11 +102,6 @@ export function recordLoopExecutionInSnapshot(
     return null;
   }
 
-  const processedWorkItemIds = new Set(loop.processedWorkItemIds ?? []);
-  for (const createdAgent of entry.createdAgents) {
-    processedWorkItemIds.add(createdAgent.workItemId);
-  }
-  loop.processedWorkItemIds = [...processedWorkItemIds];
   loop.executionLog = [
     cloneLoopExecutionEntry(entry),
     ...(loop.executionLog ?? []).filter((candidate) => candidate.id !== entry.id),
@@ -160,7 +156,7 @@ function normalizeLoopInput(snapshot: AppSnapshot, input: CreateLoopInput): Omit
     enabled: input.enabled !== false,
     source,
     action,
-    processedWorkItemIds: [],
+    instructions: normalizeLoopInstructions(input.instructions),
     executionLog: [],
   };
 }
@@ -182,11 +178,22 @@ function normalizeLoopSource(source: LoopSourceConfiguration): LoopSourceConfigu
     return null;
   }
 
+  const assigneeLogin = source.assigneeLogin?.trim();
   const tagName = source.tagName?.trim();
   return {
     provider: 'github',
     repositoryId,
+    ...(assigneeLogin ? { assigneeLogin } : {}),
     ...(tagName ? { tagName } : {}),
+  };
+}
+
+function normalizeLoopInstructions(instructions: CreateLoopInput['instructions']): Loop['instructions'] {
+  const assignment = instructions?.assignment?.trim();
+  const beforeCompletion = instructions?.beforeCompletion?.trim();
+  return {
+    ...(assignment ? { assignment } : {}),
+    ...(beforeCompletion ? { beforeCompletion } : {}),
   };
 }
 
@@ -205,6 +212,19 @@ function normalizeLoopAction(snapshot: AppSnapshot, action: LoopAction): LoopAct
     type: 'create-agent-from-bench',
     benchTemplateId,
     teamTarget,
+    cleanup: normalizeLoopCleanup(action.cleanup, teamTarget),
+  };
+}
+
+function normalizeLoopCleanup(cleanup: LoopAction['cleanup'] | undefined, teamTarget: LoopTeamTarget): LoopAction['cleanup'] {
+  if (teamTarget.mode === 'dedicated') {
+    return {
+      deleteTeam: cleanup?.deleteTeam !== false,
+    };
+  }
+
+  return {
+    deleteAgent: cleanup?.deleteAgent !== false,
   };
 }
 
@@ -225,7 +245,8 @@ function normalizeTeamTarget(snapshot: AppSnapshot, target: LoopTeamTarget): Loo
 
 function defaultLoopName(source: LoopSourceConfiguration): string {
   if (source.provider === 'github') {
-    return source.tagName ? `${source.repositoryId} / ${source.tagName}` : source.repositoryId;
+    const filters = [source.assigneeLogin, source.tagName].filter(Boolean);
+    return filters.length > 0 ? `${source.repositoryId} / ${filters.join(' / ')}` : source.repositoryId;
   }
   return 'Loop';
 }

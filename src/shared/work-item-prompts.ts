@@ -1,8 +1,9 @@
-import type { WorkItem } from './contracts';
+import type { LoopInstructions, WorkItem } from './contracts';
 import { workItemAssignmentKey } from './work-assignments';
 
-export function workItemAssignmentPrompt(item: WorkItem): string {
+export function workItemAssignmentPrompt(item: WorkItem, instructions: Pick<LoopInstructions, 'assignment'> = {}): string {
   const body = truncateWorkItemBody(item.body?.trim() ?? '');
+  const assignmentInstructions = instructions.assignment?.trim();
   const workItemId = workItemAssignmentKey(item);
   return [
     `Please take this ${workProviderLabel(item.provider)} issue and drive it to completion.`,
@@ -15,6 +16,7 @@ export function workItemAssignmentPrompt(item: WorkItem): string {
     `URL: ${item.url}`,
     item.labels.length > 0 ? `Labels: ${item.labels.map((label) => label.name).join(', ')}` : null,
     item.authorName ? `Author: ${item.authorName}` : null,
+    assignmentInstructions ? ['Assignment instructions:', assignmentInstructions].join('\n') : null,
     body ? ['Body:', body].join('\n') : null,
   ].filter((line): line is string => line !== null).join('\n');
 }

@@ -26,6 +26,7 @@ describe('loop manager', () => {
       source: {
         provider: 'github',
         repositoryId: ' nbonamy/codex-claw ',
+        assigneeLogin: ' nbonamy ',
         tagName: ' bug ',
       },
       action: {
@@ -36,15 +37,20 @@ describe('loop manager', () => {
           teamId: 'team-codex-claw',
         },
       },
+      instructions: {
+        assignment: ' Start by reproducing the issue. ',
+        beforeCompletion: ' Remove the bug tag. ',
+      },
     }, '2026-06-09T11:00:00.000Z', () => 'loop-github-bugs');
 
     expect(loop).toStrictEqual({
       id: 'loop-github-bugs',
-      name: 'nbonamy/codex-claw / bug',
+      name: 'nbonamy/codex-claw / nbonamy / bug',
       enabled: true,
       source: {
         provider: 'github',
         repositoryId: 'nbonamy/codex-claw',
+        assigneeLogin: 'nbonamy',
         tagName: 'bug',
       },
       action: {
@@ -54,8 +60,14 @@ describe('loop manager', () => {
           mode: 'existing',
           teamId: 'team-codex-claw',
         },
+        cleanup: {
+          deleteAgent: true,
+        },
       },
-      processedWorkItemIds: [],
+      instructions: {
+        assignment: 'Start by reproducing the issue.',
+        beforeCompletion: 'Remove the bug tag.',
+      },
       executionLog: [],
       createdAt: '2026-06-09T11:00:00.000Z',
       updatedAt: '2026-06-09T11:00:00.000Z',
@@ -76,6 +88,9 @@ describe('loop manager', () => {
           mode: 'dedicated',
         },
       },
+      instructions: {
+        beforeCompletion: 'Close the issue.',
+      },
     }, '2026-06-09T12:00:00.000Z')).toMatchObject({
       name: 'Triage bugs',
       enabled: false,
@@ -87,6 +102,12 @@ describe('loop manager', () => {
         teamTarget: {
           mode: 'dedicated',
         },
+        cleanup: {
+          deleteTeam: true,
+        },
+      },
+      instructions: {
+        beforeCompletion: 'Close the issue.',
       },
       updatedAt: '2026-06-09T12:00:00.000Z',
     });
@@ -110,7 +131,6 @@ describe('loop manager', () => {
       lastRunAt: '2026-06-09T12:01:00.000Z',
       lastCreatedCount: 2,
       lastError: 'GitHub failed',
-      processedWorkItemIds: ['github:nbonamy/codex-claw#12'],
       executionLog: [{
         id: 'loop-execution-1',
         status: 'failed',

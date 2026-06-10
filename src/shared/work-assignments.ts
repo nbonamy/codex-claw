@@ -3,13 +3,22 @@ import type { Agent, WorkBacklogAssignment, WorkItem, WorkProviderKind } from '.
 type WorkItemIdentity = Pick<WorkItem, 'provider' | 'id'> | Pick<WorkBacklogAssignment, 'provider' | 'itemId'>;
 export type WorkItemAssignmentSource = Pick<WorkItem, 'provider' | 'id' | 'repositoryId' | 'repositoryFullName' | 'number' | 'title' | 'url'>;
 
-export function workBacklogAssignmentFromWorkItem(item: WorkItemAssignmentSource, agentId: string, assignedAt: string): WorkBacklogAssignment {
+export type WorkBacklogAssignmentMetadata = Pick<WorkBacklogAssignment, 'loopExecutionId' | 'loopId'>;
+
+export function workBacklogAssignmentFromWorkItem(
+  item: WorkItemAssignmentSource,
+  agentId: string,
+  assignedAt: string,
+  metadata: WorkBacklogAssignmentMetadata = {},
+): WorkBacklogAssignment {
   return {
     provider: item.provider,
     itemId: item.id,
     agentId,
     assignedAt,
     status: 'working',
+    ...(metadata.loopId ? { loopId: metadata.loopId } : {}),
+    ...(metadata.loopExecutionId ? { loopExecutionId: metadata.loopExecutionId } : {}),
   };
 }
 

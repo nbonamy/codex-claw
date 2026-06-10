@@ -200,9 +200,11 @@ export class WorkIntegrationManager {
     if (input.provider === 'github') {
       const repositoryId = normalizedOptionalString(input.configuration.repositoryId);
       if (repositoryId) {
+        const assigneeLogin = normalizedOptionalString(input.configuration.assigneeLogin);
         const tagName = normalizedOptionalString(input.configuration.tagName);
         this.snapshot().workBacklog.providerConfigurations.github = {
           repositoryId,
+          ...(assigneeLogin ? { assigneeLogin } : {}),
           ...(tagName ? { tagName } : {}),
         };
       } else {

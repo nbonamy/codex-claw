@@ -145,7 +145,6 @@ describe('LoopsView', () => {
           createdAgents: [],
           error: 'GitHub failed',
         }],
-        processedWorkItemIds: ['github:nbonamy/codex-claw#12'],
       })],
     });
 
@@ -273,7 +272,7 @@ function loop(overrides: Partial<Loop> = {}): Loop {
         teamId: 'team-codex-claw',
       },
     },
-    processedWorkItemIds: [],
+    instructions: {},
     executionLog: [],
     createdAt: '2026-06-09T10:00:00.000Z',
     updatedAt: '2026-06-09T10:00:00.000Z',

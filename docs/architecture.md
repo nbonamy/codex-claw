@@ -590,12 +590,17 @@ in `workBacklog.assignments`, keyed by provider and provider-generated item id,
 then sends a deterministic prompt through the existing prompt path. Assignment
 state is local and provider-neutral: newly assigned items are `working`, and
 agents mark them `completed` through the `mark-work-item-completed` Claw MCP
-tool using the exact work item id from that prompt. Assigning the same work
-item to another agent overwrites that key and resets it to `working`. Assignment
-status belongs to the backlog record, so it is preserved even when the stored
-agent id no longer exists; only the live assignee navigation/avatar depends on
-the agent still being present. Resetting an assignment clears Codex Claw's local
-assignment metadata and its local working/completed state.
+tool using the exact work item id from that prompt. Loop-created assignments
+also store loop origin metadata so loop completion instructions can be shown at
+completion time without polluting the initial work context. Assigning the same
+work item to another agent overwrites that key and resets it to `working`.
+Assignment status belongs to the backlog record, so it is preserved even when
+the stored agent id no longer exists; only the live assignee navigation/avatar
+depends on the agent still being present. Resetting an assignment clears Codex
+Claw's local assignment metadata and its local working/completed state.
+Loops may also clean up their generated workspace after confirmed completion:
+existing-team loops can delete the generated agent, while dedicated-team loops
+can delete the generated team.
 Future provider-specific actions, such as claiming tickets, commenting, or
 changing status, should be added behind the work-provider seam without changing
 cockpit tiles into provider-aware UI.

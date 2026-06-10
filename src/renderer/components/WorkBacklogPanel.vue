@@ -42,6 +42,24 @@
 
       <el-select
         class="work-backlog-panel__select"
+        :model-value="selectedAssigneeLogin"
+        placeholder="Assigned to"
+        :disabled="!selectedRepositoryId || assigneeOptions.length === 0"
+        clearable
+        filterable
+        aria-label="Backlog assignee"
+        @update:model-value="selectAssignee"
+      >
+        <el-option
+          v-for="assignee in assigneeOptions"
+          :key="assignee.value"
+          :label="assignee.label"
+          :value="assignee.value"
+        />
+      </el-select>
+
+      <el-select
+        class="work-backlog-panel__select"
         :model-value="selectedTagName"
         placeholder="All tags"
         :disabled="!selectedRepositoryId || tagOptions.length === 0"
@@ -87,7 +105,7 @@
       v-else-if="itemRows.length === 0"
       class="work-backlog-panel__state"
     >
-      No issues with this tag
+      No issues with these filters
     </div>
 
     <div
@@ -198,6 +216,7 @@ const props = withDefaults(defineProps<{
   error: string | null;
   items: WorkItem[];
   repositories: WorkRepository[];
+  selectedAssigneeLogin?: string | null;
   selectedRepositoryId: string | null;
   selectedTagName?: string | null;
   status: 'notLoaded' | 'loading' | 'loaded' | 'error';
@@ -205,6 +224,7 @@ const props = withDefaults(defineProps<{
   assignedAgentsByWorkItemKey: () => ({}),
   assignments: () => ({}),
   canAssignToBench: true,
+  selectedAssigneeLogin: null,
   selectedTagName: null,
 });
 
@@ -214,6 +234,7 @@ const emit = defineEmits<{
   refresh: [repositoryId: string | null];
   'remove-assignment': [item: WorkItem];
   'select-assigned-agent': [agentId: string];
+  'select-assignee': [assigneeLogin: string | null];
   'select-repository': [repositoryId: string | null];
   'select-tag': [tagName: string | null];
   'work-item-drag-end': [];
@@ -236,12 +257,39 @@ const tagOptions = computed<string[]>(() => {
   }
   return [...tags].sort((left, right) => left.localeCompare(right));
 });
-const filteredItems = computed<WorkItem[]>(() => {
-  const selectedTagName = props.selectedTagName;
-  if (!selectedTagName) {
-    return props.items;
+const assigneeOptions = computed(() => {
+  const assignees = new Set<string>();
+  if (props.selectedAssigneeLogin) {
+    assignees.add(props.selectedAssigneeLogin);
   }
-  return props.items.filter((item) => item.labels.some((label) => label.name === selectedTagName));
+  for (const item of props.items) {
+    for (const assignee of item.assignees ?? []) {
+      if (assignee) {
+        assignees.add(assignee);
+      }
+    }
+  }
+
+  const accountLabel = props.connection.accountLabel?.trim();
+  return [...assignees]
+    .sort((left, right) => left.localeCompare(right))
+    .map((assignee) => ({
+      label: accountLabel && assignee === accountLabel ? 'Me' : assignee,
+      value: assignee,
+    }));
+});
+const filteredItems = computed<WorkItem[]>(() => {
+  const selectedAssigneeLogin = props.selectedAssigneeLogin;
+  const selectedTagName = props.selectedTagName;
+  return props.items.filter((item) => {
+    if (selectedAssigneeLogin && !(item.assignees ?? []).includes(selectedAssigneeLogin)) {
+      return false;
+    }
+    if (selectedTagName && !item.labels.some((label) => label.name === selectedTagName)) {
+      return false;
+    }
+    return true;
+  });
 });
 const itemRows = computed<WorkBacklogItemRow[]>(() => filteredItems.value.map((item) => {
   const assignmentKey = workItemAssignmentKey(item);
@@ -302,6 +350,10 @@ function menuItemsForRow(row: WorkBacklogItemRow): AppMenuItem[] {
 
 function selectRepository(value: string | number | boolean | Record<string, unknown> | null | undefined): void {
   emit('select-repository', typeof value === 'string' ? value : null);
+}
+
+function selectAssignee(value: string | number | boolean | Record<string, unknown> | null | undefined): void {
+  emit('select-assignee', typeof value === 'string' ? value : null);
 }
 
 function selectTag(value: string | number | boolean | Record<string, unknown> | null | undefined): void {
