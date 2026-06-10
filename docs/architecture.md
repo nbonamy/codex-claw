@@ -551,10 +551,13 @@ access tokens remain in the encrypted token store.
 
 Dragging a work item onto an agent records provider-neutral assignment metadata
 in `workBacklog.assignments`, keyed by provider and provider-generated item id,
-then sends a deterministic prompt through the existing prompt path. Assigning
-the same work item to another agent overwrites that key. If the stored agent id
-no longer exists, the ticket is treated as unassigned. Removing an assignment
-clears only Codex Claw's local backlog metadata.
+then sends a deterministic prompt through the existing prompt path. Assignment
+state is local and provider-neutral: newly assigned items are `working`, and
+agents mark them `completed` through the `mark-work-item-completed` Claw MCP
+tool using the exact work item id from that prompt. Assigning the same work
+item to another agent overwrites that key and resets it to `working`. If the
+stored agent id no longer exists, the ticket is treated as unassigned. Removing
+an assignment clears only Codex Claw's local backlog metadata.
 Future provider-specific actions, such as claiming tickets, commenting, or
 changing status, should be added behind the work-provider seam without changing
 cockpit tiles into provider-aware UI.

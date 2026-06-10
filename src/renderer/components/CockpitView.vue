@@ -39,6 +39,7 @@
         :selected-repository-id="workBacklog.selectedRepositoryId"
         :status="workBacklog.status"
         :assigned-agents-by-work-item-key="assignedAgentsByWorkItemKey"
+        :assignments="workBacklog.assignments"
         :can-assign-to-bench="bench.length > 0"
         @assign-to-bench-agent="emit('assign-work-item-to-bench-agent', { item: $event })"
         @assign-to-new-agent="emit('assign-work-item-to-new-agent', { item: $event })"

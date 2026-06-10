@@ -232,6 +232,7 @@ describe('CockpitView', () => {
         itemId: item.id,
         agentId: 'agent-dina',
         assignedAt: '2026-06-09T13:00:00.000Z',
+        status: 'working',
       },
     };
     const wrapper = mountCockpit(snapshot, {

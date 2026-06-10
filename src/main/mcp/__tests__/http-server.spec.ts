@@ -70,6 +70,7 @@ describe('ClawMcpHttpServer', () => {
       'check-messages',
       'broadcast-message',
       'set-status',
+      'mark-work-item-completed',
       'display-markdown',
     ]);
 
@@ -118,9 +119,16 @@ describe('ClawMcpHttpServer', () => {
       message: 'Displayed Markdown in the side panel.',
       title: 'Plan',
     });
+    const markWorkItemCompleted = vi.fn().mockResolvedValue({
+      success: true,
+      workItemId: 'github:nbonamy/codex-claw#12',
+      status: 'completed',
+      completedAt: '2026-06-09T13:30:00.000Z',
+    });
     const coordinator = new ClawMcpAgentCoordinator({
       getAgents: () => agents,
       onDisplayMarkdown: displayMarkdown,
+      onMarkWorkItemCompleted: markWorkItemCompleted,
       createId: vi.fn()
         .mockReturnValueOnce('message-direct')
         .mockReturnValueOnce('message-broadcast'),
@@ -196,6 +204,17 @@ describe('ClawMcpHttpServer', () => {
       markdown: undefined,
       title: undefined,
     });
+
+    const completedResponse = await callTool(dinaUrl, 'mark-work-item-completed', {
+      workItemId: 'github:nbonamy/codex-claw#12',
+    });
+    expect(completedResponse.result.structuredContent).toStrictEqual({
+      success: true,
+      workItemId: 'github:nbonamy/codex-claw#12',
+      status: 'completed',
+      completedAt: '2026-06-09T13:30:00.000Z',
+    });
+    expect(markWorkItemCompleted).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'github:nbonamy/codex-claw#12');
   });
 
   it('supports the official MCP client connect and callTool flow', async () => {

@@ -201,6 +201,23 @@ Effects:
 - returns a structured success result with the displayed title and path when
   available.
 
+### `mark-work-item-completed`
+
+Marks one of the caller's assigned backlog work items as completed.
+
+Input:
+
+- `workItemId`: exact Work item ID from the assignment prompt, such as
+  `github:owner/repo#123`.
+
+Effects:
+
+- verifies that the work item is currently assigned to the caller;
+- updates `workBacklog.assignments[workItemId].status` to `completed`;
+- emits `workBacklog.assignmentUpdated` so the cockpit backlog reflects the
+  completed state;
+- persists the updated assignment.
+
 ## Inbox Prompting
 
 When a recipient receives a direct or broadcast message:

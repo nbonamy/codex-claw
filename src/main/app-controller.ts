@@ -21,6 +21,7 @@ import { SafeStorageWorkIntegrationTokenStore } from './work-integrations/token-
 import {
   assignWorkItemToAgentInSnapshot,
   closeAgentInSnapshot,
+  completeWorkItemAssignmentInSnapshot,
   deployBenchTemplateInSnapshot,
   duplicateAgentInSnapshot,
   moveAgentToTeamInSnapshot,
@@ -48,7 +49,7 @@ import { teamColors } from '../shared/team-colors';
 import { sanitizeWorkItemAssignmentSource } from '../shared/work-assignments';
 import type { AgentBackendDriver } from './backends/types';
 import { backendDisplayName, unsupportedBackendFeature } from './backends/types';
-import type { DisplayMarkdownInput, DisplayMarkdownResponse } from './mcp/agent-coordinator';
+import { McpToolError, type DisplayMarkdownInput, type DisplayMarkdownResponse, type MarkWorkItemCompletedResponse } from './mcp/agent-coordinator';
 
 const MAX_AGENT_FILE_READ_BYTES = 2 * 1024 * 1024;
 
@@ -70,6 +71,7 @@ export class AppController {
       this.promptAgentToCheckInbox(agentId, messageId);
     },
     onDisplayMarkdown: (agent, input) => this.displayMarkdownForAgent(agent, input),
+    onMarkWorkItemCompleted: (agent, workItemId) => this.markWorkItemCompletedForAgent(agent, workItemId),
   });
   private mcpServer: ClawMcpHttpServer | null = null;
   private mcpServerUrl: string | null = null;
@@ -578,6 +580,36 @@ export class AppController {
     };
   }
 
+  private markWorkItemCompletedForAgent(agent: Agent, workItemId: string): MarkWorkItemCompletedResponse {
+    const assignment = this.snapshot.workBacklog.assignments[workItemId];
+    if (!assignment) {
+      throw new McpToolError(`Work item '${workItemId}' is not currently assigned. Use the exact Work item ID from your assignment prompt.`);
+    }
+    if (assignment.agentId !== agent.id) {
+      const assignedAgent = this.snapshot.agents.find((candidate) => candidate.id === assignment.agentId);
+      throw new McpToolError(`Work item '${workItemId}' is assigned to ${assignedAgent?.name ?? assignment.agentId}, not ${agent.name}.`);
+    }
+
+    const completedAt = new Date().toISOString();
+    const completedAssignment = completeWorkItemAssignmentInSnapshot(this.snapshot, agent.id, workItemId, completedAt);
+    if (!completedAssignment?.completedAt) {
+      throw new McpToolError(`Work item '${workItemId}' could not be marked completed.`);
+    }
+
+    this.emitAndApply({
+      agentId: agent.id,
+      type: 'workBacklog.assignmentUpdated',
+      payload: completedAssignment,
+    });
+
+    return {
+      success: true,
+      workItemId,
+      status: 'completed',
+      completedAt: completedAssignment.completedAt,
+    };
+  }
+
   private async steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot> {
     const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
     const trimmedPrompt = prompt.trim();
@@ -934,6 +966,7 @@ export class AppController {
       fullEvent.type === 'backend.statusChanged' ||
       fullEvent.type === 'agent.updated' ||
       fullEvent.type === 'account.rateLimitsUpdated' ||
+      fullEvent.type === 'workBacklog.assignmentUpdated' ||
       fullEvent.type === 'thread.started' ||
       fullEvent.type === 'thread.settingsUpdated' ||
       fullEvent.type === 'thread.tokenUsageUpdated' ||

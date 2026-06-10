@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assignWorkItemToAgentInSnapshot,
   closeAgentInSnapshot,
+  completeWorkItemAssignmentInSnapshot,
   deployBenchTemplateInSnapshot,
   duplicateAgentInSnapshot,
   moveAgentToTeamInSnapshot,
@@ -161,6 +162,7 @@ describe('agent-manager', () => {
       itemId: 'nbonamy/codex-claw#12',
       agentId: 'agent-dina',
       assignedAt: '2026-06-09T13:00:00.000Z',
+      status: 'working',
     });
 
     assignWorkItemToAgentInSnapshot(snapshot, 'agent-dina', secondItem, '2026-06-09T13:05:00.000Z');
@@ -176,7 +178,25 @@ describe('agent-manager', () => {
       itemId: 'nbonamy/codex-claw#12',
       agentId: 'agent-jesse',
       assignedAt: '2026-06-09T13:10:00.000Z',
+      status: 'working',
     });
+  });
+
+  it('marks assigned work items as completed by the owning agent', () => {
+    const snapshot = createInitialSnapshot();
+    const item = workItem(12, 'Fix cockpit drag target');
+    assignWorkItemToAgentInSnapshot(snapshot, 'agent-dina', item, '2026-06-09T13:00:00.000Z');
+
+    expect(completeWorkItemAssignmentInSnapshot(snapshot, 'agent-jesse', workItemAssignmentKey(item), '2026-06-09T13:15:00.000Z')).toBeNull();
+    expect(completeWorkItemAssignmentInSnapshot(snapshot, 'agent-dina', workItemAssignmentKey(item), '2026-06-09T13:15:00.000Z')).toStrictEqual({
+      provider: 'github',
+      itemId: 'nbonamy/codex-claw#12',
+      agentId: 'agent-dina',
+      assignedAt: '2026-06-09T13:00:00.000Z',
+      status: 'completed',
+      completedAt: '2026-06-09T13:15:00.000Z',
+    });
+    expect(snapshot.agents[0].updatedAt).toBe('2026-06-09T13:15:00.000Z');
   });
 
   it('removes assigned work item keys', () => {
@@ -195,6 +215,7 @@ describe('agent-manager', () => {
         itemId: 'nbonamy/codex-claw#13',
         agentId: 'agent-dina',
         assignedAt: '2026-06-09T13:05:00.000Z',
+        status: 'working',
       },
     });
     expect(removeWorkItemAssignmentFromSnapshot(snapshot, secondItem)).toBe(true);

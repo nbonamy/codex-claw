@@ -1630,5 +1630,6 @@ function workItemAssignment(item: WorkItem, agentId: string) {
     itemId: item.id,
     agentId,
     assignedAt: '2026-06-09T13:00:00.000Z',
+    status: 'working' as const,
   };
 }

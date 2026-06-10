@@ -7,6 +7,7 @@ import { defaultBackendCommands } from '../shared/backend-commands';
 import { codexApprovalPresetFromDefaults } from '../shared/codex-approval-presets';
 import { createQueuedChatPrompt, type QueuedChatPrompt } from './shared/chat/queued-prompts';
 import { promptSkillInputsFromText } from './shared/chat/composer-skills';
+import { workItemAssignmentKey } from '../shared/work-assignments';
 
 const snapshot = ref<AppSnapshot>(createEmptySnapshot());
 const isLoading = ref(false);
@@ -732,8 +733,12 @@ export function useAppState() {
 
 export function workItemAssignmentPrompt(item: WorkItem): string {
   const body = truncateWorkItemBody(item.body?.trim() ?? '');
+  const workItemId = workItemAssignmentKey(item);
   return [
     `Please take this ${workProviderLabel(item.provider)} issue and drive it to completion.`,
+    '',
+    `Work item ID: ${workItemId}`,
+    'When you are done with this work item, call the codex_claw MCP tool `mark-work-item-completed` with this exact Work item ID.',
     '',
     `Repository: ${item.repositoryFullName}`,
     `Issue: #${item.number} ${item.title}`,

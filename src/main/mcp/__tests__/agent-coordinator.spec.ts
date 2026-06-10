@@ -229,6 +229,37 @@ describe('ClawMcpAgentCoordinator', () => {
     })).rejects.toThrow('Provide exactly one of markdown or path.');
   });
 
+  it('marks assigned work items complete through the app callback', async () => {
+    const agents = cloneAgents(baseAgents);
+    const onMarkWorkItemCompleted = vi.fn().mockResolvedValue({
+      success: true,
+      workItemId: 'github:nbonamy/codex-claw#12',
+      status: 'completed',
+      completedAt: '2026-06-09T13:30:00.000Z',
+    });
+    const coordinator = new ClawMcpAgentCoordinator({
+      getAgents: () => agents,
+      onMarkWorkItemCompleted,
+    });
+
+    await expect(coordinator.markWorkItemCompleted('agent-dina', ' github:nbonamy/codex-claw#12 ')).resolves.toStrictEqual({
+      success: true,
+      workItemId: 'github:nbonamy/codex-claw#12',
+      status: 'completed',
+      completedAt: '2026-06-09T13:30:00.000Z',
+    });
+    expect(onMarkWorkItemCompleted).toHaveBeenCalledWith(agents[0], 'github:nbonamy/codex-claw#12');
+  });
+
+  it('rejects completion requests without a work item callback or id', async () => {
+    const coordinator = new ClawMcpAgentCoordinator({
+      getAgents: () => cloneAgents(baseAgents),
+    });
+
+    await expect(coordinator.markWorkItemCompleted('agent-dina', '  ')).rejects.toThrow('Provide the work item ID from your assignment prompt.');
+    await expect(coordinator.markWorkItemCompleted('agent-dina', 'github:nbonamy/codex-claw#12')).rejects.toThrow('Work item completion is not available.');
+  });
+
   it('rejects markdown display when the app callback is unavailable', async () => {
     const coordinator = new ClawMcpAgentCoordinator({
       getAgents: () => cloneAgents(baseAgents),

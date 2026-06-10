@@ -16,12 +16,14 @@ import type {
   ThreadPlan,
   ThreadPlanStep,
   UpdateAgentInput,
+  WorkBacklogAssignment,
 } from './contracts';
 import { defaultThemeSettings } from './settings';
 import { createEntityId } from './ids';
 import { defaultTeamColor } from './team-colors';
 import { toolOutputText } from './tool-output';
 import { codexApprovalPresetFromThreadSettings, codexBackendDefaultsWithApprovalPreset } from './codex-approval-presets';
+import { workItemAssignmentKey } from './work-assignments';
 
 const seedCreatedAt = '2026-06-05T00:00:00.000Z';
 const seedTeamId = 'team-codex-claw';
@@ -238,6 +240,17 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     const rateLimits = accountRateLimits(event.payload);
     if (rateLimits) {
       snapshot.accountRateLimits = rateLimits;
+    }
+    return;
+  }
+
+  if (event.type === 'workBacklog.assignmentUpdated') {
+    const assignment = workBacklogAssignment(event.payload);
+    if (assignment) {
+      snapshot.workBacklog.assignments = {
+        ...snapshot.workBacklog.assignments,
+        [workItemAssignmentKey(assignment)]: assignment,
+      };
     }
     return;
   }
@@ -892,6 +905,28 @@ function accountRateLimitWindow(value: unknown): AccountRateLimits['primary'] {
     usedPercent: value.usedPercent,
     windowDurationMins: typeof value.windowDurationMins === 'number' ? value.windowDurationMins : null,
     resetsAt: typeof value.resetsAt === 'number' ? value.resetsAt : null,
+  };
+}
+
+function workBacklogAssignment(value: unknown): WorkBacklogAssignment | null {
+  if (
+    !isRecord(value) ||
+    value.provider !== 'github' ||
+    typeof value.itemId !== 'string' ||
+    typeof value.agentId !== 'string' ||
+    typeof value.assignedAt !== 'string' ||
+    (value.status !== 'working' && value.status !== 'completed')
+  ) {
+    return null;
+  }
+
+  return {
+    provider: value.provider,
+    itemId: value.itemId,
+    agentId: value.agentId,
+    assignedAt: value.assignedAt,
+    status: value.status,
+    ...(typeof value.completedAt === 'string' ? { completedAt: value.completedAt } : {}),
   };
 }
 

@@ -30,6 +30,48 @@ describe('AppController', () => {
     expect(persistence.save).toHaveBeenCalledWith(snapshot);
   });
 
+  it('persists work item completion updates emitted by MCP tools', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.assignments = {
+      'github:nbonamy/codex-claw#12': {
+        provider: 'github',
+        itemId: 'nbonamy/codex-claw#12',
+        agentId: 'agent-dina',
+        assignedAt: '2026-06-09T13:00:00.000Z',
+        status: 'working',
+      },
+    };
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const send = vi.fn();
+
+    await controller.initialize();
+    setMainWindowSend(controller, send);
+    await mcpCoordinator(controller).markWorkItemCompleted('agent-dina', 'github:nbonamy/codex-claw#12');
+    await flushMicrotasks();
+
+    expect(snapshot.workBacklog.assignments['github:nbonamy/codex-claw#12']).toMatchObject({
+      provider: 'github',
+      itemId: 'nbonamy/codex-claw#12',
+      agentId: 'agent-dina',
+      assignedAt: '2026-06-09T13:00:00.000Z',
+      status: 'completed',
+      completedAt: expect.any(String),
+    });
+    expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
+      agentId: 'agent-dina',
+      type: 'workBacklog.assignmentUpdated',
+      payload: expect.objectContaining({
+        itemId: 'nbonamy/codex-claw#12',
+        status: 'completed',
+      }),
+    }));
+    expect(persistence.save).toHaveBeenCalledWith(snapshot);
+  });
+
   it('persists token usage updates emitted by Codex', async () => {
     const snapshot = createInitialSnapshot();
     const persistence = {
@@ -530,11 +572,13 @@ describe('AppController', () => {
 function mcpCoordinator(controller: AppController): {
   setStatus(agentId: string, status: string): string;
   displayMarkdown(agentId: string, input: { markdown?: string; path?: string; title?: string }): Promise<unknown>;
+  markWorkItemCompleted(agentId: string, workItemId: string): Promise<unknown>;
 } {
   return (controller as unknown as {
     mcpCoordinator: {
       setStatus(agentId: string, status: string): string;
       displayMarkdown(agentId: string, input: { markdown?: string; path?: string; title?: string }): Promise<unknown>;
+      markWorkItemCompleted(agentId: string, workItemId: string): Promise<unknown>;
     };
   }).mcpCoordinator;
 }

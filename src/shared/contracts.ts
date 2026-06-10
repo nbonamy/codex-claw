@@ -146,11 +146,15 @@ export type WorkProviderSettings = {
   oauthClientId?: string;
 };
 
+export type WorkBacklogAssignmentStatus = 'working' | 'completed';
+
 export type WorkBacklogAssignment = {
   provider: WorkProviderKind;
   itemId: string;
   agentId: string;
   assignedAt: string;
+  status: WorkBacklogAssignmentStatus;
+  completedAt?: string;
 };
 
 export type WorkBacklogState = {
@@ -441,6 +445,7 @@ export type MainToRendererEvent = {
     | 'message.steer'
     | 'context.compactionStarted'
     | 'account.rateLimitsUpdated'
+    | 'workBacklog.assignmentUpdated'
     | 'skills.changed'
     | 'sidePanel.markdownRequested'
     | 'message.delta'

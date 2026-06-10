@@ -814,6 +814,36 @@ describe('snapshot reducer', () => {
     });
   });
 
+  it('applies work backlog assignment updates from MCP tools', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'workBacklog.assignmentUpdated',
+      payload: {
+        provider: 'github',
+        itemId: 'nbonamy/codex-claw#12',
+        agentId: 'agent-dina',
+        assignedAt: '2026-06-09T13:00:00.000Z',
+        status: 'completed',
+        completedAt: '2026-06-09T13:30:00.000Z',
+      },
+      occurredAt: '2026-06-09T13:30:00.000Z',
+    });
+
+    expect(snapshot.workBacklog.assignments).toStrictEqual({
+      'github:nbonamy/codex-claw#12': {
+        provider: 'github',
+        itemId: 'nbonamy/codex-claw#12',
+        agentId: 'agent-dina',
+        assignedAt: '2026-06-09T13:00:00.000Z',
+        status: 'completed',
+        completedAt: '2026-06-09T13:30:00.000Z',
+      },
+    });
+  });
+
   it('keeps agent selection and streamed chats isolated per agent', () => {
     const snapshot = createInitialSnapshot();
 

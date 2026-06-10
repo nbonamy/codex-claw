@@ -9,6 +9,7 @@ export function workBacklogAssignmentFromWorkItem(item: WorkItemAssignmentSource
     itemId: item.id,
     agentId,
     assignedAt,
+    status: 'working',
   };
 }
 

@@ -248,6 +248,7 @@ describe('useAppState', () => {
       itemId: 'nbonamy/codex-claw#12',
       agentId: 'agent-dina',
       assignedAt: '2026-06-09T13:00:00.000Z',
+      status: 'working' as const,
     };
     const assignedSnapshot = createInitialSnapshot();
     assignedSnapshot.workBacklog.assignments = {
@@ -289,6 +290,7 @@ describe('useAppState', () => {
         itemId: item.id,
         agentId: 'agent-dina',
         assignedAt: '2026-06-09T13:00:00.000Z',
+        status: 'working',
       },
     };
     const unassignedSnapshot = createInitialSnapshot();
@@ -314,6 +316,9 @@ describe('useAppState', () => {
   it('formats deterministic work item assignment prompts', () => {
     expect(workItemAssignmentPrompt(workItem())).toBe([
       'Please take this GitHub issue and drive it to completion.',
+      '',
+      'Work item ID: github:nbonamy/codex-claw#12',
+      'When you are done with this work item, call the codex_claw MCP tool `mark-work-item-completed` with this exact Work item ID.',
       '',
       'Repository: nbonamy/codex-claw',
       'Issue: #12 Fix cockpit drag target',
@@ -514,6 +519,9 @@ describe('useAppState', () => {
       labels: [],
     })).toBe([
       'Please take this GitHub issue and drive it to completion.',
+      '',
+      'Work item ID: github:nbonamy/codex-claw#12',
+      'When you are done with this work item, call the codex_claw MCP tool `mark-work-item-completed` with this exact Work item ID.',
       '',
       'Repository: nbonamy/codex-claw',
       'Issue: #12 Fix cockpit drag target',

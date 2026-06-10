@@ -71,7 +71,10 @@
         v-for="row in itemRows"
         :key="row.item.id"
         class="work-backlog-panel__item"
-        :class="{ 'work-backlog-panel__item--assigned': row.assignedAgent }"
+        :class="{
+          'work-backlog-panel__item--assigned': row.assignedAgent,
+          'work-backlog-panel__item--completed': workItemAssignmentStatus(row) === 'completed',
+        }"
         draggable="true"
         @click="selectAssignedAgent(row.assignedAgent)"
         @contextmenu.prevent.stop="openItemMenu(row.item.id)"
@@ -123,9 +126,9 @@
           <span>{{ row.assignedAgent.name }}</span>
           <span
             class="work-backlog-panel__assignee-status"
-            :data-status="row.assignedAgent.status.type"
+            :data-status="workItemAssignmentStatus(row)"
           >
-            {{ agentStatusLabel(row.assignedAgent.status.type) }}
+            {{ workItemAssignmentStatusLabel(row) }}
           </span>
         </div>
         <div
@@ -141,21 +144,22 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Agent, WorkIntegrationConnection, WorkItem, WorkRepository } from '../../shared/contracts';
+import type { Agent, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '../../shared/contracts';
 import { workItemAssignmentKey } from '../../shared/work-assignments';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import { CircleXIcon, DotsVerticalIcon, ExternalLinkIcon, GitHubIcon, PlusCircleIcon, RefreshIcon, SaveToBenchIcon } from '../shared/icons/app-icons';
-import { agentStatusLabel } from '../shared/agent-display';
 import AgentAvatar from './AgentAvatar.vue';
 
 type WorkBacklogItemRow = {
   assignedAgent: Agent | null;
+  assignment: WorkBacklogAssignment | null;
   item: WorkItem;
 };
 
 const props = withDefaults(defineProps<{
   assignedAgentsByWorkItemKey?: Record<string, Agent>;
+  assignments?: Record<string, WorkBacklogAssignment>;
   canAssignToBench?: boolean;
   connection: WorkIntegrationConnection;
   error: string | null;
@@ -165,6 +169,7 @@ const props = withDefaults(defineProps<{
   status: 'notLoaded' | 'loading' | 'loaded' | 'error';
 }>(), {
   assignedAgentsByWorkItemKey: () => ({}),
+  assignments: () => ({}),
   canAssignToBench: true,
 });
 
@@ -180,10 +185,23 @@ const emit = defineEmits<{
 }>();
 
 const openMenuItemId = ref<string | null>(null);
-const itemRows = computed<WorkBacklogItemRow[]>(() => props.items.map((item) => ({
-  assignedAgent: props.assignedAgentsByWorkItemKey[workItemAssignmentKey(item)] ?? null,
-  item,
-})));
+const itemRows = computed<WorkBacklogItemRow[]>(() => props.items.map((item) => {
+  const assignmentKey = workItemAssignmentKey(item);
+  const assignedAgent = props.assignedAgentsByWorkItemKey[assignmentKey] ?? null;
+  return {
+    assignedAgent,
+    assignment: assignedAgent ? props.assignments[assignmentKey] ?? null : null,
+    item,
+  };
+}));
+
+function workItemAssignmentStatus(row: WorkBacklogItemRow): WorkBacklogAssignment['status'] {
+  return row.assignment?.status ?? 'working';
+}
+
+function workItemAssignmentStatusLabel(row: WorkBacklogItemRow): string {
+  return workItemAssignmentStatus(row) === 'completed' ? 'Completed' : 'Working';
+}
 
 function menuItemsForRow(row: WorkBacklogItemRow): AppMenuItem[] {
   return [
@@ -375,6 +393,11 @@ function endDrag(): void {
 
 .work-backlog-panel__item--assigned {
   cursor: pointer;
+}
+
+.work-backlog-panel__item--completed {
+  border-color: color-mix(in srgb, var(--color-success) 32%, var(--color-border));
+  background: color-mix(in srgb, var(--color-success) 6%, var(--color-surface-lowest));
 }
 
 .work-backlog-panel__item--assigned:active {

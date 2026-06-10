@@ -113,6 +113,8 @@ describe('AppStatePersistence', () => {
         itemId: 'nbonamy/codex-claw#12',
         agentId: 'agent-dina',
         assignedAt: '2026-06-09T13:00:00.000Z',
+        status: 'completed',
+        completedAt: '2026-06-09T13:30:00.000Z',
       },
     };
     appendUserPrompt(snapshot, 'agent-dina', 'do not persist this', '2026-06-05T10:11:12.000Z');
@@ -167,6 +169,8 @@ describe('AppStatePersistence', () => {
         itemId: 'nbonamy/codex-claw#12',
         agentId: 'agent-dina',
         assignedAt: '2026-06-09T13:00:00.000Z',
+        status: 'completed',
+        completedAt: '2026-06-09T13:30:00.000Z',
       },
     });
     expect(writtenAgent).not.toHaveProperty('isRegistered');
@@ -337,6 +341,7 @@ describe('AppStatePersistence', () => {
         itemId: 'nbonamy/codex-claw#12',
         agentId: 'agent-dina',
         assignedAt: '2026-06-09T13:00:00.000Z',
+        status: 'working',
       },
     });
   });
@@ -364,6 +369,8 @@ describe('AppStatePersistence', () => {
           itemId: 'nbonamy/codex-claw#12',
           agentId: 'agent-dina',
           assignedAt: '2026-06-09T13:00:00.000Z',
+          status: 'completed',
+          completedAt: '2026-06-09T13:30:00.000Z',
         },
       },
     };
@@ -391,6 +398,8 @@ describe('AppStatePersistence', () => {
           itemId: 'nbonamy/codex-claw#12',
           agentId: 'agent-dina',
           assignedAt: '2026-06-09T13:00:00.000Z',
+          status: 'completed',
+          completedAt: '2026-06-09T13:30:00.000Z',
         },
       },
     });

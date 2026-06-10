@@ -55,11 +55,19 @@ export type DisplayMarkdownResponse = {
   title?: string;
 };
 
+export type MarkWorkItemCompletedResponse = {
+  success: true;
+  workItemId: string;
+  status: 'completed';
+  completedAt: string;
+};
+
 export type ClawMcpAgentCoordinatorOptions = {
   getAgents: () => Agent[];
   onAgentUpdated?: (agent: Agent) => void;
   onInboxMessage?: (agentId: string, messageId: string) => void;
   onDisplayMarkdown?: (agent: Agent, input: DisplayMarkdownInput) => DisplayMarkdownResponse | Promise<DisplayMarkdownResponse>;
+  onMarkWorkItemCompleted?: (agent: Agent, workItemId: string) => MarkWorkItemCompletedResponse | Promise<MarkWorkItemCompletedResponse>;
   createId?: () => string;
   now?: () => Date;
 };
@@ -77,6 +85,7 @@ export class ClawMcpAgentCoordinator {
   private readonly onAgentUpdated?: (agent: Agent) => void;
   private readonly onInboxMessage?: (agentId: string, messageId: string) => void;
   private readonly onDisplayMarkdown?: (agent: Agent, input: DisplayMarkdownInput) => DisplayMarkdownResponse | Promise<DisplayMarkdownResponse>;
+  private readonly onMarkWorkItemCompleted?: (agent: Agent, workItemId: string) => MarkWorkItemCompletedResponse | Promise<MarkWorkItemCompletedResponse>;
   private readonly createId: () => string;
   private readonly now: () => Date;
 
@@ -85,6 +94,7 @@ export class ClawMcpAgentCoordinator {
     this.onAgentUpdated = options.onAgentUpdated;
     this.onInboxMessage = options.onInboxMessage;
     this.onDisplayMarkdown = options.onDisplayMarkdown;
+    this.onMarkWorkItemCompleted = options.onMarkWorkItemCompleted;
     this.createId = options.createId ?? randomUUID;
     this.now = options.now ?? (() => new Date());
   }
@@ -186,6 +196,19 @@ export class ClawMcpAgentCoordinator {
       ...(filePath ? { path: filePath } : {}),
       ...(title ? { title } : {}),
     });
+  }
+
+  async markWorkItemCompleted(agentId: string, workItemId: string): Promise<MarkWorkItemCompletedResponse> {
+    const agent = this.requireAgent(agentId);
+    const normalizedWorkItemId = workItemId.trim();
+    if (!normalizedWorkItemId) {
+      throw new McpToolError('Provide the work item ID from your assignment prompt.');
+    }
+    if (!this.onMarkWorkItemCompleted) {
+      throw new McpToolError('Work item completion is not available.');
+    }
+
+    return this.onMarkWorkItemCompleted(agent, normalizedWorkItemId);
   }
 
   latestUnreadMessageId(agentId: string): string | null {

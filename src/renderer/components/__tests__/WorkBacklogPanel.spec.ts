@@ -69,12 +69,36 @@ describe('WorkBacklogPanel', () => {
 
     const card = wrapper.get('.work-backlog-panel__item');
     expect(card.text()).toContain('Dina');
-    expect(card.text()).toContain('Idle');
+    expect(card.text()).toContain('Working');
     expect(card.text()).not.toContain('bug');
 
     await card.trigger('click');
 
     expect(wrapper.emitted('select-assigned-agent')).toStrictEqual([['agent-dina']]);
+  });
+
+  it('renders completed assignment state from the backlog mapping', () => {
+    const item = workItem();
+    const wrapper = mountPanel({
+      assignedAgentsByWorkItemKey: {
+        [workItemAssignmentKey(item)]: assignedAgent(),
+      },
+      assignments: {
+        [workItemAssignmentKey(item)]: {
+          provider: 'github',
+          itemId: item.id,
+          agentId: 'agent-dina',
+          assignedAt: '2026-06-09T13:00:00.000Z',
+          status: 'completed',
+          completedAt: '2026-06-09T13:30:00.000Z',
+        },
+      },
+      items: [item],
+    });
+
+    expect(wrapper.get('.work-backlog-panel__item').classes()).toContain('work-backlog-panel__item--completed');
+    expect(wrapper.get('.work-backlog-panel__assignee-status').text()).toBe('Completed');
+    expect(wrapper.get('.work-backlog-panel__assignee-status').attributes('data-status')).toBe('completed');
   });
 
   it('opens issue actions and routes menu selections', async () => {

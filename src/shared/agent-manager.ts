@@ -1,4 +1,4 @@
-import type { Agent, AppSnapshot, BenchTemplate } from './contracts';
+import type { Agent, AppSnapshot, BenchTemplate, WorkBacklogAssignment } from './contracts';
 import { createEntityId, createUniqueEntityId, type IdGenerator } from './ids';
 import { workBacklogAssignmentFromWorkItem, workItemAssignmentKey, type WorkItemAssignmentSource } from './work-assignments';
 
@@ -112,6 +112,29 @@ export function removeWorkItemAssignmentFromSnapshot(snapshot: AppSnapshot, item
   delete nextAssignments[assignmentKey];
   snapshot.workBacklog.assignments = nextAssignments;
   return true;
+}
+
+export function completeWorkItemAssignmentInSnapshot(snapshot: AppSnapshot, agentId: string, workItemId: string, completedAt = new Date().toISOString()): WorkBacklogAssignment | null {
+  const assignment = snapshot.workBacklog.assignments[workItemId];
+  if (!assignment || assignment.agentId !== agentId) {
+    return null;
+  }
+
+  const completedAssignment: WorkBacklogAssignment = {
+    ...assignment,
+    status: 'completed',
+    completedAt,
+  };
+  snapshot.workBacklog.assignments = {
+    ...snapshot.workBacklog.assignments,
+    [workItemId]: completedAssignment,
+  };
+
+  const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
+  if (agent) {
+    agent.updatedAt = completedAt;
+  }
+  return completedAssignment;
 }
 
 export function moveAgentToTeamInSnapshot(snapshot: AppSnapshot, agentId: string, teamId: string, updatedAt = new Date().toISOString()): Agent | null {

@@ -381,6 +381,8 @@ function sanitizeWorkBacklogAssignment(value: unknown): WorkBacklogAssignment | 
     itemId: value.itemId,
     agentId: value.agentId,
     assignedAt: value.assignedAt,
+    status: isWorkBacklogAssignmentStatus(value.status) ? value.status : 'working',
+    ...(typeof value.completedAt === 'string' ? { completedAt: value.completedAt } : {}),
   };
 }
 
@@ -424,6 +426,7 @@ function legacyWorkBacklogAssignment(agentId: string, value: unknown): WorkBackl
     itemId: value.id,
     agentId,
     assignedAt: value.assignedAt,
+    status: 'working',
   };
 }
 
@@ -492,6 +495,10 @@ function isWorkIntegrationStatus(value: unknown): value is WorkIntegrationStatus
     value === 'connecting' ||
     value === 'connected' ||
     value === 'error';
+}
+
+function isWorkBacklogAssignmentStatus(value: unknown): value is WorkBacklogAssignment['status'] {
+  return value === 'working' || value === 'completed';
 }
 
 function sanitizeTeam(value: unknown, agents: Agent[]): Team | null {

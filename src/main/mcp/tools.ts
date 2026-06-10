@@ -60,6 +60,16 @@ export function createCodexClawMcpServer(coordinator: ClawMcpAgentCoordinator, c
     statusLength: status.length,
   }, () => coordinator.setStatus(callerAgentId, status)));
 
+  server.registerTool('mark-work-item-completed', {
+    description: 'Mark one of your assigned backlog work items as completed. Call this when you have finished the work, using the exact workItemId from the assignment prompt.',
+    inputSchema: {
+      workItemId: z.string().describe('Exact Work item ID from the assignment prompt, for example github:owner/repo#123.'),
+    },
+  }, ({ workItemId }) => toolResult('mark-work-item-completed', {
+    agentId: callerAgentId,
+    workItemIdLength: workItemId.length,
+  }, () => coordinator.markWorkItemCompleted(callerAgentId, workItemId)));
+
   server.registerTool('display-markdown', {
     description: 'Display Markdown in the Codex Claw side panel. Provide exactly one of path or markdown. Use path for Markdown files in your agent folder; use markdown for inline generated content.',
     inputSchema: {
