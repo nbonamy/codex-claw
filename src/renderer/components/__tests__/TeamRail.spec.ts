@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { ElMessageBox } from 'element-plus';
@@ -48,7 +50,7 @@ describe('TeamRail', () => {
     expect(wrapper.find('.team-rail__window-controls').exists()).toBe(false);
     expect(wrapper.find('[aria-label="Create team"]').exists()).toBe(true);
     expect(wrapper.get('[aria-label="Loops"]').attributes('aria-pressed')).toBe('false');
-    expect(wrapper.find('[aria-label="Settings menu"]').exists()).toBe(true);
+    expect(wrapper.get('[aria-label="Settings menu"]').attributes('aria-pressed')).toBe('false');
   });
 
   it('falls back to team initials when no avatar is set', () => {
@@ -97,6 +99,7 @@ describe('TeamRail', () => {
     await wrapper.get('[aria-label="Cockpit"]').trigger('click');
 
     expect(wrapper.get('[aria-label="Cockpit"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('[aria-label="Cockpit"]').classes()).toContain('team-rail__cockpit--active');
     expect(wrapper.get('[aria-label="Skwad"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.get('[aria-label="Skwad"]').classes()).not.toContain('team-rail__team--active');
     expect(wrapper.emitted('select-cockpit')).toStrictEqual([[]]);
@@ -112,9 +115,39 @@ describe('TeamRail', () => {
     await wrapper.get('[aria-label="Loops"]').trigger('click');
 
     expect(wrapper.get('[aria-label="Loops"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('[aria-label="Loops"]').classes()).toContain('team-rail__loops--active');
     expect(wrapper.get('[aria-label="Skwad"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.get('[aria-label="Skwad"]').classes()).not.toContain('team-rail__team--active');
     expect(wrapper.emitted('select-loops')).toStrictEqual([[]]);
+  });
+
+  it('marks settings active without keeping a team focused', () => {
+    const wrapper = mountRail({
+      teams,
+      activeTeamId: 'team-sk',
+      settingsActive: true,
+    });
+
+    expect(wrapper.get('[aria-label="Settings menu"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('[aria-label="Settings menu"]').classes()).toContain('settings-menu__trigger--active');
+    expect(wrapper.get('[aria-label="Skwad"]').attributes('aria-pressed')).toBe('false');
+    expect(wrapper.get('[aria-label="Skwad"]').classes()).not.toContain('team-rail__team--active');
+  });
+
+  it('keeps app surface icons visually consistent', () => {
+    expect(teamRailSource()).toContain(':deep() .settings-menu__trigger svg');
+    expect(teamRailSource()).toContain('width: var(--icon-xl);');
+    expect(teamRailSource()).toContain('stroke-width: 1.25px;');
+    expect(teamRailSource()).toContain('transform: scale(1.15);');
+    expect(teamRailSource()).toContain('.team-rail__new svg');
+    expect(teamRailSource()).toContain('DashboardIcon');
+    expect(teamRailSource()).toContain('InfinityIcon');
+    expect(teamRailSource()).toContain('stroke-width: 1.35px;');
+    expect(teamRailSource()).toContain('transform: scaleX(1.2) scaleY(1.48);');
+    expect(teamRailSource()).not.toContain('CompassIcon');
+    expect(teamRailSource()).not.toContain('RepeatIcon');
+    expect(settingsMenuSource()).not.toContain('width: var(--icon-xl);');
+    expect(settingsMenuSource()).not.toContain('transform: scale(1.15)');
   });
 
   it('emits team reorder drops and marks the drop location', async () => {
@@ -276,6 +309,7 @@ function mountRail(props: {
   cockpitActive?: boolean;
   loopsActive?: boolean;
   rateLimits?: AccountRateLimits;
+  settingsActive?: boolean;
 }) {
   const wrapper = mount(TeamRail, {
     attachTo: document.body,
@@ -321,4 +355,12 @@ function mockRect(element: Element, rect: { top: number; height: number }): void
     y: rect.top,
     toJSON: () => undefined,
   });
+}
+
+function teamRailSource(): string {
+  return readFileSync(resolve(process.cwd(), 'src/renderer/components/TeamRail.vue'), 'utf8');
+}
+
+function settingsMenuSource(): string {
+  return readFileSync(resolve(process.cwd(), 'src/renderer/components/SettingsMenu.vue'), 'utf8');
 }

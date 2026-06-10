@@ -62,44 +62,64 @@
                     class="loops-view__status"
                     :data-enabled="row.enabled"
                   />
-                  <div>
+                  <div class="loops-view__info">
                     <strong>{{ row.name }}</strong>
-                    <span>
-                      {{ row.source }}
-                      <span aria-hidden="true">&bull;</span>
-                      {{ row.detail }}
-                    </span>
+                    <span>{{ row.sourceLine }}</span>
                   </div>
                 </div>
               </template>
 
-              <template #cell-schedule="{ row }">
-                <span class="loops-view__schedule-cell">{{ row.schedule }}</span>
+              <template #cell-lastExecution="{ row }">
+                <span class="loops-view__meta-cell">{{ row.lastExecution }}</span>
+              </template>
+
+              <template #cell-executionCount="{ row }">
+                <span class="loops-view__meta-cell">{{ row.executionCount }}</span>
               </template>
 
               <template #actions="{ row }">
                 <div class="loops-view__row-actions">
                   <button
                     type="button"
-                    aria-label="View loop log"
+                    :aria-label="`Run ${row.name}`"
+                    :disabled="!row.enabled"
+                    @click="runLoop(row.id)"
+                  >
+                    <PlayerPlayIcon aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    :aria-label="`View logs for ${row.name}`"
                     @click="openLog(row.id)"
                   >
-                    <ListDetailsIcon aria-hidden="true" />
+                    <LogsIcon aria-hidden="true" />
                   </button>
-                  <button
-                    type="button"
-                    aria-label="Edit loop"
-                    @click="openEdit(row.id)"
+                  <el-popover
+                    :visible="openMenuLoopId === row.id"
+                    placement="bottom-end"
+                    trigger="manual"
+                    width="180"
+                    :teleported="true"
+                    popper-class="claw-popover loops-view__menu-popover"
+                    @update:visible="setMenuVisible(row.id, $event)"
                   >
-                    <PencilIcon aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Delete loop"
-                    @click="confirmDeleteLoop(row.id)"
-                  >
-                    <Trash2Icon aria-hidden="true" />
-                  </button>
+                    <template #reference>
+                      <button
+                        type="button"
+                        :aria-label="`${row.name} actions`"
+                        @click="setMenuVisible(row.id, openMenuLoopId !== row.id)"
+                      >
+                        <DotsVerticalIcon aria-hidden="true" />
+                      </button>
+                    </template>
+                    <AppMenu
+                      class="app-menu--embedded"
+                      ariaLabel="Loop actions"
+                      :items="loopMenuItems"
+                      @click.stop
+                      @select="selectLoopMenuItem(row.id, $event)"
+                    />
+                  </el-popover>
                 </div>
               </template>
             </AppDataList>
@@ -123,11 +143,13 @@ import { computed, onMounted, ref } from 'vue';
 import type { AppSnapshot, CreateLoopInput, Loop, UpdateLoopInput, WorkItem, WorkProviderKind, WorkRepository } from '../../shared/contracts';
 import AppDataList from './AppDataList.vue';
 import type { AppDataListColumn, AppDataListRow } from './app-data-list';
+import AppMenu from '../shared/menu/AppMenu.vue';
+import type { AppMenuItem } from '../shared/menu/app-menu';
 import LoopEditor from './LoopEditor.vue';
 import LoopExecutionLog from './LoopExecutionLog.vue';
 import LoopWelcome from './LoopWelcome.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
-import { ListDetailsIcon, PencilIcon, Trash2Icon } from '../shared/icons/app-icons';
+import { DotsVerticalIcon, LogsIcon, PencilIcon, PlayerPlayIcon, Trash2Icon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
   bench: AppSnapshot['bench'];
@@ -137,6 +159,7 @@ const props = withDefaults(defineProps<{
   loadWorkItems?: (provider: WorkProviderKind, repositoryId: string) => Promise<void>;
   loadWorkRepositories?: (provider: WorkProviderKind) => Promise<void>;
   loops: Loop[];
+  runLoop?: (loopId: string) => Promise<void>;
   teams: AppSnapshot['teams'];
   updateLoop?: (input: UpdateLoopInput) => Promise<void>;
   workBacklog: AppSnapshot['workBacklog'];
@@ -150,6 +173,7 @@ const props = withDefaults(defineProps<{
   deleteLoop: async () => undefined,
   loadWorkItems: async () => undefined,
   loadWorkRepositories: async () => undefined,
+  runLoop: async () => undefined,
   updateLoop: async () => undefined,
   workBacklogError: null,
   workBacklogStatus: 'notLoaded',
@@ -162,6 +186,7 @@ type EditorMode = 'create' | 'edit';
 const editorMode = ref<EditorMode>('create');
 const editingLoopId = ref<string | null>(null);
 const logLoopId = ref<string | null>(null);
+const openMenuLoopId = ref<string | null>(null);
 const editorVisible = computed(() => editorMode.value === 'create' ? creating.value : Boolean(editingLoop.value));
 const creating = ref(false);
 const editingLoop = computed(() => editingLoopId.value ? props.loops.find((loop) => loop.id === editingLoopId.value) ?? null : null);
@@ -174,19 +199,38 @@ const loopColumns: AppDataListColumn[] = [{
   label: 'Loop',
   width: 'minmax(220px, 1fr)',
 }, {
-  id: 'schedule',
-  label: 'Schedule',
+  id: 'lastExecution',
+  label: 'Last execution',
+  width: 'max-content',
+  align: 'end',
+}, {
+  id: 'executionCount',
+  label: 'Executions',
   width: 'max-content',
   align: 'end',
 }];
+const loopMenuItems: AppMenuItem[] = [{
+  id: 'edit',
+  type: 'action',
+  label: 'Edit',
+  icon: PencilIcon,
+}, {
+  id: 'delete',
+  type: 'action',
+  label: 'Delete',
+  icon: Trash2Icon,
+  danger: true,
+}];
 const loopRows = computed<AppDataListRow[]>(() => props.loops.map((loop) => ({
+  agentName: loopAgentName(loop),
+  executionCount: loopExecutionCountLabel(loop),
   id: loop.id,
-  detail: loopDetailLabel(loop),
   enabled: loop.enabled,
   error: loop.lastError ?? '',
+  lastExecution: loopLastExecutionLabel(loop),
   name: loop.name,
-  schedule: loopScheduleLabel(loop),
   source: loopSourceLabel(loop),
+  sourceLine: `${loopAgentName(loop)} @ ${loopSourceLabel(loop)}`,
 })));
 
 onMounted(() => {
@@ -207,6 +251,7 @@ function openEdit(loopId: string): void {
   editingLoopId.value = loopId;
   logLoopId.value = null;
   creating.value = false;
+  openMenuLoopId.value = null;
 }
 
 function closeEditor(): void {
@@ -218,6 +263,7 @@ function openLog(loopId: string): void {
   creating.value = false;
   editingLoopId.value = null;
   logLoopId.value = loopId;
+  openMenuLoopId.value = null;
 }
 
 function closeLog(): void {
@@ -234,6 +280,24 @@ async function saveLoop(input: CreateLoopInput): Promise<void> {
     await props.createLoop(input);
   }
   closeEditor();
+}
+
+async function runLoop(loopId: string): Promise<void> {
+  openMenuLoopId.value = null;
+  await props.runLoop(loopId);
+}
+
+function setMenuVisible(loopId: string, visible: boolean): void {
+  openMenuLoopId.value = visible ? loopId : null;
+}
+
+function selectLoopMenuItem(loopId: string, itemId: string): void {
+  openMenuLoopId.value = null;
+  if (itemId === 'edit') {
+    openEdit(loopId);
+  } else if (itemId === 'delete') {
+    void confirmDeleteLoop(loopId);
+  }
 }
 
 async function confirmDeleteLoop(loopId: string): Promise<void> {
@@ -302,25 +366,22 @@ function loopSourceLabel(loop: Loop): string {
   return 'Work provider';
 }
 
-function loopDetailLabel(loop: Loop): string {
+function loopAgentName(loop: Loop): string {
   const template = props.bench.find((candidate) => candidate.id === loop.action.benchTemplateId);
-  const benchLabel = template ? template.name : 'Missing Bench agent';
-  const target = loop.action.teamTarget;
-  if (target.mode === 'dedicated') {
-    return `${benchLabel} - dedicated teams`;
-  }
-
-  const teamLabel = props.teams.find((team) => team.id === target.teamId)?.name ?? 'Missing team';
-  return `${benchLabel} - ${teamLabel}`;
+  return template ? template.name : 'Missing Bench agent';
 }
 
-function loopScheduleLabel(loop: Loop): string {
+function loopLastExecutionLabel(loop: Loop): string {
   if (!loop.lastRunAt) {
-    return 'Every few minutes';
+    return 'Never';
   }
 
-  const created = loop.lastCreatedCount ?? 0;
-  return `${formatShortDate(loop.lastRunAt)} - ${created} created`;
+  return formatShortDate(loop.lastRunAt);
+}
+
+function loopExecutionCountLabel(loop: Loop): string {
+  const count = loop.executionLog.length;
+  return `${count} ${count === 1 ? 'execution' : 'executions'}`;
 }
 
 function formatShortDate(value: string): string {
@@ -390,20 +451,25 @@ function formatShortDate(value: string): string {
   height: 16px;
   border: 2px solid var(--color-text-muted);
   border-radius: var(--radius-full);
-  background: transparent;
+  background: var(--color-text-muted);
 }
 
 .loops-view__status[data-enabled="true"] {
   border-color: var(--color-success);
+  background: var(--color-success);
 }
 
-.loops-view__loop-cell div {
+.loops-view__info {
   min-width: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-8);
 }
 
 .loops-view__loop-cell strong,
 .loops-view__loop-cell span,
-.loops-view__schedule-cell {
+.loops-view__meta-cell {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -417,22 +483,14 @@ function formatShortDate(value: string): string {
 }
 
 .loops-view__loop-cell span,
-.loops-view__schedule-cell {
+.loops-view__meta-cell {
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
   font-weight: var(--font-weight-medium);
   line-height: var(--line-height-18);
 }
 
-.loops-view__loop-cell strong + span {
-  margin-left: var(--space-8);
-}
-
-.loops-view__loop-cell span span {
-  padding: 0 var(--space-4);
-}
-
-.loops-view__schedule-cell {
+.loops-view__meta-cell {
   display: block;
   text-align: right;
 }
@@ -440,7 +498,7 @@ function formatShortDate(value: string): string {
 .loops-view__row-actions {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-2);
 }
 
 .loops-view__row-actions button {
@@ -455,13 +513,23 @@ function formatShortDate(value: string): string {
   cursor: pointer;
 }
 
-.loops-view__row-actions button:hover,
-.loops-view__row-actions button:focus-visible {
+.loops-view__row-actions button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.loops-view__row-actions button:hover:not(:disabled),
+.loops-view__row-actions button:focus-visible:not(:disabled) {
   color: var(--color-text);
 }
 
 .loops-view__row-actions svg {
   width: var(--icon-md);
   height: var(--icon-md);
+}
+
+.loops-view :deep(.app-data-list__actions) {
+  opacity: 1;
+  pointer-events: auto;
 }
 </style>

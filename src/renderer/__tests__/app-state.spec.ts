@@ -1535,12 +1535,20 @@ describe('useAppState', () => {
         executionLog: [],
       }],
     };
+    const runSnapshot = {
+      ...updatedSnapshot,
+      loops: [{
+        ...updatedSnapshot.loops[0],
+        lastRunAt: '2026-06-09T10:02:00.000Z',
+      }],
+    };
     const deletedSnapshot = {
       ...historyClearedSnapshot,
       loops: [],
     };
     const createLoop = vi.fn().mockResolvedValue(createdSnapshot);
     const updateLoop = vi.fn().mockResolvedValue(updatedSnapshot);
+    const runLoop = vi.fn().mockResolvedValue(runSnapshot);
     const clearLoopHistory = vi.fn().mockResolvedValue(historyClearedSnapshot);
     const deleteLoop = vi.fn().mockResolvedValue(deletedSnapshot);
 
@@ -1550,6 +1558,7 @@ describe('useAppState', () => {
         onEvent: vi.fn(),
         createLoop,
         updateLoop,
+        runLoop,
         clearLoopHistory,
         deleteLoop,
       } satisfies Partial<CodexClawApi>,
@@ -1564,6 +1573,7 @@ describe('useAppState', () => {
       enabled: false,
       name: 'Paused bugs',
     });
+    await state.runLoop('loop-bugs');
     await state.clearLoopHistory('loop-bugs');
     await state.deleteLoop('loop-bugs');
 
@@ -1574,6 +1584,7 @@ describe('useAppState', () => {
       enabled: false,
       name: 'Paused bugs',
     });
+    expect(runLoop).toHaveBeenCalledWith('loop-bugs');
     expect(clearLoopHistory).toHaveBeenCalledWith('loop-bugs');
     expect(deleteLoop).toHaveBeenCalledWith('loop-bugs');
     expect(state.snapshot.value).toStrictEqual(deletedSnapshot);

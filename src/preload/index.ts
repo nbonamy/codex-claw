@@ -26,6 +26,7 @@ const api: CodexClawApi = {
   selectTeam: (teamId: string) => ipcRenderer.invoke(ipcChannels.selectTeam, teamId),
   createLoop: (input: CreateLoopInput) => ipcRenderer.invoke(ipcChannels.createLoop, input),
   updateLoop: (input: UpdateLoopInput) => ipcRenderer.invoke(ipcChannels.updateLoop, input),
+  runLoop: (loopId: string) => ipcRenderer.invoke(ipcChannels.runLoop, loopId),
   clearLoopHistory: (loopId: string) => ipcRenderer.invoke(ipcChannels.clearLoopHistory, loopId),
   deleteLoop: (loopId: string) => ipcRenderer.invoke(ipcChannels.deleteLoop, loopId),
   createAgent: (input: CreateAgentInput) => ipcRenderer.invoke(ipcChannels.createAgent, input),

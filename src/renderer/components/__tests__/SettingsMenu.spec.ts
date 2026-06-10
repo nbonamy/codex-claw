@@ -54,6 +54,13 @@ describe('SettingsMenu', () => {
     expect(wrapper.emitted('quit')).toStrictEqual([[]]);
   });
 
+  it('marks the trigger active when settings is selected', () => {
+    const wrapper = mountMenu(undefined, { active: true });
+
+    expect(wrapper.get('[aria-label="Settings menu"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('[aria-label="Settings menu"]').classes()).toContain('settings-menu__trigger--active');
+  });
+
   it('closes the popover when selecting a menu action', async () => {
     const wrapper = mountMenu();
 
@@ -67,10 +74,11 @@ describe('SettingsMenu', () => {
   });
 });
 
-function mountMenu(rateLimits?: AccountRateLimits) {
+function mountMenu(rateLimits?: AccountRateLimits, props: { active?: boolean } = {}) {
   return mount(SettingsMenu, {
     attachTo: document.body,
     props: {
+      ...props,
       rateLimits,
     },
     global: {

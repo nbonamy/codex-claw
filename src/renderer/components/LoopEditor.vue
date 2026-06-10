@@ -388,7 +388,6 @@ function workItemsKey(provider: 'github', repositoryId: string): string {
 .loop-editor__footer {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-8);
   padding-top: var(--space-8);
 }
 </style>

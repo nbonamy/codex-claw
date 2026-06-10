@@ -27,6 +27,7 @@ describe('ipc channels', () => {
       selectTeam: 'team:select',
       createLoop: 'loop:create',
       updateLoop: 'loop:update',
+      runLoop: 'loop:run',
       clearLoopHistory: 'loop:history:clear',
       deleteLoop: 'loop:delete',
       createAgent: 'agent:create',

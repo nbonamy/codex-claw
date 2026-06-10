@@ -7,6 +7,7 @@
       :active-team-id="cockpitVisible || loopsVisible || settingsVisible ? null : activeTeam?.id ?? null"
       :cockpit-active="cockpitVisible"
       :loops-active="loopsVisible"
+      :settings-active="settingsVisible"
       :rate-limits="snapshot.accountRateLimits"
       class="app-shell__team-rail"
       @close-team="$emit('close-team', $event)"
@@ -74,6 +75,7 @@
         :load-work-items="loadWorkItems"
         :load-work-repositories="loadWorkRepositories"
         :loops="snapshot.loops"
+        :run-loop="runLoop"
         :teams="snapshot.teams"
         :update-loop="updateLoop"
         :work-backlog="snapshot.workBacklog"
@@ -283,6 +285,7 @@ const props = withDefaults(defineProps<{
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
   createLoop?: (input: CreateLoopInput) => Promise<void>;
   updateLoop?: (input: UpdateLoopInput) => Promise<void>;
+  runLoop?: (loopId: string) => Promise<void>;
   clearLoopHistory?: (loopId: string) => Promise<void>;
   deleteLoop?: (loopId: string) => Promise<void>;
   connectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
@@ -328,6 +331,7 @@ const props = withDefaults(defineProps<{
   updateSettings: async () => undefined,
   createLoop: async () => undefined,
   updateLoop: async () => undefined,
+  runLoop: async () => undefined,
   clearLoopHistory: async () => undefined,
   deleteLoop: async () => undefined,
   connectWorkProvider: async () => undefined,
@@ -677,6 +681,10 @@ async function createLoop(input: CreateLoopInput): Promise<void> {
 
 async function updateLoop(input: UpdateLoopInput): Promise<void> {
   await props.updateLoop(input);
+}
+
+async function runLoop(loopId: string): Promise<void> {
+  await props.runLoop(loopId);
 }
 
 async function clearLoopHistory(loopId: string): Promise<void> {

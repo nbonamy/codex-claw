@@ -430,6 +430,14 @@ export function useAppState() {
     snapshot.value = await window.codexClaw.updateLoop(input);
   }
 
+  async function runLoop(loopId: string): Promise<void> {
+    if (!window.codexClaw?.runLoop || !snapshot.value.loops.some((loop) => loop.id === loopId)) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.runLoop(loopId);
+  }
+
   async function deleteLoop(loopId: string): Promise<void> {
     if (!window.codexClaw?.deleteLoop || !snapshot.value.loops.some((loop) => loop.id === loopId)) {
       return;
@@ -814,6 +822,7 @@ export function useAppState() {
     configureWorkBacklog,
     createLoop,
     updateLoop,
+    runLoop,
     clearLoopHistory,
     deleteLoop,
     assignWorkItemToAgent,

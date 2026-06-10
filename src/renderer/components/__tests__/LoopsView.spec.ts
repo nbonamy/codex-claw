@@ -7,6 +7,7 @@ import LoopsView from '../LoopsView.vue';
 
 afterEach(() => {
   vi.restoreAllMocks();
+  document.body.innerHTML = '';
 });
 
 describe('LoopsView', () => {
@@ -67,7 +68,10 @@ describe('LoopsView', () => {
       loops: [loop()],
     });
 
-    await wrapper.get('[aria-label="Delete loop"]').trigger('click');
+    await wrapper.get('[aria-label="GitHub bugs actions"]').trigger('click');
+    await flushPromises();
+    const deleteButton = bodyButton('Delete');
+    deleteButton.click();
     await flushPromises();
 
     expect(ElMessageBox.confirm).toHaveBeenCalledWith(
@@ -80,6 +84,36 @@ describe('LoopsView', () => {
       },
     );
     expect(deleteLoop).toHaveBeenCalledWith('loop-bugs');
+  });
+
+  it('renders compact loop rows and runs a loop from the row action', async () => {
+    const runLoop = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountView({
+      loops: [loop({
+        executionLog: [{
+          id: 'loop-exec-1',
+          loopId: 'loop-bugs',
+          startedAt: '2026-06-09T10:00:00.000Z',
+          completedAt: '2026-06-09T10:01:00.000Z',
+          status: 'completed',
+          createdCount: 1,
+          createdAgents: [],
+        }],
+        lastRunAt: '2026-06-09T10:00:00.000Z',
+      })],
+      runLoop,
+    });
+
+    expect(wrapper.text()).toContain('GitHub bugs');
+    expect(wrapper.text()).toContain('Dina @ nbonamy/codex-claw / bug');
+    expect(wrapper.text()).toContain('Jun 9');
+    expect(wrapper.text()).toContain('1 execution');
+    expect(wrapper.text()).not.toContain('Every few minutes');
+
+    await wrapper.get('[aria-label="Run GitHub bugs"]').trigger('click');
+    await flushPromises();
+
+    expect(runLoop).toHaveBeenCalledWith('loop-bugs');
   });
 
   it('shows execution logs from the loop row action', async () => {
@@ -116,7 +150,7 @@ describe('LoopsView', () => {
     });
 
     expect(wrapper.find('[aria-label="Current loops"]').exists()).toBe(true);
-    await wrapper.get('[aria-label="View loop log"]').trigger('click');
+    await wrapper.get('[aria-label="View logs for GitHub bugs"]').trigger('click');
 
     expect(wrapper.text()).toContain('2 executions');
     expect(wrapper.text()).not.toContain('Dina');
@@ -146,8 +180,8 @@ describe('LoopsView', () => {
       })],
     });
 
-    await wrapper.get('[aria-label="View loop log"]').trigger('click');
-    const clearButton = wrapper.findAll('button').find((button) => button.text() === 'Clear History');
+    await wrapper.get('[aria-label="View logs for GitHub bugs"]').trigger('click');
+    const clearButton = wrapper.findAll('button').find((button) => button.text() === 'Clear');
     expect(clearButton).toBeDefined();
     await clearButton!.trigger('click');
     await flushPromises();
@@ -170,6 +204,7 @@ function mountView(overrides: Partial<{
   createLoop: (input: CreateLoopInput) => Promise<void>;
   deleteLoop: (loopId: string) => Promise<void>;
   loops: Loop[];
+  runLoop: (loopId: string) => Promise<void>;
   snapshot: AppSnapshot;
 }> = {}) {
   const snapshot = overrides.snapshot ?? createInitialSnapshot();
@@ -196,6 +231,7 @@ function mountView(overrides: Partial<{
       loadWorkItems: vi.fn().mockResolvedValue(undefined),
       loadWorkRepositories: vi.fn().mockResolvedValue(undefined),
       loops: overrides.loops ?? [],
+      runLoop: overrides.runLoop ?? vi.fn().mockResolvedValue(undefined),
       teams: snapshot.teams,
       updateLoop: vi.fn().mockResolvedValue(undefined),
       workBacklog: snapshot.workBacklog,
@@ -210,6 +246,13 @@ function mountView(overrides: Partial<{
       plugins: [ElementPlus],
     },
   });
+}
+
+function bodyButton(label: string): HTMLButtonElement {
+  const button = Array.from(document.body.querySelectorAll('button'))
+    .find((candidate) => candidate.textContent?.trim() === label);
+  expect(button).toBeDefined();
+  return button as HTMLButtonElement;
 }
 
 function loop(overrides: Partial<Loop> = {}): Loop {

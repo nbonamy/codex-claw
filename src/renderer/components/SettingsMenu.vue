@@ -9,8 +9,10 @@
     <template #reference>
       <button
         class="settings-menu__trigger"
+        :class="{ 'settings-menu__trigger--active': active }"
         type="button"
         aria-label="Settings menu"
+        :aria-pressed="active"
       >
         <SettingsIcon aria-hidden="true" />
       </button>
@@ -51,9 +53,12 @@ import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import { BrandSpeedTest, QuitIcon, SettingsIcon } from '../shared/icons/app-icons';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
+  active?: boolean;
   rateLimits?: AccountRateLimits;
-}>();
+}>(), {
+  active: false,
+});
 
 const emit = defineEmits<{
   'open-settings': [];
@@ -162,15 +167,19 @@ function selectMenuItem(itemId: string): void {
 
 .settings-menu__trigger {
   border: 0;
+  color: var(--color-text-muted);
   background: transparent;
   cursor: pointer;
 }
 
-.settings-menu__trigger svg {
-  width: var(--icon-xl);
-  height: var(--icon-xl);
-  stroke-width: 1.25px;
-  transform: scale(1.15);
+.settings-menu__trigger:hover,
+.settings-menu__trigger:focus-visible {
+  color: var(--color-text);
+  outline: none;
+}
+
+.settings-menu__trigger--active {
+  color: var(--color-primary);
 }
 
 .settings-menu {

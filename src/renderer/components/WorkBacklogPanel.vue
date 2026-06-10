@@ -460,7 +460,7 @@ function workProviderLabel(provider: WorkIntegrationConnection['provider']): str
 .work-backlog-panel__item {
   position: relative;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   padding: var(--space-8) 34px var(--space-8) var(--space-8);
   background: var(--color-surface-lowest);
   cursor: grab;

@@ -199,11 +199,11 @@ const gridStyle = computed<CSSProperties>(() => ({
 }
 
 .app-data-list__row {
-  min-height: 58px;
+  min-height: 48px;
   align-items: center;
   gap: var(--space-16);
-  padding: var(--space-10) var(--space-12);
-  border-radius: var(--radius-md);
+  padding: var(--space-6) var(--space-10);
+  border-radius: var(--radius-2xl);
 }
 
 .app-data-list__row:hover,

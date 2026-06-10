@@ -12,7 +12,7 @@
       :aria-pressed="cockpitActive"
       @click="emit('select-cockpit')"
     >
-      <CompassIcon aria-hidden="true" />
+      <DashboardIcon aria-hidden="true" />
     </button>
 
     <button
@@ -57,10 +57,14 @@
         :aria-pressed="loopsActive"
         @click="emit('select-loops')"
       >
-        <InfinityIcon aria-hidden="true" />
+        <InfinityIcon
+          class="team-rail__loops-icon"
+          aria-hidden="true"
+        />
       </button>
 
       <SettingsMenu
+        :active="settingsActive"
         :rate-limits="rateLimits"
         @open-settings="emit('open-settings')"
         @quit="emit('quit')"
@@ -85,7 +89,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { AccountRateLimits, ReorderTeamsInput, Team } from '../../shared/contracts';
 import { defaultTeamColor } from '../../shared/team-colors';
 import { teamInitials } from '../../shared/team-manager';
-import { CompassIcon, InfinityIcon, PlusIcon } from '../shared/icons/app-icons';
+import { DashboardIcon, InfinityIcon, PlusIcon } from '../shared/icons/app-icons';
 import { useListReorderDrag } from '../shared/use-list-reorder-drag';
 import SettingsMenu from './SettingsMenu.vue';
 import TeamContextMenu from './TeamContextMenu.vue';
@@ -97,6 +101,7 @@ const props = defineProps<{
   cockpitActive?: boolean;
   loopsActive?: boolean;
   rateLimits?: AccountRateLimits;
+  settingsActive?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -143,7 +148,7 @@ function selectEditTeam(teamId: string): void {
 }
 
 function isTeamActive(teamId: string): boolean {
-  return !props.cockpitActive && !props.loopsActive && teamId === props.activeTeamId;
+  return !props.cockpitActive && !props.loopsActive && !props.settingsActive && teamId === props.activeTeamId;
 }
 
 async function requestCloseTeam(teamId: string): Promise<void> {
@@ -196,6 +201,9 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   --team-rail-width: calc(var(--space-24) * var(--team-rail-scale));
   --team-rail-button-size: calc(var(--space-16) * var(--team-rail-scale));
   --team-text-color: white;
+  --team-rail-icon-color: var(--color-text-muted);
+  --team-rail-icon-hover-color: var(--color-text);
+  --team-rail-icon-active-color: var(--color-primary);
   flex: 0 0 var(--team-rail-width);
   width: var(--team-rail-width);
   display: flex;
@@ -226,28 +234,43 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   height: var(--team-rail-button-size);
   display: grid;
   place-items: center;
-  border: 1px solid var(--color-border);
+  border: 0;
   border-radius: var(--radius-full);
-  color: var(--color-text-muted);
-  background: var(--color-surface-low);
+  color: var(--team-rail-icon-color);
+  background: transparent;
   cursor: pointer;
 }
 
 .team-rail__cockpit:hover,
 .team-rail__cockpit:focus-visible,
-.team-rail__cockpit--active,
 .team-rail__loops:hover,
-.team-rail__loops:focus-visible,
+.team-rail__loops:focus-visible {
+  color: var(--team-rail-icon-hover-color);
+  outline: none;
+}
+
+.team-rail__cockpit--active,
 .team-rail__loops--active {
-  color: white;
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  color: var(--team-rail-icon-active-color);
 }
 
 .team-rail__cockpit svg,
+.team-rail__loops svg,
+.team-rail__new svg,
+:deep() .settings-menu__trigger svg {
+  width: var(--icon-xl);
+  height: var(--icon-xl);
+  stroke-width: 1.25px;
+  transform: scale(1.15);
+}
+
+.team-rail__cockpit svg {
+  transform: scale(1.25);
+}
+
 .team-rail__loops svg {
-  width: var(--icon-lg);
-  height: var(--icon-lg);
+  stroke-width: 1.35px;
+  transform: scaleX(1.2) scaleY(1.48);
 }
 
 .team-rail__team::before,
@@ -312,16 +335,22 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   border-color: var(--color-border-strong);
 }
 
-.team-rail__new svg {
-  width: var(--icon-lg);
-  height: var(--icon-lg);
-}
-
 :deep() .settings-menu__trigger {
   display: grid;
   place-items: center;
   width: var(--team-rail-button-size);
   height: var(--team-rail-button-size);
+  color: var(--team-rail-icon-color);
+}
+
+:deep() .settings-menu__trigger:hover,
+:deep() .settings-menu__trigger:focus-visible {
+  color: var(--team-rail-icon-hover-color);
+  outline: none;
+}
+
+:deep() .settings-menu__trigger--active {
+  color: var(--team-rail-icon-active-color);
 }
 
 .team-rail__bottom {

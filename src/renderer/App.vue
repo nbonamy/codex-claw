@@ -43,6 +43,7 @@
     :disconnect-work-provider="disconnectWorkProvider"
     :create-loop="createLoop"
     :update-loop="updateLoop"
+    :run-loop="runLoop"
     :clear-loop-history="clearLoopHistory"
     :delete-loop="deleteLoop"
     :configure-work-backlog="configureWorkBacklog"
@@ -142,6 +143,7 @@ const {
   disconnectWorkProvider,
   createLoop,
   updateLoop,
+  runLoop,
   clearLoopHistory,
   deleteLoop,
   configureWorkBacklog,

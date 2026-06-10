@@ -10,21 +10,18 @@
   >
     <template #headerActions>
       <div class="loop-execution-log__header-actions">
-        <button
-          type="button"
-          class="loop-execution-log__text-button"
+        <el-button
+          type="danger"
           :disabled="loop.executionLog.length === 0"
           @click="emit('clear-history', loop.id)"
         >
-          Clear History
-        </button>
-        <button
-          type="button"
-          class="loop-execution-log__text-button"
+          Clear
+        </el-button>
+        <el-button
           @click="emit('close')"
         >
           Back
-        </button>
+        </el-button>
       </div>
     </template>
 
@@ -174,33 +171,6 @@ function formatDuration(startedAt: string, completedAt: string): string {
 </script>
 
 <style scoped>
-.loop-execution-log__header-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-12);
-}
-
-.loop-execution-log__text-button {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-13);
-  line-height: var(--line-height-18);
-  padding: var(--space-4) 0;
-  border: 0;
-  background: transparent;
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-}
-
-.loop-execution-log__text-button:hover,
-.loop-execution-log__text-button:focus-visible {
-  color: var(--color-text);
-}
-
-.loop-execution-log__text-button:disabled {
-  color: var(--color-text-muted);
-  opacity: 0.6;
-  cursor: default;
-}
 
 .loop-execution-log__status,
 .loop-execution-log__muted {

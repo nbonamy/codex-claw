@@ -18,14 +18,12 @@
   --el-fill-color-light: var(--color-surface-low);
   --el-fill-color-lighter: var(--color-surface-lowest);
   --el-fill-color-blank: var(--color-surface-lowest);
+
+  --el-border-radius-base: var(--radius-md);
 }
 
 .el-dialog {
   --el-dialog-padding-primary: 0;
-}
-
-.el-button {
-  border-radius: var(--radius-md);
 }
 
 .el-popper {

@@ -734,6 +734,7 @@ export type CodexClawApi = {
   selectTeam(teamId: string): Promise<AppSnapshot>;
   createLoop(input: CreateLoopInput): Promise<AppSnapshot>;
   updateLoop(input: UpdateLoopInput): Promise<AppSnapshot>;
+  runLoop(loopId: string): Promise<AppSnapshot>;
   clearLoopHistory(loopId: string): Promise<AppSnapshot>;
   deleteLoop(loopId: string): Promise<AppSnapshot>;
   createAgent(input: CreateAgentInput): Promise<AppSnapshot>;

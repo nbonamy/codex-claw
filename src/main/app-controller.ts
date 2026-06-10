@@ -253,6 +253,14 @@ export class AppController {
       return this.snapshot;
     });
 
+    ipcMain.handle(ipcChannels.runLoop, async (_event, loopId: string) => {
+      if (!this.snapshot.loops.some((loop) => loop.id === loopId)) {
+        throw new Error(`Loop not found: ${loopId}`);
+      }
+      await this.loopRunner.runLoop(loopId);
+      return this.snapshot;
+    });
+
     ipcMain.handle(ipcChannels.clearLoopHistory, async (_event, loopId: string) => {
       const loop = clearLoopExecutionHistoryInSnapshot(this.snapshot, loopId);
       if (!loop) {
