@@ -78,6 +78,68 @@ describe('CockpitAddAgentTile', () => {
 
     expect(wrapper.get<HTMLButtonElement>('[aria-label="Assign issue to a Bench agent in Codex Claw"]').element.disabled).toBe(true);
   });
+
+  it('ignores drag events when there is no dragged work item', async () => {
+    const wrapper = mountTile();
+    const dragEnter = dragEvent('dragenter');
+    const dragOver = dragEvent('dragover');
+
+    wrapper.get('.cockpit-view__add-card').element.dispatchEvent(dragEnter);
+    wrapper.get('.cockpit-view__add-card').element.dispatchEvent(dragOver);
+    await nextTick();
+
+    expect(dragEnter.defaultPrevented).toBe(false);
+    expect(dragOver.defaultPrevented).toBe(false);
+    expect(wrapper.text()).not.toContain('Assign to New Agent');
+  });
+
+  it('clears split targets when dragging leaves the tile or the dragged item resets', async () => {
+    const wrapper = mountTile({
+      bench: [benchTemplate()],
+      draggedWorkItem: workItem(),
+    });
+    const card = wrapper.get('.cockpit-view__add-card');
+
+    card.element.dispatchEvent(dragEvent('dragenter'));
+    await nextTick();
+    expect(wrapper.text()).toContain('Assign to New Agent');
+
+    card.element.dispatchEvent(dragEvent('dragleave'));
+    await nextTick();
+    expect(wrapper.text()).toContain('Add Agent');
+
+    card.element.dispatchEvent(dragEvent('dragenter'));
+    await nextTick();
+    const resetProps = { draggedWorkItem: null };
+    await wrapper.setProps(resetProps as never);
+    expect(wrapper.text()).toContain('Add Agent');
+  });
+
+  it('keeps targets active while moving within them and ignores disabled bench drops', async () => {
+    const wrapper = mountTile({ draggedWorkItem: workItem() });
+    const card = wrapper.get('.cockpit-view__add-card');
+
+    card.element.dispatchEvent(dragEvent('dragenter'));
+    await nextTick();
+
+    const benchTarget = wrapper.get('[aria-label="Assign issue to a Bench agent in Codex Claw"]');
+    benchTarget.element.dispatchEvent(dragEvent('dragover'));
+    benchTarget.element.dispatchEvent(dragEvent('drop'));
+    await nextTick();
+
+    expect(benchTarget.classes()).not.toContain('cockpit-view__add-drop-target--active');
+    expect(wrapper.emitted('assign-to-bench-agent')).toBeUndefined();
+
+    const newAgentTarget = wrapper.get('[aria-label="Assign issue to a new agent in Codex Claw"]');
+    newAgentTarget.element.dispatchEvent(dragEvent('dragover'));
+    await nextTick();
+    expect(newAgentTarget.classes()).toContain('cockpit-view__add-drop-target--active');
+
+    const leaveWithinTarget = dragEvent('dragleave', newAgentTarget.element);
+    newAgentTarget.element.dispatchEvent(leaveWithinTarget);
+    await nextTick();
+    expect(newAgentTarget.classes()).toContain('cockpit-view__add-drop-target--active');
+  });
 });
 
 function mountTile(props: Partial<CockpitAddAgentTileProps> = {}) {
@@ -125,12 +187,15 @@ function workItem(): WorkItem {
   };
 }
 
-function dragEvent(type: string): DragEvent {
+function dragEvent(type: string, relatedTarget?: EventTarget): DragEvent {
   const event = new Event(type, { bubbles: true, cancelable: true }) as DragEvent;
   Object.defineProperty(event, 'dataTransfer', {
     value: {
       dropEffect: 'copy',
     },
+  });
+  Object.defineProperty(event, 'relatedTarget', {
+    value: relatedTarget ?? null,
   });
   return event;
 }

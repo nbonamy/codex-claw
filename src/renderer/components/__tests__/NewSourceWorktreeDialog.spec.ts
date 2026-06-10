@@ -60,6 +60,23 @@ describe('NewSourceWorktreeDialog', () => {
     });
   });
 
+  it('keeps the generated destination when the folder picker is cancelled', async () => {
+    const chooseDestination = vi.fn().mockResolvedValue(null);
+    const wrapper = mountDialog({ chooseDestination });
+
+    await wrapper.get('.new-source-worktree-dialog__folder-picker').trigger('click');
+    await flushPromises();
+
+    expect(chooseDestination).toHaveBeenCalledWith('/Users/nbonamy/src/codex-claw', 'codex-claw-worktree');
+    expect(wrapper.get<HTMLInputElement>('.new-source-worktree-dialog__folder-input').element.value).toBe('');
+
+    await wrapper.get('.new-source-worktree-dialog__branch-input').setValue('feature/source-folder');
+    await wrapper.get('.new-source-worktree-dialog__folder-picker').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get<HTMLInputElement>('.new-source-worktree-dialog__folder-input').element.value).toBe('/Users/nbonamy/src/codex-claw-feature-source-folder');
+  });
+
   it('resets state when reopened and surfaces creation failures', async () => {
     const wrapper = mountDialog({
       createWorktree: vi.fn().mockRejectedValue(new Error('worktree failed')),

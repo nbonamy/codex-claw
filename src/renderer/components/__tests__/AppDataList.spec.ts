@@ -36,4 +36,69 @@ describe('AppDataList', () => {
     expect(wrapper.text()).toContain('Every few minutes');
     expect(wrapper.find('[aria-label="Edit loop-bugs"]').exists()).toBe(true);
   });
+
+  it('renders column headers, subtitles, default cells, and explicit aria labels', () => {
+    const wrapper = mount(AppDataList, {
+      props: {
+        ariaLabel: 'Automation runs',
+        showColumnHeader: true,
+        subtitle: 'Recent executions',
+        title: 'History',
+        columns: [{
+          id: 'ticket',
+          label: 'Ticket',
+        }, {
+          id: 'startedAt',
+          label: 'Started',
+          align: 'end',
+        }],
+        rows: [{
+          id: 'run-1',
+          ticket: 'github:nbonamy/codex-claw#12',
+          startedAt: 'Jun 9, 10:47 PM',
+        }],
+      },
+    });
+
+    expect(wrapper.attributes('aria-label')).toBe('Automation runs');
+    expect(wrapper.text()).toContain('Recent executions');
+    expect(wrapper.text()).toContain('Ticket');
+    expect(wrapper.text()).toContain('Started');
+    expect(wrapper.text()).toContain('github:nbonamy/codex-claw#12');
+    expect(wrapper.findAll('[role="columnheader"]')).toHaveLength(2);
+    expect(wrapper.find('[data-align="end"]').text()).toBe('Started');
+  });
+
+  it('renders empty states with and without custom content', () => {
+    const wrapper = mount(AppDataList, {
+      props: {
+        columns: [{
+          id: 'name',
+          label: 'Name',
+        }],
+        emptyText: 'No executions yet',
+        rows: [],
+      },
+    });
+
+    expect(wrapper.find('.app-data-list__header').exists()).toBe(false);
+    expect(wrapper.text()).toBe('No executions yet');
+
+    const custom = mount(AppDataList, {
+      props: {
+        columns: [{
+          id: 'name',
+          label: 'Name',
+        }],
+        rows: [],
+        title: 'Current',
+      },
+      slots: {
+        empty: '<span>Nothing scheduled</span>',
+      },
+    });
+
+    expect(custom.attributes('aria-label')).toBe('Current');
+    expect(custom.text()).toContain('Nothing scheduled');
+  });
 });

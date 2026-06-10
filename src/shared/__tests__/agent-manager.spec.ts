@@ -117,6 +117,30 @@ describe('agent-manager', () => {
     expect(new Set(snapshot.agents.map((agent) => agent.id)).size).toBe(snapshot.agents.length);
   });
 
+  it('supports non-selecting Bench deploys and completed assignments for removed agents', () => {
+    const snapshot = createInitialSnapshot();
+    const generatedDuplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina');
+    const template = saveAgentToBench(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z');
+    snapshot.activeTeamId = 'team-codex-claw';
+    snapshot.activeAgentId = 'agent-dina';
+
+    const deployed = deployBenchTemplateInSnapshot(snapshot, template?.id ?? '', undefined, '2026-06-05T10:12:13.000Z', () => 'agent-bench-dina', {
+      select: false,
+    });
+
+    const item = workItem(12, 'Fix cockpit drag target');
+    assignWorkItemToAgentInSnapshot(snapshot, 'agent-dina', item, '2026-06-09T13:00:00.000Z');
+    snapshot.agents = snapshot.agents.filter((agent) => agent.id !== 'agent-dina');
+
+    expect(generatedDuplicate?.id.startsWith('agent-')).toBe(true);
+    expect(deployed?.id).toBe('agent-bench-dina');
+    expect(snapshot.activeAgentId).toBe('agent-dina');
+    expect(completeWorkItemAssignmentInSnapshot(snapshot, 'agent-dina', workItemAssignmentKey(item), '2026-06-09T13:15:00.000Z')).toMatchObject({
+      agentId: 'agent-dina',
+      status: 'completed',
+    });
+  });
+
   it('deploys a Bench template into an explicit target team', () => {
     const snapshot = createInitialSnapshot();
     snapshot.teams.push({
