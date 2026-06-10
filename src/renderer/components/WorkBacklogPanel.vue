@@ -366,7 +366,7 @@ function workProviderLabel(provider: WorkIntegrationConnection['provider']): str
   gap: var(--space-10);
   border-right: 1px solid var(--color-border);
   padding: var(--space-12);
-  background: var(--color-surface-base);
+  background: var(--color-shell-sidebar);
 }
 
 .work-backlog-panel__header {

@@ -13,12 +13,26 @@ type CockpitAddAgentTileProps = {
 };
 
 describe('CockpitAddAgentTile', () => {
-  it('emits new-agent from the normal add control', async () => {
+  it('emits new-agent from the add tile and normal add control', async () => {
     const wrapper = mountTile();
 
+    await wrapper.get('.cockpit-view__add-card').trigger('click');
     await wrapper.get('.new-agent-button__primary').trigger('click');
 
-    expect(wrapper.emitted('new-agent')).toStrictEqual([['team-codex-claw']]);
+    expect(wrapper.emitted('new-agent')).toStrictEqual([
+      ['team-codex-claw'],
+      ['team-codex-claw'],
+    ]);
+  });
+
+  it('does not create a new agent from the Bench chevron', async () => {
+    const wrapper = mountTile({
+      bench: [benchTemplate()],
+    });
+
+    await wrapper.get('[aria-label="Open Bench"]').trigger('click');
+
+    expect(wrapper.emitted('new-agent')).toBeUndefined();
   });
 
   it('shows split assignment targets while a work item is dragged over the tile', async () => {

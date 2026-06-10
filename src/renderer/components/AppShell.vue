@@ -49,6 +49,7 @@
     <section class="app-shell__agent">
       <SettingsView
         v-if="settingsVisible"
+        :active-tab="settingsActiveTab"
         :general-settings="snapshot.general"
         :settings="snapshot.theme"
         :source-folder="snapshot.sourceFolder"
@@ -62,6 +63,7 @@
         :complete-work-provider-connection="completeWorkProviderConnection"
         :disconnect-work-provider="disconnectWorkProvider"
         :update-settings="updateSettings"
+        @select-tab="settingsActiveTab = $event"
       />
       <LoopsView
         v-else-if="loopsVisible"
@@ -235,6 +237,7 @@ import TeamDialog from './TeamDialog.vue';
 import TeamRail from './TeamRail.vue';
 import BenchAgentAssignmentDialog from './BenchAgentAssignmentDialog.vue';
 import SettingsView from './SettingsView.vue';
+import type { SettingsTab } from './settings-tabs';
 import { confirmCloseTeam } from './team-close-confirmation';
 import type { QueuedChatPrompt } from '../shared/chat/queued-prompts';
 import type { PlanReviewComment, SidePanelState } from './side-panel';
@@ -383,6 +386,7 @@ const agentSidebarMinWidth = 80;
 const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
 const activeSurface = ref<AppSurface>('agent');
+const settingsActiveTab = ref<SettingsTab>('general');
 const agentDialogVisible = ref(false);
 const agentDialogMode = ref<'create' | 'edit'>('create');
 const editingAgentId = ref<string | null>(null);

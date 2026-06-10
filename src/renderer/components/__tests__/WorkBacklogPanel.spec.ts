@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { nextTick } from 'vue';
@@ -17,6 +19,10 @@ describe('WorkBacklogPanel', () => {
     expect(mountPanel({ error: 'GitHub is down', status: 'error' }).text()).toContain('GitHub is down');
     expect(mountPanel({ selectedRepositoryId: null }).text()).toContain('Select a repository');
     expect(mountPanel({ items: [], selectedRepositoryId: 'nbonamy/codex-claw' }).text()).toContain('No open issues');
+  });
+
+  it('uses the shell sidebar background token', () => {
+    expect(workBacklogPanelSource()).toContain('background: var(--color-shell-sidebar);');
   });
 
   it('emits repository selection, refresh, drag start, and drag end', async () => {
@@ -374,4 +380,8 @@ function dragEvent(type: string): DragEvent {
     },
   });
   return event;
+}
+
+function workBacklogPanelSource(): string {
+  return readFileSync(resolve(process.cwd(), 'src/renderer/components/WorkBacklogPanel.vue'), 'utf8');
 }

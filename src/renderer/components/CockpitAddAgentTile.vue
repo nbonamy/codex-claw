@@ -5,6 +5,7 @@
     @dragenter="enterDropChoice"
     @dragleave="leaveDropChoice"
     @dragover="allowDropChoice"
+    @click="createAgentFromCard"
   >
     <div
       v-if="showDropChoices"
@@ -182,6 +183,26 @@ function dropToBenchAgent(event: DragEvent): void {
     teamId: props.teamId,
   });
 }
+
+function createAgentFromCard(event: MouseEvent): void {
+  if (showDropChoices.value || isInteractiveNewAgentButtonTarget(event.target)) {
+    return;
+  }
+
+  emit('new-agent', props.teamId);
+}
+
+function isInteractiveNewAgentButtonTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+
+  return Boolean(target.closest([
+    '.new-agent-button__primary',
+    '.new-agent-button__chevron',
+    '.new-agent-menu',
+  ].join(',')));
+}
 </script>
 
 <style scoped>
@@ -194,6 +215,7 @@ function dropToBenchAgent(event: DragEvent): void {
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--color-surface-low) 48%, transparent);
+  cursor: pointer;
 }
 
 .cockpit-view__add-card:hover,
@@ -208,6 +230,7 @@ function dropToBenchAgent(event: DragEvent): void {
   min-height: 172px;
   display: grid;
   grid-template-rows: 1fr 1fr;
+  cursor: default;
 }
 
 .cockpit-view__add-drop-target {

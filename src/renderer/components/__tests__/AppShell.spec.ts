@@ -1255,7 +1255,7 @@ describe('AppShell', () => {
     });
   });
 
-  it('opens settings from the team rail menu, updates appearance, and quits', async () => {
+  it('opens settings on general, remembers the last settings pane, updates appearance, and quits', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.accountRateLimits = {
       limitId: 'codex',
@@ -1282,10 +1282,20 @@ describe('AppShell', () => {
     expect(wrapper.get('[aria-label="Settings menu"]').attributes('aria-pressed')).toBeUndefined();
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.get('[aria-label="Codex Claw"]').classes()).not.toContain('team-rail__team--active');
+    expect(wrapper.text()).toContain('Accessibility');
+    expect(wrapper.text()).not.toContain('Theme');
+
+    await wrapper.findAll('.el-menu-item').find((item) => item.text() === 'Appearance')?.trigger('click');
     expect(wrapper.text()).toContain('Theme');
     expect(wrapper.text()).toContain('Codex Claw Light');
 
-    await wrapper.findAll('.el-menu-item').find((item) => item.text() === 'Appearance')?.trigger('click');
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    expect(wrapper.find('.settings-view').exists()).toBe(false);
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Settings')?.trigger('click');
+    expect(wrapper.text()).toContain('Theme');
+    expect(wrapper.text()).toContain('Codex Claw Light');
+
     await wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'github-dark');
     await wrapper.findAll('button').find((button) => button.text() === 'Quit')?.trigger('click');
 

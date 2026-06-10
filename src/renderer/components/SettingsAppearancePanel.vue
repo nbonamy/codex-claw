@@ -3,58 +3,93 @@
     title="Appearance"
     title-id="settings-appearance-title"
   >
-    <div class="settings-appearance-panel__rows">
-      <label class="settings-appearance-panel__row">
-        <span>Mode</span>
-        <el-segmented
-          :model-value="settings.mode"
-          :options="modeOptions"
-          @update:model-value="updateMode"
-        />
-      </label>
-      <label class="settings-appearance-panel__row">
-        <span>Theme</span>
-        <el-select
-          :model-value="settings.id"
-          aria-label="Theme"
-          @update:model-value="updateThemeId"
-        >
-          <el-option
-            v-for="theme in visibleThemes"
-            :key="theme.id"
-            :label="theme.name"
-            :value="theme.id"
+    <SettingsSection
+      title="Color"
+      title-id="settings-appearance-color-title"
+    >
+      <SettingsRow
+        as="label"
+        title="Mode"
+        description="Choose how Codex Claw follows light and dark appearances"
+      >
+        <template #control>
+          <el-segmented
+            :model-value="settings.mode"
+            :options="modeOptions"
+            @update:model-value="updateMode"
           />
-        </el-select>
-      </label>
-      <!-- <label class="settings-appearance-panel__row">
-        <span>UI font size</span>
-        <el-input-number
-          :model-value="settings.uiFontSize"
-          :min="11"
-          :max="22"
-          @update:model-value="updateNumericTheme('uiFontSize', $event)"
-        />
-      </label> -->
-      <label class="settings-appearance-panel__row">
-        <span>Chat font size</span>
-        <el-input-number
-          :model-value="settings.chatFontSize"
-          :min="11"
-          :max="22"
-          @update:model-value="updateNumericTheme('chatFontSize', $event)"
-        />
-      </label>
-      <label class="settings-appearance-panel__row">
-        <span>Code font size</span>
-        <el-input-number
-          :model-value="settings.codeFontSize"
-          :min="11"
-          :max="22"
-          @update:model-value="updateNumericTheme('codeFontSize', $event)"
-        />
-      </label>
-    </div>
+        </template>
+      </SettingsRow>
+      <SettingsRow
+        as="label"
+        title="Theme"
+        description="Select the color palette used across the app"
+      >
+        <template #control>
+          <el-select
+            class="settings-appearance-panel__theme-select"
+            :model-value="settings.id"
+            aria-label="Theme"
+            @update:model-value="updateThemeId"
+          >
+            <el-option
+              v-for="theme in visibleThemes"
+              :key="theme.id"
+              :label="theme.name"
+              :value="theme.id"
+            />
+          </el-select>
+        </template>
+      </SettingsRow>
+    </SettingsSection>
+
+    <SettingsSection
+      title="Typography"
+      title-id="settings-appearance-typography-title"
+    >
+      <!-- <SettingsRow
+        as="label"
+        title="UI font size"
+        description="Adjust the interface text size"
+      >
+        <template #control>
+          <el-input-number
+            :model-value="settings.uiFontSize"
+            :min="11"
+            :max="22"
+            @update:model-value="updateNumericTheme('uiFontSize', $event)"
+          />
+        </template>
+      </SettingsRow> -->
+      <SettingsRow
+        as="label"
+        title="Chat font size"
+        description="Adjust conversation text size"
+      >
+        <template #control>
+          <el-input-number
+            :model-value="settings.chatFontSize"
+            :min="11"
+            :max="22"
+            @update:model-value="updateNumericTheme('chatFontSize', $event)"
+          />
+        </template>
+      </SettingsRow>
+      <SettingsRow
+        as="label"
+        title="Code font size"
+        description="Adjust monospace text size in code and command output"
+      >
+        <template #control>
+          <el-input-number
+            :model-value="settings.codeFontSize"
+            :min="11"
+            :max="22"
+            @update:model-value="updateNumericTheme('codeFontSize', $event)"
+          />
+        </template>
+      </SettingsRow>
+    </SettingsSection>
   </SettingsPanelFrame>
 </template>
 
@@ -62,6 +97,8 @@
 import { computed } from 'vue';
 import type { AppThemeSettings, UpdateSettingsInput } from '../../shared/contracts';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
+import SettingsRow from './SettingsRow.vue';
+import SettingsSection from './SettingsSection.vue';
 import { appThemes, themeIdForAppearance } from '../theme/themes';
 
 const props = defineProps<{
@@ -122,30 +159,7 @@ function updateNumericTheme(key: 'chatFontSize' | 'codeFontSize' | 'uiFontSize',
 </script>
 
 <style scoped>
-.settings-appearance-panel__rows {
-  display: grid;
-}
-
-.settings-appearance-panel__row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-8);
-  min-height: 58px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.settings-appearance-panel__row:last-child {
-  border-bottom: 0;
-}
-
-.settings-appearance-panel__row > span {
-  color: var(--color-text);
-  font-size: var(--font-size-14);
-  font-weight: var(--font-weight-medium);
-}
-
-.settings-appearance-panel__row :deep(.el-select) {
+.settings-appearance-panel__theme-select {
   width: 220px;
 }
 </style>

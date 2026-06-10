@@ -5,10 +5,30 @@ import SettingsView from '../SettingsView.vue';
 import { defaultGeneralSettings, defaultThemeSettings } from '../../../shared/settings';
 
 describe('SettingsView', () => {
-  it('opens on appearance and emits appearance updates', async () => {
+  it('opens on general by default and emits tab selections', async () => {
+    const wrapper = mount(SettingsView, {
+      props: {
+        settings: defaultThemeSettings,
+        generalSettings: defaultGeneralSettings,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.text()).toContain('Accessibility');
+    expect(wrapper.text()).not.toContain('Theme');
+
+    await wrapper.findAll('.el-menu-item').find((item) => item.text() === 'Appearance')?.trigger('click');
+
+    expect(wrapper.emitted('selectTab')).toStrictEqual([['appearance']]);
+  });
+
+  it('renders controlled appearance settings and emits appearance updates', async () => {
     const updateSettings = vi.fn().mockResolvedValue(undefined);
     const wrapper = mount(SettingsView, {
       props: {
+        activeTab: 'appearance',
         settings: defaultThemeSettings,
         generalSettings: defaultGeneralSettings,
         updateSettings,
@@ -32,6 +52,7 @@ describe('SettingsView', () => {
       props: {
         settings: defaultThemeSettings,
         generalSettings: defaultGeneralSettings,
+        activeTab: 'appearance',
       },
       global: {
         plugins: [ElementPlus],
@@ -39,8 +60,8 @@ describe('SettingsView', () => {
     });
 
     await wrapper.findAll('.el-menu-item').find((item) => item.text() === 'General')?.trigger('click');
+    await wrapper.setProps({ activeTab: 'general' } as never);
 
-    expect(wrapper.text()).toContain('System permissions');
     expect(wrapper.text()).toContain('Accessibility');
   });
 });

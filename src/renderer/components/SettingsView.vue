@@ -6,7 +6,7 @@
     <SettingsSidebar
       :active-tab="activeTab"
       class="settings-view__sidebar"
-      @select="activeTab = $event"
+      @select="selectTab"
     />
 
     <main class="settings-view__content">
@@ -41,7 +41,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
 import type { AppGeneralSettings, AppThemeSettings, SourceFolderState, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '../../shared/contracts';
 import { defaultGeneralSettings, defaultSourceFolderState } from '../../shared/settings';
 import SettingsAppearancePanel from './SettingsAppearancePanel.vue';
@@ -51,6 +50,7 @@ import SettingsSidebar from './SettingsSidebar.vue';
 import type { SettingsTab } from './settings-tabs';
 
 withDefaults(defineProps<{
+  activeTab?: SettingsTab;
   settings: AppThemeSettings;
   generalSettings?: AppGeneralSettings;
   sourceFolder?: SourceFolderState;
@@ -65,6 +65,7 @@ withDefaults(defineProps<{
   disconnectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
 }>(), {
+  activeTab: 'general',
   workBacklogConnections: () => [],
   workBacklogError: null,
   workBacklogStatus: 'notLoaded',
@@ -78,7 +79,13 @@ withDefaults(defineProps<{
   disconnectWorkProvider: async () => undefined,
 });
 
-const activeTab = ref<SettingsTab>('appearance');
+const emit = defineEmits<{
+  selectTab: [tab: SettingsTab];
+}>();
+
+function selectTab(tab: SettingsTab): void {
+  emit('selectTab', tab);
+}
 </script>
 
 <style scoped>
@@ -104,7 +111,7 @@ const activeTab = ref<SettingsTab>('appearance');
 }
 
 .settings-view__panel {
-  max-width: 640px;
+  max-width: 720px;
   margin: 0 auto;
 }
 </style>

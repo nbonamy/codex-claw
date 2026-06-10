@@ -3,111 +3,99 @@
     title="General"
     title-id="settings-general-title"
   >
-    <section
-      class="settings-general-panel__section"
-      aria-labelledby="settings-general-behavior-title"
+    <SettingsSection
+      title="Behavior"
+      title-id="settings-general-behavior-title"
     >
-      <header class="settings-general-panel__section-header">
-        <h3 id="settings-general-behavior-title">Behavior</h3>
-      </header>
+      <SettingsRow
+        as="label"
+        title="Prevent sleep while agents run"
+        description="Keep this computer awake while an agent is active"
+      >
+        <template #control>
+          <el-switch
+            :model-value="settings.preventSleepWhenAgentsRun"
+            aria-label="Prevent sleep while agents run"
+            @update:model-value="updatePreventSleep"
+          />
+        </template>
+      </SettingsRow>
+    </SettingsSection>
 
-      <label class="settings-general-panel__setting">
-        <span class="settings-general-panel__setting-copy">
-          <strong>Prevent sleep while agents run</strong>
-          <span>Keep the computer awake while an agent is starting, working, or waiting for input.</span>
-        </span>
-        <el-switch
-          :model-value="settings.preventSleepWhenAgentsRun"
-          aria-label="Prevent sleep while agents run"
-          @update:model-value="updatePreventSleep"
-        />
-      </label>
-    </section>
-
-    <section
+    <SettingsSection
       v-if="showSourceFolderSetting"
-      class="settings-general-panel__section"
-      aria-labelledby="settings-general-source-title"
+      title="Source folder"
+      title-id="settings-general-source-title"
     >
-      <header class="settings-general-panel__section-header">
-        <h3 id="settings-general-source-title">Source folder</h3>
-      </header>
-
-      <article class="settings-general-panel__setting">
-        <span class="settings-general-panel__setting-copy">
-          <strong>{{ sourceFolderLabel }}</strong>
-          <span>Used to discover repositories when creating agents.</span>
-          <span
-            v-if="sourceFolderError"
-            class="settings-general-panel__setting-error"
-          >
-            {{ sourceFolderError }}
+      <SettingsRow
+        title="Source folder"
+        description="Discover repositories and worktrees when creating agents"
+        :error="sourceFolderError"
+      >
+        <template #control>
+          <span class="settings-general-panel__actions settings-general-panel__actions--source">
+            <span
+              class="settings-general-panel__path"
+              :title="sourceFolderLabel"
+            >
+              {{ sourceFolderLabel }}
+            </span>
+            <el-button
+              size="small"
+              :loading="choosingSourceFolder"
+              @click="chooseSourceFolder"
+            >
+              Choose
+            </el-button>
+            <el-button
+              v-if="sourceFolderState.path"
+              size="small"
+              @click="clearSourceFolder"
+            >
+              Clear
+            </el-button>
           </span>
-        </span>
-        <span class="settings-general-panel__setting-actions">
-          <el-button
-            size="small"
-            :loading="choosingSourceFolder"
-            @click="chooseSourceFolder"
-          >
-            Choose
-          </el-button>
-          <el-button
-            v-if="sourceFolderState.path"
-            size="small"
-            @click="clearSourceFolder"
-          >
-            Clear
-          </el-button>
-        </span>
-      </article>
-    </section>
+        </template>
+      </SettingsRow>
+    </SettingsSection>
 
-    <section
-      class="settings-general-panel__section"
-      aria-labelledby="settings-general-permissions-title"
+    <SettingsSection
+      title="System permissions"
+      title-id="settings-general-permissions-title"
     >
-      <header class="settings-general-panel__section-header">
-        <h3 id="settings-general-permissions-title">System permissions</h3>
-      </header>
-
-      <article class="settings-general-panel__permission">
-        <span
-          class="settings-general-panel__permission-icon"
-          aria-hidden="true"
-        >
-          <ShieldCheckIcon />
-        </span>
-        <div class="settings-general-panel__permission-copy">
-          <strong>Accessibility</strong>
-          <span>{{ accessibilityDescription }}</span>
-        </div>
-        <div class="settings-general-panel__permission-actions">
-          <span
-            class="settings-general-panel__permission-status"
-            :class="{ 'settings-general-panel__permission-status--granted': accessibilityGranted }"
-          >
-            {{ accessibilityStatusLabel }}
+      <SettingsRow
+        title="Accessibility"
+        :description="accessibilityDescription"
+      >
+        <template #control>
+          <span class="settings-general-panel__actions">
+            <span
+              class="settings-general-panel__status"
+              :class="{ 'settings-general-panel__status--granted': accessibilityGranted }"
+            >
+              <ShieldCheckIcon aria-hidden="true" />
+              {{ accessibilityStatusLabel }}
+            </span>
+            <el-button
+              v-if="showGrantButton"
+              :loading="openingAccessibilitySettings"
+              size="small"
+              @click="grantAccessibility"
+            >
+              Grant
+            </el-button>
+            <el-button
+              v-else-if="permissions?.accessibility.required"
+              :loading="loadingPermissions"
+              size="small"
+              @click="loadPermissions"
+            >
+              Refresh
+            </el-button>
           </span>
-          <el-button
-            v-if="showGrantButton"
-            :loading="openingAccessibilitySettings"
-            size="small"
-            @click="grantAccessibility"
-          >
-            Grant
-          </el-button>
-          <el-button
-            v-else-if="permissions?.accessibility.required"
-            :loading="loadingPermissions"
-            size="small"
-            @click="loadPermissions"
-          >
-            Refresh
-          </el-button>
-        </div>
-      </article>
-    </section>
+        </template>
+      </SettingsRow>
+    </SettingsSection>
   </SettingsPanelFrame>
 </template>
 
@@ -116,6 +104,8 @@ import { computed, onMounted, ref } from 'vue';
 import type { AppGeneralSettings, SourceFolderState, SystemPermissionsStatus, UpdateSettingsInput } from '../../shared/contracts';
 import { defaultSourceFolderState } from '../../shared/settings';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
+import SettingsRow from './SettingsRow.vue';
+import SettingsSection from './SettingsSection.vue';
 import { ShieldCheckIcon } from '../shared/icons/app-icons';
 
 const defaultPermissionsStatus: SystemPermissionsStatus = {
@@ -233,126 +223,58 @@ function updatePreventSleep(value: boolean | string | number): void {
 </script>
 
 <style scoped>
-.settings-general-panel__section {
-  display: flex;
-  flex-direction: column;
+.settings-general-panel__actions {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  justify-content: flex-end;
   gap: var(--space-8);
 }
 
-.settings-general-panel__section + .settings-general-panel__section {
-  margin-top: var(--space-20);
+.settings-general-panel__actions--source {
+  width: min(360px, 100%);
 }
 
-.settings-general-panel__section-header h3 {
-  margin: 0;
+.settings-general-panel__path {
+  min-width: 0;
+  max-width: 220px;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-6);
   color: var(--color-text);
-  font-size: var(--font-size-15);
+  background: var(--color-surface-low);
+  font-size: var(--font-size-14);
+  line-height: var(--line-height-20);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-general-panel__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-14);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-20);
 }
 
-.settings-general-panel__permission {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: var(--space-24) minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-12);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-12);
-  background: var(--color-surface-low);
-}
-
-.settings-general-panel__setting {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-12);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-12);
-  background: var(--color-surface-low);
-}
-
-.settings-general-panel__setting-copy {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.settings-general-panel__setting-copy strong {
-  color: var(--color-text);
-  font-size: var(--font-size-14);
-  line-height: var(--line-height-20);
-}
-
-.settings-general-panel__setting-copy span {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-13);
-  line-height: var(--line-height-18);
-}
-
-.settings-general-panel__setting-error {
-  color: var(--color-danger, #c2410c);
-}
-
-.settings-general-panel__setting-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-6);
-}
-
-.settings-general-panel__permission-icon {
-  width: var(--space-24);
-  height: var(--space-24);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-muted);
-}
-
-.settings-general-panel__permission-icon svg {
-  width: var(--icon-md);
-  height: var(--icon-md);
+.settings-general-panel__status svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
   stroke-width: 2;
 }
 
-.settings-general-panel__permission-copy {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.settings-general-panel__permission-copy strong {
-  color: var(--color-text);
-  font-size: var(--font-size-14);
-  line-height: var(--line-height-20);
-}
-
-.settings-general-panel__permission-copy span {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-13);
-  line-height: var(--line-height-18);
-}
-
-.settings-general-panel__permission-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-8);
-}
-
-.settings-general-panel__permission-status {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-13);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-18);
-}
-
-.settings-general-panel__permission-status--granted {
+.settings-general-panel__status--granted {
   color: var(--color-success);
+}
+
+@media (max-width: 780px) {
+  .settings-general-panel__actions--source {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
 }
 </style>
