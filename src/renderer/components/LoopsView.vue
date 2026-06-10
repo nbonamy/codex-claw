@@ -3,6 +3,9 @@
     class="loops-view"
     aria-label="Loops"
   >
+
+    <div class="loops-view__header" />
+
     <main class="loops-view__content">
       <div class="loops-view__panel">
         <SettingsPanelFrame
@@ -407,6 +410,17 @@ function formatShortDate(value: string): string {
   display: flex;
   overflow: hidden;
   background: var(--color-shell-main);
+}
+
+.loops-view__header {
+  position: absolute;
+  top: 0;
+  left: var(--team-rail-width);
+  height: var(--workbench-appbar-height);
+  width: 100%;
+  background: var(--color-shell-main);
+  border-bottom: 1px solid var(--color-border);
+  -webkit-app-region: drag;
 }
 
 .loops-view__content {

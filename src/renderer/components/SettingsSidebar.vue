@@ -16,7 +16,7 @@
         <span>Appearance</span>
       </el-menu-item>
       <el-menu-item index="integrations">
-        <GitHubIcon aria-hidden="true" />
+        <AffiliateIcon aria-hidden="true" />
         <span>Integrations</span>
       </el-menu-item>
     </el-menu>
@@ -25,7 +25,7 @@
 
 <script setup lang="ts">
 import type { SettingsTab } from './settings-tabs';
-import { GitHubIcon, PaletteIcon, SettingsIcon } from '../shared/icons/app-icons';
+import { AffiliateIcon, PaletteIcon, SettingsIcon } from '../shared/icons/app-icons';
 
 defineProps<{
   activeTab: SettingsTab;
@@ -53,31 +53,34 @@ function selectTab(tab: string): void {
   border-right: 0;
   background: transparent;
   padding: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .settings-sidebar :deep(.el-menu-item) {
-  height: 48px;
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  border-radius: var(--radius-sm);
+  padding: var(--space-4) var(--space-4) !important;
+  border-radius: var(--radius-lg);
   color: var(--color-text-muted);
   font-size: var(--font-size-15);
 }
 
 .settings-sidebar :deep(.el-menu-item svg) {
+  flex: 0 0 auto;
   width: var(--icon-md);
   height: var(--icon-md);
-  flex: 0 0 auto;
-  stroke-width: 2px;
+  stroke-width: 1.5px;
 }
 
 .settings-sidebar :deep(.el-menu-item:hover) {
-  background: var(--color-surface-base);
+  background: var(--color-surface-high);
 }
 
 .settings-sidebar :deep(.el-menu-item.is-active) {
   color: var(--color-text);
-  font-weight: var(--font-weight-semibold);
+  background: var(--color-surface-high);
 }
 </style>

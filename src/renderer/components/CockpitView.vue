@@ -503,7 +503,7 @@ function summaryLabel(status: AgentStatus['type'], count: number): string {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-12);
-  padding: 0 var(--space-16) 0 var(--space-20);
+  padding: 0 var(--space-16);
   border-bottom: 1px solid var(--color-border);
   -webkit-app-region: drag;
 }
@@ -511,16 +511,17 @@ function summaryLabel(status: AgentStatus['type'], count: number): string {
 .cockpit-view__title-block {
   min-width: 0;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-8);
 }
 
 .cockpit-view h1 {
   margin: 0;
   color: var(--color-text);
-  font-size: var(--font-size-16);
+  font-size: var(--font-size-12);
   font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-22);
+  line-height: var(--line-height-16);
+  text-transform: uppercase;
 }
 
 .cockpit-view__toolbar,

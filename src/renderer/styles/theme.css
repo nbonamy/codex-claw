@@ -20,6 +20,8 @@
   --el-fill-color-blank: var(--color-surface-lowest);
 
   --el-border-radius-base: var(--radius-md);
+
+  --el-menu-item-height: auto;
 }
 
 .el-dialog {

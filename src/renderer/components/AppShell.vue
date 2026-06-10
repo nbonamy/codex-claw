@@ -47,7 +47,7 @@
         @select-agent="selectAgentFromShell"
       />
     </Transition>
-    <section class="app-shell__agent">
+    <section class="app-shell__content">
       <SettingsView
         v-if="settingsVisible"
         :active-tab="settingsActiveTab"
@@ -1145,7 +1145,7 @@ function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
   }
 }
 
-.app-shell__agent {
+.app-shell__content {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;

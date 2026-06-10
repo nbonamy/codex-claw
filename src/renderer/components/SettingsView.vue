@@ -3,6 +3,8 @@
     class="settings-view"
     aria-label="Settings"
   >
+    <div class="settings-view__header" />
+    
     <SettingsSidebar
       :active-tab="activeTab"
       class="settings-view__sidebar"
@@ -99,8 +101,20 @@ function selectTab(tab: SettingsTab): void {
   background: var(--color-shell-main);
 }
 
+.settings-view__header {
+  position: absolute;
+  top: 0;
+  left: var(--team-rail-width);
+  height: var(--workbench-appbar-height);
+  width: 100%;
+  background: var(--color-shell-main);
+  border-bottom: 1px solid var(--color-border);
+  -webkit-app-region: drag;
+}
+
 .settings-view__sidebar {
   min-height: 0;
+  user-select: none;
 }
 
 .settings-view__content {

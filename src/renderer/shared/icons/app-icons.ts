@@ -1,6 +1,8 @@
+export { default as GitHubIcon } from './GitHubIcon.vue';
+
 export {
+  IconAffiliate as AffiliateIcon,
   IconBolt as BoltIcon,
-  IconBrandGithub as GitHubIcon,
   IconBookmark as SaveToBenchIcon,
   IconBrandSpeedtest as BrandSpeedTest,
   IconCheck as CheckIcon,

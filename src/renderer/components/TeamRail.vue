@@ -4,6 +4,8 @@
     class="team-rail"
     aria-label="Teams"
   >
+    <div class="team-rail__spacer" />
+    
     <button
       class="team-rail__cockpit"
       :class="{ 'team-rail__cockpit--active': cockpitActive }"
@@ -213,6 +215,16 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   padding: var(--space-6) var(--space-4);
   background: var(--color-shell-rail);
   user-select: none;
+}
+
+.team-rail__spacer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: var(--workbench-appbar-height);
+  width: var(--team-rail-width);
+  background: var(--color-shell-main);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .team-rail__team {

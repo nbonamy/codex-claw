@@ -13,7 +13,7 @@
           class="settings-integrations-panel__icon"
           aria-hidden="true"
         >
-          <img src="https://cdn.brandfetch.io/idZAyF9rlg/theme/dark/symbol.svg?c=1bxid64Mup7aczewSAYMX&t=1779162684348">
+          <GitHubIcon />
         </span>
         <div>
           <strong>GitHub</strong>
@@ -96,6 +96,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '../../shared/contracts';
+import { GitHubIcon } from '../shared/icons/app-icons';
 import SettingsIntegrationBanner from './SettingsIntegrationBanner.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 
@@ -227,11 +228,6 @@ async function connectGithub(): Promise<void> {
   height: var(--space-16);
   display: flex;
   align-items: center;
-}
-
-.settings-integrations-panel__icon img {
-  width: 100%;
-  height: 100%;
 }
 
 .settings-integrations-panel__actions {
