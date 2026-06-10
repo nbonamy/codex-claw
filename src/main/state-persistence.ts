@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Team, ThreadGoal, ThreadPlan, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '../shared/contracts';
+import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Loop, LoopAction, LoopExecutionCreatedAgent, LoopExecutionLogEntry, LoopExecutionStatus, LoopSourceConfiguration, LoopTeamTarget, Team, ThreadGoal, ThreadPlan, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '../shared/contracts';
 import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '../shared/codex-approval-presets';
 import { normalizeThemeSettings } from '../shared/settings';
 import { createEmptySnapshot } from '../shared/snapshot';
@@ -11,6 +11,7 @@ type PersistedState = {
   teams: Team[];
   agents: PersistedAgent[];
   bench: BenchTemplate[];
+  loops?: Loop[];
   activeTeamId: string | null;
   activeAgentId: string | null;
   accountRateLimits?: AccountRateLimits;
@@ -57,6 +58,7 @@ export function persistedStateFromSnapshot(snapshot: AppSnapshot): PersistedStat
     teams: snapshot.teams.map((team) => ({ ...team, agentIds: [...team.agentIds] })),
     agents: snapshot.agents.map(persistedAgentFromSnapshot),
     bench: snapshot.bench.map((template) => ({ ...template })),
+    loops: snapshot.loops.map(cloneLoop),
     activeTeamId: snapshot.activeTeamId,
     activeAgentId: snapshot.activeAgentId,
     ...(snapshot.accountRateLimits ? { accountRateLimits: { ...snapshot.accountRateLimits } } : {}),
@@ -98,10 +100,10 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
     : seed.teams;
   const accountRateLimits = sanitizeAccountRateLimits(value.accountRateLimits);
   const workBacklog = sanitizeWorkBacklogState(value.workBacklog, seed.workBacklog);
-  workBacklog.assignments = sanitizeAssignmentsForExistingAgents({
+  workBacklog.assignments = {
     ...legacyWorkBacklogAssignments(value.agents, agents),
     ...workBacklog.assignments,
-  }, agents);
+  };
   const snapshot: AppSnapshot = {
     ...seed,
     teams: teams.length > 0 ? teams : seed.teams,
@@ -109,6 +111,9 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
     bench: Array.isArray(value.bench)
       ? value.bench.map(sanitizeBenchTemplate).filter((template): template is BenchTemplate => Boolean(template))
       : seed.bench,
+    loops: Array.isArray(value.loops)
+      ? value.loops.map(sanitizeLoop).filter((loop): loop is Loop => Boolean(loop))
+      : seed.loops,
     activeTeamId: typeof value.activeTeamId === 'string' ? value.activeTeamId : null,
     activeAgentId: typeof value.activeAgentId === 'string' ? value.activeAgentId : null,
     ...(accountRateLimits ? { accountRateLimits } : {}),
@@ -429,11 +434,6 @@ function legacyWorkBacklogAssignment(agentId: string, value: unknown): WorkBackl
   };
 }
 
-function sanitizeAssignmentsForExistingAgents(assignments: WorkBacklogState['assignments'], agents: Agent[]): WorkBacklogState['assignments'] {
-  const agentIds = new Set(agents.map((agent) => agent.id));
-  return Object.fromEntries(Object.entries(assignments).filter(([, assignment]) => agentIds.has(assignment.agentId)));
-}
-
 function sanitizeWorkIntegrationConnection(value: unknown): WorkIntegrationConnection | null {
   if (!isRecord(value) || !isWorkProvider(value.provider) || !isWorkIntegrationStatus(value.status)) {
     return null;
@@ -506,6 +506,193 @@ function sanitizeWorkProviderSetting(value: unknown): WorkProviderSettings | nul
 
   const oauthClientId = optionalTrimmedString(value.oauthClientId) ?? '';
   return oauthClientId ? { oauthClientId } : null;
+}
+
+function cloneLoop(loop: Loop): Loop {
+  return {
+    ...loop,
+    source: { ...loop.source },
+    action: cloneLoopAction(loop.action),
+    processedWorkItemIds: [...(loop.processedWorkItemIds ?? [])],
+    executionLog: (loop.executionLog ?? []).map(cloneLoopExecutionEntry),
+  };
+}
+
+function cloneLoopExecutionEntry(entry: LoopExecutionLogEntry): LoopExecutionLogEntry {
+  return {
+    ...entry,
+    createdAgents: entry.createdAgents.map((createdAgent) => ({ ...createdAgent })),
+  };
+}
+
+function cloneLoopAction(action: LoopAction): LoopAction {
+  if (action.type === 'create-agent-from-bench') {
+    return {
+      type: action.type,
+      benchTemplateId: action.benchTemplateId,
+      teamTarget: { ...action.teamTarget },
+    };
+  }
+  return action;
+}
+
+function sanitizeLoop(value: unknown): Loop | null {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== 'string' ||
+    typeof value.name !== 'string' ||
+    typeof value.createdAt !== 'string' ||
+    typeof value.updatedAt !== 'string'
+  ) {
+    return null;
+  }
+
+  const source = sanitizeLoopSource(value.source);
+  const action = sanitizeLoopAction(value.action);
+  if (!source || !action) {
+    return null;
+  }
+
+  const lastCreatedCount = typeof value.lastCreatedCount === 'number' && Number.isFinite(value.lastCreatedCount)
+    ? Math.max(0, Math.floor(value.lastCreatedCount))
+    : undefined;
+  const loopId = value.id;
+  const executionLog = Array.isArray(value.executionLog)
+    ? value.executionLog.map((entry) => sanitizeLoopExecutionEntry(entry, loopId)).filter((entry): entry is LoopExecutionLogEntry => Boolean(entry))
+    : [];
+  const processedWorkItemIds = Array.isArray(value.processedWorkItemIds)
+    ? [...new Set(value.processedWorkItemIds.filter((itemId): itemId is string => typeof itemId === 'string' && Boolean(itemId.trim())).map((itemId) => itemId.trim()))]
+    : [];
+
+  return {
+    id: value.id,
+    name: value.name.trim() || 'Loop',
+    enabled: typeof value.enabled === 'boolean' ? value.enabled : true,
+    source,
+    action,
+    processedWorkItemIds,
+    executionLog,
+    createdAt: value.createdAt,
+    updatedAt: value.updatedAt,
+    ...(typeof value.lastRunAt === 'string' ? { lastRunAt: value.lastRunAt } : {}),
+    ...(typeof value.lastError === 'string' && value.lastError.trim() ? { lastError: value.lastError } : {}),
+    ...(lastCreatedCount !== undefined ? { lastCreatedCount } : {}),
+  };
+}
+
+function sanitizeLoopExecutionEntry(value: unknown, loopId: string): LoopExecutionLogEntry | null {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== 'string' ||
+    typeof value.startedAt !== 'string' ||
+    typeof value.completedAt !== 'string' ||
+    !isLoopExecutionStatus(value.status) ||
+    !Array.isArray(value.createdAgents)
+  ) {
+    return null;
+  }
+
+  const entryLoopId = typeof value.loopId === 'string' && value.loopId.trim() ? value.loopId : loopId;
+  if (entryLoopId !== loopId) {
+    return null;
+  }
+
+  const createdAgents = value.createdAgents
+    .map(sanitizeLoopExecutionCreatedAgent)
+    .filter((createdAgent): createdAgent is LoopExecutionCreatedAgent => Boolean(createdAgent));
+  const createdCount = typeof value.createdCount === 'number' && Number.isFinite(value.createdCount)
+    ? Math.max(0, Math.floor(value.createdCount))
+    : createdAgents.length;
+
+  return {
+    id: value.id,
+    loopId,
+    startedAt: value.startedAt,
+    completedAt: value.completedAt,
+    status: value.status,
+    createdCount,
+    createdAgents,
+    ...(typeof value.error === 'string' && value.error.trim() ? { error: value.error } : {}),
+  };
+}
+
+function sanitizeLoopExecutionCreatedAgent(value: unknown): LoopExecutionCreatedAgent | null {
+  if (
+    !isRecord(value) ||
+    typeof value.agentId !== 'string' ||
+    typeof value.workItemId !== 'string' ||
+    typeof value.workItemTitle !== 'string' ||
+    typeof value.workItemUrl !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    agentId: value.agentId,
+    agentName: typeof value.agentName === 'string' && value.agentName.trim() ? value.agentName : value.agentId,
+    workItemId: value.workItemId,
+    workItemTitle: value.workItemTitle,
+    workItemUrl: value.workItemUrl,
+    ...(typeof value.conversationId === 'string' && value.conversationId.trim() ? { conversationId: value.conversationId } : {}),
+    ...(typeof value.turnId === 'string' && value.turnId.trim() ? { turnId: value.turnId } : {}),
+  };
+}
+
+function isLoopExecutionStatus(value: unknown): value is LoopExecutionStatus {
+  return value === 'completed' || value === 'failed';
+}
+
+function sanitizeLoopSource(value: unknown): LoopSourceConfiguration | null {
+  if (!isRecord(value) || value.provider !== 'github') {
+    return null;
+  }
+
+  const repositoryId = optionalTrimmedString(value.repositoryId);
+  if (!repositoryId) {
+    return null;
+  }
+
+  const tagName = optionalTrimmedString(value.tagName);
+  return {
+    provider: 'github',
+    repositoryId,
+    ...(tagName ? { tagName } : {}),
+  };
+}
+
+function sanitizeLoopAction(value: unknown): LoopAction | null {
+  if (!isRecord(value) || value.type !== 'create-agent-from-bench') {
+    return null;
+  }
+
+  const benchTemplateId = optionalTrimmedString(value.benchTemplateId);
+  const teamTarget = sanitizeLoopTeamTarget(value.teamTarget);
+  if (!benchTemplateId || !teamTarget) {
+    return null;
+  }
+
+  return {
+    type: 'create-agent-from-bench',
+    benchTemplateId,
+    teamTarget,
+  };
+}
+
+function sanitizeLoopTeamTarget(value: unknown): LoopTeamTarget | null {
+  if (!isRecord(value) || typeof value.mode !== 'string') {
+    return null;
+  }
+
+  if (value.mode === 'dedicated') {
+    return { mode: 'dedicated' };
+  }
+
+  if (value.mode === 'existing') {
+    const teamId = optionalTrimmedString(value.teamId);
+    return teamId ? { mode: 'existing', teamId } : null;
+  }
+
+  return null;
 }
 
 function optionalTrimmedString(value: unknown): string | null {

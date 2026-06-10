@@ -1,0 +1,384 @@
+import { describe, expect, it, vi } from 'vitest';
+import { createInitialSnapshot } from '../../../shared/snapshot';
+import { createLoopInSnapshot } from '../../../shared/loop-manager';
+import { workItemAssignmentKey } from '../../../shared/work-assignments';
+import type { WorkItem } from '../../../shared/contracts';
+import { LoopRunner, matchingLoopItems } from '../runner';
+
+describe('LoopRunner', () => {
+  it('creates agents from matching issues and preserves the active selection', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.bench.push({
+      id: 'bench-dina',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      createdAt: '2026-06-09T10:00:00.000Z',
+      updatedAt: '2026-06-09T10:00:00.000Z',
+    });
+    createLoopInSnapshot(snapshot, {
+      name: 'GitHub bugs',
+      source: {
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
+        tagName: 'bug',
+      },
+      action: {
+        type: 'create-agent-from-bench',
+        benchTemplateId: 'bench-dina',
+        teamTarget: {
+          mode: 'dedicated',
+        },
+      },
+    }, '2026-06-09T10:01:00.000Z', () => 'loop-bugs');
+
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const notifySnapshotUpdated = vi.fn();
+    const sendPrompt = vi.fn().mockResolvedValue(undefined);
+    const runner = new LoopRunner({
+      getSnapshot: () => snapshot,
+      listWorkItems: {
+        listItems: vi.fn().mockResolvedValue([
+          workItem(12, 'Fix cockpit', ['bug']),
+          workItem(13, 'Docs', ['documentation']),
+        ]),
+      },
+      notifySnapshotUpdated,
+      saveSnapshot,
+      sendPrompt,
+      createExecutionId: () => 'loop-exec-bugs',
+      now: () => new Date('2026-06-09T11:00:00.000Z'),
+    });
+
+    await runner.runAll();
+
+    const assignment = snapshot.workBacklog.assignments[workItemAssignmentKey(workItem(12, 'Fix cockpit', ['bug']))];
+    expect(assignment).toMatchObject({
+      provider: 'github',
+      itemId: 'nbonamy/codex-claw#12',
+      assignedAt: '2026-06-09T11:00:00.000Z',
+      status: 'working',
+    });
+    expect(snapshot.activeAgentId).toBe('agent-dina');
+    expect(snapshot.activeTeamId).toBe('team-codex-claw');
+    expect(snapshot.teams.map((team) => team.name)).toContain('GitHub #12');
+    expect(snapshot.agents.find((agent) => agent.id === assignment?.agentId)).toMatchObject({
+      name: 'Dina',
+      teamId: expect.stringContaining('team-github-12'),
+    });
+    expect(snapshot.loops[0]).toMatchObject({
+      lastRunAt: '2026-06-09T11:00:00.000Z',
+      lastCreatedCount: 1,
+      processedWorkItemIds: ['github:nbonamy/codex-claw#12'],
+      executionLog: [{
+        id: 'loop-exec-bugs',
+        loopId: 'loop-bugs',
+        status: 'completed',
+        createdCount: 1,
+        createdAgents: [{
+          agentId: assignment?.agentId,
+          agentName: 'Dina',
+          workItemId: 'github:nbonamy/codex-claw#12',
+          workItemTitle: 'Fix cockpit',
+          workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
+        }],
+      }],
+    });
+    expect(saveSnapshot).toHaveBeenCalledOnce();
+    expect(notifySnapshotUpdated).toHaveBeenCalledOnce();
+    expect(sendPrompt).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.stringContaining('Work item ID: github:nbonamy/codex-claw#12'),
+      {
+        loopId: 'loop-bugs',
+        executionId: 'loop-exec-bugs',
+        workItemId: 'github:nbonamy/codex-claw#12',
+      },
+    );
+  });
+
+  it('keeps the execution log when prompt dispatch fails after a real pickup', async () => {
+    const snapshot = snapshotWithLoop('loop-all');
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const notifySnapshotUpdated = vi.fn();
+    const sendPrompt = vi.fn().mockRejectedValue(new Error('backend offline'));
+    const runner = new LoopRunner({
+      getSnapshot: () => snapshot,
+      listWorkItems: {
+        listItems: vi.fn().mockResolvedValue([workItem(12, 'Fix cockpit', ['bug'])]),
+      },
+      notifySnapshotUpdated,
+      saveSnapshot,
+      sendPrompt,
+      createExecutionId: () => 'loop-exec-all',
+      now: () => new Date('2026-06-09T11:00:00.000Z'),
+    });
+
+    await runner.runAll();
+
+    expect(snapshot.loops[0]).toMatchObject({
+      lastRunAt: '2026-06-09T11:00:00.000Z',
+      lastCreatedCount: 1,
+      lastError: 'backend offline',
+      processedWorkItemIds: ['github:nbonamy/codex-claw#12'],
+      executionLog: [{
+        id: 'loop-exec-all',
+        status: 'failed',
+        createdCount: 1,
+        error: 'backend offline',
+        createdAgents: [{
+          workItemId: 'github:nbonamy/codex-claw#12',
+          workItemTitle: 'Fix cockpit',
+          workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
+        }],
+      }],
+    });
+    expect(saveSnapshot).toHaveBeenCalledTimes(2);
+    expect(notifySnapshotUpdated).toHaveBeenCalledTimes(2);
+    expect(sendPrompt).toHaveBeenCalledOnce();
+  });
+
+  it('logs created assignments if a later matching ticket fails before prompting', async () => {
+    const snapshot = snapshotWithLoop('loop-all');
+    const originalTeamFind = snapshot.teams.find;
+    let teamFindCalls = 0;
+    snapshot.teams.find = ((predicate: (team: (typeof snapshot.teams)[number], index: number, teams: typeof snapshot.teams) => unknown, thisArg?: unknown) => {
+      teamFindCalls += 1;
+      if (teamFindCalls > 2) {
+        return undefined;
+      }
+      return originalTeamFind.call(snapshot.teams, predicate, thisArg);
+    }) as typeof snapshot.teams.find;
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const notifySnapshotUpdated = vi.fn();
+    const sendPrompt = vi.fn().mockResolvedValue(undefined);
+    const runner = new LoopRunner({
+      getSnapshot: () => snapshot,
+      listWorkItems: {
+        listItems: vi.fn().mockResolvedValue([
+          workItem(12, 'Fix cockpit', ['bug']),
+          workItem(13, 'Fix logging', ['bug']),
+        ]),
+      },
+      notifySnapshotUpdated,
+      saveSnapshot,
+      sendPrompt,
+      createExecutionId: () => 'loop-exec-all',
+      now: () => new Date('2026-06-09T11:00:00.000Z'),
+    });
+
+    try {
+      await runner.runAll();
+    } finally {
+      snapshot.teams.find = originalTeamFind;
+    }
+
+    expect(snapshot.workBacklog.assignments['github:nbonamy/codex-claw#12']).toMatchObject({
+      provider: 'github',
+      itemId: 'nbonamy/codex-claw#12',
+      status: 'working',
+    });
+    expect(snapshot.workBacklog.assignments['github:nbonamy/codex-claw#13']).toBeUndefined();
+    expect(snapshot.loops[0]).toMatchObject({
+      lastRunAt: '2026-06-09T11:00:00.000Z',
+      lastCreatedCount: 1,
+      processedWorkItemIds: ['github:nbonamy/codex-claw#12'],
+      executionLog: [{
+        id: 'loop-exec-all',
+        status: 'failed',
+        createdCount: 1,
+        error: 'Team is no longer available for loop "nbonamy/codex-claw".',
+        createdAgents: [{
+          workItemId: 'github:nbonamy/codex-claw#12',
+          workItemTitle: 'Fix cockpit',
+          workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
+        }],
+      }],
+    });
+    expect(saveSnapshot).toHaveBeenCalledOnce();
+    expect(notifySnapshotUpdated).toHaveBeenCalledOnce();
+    expect(sendPrompt).not.toHaveBeenCalled();
+  });
+
+  it('does not create duplicate agents for already assigned work', async () => {
+    const snapshot = snapshotWithLoop('loop-all');
+    const item = workItem(12, 'Fix cockpit', ['bug']);
+    snapshot.workBacklog.assignments[workItemAssignmentKey(item)] = {
+      provider: 'github',
+      itemId: item.id,
+      agentId: 'agent-dina',
+      assignedAt: '2026-06-09T10:02:00.000Z',
+      status: 'working',
+    };
+    const sendPrompt = vi.fn().mockResolvedValue(undefined);
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const notifySnapshotUpdated = vi.fn();
+    const runner = new LoopRunner({
+      getSnapshot: () => snapshot,
+      listWorkItems: {
+        listItems: vi.fn().mockResolvedValue([item]),
+      },
+      notifySnapshotUpdated,
+      saveSnapshot,
+      sendPrompt,
+      createExecutionId: () => 'loop-exec-all',
+      now: () => new Date('2026-06-09T11:00:00.000Z'),
+    });
+
+    await runner.runAll();
+
+    expect(snapshot.agents).toHaveLength(2);
+    expect(snapshot.loops[0]?.lastCreatedCount).toBeUndefined();
+    expect(snapshot.loops[0]?.executionLog).toStrictEqual([]);
+    expect(saveSnapshot).not.toHaveBeenCalled();
+    expect(notifySnapshotUpdated).not.toHaveBeenCalled();
+    expect(sendPrompt).not.toHaveBeenCalled();
+  });
+
+  it('does nothing for an open matching issue with a completed assignment even when the agent no longer exists', async () => {
+    const snapshot = snapshotWithLoop('loop-all');
+    const item = workItem(12, 'Fix cockpit', ['bug']);
+    snapshot.workBacklog.assignments[workItemAssignmentKey(item)] = {
+      provider: 'github',
+      itemId: item.id,
+      agentId: 'agent-closed',
+      assignedAt: '2026-06-09T10:02:00.000Z',
+      status: 'completed',
+      completedAt: '2026-06-09T10:30:00.000Z',
+    };
+    const sendPrompt = vi.fn().mockResolvedValue(undefined);
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const notifySnapshotUpdated = vi.fn();
+    const runner = new LoopRunner({
+      getSnapshot: () => snapshot,
+      listWorkItems: {
+        listItems: vi.fn().mockResolvedValue([item]),
+      },
+      notifySnapshotUpdated,
+      saveSnapshot,
+      sendPrompt,
+      createExecutionId: () => 'loop-exec-all',
+      now: () => new Date('2026-06-09T11:00:00.000Z'),
+    });
+
+    await runner.runAll();
+
+    expect(snapshot.agents).toHaveLength(2);
+    expect(snapshot.loops[0]?.lastCreatedCount).toBeUndefined();
+    expect(snapshot.loops[0]?.executionLog).toStrictEqual([]);
+    expect(snapshot.loops[0]?.processedWorkItemIds).toStrictEqual([]);
+    expect(saveSnapshot).not.toHaveBeenCalled();
+    expect(notifySnapshotUpdated).not.toHaveBeenCalled();
+    expect(sendPrompt).not.toHaveBeenCalled();
+  });
+
+  it('does not recreate agents for work items already processed by the loop', async () => {
+    const snapshot = snapshotWithLoop('loop-bugs', { tagName: 'bug' });
+    snapshot.loops[0]!.processedWorkItemIds = ['github:nbonamy/codex-claw#12'];
+    const sendPrompt = vi.fn().mockResolvedValue(undefined);
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const notifySnapshotUpdated = vi.fn();
+    const runner = new LoopRunner({
+      getSnapshot: () => snapshot,
+      listWorkItems: {
+        listItems: vi.fn().mockResolvedValue([workItem(12, 'Fix cockpit', ['bug'])]),
+      },
+      notifySnapshotUpdated,
+      saveSnapshot,
+      sendPrompt,
+      createExecutionId: () => 'loop-exec-bugs',
+      now: () => new Date('2026-06-09T11:00:00.000Z'),
+    });
+
+    await runner.runAll();
+
+    expect(snapshot.agents).toHaveLength(2);
+    expect(snapshot.loops[0]?.lastCreatedCount).toBeUndefined();
+    expect(snapshot.loops[0]?.executionLog).toStrictEqual([]);
+    expect(snapshot.loops[0]?.processedWorkItemIds).toStrictEqual(['github:nbonamy/codex-claw#12']);
+    expect(saveSnapshot).not.toHaveBeenCalled();
+    expect(notifySnapshotUpdated).not.toHaveBeenCalled();
+    expect(sendPrompt).not.toHaveBeenCalled();
+  });
+
+  it('filters loop items by repository, state, and tag', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.bench.push({
+      id: 'bench-dina',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      createdAt: '2026-06-09T10:00:00.000Z',
+      updatedAt: '2026-06-09T10:00:00.000Z',
+    });
+    const loop = createLoopInSnapshot(snapshot, {
+      source: {
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
+        tagName: 'bug',
+      },
+      action: {
+        type: 'create-agent-from-bench',
+        benchTemplateId: 'bench-dina',
+        teamTarget: {
+          mode: 'existing',
+          teamId: 'team-codex-claw',
+        },
+      },
+    });
+
+    expect(loop).not.toBeNull();
+    expect(matchingLoopItems([
+      workItem(12, 'Bug', ['bug']),
+      { ...workItem(13, 'Closed', ['bug']), state: 'closed' },
+      { ...workItem(14, 'Other repo', ['bug']), repositoryId: 'nbonamy/id8' },
+      workItem(15, 'Feature', ['feature']),
+    ], loop!)).toStrictEqual([
+      workItem(12, 'Bug', ['bug']),
+    ]);
+  });
+});
+
+function snapshotWithLoop(loopId: string, options: { tagName?: string } = {}) {
+  const snapshot = createInitialSnapshot();
+  snapshot.bench.push({
+    id: 'bench-dina',
+    name: 'Dina',
+    folder: '/Users/nbonamy/src/codex-claw',
+    backend: 'codex',
+    createdAt: '2026-06-09T10:00:00.000Z',
+    updatedAt: '2026-06-09T10:00:00.000Z',
+  });
+  createLoopInSnapshot(snapshot, {
+    source: {
+      provider: 'github',
+      repositoryId: 'nbonamy/codex-claw',
+      ...(options.tagName ? { tagName: options.tagName } : {}),
+    },
+    action: {
+      type: 'create-agent-from-bench',
+      benchTemplateId: 'bench-dina',
+      teamTarget: {
+        mode: 'existing',
+        teamId: 'team-codex-claw',
+      },
+    },
+  }, '2026-06-09T10:01:00.000Z', () => loopId);
+  return snapshot;
+}
+
+function workItem(number: number, title: string, labels: string[]): WorkItem {
+  return {
+    provider: 'github',
+    id: `nbonamy/codex-claw#${number}`,
+    repositoryId: 'nbonamy/codex-claw',
+    repositoryFullName: 'nbonamy/codex-claw',
+    number,
+    title,
+    url: `https://github.com/nbonamy/codex-claw/issues/${number}`,
+    state: 'open',
+    labels: labels.map((name) => ({ name })),
+    createdAt: '2026-06-09T09:00:00.000Z',
+    updatedAt: '2026-06-09T09:30:00.000Z',
+  };
+}

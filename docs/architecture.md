@@ -557,10 +557,11 @@ then sends a deterministic prompt through the existing prompt path. Assignment
 state is local and provider-neutral: newly assigned items are `working`, and
 agents mark them `completed` through the `mark-work-item-completed` Claw MCP
 tool using the exact work item id from that prompt. Assigning the same work
-item to another agent overwrites that key and resets it to `working`. If the
-stored agent id no longer exists, the ticket is treated as unassigned. Resetting
-an assignment clears Codex Claw's local assignment metadata and its local
-working/completed state.
+item to another agent overwrites that key and resets it to `working`. Assignment
+status belongs to the backlog record, so it is preserved even when the stored
+agent id no longer exists; only the live assignee navigation/avatar depends on
+the agent still being present. Resetting an assignment clears Codex Claw's local
+assignment metadata and its local working/completed state.
 Future provider-specific actions, such as claiming tickets, commenting, or
 changing status, should be added behind the work-provider seam without changing
 cockpit tiles into provider-aware UI.

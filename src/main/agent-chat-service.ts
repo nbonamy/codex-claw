@@ -2,12 +2,16 @@ import {
   appendUserPrompt,
 } from './snapshot-service';
 import type { AgentStatus, AppSnapshot, MainToRendererEvent, SendPromptOptions } from '../shared/contracts';
-import type { AgentBackendDriver } from './backends/types';
+import type { AgentBackendDriver, BackendSendResult } from './backends/types';
 import { backendDisplayName } from './backends/types';
 
 export type AgentChatEventEmitter = (
   event: Omit<MainToRendererEvent, 'seq' | 'occurredAt'> & Partial<Pick<MainToRendererEvent, 'seq' | 'occurredAt'>>,
 ) => void;
+
+export type SendAgentPromptHooks = {
+  onPromptStarted?: (result: BackendSendResult) => void | Promise<void>;
+};
 
 export function sendAgentPrompt(
   snapshot: AppSnapshot,
@@ -16,6 +20,7 @@ export function sendAgentPrompt(
   prompt: string,
   options: SendPromptOptions | undefined,
   emit: AgentChatEventEmitter,
+  hooks?: SendAgentPromptHooks,
 ): AppSnapshot {
   const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
   const trimmedPrompt = prompt.trim();
@@ -52,6 +57,7 @@ export function sendAgentPrompt(
         status: 'running',
         detail: `${backendDisplayName(backendDriver.backend)} backend connected.`,
       }, emit, snapshot);
+      void Promise.resolve(hooks?.onPromptStarted?.(result)).catch(() => undefined);
     })
     .catch((error) => {
       const message = error instanceof Error ? error.message : String(error);

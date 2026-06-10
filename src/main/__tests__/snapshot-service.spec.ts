@@ -41,6 +41,7 @@ describe('snapshot service', () => {
         },
       ],
       bench: [],
+      loops: [],
       activeTeamId: 'team-codex-claw',
       activeAgentId: 'agent-dina',
       messages: [],

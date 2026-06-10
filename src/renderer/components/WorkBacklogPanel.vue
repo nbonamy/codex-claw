@@ -99,7 +99,7 @@
         :key="row.item.id"
         class="work-backlog-panel__item"
         :class="{
-          'work-backlog-panel__item--assigned': row.assignedAgent,
+          'work-backlog-panel__item--assigned': hasAssignmentContext(row),
           'work-backlog-panel__item--completed': workItemAssignmentStatus(row) === 'completed',
         }"
         draggable="true"
@@ -142,15 +142,21 @@
           <strong>{{ row.item.title }}</strong>
         </div>
         <div
-          v-if="row.assignedAgent"
+          v-if="hasAssignmentContext(row)"
           class="work-backlog-panel__item-assignee"
         >
           <AgentAvatar
+            v-if="row.assignedAgent"
             :avatar="row.assignedAgent.avatar"
             :name="row.assignedAgent.name"
             size="sm"
           />
-          <span>{{ row.assignedAgent.name }}</span>
+          <span
+            v-else
+            aria-hidden="true"
+            class="work-backlog-panel__missing-agent-icon"
+          />
+          <span>{{ row.assignedAgent?.name ?? 'Agent unavailable' }}</span>
           <span
             class="work-backlog-panel__assignee-status"
             :data-status="workItemAssignmentStatus(row)"
@@ -242,7 +248,7 @@ const itemRows = computed<WorkBacklogItemRow[]>(() => filteredItems.value.map((i
   const assignedAgent = props.assignedAgentsByWorkItemKey[assignmentKey] ?? null;
   return {
     assignedAgent,
-    assignment: assignedAgent ? props.assignments[assignmentKey] ?? null : null,
+    assignment: props.assignments[assignmentKey] ?? null,
     item,
   };
 }));
@@ -253,6 +259,10 @@ function workItemAssignmentStatus(row: WorkBacklogItemRow): WorkBacklogAssignmen
 
 function workItemAssignmentStatusLabel(row: WorkBacklogItemRow): string {
   return workItemAssignmentStatus(row) === 'completed' ? 'Completed' : 'Working';
+}
+
+function hasAssignmentContext(row: WorkBacklogItemRow): boolean {
+  return Boolean(row.assignment || row.assignedAgent);
 }
 
 function menuItemsForRow(row: WorkBacklogItemRow): AppMenuItem[] {
@@ -277,7 +287,7 @@ function menuItemsForRow(row: WorkBacklogItemRow): AppMenuItem[] {
       label: `View on ${integrationLabel.value}`,
       icon: ExternalLinkIcon,
     },
-    ...(row.assignedAgent ? [
+    ...(hasAssignmentContext(row) ? [
       { id: 'group-reset', type: 'separator' } satisfies AppMenuItem,
       {
         id: 'reset-assignment',
@@ -554,6 +564,14 @@ function workProviderLabel(provider: WorkIntegrationConnection['provider']): str
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.work-backlog-panel__missing-agent-icon {
+  width: 18px;
+  height: 18px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: 50%;
+  background: var(--color-surface-low);
 }
 
 .work-backlog-panel__assignee-status {

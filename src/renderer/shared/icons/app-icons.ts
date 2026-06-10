@@ -21,6 +21,7 @@ export {
   IconFolder as FolderIcon,
   IconHandStop as HandStopIcon,
   IconInfoCircle as Info,
+  IconInfinity as InfinityIcon,
   IconListDetails as ListDetailsIcon,
   IconLayoutSidebarLeftCollapse as PanelLeftCloseIcon,
   IconLayoutSidebarLeftExpand as PanelLeftOpenIcon,

@@ -36,6 +36,10 @@
     :connect-work-provider="connectWorkProvider"
     :complete-work-provider-connection="completeWorkProviderConnection"
     :disconnect-work-provider="disconnectWorkProvider"
+    :create-loop="createLoop"
+    :update-loop="updateLoop"
+    :clear-loop-history="clearLoopHistory"
+    :delete-loop="deleteLoop"
     :configure-work-backlog="configureWorkBacklog"
     :load-work-repositories="loadWorkRepositories"
     :load-work-items="loadWorkItems"
@@ -126,6 +130,10 @@ const {
   connectWorkProvider,
   completeWorkProviderConnection,
   disconnectWorkProvider,
+  createLoop,
+  updateLoop,
+  clearLoopHistory,
+  deleteLoop,
   configureWorkBacklog,
   loadWorkRepositories,
   loadWorkItems,

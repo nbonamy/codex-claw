@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AppleSpeechTranscriptionOptions, AppCommand, ClientRequestResponse, CodexApprovalPreset, CodexClawApi, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '../shared/contracts';
+import type { AppleSpeechTranscriptionOptions, AppCommand, ClientRequestResponse, CodexApprovalPreset, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '../shared/contracts';
 import { ipcChannels } from '../shared/ipc';
 
 const api: CodexClawApi = {
@@ -20,6 +20,10 @@ const api: CodexClawApi = {
   reorderTeams: (input: ReorderTeamsInput) => ipcRenderer.invoke(ipcChannels.reorderTeams, input),
   closeTeam: (teamId: string) => ipcRenderer.invoke(ipcChannels.closeTeam, teamId),
   selectTeam: (teamId: string) => ipcRenderer.invoke(ipcChannels.selectTeam, teamId),
+  createLoop: (input: CreateLoopInput) => ipcRenderer.invoke(ipcChannels.createLoop, input),
+  updateLoop: (input: UpdateLoopInput) => ipcRenderer.invoke(ipcChannels.updateLoop, input),
+  clearLoopHistory: (loopId: string) => ipcRenderer.invoke(ipcChannels.clearLoopHistory, loopId),
+  deleteLoop: (loopId: string) => ipcRenderer.invoke(ipcChannels.deleteLoop, loopId),
   createAgent: (input: CreateAgentInput) => ipcRenderer.invoke(ipcChannels.createAgent, input),
   updateAgent: (input: UpdateAgentInput) => ipcRenderer.invoke(ipcChannels.updateAgent, input),
   assignWorkItemToAgent: (agentId: string, item: WorkItem) => ipcRenderer.invoke(ipcChannels.assignWorkItemToAgent, agentId, item),

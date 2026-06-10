@@ -780,6 +780,40 @@ describe('snapshot reducer', () => {
     ]);
   });
 
+  it('replaces renderer state from a snapshot update event', () => {
+    const snapshot = createInitialSnapshot();
+    const nextSnapshot = createInitialSnapshot();
+    nextSnapshot.loops = [{
+      id: 'loop-bugs',
+      name: 'GitHub bugs',
+      enabled: true,
+      source: {
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
+      },
+      action: {
+        type: 'create-agent-from-bench',
+        benchTemplateId: 'bench-dina',
+        teamTarget: {
+          mode: 'dedicated',
+        },
+      },
+      processedWorkItemIds: [],
+      executionLog: [],
+      createdAt: '2026-06-09T10:00:00.000Z',
+      updatedAt: '2026-06-09T10:00:00.000Z',
+    }];
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      type: 'snapshot.updated',
+      payload: nextSnapshot,
+      occurredAt: '2026-06-09T10:00:00.000Z',
+    });
+
+    expect(snapshot.loops).toStrictEqual(nextSnapshot.loops);
+  });
+
   it('merges agent updates from main-process collaboration tools', () => {
     const snapshot = createInitialSnapshot();
 

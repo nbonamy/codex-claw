@@ -416,6 +416,106 @@ describe('AppStatePersistence', () => {
     expect(restored.workBacklog).toStrictEqual(snapshot.workBacklog);
   });
 
+  it('keeps work assignment status on load even when the assigned agent no longer exists', () => {
+    const restored = snapshotFromPersistedState({
+      teams: [],
+      agents: [],
+      bench: [],
+      activeTeamId: null,
+      activeAgentId: null,
+      theme: defaultThemeSettings,
+      workBacklog: {
+        connections: [],
+        providerConfigurations: {},
+        providerSettings: {},
+        assignments: {
+          'github:nbonamy/codex-claw#12': {
+            provider: 'github',
+            itemId: 'nbonamy/codex-claw#12',
+            agentId: 'agent-closed',
+            assignedAt: '2026-06-09T13:00:00.000Z',
+            status: 'completed',
+            completedAt: '2026-06-09T13:30:00.000Z',
+          },
+          'github:nbonamy/codex-claw#13': {
+            provider: 'github',
+            itemId: 'nbonamy/codex-claw#13',
+            agentId: 'agent-working-gone',
+            assignedAt: '2026-06-09T13:00:00.000Z',
+            status: 'working',
+          },
+        },
+      },
+    });
+
+    expect(restored.workBacklog.assignments).toStrictEqual({
+      'github:nbonamy/codex-claw#12': {
+        provider: 'github',
+        itemId: 'nbonamy/codex-claw#12',
+        agentId: 'agent-closed',
+        assignedAt: '2026-06-09T13:00:00.000Z',
+        status: 'completed',
+        completedAt: '2026-06-09T13:30:00.000Z',
+      },
+      'github:nbonamy/codex-claw#13': {
+        provider: 'github',
+        itemId: 'nbonamy/codex-claw#13',
+        agentId: 'agent-working-gone',
+        assignedAt: '2026-06-09T13:00:00.000Z',
+        status: 'working',
+      },
+    });
+  });
+
+  it('persists and restores loops', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.loops = [{
+      id: 'loop-bugs',
+      name: 'GitHub bugs',
+      enabled: true,
+      source: {
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
+        tagName: 'bug',
+      },
+      action: {
+        type: 'create-agent-from-bench',
+        benchTemplateId: 'bench-dina',
+        teamTarget: {
+          mode: 'dedicated',
+        },
+      },
+      createdAt: '2026-06-09T10:00:00.000Z',
+      updatedAt: '2026-06-09T10:01:00.000Z',
+      lastRunAt: '2026-06-09T10:02:00.000Z',
+      lastCreatedCount: 1,
+      processedWorkItemIds: ['github:nbonamy/codex-claw#12'],
+      executionLog: [{
+        id: 'loop-exec-1',
+        loopId: 'loop-bugs',
+        startedAt: '2026-06-09T10:02:00.000Z',
+        completedAt: '2026-06-09T10:03:00.000Z',
+        status: 'completed',
+        createdCount: 1,
+        createdAgents: [{
+          agentId: 'agent-dina',
+          agentName: 'Dina',
+          workItemId: 'github:nbonamy/codex-claw#12',
+          workItemTitle: 'Fix cockpit',
+          workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
+          conversationId: 'thread-dina',
+          turnId: 'turn-dina',
+        }],
+      }],
+    }];
+
+    const persisted = persistedStateFromSnapshot(snapshot);
+    const restored = snapshotFromPersistedState(persisted);
+
+    expect(persisted.loops).toStrictEqual(snapshot.loops);
+    expect(restored.loops).toStrictEqual(snapshot.loops);
+  });
+
   it('sanitizes invalid work integration metadata', () => {
     const restored = snapshotFromPersistedState({
       teams: [],
@@ -477,7 +577,15 @@ describe('AppStatePersistence', () => {
           oauthClientId: 'client-id',
         },
       },
-      assignments: {},
+      assignments: {
+        'github:nbonamy/codex-claw#12': {
+          provider: 'github',
+          itemId: 'nbonamy/codex-claw#12',
+          agentId: 'missing-agent',
+          assignedAt: '2026-06-09T13:00:00.000Z',
+          status: 'working',
+        },
+      },
     });
   });
 

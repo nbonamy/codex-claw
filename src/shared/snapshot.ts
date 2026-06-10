@@ -36,6 +36,7 @@ export function createEmptySnapshot(): AppSnapshot {
     ],
     agents: [],
     bench: [],
+    loops: [],
     activeTeamId: seedTeamId,
     activeAgentId: null,
     messages: [],
@@ -65,6 +66,7 @@ export function createInitialSnapshot(): AppSnapshot {
     ],
     agents,
     bench: [],
+    loops: [],
     activeTeamId: seedTeamId,
     activeAgentId: agents[0]?.id ?? null,
     messages: [],
@@ -224,6 +226,14 @@ export function selectAgent(snapshot: AppSnapshot, agentId: string): AppSnapshot
 }
 
 export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRendererEvent): void {
+  if (event.type === 'snapshot.updated') {
+    const nextSnapshot = event.payload as AppSnapshot;
+    if (isRecord(nextSnapshot) && Array.isArray(nextSnapshot.teams) && Array.isArray(nextSnapshot.agents)) {
+      Object.assign(snapshot, nextSnapshot);
+    }
+    return;
+  }
+
   if (event.type === 'backend.statusChanged') {
     const payload = event.payload as unknown;
     if (isRecord(payload) && isBackend(payload.backend) && isBackendRuntimeStatus(payload.status)) {

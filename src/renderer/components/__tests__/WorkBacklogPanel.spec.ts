@@ -165,6 +165,37 @@ describe('WorkBacklogPanel', () => {
     expect(wrapper.get('.work-backlog-panel__assignee-status').attributes('data-status')).toBe('completed');
   });
 
+  it('renders assignment status even when the assigned agent no longer exists', async () => {
+    const item = workItem();
+    const wrapper = mountPanel({
+      assignments: {
+        [workItemAssignmentKey(item)]: {
+          provider: 'github',
+          itemId: item.id,
+          agentId: 'agent-closed',
+          assignedAt: '2026-06-09T13:00:00.000Z',
+          status: 'working',
+        },
+      },
+      items: [item],
+    });
+
+    const card = wrapper.get('.work-backlog-panel__item');
+    expect(card.classes()).toContain('work-backlog-panel__item--assigned');
+    expect(card.text()).toContain('Working');
+    expect(card.text()).not.toContain('bug');
+
+    await wrapper.get('[aria-label="Issue #12 actions"]').trigger('click');
+    await nextTick();
+
+    expect(menuText()).toContain('Reset');
+
+    await clickMenuItem('Reset');
+
+    expect(wrapper.emitted('remove-assignment')).toStrictEqual([[item]]);
+    expect(wrapper.emitted('select-assigned-agent')).toBeUndefined();
+  });
+
   it('opens issue actions and routes menu selections', async () => {
     const open = vi.spyOn(window, 'open').mockImplementation(() => null);
     const wrapper = mountPanel({

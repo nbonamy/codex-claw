@@ -2,13 +2,15 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { listAgentFolderFiles } from './agent-files';
-import { sendAgentPrompt } from './agent-chat-service';
+import { sendAgentPrompt, type SendAgentPromptHooks } from './agent-chat-service';
 import { ClaudeBackendDriver } from './claude/claude-driver';
 import { CodexAgentSessionManager } from './codex/agent-session';
 import { CodexBackendDriver } from './codex/codex-driver';
 import { CodexProcessTransport } from './codex/process-transport';
 import { CodexRpcClient } from './codex/rpc-client';
 import { logMain, warnMain } from './log';
+import { LoopRunner, type LoopPromptContext } from './loops/runner';
+import { LoopScheduler } from './loops/scheduler';
 import { createMainWindow } from './main-window';
 import { ClawMcpAgentCoordinator } from './mcp/agent-coordinator';
 import { CHECK_INBOX_PROMPT } from './mcp/agent-prompts';
@@ -33,6 +35,7 @@ import {
   saveAgentToBench,
 } from '../shared/agent-manager';
 import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selectTeam, updateTeamInSnapshot } from '../shared/team-manager';
+import { clearLoopExecutionHistoryInSnapshot, createLoopInSnapshot, deleteLoopFromSnapshot, updateLoopExecutionAgentConversationInSnapshot, updateLoopInSnapshot } from '../shared/loop-manager';
 import { updateSettingsInSnapshot } from '../shared/settings';
 import {
   applyMainEventToSnapshot,
@@ -43,12 +46,12 @@ import {
   updateAgentFolder,
 } from './snapshot-service';
 import { AppStatePersistence } from './state-persistence';
-import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkProviderKind } from '../shared/contracts';
+import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateLoopInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkProviderKind } from '../shared/contracts';
 import { codexBackendDefaultsWithApprovalPreset, isCodexApprovalPreset } from '../shared/codex-approval-presets';
 import { ipcChannels } from '../shared/ipc';
 import { teamColors } from '../shared/team-colors';
 import { sanitizeWorkItemAssignmentSource } from '../shared/work-assignments';
-import type { AgentBackendDriver } from './backends/types';
+import type { AgentBackendDriver, BackendSendResult } from './backends/types';
 import { backendDisplayName, unsupportedBackendFeature } from './backends/types';
 import { McpToolError, type DisplayMarkdownInput, type DisplayMarkdownResponse, type MarkWorkItemCompletedResponse } from './mcp/agent-coordinator';
 
@@ -83,6 +86,8 @@ export class AppController {
   private seq = 0;
 
   private readonly workIntegrations: WorkIntegrationManager;
+  private readonly loopRunner: LoopRunner;
+  private readonly loopScheduler: LoopScheduler;
 
   constructor(
     persistence = new AppStatePersistence(path.join(defaultUserDataPath(), 'state.json')),
@@ -95,6 +100,19 @@ export class AppController {
       openExternal: (url) => shell.openExternal(url),
       saveSnapshot: () => this.persistSnapshot(),
       tokenStore: new SafeStorageWorkIntegrationTokenStore(path.join(defaultUserDataPath(), 'work-integration-tokens.json')),
+    });
+    this.loopRunner = new LoopRunner({
+      getSnapshot: () => this.snapshot,
+      listWorkItems: this.workIntegrations,
+      notifySnapshotUpdated: () => this.emitAndApply({
+        type: 'snapshot.updated',
+        payload: this.snapshot,
+      }),
+      saveSnapshot: () => this.persistSnapshot(),
+      sendPrompt: (agentId, prompt, context) => this.sendLoopPrompt(agentId, prompt, context),
+    });
+    this.loopScheduler = new LoopScheduler({
+      runLoops: () => this.loopRunner.runAll(),
     });
   }
 
@@ -187,6 +205,42 @@ export class AppController {
 
     ipcMain.handle(ipcChannels.selectTeam, async (_event, teamId: string) => {
       selectTeam(this.snapshot, teamId);
+      await this.persistSnapshot();
+      return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.createLoop, async (_event, input: CreateLoopInput) => {
+      const loop = createLoopInSnapshot(this.snapshot, input);
+      if (!loop) {
+        throw new Error('Invalid loop configuration.');
+      }
+      await this.persistSnapshot();
+      return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.updateLoop, async (_event, input: UpdateLoopInput) => {
+      const loop = updateLoopInSnapshot(this.snapshot, input);
+      if (!loop) {
+        throw new Error(`Loop not found or invalid: ${input.id}`);
+      }
+      await this.persistSnapshot();
+      return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.clearLoopHistory, async (_event, loopId: string) => {
+      const loop = clearLoopExecutionHistoryInSnapshot(this.snapshot, loopId);
+      if (!loop) {
+        throw new Error(`Loop not found: ${loopId}`);
+      }
+      await this.persistSnapshot();
+      return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.deleteLoop, async (_event, loopId: string) => {
+      const loop = deleteLoopFromSnapshot(this.snapshot, loopId);
+      if (!loop) {
+        throw new Error(`Loop not found: ${loopId}`);
+      }
       await this.persistSnapshot();
       return this.snapshot;
     });
@@ -410,13 +464,23 @@ export class AppController {
     this.mainWindow = createMainWindow();
   }
 
+  startLoops(): void {
+    this.loopScheduler.start();
+  }
+
   async shutdown(): Promise<void> {
+    this.loopScheduler.stop();
     await this.codexBackendDriver?.close();
     await this.claudeBackendDriver?.close();
     await this.mcpServer?.stop();
   }
 
-  private async sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot> {
+  private async sendPrompt(
+    agentId: string,
+    prompt: string,
+    options?: SendPromptOptions,
+    hooks?: SendAgentPromptHooks,
+  ): Promise<AppSnapshot> {
     const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
     if (!agent) {
       return this.snapshot;
@@ -424,6 +488,29 @@ export class AppController {
 
     return sendAgentPrompt(this.snapshot, await this.getBackendDriverForAgent(agent), agentId, prompt, options, (event) => {
       this.emitAndApply(event);
+    }, hooks);
+  }
+
+  private async sendLoopPrompt(agentId: string, prompt: string, context: LoopPromptContext): Promise<AppSnapshot> {
+    return this.sendPrompt(agentId, prompt, undefined, {
+      onPromptStarted: (result) => this.recordLoopPromptStarted(agentId, context, result),
+    });
+  }
+
+  private async recordLoopPromptStarted(agentId: string, context: LoopPromptContext, result: BackendSendResult): Promise<void> {
+    const loop = updateLoopExecutionAgentConversationInSnapshot(this.snapshot, context.loopId, context.executionId, agentId, {
+      conversationId: conversationIdFromSendResult(result),
+      ...(result.turnId ? { turnId: result.turnId } : {}),
+      updatedAt: new Date().toISOString(),
+    });
+    if (!loop) {
+      return;
+    }
+
+    await this.persistSnapshot();
+    this.emitAndApply({
+      type: 'snapshot.updated',
+      payload: this.snapshot,
     });
   }
 
@@ -970,6 +1057,7 @@ export class AppController {
     if (
       fullEvent.type === 'backend.statusChanged' ||
       fullEvent.type === 'agent.updated' ||
+      fullEvent.type === 'snapshot.updated' ||
       fullEvent.type === 'account.rateLimitsUpdated' ||
       fullEvent.type === 'workBacklog.assignmentUpdated' ||
       fullEvent.type === 'thread.started' ||
@@ -1090,6 +1178,7 @@ export function startMainApp(): void {
   void app.whenReady().then(async () => {
     await controller.initialize();
     controller.createWindow();
+    controller.startLoops();
   });
 
   app.on('before-quit', () => {
@@ -1115,6 +1204,12 @@ function rendererMessageText(message: RendererMessage): string {
     .filter(Boolean)
     .join('\n\n')
     .trim();
+}
+
+function conversationIdFromSendResult(result: BackendSendResult): string {
+  return result.backendSession.kind === 'codex'
+    ? result.backendSession.threadId
+    : result.backendSession.sessionId;
 }
 
 function turnIdFromRendererMessageId(messageId: string): string | null {

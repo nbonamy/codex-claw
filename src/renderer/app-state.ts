@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelMarkdownRequest, Team, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../shared/contracts';
+import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelMarkdownRequest, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../shared/contracts';
 import { updateSettingsInSnapshot } from '../shared/settings';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '../shared/snapshot';
 import { defaultBackendCapabilities } from '../shared/backend-capabilities';
@@ -7,7 +7,7 @@ import { defaultBackendCommands } from '../shared/backend-commands';
 import { codexApprovalPresetFromDefaults } from '../shared/codex-approval-presets';
 import { createQueuedChatPrompt, type QueuedChatPrompt } from './shared/chat/queued-prompts';
 import { promptSkillInputsFromText } from './shared/chat/composer-skills';
-import { workItemAssignmentKey } from '../shared/work-assignments';
+import { workItemAssignmentPrompt } from '../shared/work-item-prompts';
 
 const snapshot = ref<AppSnapshot>(createEmptySnapshot());
 const isLoading = ref(false);
@@ -358,6 +358,38 @@ export function useAppState() {
     await loadActiveAgentCatalogs();
   }
 
+  async function createLoop(input: CreateLoopInput): Promise<void> {
+    if (!window.codexClaw?.createLoop) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.createLoop(input);
+  }
+
+  async function updateLoop(input: UpdateLoopInput): Promise<void> {
+    if (!window.codexClaw?.updateLoop || !snapshot.value.loops.some((loop) => loop.id === input.id)) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.updateLoop(input);
+  }
+
+  async function deleteLoop(loopId: string): Promise<void> {
+    if (!window.codexClaw?.deleteLoop || !snapshot.value.loops.some((loop) => loop.id === loopId)) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.deleteLoop(loopId);
+  }
+
+  async function clearLoopHistory(loopId: string): Promise<void> {
+    if (!window.codexClaw?.clearLoopHistory || !snapshot.value.loops.some((loop) => loop.id === loopId)) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.clearLoopHistory(loopId);
+  }
+
   async function updateAgent(input: UpdateAgentInput): Promise<void> {
     if (!window.codexClaw?.updateAgent) {
       return;
@@ -705,6 +737,10 @@ export function useAppState() {
     completeWorkProviderConnection,
     disconnectWorkProvider,
     configureWorkBacklog,
+    createLoop,
+    updateLoop,
+    clearLoopHistory,
+    deleteLoop,
     assignWorkItemToAgent,
     removeWorkItemAssignment,
     duplicateAgent,
@@ -734,24 +770,6 @@ export function useAppState() {
     removeQueuedPrompt,
     quit,
   };
-}
-
-export function workItemAssignmentPrompt(item: WorkItem): string {
-  const body = truncateWorkItemBody(item.body?.trim() ?? '');
-  const workItemId = workItemAssignmentKey(item);
-  return [
-    `Please take this ${workProviderLabel(item.provider)} issue and drive it to completion.`,
-    '',
-    `Work item ID: ${workItemId}`,
-    'When you are done with this work item, call the codex_claw MCP tool `mark-work-item-completed` with this exact Work item ID.',
-    '',
-    `Repository: ${item.repositoryFullName}`,
-    `Issue: #${item.number} ${item.title}`,
-    `URL: ${item.url}`,
-    item.labels.length > 0 ? `Labels: ${item.labels.map((label) => label.name).join(', ')}` : null,
-    item.authorName ? `Author: ${item.authorName}` : null,
-    body ? ['Body:', body].join('\n') : null,
-  ].filter((line): line is string => line !== null).join('\n');
 }
 
 function cloneWorkItemForIpc(item: WorkItem): WorkItem {
@@ -1245,17 +1263,4 @@ function workProviderConnection(provider: WorkProviderKind) {
 
 function workItemsKey(provider: WorkProviderKind, repositoryId: string): string {
   return `${provider}:${repositoryId}`;
-}
-
-function workProviderLabel(provider: WorkProviderKind): string {
-  return provider === 'github' ? 'GitHub' : provider;
-}
-
-function truncateWorkItemBody(body: string): string {
-  const limit = 4000;
-  if (body.length <= limit) {
-    return body;
-  }
-
-  return `${body.slice(0, limit).trimEnd()}\n\n[Body truncated]`;
 }

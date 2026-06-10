@@ -48,11 +48,24 @@
       <PlusIcon aria-hidden="true" />
     </button>
 
-    <SettingsMenu
-      :rate-limits="rateLimits"
-      @open-settings="emit('open-settings')"
-      @quit="emit('quit')"
-    />
+    <div class="team-rail__bottom">
+      <button
+        class="team-rail__loops"
+        :class="{ 'team-rail__loops--active': loopsActive }"
+        type="button"
+        aria-label="Loops"
+        :aria-pressed="loopsActive"
+        @click="emit('select-loops')"
+      >
+        <InfinityIcon aria-hidden="true" />
+      </button>
+
+      <SettingsMenu
+        :rate-limits="rateLimits"
+        @open-settings="emit('open-settings')"
+        @quit="emit('quit')"
+      />
+    </div>
 
     <TeamContextMenu
       v-if="contextMenuTeam"
@@ -72,7 +85,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { AccountRateLimits, ReorderTeamsInput, Team } from '../../shared/contracts';
 import { defaultTeamColor } from '../../shared/team-colors';
 import { teamInitials } from '../../shared/team-manager';
-import { CompassIcon, PlusIcon } from '../shared/icons/app-icons';
+import { CompassIcon, InfinityIcon, PlusIcon } from '../shared/icons/app-icons';
 import { useListReorderDrag } from '../shared/use-list-reorder-drag';
 import SettingsMenu from './SettingsMenu.vue';
 import TeamContextMenu from './TeamContextMenu.vue';
@@ -82,6 +95,7 @@ const props = defineProps<{
   teams: Team[];
   activeTeamId: string | null;
   cockpitActive?: boolean;
+  loopsActive?: boolean;
   rateLimits?: AccountRateLimits;
 }>();
 
@@ -93,6 +107,7 @@ const emit = defineEmits<{
   quit: [];
   'reorder-teams': [input: ReorderTeamsInput];
   'select-cockpit': [];
+  'select-loops': [];
   'select-team': [teamId: string];
 }>();
 
@@ -128,7 +143,7 @@ function selectEditTeam(teamId: string): void {
 }
 
 function isTeamActive(teamId: string): boolean {
-  return !props.cockpitActive && teamId === props.activeTeamId;
+  return !props.cockpitActive && !props.loopsActive && teamId === props.activeTeamId;
 }
 
 async function requestCloseTeam(teamId: string): Promise<void> {
@@ -205,7 +220,8 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   cursor: pointer;
 }
 
-.team-rail__cockpit {
+.team-rail__cockpit,
+.team-rail__loops {
   width: var(--team-rail-button-size);
   height: var(--team-rail-button-size);
   display: grid;
@@ -219,13 +235,17 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 
 .team-rail__cockpit:hover,
 .team-rail__cockpit:focus-visible,
-.team-rail__cockpit--active {
+.team-rail__cockpit--active,
+.team-rail__loops:hover,
+.team-rail__loops:focus-visible,
+.team-rail__loops--active {
   color: white;
   background: var(--color-primary);
   border-color: var(--color-primary);
 }
 
-.team-rail__cockpit svg {
+.team-rail__cockpit svg,
+.team-rail__loops svg {
   width: var(--icon-lg);
   height: var(--icon-lg);
 }
@@ -298,7 +318,18 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 }
 
 :deep() .settings-menu__trigger {
+  display: grid;
+  place-items: center;
+  width: var(--team-rail-button-size);
+  height: var(--team-rail-button-size);
+}
+
+.team-rail__bottom {
   margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
 }
 
 </style>

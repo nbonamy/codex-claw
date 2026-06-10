@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
-import { useAppState, workItemAssignmentPrompt } from '../app-state';
+import { useAppState } from '../app-state';
 import { createEmptySnapshot, createInitialSnapshot } from '../../shared/snapshot';
 import type { CodexClawApi, MainToRendererEvent, WorkItem, WorkRepository } from '../../shared/contracts';
 import { workItemAssignmentKey } from '../../shared/work-assignments';
+import { workItemAssignmentPrompt } from '../../shared/work-item-prompts';
 
 describe('useAppState', () => {
   it('uses the local empty snapshot before preload is available', () => {
@@ -1365,6 +1366,102 @@ describe('useAppState', () => {
     await state.closeAgent('agent-dina');
 
     expect(state.snapshot.value).toBe(before);
+  });
+
+  it('creates, updates, and deletes loops through the preload bridge', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.bench.push({
+      id: 'bench-dina',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      createdAt: '2026-06-09T10:00:00.000Z',
+      updatedAt: '2026-06-09T10:00:00.000Z',
+    });
+    const loopInput = {
+      name: 'GitHub bugs',
+      source: {
+        provider: 'github' as const,
+        repositoryId: 'nbonamy/codex-claw',
+      },
+      action: {
+        type: 'create-agent-from-bench' as const,
+        benchTemplateId: 'bench-dina',
+        teamTarget: {
+          mode: 'existing' as const,
+          teamId: 'team-codex-claw',
+        },
+      },
+    };
+    const createdSnapshot = {
+      ...remoteSnapshot,
+      loops: [{
+        id: 'loop-bugs',
+        enabled: true,
+        processedWorkItemIds: [],
+        executionLog: [],
+        createdAt: '2026-06-09T10:01:00.000Z',
+        updatedAt: '2026-06-09T10:01:00.000Z',
+        ...loopInput,
+      }],
+    };
+    const updatedSnapshot = {
+      ...createdSnapshot,
+      loops: [{
+        ...createdSnapshot.loops[0],
+        enabled: false,
+        name: 'Paused bugs',
+      }],
+    };
+    const historyClearedSnapshot = {
+      ...updatedSnapshot,
+      loops: [{
+        ...updatedSnapshot.loops[0],
+        executionLog: [],
+      }],
+    };
+    const deletedSnapshot = {
+      ...historyClearedSnapshot,
+      loops: [],
+    };
+    const createLoop = vi.fn().mockResolvedValue(createdSnapshot);
+    const updateLoop = vi.fn().mockResolvedValue(updatedSnapshot);
+    const clearLoopHistory = vi.fn().mockResolvedValue(historyClearedSnapshot);
+    const deleteLoop = vi.fn().mockResolvedValue(deletedSnapshot);
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn(),
+        createLoop,
+        updateLoop,
+        clearLoopHistory,
+        deleteLoop,
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await state.createLoop(loopInput);
+    await state.updateLoop({
+      ...loopInput,
+      id: 'loop-bugs',
+      enabled: false,
+      name: 'Paused bugs',
+    });
+    await state.clearLoopHistory('loop-bugs');
+    await state.deleteLoop('loop-bugs');
+
+    expect(createLoop).toHaveBeenCalledWith(loopInput);
+    expect(updateLoop).toHaveBeenCalledWith({
+      ...loopInput,
+      id: 'loop-bugs',
+      enabled: false,
+      name: 'Paused bugs',
+    });
+    expect(clearLoopHistory).toHaveBeenCalledWith('loop-bugs');
+    expect(deleteLoop).toHaveBeenCalledWith('loop-bugs');
+    expect(state.snapshot.value).toStrictEqual(deletedSnapshot);
   });
 
   it('ignores invalid reorder requests before calling main', async () => {

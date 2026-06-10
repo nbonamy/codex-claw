@@ -49,7 +49,14 @@ export function saveAgentToBench(snapshot: AppSnapshot, agentId: string, created
   return template;
 }
 
-export function deployBenchTemplateInSnapshot(snapshot: AppSnapshot, templateId: string, teamId?: string, createdAt = new Date().toISOString(), createId: IdGenerator = () => createEntityId('agent')): Agent | null {
+export function deployBenchTemplateInSnapshot(
+  snapshot: AppSnapshot,
+  templateId: string,
+  teamId?: string,
+  createdAt = new Date().toISOString(),
+  createId: IdGenerator = () => createEntityId('agent'),
+  options: { select?: boolean } = {},
+): Agent | null {
   const template = snapshot.bench.find((candidate) => candidate.id === templateId);
   const targetTeam = teamId
     ? snapshot.teams.find((team) => team.id === teamId)
@@ -73,8 +80,10 @@ export function deployBenchTemplateInSnapshot(snapshot: AppSnapshot, templateId:
 
   snapshot.agents.push(agent);
   attachAgentToTeam(snapshot, agent);
-  snapshot.activeTeamId = targetTeam.id;
-  snapshot.activeAgentId = agent.id;
+  if (options.select !== false) {
+    snapshot.activeTeamId = targetTeam.id;
+    snapshot.activeAgentId = agent.id;
+  }
   return agent;
 }
 

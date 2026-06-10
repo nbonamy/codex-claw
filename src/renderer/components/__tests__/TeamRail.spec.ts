@@ -47,6 +47,7 @@ describe('TeamRail', () => {
     expect((wrapper.get('[aria-label="Skwad"]').element as HTMLButtonElement).style.backgroundColor).toBe('rgb(70, 168, 87)');
     expect(wrapper.find('.team-rail__window-controls').exists()).toBe(false);
     expect(wrapper.find('[aria-label="Create team"]').exists()).toBe(true);
+    expect(wrapper.get('[aria-label="Loops"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.find('[aria-label="Settings menu"]').exists()).toBe(true);
   });
 
@@ -99,6 +100,21 @@ describe('TeamRail', () => {
     expect(wrapper.get('[aria-label="Skwad"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.get('[aria-label="Skwad"]').classes()).not.toContain('team-rail__team--active');
     expect(wrapper.emitted('select-cockpit')).toStrictEqual([[]]);
+  });
+
+  it('emits loops selection and marks it active', async () => {
+    const wrapper = mountRail({
+      teams,
+      activeTeamId: 'team-sk',
+      loopsActive: true,
+    });
+
+    await wrapper.get('[aria-label="Loops"]').trigger('click');
+
+    expect(wrapper.get('[aria-label="Loops"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('[aria-label="Skwad"]').attributes('aria-pressed')).toBe('false');
+    expect(wrapper.get('[aria-label="Skwad"]').classes()).not.toContain('team-rail__team--active');
+    expect(wrapper.emitted('select-loops')).toStrictEqual([[]]);
   });
 
   it('emits team reorder drops and marks the drop location', async () => {
@@ -258,6 +274,7 @@ function mountRail(props: {
   teams: Team[];
   activeTeamId: string | null;
   cockpitActive?: boolean;
+  loopsActive?: boolean;
   rateLimits?: AccountRateLimits;
 }) {
   const wrapper = mount(TeamRail, {

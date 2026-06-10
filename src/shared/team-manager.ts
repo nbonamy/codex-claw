@@ -1,7 +1,12 @@
 import type { AppSnapshot, CreateTeamInput, Team, UpdateTeamInput } from './contracts';
 import { defaultTeamColor, teamColors } from './team-colors';
 
-export function createTeamInSnapshot(snapshot: AppSnapshot, input: CreateTeamInput, createdAt = new Date().toISOString()): Team {
+export function createTeamInSnapshot(
+  snapshot: AppSnapshot,
+  input: CreateTeamInput,
+  createdAt = new Date().toISOString(),
+  options: { select?: boolean } = {},
+): Team {
   const name = normalizedTeamName(input.name);
   const color = normalizedTeamColor(input.color);
   const team: Team = {
@@ -13,8 +18,10 @@ export function createTeamInSnapshot(snapshot: AppSnapshot, input: CreateTeamInp
   };
 
   snapshot.teams.push(team);
-  snapshot.activeTeamId = team.id;
-  snapshot.activeAgentId = null;
+  if (options.select !== false) {
+    snapshot.activeTeamId = team.id;
+    snapshot.activeAgentId = null;
+  }
   return team;
 }
 

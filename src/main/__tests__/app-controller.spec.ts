@@ -6,9 +6,10 @@ import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '../../shared/snapshot';
 import type { MainToRendererEvent } from '../../shared/contracts';
 import type { AppStatePersistence } from '../state-persistence';
-import type { AgentBackendDriver } from '../backends/types';
+import type { AgentBackendDriver, BackendSendResult } from '../backends/types';
 import { claudeBackendCapabilities, codexBackendCapabilities } from '../../shared/backend-capabilities';
 import { ipcChannels } from '../../shared/ipc';
+import type { LoopPromptContext } from '../loops/runner';
 
 describe('AppController', () => {
   it('persists collaboration status updates emitted by MCP tools', async () => {
@@ -408,6 +409,75 @@ describe('AppController', () => {
     expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' });
   });
 
+  it('records loop execution conversation metadata when a loop prompt starts', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.loops = [{
+      id: 'loop-bugs',
+      name: 'GitHub bugs',
+      enabled: true,
+      source: {
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
+        tagName: 'bug',
+      },
+      action: {
+        type: 'create-agent-from-bench',
+        benchTemplateId: 'bench-dina',
+        teamTarget: {
+          mode: 'existing',
+          teamId: 'team-codex-claw',
+        },
+      },
+      processedWorkItemIds: ['github:nbonamy/codex-claw#12'],
+      executionLog: [{
+        id: 'loop-exec-1',
+        loopId: 'loop-bugs',
+        startedAt: '2026-06-09T10:00:00.000Z',
+        completedAt: '2026-06-09T10:01:00.000Z',
+        status: 'completed',
+        createdCount: 1,
+        createdAgents: [{
+          agentId: 'agent-dina',
+          agentName: 'Dina',
+          workItemId: 'github:nbonamy/codex-claw#12',
+          workItemTitle: 'Fix cockpit',
+          workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
+        }],
+      }],
+      createdAt: '2026-06-09T09:59:00.000Z',
+      updatedAt: '2026-06-09T10:01:00.000Z',
+      lastRunAt: '2026-06-09T10:00:00.000Z',
+      lastCreatedCount: 1,
+    }];
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const send = vi.fn();
+
+    await controller.initialize();
+    setMainWindowSend(controller, send);
+    await recordLoopPromptStarted(controller, 'agent-dina', {
+      loopId: 'loop-bugs',
+      executionId: 'loop-exec-1',
+      workItemId: 'github:nbonamy/codex-claw#12',
+    }, {
+      backendSession: { kind: 'codex', threadId: 'thread-dina' },
+      turnId: 'turn-dina',
+    });
+
+    expect(snapshot.loops[0]?.executionLog[0]?.createdAgents[0]).toMatchObject({
+      conversationId: 'thread-dina',
+      turnId: 'turn-dina',
+    });
+    expect(persistence.save).toHaveBeenCalledWith(snapshot);
+    expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
+      type: 'snapshot.updated',
+      payload: snapshot,
+    }));
+  });
+
   it('reads text files inside the active agent folder and rejects traversal', async () => {
     const folder = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-agent-files-'));
     try {
@@ -655,6 +725,17 @@ async function sendPrompt(controller: AppController, agentId: string, prompt: st
   await (controller as unknown as {
     sendPrompt(agentId: string, prompt: string): Promise<void>;
   }).sendPrompt(agentId, prompt);
+}
+
+async function recordLoopPromptStarted(
+  controller: AppController,
+  agentId: string,
+  context: LoopPromptContext,
+  result: BackendSendResult,
+): Promise<void> {
+  await (controller as unknown as {
+    recordLoopPromptStarted(agentId: string, context: LoopPromptContext, result: BackendSendResult): Promise<void>;
+  }).recordLoopPromptStarted(agentId, context, result);
 }
 
 async function interruptAgent(controller: AppController, agentId: string): Promise<void> {

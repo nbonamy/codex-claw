@@ -4,8 +4,9 @@
   >
     <TeamRail
       :teams="snapshot.teams"
-      :active-team-id="cockpitVisible || settingsVisible ? null : activeTeam?.id ?? null"
+      :active-team-id="cockpitVisible || loopsVisible || settingsVisible ? null : activeTeam?.id ?? null"
       :cockpit-active="cockpitVisible"
+      :loops-active="loopsVisible"
       :rate-limits="snapshot.accountRateLimits"
       class="app-shell__team-rail"
       @close-team="$emit('close-team', $event)"
@@ -15,6 +16,7 @@
       @quit="quit"
       @reorder-teams="$emit('reorder-teams', $event)"
       @select-cockpit="openCockpit"
+      @select-loops="openLoops"
       @select-team="selectTeamFromRail"
     />
     <Transition name="agent-sidebar">
@@ -57,6 +59,23 @@
         :complete-work-provider-connection="completeWorkProviderConnection"
         :disconnect-work-provider="disconnectWorkProvider"
         :update-settings="updateSettings"
+      />
+      <LoopsView
+        v-else-if="loopsVisible"
+        :bench="snapshot.bench"
+        :clear-loop-history="clearLoopHistory"
+        :create-loop="createLoop"
+        :delete-loop="deleteLoop"
+        :load-work-items="loadWorkItems"
+        :load-work-repositories="loadWorkRepositories"
+        :loops="snapshot.loops"
+        :teams="snapshot.teams"
+        :update-loop="updateLoop"
+        :work-backlog="snapshot.workBacklog"
+        :work-backlog-error="workBacklogError"
+        :work-backlog-status="workBacklogStatus"
+        :work-items-by-repository="workItemsByRepository"
+        :work-repositories-by-provider="workRepositoriesByProvider"
       />
       <CockpitView
         v-else-if="cockpitVisible"
@@ -191,7 +210,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, Team, ThreadGoal, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../../shared/contracts';
+import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, Team, ThreadGoal, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../../shared/contracts';
 import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import { defaultTeamColor } from '../../shared/team-colors';
 import { findAssignedAgentForWorkItem } from '../../shared/work-assignments';
@@ -201,6 +220,7 @@ import AgentHeader from './AgentHeader.vue';
 import AgentSidebar from './AgentSidebar.vue';
 import CockpitView from './CockpitView.vue';
 import ConversationPane from './ConversationPane.vue';
+import LoopsView from './LoopsView.vue';
 import SidePanel from './SidePanel.vue';
 import TeamDialog from './TeamDialog.vue';
 import TeamRail from './TeamRail.vue';
@@ -244,6 +264,10 @@ const props = withDefaults(defineProps<{
   updateTeam?: (input: UpdateTeamInput) => Promise<void>;
   updateAgent?: (input: UpdateAgentInput) => Promise<void>;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
+  createLoop?: (input: CreateLoopInput) => Promise<void>;
+  updateLoop?: (input: UpdateLoopInput) => Promise<void>;
+  clearLoopHistory?: (loopId: string) => Promise<void>;
+  deleteLoop?: (loopId: string) => Promise<void>;
   connectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   completeWorkProviderConnection?: (provider: WorkProviderKind) => Promise<void>;
   disconnectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
@@ -280,6 +304,10 @@ const props = withDefaults(defineProps<{
   updateTeam: async () => undefined,
   updateAgent: async () => undefined,
   updateSettings: async () => undefined,
+  createLoop: async () => undefined,
+  updateLoop: async () => undefined,
+  clearLoopHistory: async () => undefined,
+  deleteLoop: async () => undefined,
   connectWorkProvider: async () => undefined,
   completeWorkProviderConnection: async () => undefined,
   disconnectWorkProvider: async () => undefined,
@@ -329,7 +357,7 @@ type WorkItemAssignmentIntent = {
   teamId?: string;
 };
 
-type AppSurface = 'agent' | 'cockpit' | 'settings';
+type AppSurface = 'agent' | 'cockpit' | 'loops' | 'settings';
 
 const agentSidebarCollapsed = ref(false);
 const agentSidebarMinWidth = 80;
@@ -406,6 +434,7 @@ const pendingNewAgentTeamName = computed(() => pendingNewAgentWorkItem.value ? w
 const pendingBenchAgentTeamName = computed(() => pendingBenchAgentWorkItem.value ? workItemTeamName(pendingBenchAgentWorkItem.value) : '');
 const isAgentEmpty = computed(() => activeTeamAgents.value.length === 0);
 const cockpitVisible = computed(() => activeSurface.value === 'cockpit');
+const loopsVisible = computed(() => activeSurface.value === 'loops');
 const settingsVisible = computed(() => activeSurface.value === 'settings');
 const isAgentWorkspaceVisible = computed(() => activeSurface.value === 'agent');
 const isModalDialogVisible = computed(() => agentDialogVisible.value || benchAssignmentDialogVisible.value || teamDialogVisible.value);
@@ -609,9 +638,30 @@ function openCockpit(): void {
   activeSurface.value = 'cockpit';
 }
 
+function openLoops(): void {
+  closeSidePanel();
+  activeSurface.value = 'loops';
+}
+
 function openSettings(): void {
   closeSidePanel();
   activeSurface.value = 'settings';
+}
+
+async function createLoop(input: CreateLoopInput): Promise<void> {
+  await props.createLoop(input);
+}
+
+async function updateLoop(input: UpdateLoopInput): Promise<void> {
+  await props.updateLoop(input);
+}
+
+async function clearLoopHistory(loopId: string): Promise<void> {
+  await props.clearLoopHistory(loopId);
+}
+
+async function deleteLoop(loopId: string): Promise<void> {
+  await props.deleteLoop(loopId);
 }
 
 function selectTeamFromRail(teamId: string): void {

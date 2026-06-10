@@ -4,7 +4,7 @@ import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '../../../shared/snapshot';
-import type { Agent, AppCommand, AppSnapshot, CodexClawApi, CreateAgentInput, CreateTeamInput, DeployBenchTemplateInput, RendererMessage, Team, UpdateAgentInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '../../../shared/contracts';
+import type { Agent, AppCommand, AppSnapshot, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, RendererMessage, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '../../../shared/contracts';
 import { workItemAssignmentKey } from '../../../shared/work-assignments';
 import { i18n } from '../../i18n';
 
@@ -724,6 +724,20 @@ describe('AppShell', () => {
     expect(wrapper.find('.cockpit-view').exists()).toBe(false);
     expect(wrapper.emitted('select-team')).toStrictEqual([['team-codex-claw']]);
     expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-jesse']]);
+  });
+
+  it('opens loops from the rail without keeping a team active', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mountShell({ snapshot });
+
+    await wrapper.get('[aria-label="Loops"]').trigger('click');
+
+    expect(wrapper.find('.loops-view').exists()).toBe(true);
+    expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
+    expect(wrapper.find('.conversation-pane').exists()).toBe(false);
+    expect(wrapper.get('[aria-label="Loops"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('false');
+    expect(wrapper.text()).toContain('A loop is an automation that just works for you.');
   });
 
   it('forwards cockpit agent context menu actions', async () => {
@@ -1621,7 +1635,12 @@ function mountShell(overrides: Partial<{
   updateTeam: (input: UpdateTeamInput) => Promise<void>;
   updateAgent: (input: UpdateAgentInput) => Promise<void>;
   updateSettings: (input: UpdateSettingsInput) => Promise<void>;
+  createLoop: (input: CreateLoopInput) => Promise<void>;
+  updateLoop: (input: UpdateLoopInput) => Promise<void>;
+  clearLoopHistory: (loopId: string) => Promise<void>;
+  deleteLoop: (loopId: string) => Promise<void>;
   configureWorkBacklog: (input: WorkBacklogConfigurationInput) => Promise<void>;
+  loadWorkRepositories: (provider: WorkProviderKind) => Promise<void>;
   loadWorkItems: (provider: WorkProviderKind, repositoryId: string) => Promise<void>;
   quit: () => Promise<void>;
   workRepositoriesByProvider: Partial<Record<WorkProviderKind, WorkRepository[]>>;
@@ -1642,7 +1661,12 @@ function mountShell(overrides: Partial<{
       updateTeam: overrides.updateTeam ?? vi.fn().mockResolvedValue(undefined),
       updateAgent: overrides.updateAgent ?? vi.fn().mockResolvedValue(undefined),
       updateSettings: overrides.updateSettings ?? vi.fn().mockResolvedValue(undefined),
+      createLoop: overrides.createLoop ?? vi.fn().mockResolvedValue(undefined),
+      updateLoop: overrides.updateLoop ?? vi.fn().mockResolvedValue(undefined),
+      clearLoopHistory: overrides.clearLoopHistory ?? vi.fn().mockResolvedValue(undefined),
+      deleteLoop: overrides.deleteLoop ?? vi.fn().mockResolvedValue(undefined),
       configureWorkBacklog: overrides.configureWorkBacklog ?? vi.fn().mockResolvedValue(undefined),
+      loadWorkRepositories: overrides.loadWorkRepositories ?? vi.fn().mockResolvedValue(undefined),
       loadWorkItems: overrides.loadWorkItems ?? vi.fn().mockResolvedValue(undefined),
       workRepositoriesByProvider: overrides.workRepositoriesByProvider ?? {},
       workItemsByRepository: overrides.workItemsByRepository ?? {},

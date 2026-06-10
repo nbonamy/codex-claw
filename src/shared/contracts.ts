@@ -229,6 +229,78 @@ export type WorkItem = {
   updatedAt: string;
 };
 
+export type LoopSourceConfiguration =
+  | {
+    provider: 'github';
+    repositoryId: string;
+    tagName?: string;
+  };
+
+export type LoopTeamTarget =
+  | {
+    mode: 'existing';
+    teamId: string;
+  }
+  | {
+    mode: 'dedicated';
+  };
+
+export type LoopAction =
+  | {
+    type: 'create-agent-from-bench';
+    benchTemplateId: string;
+    teamTarget: LoopTeamTarget;
+  };
+
+export type LoopExecutionStatus = 'completed' | 'failed';
+
+export type LoopExecutionCreatedAgent = {
+  agentId: string;
+  agentName: string;
+  workItemId: string;
+  workItemTitle: string;
+  workItemUrl: string;
+  conversationId?: string;
+  turnId?: string;
+};
+
+export type LoopExecutionLogEntry = {
+  id: string;
+  loopId: string;
+  startedAt: string;
+  completedAt: string;
+  status: LoopExecutionStatus;
+  createdCount: number;
+  createdAgents: LoopExecutionCreatedAgent[];
+  error?: string;
+};
+
+export type Loop = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  source: LoopSourceConfiguration;
+  action: LoopAction;
+  processedWorkItemIds: string[];
+  executionLog: LoopExecutionLogEntry[];
+  createdAt: string;
+  updatedAt: string;
+  lastRunAt?: string;
+  lastError?: string;
+  lastCreatedCount?: number;
+};
+
+export type CreateLoopInput = {
+  name?: string;
+  enabled?: boolean;
+  source: LoopSourceConfiguration;
+  action: LoopAction;
+};
+
+export type UpdateLoopInput = CreateLoopInput & {
+  id: string;
+};
+
 export type BenchTemplate = {
   id: string;
   name: string;
@@ -431,6 +503,7 @@ export type AppSnapshot = {
   teams: Team[];
   agents: Agent[];
   bench: BenchTemplate[];
+  loops: Loop[];
   activeTeamId: string | null;
   activeAgentId: string | null;
   messages: RendererMessage[];
@@ -456,6 +529,7 @@ export type MainToRendererEvent = {
   type:
     | 'backend.statusChanged'
     | 'agent.updated'
+    | 'snapshot.updated'
     | 'agent.statusChanged'
     | 'thread.started'
     | 'thread.historyLoaded'
@@ -623,6 +697,10 @@ export type CodexClawApi = {
   reorderTeams(input: ReorderTeamsInput): Promise<AppSnapshot>;
   closeTeam(teamId: string): Promise<AppSnapshot>;
   selectTeam(teamId: string): Promise<AppSnapshot>;
+  createLoop(input: CreateLoopInput): Promise<AppSnapshot>;
+  updateLoop(input: UpdateLoopInput): Promise<AppSnapshot>;
+  clearLoopHistory(loopId: string): Promise<AppSnapshot>;
+  deleteLoop(loopId: string): Promise<AppSnapshot>;
   createAgent(input: CreateAgentInput): Promise<AppSnapshot>;
   updateAgent(input: UpdateAgentInput): Promise<AppSnapshot>;
   assignWorkItemToAgent(agentId: string, item: WorkItem): Promise<AppSnapshot>;
