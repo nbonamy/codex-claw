@@ -103,8 +103,8 @@ type AgentStatus =
 
 Codex app-server owns the conversation transcript and thread history in
 `CODEX_HOME`. Codex Claw owns only product state: teams, agents, selected
-folders, Bench templates, view preferences, theme preference, and backend
-session metadata such as the Codex thread id.
+folders, the global source folder, Bench templates, view preferences, theme
+preference, and backend session metadata such as the Codex thread id.
 
 Bench templates are reusable saved agents, not active sessions. Saving an agent
 to Bench captures the deployable shape: name, avatar, folder, backend, and
@@ -115,6 +115,40 @@ different roles or model defaults.
 
 On a fresh install, create a default team when no teams exist. Do not create a
 default agent automatically; an empty team shows the New Agent empty state.
+
+## Source Folder And Repo Discovery
+
+The source folder is a global convenience setting borrowed from Skwad. It is
+not team membership, it is not an agent backend setting, and it does not replace
+the explicit folder stored on each agent. Instead, it gives the app and Claw MCP
+tools a common place to discover local source repositories when creating agents
+or worktrees.
+
+Codex Claw persists the selected source folder path, whether initial detection
+has already run, and up to five recent repository names. On a fresh app state,
+main may initialize the source folder once from common source-code locations.
+After the user clears or changes the folder, the app respects that explicit
+choice and does not keep auto-detecting behind their back.
+
+Repository discovery is read-only and shallow. Electron main scans only direct
+children of the configured source folder; a child with a `.git` directory is a
+clone, and a child with a `.git` file pointing into a parent repo worktree is a
+worktree. Worktrees are grouped under their parent clone when that clone is
+also present under the source folder. Orphan worktrees are ignored. Discovery
+does not run `git` and must tolerate missing, unreadable, detached, or malformed
+git metadata.
+
+Creating a worktree is the one source-folder git write. It is an explicit
+main-process operation that runs `git worktree add -b <branch> <destination>`
+for the selected repository, then refreshes discovery. Renderer code and MCP
+tools request this through typed app APIs; they never scan arbitrary folders or
+spawn git directly.
+
+The renderer uses source repositories only as creation affordances: Settings
+chooses or clears the source folder, the agent dialog can pick a discovered
+repo/worktree or browse another folder, and new worktree creation can feed back
+into agent creation. The Claw MCP server exposes the same app-owned operations
+with `list-repos`, `list-worktrees`, `create-worktree`, and `create-agent`.
 
 ## Process Architecture
 

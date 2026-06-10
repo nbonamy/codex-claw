@@ -9,6 +9,7 @@ import { CodexAgentSessionManager } from './codex/agent-session';
 import { CodexBackendDriver } from './codex/codex-driver';
 import { CodexProcessTransport } from './codex/process-transport';
 import { CodexRpcClient } from './codex/rpc-client';
+import { createSourceWorktree as createGitSourceWorktree } from './git-worktrees';
 import { logMain, warnMain } from './log';
 import { LoopRunner, type LoopPromptContext } from './loops/runner';
 import { LoopScheduler } from './loops/scheduler';
@@ -17,6 +18,7 @@ import { ClawMcpAgentCoordinator } from './mcp/agent-coordinator';
 import { CHECK_INBOX_PROMPT } from './mcp/agent-prompts';
 import { buildCodexClawMcpConfigOverrides } from './mcp/codex-config';
 import { ClawMcpHttpServer } from './mcp/http-server';
+import { detectSourceFolder, scanSourceRepositories } from './source-repositories';
 import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-permissions';
 import { transcribeWithAppleSpeechAnalyzer } from './transcription/apple-speech';
 import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
@@ -47,7 +49,7 @@ import {
   updateAgentFolder,
 } from './snapshot-service';
 import { AppStatePersistence } from './state-persistence';
-import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateLoopInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkProviderKind } from '../shared/contracts';
+import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkProviderKind } from '../shared/contracts';
 import { codexBackendDefaultsWithApprovalPreset, isCodexApprovalPreset } from '../shared/codex-approval-presets';
 import { ipcChannels } from '../shared/ipc';
 import { teamColors } from '../shared/team-colors';
@@ -78,6 +80,9 @@ export class AppController {
     },
     onDisplayMarkdown: (agent, input) => this.displayMarkdownForAgent(agent, input),
     onMarkWorkItemCompleted: (agent, workItemId) => this.markWorkItemCompletedForAgent(agent, workItemId),
+    onListSourceRepositories: () => this.listSourceRepositories(),
+    onCreateSourceWorktree: (input) => this.createSourceWorktree(input),
+    onCreateAgent: (agent, input) => this.createAgentFromMcp(agent, input),
   });
   private mcpServer: ClawMcpHttpServer | null = null;
   private mcpServerUrl: string | null = null;
@@ -121,6 +126,7 @@ export class AppController {
 
   async initialize(): Promise<void> {
     this.snapshot = await this.persistence.load();
+    await this.initializeSourceFolderIfNeeded();
     await this.workIntegrations.hydrateConnections();
     this.syncPowerSaveBlocker();
   }
@@ -170,6 +176,22 @@ export class AppController {
 
     ipcMain.handle(ipcChannels.chooseAgentFolder, async () => {
       return this.chooseAgentFolder();
+    });
+
+    ipcMain.handle(ipcChannels.chooseSourceFolder, async () => {
+      return this.chooseSourceFolder();
+    });
+
+    ipcMain.handle(ipcChannels.listSourceRepositories, async () => {
+      return this.listSourceRepositories();
+    });
+
+    ipcMain.handle(ipcChannels.chooseSourceWorktreeDestination, async (_event, repoPath: string, suggestedName: string) => {
+      return this.chooseSourceWorktreeDestination(repoPath, suggestedName);
+    });
+
+    ipcMain.handle(ipcChannels.createSourceWorktree, async (_event, input: CreateSourceWorktreeInput) => {
+      return this.createSourceWorktree(input);
     });
 
     ipcMain.handle(ipcChannels.createTeam, async (_event, input: CreateTeamInput) => {
@@ -974,6 +996,125 @@ export class AppController {
     });
 
     return result.canceled ? null : result.filePaths[0] ?? null;
+  }
+
+  private async chooseSourceFolder(): Promise<string | null> {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory'],
+      title: 'Select source folder',
+      message: 'Select your source folder containing git repositories',
+      defaultPath: this.snapshot.sourceFolder.path || undefined,
+    });
+
+    return result.canceled ? null : result.filePaths[0] ?? null;
+  }
+
+  private async chooseSourceWorktreeDestination(repoPath: string, suggestedName: string): Promise<string | null> {
+    const result = await dialog.showSaveDialog({
+      title: 'Choose worktree folder',
+      message: 'Choose location for the worktree',
+      defaultPath: path.join(path.dirname(repoPath), suggestedName),
+      properties: ['createDirectory'],
+    });
+
+    return result.canceled ? null : result.filePath ?? null;
+  }
+
+  private async initializeSourceFolderIfNeeded(): Promise<void> {
+    if (this.snapshot.sourceFolder.initialized) {
+      return;
+    }
+
+    const detected = await detectSourceFolder();
+    this.snapshot.sourceFolder = {
+      ...this.snapshot.sourceFolder,
+      path: detected,
+      initialized: true,
+    };
+    await this.persistSnapshot();
+  }
+
+  private async listSourceRepositories(): Promise<SourceRepository[]> {
+    const sourceFolder = this.snapshot.sourceFolder.path.trim();
+    if (!sourceFolder) {
+      return [];
+    }
+    return scanSourceRepositories(sourceFolder);
+  }
+
+  private async createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {
+    const worktree = await createGitSourceWorktree(input);
+    await this.addRecentSourceRepositoryByPath(input.repoPath);
+    await this.persistSnapshot();
+    return worktree;
+  }
+
+  private async addRecentSourceRepositoryByPath(repoPath: string): Promise<void> {
+    const repos = await this.listSourceRepositories();
+    const repoName = repos.find((repo) => repo.path === repoPath)?.name ?? path.basename(repoPath);
+    this.addRecentSourceRepository(repoName);
+  }
+
+  private addRecentSourceRepository(repoName: string): void {
+    const trimmed = repoName.trim();
+    if (!trimmed) {
+      return;
+    }
+    const nextNames = this.snapshot.sourceFolder.recentRepoNames.filter((name) => name !== trimmed);
+    nextNames.unshift(trimmed);
+    this.snapshot.sourceFolder.recentRepoNames = nextNames.slice(0, 5);
+  }
+
+  private async createAgentFromMcp(
+    caller: Agent,
+    input: {
+      avatar?: string;
+      backend?: Agent['backend'];
+      branchName?: string;
+      createWorktree?: boolean;
+      destinationPath?: string;
+      name?: string;
+      repoPath: string;
+      teamId?: string;
+    },
+  ): Promise<{ success: boolean; agentId?: string; message: string }> {
+    const repoPath = input.repoPath.trim();
+    if (!repoPath) {
+      return { success: false, message: 'repoPath is required' };
+    }
+
+    let folder = repoPath;
+    if (input.createWorktree) {
+      const branchName = input.branchName?.trim();
+      if (!branchName) {
+        return { success: false, message: 'branchName is required when createWorktree is true' };
+      }
+      folder = (await this.createSourceWorktree({
+        repoPath,
+        branchName,
+        ...(input.destinationPath?.trim() ? { destinationPath: input.destinationPath.trim() } : {}),
+      })).path;
+    }
+
+    const createInput: CreateAgentInput = {
+      name: input.name?.trim() || path.basename(folder),
+      folder,
+      ...(input.avatar ? { avatar: input.avatar } : {}),
+      backend: input.backend ?? 'codex',
+      teamId: input.teamId ?? caller.teamId,
+    };
+
+    await this.validateAgentInput(createInput);
+    const previousAgentIds = new Set(this.snapshot.agents.map((agent) => agent.id));
+    createAgentInSnapshot(this.snapshot, createInput);
+    this.addRecentSourceRepository(path.basename(repoPath));
+    await this.persistSnapshot();
+    const agent = this.snapshot.agents.find((candidate) => !previousAgentIds.has(candidate.id));
+    return {
+      success: true,
+      ...(agent?.id ? { agentId: agent.id } : {}),
+      message: 'Agent created successfully',
+    };
   }
 
   private async validateAgentInput(input: Pick<CreateAgentInput, 'name' | 'folder'>): Promise<void> {

@@ -13,7 +13,9 @@
       <div class="settings-view__panel">
         <SettingsGeneralPanel
           v-if="activeTab === 'general'"
+          :choose-source-folder="chooseSourceFolder"
           :settings="generalSettings"
+          :source-folder="sourceFolder"
           :update-settings="updateSettings"
         />
         <SettingsIntegrationsPanel
@@ -40,8 +42,8 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import type { AppGeneralSettings, AppThemeSettings, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '../../shared/contracts';
-import { defaultGeneralSettings } from '../../shared/settings';
+import type { AppGeneralSettings, AppThemeSettings, SourceFolderState, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '../../shared/contracts';
+import { defaultGeneralSettings, defaultSourceFolderState } from '../../shared/settings';
 import SettingsAppearancePanel from './SettingsAppearancePanel.vue';
 import SettingsGeneralPanel from './SettingsGeneralPanel.vue';
 import SettingsIntegrationsPanel from './SettingsIntegrationsPanel.vue';
@@ -51,6 +53,8 @@ import type { SettingsTab } from './settings-tabs';
 withDefaults(defineProps<{
   settings: AppThemeSettings;
   generalSettings?: AppGeneralSettings;
+  sourceFolder?: SourceFolderState;
+  chooseSourceFolder?: () => Promise<string | null>;
   workBacklogConnections?: WorkIntegrationConnection[];
   workBacklogError?: string | null;
   workBacklogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
@@ -67,6 +71,8 @@ withDefaults(defineProps<{
   workProviderSettings: () => ({}),
   workProviderAuthorization: null,
   generalSettings: () => ({ ...defaultGeneralSettings }),
+  sourceFolder: () => ({ ...defaultSourceFolderState }),
+  chooseSourceFolder: async () => null,
   completeWorkProviderConnection: async () => undefined,
   connectWorkProvider: async () => undefined,
   disconnectWorkProvider: async () => undefined,

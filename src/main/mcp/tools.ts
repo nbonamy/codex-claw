@@ -70,6 +70,61 @@ export function createCodexClawMcpServer(coordinator: ClawMcpAgentCoordinator, c
     workItemIdLength: workItemId.length,
   }, () => coordinator.markWorkItemCompleted(callerAgentId, workItemId)));
 
+  server.registerTool('list-repos', {
+    description: 'List all git repositories in the configured source folder.',
+    inputSchema: {},
+  }, () => toolResult('list-repos', {
+    agentId: callerAgentId,
+  }, () => coordinator.listSourceRepositories(callerAgentId)));
+
+  server.registerTool('list-worktrees', {
+    description: 'List all discovered worktrees for a source repository.',
+    inputSchema: {
+      repoPath: z.string().describe('Path to the source repository.'),
+    },
+  }, ({ repoPath }) => toolResult('list-worktrees', {
+    agentId: callerAgentId,
+    repoPath,
+  }, () => coordinator.listSourceWorktrees(callerAgentId, repoPath)));
+
+  server.registerTool('create-worktree', {
+    description: 'Create a new git worktree from a source repository and return the created folder.',
+    inputSchema: {
+      repoPath: z.string().describe('Path to the source repository.'),
+      branchName: z.string().describe('Branch name for the new worktree.'),
+      destinationPath: z.string().optional().describe('Optional destination path. Defaults to a sibling folder named <repo>-<branch>.'),
+    },
+  }, ({ repoPath, branchName, destinationPath }) => toolResult('create-worktree', {
+    agentId: callerAgentId,
+    repoPath,
+    branchName,
+  }, () => coordinator.createSourceWorktree(callerAgentId, { repoPath, branchName, destinationPath })));
+
+  server.registerTool('create-agent', {
+    description: 'Create a new Codex Claw agent in your team. Can optionally create a new git worktree first.',
+    inputSchema: {
+      name: z.string().optional().describe('Name for the agent. Defaults to the folder basename.'),
+      avatar: z.string().optional().describe('Avatar text or emoji for the agent.'),
+      backend: z.enum(['codex', 'claude']).optional().describe('Backend: codex or claude. Defaults to codex.'),
+      repoPath: z.string().describe('Repository or worktree folder path.'),
+      createWorktree: z.boolean().optional().describe('If true, create a new worktree from repoPath before creating the agent.'),
+      branchName: z.string().optional().describe('Branch name for the new worktree. Required when createWorktree is true.'),
+      destinationPath: z.string().optional().describe('Optional destination path for the new worktree.'),
+    },
+  }, ({ name, avatar, backend, repoPath, createWorktree, branchName, destinationPath }) => toolResult('create-agent', {
+    agentId: callerAgentId,
+    repoPath,
+    createWorktree: createWorktree === true,
+  }, () => coordinator.createAgent(callerAgentId, {
+    name,
+    avatar,
+    backend,
+    repoPath,
+    createWorktree,
+    branchName,
+    destinationPath,
+  })));
+
   server.registerTool('display-markdown', {
     description: 'Display Markdown in the Codex Claw side panel. Provide exactly one of path or markdown. Use path for Markdown files in your agent folder; use markdown for inline generated content.',
     inputSchema: {

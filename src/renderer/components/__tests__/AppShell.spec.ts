@@ -1004,7 +1004,7 @@ describe('AppShell', () => {
 
     expect(wrapper.text()).toContain('Create Agent');
     expect(wrapper.find('#agent-dialog-team').exists()).toBe(false);
-    await wrapper.get('.agent-dialog__folder-control').trigger('click');
+    await chooseCustomAgentFolder(wrapper);
     await wrapper.get('.agent-dialog__text-input').setValue('Jules');
     await wrapper.find('.claw-dialog__footer .el-button--primary').trigger('click');
 
@@ -1038,8 +1038,7 @@ describe('AppShell', () => {
     await wrapper.findAll('.cockpit-view__add-card .new-agent-button__primary')[1].trigger('click');
 
     expect(wrapper.text()).toContain('Create Agent');
-    await wrapper.get('.agent-dialog__folder-control').trigger('click');
-    await flushPromises();
+    await chooseCustomAgentFolder(wrapper);
     await wrapper.get('.agent-dialog__text-input').setValue('Abby');
     await wrapper.find('.claw-dialog__footer .el-button--primary').trigger('click');
 
@@ -1089,7 +1088,7 @@ describe('AppShell', () => {
     const agentDialog = wrapper.findComponent({ name: 'AgentDialog' });
     expect(agentDialog.find('#agent-dialog-team').exists()).toBe(true);
 
-    await wrapper.get('.agent-dialog__folder-control').trigger('click');
+    await chooseCustomAgentFolder(wrapper, 2);
     await agentDialog.findAllComponents({ name: 'ElSelect' })[0]?.vm.$emit('update:modelValue', '__new_team__');
     await nextTick();
     expect(agentDialog.get<HTMLInputElement>('[aria-label="New team name"]').element.value).toBe('GitHub #12');
@@ -1691,6 +1690,11 @@ function mountShell(overrides: Partial<{
       },
     },
   });
+}
+
+async function chooseCustomAgentFolder(wrapper: ReturnType<typeof mountShell>, repositorySelectIndex = 1) {
+  wrapper.findComponent({ name: 'AgentDialog' }).findAllComponents({ name: 'ElSelect' })[repositorySelectIndex]?.vm.$emit('update:modelValue', '__custom_folder__');
+  await flushPromises();
 }
 
 function workItem(): WorkItem {

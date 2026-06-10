@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AppleSpeechTranscriptionOptions, AppCommand, ClientRequestResponse, CodexApprovalPreset, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '../shared/contracts';
+import type { AppleSpeechTranscriptionOptions, AppCommand, ClientRequestResponse, CodexApprovalPreset, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '../shared/contracts';
 import { ipcChannels } from '../shared/ipc';
 
 const api: CodexClawApi = {
@@ -15,6 +15,10 @@ const api: CodexClawApi = {
   listAgentFiles: (agentId: string) => ipcRenderer.invoke(ipcChannels.listAgentFiles, agentId),
   readAgentFile: (agentId: string, filePath: string) => ipcRenderer.invoke(ipcChannels.readAgentFile, agentId, filePath),
   chooseAgentFolder: () => ipcRenderer.invoke(ipcChannels.chooseAgentFolder),
+  chooseSourceFolder: () => ipcRenderer.invoke(ipcChannels.chooseSourceFolder),
+  listSourceRepositories: () => ipcRenderer.invoke(ipcChannels.listSourceRepositories),
+  chooseSourceWorktreeDestination: (repoPath: string, suggestedName: string) => ipcRenderer.invoke(ipcChannels.chooseSourceWorktreeDestination, repoPath, suggestedName),
+  createSourceWorktree: (input: CreateSourceWorktreeInput) => ipcRenderer.invoke(ipcChannels.createSourceWorktree, input),
   createTeam: (input: CreateTeamInput) => ipcRenderer.invoke(ipcChannels.createTeam, input),
   updateTeam: (input: UpdateTeamInput) => ipcRenderer.invoke(ipcChannels.updateTeam, input),
   reorderTeams: (input: ReorderTeamsInput) => ipcRenderer.invoke(ipcChannels.reorderTeams, input),

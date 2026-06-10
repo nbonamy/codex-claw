@@ -709,6 +709,41 @@ describe('AppStatePersistence', () => {
 
     expect(restored.theme).toStrictEqual(snapshot.theme);
   });
+
+  it('persists and restores source folder settings', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.sourceFolder = {
+      path: '~/src',
+      initialized: true,
+      recentRepoNames: ['codex-claw', 'skwad'],
+    };
+
+    const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
+
+    expect(restored.sourceFolder).toStrictEqual(snapshot.sourceFolder);
+  });
+
+  it('sanitizes invalid source folder settings', () => {
+    const restored = snapshotFromPersistedState({
+      teams: [],
+      agents: [],
+      bench: [],
+      activeTeamId: null,
+      activeAgentId: null,
+      theme: defaultThemeSettings,
+      sourceFolder: {
+        path: 42,
+        initialized: 'yes',
+        recentRepoNames: [' codex-claw ', '', 12, 'skwad', 'codex-claw'],
+      },
+    });
+
+    expect(restored.sourceFolder).toStrictEqual({
+      path: '',
+      initialized: false,
+      recentRepoNames: ['codex-claw', 'skwad'],
+    });
+  });
 });
 
 async function tempStatePath(): Promise<string> {

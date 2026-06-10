@@ -228,30 +228,6 @@ function initialTeamSelection(): string {
 </script>
 
 <style scoped>
-.bench-agent-assignment-dialog__select {
-  width: 100%;
-  font-size: var(--font-size-14);
-  font-weight: var(--font-weight-semibold);
-}
-
-.bench-agent-assignment-dialog__select :deep(.el-select__wrapper) {
-  min-height: 42px;
-  padding: 0 var(--space-6);
-  border-radius: calc(var(--radius-lg) - 1px);
-  background: transparent;
-  box-shadow: none;
-}
-
-.bench-agent-assignment-dialog__select :deep(.el-select__wrapper:hover),
-.bench-agent-assignment-dialog__select :deep(.el-select__wrapper.is-focused) {
-  box-shadow: none;
-}
-
-.bench-agent-assignment-dialog__select :deep(.el-select__placeholder),
-.bench-agent-assignment-dialog__select :deep(.el-select__selected-item) {
-  color: var(--color-text);
-}
-
 .bench-agent-assignment-dialog__bench-option {
   display: flex;
   align-items: center;

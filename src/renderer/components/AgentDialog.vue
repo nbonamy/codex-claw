@@ -149,7 +149,10 @@
         </div>
       </section>
 
-      <section class="claw-form-dialog__field agent-dialog__field">
+      <section
+        v-if="isEditing"
+        class="claw-form-dialog__field agent-dialog__field"
+      >
         <div class="claw-form-dialog__field-heading agent-dialog__field-heading">
           <span class="claw-form-dialog__label agent-dialog__label">Workspace folder</span>
           <span class="claw-form-dialog__heading-separator agent-dialog__heading-separator">•</span>
@@ -171,6 +174,121 @@
         </button>
       </section>
 
+      <section
+        v-else
+        class="claw-form-dialog__field agent-dialog__field"
+      >
+        <div class="claw-form-dialog__field-heading agent-dialog__field-heading">
+          <label
+            class="claw-form-dialog__label agent-dialog__label"
+            for="agent-dialog-repository"
+          >
+            Repository
+          </label>
+          <span class="claw-form-dialog__heading-separator agent-dialog__heading-separator">•</span>
+          <p class="claw-form-dialog__help agent-dialog__help">{{ repositoryHelp }}</p>
+        </div>
+        <div class="claw-form-dialog__control agent-dialog__input-shell agent-dialog__input-shell--select">
+          <el-select
+            id="agent-dialog-repository"
+            v-model="repositoryControlValue"
+            class="agent-dialog__source-select"
+            :teleported="false"
+            @update:model-value="selectRepositoryControl"
+          >
+            <el-option
+              v-for="repository in sourceRepositories"
+              :key="repository.path"
+              :label="repository.name"
+              :value="repository.path"
+            />
+            <el-option
+              v-if="sourceRepositories.length > 0"
+              class="agent-dialog__source-option-divider"
+              disabled
+              label=""
+              :value="sourceDividerOptionValue"
+            />
+            <el-option
+              class="agent-dialog__source-custom-option"
+              :label="customFolderOptionLabel"
+              :value="customFolderOptionValue"
+            />
+          </el-select>
+        </div>
+      </section>
+
+      <section
+        v-if="showSourceWorktreeControl"
+        class="claw-form-dialog__field agent-dialog__field"
+      >
+        <div class="claw-form-dialog__field-heading agent-dialog__field-heading">
+          <label
+            class="claw-form-dialog__label agent-dialog__label"
+            for="agent-dialog-worktree"
+          >
+            Worktree
+          </label>
+          <span class="claw-form-dialog__heading-separator agent-dialog__heading-separator">•</span>
+          <p class="claw-form-dialog__help agent-dialog__help">Choose the checkout for this agent.</p>
+        </div>
+        <div class="claw-form-dialog__control agent-dialog__input-shell agent-dialog__input-shell--select agent-dialog__source-worktree-row">
+          <el-select
+            id="agent-dialog-worktree"
+            v-model="selectedSourceWorktreePath"
+            class="agent-dialog__source-select"
+            :teleported="false"
+            @update:model-value="selectWorktreeControl"
+          >
+            <el-option
+              v-for="worktree in selectedSourceWorktrees"
+              :key="worktree.path"
+              :label="worktree.name"
+              :value="worktree.path"
+            />
+            <el-option
+              v-if="selectedSourceWorktrees.length > 0"
+              class="agent-dialog__source-option-divider"
+              disabled
+              label=""
+              :value="worktreeDividerOptionValue"
+            />
+            <el-option
+              class="agent-dialog__source-custom-option"
+              label="New Worktree..."
+              :value="newWorktreeOptionValue"
+            />
+          </el-select>
+        </div>
+      </section>
+
+      <section
+        v-if="!isEditing"
+        class="claw-form-dialog__field agent-dialog__field"
+      >
+        <div class="claw-form-dialog__field-heading agent-dialog__field-heading">
+          <label
+            class="claw-form-dialog__label agent-dialog__label"
+            for="agent-dialog-resolved-path"
+          >
+            Resolved path
+          </label>
+          <span class="claw-form-dialog__heading-separator agent-dialog__heading-separator">•</span>
+          <p class="claw-form-dialog__help agent-dialog__help">This is the folder the agent will use.</p>
+        </div>
+        <div class="claw-form-dialog__control claw-form-dialog__input-control agent-dialog__resolved-path-control">
+          <input
+            id="agent-dialog-resolved-path"
+            class="claw-form-dialog__text-input agent-dialog__text-input agent-dialog__resolved-path-input"
+            type="text"
+            aria-label="Resolved path"
+            readonly
+            :value="folder"
+            placeholder="No folder selected"
+          />
+        </div>
+      </section>
+
       <el-alert
         v-if="!canEdit"
         title="Agent must be idle before editing."
@@ -187,6 +305,15 @@
         show-icon
       />
     </el-form>
+
+    <NewSourceWorktreeDialog
+      :choose-destination="chooseSourceWorktreeDestination"
+      :create-worktree="createSourceWorktree"
+      :repo="selectedSourceRepository"
+      :visible="newSourceWorktreeDialogVisible"
+      @close="newSourceWorktreeDialogVisible = false"
+      @created="selectCreatedSourceWorktree"
+    />
 
     <template #footer>
       <div class="claw-dialog__footer">
@@ -207,10 +334,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { Component } from 'vue';
-import type { Agent, AgentBackend, CreateAgentInput, Team, UpdateAgentInput } from '../../shared/contracts';
+import type { Agent, AgentBackend, CreateAgentInput, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '../../shared/contracts';
 import { ClaudeCodeBackendIcon, CodexBackendIcon } from '../shared/icons/backend-icons';
 import { ChevronDown } from '../shared/icons/app-icons';
 import AgentAvatarPicker from './AgentAvatarPicker.vue';
+import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
 
 export type AgentDialogCreateInput = CreateAgentInput & {
   newTeamName?: string;
@@ -219,12 +347,18 @@ export type AgentDialogCreateInput = CreateAgentInput & {
 
 const props = withDefaults(defineProps<{
   agent: Agent | null;
+  addRecentSourceRepository?: (repoName: string) => void;
   chooseAgentFolder: () => Promise<string | null>;
+  chooseSourceWorktreeDestination?: (repoPath: string, suggestedName: string) => Promise<string | null>;
   createAgent: (input: AgentDialogCreateInput) => Promise<Agent | null | void>;
+  createSourceWorktree?: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   initialNewTeamName?: string;
   initialTeamId?: string | null;
   mode: 'create' | 'edit';
   showTeamField?: boolean;
+  sourceFolderPath?: string;
+  sourceRecentRepoNames?: string[];
+  sourceRepositories?: SourceRepository[];
   teams?: Team[];
   updateAgent: (input: UpdateAgentInput) => Promise<void>;
   visible: boolean;
@@ -232,6 +366,9 @@ const props = withDefaults(defineProps<{
   initialNewTeamName: '',
   initialTeamId: null,
   showTeamField: false,
+  sourceFolderPath: '',
+  sourceRecentRepoNames: () => [],
+  sourceRepositories: () => [],
   teams: () => [],
 });
 
@@ -249,6 +386,15 @@ const errorMessage = ref<string | null>(null);
 const choosingFolder = ref(false);
 const submitting = ref(false);
 const newTeamOptionId = '__new_team__';
+const customFolderOptionValue = '__custom_folder__';
+const sourceDividerOptionValue = '__source_divider__';
+const newWorktreeOptionValue = '__new_worktree__';
+const worktreeDividerOptionValue = '__worktree_divider__';
+const selectedSourceRepositoryPath = ref('');
+const selectedSourceWorktreePath = ref('');
+const repositoryControlValue = ref(customFolderOptionValue);
+const createdSourceWorktree = ref<SourceWorktree | null>(null);
+const newSourceWorktreeDialogVisible = ref(false);
 
 type BackendOption = {
   icon: Component;
@@ -287,6 +433,23 @@ const selectedBackendOption = computed(() => (
 ));
 const teams = computed(() => props.teams);
 const showTeamSelector = computed(() => props.showTeamField && !isEditing.value);
+const sourceRepositories = computed(() => props.sourceRepositories ?? []);
+const selectedSourceRepository = computed(() => sourceRepositories.value.find((repository) => repository.path === selectedSourceRepositoryPath.value) ?? null);
+const selectedSourceWorktrees = computed(() => {
+  const worktrees = selectedSourceRepository.value?.worktrees ?? [];
+  const created = createdSourceWorktree.value;
+  if (!created || worktrees.some((worktree) => worktree.path === created.path)) {
+    return worktrees;
+  }
+  return [...worktrees, created];
+});
+const showSourceWorktreeControl = computed(() => !isEditing.value && selectedSourceRepository.value !== null);
+const repositoryHelp = computed(() => (
+  props.sourceFolderPath && sourceRepositories.value.length > 0
+    ? `Pick from ${props.sourceFolderPath}.`
+    : 'Pick a custom project folder.'
+));
+const customFolderOptionLabel = computed(() => folder.value && !selectedSourceRepository.value ? 'Custom folder' : 'Choose folder...');
 const teamCanSave = computed(() => (
   !showTeamSelector.value ||
   (teamSelection.value === newTeamOptionId ? newTeamName.value.trim().length > 0 : teamSelection.value.trim().length > 0)
@@ -311,9 +474,13 @@ async function chooseFolder(): Promise<void> {
   try {
     const selectedFolder = await props.chooseAgentFolder();
     if (!selectedFolder) {
+      syncRepositoryControlValue();
       return;
     }
 
+    selectedSourceRepositoryPath.value = '';
+    selectedSourceWorktreePath.value = '';
+    repositoryControlValue.value = customFolderOptionValue;
     folder.value = selectedFolder;
     if (!name.value.trim()) {
       name.value = selectedFolder.split(/[\\/]/).filter(Boolean).at(-1) ?? '';
@@ -323,6 +490,70 @@ async function chooseFolder(): Promise<void> {
   } finally {
     choosingFolder.value = false;
   }
+}
+
+async function selectRepositoryControl(value: string): Promise<void> {
+  if (value === customFolderOptionValue) {
+    await chooseFolder();
+    return;
+  }
+
+  selectSourceRepository(value);
+}
+
+function selectSourceRepository(repoPath: string): void {
+  selectedSourceRepositoryPath.value = repoPath;
+  repositoryControlValue.value = repoPath;
+  createdSourceWorktree.value = null;
+  const worktree = selectedSourceRepository.value?.worktrees[0];
+  if (worktree) {
+    selectSourceWorktree(worktree.path);
+  } else {
+    selectedSourceWorktreePath.value = '';
+    folder.value = '';
+  }
+}
+
+function selectWorktreeControl(value: string): void {
+  if (value === newWorktreeOptionValue) {
+    selectedSourceWorktreePath.value = selectedSourceWorktrees.value.find((worktree) => worktree.path === folder.value)?.path ?? '';
+    openNewSourceWorktreeDialog();
+    return;
+  }
+
+  selectSourceWorktree(value);
+}
+
+function selectSourceWorktree(worktreePath: string): void {
+  selectedSourceWorktreePath.value = worktreePath;
+  folder.value = worktreePath;
+  name.value = worktreePath.split(/[\\/]/).filter(Boolean).at(-1) ?? '';
+}
+
+function openNewSourceWorktreeDialog(): void {
+  newSourceWorktreeDialogVisible.value = true;
+}
+
+function chooseSourceWorktreeDestination(repoPath: string, suggestedName: string): Promise<string | null> {
+  return props.chooseSourceWorktreeDestination?.(repoPath, suggestedName) ?? Promise.resolve(null);
+}
+
+async function createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {
+  if (!props.createSourceWorktree) {
+    throw new Error('Source worktree creation is not available.');
+  }
+
+  return props.createSourceWorktree({
+    repoPath: input.repoPath,
+    branchName: input.branchName,
+    destinationPath: input.destinationPath,
+  });
+}
+
+function selectCreatedSourceWorktree(worktree: SourceWorktree): void {
+  createdSourceWorktree.value = worktree;
+  selectedSourceWorktreePath.value = worktree.path;
+  selectSourceWorktree(worktree.path);
 }
 
 async function submit(): Promise<void> {
@@ -358,6 +589,10 @@ async function submit(): Promise<void> {
         } else {
           createInput.teamId = teamSelection.value;
         }
+      }
+      const repository = selectedSourceRepository.value;
+      if (repository && selectedSourceWorktreePath.value) {
+        props.addRecentSourceRepository?.(repository.name);
       }
 
       await props.createAgent(createInput);
@@ -399,6 +634,21 @@ function resetForm(): void {
   backend.value = 'codex';
   teamSelection.value = initialTeamSelection();
   newTeamName.value = props.initialNewTeamName;
+  const preferredRepositoryPath = preferredSourceRepositoryPath();
+  selectedSourceRepositoryPath.value = '';
+  selectedSourceWorktreePath.value = '';
+  repositoryControlValue.value = customFolderOptionValue;
+  createdSourceWorktree.value = null;
+  newSourceWorktreeDialogVisible.value = false;
+  if (preferredRepositoryPath) {
+    selectSourceRepository(preferredRepositoryPath);
+  }
+}
+
+function preferredSourceRepositoryPath(): string {
+  const recent = props.sourceRecentRepoNames ?? [];
+  const recentRepository = sourceRepositories.value.find((repository) => recent.includes(repository.name));
+  return recentRepository?.path ?? sourceRepositories.value[0]?.path ?? '';
 }
 
 function initialTeamSelection(): string {
@@ -420,6 +670,10 @@ function shortenFolder(value: string): string {
   }
 
   return `…/${parts.slice(-2).join('/')}`;
+}
+
+function syncRepositoryControlValue(): void {
+  repositoryControlValue.value = selectedSourceRepositoryPath.value || customFolderOptionValue;
 }
 </script>
 
@@ -460,38 +714,8 @@ function shortenFolder(value: string): string {
   display: none;
 }
 
-.agent-dialog__backend-select,
-.agent-dialog__team-select {
-  width: 100%;
-  font-size: var(--font-size-14);
-  font-weight: var(--font-weight-semibold);
-}
-
 .agent-dialog__input-shell--select {
   display: block;
-}
-
-.agent-dialog__backend-select :deep(.el-select__wrapper),
-.agent-dialog__team-select :deep(.el-select__wrapper) {
-  min-height: 42px;
-  padding: 0 var(--space-6);
-  border-radius: calc(var(--radius-lg) - 1px);
-  background: transparent;
-  box-shadow: none;
-}
-
-.agent-dialog__backend-select :deep(.el-select__wrapper:hover),
-.agent-dialog__backend-select :deep(.el-select__wrapper.is-focused),
-.agent-dialog__team-select :deep(.el-select__wrapper:hover),
-.agent-dialog__team-select :deep(.el-select__wrapper.is-focused) {
-  box-shadow: none;
-}
-
-.agent-dialog__backend-select :deep(.el-select__placeholder),
-.agent-dialog__backend-select :deep(.el-select__selected-item),
-.agent-dialog__team-select :deep(.el-select__placeholder),
-.agent-dialog__team-select :deep(.el-select__selected-item) {
-  color: var(--color-text);
 }
 
 .agent-dialog__new-team-control {
@@ -591,6 +815,31 @@ function shortenFolder(value: string): string {
   flex: 0 0 auto;
   width: var(--icon-md);
   height: var(--icon-md);
+}
+
+.agent-dialog__source-worktree-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.agent-dialog__new-worktree-button {
+  flex: 0 0 auto;
+}
+
+.agent-dialog__resolved-path-input {
+  color: var(--color-text-muted);
+}
+
+.agent-dialog__source-option-divider {
+  height: 1px;
+  margin: var(--space-4) 0;
+  padding: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.agent-dialog__source-custom-option {
+  color: var(--color-text);
 }
 
 </style>

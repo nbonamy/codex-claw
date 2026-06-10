@@ -355,6 +355,31 @@ button {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 18%, transparent);
 }
 
+.claw-form-dialog__control .el-select {
+  width: 100%;
+  font-size: var(--font-size-14);
+  font-weight: var(--font-weight-regular);
+}
+
+.claw-form-dialog__control .el-select__wrapper {
+  min-height: 42px;
+  padding: 0 var(--space-6);
+  border-radius: calc(var(--radius-lg) - 1px);
+  background: transparent;
+  box-shadow: none;
+}
+
+.claw-form-dialog__control .el-select__wrapper:hover,
+.claw-form-dialog__control .el-select__wrapper.is-focused {
+  box-shadow: none;
+}
+
+.claw-form-dialog__control .el-select__placeholder,
+.claw-form-dialog__control .el-select__selected-item {
+  color: var(--color-text);
+  font-weight: var(--font-weight-regular);
+}
+
 .claw-form-dialog__text-input {
   width: 100%;
   min-width: 0;

@@ -455,8 +455,32 @@ export type SystemPermissionsStatus = {
   };
 };
 
+export type SourceWorktree = {
+  name: string;
+  path: string;
+};
+
+export type SourceRepository = {
+  name: string;
+  path: string;
+  worktrees: SourceWorktree[];
+};
+
+export type SourceFolderState = {
+  path: string;
+  initialized: boolean;
+  recentRepoNames: string[];
+};
+
+export type CreateSourceWorktreeInput = {
+  repoPath: string;
+  branchName: string;
+  destinationPath?: string;
+};
+
 export type UpdateSettingsInput = {
   general?: Partial<AppGeneralSettings>;
+  sourceFolder?: Partial<Pick<SourceFolderState, 'path' | 'recentRepoNames'>>;
   theme?: Partial<AppThemeSettings>;
   workProviders?: Partial<Record<WorkProviderKind, WorkProviderSettings>>;
 };
@@ -516,6 +540,7 @@ export type AppSnapshot = {
   accountRateLimits?: AccountRateLimits;
   workBacklog: WorkBacklogState;
   general: AppGeneralSettings;
+  sourceFolder: SourceFolderState;
   theme: AppThemeSettings;
 };
 
@@ -698,6 +723,10 @@ export type CodexClawApi = {
   listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]>;
   readAgentFile(agentId: string, filePath: string): Promise<AgentFileReadResult>;
   chooseAgentFolder(): Promise<string | null>;
+  chooseSourceFolder(): Promise<string | null>;
+  listSourceRepositories(): Promise<SourceRepository[]>;
+  chooseSourceWorktreeDestination(repoPath: string, suggestedName: string): Promise<string | null>;
+  createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree>;
   createTeam(input: CreateTeamInput): Promise<AppSnapshot>;
   updateTeam(input: UpdateTeamInput): Promise<AppSnapshot>;
   reorderTeams(input: ReorderTeamsInput): Promise<AppSnapshot>;

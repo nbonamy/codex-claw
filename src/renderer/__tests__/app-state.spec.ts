@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
 import { createEmptySnapshot, createInitialSnapshot } from '../../shared/snapshot';
-import type { CodexClawApi, MainToRendererEvent, WorkItem, WorkRepository } from '../../shared/contracts';
+import type { CodexClawApi, MainToRendererEvent, SourceRepository, WorkItem, WorkRepository } from '../../shared/contracts';
 import { workItemAssignmentKey } from '../../shared/work-assignments';
 import { workItemAssignmentPrompt } from '../../shared/work-item-prompts';
 
@@ -180,6 +180,121 @@ describe('useAppState', () => {
     expect(updateSettings).toHaveBeenCalledWith({ theme: { id: 'github-dark', mode: 'dark' } });
     expect(state.snapshot.value.theme.id).toBe('github-dark');
     expect(quit).toHaveBeenCalledOnce();
+  });
+
+  it('loads source repositories, creates worktrees, and stores recent repositories', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.sourceFolder = {
+      path: '~/src',
+      initialized: true,
+      recentRepoNames: [],
+    };
+    const updatedSnapshot = createInitialSnapshot();
+    updatedSnapshot.sourceFolder = {
+      path: '~/src',
+      initialized: true,
+      recentRepoNames: ['codex-claw'],
+    };
+    const repositories: SourceRepository[] = [{
+      name: 'codex-claw',
+      path: '/Users/nbonamy/src/codex-claw',
+      worktrees: [{
+        name: 'main',
+        path: '/Users/nbonamy/src/codex-claw',
+      }],
+    }];
+    const listSourceRepositories = vi.fn().mockResolvedValue(repositories);
+    const createSourceWorktree = vi.fn().mockResolvedValue({
+      name: 'source-folder',
+      path: '/Users/nbonamy/src/codex-claw-source-folder',
+    });
+    const updateSettings = vi.fn().mockResolvedValue(updatedSnapshot);
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        listSourceRepositories,
+        createSourceWorktree,
+        updateSettings,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    expect(state.sourceRepositoryStatus.value).toBe('loaded');
+    expect(state.sourceRepositories.value).toStrictEqual(repositories);
+
+    await expect(state.createSourceWorktree({
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      branchName: 'feature/source-folder',
+    })).resolves.toStrictEqual({
+      name: 'source-folder',
+      path: '/Users/nbonamy/src/codex-claw-source-folder',
+    });
+    expect(listSourceRepositories).toHaveBeenCalledTimes(2);
+
+    await state.addRecentSourceRepository('codex-claw');
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      sourceFolder: {
+        recentRepoNames: ['codex-claw'],
+      },
+    });
+    expect(state.snapshot.value.sourceFolder.recentRepoNames).toStrictEqual(['codex-claw']);
+  });
+
+  it('uses source repository fallbacks when preload helpers are unavailable', async () => {
+    vi.stubGlobal('window', { codexClaw: {} satisfies Partial<CodexClawApi> });
+    const state = useAppState();
+    state.snapshot.value = createInitialSnapshot();
+    state.snapshot.value.sourceFolder = {
+      path: '~/src',
+      initialized: true,
+      recentRepoNames: [],
+    };
+
+    await expect(state.chooseSourceFolder()).resolves.toBeNull();
+    await expect(state.chooseSourceWorktreeDestination('/Users/nbonamy/src/codex-claw', 'source-folder')).resolves.toBeNull();
+    await expect(state.createSourceWorktree({
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      branchName: 'feature/source-folder',
+    })).rejects.toThrow('Source worktree creation is not available.');
+
+    await state.loadSourceRepositories();
+    await state.addRecentSourceRepository('   ');
+
+    expect(state.sourceRepositories.value).toStrictEqual([]);
+    expect(state.sourceRepositoryStatus.value).toBe('notLoaded');
+    expect(state.sourceRepositoryError.value).toBeNull();
+    expect(state.snapshot.value.sourceFolder.recentRepoNames).toStrictEqual([]);
+  });
+
+  it('records source repository loading errors', async () => {
+    const listSourceRepositories = vi.fn().mockRejectedValueOnce(new Error('source folder disappeared'))
+      .mockRejectedValueOnce('plain failure');
+    vi.stubGlobal('window', {
+      codexClaw: {
+        listSourceRepositories,
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    state.snapshot.value = createInitialSnapshot();
+    state.snapshot.value.sourceFolder = {
+      path: '~/src',
+      initialized: true,
+      recentRepoNames: [],
+    };
+
+    await state.loadSourceRepositories();
+
+    expect(state.sourceRepositories.value).toStrictEqual([]);
+    expect(state.sourceRepositoryStatus.value).toBe('error');
+    expect(state.sourceRepositoryError.value).toBe('source folder disappeared');
+
+    await state.loadSourceRepositories();
+
+    expect(state.sourceRepositoryError.value).toBe('plain failure');
   });
 
   it('connects work providers and hydrates the selected repository backlog', async () => {

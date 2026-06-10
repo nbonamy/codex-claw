@@ -18,7 +18,7 @@ import type {
   UpdateAgentInput,
   WorkBacklogAssignment,
 } from './contracts';
-import { defaultGeneralSettings, defaultThemeSettings } from './settings';
+import { defaultGeneralSettings, defaultSourceFolderState, defaultThemeSettings } from './settings';
 import { createEntityId } from './ids';
 import { defaultTeamColor } from './team-colors';
 import { toolOutputText } from './tool-output';
@@ -51,6 +51,7 @@ export function createEmptySnapshot(): AppSnapshot {
     }],
     workBacklog: createDefaultWorkBacklogState(),
     general: { ...defaultGeneralSettings },
+    sourceFolder: { ...defaultSourceFolderState },
     theme: { ...defaultThemeSettings },
   };
 }
@@ -82,6 +83,7 @@ export function createInitialSnapshot(): AppSnapshot {
     }],
     workBacklog: createDefaultWorkBacklogState(),
     general: { ...defaultGeneralSettings },
+    sourceFolder: { ...defaultSourceFolderState },
     theme: { ...defaultThemeSettings },
   };
 }

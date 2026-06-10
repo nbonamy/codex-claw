@@ -21,6 +21,66 @@ describe('SettingsGeneralPanel', () => {
     });
   });
 
+  it('chooses and clears the configured source folder', async () => {
+    const chooseSourceFolder = vi.fn().mockResolvedValue('/Users/nbonamy/src');
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({
+      chooseSourceFolder,
+      sourceFolder: {
+        path: '',
+        initialized: true,
+        recentRepoNames: [],
+      },
+      updateSettings,
+    });
+
+    await flushPromises();
+    expect(wrapper.text()).toContain('Source folder');
+    expect(wrapper.text()).toContain('Not configured');
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Choose')?.trigger('click');
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      sourceFolder: {
+        path: '/Users/nbonamy/src',
+      },
+    });
+
+    const configuredSourceFolder = {
+      sourceFolder: {
+        path: '~/src',
+        initialized: true,
+        recentRepoNames: ['codex-claw'],
+      },
+    };
+    await wrapper.setProps(configuredSourceFolder as never);
+    await wrapper.findAll('button').find((button) => button.text() === 'Clear')?.trigger('click');
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      sourceFolder: {
+        path: '',
+      },
+    });
+  });
+
+  it('surfaces source folder chooser failures', async () => {
+    const wrapper = mountPanel({
+      chooseSourceFolder: vi.fn().mockRejectedValue(new Error('Dialog failed')),
+      sourceFolder: {
+        path: '',
+        initialized: true,
+        recentRepoNames: [],
+      },
+    });
+
+    await flushPromises();
+    await wrapper.findAll('button').find((button) => button.text() === 'Choose')?.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Dialog failed');
+  });
+
   it('shows a grant action when macOS Accessibility is required', async () => {
     const getSystemPermissions = vi.fn().mockResolvedValue(permissionStatus({
       required: true,

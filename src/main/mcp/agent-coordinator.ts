@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Agent, AgentStatus } from '../../shared/contracts';
+import type { Agent, AgentBackend, AgentStatus, CreateSourceWorktreeInput, SourceRepository, SourceWorktree } from '../../shared/contracts';
 
 export type McpAgentInfo = {
   id: string;
@@ -62,12 +62,31 @@ export type MarkWorkItemCompletedResponse = {
   completedAt: string;
 };
 
+export type McpCreateAgentInput = {
+  avatar?: string;
+  backend?: AgentBackend;
+  branchName?: string;
+  createWorktree?: boolean;
+  destinationPath?: string;
+  name?: string;
+  repoPath: string;
+};
+
+export type McpCreateAgentResponse = {
+  success: boolean;
+  agentId?: string;
+  message: string;
+};
+
 export type ClawMcpAgentCoordinatorOptions = {
   getAgents: () => Agent[];
   onAgentUpdated?: (agent: Agent) => void;
   onInboxMessage?: (agentId: string, messageId: string) => void;
   onDisplayMarkdown?: (agent: Agent, input: DisplayMarkdownInput) => DisplayMarkdownResponse | Promise<DisplayMarkdownResponse>;
   onMarkWorkItemCompleted?: (agent: Agent, workItemId: string) => MarkWorkItemCompletedResponse | Promise<MarkWorkItemCompletedResponse>;
+  onListSourceRepositories?: () => SourceRepository[] | Promise<SourceRepository[]>;
+  onCreateSourceWorktree?: (input: CreateSourceWorktreeInput) => SourceWorktree | Promise<SourceWorktree>;
+  onCreateAgent?: (agent: Agent, input: McpCreateAgentInput & { backend: AgentBackend; teamId?: string }) => McpCreateAgentResponse | Promise<McpCreateAgentResponse>;
   createId?: () => string;
   now?: () => Date;
 };
@@ -86,6 +105,9 @@ export class ClawMcpAgentCoordinator {
   private readonly onInboxMessage?: (agentId: string, messageId: string) => void;
   private readonly onDisplayMarkdown?: (agent: Agent, input: DisplayMarkdownInput) => DisplayMarkdownResponse | Promise<DisplayMarkdownResponse>;
   private readonly onMarkWorkItemCompleted?: (agent: Agent, workItemId: string) => MarkWorkItemCompletedResponse | Promise<MarkWorkItemCompletedResponse>;
+  private readonly onListSourceRepositories?: () => SourceRepository[] | Promise<SourceRepository[]>;
+  private readonly onCreateSourceWorktree?: (input: CreateSourceWorktreeInput) => SourceWorktree | Promise<SourceWorktree>;
+  private readonly onCreateAgent?: (agent: Agent, input: McpCreateAgentInput & { backend: AgentBackend; teamId?: string }) => McpCreateAgentResponse | Promise<McpCreateAgentResponse>;
   private readonly createId: () => string;
   private readonly now: () => Date;
 
@@ -95,6 +117,9 @@ export class ClawMcpAgentCoordinator {
     this.onInboxMessage = options.onInboxMessage;
     this.onDisplayMarkdown = options.onDisplayMarkdown;
     this.onMarkWorkItemCompleted = options.onMarkWorkItemCompleted;
+    this.onListSourceRepositories = options.onListSourceRepositories;
+    this.onCreateSourceWorktree = options.onCreateSourceWorktree;
+    this.onCreateAgent = options.onCreateAgent;
     this.createId = options.createId ?? randomUUID;
     this.now = options.now ?? (() => new Date());
   }
@@ -209,6 +234,62 @@ export class ClawMcpAgentCoordinator {
     }
 
     return this.onMarkWorkItemCompleted(agent, normalizedWorkItemId);
+  }
+
+  async listSourceRepositories(agentId: string): Promise<{ repos: SourceRepository[] }> {
+    this.requireAgent(agentId);
+    if (!this.onListSourceRepositories) {
+      throw new McpToolError('Source repositories are not available.');
+    }
+
+    return {
+      repos: await this.onListSourceRepositories(),
+    };
+  }
+
+  async listSourceWorktrees(agentId: string, repoPath: string): Promise<{ repoPath: string; worktrees: SourceWorktree[] }> {
+    const normalizedRepoPath = repoPath.trim();
+    const { repos } = await this.listSourceRepositories(agentId);
+    const repository = repos.find((candidate) => candidate.path === normalizedRepoPath);
+    if (!repository) {
+      throw new McpToolError('Source repository not found.');
+    }
+
+    return {
+      repoPath: normalizedRepoPath,
+      worktrees: repository.worktrees,
+    };
+  }
+
+  async createSourceWorktree(agentId: string, input: CreateSourceWorktreeInput): Promise<SourceWorktree> {
+    this.requireAgent(agentId);
+    if (!this.onCreateSourceWorktree) {
+      throw new McpToolError('Source worktree creation is not available.');
+    }
+
+    return this.onCreateSourceWorktree({
+      repoPath: input.repoPath.trim(),
+      branchName: input.branchName.trim(),
+      ...(input.destinationPath?.trim() ? { destinationPath: input.destinationPath.trim() } : {}),
+    });
+  }
+
+  async createAgent(agentId: string, input: McpCreateAgentInput): Promise<McpCreateAgentResponse> {
+    const agent = this.requireAgent(agentId);
+    if (!this.onCreateAgent) {
+      throw new McpToolError('Agent creation is not available.');
+    }
+
+    return this.onCreateAgent(agent, {
+      name: input.name?.trim(),
+      avatar: input.avatar?.trim() || undefined,
+      backend: input.backend ?? 'codex',
+      repoPath: input.repoPath.trim(),
+      createWorktree: input.createWorktree,
+      branchName: input.branchName?.trim(),
+      destinationPath: input.destinationPath?.trim() || undefined,
+      teamId: agent.teamId,
+    });
   }
 
   latestUnreadMessageId(agentId: string): string | null {

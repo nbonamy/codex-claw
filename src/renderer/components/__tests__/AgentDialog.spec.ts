@@ -3,7 +3,7 @@ import ElementPlus from 'element-plus';
 import { nextTick } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import AgentDialog from '../AgentDialog.vue';
-import type { Agent, CreateAgentInput, Team, UpdateAgentInput } from '../../../shared/contracts';
+import type { Agent, CreateAgentInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '../../../shared/contracts';
 
 const idleAgent: Agent = {
   id: 'agent-dina',
@@ -25,14 +25,17 @@ describe('AgentDialog', () => {
     expect(wrapper.get('.claw-dialog__title').text()).toBe('Create Agent');
     expect(wrapper.get('.claw-dialog__subtitle').text()).toBe('Add a teammate to your Codex Claw team');
     expect(wrapper.text()).toContain('Add a teammate to your Codex Claw team');
-    expect(wrapper.findAll('.agent-dialog__field')).toHaveLength(3);
+    expect(wrapper.findAll('.agent-dialog__field')).toHaveLength(4);
     expect(wrapper.text()).toContain('Identity');
     expect(wrapper.text()).not.toContain('Coding Agent');
     expect(wrapper.text()).not.toContain('Persona');
-    expect(wrapper.text()).toContain('Workspace folder');
+    expect(wrapper.text()).not.toContain('Workspace folder');
+    expect(wrapper.text()).toContain('Repository');
+    expect(wrapper.text()).toContain('Resolved path');
     expect(wrapper.text()).toContain('Backend');
     expect(wrapper.text()).toContain('Claude Code');
     expect(wrapper.get('.agent-dialog__text-input').attributes('placeholder')).toBe('Enter agent name');
+    expect(wrapper.get<HTMLInputElement>('.agent-dialog__resolved-path-input').element.value).toBe('');
     expect(wrapper.findComponent({ name: 'CodexBackendIcon' }).exists()).toBe(true);
     expect(wrapper.findComponent({ name: 'ClaudeCodeBackendIcon' }).exists()).toBe(true);
     expect(saveButton(wrapper).attributes()).toHaveProperty('disabled');
@@ -43,7 +46,7 @@ describe('AgentDialog', () => {
     const createAgent = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountDialog({ chooseAgentFolder, createAgent });
 
-    await wrapper.get('.agent-dialog__folder-control').trigger('click');
+    await chooseCustomFolder(wrapper);
     await wrapper.get('.agent-avatar-picker__trigger').trigger('click');
     await wrapper.findAll('.agent-avatar-picker__preset').find((button) => button.text() === '🤖')?.trigger('click');
     await saveButton(wrapper).trigger('click');
@@ -65,7 +68,7 @@ describe('AgentDialog', () => {
     });
 
     await wrapper.get('.agent-dialog__text-input').setValue('Custom Agent');
-    await wrapper.get('.agent-dialog__folder-control').trigger('click');
+    await chooseCustomFolder(wrapper);
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
@@ -82,9 +85,9 @@ describe('AgentDialog', () => {
     });
 
     await wrapper.get('.agent-dialog__text-input').setValue('Waiting');
-    await wrapper.get('.agent-dialog__folder-control').trigger('click');
+    await chooseCustomFolder(wrapper);
 
-    expect(wrapper.text()).toContain('Select folder');
+    expect(wrapper.get<HTMLInputElement>('.agent-dialog__resolved-path-input').element.value).toBe('');
     expect(saveButton(wrapper).attributes()).toHaveProperty('disabled');
   });
 
@@ -117,7 +120,7 @@ describe('AgentDialog', () => {
       createAgent,
     });
 
-    await wrapper.get('.agent-dialog__folder-control').trigger('click');
+    await chooseCustomFolder(wrapper);
     await wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'claude');
     await saveButton(wrapper).trigger('click');
 
@@ -145,8 +148,8 @@ describe('AgentDialog', () => {
       }],
     });
 
-    expect(wrapper.findAll('.agent-dialog__field')).toHaveLength(4);
-    await wrapper.get('.agent-dialog__folder-control').trigger('click');
+    expect(wrapper.findAll('.agent-dialog__field')).toHaveLength(5);
+    await chooseCustomFolder(wrapper, 2);
     await wrapper.findAllComponents({ name: 'ElSelect' })[0]?.vm.$emit('update:modelValue', '__new_team__');
     await nextTick();
 
@@ -187,7 +190,7 @@ describe('AgentDialog', () => {
       ],
     });
 
-    await wrapper.get('.agent-dialog__folder-control').trigger('click');
+    await chooseCustomFolder(wrapper, 2);
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
@@ -220,7 +223,7 @@ describe('AgentDialog', () => {
       createAgent,
     });
 
-    await wrapper.get('.agent-dialog__folder-control').trigger('click');
+    await chooseCustomFolder(wrapper);
     await wrapper.get('.agent-dialog__text-input').setValue('Broken');
     await saveButton(wrapper).trigger('click');
 
@@ -233,7 +236,7 @@ describe('AgentDialog', () => {
       chooseAgentFolder: vi.fn().mockRejectedValue('Folder dialog failed.'),
     });
 
-    await wrapper.get('.agent-dialog__folder-control').trigger('click');
+    await chooseCustomFolder(wrapper);
     await flushPromises();
 
     expect(wrapper.text()).toContain('Folder dialog failed.');
@@ -242,25 +245,110 @@ describe('AgentDialog', () => {
 
     expect(wrapper.emitted('close')).toStrictEqual([[]]);
   });
+
+  it('creates an agent from discovered source repositories and worktrees', async () => {
+    const createAgent = vi.fn().mockResolvedValue(undefined);
+    const addRecentSourceRepository = vi.fn();
+    const repositories: SourceRepository[] = [{
+      name: 'codex-claw',
+      path: '/Users/nbonamy/src/codex-claw',
+      worktrees: [
+        { name: 'main', path: '/Users/nbonamy/src/codex-claw' },
+        { name: 'source-folder', path: '/Users/nbonamy/src/codex-claw-source-folder' },
+      ],
+    }];
+    const wrapper = mountDialog({
+      addRecentSourceRepository,
+      createAgent,
+      sourceFolderPath: '~/src',
+      sourceRepositories: repositories,
+    });
+
+    expect(wrapper.text()).toContain('Worktree');
+    expect(wrapper.get<HTMLInputElement>('.agent-dialog__resolved-path-input').element.value).toBe('/Users/nbonamy/src/codex-claw');
+    await wrapper.findAllComponents({ name: 'ElSelect' })[1]?.vm.$emit('update:modelValue', '/Users/nbonamy/src/codex-claw');
+    await nextTick();
+    await wrapper.findAllComponents({ name: 'ElSelect' })[2]?.vm.$emit('update:modelValue', '/Users/nbonamy/src/codex-claw-source-folder');
+    await nextTick();
+    expect(wrapper.get<HTMLInputElement>('.agent-dialog__resolved-path-input').element.value).toBe('/Users/nbonamy/src/codex-claw-source-folder');
+    await saveButton(wrapper).trigger('click');
+
+    expect(createAgent).toHaveBeenCalledWith({
+      name: 'codex-claw-source-folder',
+      avatar: '🤖',
+      folder: '/Users/nbonamy/src/codex-claw-source-folder',
+      backend: 'codex',
+    });
+    expect(addRecentSourceRepository).toHaveBeenCalledWith('codex-claw');
+  });
+
+  it('creates and selects a new source worktree from the dialog', async () => {
+    const createAgent = vi.fn().mockResolvedValue(undefined);
+    const createSourceWorktree = vi.fn().mockResolvedValue({
+      name: 'source-folder',
+      path: '/Users/nbonamy/src/codex-claw-source-folder',
+    } satisfies SourceWorktree);
+    const wrapper = mountDialog({
+      createAgent,
+      createSourceWorktree,
+      sourceFolderPath: '~/src',
+      sourceRepositories: [{
+        name: 'codex-claw',
+        path: '/Users/nbonamy/src/codex-claw',
+        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/codex-claw' }],
+      }],
+    });
+
+    expect(wrapper.text()).toContain('New Worktree...');
+    await wrapper.findAllComponents({ name: 'ElSelect' })[1]?.vm.$emit('update:modelValue', '/Users/nbonamy/src/codex-claw');
+    await nextTick();
+    await wrapper.findAllComponents({ name: 'ElSelect' })[2]?.vm.$emit('update:modelValue', '__new_worktree__');
+    await nextTick();
+    await wrapper.get('.new-source-worktree-dialog__branch-input').setValue('feature/source-folder');
+    await wrapper.find('.new-source-worktree-dialog .el-button--primary').trigger('click');
+    await flushPromises();
+    await saveButton(wrapper).trigger('click');
+
+    expect(createSourceWorktree).toHaveBeenCalledWith({
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      branchName: 'feature/source-folder',
+      destinationPath: '/Users/nbonamy/src/codex-claw-feature-source-folder',
+    });
+    expect(createAgent).toHaveBeenCalledWith(expect.objectContaining({
+      folder: '/Users/nbonamy/src/codex-claw-source-folder',
+    }));
+  });
 });
 
 function mountDialog(overrides: Partial<{
+  addRecentSourceRepository: (repoName: string) => void;
   agent: Agent | null;
   chooseAgentFolder: () => Promise<string | null>;
+  chooseSourceWorktreeDestination: (repoPath: string, suggestedName: string) => Promise<string | null>;
   createAgent: (input: CreateAgentInput & { newTeamName?: string; teamId?: string }) => Promise<void>;
+  createSourceWorktree: (input: { repoPath: string; branchName: string; destinationPath?: string }) => Promise<SourceWorktree>;
   initialNewTeamName: string;
   initialTeamId: string | null;
   mode: 'create' | 'edit';
   showTeamField: boolean;
+  sourceFolderPath: string;
+  sourceRecentRepoNames: string[];
+  sourceRepositories: SourceRepository[];
   teams: Team[];
   updateAgent: (input: UpdateAgentInput) => Promise<void>;
 }> = {}) {
   return mount(AgentDialog, {
     props: {
       agent: null,
+      addRecentSourceRepository: vi.fn(),
       chooseAgentFolder: vi.fn().mockResolvedValue(null),
+      chooseSourceWorktreeDestination: vi.fn().mockResolvedValue(null),
       createAgent: vi.fn().mockResolvedValue(undefined),
+      createSourceWorktree: vi.fn().mockResolvedValue({ name: 'worktree', path: '/tmp/worktree' }),
       mode: 'create',
+      sourceFolderPath: '',
+      sourceRecentRepoNames: [],
+      sourceRepositories: [],
       updateAgent: vi.fn().mockResolvedValue(undefined),
       visible: true,
       ...overrides,
@@ -291,4 +379,9 @@ function saveButton(wrapper: ReturnType<typeof mountDialog>) {
   }
 
   return button;
+}
+
+async function chooseCustomFolder(wrapper: ReturnType<typeof mountDialog>, repositorySelectIndex = 1) {
+  wrapper.findAllComponents({ name: 'ElSelect' })[repositorySelectIndex]?.vm.$emit('update:modelValue', '__custom_folder__');
+  await flushPromises();
 }

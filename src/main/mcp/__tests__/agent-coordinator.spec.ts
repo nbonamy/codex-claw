@@ -251,6 +251,101 @@ describe('ClawMcpAgentCoordinator', () => {
     expect(onMarkWorkItemCompleted).toHaveBeenCalledWith(agents[0], 'github:nbonamy/codex-claw#12');
   });
 
+  it('lists source repositories and worktrees through app callbacks', async () => {
+    const repositories = [{
+      name: 'codex-claw',
+      path: '/Users/nbonamy/src/codex-claw',
+      worktrees: [
+        { name: 'main', path: '/Users/nbonamy/src/codex-claw' },
+        { name: 'source-folder', path: '/Users/nbonamy/src/codex-claw-source-folder' },
+      ],
+    }];
+    const coordinator = new ClawMcpAgentCoordinator({
+      getAgents: () => cloneAgents(baseAgents),
+      onListSourceRepositories: vi.fn().mockResolvedValue(repositories),
+    });
+
+    await expect(coordinator.listSourceRepositories('agent-dina')).resolves.toStrictEqual({
+      repos: repositories,
+    });
+    await expect(coordinator.listSourceWorktrees('agent-dina', '/Users/nbonamy/src/codex-claw')).resolves.toStrictEqual({
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      worktrees: repositories[0].worktrees,
+    });
+  });
+
+  it('creates source worktrees and agents through app callbacks', async () => {
+    const createWorktree = vi.fn().mockResolvedValue({
+      name: 'source-folder',
+      path: '/Users/nbonamy/src/codex-claw-source-folder',
+    });
+    const createAgent = vi.fn().mockResolvedValue({
+      success: true,
+      agentId: 'agent-source',
+      message: 'Agent created successfully',
+    });
+    const coordinator = new ClawMcpAgentCoordinator({
+      getAgents: () => [{ ...baseAgents[0], teamId: 'team-codex-claw' }],
+      onCreateSourceWorktree: createWorktree,
+      onCreateAgent: createAgent,
+    });
+
+    await expect(coordinator.createSourceWorktree('agent-dina', {
+      repoPath: ' /Users/nbonamy/src/codex-claw ',
+      branchName: ' feature/source-folder ',
+    })).resolves.toStrictEqual({
+      name: 'source-folder',
+      path: '/Users/nbonamy/src/codex-claw-source-folder',
+    });
+    expect(createWorktree).toHaveBeenCalledWith({
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      branchName: 'feature/source-folder',
+    });
+
+    await expect(coordinator.createAgent('agent-dina', {
+      name: 'Source',
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      createWorktree: true,
+      branchName: 'feature/source-folder',
+    })).resolves.toStrictEqual({
+      success: true,
+      agentId: 'agent-source',
+      message: 'Agent created successfully',
+    });
+    expect(createAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), {
+      name: 'Source',
+      avatar: undefined,
+      backend: 'codex',
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      createWorktree: true,
+      branchName: 'feature/source-folder',
+      destinationPath: undefined,
+      teamId: 'team-codex-claw',
+    });
+  });
+
+  it('rejects source operations when app callbacks or repositories are unavailable', async () => {
+    const coordinator = new ClawMcpAgentCoordinator({
+      getAgents: () => cloneAgents(baseAgents),
+    });
+
+    await expect(coordinator.listSourceRepositories('agent-dina')).rejects.toThrow('Source repositories are not available.');
+    await expect(coordinator.createSourceWorktree('agent-dina', {
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      branchName: 'feature/source-folder',
+    })).rejects.toThrow('Source worktree creation is not available.');
+    await expect(coordinator.createAgent('agent-dina', {
+      repoPath: '/Users/nbonamy/src/codex-claw',
+    })).rejects.toThrow('Agent creation is not available.');
+
+    const listCoordinator = new ClawMcpAgentCoordinator({
+      getAgents: () => cloneAgents(baseAgents),
+      onListSourceRepositories: vi.fn().mockResolvedValue([]),
+    });
+
+    await expect(listCoordinator.listSourceWorktrees('agent-dina', '/Users/nbonamy/src/missing')).rejects.toThrow('Source repository not found.');
+  });
+
   it('rejects completion requests without a work item callback or id', async () => {
     const coordinator = new ClawMcpAgentCoordinator({
       getAgents: () => cloneAgents(baseAgents),

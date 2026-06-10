@@ -15,8 +15,26 @@ describe('ClawMcpHttpServer', () => {
 
   it('serves health, debug status, tools/list, and tools/call over Streamable HTTP', async () => {
     const agents = createAgents();
+    const repositories = [{
+      name: 'codex-claw',
+      path: '/Users/nbonamy/src/codex-claw',
+      worktrees: [{
+        name: 'main',
+        path: '/Users/nbonamy/src/codex-claw',
+      }],
+    }];
     const coordinator = new ClawMcpAgentCoordinator({
       getAgents: () => agents,
+      onCreateAgent: vi.fn().mockResolvedValue({
+        success: true,
+        agentId: 'agent-source',
+        message: 'Agent created successfully',
+      }),
+      onCreateSourceWorktree: vi.fn().mockResolvedValue({
+        name: 'source-folder',
+        path: '/Users/nbonamy/src/codex-claw-source-folder',
+      }),
+      onListSourceRepositories: vi.fn().mockResolvedValue(repositories),
       now: () => new Date('2026-06-05T00:00:06.000Z'),
     });
     server = new ClawMcpHttpServer({ coordinator });
@@ -71,6 +89,10 @@ describe('ClawMcpHttpServer', () => {
       'broadcast-message',
       'set-status',
       'mark-work-item-completed',
+      'list-repos',
+      'list-worktrees',
+      'create-worktree',
+      'create-agent',
       'display-markdown',
     ]);
 
@@ -98,6 +120,46 @@ describe('ClawMcpHttpServer', () => {
       isError: false,
     });
     expect(agents[0].statusText).toBe('Running tests');
+
+    await expect(callTool(dinaUrl, 'list-repos', {})).resolves.toMatchObject({
+      result: {
+        structuredContent: {
+          repos: repositories,
+        },
+      },
+    });
+    await expect(callTool(dinaUrl, 'list-worktrees', {
+      repoPath: '/Users/nbonamy/src/codex-claw',
+    })).resolves.toMatchObject({
+      result: {
+        structuredContent: {
+          repoPath: '/Users/nbonamy/src/codex-claw',
+          worktrees: repositories[0].worktrees,
+        },
+      },
+    });
+    await expect(callTool(dinaUrl, 'create-worktree', {
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      branchName: 'feature/source-folder',
+    })).resolves.toMatchObject({
+      result: {
+        structuredContent: {
+          name: 'source-folder',
+          path: '/Users/nbonamy/src/codex-claw-source-folder',
+        },
+      },
+    });
+    await expect(callTool(dinaUrl, 'create-agent', {
+      name: 'Source',
+      repoPath: '/Users/nbonamy/src/codex-claw',
+    })).resolves.toMatchObject({
+      result: {
+        structuredContent: {
+          success: true,
+          agentId: 'agent-source',
+        },
+      },
+    });
 
     const rawCallResponse = await postJsonResponse(dinaUrl, {
       jsonrpc: '2.0',

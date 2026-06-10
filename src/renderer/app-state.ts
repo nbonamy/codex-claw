@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelMarkdownRequest, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../shared/contracts';
+import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelMarkdownRequest, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../shared/contracts';
 import { updateSettingsInSnapshot } from '../shared/settings';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '../shared/snapshot';
 import { defaultBackendCapabilities } from '../shared/backend-capabilities';
@@ -32,6 +32,9 @@ const workRepositoriesByProvider = ref<Partial<Record<WorkProviderKind, WorkRepo
 const workItemsByRepository = ref<Record<string, WorkItem[]>>({});
 const workBacklogStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
 const workBacklogError = ref<string | null>(null);
+const sourceRepositories = ref<SourceRepository[]>([]);
+const sourceRepositoryStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
+const sourceRepositoryError = ref<string | null>(null);
 let unsubscribeMainEvents: (() => void) | null = null;
 
 export function useAppState() {
@@ -86,6 +89,7 @@ export function useAppState() {
       await Promise.all([
         loadActiveAgentCatalogs(),
         loadConnectedWorkBacklogs(),
+        loadSourceRepositories(),
       ]);
     } finally {
       isLoading.value = false;
@@ -284,6 +288,58 @@ export function useAppState() {
     return await window.codexClaw?.chooseAgentFolder?.() ?? null;
   }
 
+  async function chooseSourceFolder(): Promise<string | null> {
+    return await window.codexClaw?.chooseSourceFolder?.() ?? null;
+  }
+
+  async function chooseSourceWorktreeDestination(repoPath: string, suggestedName: string): Promise<string | null> {
+    return await window.codexClaw?.chooseSourceWorktreeDestination?.(repoPath, suggestedName) ?? null;
+  }
+
+  async function createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {
+    if (!window.codexClaw?.createSourceWorktree) {
+      throw new Error('Source worktree creation is not available.');
+    }
+
+    const worktree = await window.codexClaw.createSourceWorktree(input);
+    await loadSourceRepositories();
+    return worktree;
+  }
+
+  async function loadSourceRepositories(): Promise<void> {
+    if (!window.codexClaw?.listSourceRepositories || !snapshot.value.sourceFolder.path) {
+      sourceRepositories.value = [];
+      sourceRepositoryStatus.value = 'notLoaded';
+      sourceRepositoryError.value = null;
+      return;
+    }
+
+    sourceRepositoryStatus.value = 'loading';
+    sourceRepositoryError.value = null;
+    try {
+      sourceRepositories.value = await window.codexClaw.listSourceRepositories();
+      sourceRepositoryStatus.value = 'loaded';
+    } catch (error) {
+      sourceRepositories.value = [];
+      sourceRepositoryStatus.value = 'error';
+      sourceRepositoryError.value = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  async function addRecentSourceRepository(repoName: string): Promise<void> {
+    const trimmed = repoName.trim();
+    if (!trimmed) {
+      return;
+    }
+    const nextNames = snapshot.value.sourceFolder.recentRepoNames.filter((name) => name !== trimmed);
+    nextNames.unshift(trimmed);
+    await updateSettings({
+      sourceFolder: {
+        recentRepoNames: nextNames.slice(0, 5),
+      },
+    });
+  }
+
   async function readAgentFile(agentId: string, filePath: string): Promise<AgentFileReadResult> {
     if (!window.codexClaw?.readAgentFile) {
       throw new Error('File preview is not available.');
@@ -402,6 +458,11 @@ export function useAppState() {
   async function updateSettings(input: UpdateSettingsInput): Promise<void> {
     const previousTheme = { ...snapshot.value.theme };
     const previousGeneral = { ...snapshot.value.general };
+    const previousSourceFolder = {
+      ...snapshot.value.sourceFolder,
+      recentRepoNames: [...snapshot.value.sourceFolder.recentRepoNames],
+    };
+    const previousSourceFolderPath = snapshot.value.sourceFolder.path;
     updateSettingsInSnapshot(snapshot.value, input);
 
     if (!window.codexClaw?.updateSettings) {
@@ -410,9 +471,13 @@ export function useAppState() {
 
     try {
       snapshot.value = await window.codexClaw.updateSettings(input);
+      if (input.sourceFolder && snapshot.value.sourceFolder.path !== previousSourceFolderPath) {
+        await loadSourceRepositories();
+      }
     } catch (error) {
       snapshot.value.theme = previousTheme;
       snapshot.value.general = previousGeneral;
+      snapshot.value.sourceFolder = previousSourceFolder;
       throw error;
     }
   }
@@ -720,13 +785,21 @@ export function useAppState() {
     workItemsByRepository,
     workBacklogStatus,
     workBacklogError,
+    sourceRepositories,
+    sourceRepositoryStatus,
+    sourceRepositoryError,
     loadBackendModels: loadBackendModelsForActiveAgent,
     loadBackendSkills: loadBackendSkillsForActiveAgent,
     loadAgentFiles: loadAgentFilesForActiveAgent,
     loadWorkRepositories,
     loadWorkItems,
+    loadSourceRepositories,
     loadSnapshot,
     chooseAgentFolder,
+    chooseSourceFolder,
+    chooseSourceWorktreeDestination,
+    createSourceWorktree,
+    addRecentSourceRepository,
     readAgentFile,
     createAgent,
     createTeam,

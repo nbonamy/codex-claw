@@ -25,6 +25,45 @@
     </section>
 
     <section
+      v-if="showSourceFolderSetting"
+      class="settings-general-panel__section"
+      aria-labelledby="settings-general-source-title"
+    >
+      <header class="settings-general-panel__section-header">
+        <h3 id="settings-general-source-title">Source folder</h3>
+      </header>
+
+      <article class="settings-general-panel__setting">
+        <span class="settings-general-panel__setting-copy">
+          <strong>{{ sourceFolderLabel }}</strong>
+          <span>Used to discover repositories when creating agents.</span>
+          <span
+            v-if="sourceFolderError"
+            class="settings-general-panel__setting-error"
+          >
+            {{ sourceFolderError }}
+          </span>
+        </span>
+        <span class="settings-general-panel__setting-actions">
+          <el-button
+            size="small"
+            :loading="choosingSourceFolder"
+            @click="chooseSourceFolder"
+          >
+            Choose
+          </el-button>
+          <el-button
+            v-if="sourceFolderState.path"
+            size="small"
+            @click="clearSourceFolder"
+          >
+            Clear
+          </el-button>
+        </span>
+      </article>
+    </section>
+
+    <section
       class="settings-general-panel__section"
       aria-labelledby="settings-general-permissions-title"
     >
@@ -74,7 +113,8 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import type { AppGeneralSettings, SystemPermissionsStatus, UpdateSettingsInput } from '../../shared/contracts';
+import type { AppGeneralSettings, SourceFolderState, SystemPermissionsStatus, UpdateSettingsInput } from '../../shared/contracts';
+import { defaultSourceFolderState } from '../../shared/settings';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import { ShieldCheckIcon } from '../shared/icons/app-icons';
 
@@ -87,16 +127,23 @@ const defaultPermissionsStatus: SystemPermissionsStatus = {
 };
 
 const props = defineProps<{
+  chooseSourceFolder?: () => Promise<string | null>;
   getSystemPermissions?: () => Promise<SystemPermissionsStatus>;
   openAccessibilitySettings?: () => Promise<SystemPermissionsStatus>;
   settings: AppGeneralSettings;
+  sourceFolder?: SourceFolderState;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
 }>();
 
 const permissions = ref<SystemPermissionsStatus | null>(null);
 const loadingPermissions = ref(false);
 const openingAccessibilitySettings = ref(false);
+const choosingSourceFolder = ref(false);
+const sourceFolderError = ref<string | null>(null);
 
+const showSourceFolderSetting = computed(() => Boolean(props.sourceFolder));
+const sourceFolderState = computed(() => props.sourceFolder ?? defaultSourceFolderState);
+const sourceFolderLabel = computed(() => sourceFolderState.value.path || 'Not configured');
 const accessibilityGranted = computed(() => permissions.value?.accessibility.trusted ?? false);
 const showGrantButton = computed(() => permissions.value?.accessibility.required === true && !accessibilityGranted.value);
 const accessibilityStatusLabel = computed(() => {
@@ -138,6 +185,34 @@ async function grantAccessibility(): Promise<void> {
   } finally {
     openingAccessibilitySettings.value = false;
   }
+}
+
+async function chooseSourceFolder(): Promise<void> {
+  sourceFolderError.value = null;
+  choosingSourceFolder.value = true;
+  try {
+    const selected = await props.chooseSourceFolder?.();
+    if (selected) {
+      await props.updateSettings?.({
+        sourceFolder: {
+          path: selected,
+        },
+      });
+    }
+  } catch (error) {
+    sourceFolderError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    choosingSourceFolder.value = false;
+  }
+}
+
+function clearSourceFolder(): void {
+  sourceFolderError.value = null;
+  void props.updateSettings?.({
+    sourceFolder: {
+      path: '',
+    },
+  });
 }
 
 async function getSystemPermissions(): Promise<SystemPermissionsStatus> {
@@ -217,6 +292,16 @@ function updatePreventSleep(value: boolean | string | number): void {
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
   line-height: var(--line-height-18);
+}
+
+.settings-general-panel__setting-error {
+  color: var(--color-danger, #c2410c);
+}
+
+.settings-general-panel__setting-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
 }
 
 .settings-general-panel__permission-icon {

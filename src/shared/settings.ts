@@ -1,7 +1,13 @@
-import type { AppGeneralSettings, AppSnapshot, AppThemeSettings, UpdateSettingsInput, WorkProviderSettings } from './contracts';
+import type { AppGeneralSettings, AppSnapshot, AppThemeSettings, SourceFolderState, UpdateSettingsInput, WorkProviderSettings } from './contracts';
 
 export const defaultGeneralSettings: AppGeneralSettings = {
   preventSleepWhenAgentsRun: true,
+};
+
+export const defaultSourceFolderState: SourceFolderState = {
+  path: '',
+  initialized: false,
+  recentRepoNames: [],
 };
 
 export const defaultThemeSettings: AppThemeSettings = {
@@ -17,6 +23,19 @@ export function updateSettingsInSnapshot(snapshot: AppSnapshot, input: UpdateSet
     snapshot.general = normalizeGeneralSettings({
       ...snapshot.general,
       ...input.general,
+    });
+  }
+
+  if (input.sourceFolder) {
+    const nextPath = normalizeString(input.sourceFolder.path);
+    const nextRecentRepoNames = input.sourceFolder.recentRepoNames
+      ? normalizeRecentRepoNames(input.sourceFolder.recentRepoNames)
+      : snapshot.sourceFolder.recentRepoNames;
+    snapshot.sourceFolder = normalizeSourceFolderState({
+      ...snapshot.sourceFolder,
+      path: nextPath ?? snapshot.sourceFolder.path,
+      initialized: true,
+      recentRepoNames: nextPath === '' ? [] : nextRecentRepoNames,
     });
   }
 
@@ -49,6 +68,18 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
 
   return {
     preventSleepWhenAgentsRun: value.preventSleepWhenAgentsRun !== false,
+  };
+}
+
+export function normalizeSourceFolderState(value: unknown): SourceFolderState {
+  if (!isRecord(value)) {
+    return { ...defaultSourceFolderState };
+  }
+
+  return {
+    path: normalizeString(value.path) ?? defaultSourceFolderState.path,
+    initialized: value.initialized === true,
+    recentRepoNames: normalizeRecentRepoNames(value.recentRepoNames),
   };
 }
 
@@ -85,6 +116,29 @@ function normalizeWorkProviderSettings(value: unknown): WorkProviderSettings {
 
   const oauthClientId = normalizeOptionalString(value.oauthClientId);
   return oauthClientId ? { oauthClientId } : {};
+}
+
+function normalizeRecentRepoNames(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const names: string[] = [];
+  for (const item of value) {
+    const name = normalizeString(item);
+    if (!name || names.includes(name)) {
+      continue;
+    }
+    names.push(name);
+    if (names.length >= 5) {
+      break;
+    }
+  }
+  return names;
+}
+
+function normalizeString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value.trim() : undefined;
 }
 
 function normalizeOptionalString(value: unknown): string | undefined {

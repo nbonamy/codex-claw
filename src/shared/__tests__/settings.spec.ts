@@ -66,6 +66,44 @@ describe('settings contracts', () => {
     expect(snapshot.teams).toHaveLength(1);
   });
 
+  it('updates source folder settings without replacing unrelated state', () => {
+    const snapshot = createEmptySnapshot();
+    snapshot.sourceFolder.recentRepoNames = ['skwad'];
+
+    updateSettingsInSnapshot(snapshot, {
+      sourceFolder: {
+        path: ' ~/src ',
+      },
+    });
+
+    expect(snapshot.sourceFolder).toStrictEqual({
+      path: '~/src',
+      initialized: true,
+      recentRepoNames: ['skwad'],
+    });
+    expect(snapshot.teams).toHaveLength(1);
+
+    updateSettingsInSnapshot(snapshot, {
+      sourceFolder: {
+        path: '',
+      },
+    });
+
+    expect(snapshot.sourceFolder).toStrictEqual({
+      path: '',
+      initialized: true,
+      recentRepoNames: [],
+    });
+
+    updateSettingsInSnapshot(snapshot, {
+      sourceFolder: {
+        recentRepoNames: [' one ', '', 'two', 'three', 'four', 'five', 'six', 'one'],
+      },
+    });
+
+    expect(snapshot.sourceFolder.recentRepoNames).toStrictEqual(['one', 'two', 'three', 'four', 'five']);
+  });
+
   it('updates GitHub provider settings without replacing connection state', () => {
     const snapshot = createEmptySnapshot();
     snapshot.workBacklog.connections[0] = {

@@ -1,8 +1,8 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Loop, LoopAction, LoopExecutionCreatedAgent, LoopExecutionLogEntry, LoopExecutionStatus, LoopSourceConfiguration, LoopTeamTarget, Team, ThreadGoal, ThreadPlan, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '../shared/contracts';
+import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Loop, LoopAction, LoopExecutionCreatedAgent, LoopExecutionLogEntry, LoopExecutionStatus, LoopSourceConfiguration, LoopTeamTarget, SourceFolderState, Team, ThreadGoal, ThreadPlan, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '../shared/contracts';
 import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '../shared/codex-approval-presets';
-import { normalizeGeneralSettings, normalizeThemeSettings } from '../shared/settings';
+import { normalizeGeneralSettings, normalizeSourceFolderState, normalizeThemeSettings } from '../shared/settings';
 import { createEmptySnapshot } from '../shared/snapshot';
 import { workItemAssignmentKey } from '../shared/work-assignments';
 import { defaultTeamColor } from '../shared/team-colors';
@@ -17,6 +17,7 @@ type PersistedState = {
   accountRateLimits?: AccountRateLimits;
   workBacklog?: WorkBacklogState;
   general?: AppGeneralSettings;
+  sourceFolder?: SourceFolderState;
   theme: AppSnapshot['theme'];
 };
 
@@ -65,6 +66,10 @@ export function persistedStateFromSnapshot(snapshot: AppSnapshot): PersistedStat
     ...(snapshot.accountRateLimits ? { accountRateLimits: { ...snapshot.accountRateLimits } } : {}),
     workBacklog: cloneWorkBacklogState(snapshot.workBacklog),
     general: { ...snapshot.general },
+    sourceFolder: {
+      ...snapshot.sourceFolder,
+      recentRepoNames: [...snapshot.sourceFolder.recentRepoNames],
+    },
     theme: { ...snapshot.theme },
   };
 }
@@ -121,6 +126,7 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
     ...(accountRateLimits ? { accountRateLimits } : {}),
     workBacklog,
     general: normalizeGeneralSettings(value.general),
+    sourceFolder: normalizeSourceFolderState(value.sourceFolder),
     theme: normalizeThemeSettings(value.theme),
     messages: [],
     backendRuntimes: seed.backendRuntimes.map((runtime) => ({ ...runtime })),

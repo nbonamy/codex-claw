@@ -51,11 +51,13 @@
         v-if="settingsVisible"
         :general-settings="snapshot.general"
         :settings="snapshot.theme"
+        :source-folder="snapshot.sourceFolder"
         :work-backlog-connections="snapshot.workBacklog.connections"
         :work-backlog-error="workBacklogError"
         :work-backlog-status="workBacklogStatus"
         :work-provider-settings="snapshot.workBacklog.providerSettings"
         :work-provider-authorization="workProviderAuthorization"
+        :choose-source-folder="chooseSourceFolder"
         :connect-work-provider="connectWorkProvider"
         :complete-work-provider-connection="completeWorkProviderConnection"
         :disconnect-work-provider="disconnectWorkProvider"
@@ -176,10 +178,16 @@
       :visible="agentDialogVisible"
       :mode="agentDialogMode"
       :agent="editingAgent"
+      :add-recent-source-repository="addRecentSourceRepository"
       :choose-agent-folder="chooseAgentFolder"
+      :choose-source-worktree-destination="chooseSourceWorktreeDestination"
       :create-agent="createAgentFromDialog"
+      :create-source-worktree="createSourceWorktree"
       :initial-new-team-name="pendingNewAgentTeamName"
       :initial-team-id="agentDialogTeamId"
+      :source-folder-path="snapshot.sourceFolder.path"
+      :source-recent-repo-names="snapshot.sourceFolder.recentRepoNames"
+      :source-repositories="sourceRepositories"
       :update-agent="updateAgent"
       :teams="snapshot.teams"
       :show-team-field="showAgentDialogTeamSelector"
@@ -211,7 +219,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, Team, ThreadGoal, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../../shared/contracts';
+import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SourceRepository, SourceWorktree, Team, ThreadGoal, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../../shared/contracts';
 import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import { defaultTeamColor } from '../../shared/team-colors';
 import { findAssignedAgentForWorkItem } from '../../shared/work-assignments';
@@ -258,6 +266,11 @@ const props = withDefaults(defineProps<{
   workBacklogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   workBacklogError?: string | null;
   chooseAgentFolder?: () => Promise<string | null>;
+  chooseSourceFolder?: () => Promise<string | null>;
+  sourceRepositories?: SourceRepository[];
+  chooseSourceWorktreeDestination?: (repoPath: string, suggestedName: string) => Promise<string | null>;
+  createSourceWorktree?: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
+  addRecentSourceRepository?: (repoName: string) => void;
   readAgentFile?: (agentId: string, filePath: string) => Promise<AgentFileReadResult>;
   createAgent?: (input: CreateAgentInput) => Promise<Agent | null | void>;
   createTeam?: (input: CreateTeamInput) => Promise<Team | null | void>;
@@ -296,6 +309,11 @@ const props = withDefaults(defineProps<{
   workBacklogStatus: 'notLoaded',
   workBacklogError: null,
   chooseAgentFolder: async () => null,
+  chooseSourceFolder: async () => null,
+  sourceRepositories: () => [],
+  chooseSourceWorktreeDestination: async () => null,
+  createSourceWorktree: async () => ({ name: '', path: '' }),
+  addRecentSourceRepository: () => undefined,
   readAgentFile: async () => {
     throw new Error('File preview is not available.');
   },

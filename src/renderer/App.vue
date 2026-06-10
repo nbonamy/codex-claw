@@ -25,7 +25,12 @@
     :work-items-by-repository="workItemsByRepository"
     :work-backlog-status="workBacklogStatus"
     :work-backlog-error="workBacklogError"
+    :source-repositories="sourceRepositories"
     :choose-agent-folder="chooseAgentFolder"
+    :choose-source-folder="chooseSourceFolder"
+    :choose-source-worktree-destination="chooseSourceWorktreeDestination"
+    :create-source-worktree="createSourceWorktree"
+    :add-recent-source-repository="addRecentSourceRepository"
     :read-agent-file="readAgentFile"
     :create-agent="createAgent"
     :create-team="createTeam"
@@ -108,9 +113,14 @@ const {
   workItemsByRepository,
   workBacklogStatus,
   workBacklogError,
+  sourceRepositories,
   loadBackendModels,
   loadSnapshot,
   chooseAgentFolder,
+  chooseSourceFolder,
+  chooseSourceWorktreeDestination,
+  createSourceWorktree,
+  addRecentSourceRepository,
   readAgentFile,
   createAgent,
   createTeam,
