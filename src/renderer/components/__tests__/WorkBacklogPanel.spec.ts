@@ -44,6 +44,23 @@ describe('WorkBacklogPanel', () => {
     expect(wrapper.emitted('select-repository')).toStrictEqual([[null]]);
   });
 
+  it('renders the repository selector as searchable and sorted alphabetically', () => {
+    const wrapper = mountPanel({
+      repositories: [
+        workRepository({ id: 'zeta/api', fullName: 'zeta/api', name: 'api', owner: 'zeta' }),
+        workRepository({ id: 'alpha/web', fullName: 'alpha/web', name: 'web', owner: 'alpha' }),
+        workRepository({ id: 'alpha/app', fullName: 'alpha/app', name: 'app', owner: 'alpha' }),
+      ],
+    });
+
+    expect(wrapper.getComponent({ name: 'ElSelect' }).props('filterable')).toBe(true);
+    expect(wrapper.findAllComponents({ name: 'ElOption' }).map((option) => option.props('label'))).toStrictEqual([
+      'alpha/app',
+      'alpha/web',
+      'zeta/api',
+    ]);
+  });
+
   it('does not repeat the selected repository name on issue cards', () => {
     const wrapper = mountPanel({
       items: [workItem()],
@@ -194,7 +211,7 @@ function mountPanel(props: Record<string, unknown> = {}) {
   });
 }
 
-function workRepository(): WorkRepository {
+function workRepository(overrides: Partial<WorkRepository> = {}): WorkRepository {
   return {
     provider: 'github',
     id: 'nbonamy/codex-claw',
@@ -203,6 +220,7 @@ function workRepository(): WorkRepository {
     fullName: 'nbonamy/codex-claw',
     url: 'https://github.com/nbonamy/codex-claw',
     isPrivate: true,
+    ...overrides,
   };
 }
 

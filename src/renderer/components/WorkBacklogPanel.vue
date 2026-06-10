@@ -27,11 +27,12 @@
       :model-value="selectedRepositoryId"
       placeholder="Select repo"
       :disabled="repositories.length === 0"
+      filterable
       aria-label="Backlog repository"
       @update:model-value="selectRepository"
     >
       <el-option
-        v-for="repository in repositories"
+        v-for="repository in sortedRepositories"
         :key="repository.id"
         :label="repository.fullName"
         :value="repository.id"
@@ -185,6 +186,9 @@ const emit = defineEmits<{
 }>();
 
 const openMenuItemId = ref<string | null>(null);
+const sortedRepositories = computed<WorkRepository[]>(() => [...props.repositories].sort((left, right) => (
+  left.fullName.localeCompare(right.fullName) || left.id.localeCompare(right.id)
+)));
 const itemRows = computed<WorkBacklogItemRow[]>(() => props.items.map((item) => {
   const assignmentKey = workItemAssignmentKey(item);
   const assignedAgent = props.assignedAgentsByWorkItemKey[assignmentKey] ?? null;
