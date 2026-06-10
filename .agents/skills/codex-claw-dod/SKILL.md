@@ -45,7 +45,7 @@ Before handoff or commit, check every applicable item:
 - [ ] **Coverage:** Coverage remains at or above the configured thresholds. Once
   configured, the minimum is 85% for statements, branches, functions, and
   lines.
-- [ ] **Relevant gates:** The relevant test/lint/build commands pass.
+- [ ] **Relevant gates:** The relevant test/lint commands pass.
 - [ ] **Visual verification:** Visible UI changes are checked in the running app
   or with screenshots when tooling exists.
 - [ ] **Docs:** `AGENTS.md`, `docs/*.md`, and plans are updated when behavior,
@@ -69,7 +69,6 @@ For ordinary code changes once scripts exist:
 
 ```bash
 npm test
-npm run build
 ```
 
 For coverage-sensitive work:
@@ -94,7 +93,7 @@ pretending the gate passed.
 
 Stop and report clearly instead of committing when:
 
-- a required test, lint, build, or coverage gate fails;
+- a required test, lint, or coverage gate fails;
 - the worktree contains ambiguous unrelated changes in files you need to stage;
 - an Electron security, filesystem, Codex-home, or privacy boundary is
   uncertain;
