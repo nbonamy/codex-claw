@@ -78,6 +78,22 @@ describe('CockpitAgentCard', () => {
     expect(wrapper.emitted('drop-target-leave')).toStrictEqual([['agent-dina']]);
   });
 
+  it('emits the agent menu intent on right click without selecting the card', async () => {
+    const wrapper = mountCard({ agent: idleAgent() });
+
+    await wrapper.get('.cockpit-view__agent-card').trigger('contextmenu', {
+      clientX: 24,
+      clientY: 48,
+    });
+
+    expect(wrapper.emitted('open-agent-menu')).toStrictEqual([[{
+      agentId: 'agent-dina',
+      x: 24,
+      y: 48,
+    }]]);
+    expect(wrapper.emitted('select')).toBeUndefined();
+  });
+
   it('does not accept prompts or drops while the agent is busy', async () => {
     const agent = idleAgent();
     agent.status = { type: 'working' };

@@ -716,12 +716,28 @@ describe('AppShell', () => {
     expect(wrapper.find('.cockpit-view').exists()).toBe(true);
     expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
     expect(wrapper.find('.conversation-pane').exists()).toBe(false);
+    expect(wrapper.get('[aria-label="Cockpit"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('false');
 
     await wrapper.findAll('.cockpit-view__agent-card')[1].trigger('click');
 
     expect(wrapper.find('.cockpit-view').exists()).toBe(false);
     expect(wrapper.emitted('select-team')).toStrictEqual([['team-codex-claw']]);
     expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-jesse']]);
+  });
+
+  it('forwards cockpit agent context menu actions', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mountShell({ snapshot });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    await wrapper.get('.cockpit-view__agent-card').trigger('contextmenu', {
+      clientX: 20,
+      clientY: 40,
+    });
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Duplicate Agent')?.trigger('click');
+
+    expect(wrapper.emitted('duplicate-agent')).toStrictEqual([['agent-dina']]);
   });
 
   it('forwards cockpit prompts for the targeted agent', async () => {

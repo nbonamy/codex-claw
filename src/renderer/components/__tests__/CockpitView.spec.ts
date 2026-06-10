@@ -50,6 +50,26 @@ describe('CockpitView', () => {
     expect(wrapper.emitted('add-agent')).toStrictEqual([['team-codex-claw']]);
   });
 
+  it('opens agent actions from cockpit card right click', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mountCockpit(snapshot);
+
+    await wrapper.get('.cockpit-view__agent-card').trigger('contextmenu', {
+      clientX: 42,
+      clientY: 84,
+    });
+
+    const menu = wrapper.get('.agent-context-menu');
+    expect(menu.attributes('style')).toContain('left: 42px');
+    expect(menu.attributes('style')).toContain('top: 84px');
+    expect(wrapper.text()).toContain('Edit Agent');
+
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Duplicate Agent')?.trigger('click');
+
+    expect(wrapper.emitted('duplicate-agent')).toStrictEqual([['agent-dina']]);
+    expect(wrapper.find('.agent-context-menu').exists()).toBe(false);
+  });
+
   it('shows the add tile when the final row has space', () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mountCockpit(snapshot);

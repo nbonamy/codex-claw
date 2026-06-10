@@ -96,6 +96,8 @@ describe('TeamRail', () => {
     await wrapper.get('[aria-label="Cockpit"]').trigger('click');
 
     expect(wrapper.get('[aria-label="Cockpit"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('[aria-label="Skwad"]').attributes('aria-pressed')).toBe('false');
+    expect(wrapper.get('[aria-label="Skwad"]').classes()).not.toContain('team-rail__team--active');
     expect(wrapper.emitted('select-cockpit')).toStrictEqual([[]]);
   });
 

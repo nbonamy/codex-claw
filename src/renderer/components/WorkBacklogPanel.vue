@@ -74,6 +74,7 @@
         :class="{ 'work-backlog-panel__item--assigned': row.assignedAgent }"
         draggable="true"
         @click="selectAssignedAgent(row.assignedAgent)"
+        @contextmenu.prevent.stop="openItemMenu(row.item.id)"
         @dragstart="startDrag($event, row.item)"
         @dragend="endDrag"
       >
@@ -221,6 +222,10 @@ function selectRepository(value: string | number | boolean | Record<string, unkn
 
 function setMenuVisible(itemId: string, visible: boolean): void {
   openMenuItemId.value = visible ? itemId : null;
+}
+
+function openItemMenu(itemId: string): void {
+  openMenuItemId.value = itemId;
 }
 
 function selectMenuItem(item: WorkItem, itemId: string): void {

@@ -117,6 +117,7 @@
               @clear-dragged-work-item="clearDraggedWorkItem"
               @drop-target-enter="dropTargetAgentId = $event"
               @drop-target-leave="leaveAgentDropTarget"
+              @open-agent-menu="openAgentMenu"
               @prompt="emit('prompt-agent', $event)"
               @select="emit('select-agent', { agentId: agent.id, teamId: section.team.id })"
             />
@@ -137,6 +138,16 @@
         </section>
       </div>
     </div>
+
+    <AgentContextMenu
+      v-if="contextMenuAgent"
+      :move-targets="contextMenuMoveTargets"
+      :x="contextMenuPosition.x"
+      :y="contextMenuPosition.y"
+      @action="emitContextAgentAction"
+      @move-agent-to-team="emitContextAgentMove"
+      @close="closeAgentMenu"
+    />
   </section>
 </template>
 
@@ -146,6 +157,8 @@ import type { ComponentPublicInstance } from 'vue';
 import type { Agent, AgentStatus, BenchTemplate, DeployBenchTemplateInput, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '../../shared/contracts';
 import { defaultTeamColor } from '../../shared/team-colors';
 import { assignedAgentsByWorkItemKey as collectAssignedAgentsByWorkItemKey } from '../../shared/work-assignments';
+import AgentContextMenu from './AgentContextMenu.vue';
+import type { AgentContextMenuAction } from './AgentContextMenu.vue';
 import CockpitAddAgentTile from './CockpitAddAgentTile.vue';
 import CockpitAgentCard from './CockpitAgentCard.vue';
 import NewAgentButton from './NewAgentButton.vue';
@@ -194,11 +207,17 @@ const emit = defineEmits<{
   'assign-work-item-to-bench-agent': [intent: WorkItemAssignmentIntent];
   'assign-work-item-to-new-agent': [intent: WorkItemAssignmentIntent];
   'assign-work-item': [payload: { agentId: string; item: WorkItem }];
+  'close-agent': [agentId: string];
   'deploy-bench-template': [input: DeployBenchTemplateInput];
+  'duplicate-agent': [agentId: string];
+  'edit-agent': [agentId: string];
+  'move-agent-to-team': [payload: { agentId: string; teamId: string }];
   'prompt-agent': [payload: { agentId: string; prompt: string }];
   'refresh-work-items': [repositoryId: string | null];
   'remove-bench-template': [templateId: string];
   'remove-work-item-assignment': [item: WorkItem];
+  'restart-agent': [agentId: string];
+  'save-agent-to-bench': [agentId: string];
   'select-work-repository': [repositoryId: string | null];
   'select-agent': [payload: { agentId: string; teamId: string }];
   'select-team': [teamId: string];
@@ -206,12 +225,25 @@ const emit = defineEmits<{
 
 const draggedWorkItem = ref<WorkItem | null>(null);
 const dropTargetAgentId = ref<string | null>(null);
+const contextMenuAgentId = ref<string | null>(null);
+const contextMenuPosition = ref({ x: 0, y: 0 });
 const columnsByTeam = ref<Record<string, number>>({});
 const gridElements = new Map<string, HTMLElement>();
 let resizeObserver: ResizeObserver | null = null;
 const bench = computed(() => props.bench ?? []);
 
 const agentsById = computed(() => new Map(props.agents.map((agent) => [agent.id, agent])));
+const contextMenuAgent = computed(() => (
+  contextMenuAgentId.value ? agentsById.value.get(contextMenuAgentId.value) ?? null : null
+));
+const contextMenuMoveTargets = computed(() => {
+  const agent = contextMenuAgent.value;
+  if (!agent) {
+    return [];
+  }
+
+  return props.teams.filter((team) => team.id !== agent.teamId);
+});
 const assignedAgentsByWorkItemKey = computed<Record<string, Agent>>(() => (
   collectAssignedAgentsByWorkItemKey(props.agents, props.workBacklog?.assignments ?? {})
 ));
@@ -333,6 +365,54 @@ function leaveAgentDropTarget(agentId: string): void {
   if (dropTargetAgentId.value === agentId) {
     dropTargetAgentId.value = null;
   }
+}
+
+function openAgentMenu(payload: { agentId: string; x: number; y: number }): void {
+  contextMenuAgentId.value = payload.agentId;
+  contextMenuPosition.value = {
+    x: payload.x,
+    y: payload.y,
+  };
+}
+
+function emitContextAgentAction(action: AgentContextMenuAction): void {
+  const agentId = contextMenuAgentId.value;
+  if (!agentId) {
+    return;
+  }
+
+  switch (action) {
+    case 'close-agent':
+      emit('close-agent', agentId);
+      break;
+    case 'duplicate-agent':
+      emit('duplicate-agent', agentId);
+      break;
+    case 'edit-agent':
+      emit('edit-agent', agentId);
+      break;
+    case 'restart-agent':
+      emit('restart-agent', agentId);
+      break;
+    case 'save-agent-to-bench':
+      emit('save-agent-to-bench', agentId);
+      break;
+  }
+  closeAgentMenu();
+}
+
+function emitContextAgentMove(teamId: string): void {
+  const agentId = contextMenuAgentId.value;
+  if (!agentId) {
+    return;
+  }
+
+  emit('move-agent-to-team', { agentId, teamId });
+  closeAgentMenu();
+}
+
+function closeAgentMenu(): void {
+  contextMenuAgentId.value = null;
 }
 
 function assignDraggedWorkItemToAgent(payload: { agentId: string; item: WorkItem }): void {

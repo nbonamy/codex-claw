@@ -20,14 +20,14 @@
       :key="team.id"
       class="team-rail__team"
       :class="[
-        { 'team-rail__team--active': team.id === activeTeamId },
+        { 'team-rail__team--active': isTeamActive(team.id) },
         teamReorder.dropTargetClass(team.id),
       ]"
       type="button"
       v-bind="teamReorder.dragItemAttributes(team.id)"
       :style="{ backgroundColor: team.color ?? defaultTeamColor }"
       :aria-label="team.name"
-      :aria-pressed="team.id === activeTeamId"
+      :aria-pressed="isTeamActive(team.id)"
       @click="emit('select-team', team.id)"
       @contextmenu.prevent="openTeamMenu(team.id, $event)"
       @dragstart="teamReorder.onDragStart(team.id, $event)"
@@ -125,6 +125,10 @@ onBeforeUnmount(() => {
 function selectEditTeam(teamId: string): void {
   emit('edit-team', teamId);
   contextMenuTeamId.value = null;
+}
+
+function isTeamActive(teamId: string): boolean {
+  return !props.cockpitActive && teamId === props.activeTeamId;
 }
 
 async function requestCloseTeam(teamId: string): Promise<void> {

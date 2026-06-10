@@ -6,6 +6,7 @@
       'cockpit-view__agent-card--drop-target': dropTarget,
     }"
     @click="emit('select')"
+    @contextmenu.prevent="openAgentMenu"
     @dragenter="enterDropTarget"
     @dragleave="leaveDropTarget"
     @dragover="allowDrop"
@@ -74,6 +75,7 @@ const emit = defineEmits<{
   'clear-dragged-work-item': [];
   'drop-target-enter': [agentId: string];
   'drop-target-leave': [agentId: string];
+  'open-agent-menu': [payload: { agentId: string; x: number; y: number }];
   prompt: [payload: { agentId: string; prompt: string }];
   select: [];
 }>();
@@ -114,6 +116,15 @@ function enterDropTarget(event: DragEvent): void {
 
   event.preventDefault();
   emit('drop-target-enter', props.agent.id);
+}
+
+function openAgentMenu(event: MouseEvent): void {
+  event.stopPropagation();
+  emit('open-agent-menu', {
+    agentId: props.agent.id,
+    x: event.clientX,
+    y: event.clientY,
+  });
 }
 
 function leaveDropTarget(event: DragEvent): void {

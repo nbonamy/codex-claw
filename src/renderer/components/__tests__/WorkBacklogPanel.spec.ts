@@ -101,6 +101,22 @@ describe('WorkBacklogPanel', () => {
     expect(open).toHaveBeenCalledWith('https://github.com/nbonamy/codex-claw/issues/12', '_blank', 'noreferrer');
   });
 
+  it('opens issue actions from the work item context menu', async () => {
+    const item = workItem();
+    const wrapper = mountPanel({
+      items: [item],
+    });
+
+    await wrapper.get('.work-backlog-panel__item').trigger('contextmenu');
+
+    expect(wrapper.text()).toContain('Assign to New Agent');
+    expect(wrapper.text()).toContain('Assign to Bench Agent');
+
+    await wrapper.findAll('[role="menuitem"]').find((menuItem) => menuItem.text() === 'Assign to New Agent')?.trigger('click');
+
+    expect(wrapper.emitted('assign-to-new-agent')).toStrictEqual([[item]]);
+  });
+
   it('routes remove assignment from assigned issue actions', async () => {
     const item = workItem();
     const wrapper = mountPanel({
