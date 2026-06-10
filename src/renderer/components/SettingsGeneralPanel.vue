@@ -5,6 +5,27 @@
   >
     <section
       class="settings-general-panel__section"
+      aria-labelledby="settings-general-behavior-title"
+    >
+      <header class="settings-general-panel__section-header">
+        <h3 id="settings-general-behavior-title">Behavior</h3>
+      </header>
+
+      <label class="settings-general-panel__setting">
+        <span class="settings-general-panel__setting-copy">
+          <strong>Prevent sleep while agents run</strong>
+          <span>Keep the computer awake while an agent is starting, working, or waiting for input.</span>
+        </span>
+        <el-switch
+          :model-value="settings.preventSleepWhenAgentsRun"
+          aria-label="Prevent sleep while agents run"
+          @update:model-value="updatePreventSleep"
+        />
+      </label>
+    </section>
+
+    <section
+      class="settings-general-panel__section"
       aria-labelledby="settings-general-permissions-title"
     >
       <header class="settings-general-panel__section-header">
@@ -53,7 +74,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import type { SystemPermissionsStatus } from '../../shared/contracts';
+import type { AppGeneralSettings, SystemPermissionsStatus, UpdateSettingsInput } from '../../shared/contracts';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import { ShieldCheckIcon } from '../shared/icons/app-icons';
 
@@ -68,6 +89,8 @@ const defaultPermissionsStatus: SystemPermissionsStatus = {
 const props = defineProps<{
   getSystemPermissions?: () => Promise<SystemPermissionsStatus>;
   openAccessibilitySettings?: () => Promise<SystemPermissionsStatus>;
+  settings: AppGeneralSettings;
+  updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
 }>();
 
 const permissions = ref<SystemPermissionsStatus | null>(null);
@@ -124,6 +147,14 @@ async function getSystemPermissions(): Promise<SystemPermissionsStatus> {
 async function openAccessibilitySettings(): Promise<SystemPermissionsStatus> {
   return window.codexClaw?.openAccessibilitySettings?.() ?? defaultPermissionsStatus;
 }
+
+function updatePreventSleep(value: boolean | string | number): void {
+  void props.updateSettings?.({
+    general: {
+      preventSleepWhenAgentsRun: value === true,
+    },
+  });
+}
 </script>
 
 <style scoped>
@@ -131,6 +162,10 @@ async function openAccessibilitySettings(): Promise<SystemPermissionsStatus> {
   display: flex;
   flex-direction: column;
   gap: var(--space-8);
+}
+
+.settings-general-panel__section + .settings-general-panel__section {
+  margin-top: var(--space-20);
 }
 
 .settings-general-panel__section-header h3 {
@@ -151,6 +186,37 @@ async function openAccessibilitySettings(): Promise<SystemPermissionsStatus> {
   border-radius: var(--radius-md);
   padding: var(--space-12);
   background: var(--color-surface-low);
+}
+
+.settings-general-panel__setting {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-12);
+  background: var(--color-surface-low);
+}
+
+.settings-general-panel__setting-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.settings-general-panel__setting-copy strong {
+  color: var(--color-text);
+  font-size: var(--font-size-14);
+  line-height: var(--line-height-20);
+}
+
+.settings-general-panel__setting-copy span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-18);
 }
 
 .settings-general-panel__permission-icon {

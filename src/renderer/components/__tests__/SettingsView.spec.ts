@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import SettingsView from '../SettingsView.vue';
-import { defaultThemeSettings } from '../../../shared/settings';
+import { defaultGeneralSettings, defaultThemeSettings } from '../../../shared/settings';
 
 describe('SettingsView', () => {
   it('opens on appearance and emits appearance updates', async () => {
@@ -10,6 +10,7 @@ describe('SettingsView', () => {
     const wrapper = mount(SettingsView, {
       props: {
         settings: defaultThemeSettings,
+        generalSettings: defaultGeneralSettings,
         updateSettings,
       },
       global: {
@@ -30,6 +31,7 @@ describe('SettingsView', () => {
     const wrapper = mount(SettingsView, {
       props: {
         settings: defaultThemeSettings,
+        generalSettings: defaultGeneralSettings,
       },
       global: {
         plugins: [ElementPlus],

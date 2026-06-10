@@ -401,6 +401,7 @@ export function useAppState() {
 
   async function updateSettings(input: UpdateSettingsInput): Promise<void> {
     const previousTheme = { ...snapshot.value.theme };
+    const previousGeneral = { ...snapshot.value.general };
     updateSettingsInSnapshot(snapshot.value, input);
 
     if (!window.codexClaw?.updateSettings) {
@@ -411,6 +412,7 @@ export function useAppState() {
       snapshot.value = await window.codexClaw.updateSettings(input);
     } catch (error) {
       snapshot.value.theme = previousTheme;
+      snapshot.value.general = previousGeneral;
       throw error;
     }
   }

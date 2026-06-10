@@ -49,6 +49,7 @@
     <section class="app-shell__agent">
       <SettingsView
         v-if="settingsVisible"
+        :general-settings="snapshot.general"
         :settings="snapshot.theme"
         :work-backlog-connections="snapshot.workBacklog.connections"
         :work-backlog-error="workBacklogError"

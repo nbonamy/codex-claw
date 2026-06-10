@@ -18,7 +18,7 @@ import type {
   UpdateAgentInput,
   WorkBacklogAssignment,
 } from './contracts';
-import { defaultThemeSettings } from './settings';
+import { defaultGeneralSettings, defaultThemeSettings } from './settings';
 import { createEntityId } from './ids';
 import { defaultTeamColor } from './team-colors';
 import { toolOutputText } from './tool-output';
@@ -50,6 +50,7 @@ export function createEmptySnapshot(): AppSnapshot {
       detail: 'Claude backend has not been started yet.',
     }],
     workBacklog: createDefaultWorkBacklogState(),
+    general: { ...defaultGeneralSettings },
     theme: { ...defaultThemeSettings },
   };
 }
@@ -80,6 +81,7 @@ export function createInitialSnapshot(): AppSnapshot {
       detail: 'Claude backend has not been started yet.',
     }],
     workBacklog: createDefaultWorkBacklogState(),
+    general: { ...defaultGeneralSettings },
     theme: { ...defaultThemeSettings },
   };
 }

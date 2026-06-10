@@ -13,6 +13,8 @@
       <div class="settings-view__panel">
         <SettingsGeneralPanel
           v-if="activeTab === 'general'"
+          :settings="generalSettings"
+          :update-settings="updateSettings"
         />
         <SettingsIntegrationsPanel
           v-else-if="activeTab === 'integrations'"
@@ -38,7 +40,8 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import type { AppThemeSettings, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '../../shared/contracts';
+import type { AppGeneralSettings, AppThemeSettings, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '../../shared/contracts';
+import { defaultGeneralSettings } from '../../shared/settings';
 import SettingsAppearancePanel from './SettingsAppearancePanel.vue';
 import SettingsGeneralPanel from './SettingsGeneralPanel.vue';
 import SettingsIntegrationsPanel from './SettingsIntegrationsPanel.vue';
@@ -47,6 +50,7 @@ import type { SettingsTab } from './settings-tabs';
 
 withDefaults(defineProps<{
   settings: AppThemeSettings;
+  generalSettings?: AppGeneralSettings;
   workBacklogConnections?: WorkIntegrationConnection[];
   workBacklogError?: string | null;
   workBacklogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
@@ -62,6 +66,7 @@ withDefaults(defineProps<{
   workBacklogStatus: 'notLoaded',
   workProviderSettings: () => ({}),
   workProviderAuthorization: null,
+  generalSettings: () => ({ ...defaultGeneralSettings }),
   completeWorkProviderConnection: async () => undefined,
   connectWorkProvider: async () => undefined,
   disconnectWorkProvider: async () => undefined,

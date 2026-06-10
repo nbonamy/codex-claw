@@ -347,6 +347,10 @@ export type AppThemeSettings = {
   codeFontSize: number;
 };
 
+export type AppGeneralSettings = {
+  preventSleepWhenAgentsRun: boolean;
+};
+
 export type BackendReasoningEffortOption = {
   reasoningEffort: ReasoningEffort;
   description: string;
@@ -452,6 +456,7 @@ export type SystemPermissionsStatus = {
 };
 
 export type UpdateSettingsInput = {
+  general?: Partial<AppGeneralSettings>;
   theme?: Partial<AppThemeSettings>;
   workProviders?: Partial<Record<WorkProviderKind, WorkProviderSettings>>;
 };
@@ -510,6 +515,7 @@ export type AppSnapshot = {
   backendRuntimes: BackendRuntimeStatus[];
   accountRateLimits?: AccountRateLimits;
   workBacklog: WorkBacklogState;
+  general: AppGeneralSettings;
   theme: AppThemeSettings;
 };
 

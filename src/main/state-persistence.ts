@@ -1,8 +1,8 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Loop, LoopAction, LoopExecutionCreatedAgent, LoopExecutionLogEntry, LoopExecutionStatus, LoopSourceConfiguration, LoopTeamTarget, Team, ThreadGoal, ThreadPlan, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '../shared/contracts';
+import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Loop, LoopAction, LoopExecutionCreatedAgent, LoopExecutionLogEntry, LoopExecutionStatus, LoopSourceConfiguration, LoopTeamTarget, Team, ThreadGoal, ThreadPlan, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '../shared/contracts';
 import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '../shared/codex-approval-presets';
-import { normalizeThemeSettings } from '../shared/settings';
+import { normalizeGeneralSettings, normalizeThemeSettings } from '../shared/settings';
 import { createEmptySnapshot } from '../shared/snapshot';
 import { workItemAssignmentKey } from '../shared/work-assignments';
 import { defaultTeamColor } from '../shared/team-colors';
@@ -16,6 +16,7 @@ type PersistedState = {
   activeAgentId: string | null;
   accountRateLimits?: AccountRateLimits;
   workBacklog?: WorkBacklogState;
+  general?: AppGeneralSettings;
   theme: AppSnapshot['theme'];
 };
 
@@ -63,6 +64,7 @@ export function persistedStateFromSnapshot(snapshot: AppSnapshot): PersistedStat
     activeAgentId: snapshot.activeAgentId,
     ...(snapshot.accountRateLimits ? { accountRateLimits: { ...snapshot.accountRateLimits } } : {}),
     workBacklog: cloneWorkBacklogState(snapshot.workBacklog),
+    general: { ...snapshot.general },
     theme: { ...snapshot.theme },
   };
 }
@@ -118,6 +120,7 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
     activeAgentId: typeof value.activeAgentId === 'string' ? value.activeAgentId : null,
     ...(accountRateLimits ? { accountRateLimits } : {}),
     workBacklog,
+    general: normalizeGeneralSettings(value.general),
     theme: normalizeThemeSettings(value.theme),
     messages: [],
     backendRuntimes: seed.backendRuntimes.map((runtime) => ({ ...runtime })),

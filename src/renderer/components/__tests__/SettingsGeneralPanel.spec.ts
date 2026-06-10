@@ -2,9 +2,25 @@ import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import type { SystemPermissionsStatus } from '../../../shared/contracts';
+import { defaultGeneralSettings } from '../../../shared/settings';
 import SettingsGeneralPanel from '../SettingsGeneralPanel.vue';
 
 describe('SettingsGeneralPanel', () => {
+  it('updates the prevent sleep setting', async () => {
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({ updateSettings });
+
+    await flushPromises();
+    await wrapper.findComponent({ name: 'ElSwitch' }).vm.$emit('update:modelValue', false);
+
+    expect(wrapper.text()).toContain('Prevent sleep while agents run');
+    expect(updateSettings).toHaveBeenCalledWith({
+      general: {
+        preventSleepWhenAgentsRun: false,
+      },
+    });
+  });
+
   it('shows a grant action when macOS Accessibility is required', async () => {
     const getSystemPermissions = vi.fn().mockResolvedValue(permissionStatus({
       required: true,
@@ -48,7 +64,10 @@ describe('SettingsGeneralPanel', () => {
 
 function mountPanel(props: Record<string, unknown>) {
   return mount(SettingsGeneralPanel, {
-    props,
+    props: {
+      settings: defaultGeneralSettings,
+      ...props,
+    },
     global: {
       plugins: [ElementPlus],
     },

@@ -1,4 +1,8 @@
-import type { AppSnapshot, AppThemeSettings, UpdateSettingsInput, WorkProviderSettings } from './contracts';
+import type { AppGeneralSettings, AppSnapshot, AppThemeSettings, UpdateSettingsInput, WorkProviderSettings } from './contracts';
+
+export const defaultGeneralSettings: AppGeneralSettings = {
+  preventSleepWhenAgentsRun: true,
+};
 
 export const defaultThemeSettings: AppThemeSettings = {
   id: 'codex-claw-light',
@@ -9,6 +13,13 @@ export const defaultThemeSettings: AppThemeSettings = {
 };
 
 export function updateSettingsInSnapshot(snapshot: AppSnapshot, input: UpdateSettingsInput): AppSnapshot {
+  if (input.general) {
+    snapshot.general = normalizeGeneralSettings({
+      ...snapshot.general,
+      ...input.general,
+    });
+  }
+
   if (input.theme) {
     snapshot.theme = normalizeThemeSettings({
       ...snapshot.theme,
@@ -29,6 +40,16 @@ export function updateSettingsInSnapshot(snapshot: AppSnapshot, input: UpdateSet
   }
 
   return snapshot;
+}
+
+export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
+  if (!isRecord(value)) {
+    return { ...defaultGeneralSettings };
+  }
+
+  return {
+    preventSleepWhenAgentsRun: value.preventSleepWhenAgentsRun !== false,
+  };
 }
 
 export function normalizeThemeSettings(value: unknown): AppThemeSettings {

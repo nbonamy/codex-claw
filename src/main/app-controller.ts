@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { listAgentFolderFiles } from './agent-files';
+import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
 import { sendAgentPrompt, type SendAgentPromptHooks } from './agent-chat-service';
 import { ClaudeBackendDriver } from './claude/claude-driver';
 import { CodexAgentSessionManager } from './codex/agent-session';
@@ -88,6 +89,7 @@ export class AppController {
   private readonly workIntegrations: WorkIntegrationManager;
   private readonly loopRunner: LoopRunner;
   private readonly loopScheduler: LoopScheduler;
+  private readonly powerSaveBlocker = new AgentActivityPowerSaveBlocker();
 
   constructor(
     persistence = new AppStatePersistence(path.join(defaultUserDataPath(), 'state.json')),
@@ -119,6 +121,7 @@ export class AppController {
   async initialize(): Promise<void> {
     this.snapshot = await this.persistence.load();
     await this.workIntegrations.hydrateConnections();
+    this.syncPowerSaveBlocker();
   }
 
   registerIpcHandlers(): void {
@@ -395,6 +398,7 @@ export class AppController {
       }
       await this.workIntegrations.hydrateConnections();
       await this.persistSnapshot();
+      this.syncPowerSaveBlocker();
       return this.snapshot;
     });
 
@@ -470,6 +474,7 @@ export class AppController {
 
   async shutdown(): Promise<void> {
     this.loopScheduler.stop();
+    this.powerSaveBlocker.stop();
     await this.codexBackendDriver?.close();
     await this.claudeBackendDriver?.close();
     await this.mcpServer?.stop();
@@ -1053,6 +1058,7 @@ export class AppController {
 
     this.recordClientRequestOwner(fullEvent);
     applyMainEventToSnapshot(this.snapshot, fullEvent);
+    this.syncPowerSaveBlocker();
     this.mainWindow?.webContents.send(ipcChannels.event, fullEvent);
     if (
       fullEvent.type === 'backend.statusChanged' ||
@@ -1086,6 +1092,10 @@ export class AppController {
       this.promptPlanPreview(fullEvent);
       this.promptLatestUnreadMessage(fullEvent.agentId);
     }
+  }
+
+  private syncPowerSaveBlocker(): void {
+    this.powerSaveBlocker.sync(this.snapshot);
   }
 
   private eventCompletesSavedPlan(event: MainToRendererEvent): boolean {
