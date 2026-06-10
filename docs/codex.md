@@ -81,9 +81,12 @@ and app-owned `agentId`.
 
 If an agent has a persisted Codex `backendSession`, main resumes it with
 `thread/resume` before starting the next turn. New agents without a Codex
-session use `thread/start`. `thread/settings/updated` confirms the active
-thread settings and should update the app-owned agent/session mapping so the
-id is saved in Electron `userData` and reused after relaunch.
+session use `thread/start`. After the app stores a newly created backend
+session, it sets the generic conversation title through the backend seam;
+Codex implements this with `thread/name/set`. `thread/settings/updated`
+confirms the active thread settings and should update the app-owned
+agent/session mapping so the id is saved in Electron `userData` and reused
+after relaunch.
 
 Codex approval presets are app-owned shortcuts over Codex thread settings. The
 renderer only sees the Codex preset id; Electron main maps it to
@@ -105,6 +108,7 @@ read-only history loading path that does not resume the runtime session.
 Important requests for the first product:
 
 - `thread/start`
+- `thread/name/set`
 - `thread/resume`
 - `thread/list`
 - `turn/start`

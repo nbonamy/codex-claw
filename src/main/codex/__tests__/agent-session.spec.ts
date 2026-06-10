@@ -131,6 +131,49 @@ describe('CodexAgentSessionManager', () => {
     ]);
   });
 
+  it('sets a Codex thread name for a conversation title', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+
+    const title = manager.setConversationTitle(agent, 'Dina - Jun 10, 2026 3:42 PM');
+    await waitForSentCount(transport, 1);
+    transport.receive({
+      id: 1,
+      result: {
+        userAgent: 'codex',
+        codexHome: '/tmp/codex-home',
+        platformFamily: 'unix',
+        platformOs: 'macos',
+      },
+    });
+    await waitForSentCount(transport, 3);
+    transport.receive({
+      id: 2,
+      result: {
+        thread: {
+          id: 'thread-1',
+          cwd: '/Users/nbonamy/src/codex-claw',
+        },
+      },
+    });
+    await waitForSentCount(transport, 4);
+
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 3,
+      method: 'thread/name/set',
+      params: {
+        threadId: 'thread-1',
+        name: 'Dina - Jun 10, 2026 3:42 PM',
+      },
+    });
+
+    transport.receive({
+      id: 3,
+      result: {},
+    });
+    await expect(title).resolves.toBeUndefined();
+  });
+
   it('updates the running thread approval preset through thread settings', async () => {
     const transport = new FakeTransport();
     const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));

@@ -329,6 +329,50 @@ describe('AppController', () => {
     expect(snapshot.agents[0].goal).toBeUndefined();
   });
 
+  it('sets a generic conversation title when a goal creates a backend session', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 10, 15, 42));
+    try {
+      const snapshot = createInitialSnapshot();
+      const persistence = {
+        load: vi.fn().mockResolvedValue(snapshot),
+        save: vi.fn().mockResolvedValue(undefined),
+      } as unknown as AppStatePersistence;
+      const controller = new AppController(persistence);
+      const setConversationTitle = vi.fn().mockResolvedValue(undefined);
+      const backendDriver = createFakeCodexBackendDriver({
+        setConversationTitle,
+        setGoal: vi.fn().mockResolvedValue({
+          backendSession: { kind: 'codex', threadId: 'thread-dina' },
+          goal: {
+            threadId: 'thread-dina',
+            objective: 'Ship the goal shelf',
+            status: 'active',
+            tokenBudget: null,
+            tokensUsed: 0,
+            timeUsedSeconds: 0,
+            createdAt: 0,
+            updatedAt: 0,
+          },
+        }),
+      });
+
+      await controller.initialize();
+      setCodexBackendDriver(controller, backendDriver);
+      await setAgentGoal(controller, 'agent-dina', 'Ship the goal shelf');
+
+      expect(setConversationTitle).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'agent-dina',
+          backendSession: { kind: 'codex', threadId: 'thread-dina' },
+        }),
+        'Dina - Jun 10, 2026 3:42 PM',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('sets a Codex approval preset through the backend driver', async () => {
     const snapshot = createInitialSnapshot();
     const persistence = {
@@ -407,6 +451,75 @@ describe('AppController', () => {
       parts: [{ type: 'text', text: 'hello claude' }],
     });
     expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' });
+  });
+
+  it('sets a generic conversation title when a prompt creates a backend session', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 10, 15, 42));
+    try {
+      const snapshot = createInitialSnapshot();
+      const persistence = {
+        load: vi.fn().mockResolvedValue(snapshot),
+        save: vi.fn().mockResolvedValue(undefined),
+      } as unknown as AppStatePersistence;
+      const controller = new AppController(persistence);
+      const setConversationTitle = vi.fn().mockResolvedValue(undefined);
+      const backendDriver = createFakeCodexBackendDriver({ setConversationTitle });
+
+      await controller.initialize();
+      setCodexBackendDriver(controller, backendDriver);
+      await sendPrompt(controller, 'agent-dina', 'hello codex');
+      await flushMicrotasks();
+
+      expect(setConversationTitle).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'agent-dina',
+          backendSession: { kind: 'codex', threadId: 'thread-dina' },
+        }),
+        'Dina - Jun 10, 2026 3:42 PM',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not retitle an existing backend session', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-existing' };
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const setConversationTitle = vi.fn().mockResolvedValue(undefined);
+    const backendDriver = createFakeCodexBackendDriver({ setConversationTitle });
+
+    await controller.initialize();
+    setCodexBackendDriver(controller, backendDriver);
+    await sendPrompt(controller, 'agent-dina', 'continue');
+    await flushMicrotasks();
+
+    expect(setConversationTitle).not.toHaveBeenCalled();
+  });
+
+  it('keeps prompt startup successful when title assignment fails', async () => {
+    const snapshot = createInitialSnapshot();
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const backendDriver = createFakeCodexBackendDriver({
+      setConversationTitle: vi.fn().mockRejectedValue(new Error('name unavailable')),
+    });
+
+    await controller.initialize();
+    setCodexBackendDriver(controller, backendDriver);
+    await sendPrompt(controller, 'agent-dina', 'hello codex');
+    await flushMicrotasks();
+
+    expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-dina' });
+    expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
   });
 
   it('records loop execution conversation metadata when a loop prompt starts', async () => {

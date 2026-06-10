@@ -54,6 +54,7 @@ import { teamColors } from '../shared/team-colors';
 import { sanitizeWorkItemAssignmentSource } from '../shared/work-assignments';
 import type { AgentBackendDriver, BackendSendResult } from './backends/types';
 import { backendDisplayName, unsupportedBackendFeature } from './backends/types';
+import { formatConversationTitle } from './backends/conversation-title';
 import { McpToolError, type DisplayMarkdownInput, type DisplayMarkdownResponse, type MarkWorkItemCompletedResponse } from './mcp/agent-coordinator';
 
 const MAX_AGENT_FILE_READ_BYTES = 2 * 1024 * 1024;
@@ -491,9 +492,16 @@ export class AppController {
       return this.snapshot;
     }
 
-    return sendAgentPrompt(this.snapshot, await this.getBackendDriverForAgent(agent), agentId, prompt, options, (event) => {
+    const driver = await this.getBackendDriverForAgent(agent);
+    return sendAgentPrompt(this.snapshot, driver, agentId, prompt, options, (event) => {
       this.emitAndApply(event);
-    }, hooks);
+    }, {
+      ...hooks,
+      onBackendSessionUpdated: async (result, wasNewSession) => {
+        await hooks?.onBackendSessionUpdated?.(result, wasNewSession);
+        await this.setNewConversationTitle(agent, driver, wasNewSession);
+      },
+    });
   }
 
   private async sendLoopPrompt(agentId: string, prompt: string, context: LoopPromptContext): Promise<AppSnapshot> {
@@ -519,6 +527,22 @@ export class AppController {
     });
   }
 
+  private async setNewConversationTitle(agent: Agent, driver: AgentBackendDriver, wasNewSession: boolean): Promise<void> {
+    if (!wasNewSession || !driver.setConversationTitle) {
+      return;
+    }
+
+    try {
+      await driver.setConversationTitle(agent, formatConversationTitle(agent));
+    } catch (error) {
+      warnMain('conversation-title', 'failed', {
+        agentId: agent.id,
+        backend: driver.backend,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   private async setAgentGoal(agentId: string, objective: string): Promise<AppSnapshot> {
     const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
     const trimmedObjective = objective.trim();
@@ -531,8 +555,10 @@ export class AppController {
       throw new Error(`${agent.backend} does not support goals.`);
     }
 
+    const wasNewSession = !agent.backendSession;
     const result = await driver.setGoal(agent, trimmedObjective);
     agent.backendSession = result.backendSession;
+    await this.setNewConversationTitle(agent, driver, wasNewSession);
     if (result.goal) {
       this.emitAndApply({
         agentId,
@@ -557,8 +583,10 @@ export class AppController {
       throw new Error(`${agent.backend} does not support goals.`);
     }
 
+    const wasNewSession = !agent.backendSession;
     const result = await driver.clearGoal(agent);
     agent.backendSession = result.backendSession;
+    await this.setNewConversationTitle(agent, driver, wasNewSession);
     if (result.cleared) {
       this.emitAndApply({
         agentId,
@@ -587,8 +615,10 @@ export class AppController {
       throw unsupportedBackendFeature(agent, 'Codex approval presets');
     }
 
+    const wasNewSession = !agent.backendSession;
     const result = await driver.setCodexApprovalPreset(agent, preset);
     agent.backendSession = result.backendSession;
+    await this.setNewConversationTitle(agent, driver, wasNewSession);
     agent.backendDefaults = codexBackendDefaultsWithApprovalPreset(agent.backendDefaults, result.approvalPreset);
     await this.persistSnapshot();
 

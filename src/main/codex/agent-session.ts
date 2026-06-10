@@ -35,6 +35,7 @@ import type {
   ThreadReadResponse,
   ThreadResumeResponse,
   ThreadRollbackResponse,
+  ThreadSetNameResponse,
   ThreadStartResponse,
   TurnInterruptResponse,
   TurnStartResponse,
@@ -228,6 +229,16 @@ export class CodexAgentSessionManager {
     return {
       threadId: session.threadId,
     };
+  }
+
+  async setConversationTitle(agent: Agent, title: string): Promise<void> {
+    await this.start();
+
+    const session = await this.ensureSession(agent);
+    await this.client.request<ThreadSetNameResponse>('thread/name/set', {
+      threadId: session.threadId,
+      name: title,
+    });
   }
 
   async setThreadGoal(agent: Agent, objective: string): Promise<CodexSessionGoalSetResult> {

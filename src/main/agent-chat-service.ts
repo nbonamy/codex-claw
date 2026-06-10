@@ -10,6 +10,7 @@ export type AgentChatEventEmitter = (
 ) => void;
 
 export type SendAgentPromptHooks = {
+  onBackendSessionUpdated?: (result: BackendSendResult, wasNewSession: boolean) => void | Promise<void>;
   onPromptStarted?: (result: BackendSendResult) => void | Promise<void>;
 };
 
@@ -32,6 +33,7 @@ export function sendAgentPrompt(
   if (!promptResult) {
     appendUserPrompt(snapshot, agentId, trimmedPrompt);
   }
+  const hadBackendSession = Boolean(agent.backendSession);
 
   updateAgentStatus(agentId, { type: 'starting' }, emit, snapshot);
   updateBackendRuntimeStatus({
@@ -49,6 +51,7 @@ export function sendAgentPrompt(
     .then((result) => {
       agent.backend = backendDriver.backend;
       agent.backendSession = result.backendSession;
+      void Promise.resolve(hooks?.onBackendSessionUpdated?.(result, !hadBackendSession)).catch(() => undefined);
       if (agent.status.type === 'starting') {
         updateAgentStatus(agentId, { type: 'working' }, emit, snapshot);
       }

@@ -60,6 +60,10 @@ export class CodexBackendDriver implements AgentBackendDriver {
     };
   }
 
+  async setConversationTitle(agent: Agent, title: string): Promise<void> {
+    await this.sessionManager.setConversationTitle(agent, title);
+  }
+
   async setGoal(agent: Agent, objective: string): Promise<BackendGoalResult> {
     const result = await this.sessionManager.setThreadGoal(agent, objective);
     return {

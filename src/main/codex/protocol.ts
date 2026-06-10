@@ -108,6 +108,8 @@ export type ThreadRollbackResponse = {
 
 export type ThreadCompactStartResponse = Record<string, never>;
 
+export type ThreadSetNameResponse = Record<string, never>;
+
 export type TurnStartResponse = {
   turn: CodexTurn;
 };

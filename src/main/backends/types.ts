@@ -45,6 +45,7 @@ export type AgentBackendDriver = {
   getCapabilities(agent: Agent): BackendCapabilities;
   tryHandlePromptCommand?(agent: Agent, prompt: string): Promise<BackendSendResult> | null;
   sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>;
+  setConversationTitle?(agent: Agent, title: string): Promise<void>;
   setGoal?(agent: Agent, objective: string): Promise<BackendGoalResult>;
   clearGoal?(agent: Agent): Promise<BackendGoalResult>;
   setCodexApprovalPreset?(agent: Agent, preset: CodexApprovalPreset): Promise<BackendCodexApprovalPresetResult>;

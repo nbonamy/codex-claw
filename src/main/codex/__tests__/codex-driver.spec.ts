@@ -93,14 +93,32 @@ describe('CodexBackendDriver', () => {
     });
     expect(sessionManager.setApprovalPreset).toHaveBeenCalledWith(agent, 'full-access');
   });
+
+  it('sets conversation titles through the session manager', async () => {
+    const sessionManager = createSessionManager();
+    const driver = new CodexBackendDriver(sessionManager);
+
+    await expect(driver.setConversationTitle(agent, 'Dina - Jun 10, 2026 3:42 PM')).resolves.toBeUndefined();
+    expect(sessionManager.setConversationTitle).toHaveBeenCalledWith(agent, 'Dina - Jun 10, 2026 3:42 PM');
+  });
+
+  it('propagates conversation title failures from the session manager', async () => {
+    const sessionManager = createSessionManager({
+      setConversationTitle: vi.fn().mockRejectedValue(new Error('rename failed')),
+    });
+    const driver = new CodexBackendDriver(sessionManager);
+
+    await expect(driver.setConversationTitle(agent, 'Dina - Jun 10, 2026 3:42 PM')).rejects.toThrow('rename failed');
+  });
 });
 
-function createSessionManager(): CodexAgentSessionManager {
+function createSessionManager(overrides: Partial<CodexAgentSessionManager> = {}): CodexAgentSessionManager {
   return {
     compactThread: vi.fn().mockResolvedValue({ threadId: 'thread-compact' }),
     clearThreadGoal: vi.fn().mockResolvedValue({ threadId: 'thread-goal', cleared: true }),
     reviewThread: vi.fn().mockResolvedValue({ threadId: 'thread-review', turnId: 'turn-review' }),
     sendPrompt: vi.fn(),
+    setConversationTitle: vi.fn().mockResolvedValue(undefined),
     setApprovalPreset: vi.fn().mockResolvedValue({ threadId: 'thread-approval', approvalPreset: 'full-access' }),
     setThreadGoal: vi.fn().mockResolvedValue({
       threadId: 'thread-goal',
@@ -115,5 +133,6 @@ function createSessionManager(): CodexAgentSessionManager {
         updatedAt: 0,
       },
     }),
+    ...overrides,
   } as unknown as CodexAgentSessionManager;
 }
