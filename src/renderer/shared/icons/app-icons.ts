@@ -28,6 +28,7 @@ export {
   IconMaximize as Maximize2,
   IconMicrophone as MicrophoneIcon,
   IconPaperclip as PaperclipIcon,
+  IconPalette as PaletteIcon,
   IconPencil as PencilIcon,
   IconPhoto as PhotoIcon,
   IconPlus as PlusIcon,

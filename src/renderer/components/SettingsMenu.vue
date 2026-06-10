@@ -1,5 +1,6 @@
 <template>
   <el-popover
+    v-model:visible="popoverVisible"
     placement="right-end"
     popper-class="claw-popover settings-menu-popover"
     trigger="click"
@@ -44,7 +45,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import type { AccountRateLimitWindow, AccountRateLimits } from '../../shared/contracts';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
@@ -58,6 +59,7 @@ const emit = defineEmits<{
   'open-settings': [];
   quit: [];
 }>();
+const popoverVisible = ref(false);
 const menuItems: AppMenuItem[] = [
   { id: 'settings-separator', type: 'separator' },
   {
@@ -146,6 +148,8 @@ function rateLimitReset(window: AccountRateLimitWindow): string {
 }
 
 function selectMenuItem(itemId: string): void {
+  popoverVisible.value = false;
+
   if (itemId === 'open-settings') {
     emit('open-settings');
   } else if (itemId === 'quit') {

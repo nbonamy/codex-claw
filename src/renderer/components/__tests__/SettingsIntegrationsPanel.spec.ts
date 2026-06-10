@@ -4,6 +4,19 @@ import { describe, expect, it, vi } from 'vitest';
 import SettingsIntegrationsPanel from '../SettingsIntegrationsPanel.vue';
 
 describe('SettingsIntegrationsPanel', () => {
+  it('renders a decorative banner below the title', () => {
+    const wrapper = mountPanel({
+      connections: [{ provider: 'github', status: 'disconnected' }],
+    });
+
+    const title = wrapper.get('#settings-integrations-title');
+    const banner = wrapper.get('.settings-integrations-banner');
+
+    expect(title.element.compareDocumentPosition(banner.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(banner.attributes('aria-hidden')).toBe('true');
+    expect(banner.text()).toBe('');
+  });
+
   it('emits connect for disconnected GitHub', async () => {
     const wrapper = mountPanel({
       connections: [{ provider: 'github', status: 'disconnected' }],

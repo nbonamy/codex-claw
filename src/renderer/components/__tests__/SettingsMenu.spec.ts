@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
+import { nextTick } from 'vue';
 import { afterEach, describe, expect, it } from 'vitest';
 import SettingsMenu from '../SettingsMenu.vue';
 import type { AccountRateLimits } from '../../../shared/contracts';
@@ -9,7 +10,7 @@ afterEach(() => {
 });
 
 describe('SettingsMenu', () => {
-  it('renders primary and weekly rate-limit rows', () => {
+  it('renders primary and weekly rate-limit rows', async () => {
     const wrapper = mountMenu({
       limitId: 'codex',
       limitName: null,
@@ -29,6 +30,8 @@ describe('SettingsMenu', () => {
       rateLimitReachedType: null,
     });
 
+    await openMenu(wrapper);
+
     const rows = wrapper.findAll('.settings-menu__rate-limit');
     expect(rows).toHaveLength(2);
     expect(rows[0]?.text()).toContain('5h');
@@ -42,11 +45,25 @@ describe('SettingsMenu', () => {
   it('emits menu actions', async () => {
     const wrapper = mountMenu();
 
+    await openMenu(wrapper);
     await wrapper.findAll('button').find((button) => button.text() === 'Settings')?.trigger('click');
+    await openMenu(wrapper);
     await wrapper.findAll('button').find((button) => button.text() === 'Quit')?.trigger('click');
 
     expect(wrapper.emitted('open-settings')).toStrictEqual([[]]);
     expect(wrapper.emitted('quit')).toStrictEqual([[]]);
+  });
+
+  it('closes the popover when selecting a menu action', async () => {
+    const wrapper = mountMenu();
+
+    await openMenu(wrapper);
+    expect(wrapper.find('[data-test="settings-popover-content"]').exists()).toBe(true);
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Settings')?.trigger('click');
+    await nextTick();
+
+    expect(wrapper.find('[data-test="settings-popover-content"]').exists()).toBe(false);
   });
 });
 
@@ -60,9 +77,25 @@ function mountMenu(rateLimits?: AccountRateLimits) {
       plugins: [ElementPlus],
       stubs: {
         ElPopover: {
-          template: '<div><slot name="reference" /><slot /></div>',
+          props: ['visible'],
+          emits: ['update:visible'],
+          template: `
+            <div>
+              <span @click="$emit('update:visible', !visible)">
+                <slot name="reference" />
+              </span>
+              <section v-if="visible" data-test="settings-popover-content">
+                <slot />
+              </section>
+            </div>
+          `,
         },
       },
     },
   });
+}
+
+async function openMenu(wrapper: ReturnType<typeof mountMenu>): Promise<void> {
+  await wrapper.get('[aria-label="Settings menu"]').trigger('click');
+  await nextTick();
 }

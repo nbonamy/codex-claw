@@ -1,26 +1,19 @@
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
-import SettingsDialog from '../SettingsDialog.vue';
+import SettingsView from '../SettingsView.vue';
 import { defaultThemeSettings } from '../../../shared/settings';
 
-describe('SettingsDialog', () => {
+describe('SettingsView', () => {
   it('opens on appearance and emits appearance updates', async () => {
     const updateSettings = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mount(SettingsDialog, {
+    const wrapper = mount(SettingsView, {
       props: {
-        visible: true,
         settings: defaultThemeSettings,
         updateSettings,
       },
       global: {
         plugins: [ElementPlus],
-        stubs: {
-          ElDialog: {
-            props: ['modelValue'],
-            template: '<section v-if="modelValue"><slot name="header" /><slot /></section>',
-          },
-        },
       },
     });
 
@@ -34,19 +27,12 @@ describe('SettingsDialog', () => {
   });
 
   it('keeps the empty general tab reachable', async () => {
-    const wrapper = mount(SettingsDialog, {
+    const wrapper = mount(SettingsView, {
       props: {
-        visible: true,
         settings: defaultThemeSettings,
       },
       global: {
         plugins: [ElementPlus],
-        stubs: {
-          ElDialog: {
-            props: ['modelValue'],
-            template: '<section v-if="modelValue"><slot name="header" /><slot /></section>',
-          },
-        },
       },
     });
 

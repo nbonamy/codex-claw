@@ -1264,6 +1264,11 @@ describe('AppShell', () => {
 
     expect(wrapper.text()).toContain('59%');
     await wrapper.findAll('button').find((button) => button.text() === 'Settings')?.trigger('click');
+    expect(wrapper.find('.settings-view').exists()).toBe(true);
+    expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
+    expect(wrapper.get('[aria-label="Settings menu"]').attributes('aria-pressed')).toBeUndefined();
+    expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('false');
+    expect(wrapper.get('[aria-label="Codex Claw"]').classes()).not.toContain('team-rail__team--active');
     expect(wrapper.text()).toContain('Theme');
     expect(wrapper.text()).toContain('Codex Claw Light');
 

@@ -1,9 +1,11 @@
 <template>
-  <section
-    class="settings-integrations-panel"
-    aria-labelledby="settings-integrations-title"
+  <SettingsPanelFrame
+    title="Integrations"
+    title-id="settings-integrations-title"
   >
-    <h3 id="settings-integrations-title">Integrations</h3>
+    <template #banner>
+      <SettingsIntegrationBanner />
+    </template>
 
     <article class="settings-integrations-panel__integration">
       <div class="settings-integrations-panel__identity">
@@ -88,12 +90,14 @@
     >
       {{ configurationError ?? error ?? githubConnection.detail }}
     </p>
-  </section>
+  </SettingsPanelFrame>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '../../shared/contracts';
+import SettingsIntegrationBanner from './SettingsIntegrationBanner.vue';
+import SettingsPanelFrame from './SettingsPanelFrame.vue';
 
 const props = withDefaults(defineProps<{
   authorization?: WorkProviderAuthorization | null;
@@ -183,20 +187,6 @@ async function connectGithub(): Promise<void> {
 </script>
 
 <style scoped>
-.settings-integrations-panel {
-  min-width: 0;
-  padding: var(--space-8) var(--space-12);
-  background: var(--color-surface-lowest);
-}
-
-.settings-integrations-panel h3 {
-  margin: 0 0 var(--space-8);
-  color: var(--color-text);
-  font-size: var(--font-size-14);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-24);
-}
-
 .settings-integrations-panel__integration {
   min-height: 64px;
   display: flex;

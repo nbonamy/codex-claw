@@ -1,9 +1,8 @@
 <template>
-  <section
-    class="settings-appearance-panel"
-    aria-labelledby="settings-appearance-title"
+  <SettingsPanelFrame
+    title="Appearance"
+    title-id="settings-appearance-title"
   >
-    <h3 id="settings-appearance-title">Appearance</h3>
     <div class="settings-appearance-panel__rows">
       <label class="settings-appearance-panel__row">
         <span>Mode</span>
@@ -56,12 +55,13 @@
         />
       </label>
     </div>
-  </section>
+  </SettingsPanelFrame>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { AppThemeSettings, UpdateSettingsInput } from '../../shared/contracts';
+import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import { appThemes, themeIdForAppearance } from '../theme/themes';
 
 const props = defineProps<{
@@ -122,20 +122,6 @@ function updateNumericTheme(key: 'chatFontSize' | 'codeFontSize' | 'uiFontSize',
 </script>
 
 <style scoped>
-.settings-appearance-panel {
-  min-width: 0;
-  padding: var(--space-8) var(--space-12);
-  background: var(--color-surface-lowest);
-}
-
-.settings-appearance-panel h3 {
-  margin: 0 0 var(--space-8);
-  color: var(--color-text);
-  font-size: var(--font-size-14);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-24);
-}
-
 .settings-appearance-panel__rows {
   display: grid;
 }

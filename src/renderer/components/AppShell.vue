@@ -4,14 +4,14 @@
   >
     <TeamRail
       :teams="snapshot.teams"
-      :active-team-id="activeTeam?.id ?? null"
+      :active-team-id="cockpitVisible || settingsVisible ? null : activeTeam?.id ?? null"
       :cockpit-active="cockpitVisible"
       :rate-limits="snapshot.accountRateLimits"
       class="app-shell__team-rail"
       @close-team="$emit('close-team', $event)"
       @edit-team="openEditTeam"
       @new-team="openNewTeam"
-      @open-settings="settingsDialogVisible = true"
+      @open-settings="openSettings"
       @quit="quit"
       @reorder-teams="$emit('reorder-teams', $event)"
       @select-cockpit="openCockpit"
@@ -45,8 +45,21 @@
       />
     </Transition>
     <section class="app-shell__agent">
+      <SettingsView
+        v-if="settingsVisible"
+        :settings="snapshot.theme"
+        :work-backlog-connections="snapshot.workBacklog.connections"
+        :work-backlog-error="workBacklogError"
+        :work-backlog-status="workBacklogStatus"
+        :work-provider-settings="snapshot.workBacklog.providerSettings"
+        :work-provider-authorization="workProviderAuthorization"
+        :connect-work-provider="connectWorkProvider"
+        :complete-work-provider-connection="completeWorkProviderConnection"
+        :disconnect-work-provider="disconnectWorkProvider"
+        :update-settings="updateSettings"
+      />
       <CockpitView
-        v-if="cockpitVisible"
+        v-else-if="cockpitVisible"
         :agents="snapshot.agents"
         :bench="snapshot.bench"
         :teams="snapshot.teams"
@@ -172,19 +185,6 @@
       :update-team="updateTeam"
       @close="teamDialogVisible = false"
     />
-    <SettingsDialog
-      v-model:visible="settingsDialogVisible"
-      :settings="snapshot.theme"
-      :work-backlog-connections="snapshot.workBacklog.connections"
-      :work-backlog-error="workBacklogError"
-      :work-backlog-status="workBacklogStatus"
-      :work-provider-settings="snapshot.workBacklog.providerSettings"
-      :work-provider-authorization="workProviderAuthorization"
-      :connect-work-provider="connectWorkProvider"
-      :complete-work-provider-connection="completeWorkProviderConnection"
-      :disconnect-work-provider="disconnectWorkProvider"
-      :update-settings="updateSettings"
-    />
   </main>
 </template>
 
@@ -205,7 +205,7 @@ import SidePanel from './SidePanel.vue';
 import TeamDialog from './TeamDialog.vue';
 import TeamRail from './TeamRail.vue';
 import BenchAgentAssignmentDialog from './BenchAgentAssignmentDialog.vue';
-import SettingsDialog from './SettingsDialog.vue';
+import SettingsView from './SettingsView.vue';
 import { confirmCloseTeam } from './team-close-confirmation';
 import type { QueuedChatPrompt } from '../shared/chat/queued-prompts';
 import type { PlanReviewComment, SidePanelState } from './side-panel';
@@ -329,11 +329,13 @@ type WorkItemAssignmentIntent = {
   teamId?: string;
 };
 
+type AppSurface = 'agent' | 'cockpit' | 'settings';
+
 const agentSidebarCollapsed = ref(false);
 const agentSidebarMinWidth = 80;
 const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
-const cockpitVisible = ref(false);
+const activeSurface = ref<AppSurface>('agent');
 const agentDialogVisible = ref(false);
 const agentDialogMode = ref<'create' | 'edit'>('create');
 const editingAgentId = ref<string | null>(null);
@@ -345,7 +347,6 @@ const benchAssignmentDialogVisible = ref(false);
 const teamDialogVisible = ref(false);
 const teamDialogMode = ref<'create' | 'edit'>('create');
 const editingTeamId = ref<string | null>(null);
-const settingsDialogVisible = ref(false);
 const sidePanel = ref<SidePanelState | null>(null);
 let sidePanelRequestId = 0;
 let unsubscribeAppCommand: (() => void) | null = null;
@@ -404,7 +405,11 @@ const showAgentDialogTeamSelector = computed(() => agentDialogMode.value === 'cr
 const pendingNewAgentTeamName = computed(() => pendingNewAgentWorkItem.value ? workItemTeamName(pendingNewAgentWorkItem.value) : '');
 const pendingBenchAgentTeamName = computed(() => pendingBenchAgentWorkItem.value ? workItemTeamName(pendingBenchAgentWorkItem.value) : '');
 const isAgentEmpty = computed(() => activeTeamAgents.value.length === 0);
-const showAgentSidebar = computed(() => !cockpitVisible.value && !agentSidebarCollapsed.value && !isAgentEmpty.value);
+const cockpitVisible = computed(() => activeSurface.value === 'cockpit');
+const settingsVisible = computed(() => activeSurface.value === 'settings');
+const isAgentWorkspaceVisible = computed(() => activeSurface.value === 'agent');
+const isModalDialogVisible = computed(() => agentDialogVisible.value || benchAssignmentDialogVisible.value || teamDialogVisible.value);
+const showAgentSidebar = computed(() => isAgentWorkspaceVisible.value && !agentSidebarCollapsed.value && !isAgentEmpty.value);
 const editingAgent = computed(() => (
   editingAgentId.value ? props.snapshot.agents.find((agent) => agent.id === editingAgentId.value) ?? null : null
 ));
@@ -601,21 +606,26 @@ async function resolveSelectedTeam(teamId: string | null | undefined, newTeamNam
 
 function openCockpit(): void {
   closeSidePanel();
-  cockpitVisible.value = true;
+  activeSurface.value = 'cockpit';
+}
+
+function openSettings(): void {
+  closeSidePanel();
+  activeSurface.value = 'settings';
 }
 
 function selectTeamFromRail(teamId: string): void {
-  cockpitVisible.value = false;
+  activeSurface.value = 'agent';
   emit('select-team', teamId);
 }
 
 function selectAgentFromShell(agentId: string): void {
-  cockpitVisible.value = false;
+  activeSurface.value = 'agent';
   emit('select-agent', agentId);
 }
 
 function selectAgentFromCockpit(payload: { agentId: string; teamId: string }): void {
-  cockpitVisible.value = false;
+  activeSurface.value = 'agent';
   emit('select-team', payload.teamId);
   emit('select-agent', payload.agentId);
 }
@@ -690,7 +700,7 @@ async function openMarkdownFile(filePath: string): Promise<void> {
 }
 
 function handleShellShortcut(event: KeyboardEvent): void {
-  if (agentDialogVisible.value || teamDialogVisible.value || settingsDialogVisible.value) {
+  if (isModalDialogVisible.value || !isAgentWorkspaceVisible.value) {
     return;
   }
 
@@ -717,11 +727,19 @@ function handleShellShortcut(event: KeyboardEvent): void {
 }
 
 function handleAppCommand(command: AppCommand): void {
-  if (agentDialogVisible.value || teamDialogVisible.value || settingsDialogVisible.value) {
+  if (isModalDialogVisible.value) {
+    return;
+  }
+
+  if (command.type === 'quit') {
+    void quit();
     return;
   }
 
   if (command.type === 'cycle-teams') {
+    if (!isAgentWorkspaceVisible.value) {
+      return;
+    }
     cycleTeams();
     return;
   }
@@ -737,36 +755,49 @@ function handleAppCommand(command: AppCommand): void {
   }
 
   if (command.type === 'close-active-agent') {
+    if (!isAgentWorkspaceVisible.value) {
+      return;
+    }
     closeActiveAgent();
     return;
   }
 
   if (command.type === 'close-active-team') {
+    if (!isAgentWorkspaceVisible.value) {
+      return;
+    }
     void closeActiveTeam();
     return;
   }
 
-  if (command.type === 'quit') {
-    void quit();
-    return;
-  }
-
   if (command.type === 'cycle-agents') {
+    if (!isAgentWorkspaceVisible.value) {
+      return;
+    }
     cycleAgents(command.direction);
     return;
   }
 
   if (command.type === 'edit-active-agent') {
+    if (!isAgentWorkspaceVisible.value) {
+      return;
+    }
     editActiveAgent();
     return;
   }
 
   if (command.type === 'duplicate-active-agent') {
+    if (!isAgentWorkspaceVisible.value) {
+      return;
+    }
     duplicateActiveAgent();
     return;
   }
 
   if (command.type === 'restart-active-agent') {
+    if (!isAgentWorkspaceVisible.value) {
+      return;
+    }
     restartActiveAgent();
   }
 }

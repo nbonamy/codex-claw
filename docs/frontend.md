@@ -74,6 +74,8 @@ implemented:
 - right-side artifact pane for documents, plans, files, diffs, and future SWE
   surfaces;
 - Bench entry point in the agent creation flow.
+- full-space Settings surface launched from the rail, with its own category
+  sidebar and screen-level panels instead of dialog chrome.
 
 Avoid layout jumps during streaming, loading, plan updates, approval prompts,
 and artifact pane changes.
