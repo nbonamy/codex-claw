@@ -1,6 +1,7 @@
 <template>
   <article
     class="git-diff-preview-panel"
+    :class="{ 'git-diff-preview-panel--wrap': wordWrap }"
     :aria-busy="state === 'loading'"
   >
     <div
@@ -94,12 +95,22 @@ import { ChevronRightIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
   diff: string;
+  collapseAllSignal?: number;
   error?: string | null;
+  expandAllSignal?: number;
   state?: 'idle' | 'loading' | 'error';
+  wordWrap?: boolean;
 }>(), {
+  collapseAllSignal: 0,
   error: null,
+  expandAllSignal: 0,
   state: 'idle',
+  wordWrap: false,
 });
+
+const emit = defineEmits<{
+  allExpandedChange: [isAllExpanded: boolean];
+}>();
 
 type DiffLineKind = 'added' | 'deleted' | 'context' | 'message';
 
@@ -150,11 +161,24 @@ const parsed = computed(() => {
 const files = computed(() => parsed.value.files);
 const parseError = computed(() => parsed.value.error);
 const collapsedFileKeys = ref(new Set<string>());
+const isAllExpanded = computed(() => collapsedFileKeys.value.size === 0);
 
 watch(files, (nextFiles) => {
   const nextFileKeys = new Set(nextFiles.map((file) => file.key));
   collapsedFileKeys.value = new Set([...collapsedFileKeys.value].filter((key) => nextFileKeys.has(key)));
 });
+
+watch(() => props.expandAllSignal, () => {
+  collapsedFileKeys.value = new Set();
+});
+
+watch(() => props.collapseAllSignal, () => {
+  collapsedFileKeys.value = new Set(files.value.map((file) => file.key));
+});
+
+watch(isAllExpanded, (nextIsAllExpanded) => {
+  emit('allExpandedChange', nextIsAllExpanded);
+}, { immediate: true });
 
 function isFileExpanded(fileKey: string): boolean {
   return !collapsedFileKeys.value.has(fileKey);
@@ -266,6 +290,10 @@ function mapLine(line: Chunk['changes'][number]): DiffLineView {
   min-width: max-content;
 }
 
+.git-diff-preview-panel--wrap .git-diff-preview-panel__files {
+  min-width: 0;
+}
+
 .git-diff-preview-panel__file {
   overflow: hidden;
   border-bottom: 1px solid var(--color-border);
@@ -340,11 +368,11 @@ function mapLine(line: Chunk['changes'][number]): DiffLineView {
 }
 
 .git-diff-preview-panel__line--added {
-  background: color-mix(in srgb, var(--color-success) 12%, var(--color-surface-lowest));
+  background: var(--color-success-container);
 }
 
 .git-diff-preview-panel__line--deleted {
-  background: color-mix(in srgb, var(--color-error) 12%, var(--color-surface-lowest));
+  background: var(--color-error-container);
 }
 
 .git-diff-preview-panel__line--message {
@@ -375,6 +403,16 @@ function mapLine(line: Chunk['changes'][number]): DiffLineView {
   overflow: hidden;
   font-family: inherit;
   text-overflow: clip;
+}
+
+.git-diff-preview-panel--wrap .git-diff-preview-panel__hunk,
+.git-diff-preview-panel--wrap .git-diff-preview-panel__line {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.git-diff-preview-panel--wrap .git-diff-preview-panel__line code {
+  overflow: visible;
 }
 
 .git-diff-preview-panel__empty {

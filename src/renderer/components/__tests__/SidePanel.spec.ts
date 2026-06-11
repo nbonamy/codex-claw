@@ -80,6 +80,40 @@ describe('SidePanel', () => {
     expect(wrapper.text()).toContain('value');
   });
 
+  it('shows source preview actions before close and toggles source display options', async () => {
+    const wrapper = mount(SidePanel, {
+      props: {
+        panel: {
+          kind: 'source',
+          title: 'main.ts',
+          subtitle: 'src/main.ts',
+          content: 'const value: number = 1;',
+          language: 'typescript',
+          state: 'idle',
+          error: null,
+        },
+      },
+      global: {
+        plugins: [i18n],
+      },
+    });
+
+    expect(wrapper.find('[aria-label="Preview options"]').exists()).toBe(true);
+    expect(wrapper.get('[aria-label="Preview options"]').element.compareDocumentPosition(
+      wrapper.get('[aria-label="Close side panel"]').element,
+    ) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await wrapper.get('[aria-label="Preview options"]').trigger('click');
+    await menuButton(wrapper, 'Line numbers').trigger('click');
+
+    expect(wrapper.get('.source-preview-panel').classes()).toContain('source-preview-panel--hide-line-numbers');
+
+    await wrapper.get('[aria-label="Preview options"]').trigger('click');
+    await menuButton(wrapper, 'Line wrap').trigger('click');
+
+    expect(wrapper.get('.source-preview-panel').classes()).toContain('source-preview-panel--wrap');
+  });
+
   it('routes git diff panels to the read-only diff preview', () => {
     const wrapper = mount(SidePanel, {
       props: {
@@ -109,6 +143,53 @@ describe('SidePanel', () => {
     expect(wrapper.text()).toContain('modified');
     expect(wrapper.text()).toContain('oldValue');
     expect(wrapper.text()).toContain('newValue');
+  });
+
+  it('shows git diff preview actions for refresh, wrapping, and folding', async () => {
+    const wrapper = mount(SidePanel, {
+      props: {
+        panel: {
+          kind: 'gitDiff',
+          title: 'Git Diff',
+          subtitle: 'Current turn',
+          diff: [
+            'diff --git a/src/main.ts b/src/main.ts',
+            '--- a/src/main.ts',
+            '+++ b/src/main.ts',
+            '@@ -1,2 +1,2 @@',
+            '-const oldValue = 1;',
+            '+const newValue = 2;',
+          ].join('\n'),
+          state: 'idle',
+          error: null,
+        },
+      },
+      global: {
+        plugins: [i18n],
+      },
+    });
+
+    await wrapper.get('[aria-label="Preview options"]').trigger('click');
+    await menuButton(wrapper, 'Refresh').trigger('click');
+
+    expect(wrapper.emitted('refreshGitDiff')).toStrictEqual([[]]);
+
+    await wrapper.get('[aria-label="Preview options"]').trigger('click');
+    await menuButton(wrapper, 'Word wrap').trigger('click');
+
+    expect(wrapper.get('.git-diff-preview-panel').classes()).toContain('git-diff-preview-panel--wrap');
+
+    await wrapper.get('[aria-label="Preview options"]').trigger('click');
+    await menuButton(wrapper, 'Collapse all').trigger('click');
+    await nextTick();
+
+    expect(wrapper.get('.git-diff-preview-panel__file-header').attributes('aria-expanded')).toBe('false');
+
+    await wrapper.get('[aria-label="Preview options"]').trigger('click');
+    await menuButton(wrapper, 'Expand all').trigger('click');
+    await nextTick();
+
+    expect(wrapper.get('.git-diff-preview-panel__file-header').attributes('aria-expanded')).toBe('true');
   });
 
   it('resizes the side panel from the left edge handle', async () => {
@@ -347,6 +428,14 @@ function mockPlanSelection(wrapper: ReturnType<typeof mount>, text: string): voi
     } as unknown as Range),
     removeAllRanges: vi.fn(),
   } as unknown as Selection);
+}
+
+function menuButton(wrapper: ReturnType<typeof mount>, label: string) {
+  const button = wrapper.findAll('.app-menu__item').find((item) => item.text().includes(label));
+  if (!button) {
+    throw new Error(`Menu item not found: ${label}`);
+  }
+  return button;
 }
 
 function dispatchPointerEvent(element: Element, type: string, input: { clientX: number; pointerId: number }): void {

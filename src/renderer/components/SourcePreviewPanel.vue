@@ -1,6 +1,10 @@
 <template>
   <article
     class="source-preview-panel"
+    :class="{
+      'source-preview-panel--hide-line-numbers': !showLineNumbers,
+      'source-preview-panel--wrap': wordWrap,
+    }"
     :aria-busy="state === 'loading'"
   >
     <div
@@ -36,11 +40,15 @@ withDefaults(defineProps<{
   content: string;
   error?: string | null;
   language?: string | null;
+  showLineNumbers?: boolean;
   state?: 'idle' | 'loading' | 'error';
+  wordWrap?: boolean;
 }>(), {
   error: null,
   language: null,
+  showLineNumbers: true,
   state: 'idle',
+  wordWrap: false,
 });
 </script>
 
@@ -56,6 +64,10 @@ withDefaults(defineProps<{
 
 .source-preview-panel__content {
   min-width: max-content;
+}
+
+.source-preview-panel--wrap .source-preview-panel__content {
+  min-width: 0;
 }
 
 .source-preview-panel__content :deep(.shiki),
@@ -87,6 +99,24 @@ withDefaults(defineProps<{
   padding-right: var(--space-8);
   line-height: var(--source-preview-line-height);
   white-space: pre;
+}
+
+.source-preview-panel--wrap .source-preview-panel__content :deep(.shiki),
+.source-preview-panel--wrap .source-preview-panel__content :deep(pre) {
+  min-width: 0;
+}
+
+.source-preview-panel--wrap .source-preview-panel__content :deep(.line) {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.source-preview-panel--hide-line-numbers .source-preview-panel__content :deep(.line) {
+  padding-left: var(--space-8);
+}
+
+.source-preview-panel--hide-line-numbers .source-preview-panel__content :deep(.line::before) {
+  content: none;
 }
 
 .source-preview-panel__content :deep(.line::before) {

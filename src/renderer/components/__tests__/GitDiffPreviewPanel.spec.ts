@@ -63,6 +63,42 @@ describe('GitDiffPreviewPanel', () => {
     expect(wrapper.text()).not.toContain('oldValue');
   });
 
+  it('supports external expand/collapse all signals and word wrap', async () => {
+    const wrapper = mount(GitDiffPreviewPanel, {
+      props: {
+        diff: [
+          'diff --git a/src/a.ts b/src/a.ts',
+          '--- a/src/a.ts',
+          '+++ b/src/a.ts',
+          '@@ -1 +1 @@',
+          '-const oldValue = 1;',
+          '+const newValue = 2;',
+        ].join('\n'),
+        collapseAllSignal: 0,
+        expandAllSignal: 0,
+        wordWrap: true,
+      },
+    });
+
+    expect(wrapper.get('.git-diff-preview-panel').classes()).toContain('git-diff-preview-panel--wrap');
+    expect(wrapper.emitted('allExpandedChange')?.at(-1)).toStrictEqual([true]);
+
+    const setSignalProps = wrapper.setProps.bind(wrapper) as unknown as (props: {
+      collapseAllSignal?: number;
+      expandAllSignal?: number;
+    }) => Promise<void>;
+
+    await setSignalProps({ collapseAllSignal: 1 });
+
+    expect(wrapper.get('.git-diff-preview-panel__file-header').attributes('aria-expanded')).toBe('false');
+    expect(wrapper.emitted('allExpandedChange')?.at(-1)).toStrictEqual([false]);
+
+    await setSignalProps({ expandAllSignal: 1 });
+
+    expect(wrapper.get('.git-diff-preview-panel__file-header').attributes('aria-expanded')).toBe('true');
+    expect(wrapper.emitted('allExpandedChange')?.at(-1)).toStrictEqual([true]);
+  });
+
   it('renders empty, loading, and error states', () => {
     expect(mount(GitDiffPreviewPanel, {
       props: { diff: '' },

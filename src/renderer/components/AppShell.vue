@@ -186,6 +186,7 @@
             @close="closeSidePanel"
             @comment-plan="commentOnPlan"
             @confirm-plan="confirmPlan"
+            @refresh-git-diff="openAgentGitDiffPreview"
           />
         </div>
       </template>

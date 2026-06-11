@@ -191,8 +191,7 @@ function isSelected(item: Exclude<AppMenuItem, { type: 'separator' | 'submenu' }
 }
 
 .app-menu__item:hover:not(:disabled),
-.app-menu__item:focus-visible,
-.app-menu__item--selected {
+.app-menu__item:focus-visible {
   background: var(--color-surface-low);
 }
 

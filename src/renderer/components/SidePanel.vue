@@ -36,14 +36,41 @@
           <p v-if="panel.subtitle">{{ panel.subtitle }}</p>
         </div>
       </div>
-      <button
-        class="side-panel__close"
-        type="button"
-        aria-label="Close side panel"
-        @click="emit('close')"
+      <div
+        ref="actionsRoot"
+        class="side-panel__actions"
       >
-        <X aria-hidden="true" />
-      </button>
+        <div
+          v-if="previewMenuItems.length"
+          class="side-panel__menu-anchor"
+        >
+          <button
+            class="side-panel__action"
+            type="button"
+            aria-label="Preview options"
+            :aria-expanded="previewMenuOpen"
+            aria-haspopup="menu"
+            @click.stop="togglePreviewMenu"
+          >
+            <DotsVerticalIcon aria-hidden="true" />
+          </button>
+          <AppMenu
+            v-if="previewMenuOpen"
+            class="side-panel__menu"
+            ariaLabel="Preview options"
+            :items="previewMenuItems"
+            @select="selectPreviewMenuItem"
+          />
+        </div>
+        <button
+          class="side-panel__action side-panel__close"
+          type="button"
+          aria-label="Close side panel"
+          @click="emit('close')"
+        >
+          <X aria-hidden="true" />
+        </button>
+      </div>
     </header>
 
     <div
@@ -71,14 +98,20 @@
       :content="panel.content"
       :error="panel.error"
       :language="panel.language"
+      :show-line-numbers="sourceShowLineNumbers"
       :state="panel.state"
+      :word-wrap="sourceLineWrap"
     />
 
     <GitDiffPreviewPanel
       v-else-if="panel.kind === 'gitDiff'"
+      :collapse-all-signal="diffCollapseAllSignal"
       :diff="panel.diff"
       :error="panel.error"
+      :expand-all-signal="diffExpandAllSignal"
       :state="panel.state"
+      :word-wrap="diffWordWrap"
+      @all-expanded-change="diffAllExpanded = $event"
     />
 
     <form
@@ -134,13 +167,25 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import GitDiffPreviewPanel from './GitDiffPreviewPanel.vue';
 import MarkdownPanel from './MarkdownPanel.vue';
 import PlanReviewFooter from './PlanReviewFooter.vue';
 import SourcePreviewPanel from './SourcePreviewPanel.vue';
-import { CodeIcon, FileDiffIcon, FileTextIcon, X } from '../shared/icons/app-icons';
+import AppMenu from '../shared/menu/AppMenu.vue';
+import type { AppMenuItem } from '../shared/menu/app-menu';
+import {
+  CodeIcon,
+  DotsVerticalIcon,
+  FileDiffIcon,
+  FileTextIcon,
+  ListDetailsIcon,
+  RefreshIcon,
+  TextWrapDisabledIcon,
+  TextWrapIcon,
+  X,
+} from '../shared/icons/app-icons';
 import type { PlanReviewComment, SidePanelState } from './side-panel';
 
 const props = defineProps<{
@@ -153,15 +198,24 @@ const emit = defineEmits<{
   confirmPlan: [];
   commentPlan: [comments: PlanReviewComment[]];
   cancelPlan: [];
+  refreshGitDiff: [];
 }>();
 
 const { t } = useI18n();
+const actionsRoot = ref<HTMLElement | null>(null);
 const commentInput = ref<HTMLTextAreaElement | null>(null);
 const planComments = ref<PlanReviewComment[]>([]);
 const showCommentHelp = ref(false);
 const commentDraft = ref('');
 const activeCommentTarget = ref<{ quote: string; top: number; left: number } | null>(null);
 const editingCommentId = ref<string | null>(null);
+const previewMenuOpen = ref(false);
+const sourceShowLineNumbers = ref(true);
+const sourceLineWrap = ref(false);
+const diffWordWrap = ref(false);
+const diffAllExpanded = ref(true);
+const diffExpandAllSignal = ref(0);
+const diffCollapseAllSignal = ref(0);
 const panelWidth = ref<number | null>(null);
 const resizeStart = ref<{ pointerId: number; startX: number; startWidth: number } | null>(null);
 let commentId = 0;
@@ -171,6 +225,53 @@ const isPlanUpdating = computed(() => props.planUpdating === true && props.panel
 const sidePanelStyle = computed(() => (panelWidth.value ? {
   '--side-panel-width': `${panelWidth.value}px`,
 } : {}));
+const previewMenuItems = computed<AppMenuItem[]>(() => {
+  if (props.panel.kind === 'source') {
+    return [
+      {
+        id: 'source-line-numbers',
+        type: 'checkbox',
+        label: 'Line numbers',
+        icon: ListDetailsIcon,
+        checked: sourceShowLineNumbers.value,
+      },
+      {
+        id: 'source-line-wrap',
+        type: 'checkbox',
+        label: 'Line wrap',
+        icon: sourceLineWrap.value ? TextWrapIcon : TextWrapDisabledIcon,
+        checked: sourceLineWrap.value,
+      },
+    ];
+  }
+
+  if (props.panel.kind === 'gitDiff') {
+    return [
+      {
+        id: 'diff-refresh',
+        type: 'action',
+        label: 'Refresh',
+        icon: RefreshIcon,
+      },
+      {
+        id: 'diff-word-wrap',
+        type: 'checkbox',
+        label: 'Word wrap',
+        icon: diffWordWrap.value ? TextWrapIcon : TextWrapDisabledIcon,
+        checked: diffWordWrap.value,
+      },
+      { id: 'diff-fold-separator', type: 'separator' },
+      {
+        id: diffAllExpanded.value ? 'diff-collapse-all' : 'diff-expand-all',
+        type: 'action',
+        label: diffAllExpanded.value ? 'Collapse all' : 'Expand all',
+        icon: ListDetailsIcon,
+      },
+    ];
+  }
+
+  return [];
+});
 
 const commentBoxStyle = computed(() => {
   if (!activeCommentTarget.value) {
@@ -195,7 +296,69 @@ watch(() => {
   planComments.value = [];
   showCommentHelp.value = false;
   cancelPlanComment();
+  closePreviewMenu();
 });
+
+onMounted(() => {
+  document.addEventListener('click', closePreviewMenuOnDocumentClick);
+  document.addEventListener('keydown', closePreviewMenuOnEscape);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', closePreviewMenuOnDocumentClick);
+  document.removeEventListener('keydown', closePreviewMenuOnEscape);
+});
+
+function togglePreviewMenu(): void {
+  previewMenuOpen.value = !previewMenuOpen.value;
+}
+
+function closePreviewMenu(): void {
+  previewMenuOpen.value = false;
+}
+
+function closePreviewMenuOnDocumentClick(event: MouseEvent): void {
+  if (!previewMenuOpen.value) {
+    return;
+  }
+
+  if (event.target instanceof Node && actionsRoot.value?.contains(event.target)) {
+    return;
+  }
+
+  closePreviewMenu();
+}
+
+function closePreviewMenuOnEscape(event: KeyboardEvent): void {
+  if (event.key === 'Escape') {
+    closePreviewMenu();
+  }
+}
+
+function selectPreviewMenuItem(itemId: string): void {
+  switch (itemId) {
+    case 'source-line-numbers':
+      sourceShowLineNumbers.value = !sourceShowLineNumbers.value;
+      break;
+    case 'source-line-wrap':
+      sourceLineWrap.value = !sourceLineWrap.value;
+      break;
+    case 'diff-refresh':
+      emit('refreshGitDiff');
+      break;
+    case 'diff-word-wrap':
+      diffWordWrap.value = !diffWordWrap.value;
+      break;
+    case 'diff-expand-all':
+      diffExpandAllSignal.value += 1;
+      break;
+    case 'diff-collapse-all':
+      diffCollapseAllSignal.value += 1;
+      break;
+  }
+
+  closePreviewMenu();
+}
 
 function capturePlanSelection(event: MouseEvent): void {
   if (isPlanUpdating.value || props.panel.kind !== 'markdown' || props.panel.purpose !== 'plan' || props.panel.state !== 'idle') {
@@ -434,7 +597,26 @@ function clamp(value: number, min: number, max: number): number {
   line-height: var(--line-height-16);
 }
 
-.side-panel__close {
+.side-panel__actions {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.side-panel__menu-anchor {
+  position: relative;
+}
+
+.side-panel__menu {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + var(--space-2));
+  right: 0;
+}
+
+.side-panel__action {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -449,12 +631,13 @@ function clamp(value: number, min: number, max: number): number {
   cursor: pointer;
 }
 
-.side-panel__close:hover {
+.side-panel__action:hover,
+.side-panel__action[aria-expanded="true"] {
   color: var(--color-text);
   background: var(--color-surface-low);
 }
 
-.side-panel__close svg {
+.side-panel__action svg {
   width: var(--icon-md);
   height: var(--icon-md);
 }

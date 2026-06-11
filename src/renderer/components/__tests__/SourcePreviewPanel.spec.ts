@@ -18,6 +18,20 @@ describe('SourcePreviewPanel', () => {
     expect(wrapper.text()).toContain('value');
   });
 
+  it('can hide line numbers and enable line wrap', () => {
+    const wrapper = mount(SourcePreviewPanel, {
+      props: {
+        content: 'const veryLongValueName = "this is intentionally long";\n',
+        language: 'typescript',
+        showLineNumbers: false,
+        wordWrap: true,
+      },
+    });
+
+    expect(wrapper.get('.source-preview-panel').classes()).toContain('source-preview-panel--hide-line-numbers');
+    expect(wrapper.get('.source-preview-panel').classes()).toContain('source-preview-panel--wrap');
+  });
+
   it('renders loading, empty, and error states', () => {
     expect(mount(SourcePreviewPanel, {
       props: { content: '', state: 'loading' },
