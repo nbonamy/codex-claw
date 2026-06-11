@@ -1084,14 +1084,18 @@ function isMarkdownPath(filePath: string): boolean {
 function normalizePreviewFilePath(filePath: string): string {
   const trimmedPath = filePath.trim();
   if (!trimmedPath.startsWith('file://')) {
-    return trimmedPath;
+    return stripPreviewLineSuffix(trimmedPath);
   }
 
   try {
-    return decodeURIComponent(new URL(trimmedPath).pathname);
+    return stripPreviewLineSuffix(decodeURIComponent(new URL(trimmedPath).pathname));
   } catch {
-    return trimmedPath;
+    return stripPreviewLineSuffix(trimmedPath);
   }
+}
+
+function stripPreviewLineSuffix(filePath: string): string {
+  return filePath.replace(/:(?:\d+)(?::\d+)?$/u, '');
 }
 
 function workItemsKey(provider: WorkProviderKind, repositoryId: string): string {

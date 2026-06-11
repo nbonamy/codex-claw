@@ -190,6 +190,78 @@ describe('AppShell', () => {
     expect(wrapper.text()).toContain('answer');
   });
 
+  it('strips editor-style line suffixes before reading file previews', async () => {
+    const snapshot = createInitialSnapshot();
+    const readAgentFile = vi.fn().mockResolvedValue({
+      path: 'README.md',
+      content: '# Codex Claw\n',
+    });
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [
+          {
+            id: 'message-line-link',
+            agentId: 'agent-dina',
+            role: 'assistant',
+            status: 'complete',
+            createdAt: '2026-06-05T00:00:00.000Z',
+            parts: [{ type: 'text', text: 'Open [readme](README.md:40).' }],
+          },
+        ],
+        isLoading: false,
+        isSending: false,
+        readAgentFile,
+      },
+      global: {
+        plugins: [ElementPlus, i18n],
+      },
+    });
+
+    await wrapper.get('a[href="README.md:40"]').trigger('click');
+    await flushPromises();
+
+    expect(readAgentFile).toHaveBeenCalledWith('agent-dina', 'README.md');
+    expect(wrapper.text()).toContain('Codex Claw');
+  });
+
+  it('strips line and column suffixes from file URLs before reading previews', async () => {
+    const snapshot = createInitialSnapshot();
+    const readAgentFile = vi.fn().mockResolvedValue({
+      path: '/Users/nbonamy/src/id8/README.md',
+      content: '# id8\n',
+    });
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [
+          {
+            id: 'message-file-url-line-link',
+            agentId: 'agent-dina',
+            role: 'assistant',
+            status: 'complete',
+            createdAt: '2026-06-05T00:00:00.000Z',
+            parts: [{ type: 'text', text: 'Open [readme](file:///Users/nbonamy/src/id8/README.md:40:2).' }],
+          },
+        ],
+        isLoading: false,
+        isSending: false,
+        readAgentFile,
+      },
+      global: {
+        plugins: [ElementPlus, i18n],
+      },
+    });
+
+    await wrapper.get('a[href="file:///Users/nbonamy/src/id8/README.md:40:2"]').trigger('click');
+    await flushPromises();
+
+    expect(readAgentFile).toHaveBeenCalledWith('agent-dina', '/Users/nbonamy/src/id8/README.md');
+    expect(wrapper.text()).toContain('id8');
+  });
+
   it('normalizes file URLs before opening source previews', async () => {
     const snapshot = createInitialSnapshot();
     const readAgentFile = vi.fn().mockResolvedValue({
