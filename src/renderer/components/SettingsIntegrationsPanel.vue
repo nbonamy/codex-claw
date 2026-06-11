@@ -389,18 +389,18 @@ async function copyAuthorizationCode(): Promise<void> {
 }
 
 .settings-integrations-panel__code {
-  min-width: 128px;
+  width: 128px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-6);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: var(--space-6) var(--space-8);
+  padding: var(--space-3) var(--space-4);
   color: var(--color-text);
   background: var(--color-surface-low);
   font-family: var(--font-family-mono);
-  font-size: var(--font-size-15);
+  font-size: var(--font-size-14);
   font-weight: var(--font-weight-semibold);
   text-align: center;
   cursor: pointer;
