@@ -59,6 +59,7 @@ import type { AgentBackendDriver, BackendSendResult } from './backends/types';
 import { backendDisplayName, unsupportedBackendFeature } from './backends/types';
 import { formatConversationTitle } from './backends/conversation-title';
 import { McpToolError, type DisplayMarkdownInput, type DisplayMarkdownResponse, type MarkWorkItemCompletedResponse } from './mcp/agent-coordinator';
+import { runtimeGitHubOAuthClientId } from './runtime-config';
 
 const MAX_AGENT_FILE_READ_BYTES = 2 * 1024 * 1024;
 
@@ -1632,5 +1633,5 @@ function defaultUserDataPath(): string {
 }
 
 function githubOAuthClientId(snapshot: AppSnapshot): string {
-  return snapshot.workBacklog.providerSettings.github?.oauthClientId ?? process.env.CODEX_CLAW_GITHUB_CLIENT_ID ?? '';
+  return snapshot.workBacklog.providerSettings.github?.oauthClientId ?? runtimeGitHubOAuthClientId();
 }

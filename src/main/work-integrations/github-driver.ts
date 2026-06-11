@@ -1,4 +1,5 @@
 import type { WorkItem, WorkItemLabel, WorkRepository } from '../../shared/contracts';
+import { runtimeGitHubOAuthClientId } from '../runtime-config';
 import type { WorkProviderToken } from './token-store';
 import type { WorkProviderDeviceAuthorization, WorkProviderDeviceTokenResult, WorkProviderDriver } from './types';
 
@@ -10,7 +11,7 @@ const DEFAULT_SCOPE = 'repo read:user';
 export class GitHubWorkProviderDriver implements WorkProviderDriver {
   readonly provider = 'github' as const;
 
-  constructor(private readonly clientIdProvider: string | (() => string | null | undefined) = () => process.env.CODEX_CLAW_GITHUB_CLIENT_ID) {}
+  constructor(private readonly clientIdProvider: string | (() => string | null | undefined) = runtimeGitHubOAuthClientId) {}
 
   configured(): boolean {
     return Boolean(this.clientId().trim());
