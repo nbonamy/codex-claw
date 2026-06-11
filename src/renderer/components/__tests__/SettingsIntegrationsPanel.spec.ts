@@ -3,6 +3,8 @@ import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import SettingsIntegrationsPanel from '../SettingsIntegrationsPanel.vue';
 
+const clipboardWriteText = vi.fn();
+
 describe('SettingsIntegrationsPanel', () => {
   it('renders a decorative banner below the title', () => {
     const wrapper = mountPanel({
@@ -27,7 +29,15 @@ describe('SettingsIntegrationsPanel', () => {
     expect(wrapper.emitted('connect')).toStrictEqual([['github']]);
   });
 
-  it('shows the GitHub verification code and emits finish', async () => {
+  it('shows the GitHub verification code, copies it, and emits browser open while waiting for polling', async () => {
+    vi.useFakeTimers();
+    clipboardWriteText.mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: clipboardWriteText,
+      },
+    });
     const wrapper = mountPanel({
       authorization: {
         provider: 'github',
@@ -43,10 +53,26 @@ describe('SettingsIntegrationsPanel', () => {
     });
 
     expect(wrapper.text()).toContain('ABCD-1234');
+    expect(wrapper.text()).toContain('Step 1: Copy the code');
+    expect(wrapper.text()).toContain('Step 2: Open GitHub');
+    expect(wrapper.text()).toContain('GitHub will ask for the code. Paste it there, authorize Codex Claw, then come back here.');
+    expect(wrapper.text()).toContain('Step 3: Come back here');
+    expect(wrapper.text()).toContain('Codex Claw will finish the connection automatically once GitHub approves it.');
+    expect(wrapper.find('[aria-label="Waiting for GitHub authorization"]').exists()).toBe(true);
 
-    await wrapper.findAll('button').find((button) => button.text() === 'Finish connection')?.trigger('click');
+    await wrapper.get('[aria-label="Copy GitHub device code ABCD-1234"]').trigger('click');
+    expect(clipboardWriteText).toHaveBeenCalledWith('ABCD-1234');
+    expect(wrapper.text()).not.toContain('Copied');
+    expect(wrapper.findAllComponents({ name: 'ElButton' }).find((button) => button.text() === 'Open GitHub')?.props('type')).toBe('primary');
 
-    expect(wrapper.emitted('complete')).toStrictEqual([['github']]);
+    await vi.advanceTimersByTimeAsync(1_400);
+    expect(wrapper.find('[aria-label="Copy GitHub device code ABCD-1234"]').exists()).toBe(true);
+    expect(wrapper.findAllComponents({ name: 'ElButton' }).find((button) => button.text() === 'Open GitHub')?.props('type')).toBe('primary');
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Open GitHub')?.trigger('click');
+    expect(wrapper.emitted('open-authorization')).toStrictEqual([['github']]);
+    expect(wrapper.emitted('complete')).toBeUndefined();
+    vi.useRealTimers();
   });
 
   it('shows connected account state and emits disconnect', async () => {

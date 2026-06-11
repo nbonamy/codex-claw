@@ -39,6 +39,7 @@
     :update-agent="updateAgent"
     :update-settings="updateSettings"
     :connect-work-provider="connectWorkProvider"
+    :open-work-provider-authorization="openWorkProviderAuthorization"
     :complete-work-provider-connection="completeWorkProviderConnection"
     :disconnect-work-provider="disconnectWorkProvider"
     :create-loop="createLoop"
@@ -143,6 +144,7 @@ const {
   closeAgent,
   updateSettings,
   connectWorkProvider,
+  openWorkProviderAuthorization,
   completeWorkProviderConnection,
   disconnectWorkProvider,
   createLoop,

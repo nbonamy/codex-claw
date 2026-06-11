@@ -94,12 +94,32 @@ export class WorkIntegrationManager {
       detail: `Enter code ${authorization.userCode} in ${providerLabel(provider)}.`,
     });
     await this.options.saveSnapshot();
-    await this.options.openExternal(authorization.verificationUri);
 
     return {
       snapshot: this.snapshot(),
       authorization: publicAuthorization(authorization),
     };
+  }
+
+  async openAuthorization(provider: WorkProviderKind): Promise<AppSnapshot> {
+    const pending = this.pendingAuthorizations.get(provider);
+    if (!pending) {
+      return this.snapshot();
+    }
+
+    if (Date.parse(pending.expiresAt) <= Date.now()) {
+      this.pendingAuthorizations.delete(provider);
+      this.setConnection({
+        provider,
+        status: 'error',
+        detail: 'The verification code expired. Start the connection again.',
+      });
+      await this.options.saveSnapshot();
+      return this.snapshot();
+    }
+
+    await this.options.openExternal(authorizationUrl(pending));
+    return this.snapshot();
   }
 
   async completeConnection(provider: WorkProviderKind): Promise<AppSnapshot> {
@@ -279,6 +299,16 @@ function publicAuthorization(authorization: WorkProviderDeviceAuthorization): Wo
     verificationUri: authorization.verificationUri,
     expiresAt: authorization.expiresAt,
   };
+}
+
+function authorizationUrl(authorization: WorkProviderDeviceAuthorization): string {
+  try {
+    const url = new URL(authorization.verificationUri);
+    url.searchParams.set('user_code', authorization.userCode);
+    return url.toString();
+  } catch {
+    return authorization.verificationUri;
+  }
 }
 
 function providerLabel(provider: WorkProviderKind): string {

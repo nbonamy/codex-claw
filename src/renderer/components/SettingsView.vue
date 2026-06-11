@@ -31,6 +31,7 @@
           @complete="completeWorkProviderConnection"
           @connect="connectWorkProvider"
           @disconnect="disconnectWorkProvider"
+          @open-authorization="openWorkProviderAuthorization"
         />
         <SettingsAppearancePanel
           v-else
@@ -65,6 +66,7 @@ withDefaults(defineProps<{
   completeWorkProviderConnection?: (provider: WorkProviderKind) => Promise<void>;
   connectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   disconnectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
+  openWorkProviderAuthorization?: (provider: WorkProviderKind) => Promise<void>;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
 }>(), {
   activeTab: 'general',
@@ -79,6 +81,7 @@ withDefaults(defineProps<{
   completeWorkProviderConnection: async () => undefined,
   connectWorkProvider: async () => undefined,
   disconnectWorkProvider: async () => undefined,
+  openWorkProviderAuthorization: async () => undefined,
 });
 
 const emit = defineEmits<{

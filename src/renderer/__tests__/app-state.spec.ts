@@ -298,6 +298,7 @@ describe('useAppState', () => {
   });
 
   it('connects work providers and hydrates the selected repository backlog', async () => {
+    vi.useFakeTimers();
     const initialSnapshot = createInitialSnapshot();
     const connectingSnapshot = createInitialSnapshot();
     connectingSnapshot.workBacklog.connections = [{
@@ -327,6 +328,7 @@ describe('useAppState', () => {
         expiresAt: '2026-06-09T12:05:00.000Z',
       },
     });
+    const openWorkProviderAuthorization = vi.fn().mockResolvedValue(connectingSnapshot);
     const completeWorkProviderConnection = vi.fn().mockResolvedValue(connectedSnapshot);
     const listWorkRepositories = vi.fn().mockResolvedValue([repository]);
     const configureWorkBacklog = vi.fn().mockResolvedValue(selectedSnapshot);
@@ -334,6 +336,7 @@ describe('useAppState', () => {
     vi.stubGlobal('window', {
       codexClaw: {
         connectWorkProvider,
+        openWorkProviderAuthorization,
         completeWorkProviderConnection,
         listWorkRepositories,
         configureWorkBacklog,
@@ -348,7 +351,11 @@ describe('useAppState', () => {
     expect(state.snapshot.value).toStrictEqual(connectingSnapshot);
     expect(state.workProviderAuthorization.value?.userCode).toBe('ABCD-1234');
 
-    await state.completeWorkProviderConnection('github');
+    await state.openWorkProviderAuthorization('github');
+    expect(openWorkProviderAuthorization).toHaveBeenCalledWith('github');
+    expect(state.snapshot.value).toStrictEqual(connectingSnapshot);
+
+    await vi.advanceTimersByTimeAsync(5_000);
 
     expect(completeWorkProviderConnection).toHaveBeenCalledWith('github');
     expect(listWorkRepositories).toHaveBeenCalledWith('github');
@@ -364,6 +371,7 @@ describe('useAppState', () => {
     expect(state.workProviderAuthorization.value).toBeNull();
     expect(state.workRepositoriesByProvider.value.github).toStrictEqual([repository]);
     expect(state.workItemsByRepository.value['github:nbonamy/codex-claw']).toStrictEqual([item]);
+    vi.useRealTimers();
   });
 
   it('assigns work items through the existing agent prompt path', async () => {

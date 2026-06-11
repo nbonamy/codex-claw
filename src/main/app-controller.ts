@@ -152,6 +152,10 @@ export class AppController {
       return this.workIntegrations.connect(provider);
     });
 
+    ipcMain.handle(ipcChannels.openWorkProviderAuthorization, async (_event, provider: WorkProviderKind) => {
+      return this.workIntegrations.openAuthorization(provider);
+    });
+
     ipcMain.handle(ipcChannels.completeWorkProviderConnection, async (_event, provider: WorkProviderKind) => {
       return this.workIntegrations.completeConnection(provider);
     });

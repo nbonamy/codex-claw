@@ -1,6 +1,7 @@
 export const ipcChannels = {
   getSnapshot: 'app:get-snapshot',
   connectWorkProvider: 'work-provider:connect',
+  openWorkProviderAuthorization: 'work-provider:authorization:open',
   completeWorkProviderConnection: 'work-provider:connection-complete',
   disconnectWorkProvider: 'work-provider:disconnect',
   listWorkRepositories: 'work-provider:repositories:list',

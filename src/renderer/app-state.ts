@@ -36,6 +36,8 @@ const sourceRepositories = ref<SourceRepository[]>([]);
 const sourceRepositoryStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
 const sourceRepositoryError = ref<string | null>(null);
 let unsubscribeMainEvents: (() => void) | null = null;
+const workProviderAuthorizationPollTimers = new Map<WorkProviderKind, ReturnType<typeof globalThis.setTimeout>>();
+const WORK_PROVIDER_AUTHORIZATION_POLL_MS = 5_000;
 
 export function useAppState() {
   const selectedModel = computed(() => selectedModelFromCatalog());
@@ -544,6 +546,29 @@ export function useAppState() {
       const result = await window.codexClaw.connectWorkProvider(provider);
       snapshot.value = result.snapshot;
       workProviderAuthorization.value = result.authorization ?? null;
+      if (result.authorization) {
+        scheduleWorkProviderAuthorizationPoll(provider);
+      } else {
+        clearWorkProviderAuthorizationPoll(provider);
+      }
+      workBacklogStatus.value = 'loaded';
+    } catch (error) {
+      workBacklogStatus.value = 'error';
+      workBacklogError.value = error instanceof Error ? error.message : String(error);
+      throw error;
+    }
+  }
+
+  async function openWorkProviderAuthorization(provider: WorkProviderKind): Promise<void> {
+    if (!window.codexClaw?.openWorkProviderAuthorization) {
+      return;
+    }
+
+    workBacklogStatus.value = 'loading';
+    workBacklogError.value = null;
+    try {
+      snapshot.value = await window.codexClaw.openWorkProviderAuthorization(provider);
+      scheduleWorkProviderAuthorizationPoll(provider);
       workBacklogStatus.value = 'loaded';
     } catch (error) {
       workBacklogStatus.value = 'error';
@@ -557,21 +582,7 @@ export function useAppState() {
       return;
     }
 
-    workBacklogStatus.value = 'loading';
-    workBacklogError.value = null;
-    try {
-      snapshot.value = await window.codexClaw.completeWorkProviderConnection(provider);
-      if (workProviderConnection(provider)?.status === 'connected') {
-        workProviderAuthorization.value = null;
-        await loadWorkRepositories(provider);
-      } else {
-        workBacklogStatus.value = 'loaded';
-      }
-    } catch (error) {
-      workBacklogStatus.value = 'error';
-      workBacklogError.value = error instanceof Error ? error.message : String(error);
-      throw error;
-    }
+    await pollWorkProviderConnection(provider, { userInitiated: true });
   }
 
   async function disconnectWorkProvider(provider: WorkProviderKind): Promise<void> {
@@ -580,6 +591,7 @@ export function useAppState() {
     }
 
     snapshot.value = await window.codexClaw.disconnectWorkProvider(provider);
+    clearWorkProviderAuthorizationPoll(provider);
     workProviderAuthorization.value = null;
     workRepositoriesByProvider.value = {
       ...workRepositoriesByProvider.value,
@@ -588,6 +600,68 @@ export function useAppState() {
     workItemsByRepository.value = {};
     workBacklogStatus.value = 'notLoaded';
     workBacklogError.value = null;
+  }
+
+  async function pollWorkProviderConnection(provider: WorkProviderKind, options: { userInitiated?: boolean } = {}): Promise<void> {
+    if (!window.codexClaw?.completeWorkProviderConnection) {
+      return;
+    }
+
+    if (options.userInitiated) {
+      workBacklogStatus.value = 'loading';
+    }
+    workBacklogError.value = null;
+    try {
+      snapshot.value = await window.codexClaw.completeWorkProviderConnection(provider);
+      const connection = workProviderConnection(provider);
+      if (connection?.status === 'connected') {
+        clearWorkProviderAuthorizationPoll(provider);
+        workProviderAuthorization.value = null;
+        await loadWorkRepositories(provider);
+        return;
+      }
+
+      if (connection?.status === 'connecting' && workProviderAuthorization.value?.provider === provider) {
+        workBacklogStatus.value = 'loaded';
+        scheduleWorkProviderAuthorizationPoll(provider);
+        return;
+      }
+
+      clearWorkProviderAuthorizationPoll(provider);
+      workProviderAuthorization.value = null;
+      workBacklogStatus.value = connection?.status === 'error' ? 'error' : 'loaded';
+      workBacklogError.value = connection?.status === 'error' ? connection.detail ?? null : null;
+    } catch (error) {
+      clearWorkProviderAuthorizationPoll(provider);
+      workBacklogStatus.value = 'error';
+      workBacklogError.value = error instanceof Error ? error.message : String(error);
+      if (options.userInitiated) {
+        throw error;
+      }
+    }
+  }
+
+  function clearWorkProviderAuthorizationPoll(provider: WorkProviderKind): void {
+    const timer = workProviderAuthorizationPollTimers.get(provider);
+    if (timer === undefined) {
+      return;
+    }
+
+    globalThis.clearTimeout(timer);
+    workProviderAuthorizationPollTimers.delete(provider);
+  }
+
+  function scheduleWorkProviderAuthorizationPoll(provider: WorkProviderKind): void {
+    clearWorkProviderAuthorizationPoll(provider);
+    if (workProviderAuthorization.value?.provider !== provider || workProviderConnection(provider)?.status !== 'connecting') {
+      return;
+    }
+
+    const timer = globalThis.setTimeout(() => {
+      workProviderAuthorizationPollTimers.delete(provider);
+      void pollWorkProviderConnection(provider);
+    }, WORK_PROVIDER_AUTHORIZATION_POLL_MS);
+    workProviderAuthorizationPollTimers.set(provider, timer);
   }
 
   async function loadWorkRepositories(provider: WorkProviderKind): Promise<void> {
@@ -859,6 +933,7 @@ export function useAppState() {
     connectWorkProvider,
     completeWorkProviderConnection,
     disconnectWorkProvider,
+    openWorkProviderAuthorization,
     configureWorkBacklog,
     createLoop,
     updateLoop,

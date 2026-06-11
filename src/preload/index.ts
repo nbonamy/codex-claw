@@ -5,6 +5,7 @@ import { ipcChannels } from '../shared/ipc';
 const api: CodexClawApi = {
   getSnapshot: () => ipcRenderer.invoke(ipcChannels.getSnapshot),
   connectWorkProvider: (provider: WorkProviderKind) => ipcRenderer.invoke(ipcChannels.connectWorkProvider, provider),
+  openWorkProviderAuthorization: (provider: WorkProviderKind) => ipcRenderer.invoke(ipcChannels.openWorkProviderAuthorization, provider),
   completeWorkProviderConnection: (provider: WorkProviderKind) => ipcRenderer.invoke(ipcChannels.completeWorkProviderConnection, provider),
   disconnectWorkProvider: (provider: WorkProviderKind) => ipcRenderer.invoke(ipcChannels.disconnectWorkProvider, provider),
   listWorkRepositories: (provider: WorkProviderKind) => ipcRenderer.invoke(ipcChannels.listWorkRepositories, provider),

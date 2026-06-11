@@ -750,6 +750,7 @@ export type ClientRequestResponse = {
 export type CodexClawApi = {
   getSnapshot(): Promise<AppSnapshot>;
   connectWorkProvider(provider: WorkProviderKind): Promise<WorkProviderConnectResult>;
+  openWorkProviderAuthorization(provider: WorkProviderKind): Promise<AppSnapshot>;
   completeWorkProviderConnection(provider: WorkProviderKind): Promise<AppSnapshot>;
   disconnectWorkProvider(provider: WorkProviderKind): Promise<AppSnapshot>;
   listWorkRepositories(provider: WorkProviderKind): Promise<WorkRepository[]>;

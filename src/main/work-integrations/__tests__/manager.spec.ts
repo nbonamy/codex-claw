@@ -61,11 +61,15 @@ describe('WorkIntegrationManager', () => {
       verificationUri: 'https://github.com/login/device',
       expiresAt: result.authorization?.expiresAt,
     });
-    expect(openExternal).toHaveBeenCalledWith('https://github.com/login/device');
+    expect(openExternal).not.toHaveBeenCalled();
     expect(snapshot.workBacklog.connections[0]).toMatchObject({
       provider: 'github',
       status: 'connecting',
     });
+
+    await manager.openAuthorization('github');
+
+    expect(openExternal).toHaveBeenCalledWith('https://github.com/login/device?user_code=ABCD-1234');
 
     await manager.completeConnection('github');
 
@@ -79,6 +83,38 @@ describe('WorkIntegrationManager', () => {
       accessToken: 'gho_secret',
       accountLabel: 'nbonamy',
     });
+  });
+
+  it('marks pending GitHub authorization expired before opening the browser', async () => {
+    const snapshot = createInitialSnapshot();
+    const openExternal = vi.fn().mockResolvedValue(undefined);
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const manager = createManager({
+      driver: fakeDriver({
+        authorization: {
+          provider: 'github',
+          deviceCode: 'device-code',
+          userCode: 'ABCD-1234',
+          verificationUri: 'https://github.com/login/device',
+          expiresAt: new Date(Date.now() - 60_000).toISOString(),
+          intervalSeconds: 5,
+        },
+      }),
+      openExternal,
+      saveSnapshot,
+      snapshot,
+    });
+
+    await manager.connect('github');
+    await manager.openAuthorization('github');
+
+    expect(openExternal).not.toHaveBeenCalled();
+    expect(saveSnapshot).toHaveBeenCalledTimes(2);
+    expect(snapshot.workBacklog.connections).toStrictEqual([{
+      provider: 'github',
+      status: 'error',
+      detail: 'The verification code expired. Start the connection again.',
+    }]);
   });
 
   it('keeps pending authorization alive and records pending detail', async () => {
