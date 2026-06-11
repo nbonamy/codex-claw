@@ -166,8 +166,8 @@ describe('ported id8 chat components', () => {
   it('normalizes invalid animated diff values', () => {
     const wrapper = mount(ChatAnimatedDiffStat, {
       props: {
+        kind: 'added',
         label: 'Added lines',
-        sign: '+',
         value: Number.NaN,
       },
     });
@@ -220,6 +220,26 @@ describe('ported id8 chat components', () => {
     expect(wrapper.emitted('steerQueuedPrompt')).toStrictEqual([['prompt-1']]);
     expect(wrapper.emitted('clearGoal')).toStrictEqual([[]]);
     expect(wrapper.emitted('editGoal')).toStrictEqual([[]]);
+  });
+
+  it('keeps current turn diff hidden while shelf display is disabled', () => {
+    const wrapper = mount(ChatComposerShelf, {
+      props: {
+        turnGitDiff: {
+          turnId: 'turn-1',
+          addedLines: 45,
+          removedLines: 23,
+          updatedAt: '2026-06-11T10:00:00.000Z',
+        },
+        queuedPrompts: [{ id: 'prompt-1', text: 'Run the tests after this turn' }],
+        goal: null,
+      },
+    });
+
+    expect(wrapper.find('.chat-turn-git-info').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('Current turn');
+    expect(wrapper.text()).not.toContain('+45');
+    expect(wrapper.text()).not.toContain('-23');
   });
 
   it('renders collapsible tool calls with params and result', async () => {
@@ -352,8 +372,8 @@ describe('ported id8 chat components', () => {
     });
     expect(editing.text()).toContain('Editing');
     expect(editing.find('.chat-tool-call__title-target').text()).toBe('tool-part-adapter.ts');
-    expect(editing.find('.chat-tool-call__diff-add').text()).toBe('+134');
-    expect(editing.find('.chat-tool-call__diff-delete').text()).toBe('-1');
+    expect(editing.find('.chat-animated-diff-stat--added').text()).toBe('+134');
+    expect(editing.find('.chat-animated-diff-stat--deleted').text()).toBe('-1');
 
     const bare = mount(ChatToolCall, {
       props: {

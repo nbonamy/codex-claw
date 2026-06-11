@@ -58,10 +58,27 @@
         <strong>{{ activityTitle }}</strong>
       </div>
       <span
-        v-if="!sidebarCollapsed"
+        v-if="hasHeaderGitStatus"
         class="agent-header__git-status"
       >
-        {{ gitStatusLabel }}
+        <span
+          v-if="gitStatus?.addedLines || gitStatus?.removedLines"
+          class="agent-header__git-diff"
+          aria-label="Repository line changes"
+        >
+          <ChatAnimatedDiffStat
+            v-if="gitStatus?.addedLines"
+            kind="added"
+            label="Added lines"
+            :value="gitStatus?.addedLines ?? 0"
+          />
+          <ChatAnimatedDiffStat
+            v-if="gitStatus?.removedLines"
+            kind="deleted"
+            label="Removed lines"
+            :value="gitStatus?.removedLines ?? 0"
+          />
+        </span>
       </span>
     </div>
   </header>
@@ -69,12 +86,14 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Agent, BackendRuntimeStatus } from '../../shared/contracts';
+import type { Agent, AgentGitStatus, BackendRuntimeStatus } from '../../shared/contracts';
 import { PanelLeftOpenIcon } from '../shared/icons/app-icons';
+import ChatAnimatedDiffStat from '../shared/chat/ChatAnimatedDiffStat.vue';
 import AgentAvatar from './AgentAvatar.vue';
 
 const props = defineProps<{
   agent: Agent | null;
+  gitStatus?: AgentGitStatus | null;
   backendRuntime: BackendRuntimeStatus;
   isLoading: boolean;
   sidebarCollapsed: boolean;
@@ -136,8 +155,17 @@ const agentStatusDetail = computed(() => {
       return 'Ready to get going';
   }
 });
+
 const activityTitle = computed(() => agentStateLabel.value);
-const gitStatusLabel = computed(() => 'Git status pending');
+const hasHeaderGitStatus = computed(() => {
+  const gitStatus = props.gitStatus;
+  if (props.sidebarCollapsed || !gitStatus || gitStatus.state === 'unknown') {
+    return false;
+  }
+
+  return Boolean(gitStatus.addedLines || gitStatus.removedLines);
+});
+
 </script>
 
 <style scoped>
@@ -268,7 +296,24 @@ const gitStatusLabel = computed(() => 'Git status pending');
 }
 
 .agent-header__git-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-4);
   font-size: var(--font-size-13);
+}
+
+.agent-header__git-status > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-header__git-diff {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
 }
 
 .agent-header__expand {

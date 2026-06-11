@@ -2,6 +2,7 @@ import type {
   Agent,
   AgentBackend,
   AgentContextUsage,
+  AgentGitStatus,
   AgentStatus,
   AccountRateLimits,
   AppSnapshot,
@@ -13,6 +14,7 @@ import type {
   RendererToolPart,
   RendererToolPartUpdate,
   ThreadGoal,
+  TurnGitDiff,
   ThreadPlan,
   ThreadPlanStep,
   UpdateAgentInput,
@@ -40,6 +42,8 @@ export function createEmptySnapshot(): AppSnapshot {
     activeTeamId: seedTeamId,
     activeAgentId: null,
     messages: [],
+    agentGitStatuses: {},
+    turnGitDiffs: {},
     backendRuntimes: [{
       backend: 'codex',
       status: 'notConfigured',
@@ -72,6 +76,8 @@ export function createInitialSnapshot(): AppSnapshot {
     activeTeamId: seedTeamId,
     activeAgentId: agents[0]?.id ?? null,
     messages: [],
+    agentGitStatuses: {},
+    turnGitDiffs: {},
     backendRuntimes: [{
       backend: 'codex',
       status: 'notConfigured',
@@ -440,7 +446,13 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   }
 
   if (event.type === 'diff.updated' && event.turnId) {
+    updateTurnGitDiff(snapshot, event.turnId, event.payload, event.occurredAt);
     updateAssistantTurnDiff(snapshot, event.agentId, event.turnId, event.payload);
+    return;
+  }
+
+  if (event.type === 'git.statusUpdated' && event.agentId) {
+    updateAgentGitStatus(snapshot, event.agentId, event.payload);
     return;
   }
 
@@ -818,6 +830,64 @@ function updateAssistantTurnDiff(snapshot: AppSnapshot, agentId: string, turnId:
     },
     source: 'codex',
   });
+}
+
+function updateTurnGitDiff(snapshot: AppSnapshot, turnId: string, payload: unknown, updatedAt: string): void {
+  if (!isRecord(payload)) {
+    return;
+  }
+
+  const addedLines = finiteNonNegativeInteger(payload.addedLines);
+  const removedLines = finiteNonNegativeInteger(payload.removedLines);
+  if (!addedLines && !removedLines) {
+    return;
+  }
+
+  const diff = typeof payload.diff === 'string' ? payload.diff : undefined;
+  const nextDiff: TurnGitDiff = {
+    turnId,
+    addedLines,
+    removedLines,
+    updatedAt,
+    ...(diff ? { diff } : {}),
+  };
+  snapshot.turnGitDiffs = {
+    ...snapshot.turnGitDiffs,
+    [turnId]: nextDiff,
+  };
+}
+
+function updateAgentGitStatus(snapshot: AppSnapshot, agentId: string, payload: unknown): void {
+  if (!isAgentGitStatus(payload)) {
+    return;
+  }
+
+  snapshot.agentGitStatuses = {
+    ...snapshot.agentGitStatuses,
+    [agentId]: payload,
+  };
+}
+
+function isAgentGitStatus(value: unknown): value is AgentGitStatus {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.folder === 'string' &&
+    typeof value.updatedAt === 'string' &&
+    (value.state === 'clean' || value.state === 'dirty' || value.state === 'unknown') &&
+    typeof value.ahead === 'number' &&
+    typeof value.behind === 'number' &&
+    typeof value.changedFiles === 'number' &&
+    typeof value.addedLines === 'number' &&
+    typeof value.removedLines === 'number' &&
+    typeof value.hasUntracked === 'boolean'
+  );
+}
+
+function finiteNonNegativeInteger(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
 }
 
 function toolStatusDescriptor(statusText: unknown): { action?: unknown; params?: unknown } | undefined {

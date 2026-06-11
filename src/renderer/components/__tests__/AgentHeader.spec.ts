@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import AgentHeader from '../AgentHeader.vue';
-import type { Agent, BackendRuntimeStatus } from '../../../shared/contracts';
+import type { Agent, AgentGitStatus, BackendRuntimeStatus } from '../../../shared/contracts';
 
 const agent: Agent = {
   id: 'agent-dina',
@@ -16,10 +16,11 @@ const agent: Agent = {
   updatedAt: '2026-06-05T00:00:00.000Z',
 };
 
-function mountHeader(backendRuntime: BackendRuntimeStatus, isLoading = false) {
+function mountHeader(backendRuntime: BackendRuntimeStatus, isLoading = false, gitStatus: AgentGitStatus | null = null) {
   return mount(AgentHeader, {
     props: {
       agent,
+      gitStatus,
       backendRuntime,
       isLoading,
       sidebarCollapsed: false,
@@ -37,8 +38,29 @@ describe('AgentHeader', () => {
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('~/src/id8');
     expect(wrapper.text()).toContain('Ready to get going');
-    expect(wrapper.text()).toContain('Git status pending');
     expect(wrapper.find('[aria-label="Show agent sidebar"]').exists()).toBe(false);
+  });
+
+  it('renders repo diff stats without file count or branch details', () => {
+    const wrapper = mountHeader({ backend: 'codex', status: 'running' }, false, {
+      folder: '/Users/nbonamy/src/id8',
+      branch: 'main',
+      ahead: 2,
+      behind: 1,
+      changedFiles: 3,
+      addedLines: 134,
+      removedLines: 1,
+      hasUntracked: true,
+      state: 'dirty',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    });
+
+    expect(wrapper.text()).toContain('+134');
+    expect(wrapper.text()).toContain('-1');
+    expect(wrapper.text()).not.toContain('3 files');
+    expect(wrapper.text()).not.toContain('main');
+    expect(wrapper.text()).not.toContain('ahead');
+    expect(wrapper.findComponent({ name: 'ChatAnimatedDiffStat' }).exists()).toBe(true);
   });
 
   it('renders loading, running, and error fallback labels without an agent', () => {
@@ -107,7 +129,6 @@ describe('AgentHeader', () => {
 
     expect(wrapper.get('.agent-header__activity-line strong').text()).toBe(stateLabel);
     expect(wrapper.text()).toContain(detail);
-    expect(wrapper.text()).toContain('Git status pending');
   });
 
   it('renders an empty identity when no agent is selected', () => {
@@ -143,7 +164,7 @@ describe('AgentHeader', () => {
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('Idle');
     expect(wrapper.text()).toContain('~/src/id8');
-    expect(wrapper.text()).not.toContain('Git status pending');
+    expect(wrapper.text()).not.toContain('files');
 
     await wrapper.get('[aria-label="Show agent sidebar"]').trigger('click');
 

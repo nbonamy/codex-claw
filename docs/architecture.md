@@ -347,6 +347,10 @@ Renderer layers:
 - id8-derived components for `MessageList`, `ChatMessage`, `ChatToolCall`,
   composer, markdown, mermaid, media, and diff summaries. These components are
   a rendering starting point, not a required data contract;
+- git status and turn diff display consume runtime snapshot state. Repo git
+  status is requested through the active `AgentBackendDriver` capability and is
+  not persisted; turn diff state comes from app-owned backend events such as
+  Codex `turn/diff/updated`;
 - theme provider that applies semantic CSS custom properties to the document.
 
 ## IPC Contract
@@ -541,7 +545,8 @@ Mapping sketch:
   call result/output buffer
 - `FileChange` and `FileChangePatchUpdated` -> file change tool item plus diff
   state
-- `TurnDiffUpdated` -> aggregate diff panel/state for the turn
+- `TurnDiffUpdated` -> aggregate diff panel/state for the turn and composer
+  shelf turn-diff summary
 - `McpToolCall` and `DynamicToolCall` -> tool calls
 - approval server requests -> pending UI prompts, not transcript items until
   answered

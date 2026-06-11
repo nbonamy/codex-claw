@@ -30,6 +30,7 @@
           class="conversation-pane__composer-shelf"
           :goal="goal ?? null"
           :queued-prompts="queuedPrompts"
+          :turn-git-diff="turnGitDiff"
           @clear-goal="$emit('clear-goal')"
           @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
           @edit-goal="editGoal"
@@ -82,6 +83,7 @@
         class="conversation-pane__composer-shelf"
         :goal="goal ?? null"
         :queued-prompts="queuedPrompts"
+        :turn-git-diff="turnGitDiff"
         @clear-goal="$emit('clear-goal')"
         @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
         @edit-goal="editGoal"
@@ -120,7 +122,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Agent, AgentFileSearchItem, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, ReasoningEffort, RendererMessage } from '../../shared/contracts';
+import type { Agent, AgentFileSearchItem, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, ReasoningEffort, RendererMessage, TurnGitDiff } from '../../shared/contracts';
 import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import WorkbenchLayout from './WorkbenchLayout.vue';
 import ChatComposer from './ChatComposer.vue';
@@ -135,6 +137,7 @@ const props = withDefaults(defineProps<{
   agent: Agent | null;
   agentFiles?: AgentFileSearchItem[];
   goal?: Agent['goal'] | null;
+  turnGitDiff?: TurnGitDiff | null;
   isLoading: boolean;
   isSending: boolean;
   answeredClientRequestIds?: Set<string>;

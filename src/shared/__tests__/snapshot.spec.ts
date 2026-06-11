@@ -1842,6 +1842,49 @@ describe('snapshot reducer', () => {
       },
       source: 'codex',
     });
+    expect(snapshot.turnGitDiffs['turn-1']).toStrictEqual({
+      turnId: 'turn-1',
+      addedLines: 4,
+      removedLines: 2,
+      diff: '--- a/src/app.ts\n+++ b/src/app.ts',
+      updatedAt: '2026-06-05T00:00:03.000Z',
+    });
+  });
+
+  it('stores runtime git status for an agent', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'git.statusUpdated',
+      payload: {
+        folder: '/Users/nbonamy/src/codex-claw',
+        branch: 'main',
+        ahead: 1,
+        behind: 0,
+        changedFiles: 3,
+        addedLines: 12,
+        removedLines: 4,
+        hasUntracked: true,
+        state: 'dirty',
+        updatedAt: '2026-06-05T00:00:03.000Z',
+      },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+
+    expect(snapshot.agentGitStatuses['agent-dina']).toStrictEqual({
+      folder: '/Users/nbonamy/src/codex-claw',
+      branch: 'main',
+      ahead: 1,
+      behind: 0,
+      changedFiles: 3,
+      addedLines: 12,
+      removedLines: 4,
+      hasUntracked: true,
+      state: 'dirty',
+      updatedAt: '2026-06-05T00:00:03.000Z',
+    });
   });
 
   it('uses MCP structuredContent instead of the model-facing placeholder text', () => {

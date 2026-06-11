@@ -1,6 +1,7 @@
 import type {
   Agent,
   AgentBackend,
+  AgentGitStatus,
   AppSnapshot,
   BackendCapabilities,
   BackendConversationRef,
@@ -50,6 +51,7 @@ export type AgentBackendDriver = {
   readonly backend: AgentBackend;
   getRuntimeStatus(): BackendRuntimeStatus;
   getCapabilities(agent: Agent): BackendCapabilities;
+  getGitStatus?(agent: Agent): Promise<AgentGitStatus | null>;
   tryHandlePromptCommand?(agent: Agent, prompt: string): Promise<BackendSendResult> | null;
   sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>;
   setConversationTitle?(agent: Agent, title: string): Promise<void>;

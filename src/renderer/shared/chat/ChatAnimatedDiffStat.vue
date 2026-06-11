@@ -1,5 +1,9 @@
 <template>
-  <span class="chat-animated-diff-stat" :aria-label="labelText">
+  <span
+    class="chat-animated-diff-stat"
+    :class="`chat-animated-diff-stat--${kind}`"
+    :aria-label="labelText"
+  >
     <span class="chat-animated-diff-stat__sign">{{ sign }}</span>
     <span class="chat-animated-diff-stat__digits">
       <span
@@ -24,10 +28,12 @@
 import { computed } from 'vue'
 
 const props = defineProps<{
+  kind: 'added' | 'deleted'
   label: string
-  sign: '+' | '-'
   value: number
 }>()
+
+const sign = computed(() => (props.kind === 'added' ? '+' : '-'))
 
 const normalizedValue = computed(() => {
   if (!Number.isFinite(props.value)) {
@@ -44,15 +50,27 @@ const digitColumns = computed(() => {
   }))
 })
 
-const labelText = computed(() => `${props.label}: ${props.sign}${normalizedValue.value}`)
+const labelText = computed(() => `${props.label}: ${sign.value}${normalizedValue.value}`)
 </script>
 
 <style scoped>
 .chat-animated-diff-stat {
   display: inline-flex;
   align-items: center;
+  color: var(--color-text-muted);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-16);
+  font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
-  line-height: 1.25;
+}
+
+.chat-animated-diff-stat--added {
+  color: var(--color-success);
+}
+
+.chat-animated-diff-stat--deleted {
+  color: var(--color-error);
 }
 
 .chat-animated-diff-stat__sign {

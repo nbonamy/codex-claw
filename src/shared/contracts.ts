@@ -571,6 +571,29 @@ export type RendererMessage = {
   createdAt: string;
 };
 
+export type AgentGitStatus = {
+  folder: string;
+  branch?: string;
+  upstream?: string;
+  ahead: number;
+  behind: number;
+  changedFiles: number;
+  addedLines: number;
+  removedLines: number;
+  hasUntracked: boolean;
+  state: 'clean' | 'dirty' | 'unknown';
+  updatedAt: string;
+  error?: string;
+};
+
+export type TurnGitDiff = {
+  turnId: string;
+  addedLines: number;
+  removedLines: number;
+  diff?: string;
+  updatedAt: string;
+};
+
 export type AppSnapshot = {
   teams: Team[];
   agents: Agent[];
@@ -579,6 +602,8 @@ export type AppSnapshot = {
   activeTeamId: string | null;
   activeAgentId: string | null;
   messages: RendererMessage[];
+  agentGitStatuses: Record<string, AgentGitStatus>;
+  turnGitDiffs: Record<string, TurnGitDiff>;
   backendRuntimes: BackendRuntimeStatus[];
   accountRateLimits?: AccountRateLimits;
   workBacklog: WorkBacklogState;
@@ -628,6 +653,7 @@ export type MainToRendererEvent = {
     | 'item.updated'
     | 'item.completed'
     | 'diff.updated'
+    | 'git.statusUpdated'
     | 'approval.requested'
     | 'toolInput.requested'
     | 'error';

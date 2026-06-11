@@ -321,6 +321,9 @@ export class AppController {
       await this.validateAgentInput(input);
       createAgentInSnapshot(this.snapshot, input);
       await this.persistSnapshot();
+      if (this.snapshot.activeAgentId) {
+        await this.refreshAgentGitStatus(this.snapshot.activeAgentId);
+      }
       return this.snapshot;
     });
 
@@ -331,6 +334,7 @@ export class AppController {
         throw new Error(`Agent not found: ${input.id}`);
       }
       await this.persistSnapshot();
+      await this.refreshAgentGitStatus(agent.id);
       return this.snapshot;
     });
 
@@ -436,6 +440,7 @@ export class AppController {
       const snapshot = selectAgent(this.snapshot, agentId);
       await this.persistSnapshot();
       await this.hydrateAgentHistory(agentId);
+      await this.refreshAgentGitStatus(agentId);
       return snapshot;
     });
 
@@ -1481,6 +1486,38 @@ export class AppController {
       this.promptPlanPreview(fullEvent);
       this.promptUnreadAgentMessages(fullEvent.agentId);
     }
+
+    if (
+      fullEvent.agentId &&
+      (fullEvent.type === 'turn.started' || fullEvent.type === 'diff.updated' || fullEvent.type === 'turn.completed')
+    ) {
+      void this.refreshAgentGitStatus(fullEvent.agentId).catch((error: unknown) => {
+        warnMain('git-status', 'failed to refresh after event', {
+          agentId: fullEvent.agentId,
+          eventType: fullEvent.type,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+    }
+  }
+
+  private async refreshAgentGitStatus(agentId: string): Promise<void> {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) {
+      return;
+    }
+
+    const driver = await this.getBackendDriverForAgent(agent);
+    const status = await driver.getGitStatus?.(agent);
+    if (!status) {
+      return;
+    }
+
+    this.emitAndApply({
+      agentId,
+      type: 'git.statusUpdated',
+      payload: status,
+    });
   }
 
   private syncPowerSaveBlocker(): void {

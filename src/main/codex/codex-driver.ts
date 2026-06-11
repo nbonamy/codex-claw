@@ -2,6 +2,7 @@ import type {
   Agent,
   BackendCapabilities,
   BackendConversationRef,
+  AgentGitStatus,
   BackendModelOption,
   BackendRuntimeStatus,
   BackendSession,
@@ -14,6 +15,7 @@ import type {
 } from '../../shared/contracts';
 import { codexBackendCapabilities } from '../../shared/backend-capabilities';
 import type { AgentBackendDriver, BackendCodexApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '../backends/types';
+import { AgentGitService } from '../git/agent-git-service';
 import type { CodexAgentSessionManager } from './agent-session';
 import type { CodexReviewTarget } from './protocol';
 
@@ -24,7 +26,10 @@ type CodexPromptCommand =
 export class CodexBackendDriver implements AgentBackendDriver {
   readonly backend = 'codex' as const;
 
-  constructor(private readonly sessionManager: CodexAgentSessionManager) {}
+  constructor(
+    private readonly sessionManager: CodexAgentSessionManager,
+    private readonly gitService = new AgentGitService(),
+  ) {}
 
   getRuntimeStatus(): BackendRuntimeStatus {
     return {
@@ -36,6 +41,10 @@ export class CodexBackendDriver implements AgentBackendDriver {
 
   getCapabilities(_agent: Agent): BackendCapabilities {
     return codexBackendCapabilities;
+  }
+
+  async getGitStatus(agent: Agent): Promise<AgentGitStatus> {
+    return this.gitService.status(agent.folder);
   }
 
   async listModels(_agent: Agent): Promise<BackendModelOption[]> {

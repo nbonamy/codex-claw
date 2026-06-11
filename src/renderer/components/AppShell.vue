@@ -123,6 +123,7 @@
         <AgentHeader
           v-if="!isAgentEmpty && currentAgent"
           :agent="currentAgent"
+          :git-status="currentAgentGitStatus"
           :backend-runtime="currentBackendRuntime"
           :is-loading="isLoading"
           :sidebar-collapsed="agentSidebarCollapsed"
@@ -151,6 +152,7 @@
             :model-catalog-status="modelCatalogStatus"
             :skill-catalog-status="skillCatalogStatus"
             :goal="goal"
+            :turn-git-diff="currentTurnGitDiff"
             :codex-approval-preset="codexApprovalPreset"
             :plan-mode="planMode"
             :selected-model-id="selectedModelId"
@@ -232,7 +234,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SourceRepository, SourceWorktree, Team, ThreadGoal, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../../shared/contracts';
+import type { Agent, AgentFileReadResult, AgentFileSearchItem, AgentGitStatus, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SourceRepository, SourceWorktree, Team, ThreadGoal, TurnGitDiff, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../../shared/contracts';
 import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import { defaultTeamColor } from '../../shared/team-colors';
 import { findAssignedAgentForWorkItem } from '../../shared/work-assignments';
@@ -452,6 +454,21 @@ const currentBackendRuntime = computed<BackendRuntimeStatus>(() => {
     backend,
     status: 'notConfigured',
   };
+});
+const currentAgentGitStatus = computed<AgentGitStatus | null>(() => {
+  const agentId = currentAgent.value?.id;
+  return agentId ? props.snapshot.agentGitStatuses[agentId] ?? null : null;
+});
+const currentTurnGitDiff = computed<TurnGitDiff | null>(() => {
+  for (let index = props.messages.length - 1; index >= 0; index -= 1) {
+    const turnId = props.messages[index]?.turnId;
+    const diff = turnId ? props.snapshot.turnGitDiffs[turnId] : null;
+    if (diff) {
+      return diff;
+    }
+  }
+
+  return null;
 });
 const cockpitWorkBacklog = computed(() => {
   const connection = props.snapshot.workBacklog.connections.find((candidate) => candidate.provider === 'github');

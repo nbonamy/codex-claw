@@ -1,5 +1,9 @@
 <template>
   <div v-if="visible" class="chat-composer-shelf">
+    <!-- <ChatTurnGitInfo
+      v-if="turnGitDiff"
+      :diff="turnGitDiff"
+    /> -->
     <ChatQueuedPrompts
       :prompts="queuedPrompts"
       @delete="$emit('deleteQueuedPrompt', $event)"
@@ -15,14 +19,16 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { ThreadGoal } from '../../../shared/contracts';
+import type { ThreadGoal, TurnGitDiff } from '../../../shared/contracts';
 import ChatGoal from './ChatGoal.vue';
 import ChatQueuedPrompts from './ChatQueuedPrompts.vue';
+// import ChatTurnGitInfo from './ChatTurnGitInfo.vue';
 import type { QueuedChatPrompt } from './queued-prompts';
 
 const props = defineProps<{
   goal: ThreadGoal | null;
   queuedPrompts: QueuedChatPrompt[];
+  turnGitDiff?: TurnGitDiff | null;
 }>();
 
 defineEmits<{

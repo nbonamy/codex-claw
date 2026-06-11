@@ -67,6 +67,46 @@ describe('AppController', () => {
     });
   });
 
+  it('refreshes git status through the backend driver capability', async () => {
+    const snapshot = createInitialSnapshot();
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const getGitStatus = vi.fn().mockResolvedValue({
+      folder: '/Users/nbonamy/src/id8',
+      branch: 'main',
+      ahead: 0,
+      behind: 0,
+      changedFiles: 2,
+      addedLines: 12,
+      removedLines: 4,
+      hasUntracked: false,
+      state: 'dirty',
+      updatedAt: '2026-06-11T10:00:00.000Z',
+    });
+    const backendDriver = createFakeCodexBackendDriver({ getGitStatus });
+
+    await controller.initialize();
+    setCodexBackendDriver(controller, backendDriver);
+    await refreshAgentGitStatus(controller, 'agent-dina');
+
+    expect(getGitStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(snapshot.agentGitStatuses['agent-dina']).toStrictEqual({
+      folder: '/Users/nbonamy/src/id8',
+      branch: 'main',
+      ahead: 0,
+      behind: 0,
+      changedFiles: 2,
+      addedLines: 12,
+      removedLines: 4,
+      hasUntracked: false,
+      state: 'dirty',
+      updatedAt: '2026-06-11T10:00:00.000Z',
+    });
+  });
+
   it('injects all pending MCP messages after a busy recipient becomes idle', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[1].status = { type: 'working' };
@@ -1590,6 +1630,12 @@ async function restartAgent(controller: AppController, agentId: string): Promise
   await (controller as unknown as {
     restartAgent(agentId: string): Promise<void>;
   }).restartAgent(agentId);
+}
+
+async function refreshAgentGitStatus(controller: AppController, agentId: string): Promise<void> {
+  await (controller as unknown as {
+    refreshAgentGitStatus(agentId: string): Promise<void>;
+  }).refreshAgentGitStatus(agentId);
 }
 
 async function recordLoopPromptStarted(

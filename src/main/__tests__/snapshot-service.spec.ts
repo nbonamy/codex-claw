@@ -45,6 +45,8 @@ describe('snapshot service', () => {
       activeTeamId: 'team-codex-claw',
       activeAgentId: 'agent-dina',
       messages: [],
+      agentGitStatuses: {},
+      turnGitDiffs: {},
       backendRuntimes: [{
         backend: 'codex',
         status: 'notConfigured',
