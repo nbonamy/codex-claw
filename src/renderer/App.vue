@@ -85,12 +85,14 @@
     @steer-prompt="steerPrompt"
     @steer-queued-prompt="steerQueuedPrompt"
   />
+  <ConfettiOverlay />
 </template>
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, watch } from 'vue';
 import AppShell from './components/AppShell.vue';
 import { useAppState } from './app-state';
+import ConfettiOverlay from './shared/confetti/ConfettiOverlay.vue';
 import { applyAppTheme, subscribeToSystemAppearance } from './theme/apply-theme';
 
 const {

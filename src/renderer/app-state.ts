@@ -8,6 +8,7 @@ import { codexApprovalPresetFromDefaults } from '../shared/codex-approval-preset
 import { createQueuedChatPrompt, type QueuedChatPrompt } from './shared/chat/queued-prompts';
 import { promptSkillInputsFromText } from './shared/chat/composer-skills';
 import { workItemAssignmentPrompt } from '../shared/work-item-prompts';
+import { useConfetti } from './shared/confetti/use-confetti';
 
 const snapshot = ref<AppSnapshot>(createEmptySnapshot());
 const isLoading = ref(false);
@@ -617,6 +618,7 @@ export function useAppState() {
       if (connection?.status === 'connected') {
         clearWorkProviderAuthorizationPoll(provider);
         workProviderAuthorization.value = null;
+        useConfetti().celebrate();
         await loadWorkRepositories(provider);
         return;
       }

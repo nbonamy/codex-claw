@@ -1,12 +1,18 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
 import { createEmptySnapshot, createInitialSnapshot } from '../../shared/snapshot';
 import type { BackendConversationRef, CodexClawApi, ConversationSummary, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '../../shared/contracts';
 import { workItemAssignmentKey } from '../../shared/work-assignments';
 import { workItemAssignmentPrompt } from '../../shared/work-item-prompts';
+import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';
 
 describe('useAppState', () => {
+  afterEach(() => {
+    clearConfetti();
+    vi.useRealTimers();
+  });
+
   it('uses the local empty snapshot before preload is available', () => {
     vi.stubGlobal('window', {});
 
@@ -358,6 +364,7 @@ describe('useAppState', () => {
     await vi.advanceTimersByTimeAsync(5_000);
 
     expect(completeWorkProviderConnection).toHaveBeenCalledWith('github');
+    expect(useConfetti().bursts.value).toHaveLength(1);
     expect(listWorkRepositories).toHaveBeenCalledWith('github');
     expect(configureWorkBacklog).toHaveBeenCalledWith({
       provider: 'github',
@@ -371,7 +378,6 @@ describe('useAppState', () => {
     expect(state.workProviderAuthorization.value).toBeNull();
     expect(state.workRepositoriesByProvider.value.github).toStrictEqual([repository]);
     expect(state.workItemsByRepository.value['github:nbonamy/codex-claw']).toStrictEqual([item]);
-    vi.useRealTimers();
   });
 
   it('assigns work items through the existing agent prompt path', async () => {
