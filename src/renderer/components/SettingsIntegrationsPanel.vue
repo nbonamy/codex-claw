@@ -389,7 +389,7 @@ async function copyAuthorizationCode(): Promise<void> {
 }
 
 .settings-integrations-panel__code {
-  width: 128px;
+  min-width: 128px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -400,7 +400,7 @@ async function copyAuthorizationCode(): Promise<void> {
   color: var(--color-text);
   background: var(--color-surface-low);
   font-family: var(--font-family-mono);
-  font-size: var(--font-size-14);
+  font-size: var(--font-size-13);
   font-weight: var(--font-weight-semibold);
   text-align: center;
   cursor: pointer;
@@ -413,7 +413,7 @@ async function copyAuthorizationCode(): Promise<void> {
 .settings-integrations-panel__waiting {
   flex: 0 0 auto;
   color: var(--color-text-muted);
-  font-size: var(--font-size-12);
+  font-size: var(--font-size-14);
   font-weight: var(--font-weight-medium);
 }
 
