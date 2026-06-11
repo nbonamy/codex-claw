@@ -31,7 +31,7 @@ export function createCodexClawMcpServer(coordinator: ClawMcpAgentCoordinator, c
   }, () => coordinator.sendMessage(callerAgentId, to, content)));
 
   server.registerTool('check-messages', {
-    description: CHECK_INBOX_PROMPT,
+    description: `${CHECK_INBOX_PROMPT} Normal teammate messages are delivered directly as prompts, so only use this if explicitly asked to recover missed messages.`,
     inputSchema: {
       markAsRead: z.boolean().optional().describe('Mark messages as read (default: true)'),
     },

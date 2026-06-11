@@ -157,15 +157,19 @@ Effects:
 
 ### `check-messages`
 
-Returns unread messages for the caller.
+Manual recovery tool that returns unread messages for the caller.
+
+Normal agent-to-agent messages are delivered directly as backend prompts. An
+agent should only call `check-messages` when explicitly asked to recover missed
+messages or debug message delivery.
 
 Input:
 
 - `markAsRead`: optional boolean, default `true`.
 
-Returned messages include message ID, sender display name, content, and
-timestamp. Message IDs are inbox item IDs, not agent IDs. When `markAsRead` is
-true, returned messages are marked read immediately.
+Returned messages include message ID, sender display name, sender agent ID,
+content, and timestamp. Message IDs are inbox item IDs, not agent IDs. When
+`markAsRead` is true, returned messages are marked read immediately.
 
 ### `broadcast-message`
 
@@ -227,23 +231,27 @@ Effects:
   completed state;
 - persists the updated assignment.
 
-## Inbox Prompting
+## Direct Message Delivery
 
 When a recipient receives a direct or broadcast message:
 
-- if the recipient is idle, main starts a normal backend turn with the inbox
-  prompt;
-- if the recipient is busy, main waits until the current turn completes and
-  prompts them only if unread messages remain.
+- the message is stored as unread in the MCP coordinator;
+- if the recipient is idle, main drains unread messages for that agent and
+  starts a normal backend turn containing the sender name, sender agent ID, and
+  message body directly;
+- if the recipient is busy, main waits until the current turn completes, then
+  drains all pending unread messages into one direct delivery prompt.
 
-The current inbox prompt is:
+The direct delivery prompt is intentionally not a generic "check your inbox"
+instruction. For one message it starts like:
 
 ```text
-Check your inbox for questions or instructions from other agents. Update your status and immediately execute what is being asked without confirmation.
+You received a message from Dina (agent-dina).
 ```
 
 This keeps agent-to-agent messaging inside the same turn pipeline as normal
-user prompts. There is no separate renderer-side command path.
+user prompts, while avoiding the old extra `check-messages` indirection. There
+is no separate renderer-side command path.
 
 ## Approval Flow
 

@@ -15,7 +15,7 @@ import { LoopRunner, type LoopPromptContext } from './loops/runner';
 import { LoopScheduler } from './loops/scheduler';
 import { createMainWindow } from './main-window';
 import { ClawMcpAgentCoordinator } from './mcp/agent-coordinator';
-import { CHECK_INBOX_PROMPT } from './mcp/agent-prompts';
+import { agentMessagesPrompt } from './mcp/agent-prompts';
 import { buildCodexClawMcpConfigOverrides } from './mcp/codex-config';
 import { ClawMcpHttpServer } from './mcp/http-server';
 import { detectSourceFolder, scanSourceRepositories } from './source-repositories';
@@ -79,7 +79,6 @@ export class AppController {
   private mainWindow: BrowserWindow | null = null;
   private snapshot = createEmptySnapshot();
   private readonly persistence: AppStatePersistence;
-  private readonly notifiedInboxMessageIds = new Map<string, string>();
   private readonly mcpCoordinator = new ClawMcpAgentCoordinator({
     getAgents: () => this.snapshot.agents,
     onAgentUpdated: (agent) => {
@@ -89,8 +88,8 @@ export class AppController {
         payload: agent,
       });
     },
-    onInboxMessage: (agentId, messageId) => {
-      this.promptAgentToCheckInbox(agentId, messageId);
+    onInboxMessage: (agentId) => {
+      this.promptUnreadAgentMessages(agentId);
     },
     onDisplayMarkdown: (agent, input) => this.displayMarkdownForAgent(agent, input),
     onMarkWorkItemCompleted: (agent, workItemId, confirmCompletion) => this.markWorkItemCompletedForAgent(agent, workItemId, confirmCompletion),
@@ -1464,7 +1463,7 @@ export class AppController {
 
     if (fullEvent.type === 'turn.completed' && fullEvent.agentId) {
       this.promptPlanPreview(fullEvent);
-      this.promptLatestUnreadMessage(fullEvent.agentId);
+      this.promptUnreadAgentMessages(fullEvent.agentId);
     }
   }
 
@@ -1529,25 +1528,18 @@ export class AppController {
     }
   }
 
-  private promptLatestUnreadMessage(agentId: string): void {
-    const messageId = this.mcpCoordinator.latestUnreadMessageId(agentId);
-    if (messageId) {
-      this.promptAgentToCheckInbox(agentId, messageId);
-    }
-  }
-
-  private promptAgentToCheckInbox(agentId: string, messageId: string): void {
-    if (this.notifiedInboxMessageIds.get(agentId) === messageId) {
-      return;
-    }
-
+  private promptUnreadAgentMessages(agentId: string): void {
     const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
     if (!agent || agent.status.type !== 'idle') {
       return;
     }
 
-    this.notifiedInboxMessageIds.set(agentId, messageId);
-    void this.sendPrompt(agentId, CHECK_INBOX_PROMPT);
+    const messages = this.mcpCoordinator.takeUnreadMessages(agentId);
+    if (messages.length === 0) {
+      return;
+    }
+
+    void this.sendPrompt(agentId, agentMessagesPrompt(messages));
   }
 
   private async persistSnapshot(): Promise<void> {

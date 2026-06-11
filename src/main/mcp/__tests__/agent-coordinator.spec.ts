@@ -78,7 +78,7 @@ describe('ClawMcpAgentCoordinator', () => {
 
     expect(coordinator.sendMessage('agent-dina', 'Jesse', 'Can you review MCP?')).toStrictEqual({
       success: true,
-      message: "Message sent successfully. Don't check for a response right away - you will be notified when the other agent responds.",
+      message: 'Message sent successfully. The recipient will process it when they are idle.',
     });
     expect(inboxMessages).toStrictEqual([{ agentId: 'agent-jesse', messageId: 'message-1' }]);
     expect(coordinator.latestUnreadMessageId('agent-jesse')).toBe('message-1');
@@ -88,11 +88,45 @@ describe('ClawMcpAgentCoordinator', () => {
         {
           id: 'message-1',
           from: 'Dina',
+          fromId: 'agent-dina',
           content: 'Can you review MCP?',
           timestamp: '2026-06-05T00:00:03.000Z',
         },
       ],
     });
+    expect(coordinator.checkMessages('agent-jesse')).toStrictEqual({ messages: [] });
+  });
+
+  it('drains unread messages for direct prompt delivery', () => {
+    const agents = cloneAgents(baseAgents).map((agent) => ({ ...agent, isRegistered: true }));
+    const coordinator = new ClawMcpAgentCoordinator({
+      getAgents: () => agents,
+      createId: vi.fn()
+        .mockReturnValueOnce('message-1')
+        .mockReturnValueOnce('message-2'),
+      now: () => new Date('2026-06-05T00:00:03.000Z'),
+    });
+
+    coordinator.sendMessage('agent-dina', 'Jesse', 'First');
+    coordinator.sendMessage('agent-dina', 'agent-jesse', 'Second');
+
+    expect(coordinator.takeUnreadMessages('agent-jesse')).toStrictEqual([
+      {
+        id: 'message-1',
+        from: 'Dina',
+        fromId: 'agent-dina',
+        content: 'First',
+        timestamp: '2026-06-05T00:00:03.000Z',
+      },
+      {
+        id: 'message-2',
+        from: 'Dina',
+        fromId: 'agent-dina',
+        content: 'Second',
+        timestamp: '2026-06-05T00:00:03.000Z',
+      },
+    ]);
+    expect(coordinator.takeUnreadMessages('agent-jesse')).toStrictEqual([]);
     expect(coordinator.checkMessages('agent-jesse')).toStrictEqual({ messages: [] });
   });
 
@@ -157,13 +191,14 @@ describe('ClawMcpAgentCoordinator', () => {
     expect(() => coordinator.sendMessage('agent-dina', 'Dina', 'hello')).toThrow("Failed to send message: Recipient name 'Dina' is ambiguous. Use the recipient ID from list-agents.");
     expect(coordinator.sendMessage('agent-dina', 'agent-jesse', 'hello')).toStrictEqual({
       success: true,
-      message: "Message sent successfully. Don't check for a response right away - you will be notified when the other agent responds.",
+      message: 'Message sent successfully. The recipient will process it when they are idle.',
     });
     expect(coordinator.checkMessages('agent-jesse')).toStrictEqual({
       messages: [
         {
           id: 'message-direct',
           from: 'Dina',
+          fromId: 'agent-dina',
           content: 'hello',
           timestamp: '2026-06-05T00:00:04.000Z',
         },
@@ -410,6 +445,7 @@ describe('ClawMcpAgentCoordinator', () => {
         {
           id: 'message-orphaned',
           from: 'agent-dina',
+          fromId: 'agent-dina',
           content: 'I may disappear',
           timestamp: '2026-06-05T00:00:07.000Z',
         },

@@ -20,6 +20,7 @@ export type McpMessage = {
 export type MessageInfo = {
   id: string;
   from: string;
+  fromId: string;
   content: string;
   timestamp: string;
 };
@@ -164,7 +165,7 @@ export class ClawMcpAgentCoordinator {
 
     return {
       success: true,
-      message: "Message sent successfully. Don't check for a response right away - you will be notified when the other agent responds.",
+      message: 'Message sent successfully. The recipient will process it when they are idle.',
     };
   }
 
@@ -179,12 +180,7 @@ export class ClawMcpAgentCoordinator {
     }
 
     return {
-      messages: unread.map((message) => ({
-        id: message.id,
-        from: this.findAgent(message.from)?.name ?? message.from,
-        content: message.content,
-        timestamp: message.timestamp.toISOString(),
-      })),
+      messages: unread.map((message) => this.toMessageInfo(message)),
     };
   }
 
@@ -310,6 +306,21 @@ export class ClawMcpAgentCoordinator {
     return this.unreadMessagesFor(agent.id).at(-1)?.id ?? null;
   }
 
+  takeUnreadMessages(agentId: string): MessageInfo[] {
+    const agent = this.findAgent(agentId);
+    if (!agent) {
+      return [];
+    }
+
+    const unread = this.unreadMessagesFor(agent.id);
+    const messages = unread.map((message) => this.toMessageInfo(message));
+    for (const message of unread) {
+      message.isRead = true;
+    }
+
+    return messages;
+  }
+
   debugAgents(): McpAgentInfo[] {
     return this.getAgents().map((agent) => this.toAgentInfo(agent));
   }
@@ -386,6 +397,16 @@ export class ClawMcpAgentCoordinator {
       name: agent.name,
       folder: agent.folder,
       status: agent.statusText ? `${agentStatusLabel(agent.status)}: ${agent.statusText}` : agentStatusLabel(agent.status),
+    };
+  }
+
+  private toMessageInfo(message: McpMessage): MessageInfo {
+    return {
+      id: message.id,
+      from: this.findAgent(message.from)?.name ?? message.from,
+      fromId: message.from,
+      content: message.content,
+      timestamp: message.timestamp.toISOString(),
     };
   }
 

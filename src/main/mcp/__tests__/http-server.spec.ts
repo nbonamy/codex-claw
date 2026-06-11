@@ -231,6 +231,7 @@ describe('ClawMcpHttpServer', () => {
       {
         id: 'message-direct',
         from: 'Dina',
+        fromId: 'agent-dina',
         content: 'Can you review this?',
         timestamp: '2026-06-05T00:00:08.000Z',
       },

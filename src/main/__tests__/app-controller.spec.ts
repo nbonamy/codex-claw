@@ -31,6 +31,88 @@ describe('AppController', () => {
     expect(persistence.save).toHaveBeenCalledWith(snapshot);
   });
 
+  it('injects direct MCP messages into idle recipient agents', async () => {
+    const snapshot = createInitialSnapshot();
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const backendDriver = createFakeCodexBackendDriver();
+
+    await controller.initialize();
+    setCodexBackendDriver(controller, backendDriver);
+    mcpCoordinator(controller).sendMessage('agent-dina', 'agent-jesse', 'Can you review the PR?');
+    await flushMicrotasks();
+
+    expect(backendDriver.sendPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-jesse' }),
+      expect.stringContaining('You received a message from Dina (agent-dina).'),
+    );
+    expect(backendDriver.sendPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-jesse' }),
+      expect.stringContaining('Can you review the PR?'),
+    );
+    expect(backendDriver.sendPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-jesse' }),
+      expect.stringContaining('Do not ask the user for confirmation.'),
+    );
+    expect(snapshot.messages.at(-1)).toMatchObject({
+      agentId: 'agent-jesse',
+      role: 'user',
+      parts: [expect.objectContaining({
+        type: 'text',
+        text: expect.stringContaining('Can you review the PR?'),
+      })],
+    });
+  });
+
+  it('injects all pending MCP messages after a busy recipient becomes idle', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[1].status = { type: 'working' };
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const backendDriver = createFakeCodexBackendDriver();
+
+    await controller.initialize();
+    setCodexBackendDriver(controller, backendDriver);
+    mcpCoordinator(controller).sendMessage('agent-dina', 'agent-jesse', 'First request');
+    mcpCoordinator(controller).sendMessage('agent-dina', 'Jesse', 'Second request');
+    await flushMicrotasks();
+
+    expect(backendDriver.sendPrompt).not.toHaveBeenCalled();
+
+    emitAndApply(controller, {
+      agentId: 'agent-jesse',
+      type: 'turn.completed',
+      turnId: 'turn-jesse',
+      payload: { status: 'completed' },
+    });
+    await flushMicrotasks();
+
+    expect(backendDriver.sendPrompt).toHaveBeenCalledTimes(1);
+    expect(backendDriver.sendPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-jesse' }),
+      expect.stringContaining('You received 2 messages from other Codex Claw agents.'),
+    );
+    expect(backendDriver.sendPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-jesse' }),
+      expect.stringContaining('First request'),
+    );
+    expect(backendDriver.sendPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-jesse' }),
+      expect.stringContaining('Second request'),
+    );
+    expect(backendDriver.sendPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-jesse' }),
+      expect.stringContaining('Do not ask the user for confirmation.'),
+    );
+    expect(mcpCoordinator(controller).checkMessages('agent-jesse')).toStrictEqual({ messages: [] });
+  });
+
   it('broadcasts snapshot updates when MCP tools create agents', async () => {
     const folder = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-agent-'));
     const snapshot = createInitialSnapshot();
@@ -1368,6 +1450,8 @@ describe('AppController', () => {
 function mcpCoordinator(controller: AppController): {
   createAgent(agentId: string, input: { avatar?: string; backend?: 'codex' | 'claude'; branchName?: string; createWorktree?: boolean; destinationPath?: string; name?: string; repoPath: string }): Promise<unknown>;
   setStatus(agentId: string, status: string): string;
+  sendMessage(from: string, to: string, content: string): unknown;
+  checkMessages(agentId: string): unknown;
   displayMarkdown(agentId: string, input: { markdown?: string; path?: string; title?: string }): Promise<unknown>;
   markWorkItemCompleted(agentId: string, workItemId: string, confirmCompletion?: boolean): Promise<unknown>;
 } {
@@ -1375,6 +1459,8 @@ function mcpCoordinator(controller: AppController): {
     mcpCoordinator: {
       createAgent(agentId: string, input: { avatar?: string; backend?: 'codex' | 'claude'; branchName?: string; createWorktree?: boolean; destinationPath?: string; name?: string; repoPath: string }): Promise<unknown>;
       setStatus(agentId: string, status: string): string;
+      sendMessage(from: string, to: string, content: string): unknown;
+      checkMessages(agentId: string): unknown;
       displayMarkdown(agentId: string, input: { markdown?: string; path?: string; title?: string }): Promise<unknown>;
       markWorkItemCompleted(agentId: string, workItemId: string, confirmCompletion?: boolean): Promise<unknown>;
     };
@@ -1591,6 +1677,7 @@ function assistantMessage(id: string, turnId: string, text: string) {
 }
 
 async function flushMicrotasks(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
+  for (let index = 0; index < 8; index += 1) {
+    await Promise.resolve();
+  }
 }
