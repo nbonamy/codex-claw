@@ -256,6 +256,8 @@ export type LoopAction =
   | {
     type: 'create-agent';
     sourceRepositoryPath: string;
+    backend?: AgentBackend;
+    backendDefaults?: BackendDefaults;
     teamTarget: LoopTeamTarget;
     cleanup?: LoopCleanup;
   }
@@ -690,6 +692,7 @@ export type CreateAgentInput = {
   folder: string;
   avatar?: string;
   backend?: AgentBackend;
+  backendDefaults?: BackendDefaults;
   teamId?: string;
 };
 

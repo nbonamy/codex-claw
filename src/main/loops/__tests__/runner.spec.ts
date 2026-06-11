@@ -293,6 +293,15 @@ describe('LoopRunner', () => {
       action: {
         type: 'create-agent',
         sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        backend: 'claude',
+        backendDefaults: {
+          kind: 'claude',
+          model: 'claude-opus-4.1',
+          thinking: {
+            type: 'enabled',
+            budgetTokens: 4096,
+          },
+        },
         teamTarget: {
           mode: 'existing',
           teamId: 'team-codex-claw',
@@ -320,7 +329,15 @@ describe('LoopRunner', () => {
     expect(snapshot.agents.find((agent) => agent.id === assignment?.agentId)).toMatchObject({
       name: 'GitHub #12',
       folder: '/Users/nbonamy/src/codex-claw',
-      backend: 'codex',
+      backend: 'claude',
+      backendDefaults: {
+        kind: 'claude',
+        model: 'claude-opus-4.1',
+        thinking: {
+          type: 'enabled',
+          budgetTokens: 4096,
+        },
+      },
       teamId: 'team-codex-claw',
     });
     expect(sendPrompt).toHaveBeenCalledOnce();

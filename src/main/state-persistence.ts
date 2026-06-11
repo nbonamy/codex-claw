@@ -547,6 +547,8 @@ function cloneLoopAction(action: LoopAction): LoopAction {
     return {
       type: action.type,
       sourceRepositoryPath: action.sourceRepositoryPath,
+      ...(action.backend ? { backend: action.backend } : {}),
+      ...(action.backendDefaults ? { backendDefaults: cloneBackendDefaults(action.backendDefaults) } : {}),
       teamTarget: { ...action.teamTarget },
       ...(action.cleanup ? { cleanup: { ...action.cleanup } } : {}),
     };
@@ -751,10 +753,14 @@ function sanitizeLoopAction(value: unknown): LoopAction | null {
     if (!sourceRepositoryPath) {
       return null;
     }
+    const backend = sanitizeBackend(value.backend) ?? 'codex';
+    const backendDefaults = sanitizeBackendDefaults(value.backendDefaults, backend);
 
     return {
       type: 'create-agent',
       sourceRepositoryPath,
+      backend,
+      ...(backendDefaults ? { backendDefaults } : {}),
       teamTarget,
       cleanup: sanitizeLoopCleanup(value.cleanup, teamTarget),
     };

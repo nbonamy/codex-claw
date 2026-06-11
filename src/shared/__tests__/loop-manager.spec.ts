@@ -220,6 +220,15 @@ describe('loop manager', () => {
       action: {
         type: 'create-agent',
         sourceRepositoryPath: ' /Users/nbonamy/src/codex-claw ',
+        backend: 'claude',
+        backendDefaults: {
+          kind: 'claude',
+          model: ' claude-opus-4.1 ',
+          thinking: {
+            type: 'enabled',
+            budgetTokens: 4096,
+          },
+        },
         teamTarget: {
           mode: 'existing',
           teamId: 'team-codex-claw',
@@ -229,6 +238,15 @@ describe('loop manager', () => {
       action: {
         type: 'create-agent',
         sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        backend: 'claude',
+        backendDefaults: {
+          kind: 'claude',
+          model: 'claude-opus-4.1',
+          thinking: {
+            type: 'enabled',
+            budgetTokens: 4096,
+          },
+        },
         teamTarget: {
           mode: 'existing',
           teamId: 'team-codex-claw',

@@ -252,6 +252,107 @@
             />
           </el-select>
         </div>
+
+        <div
+          v-if="form.actionMode === 'new-agent'"
+          class="loop-editor__source-row"
+          aria-label="Loop agent backend defaults"
+        >
+          <div class="loop-editor__section">
+            <label for="loop-editor-backend">Backend</label>
+            <el-select
+              id="loop-editor-backend"
+              v-model="form.backend"
+              aria-label="Loop backend"
+            >
+              <el-option label="Codex" value="codex" />
+              <el-option label="Claude" value="claude" />
+            </el-select>
+          </div>
+
+          <div class="loop-editor__section">
+            <label for="loop-editor-model">Model</label>
+            <el-select
+              v-if="form.backend === 'codex' && backendModels.length > 0"
+              id="loop-editor-model"
+              v-model="form.model"
+              clearable
+              filterable
+              placeholder="Default model"
+              aria-label="Loop model"
+            >
+              <el-option
+                v-for="model in backendModels"
+                :key="model.id"
+                :label="model.displayName"
+                :value="model.model"
+              />
+            </el-select>
+            <el-input
+              v-else
+              id="loop-editor-model"
+              v-model="form.model"
+              placeholder="Default model"
+              aria-label="Loop model"
+            />
+          </div>
+        </div>
+
+        <div
+          v-if="form.actionMode === 'new-agent'"
+          class="loop-editor__source-row"
+          aria-label="Loop thinking defaults"
+        >
+          <div
+            v-if="form.backend === 'codex'"
+            class="loop-editor__section"
+          >
+            <label for="loop-editor-thinking">Thinking</label>
+            <el-select
+              id="loop-editor-thinking"
+              v-model="form.reasoningEffort"
+              clearable
+              filterable
+              placeholder="Default"
+              aria-label="Loop thinking"
+              :disabled="reasoningOptions.length === 0"
+            >
+              <el-option
+                v-for="effort in reasoningOptions"
+                :key="effort.reasoningEffort"
+                :label="effortLabel(effort.reasoningEffort)"
+                :value="effort.reasoningEffort"
+              />
+            </el-select>
+          </div>
+
+          <template v-else>
+            <div class="loop-editor__section">
+              <label for="loop-editor-thinking">Thinking</label>
+              <el-select
+                id="loop-editor-thinking"
+                v-model="form.claudeThinkingType"
+                aria-label="Loop thinking"
+              >
+                <el-option label="Disabled" value="disabled" />
+                <el-option label="Enabled" value="enabled" />
+              </el-select>
+            </div>
+
+            <div class="loop-editor__section">
+              <label for="loop-editor-thinking-budget">Budget</label>
+              <el-input-number
+                id="loop-editor-thinking-budget"
+                v-model="form.claudeThinkingBudget"
+                :disabled="form.claudeThinkingType !== 'enabled'"
+                :min="1024"
+                :step="1024"
+                controls-position="right"
+                aria-label="Loop thinking budget"
+              />
+            </div>
+          </template>
+        </div>
       </section>
 
       <section class="loop-editor__section loop-editor__section--compact">
@@ -285,13 +386,14 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, watch } from 'vue';
-import type { BenchTemplate, CreateLoopInput, Loop, SourceRepository, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '../../shared/contracts';
+import type { AgentBackend, BackendDefaults, BackendModelOption, BenchTemplate, CreateLoopInput, Loop, ReasoningEffort, SourceRepository, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '../../shared/contracts';
 import AgentAvatar from './AgentAvatar.vue';
 
 type TeamMode = 'existing' | 'dedicated';
 type ActionMode = 'new-agent' | `bench:${string}`;
 
 const props = withDefaults(defineProps<{
+  backendModels?: BackendModelOption[];
   benchTemplates: BenchTemplate[];
   chooseAgentFolder?: () => Promise<string | null>;
   connection?: WorkIntegrationConnection | null;
@@ -302,6 +404,7 @@ const props = withDefaults(defineProps<{
   sourceRepositories?: SourceRepository[];
   teams: Team[];
 }>(), {
+  backendModels: () => [],
   chooseAgentFolder: async () => null,
   connection: null,
   itemsByRepository: () => ({}),
@@ -329,6 +432,11 @@ const form = reactive({
   assignmentInstructions: props.loop?.instructions.assignment ?? '',
   beforeCompletionInstructions: props.loop?.instructions.beforeCompletion ?? '',
   actionMode: initialActionMode(props.loop),
+  backend: initialBackend(props.loop),
+  model: initialModel(props.loop),
+  reasoningEffort: initialReasoningEffort(props.loop),
+  claudeThinkingType: initialClaudeThinkingType(props.loop),
+  claudeThinkingBudget: initialClaudeThinkingBudget(props.loop),
   sourceRepositoryPath: props.loop?.action.type === 'create-agent'
     ? props.loop.action.sourceRepositoryPath
     : props.sourceRepositories[0]?.path ?? '',
@@ -355,6 +463,14 @@ const currentItems = computed(() => form.repositoryId ? props.itemsByRepository[
 const selectedBenchTemplateId = computed(() => (
   form.actionMode.startsWith('bench:') ? form.actionMode.slice('bench:'.length) : ''
 ));
+const selectedModel = computed(() => (
+  props.backendModels.find((model) => model.model === form.model) ??
+  props.backendModels.find((model) => model.id === form.model) ??
+  props.backendModels.find((model) => model.isDefault) ??
+  props.backendModels[0] ??
+  null
+));
+const reasoningOptions = computed(() => selectedModel.value?.supportedReasoningEfforts ?? []);
 const selectedCustomFolderPath = computed(() => {
   if (!form.sourceRepositoryPath || sourceRepositories.value.some((repository) => repository.path === form.sourceRepositoryPath)) {
     return '';
@@ -447,6 +563,27 @@ watch(() => props.teams, (teams) => {
   }
 });
 
+watch(() => form.backend, (backend) => {
+  if (backend === 'codex') {
+    const model = selectedModel.value;
+    form.model = form.model || model?.model || '';
+    form.reasoningEffort = form.reasoningEffort || model?.defaultReasoningEffort || model?.supportedReasoningEfforts?.[0]?.reasoningEffort || '';
+  } else {
+    form.reasoningEffort = '';
+  }
+});
+
+watch(() => form.model, () => {
+  if (form.backend !== 'codex') {
+    return;
+  }
+
+  const model = selectedModel.value;
+  if (!model?.supportedReasoningEfforts?.some((effort) => effort.reasoningEffort === form.reasoningEffort)) {
+    form.reasoningEffort = model?.defaultReasoningEffort || model?.supportedReasoningEfforts?.[0]?.reasoningEffort || '';
+  }
+});
+
 watch(suggestedBeforeCompletionInstructions, (suggestion, previousSuggestion) => {
   const currentValue = form.beforeCompletionInstructions.trim();
   const canApplySuggestion = !currentValue || currentValue === previousSuggestion || currentValue === lastSuggestedBeforeCompletionInstructions;
@@ -504,6 +641,8 @@ function submit(): void {
       ? {
         type: 'create-agent',
         sourceRepositoryPath: form.sourceRepositoryPath,
+        backend: form.backend,
+        backendDefaults: loopBackendDefaults(),
         teamTarget,
         cleanup,
       }
@@ -516,11 +655,68 @@ function submit(): void {
   });
 }
 
+function loopBackendDefaults(): BackendDefaults {
+  if (form.backend === 'claude') {
+    return {
+      kind: 'claude',
+      ...(form.model.trim() ? { model: form.model.trim() } : {}),
+      thinking: {
+        type: form.claudeThinkingType,
+        ...(form.claudeThinkingType === 'enabled' && form.claudeThinkingBudget ? { budgetTokens: form.claudeThinkingBudget } : {}),
+      },
+    };
+  }
+
+  return {
+    kind: 'codex',
+    ...(form.model.trim() ? { model: form.model.trim() } : {}),
+    ...(form.reasoningEffort.trim() ? { reasoningEffort: form.reasoningEffort.trim() } : {}),
+  };
+}
+
 function initialActionMode(loop: Loop | null | undefined): ActionMode {
   if (loop?.action.type === 'create-agent-from-bench') {
     return `bench:${loop.action.benchTemplateId}`;
   }
   return 'new-agent';
+}
+
+function initialBackend(loop: Loop | null | undefined): AgentBackend {
+  return loop?.action.type === 'create-agent' && loop.action.backend === 'claude' ? 'claude' : 'codex';
+}
+
+function initialModel(loop: Loop | null | undefined): string {
+  return loop?.action.type === 'create-agent' ? loop.action.backendDefaults?.model ?? '' : '';
+}
+
+function initialReasoningEffort(loop: Loop | null | undefined): ReasoningEffort | '' {
+  return loop?.action.type === 'create-agent' && loop.action.backendDefaults?.kind === 'codex'
+    ? loop.action.backendDefaults.reasoningEffort ?? ''
+    : '';
+}
+
+function initialClaudeThinkingType(loop: Loop | null | undefined): 'enabled' | 'disabled' {
+  return loop?.action.type === 'create-agent' && loop.action.backendDefaults?.kind === 'claude'
+    ? loop.action.backendDefaults.thinking?.type ?? 'disabled'
+    : 'disabled';
+}
+
+function initialClaudeThinkingBudget(loop: Loop | null | undefined): number | undefined {
+  return loop?.action.type === 'create-agent' && loop.action.backendDefaults?.kind === 'claude'
+    ? loop.action.backendDefaults.thinking?.budgetTokens
+    : undefined;
+}
+
+function effortLabel(effort: ReasoningEffort): string {
+  if (effort.trim().toLowerCase() === 'xhigh') {
+    return 'Extra High';
+  }
+
+  return effort
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 }
 
 function workItemsKey(provider: 'github', repositoryId: string): string {

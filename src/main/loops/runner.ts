@@ -137,7 +137,8 @@ export class LoopRunner {
     createAgentInSnapshot(this.snapshot(), {
       name: dedicatedTeamName(item),
       folder: loop.action.sourceRepositoryPath,
-      backend: 'codex',
+      backend: loop.action.backend ?? 'codex',
+      backendDefaults: loop.action.backendDefaults,
       teamId,
     }, createdAt, undefined, { select: false });
     return this.snapshot().agents.find((agent) => !previousAgentIds.has(agent.id)) ?? null;

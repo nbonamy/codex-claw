@@ -71,6 +71,7 @@
       />
       <LoopsView
         v-else-if="loopsVisible"
+        :backend-models="backendModels"
         :bench="snapshot.bench"
         :choose-agent-folder="chooseAgentFolder"
         :clear-loop-history="clearLoopHistory"

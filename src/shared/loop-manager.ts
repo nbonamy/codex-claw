@@ -1,5 +1,6 @@
 import type {
   AppSnapshot,
+  BackendDefaults,
   CreateLoopInput,
   Loop,
   LoopAction,
@@ -254,10 +255,14 @@ function normalizeLoopAction(snapshot: AppSnapshot, action: LoopAction): LoopAct
     if (!sourceRepositoryPath) {
       return null;
     }
+    const backend = action.backend === 'claude' ? 'claude' : 'codex';
+    const backendDefaults = normalizeBackendDefaults(action.backendDefaults, backend);
 
     return {
       type: 'create-agent',
       sourceRepositoryPath,
+      backend,
+      ...(backendDefaults ? { backendDefaults } : {}),
       teamTarget,
       cleanup: normalizeLoopCleanup(action.cleanup, teamTarget),
     };
@@ -278,6 +283,34 @@ function normalizeLoopAction(snapshot: AppSnapshot, action: LoopAction): LoopAct
   }
 
   return null;
+}
+
+function normalizeBackendDefaults(defaults: BackendDefaults | undefined, backend: 'codex' | 'claude'): BackendDefaults | undefined {
+  if (!defaults || defaults.kind !== backend) {
+    return { kind: backend };
+  }
+
+  if (defaults.kind === 'codex') {
+    const model = defaults.model?.trim();
+    const reasoningEffort = defaults.reasoningEffort?.trim();
+    return {
+      kind: 'codex',
+      ...(model ? { model } : {}),
+      ...(defaults.approvalPreset ? { approvalPreset: defaults.approvalPreset } : {}),
+      ...(defaults.approvalPolicy ? { approvalPolicy: defaults.approvalPolicy } : {}),
+      ...(defaults.approvalsReviewer ? { approvalsReviewer: defaults.approvalsReviewer } : {}),
+      ...(defaults.sandboxMode ? { sandboxMode: defaults.sandboxMode } : {}),
+      ...(reasoningEffort ? { reasoningEffort } : {}),
+    };
+  }
+
+  const model = defaults.model?.trim();
+  return {
+    kind: 'claude',
+    ...(model ? { model } : {}),
+    ...(defaults.permissionMode ? { permissionMode: defaults.permissionMode } : {}),
+    ...(defaults.thinking ? { thinking: { ...defaults.thinking } } : {}),
+  };
 }
 
 function normalizeLoopCleanup(cleanup: LoopAction['cleanup'] | undefined, teamTarget: LoopTeamTarget): LoopAction['cleanup'] {

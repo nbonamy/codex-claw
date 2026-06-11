@@ -1,7 +1,8 @@
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
+import { nextTick } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
-import type { BenchTemplate, Loop, SourceRepository, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '../../../shared/contracts';
+import type { BackendModelOption, BenchTemplate, Loop, SourceRepository, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '../../../shared/contracts';
 import LoopEditor from '../LoopEditor.vue';
 
 describe('LoopEditor', () => {
@@ -29,6 +30,10 @@ describe('LoopEditor', () => {
         action: {
           type: 'create-agent',
           sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+          backend: 'codex',
+          backendDefaults: {
+            kind: 'codex',
+          },
           teamTarget: {
             mode: 'existing',
             teamId: 'team-codex-claw',
@@ -51,6 +56,53 @@ describe('LoopEditor', () => {
       action: {
         type: 'create-agent-from-bench',
         benchTemplateId: 'bench-dina',
+      },
+    });
+  });
+
+  it('emits selected Codex model and thinking defaults for new agents', async () => {
+    const wrapper = mountEditor({ backendModels: models() });
+
+    await wrapper.findAllComponents({ name: 'ElSelect' })[8]?.vm.$emit('update:modelValue', 'codex');
+    await wrapper.findAllComponents({ name: 'ElSelect' })[9]?.vm.$emit('update:modelValue', 'gpt-5.1-codex-max');
+    await wrapper.findAllComponents({ name: 'ElSelect' })[10]?.vm.$emit('update:modelValue', 'high');
+    await wrapper.find('form').trigger('submit');
+
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({
+      action: {
+        type: 'create-agent',
+        backend: 'codex',
+        backendDefaults: {
+          kind: 'codex',
+          model: 'gpt-5.1-codex-max',
+          reasoningEffort: 'high',
+        },
+      },
+    });
+  });
+
+  it('emits Claude model and thinking defaults for new agents', async () => {
+    const wrapper = mountEditor();
+
+    await wrapper.findAllComponents({ name: 'ElSelect' })[8]?.vm.$emit('update:modelValue', 'claude');
+    await nextTick();
+    await wrapper.get('input#loop-editor-model').setValue('claude-opus-4.1');
+    await wrapper.findAllComponents({ name: 'ElSelect' })[9]?.vm.$emit('update:modelValue', 'enabled');
+    await wrapper.findComponent({ name: 'ElInputNumber' }).vm.$emit('update:modelValue', 4096);
+    await wrapper.find('form').trigger('submit');
+
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({
+      action: {
+        type: 'create-agent',
+        backend: 'claude',
+        backendDefaults: {
+          kind: 'claude',
+          model: 'claude-opus-4.1',
+          thinking: {
+            type: 'enabled',
+            budgetTokens: 4096,
+          },
+        },
       },
     });
   });
@@ -170,6 +222,7 @@ describe('LoopEditor', () => {
 
 function mountEditor(overrides: Partial<{
   benchTemplates: BenchTemplate[];
+  backendModels: BackendModelOption[];
   chooseAgentFolder: () => Promise<string | null>;
   connection: WorkIntegrationConnection;
   itemsByRepository: Record<string, WorkItem[]>;
@@ -181,6 +234,7 @@ function mountEditor(overrides: Partial<{
   return mount(LoopEditor, {
     props: {
       mode: 'create',
+      backendModels: overrides.backendModels ?? [],
       benchTemplates: overrides.benchTemplates ?? benchTemplates(),
       chooseAgentFolder: overrides.chooseAgentFolder,
       connection: overrides.connection ?? {
@@ -255,6 +309,29 @@ function benchTemplates(): BenchTemplate[] {
     backend: 'codex',
     createdAt: '2026-06-09T10:00:00.000Z',
     updatedAt: '2026-06-09T10:00:00.000Z',
+  }];
+}
+
+function models(): BackendModelOption[] {
+  return [{
+    id: 'gpt-5.1-codex-fast',
+    model: 'gpt-5.1-codex-fast',
+    displayName: 'GPT-5.1 Codex Fast',
+    supportedReasoningEfforts: [
+      { reasoningEffort: 'low', description: 'Low' },
+      { reasoningEffort: 'high', description: 'High' },
+    ],
+    defaultReasoningEffort: 'low',
+    isDefault: true,
+  }, {
+    id: 'gpt-5.1-codex-max',
+    model: 'gpt-5.1-codex-max',
+    displayName: 'GPT-5.1 Codex Max',
+    supportedReasoningEfforts: [
+      { reasoningEffort: 'medium', description: 'Medium' },
+      { reasoningEffort: 'high', description: 'High' },
+    ],
+    defaultReasoningEffort: 'medium',
   }];
 }
 

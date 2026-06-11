@@ -2,6 +2,7 @@ import type {
   Agent,
   AgentBackend,
   AgentContextUsage,
+  BackendDefaults,
   AgentGitStatus,
   AgentStatus,
   AccountRateLimits,
@@ -117,7 +118,7 @@ export function createAgentFromInput(input: CreateAgentInput, createdAt = new Da
     avatar: normalizedOptionalString(input.avatar),
     folder: normalizedFolder(input.folder),
     backend,
-    backendDefaults: defaultBackendDefaults(backend),
+    backendDefaults: normalizedBackendDefaults(input.backendDefaults, backend) ?? defaultBackendDefaults(backend),
     status: { type: 'idle' },
     createdAt,
     updatedAt: createdAt,
@@ -1644,6 +1645,16 @@ function normalizedBackend(value: AgentBackend | undefined): AgentBackend {
 
 function defaultBackendDefaults(backend: AgentBackend): Agent['backendDefaults'] {
   return backend === 'claude' ? { kind: 'claude' } : { kind: 'codex' };
+}
+
+function normalizedBackendDefaults(defaults: BackendDefaults | undefined, backend: AgentBackend): Agent['backendDefaults'] {
+  if (!defaults || defaults.kind !== backend) {
+    return undefined;
+  }
+
+  return defaults.kind === 'claude' && defaults.thinking
+    ? { ...defaults, thinking: { ...defaults.thinking } }
+    : { ...defaults };
 }
 
 function normalizedAgentName(name: string, folder: string): string {

@@ -15,6 +15,7 @@
           <LoopEditor
             v-if="editorVisible"
             :key="editorKey"
+            :backend-models="backendModels"
             :bench-templates="bench"
             :choose-agent-folder="chooseAgentFolder"
             :connection="githubConnection"
@@ -148,7 +149,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onMounted, ref } from 'vue';
-import type { AppSnapshot, BackendConversationRef, CreateLoopInput, Loop, RendererMessage, SourceRepository, UpdateLoopInput, WorkItem, WorkProviderKind, WorkRepository } from '../../shared/contracts';
+import type { AppSnapshot, BackendConversationRef, BackendModelOption, CreateLoopInput, Loop, RendererMessage, SourceRepository, UpdateLoopInput, WorkItem, WorkProviderKind, WorkRepository } from '../../shared/contracts';
 import AppDataList from './AppDataList.vue';
 import type { AppDataListColumn, AppDataListRow } from './app-data-list';
 import AppMenu from '../shared/menu/AppMenu.vue';
@@ -160,6 +161,7 @@ import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import { DotsVerticalIcon, LogsIcon, PencilIcon, PlayerPlayIcon, Trash2Icon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
+  backendModels?: BackendModelOption[];
   bench: AppSnapshot['bench'];
   chooseAgentFolder?: () => Promise<string | null>;
   clearLoopHistory?: (loopId: string) => Promise<void>;
@@ -181,6 +183,7 @@ const props = withDefaults(defineProps<{
   workItemsByRepository?: Record<string, WorkItem[]>;
   workRepositoriesByProvider?: Partial<Record<WorkProviderKind, WorkRepository[]>>;
 }>(), {
+  backendModels: () => [],
   clearLoopHistory: async () => undefined,
   chooseAgentFolder: async () => null,
   createLoop: async () => undefined,
