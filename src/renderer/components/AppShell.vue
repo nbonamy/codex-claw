@@ -1173,7 +1173,8 @@ function openSidePanelRequest(request: SidePanelRequest): void {
     return;
   }
 
-  openGitDiffRequest(request);
+  // Temporarily keep turn diff side-panel requests from auto-opening.
+  // openGitDiffRequest(request);
 }
 
 function openMarkdownRequest(request: SidePanelMarkdownRequest): void {
