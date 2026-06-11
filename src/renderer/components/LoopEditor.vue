@@ -438,7 +438,8 @@ function workItemsKey(provider: 'github', repositoryId: string): string {
   flex-direction: column;
   gap: var(--space-16);
   overflow-y: auto;
-  padding: var(--space-16) var(--space-4) var(--space-16) 0;
+  padding: var(--space-16) var(--space-12) var(--space-16) 0;
+  scrollbar-width: thin;
 }
 
 .loop-editor__header h3,
