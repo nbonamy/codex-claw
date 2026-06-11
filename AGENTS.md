@@ -62,6 +62,8 @@ doc and update it when behavior changes:
   Vitest/component/contract/smoke test guidance, and verification gates.
 - `docs/frontend.md`: Vue/Element Plus conventions, design tokens, app shell,
   visual references, and UX standards.
+- `docs/team-cockpit.md`: design note for a possible team-scoped Cockpit entry
+  inside the agent sidebar while preserving the global Cockpit.
 - `docs/codex.md`: how Electron main communicates with Codex app-server,
   including transport, lifecycle, event adaptation, generated types, and test
   fixtures.
