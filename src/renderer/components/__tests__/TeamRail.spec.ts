@@ -105,6 +105,37 @@ describe('TeamRail', () => {
     expect(wrapper.emitted('select-cockpit')).toStrictEqual([[]]);
   });
 
+  it('refreshes the cockpit icon from team colors', async () => {
+    const wrapper = mountRail({
+      teams: [teams[0]],
+      activeTeamId: 'team-sk',
+    });
+
+    expect(cockpitSquareBackgrounds(wrapper)).toStrictEqual([
+      'rgb(70, 168, 87)',
+      'transparent',
+      'transparent',
+      'transparent',
+    ]);
+
+    await (wrapper as unknown as { setProps: (props: { teams: Team[] }) => Promise<void> }).setProps({
+      teams: [
+        {
+          ...teams[0],
+          color: '#0093FF',
+        },
+        teams[1],
+      ],
+    });
+
+    expect(cockpitSquareBackgrounds(wrapper)).toStrictEqual([
+      'rgb(0, 147, 255)',
+      'rgb(27, 79, 178)',
+      'transparent',
+      'transparent',
+    ]);
+  });
+
   it('emits loops selection and marks it active', async () => {
     const wrapper = mountRail({
       teams,
@@ -140,7 +171,11 @@ describe('TeamRail', () => {
     expect(teamRailSource()).toContain('stroke-width: 1.25px;');
     expect(teamRailSource()).toContain('transform: scale(1.15);');
     expect(teamRailSource()).toContain('.team-rail__new svg');
-    expect(teamRailSource()).toContain('DashboardIcon');
+    expect(teamRailSource()).toContain('CockpitIcon');
+    expect(teamRailSource()).not.toContain('DashboardIcon');
+    expect(teamRailSource()).toContain('.team-rail__cockpit:not(.team-rail__cockpit--active)');
+    expect(teamRailSource()).toContain('.team-rail__team:not(.team-rail__team--active, .list-reorder-drag--dragging)');
+    expect(teamRailSource()).toMatch(/\.team-rail__team:not\(\.team-rail__team--active, \.list-reorder-drag--dragging\) \{\s+opacity: 0\.\d+;/);
     expect(teamRailSource()).toContain('InfinityIcon');
     expect(teamRailSource()).toContain('stroke-width: 1.35px;');
     expect(teamRailSource()).toContain('transform: scaleX(1.2) scaleY(1.48);');
@@ -355,6 +390,12 @@ function mockRect(element: Element, rect: { top: number; height: number }): void
     y: rect.top,
     toJSON: () => undefined,
   });
+}
+
+function cockpitSquareBackgrounds(wrapper: ReturnType<typeof mountRail>): string[] {
+  return wrapper
+    .findAll('.cockpit-icon__square')
+    .map((square) => (square.element as HTMLElement).style.backgroundColor);
 }
 
 function teamRailSource(): string {

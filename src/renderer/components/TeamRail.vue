@@ -14,7 +14,7 @@
       :aria-pressed="cockpitActive"
       @click="emit('select-cockpit')"
     >
-      <DashboardIcon aria-hidden="true" />
+      <CockpitIcon :teams="teams" />
     </button>
 
     <button
@@ -91,8 +91,9 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { AccountRateLimits, ReorderTeamsInput, Team } from '../../shared/contracts';
 import { defaultTeamColor } from '../../shared/team-colors';
 import { teamInitials } from '../../shared/team-manager';
-import { DashboardIcon, InfinityIcon, PlusIcon } from '../shared/icons/app-icons';
+import { InfinityIcon, PlusIcon } from '../shared/icons/app-icons';
 import { useListReorderDrag } from '../shared/use-list-reorder-drag';
+import CockpitIcon from './CockpitIcon.vue';
 import SettingsMenu from './SettingsMenu.vue';
 import TeamContextMenu from './TeamContextMenu.vue';
 import { confirmCloseTeam } from './team-close-confirmation';
@@ -238,6 +239,15 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   cursor: pointer;
 }
 
+.team-rail__team:not(.team-rail__team--active, .list-reorder-drag--dragging) {
+  opacity: 0.6;
+}
+
+.team-rail__team:not(.team-rail__team--active, .list-reorder-drag--dragging):hover,
+.team-rail__team:not(.team-rail__team--active, .list-reorder-drag--dragging):focus-visible {
+  opacity: 1;
+}
+
 .team-rail__cockpit,
 .team-rail__loops {
   width: var(--team-rail-button-size);
@@ -251,6 +261,10 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   cursor: pointer;
 }
 
+.team-rail__cockpit:not(.team-rail__cockpit--active) {
+  opacity: 0.8;
+}
+
 .team-rail__cockpit:hover,
 .team-rail__cockpit:focus-visible,
 .team-rail__loops:hover,
@@ -262,9 +276,14 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 .team-rail__cockpit--active,
 .team-rail__loops--active {
   color: var(--team-rail-icon-active-color);
+  opacity: 1;
 }
 
-.team-rail__cockpit svg,
+.team-rail__cockpit:hover,
+.team-rail__cockpit:focus-visible {
+  opacity: 1;
+}
+
 .team-rail__loops svg,
 .team-rail__new svg,
 :deep() .settings-menu__trigger svg {
@@ -272,10 +291,6 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   height: var(--icon-xl);
   stroke-width: 1.25px;
   transform: scale(1.15);
-}
-
-.team-rail__cockpit svg {
-  transform: scale(1.25);
 }
 
 .team-rail__loops svg {
