@@ -1508,7 +1508,6 @@ describe('CodexAgentSessionManager', () => {
             kind: 'command',
             title: 'npm test',
             status: 'running',
-            body: undefined,
             input: {
               command: 'npm test',
               cwd: undefined,
@@ -1531,25 +1530,6 @@ describe('CodexAgentSessionManager', () => {
         agentId: 'agent-dina',
         threadId: 'thread-1',
         turnId: 'turn-1',
-        type: 'item.updated',
-        payload: {
-          itemId: 'cmd-1',
-          bodyDelta: 'running\n',
-          fallbackToolPart: {
-            type: 'tool',
-            id: 'cmd-1',
-            kind: 'command',
-            title: 'Command',
-            status: 'running',
-          },
-        },
-        occurredAt: '<now>',
-      },
-      {
-        seq: 6,
-        agentId: 'agent-dina',
-        threadId: 'thread-1',
-        turnId: 'turn-1',
         type: 'item.completed',
         payload: {
           toolPart: {
@@ -1558,7 +1538,6 @@ describe('CodexAgentSessionManager', () => {
             kind: 'command',
             title: 'npm test',
             status: 'completed',
-            body: 'passed',
             input: {
               command: 'npm test',
               cwd: undefined,
@@ -1577,7 +1556,7 @@ describe('CodexAgentSessionManager', () => {
         occurredAt: '<now>',
       },
       {
-        seq: 7,
+        seq: 6,
         agentId: 'agent-dina',
         threadId: 'thread-1',
         turnId: 'turn-1',
@@ -1586,6 +1565,118 @@ describe('CodexAgentSessionManager', () => {
         occurredAt: '<now>',
       },
     ]);
+  });
+
+  it('suppresses noisy command output while allowing recognized file write output', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+    const events: Array<{ type: string; payload: unknown }> = [];
+    manager.onEvent((event) => events.push({ type: event.type, payload: event.payload }));
+
+    await resolveStartedPrompt(transport, manager);
+
+    transport.receive({
+      method: 'item/started',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        item: {
+          type: 'commandExecution',
+          id: 'cmd-rg',
+          command: 'rg "RendererMessage" src',
+          status: 'inProgress',
+        },
+      },
+    });
+    transport.receive({
+      method: 'item/commandExecution/outputDelta',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        itemId: 'cmd-rg',
+        delta: 'a lot of search output\n',
+      },
+    });
+    transport.receive({
+      method: 'item/completed',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        item: {
+          type: 'commandExecution',
+          id: 'cmd-rg',
+          command: 'rg "RendererMessage" src',
+          status: 'completed',
+          aggregatedOutput: 'a lot of search output\n',
+        },
+      },
+    });
+
+    transport.receive({
+      method: 'item/started',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        item: {
+          type: 'commandExecution',
+          id: 'cmd-patch',
+          command: "apply_patch <<'PATCH'",
+          status: 'inProgress',
+        },
+      },
+    });
+    transport.receive({
+      method: 'item/commandExecution/outputDelta',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        itemId: 'cmd-patch',
+        delta: 'Success\n',
+      },
+    });
+    transport.receive({
+      method: 'item/completed',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        item: {
+          type: 'commandExecution',
+          id: 'cmd-patch',
+          command: "apply_patch <<'PATCH'",
+          status: 'completed',
+          aggregatedOutput: 'Success\n',
+        },
+      },
+    });
+
+    const searchEvents = events.filter((event) => JSON.stringify(event.payload).includes('cmd-rg'));
+    expect(searchEvents.map((event) => event.type)).toStrictEqual([
+      'item.started',
+      'item.completed',
+    ]);
+    expect(searchEvents.at(-1)?.payload).toMatchObject({
+      toolPart: {
+        id: 'cmd-rg',
+      },
+    });
+    expect((searchEvents.at(-1)?.payload as { toolPart?: Record<string, unknown> }).toolPart).not.toHaveProperty('body');
+
+    const writeEvents = events.filter((event) => JSON.stringify(event.payload).includes('cmd-patch'));
+    expect(writeEvents.map((event) => event.type)).toStrictEqual([
+      'item.started',
+      'item.updated',
+      'item.completed',
+    ]);
+    expect(writeEvents[1]?.payload).toMatchObject({
+      itemId: 'cmd-patch',
+      bodyDelta: 'Success\n',
+    });
+    expect(writeEvents[2]?.payload).toMatchObject({
+      toolPart: {
+        id: 'cmd-patch',
+        body: 'Success\n',
+      },
+    });
   });
 
   it('maps turn diff notifications into app-owned diff updates', async () => {
@@ -2470,7 +2561,6 @@ describe('CodexAgentSessionManager', () => {
             kind: 'command',
             title: 'sed -n 1,80p docs/architecture.md',
             status: 'running',
-            body: undefined,
             input: {
               command: 'sed -n 1,80p docs/architecture.md',
               cwd: '/Users/nbonamy/src/codex-claw',

@@ -3,7 +3,11 @@ import { toolOutputText } from '../../shared/tool-output';
 
 const structuredToolResultNotice = 'Result returned in structuredContent.';
 
-export function codexThreadItemToToolPart(item: unknown): RendererToolPart | null {
+export type CodexToolPartAdapterOptions = {
+  includeCommandOutput?: boolean;
+};
+
+export function codexThreadItemToToolPart(item: unknown, options: CodexToolPartAdapterOptions = {}): RendererToolPart | null {
   if (!isRecord(item) || typeof item.id !== 'string' || typeof item.type !== 'string') {
     return null;
   }
@@ -12,6 +16,7 @@ export function codexThreadItemToToolPart(item: unknown): RendererToolPart | nul
     const command = typeof item.command === 'string' ? item.command : 'command';
     const status = rendererToolStatus(item.status);
     const statusText = commandStatusText(status, item.commandActions, command);
+    const body = options.includeCommandOutput && typeof item.aggregatedOutput === 'string' ? item.aggregatedOutput : undefined;
     return {
       type: 'tool',
       id: item.id,
@@ -19,7 +24,7 @@ export function codexThreadItemToToolPart(item: unknown): RendererToolPart | nul
       title: command,
       status,
       ...(statusText ? { statusText } : {}),
-      body: typeof item.aggregatedOutput === 'string' ? item.aggregatedOutput : undefined,
+      ...(body !== undefined ? { body } : {}),
       input: {
         command,
         cwd: typeof item.cwd === 'string' ? item.cwd : undefined,
@@ -135,6 +140,15 @@ export function codexThreadItemToToolPart(item: unknown): RendererToolPart | nul
   }
 
   return null;
+}
+
+export function shouldForwardCommandExecutionOutput(item: unknown): boolean {
+  if (!isRecord(item) || item.type !== 'commandExecution' || typeof item.command !== 'string') {
+    return false;
+  }
+
+  const command = item.command.trim();
+  return isApplyPatchCommand(command) || isShellRedirectWriteCommand(command) || isTeeWriteCommand(command);
 }
 
 export function commandOutputDeltaToToolPartUpdate(itemId: string, delta: string): RendererToolPartUpdate {
@@ -331,6 +345,18 @@ function normalizedCommandActions(value: unknown): NormalizedCommandAction[] {
       type: entry.type,
     }];
   });
+}
+
+function isApplyPatchCommand(command: string): boolean {
+  return /(?:^|[\s;"'(|&])apply_patch(?:\s|$)/u.test(command);
+}
+
+function isShellRedirectWriteCommand(command: string): boolean {
+  return /(?:^|[\s;"'(|&])(?:cat|printf|echo)\b[\s\S]*(?:>|>>)\s*(?:"[^"]+"|'[^']+'|[^\s;&|]+)/u.test(command);
+}
+
+function isTeeWriteCommand(command: string): boolean {
+  return /(?:^|[\s;"'(|&])tee(?:\s+-a)?\s+(?:"[^"]+"|'[^']+'|[^\s;&|]+)/u.test(command);
 }
 
 function uniqueNonEmpty(values: Array<string | undefined>): string[] {

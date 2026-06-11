@@ -6,10 +6,11 @@ import {
   lineDiffFromUnifiedDiff,
   mcpProgressToToolPartUpdate,
   rawOutputToToolPartUpdate,
+  shouldForwardCommandExecutionOutput,
 } from '../tool-part-adapter';
 
 describe('tool-part-adapter', () => {
-  it('maps Codex command executions into renderer tool parts', () => {
+  it('maps Codex command executions into renderer tool parts without raw output by default', () => {
     expect(codexThreadItemToToolPart({
       type: 'commandExecution',
       id: 'cmd-1',
@@ -28,7 +29,6 @@ describe('tool-part-adapter', () => {
       kind: 'command',
       title: 'npm test',
       status: 'completed',
-      body: 'passed',
       input: {
         command: 'npm test',
         cwd: '/Users/nbonamy/src/codex-claw',
@@ -43,6 +43,50 @@ describe('tool-part-adapter', () => {
         processId: 42,
       },
     });
+  });
+
+  it('keeps command execution output when explicitly allowed', () => {
+    expect(codexThreadItemToToolPart({
+      type: 'commandExecution',
+      id: 'cmd-1',
+      command: "apply_patch <<'PATCH'",
+      status: 'completed',
+      aggregatedOutput: 'Done',
+    }, { includeCommandOutput: true })).toMatchObject({
+      type: 'tool',
+      id: 'cmd-1',
+      kind: 'command',
+      title: "apply_patch <<'PATCH'",
+      status: 'completed',
+      body: 'Done',
+    });
+  });
+
+  it('only forwards command output for recognized file write commands', () => {
+    expect(shouldForwardCommandExecutionOutput({
+      type: 'commandExecution',
+      command: 'rg "needle" src',
+    })).toBe(false);
+    expect(shouldForwardCommandExecutionOutput({
+      type: 'commandExecution',
+      command: "sed -n '1,220p' README.md",
+    })).toBe(false);
+    expect(shouldForwardCommandExecutionOutput({
+      type: 'commandExecution',
+      command: 'npm test',
+    })).toBe(false);
+    expect(shouldForwardCommandExecutionOutput({
+      type: 'commandExecution',
+      command: "apply_patch <<'PATCH'",
+    })).toBe(true);
+    expect(shouldForwardCommandExecutionOutput({
+      type: 'commandExecution',
+      command: "cat <<'EOF' > docs/new.md",
+    })).toBe(true);
+    expect(shouldForwardCommandExecutionOutput({
+      type: 'commandExecution',
+      command: 'printf hi | tee src/file.ts',
+    })).toBe(true);
   });
 
   it('summarizes Codex command actions for localized renderer labels', () => {

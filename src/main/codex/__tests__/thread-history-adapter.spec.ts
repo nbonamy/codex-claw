@@ -83,7 +83,6 @@ describe('codexThreadHistoryToRendererMessages', () => {
             title: 'sed -n "1,120p" README.md',
             status: 'completed',
             statusText: '{"action":"read","phase":"completed","params":{"names":["README.md"],"target":"README.md"},"source":"codex"}',
-            body: '# Codex Claw',
             input: {
               command: 'sed -n "1,120p" README.md',
               cwd: '/Users/nbonamy/src/codex-claw',

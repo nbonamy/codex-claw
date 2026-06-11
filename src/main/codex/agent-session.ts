@@ -11,6 +11,7 @@ import {
   fileChangePatchToToolPartUpdate,
   lineDiffFromUnifiedDiff,
   mcpProgressToToolPartUpdate,
+  shouldForwardCommandExecutionOutput,
 } from './tool-part-adapter';
 import {
   codexSkillToSummary,
@@ -90,6 +91,7 @@ export class CodexAgentSessionManager {
   private readonly activeTurnIdsByThreadId = new Map<string, string>();
   private readonly turnIdsByThreadId = new Map<string, string[]>();
   private readonly pendingClientRequests = new Map<string, PendingClientRequest>();
+  private readonly commandOutputForwardItemIds = new Set<string>();
   private readonly listeners = new Set<EventListener>();
   private initialized = false;
   private startPromise: Promise<void> | null = null;
@@ -483,6 +485,7 @@ export class CodexAgentSessionManager {
   }
 
   async close(): Promise<void> {
+    this.commandOutputForwardItemIds.clear();
     await this.client.close();
   }
 
@@ -738,8 +741,10 @@ export class CodexAgentSessionManager {
         }
         const reviewText = notification.method === 'item/completed' ? exitedReviewText(params.item) : '';
         const planText = notification.method === 'item/completed' ? completedPlanText(params.item) : '';
+        const itemId = codexItemId(params.item);
+        const includeCommandOutput = this.shouldForwardCommandOutput(notification.method, params.item, itemId);
         this.logMcpToolItem(notification.method, params.threadId, params.item);
-        const toolPart = codexThreadItemToToolPart(params.item);
+        const toolPart = codexThreadItemToToolPart(params.item, { includeCommandOutput });
         if (toolPart) {
           this.emitForThread(params.threadId, {
             turnId: params.turnId,
@@ -802,6 +807,9 @@ export class CodexAgentSessionManager {
 
       case 'item/commandExecution/outputDelta': {
         const params = notification.params as { threadId: string; turnId: string; itemId: string; delta: string };
+        if (!this.commandOutputForwardItemIds.has(params.itemId)) {
+          return;
+        }
         this.emitForThread(params.threadId, {
           turnId: params.turnId,
           type: 'item.updated',
@@ -996,6 +1004,25 @@ export class CodexAgentSessionManager {
     for (const listener of this.listeners) {
       listener(fullEvent);
     }
+  }
+
+  private shouldForwardCommandOutput(method: 'item/started' | 'item/completed', item: unknown, itemId: string | undefined): boolean {
+    if (!itemId) {
+      return false;
+    }
+
+    if (method === 'item/started') {
+      if (shouldForwardCommandExecutionOutput(item)) {
+        this.commandOutputForwardItemIds.add(itemId);
+        return true;
+      }
+      this.commandOutputForwardItemIds.delete(itemId);
+      return false;
+    }
+
+    const shouldForward = this.commandOutputForwardItemIds.has(itemId) || shouldForwardCommandExecutionOutput(item);
+    this.commandOutputForwardItemIds.delete(itemId);
+    return shouldForward;
   }
 
   private async turnIdsForRollback(threadId: string, targetTurnId: string): Promise<string[]> {
