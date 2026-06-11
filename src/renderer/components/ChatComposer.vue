@@ -177,6 +177,8 @@ const emit = defineEmits<{
   'update:reasoningEffort': [reasoningEffort: ReasoningEffort];
 }>();
 
+const CHAT_COMPOSER_INPUT_MAX_HEIGHT_PX = 88;
+
 const prompt = ref('');
 const textareaEl = ref<HTMLTextAreaElement | null>(null);
 const caretPosition = ref(0);
@@ -676,7 +678,7 @@ function resizeTextarea(): void {
   }
 
   textarea.style.height = '0px';
-  textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
+  textarea.style.height = `${Math.min(textarea.scrollHeight, CHAT_COMPOSER_INPUT_MAX_HEIGHT_PX)}px`;
 }
 
 function resizeTextareaSoon(): void {
@@ -688,7 +690,7 @@ function resizeTextareaSoon(): void {
 .chat-composer {
   --chat-composer-button-size: 36px;
   --chat-composer-button-size-small: 28px;
-  --chat-composer-input-max-height: 160px;
+  --chat-composer-input-max-height: calc(var(--line-height-24) + var(--line-height-24) + var(--line-height-24) + var(--space-4) + var(--space-4));
   position: relative;
   display: flex;
   align-items: center;

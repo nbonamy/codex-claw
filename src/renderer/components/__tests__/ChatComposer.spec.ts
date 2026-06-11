@@ -99,6 +99,20 @@ describe('ChatComposer', () => {
     expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('quoted prompt');
   });
 
+  it('caps the growing textarea at three composer lines', async () => {
+    const wrapper = mountComposer();
+    const textarea = wrapper.get('textarea').element as HTMLTextAreaElement;
+    Object.defineProperty(textarea, 'scrollHeight', {
+      configurable: true,
+      value: 240,
+    });
+
+    await wrapper.get('textarea').setValue('one\ntwo\nthree\nfour\nfive');
+    await nextTick();
+
+    expect(textarea.style.height).toBe('88px');
+  });
+
   it('interrupts from the shared send button while Codex is working without a draft', async () => {
     const wrapper = mountComposer({ isSending: true });
 
