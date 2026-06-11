@@ -262,7 +262,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 }
 
 .team-rail__cockpit:not(.team-rail__cockpit--active) {
-  opacity: 0.8;
+  opacity: 0.6;
 }
 
 .team-rail__cockpit:hover,
