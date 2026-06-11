@@ -19,6 +19,7 @@ export {
   IconDotsVertical as DotsVerticalIcon,
   IconEye as EyeIcon,
   IconExternalLink as ExternalLinkIcon,
+  IconFileDiff as FileDiffIcon,
   IconFileText as FileTextIcon,
   IconFolder as FolderIcon,
   IconHandStop as HandStopIcon,

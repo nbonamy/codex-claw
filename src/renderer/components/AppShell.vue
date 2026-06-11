@@ -128,6 +128,7 @@
           :is-loading="isLoading"
           :sidebar-collapsed="agentSidebarCollapsed"
           @expand-sidebar="agentSidebarCollapsed = false"
+          @open-git-diff="openAgentGitDiffPreview"
         />
         <div class="app-shell__body">
           <AgentEmptyState
@@ -165,7 +166,7 @@
             @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
             @edit-message="$emit('edit-message', $event)"
             @interrupt-agent="$emit('interrupt-agent')"
-            @open-markdown-file="openMarkdownFile"
+            @open-file="openFilePreview"
             @quote-message="$emit('quote-message', $event)"
             @retry-message="$emit('retry-message', $event)"
             @select-model="$emit('select-model', $event)"
@@ -234,7 +235,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { Agent, AgentFileReadResult, AgentFileSearchItem, AgentGitStatus, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SourceRepository, SourceWorktree, Team, ThreadGoal, TurnGitDiff, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../../shared/contracts';
+import type { Agent, AgentFileReadResult, AgentFileSearchItem, AgentGitStatus, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SidePanelRequest, SourceRepository, SourceWorktree, Team, ThreadGoal, TurnGitDiff, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../../shared/contracts';
 import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import { defaultTeamColor } from '../../shared/team-colors';
 import { findAssignedAgentForWorkItem } from '../../shared/work-assignments';
@@ -253,6 +254,7 @@ import SettingsView from './SettingsView.vue';
 import type { SettingsTab } from './settings-tabs';
 import { confirmCloseTeam } from './team-close-confirmation';
 import type { QueuedChatPrompt } from '../shared/chat/queued-prompts';
+import { languageForFilePath } from '../shared/chat/syntax-highlighting';
 import type { PlanReviewComment, SidePanelState } from './side-panel';
 
 const props = withDefaults(defineProps<{
@@ -275,7 +277,7 @@ const props = withDefaults(defineProps<{
   selectedReasoningEffort?: ReasoningEffort | null;
   planMode?: boolean;
   queuedPrompts?: QueuedChatPrompt[];
-  sidePanelMarkdownRequest?: SidePanelMarkdownRequest | null;
+  sidePanelRequest?: SidePanelRequest | null;
   workProviderAuthorization?: WorkProviderAuthorization | null;
   workRepositoriesByProvider?: Partial<Record<WorkProviderKind, WorkRepository[]>>;
   workItemsByRepository?: Record<string, WorkItem[]>;
@@ -288,6 +290,7 @@ const props = withDefaults(defineProps<{
   createSourceWorktree?: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   addRecentSourceRepository?: (repoName: string) => void;
   readAgentFile?: (agentId: string, filePath: string) => Promise<AgentFileReadResult>;
+  openAgentGitDiff?: (agentId: string) => Promise<void>;
   createAgent?: (input: CreateAgentInput) => Promise<Agent | null | void>;
   createTeam?: (input: CreateTeamInput) => Promise<Team | null | void>;
   deployBenchTemplateAction?: (input: string | DeployBenchTemplateInput) => Promise<Agent | null | void>;
@@ -324,7 +327,7 @@ const props = withDefaults(defineProps<{
   selectedReasoningEffort: null,
   codexApprovalPreset: null,
   queuedPrompts: () => [],
-  sidePanelMarkdownRequest: null,
+  sidePanelRequest: null,
   workProviderAuthorization: null,
   workRepositoriesByProvider: () => ({}),
   workItemsByRepository: () => ({}),
@@ -338,6 +341,9 @@ const props = withDefaults(defineProps<{
   addRecentSourceRepository: () => undefined,
   readAgentFile: async () => {
     throw new Error('File preview is not available.');
+  },
+  openAgentGitDiff: async () => {
+    throw new Error('Git diff preview is not available.');
   },
   createAgent: async () => undefined,
   createTeam: async () => undefined,
@@ -787,50 +793,64 @@ function commentOnPlan(comments: PlanReviewComment[]): void {
   emit('sendPrompt', formatPlanCommentPrompt(comments));
 }
 
-async function openMarkdownFile(filePath: string): Promise<void> {
+async function openFilePreview(filePath: string): Promise<void> {
   const agent = currentAgent.value;
-  const trimmedPath = filePath.trim();
+  const trimmedPath = normalizePreviewFilePath(filePath);
   if (!agent || !trimmedPath) {
     return;
   }
 
   const requestId = sidePanelRequestId + 1;
   sidePanelRequestId = requestId;
+  const initialKind = isMarkdownPath(trimmedPath) ? 'markdown' : 'source';
   sidePanel.value = {
-    kind: 'markdown',
+    kind: initialKind,
     title: fileBasename(trimmedPath),
     subtitle: trimmedPath,
     content: '',
+    ...(initialKind === 'source' ? { language: languageForFilePath(trimmedPath) ?? null } : {}),
     state: 'loading',
     error: null,
-  };
+  } as SidePanelState;
 
   try {
     const result = await props.readAgentFile(agent.id, trimmedPath);
     if (requestId !== sidePanelRequestId) {
       return;
     }
+    const resultKind = isMarkdownPath(result.path) ? 'markdown' : 'source';
     sidePanel.value = {
-      kind: 'markdown',
+      kind: resultKind,
       title: fileBasename(result.path),
       subtitle: result.path,
       content: result.content,
+      ...(resultKind === 'source' ? { language: languageForFilePath(result.path) ?? null } : {}),
       state: 'idle',
       error: null,
-    };
+    } as SidePanelState;
   } catch (error) {
     if (requestId !== sidePanelRequestId) {
       return;
     }
     sidePanel.value = {
-      kind: 'markdown',
+      kind: initialKind,
       title: fileBasename(trimmedPath),
       subtitle: trimmedPath,
       content: '',
+      ...(initialKind === 'source' ? { language: languageForFilePath(trimmedPath) ?? null } : {}),
       state: 'error',
       error: error instanceof Error ? error.message : String(error),
-    };
+    } as SidePanelState;
   }
+}
+
+async function openAgentGitDiffPreview(): Promise<void> {
+  const agent = currentAgent.value;
+  if (!agent) {
+    return;
+  }
+
+  await props.openAgentGitDiff(agent.id);
 }
 
 function handleShellShortcut(event: KeyboardEvent): void {
@@ -1055,6 +1075,24 @@ function fileBasename(filePath: string): string {
   return filePath.split('/').filter(Boolean).at(-1) ?? filePath;
 }
 
+function isMarkdownPath(filePath: string): boolean {
+  const normalizedPath = filePath.split('#')[0]?.split('?')[0]?.toLowerCase() ?? '';
+  return /\.(md|markdown|mdown|mkdn)$/u.test(normalizedPath);
+}
+
+function normalizePreviewFilePath(filePath: string): string {
+  const trimmedPath = filePath.trim();
+  if (!trimmedPath.startsWith('file://')) {
+    return trimmedPath;
+  }
+
+  try {
+    return decodeURIComponent(new URL(trimmedPath).pathname);
+  } catch {
+    return trimmedPath;
+  }
+}
+
 function workItemsKey(provider: WorkProviderKind, repositoryId: string): string {
   return `${provider}:${repositoryId}`;
 }
@@ -1115,13 +1153,22 @@ watch(() => currentAgent.value?.id ?? null, () => {
   closeSidePanel();
 });
 
-watch(() => props.sidePanelMarkdownRequest, (request) => {
+watch(() => props.sidePanelRequest, (request) => {
   if (!request) {
     return;
   }
 
-  openMarkdownRequest(request);
+  openSidePanelRequest(request);
 }, { immediate: true });
+
+function openSidePanelRequest(request: SidePanelRequest): void {
+  if (request.kind === 'markdown') {
+    openMarkdownRequest(request);
+    return;
+  }
+
+  openGitDiffRequest(request);
+}
 
 function openMarkdownRequest(request: SidePanelMarkdownRequest): void {
   sidePanelRequestId += 1;
@@ -1134,6 +1181,18 @@ function openMarkdownRequest(request: SidePanelMarkdownRequest): void {
     content: request.content,
     state: 'idle',
     error: null,
+  };
+}
+
+function openGitDiffRequest(request: Extract<SidePanelRequest, { kind: 'gitDiff' }>): void {
+  sidePanelRequestId += 1;
+  sidePanel.value = {
+    kind: 'gitDiff',
+    title: request.title ?? 'Git Diff',
+    ...(request.subtitle ? { subtitle: request.subtitle } : {}),
+    diff: request.diff,
+    state: request.state ?? 'idle',
+    error: request.error ?? null,
   };
 }
 

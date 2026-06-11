@@ -52,6 +52,7 @@ export type AgentBackendDriver = {
   getRuntimeStatus(): BackendRuntimeStatus;
   getCapabilities(agent: Agent): BackendCapabilities;
   getGitStatus?(agent: Agent): Promise<AgentGitStatus | null>;
+  getGitDiff?(agent: Agent): Promise<string | null>;
   tryHandlePromptCommand?(agent: Agent, prompt: string): Promise<BackendSendResult> | null;
   sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>;
   setConversationTitle?(agent: Agent, title: string): Promise<void>;

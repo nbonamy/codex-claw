@@ -16,6 +16,7 @@ describe('ipc channels', () => {
       listBackendSkills: 'backend:skills:list',
       listAgentFiles: 'agent:files:list',
       readAgentFile: 'agent:file:read',
+      openAgentGitDiff: 'agent:git-diff:open',
       chooseAgentFolder: 'agent:choose-folder',
       chooseSourceFolder: 'source-folder:choose',
       listSourceRepositories: 'source-folder:repositories:list',

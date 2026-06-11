@@ -61,10 +61,12 @@
         v-if="hasHeaderGitStatus"
         class="agent-header__git-status"
       >
-        <span
+        <button
           v-if="gitStatus?.addedLines || gitStatus?.removedLines"
           class="agent-header__git-diff"
-          aria-label="Repository line changes"
+          aria-label="Open repository diff"
+          type="button"
+          @click="emit('open-git-diff')"
         >
           <ChatAnimatedDiffStat
             v-if="gitStatus?.addedLines"
@@ -78,7 +80,7 @@
             label="Removed lines"
             :value="gitStatus?.removedLines ?? 0"
           />
-        </span>
+        </button>
       </span>
     </div>
   </header>
@@ -101,6 +103,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'expand-sidebar': [];
+  'open-git-diff': [];
 }>();
 
 const statusLabel = computed(() => {
@@ -314,6 +317,18 @@ const hasHeaderGitStatus = computed(() => {
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.agent-header__git-diff:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .agent-header__expand {

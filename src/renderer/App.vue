@@ -19,7 +19,7 @@
     :selected-model-id="selectedModelId"
     :selected-reasoning-effort="selectedReasoningEffort"
     :queued-prompts="activeQueuedPrompts"
-    :side-panel-markdown-request="sidePanelMarkdownRequest"
+    :side-panel-request="sidePanelRequest"
     :work-provider-authorization="workProviderAuthorization"
     :work-repositories-by-provider="workRepositoriesByProvider"
     :work-items-by-repository="workItemsByRepository"
@@ -32,6 +32,7 @@
     :create-source-worktree="createSourceWorktree"
     :add-recent-source-repository="addRecentSourceRepository"
     :read-agent-file="readAgentFile"
+    :open-agent-git-diff="openAgentGitDiff"
     :create-agent="createAgent"
     :create-team="createTeam"
     :deploy-bench-template-action="deployBenchTemplate"
@@ -115,7 +116,7 @@ const {
   selectedModelId,
   selectedReasoningEffort,
   planMode,
-  sidePanelMarkdownRequest,
+  sidePanelRequest,
   workProviderAuthorization,
   workRepositoriesByProvider,
   workItemsByRepository,
@@ -130,6 +131,7 @@ const {
   createSourceWorktree,
   addRecentSourceRepository,
   readAgentFile,
+  openAgentGitDiff,
   createAgent,
   createTeam,
   updateTeam,

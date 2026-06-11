@@ -19,8 +19,8 @@ import typescript from '@shikijs/langs/typescript'
 import vue from '@shikijs/langs/vue'
 import xml from '@shikijs/langs/xml'
 import yaml from '@shikijs/langs/yaml'
-import githubDark from '@shikijs/themes/github-dark'
-import githubLight from '@shikijs/themes/github-light'
+import darkPlus from '@shikijs/themes/dark-plus'
+import lightPlus from '@shikijs/themes/light-plus'
 import { escapeAttribute, escapeHtml } from './html-escape'
 
 const highlighter = createHighlighterCoreSync({
@@ -46,7 +46,7 @@ const highlighter = createHighlighterCoreSync({
     xml,
     yaml,
   ],
-  themes: [githubLight, githubDark],
+  themes: [lightPlus, darkPlus],
 })
 
 const loadedLanguages = new Set(highlighter.getLoadedLanguages())
@@ -62,12 +62,76 @@ export function renderCodeBlock(code: string, language: string | undefined) {
       defaultColor: false,
       lang,
       themes: {
-        dark: 'github-dark',
-        light: 'github-light',
+        dark: 'dark-plus',
+        light: 'light-plus',
       },
     })
   } catch {
     return renderPlainCodeBlock(code, language)
+  }
+}
+
+export function languageForFilePath(filePath: string | undefined): string | undefined {
+  const normalizedPath = (filePath ?? '').trim().toLowerCase();
+  const extension = normalizedPath.match(/\.([^.\\/]+)$/)?.[1];
+  switch (extension) {
+    case 'css':
+      return 'css';
+    case 'diff':
+    case 'patch':
+      return 'diff';
+    case 'dockerfile':
+      return 'docker';
+    case 'go':
+      return 'go';
+    case 'htm':
+    case 'html':
+      return 'html';
+    case 'js':
+    case 'mjs':
+    case 'cjs':
+      return 'javascript';
+    case 'json':
+    case 'jsonc':
+      return 'json';
+    case 'jsx':
+      return 'jsx';
+    case 'md':
+    case 'markdown':
+    case 'mdown':
+    case 'mkdn':
+      return 'markdown';
+    case 'py':
+      return 'python';
+    case 'rs':
+      return 'rust';
+    case 'sh':
+    case 'bash':
+    case 'zsh':
+      return 'sh';
+    case 'sql':
+      return 'sql';
+    case 'toml':
+      return 'toml';
+    case 'ts':
+    case 'mts':
+    case 'cts':
+      return 'typescript';
+    case 'tsx':
+      return 'tsx';
+    case 'vue':
+      return 'vue';
+    case 'xml':
+    case 'svg':
+      return 'xml';
+    case 'yaml':
+    case 'yml':
+      return 'yaml';
+    default:
+      if (normalizedPath.endsWith('/dockerfile') || normalizedPath === 'dockerfile') {
+        return 'docker';
+      }
+      return extension;
   }
 }
 
@@ -79,5 +143,9 @@ function normalizeLanguage(language: string | undefined) {
 function renderPlainCodeBlock(code: string, language: string | undefined) {
   const lang = normalizeLanguage(language)
   const className = lang ? ` class="language-${escapeAttribute(lang)}"` : ''
-  return `<pre><code${className}>${escapeHtml(code)}</code></pre>`
+  return `<pre><code${className}>${renderPlainCodeLines(code)}</code></pre>`
+}
+
+function renderPlainCodeLines(code: string) {
+  return code.split('\n').map((line) => `<span class="line">${escapeHtml(line)}</span>`).join('')
 }

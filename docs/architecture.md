@@ -338,8 +338,8 @@ Renderer layers:
 - app shell inspired by Skwad: team rail, agent list, agent header, status, and
   conversation area;
 - native workspace panes inspired by `docs/codex.png`: the active conversation
-  should be able to sit beside document, plan, diff, or file viewer tabs rather
-  than forcing every artifact into the chat column;
+  should be able to sit beside document, plan, read-only source, git diff, or
+  file viewer tabs rather than forcing every artifact into the chat column;
 - Bench surface for saved agent templates, starting as a New Agent menu section
   and eventually supporting faster deployment into any team;
 - chat state store that reduces `MainToRendererEvent` into message/tool/diff
@@ -351,6 +351,10 @@ Renderer layers:
   status is requested through the active `AgentBackendDriver` capability and is
   not persisted; turn diff state comes from app-owned backend events such as
   Codex `turn/diff/updated`;
+- side-panel previews are read-only app artifacts. Markdown and source file
+  links read through the main-process agent file bridge; source highlighting
+  uses Shiki, while git diff previews parse unified diff data and render with
+  Claw-owned Vue components;
 - theme provider that applies semantic CSS custom properties to the document.
 
 ## IPC Contract
@@ -545,8 +549,8 @@ Mapping sketch:
   call result/output buffer
 - `FileChange` and `FileChangePatchUpdated` -> file change tool item plus diff
   state
-- `TurnDiffUpdated` -> aggregate diff panel/state for the turn and composer
-  shelf turn-diff summary
+- `TurnDiffUpdated` -> aggregate diff panel/state for the turn and git diff
+  side-panel preview
 - `McpToolCall` and `DynamicToolCall` -> tool calls
 - approval server requests -> pending UI prompts, not transcript items until
   answered

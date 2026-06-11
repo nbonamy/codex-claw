@@ -47,6 +47,11 @@ export class AgentGitService {
       };
     }
   }
+
+  async diff(folder: string): Promise<string> {
+    const result = await git(folder, ['diff', '--no-ext-diff', '--']);
+    return result.stdout;
+  }
 }
 
 async function git(cwd: string, args: string[]): Promise<{ stdout: string }> {

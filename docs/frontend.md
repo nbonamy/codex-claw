@@ -71,8 +71,8 @@ implemented:
 - agent list with avatar, name, folder, and status;
 - active agent header;
 - central conversation and composer;
-- right-side artifact pane for documents, plans, files, diffs, and future SWE
-  surfaces;
+- right-side artifact pane for documents, plans, read-only source previews,
+  git diffs, and future SWE surfaces;
 - Bench entry point in the agent creation flow.
 - full-space Settings surface launched from the rail, with its own category
   sidebar and screen-level panels instead of dialog chrome.
@@ -115,7 +115,8 @@ Theme rules:
 - Theme switching should update CSS variables at the document root.
 - Element Plus theme overrides should be derived from the same app tokens.
 - Syntax highlighting and diff rendering should be fed by the same theme
-  source whenever practical.
+  source whenever practical. Source previews use Shiki; git diff previews use
+  Claw-owned Vue rendering fed by parsed unified diff data.
 
 ## Internationalization
 
@@ -162,7 +163,7 @@ High-priority surfaces:
 - tool calls;
 - approval requests;
 - ask-user prompts;
-- file changes and diffs;
+- file changes, read-only source previews, and diffs;
 - errors and interrupted turns.
 
 Renderer components consume app-owned state, not raw app-server or backend

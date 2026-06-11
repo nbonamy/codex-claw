@@ -69,6 +69,40 @@ describe('AppShell', () => {
     expect(wrapper.emitted('sendPrompt')).toStrictEqual([['hello']]);
   });
 
+  it('opens the active agent git diff from header diff stats', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agentGitStatuses['agent-dina'] = {
+      folder: '/Users/nbonamy/src/id8',
+      branch: 'main',
+      ahead: 0,
+      behind: 0,
+      changedFiles: 1,
+      addedLines: 45,
+      removedLines: 23,
+      hasUntracked: false,
+      state: 'dirty',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    };
+    const openAgentGitDiff = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [],
+        isLoading: false,
+        isSending: false,
+        openAgentGitDiff,
+      },
+      global: {
+        plugins: [ElementPlus, i18n],
+      },
+    });
+
+    await wrapper.get('[aria-label="Open repository diff"]').trigger('click');
+
+    expect(openAgentGitDiff).toHaveBeenCalledWith('agent-dina');
+  });
+
   it('opens markdown links in the side panel through the agent file bridge', async () => {
     const snapshot = createInitialSnapshot();
     let resolveReadAgentFile: (result: { content: string; path: string }) => void = () => undefined;
@@ -115,6 +149,81 @@ describe('AppShell', () => {
 
     await wrapper.get('[aria-label="Close side panel"]').trigger('click');
     expect(wrapper.find('.side-panel').exists()).toBe(false);
+  });
+
+  it('opens source file links as read-only source previews', async () => {
+    const snapshot = createInitialSnapshot();
+    const readAgentFile = vi.fn().mockResolvedValue({
+      path: 'src/main.ts',
+      content: 'const answer: number = 42;\n',
+    });
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [
+          {
+            id: 'message-source-link',
+            agentId: 'agent-dina',
+            role: 'assistant',
+            status: 'complete',
+            createdAt: '2026-06-05T00:00:00.000Z',
+            parts: [{ type: 'text', text: 'Open [main](src/main.ts).' }],
+          },
+        ],
+        isLoading: false,
+        isSending: false,
+        readAgentFile,
+      },
+      global: {
+        plugins: [ElementPlus, i18n],
+      },
+    });
+
+    await wrapper.get('a[href="src/main.ts"]').trigger('click');
+    await flushPromises();
+
+    expect(readAgentFile).toHaveBeenCalledWith('agent-dina', 'src/main.ts');
+    expect(wrapper.find('.source-preview-panel').exists()).toBe(true);
+    expect(wrapper.text()).toContain('src/main.ts');
+    expect(wrapper.html()).toContain('shiki');
+    expect(wrapper.text()).toContain('answer');
+  });
+
+  it('normalizes file URLs before opening source previews', async () => {
+    const snapshot = createInitialSnapshot();
+    const readAgentFile = vi.fn().mockResolvedValue({
+      path: 'src/file name.ts',
+      content: 'export const value = true;\n',
+    });
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [
+          {
+            id: 'message-file-url',
+            agentId: 'agent-dina',
+            role: 'assistant',
+            status: 'complete',
+            createdAt: '2026-06-05T00:00:00.000Z',
+            parts: [{ type: 'text', text: 'Open [file](file:///Users/nbonamy/src/codex-claw/src/file%20name.ts).' }],
+          },
+        ],
+        isLoading: false,
+        isSending: false,
+        readAgentFile,
+      },
+      global: {
+        plugins: [ElementPlus, i18n],
+      },
+    });
+
+    await wrapper.get('a[href="file:///Users/nbonamy/src/codex-claw/src/file%20name.ts"]').trigger('click');
+    await flushPromises();
+
+    expect(readAgentFile).toHaveBeenCalledWith('agent-dina', '/Users/nbonamy/src/codex-claw/src/file name.ts');
+    expect(wrapper.find('.source-preview-panel').exists()).toBe(true);
   });
 
   it('ignores stale markdown reads after the side panel changes', async () => {
@@ -251,7 +360,7 @@ describe('AppShell', () => {
       },
     });
 
-    wrapper.findComponent({ name: 'ConversationPane' }).vm.$emit('open-markdown-file', '   ');
+    wrapper.findComponent({ name: 'ConversationPane' }).vm.$emit('open-file', '   ');
     await flushPromises();
 
     expect(readAgentFile).not.toHaveBeenCalled();
@@ -267,7 +376,7 @@ describe('AppShell', () => {
         messages: [],
         isLoading: false,
         isSending: false,
-        sidePanelMarkdownRequest: {
+        sidePanelRequest: {
           kind: 'markdown',
           title: 'Generated Plan',
           content: '# Plan\n\nShip it.',
@@ -283,7 +392,7 @@ describe('AppShell', () => {
     expect(wrapper.text()).toContain('Ship it.');
 
     await wrapper.setProps({
-      sidePanelMarkdownRequest: {
+      sidePanelRequest: {
         kind: 'markdown',
         path: 'docs/mcp.md',
         content: '# MCP',
@@ -303,7 +412,7 @@ describe('AppShell', () => {
         messages: [],
         isLoading: false,
         isSending: false,
-        sidePanelMarkdownRequest: {
+        sidePanelRequest: {
           kind: 'markdown',
           content: '# Generated',
         },
@@ -328,7 +437,7 @@ describe('AppShell', () => {
         isLoading: false,
         isSending: false,
         planMode: true,
-        sidePanelMarkdownRequest: {
+        sidePanelRequest: {
           kind: 'markdown',
           purpose: 'plan',
           title: 'Plan',
@@ -356,7 +465,7 @@ describe('AppShell', () => {
         isLoading: false,
         isSending: false,
         planMode: true,
-        sidePanelMarkdownRequest: {
+        sidePanelRequest: {
           kind: 'markdown',
           purpose: 'plan',
           title: 'Plan',
@@ -385,7 +494,7 @@ describe('AppShell', () => {
         isLoading: false,
         isSending: false,
         planMode: true,
-        sidePanelMarkdownRequest: {
+        sidePanelRequest: {
           kind: 'markdown',
           purpose: 'plan',
           title: 'Plan',
@@ -439,7 +548,7 @@ describe('AppShell', () => {
         isLoading: false,
         isSending: true,
         planMode: true,
-        sidePanelMarkdownRequest: {
+        sidePanelRequest: {
           kind: 'markdown',
           purpose: 'plan',
           title: 'Plan',

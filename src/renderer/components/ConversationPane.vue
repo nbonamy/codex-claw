@@ -174,7 +174,7 @@ const emit = defineEmits<{
   'interrupt-agent': [];
   'quote-message': [index: number];
   'retry-message': [index: number];
-  'open-markdown-file': [filePath: string];
+  'open-file': [filePath: string];
   'select-model': [modelId: string];
   'select-reasoning-effort': [reasoningEffort: ReasoningEffort];
   'select-codex-approval-preset': [preset: CodexApprovalPreset];
@@ -234,15 +234,15 @@ function handleConversationClick(event: MouseEvent): void {
   }
 
   const href = anchor.getAttribute('href') ?? '';
-  if (!isLocalMarkdownHref(href)) {
+  if (!isLocalFileHref(href)) {
     return;
   }
 
   event.preventDefault();
-  emit('open-markdown-file', stripLinkFragment(href));
+  emit('open-file', stripLinkFragment(href));
 }
 
-function isLocalMarkdownHref(href: string): boolean {
+function isLocalFileHref(href: string): boolean {
   const trimmedHref = href.trim();
   if (!trimmedHref || trimmedHref.startsWith('#')) {
     return false;
@@ -257,8 +257,7 @@ function isLocalMarkdownHref(href: string): boolean {
     // Relative links land here.
   }
 
-  const pathname = stripLinkFragment(trimmedHref).toLowerCase();
-  return pathname.endsWith('.md') || pathname.endsWith('.markdown');
+  return Boolean(stripLinkFragment(trimmedHref).trim());
 }
 
 function stripLinkFragment(href: string): string {

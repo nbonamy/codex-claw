@@ -549,8 +549,8 @@ Mapping sketch:
 - `CommandExecutionOutputDelta` appends output to the matching tool call.
 - `FileChange` and `FileChangePatchUpdated` become file-change tool/diff
   state.
-- `TurnDiffUpdated` updates turn-level diff state used by the composer shelf
-  and future diff panels.
+- `TurnDiffUpdated` updates turn-level diff state and requests the read-only
+  git diff side panel with the unified diff text.
 - `PlanDelta` updates a draft plan artifact, and completed `Plan` items update
   the authoritative plan artifact. They are not replayed as normal assistant
   chat text.

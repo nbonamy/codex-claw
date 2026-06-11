@@ -2135,7 +2135,7 @@ describe('useAppState', () => {
     });
   });
 
-  it('captures markdown side panel requests from main events', async () => {
+  it('captures side panel requests from main events', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
 
@@ -2151,7 +2151,7 @@ describe('useAppState', () => {
 
     const state = useAppState();
     await state.loadSnapshot();
-    state.sidePanelMarkdownRequest.value = null;
+    state.sidePanelRequest.value = null;
 
     listeners[0]?.({
       seq: 1,
@@ -2167,7 +2167,7 @@ describe('useAppState', () => {
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
 
-    expect(state.sidePanelMarkdownRequest.value).toStrictEqual({
+    expect(state.sidePanelRequest.value).toStrictEqual({
       kind: 'markdown',
       purpose: 'plan',
       title: 'Architecture',
@@ -2186,11 +2186,31 @@ describe('useAppState', () => {
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
 
-    const markdownRequest = state.sidePanelMarkdownRequest.value as { content: string } | null;
+    const markdownRequest = state.sidePanelRequest.value as { content: string } | null;
     expect(markdownRequest?.content).toBe('# Architecture');
+
+    listeners[0]?.({
+      seq: 3,
+      agentId: 'agent-dina',
+      type: 'sidePanel.gitDiffRequested',
+      payload: {
+        kind: 'gitDiff',
+        title: 'Current diff',
+        subtitle: 'Working tree',
+        diff: 'diff --git a/a.ts b/a.ts\n',
+      },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+
+    expect(state.sidePanelRequest.value).toStrictEqual({
+      kind: 'gitDiff',
+      title: 'Current diff',
+      subtitle: 'Working tree',
+      diff: 'diff --git a/a.ts b/a.ts\n',
+    });
   });
 
-  it('ignores malformed markdown side panel events', async () => {
+  it('ignores malformed side panel events', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
 
@@ -2206,7 +2226,7 @@ describe('useAppState', () => {
 
     const state = useAppState();
     await state.loadSnapshot();
-    state.sidePanelMarkdownRequest.value = null;
+    state.sidePanelRequest.value = null;
 
     listeners[0]?.({
       seq: 1,
@@ -2236,11 +2256,18 @@ describe('useAppState', () => {
       payload: { kind: 'markdown', content: 123 },
       occurredAt: '2026-06-05T00:00:04.000Z',
     } as MainToRendererEvent);
-
-    expect(state.sidePanelMarkdownRequest.value).toBeNull();
-
     listeners[0]?.({
       seq: 5,
+      agentId: 'agent-dina',
+      type: 'sidePanel.gitDiffRequested',
+      payload: { kind: 'gitDiff', diff: 123 },
+      occurredAt: '2026-06-05T00:00:05.000Z',
+    } as MainToRendererEvent);
+
+    expect(state.sidePanelRequest.value).toBeNull();
+
+    listeners[0]?.({
+      seq: 6,
       agentId: 'agent-dina',
       type: 'sidePanel.markdownRequested',
       payload: {
@@ -2252,7 +2279,7 @@ describe('useAppState', () => {
       occurredAt: '2026-06-05T00:00:05.000Z',
     } as MainToRendererEvent);
 
-    expect(state.sidePanelMarkdownRequest.value).toStrictEqual({
+    expect(state.sidePanelRequest.value).toStrictEqual({
       kind: 'markdown',
       content: '# Valid',
     });

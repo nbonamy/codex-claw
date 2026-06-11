@@ -246,7 +246,7 @@ describe('ConversationPane', () => {
 
     await wrapper.get('a[href="docs/architecture.md"]').trigger('click');
 
-    expect(wrapper.emitted('open-markdown-file')).toStrictEqual([['docs/architecture.md']]);
+    expect(wrapper.emitted('open-file')).toStrictEqual([['docs/architecture.md']]);
   });
 
   it('leaves remote markdown links to the browser', async () => {
@@ -267,10 +267,10 @@ describe('ConversationPane', () => {
 
     await wrapper.get('a[href="https://example.com/notes.md"]').trigger('click');
 
-    expect(wrapper.emitted('open-markdown-file')).toBeUndefined();
+    expect(wrapper.emitted('open-file')).toBeUndefined();
   });
 
-  it('normalizes markdown links and ignores non-preview links', async () => {
+  it('normalizes local file links and ignores non-preview links', async () => {
     const wrapper = mountPane({
       agent,
       messages: [
@@ -301,7 +301,10 @@ describe('ConversationPane', () => {
     await wrapper.get('a[href="tel:+15551234567"]').trigger('click');
     await wrapper.get('a[href="notes.txt"]').trigger('click');
 
-    expect(wrapper.emitted('open-markdown-file')).toStrictEqual([['docs/guide.markdown']]);
+    expect(wrapper.emitted('open-file')).toStrictEqual([
+      ['docs/guide.markdown'],
+      ['notes.txt'],
+    ]);
   });
 
   it('handles bare pane clicks and file markdown links without leaking browser navigation', async () => {
@@ -323,7 +326,7 @@ describe('ConversationPane', () => {
     await wrapper.get('.conversation-pane').trigger('click');
     await wrapper.get('a[href="file:///Users/nbonamy/src/codex-claw/README.md"]').trigger('click');
 
-    expect(wrapper.emitted('open-markdown-file')).toStrictEqual([['file:///Users/nbonamy/src/codex-claw/README.md']]);
+    expect(wrapper.emitted('open-file')).toStrictEqual([['file:///Users/nbonamy/src/codex-claw/README.md']]);
   });
 
   it('bubbles tool confirmation responses from the message list', async () => {

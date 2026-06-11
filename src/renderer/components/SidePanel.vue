@@ -2,11 +2,32 @@
   <aside
     class="side-panel"
     aria-label="Side panel"
+    :style="sidePanelStyle"
   >
+    <div
+      class="side-panel__resize-handle"
+      role="separator"
+      aria-label="Resize preview panel"
+      aria-orientation="vertical"
+      @pointerdown="startResize"
+      @pointermove="resizePanel"
+      @pointerup="stopResize"
+      @pointercancel="stopResize"
+    />
     <header class="side-panel__header">
       <div class="side-panel__title-group">
         <FileTextIcon
           v-if="panel.kind === 'markdown'"
+          class="side-panel__icon"
+          aria-hidden="true"
+        />
+        <CodeIcon
+          v-else-if="panel.kind === 'source'"
+          class="side-panel__icon"
+          aria-hidden="true"
+        />
+        <FileDiffIcon
+          v-else-if="panel.kind === 'gitDiff'"
           class="side-panel__icon"
           aria-hidden="true"
         />
@@ -44,6 +65,21 @@
         <span>{{ t('chat.planReview.updating') }}</span>
       </div>
     </div>
+
+    <SourcePreviewPanel
+      v-else-if="panel.kind === 'source'"
+      :content="panel.content"
+      :error="panel.error"
+      :language="panel.language"
+      :state="panel.state"
+    />
+
+    <GitDiffPreviewPanel
+      v-else-if="panel.kind === 'gitDiff'"
+      :diff="panel.diff"
+      :error="panel.error"
+      :state="panel.state"
+    />
 
     <form
       v-if="activeCommentTarget"
@@ -100,9 +136,11 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import GitDiffPreviewPanel from './GitDiffPreviewPanel.vue';
 import MarkdownPanel from './MarkdownPanel.vue';
 import PlanReviewFooter from './PlanReviewFooter.vue';
-import { FileTextIcon, X } from '../shared/icons/app-icons';
+import SourcePreviewPanel from './SourcePreviewPanel.vue';
+import { CodeIcon, FileDiffIcon, FileTextIcon, X } from '../shared/icons/app-icons';
 import type { PlanReviewComment, SidePanelState } from './side-panel';
 
 const props = defineProps<{
@@ -124,8 +162,15 @@ const showCommentHelp = ref(false);
 const commentDraft = ref('');
 const activeCommentTarget = ref<{ quote: string; top: number; left: number } | null>(null);
 const editingCommentId = ref<string | null>(null);
+const panelWidth = ref<number | null>(null);
+const resizeStart = ref<{ pointerId: number; startX: number; startWidth: number } | null>(null);
 let commentId = 0;
+const MIN_PANEL_WIDTH = 320;
+const MAX_PANEL_WIDTH_RATIO = 0.72;
 const isPlanUpdating = computed(() => props.planUpdating === true && props.panel.kind === 'markdown' && props.panel.purpose === 'plan');
+const sidePanelStyle = computed(() => (panelWidth.value ? {
+  '--side-panel-width': `${panelWidth.value}px`,
+} : {}));
 
 const commentBoxStyle = computed(() => {
   if (!activeCommentTarget.value) {
@@ -138,7 +183,15 @@ const commentBoxStyle = computed(() => {
   };
 });
 
-watch(() => [props.panel.title, props.panel.content, props.panel.purpose], () => {
+watch(() => {
+  if (props.panel.kind === 'markdown') {
+    return [props.panel.kind, props.panel.title, props.panel.content, props.panel.purpose];
+  }
+  if (props.panel.kind === 'source') {
+    return [props.panel.kind, props.panel.title, props.panel.content];
+  }
+  return [props.panel.kind, props.panel.title, props.panel.diff];
+}, () => {
   planComments.value = [];
   showCommentHelp.value = false;
   cancelPlanComment();
@@ -244,20 +297,89 @@ function handleCommentAction(): void {
   emit('commentPlan', planComments.value);
   resetPlanComments();
 }
+
+function startResize(event: PointerEvent): void {
+  const resizeHandle = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+  const panelElement = resizeHandle
+    ? resizeHandle.closest('.side-panel')
+    : null;
+  if (!(panelElement instanceof HTMLElement)) {
+    return;
+  }
+
+  event.preventDefault();
+  resizeHandle?.setPointerCapture?.(event.pointerId);
+  resizeStart.value = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startWidth: panelElement.getBoundingClientRect().width,
+  };
+}
+
+function resizePanel(event: PointerEvent): void {
+  const resize = resizeStart.value;
+  if (!resize || resize.pointerId !== event.pointerId) {
+    return;
+  }
+
+  const maxWidth = Math.max(MIN_PANEL_WIDTH, Math.round(window.innerWidth * MAX_PANEL_WIDTH_RATIO));
+  panelWidth.value = clamp(resize.startWidth + resize.startX - event.clientX, MIN_PANEL_WIDTH, maxWidth);
+}
+
+function stopResize(event: PointerEvent): void {
+  const resize = resizeStart.value;
+  if (!resize || resize.pointerId !== event.pointerId) {
+    return;
+  }
+
+  if (event.currentTarget instanceof HTMLElement) {
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+  }
+  resizeStart.value = null;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
 </script>
 
 <style scoped>
 .side-panel {
+  --side-panel-default-width: min(38vw, 520px);
   position: relative;
-  flex: 0 0 min(38vw, 520px);
-  width: min(38vw, 520px);
+  flex: 0 0 var(--side-panel-width, var(--side-panel-default-width));
+  width: var(--side-panel-width, var(--side-panel-default-width));
   min-width: 320px;
-  max-width: 560px;
+  max-width: 72vw;
   min-height: 0;
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--color-border);
   background: var(--color-surface-lowest);
+}
+
+.side-panel__resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  z-index: 5;
+  width: 6px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.side-panel__resize-handle::after {
+  content: "";
+  position: absolute;
+  inset: 0 2px;
+  background: transparent;
+  transition: background-color 120ms ease;
+}
+
+.side-panel__resize-handle:hover::after,
+.side-panel__resize-handle:focus-visible::after {
+  background: var(--color-primary);
 }
 
 .side-panel__header {
@@ -464,8 +586,7 @@ function handleCommentAction(): void {
 
 @media (width < 1000px) {
   .side-panel {
-    flex-basis: 360px;
-    width: 360px;
+    --side-panel-default-width: 360px;
   }
 }
 </style>

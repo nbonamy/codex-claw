@@ -15,6 +15,7 @@ const api: CodexClawApi = {
   listBackendSkills: (agentId: string) => ipcRenderer.invoke(ipcChannels.listBackendSkills, agentId),
   listAgentFiles: (agentId: string) => ipcRenderer.invoke(ipcChannels.listAgentFiles, agentId),
   readAgentFile: (agentId: string, filePath: string) => ipcRenderer.invoke(ipcChannels.readAgentFile, agentId, filePath),
+  openAgentGitDiff: (agentId: string) => ipcRenderer.invoke(ipcChannels.openAgentGitDiff, agentId),
   chooseAgentFolder: () => ipcRenderer.invoke(ipcChannels.chooseAgentFolder),
   chooseSourceFolder: () => ipcRenderer.invoke(ipcChannels.chooseSourceFolder),
   listSourceRepositories: () => ipcRenderer.invoke(ipcChannels.listSourceRepositories),

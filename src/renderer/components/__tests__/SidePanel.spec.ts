@@ -1,4 +1,5 @@
 import { mount } from '@vue/test-utils';
+import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import SidePanel from '../SidePanel.vue';
 import { i18n } from '../../i18n';
@@ -52,6 +53,99 @@ describe('SidePanel', () => {
 
     expect(wrapper.get('h2').text()).toBe('Generated Plan');
     expect(wrapper.find('.side-panel__copy p').exists()).toBe(false);
+  });
+
+  it('routes source panels to the read-only source preview', () => {
+    const wrapper = mount(SidePanel, {
+      props: {
+        panel: {
+          kind: 'source',
+          title: 'main.ts',
+          subtitle: 'src/main.ts',
+          content: 'const value: number = 1;',
+          language: 'typescript',
+          state: 'idle',
+          error: null,
+        },
+      },
+      global: {
+        plugins: [i18n],
+      },
+    });
+
+    expect(wrapper.find('.source-preview-panel').exists()).toBe(true);
+    expect(wrapper.find('.markdown-panel').exists()).toBe(false);
+    expect(wrapper.text()).toContain('src/main.ts');
+    expect(wrapper.html()).toContain('shiki');
+    expect(wrapper.text()).toContain('value');
+  });
+
+  it('routes git diff panels to the read-only diff preview', () => {
+    const wrapper = mount(SidePanel, {
+      props: {
+        panel: {
+          kind: 'gitDiff',
+          title: 'Git Diff',
+          subtitle: 'Current turn',
+          diff: [
+            'diff --git a/src/main.ts b/src/main.ts',
+            '--- a/src/main.ts',
+            '+++ b/src/main.ts',
+            '@@ -1,2 +1,2 @@',
+            '-const oldValue = 1;',
+            '+const newValue = 2;',
+          ].join('\n'),
+          state: 'idle',
+          error: null,
+        },
+      },
+      global: {
+        plugins: [i18n],
+      },
+    });
+
+    expect(wrapper.find('.git-diff-preview-panel').exists()).toBe(true);
+    expect(wrapper.text()).toContain('src/main.ts');
+    expect(wrapper.text()).toContain('modified');
+    expect(wrapper.text()).toContain('oldValue');
+    expect(wrapper.text()).toContain('newValue');
+  });
+
+  it('resizes the side panel from the left edge handle', async () => {
+    const wrapper = mount(SidePanel, {
+      props: {
+        panel: {
+          kind: 'source',
+          title: 'main.ts',
+          subtitle: 'src/main.ts',
+          content: 'const value = 1;',
+          language: 'typescript',
+          state: 'idle',
+          error: null,
+        },
+      },
+      global: {
+        plugins: [i18n],
+      },
+    });
+    vi.spyOn(wrapper.get('.side-panel').element, 'getBoundingClientRect').mockReturnValue({
+      width: 420,
+      height: 600,
+      top: 0,
+      left: 0,
+      bottom: 600,
+      right: 420,
+      x: 0,
+      y: 0,
+      toJSON: () => undefined,
+    } as DOMRect);
+    const handle = wrapper.get('.side-panel__resize-handle');
+
+    dispatchPointerEvent(handle.element, 'pointerdown', { clientX: 500, pointerId: 1 });
+    dispatchPointerEvent(handle.element, 'pointermove', { clientX: 440, pointerId: 1 });
+    await nextTick();
+
+    expect(wrapper.get('.side-panel').attributes('style')).toContain('--side-panel-width: 480px');
   });
 
   it('renders plan review actions and emits confirm and cancel', async () => {
@@ -253,4 +347,11 @@ function mockPlanSelection(wrapper: ReturnType<typeof mount>, text: string): voi
     } as unknown as Range),
     removeAllRanges: vi.fn(),
   } as unknown as Selection);
+}
+
+function dispatchPointerEvent(element: Element, type: string, input: { clientX: number; pointerId: number }): void {
+  const event = new Event(type, { bubbles: true });
+  Object.defineProperty(event, 'clientX', { value: input.clientX });
+  Object.defineProperty(event, 'pointerId', { value: input.pointerId });
+  element.dispatchEvent(event);
 }

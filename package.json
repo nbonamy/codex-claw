@@ -29,6 +29,7 @@
     "element-plus": "^2.13.6",
     "fix-webm-duration": "^1.0.6",
     "marked": "^17.0.6",
+    "parse-git-diff": "^0.0.20",
     "shiki": "^4.2.0",
     "vue": "^3.5.35",
     "vue-i18n": "^11.4.5",

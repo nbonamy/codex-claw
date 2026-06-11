@@ -457,6 +457,17 @@ export type SidePanelMarkdownRequest = {
   content: string;
 };
 
+export type SidePanelGitDiffRequest = {
+  kind: 'gitDiff';
+  title?: string;
+  subtitle?: string;
+  diff: string;
+  state?: 'idle' | 'error';
+  error?: string | null;
+};
+
+export type SidePanelRequest = SidePanelMarkdownRequest | SidePanelGitDiffRequest;
+
 export type PromptSkillInput = {
   name: string;
   path: string;
@@ -648,6 +659,7 @@ export type MainToRendererEvent = {
     | 'workBacklog.assignmentUpdated'
     | 'skills.changed'
     | 'sidePanel.markdownRequested'
+    | 'sidePanel.gitDiffRequested'
     | 'message.delta'
     | 'item.started'
     | 'item.updated'
@@ -792,6 +804,7 @@ export type CodexClawApi = {
   listBackendSkills(agentId: string): Promise<BackendSkillSummary[]>;
   listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]>;
   readAgentFile(agentId: string, filePath: string): Promise<AgentFileReadResult>;
+  openAgentGitDiff(agentId: string): Promise<void>;
   chooseAgentFolder(): Promise<string | null>;
   chooseSourceFolder(): Promise<string | null>;
   listSourceRepositories(): Promise<SourceRepository[]>;

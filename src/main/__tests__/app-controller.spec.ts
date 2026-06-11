@@ -107,6 +107,35 @@ describe('AppController', () => {
     });
   });
 
+  it('opens repo git diff previews through the backend driver capability', async () => {
+    const snapshot = createInitialSnapshot();
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const send = vi.fn();
+    const getGitDiff = vi.fn().mockResolvedValue('diff --git a/a.ts b/a.ts\n');
+    const backendDriver = createFakeCodexBackendDriver({ getGitDiff });
+
+    await controller.initialize();
+    setMainWindowSend(controller, send);
+    setCodexBackendDriver(controller, backendDriver);
+    await openAgentGitDiff(controller, 'agent-dina');
+
+    expect(getGitDiff).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(send).toHaveBeenCalledWith('app:event', expect.objectContaining({
+      agentId: 'agent-dina',
+      type: 'sidePanel.gitDiffRequested',
+      payload: {
+        kind: 'gitDiff',
+        title: 'Git Diff',
+        subtitle: '~/src/codex-claw',
+        diff: 'diff --git a/a.ts b/a.ts\n',
+      },
+    }));
+  });
+
   it('injects all pending MCP messages after a busy recipient becomes idle', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[1].status = { type: 'working' };
@@ -1422,6 +1451,99 @@ describe('AppController', () => {
     }
   });
 
+  it('prompts a git diff side panel preview from turn diff updates', async () => {
+    const snapshot = createInitialSnapshot();
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    await controller.initialize();
+    const send = vi.fn();
+    (controller as unknown as {
+      mainWindow: { webContents: { send: ReturnType<typeof vi.fn> } };
+      refreshAgentGitStatus(agentId: string): Promise<void>;
+    }).mainWindow = { webContents: { send } };
+    (controller as unknown as {
+      refreshAgentGitStatus(agentId: string): Promise<void>;
+    }).refreshAgentGitStatus = vi.fn().mockResolvedValue(undefined);
+    const diff = [
+      'diff --git a/src/main.ts b/src/main.ts',
+      '--- a/src/main.ts',
+      '+++ b/src/main.ts',
+      '@@ -1 +1 @@',
+      '-old',
+      '+new',
+    ].join('\n');
+
+    emitAndApply(controller, {
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-1',
+      type: 'diff.updated',
+      payload: {
+        turnId: 'turn-1',
+        addedLines: 1,
+        removedLines: 1,
+        diff,
+      },
+    });
+
+    expect(send).toHaveBeenCalledWith('app:event', expect.objectContaining({
+      type: 'diff.updated',
+      payload: expect.objectContaining({ diff }),
+    }));
+    expect(send).toHaveBeenCalledWith('app:event', expect.objectContaining({
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-1',
+      type: 'sidePanel.gitDiffRequested',
+      payload: {
+        kind: 'gitDiff',
+        title: 'Git Diff',
+        subtitle: 'Current turn',
+        diff,
+      },
+    }));
+  });
+
+  it('ignores malformed turn diff preview payloads', async () => {
+    const snapshot = createInitialSnapshot();
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    await controller.initialize();
+    const send = vi.fn();
+    (controller as unknown as {
+      mainWindow: { webContents: { send: ReturnType<typeof vi.fn> } };
+      refreshAgentGitStatus(agentId: string): Promise<void>;
+    }).mainWindow = { webContents: { send } };
+    (controller as unknown as {
+      refreshAgentGitStatus(agentId: string): Promise<void>;
+    }).refreshAgentGitStatus = vi.fn().mockResolvedValue(undefined);
+
+    emitAndApply(controller, {
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-1',
+      type: 'diff.updated',
+      payload: {
+        turnId: 'turn-1',
+        addedLines: 1,
+        removedLines: 1,
+      },
+    });
+
+    expect(send).toHaveBeenCalledWith('app:event', expect.objectContaining({
+      type: 'diff.updated',
+    }));
+    expect(send).not.toHaveBeenCalledWith('app:event', expect.objectContaining({
+      type: 'sidePanel.gitDiffRequested',
+    }));
+  });
+
   it('deletes a message by rolling back from its Codex turn and replacing history', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
@@ -1630,6 +1752,12 @@ async function restartAgent(controller: AppController, agentId: string): Promise
   await (controller as unknown as {
     restartAgent(agentId: string): Promise<void>;
   }).restartAgent(agentId);
+}
+
+async function openAgentGitDiff(controller: AppController, agentId: string): Promise<void> {
+  await (controller as unknown as {
+    openAgentGitDiff(agentId: string): Promise<void>;
+  }).openAgentGitDiff(agentId);
 }
 
 async function refreshAgentGitStatus(controller: AppController, agentId: string): Promise<void> {

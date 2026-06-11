@@ -191,6 +191,10 @@ export class AppController {
       return this.readAgentFile(agentId, filePath);
     });
 
+    ipcMain.handle(ipcChannels.openAgentGitDiff, async (_event, agentId: string) => {
+      return this.openAgentGitDiff(agentId);
+    });
+
     ipcMain.handle(ipcChannels.chooseAgentFolder, async () => {
       return this.chooseAgentFolder();
     });
@@ -825,6 +829,60 @@ export class AppController {
       path: resolvedPath.relativePath,
       content: await readFile(resolvedPath.absolutePath, 'utf8'),
     };
+  }
+
+  private async openAgentGitDiff(agentId: string): Promise<void> {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) {
+      throw new Error(`Agent not found: ${agentId}`);
+    }
+
+    const driver = await this.getBackendDriverForAgent(agent);
+    const title = 'Git Diff';
+    const subtitle = agent.folder;
+
+    if (!driver.getGitDiff) {
+      this.emitAndApply({
+        agentId,
+        type: 'sidePanel.gitDiffRequested',
+        payload: {
+          kind: 'gitDiff',
+          title,
+          subtitle,
+          diff: '',
+          state: 'error',
+          error: unsupportedBackendFeature(agent, 'git diff preview').message,
+        },
+      });
+      return;
+    }
+
+    try {
+      const diff = await driver.getGitDiff(agent);
+      this.emitAndApply({
+        agentId,
+        type: 'sidePanel.gitDiffRequested',
+        payload: {
+          kind: 'gitDiff',
+          title,
+          subtitle,
+          diff: diff ?? '',
+        },
+      });
+    } catch (error) {
+      this.emitAndApply({
+        agentId,
+        type: 'sidePanel.gitDiffRequested',
+        payload: {
+          kind: 'gitDiff',
+          title,
+          subtitle,
+          diff: '',
+          state: 'error',
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+    }
   }
 
   private async displayMarkdownForAgent(agent: Agent, input: DisplayMarkdownInput): Promise<DisplayMarkdownResponse> {
@@ -1482,6 +1540,10 @@ export class AppController {
       this.promptPlanPreview(fullEvent);
     }
 
+    if (fullEvent.type === 'diff.updated') {
+      this.promptGitDiffPreview(fullEvent);
+    }
+
     if (fullEvent.type === 'turn.completed' && fullEvent.agentId) {
       this.promptPlanPreview(fullEvent);
       this.promptUnreadAgentMessages(fullEvent.agentId);
@@ -1561,6 +1623,25 @@ export class AppController {
         purpose: 'plan',
         title: 'Plan',
         content: agent.plan.markdown,
+      },
+    });
+  }
+
+  private promptGitDiffPreview(event: MainToRendererEvent): void {
+    if (!event.agentId || !isRecord(event.payload) || typeof event.payload.diff !== 'string' || !event.payload.diff.trim()) {
+      return;
+    }
+
+    this.emitAndApply({
+      agentId: event.agentId,
+      threadId: event.threadId,
+      turnId: event.turnId,
+      type: 'sidePanel.gitDiffRequested',
+      payload: {
+        kind: 'gitDiff',
+        title: 'Git Diff',
+        subtitle: 'Current turn',
+        diff: event.payload.diff,
       },
     });
   }
@@ -1724,6 +1805,10 @@ function clientRequest(value: unknown): ClientRequest | null {
   }
 
   return value as ClientRequest;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function defaultUserDataPath(): string {

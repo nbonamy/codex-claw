@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelMarkdownRequest, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../shared/contracts';
+import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../shared/contracts';
 import { updateSettingsInSnapshot } from '../shared/settings';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '../shared/snapshot';
 import { defaultBackendCapabilities } from '../shared/backend-capabilities';
@@ -27,7 +27,7 @@ const fileCatalogError = ref<string | null>(null);
 const selectedModelId = ref<string | null>(null);
 const selectedReasoningEffort = ref<ReasoningEffort | null>(null);
 const planMode = ref(false);
-const sidePanelMarkdownRequest = ref<SidePanelMarkdownRequest | null>(null);
+const sidePanelRequest = ref<SidePanelRequest | null>(null);
 const workProviderAuthorization = ref<WorkProviderAuthorization | null>(null);
 const workRepositoriesByProvider = ref<Partial<Record<WorkProviderKind, WorkRepository[]>>>({});
 const workItemsByRepository = ref<Record<string, WorkItem[]>>({});
@@ -349,6 +349,14 @@ export function useAppState() {
     }
 
     return window.codexClaw.readAgentFile(agentId, filePath);
+  }
+
+  async function openAgentGitDiff(agentId: string): Promise<void> {
+    if (!window.codexClaw?.openAgentGitDiff) {
+      throw new Error('Git diff preview is not available.');
+    }
+
+    await window.codexClaw.openAgentGitDiff(agentId);
   }
 
   async function createAgent(input: CreateAgentInput): Promise<Agent | null> {
@@ -903,7 +911,7 @@ export function useAppState() {
     selectedModelId,
     selectedReasoningEffort,
     planMode,
-    sidePanelMarkdownRequest,
+    sidePanelRequest,
     workProviderAuthorization,
     workRepositoriesByProvider,
     workItemsByRepository,
@@ -925,6 +933,7 @@ export function useAppState() {
     createSourceWorktree,
     addRecentSourceRepository,
     readAgentFile,
+    openAgentGitDiff,
     createAgent,
     createTeam,
     updateTeam,
@@ -1351,19 +1360,36 @@ function syncSidePanelFromMainEvent(event: MainToRendererEvent): void {
   if (event.agentId && event.agentId !== snapshot.value.activeAgentId) {
     return;
   }
-  if (event.type !== 'sidePanel.markdownRequested' || !isRecord(event.payload)) {
-    return;
-  }
-  if (event.payload.kind !== 'markdown' || typeof event.payload.content !== 'string') {
+  if ((event.type !== 'sidePanel.markdownRequested' && event.type !== 'sidePanel.gitDiffRequested') || !isRecord(event.payload)) {
     return;
   }
 
-  sidePanelMarkdownRequest.value = {
-    kind: 'markdown',
-    content: event.payload.content,
-    ...(event.payload.purpose === 'plan' ? { purpose: 'plan' } : {}),
+  if (event.type === 'sidePanel.markdownRequested') {
+    if (event.payload.kind !== 'markdown' || typeof event.payload.content !== 'string') {
+      return;
+    }
+
+    sidePanelRequest.value = {
+      kind: 'markdown',
+      content: event.payload.content,
+      ...(event.payload.purpose === 'plan' ? { purpose: 'plan' } : {}),
+      ...(typeof event.payload.title === 'string' ? { title: event.payload.title } : {}),
+      ...(typeof event.payload.path === 'string' ? { path: event.payload.path } : {}),
+    };
+    return;
+  }
+
+  if (event.payload.kind !== 'gitDiff' || typeof event.payload.diff !== 'string') {
+    return;
+  }
+
+  sidePanelRequest.value = {
+    kind: 'gitDiff',
+    diff: event.payload.diff,
     ...(typeof event.payload.title === 'string' ? { title: event.payload.title } : {}),
-    ...(typeof event.payload.path === 'string' ? { path: event.payload.path } : {}),
+    ...(typeof event.payload.subtitle === 'string' ? { subtitle: event.payload.subtitle } : {}),
+    ...(event.payload.state === 'error' ? { state: 'error' } : {}),
+    ...(typeof event.payload.error === 'string' ? { error: event.payload.error } : {}),
   };
 }
 

@@ -36,8 +36,8 @@ describe('message markdown rendering', () => {
     const html = renderMarkdown('```ts\nconst ok = true\n```');
 
     expect(html).toContain('class="shiki shiki-themes');
-    expect(html).toContain('github-light');
-    expect(html).toContain('github-dark');
+    expect(html).toContain('light-plus');
+    expect(html).toContain('dark-plus');
     expect(html).toContain('--shiki-light');
     expect(html).toContain('--shiki-dark');
     expect(html).toContain('const');

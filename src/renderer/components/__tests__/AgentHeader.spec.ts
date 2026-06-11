@@ -63,6 +63,25 @@ describe('AgentHeader', () => {
     expect(wrapper.findComponent({ name: 'ChatAnimatedDiffStat' }).exists()).toBe(true);
   });
 
+  it('emits a git diff preview request when repo diff stats are clicked', async () => {
+    const wrapper = mountHeader({ backend: 'codex', status: 'running' }, false, {
+      folder: '/Users/nbonamy/src/id8',
+      branch: 'main',
+      ahead: 0,
+      behind: 0,
+      changedFiles: 1,
+      addedLines: 12,
+      removedLines: 4,
+      hasUntracked: false,
+      state: 'dirty',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    });
+
+    await wrapper.get('[aria-label="Open repository diff"]').trigger('click');
+
+    expect(wrapper.emitted('open-git-diff')).toStrictEqual([[]]);
+  });
+
   it('renders loading, running, and error fallback labels without an agent', () => {
     const props = {
       agent: null,

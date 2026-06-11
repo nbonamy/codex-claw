@@ -47,6 +47,10 @@ export class CodexBackendDriver implements AgentBackendDriver {
     return this.gitService.status(agent.folder);
   }
 
+  async getGitDiff(agent: Agent): Promise<string> {
+    return this.gitService.diff(agent.folder);
+  }
+
   async listModels(_agent: Agent): Promise<BackendModelOption[]> {
     return this.sessionManager.listModels();
   }
