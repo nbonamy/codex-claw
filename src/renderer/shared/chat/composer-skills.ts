@@ -1,4 +1,5 @@
 import type { BackendSkillSummary, PromptSkillInput } from '../../../shared/contracts';
+import { filterComposerSearchItems } from './composer-search';
 
 export type ActiveSkillSlash = {
   end: number;
@@ -38,24 +39,11 @@ export function findActiveSkillSlash(value: string, caretPosition: number): Acti
 }
 
 export function filterComposerSkills(skills: BackendSkillSummary[], query: string, maxResults = -1): BackendSkillSummary[] {
-  const value = query.trim().toLowerCase();
-  if (!value) {
-    return limitSkills(skills, maxResults);
-  }
-
-  const matches = skills
-    .map((skill) => ({
-      skill,
-      score: Math.max(
-        fuzzyScore(value, skill.name.toLowerCase()),
-        fuzzyScore(value, (skill.displayName ?? '').toLowerCase()),
-        fuzzyScore(value, (skill.shortDescription ?? skill.description ?? '').toLowerCase()),
-      ),
-    }))
-    .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score);
-
-  return limitSkills(matches.map((entry) => entry.skill), maxResults);
+  return filterComposerSearchItems(skills, query, [
+    { values: (skill) => [skill.id] },
+    { values: (skill) => [skill.name, skill.displayName] },
+    { values: (skill) => [skill.shortDescription, skill.description] },
+  ], maxResults);
 }
 
 export function skillDisplayName(skill: BackendSkillSummary): string {
@@ -80,33 +68,4 @@ export function promptSkillInputsFromText(text: string, skills: BackendSkillSumm
       name: skill.name,
       path: skill.path,
     }));
-}
-
-function fuzzyScore(pattern: string, target: string): number {
-  if (!target) {
-    return 0;
-  }
-
-  let score = 0;
-  let patternIndex = 0;
-  let lastMatch = -1;
-
-  for (let index = 0; index < target.length && patternIndex < pattern.length; index += 1) {
-    if (target[index] !== pattern[patternIndex]) {
-      continue;
-    }
-
-    score += lastMatch === index - 1 ? 6 : 1;
-    if (index === 0 || '/-_. '.includes(target[index - 1])) {
-      score += 4;
-    }
-    lastMatch = index;
-    patternIndex += 1;
-  }
-
-  return patternIndex === pattern.length ? score : 0;
-}
-
-function limitSkills(skills: BackendSkillSummary[], maxResults: number): BackendSkillSummary[] {
-  return maxResults >= 0 ? skills.slice(0, maxResults) : skills;
 }

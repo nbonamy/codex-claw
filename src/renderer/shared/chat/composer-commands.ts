@@ -1,4 +1,5 @@
 import type { BackendCommandSummary } from '../../../shared/contracts';
+import { filterComposerSearchItems } from './composer-search';
 
 export type ActiveCommandSlash = {
   end: number;
@@ -32,24 +33,11 @@ export function findActiveCommandSlash(value: string, caretPosition: number): Ac
 }
 
 export function filterComposerCommands(commands: BackendCommandSummary[], query: string, maxResults = -1): BackendCommandSummary[] {
-  const value = query.trim().toLowerCase();
-  if (!value) {
-    return limitCommands(commands, maxResults);
-  }
-
-  const matches = commands
-    .map((command) => ({
-      command,
-      score: Math.max(
-        fuzzyScore(value, command.name.toLowerCase()),
-        fuzzyScore(value, (command.displayName ?? '').toLowerCase()),
-        fuzzyScore(value, (command.description ?? '').toLowerCase()),
-      ),
-    }))
-    .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score);
-
-  return limitCommands(matches.map((entry) => entry.command), maxResults);
+  return filterComposerSearchItems(commands, query, [
+    { values: (command) => [command.id] },
+    { values: (command) => [command.name, command.displayName, command.slashName] },
+    { values: (command) => [command.description] },
+  ], maxResults);
 }
 
 export function commandDisplayName(command: BackendCommandSummary): string {
@@ -58,33 +46,4 @@ export function commandDisplayName(command: BackendCommandSummary): string {
 
 export function commandDescription(command: BackendCommandSummary): string {
   return command.description || '';
-}
-
-function fuzzyScore(pattern: string, target: string): number {
-  if (!target) {
-    return 0;
-  }
-
-  let score = 0;
-  let patternIndex = 0;
-  let lastMatch = -1;
-
-  for (let index = 0; index < target.length && patternIndex < pattern.length; index += 1) {
-    if (target[index] !== pattern[patternIndex]) {
-      continue;
-    }
-
-    score += lastMatch === index - 1 ? 6 : 1;
-    if (index === 0 || '/-_. '.includes(target[index - 1])) {
-      score += 4;
-    }
-    lastMatch = index;
-    patternIndex += 1;
-  }
-
-  return patternIndex === pattern.length ? score : 0;
-}
-
-function limitCommands(commands: BackendCommandSummary[], maxResults: number): BackendCommandSummary[] {
-  return maxResults >= 0 ? commands.slice(0, maxResults) : commands;
 }
