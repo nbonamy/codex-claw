@@ -209,6 +209,52 @@ describe('loop manager', () => {
     })).toBeNull();
   });
 
+  it('creates loops that create a new agent from a source repository', () => {
+    const snapshot = createInitialSnapshot();
+
+    expect(createLoopInSnapshot(snapshot, {
+      source: {
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
+      },
+      action: {
+        type: 'create-agent',
+        sourceRepositoryPath: ' /Users/nbonamy/src/codex-claw ',
+        teamTarget: {
+          mode: 'existing',
+          teamId: 'team-codex-claw',
+        },
+      },
+    }, '2026-06-09T11:00:00.000Z', () => 'loop-new-agent')).toMatchObject({
+      action: {
+        type: 'create-agent',
+        sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        teamTarget: {
+          mode: 'existing',
+          teamId: 'team-codex-claw',
+        },
+        cleanup: {
+          deleteAgent: true,
+        },
+      },
+    });
+
+    expect(createLoopInSnapshot(snapshot, {
+      source: {
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
+      },
+      action: {
+        type: 'create-agent',
+        sourceRepositoryPath: ' ',
+        teamTarget: {
+          mode: 'existing',
+          teamId: 'team-codex-claw',
+        },
+      },
+    })).toBeNull();
+  });
+
   it('ignores updates and deletes for missing or invalid loops', () => {
     const snapshot = createInitialSnapshot();
     snapshot.bench.push(createBenchTemplate());

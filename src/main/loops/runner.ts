@@ -2,10 +2,12 @@ import type { Agent, AppSnapshot, Loop, LoopExecutionLogEntry, WorkItem, WorkPro
 import { assignWorkItemToAgentInSnapshot, deployBenchTemplateInSnapshot } from '../../shared/agent-manager';
 import { recordLoopExecutionInSnapshot } from '../../shared/loop-manager';
 import { createEntityId, type IdGenerator } from '../../shared/ids';
+import { createAgentInSnapshot } from '../../shared/snapshot';
 import { defaultTeamColor } from '../../shared/team-colors';
 import { createTeamInSnapshot } from '../../shared/team-manager';
 import { workItemAssignmentKey } from '../../shared/work-assignments';
 import { workItemAssignmentPrompt, workProviderLabel } from '../../shared/work-item-prompts';
+import path from 'node:path';
 
 type WorkItemLister = {
   listItems(provider: WorkProviderKind, repositoryId: string): Promise<WorkItem[]>;
@@ -106,16 +108,9 @@ export class LoopRunner {
       }
 
       const teamId = this.resolveTargetTeamId(loop, item, createdAt);
-      const agent = deployBenchTemplateInSnapshot(
-        this.snapshot(),
-        loop.action.benchTemplateId,
-        teamId,
-        createdAt,
-        undefined,
-        { select: false },
-      );
+      const agent = this.createAgentForLoop(loop, item, teamId, createdAt);
       if (!agent) {
-        throw new Error(`Bench agent is no longer available for loop "${loop.name}".`);
+        throw new Error(`Agent configuration is no longer available for loop "${loop.name}".`);
       }
 
       assignWorkItemToAgentInSnapshot(this.snapshot(), agent.id, item, createdAt, {
@@ -124,6 +119,28 @@ export class LoopRunner {
       });
       createdAssignments.push({ agent, item });
     }
+  }
+
+  private createAgentForLoop(loop: Loop, item: WorkItem, teamId: string, createdAt: string): Agent | null {
+    if (loop.action.type === 'create-agent-from-bench') {
+      return deployBenchTemplateInSnapshot(
+        this.snapshot(),
+        loop.action.benchTemplateId,
+        teamId,
+        createdAt,
+        undefined,
+        { select: false },
+      );
+    }
+
+    const previousAgentIds = new Set(this.snapshot().agents.map((agent) => agent.id));
+    createAgentInSnapshot(this.snapshot(), {
+      name: dedicatedTeamName(item),
+      folder: loop.action.sourceRepositoryPath,
+      backend: 'codex',
+      teamId,
+    }, createdAt, undefined, { select: false });
+    return this.snapshot().agents.find((agent) => !previousAgentIds.has(agent.id)) ?? null;
   }
 
   private resolveTargetTeamId(loop: Loop, item: WorkItem, createdAt: string): string {

@@ -3,7 +3,7 @@
     <header class="loop-editor__header">
       <div>
         <h3>{{ mode === 'edit' ? 'Edit Loop' : 'Create Loop' }}</h3>
-        <p>Watch work, create the right Bench agent, and send the assignment automatically.</p>
+        <p>Watch work, create the right agent, and send the assignment automatically.</p>
       </div>
       <el-switch
         v-model="form.enabled"
@@ -133,70 +133,125 @@
         />
       </section>
 
-      <section class="loop-editor__grid">
-        <div class="loop-editor__section">
-          <label for="loop-editor-bench">Bench Agent</label>
+      <section
+        class="loop-editor__source-group"
+        aria-label="Loop agent target"
+      >
+        <div class="loop-editor__source-row">
+          <div class="loop-editor__section">
+            <label for="loop-editor-agent">Agent</label>
+            <el-select
+              id="loop-editor-agent"
+              v-model="form.actionMode"
+              filterable
+              placeholder="Select agent"
+              aria-label="Loop agent"
+            >
+              <el-option
+                label="New Agent"
+                value="new-agent"
+              />
+              <el-option-group
+                v-if="benchTemplates.length > 0"
+                label="Bench"
+              >
+                <el-option
+                  v-for="template in benchTemplates"
+                  :key="template.id"
+                  :label="template.name"
+                  :value="`bench:${template.id}`"
+                >
+                  <span class="loop-editor__bench-option">
+                    <AgentAvatar
+                      :avatar="template.avatar"
+                      :name="template.name"
+                      size="sm"
+                    />
+                    <span>
+                      <strong>{{ template.name }}</strong>
+                      <small>{{ template.folder }}</small>
+                    </span>
+                  </span>
+                </el-option>
+              </el-option-group>
+            </el-select>
+          </div>
+
+          <div class="loop-editor__section">
+            <label for="loop-editor-team-mode">Team</label>
+            <el-select
+              id="loop-editor-team-mode"
+              v-model="form.teamMode"
+              aria-label="Loop team mode"
+            >
+              <el-option label="Existing team" value="existing" />
+              <el-option label="Dedicated team per ticket" value="dedicated" />
+            </el-select>
+          </div>
+        </div>
+
+        <div
+          v-if="form.teamMode === 'existing'"
+          class="loop-editor__section"
+        >
+          <label for="loop-editor-team">Target Team</label>
           <el-select
-            id="loop-editor-bench"
-            v-model="form.benchTemplateId"
+            id="loop-editor-team"
+            v-model="form.teamId"
             filterable
-            placeholder="Select Bench agent"
-            aria-label="Loop Bench agent"
-            :disabled="benchTemplates.length === 0"
+            placeholder="Select team"
+            aria-label="Loop target team"
           >
             <el-option
-              v-for="template in benchTemplates"
-              :key="template.id"
-              :label="template.name"
-              :value="template.id"
+              v-for="team in teams"
+              :key="team.id"
+              :label="team.name"
+              :value="team.id"
+            />
+          </el-select>
+        </div>
+
+        <div
+          v-if="form.actionMode === 'new-agent'"
+          class="loop-editor__section"
+        >
+          <label for="loop-editor-source-repository">Repository</label>
+          <el-select
+            id="loop-editor-source-repository"
+            :model-value="form.sourceRepositoryPath"
+            filterable
+            placeholder="Select repository"
+            aria-label="Loop source repository"
+            @update:model-value="selectSourceRepository"
+          >
+            <el-option
+              v-if="selectedCustomFolderPath"
+              :label="selectedCustomFolderLabel"
+              :value="selectedCustomFolderPath"
+            />
+            <el-option
+              v-for="repository in sourceRepositories"
+              :key="repository.path"
+              :label="repository.name"
+              :value="repository.path"
             >
-              <span class="loop-editor__bench-option">
-                <AgentAvatar
-                  :avatar="template.avatar"
-                  :name="template.name"
-                  size="sm"
-                />
-                <span>
-                  <strong>{{ template.name }}</strong>
-                  <small>{{ template.folder }}</small>
-                </span>
+              <span class="loop-editor__repository-option">
+                <strong>{{ repository.name }}</strong>
+                <small>{{ repository.path }}</small>
               </span>
             </el-option>
+            <el-option
+              v-if="sourceRepositories.length > 0"
+              disabled
+              label=""
+              :value="sourceDividerOptionValue"
+            />
+            <el-option
+              label="Pick folder..."
+              :value="pickFolderOptionValue"
+            />
           </el-select>
         </div>
-
-        <div class="loop-editor__section">
-          <label for="loop-editor-team-mode">Team</label>
-          <el-select
-            id="loop-editor-team-mode"
-            v-model="form.teamMode"
-            aria-label="Loop team mode"
-          >
-            <el-option label="Existing team" value="existing" />
-            <el-option label="Dedicated team per ticket" value="dedicated" />
-          </el-select>
-        </div>
-      </section>
-
-      <section
-        v-if="form.teamMode === 'existing'"
-        class="loop-editor__section"
-      >
-        <label for="loop-editor-team">Target Team</label>
-        <el-select
-          id="loop-editor-team"
-          v-model="form.teamId"
-          filterable
-          placeholder="Select team"
-          aria-label="Loop target team"
-        >
-          <el-option
-            v-for="team in teams"
-            :key="team.id"
-            :label="team.name"
-            :value="team.id"
-          />
-        </el-select>
       </section>
 
       <section class="loop-editor__section loop-editor__section--compact">
@@ -230,23 +285,28 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, watch } from 'vue';
-import type { BenchTemplate, CreateLoopInput, Loop, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '../../shared/contracts';
+import type { BenchTemplate, CreateLoopInput, Loop, SourceRepository, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '../../shared/contracts';
 import AgentAvatar from './AgentAvatar.vue';
 
 type TeamMode = 'existing' | 'dedicated';
+type ActionMode = 'new-agent' | `bench:${string}`;
 
 const props = withDefaults(defineProps<{
   benchTemplates: BenchTemplate[];
+  chooseAgentFolder?: () => Promise<string | null>;
   connection?: WorkIntegrationConnection | null;
   itemsByRepository?: Record<string, WorkItem[]>;
   loop?: Loop | null;
   mode: 'create' | 'edit';
   repositories: WorkRepository[];
+  sourceRepositories?: SourceRepository[];
   teams: Team[];
 }>(), {
+  chooseAgentFolder: async () => null,
   connection: null,
   itemsByRepository: () => ({}),
   loop: null,
+  sourceRepositories: () => [],
 });
 
 const emit = defineEmits<{
@@ -255,6 +315,9 @@ const emit = defineEmits<{
   'load-repositories': [];
   submit: [input: CreateLoopInput];
 }>();
+
+const pickFolderOptionValue = '__pick-folder__';
+const sourceDividerOptionValue = '__source-divider__';
 
 const form = reactive({
   name: props.loop?.name ?? '',
@@ -265,7 +328,10 @@ const form = reactive({
   tagName: props.loop?.source.tagName ?? '',
   assignmentInstructions: props.loop?.instructions.assignment ?? '',
   beforeCompletionInstructions: props.loop?.instructions.beforeCompletion ?? '',
-  benchTemplateId: props.loop?.action.benchTemplateId ?? props.benchTemplates[0]?.id ?? '',
+  actionMode: initialActionMode(props.loop),
+  sourceRepositoryPath: props.loop?.action.type === 'create-agent'
+    ? props.loop.action.sourceRepositoryPath
+    : props.sourceRepositories[0]?.path ?? '',
   teamMode: (props.loop?.action.teamTarget.mode ?? 'existing') as TeamMode,
   teamId: props.loop?.action.teamTarget.mode === 'existing'
     ? props.loop.action.teamTarget.teamId
@@ -282,7 +348,20 @@ const githubConnected = computed(() => props.connection?.provider === 'github' &
 const sortedRepositories = computed(() => [...props.repositories].sort((left, right) => (
   left.fullName.localeCompare(right.fullName) || left.id.localeCompare(right.id)
 )));
+const sourceRepositories = computed(() => [...props.sourceRepositories].sort((left, right) => (
+  left.name.localeCompare(right.name) || left.path.localeCompare(right.path)
+)));
 const currentItems = computed(() => form.repositoryId ? props.itemsByRepository[workItemsKey(form.provider, form.repositoryId)] ?? [] : []);
+const selectedBenchTemplateId = computed(() => (
+  form.actionMode.startsWith('bench:') ? form.actionMode.slice('bench:'.length) : ''
+));
+const selectedCustomFolderPath = computed(() => {
+  if (!form.sourceRepositoryPath || sourceRepositories.value.some((repository) => repository.path === form.sourceRepositoryPath)) {
+    return '';
+  }
+  return form.sourceRepositoryPath;
+});
+const selectedCustomFolderLabel = computed(() => basename(selectedCustomFolderPath.value) || selectedCustomFolderPath.value);
 const assigneeOptions = computed(() => {
   const assignees = new Set<string>();
   if (form.assigneeLogin) {
@@ -324,7 +403,7 @@ const suggestedBeforeCompletionInstructions = computed(() => (
 const canSubmit = computed(() => (
   githubConnected.value &&
   Boolean(form.repositoryId) &&
-  Boolean(form.benchTemplateId) &&
+  (form.actionMode === 'new-agent' ? Boolean(form.sourceRepositoryPath) : Boolean(selectedBenchTemplateId.value)) &&
   (form.teamMode === 'dedicated' || Boolean(form.teamId))
 ));
 
@@ -350,9 +429,15 @@ watch(() => props.repositories, (repositories) => {
 
 let lastSuggestedBeforeCompletionInstructions = suggestedBeforeCompletionInstructions.value;
 
+watch(() => props.sourceRepositories, (repositories) => {
+  if (!form.sourceRepositoryPath && repositories[0]) {
+    form.sourceRepositoryPath = repositories[0].path;
+  }
+});
+
 watch(() => props.benchTemplates, (templates) => {
-  if (!form.benchTemplateId && templates[0]) {
-    form.benchTemplateId = templates[0].id;
+  if (form.actionMode !== 'new-agent' && !selectedBenchTemplateId.value && templates[0]) {
+    form.actionMode = `bench:${templates[0].id}`;
   }
 });
 
@@ -379,10 +464,28 @@ function repositoryChanged(): void {
   }
 }
 
+async function selectSourceRepository(value: string): Promise<void> {
+  if (value !== pickFolderOptionValue) {
+    form.sourceRepositoryPath = value;
+    return;
+  }
+
+  const previousPath = form.sourceRepositoryPath;
+  const selectedFolder = await props.chooseAgentFolder();
+  form.sourceRepositoryPath = selectedFolder?.trim() || previousPath;
+}
+
 function submit(): void {
   if (!canSubmit.value) {
     return;
   }
+
+  const teamTarget = form.teamMode === 'dedicated'
+    ? { mode: 'dedicated' as const }
+    : { mode: 'existing' as const, teamId: form.teamId };
+  const cleanup = form.teamMode === 'dedicated'
+    ? { deleteTeam: form.cleanupDeleteTeam }
+    : { deleteAgent: form.cleanupDeleteAgent };
 
   emit('submit', {
     name: form.name,
@@ -397,21 +500,35 @@ function submit(): void {
       assignment: form.assignmentInstructions,
       beforeCompletion: form.beforeCompletionInstructions,
     },
-    action: {
-      type: 'create-agent-from-bench',
-      benchTemplateId: form.benchTemplateId,
-      teamTarget: form.teamMode === 'dedicated'
-        ? { mode: 'dedicated' }
-        : { mode: 'existing', teamId: form.teamId },
-      cleanup: form.teamMode === 'dedicated'
-        ? { deleteTeam: form.cleanupDeleteTeam }
-        : { deleteAgent: form.cleanupDeleteAgent },
-    },
+    action: form.actionMode === 'new-agent'
+      ? {
+        type: 'create-agent',
+        sourceRepositoryPath: form.sourceRepositoryPath,
+        teamTarget,
+        cleanup,
+      }
+      : {
+        type: 'create-agent-from-bench',
+        benchTemplateId: selectedBenchTemplateId.value,
+        teamTarget,
+        cleanup,
+      },
   });
+}
+
+function initialActionMode(loop: Loop | null | undefined): ActionMode {
+  if (loop?.action.type === 'create-agent-from-bench') {
+    return `bench:${loop.action.benchTemplateId}`;
+  }
+  return 'new-agent';
 }
 
 function workItemsKey(provider: 'github', repositoryId: string): string {
   return `${provider}:${repositoryId}`;
+}
+
+function basename(value: string): string {
+  return value.split(/[\\/]/).filter(Boolean).at(-1) ?? '';
 }
 </script>
 
@@ -512,7 +629,8 @@ function workItemsKey(provider: 'github', repositoryId: string): string {
   line-height: var(--line-height-18);
 }
 
-.loop-editor__bench-option {
+.loop-editor__bench-option,
+.loop-editor__repository-option {
   min-width: 0;
   display: inline-flex;
   align-items: center;
@@ -527,6 +645,14 @@ function workItemsKey(provider: 'github', repositoryId: string): string {
   line-height: var(--line-height-18);
 }
 
+.loop-editor__repository-option {
+  width: 100%;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.loop-editor__repository-option strong,
+.loop-editor__repository-option small,
 .loop-editor__bench-option strong,
 .loop-editor__bench-option small {
   overflow: hidden;
@@ -534,11 +660,13 @@ function workItemsKey(provider: 'github', repositoryId: string): string {
   white-space: nowrap;
 }
 
+.loop-editor__repository-option strong,
 .loop-editor__bench-option strong {
   color: var(--color-text);
   font-weight: var(--font-weight-regular);
 }
 
+.loop-editor__repository-option small,
 .loop-editor__bench-option small {
   color: var(--color-text-muted);
 }

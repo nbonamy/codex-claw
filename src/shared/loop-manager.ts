@@ -244,22 +244,40 @@ function normalizeLoopInstructions(instructions: CreateLoopInput['instructions']
 }
 
 function normalizeLoopAction(snapshot: AppSnapshot, action: LoopAction): LoopAction | null {
-  if (action.type !== 'create-agent-from-bench') {
-    return null;
-  }
-
-  const benchTemplateId = action.benchTemplateId.trim();
   const teamTarget = normalizeTeamTarget(snapshot, action.teamTarget);
-  if (!benchTemplateId || !snapshot.bench.some((template) => template.id === benchTemplateId) || !teamTarget) {
+  if (!teamTarget) {
     return null;
   }
 
-  return {
-    type: 'create-agent-from-bench',
-    benchTemplateId,
-    teamTarget,
-    cleanup: normalizeLoopCleanup(action.cleanup, teamTarget),
-  };
+  if (action.type === 'create-agent') {
+    const sourceRepositoryPath = action.sourceRepositoryPath.trim();
+    if (!sourceRepositoryPath) {
+      return null;
+    }
+
+    return {
+      type: 'create-agent',
+      sourceRepositoryPath,
+      teamTarget,
+      cleanup: normalizeLoopCleanup(action.cleanup, teamTarget),
+    };
+  }
+
+  if (action.type === 'create-agent-from-bench') {
+    const benchTemplateId = action.benchTemplateId.trim();
+    if (!benchTemplateId || !snapshot.bench.some((template) => template.id === benchTemplateId)) {
+      return null;
+    }
+
+    return {
+      type: 'create-agent-from-bench',
+      benchTemplateId,
+      teamTarget,
+      cleanup: normalizeLoopCleanup(action.cleanup, teamTarget),
+    };
+  }
+
+  return null;
 }
 
 function normalizeLoopCleanup(cleanup: LoopAction['cleanup'] | undefined, teamTarget: LoopTeamTarget): LoopAction['cleanup'] {

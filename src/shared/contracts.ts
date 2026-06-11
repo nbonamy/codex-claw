@@ -254,6 +254,12 @@ export type LoopTeamTarget =
 
 export type LoopAction =
   | {
+    type: 'create-agent';
+    sourceRepositoryPath: string;
+    teamTarget: LoopTeamTarget;
+    cleanup?: LoopCleanup;
+  }
+  | {
     type: 'create-agent-from-bench';
     benchTemplateId: string;
     teamTarget: LoopTeamTarget;

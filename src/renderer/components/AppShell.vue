@@ -72,6 +72,7 @@
       <LoopsView
         v-else-if="loopsVisible"
         :bench="snapshot.bench"
+        :choose-agent-folder="chooseAgentFolder"
         :clear-loop-history="clearLoopHistory"
         :create-loop="createLoop"
         :delete-loop-execution="deleteLoopExecution"
@@ -82,6 +83,7 @@
         :messages="snapshot.messages"
         :read-conversation-messages="readConversationMessages"
         :run-loop="runLoop"
+        :source-repositories="sourceRepositories"
         :teams="snapshot.teams"
         :update-loop="updateLoop"
         :work-backlog="snapshot.workBacklog"

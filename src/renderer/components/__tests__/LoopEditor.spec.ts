@@ -1,11 +1,11 @@
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
-import { describe, expect, it } from 'vitest';
-import type { BenchTemplate, Loop, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '../../../shared/contracts';
+import { describe, expect, it, vi } from 'vitest';
+import type { BenchTemplate, Loop, SourceRepository, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '../../../shared/contracts';
 import LoopEditor from '../LoopEditor.vue';
 
 describe('LoopEditor', () => {
-  it('emits a loop configuration with repo, assignee, tag, bench agent, and team target', async () => {
+  it('emits a loop configuration with repo, assignee, tag, new agent, and team target', async () => {
     const wrapper = mountEditor();
 
     await wrapper.findAllComponents({ name: 'ElSelect' })[2]?.vm.$emit('update:modelValue', 'nbonamy');
@@ -27,8 +27,8 @@ describe('LoopEditor', () => {
           beforeCompletion: 'Before marking this work item complete, remove the "bug" tag from the GitHub issue.',
         },
         action: {
-          type: 'create-agent-from-bench',
-          benchTemplateId: 'bench-dina',
+          type: 'create-agent',
+          sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
           teamTarget: {
             mode: 'existing',
             teamId: 'team-codex-claw',
@@ -39,6 +39,51 @@ describe('LoopEditor', () => {
         },
       },
     ]]);
+  });
+
+  it('can select a Bench agent from the agent selector', async () => {
+    const wrapper = mountEditor();
+
+    await wrapper.findAllComponents({ name: 'ElSelect' })[4]?.vm.$emit('update:modelValue', 'bench:bench-dina');
+    await wrapper.find('form').trigger('submit');
+
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({
+      action: {
+        type: 'create-agent-from-bench',
+        benchTemplateId: 'bench-dina',
+      },
+    });
+  });
+
+  it('can pick a custom folder for new agents', async () => {
+    const chooseAgentFolder = vi.fn().mockResolvedValue('/Users/nbonamy/src/id8');
+    const wrapper = mountEditor({ chooseAgentFolder });
+
+    await wrapper.findAllComponents({ name: 'ElSelect' })[7]?.vm.$emit('update:modelValue', '__pick-folder__');
+    await wrapper.find('form').trigger('submit');
+
+    expect(chooseAgentFolder).toHaveBeenCalledOnce();
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({
+      action: {
+        type: 'create-agent',
+        sourceRepositoryPath: '/Users/nbonamy/src/id8',
+      },
+    });
+  });
+
+  it('keeps the previous repository if folder picking is cancelled', async () => {
+    const chooseAgentFolder = vi.fn().mockResolvedValue(null);
+    const wrapper = mountEditor({ chooseAgentFolder });
+
+    await wrapper.findAllComponents({ name: 'ElSelect' })[7]?.vm.$emit('update:modelValue', '__pick-folder__');
+    await wrapper.find('form').trigger('submit');
+
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({
+      action: {
+        type: 'create-agent',
+        sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+      },
+    });
   });
 
   it('supports dedicated teams per ticket', async () => {
@@ -125,16 +170,19 @@ describe('LoopEditor', () => {
 
 function mountEditor(overrides: Partial<{
   benchTemplates: BenchTemplate[];
+  chooseAgentFolder: () => Promise<string | null>;
   connection: WorkIntegrationConnection;
   itemsByRepository: Record<string, WorkItem[]>;
   loop: Loop;
   repositories: WorkRepository[];
+  sourceRepositories: SourceRepository[];
   teams: Team[];
 }> = {}) {
   return mount(LoopEditor, {
     props: {
       mode: 'create',
       benchTemplates: overrides.benchTemplates ?? benchTemplates(),
+      chooseAgentFolder: overrides.chooseAgentFolder,
       connection: overrides.connection ?? {
         provider: 'github',
         status: 'connected',
@@ -152,6 +200,11 @@ function mountEditor(overrides: Partial<{
         fullName: 'nbonamy/codex-claw',
         url: 'https://github.com/nbonamy/codex-claw',
         isPrivate: true,
+      }],
+      sourceRepositories: overrides.sourceRepositories ?? [{
+        name: 'codex-claw',
+        path: '/Users/nbonamy/src/codex-claw',
+        worktrees: [],
       }],
       teams: overrides.teams ?? [{
         id: 'team-codex-claw',

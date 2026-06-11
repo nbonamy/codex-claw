@@ -16,11 +16,13 @@
             v-if="editorVisible"
             :key="editorKey"
             :bench-templates="bench"
+            :choose-agent-folder="chooseAgentFolder"
             :connection="githubConnection"
             :items-by-repository="workItemsByRepository"
             :loop="editingLoop"
             :mode="editorMode"
             :repositories="githubRepositories"
+            :source-repositories="sourceRepositories"
             :teams="teams"
             @cancel="closeEditor"
             @load-items="loadGitHubItems"
@@ -146,7 +148,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onMounted, ref } from 'vue';
-import type { AppSnapshot, BackendConversationRef, CreateLoopInput, Loop, RendererMessage, UpdateLoopInput, WorkItem, WorkProviderKind, WorkRepository } from '../../shared/contracts';
+import type { AppSnapshot, BackendConversationRef, CreateLoopInput, Loop, RendererMessage, SourceRepository, UpdateLoopInput, WorkItem, WorkProviderKind, WorkRepository } from '../../shared/contracts';
 import AppDataList from './AppDataList.vue';
 import type { AppDataListColumn, AppDataListRow } from './app-data-list';
 import AppMenu from '../shared/menu/AppMenu.vue';
@@ -159,6 +161,7 @@ import { DotsVerticalIcon, LogsIcon, PencilIcon, PlayerPlayIcon, Trash2Icon } fr
 
 const props = withDefaults(defineProps<{
   bench: AppSnapshot['bench'];
+  chooseAgentFolder?: () => Promise<string | null>;
   clearLoopHistory?: (loopId: string) => Promise<void>;
   createLoop?: (input: CreateLoopInput) => Promise<void>;
   deleteLoopExecution?: (loopId: string, executionId: string) => Promise<void>;
@@ -169,6 +172,7 @@ const props = withDefaults(defineProps<{
   messages?: RendererMessage[];
   runLoop?: (loopId: string) => Promise<void>;
   readConversationMessages?: (ref: BackendConversationRef, agentId: string) => Promise<RendererMessage[]>;
+  sourceRepositories?: SourceRepository[];
   teams: AppSnapshot['teams'];
   updateLoop?: (input: UpdateLoopInput) => Promise<void>;
   workBacklog: AppSnapshot['workBacklog'];
@@ -178,6 +182,7 @@ const props = withDefaults(defineProps<{
   workRepositoriesByProvider?: Partial<Record<WorkProviderKind, WorkRepository[]>>;
 }>(), {
   clearLoopHistory: async () => undefined,
+  chooseAgentFolder: async () => null,
   createLoop: async () => undefined,
   deleteLoopExecution: async () => undefined,
   deleteLoop: async () => undefined,
@@ -186,6 +191,7 @@ const props = withDefaults(defineProps<{
   messages: () => [],
   readConversationMessages: async () => [],
   runLoop: async () => undefined,
+  sourceRepositories: () => [],
   updateLoop: async () => undefined,
   workBacklogError: null,
   workBacklogStatus: 'notLoaded',
@@ -403,7 +409,12 @@ function loopSourceLabel(loop: Loop): string {
 }
 
 function loopAgentName(loop: Loop): string {
-  const template = props.bench.find((candidate) => candidate.id === loop.action.benchTemplateId);
+  const action = loop.action;
+  if (action.type === 'create-agent') {
+    return 'New Agent';
+  }
+
+  const template = props.bench.find((candidate) => candidate.id === action.benchTemplateId);
   return template ? template.name : 'Missing Bench agent';
 }
 

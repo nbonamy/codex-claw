@@ -281,6 +281,51 @@ describe('LoopRunner', () => {
     expect(sendPrompt).toHaveBeenCalledOnce();
   });
 
+  it('creates plain agents from a selected source repository', async () => {
+    const snapshot = createInitialSnapshot();
+    createLoopInSnapshot(snapshot, {
+      name: 'GitHub bugs',
+      source: {
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
+        tagName: 'bug',
+      },
+      action: {
+        type: 'create-agent',
+        sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        teamTarget: {
+          mode: 'existing',
+          teamId: 'team-codex-claw',
+        },
+      },
+    }, '2026-06-09T10:01:00.000Z', () => 'loop-bugs');
+    const sendPrompt = vi.fn().mockResolvedValue(undefined);
+    const runner = new LoopRunner({
+      getSnapshot: () => snapshot,
+      listWorkItems: {
+        listItems: vi.fn().mockResolvedValue([workItem(12, 'Fix cockpit', ['bug'])]),
+      },
+      notifySnapshotUpdated: vi.fn(),
+      saveSnapshot: vi.fn().mockResolvedValue(undefined),
+      sendPrompt,
+      createExecutionId: () => 'loop-exec-bugs',
+      now: () => new Date('2026-06-09T11:00:00.000Z'),
+    });
+
+    await runner.runAll();
+
+    const assignment = snapshot.workBacklog.assignments[workItemAssignmentKey(workItem(12, 'Fix cockpit', ['bug']))];
+    expect(snapshot.activeAgentId).toBe('agent-dina');
+    expect(snapshot.activeTeamId).toBe('team-codex-claw');
+    expect(snapshot.agents.find((agent) => agent.id === assignment?.agentId)).toMatchObject({
+      name: 'GitHub #12',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      teamId: 'team-codex-claw',
+    });
+    expect(sendPrompt).toHaveBeenCalledOnce();
+  });
+
   it('filters loop items by repository, state, assignee, and tag', () => {
     const snapshot = createInitialSnapshot();
     snapshot.bench.push({

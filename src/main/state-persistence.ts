@@ -543,6 +543,15 @@ function cloneLoopExecutionEntry(entry: LoopExecutionLogEntry): LoopExecutionLog
 }
 
 function cloneLoopAction(action: LoopAction): LoopAction {
+  if (action.type === 'create-agent') {
+    return {
+      type: action.type,
+      sourceRepositoryPath: action.sourceRepositoryPath,
+      teamTarget: { ...action.teamTarget },
+      ...(action.cleanup ? { cleanup: { ...action.cleanup } } : {}),
+    };
+  }
+
   if (action.type === 'create-agent-from-bench') {
     return {
       type: action.type,
@@ -728,22 +737,44 @@ function sanitizeLoopSource(value: unknown): LoopSourceConfiguration | null {
 }
 
 function sanitizeLoopAction(value: unknown): LoopAction | null {
-  if (!isRecord(value) || value.type !== 'create-agent-from-bench') {
+  if (!isRecord(value)) {
     return null;
   }
 
-  const benchTemplateId = optionalTrimmedString(value.benchTemplateId);
   const teamTarget = sanitizeLoopTeamTarget(value.teamTarget);
-  if (!benchTemplateId || !teamTarget) {
+  if (!teamTarget) {
     return null;
   }
 
-  return {
-    type: 'create-agent-from-bench',
-    benchTemplateId,
-    teamTarget,
-    cleanup: sanitizeLoopCleanup(value.cleanup, teamTarget),
-  };
+  if (value.type === 'create-agent') {
+    const sourceRepositoryPath = optionalTrimmedString(value.sourceRepositoryPath);
+    if (!sourceRepositoryPath) {
+      return null;
+    }
+
+    return {
+      type: 'create-agent',
+      sourceRepositoryPath,
+      teamTarget,
+      cleanup: sanitizeLoopCleanup(value.cleanup, teamTarget),
+    };
+  }
+
+  if (value.type === 'create-agent-from-bench') {
+    const benchTemplateId = optionalTrimmedString(value.benchTemplateId);
+    if (!benchTemplateId) {
+      return null;
+    }
+
+    return {
+      type: 'create-agent-from-bench',
+      benchTemplateId,
+      teamTarget,
+      cleanup: sanitizeLoopCleanup(value.cleanup, teamTarget),
+    };
+  }
+
+  return null;
 }
 
 function sanitizeLoopCleanup(value: unknown, teamTarget: LoopTeamTarget): LoopAction['cleanup'] {
