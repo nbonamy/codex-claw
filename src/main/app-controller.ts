@@ -1309,6 +1309,10 @@ export class AppController {
     this.addRecentSourceRepository(path.basename(repoPath));
     await this.persistSnapshot();
     const agent = this.snapshot.agents.find((candidate) => !previousAgentIds.has(candidate.id));
+    this.emitAndApply({
+      type: 'snapshot.updated',
+      payload: this.snapshot,
+    });
     return {
       success: true,
       ...(agent?.id ? { agentId: agent.id } : {}),

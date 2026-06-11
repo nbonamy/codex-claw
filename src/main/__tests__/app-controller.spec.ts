@@ -31,6 +31,45 @@ describe('AppController', () => {
     expect(persistence.save).toHaveBeenCalledWith(snapshot);
   });
 
+  it('broadcasts snapshot updates when MCP tools create agents', async () => {
+    const folder = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-agent-'));
+    const snapshot = createInitialSnapshot();
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const send = vi.fn();
+
+    try {
+      await controller.initialize();
+      setMainWindowSend(controller, send);
+      const result = await mcpCoordinator(controller).createAgent('agent-dina', {
+        name: 'Jean',
+        repoPath: folder,
+      });
+      await flushMicrotasks();
+
+      const createdAgent = snapshot.agents.find((agent) => agent.name === 'Jean');
+      expect(result).toMatchObject({
+        success: true,
+        agentId: createdAgent?.id,
+      });
+      expect(createdAgent).toMatchObject({
+        folder,
+        teamId: 'team-codex-claw',
+      });
+      expect(snapshot.teams[0]?.agentIds).toContain(createdAgent?.id);
+      expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
+        type: 'snapshot.updated',
+        payload: snapshot,
+      }));
+      expect(persistence.save).toHaveBeenCalledWith(snapshot);
+    } finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  });
+
   it('persists work item completion updates emitted by MCP tools', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.workBacklog.assignments = {
@@ -1327,12 +1366,14 @@ describe('AppController', () => {
 });
 
 function mcpCoordinator(controller: AppController): {
+  createAgent(agentId: string, input: { avatar?: string; backend?: 'codex' | 'claude'; branchName?: string; createWorktree?: boolean; destinationPath?: string; name?: string; repoPath: string }): Promise<unknown>;
   setStatus(agentId: string, status: string): string;
   displayMarkdown(agentId: string, input: { markdown?: string; path?: string; title?: string }): Promise<unknown>;
   markWorkItemCompleted(agentId: string, workItemId: string, confirmCompletion?: boolean): Promise<unknown>;
 } {
   return (controller as unknown as {
     mcpCoordinator: {
+      createAgent(agentId: string, input: { avatar?: string; backend?: 'codex' | 'claude'; branchName?: string; createWorktree?: boolean; destinationPath?: string; name?: string; repoPath: string }): Promise<unknown>;
       setStatus(agentId: string, status: string): string;
       displayMarkdown(agentId: string, input: { markdown?: string; path?: string; title?: string }): Promise<unknown>;
       markWorkItemCompleted(agentId: string, workItemId: string, confirmCompletion?: boolean): Promise<unknown>;
