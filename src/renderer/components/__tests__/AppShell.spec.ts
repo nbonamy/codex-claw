@@ -4,7 +4,7 @@ import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '../../../shared/snapshot';
-import type { Agent, AppCommand, AppSnapshot, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, RendererMessage, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '../../../shared/contracts';
+import type { Agent, AppCommand, AppSnapshot, BackendConversationRef, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, RendererMessage, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '../../../shared/contracts';
 import { workItemAssignmentKey } from '../../../shared/work-assignments';
 import { i18n } from '../../i18n';
 
@@ -738,6 +738,75 @@ describe('AppShell', () => {
     expect(wrapper.get('[aria-label="Loops"]').attributes('aria-pressed')).toBe('true');
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.text()).toContain('A loop is an automation that just works for you.');
+  });
+
+  it('opens a loop execution conversation from the logs view', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.loops = [{
+      id: 'loop-bugs',
+      name: 'GitHub bugs',
+      enabled: true,
+      source: {
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
+      },
+      action: {
+        type: 'create-agent-from-bench',
+        benchTemplateId: 'bench-dina',
+        teamTarget: {
+          mode: 'existing',
+          teamId: 'team-codex-claw',
+        },
+      },
+      instructions: {},
+      executionLog: [{
+        id: 'loop-exec-1',
+        loopId: 'loop-bugs',
+        startedAt: '2026-06-09T10:00:00.000Z',
+        completedAt: '2026-06-09T10:01:00.000Z',
+        status: 'completed',
+        createdCount: 1,
+        createdAgents: [{
+          agentId: 'agent-jesse',
+          agentName: 'Jesse',
+          workItemId: 'github:nbonamy/codex-claw#12',
+          workItemTitle: 'Fix cockpit',
+          workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
+          conversationRef: { backend: 'codex', threadId: 'thread-jesse' },
+        }],
+      }],
+      createdAt: '2026-06-09T09:59:00.000Z',
+      updatedAt: '2026-06-09T10:01:00.000Z',
+    }];
+    snapshot.messages = [{
+      id: 'message-jesse-user',
+      agentId: 'agent-jesse',
+      role: 'user',
+      status: 'complete',
+      createdAt: '2026-06-09T10:00:02.000Z',
+      parts: [{ type: 'text', text: 'Please fix cockpit from the loop.' }],
+    }, {
+      id: 'message-jesse-assistant',
+      agentId: 'agent-jesse',
+      role: 'assistant',
+      status: 'complete',
+      createdAt: '2026-06-09T10:00:45.000Z',
+      parts: [{ type: 'text', text: 'Loop work is ready.' }],
+    }];
+    const readConversationMessages = vi.fn().mockResolvedValue(snapshot.messages);
+    const wrapper = mountShell({ snapshot, readConversationMessages });
+
+    await wrapper.get('[aria-label="Loops"]').trigger('click');
+    await wrapper.get('[aria-label="View logs for GitHub bugs"]').trigger('click');
+    await wrapper.get('[aria-label="View conversation for github:nbonamy/codex-claw#12"]').trigger('click');
+    await flushPromises();
+
+    expect(readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-jesse' }, 'agent-jesse');
+    expect(wrapper.emitted('select-agent')).toBeUndefined();
+    expect(wrapper.find('.loops-view').exists()).toBe(true);
+    expect(wrapper.find('.loop-execution-conversation-overlay').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Please fix cockpit from the loop.');
+    expect(wrapper.text()).toContain('Loop work is ready.');
   });
 
   it('forwards cockpit agent context menu actions', async () => {
@@ -1659,7 +1728,9 @@ function mountShell(overrides: Partial<{
   createLoop: (input: CreateLoopInput) => Promise<void>;
   updateLoop: (input: UpdateLoopInput) => Promise<void>;
   clearLoopHistory: (loopId: string) => Promise<void>;
+  deleteLoopExecution: (loopId: string, executionId: string) => Promise<void>;
   deleteLoop: (loopId: string) => Promise<void>;
+  readConversationMessages: (ref: BackendConversationRef, agentId: string) => Promise<RendererMessage[]>;
   configureWorkBacklog: (input: WorkBacklogConfigurationInput) => Promise<void>;
   loadWorkRepositories: (provider: WorkProviderKind) => Promise<void>;
   loadWorkItems: (provider: WorkProviderKind, repositoryId: string) => Promise<void>;
@@ -1672,7 +1743,7 @@ function mountShell(overrides: Partial<{
     props: {
       snapshot,
       activeAgent: snapshot.agents.find((agent) => agent.id === snapshot.activeAgentId) ?? null,
-      messages: [],
+      messages: snapshot.messages,
       isLoading: false,
       isSending: false,
       chooseAgentFolder: overrides.chooseAgentFolder ?? vi.fn().mockResolvedValue(null),
@@ -1685,7 +1756,9 @@ function mountShell(overrides: Partial<{
       createLoop: overrides.createLoop ?? vi.fn().mockResolvedValue(undefined),
       updateLoop: overrides.updateLoop ?? vi.fn().mockResolvedValue(undefined),
       clearLoopHistory: overrides.clearLoopHistory ?? vi.fn().mockResolvedValue(undefined),
+      deleteLoopExecution: overrides.deleteLoopExecution ?? vi.fn().mockResolvedValue(undefined),
       deleteLoop: overrides.deleteLoop ?? vi.fn().mockResolvedValue(undefined),
+      readConversationMessages: overrides.readConversationMessages ?? vi.fn().mockResolvedValue([]),
       configureWorkBacklog: overrides.configureWorkBacklog ?? vi.fn().mockResolvedValue(undefined),
       loadWorkRepositories: overrides.loadWorkRepositories ?? vi.fn().mockResolvedValue(undefined),
       loadWorkItems: overrides.loadWorkItems ?? vi.fn().mockResolvedValue(undefined),

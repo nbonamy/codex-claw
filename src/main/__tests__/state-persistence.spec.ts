@@ -517,8 +517,20 @@ describe('AppStatePersistence', () => {
           workItemId: 'github:nbonamy/codex-claw#12',
           workItemTitle: 'Fix cockpit',
           workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
-          conversationId: 'thread-dina',
-          turnId: 'turn-dina',
+          conversationRef: { backend: 'codex', threadId: 'thread-dina' },
+        }],
+      }, {
+        id: 'loop-exec-2',
+        loopId: 'loop-bugs',
+        startedAt: '2026-06-09T10:04:00.000Z',
+        status: 'working',
+        createdCount: 1,
+        createdAgents: [{
+          agentId: 'agent-jesse',
+          agentName: 'Jesse',
+          workItemId: 'github:nbonamy/codex-claw#13',
+          workItemTitle: 'Fix loop timestamps',
+          workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/13',
         }],
       }],
     }];

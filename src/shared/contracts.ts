@@ -270,7 +270,18 @@ export type LoopInstructions = {
   beforeCompletion?: string;
 };
 
-export type LoopExecutionStatus = 'completed' | 'failed';
+export type LoopExecutionStatus = 'working' | 'completed' | 'failed';
+
+export type BackendConversationRef =
+  | {
+    backend: 'codex';
+    threadId: string;
+  }
+  | {
+    backend: 'claude';
+    folder: string;
+    sessionId: string;
+  };
 
 export type LoopExecutionCreatedAgent = {
   agentId: string;
@@ -278,15 +289,14 @@ export type LoopExecutionCreatedAgent = {
   workItemId: string;
   workItemTitle: string;
   workItemUrl: string;
-  conversationId?: string;
-  turnId?: string;
+  conversationRef?: BackendConversationRef;
 };
 
 export type LoopExecutionLogEntry = {
   id: string;
   loopId: string;
   startedAt: string;
-  completedAt: string;
+  completedAt?: string;
   status: LoopExecutionStatus;
   createdCount: number;
   createdAgents: LoopExecutionCreatedAgent[];
@@ -755,7 +765,9 @@ export type CodexClawApi = {
   updateLoop(input: UpdateLoopInput): Promise<AppSnapshot>;
   runLoop(loopId: string): Promise<AppSnapshot>;
   clearLoopHistory(loopId: string): Promise<AppSnapshot>;
+  deleteLoopExecution(loopId: string, executionId: string): Promise<AppSnapshot>;
   deleteLoop(loopId: string): Promise<AppSnapshot>;
+  readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]>;
   createAgent(input: CreateAgentInput): Promise<AppSnapshot>;
   updateAgent(input: UpdateAgentInput): Promise<AppSnapshot>;
   assignWorkItemToAgent(agentId: string, item: WorkItem): Promise<AppSnapshot>;

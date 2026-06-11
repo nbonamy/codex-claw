@@ -1,11 +1,13 @@
 import type {
   Agent,
   BackendCapabilities,
+  BackendConversationRef,
   BackendModelOption,
   BackendRuntimeStatus,
   BackendSession,
   BackendSkillSummary,
   ClientRequestResponse,
+  RendererMessage,
   RendererToolPart,
   SendPromptOptions,
 } from '../../shared/contracts';
@@ -188,6 +190,28 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
     }
 
     return history.backendSession;
+  }
+
+  async readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]> {
+    if (ref.backend !== 'claude') {
+      throw new Error('Claude cannot read non-Claude conversation history.');
+    }
+
+    const history = await this.historyLoader({
+      id: agentId,
+      name: agentId,
+      folder: ref.folder,
+      backend: 'claude',
+      backendSession: {
+        kind: 'claude',
+        sessionId: ref.sessionId,
+        transport: 'stdio',
+      },
+      status: { type: 'idle' },
+      createdAt: new Date(0).toISOString(),
+      updatedAt: new Date(0).toISOString(),
+    });
+    return history?.messages ?? [];
   }
 
   onEvent(listener: EventListener): () => void {

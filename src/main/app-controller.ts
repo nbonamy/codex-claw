@@ -39,7 +39,7 @@ import {
   saveAgentToBench,
 } from '../shared/agent-manager';
 import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selectTeam, updateTeamInSnapshot } from '../shared/team-manager';
-import { clearLoopExecutionHistoryInSnapshot, createLoopInSnapshot, deleteLoopFromSnapshot, updateLoopExecutionAgentConversationInSnapshot, updateLoopInSnapshot } from '../shared/loop-manager';
+import { clearLoopExecutionHistoryInSnapshot, completeLoopExecutionInSnapshot, createLoopInSnapshot, deleteLoopExecutionFromSnapshot, deleteLoopFromSnapshot, updateLoopExecutionAgentConversationInSnapshot, updateLoopInSnapshot } from '../shared/loop-manager';
 import { updateSettingsInSnapshot } from '../shared/settings';
 import {
   applyMainEventToSnapshot,
@@ -50,7 +50,7 @@ import {
   updateAgentFolder,
 } from './snapshot-service';
 import { AppStatePersistence } from './state-persistence';
-import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogAssignment, WorkBacklogConfigurationInput, WorkProviderKind } from '../shared/contracts';
+import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogAssignment, WorkBacklogConfigurationInput, WorkProviderKind } from '../shared/contracts';
 import { codexBackendDefaultsWithApprovalPreset, isCodexApprovalPreset } from '../shared/codex-approval-presets';
 import { ipcChannels } from '../shared/ipc';
 import { teamColors } from '../shared/team-colors';
@@ -282,6 +282,15 @@ export class AppController {
       return this.snapshot;
     });
 
+    ipcMain.handle(ipcChannels.deleteLoopExecution, async (_event, loopId: string, executionId: string) => {
+      const loop = deleteLoopExecutionFromSnapshot(this.snapshot, loopId, executionId);
+      if (!loop) {
+        throw new Error(`Loop execution not found: ${loopId}/${executionId}`);
+      }
+      await this.persistSnapshot();
+      return this.snapshot;
+    });
+
     ipcMain.handle(ipcChannels.deleteLoop, async (_event, loopId: string) => {
       const loop = deleteLoopFromSnapshot(this.snapshot, loopId);
       if (!loop) {
@@ -289,6 +298,10 @@ export class AppController {
       }
       await this.persistSnapshot();
       return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.readConversationMessages, async (_event, ref: unknown, agentId: string) => {
+      return this.readConversationMessages(ref, agentId);
     });
 
     ipcMain.handle(ipcChannels.createAgent, async (_event, input: CreateAgentInput) => {
@@ -553,9 +566,13 @@ export class AppController {
   }
 
   private async recordLoopPromptStarted(agentId: string, context: LoopPromptContext, result: BackendSendResult): Promise<void> {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) {
+      return;
+    }
+
     const loop = updateLoopExecutionAgentConversationInSnapshot(this.snapshot, context.loopId, context.executionId, agentId, {
-      conversationId: conversationIdFromSendResult(result),
-      ...(result.turnId ? { turnId: result.turnId } : {}),
+      conversationRef: conversationRefFromSendResult(agent, result),
       updatedAt: new Date().toISOString(),
     });
     if (!loop) {
@@ -567,6 +584,21 @@ export class AppController {
       type: 'snapshot.updated',
       payload: this.snapshot,
     });
+  }
+
+  private async readConversationMessages(ref: unknown, agentId: string): Promise<RendererMessage[]> {
+    if (!isBackendConversationRef(ref) || typeof agentId !== 'string' || !agentId.trim()) {
+      throw new Error('Invalid conversation reference.');
+    }
+    if (!this.isStoredConversationRef(ref, agentId)) {
+      throw new Error('Conversation reference is not available.');
+    }
+
+    const driver = await this.getBackendDriver(ref.backend);
+    if (!driver.readConversationMessages) {
+      throw new Error(`${backendDisplayName(ref.backend)} does not support conversation history.`);
+    }
+    return driver.readConversationMessages(ref, agentId);
   }
 
   private async setNewConversationTitle(agent: Agent, driver: AgentBackendDriver, wasNewSession: boolean): Promise<void> {
@@ -790,7 +822,17 @@ export class AppController {
       type: 'workBacklog.assignmentUpdated',
       payload: completedAssignment,
     });
+    const completedLoop = completedAssignment.loopId &&
+      completedAssignment.loopExecutionId &&
+      this.isLoopExecutionComplete(completedAssignment.loopId, completedAssignment.loopExecutionId)
+      ? completeLoopExecutionInSnapshot(this.snapshot, completedAssignment.loopId, completedAssignment.loopExecutionId, completedAt)
+      : null;
     if (this.cleanupCompletedLoopAssignment(agent, completedAssignment)) {
+      this.emitAndApply({
+        type: 'snapshot.updated',
+        payload: this.snapshot,
+      });
+    } else if (completedLoop) {
       this.emitAndApply({
         type: 'snapshot.updated',
         payload: this.snapshot,
@@ -812,6 +854,28 @@ export class AppController {
 
     const loop = this.snapshot.loops.find((candidate) => candidate.id === loopId);
     return loop?.instructions.beforeCompletion?.trim() ?? '';
+  }
+
+  private isLoopExecutionComplete(loopId: string, executionId: string): boolean {
+    const execution = this.snapshot.loops
+      .find((candidate) => candidate.id === loopId)
+      ?.executionLog.find((candidate) => candidate.id === executionId);
+    if (!execution || execution.createdAgents.length === 0) {
+      return false;
+    }
+
+    return execution.createdAgents.every((createdAgent) => (
+      this.snapshot.workBacklog.assignments[createdAgent.workItemId]?.status === 'completed'
+    ));
+  }
+
+  private isStoredConversationRef(ref: BackendConversationRef, agentId: string): boolean {
+    return this.snapshot.loops.some((loop) => loop.executionLog.some((entry) => (
+      entry.createdAgents.some((createdAgent) => (
+        createdAgent.agentId === agentId &&
+        (createdAgent.conversationRef ? sameConversationRef(createdAgent.conversationRef, ref) : false)
+      ))
+    )));
   }
 
   private cleanupCompletedLoopAssignment(agent: Agent, assignment: WorkBacklogAssignment): boolean {
@@ -1464,10 +1528,35 @@ function rendererMessageText(message: RendererMessage): string {
     .trim();
 }
 
-function conversationIdFromSendResult(result: BackendSendResult): string {
+function conversationRefFromSendResult(agent: Agent, result: BackendSendResult): BackendConversationRef {
   return result.backendSession.kind === 'codex'
-    ? result.backendSession.threadId
-    : result.backendSession.sessionId;
+    ? { backend: 'codex', threadId: result.backendSession.threadId }
+    : { backend: 'claude', folder: agent.folder, sessionId: result.backendSession.transcriptSessionId ?? result.backendSession.sessionId };
+}
+
+function isBackendConversationRef(value: unknown): value is BackendConversationRef {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  if (candidate.backend === 'codex') {
+    return typeof candidate.threadId === 'string' && candidate.threadId.trim().length > 0;
+  }
+
+  return candidate.backend === 'claude' &&
+    typeof candidate.folder === 'string' &&
+    candidate.folder.trim().length > 0 &&
+    typeof candidate.sessionId === 'string' &&
+    candidate.sessionId.trim().length > 0;
+}
+
+function sameConversationRef(left: BackendConversationRef, right: BackendConversationRef): boolean {
+  if (left.backend === 'codex') {
+    return right.backend === 'codex' && left.threadId === right.threadId;
+  }
+
+  return right.backend === 'claude' && left.folder === right.folder && left.sessionId === right.sessionId;
 }
 
 function turnIdFromRendererMessageId(messageId: string): string | null {

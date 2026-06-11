@@ -13,198 +13,200 @@
       />
     </header>
 
-    <div
-      v-if="!githubConnected"
-      class="loop-editor__notice"
-    >
-      Connect GitHub in Settings before saving a loop.
-    </div>
-
-    <section class="loop-editor__section">
-      <label for="loop-editor-name">Name</label>
-      <el-input
-        id="loop-editor-name"
-        v-model="form.name"
-        placeholder="Loop name"
-      />
-    </section>
-
-    <section class="loop-editor__grid">
-      <div class="loop-editor__section">
-        <label for="loop-editor-provider">Provider</label>
-        <el-select
-          id="loop-editor-provider"
-          v-model="form.provider"
-          disabled
-          aria-label="Loop provider"
-        >
-          <el-option label="GitHub" value="github" />
-        </el-select>
-      </div>
-
-      <div class="loop-editor__section">
-        <label for="loop-editor-repository">Repository</label>
-        <el-select
-          id="loop-editor-repository"
-          v-model="form.repositoryId"
-          filterable
-          placeholder="Select repo"
-          aria-label="Loop repository"
-          :disabled="!githubConnected || sortedRepositories.length === 0"
-          @change="repositoryChanged"
-        >
-          <el-option
-            v-for="repository in sortedRepositories"
-            :key="repository.id"
-            :label="repository.fullName"
-            :value="repository.id"
-          />
-        </el-select>
-      </div>
-    </section>
-
-    <section class="loop-editor__section">
-      <label for="loop-editor-assignee">Assigned to</label>
-      <el-select
-        id="loop-editor-assignee"
-        v-model="form.assigneeLogin"
-        clearable
-        filterable
-        placeholder="Anyone"
-        aria-label="Loop assignee"
-        :disabled="!form.repositoryId || assigneeOptions.length === 0"
-      >
-        <el-option
-          v-for="assignee in assigneeOptions"
-          :key="assignee.value"
-          :label="assignee.label"
-          :value="assignee.value"
-        />
-      </el-select>
-    </section>
-
-    <section class="loop-editor__section">
-      <label for="loop-editor-tag">Tag</label>
-      <el-select
-        id="loop-editor-tag"
-        v-model="form.tagName"
-        clearable
-        filterable
-        placeholder="Any tag"
-        aria-label="Loop tag"
-        :disabled="!form.repositoryId || tagOptions.length === 0"
-      >
-        <el-option
-          v-for="tag in tagOptions"
-          :key="tag"
-          :label="tag"
-          :value="tag"
-        />
-      </el-select>
-    </section>
-
-    <section class="loop-editor__section">
-      <label for="loop-editor-assignment-instructions">Assignment instructions</label>
-      <el-input
-        id="loop-editor-assignment-instructions"
-        v-model="form.assignmentInstructions"
-        type="textarea"
-        :rows="3"
-        placeholder="Optional instructions to include when the ticket is assigned"
-      />
-    </section>
-
-    <section class="loop-editor__section">
-      <label for="loop-editor-completion-instructions">Before completion</label>
-      <el-input
-        id="loop-editor-completion-instructions"
-        v-model="form.beforeCompletionInstructions"
-        type="textarea"
-        :rows="3"
-        placeholder="Optional instructions to show when the agent marks the ticket complete"
-      />
-    </section>
-
-    <section class="loop-editor__section">
-      <label for="loop-editor-bench">Bench Agent</label>
-      <el-select
-        id="loop-editor-bench"
-        v-model="form.benchTemplateId"
-        filterable
-        placeholder="Select Bench agent"
-        aria-label="Loop Bench agent"
-        :disabled="benchTemplates.length === 0"
-      >
-        <el-option
-          v-for="template in benchTemplates"
-          :key="template.id"
-          :label="template.name"
-          :value="template.id"
-        >
-          <span class="loop-editor__bench-option">
-            <AgentAvatar
-              :avatar="template.avatar"
-              :name="template.name"
-              size="sm"
-            />
-            <span>
-              <strong>{{ template.name }}</strong>
-              <small>{{ template.folder }}</small>
-            </span>
-          </span>
-        </el-option>
-      </el-select>
-    </section>
-
-    <section class="loop-editor__grid">
-      <div class="loop-editor__section">
-        <label for="loop-editor-team-mode">Team</label>
-        <el-select
-          id="loop-editor-team-mode"
-          v-model="form.teamMode"
-          aria-label="Loop team mode"
-        >
-          <el-option label="Existing team" value="existing" />
-          <el-option label="Dedicated team per ticket" value="dedicated" />
-        </el-select>
-      </div>
-
+    <div class="loop-editor__body">
       <div
-        v-if="form.teamMode === 'existing'"
-        class="loop-editor__section"
+        v-if="!githubConnected"
+        class="loop-editor__notice"
       >
-        <label for="loop-editor-team">Target Team</label>
+        Connect GitHub in Settings before saving a loop.
+      </div>
+
+      <section class="loop-editor__section">
+        <label for="loop-editor-name">Name</label>
+        <el-input
+          id="loop-editor-name"
+          v-model="form.name"
+          placeholder="Loop name"
+        />
+      </section>
+
+      <section class="loop-editor__grid">
+        <div class="loop-editor__section">
+          <label for="loop-editor-provider">Provider</label>
+          <el-select
+            id="loop-editor-provider"
+            v-model="form.provider"
+            disabled
+            aria-label="Loop provider"
+          >
+            <el-option label="GitHub" value="github" />
+          </el-select>
+        </div>
+
+        <div class="loop-editor__section">
+          <label for="loop-editor-repository">Repository</label>
+          <el-select
+            id="loop-editor-repository"
+            v-model="form.repositoryId"
+            filterable
+            placeholder="Select repo"
+            aria-label="Loop repository"
+            :disabled="!githubConnected || sortedRepositories.length === 0"
+            @change="repositoryChanged"
+          >
+            <el-option
+              v-for="repository in sortedRepositories"
+              :key="repository.id"
+              :label="repository.fullName"
+              :value="repository.id"
+            />
+          </el-select>
+        </div>
+      </section>
+
+      <section class="loop-editor__section">
+        <label for="loop-editor-assignee">Assigned to</label>
         <el-select
-          id="loop-editor-team"
-          v-model="form.teamId"
+          id="loop-editor-assignee"
+          v-model="form.assigneeLogin"
+          clearable
           filterable
-          placeholder="Select team"
-          aria-label="Loop target team"
+          placeholder="Anyone"
+          aria-label="Loop assignee"
+          :disabled="!form.repositoryId || assigneeOptions.length === 0"
         >
           <el-option
-            v-for="team in teams"
-            :key="team.id"
-            :label="team.name"
-            :value="team.id"
+            v-for="assignee in assigneeOptions"
+            :key="assignee.value"
+            :label="assignee.label"
+            :value="assignee.value"
           />
         </el-select>
-      </div>
-    </section>
+      </section>
 
-    <section class="loop-editor__section loop-editor__section--compact">
-      <el-checkbox
-        v-if="form.teamMode === 'existing'"
-        v-model="form.cleanupDeleteAgent"
-      >
-        Delete agent when work item completes
-      </el-checkbox>
-      <el-checkbox
-        v-else
-        v-model="form.cleanupDeleteTeam"
-      >
-        Delete team when work item completes
-      </el-checkbox>
-    </section>
+      <section class="loop-editor__section">
+        <label for="loop-editor-tag">Tag</label>
+        <el-select
+          id="loop-editor-tag"
+          v-model="form.tagName"
+          clearable
+          filterable
+          placeholder="Any tag"
+          aria-label="Loop tag"
+          :disabled="!form.repositoryId || tagOptions.length === 0"
+        >
+          <el-option
+            v-for="tag in tagOptions"
+            :key="tag"
+            :label="tag"
+            :value="tag"
+          />
+        </el-select>
+      </section>
+
+      <section class="loop-editor__section">
+        <label for="loop-editor-assignment-instructions">Assignment instructions</label>
+        <el-input
+          id="loop-editor-assignment-instructions"
+          v-model="form.assignmentInstructions"
+          type="textarea"
+          :rows="3"
+          placeholder="Optional instructions to include when the ticket is assigned"
+        />
+      </section>
+
+      <section class="loop-editor__section">
+        <label for="loop-editor-completion-instructions">Before completion</label>
+        <el-input
+          id="loop-editor-completion-instructions"
+          v-model="form.beforeCompletionInstructions"
+          type="textarea"
+          :rows="3"
+          placeholder="Optional instructions to show when the agent marks the ticket complete"
+        />
+      </section>
+
+      <section class="loop-editor__section">
+        <label for="loop-editor-bench">Bench Agent</label>
+        <el-select
+          id="loop-editor-bench"
+          v-model="form.benchTemplateId"
+          filterable
+          placeholder="Select Bench agent"
+          aria-label="Loop Bench agent"
+          :disabled="benchTemplates.length === 0"
+        >
+          <el-option
+            v-for="template in benchTemplates"
+            :key="template.id"
+            :label="template.name"
+            :value="template.id"
+          >
+            <span class="loop-editor__bench-option">
+              <AgentAvatar
+                :avatar="template.avatar"
+                :name="template.name"
+                size="sm"
+              />
+              <span>
+                <strong>{{ template.name }}</strong>
+                <small>{{ template.folder }}</small>
+              </span>
+            </span>
+          </el-option>
+        </el-select>
+      </section>
+
+      <section class="loop-editor__grid">
+        <div class="loop-editor__section">
+          <label for="loop-editor-team-mode">Team</label>
+          <el-select
+            id="loop-editor-team-mode"
+            v-model="form.teamMode"
+            aria-label="Loop team mode"
+          >
+            <el-option label="Existing team" value="existing" />
+            <el-option label="Dedicated team per ticket" value="dedicated" />
+          </el-select>
+        </div>
+
+        <div
+          v-if="form.teamMode === 'existing'"
+          class="loop-editor__section"
+        >
+          <label for="loop-editor-team">Target Team</label>
+          <el-select
+            id="loop-editor-team"
+            v-model="form.teamId"
+            filterable
+            placeholder="Select team"
+            aria-label="Loop target team"
+          >
+            <el-option
+              v-for="team in teams"
+              :key="team.id"
+              :label="team.name"
+              :value="team.id"
+            />
+          </el-select>
+        </div>
+      </section>
+
+      <section class="loop-editor__section loop-editor__section--compact">
+        <el-checkbox
+          v-if="form.teamMode === 'existing'"
+          v-model="form.cleanupDeleteAgent"
+        >
+          Delete agent when work item completes
+        </el-checkbox>
+        <el-checkbox
+          v-else
+          v-model="form.cleanupDeleteTeam"
+        >
+          Delete team when work item completes
+        </el-checkbox>
+      </section>
+    </div>
 
     <footer class="loop-editor__footer">
       <el-button @click="emit('cancel')">Cancel</el-button>
@@ -408,18 +410,35 @@ function workItemsKey(provider: 'github', repositoryId: string): string {
 
 <style scoped>
 .loop-editor {
+  max-height: calc(100vh - var(--workbench-appbar-height) - var(--space-32));
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-16);
+  overflow: hidden;
 }
 
 .loop-editor__header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  flex: 0 0 auto;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-16);
   padding-bottom: var(--space-12);
   border-bottom: 1px solid var(--color-border);
+  background: var(--color-shell-main);
+}
+
+.loop-editor__body {
+  min-height: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-16);
+  overflow-y: auto;
+  padding: var(--space-16) var(--space-4) var(--space-16) 0;
 }
 
 .loop-editor__header h3,
@@ -504,8 +523,14 @@ function workItemsKey(provider: 'github', repositoryId: string): string {
 }
 
 .loop-editor__footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  flex: 0 0 auto;
   display: flex;
   justify-content: flex-end;
-  padding-top: var(--space-8);
+  padding-top: var(--space-12);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-shell-main);
 }
 </style>

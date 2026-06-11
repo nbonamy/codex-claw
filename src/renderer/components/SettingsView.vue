@@ -106,7 +106,7 @@ function selectTab(tab: SettingsTab): void {
   top: 0;
   left: var(--team-rail-width);
   height: var(--workbench-appbar-height);
-  width: 100%;
+  width: calc(100% - var(--team-rail-width));
   background: var(--color-shell-main);
   border-bottom: 1px solid var(--color-border);
   -webkit-app-region: drag;

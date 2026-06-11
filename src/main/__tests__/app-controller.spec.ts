@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '../../shared/snapshot';
-import type { Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent } from '../../shared/contracts';
+import type { Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, RendererMessage } from '../../shared/contracts';
 import type { AppStatePersistence } from '../state-persistence';
 import type { AgentBackendDriver, BackendSendResult } from '../backends/types';
 import { claudeBackendCapabilities, codexBackendCapabilities } from '../../shared/backend-capabilities';
@@ -71,6 +71,152 @@ describe('AppController', () => {
       }),
     }));
     expect(persistence.save).toHaveBeenCalledWith(snapshot);
+  });
+
+  it('marks loop execution completed when loop work is confirmed complete', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.loops = [loopFixture({
+      cleanup: {
+        deleteAgent: false,
+      },
+      teamTarget: {
+        mode: 'existing',
+        teamId: 'team-codex-claw',
+      },
+    })];
+    snapshot.loops[0]!.executionLog = [{
+      id: 'loop-exec-1',
+      loopId: 'loop-bugs',
+      startedAt: '2026-06-09T13:00:00.000Z',
+      status: 'working',
+      createdCount: 1,
+      createdAgents: [{
+        agentId: 'agent-dina',
+        agentName: 'Dina',
+        workItemId: 'github:nbonamy/codex-claw#12',
+        workItemTitle: 'Fix cockpit',
+        workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
+      }],
+    }];
+    snapshot.workBacklog.assignments = {
+      'github:nbonamy/codex-claw#12': {
+        provider: 'github',
+        itemId: 'nbonamy/codex-claw#12',
+        agentId: 'agent-dina',
+        assignedAt: '2026-06-09T13:00:00.000Z',
+        loopExecutionId: 'loop-exec-1',
+        loopId: 'loop-bugs',
+        status: 'working',
+      },
+    };
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const send = vi.fn();
+
+    await controller.initialize();
+    setMainWindowSend(controller, send);
+    await mcpCoordinator(controller).markWorkItemCompleted('agent-dina', 'github:nbonamy/codex-claw#12');
+    await flushMicrotasks();
+
+    expect(snapshot.loops[0]?.executionLog[0]).toMatchObject({
+      id: 'loop-exec-1',
+      status: 'completed',
+      completedAt: expect.any(String),
+    });
+    expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
+      type: 'snapshot.updated',
+      payload: snapshot,
+    }));
+    expect(persistence.save).toHaveBeenCalledWith(snapshot);
+  });
+
+  it('keeps loop execution working until all created assignments are completed', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.loops = [loopFixture({
+      cleanup: {
+        deleteAgent: false,
+      },
+      teamTarget: {
+        mode: 'existing',
+        teamId: 'team-codex-claw',
+      },
+    })];
+    snapshot.loops[0]!.executionLog = [{
+      id: 'loop-exec-1',
+      loopId: 'loop-bugs',
+      startedAt: '2026-06-09T13:00:00.000Z',
+      status: 'working',
+      createdCount: 2,
+      createdAgents: [{
+        agentId: 'agent-dina',
+        agentName: 'Dina',
+        workItemId: 'github:nbonamy/codex-claw#12',
+        workItemTitle: 'Fix cockpit',
+        workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
+      }, {
+        agentId: 'agent-jesse',
+        agentName: 'Jesse',
+        workItemId: 'github:nbonamy/codex-claw#13',
+        workItemTitle: 'Fix logs',
+        workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/13',
+      }],
+    }];
+    snapshot.workBacklog.assignments = {
+      'github:nbonamy/codex-claw#12': {
+        provider: 'github',
+        itemId: 'nbonamy/codex-claw#12',
+        agentId: 'agent-dina',
+        assignedAt: '2026-06-09T13:00:00.000Z',
+        loopExecutionId: 'loop-exec-1',
+        loopId: 'loop-bugs',
+        status: 'working',
+      },
+      'github:nbonamy/codex-claw#13': {
+        provider: 'github',
+        itemId: 'nbonamy/codex-claw#13',
+        agentId: 'agent-jesse',
+        assignedAt: '2026-06-09T13:00:00.000Z',
+        loopExecutionId: 'loop-exec-1',
+        loopId: 'loop-bugs',
+        status: 'working',
+      },
+    };
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const send = vi.fn();
+
+    await controller.initialize();
+    setMainWindowSend(controller, send);
+    await mcpCoordinator(controller).markWorkItemCompleted('agent-dina', 'github:nbonamy/codex-claw#12');
+    await flushMicrotasks();
+
+    expect(snapshot.loops[0]?.executionLog[0]).toMatchObject({
+      id: 'loop-exec-1',
+      status: 'working',
+    });
+    expect(snapshot.loops[0]?.executionLog[0]).not.toHaveProperty('completedAt');
+    expect(send).not.toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
+      type: 'snapshot.updated',
+    }));
+
+    await mcpCoordinator(controller).markWorkItemCompleted('agent-jesse', 'github:nbonamy/codex-claw#13');
+    await flushMicrotasks();
+
+    expect(snapshot.loops[0]?.executionLog[0]).toMatchObject({
+      id: 'loop-exec-1',
+      status: 'completed',
+      completedAt: expect.any(String),
+    });
+    expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
+      type: 'snapshot.updated',
+      payload: snapshot,
+    }));
   });
 
   it('requires latest loop completion instructions before completing loop-assigned work', async () => {
@@ -766,14 +912,158 @@ describe('AppController', () => {
     });
 
     expect(snapshot.loops[0]?.executionLog[0]?.createdAgents[0]).toMatchObject({
-      conversationId: 'thread-dina',
-      turnId: 'turn-dina',
+      conversationRef: { backend: 'codex', threadId: 'thread-dina' },
     });
     expect(persistence.save).toHaveBeenCalledWith(snapshot);
     expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
       type: 'snapshot.updated',
       payload: snapshot,
     }));
+  });
+
+  it('records Claude loop execution conversation refs from the created agent backend', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].backend = 'claude';
+    snapshot.agents[0].folder = '/Users/nbonamy/src/id8';
+    snapshot.loops = [{
+      id: 'loop-bugs',
+      name: 'GitHub bugs',
+      enabled: true,
+      source: {
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
+      },
+      action: {
+        type: 'create-agent-from-bench',
+        benchTemplateId: 'bench-dina',
+        teamTarget: {
+          mode: 'existing',
+          teamId: 'team-codex-claw',
+        },
+      },
+      instructions: {},
+      executionLog: [{
+        id: 'loop-exec-1',
+        loopId: 'loop-bugs',
+        startedAt: '2026-06-09T10:00:00.000Z',
+        status: 'working',
+        createdCount: 1,
+        createdAgents: [{
+          agentId: 'agent-dina',
+          agentName: 'Dina',
+          workItemId: 'github:nbonamy/codex-claw#12',
+          workItemTitle: 'Fix cockpit',
+          workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
+        }],
+      }],
+      createdAt: '2026-06-09T09:59:00.000Z',
+      updatedAt: '2026-06-09T10:01:00.000Z',
+    }];
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+
+    await controller.initialize();
+    await recordLoopPromptStarted(controller, 'agent-dina', {
+      loopId: 'loop-bugs',
+      executionId: 'loop-exec-1',
+      workItemId: 'github:nbonamy/codex-claw#12',
+    }, {
+      backendSession: { kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' },
+      turnId: 'claude-turn-1',
+    });
+
+    expect(snapshot.loops[0]?.executionLog[0]?.createdAgents[0]).toMatchObject({
+      conversationRef: { backend: 'claude', folder: '/Users/nbonamy/src/id8', sessionId: 'claude-session-1' },
+    });
+  });
+
+  it('reads historical conversation messages through the referenced backend driver', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.loops = [loopFixture({
+      cleanup: {
+        deleteAgent: false,
+      },
+      teamTarget: {
+        mode: 'existing',
+        teamId: 'team-codex-claw',
+      },
+    })];
+    snapshot.loops[0]!.executionLog = [{
+      id: 'loop-exec-1',
+      loopId: 'loop-bugs',
+      startedAt: '2026-06-09T10:00:00.000Z',
+      status: 'completed',
+      createdCount: 1,
+      createdAgents: [{
+        agentId: 'agent-dina',
+        agentName: 'Dina',
+        workItemId: 'github:nbonamy/codex-claw#12',
+        workItemTitle: 'Fix cockpit',
+        workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
+        conversationRef: { backend: 'codex', threadId: 'thread-dina' },
+      }],
+    }];
+    const messages = [{
+      id: 'user-thread-dina-user-1',
+      agentId: 'agent-dina',
+      role: 'user' as const,
+      status: 'complete' as const,
+      createdAt: '2026-06-09T10:00:00.000Z',
+      parts: [{ type: 'text' as const, text: 'hello' }],
+    }];
+    const backendDriver = createFakeCodexBackendDriver({
+      readConversationMessages: vi.fn().mockResolvedValue(messages),
+    });
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+
+    await controller.initialize();
+    setCodexBackendDriver(controller, backendDriver);
+
+    await expect(readConversationMessages(controller, { backend: 'codex', threadId: 'thread-dina' }, 'agent-dina')).resolves.toStrictEqual(messages);
+    expect(backendDriver.readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-dina' }, 'agent-dina');
+  });
+
+  it('rejects unrecorded historical conversation refs before reaching a backend driver', async () => {
+    const snapshot = createInitialSnapshot();
+    const backendDriver = createFakeCodexBackendDriver({
+      readConversationMessages: vi.fn().mockResolvedValue([]),
+    });
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+
+    await controller.initialize();
+    setCodexBackendDriver(controller, backendDriver);
+
+    await expect(readConversationMessages(controller, { backend: 'codex', threadId: 'thread-dina' }, 'agent-dina')).rejects.toThrow('Conversation reference is not available.');
+    expect(backendDriver.readConversationMessages).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid historical conversation refs before reaching a backend driver', async () => {
+    const snapshot = createInitialSnapshot();
+    const backendDriver = createFakeCodexBackendDriver({
+      readConversationMessages: vi.fn().mockResolvedValue([]),
+    });
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+
+    await controller.initialize();
+    setCodexBackendDriver(controller, backendDriver);
+
+    await expect(readConversationMessages(controller, { backend: 'codex' }, 'agent-dina')).rejects.toThrow('Invalid conversation reference.');
+    expect(backendDriver.readConversationMessages).not.toHaveBeenCalled();
   });
 
   it('reads text files inside the active agent folder and rejects traversal', async () => {
@@ -1057,6 +1347,16 @@ async function recordLoopPromptStarted(
   await (controller as unknown as {
     recordLoopPromptStarted(agentId: string, context: LoopPromptContext, result: BackendSendResult): Promise<void>;
   }).recordLoopPromptStarted(agentId, context, result);
+}
+
+async function readConversationMessages(
+  controller: AppController,
+  ref: unknown,
+  agentId: string,
+): Promise<RendererMessage[]> {
+  return (controller as unknown as {
+    readConversationMessages(ref: unknown, agentId: string): Promise<RendererMessage[]>;
+  }).readConversationMessages(ref, agentId);
 }
 
 async function interruptAgent(controller: AppController, agentId: string): Promise<void> {

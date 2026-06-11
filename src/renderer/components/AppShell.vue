@@ -71,10 +71,13 @@
         :bench="snapshot.bench"
         :clear-loop-history="clearLoopHistory"
         :create-loop="createLoop"
+        :delete-loop-execution="deleteLoopExecution"
         :delete-loop="deleteLoop"
         :load-work-items="loadWorkItems"
         :load-work-repositories="loadWorkRepositories"
         :loops="snapshot.loops"
+        :messages="snapshot.messages"
+        :read-conversation-messages="readConversationMessages"
         :run-loop="runLoop"
         :teams="snapshot.teams"
         :update-loop="updateLoop"
@@ -224,7 +227,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SourceRepository, SourceWorktree, Team, ThreadGoal, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../../shared/contracts';
+import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SourceRepository, SourceWorktree, Team, ThreadGoal, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../../shared/contracts';
 import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import { defaultTeamColor } from '../../shared/team-colors';
 import { findAssignedAgentForWorkItem } from '../../shared/work-assignments';
@@ -288,7 +291,9 @@ const props = withDefaults(defineProps<{
   updateLoop?: (input: UpdateLoopInput) => Promise<void>;
   runLoop?: (loopId: string) => Promise<void>;
   clearLoopHistory?: (loopId: string) => Promise<void>;
+  deleteLoopExecution?: (loopId: string, executionId: string) => Promise<void>;
   deleteLoop?: (loopId: string) => Promise<void>;
+  readConversationMessages?: (ref: BackendConversationRef, agentId: string) => Promise<RendererMessage[]>;
   connectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   completeWorkProviderConnection?: (provider: WorkProviderKind) => Promise<void>;
   disconnectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
@@ -334,7 +339,9 @@ const props = withDefaults(defineProps<{
   updateLoop: async () => undefined,
   runLoop: async () => undefined,
   clearLoopHistory: async () => undefined,
+  deleteLoopExecution: async () => undefined,
   deleteLoop: async () => undefined,
+  readConversationMessages: async () => [],
   connectWorkProvider: async () => undefined,
   completeWorkProviderConnection: async () => undefined,
   disconnectWorkProvider: async () => undefined,
@@ -693,8 +700,16 @@ async function clearLoopHistory(loopId: string): Promise<void> {
   await props.clearLoopHistory(loopId);
 }
 
+async function deleteLoopExecution(loopId: string, executionId: string): Promise<void> {
+  await props.deleteLoopExecution(loopId, executionId);
+}
+
 async function deleteLoop(loopId: string): Promise<void> {
   await props.deleteLoop(loopId);
+}
+
+async function readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]> {
+  return props.readConversationMessages(ref, agentId);
 }
 
 function selectTeamFromRail(teamId: string): void {

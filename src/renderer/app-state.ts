@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelMarkdownRequest, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../shared/contracts';
+import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelMarkdownRequest, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../shared/contracts';
 import { updateSettingsInSnapshot } from '../shared/settings';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '../shared/snapshot';
 import { defaultBackendCapabilities } from '../shared/backend-capabilities';
@@ -454,6 +454,28 @@ export function useAppState() {
     snapshot.value = await window.codexClaw.clearLoopHistory(loopId);
   }
 
+  async function deleteLoopExecution(loopId: string, executionId: string): Promise<void> {
+    if (
+      !window.codexClaw?.deleteLoopExecution ||
+      !snapshot.value.loops.some((loop) => (
+        loop.id === loopId &&
+        loop.executionLog.some((entry) => entry.id === executionId)
+      ))
+    ) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.deleteLoopExecution(loopId, executionId);
+  }
+
+  async function readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]> {
+    if (!window.codexClaw?.readConversationMessages) {
+      return [];
+    }
+
+    return window.codexClaw.readConversationMessages(plainConversationRef(ref), agentId);
+  }
+
   async function updateAgent(input: UpdateAgentInput): Promise<void> {
     if (!window.codexClaw?.updateAgent) {
       return;
@@ -825,7 +847,9 @@ export function useAppState() {
     updateLoop,
     runLoop,
     clearLoopHistory,
+    deleteLoopExecution,
     deleteLoop,
+    readConversationMessages,
     assignWorkItemToAgent,
     removeWorkItemAssignment,
     duplicateAgent,
@@ -855,6 +879,12 @@ export function useAppState() {
     removeQueuedPrompt,
     quit,
   };
+}
+
+function plainConversationRef(ref: BackendConversationRef): BackendConversationRef {
+  return ref.backend === 'codex'
+    ? { backend: 'codex', threadId: ref.threadId }
+    : { backend: 'claude', folder: ref.folder, sessionId: ref.sessionId };
 }
 
 function cloneWorkItemForIpc(item: WorkItem): WorkItem {

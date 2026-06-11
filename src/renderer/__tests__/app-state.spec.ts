@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
 import { createEmptySnapshot, createInitialSnapshot } from '../../shared/snapshot';
-import type { CodexClawApi, MainToRendererEvent, SourceRepository, WorkItem, WorkRepository } from '../../shared/contracts';
+import type { BackendConversationRef, CodexClawApi, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '../../shared/contracts';
 import { workItemAssignmentKey } from '../../shared/work-assignments';
 import { workItemAssignmentPrompt } from '../../shared/work-item-prompts';
 
@@ -1545,6 +1545,21 @@ describe('useAppState', () => {
       loops: [{
         ...updatedSnapshot.loops[0],
         lastRunAt: '2026-06-09T10:02:00.000Z',
+        executionLog: [{
+          id: 'loop-exec-1',
+          loopId: 'loop-bugs',
+          startedAt: '2026-06-09T10:02:00.000Z',
+          status: 'working' as const,
+          createdCount: 1,
+          createdAgents: [],
+        }],
+      }],
+    };
+    const executionDeletedSnapshot = {
+      ...runSnapshot,
+      loops: [{
+        ...runSnapshot.loops[0],
+        executionLog: [],
       }],
     };
     const deletedSnapshot = {
@@ -1555,7 +1570,17 @@ describe('useAppState', () => {
     const updateLoop = vi.fn().mockResolvedValue(updatedSnapshot);
     const runLoop = vi.fn().mockResolvedValue(runSnapshot);
     const clearLoopHistory = vi.fn().mockResolvedValue(historyClearedSnapshot);
+    const deleteLoopExecution = vi.fn().mockResolvedValue(executionDeletedSnapshot);
     const deleteLoop = vi.fn().mockResolvedValue(deletedSnapshot);
+    const conversationMessages: RendererMessage[] = [{
+      id: 'message-dina-user',
+      agentId: 'agent-dina',
+      role: 'user',
+      status: 'complete',
+      createdAt: '2026-06-09T10:00:00.000Z',
+      parts: [{ type: 'text', text: 'hello' }],
+    }];
+    const readConversationMessages = vi.fn().mockResolvedValue(conversationMessages);
 
     vi.stubGlobal('window', {
       codexClaw: {
@@ -1565,7 +1590,9 @@ describe('useAppState', () => {
         updateLoop,
         runLoop,
         clearLoopHistory,
+        deleteLoopExecution,
         deleteLoop,
+        readConversationMessages,
       } satisfies Partial<CodexClawApi>,
     });
 
@@ -1579,8 +1606,16 @@ describe('useAppState', () => {
       name: 'Paused bugs',
     });
     await state.runLoop('loop-bugs');
+    await state.deleteLoopExecution('loop-bugs', 'loop-exec-1');
     await state.clearLoopHistory('loop-bugs');
     await state.deleteLoop('loop-bugs');
+    await expect(state.readConversationMessages({ backend: 'codex', threadId: 'thread-dina' }, 'agent-dina')).resolves.toStrictEqual(conversationMessages);
+    const reactiveConversationRef = reactive({
+      backend: 'claude' as const,
+      folder: '/Users/nbonamy/src/codex-claw',
+      sessionId: 'session-dina',
+    });
+    await expect(state.readConversationMessages(reactiveConversationRef as BackendConversationRef, 'agent-dina')).resolves.toStrictEqual(conversationMessages);
 
     expect(createLoop).toHaveBeenCalledWith(loopInput);
     expect(updateLoop).toHaveBeenCalledWith({
@@ -1590,8 +1625,16 @@ describe('useAppState', () => {
       name: 'Paused bugs',
     });
     expect(runLoop).toHaveBeenCalledWith('loop-bugs');
+    expect(deleteLoopExecution).toHaveBeenCalledWith('loop-bugs', 'loop-exec-1');
     expect(clearLoopHistory).toHaveBeenCalledWith('loop-bugs');
     expect(deleteLoop).toHaveBeenCalledWith('loop-bugs');
+    expect(readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-dina' }, 'agent-dina');
+    expect(readConversationMessages).toHaveBeenLastCalledWith({
+      backend: 'claude',
+      folder: '/Users/nbonamy/src/codex-claw',
+      sessionId: 'session-dina',
+    }, 'agent-dina');
+    expect(readConversationMessages.mock.calls.at(-1)?.[0]).not.toBe(reactiveConversationRef);
     expect(state.snapshot.value).toStrictEqual(deletedSnapshot);
   });
 

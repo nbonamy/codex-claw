@@ -5,7 +5,7 @@ export type LoopSchedulerOptions = {
   runLoops: () => Promise<void>;
 };
 
-const DEFAULT_LOOP_INTERVAL_MS = 2 * 60 * 1000;
+const DEFAULT_LOOP_INTERVAL_MS = 1 * 60 * 1000;
 
 export class LoopScheduler {
   private timer: NodeJS.Timeout | null = null;

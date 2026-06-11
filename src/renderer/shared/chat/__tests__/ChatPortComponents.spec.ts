@@ -251,6 +251,22 @@ describe('ported id8 chat components', () => {
     expect(structuredResult.text()).not.toContain('Ran codex_claw.set-status');
     await structuredResult.get('.chat-tool-call__header').trigger('click');
     expect(structuredResult.text()).toContain('"status": "Registered and idle"');
+
+    const completedWorkItem = mount(ChatToolCall, {
+      props: {
+        toolCall: {
+          ...completedTool,
+          function: 'codex_claw.mark-work-item-completed',
+          result: {
+            message: 'Work item marked completed.',
+            status: 'completed',
+            workItemId: 'github:nbonamy/codex-claw#12',
+          },
+        },
+      },
+    });
+    expect(completedWorkItem.text()).toContain('Marked work item complete');
+    expect(completedWorkItem.text()).not.toContain('Ran codex_claw.mark-work-item-completed');
   });
 
   it('renders display-markdown MCP calls with a human title', () => {

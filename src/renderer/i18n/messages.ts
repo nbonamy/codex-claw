@@ -130,6 +130,11 @@ export const messages = {
               failed: 'Failed listing agents',
               running: 'Listing agents',
             },
+            markWorkItemCompleted: {
+              completed: 'Marked work item complete',
+              failed: 'Failed marking work item complete',
+              running: 'Marking work item complete',
+            },
             registerAgent: {
               completed: 'Registered agent',
               failed: 'Failed registering agent',

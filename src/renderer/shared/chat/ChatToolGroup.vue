@@ -8,8 +8,6 @@
   />
   <section v-else class="chat-tool-group">
     <button class="chat-tool-group__header" type="button" @click="toggleExpanded">
-      <SquareDashed v-if="runningCount > 0" class="chat-tool-group__icon chat-tool-group__icon--running" :size="15" />
-      <SquareCheck v-else class="chat-tool-group__icon" :size="15" />
       <ChatToolCall
         v-if="headerToolCall"
         class="chat-tool-group__active"
@@ -47,7 +45,7 @@
 </template>
 
 <script setup lang="ts">
-import { ChevronDown, ChevronUp, SquareCheck, SquareDashed } from '../icons/app-icons'
+import { ChevronDown, ChevronUp } from '../icons/app-icons'
 import { computed, ref } from 'vue'
 import type { ClientRequestResponse } from '../../../shared/contracts'
 import ChatFoldTransition from './ChatFoldTransition.vue'

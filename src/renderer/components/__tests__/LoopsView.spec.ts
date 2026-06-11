@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus, { ElMessageBox } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '../../../shared/snapshot';
-import type { AppSnapshot, CreateLoopInput, Loop, WorkItem, WorkRepository } from '../../../shared/contracts';
+import type { AppSnapshot, BackendConversationRef, CreateLoopInput, Loop, RendererMessage, WorkItem, WorkRepository } from '../../../shared/contracts';
 import LoopsView from '../LoopsView.vue';
 
 afterEach(() => {
@@ -117,6 +117,22 @@ describe('LoopsView', () => {
   });
 
   it('shows execution logs from the loop row action', async () => {
+    const conversationMessages: RendererMessage[] = [{
+      id: 'message-dina-user',
+      agentId: 'agent-dina',
+      role: 'user',
+      status: 'complete',
+      createdAt: '2026-06-09T10:00:02.000Z',
+      parts: [{ type: 'text', text: 'Please fix the cockpit issue.' }],
+    }, {
+      id: 'message-dina-assistant',
+      agentId: 'agent-dina',
+      role: 'assistant',
+      status: 'complete',
+      createdAt: '2026-06-09T10:00:45.000Z',
+      parts: [{ type: 'text', text: 'The cockpit issue is fixed.' }],
+    }];
+    const readConversationMessages = vi.fn().mockResolvedValue(conversationMessages);
     const wrapper = mountView({
       loops: [loop({
         executionLog: [{
@@ -132,8 +148,7 @@ describe('LoopsView', () => {
             workItemId: 'github:nbonamy/codex-claw#12',
             workItemTitle: 'Fix cockpit',
             workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
-            conversationId: 'thread-dina',
-            turnId: 'turn-dina',
+            conversationRef: { backend: 'codex', threadId: 'thread-dina' },
           }],
         }, {
           id: 'loop-exec-0',
@@ -146,6 +161,7 @@ describe('LoopsView', () => {
           error: 'GitHub failed',
         }],
       })],
+      readConversationMessages,
     });
 
     expect(wrapper.find('[aria-label="Current loops"]').exists()).toBe(true);
@@ -159,6 +175,61 @@ describe('LoopsView', () => {
     expect(wrapper.find('a[href="https://github.com/nbonamy/codex-claw/issues/12"]').exists()).toBe(true);
     expect(wrapper.text().indexOf('Completed')).toBeLessThan(wrapper.text().indexOf('Failed'));
     expect(wrapper.text()).not.toContain('No ticket');
+
+    await wrapper.get('[aria-label="View conversation for github:nbonamy/codex-claw#12"]').trigger('click');
+    await flushPromises();
+
+    expect(readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-dina' }, 'agent-dina');
+    expect(wrapper.find('.loop-execution-conversation-overlay').exists()).toBe(true);
+    expect(wrapper.text()).toContain('github:nbonamy/codex-claw#12');
+    expect(wrapper.text()).toContain('Dina');
+    expect(wrapper.text()).toContain('Please fix the cockpit issue.');
+    expect(wrapper.text()).toContain('The cockpit issue is fixed.');
+
+    await wrapper.get('[aria-label="Close conversation preview"]').trigger('click');
+
+    expect(wrapper.find('.loop-execution-conversation-overlay').exists()).toBe(false);
+  });
+
+  it('confirms before deleting one execution row', async () => {
+    const deleteLoopExecution = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
+    const wrapper = mountView({
+      deleteLoopExecution,
+      loops: [loop({
+        executionLog: [{
+          id: 'loop-exec-1',
+          loopId: 'loop-bugs',
+          startedAt: '2026-06-09T10:00:00.000Z',
+          completedAt: '2026-06-09T10:01:00.000Z',
+          status: 'completed',
+          createdCount: 1,
+          createdAgents: [{
+            agentId: 'agent-dina',
+            agentName: 'Dina',
+            workItemId: 'github:nbonamy/codex-claw#12',
+            workItemTitle: 'Fix cockpit',
+            workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
+            conversationRef: { backend: 'codex', threadId: 'thread-dina' },
+          }],
+        }],
+      })],
+    });
+
+    await wrapper.get('[aria-label="View logs for GitHub bugs"]').trigger('click');
+    await wrapper.get('[aria-label="Delete execution for github:nbonamy/codex-claw#12"]').trigger('click');
+    await flushPromises();
+
+    expect(ElMessageBox.confirm).toHaveBeenCalledWith(
+      'This execution will be removed from the loop history.',
+      'Delete execution?',
+      {
+        cancelButtonText: 'Cancel',
+        confirmButtonText: 'Delete Execution',
+        type: 'warning',
+      },
+    );
+    expect(deleteLoopExecution).toHaveBeenCalledWith('loop-bugs', 'loop-exec-1');
   });
 
   it('confirms before clearing execution history', async () => {
@@ -201,8 +272,11 @@ describe('LoopsView', () => {
 function mountView(overrides: Partial<{
   clearLoopHistory: (loopId: string) => Promise<void>;
   createLoop: (input: CreateLoopInput) => Promise<void>;
+  deleteLoopExecution: (loopId: string, executionId: string) => Promise<void>;
   deleteLoop: (loopId: string) => Promise<void>;
   loops: Loop[];
+  messages: RendererMessage[];
+  readConversationMessages: (ref: BackendConversationRef, agentId: string) => Promise<RendererMessage[]>;
   runLoop: (loopId: string) => Promise<void>;
   snapshot: AppSnapshot;
 }> = {}) {
@@ -223,13 +297,17 @@ function mountView(overrides: Partial<{
 
   return mount(LoopsView, {
     props: {
+      agents: snapshot.agents,
       bench: snapshot.bench,
       clearLoopHistory: overrides.clearLoopHistory ?? vi.fn().mockResolvedValue(undefined),
       createLoop: overrides.createLoop ?? vi.fn().mockResolvedValue(undefined),
+      deleteLoopExecution: overrides.deleteLoopExecution ?? vi.fn().mockResolvedValue(undefined),
       deleteLoop: overrides.deleteLoop ?? vi.fn().mockResolvedValue(undefined),
       loadWorkItems: vi.fn().mockResolvedValue(undefined),
       loadWorkRepositories: vi.fn().mockResolvedValue(undefined),
       loops: overrides.loops ?? [],
+      messages: overrides.messages ?? snapshot.messages,
+      readConversationMessages: overrides.readConversationMessages ?? vi.fn().mockResolvedValue([]),
       runLoop: overrides.runLoop ?? vi.fn().mockResolvedValue(undefined),
       teams: snapshot.teams,
       updateLoop: vi.fn().mockResolvedValue(undefined),

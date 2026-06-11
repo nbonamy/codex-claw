@@ -77,7 +77,7 @@ describe('LoopRunner', () => {
       executionLog: [{
         id: 'loop-exec-bugs',
         loopId: 'loop-bugs',
-        status: 'completed',
+        status: 'working',
         createdCount: 1,
         createdAgents: [{
           agentId: assignment?.agentId,
@@ -88,6 +88,7 @@ describe('LoopRunner', () => {
         }],
       }],
     });
+    expect(snapshot.loops[0]?.executionLog[0]).not.toHaveProperty('completedAt');
     expect(saveSnapshot).toHaveBeenCalledOnce();
     expect(notifySnapshotUpdated).toHaveBeenCalledOnce();
     expect(sendPrompt).toHaveBeenCalledWith(

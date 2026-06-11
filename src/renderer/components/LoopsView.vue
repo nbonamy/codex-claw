@@ -31,8 +31,11 @@
           <LoopExecutionLog
             v-else-if="logLoop"
             :loop="logLoop"
+            :messages="messages"
+            :read-conversation-messages="readConversationMessages"
             @clear-history="confirmClearLoopHistory"
             @close="closeLog"
+            @delete-execution="confirmDeleteLoopExecution"
           />
 
           <LoopWelcome
@@ -143,7 +146,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onMounted, ref } from 'vue';
-import type { AppSnapshot, CreateLoopInput, Loop, UpdateLoopInput, WorkItem, WorkProviderKind, WorkRepository } from '../../shared/contracts';
+import type { AppSnapshot, BackendConversationRef, CreateLoopInput, Loop, RendererMessage, UpdateLoopInput, WorkItem, WorkProviderKind, WorkRepository } from '../../shared/contracts';
 import AppDataList from './AppDataList.vue';
 import type { AppDataListColumn, AppDataListRow } from './app-data-list';
 import AppMenu from '../shared/menu/AppMenu.vue';
@@ -158,11 +161,14 @@ const props = withDefaults(defineProps<{
   bench: AppSnapshot['bench'];
   clearLoopHistory?: (loopId: string) => Promise<void>;
   createLoop?: (input: CreateLoopInput) => Promise<void>;
+  deleteLoopExecution?: (loopId: string, executionId: string) => Promise<void>;
   deleteLoop?: (loopId: string) => Promise<void>;
   loadWorkItems?: (provider: WorkProviderKind, repositoryId: string) => Promise<void>;
   loadWorkRepositories?: (provider: WorkProviderKind) => Promise<void>;
   loops: Loop[];
+  messages?: RendererMessage[];
   runLoop?: (loopId: string) => Promise<void>;
+  readConversationMessages?: (ref: BackendConversationRef, agentId: string) => Promise<RendererMessage[]>;
   teams: AppSnapshot['teams'];
   updateLoop?: (input: UpdateLoopInput) => Promise<void>;
   workBacklog: AppSnapshot['workBacklog'];
@@ -173,9 +179,12 @@ const props = withDefaults(defineProps<{
 }>(), {
   clearLoopHistory: async () => undefined,
   createLoop: async () => undefined,
+  deleteLoopExecution: async () => undefined,
   deleteLoop: async () => undefined,
   loadWorkItems: async () => undefined,
   loadWorkRepositories: async () => undefined,
+  messages: () => [],
+  readConversationMessages: async () => [],
   runLoop: async () => undefined,
   updateLoop: async () => undefined,
   workBacklogError: null,
@@ -352,6 +361,30 @@ async function confirmClearLoopHistory(loopId: string): Promise<void> {
   await props.clearLoopHistory(loop.id);
 }
 
+async function confirmDeleteLoopExecution(payload: { executionId: string; loopId: string }): Promise<void> {
+  const loop = props.loops.find((candidate) => candidate.id === payload.loopId);
+  const execution = loop?.executionLog.find((candidate) => candidate.id === payload.executionId);
+  if (!loop || !execution) {
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      'This execution will be removed from the loop history.',
+      'Delete execution?',
+      {
+        cancelButtonText: 'Cancel',
+        confirmButtonText: 'Delete Execution',
+        type: 'warning',
+      },
+    );
+  } catch {
+    return;
+  }
+
+  await props.deleteLoopExecution(loop.id, execution.id);
+}
+
 async function loadGitHubRepositories(): Promise<void> {
   await props.loadWorkRepositories('github');
 }
@@ -417,7 +450,7 @@ function formatShortDate(value: string): string {
   top: 0;
   left: var(--team-rail-width);
   height: var(--workbench-appbar-height);
-  width: 100%;
+  width: calc(100% - var(--team-rail-width));
   background: var(--color-shell-main);
   border-bottom: 1px solid var(--color-border);
   -webkit-app-region: drag;
@@ -428,11 +461,11 @@ function formatShortDate(value: string): string {
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding: var(--space-32) 0;
+  padding-top: 0;
 }
 
 .loops-view__panel {
-  max-width: 980px;
+  max-width: 720px;
   margin: 0 auto;
 }
 

@@ -535,7 +535,10 @@ function cloneLoop(loop: Loop): Loop {
 function cloneLoopExecutionEntry(entry: LoopExecutionLogEntry): LoopExecutionLogEntry {
   return {
     ...entry,
-    createdAgents: entry.createdAgents.map((createdAgent) => ({ ...createdAgent })),
+    createdAgents: entry.createdAgents.map((createdAgent) => ({
+      ...createdAgent,
+      ...(createdAgent.conversationRef ? { conversationRef: { ...createdAgent.conversationRef } } : {}),
+    })),
   };
 }
 
@@ -610,7 +613,6 @@ function sanitizeLoopExecutionEntry(value: unknown, loopId: string): LoopExecuti
     !isRecord(value) ||
     typeof value.id !== 'string' ||
     typeof value.startedAt !== 'string' ||
-    typeof value.completedAt !== 'string' ||
     !isLoopExecutionStatus(value.status) ||
     !Array.isArray(value.createdAgents)
   ) {
@@ -633,10 +635,10 @@ function sanitizeLoopExecutionEntry(value: unknown, loopId: string): LoopExecuti
     id: value.id,
     loopId,
     startedAt: value.startedAt,
-    completedAt: value.completedAt,
     status: value.status,
     createdCount,
     createdAgents,
+    ...(typeof value.completedAt === 'string' ? { completedAt: value.completedAt } : {}),
     ...(typeof value.error === 'string' && value.error.trim() ? { error: value.error } : {}),
   };
 }
@@ -658,13 +660,51 @@ function sanitizeLoopExecutionCreatedAgent(value: unknown): LoopExecutionCreated
     workItemId: value.workItemId,
     workItemTitle: value.workItemTitle,
     workItemUrl: value.workItemUrl,
-    ...(typeof value.conversationId === 'string' && value.conversationId.trim() ? { conversationId: value.conversationId } : {}),
-    ...(typeof value.turnId === 'string' && value.turnId.trim() ? { turnId: value.turnId } : {}),
+    ...(sanitizeBackendConversationRef(value.conversationRef) ?? legacyCodexConversationRef(value.conversationId)),
   };
 }
 
+function sanitizeBackendConversationRef(value: unknown): Partial<Pick<LoopExecutionCreatedAgent, 'conversationRef'>> | null {
+  if (!isRecord(value) || typeof value.backend !== 'string') {
+    return null;
+  }
+
+  if (value.backend === 'codex' && typeof value.threadId === 'string' && value.threadId.trim()) {
+    return {
+      conversationRef: {
+        backend: 'codex',
+        threadId: value.threadId,
+      },
+    };
+  }
+
+  if (
+    value.backend === 'claude' &&
+    typeof value.folder === 'string' &&
+    value.folder.trim() &&
+    typeof value.sessionId === 'string' &&
+    value.sessionId.trim()
+  ) {
+    return {
+      conversationRef: {
+        backend: 'claude',
+        folder: value.folder,
+        sessionId: value.sessionId,
+      },
+    };
+  }
+
+  return null;
+}
+
+function legacyCodexConversationRef(value: unknown): Partial<Pick<LoopExecutionCreatedAgent, 'conversationRef'>> {
+  return typeof value === 'string' && value.trim()
+    ? { conversationRef: { backend: 'codex', threadId: value } }
+    : {};
+}
+
 function isLoopExecutionStatus(value: unknown): value is LoopExecutionStatus {
-  return value === 'completed' || value === 'failed';
+  return value === 'working' || value === 'completed' || value === 'failed';
 }
 
 function sanitizeLoopSource(value: unknown): LoopSourceConfiguration | null {

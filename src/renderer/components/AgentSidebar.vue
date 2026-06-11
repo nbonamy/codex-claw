@@ -300,7 +300,6 @@ function onResizePointerEnd(event: PointerEvent): void {
   padding-right: var(--space-2);
   color: var(--color-text);
   background: var(--color-shell-main);
-  background: var(--color-shell-main);
   border-bottom: 1px solid var(--color-border);
   -webkit-app-region: drag;
 }

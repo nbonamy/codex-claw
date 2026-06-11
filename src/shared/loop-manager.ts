@@ -3,6 +3,7 @@ import type {
   CreateLoopInput,
   Loop,
   LoopAction,
+  BackendConversationRef,
   LoopExecutionLogEntry,
   LoopSourceConfiguration,
   LoopTeamTarget,
@@ -13,8 +14,7 @@ import { createEntityId, type IdGenerator } from './ids';
 const MAX_LOOP_EXECUTION_LOG_ENTRIES = 50;
 
 export type LoopExecutionConversationUpdate = {
-  conversationId: string;
-  turnId?: string;
+  conversationRef: BackendConversationRef;
   updatedAt: string;
 };
 
@@ -92,6 +92,34 @@ export function clearLoopExecutionHistoryInSnapshot(
   return loop;
 }
 
+export function deleteLoopExecutionFromSnapshot(
+  snapshot: AppSnapshot,
+  loopId: string,
+  executionId: string,
+  updatedAt = new Date().toISOString(),
+): Loop | null {
+  const loop = snapshot.loops.find((candidate) => candidate.id === loopId);
+  if (!loop || !loop.executionLog.some((entry) => entry.id === executionId)) {
+    return null;
+  }
+
+  loop.executionLog = loop.executionLog.filter((entry) => entry.id !== executionId);
+  loop.updatedAt = updatedAt;
+  if (loop.lastError && loop.executionLog.every((entry) => entry.status !== 'failed')) {
+    delete loop.lastError;
+  }
+  const latestEntry = loop.executionLog[0];
+  if (latestEntry) {
+    loop.lastRunAt = latestEntry.startedAt;
+    loop.lastCreatedCount = latestEntry.createdCount;
+  } else {
+    delete loop.lastRunAt;
+    delete loop.lastCreatedCount;
+  }
+
+  return loop;
+}
+
 export function recordLoopExecutionInSnapshot(
   snapshot: AppSnapshot,
   loopId: string,
@@ -108,10 +136,33 @@ export function recordLoopExecutionInSnapshot(
   ].slice(0, MAX_LOOP_EXECUTION_LOG_ENTRIES);
   loop.lastRunAt = entry.startedAt;
   loop.lastCreatedCount = entry.createdCount;
-  loop.updatedAt = entry.completedAt;
+  loop.updatedAt = entry.completedAt ?? entry.startedAt;
   if (entry.status === 'failed' && entry.error) {
     loop.lastError = entry.error;
   } else {
+    delete loop.lastError;
+  }
+
+  return loop;
+}
+
+export function completeLoopExecutionInSnapshot(
+  snapshot: AppSnapshot,
+  loopId: string,
+  executionId: string,
+  completedAt = new Date().toISOString(),
+): Loop | null {
+  const loop = snapshot.loops.find((candidate) => candidate.id === loopId);
+  const execution = loop?.executionLog?.find((candidate) => candidate.id === executionId);
+  if (!loop || !execution || execution.loopId !== loopId) {
+    return null;
+  }
+
+  execution.status = 'completed';
+  execution.completedAt = completedAt;
+  delete execution.error;
+  loop.updatedAt = completedAt;
+  if (loop.lastError && loop.executionLog.every((entry) => entry.status !== 'failed')) {
     delete loop.lastError;
   }
 
@@ -132,12 +183,7 @@ export function updateLoopExecutionAgentConversationInSnapshot(
     return null;
   }
 
-  createdAgent.conversationId = update.conversationId;
-  if (update.turnId) {
-    createdAgent.turnId = update.turnId;
-  } else {
-    delete createdAgent.turnId;
-  }
+  createdAgent.conversationRef = { ...update.conversationRef };
   loop.updatedAt = update.updatedAt;
 
   return loop;

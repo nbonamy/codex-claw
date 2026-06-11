@@ -199,8 +199,6 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 <style scoped>
 
 .team-rail {
-  --team-rail-scale: 1.1;
-  --team-rail-width: calc(var(--space-24) * var(--team-rail-scale));
   --team-rail-button-size: calc(var(--space-16) * var(--team-rail-scale));
   --team-text-color: white;
   --team-rail-icon-color: var(--color-text-muted);

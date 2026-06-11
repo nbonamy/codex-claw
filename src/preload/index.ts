@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AppleSpeechTranscriptionOptions, AppCommand, ClientRequestResponse, CodexApprovalPreset, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '../shared/contracts';
+import type { AppleSpeechTranscriptionOptions, AppCommand, BackendConversationRef, ClientRequestResponse, CodexApprovalPreset, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '../shared/contracts';
 import { ipcChannels } from '../shared/ipc';
 
 const api: CodexClawApi = {
@@ -28,7 +28,9 @@ const api: CodexClawApi = {
   updateLoop: (input: UpdateLoopInput) => ipcRenderer.invoke(ipcChannels.updateLoop, input),
   runLoop: (loopId: string) => ipcRenderer.invoke(ipcChannels.runLoop, loopId),
   clearLoopHistory: (loopId: string) => ipcRenderer.invoke(ipcChannels.clearLoopHistory, loopId),
+  deleteLoopExecution: (loopId: string, executionId: string) => ipcRenderer.invoke(ipcChannels.deleteLoopExecution, loopId, executionId),
   deleteLoop: (loopId: string) => ipcRenderer.invoke(ipcChannels.deleteLoop, loopId),
+  readConversationMessages: (ref: BackendConversationRef, agentId: string) => ipcRenderer.invoke(ipcChannels.readConversationMessages, ref, agentId),
   createAgent: (input: CreateAgentInput) => ipcRenderer.invoke(ipcChannels.createAgent, input),
   updateAgent: (input: UpdateAgentInput) => ipcRenderer.invoke(ipcChannels.updateAgent, input),
   assignWorkItemToAgent: (agentId: string, item: WorkItem) => ipcRenderer.invoke(ipcChannels.assignWorkItemToAgent, agentId, item),

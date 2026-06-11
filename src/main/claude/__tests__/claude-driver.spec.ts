@@ -223,6 +223,40 @@ describe('ClaudeBackendDriver', () => {
     ]);
   });
 
+  it('reads historical conversation messages from Claude transcript refs', async () => {
+    const transport = createFakeTransport();
+    const messages = [{
+      id: 'user-claude-session-existing-user-1',
+      agentId: 'agent-claude',
+      role: 'user' as const,
+      status: 'complete' as const,
+      turnId: 'claude-prompt-1',
+      createdAt: '2026-06-06T22:33:42.809Z',
+      parts: [{ type: 'text' as const, text: 'hello' }],
+    }];
+    const historyLoader = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'claude', sessionId: 'claude-session-existing', transcriptSessionId: 'claude-session-existing', transport: 'stdio' },
+      messages,
+    });
+    const driver = new ClaudeBackendDriver(transport, historyLoader);
+
+    await expect(driver.readConversationMessages({
+      backend: 'claude',
+      folder: '/Users/nbonamy/src/id8',
+      sessionId: 'claude-session-existing',
+    }, 'agent-claude')).resolves.toStrictEqual(messages);
+    expect(historyLoader).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'agent-claude',
+      folder: '/Users/nbonamy/src/id8',
+      backend: 'claude',
+      backendSession: {
+        kind: 'claude',
+        sessionId: 'claude-session-existing',
+        transport: 'stdio',
+      },
+    }));
+  });
+
   it('converts prompted plan mode into Claude slash plan commands', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);

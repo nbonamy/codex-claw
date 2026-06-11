@@ -3,6 +3,7 @@ import type {
   AgentBackend,
   AppSnapshot,
   BackendCapabilities,
+  BackendConversationRef,
   CodexApprovalPreset,
   BackendModelOption,
   BackendPromptOptions,
@@ -52,6 +53,7 @@ export type AgentBackendDriver = {
   interrupt(agent: Agent): Promise<BackendSendResult>;
   respondToRequest(response: ClientRequestResponse): Promise<void>;
   hydrateAgent?(agent: Agent): Promise<BackendSession | null>;
+  readConversationMessages?(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]>;
   steerPrompt?(agent: Agent, prompt: string): Promise<BackendSendResult>;
   rollbackToTurn?(agent: Agent, turnId: string): Promise<BackendRollbackResult>;
   listModels?(agent: Agent): Promise<BackendModelOption[]>;

@@ -3,7 +3,9 @@ import { createInitialSnapshot } from '../snapshot';
 import type { LoopExecutionLogEntry } from '../contracts';
 import {
   clearLoopExecutionHistoryInSnapshot,
+  completeLoopExecutionInSnapshot,
   createLoopInSnapshot,
+  deleteLoopExecutionFromSnapshot,
   deleteLoopFromSnapshot,
   recordLoopExecutionInSnapshot,
   updateLoopExecutionAgentConversationInSnapshot,
@@ -141,8 +143,7 @@ describe('loop manager', () => {
     });
 
     expect(updateLoopExecutionAgentConversationInSnapshot(snapshot, 'loop-github-bugs', 'loop-execution-1', 'agent-dina', {
-      conversationId: 'thread-dina',
-      turnId: 'turn-dina',
+      conversationRef: { backend: 'codex', threadId: 'thread-dina' },
       updatedAt: '2026-06-09T12:03:00.000Z',
     })).toMatchObject({
       updatedAt: '2026-06-09T12:03:00.000Z',
@@ -150,8 +151,7 @@ describe('loop manager', () => {
         id: 'loop-execution-1',
         createdAgents: [{
           agentId: 'agent-dina',
-          conversationId: 'thread-dina',
-          turnId: 'turn-dina',
+          conversationRef: { backend: 'codex', threadId: 'thread-dina' },
         }],
       }],
     });
@@ -292,32 +292,52 @@ describe('loop manager', () => {
     failed.error = 'GitHub failed';
     expect(recordLoopExecutionInSnapshot(snapshot, 'loop-backlog', failed)?.lastError).toBe('GitHub failed');
 
-    const successful = createExecutionEntry('run-1', 'loop-backlog', 'completed');
-    const completedLoop = recordLoopExecutionInSnapshot(snapshot, 'loop-backlog', successful);
-    expect(completedLoop).toMatchObject({
+    const working = createExecutionEntry('run-1', 'loop-backlog', 'working');
+    const workingLoop = recordLoopExecutionInSnapshot(snapshot, 'loop-backlog', working);
+    expect(workingLoop).toMatchObject({
       lastCreatedCount: 1,
       executionLog: [{
         id: 'run-1',
-        status: 'completed',
+        status: 'working',
       }],
     });
-    expect(completedLoop).not.toHaveProperty('lastError');
+    expect(workingLoop).not.toHaveProperty('lastError');
     expect(loop?.executionLog).toHaveLength(1);
+    expect(loop?.executionLog[0]).not.toHaveProperty('completedAt');
 
+    expect(completeLoopExecutionInSnapshot(snapshot, 'loop-backlog', 'run-1', '2026-06-09T12:03:00.000Z')).toMatchObject({
+      updatedAt: '2026-06-09T12:03:00.000Z',
+      executionLog: [{
+        id: 'run-1',
+        status: 'completed',
+        completedAt: '2026-06-09T12:03:00.000Z',
+      }],
+    });
+    expect(completeLoopExecutionInSnapshot(snapshot, 'loop-backlog', 'missing-run')).toBeNull();
+
+    expect(deleteLoopExecutionFromSnapshot(snapshot, 'loop-backlog', 'run-1', '2026-06-09T12:03:30.000Z')).toMatchObject({
+      executionLog: [],
+      updatedAt: '2026-06-09T12:03:30.000Z',
+    });
+    expect(loop).not.toHaveProperty('lastRunAt');
+    expect(loop).not.toHaveProperty('lastCreatedCount');
+    expect(deleteLoopExecutionFromSnapshot(snapshot, 'loop-backlog', 'missing-run')).toBeNull();
+
+    recordLoopExecutionInSnapshot(snapshot, 'loop-backlog', working);
     const loopWithConversation = updateLoopExecutionAgentConversationInSnapshot(snapshot, 'loop-backlog', 'run-1', 'agent-dina', {
-      conversationId: 'thread-dina',
+      conversationRef: { backend: 'codex', threadId: 'thread-dina' },
       updatedAt: '2026-06-09T12:04:00.000Z',
     });
     expect(loopWithConversation).toMatchObject({
       executionLog: [{
         createdAgents: [{
-          conversationId: 'thread-dina',
+          conversationRef: { backend: 'codex', threadId: 'thread-dina' },
         }],
       }],
     });
     expect(loopWithConversation?.executionLog[0].createdAgents[0]).not.toHaveProperty('turnId');
     expect(updateLoopExecutionAgentConversationInSnapshot(snapshot, 'loop-backlog', 'missing-run', 'agent-dina', {
-      conversationId: 'thread-dina',
+      conversationRef: { backend: 'codex', threadId: 'thread-dina' },
       updatedAt: '2026-06-09T12:05:00.000Z',
     })).toBeNull();
 
@@ -342,13 +362,12 @@ function createBenchTemplate() {
 function createExecutionEntry(
   id: string,
   loopId: string,
-  status: 'completed' | 'failed' = 'completed',
+  status: LoopExecutionLogEntry['status'] = 'completed',
 ): LoopExecutionLogEntry {
   return {
     id,
     loopId,
     startedAt: '2026-06-09T12:01:00.000Z',
-    completedAt: '2026-06-09T12:02:00.000Z',
     status,
     createdCount: 1,
     createdAgents: [{
@@ -358,5 +377,6 @@ function createExecutionEntry(
       workItemTitle: 'Fix cockpit',
       workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
     }],
+    ...(status === 'working' ? {} : { completedAt: '2026-06-09T12:02:00.000Z' }),
   };
 }

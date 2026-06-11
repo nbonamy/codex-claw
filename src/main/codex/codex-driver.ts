@@ -1,12 +1,14 @@
 import type {
   Agent,
   BackendCapabilities,
+  BackendConversationRef,
   BackendModelOption,
   BackendRuntimeStatus,
   BackendSession,
   BackendSkillSummary,
   CodexApprovalPreset,
   ClientRequestResponse,
+  RendererMessage,
   SendPromptOptions,
 } from '../../shared/contracts';
 import { codexBackendCapabilities } from '../../shared/backend-capabilities';
@@ -131,6 +133,13 @@ export class CodexBackendDriver implements AgentBackendDriver {
   async hydrateAgent(agent: Agent): Promise<BackendSession | null> {
     const threadId = await this.sessionManager.hydrateAgent(agent);
     return threadId ? codexBackendSession(threadId) : null;
+  }
+
+  async readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]> {
+    if (ref.backend !== 'codex') {
+      throw new Error('Codex cannot read non-Codex conversation history.');
+    }
+    return this.sessionManager.readConversationMessages(ref.threadId, agentId);
   }
 
   async respondToRequest(response: ClientRequestResponse): Promise<void> {

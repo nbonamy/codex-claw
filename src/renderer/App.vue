@@ -45,7 +45,9 @@
     :update-loop="updateLoop"
     :run-loop="runLoop"
     :clear-loop-history="clearLoopHistory"
+    :delete-loop-execution="deleteLoopExecution"
     :delete-loop="deleteLoop"
+    :read-conversation-messages="readConversationMessages"
     :configure-work-backlog="configureWorkBacklog"
     :load-work-repositories="loadWorkRepositories"
     :load-work-items="loadWorkItems"
@@ -145,7 +147,9 @@ const {
   updateLoop,
   runLoop,
   clearLoopHistory,
+  deleteLoopExecution,
   deleteLoop,
+  readConversationMessages,
   configureWorkBacklog,
   loadWorkRepositories,
   loadWorkItems,

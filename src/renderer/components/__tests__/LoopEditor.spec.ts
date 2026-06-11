@@ -110,6 +110,17 @@ describe('LoopEditor', () => {
       },
     });
   });
+
+  it('keeps the header and actions outside the scrollable form body', () => {
+    const wrapper = mountEditor();
+    const form = wrapper.get('.loop-editor');
+    const children = form.element.children;
+
+    expect(children[0]).toBe(wrapper.get('.loop-editor__header').element);
+    expect(children[1]).toBe(wrapper.get('.loop-editor__body').element);
+    expect(children[2]).toBe(wrapper.get('.loop-editor__footer').element);
+    expect(wrapper.get('.loop-editor__body').find('.loop-editor__footer').exists()).toBe(false);
+  });
 });
 
 function mountEditor(overrides: Partial<{

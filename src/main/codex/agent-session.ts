@@ -395,6 +395,16 @@ export class CodexAgentSessionManager {
     };
   }
 
+  async readConversationMessages(threadId: string, agentId: string): Promise<RendererMessage[]> {
+    await this.start();
+    const response = await this.client.request<ThreadReadResponse>('thread/read', {
+      threadId,
+      includeTurns: true,
+    });
+    this.recordThreadTurns(response.thread);
+    return codexThreadHistoryToRendererMessages(response.thread, agentId);
+  }
+
   async hydrateAgent(agent: Agent): Promise<string | null> {
     if (!codexThreadId(agent)) {
       return null;

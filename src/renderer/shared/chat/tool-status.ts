@@ -144,6 +144,7 @@ function codexClawToolKey(toolName: CodexClawToolName) {
     'check-messages': 'checkMessages',
     'display-markdown': 'displayMarkdown',
     'list-agents': 'listAgents',
+    'mark-work-item-completed': 'markWorkItemCompleted',
     'register-agent': 'registerAgent',
     'send-message': 'sendMessage',
     'set-status': 'setStatus',
@@ -216,6 +217,7 @@ const codexClawTools = new Set([
   'check-messages',
   'display-markdown',
   'list-agents',
+  'mark-work-item-completed',
   'register-agent',
   'send-message',
   'set-status',
@@ -226,6 +228,7 @@ type CodexClawToolName =
   | 'check-messages'
   | 'display-markdown'
   | 'list-agents'
+  | 'mark-work-item-completed'
   | 'register-agent'
   | 'send-message'
   | 'set-status';
@@ -281,6 +284,9 @@ function defaultTranslate(key: string, params?: Record<string, unknown>) {
     'chat.tool.mcp.codexClaw.listAgents.completed': 'Listed agents',
     'chat.tool.mcp.codexClaw.listAgents.failed': 'Failed listing agents',
     'chat.tool.mcp.codexClaw.listAgents.running': 'Listing agents',
+    'chat.tool.mcp.codexClaw.markWorkItemCompleted.completed': 'Marked work item complete',
+    'chat.tool.mcp.codexClaw.markWorkItemCompleted.failed': 'Failed marking work item complete',
+    'chat.tool.mcp.codexClaw.markWorkItemCompleted.running': 'Marking work item complete',
     'chat.tool.mcp.codexClaw.registerAgent.completed': 'Registered agent',
     'chat.tool.mcp.codexClaw.registerAgent.failed': 'Failed registering agent',
     'chat.tool.mcp.codexClaw.registerAgent.running': 'Registering agent',

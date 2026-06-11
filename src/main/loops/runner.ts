@@ -56,8 +56,7 @@ export class LoopRunner {
       if (createdAssignments.length === 0) {
         return;
       }
-      const completedAt = this.now().toISOString();
-      const entry = createLoopExecutionEntry(loop.id, executionId, startedAt, completedAt, 'completed', createdAssignments);
+      const entry = createLoopExecutionEntry(loop.id, executionId, startedAt, 'working', createdAssignments);
       recordLoopExecutionInSnapshot(this.snapshot(), loop.id, entry);
       await this.publishSnapshotUpdate();
 
@@ -88,10 +87,10 @@ export class LoopRunner {
         loop.id,
         executionId,
         startedAt,
-        this.now().toISOString(),
         'failed',
         createdAssignments,
         error instanceof Error ? error.message : String(error),
+        this.now().toISOString(),
       ));
       await this.publishSnapshotUpdate();
     }
@@ -190,16 +189,15 @@ function createLoopExecutionEntry(
   loopId: string,
   executionId: string,
   startedAt: string,
-  completedAt: string,
   status: LoopExecutionLogEntry['status'],
   assignments: CreatedLoopAssignment[],
   error?: string,
+  completedAt?: string,
 ): LoopExecutionLogEntry {
   return {
     id: executionId,
     loopId,
     startedAt,
-    completedAt,
     status,
     createdCount: assignments.length,
     createdAgents: assignments.map(({ agent, item }) => ({
@@ -209,6 +207,7 @@ function createLoopExecutionEntry(
       workItemTitle: item.title,
       workItemUrl: item.url,
     })),
+    ...(completedAt ? { completedAt } : {}),
     ...(error ? { error } : {}),
   };
 }
