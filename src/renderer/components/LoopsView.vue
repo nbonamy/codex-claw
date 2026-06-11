@@ -493,9 +493,9 @@ function formatShortDate(value: string): string {
 }
 
 .loops-view__status {
-  flex: 0 0 16px;
-  width: 16px;
-  height: 16px;
+  flex: 0 0 12px;
+  width: 12px;
+  height: 12px;
   border: 2px solid var(--color-text-muted);
   border-radius: var(--radius-full);
   background: var(--color-text-muted);
