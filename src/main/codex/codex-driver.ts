@@ -123,6 +123,10 @@ export class CodexBackendDriver implements AgentBackendDriver {
     };
   }
 
+  forgetAgentSession(agentId: string): void {
+    this.sessionManager.forgetAgentSession(agentId);
+  }
+
   async rollbackToTurn(agent: Agent, turnId: string): Promise<BackendRollbackResult> {
     const result = await this.sessionManager.rollbackToTurn(agent, turnId);
     return {

@@ -420,12 +420,7 @@ export class AppController {
     });
 
     ipcMain.handle(ipcChannels.restartAgent, async (_event, agentId: string) => {
-      const agent = restartAgentConversation(this.snapshot, agentId);
-      if (!agent) {
-        throw new Error(`Agent not found: ${agentId}`);
-      }
-      await this.persistSnapshot();
-      return this.snapshot;
+      return this.restartAgent(agentId);
     });
 
     ipcMain.handle(ipcChannels.closeAgent, async (_event, agentId: string) => {
@@ -570,6 +565,19 @@ export class AppController {
         await this.setNewConversationTitle(agent, driver, wasNewSession);
       },
     });
+  }
+
+  private async restartAgent(agentId: string): Promise<AppSnapshot> {
+    const backend = this.snapshot.agents.find((candidate) => candidate.id === agentId)?.backend;
+    const agent = restartAgentConversation(this.snapshot, agentId);
+    if (!agent) {
+      throw new Error(`Agent not found: ${agentId}`);
+    }
+    if (backend) {
+      this.getExistingBackendDriver(backend)?.forgetAgentSession?.(agentId);
+    }
+    await this.persistSnapshot();
+    return this.snapshot;
   }
 
   private async sendLoopPrompt(agentId: string, prompt: string, context: LoopPromptContext): Promise<AppSnapshot> {
@@ -1363,6 +1371,14 @@ export class AppController {
     }
 
     return this.getClaudeBackendDriver(await this.ensureMcpServer());
+  }
+
+  private getExistingBackendDriver(backend: AgentBackend): AgentBackendDriver | null {
+    if (backend === 'codex') {
+      return this.codexBackendDriver;
+    }
+
+    return this.claudeBackendDriver;
   }
 
   private getClaudeBackendDriver(clawMcpServerUrl: string): ClaudeBackendDriver {

@@ -56,6 +56,7 @@ export type AgentBackendDriver = {
   setGoal?(agent: Agent, objective: string): Promise<BackendGoalResult>;
   clearGoal?(agent: Agent): Promise<BackendGoalResult>;
   setCodexApprovalPreset?(agent: Agent, preset: CodexApprovalPreset): Promise<BackendCodexApprovalPresetResult>;
+  forgetAgentSession?(agentId: string): void;
   interrupt(agent: Agent): Promise<BackendSendResult>;
   respondToRequest(response: ClientRequestResponse): Promise<void>;
   hydrateAgent?(agent: Agent): Promise<BackendSession | null>;

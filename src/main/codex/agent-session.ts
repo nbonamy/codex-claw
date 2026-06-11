@@ -368,6 +368,20 @@ export class CodexAgentSessionManager {
     };
   }
 
+  forgetAgentSession(agentId: string): void {
+    const existing = this.sessionsByAgentId.get(agentId);
+    if (!existing) {
+      return;
+    }
+
+    this.sessionsByAgentId.delete(agentId);
+    if (this.agentIdsByThreadId.get(existing.threadId) === agentId) {
+      this.agentIdsByThreadId.delete(existing.threadId);
+    }
+    this.activeTurnIdsByThreadId.delete(existing.threadId);
+    this.turnIdsByThreadId.delete(existing.threadId);
+  }
+
   async rollbackToTurn(agent: Agent, targetTurnId: string): Promise<{ threadId: string; messages: RendererMessage[] }> {
     await this.start();
 

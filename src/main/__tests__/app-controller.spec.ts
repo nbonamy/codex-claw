@@ -113,6 +113,28 @@ describe('AppController', () => {
     expect(mcpCoordinator(controller).checkMessages('agent-jesse')).toStrictEqual({ messages: [] });
   });
 
+  it('forgets backend session caches when restarting an agent', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-old' };
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const controller = new AppController(persistence);
+    const backendDriver = createFakeCodexBackendDriver({
+      forgetAgentSession: vi.fn(),
+    });
+
+    await controller.initialize();
+    setCodexBackendDriver(controller, backendDriver);
+    await restartAgent(controller, 'agent-dina');
+
+    expect(backendDriver.forgetAgentSession).toHaveBeenCalledWith('agent-dina');
+    expect(snapshot.agents[0].backendSession).toBeUndefined();
+    expect(snapshot.messages.filter((message) => message.agentId === 'agent-dina')).toStrictEqual([]);
+    expect(persistence.save).toHaveBeenCalledWith(snapshot);
+  });
+
   it('broadcasts snapshot updates when MCP tools create agents', async () => {
     const folder = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-agent-'));
     const snapshot = createInitialSnapshot();
@@ -1562,6 +1584,12 @@ async function sendPrompt(controller: AppController, agentId: string, prompt: st
   await (controller as unknown as {
     sendPrompt(agentId: string, prompt: string): Promise<void>;
   }).sendPrompt(agentId, prompt);
+}
+
+async function restartAgent(controller: AppController, agentId: string): Promise<void> {
+  await (controller as unknown as {
+    restartAgent(agentId: string): Promise<void>;
+  }).restartAgent(agentId);
 }
 
 async function recordLoopPromptStarted(

@@ -2672,6 +2672,46 @@ describe('CodexAgentSessionManager', () => {
     });
     await expect(manager.interruptTurn(agent)).rejects.toThrow('No active Codex turn to interrupt.');
   });
+
+  it('starts a fresh thread after forgetting an agent session', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+
+    const first = manager.sendPrompt(agent, 'first');
+    await waitForSentCount(transport, 1);
+    transport.receive({ id: 1, result: { userAgent: 'codex', codexHome: '/tmp/codex-home', platformFamily: 'unix', platformOs: 'macos' } });
+    await waitForSentCount(transport, 3);
+    transport.receive({ id: 2, result: { thread: { id: 'thread-1', cwd: '/Users/nbonamy/src/codex-claw' } } });
+    await waitForSentCount(transport, 4);
+    transport.receive({ id: 3, result: { turn: { id: 'turn-1', status: 'running' } } });
+    await first;
+
+    manager.forgetAgentSession(agent.id);
+
+    const second = manager.sendPrompt(agent, 'second');
+    await waitForSentCount(transport, 5);
+    transport.receive({ id: 4, result: { thread: { id: 'thread-2', cwd: '/Users/nbonamy/src/codex-claw' } } });
+    await waitForSentCount(transport, 6);
+    transport.receive({ id: 5, result: { turn: { id: 'turn-2', status: 'running' } } });
+    await second;
+
+    expect(transport.sent.filter((message) => 'method' in message && message.method === 'thread/start')).toHaveLength(2);
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 5,
+      method: 'turn/start',
+      params: {
+        threadId: 'thread-2',
+        input: [
+          {
+            type: 'text',
+            text: 'second',
+            text_elements: [],
+          },
+        ],
+        cwd: expandHome('~/src/codex-claw'),
+      },
+    });
+  });
 });
 
 async function resolveStartedPrompt(transport: FakeTransport, manager: CodexAgentSessionManager): Promise<void> {
