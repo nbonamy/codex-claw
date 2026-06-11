@@ -55,6 +55,14 @@
       </button>
     </nav>
 
+    <ConversationHistoryPanel
+      v-if="activeAgent"
+      class="agent-sidebar__conversations"
+      :agent="activeAgent"
+      :list-conversations="listConversations"
+      :resume-conversation="resumeConversation"
+    />
+
     <AgentContextMenu
       v-if="contextMenuAgentId"
       :move-targets="contextMenuMoveTargets"
@@ -95,13 +103,14 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Agent, BenchTemplate, ReorderAgentsInput, Team } from '../../shared/contracts';
+import type { Agent, BackendConversationRef, BenchTemplate, ConversationSummary, ReorderAgentsInput, Team } from '../../shared/contracts';
 import {
   PanelLeftCloseIcon,
 } from '../shared/icons/app-icons';
 import AgentContextMenu from './AgentContextMenu.vue';
 import type { AgentContextMenuAction } from './AgentContextMenu.vue';
 import AgentAvatar from './AgentAvatar.vue';
+import ConversationHistoryPanel from './ConversationHistoryPanel.vue';
 import NewAgentButton from './NewAgentButton.vue';
 import { agentStatusLabel, agentStatusText, folderBasename } from '../shared/agent-display';
 import { useListReorderDrag } from '../shared/use-list-reorder-drag';
@@ -116,6 +125,8 @@ const props = defineProps<{
   width?: number;
   minWidth?: number;
   maxWidth?: number;
+  listConversations?: (agentId: string) => Promise<ConversationSummary[]>;
+  resumeConversation?: (agentId: string, ref: BackendConversationRef) => Promise<void>;
 }>();
 
 const emit = defineEmits<{
@@ -140,6 +151,7 @@ const resizeStep = 16;
 const currentWidth = computed(() => clampWidth(props.width ?? 260));
 const teamTitle = computed(() => props.teamName.toUpperCase());
 const bench = computed(() => props.bench ?? []);
+const activeAgent = computed(() => props.agents.find((agent) => agent.id === props.activeAgentId) ?? null);
 const contextMenuAgentId = ref<string | null>(null);
 const contextMenuPosition = ref({ x: 0, y: 0 });
 const contextMenuAgent = computed(() => (
@@ -173,6 +185,14 @@ const sidebarStyle = computed<Record<string, string>>(() => ({
   '--agent-sidebar-max-width': `${maxWidth.value}px`,
 }));
 let resizeStart: { pointerId: number; clientX: number; width: number } | null = null;
+
+async function listConversations(agentId: string): Promise<ConversationSummary[]> {
+  return props.listConversations ? props.listConversations(agentId) : [];
+}
+
+async function resumeConversation(agentId: string, ref: BackendConversationRef): Promise<void> {
+  await props.resumeConversation?.(agentId, ref);
+}
 
 function clampWidth(width: number): number {
   return Math.min(Math.max(Math.round(width), minWidth.value), maxWidth.value);
@@ -540,6 +560,10 @@ function onResizePointerEnd(event: PointerEvent): void {
 
   .agent-sidebar__footer {
     justify-items: center;
+  }
+
+  .agent-sidebar__conversations {
+    display: none;
   }
 
 }

@@ -1,6 +1,6 @@
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, AgentContextUsage, AgentStatus, AskUserAnswers, AskUserQuestion, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CodexApprovalPreset, ConfirmToolRequest, MainToRendererEvent, RendererMessage, SendPromptOptions, ToolConfirmationDecision } from '../../shared/contracts';
+import type { Agent, AgentContextUsage, AgentStatus, AskUserAnswers, AskUserQuestion, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CodexApprovalPreset, ConfirmToolRequest, ConversationSummary, MainToRendererEvent, RendererMessage, SendPromptOptions, ToolConfirmationDecision } from '../../shared/contracts';
 import { codexApprovalPresetFromDefaults } from '../../shared/codex-approval-presets';
 import { logMain, warnMain } from '../log';
 import { buildCodexClawThreadConfig } from '../mcp/codex-config';
@@ -31,6 +31,7 @@ import type {
   CodexSessionPromptResult,
   ReviewStartResponse,
   ThreadCompactStartResponse,
+  ThreadListResponse,
   CodexTurn,
   ThreadReadResponse,
   ThreadResumeResponse,
@@ -405,6 +406,50 @@ export class CodexAgentSessionManager {
     return codexThreadHistoryToRendererMessages(response.thread, agentId);
   }
 
+  async listConversations(agent: Agent): Promise<ConversationSummary[]> {
+    await this.start();
+    const response = await this.client.request<ThreadListResponse>('thread/list', {
+      cwd: expandHome(agent.folder),
+      archived: false,
+      sortKey: 'updated_at',
+      sortDirection: 'desc',
+      limit: 30,
+    });
+
+    return response.data.map((thread) => ({
+      id: thread.id,
+      title: conversationTitle(thread),
+      updatedAt: timestampSecondsToIso(thread.updatedAt ?? thread.createdAt),
+      messageCount: Array.isArray(thread.turns) ? thread.turns.length : 0,
+      ref: {
+        backend: 'codex',
+        threadId: thread.id,
+      },
+    }));
+  }
+
+  async resumeConversation(agent: Agent, threadId: string): Promise<{ threadId: string; messages: RendererMessage[] }> {
+    await this.start();
+
+    const cwd = expandHome(agent.folder);
+    const approvalSettings = codexApprovalThreadStartParams(codexApprovalPresetFromDefaults(agent.backendDefaults));
+    const threadConfig = buildCodexClawThreadConfig(agent, this.options.clawMcpServerUrl ?? null);
+    const response = await this.client.request<ThreadResumeResponse>('thread/resume', {
+      threadId,
+      cwd,
+      ...approvalSettings,
+      ...threadConfig,
+    });
+    this.recordSession(agent.id, response.thread.id);
+    this.recordThreadTurns(response.thread);
+    this.activeTurnIdsByThreadId.delete(response.thread.id);
+
+    return {
+      threadId: response.thread.id,
+      messages: codexThreadHistoryToRendererMessages(response.thread, agent.id),
+    };
+  }
+
   async hydrateAgent(agent: Agent): Promise<string | null> {
     if (!codexThreadId(agent)) {
       return null;
@@ -471,12 +516,7 @@ export class CodexAgentSessionManager {
         ...threadConfig,
       });
 
-    const session = {
-      agentId: agent.id,
-      threadId: response.thread.id,
-    };
-    this.sessionsByAgentId.set(agent.id, session);
-    this.agentIdsByThreadId.set(session.threadId, agent.id);
+    const session = this.recordSession(agent.id, response.thread.id);
     this.recordThreadTurns(response.thread);
 
     if (shouldResume) {
@@ -493,6 +533,22 @@ export class CodexAgentSessionManager {
       }
     }
 
+    return session;
+  }
+
+  private recordSession(agentId: string, threadId: string): AgentSession {
+    const existing = this.sessionsByAgentId.get(agentId);
+    if (existing && existing.threadId !== threadId && this.agentIdsByThreadId.get(existing.threadId) === agentId) {
+      this.agentIdsByThreadId.delete(existing.threadId);
+      this.activeTurnIdsByThreadId.delete(existing.threadId);
+    }
+
+    const session = {
+      agentId,
+      threadId,
+    };
+    this.sessionsByAgentId.set(agentId, session);
+    this.agentIdsByThreadId.set(threadId, agentId);
     return session;
   }
 
@@ -963,6 +1019,24 @@ export class CodexAgentSessionManager {
 
 function codexThreadId(agent: Agent): string | undefined {
   return agent.backendSession?.kind === 'codex' ? agent.backendSession.threadId : undefined;
+}
+
+function conversationTitle(thread: CodexThread): string {
+  const name = typeof thread.name === 'string' ? thread.name.trim() : '';
+  if (name) {
+    return name;
+  }
+
+  const preview = typeof thread.preview === 'string' ? thread.preview.trim() : '';
+  return preview || 'Untitled conversation';
+}
+
+function timestampSecondsToIso(value: number | undefined): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return new Date(0).toISOString();
+  }
+
+  return new Date(value * 1000).toISOString();
 }
 
 export function expandHome(folder: string): string {

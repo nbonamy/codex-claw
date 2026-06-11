@@ -1,4 +1,4 @@
-import type { Agent, AppSnapshot, BenchTemplate, WorkBacklogAssignment } from './contracts';
+import type { Agent, AppSnapshot, BackendSession, BenchTemplate, RendererMessage, WorkBacklogAssignment } from './contracts';
 import { createEntityId, createUniqueEntityId, type IdGenerator } from './ids';
 import { workBacklogAssignmentFromWorkItem, workItemAssignmentKey, type WorkItemAssignmentSource } from './work-assignments';
 
@@ -241,6 +241,37 @@ export function restartAgentConversation(snapshot: AppSnapshot, agentId: string,
   agent.status = { type: 'idle' };
   agent.updatedAt = updatedAt;
   snapshot.messages = snapshot.messages.filter((message) => message.agentId !== agentId);
+  return agent;
+}
+
+export function resumeAgentConversationInSnapshot(
+  snapshot: AppSnapshot,
+  agentId: string,
+  backendSession: BackendSession,
+  messages: RendererMessage[],
+  updatedAt = new Date().toISOString(),
+): Agent | null {
+  const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
+  if (!agent) {
+    return null;
+  }
+
+  ensureAgentCanChange(agent, 'Agent must be idle before resuming a conversation.');
+  if (backendSession.kind !== agent.backend) {
+    throw new Error('Conversation backend does not match the agent backend.');
+  }
+
+  clearRuntimeState(agent);
+  agent.backendSession = { ...backendSession };
+  agent.status = { type: 'idle' };
+  agent.updatedAt = updatedAt;
+  snapshot.messages = [
+    ...snapshot.messages.filter((message) => message.agentId !== agentId),
+    ...messages.map((message) => ({
+      ...message,
+      agentId,
+    })),
+  ];
   return agent;
 }
 

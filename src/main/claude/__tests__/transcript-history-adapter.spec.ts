@@ -1,8 +1,8 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, utimes, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
-import { claudeTranscriptToRendererMessages, loadClaudeTranscriptHistory } from '../transcript-history-adapter';
+import { claudeTranscriptToRendererMessages, listClaudeTranscriptSummaries, loadClaudeTranscriptHistory } from '../transcript-history-adapter';
 import type { Agent } from '../../../shared/contracts';
 
 describe('claudeTranscriptToRendererMessages', () => {
@@ -145,5 +145,69 @@ describe('loadClaudeTranscriptHistory', () => {
         }),
       ],
     });
+  });
+});
+
+describe('listClaudeTranscriptSummaries', () => {
+  it('lists Claude project transcripts newest first with user-facing titles', async () => {
+    const projectsRoot = path.join(tmpdir(), `codex-claw-claude-list-${Date.now()}`);
+    const projectDirectory = path.join(projectsRoot, '-Users-nbonamy-src-id8');
+    await mkdir(projectDirectory, { recursive: true });
+    await writeFile(path.join(projectDirectory, 'session-old.jsonl'), [
+      JSON.stringify({
+        type: 'user',
+        uuid: 'user-1',
+        message: { role: 'user', content: 'older prompt' },
+      }),
+      JSON.stringify({
+        type: 'assistant',
+        uuid: 'assistant-1',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'older answer' }] },
+      }),
+    ].join('\n'));
+    await writeFile(path.join(projectDirectory, 'session-new.jsonl'), [
+      JSON.stringify({
+        type: 'user',
+        uuid: 'meta-1',
+        isMeta: true,
+        message: { role: 'user', content: '<local-command-caveat>ignore</local-command-caveat>' },
+      }),
+      JSON.stringify({
+        type: 'user',
+        uuid: 'user-2',
+        message: { role: 'user', content: '<command-name>plan</command-name><command-args>ship history</command-args>' },
+      }),
+    ].join('\n'));
+    await writeFile(path.join(projectDirectory, 'not-a-session.txt'), 'ignored');
+
+    await utimes(path.join(projectDirectory, 'session-old.jsonl'), new Date('2026-06-09T10:00:00.000Z'), new Date('2026-06-09T10:00:00.000Z'));
+    await utimes(path.join(projectDirectory, 'session-new.jsonl'), new Date('2026-06-09T11:00:00.000Z'), new Date('2026-06-09T11:00:00.000Z'));
+
+    const agent: Agent = {
+      id: 'agent-claude',
+      name: 'Claude',
+      folder: '/Users/nbonamy/src/id8',
+      backend: 'claude',
+      status: { type: 'idle' },
+      createdAt: '2026-06-06T00:00:00.000Z',
+      updatedAt: '2026-06-06T00:00:00.000Z',
+    };
+
+    await expect(listClaudeTranscriptSummaries(agent, { projectsRoot })).resolves.toStrictEqual([
+      {
+        id: 'session-new',
+        title: '/plan ship history',
+        updatedAt: '2026-06-09T11:00:00.000Z',
+        messageCount: 1,
+        ref: { backend: 'claude', folder: '/Users/nbonamy/src/id8', sessionId: 'session-new' },
+      },
+      {
+        id: 'session-old',
+        title: 'older prompt',
+        updatedAt: '2026-06-09T10:00:00.000Z',
+        messageCount: 2,
+        ref: { backend: 'claude', folder: '/Users/nbonamy/src/id8', sessionId: 'session-old' },
+      },
+    ]);
   });
 });

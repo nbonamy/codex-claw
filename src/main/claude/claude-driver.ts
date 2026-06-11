@@ -1,3 +1,4 @@
+import path from 'node:path';
 import type {
   Agent,
   BackendCapabilities,
@@ -7,18 +8,19 @@ import type {
   BackendSession,
   BackendSkillSummary,
   ClientRequestResponse,
+  ConversationSummary,
   RendererMessage,
   RendererToolPart,
   SendPromptOptions,
 } from '../../shared/contracts';
 import { claudeBackendCapabilities } from '../../shared/backend-capabilities';
-import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '../backends/types';
+import type { AgentBackendDriver, BackendConversationResumeResult, BackendEvent, BackendSendResult } from '../backends/types';
 import { agentScopedMcpUrl } from '../mcp/codex-config';
 import { codexClawDeveloperInstructions } from '../mcp/agent-prompts';
 import { ClaudeCliTransport, type ClaudeTurnHandle, type ClaudeTurnParams, type ClaudeTurnTransport } from './cli-transport';
 import { claudeModelOptions } from './models';
 import { listClaudeSkills } from './skills';
-import { loadClaudeTranscriptHistory, type ClaudeTranscriptHistory } from './transcript-history-adapter';
+import { listClaudeTranscriptSummaries, loadClaudeTranscriptHistory, type ClaudeTranscriptHistory } from './transcript-history-adapter';
 import {
   claudeMessageContentBlocks,
   claudeMessageSessionId,
@@ -172,7 +174,7 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
   }
 
   async hydrateAgent(agent: Agent): Promise<BackendSession | null> {
-    const history = await this.historyLoader(agent);
+    const history = await this.loadHistory(agent);
     if (!history) {
       return null;
     }
@@ -192,12 +194,37 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
     return history.backendSession;
   }
 
+  async listConversations(agent: Agent): Promise<ConversationSummary[]> {
+    return listClaudeTranscriptSummaries(agent, {
+      projectsRoot: this.claudeProjectsRoot(),
+    });
+  }
+
+  async resumeConversation(agent: Agent, ref: BackendConversationRef): Promise<BackendConversationResumeResult> {
+    if (ref.backend !== 'claude') {
+      throw new Error('Claude cannot resume non-Claude conversation history.');
+    }
+    if (ref.folder !== agent.folder) {
+      throw new Error('Claude conversation folder does not match the agent folder.');
+    }
+
+    const backendSession = claudeBackendSession(ref.sessionId);
+    const history = await this.loadHistory({
+      ...agent,
+      backendSession,
+    });
+    return {
+      backendSession: history?.backendSession ?? backendSession,
+      messages: history?.messages ?? [],
+    };
+  }
+
   async readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]> {
     if (ref.backend !== 'claude') {
       throw new Error('Claude cannot read non-Claude conversation history.');
     }
 
-    const history = await this.historyLoader({
+    const history = await this.loadHistory({
       id: agentId,
       name: agentId,
       folder: ref.folder,
@@ -212,6 +239,20 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
       updatedAt: new Date(0).toISOString(),
     });
     return history?.messages ?? [];
+  }
+
+  private loadHistory(agent: Agent): Promise<ClaudeTranscriptHistory | null> {
+    if (this.historyLoader === loadClaudeTranscriptHistory) {
+      return loadClaudeTranscriptHistory(agent, {
+        projectsRoot: this.claudeProjectsRoot(),
+      });
+    }
+
+    return this.historyLoader(agent);
+  }
+
+  private claudeProjectsRoot(): string | undefined {
+    return this.driverOptions.homeDir ? path.join(this.driverOptions.homeDir, '.claude', 'projects') : undefined;
   }
 
   onEvent(listener: EventListener): () => void {

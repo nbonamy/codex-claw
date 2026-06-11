@@ -1,6 +1,6 @@
 # Codex Claw Architecture
 
-Status: updated for backend seam cleanup, 2026-06-06.
+Status: updated for backend driver capability seam, 2026-06-11.
 
 Codex Claw is an Electron app that merges the team/agent product model from
 Skwad with the native chat and artifact rendering already built in id8. The app
@@ -226,11 +226,21 @@ our app, not by Codex. Keep one narrow main-process interface:
 
 ```ts
 type AgentBackendDriver = {
-  backend: AgentBackend
+  readonly backend: AgentBackend
+  getRuntimeStatus(): BackendRuntimeStatus
+  getCapabilities(agent: Agent): BackendCapabilities
+  tryHandlePromptCommand?(agent: Agent, prompt: string): Promise<BackendSendResult> | null
   sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>
+  setConversationTitle?(agent: Agent, title: string): Promise<void>
+  setGoal?(agent: Agent, objective: string): Promise<BackendGoalResult>
+  clearGoal?(agent: Agent): Promise<BackendGoalResult>
+  setCodexApprovalPreset?(agent: Agent, preset: CodexApprovalPreset): Promise<BackendCodexApprovalPresetResult>
   interrupt(agent: Agent): Promise<BackendSendResult>
   respondToRequest(response: ClientRequestResponse): Promise<void>
   hydrateAgent?(agent: Agent): Promise<BackendSession | null>
+  listConversations?(agent: Agent): Promise<ConversationSummary[]>
+  resumeConversation?(agent: Agent, ref: BackendConversationRef): Promise<BackendConversationResumeResult>
+  readConversationMessages?(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]>
   steerPrompt?(agent: Agent, prompt: string): Promise<BackendSendResult>
   rollbackToTurn?(agent: Agent, turnId: string): Promise<BackendRollbackResult>
   listModels?(agent: Agent): Promise<BackendModelOption[]>
@@ -245,6 +255,34 @@ app-server adapter. If Claude Code becomes a supported backend later, it gets
 its own driver and adapter that emit the same app-owned `BackendEvent` shape.
 That is the seam we want; a generic lowest-common-denominator provider model is
 not.
+
+#### Backend Feature Rule
+
+Backend-dependent features must be added through the app seam, not directly in
+renderer UI. The required path is:
+
+1. Define an app-owned shared contract that describes product behavior rather
+   than provider protocol. Examples include `RendererMessage`,
+   `ConversationSummary`, `BackendConversationRef`, `BackendModelOption`, and
+   `BackendSkillSummary`.
+2. Add or extend an optional `AgentBackendDriver` method or declared backend
+   capability in Electron main. Optional methods are the parity boundary when
+   Codex and Claude do not support the same feature yet.
+3. Keep provider details inside concrete driver/adapter code such as
+   `src/main/codex/*` or `src/main/claude/*`.
+4. Route renderer requests through app controller/preload IPC using app-owned
+   contracts. Renderer components may branch on app capabilities or empty data,
+   but must not import Codex/Claude protocol types or know where a backend
+   stores history.
+5. Test the seam: fake backend-driver routing in controller tests, concrete
+   provider adapter/session tests for protocol behavior, and renderer component
+   tests against app-owned data.
+
+Conversation history is the canonical example. The sidebar renders
+`ConversationSummary` rows and sends a `BackendConversationRef` to main. Codex
+implements that with `thread/list` and `thread/resume`; Claude implements it by
+scanning local JSONL transcripts and resuming a session id. The renderer does
+not know either storage model.
 
 ### Preload
 
@@ -264,6 +302,8 @@ type CodexClawApi = {
   selectTeam(teamId: string): Promise<AppSnapshot>
   createAgent(input: CreateAgentInput): Promise<AppSnapshot>
   updateAgent(input: UpdateAgentInput): Promise<AppSnapshot>
+  listAgentConversations(agentId: string): Promise<ConversationSummary[]>
+  resumeAgentConversation(agentId: string, ref: BackendConversationRef): Promise<AppSnapshot>
   duplicateAgent(agentId: string): Promise<AppSnapshot>
   moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot>
   saveAgentToBench(agentId: string): Promise<AppSnapshot>

@@ -1,7 +1,8 @@
-import { access, readFile, readdir } from 'node:fs/promises';
+import type { Dirent } from 'node:fs';
+import { access, readFile, readdir, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, BackendSession, RendererMessage, RendererMessagePart, RendererToolPart } from '../../shared/contracts';
+import type { Agent, BackendSession, ConversationSummary, RendererMessage, RendererMessagePart, RendererToolPart } from '../../shared/contracts';
 import { claudeMessageContentBlocks, parseClaudeSdkMessage, type ClaudeSdkContentBlock, type ClaudeSdkMessage } from './protocol';
 
 export type ClaudeTranscriptHistory = {
@@ -53,6 +54,72 @@ export async function loadClaudeTranscriptHistory(
     },
     messages: claudeTranscriptToRendererMessages(content, agent.id, sessionId),
   };
+}
+
+export async function listClaudeTranscriptSummaries(
+  agent: Agent,
+  options: ClaudeTranscriptHistoryOptions = {},
+): Promise<ConversationSummary[]> {
+  const projectsRoot = options.projectsRoot ?? path.join(os.homedir(), '.claude', 'projects');
+  const projectDir = path.join(projectsRoot, claudeProjectDirectoryName(expandHome(agent.folder)));
+  const files: Array<{ filePath: string; sessionId: string; updatedAt: string; updatedAtMs: number }> = [];
+
+  let entries: Dirent[];
+  try {
+    entries = await readdir(projectDir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith('.jsonl')) {
+      continue;
+    }
+
+    const sessionId = entry.name.slice(0, -'.jsonl'.length);
+    if (!isSafeSessionId(sessionId)) {
+      continue;
+    }
+
+    const filePath = path.join(projectDir, entry.name);
+    try {
+      const fileStat = await stat(filePath);
+      files.push({
+        filePath,
+        sessionId,
+        updatedAt: fileStat.mtime.toISOString(),
+        updatedAtMs: fileStat.mtimeMs,
+      });
+    } catch {
+      continue;
+    }
+  }
+
+  files.sort((left, right) => right.updatedAtMs - left.updatedAtMs);
+  const summaries: ConversationSummary[] = [];
+  for (const file of files.slice(0, 30)) {
+    let content = '';
+    try {
+      content = await readFile(file.filePath, 'utf8');
+    } catch {
+      continue;
+    }
+
+    const transcriptSummary = summarizeClaudeTranscript(content);
+    summaries.push({
+      id: file.sessionId,
+      title: transcriptSummary.title,
+      updatedAt: file.updatedAt,
+      messageCount: transcriptSummary.messageCount,
+      ref: {
+        backend: 'claude',
+        folder: agent.folder,
+        sessionId: file.sessionId,
+      },
+    });
+  }
+
+  return summaries;
 }
 
 export function claudeTranscriptToRendererMessages(content: string, agentId: string, sessionId: string): RendererMessage[] {
@@ -140,6 +207,57 @@ export function claudeTranscriptToRendererMessages(content: string, agentId: str
 
   flushAssistantMessage();
   return messages;
+}
+
+function summarizeClaudeTranscript(content: string): { title: string; messageCount: number } {
+  let title = '';
+  let messageCount = 0;
+
+  for (const line of content.split(/\r?\n/)) {
+    const entry = parseClaudeSdkMessage(line) as TranscriptLine | null;
+    if (!entry || entry.isSidechain) {
+      continue;
+    }
+
+    if (entry.type === 'user') {
+      if (entry.isMeta || claudeMessageContentBlocks(entry).some(isClaudeToolResultBlock)) {
+        continue;
+      }
+
+      const text = messageText(entry);
+      if (!text) {
+        continue;
+      }
+
+      messageCount += 1;
+      title ||= compactTitle(claudeTitleText(text));
+      continue;
+    }
+
+    if (entry.type === 'assistant' && assistantMessageParts(entry).length > 0) {
+      messageCount += 1;
+    }
+  }
+
+  return {
+    title: title || 'Untitled conversation',
+    messageCount,
+  };
+}
+
+function claudeTitleText(text: string): string {
+  const commandName = text.match(/<command-name>([\s\S]*?)<\/command-name>/)?.[1]?.trim();
+  if (!commandName) {
+    return text;
+  }
+
+  const commandArgs = text.match(/<command-args>([\s\S]*?)<\/command-args>/)?.[1]?.trim();
+  return commandArgs ? `/${commandName} ${commandArgs}` : `/${commandName}`;
+}
+
+function compactTitle(value: string): string {
+  const compacted = value.replace(/\s+/g, ' ').trim();
+  return compacted.length > 96 ? `${compacted.slice(0, 93)}...` : compacted;
 }
 
 async function findClaudeTranscriptPath(projectsRoot: string, folder: string, sessionId: string): Promise<string | null> {

@@ -18,6 +18,10 @@ export type JsonRpcServerMessage =
 export type CodexThread = {
   id: string;
   cwd: string;
+  preview?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  name?: string | null;
   status?: string;
   turns?: CodexThreadTurn[];
 };
@@ -100,6 +104,12 @@ export type ThreadResumeResponse = ThreadStartResponse;
 
 export type ThreadReadResponse = {
   thread: CodexThread;
+};
+
+export type ThreadListResponse = {
+  data: CodexThread[];
+  nextCursor?: string | null;
+  backwardsCursor?: string | null;
 };
 
 export type ThreadRollbackResponse = {

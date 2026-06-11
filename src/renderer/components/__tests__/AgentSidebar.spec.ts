@@ -98,6 +98,7 @@ const bench: BenchTemplate[] = [
 
 afterEach(() => {
   vi.restoreAllMocks();
+  window.localStorage.clear();
 });
 
 describe('AgentSidebar', () => {
@@ -532,5 +533,28 @@ describe('AgentSidebar', () => {
     await handle.trigger('keydown', { key: 'ArrowRight' });
 
     expect(wrapper.emitted('resize-sidebar')).toStrictEqual([[244], [276]]);
+  });
+
+  it('shows the conversation history panel above the new agent footer', async () => {
+    const listConversations = vi.fn().mockResolvedValue([]);
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+        listConversations,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    const panel = wrapper.get('.agent-sidebar__conversations');
+    expect(Boolean(panel.element.compareDocumentPosition(wrapper.get('.agent-sidebar__footer').element) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+
+    await wrapper.get('.conversation-history__header').trigger('click');
+    await flushPromises();
+
+    expect(listConversations).toHaveBeenCalledWith('agent-dina');
   });
 });

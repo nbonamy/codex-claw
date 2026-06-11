@@ -32,6 +32,8 @@
         :width="agentSidebarWidth"
         :min-width="agentSidebarMinWidth"
         :max-width="agentSidebarMaxWidth"
+        :list-conversations="listAgentConversations"
+        :resume-conversation="resumeAgentConversation"
         @collapse-sidebar="agentSidebarCollapsed = true"
         @close-agent="$emit('close-agent', $event)"
         @deploy-bench-template="$emit('deploy-bench-template', $event)"
@@ -227,7 +229,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SourceRepository, SourceWorktree, Team, ThreadGoal, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../../shared/contracts';
+import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SourceRepository, SourceWorktree, Team, ThreadGoal, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../../shared/contracts';
 import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import { defaultTeamColor } from '../../shared/team-colors';
 import { findAssignedAgentForWorkItem } from '../../shared/work-assignments';
@@ -293,6 +295,8 @@ const props = withDefaults(defineProps<{
   clearLoopHistory?: (loopId: string) => Promise<void>;
   deleteLoopExecution?: (loopId: string, executionId: string) => Promise<void>;
   deleteLoop?: (loopId: string) => Promise<void>;
+  listAgentConversations?: (agentId: string) => Promise<ConversationSummary[]>;
+  resumeAgentConversation?: (agentId: string, ref: BackendConversationRef) => Promise<void>;
   readConversationMessages?: (ref: BackendConversationRef, agentId: string) => Promise<RendererMessage[]>;
   connectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   completeWorkProviderConnection?: (provider: WorkProviderKind) => Promise<void>;
@@ -341,6 +345,8 @@ const props = withDefaults(defineProps<{
   clearLoopHistory: async () => undefined,
   deleteLoopExecution: async () => undefined,
   deleteLoop: async () => undefined,
+  listAgentConversations: async () => [],
+  resumeAgentConversation: async () => undefined,
   readConversationMessages: async () => [],
   connectWorkProvider: async () => undefined,
   completeWorkProviderConnection: async () => undefined,
@@ -710,6 +716,14 @@ async function deleteLoop(loopId: string): Promise<void> {
 
 async function readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]> {
   return props.readConversationMessages(ref, agentId);
+}
+
+async function listAgentConversations(agentId: string): Promise<ConversationSummary[]> {
+  return props.listAgentConversations(agentId);
+}
+
+async function resumeAgentConversation(agentId: string, ref: BackendConversationRef): Promise<void> {
+  await props.resumeAgentConversation(agentId, ref);
 }
 
 function selectTeamFromRail(teamId: string): void {

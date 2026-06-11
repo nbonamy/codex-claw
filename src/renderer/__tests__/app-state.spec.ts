@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
 import { createEmptySnapshot, createInitialSnapshot } from '../../shared/snapshot';
-import type { BackendConversationRef, CodexClawApi, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '../../shared/contracts';
+import type { BackendConversationRef, CodexClawApi, ConversationSummary, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '../../shared/contracts';
 import { workItemAssignmentKey } from '../../shared/work-assignments';
 import { workItemAssignmentPrompt } from '../../shared/work-item-prompts';
 
@@ -1636,6 +1636,58 @@ describe('useAppState', () => {
     }, 'agent-dina');
     expect(readConversationMessages.mock.calls.at(-1)?.[0]).not.toBe(reactiveConversationRef);
     expect(state.snapshot.value).toStrictEqual(deletedSnapshot);
+  });
+
+  it('lists and resumes active agent conversations through preload', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const resumedSnapshot = {
+      ...remoteSnapshot,
+      agents: remoteSnapshot.agents.map((agent) => (
+        agent.id === 'agent-dina'
+          ? { ...agent, backendSession: { kind: 'codex' as const, threadId: 'thread-dina' } }
+          : agent
+      )),
+      messages: [{
+        id: 'user-thread-dina',
+        agentId: 'agent-dina',
+        role: 'user' as const,
+        status: 'complete' as const,
+        createdAt: '2026-06-09T10:00:00.000Z',
+        parts: [{ type: 'text' as const, text: 'hello again' }],
+      }],
+    };
+    const conversations: ConversationSummary[] = [{
+      id: 'thread-dina',
+      title: 'hello again',
+      updatedAt: '2026-06-09T10:00:00.000Z',
+      messageCount: 1,
+      ref: { backend: 'codex', threadId: 'thread-dina' },
+    }];
+    const listAgentConversations = vi.fn().mockResolvedValue(conversations);
+    const resumeAgentConversation = vi.fn().mockResolvedValue(resumedSnapshot);
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn(),
+        listAgentConversations,
+        resumeAgentConversation,
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await expect(state.listAgentConversations('agent-dina')).resolves.toStrictEqual(conversations);
+
+    const reactiveConversationRef = reactive({
+      backend: 'codex' as const,
+      threadId: 'thread-dina',
+    });
+    await state.resumeAgentConversation('agent-dina', reactiveConversationRef as BackendConversationRef);
+
+    expect(listAgentConversations).toHaveBeenCalledWith('agent-dina');
+    expect(resumeAgentConversation).toHaveBeenCalledWith('agent-dina', { backend: 'codex', threadId: 'thread-dina' });
+    expect(resumeAgentConversation.mock.calls.at(-1)?.[1]).not.toBe(reactiveConversationRef);
+    expect(state.snapshot.value).toStrictEqual(resumedSnapshot);
   });
 
   it('ignores invalid reorder requests before calling main', async () => {

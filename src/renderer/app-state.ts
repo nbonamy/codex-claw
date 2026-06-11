@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelMarkdownRequest, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../shared/contracts';
+import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelMarkdownRequest, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../shared/contracts';
 import { updateSettingsInSnapshot } from '../shared/settings';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '../shared/snapshot';
 import { defaultBackendCapabilities } from '../shared/backend-capabilities';
@@ -476,6 +476,23 @@ export function useAppState() {
     return window.codexClaw.readConversationMessages(plainConversationRef(ref), agentId);
   }
 
+  async function listAgentConversations(agentId: string): Promise<ConversationSummary[]> {
+    if (!window.codexClaw?.listAgentConversations) {
+      return [];
+    }
+
+    return window.codexClaw.listAgentConversations(agentId);
+  }
+
+  async function resumeAgentConversation(agentId: string, ref: BackendConversationRef): Promise<void> {
+    if (!window.codexClaw?.resumeAgentConversation) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.resumeAgentConversation(agentId, plainConversationRef(ref));
+    await loadActiveAgentCatalogs();
+  }
+
   async function updateAgent(input: UpdateAgentInput): Promise<void> {
     if (!window.codexClaw?.updateAgent) {
       return;
@@ -849,6 +866,8 @@ export function useAppState() {
     clearLoopHistory,
     deleteLoopExecution,
     deleteLoop,
+    listAgentConversations,
+    resumeAgentConversation,
     readConversationMessages,
     assignWorkItemToAgent,
     removeWorkItemAssignment,

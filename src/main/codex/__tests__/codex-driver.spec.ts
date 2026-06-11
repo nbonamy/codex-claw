@@ -128,6 +128,40 @@ describe('CodexBackendDriver', () => {
     await expect(driver.readConversationMessages({ backend: 'codex', threadId: 'thread-dina' }, 'agent-dina')).resolves.toStrictEqual(messages);
     expect(sessionManager.readConversationMessages).toHaveBeenCalledWith('thread-dina', 'agent-dina');
   });
+
+  it('lists and resumes conversations through the session manager', async () => {
+    const messages = [{
+      id: 'user-thread-dina-user-1',
+      agentId: 'agent-dina',
+      role: 'user' as const,
+      status: 'complete' as const,
+      createdAt: '2026-06-09T10:00:00.000Z',
+      parts: [{ type: 'text' as const, text: 'hello' }],
+    }];
+    const conversations = [{
+      id: 'thread-dina',
+      title: 'hello',
+      updatedAt: '2026-06-09T10:00:00.000Z',
+      messageCount: 1,
+      ref: { backend: 'codex' as const, threadId: 'thread-dina' },
+    }];
+    const sessionManager = createSessionManager({
+      listConversations: vi.fn().mockResolvedValue(conversations),
+      resumeConversation: vi.fn().mockResolvedValue({
+        threadId: 'thread-dina',
+        messages,
+      }),
+    });
+    const driver = new CodexBackendDriver(sessionManager);
+
+    await expect(driver.listConversations(agent)).resolves.toStrictEqual(conversations);
+    await expect(driver.resumeConversation(agent, { backend: 'codex', threadId: 'thread-dina' })).resolves.toStrictEqual({
+      backendSession: { kind: 'codex', threadId: 'thread-dina' },
+      messages,
+    });
+    expect(sessionManager.listConversations).toHaveBeenCalledWith(agent);
+    expect(sessionManager.resumeConversation).toHaveBeenCalledWith(agent, 'thread-dina');
+  });
 });
 
 function createSessionManager(overrides: Partial<CodexAgentSessionManager> = {}): CodexAgentSessionManager {
@@ -136,6 +170,8 @@ function createSessionManager(overrides: Partial<CodexAgentSessionManager> = {})
     clearThreadGoal: vi.fn().mockResolvedValue({ threadId: 'thread-goal', cleared: true }),
     reviewThread: vi.fn().mockResolvedValue({ threadId: 'thread-review', turnId: 'turn-review' }),
     sendPrompt: vi.fn(),
+    listConversations: vi.fn().mockResolvedValue([]),
+    resumeConversation: vi.fn().mockResolvedValue({ threadId: 'thread-dina', messages: [] }),
     readConversationMessages: vi.fn().mockResolvedValue([]),
     setConversationTitle: vi.fn().mockResolvedValue(undefined),
     setApprovalPreset: vi.fn().mockResolvedValue({ threadId: 'thread-approval', approvalPreset: 'full-access' }),

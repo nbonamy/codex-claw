@@ -4,7 +4,7 @@ import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '../../../shared/snapshot';
-import type { Agent, AppCommand, AppSnapshot, BackendConversationRef, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, RendererMessage, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '../../../shared/contracts';
+import type { Agent, AppCommand, AppSnapshot, BackendConversationRef, CodexClawApi, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, RendererMessage, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '../../../shared/contracts';
 import { workItemAssignmentKey } from '../../../shared/work-assignments';
 import { i18n } from '../../i18n';
 
@@ -1730,6 +1730,8 @@ function mountShell(overrides: Partial<{
   clearLoopHistory: (loopId: string) => Promise<void>;
   deleteLoopExecution: (loopId: string, executionId: string) => Promise<void>;
   deleteLoop: (loopId: string) => Promise<void>;
+  listAgentConversations: (agentId: string) => Promise<ConversationSummary[]>;
+  resumeAgentConversation: (agentId: string, ref: BackendConversationRef) => Promise<void>;
   readConversationMessages: (ref: BackendConversationRef, agentId: string) => Promise<RendererMessage[]>;
   configureWorkBacklog: (input: WorkBacklogConfigurationInput) => Promise<void>;
   loadWorkRepositories: (provider: WorkProviderKind) => Promise<void>;
@@ -1758,6 +1760,8 @@ function mountShell(overrides: Partial<{
       clearLoopHistory: overrides.clearLoopHistory ?? vi.fn().mockResolvedValue(undefined),
       deleteLoopExecution: overrides.deleteLoopExecution ?? vi.fn().mockResolvedValue(undefined),
       deleteLoop: overrides.deleteLoop ?? vi.fn().mockResolvedValue(undefined),
+      listAgentConversations: overrides.listAgentConversations ?? vi.fn().mockResolvedValue([]),
+      resumeAgentConversation: overrides.resumeAgentConversation ?? vi.fn().mockResolvedValue(undefined),
       readConversationMessages: overrides.readConversationMessages ?? vi.fn().mockResolvedValue([]),
       configureWorkBacklog: overrides.configureWorkBacklog ?? vi.fn().mockResolvedValue(undefined),
       loadWorkRepositories: overrides.loadWorkRepositories ?? vi.fn().mockResolvedValue(undefined),

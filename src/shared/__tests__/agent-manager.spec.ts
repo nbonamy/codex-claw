@@ -10,6 +10,7 @@ import {
   removeWorkItemAssignmentFromSnapshot,
   reorderAgentInTeam,
   restartAgentConversation,
+  resumeAgentConversationInSnapshot,
   saveAgentToBench,
 } from '../agent-manager';
 import { appendUserPrompt, createInitialSnapshot } from '../snapshot';
@@ -357,6 +358,57 @@ describe('agent-manager', () => {
     expect(snapshot.messages.map((message) => message.agentId)).toStrictEqual(['agent-jesse']);
   });
 
+  it('resumes an idle agent by replacing its messages and preserving the selected backend session', () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0];
+    agent.backendSession = { kind: 'codex', threadId: 'thread-old' };
+    agent.contextUsage = {
+      totalTokens: 397_740,
+      inputTokens: 320_000,
+      cachedInputTokens: 80_000,
+      outputTokens: 72_000,
+      reasoningOutputTokens: 24_000,
+      lastTotalTokens: 64_600,
+      modelContextWindow: 258_400,
+      usedPercent: 25,
+    };
+    agent.plan = {
+      threadId: 'thread-old',
+      turnId: 'turn-plan',
+      explanation: 'Old plan',
+      steps: [{ step: 'Do old work', status: 'pending' }],
+      markdown: 'Old plan\n- [ ] Do old work',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    };
+    agent.isRegistered = true;
+    appendUserPrompt(snapshot, 'agent-dina', 'old prompt');
+    appendUserPrompt(snapshot, 'agent-jesse', 'keep prompt');
+
+    expect(resumeAgentConversationInSnapshot(snapshot, 'agent-dina', { kind: 'codex', threadId: 'thread-new' }, [{
+      id: 'user-thread-new',
+      agentId: 'agent-other',
+      role: 'user',
+      status: 'complete',
+      createdAt: '2026-06-05T10:00:00.000Z',
+      parts: [{ type: 'text', text: 'resumed prompt' }],
+    }], '2026-06-05T10:11:12.000Z')).toMatchObject({
+      id: 'agent-dina',
+      backendSession: { kind: 'codex', threadId: 'thread-new' },
+      status: { type: 'idle' },
+      updatedAt: '2026-06-05T10:11:12.000Z',
+    });
+    expect(snapshot.agents[0].contextUsage).toBeUndefined();
+    expect(snapshot.agents[0].plan).toBeUndefined();
+    expect(snapshot.agents[0].isRegistered).toBeUndefined();
+    expect(snapshot.messages.map((message) => [
+      message.agentId,
+      message.parts[0]?.type === 'text' ? message.parts[0].text : '',
+    ])).toStrictEqual([
+      ['agent-jesse', 'keep prompt'],
+      ['agent-dina', 'resumed prompt'],
+    ]);
+  });
+
   it('closes an idle agent and selects the next available agent', () => {
     const snapshot = createInitialSnapshot();
     appendUserPrompt(snapshot, 'agent-dina', 'old prompt');
@@ -406,6 +458,7 @@ describe('agent-manager', () => {
     appendUserPrompt(snapshot, 'agent-dina', 'busy prompt');
 
     expect(() => restartAgentConversation(snapshot, 'agent-dina')).toThrow('Agent must be idle before restarting.');
+    expect(() => resumeAgentConversationInSnapshot(snapshot, 'agent-dina', { kind: 'codex', threadId: 'thread-new' }, [])).toThrow('Agent must be idle before resuming a conversation.');
     expect(() => moveAgentToTeamInSnapshot(snapshot, 'agent-dina', 'team-codex-claw')).toThrow('Agent must be idle before moving.');
     expect(closeAgentInSnapshot(snapshot, 'agent-dina')).toMatchObject({ id: 'agent-dina' });
     expect(snapshot.agents.map((agent) => agent.id)).toStrictEqual(['agent-jesse']);

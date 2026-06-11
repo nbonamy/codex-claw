@@ -36,6 +36,7 @@ import {
   removeWorkItemAssignmentFromSnapshot,
   reorderAgentInTeam,
   restartAgentConversation,
+  resumeAgentConversationInSnapshot,
   saveAgentToBench,
 } from '../shared/agent-manager';
 import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selectTeam, updateTeamInSnapshot } from '../shared/team-manager';
@@ -50,7 +51,7 @@ import {
   updateAgentFolder,
 } from './snapshot-service';
 import { AppStatePersistence } from './state-persistence';
-import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CodexApprovalPreset, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogAssignment, WorkBacklogConfigurationInput, WorkProviderKind } from '../shared/contracts';
+import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CodexApprovalPreset, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogAssignment, WorkBacklogConfigurationInput, WorkProviderKind } from '../shared/contracts';
 import { codexBackendDefaultsWithApprovalPreset, isCodexApprovalPreset } from '../shared/codex-approval-presets';
 import { ipcChannels } from '../shared/ipc';
 import { teamColors } from '../shared/team-colors';
@@ -299,6 +300,14 @@ export class AppController {
       }
       await this.persistSnapshot();
       return this.snapshot;
+    });
+
+    ipcMain.handle(ipcChannels.listAgentConversations, async (_event, agentId: string) => {
+      return this.listAgentConversations(agentId);
+    });
+
+    ipcMain.handle(ipcChannels.resumeAgentConversation, async (_event, agentId: string, ref: unknown) => {
+      return this.resumeAgentConversation(agentId, ref);
     });
 
     ipcMain.handle(ipcChannels.readConversationMessages, async (_event, ref: unknown, agentId: string) => {
@@ -585,6 +594,50 @@ export class AppController {
       type: 'snapshot.updated',
       payload: this.snapshot,
     });
+  }
+
+  private async listAgentConversations(agentId: string): Promise<ConversationSummary[]> {
+    if (typeof agentId !== 'string' || !agentId.trim()) {
+      throw new Error('Invalid agent id.');
+    }
+
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) {
+      throw new Error(`Agent not found: ${agentId}`);
+    }
+
+    const driver = await this.getBackendDriverForAgent(agent);
+    return driver.listConversations ? driver.listConversations(agent) : [];
+  }
+
+  private async resumeAgentConversation(agentId: string, ref: unknown): Promise<AppSnapshot> {
+    if (typeof agentId !== 'string' || !agentId.trim() || !isBackendConversationRef(ref)) {
+      throw new Error('Invalid conversation reference.');
+    }
+
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) {
+      throw new Error(`Agent not found: ${agentId}`);
+    }
+    if (ref.backend !== agent.backend) {
+      throw new Error('Conversation backend does not match the agent backend.');
+    }
+    if (agent.status.type !== 'idle') {
+      throw new Error('Agent must be idle before resuming a conversation.');
+    }
+
+    const driver = await this.getBackendDriverForAgent(agent);
+    if (!driver.resumeConversation) {
+      throw new Error(`${backendDisplayName(agent.backend)} does not support conversation resume.`);
+    }
+
+    const result = await driver.resumeConversation(agent, ref);
+    const resumedAgent = resumeAgentConversationInSnapshot(this.snapshot, agentId, result.backendSession, result.messages);
+    if (!resumedAgent) {
+      throw new Error(`Agent not found: ${agentId}`);
+    }
+    await this.persistSnapshot();
+    return this.snapshot;
   }
 
   private async readConversationMessages(ref: unknown, agentId: string): Promise<RendererMessage[]> {

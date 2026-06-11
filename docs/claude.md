@@ -3,7 +3,7 @@
 Status: implementation notes plus historical research, 2026-06-06.
 
 Update, 2026-06-06: the Codex-bias inventory in this document was written
-before the backend-agnostic cleanup landed. The current code now has
+before the backend driver seam landed. The current code now has
 `backendSession`, `backendDefaults`, `backendRuntimes`, backend-neutral model
 and skill catalogs, and a main-process backend driver seam. The Claude protocol
 research below still applies; the old-field bias list is retained as historical
@@ -41,17 +41,25 @@ stdio://`. Electron main owns the process, JSON-RPC request ids, server
 requests, and event adaptation. Renderer code consumes app-owned
 `MainToRendererEvent` and `RendererMessage` shapes.
 
-The backend-agnostic cleanup has landed. The current shared/main seam is:
+The backend driver seam has landed. The current shared/main seam is:
 
 ```ts
 type AgentBackendDriver = {
   readonly backend: AgentBackend
   getRuntimeStatus(): BackendRuntimeStatus
   getCapabilities(agent: Agent): BackendCapabilities
+  tryHandlePromptCommand?(agent: Agent, prompt: string): Promise<BackendSendResult> | null
   sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>
+  setConversationTitle?(agent: Agent, title: string): Promise<void>
+  setGoal?(agent: Agent, objective: string): Promise<BackendGoalResult>
+  clearGoal?(agent: Agent): Promise<BackendGoalResult>
+  setCodexApprovalPreset?(agent: Agent, preset: CodexApprovalPreset): Promise<BackendCodexApprovalPresetResult>
   interrupt(agent: Agent): Promise<BackendSendResult>
   respondToRequest(response: ClientRequestResponse): Promise<void>
   hydrateAgent?(agent: Agent): Promise<BackendSession | null>
+  listConversations?(agent: Agent): Promise<ConversationSummary[]>
+  resumeConversation?(agent: Agent, ref: BackendConversationRef): Promise<BackendConversationResumeResult>
+  readConversationMessages?(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]>
   steerPrompt?(agent: Agent, prompt: string): Promise<BackendSendResult>
   rollbackToTurn?(agent: Agent, turnId: string): Promise<BackendRollbackResult>
   listModels?(agent: Agent): Promise<BackendModelOption[]>
@@ -137,7 +145,16 @@ displayable records:
 
 On agent selection or startup active-agent hydration, `ClaudeBackendDriver`
 emits `thread.historyLoaded` through the same app-owned event path used by
-Codex, so the renderer remains backend-agnostic.
+Codex, so the renderer remains backend-neutral.
+
+The sidebar conversation history is the Claude implementation of the generic
+driver capability documented in `docs/architecture.md`. Main process scans the
+active agent folder's `~/.claude/projects/.../*.jsonl` entries, sorts them
+newest first by file modification time, and returns app-owned
+`ConversationSummary` rows with an opaque `BackendConversationRef`. Clicking a
+Claude conversation stores that session id as the agent's current
+`BackendSession`, reloads its transcript messages, and the next prompt resumes
+with `--resume <session_id>`. Resume is allowed only while the agent is idle.
 
 The actual Electron process uses `spawn(command, args)`, not shell string
 execution, so `-p` and `--append-system-prompt` values are passed as single argv
@@ -649,10 +666,10 @@ either:
 
 ## Historical Codex Bias Inventory
 
-This section is retained to explain why `docs/backend-agnostic-cleanup.md`
-exists. Most items below were fixed by the backend-agnostic cleanup on
-2026-06-06 and should not be treated as current code facts. Current remaining
-Claude work is listed in "Remaining Claude Driver Work".
+This section is retained as historical context. Most items below were fixed by
+the backend driver seam cleanup on 2026-06-06 and should not be treated as
+current code facts. Current remaining Claude work is listed in "Remaining
+Claude Driver Work".
 
 ### Shared Contracts
 

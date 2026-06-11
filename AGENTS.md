@@ -38,6 +38,10 @@ Preserve the product and process boundaries:
 - Backend events become app-owned events before they become renderer state.
 - Codex-specific protocol data belongs in the Codex driver/adapter, not in
   reusable renderer components.
+- Backend-dependent features must enter through app-owned contracts and the
+  `AgentBackendDriver` seam first. Add or extend an optional driver method or
+  capability in Electron main, route it through typed IPC, and keep renderer
+  components free of Codex/Claude protocol branches.
 - `RendererMessage` is our app contract. It can borrow ideas from id8, but it
   is not bound to id8 or multi-llm-ts message shapes.
 - Future Claude Code support should arrive through a new backend driver and
@@ -63,8 +67,6 @@ doc and update it when behavior changes:
   fixtures.
 - `docs/claude.md`: Claude Code websocket/SDK protocol research, support
   strategy, and remaining Claude-driver questions.
-- `docs/backend-agnostic-cleanup.md`: implemented pre-Claude cleanup for shared
-  contracts, runtime state, renderer controls, and main-process backend seams.
 - `docs/mcp.md`: how the app-owned MCP server exposes agent collaboration
   tools, inbox state, backend enablement, security, and tests.
 - `docs/architecture.md`: product model, process architecture, IPC,

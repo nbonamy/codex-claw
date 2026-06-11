@@ -100,8 +100,15 @@ must translate those turns into app-owned `RendererMessage`s and emit a
 history hydration event before the next turn streams. The renderer asks main
 to re-select the active persisted agent after subscribing to main events, so
 relaunch restores visible history without the renderer importing Codex protocol
-types. The same adapter should be reused later for `thread/read` if we add a
-read-only history loading path that does not resume the runtime session.
+types.
+
+The sidebar conversation history uses `thread/list` with the active agent
+folder as an exact `cwd` filter, `archived: false`, and newest-first
+`updated_at` sorting. Main sends app-owned `ConversationSummary` objects to the
+renderer. Clicking a Codex conversation calls `thread/resume`, stores the
+returned `{ kind: "codex", threadId }` session on the agent, replaces that
+agent's visible messages with the resumed turns, and routes the next prompt to
+the selected thread. Resume is allowed only while the agent is idle.
 
 ## Requests
 

@@ -8,11 +8,12 @@ import type {
   BackendSkillSummary,
   CodexApprovalPreset,
   ClientRequestResponse,
+  ConversationSummary,
   RendererMessage,
   SendPromptOptions,
 } from '../../shared/contracts';
 import { codexBackendCapabilities } from '../../shared/backend-capabilities';
-import type { AgentBackendDriver, BackendCodexApprovalPresetResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '../backends/types';
+import type { AgentBackendDriver, BackendCodexApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '../backends/types';
 import type { CodexAgentSessionManager } from './agent-session';
 import type { CodexReviewTarget } from './protocol';
 
@@ -140,6 +141,22 @@ export class CodexBackendDriver implements AgentBackendDriver {
       throw new Error('Codex cannot read non-Codex conversation history.');
     }
     return this.sessionManager.readConversationMessages(ref.threadId, agentId);
+  }
+
+  async listConversations(agent: Agent): Promise<ConversationSummary[]> {
+    return this.sessionManager.listConversations(agent);
+  }
+
+  async resumeConversation(agent: Agent, ref: BackendConversationRef): Promise<BackendConversationResumeResult> {
+    if (ref.backend !== 'codex') {
+      throw new Error('Codex cannot resume non-Codex conversation history.');
+    }
+
+    const result = await this.sessionManager.resumeConversation(agent, ref.threadId);
+    return {
+      backendSession: codexBackendSession(result.threadId),
+      messages: result.messages,
+    };
   }
 
   async respondToRequest(response: ClientRequestResponse): Promise<void> {

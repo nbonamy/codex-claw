@@ -283,6 +283,14 @@ export type BackendConversationRef =
     sessionId: string;
   };
 
+export type ConversationSummary = {
+  id: string;
+  title: string;
+  updatedAt: string;
+  messageCount: number;
+  ref: BackendConversationRef;
+};
+
 export type LoopExecutionCreatedAgent = {
   agentId: string;
   agentName: string;
@@ -767,6 +775,8 @@ export type CodexClawApi = {
   clearLoopHistory(loopId: string): Promise<AppSnapshot>;
   deleteLoopExecution(loopId: string, executionId: string): Promise<AppSnapshot>;
   deleteLoop(loopId: string): Promise<AppSnapshot>;
+  listAgentConversations(agentId: string): Promise<ConversationSummary[]>;
+  resumeAgentConversation(agentId: string, ref: BackendConversationRef): Promise<AppSnapshot>;
   readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]>;
   createAgent(input: CreateAgentInput): Promise<AppSnapshot>;
   updateAgent(input: UpdateAgentInput): Promise<AppSnapshot>;

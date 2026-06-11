@@ -26,6 +26,8 @@ export const ipcChannels = {
   clearLoopHistory: 'loop:history:clear',
   deleteLoopExecution: 'loop:execution:delete',
   deleteLoop: 'loop:delete',
+  listAgentConversations: 'conversation:list',
+  resumeAgentConversation: 'conversation:resume',
   readConversationMessages: 'conversation:messages:read',
   createAgent: 'agent:create',
   updateAgent: 'agent:update',

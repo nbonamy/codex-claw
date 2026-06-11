@@ -900,6 +900,151 @@ describe('CodexAgentSessionManager', () => {
     ]);
   });
 
+  it('lists stored conversations for the agent folder', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+
+    const list = manager.listConversations(agent);
+    await waitForSentCount(transport, 1);
+    transport.receive({
+      id: 1,
+      result: {
+        userAgent: 'codex',
+        codexHome: '/tmp/codex-home',
+        platformFamily: 'unix',
+        platformOs: 'macos',
+      },
+    });
+    await waitForSentCount(transport, 3);
+    transport.receive({
+      id: 2,
+      result: {
+        data: [{
+          id: 'thread-history',
+          cwd: '/Users/nbonamy/src/codex-claw',
+          preview: 'read docs',
+          name: null,
+          updatedAt: 1_780_000_000,
+          turns: [],
+        }],
+        nextCursor: null,
+        backwardsCursor: null,
+      },
+    });
+
+    await expect(list).resolves.toStrictEqual([{
+      id: 'thread-history',
+      title: 'read docs',
+      updatedAt: '2026-05-28T20:26:40.000Z',
+      messageCount: 0,
+      ref: {
+        backend: 'codex',
+        threadId: 'thread-history',
+      },
+    }]);
+    expect(transport.sent).toContainEqual({
+      id: 2,
+      method: 'thread/list',
+      params: {
+        cwd: expandHome('~/src/codex-claw'),
+        archived: false,
+        sortKey: 'updated_at',
+        sortDirection: 'desc',
+        limit: 30,
+      },
+    });
+  });
+
+  it('resumes a selected stored conversation and uses it for the next turn', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));
+
+    const resume = manager.resumeConversation(agent, 'thread-history');
+    await waitForSentCount(transport, 1);
+    transport.receive({
+      id: 1,
+      result: {
+        userAgent: 'codex',
+        codexHome: '/tmp/codex-home',
+        platformFamily: 'unix',
+        platformOs: 'macos',
+      },
+    });
+    await waitForSentCount(transport, 3);
+    transport.receive({
+      id: 2,
+      result: {
+        thread: {
+          id: 'thread-history',
+          cwd: '/Users/nbonamy/src/codex-claw',
+          turns: [
+            {
+              id: 'turn-history',
+              status: 'completed',
+              startedAt: 1_780_000_000,
+              items: [{
+                type: 'userMessage',
+                id: 'user-history',
+                content: [{ type: 'text', text: 'old question', text_elements: [] }],
+              }],
+            },
+          ],
+        },
+      },
+    });
+
+    await expect(resume).resolves.toMatchObject({
+      threadId: 'thread-history',
+      messages: [
+        expect.objectContaining({
+          id: 'user-thread-history-turn-history-user-history',
+          parts: [{ type: 'text', text: 'old question' }],
+        }),
+      ],
+    });
+    expect(transport.sent).toContainEqual({
+      id: 2,
+      method: 'thread/resume',
+      params: {
+        threadId: 'thread-history',
+        cwd: expandHome('~/src/codex-claw'),
+        approvalPolicy: 'never',
+        approvalsReviewer: 'user',
+        sandbox: 'danger-full-access',
+      },
+    });
+
+    const prompt = manager.sendPrompt(agent, 'continue here');
+    await waitForSentCount(transport, 4);
+    transport.receive({
+      id: 3,
+      result: {
+        turn: {
+          id: 'turn-next',
+          status: 'running',
+        },
+      },
+    });
+
+    await expect(prompt).resolves.toStrictEqual({
+      threadId: 'thread-history',
+      turnId: 'turn-next',
+    });
+    expect(transport.sent.at(-1)).toStrictEqual({
+      id: 3,
+      method: 'turn/start',
+      params: {
+        threadId: 'thread-history',
+        input: [{
+          type: 'text',
+          text: 'continue here',
+          text_elements: [],
+        }],
+        cwd: expandHome('~/src/codex-claw'),
+      },
+    });
+  });
+
   it('rolls back from a target turn and returns replacement renderer history', async () => {
     const transport = new FakeTransport();
     const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));

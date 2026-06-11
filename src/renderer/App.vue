@@ -47,6 +47,8 @@
     :clear-loop-history="clearLoopHistory"
     :delete-loop-execution="deleteLoopExecution"
     :delete-loop="deleteLoop"
+    :list-agent-conversations="listAgentConversations"
+    :resume-agent-conversation="resumeAgentConversation"
     :read-conversation-messages="readConversationMessages"
     :configure-work-backlog="configureWorkBacklog"
     :load-work-repositories="loadWorkRepositories"
@@ -149,6 +151,8 @@ const {
   clearLoopHistory,
   deleteLoopExecution,
   deleteLoop,
+  listAgentConversations,
+  resumeAgentConversation,
   readConversationMessages,
   configureWorkBacklog,
   loadWorkRepositories,
