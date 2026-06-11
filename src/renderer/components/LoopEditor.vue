@@ -30,78 +30,85 @@
         />
       </section>
 
-      <section class="loop-editor__grid">
-        <div class="loop-editor__section">
-          <label for="loop-editor-provider">Provider</label>
-          <el-select
-            id="loop-editor-provider"
-            v-model="form.provider"
-            disabled
-            aria-label="Loop provider"
-          >
-            <el-option label="GitHub" value="github" />
-          </el-select>
+      <section
+        class="loop-editor__source-group"
+        aria-label="Loop source filters"
+      >
+        <div class="loop-editor__source-row">
+          <div class="loop-editor__section">
+            <label for="loop-editor-provider">Provider</label>
+            <el-select
+              id="loop-editor-provider"
+              v-model="form.provider"
+              disabled
+              aria-label="Loop provider"
+            >
+              <el-option label="GitHub" value="github" />
+            </el-select>
+          </div>
+
+          <div class="loop-editor__section">
+            <label for="loop-editor-repository">Repo</label>
+            <el-select
+              id="loop-editor-repository"
+              v-model="form.repositoryId"
+              filterable
+              placeholder="Select repo"
+              aria-label="Loop repository"
+              :disabled="!githubConnected || sortedRepositories.length === 0"
+              @change="repositoryChanged"
+            >
+              <el-option
+                v-for="repository in sortedRepositories"
+                :key="repository.id"
+                :label="repository.fullName"
+                :value="repository.id"
+              />
+            </el-select>
+          </div>
         </div>
 
-        <div class="loop-editor__section">
-          <label for="loop-editor-repository">Repository</label>
-          <el-select
-            id="loop-editor-repository"
-            v-model="form.repositoryId"
-            filterable
-            placeholder="Select repo"
-            aria-label="Loop repository"
-            :disabled="!githubConnected || sortedRepositories.length === 0"
-            @change="repositoryChanged"
-          >
-            <el-option
-              v-for="repository in sortedRepositories"
-              :key="repository.id"
-              :label="repository.fullName"
-              :value="repository.id"
-            />
-          </el-select>
+        <div class="loop-editor__source-row">
+          <div class="loop-editor__section">
+            <label for="loop-editor-assignee">Assigned to</label>
+            <el-select
+              id="loop-editor-assignee"
+              v-model="form.assigneeLogin"
+              clearable
+              filterable
+              placeholder="Anyone"
+              aria-label="Loop assignee"
+              :disabled="!form.repositoryId || assigneeOptions.length === 0"
+            >
+              <el-option
+                v-for="assignee in assigneeOptions"
+                :key="assignee.value"
+                :label="assignee.label"
+                :value="assignee.value"
+              />
+            </el-select>
+          </div>
+
+          <div class="loop-editor__section">
+            <label for="loop-editor-tag">Tag</label>
+            <el-select
+              id="loop-editor-tag"
+              v-model="form.tagName"
+              clearable
+              filterable
+              placeholder="Any tag"
+              aria-label="Loop tag"
+              :disabled="!form.repositoryId || tagOptions.length === 0"
+            >
+              <el-option
+                v-for="tag in tagOptions"
+                :key="tag"
+                :label="tag"
+                :value="tag"
+              />
+            </el-select>
+          </div>
         </div>
-      </section>
-
-      <section class="loop-editor__section">
-        <label for="loop-editor-assignee">Assigned to</label>
-        <el-select
-          id="loop-editor-assignee"
-          v-model="form.assigneeLogin"
-          clearable
-          filterable
-          placeholder="Anyone"
-          aria-label="Loop assignee"
-          :disabled="!form.repositoryId || assigneeOptions.length === 0"
-        >
-          <el-option
-            v-for="assignee in assigneeOptions"
-            :key="assignee.value"
-            :label="assignee.label"
-            :value="assignee.value"
-          />
-        </el-select>
-      </section>
-
-      <section class="loop-editor__section">
-        <label for="loop-editor-tag">Tag</label>
-        <el-select
-          id="loop-editor-tag"
-          v-model="form.tagName"
-          clearable
-          filterable
-          placeholder="Any tag"
-          aria-label="Loop tag"
-          :disabled="!form.repositoryId || tagOptions.length === 0"
-        >
-          <el-option
-            v-for="tag in tagOptions"
-            :key="tag"
-            :label="tag"
-            :value="tag"
-          />
-        </el-select>
       </section>
 
       <section class="loop-editor__section">
@@ -126,38 +133,38 @@
         />
       </section>
 
-      <section class="loop-editor__section">
-        <label for="loop-editor-bench">Bench Agent</label>
-        <el-select
-          id="loop-editor-bench"
-          v-model="form.benchTemplateId"
-          filterable
-          placeholder="Select Bench agent"
-          aria-label="Loop Bench agent"
-          :disabled="benchTemplates.length === 0"
-        >
-          <el-option
-            v-for="template in benchTemplates"
-            :key="template.id"
-            :label="template.name"
-            :value="template.id"
-          >
-            <span class="loop-editor__bench-option">
-              <AgentAvatar
-                :avatar="template.avatar"
-                :name="template.name"
-                size="sm"
-              />
-              <span>
-                <strong>{{ template.name }}</strong>
-                <small>{{ template.folder }}</small>
-              </span>
-            </span>
-          </el-option>
-        </el-select>
-      </section>
-
       <section class="loop-editor__grid">
+        <div class="loop-editor__section">
+          <label for="loop-editor-bench">Bench Agent</label>
+          <el-select
+            id="loop-editor-bench"
+            v-model="form.benchTemplateId"
+            filterable
+            placeholder="Select Bench agent"
+            aria-label="Loop Bench agent"
+            :disabled="benchTemplates.length === 0"
+          >
+            <el-option
+              v-for="template in benchTemplates"
+              :key="template.id"
+              :label="template.name"
+              :value="template.id"
+            >
+              <span class="loop-editor__bench-option">
+                <AgentAvatar
+                  :avatar="template.avatar"
+                  :name="template.name"
+                  size="sm"
+                />
+                <span>
+                  <strong>{{ template.name }}</strong>
+                  <small>{{ template.folder }}</small>
+                </span>
+              </span>
+            </el-option>
+          </el-select>
+        </div>
+
         <div class="loop-editor__section">
           <label for="loop-editor-team-mode">Team</label>
           <el-select
@@ -169,27 +176,27 @@
             <el-option label="Dedicated team per ticket" value="dedicated" />
           </el-select>
         </div>
+      </section>
 
-        <div
-          v-if="form.teamMode === 'existing'"
-          class="loop-editor__section"
+      <section
+        v-if="form.teamMode === 'existing'"
+        class="loop-editor__section"
+      >
+        <label for="loop-editor-team">Target Team</label>
+        <el-select
+          id="loop-editor-team"
+          v-model="form.teamId"
+          filterable
+          placeholder="Select team"
+          aria-label="Loop target team"
         >
-          <label for="loop-editor-team">Target Team</label>
-          <el-select
-            id="loop-editor-team"
-            v-model="form.teamId"
-            filterable
-            placeholder="Select team"
-            aria-label="Loop target team"
-          >
-            <el-option
-              v-for="team in teams"
-              :key="team.id"
-              :label="team.name"
-              :value="team.id"
-            />
-          </el-select>
-        </div>
+          <el-option
+            v-for="team in teams"
+            :key="team.id"
+            :label="team.name"
+            :value="team.id"
+          />
+        </el-select>
       </section>
 
       <section class="loop-editor__section loop-editor__section--compact">
@@ -475,6 +482,18 @@ function workItemsKey(provider: 'github', repositoryId: string): string {
   gap: var(--space-12);
 }
 
+.loop-editor__source-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.loop-editor__source-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-12);
+}
+
 .loop-editor__section {
   min-width: 0;
   display: flex;
@@ -497,13 +516,14 @@ function workItemsKey(provider: 'github', repositoryId: string): string {
   min-width: 0;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-8);
+  gap: var(--space-4);
 }
 
 .loop-editor__bench-option span {
   min-width: 0;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
   line-height: var(--line-height-18);
 }
 
@@ -516,7 +536,7 @@ function workItemsKey(provider: 'github', repositoryId: string): string {
 
 .loop-editor__bench-option strong {
   color: var(--color-text);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-regular);
 }
 
 .loop-editor__bench-option small {
