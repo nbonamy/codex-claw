@@ -480,6 +480,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   display: grid;
   gap: var(--space-4);
   padding: var(--space-6);
+  padding-top: 0;
 }
 
 .agent-sidebar__resize-handle {

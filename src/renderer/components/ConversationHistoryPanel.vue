@@ -216,16 +216,19 @@ function writeExpandedPreference(value: boolean): void {
 <style scoped>
 .conversation-history {
   border-top: 1px solid var(--color-border);
+  padding-left: var(--space-8);
 }
 
 .conversation-history__header {
   width: 100%;
-  height: var(--space-32);
+  height: var(--space-16);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-8);
-  padding: 0 var(--space-16);
+  padding: 0;
+  padding-left: var(--space-4);
+  padding-right: var(--space-8);
   border: none;
   color: var(--color-text-muted);
   background: transparent;
@@ -256,18 +259,21 @@ function writeExpandedPreference(value: boolean): void {
 .conversation-history__list {
   min-height: 0;
   overflow: auto;
-  padding: var(--space-4) var(--space-8) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-bottom: var(--space-8);
 }
 
 .conversation-history__row {
-  width: 100%;
-  min-height: 46px;
+  width: calc(100% - 1 * var(--space-8));
+  height: auto;
   display: flex;
   align-items: center;
   gap: var(--space-8);
-  padding: var(--space-6) var(--space-6) var(--space-6) var(--space-12);
   border: none;
   border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
   color: var(--color-text);
   background: transparent;
   text-align: left;
@@ -317,8 +323,6 @@ function writeExpandedPreference(value: boolean): void {
 }
 
 .conversation-history__row-action {
-  width: var(--space-24);
-  height: var(--space-24);
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -327,8 +331,8 @@ function writeExpandedPreference(value: boolean): void {
 }
 
 .conversation-history__current-dot {
-  width: var(--space-8);
-  height: var(--space-8);
+  width: var(--space-4);
+  height: var(--space-4);
   border-radius: var(--radius-full);
   background: color-mix(in srgb, var(--color-text-muted) 48%, transparent);
 }
