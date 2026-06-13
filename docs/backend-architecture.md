@@ -64,9 +64,11 @@ Current implementation checkpoint:
   window/menu/shortcut lifecycle, file/folder/save dialogs, URL opening,
   Electron `safeStorage`, Electron system permission APIs, packaged resource
   path resolution, and renderer IPC fanout.
+- `clawd` owns durable snapshot loading and saving. Electron keeps only a
+  volatile renderer-facing snapshot cache hydrated from `snapshot/get` and
+  backend events; it does not read or write `state.json`.
 - `clawd` now owns loop CRUD, manual loop runs, and the loop scheduler/runner.
-  Electron proxies loop IPC to backend RPC and adopts the returned snapshot
-  while the broader state migration is still in flight.
+  Electron proxies loop IPC to backend RPC and adopts the returned snapshot.
 - `clawd` now owns team create/update/reorder/close/select mutations. Electron
   proxies team IPC to backend RPC and adopts the returned snapshot.
 - `clawd` now owns Bench save/deploy/remove mutations. Deploying a Bench
@@ -719,9 +721,11 @@ and future remote.
 
 ## State And Migration
 
-Today `AppController` owns the `AppSnapshot` and persists `state.json` under
-Electron `userData`. After extraction, `clawd` owns durable state and Electron
-main owns only desktop-window state.
+`clawd` owns the durable `AppSnapshot` and persists `state.json` under the
+backend state directory. Electron main owns only desktop-window state plus a
+volatile renderer-facing snapshot cache. That cache is hydrated through
+`snapshot/get`, advanced by backend events, and never written back to disk by
+Electron.
 
 Local migration path:
 
@@ -730,8 +734,7 @@ Local migration path:
 2. `clawd` loads the existing `state.json` through the shared
    `AppStatePersistence` serializer/parser and writes backend-owned future
    changes using the same schema.
-3. Electron main stops importing snapshot mutation helpers directly.
-4. Old development checkouts keep working because the state path is explicit.
+3. Old development checkouts keep working because the state path is explicit.
 
 Remote migration path:
 

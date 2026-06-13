@@ -31,4 +31,14 @@ describe('Electron backend boundary', () => {
     expect(source).toContain("request('agent/readFile'");
     expect(source).toContain('agentId');
   });
+
+  it('keeps durable snapshot persistence in clawd', async () => {
+    const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
+    const source = await readFile(appControllerPath, 'utf8');
+
+    expect(source).not.toContain('AppStatePersistence');
+    expect(source).not.toContain('state.json');
+    expect(source).not.toContain('persistSnapshot');
+    expect(source).toContain("request<unknown>('snapshot/get')");
+  });
 });

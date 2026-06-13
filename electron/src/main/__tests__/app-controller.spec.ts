@@ -6,7 +6,6 @@ import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
 import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
-import type { AppStatePersistence } from '@codex-claw/shared/state-persistence';
 import type { AgentBackendDriver, BackendSendResult } from '../backends/types';
 import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { ipcChannels } from '@codex-claw/shared/ipc';
@@ -14,10 +13,6 @@ import { ipcChannels } from '@codex-claw/shared/ipc';
 describe('AppController', () => {
   it('starts and health-checks the configured backend process client', async () => {
     const snapshot = createInitialSnapshot();
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
     const backendClient = {
       start: vi.fn().mockResolvedValue(undefined),
       health: vi.fn().mockResolvedValue({ ok: true, name: 'clawd', version: '0.1.0', pid: 123 }),
@@ -25,7 +20,7 @@ describe('AppController', () => {
       onEvent: vi.fn(() => () => undefined),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    const controller = new AppController(persistence, undefined, backendClient);
+    const controller = new AppController(snapshot, undefined, backendClient);
 
     await controller.initialize();
     await controller.shutdown();
@@ -35,19 +30,46 @@ describe('AppController', () => {
     expect(backendClient.close).toHaveBeenCalledOnce();
   });
 
+  it('hydrates its renderer cache from clawd snapshot state', async () => {
+    const initialSnapshot = createInitialSnapshot();
+    const backendSnapshot = {
+      ...createInitialSnapshot(),
+      activeAgentId: 'agent-dina',
+      activeTeamId: 'team-codex-claw',
+      sourceFolder: {
+        path: '/Users/nbonamy/src',
+        initialized: true,
+        recentRepoNames: ['codex-claw'],
+      },
+    };
+    const request = vi.fn();
+    const backendClient: NonNullable<ConstructorParameters<typeof AppController>[2]> = {
+      start: vi.fn().mockResolvedValue(undefined),
+      health: vi.fn().mockResolvedValue({ ok: true, name: 'clawd', version: '0.1.0', pid: 123 }),
+      request: <Result,>(method: string): Promise<Result> => {
+        request(method);
+        return Promise.resolve((method === 'snapshot/get' ? { snapshot: backendSnapshot, lastEventSeq: 17 } : {}) as Result);
+      },
+      onEvent: vi.fn(() => () => undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const controller = new AppController(initialSnapshot, undefined, backendClient);
+
+    await controller.initialize();
+
+    expect(request).toHaveBeenCalledWith('snapshot/get');
+    expect(currentSnapshot(controller)).toBe(backendSnapshot);
+  });
+
   it('applies backend events emitted by the clawd process client', async () => {
     const snapshot = createInitialSnapshot();
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
     const unsubscribe = vi.fn();
     let emitBackendEvent: (event: ClawBackendEvent) => void = () => undefined;
     const backendClient = createBackendClientWithEventEmitter((listener) => {
       emitBackendEvent = listener;
       return unsubscribe;
     });
-    const controller = new AppController(persistence, undefined, backendClient);
+    const controller = new AppController(snapshot, undefined, backendClient);
     const send = vi.fn();
 
     setMainWindowSend(controller, send);
@@ -90,7 +112,7 @@ describe('AppController', () => {
       }],
     }];
     const request = vi.fn().mockResolvedValue(repositories);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
 
     await controller.initialize();
 
@@ -114,7 +136,7 @@ describe('AppController', () => {
     const request = vi.fn()
       .mockResolvedValueOnce('/Users/nbonamy/src')
       .mockResolvedValueOnce(backendSnapshot);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
 
     await controller.initialize();
 
@@ -140,7 +162,7 @@ describe('AppController', () => {
       path: '/Users/nbonamy/src/codex-claw-backend-split',
     };
     const request = vi.fn().mockResolvedValueOnce(worktree);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
     const input: CreateSourceWorktreeInput = {
       repoPath: '/Users/nbonamy/src/codex-claw',
       branchName: 'backend-split',
@@ -157,7 +179,7 @@ describe('AppController', () => {
     snapshot.sourceFolder.initialized = true;
     const transcription: AppleSpeechTranscriptionResult = { text: 'ship it' };
     const request = vi.fn().mockResolvedValue(transcription);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
     const audioData = new Uint8Array([1, 2, 3]).buffer;
 
     await controller.initialize();
@@ -194,7 +216,7 @@ describe('AppController', () => {
       }
       return snapshot;
     });
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
 
     await controller.initialize();
 
@@ -234,7 +256,7 @@ describe('AppController', () => {
       },
     } satisfies AppSnapshot;
     const request = vi.fn().mockResolvedValue(backendSnapshot);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
 
     await controller.initialize();
 
@@ -257,7 +279,7 @@ describe('AppController', () => {
       activeTeamId: 'team-backend',
     };
     const request = vi.fn().mockResolvedValue(backendSnapshot);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
     const createInput: CreateTeamInput = { name: 'Backend', color: '#7158D4' };
     const updateInput: UpdateTeamInput = { id: 'team-backend', name: 'Backend Core', color: '#AA4AB8' };
     const reorderInput: ReorderTeamsInput = { teamId: 'team-backend', beforeTeamId: 'team-codex-claw' };
@@ -288,7 +310,7 @@ describe('AppController', () => {
       }],
     };
     const request = vi.fn().mockResolvedValue(backendSnapshot);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
     const createInput: CreateAgentInput = {
       name: 'Backend Dina',
       folder: '/Users/nbonamy/src/codex-claw',
@@ -347,7 +369,7 @@ describe('AppController', () => {
       }],
     };
     const request = vi.fn().mockResolvedValue(backendSnapshot);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
 
     await controller.initialize();
 
@@ -369,7 +391,7 @@ describe('AppController', () => {
       theme: { ...snapshot.theme, mode: 'dark' as const },
     };
     const request = vi.fn().mockResolvedValue(backendSnapshot);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
     const input: UpdateSettingsInput = {
       general: { preventSleepWhenAgentsRun: false },
       theme: { mode: 'dark' },
@@ -393,7 +415,7 @@ describe('AppController', () => {
       })],
     };
     const request = vi.fn().mockResolvedValue(backendSnapshot);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
     const createInput: CreateLoopInput = {
       name: 'GitHub bugs',
       enabled: true,
@@ -436,7 +458,7 @@ describe('AppController', () => {
   it('opens repo git diff previews through clawd', async () => {
     const snapshot = createInitialSnapshot();
     const request = vi.fn().mockResolvedValue(true);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
 
     await controller.initialize();
     await openAgentGitDiff(controller, 'agent-dina');
@@ -453,7 +475,7 @@ describe('AppController', () => {
       messages: snapshot.messages.filter((message) => message.agentId !== 'agent-dina'),
     };
     const request = vi.fn().mockResolvedValue(backendSnapshot);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
 
     await controller.initialize();
 
@@ -462,13 +484,9 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('agent/restart', { agentId: 'agent-dina' });
   });
 
-  it('persists token usage updates emitted by Codex', async () => {
+  it('caches token usage updates emitted by clawd', async () => {
     const snapshot = createInitialSnapshot();
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
+    const controller = new AppController(snapshot, undefined, createBackendClient());
     const contextUsage = {
       totalTokens: 1200,
       inputTokens: 900,
@@ -491,16 +509,11 @@ describe('AppController', () => {
     await flushMicrotasks();
 
     expect(snapshot.agents[0].contextUsage).toStrictEqual(contextUsage);
-    expect(persistence.save).toHaveBeenCalledWith(snapshot);
   });
 
-  it('persists account rate-limit updates emitted by Codex', async () => {
+  it('caches account rate-limit updates emitted by clawd', async () => {
     const snapshot = createInitialSnapshot();
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
+    const controller = new AppController(snapshot, undefined, createBackendClient());
     const rateLimits = {
       limitId: 'codex',
       limitName: null,
@@ -528,17 +541,12 @@ describe('AppController', () => {
     await flushMicrotasks();
 
     expect(snapshot.accountRateLimits).toStrictEqual(rateLimits);
-    expect(persistence.save).toHaveBeenCalledWith(snapshot);
   });
 
-  it('persists Codex plan updates and previews the completed plan as markdown', async () => {
+  it('caches plan updates and previews the completed plan as markdown', async () => {
     const snapshot = createInitialSnapshot();
     const send = vi.fn();
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
+    const controller = new AppController(snapshot, undefined, createBackendClient());
 
     await controller.initialize();
     setMainWindowSend(controller, send);
@@ -569,7 +577,6 @@ describe('AppController', () => {
       markdown: 'Current plan\n- [x] Inspect app-server event\n- [ ] Preview markdown',
       updatedAt: '2026-06-05T10:11:12.000Z',
     });
-    expect(persistence.save).toHaveBeenCalledWith(snapshot);
     expect(send).toHaveBeenLastCalledWith(ipcChannels.event, expect.objectContaining({
       agentId: 'agent-dina',
       threadId: 'thread-dina',
@@ -606,14 +613,10 @@ describe('AppController', () => {
     }));
   });
 
-  it('persists and previews completed Codex plan items', async () => {
+  it('caches and previews completed plan items', async () => {
     const snapshot = createInitialSnapshot();
     const send = vi.fn();
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
+    const controller = new AppController(snapshot, undefined, createBackendClient());
 
     await controller.initialize();
     setMainWindowSend(controller, send);
@@ -638,7 +641,6 @@ describe('AppController', () => {
       updatedAt: '2026-06-05T10:11:12.000Z',
     });
     await flushMicrotasks();
-    expect(persistence.save).toHaveBeenCalledWith(snapshot);
     expect(send).toHaveBeenLastCalledWith(ipcChannels.event, expect.objectContaining({
       agentId: 'agent-dina',
       threadId: 'thread-dina',
@@ -703,7 +705,7 @@ describe('AppController', () => {
     const request = vi.fn()
       .mockResolvedValueOnce(goalSnapshot)
       .mockResolvedValueOnce(clearedSnapshot);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
 
     await controller.initialize();
 
@@ -732,7 +734,7 @@ describe('AppController', () => {
       }],
     };
     const request = vi.fn().mockResolvedValue(backendSnapshot);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
 
     await controller.initialize();
 
@@ -752,7 +754,7 @@ describe('AppController', () => {
       }],
     };
     const request = vi.fn().mockResolvedValue(backendSnapshot);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
 
     await controller.initialize();
 
@@ -773,7 +775,7 @@ describe('AppController', () => {
       }],
     };
     const request = vi.fn().mockResolvedValue(backendSnapshot);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
 
     await controller.initialize();
 
@@ -798,7 +800,7 @@ describe('AppController', () => {
       }],
     };
     const request = vi.fn().mockResolvedValue(backendSnapshot);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
 
     await controller.initialize();
     await expect(sendPrompt(controller, 'agent-dina', 'hello claude')).resolves.toBe(backendSnapshot);
@@ -821,7 +823,7 @@ describe('AppController', () => {
       parts: [{ type: 'text' as const, text: 'hello' }],
     }];
     const request = vi.fn().mockResolvedValue(messages);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
 
     await controller.initialize();
 
@@ -842,7 +844,7 @@ describe('AppController', () => {
       ref: { backend: 'codex', threadId: 'thread-dina' },
     }];
     const request = vi.fn().mockResolvedValue(conversations);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
 
     await controller.initialize();
 
@@ -858,7 +860,7 @@ describe('AppController', () => {
       agents: [{ ...snapshot.agents[0]!, backendSession: { kind: 'codex' as const, threadId: 'thread-dina' } }],
     };
     const request = vi.fn().mockResolvedValue(backendSnapshot);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
     const ref = { backend: 'codex' as const, threadId: 'thread-dina' };
 
     await controller.initialize();
@@ -872,7 +874,7 @@ describe('AppController', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].status = { type: 'working' };
     const request = vi.fn().mockRejectedValue(new Error('Agent must be idle before resuming a conversation.'));
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
     const ref = { backend: 'codex' as const, threadId: 'thread-dina' };
 
     await controller.initialize();
@@ -884,7 +886,7 @@ describe('AppController', () => {
   it('lets clawd reject unrecorded historical conversation refs', async () => {
     const snapshot = createInitialSnapshot();
     const request = vi.fn().mockRejectedValue(new Error('Conversation reference is not available.'));
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
 
     await controller.initialize();
 
@@ -898,7 +900,7 @@ describe('AppController', () => {
   it('lets clawd reject invalid historical conversation refs', async () => {
     const snapshot = createInitialSnapshot();
     const request = vi.fn().mockRejectedValue(new Error('Invalid conversation reference.'));
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
 
     await controller.initialize();
 
@@ -918,7 +920,7 @@ describe('AppController', () => {
     const request = vi.fn()
       .mockResolvedValueOnce(files)
       .mockResolvedValueOnce(readResult);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
 
     await controller.initialize();
 
@@ -935,11 +937,7 @@ describe('AppController', () => {
 
   it('prompts a git diff side panel preview from turn diff updates', async () => {
     const snapshot = createInitialSnapshot();
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
+    const controller = new AppController(snapshot, undefined, createBackendClient());
     await controller.initialize();
     const send = vi.fn();
     (controller as unknown as {
@@ -987,11 +985,7 @@ describe('AppController', () => {
 
   it('ignores malformed turn diff preview payloads', async () => {
     const snapshot = createInitialSnapshot();
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
+    const controller = new AppController(snapshot, undefined, createBackendClient());
     await controller.initialize();
     const send = vi.fn();
     (controller as unknown as {
@@ -1033,7 +1027,7 @@ describe('AppController', () => {
       messages: snapshot.messages.slice(0, 2),
     };
     const request = vi.fn().mockResolvedValue(rollbackSnapshot);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
 
     await controller.initialize();
 
@@ -1055,7 +1049,7 @@ describe('AppController', () => {
       messages: [],
     };
     const request = vi.fn().mockResolvedValue(rollbackSnapshot);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
 
     await controller.initialize();
     await retryMessage(controller, 'agent-dina', 'assistant-turn-1');
@@ -1076,7 +1070,7 @@ describe('AppController', () => {
       messages: [],
     };
     const request = vi.fn().mockResolvedValue(rollbackSnapshot);
-    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
 
     await controller.initialize();
     await editMessage(controller, 'agent-dina', 'user-turn-1', ' edited prompt ');
@@ -1206,6 +1200,10 @@ async function getBackendDriver(controller: AppController, backend: 'codex' | 'c
   }).getBackendDriver(backend);
 }
 
+function currentSnapshot(controller: AppController): AppSnapshot {
+  return (controller as unknown as { snapshot: AppSnapshot }).snapshot;
+}
+
 function createBackendClientWithEventEmitter(
   onEvent: (listener: (event: ClawBackendEvent) => void) => () => void,
 ) {
@@ -1239,13 +1237,6 @@ function createBackendClient(overrides: {
     onEvent,
     close: vi.fn().mockResolvedValue(undefined),
   };
-}
-
-function createPersistence(snapshot: AppSnapshot): AppStatePersistence {
-  return {
-    load: vi.fn().mockResolvedValue(snapshot),
-    save: vi.fn().mockResolvedValue(undefined),
-  } as unknown as AppStatePersistence;
 }
 
 async function listSourceRepositories(controller: AppController): Promise<SourceRepository[]> {

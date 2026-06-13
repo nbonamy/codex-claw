@@ -9,20 +9,17 @@ import {
   applyMainEventToSnapshot,
   createEmptySnapshot,
 } from './snapshot-service';
-import { AppStatePersistence } from '@codex-claw/shared/state-persistence';
 import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from './backend-process-client';
 import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 import type { AgentBackendDriver } from './backends/types';
 import { backendDisplayName } from './backends/types';
-import { defaultUserDataPath } from './user-data';
 
 type ClawBackendClientPort = Pick<ClawBackendProcessClient, 'start' | 'health' | 'request' | 'onEvent' | 'close'>;
 
 export class AppController {
   private mainWindow: BrowserWindow | null = null;
   private snapshot = createEmptySnapshot();
-  private readonly persistence: AppStatePersistence;
   private readonly backendDrivers = new Map<AgentBackend, AgentBackendDriver>();
   private readonly backendDriverEventUnsubscribes = new Map<AgentBackend, () => void>();
   private backendClientEventUnsubscribe: (() => void) | null = null;
@@ -33,16 +30,15 @@ export class AppController {
   private readonly backendClient: ClawBackendClientPort | null;
 
   constructor(
-    persistence = new AppStatePersistence(path.join(defaultUserDataPath(), 'state.json')),
+    initialSnapshot: AppSnapshot = createEmptySnapshot(),
     _workIntegrations?: unknown,
     backendClient: ClawBackendClientPort | null = createRuntimeClawBackendClient(),
   ) {
-    this.persistence = persistence;
+    this.snapshot = initialSnapshot;
     this.backendClient = backendClient;
   }
 
   async initialize(): Promise<void> {
-    this.snapshot = await this.persistence.load();
     await this.initializeBackendClient();
     await this.initializeSourceFolderIfNeeded();
     this.syncPowerSaveBlocker();
@@ -697,26 +693,6 @@ export class AppController {
     applyMainEventToSnapshot(this.snapshot, fullEvent);
     this.syncPowerSaveBlocker();
     this.mainWindow?.webContents.send(ipcChannels.event, fullEvent);
-    if (
-      fullEvent.type === 'backend.statusChanged' ||
-      fullEvent.type === 'agent.updated' ||
-      fullEvent.type === 'snapshot.updated' ||
-      fullEvent.type === 'account.rateLimitsUpdated' ||
-      fullEvent.type === 'workBacklog.assignmentUpdated' ||
-      fullEvent.type === 'thread.started' ||
-      fullEvent.type === 'thread.settingsUpdated' ||
-      fullEvent.type === 'thread.tokenUsageUpdated' ||
-      fullEvent.type === 'turn.planUpdated' ||
-      fullEvent.type === 'turn.proposedPlanCompleted' ||
-      this.eventCompletesSavedPlan(fullEvent)
-    ) {
-      void this.persistSnapshot().catch((error: unknown) => {
-        warnMain('state', 'failed to persist snapshot event', {
-          error: error instanceof Error ? error.message : String(error),
-          eventType: fullEvent.type,
-        });
-      });
-    }
 
     if (
       fullEvent.type === 'turn.planUpdated' ||
@@ -737,15 +713,6 @@ export class AppController {
 
   private syncPowerSaveBlocker(): void {
     this.powerSaveBlocker.sync(this.snapshot);
-  }
-
-  private eventCompletesSavedPlan(event: MainToRendererEvent): boolean {
-    if (event.type !== 'turn.completed' || !event.agentId || !event.turnId) {
-      return false;
-    }
-
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === event.agentId);
-    return agent?.plan?.turnId === event.turnId && Boolean(agent.plan.markdown.trim());
   }
 
   private promptPlanPreview(event: MainToRendererEvent): void {
@@ -813,10 +780,6 @@ export class AppController {
     if (backend) {
       this.clientRequestBackends.set(request.id, backend);
     }
-  }
-
-  private async persistSnapshot(): Promise<void> {
-    await this.persistence.save(this.snapshot);
   }
 }
 
