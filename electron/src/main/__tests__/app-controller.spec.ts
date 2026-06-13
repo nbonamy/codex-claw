@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AppSnapshot, BackendConversationRef, ConversationSummary, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, RendererMessage } from '@codex-claw/shared/contracts';
+import type { AppSnapshot, BackendConversationRef, ConversationSummary, CreateSourceWorktreeInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, RendererMessage, SourceRepository, SourceWorktree } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import type { AppStatePersistence } from '../state-persistence';
 import type { AgentBackendDriver, BackendSendResult } from '../backends/types';
@@ -73,6 +73,68 @@ describe('AppController', () => {
       payload: { type: 'working' },
     }));
     expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it('routes source repository discovery through clawd', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.sourceFolder = {
+      path: '/Users/nbonamy/src',
+      initialized: true,
+      recentRepoNames: [],
+    };
+    const repositories: SourceRepository[] = [{
+      name: 'codex-claw',
+      path: '/Users/nbonamy/src/codex-claw',
+      worktrees: [{
+        name: 'main',
+        path: '/Users/nbonamy/src/codex-claw',
+      }],
+    }];
+    const request = vi.fn().mockResolvedValue(repositories);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+
+    await controller.initialize();
+
+    await expect(listSourceRepositories(controller)).resolves.toStrictEqual(repositories);
+    expect(request).toHaveBeenCalledWith('source/listRepositories', {
+      sourceFolderPath: '/Users/nbonamy/src',
+    });
+  });
+
+  it('routes source worktree creation through clawd and records the recent repository', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.sourceFolder = {
+      path: '/Users/nbonamy/src',
+      initialized: true,
+      recentRepoNames: [],
+    };
+    const worktree: SourceWorktree = {
+      name: 'backend-split',
+      path: '/Users/nbonamy/src/codex-claw-backend-split',
+    };
+    const request = vi.fn()
+      .mockResolvedValueOnce(worktree)
+      .mockResolvedValueOnce([{
+        name: 'codex-claw',
+        path: '/Users/nbonamy/src/codex-claw',
+        worktrees: [],
+      } satisfies SourceRepository]);
+    const persistence = createPersistence(snapshot);
+    const controller = new AppController(persistence, undefined, createBackendClient({ request }));
+    const input: CreateSourceWorktreeInput = {
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      branchName: 'backend-split',
+    };
+
+    await controller.initialize();
+
+    await expect(createSourceWorktree(controller, input)).resolves.toStrictEqual(worktree);
+    expect(request).toHaveBeenNthCalledWith(1, 'source/createWorktree', { input });
+    expect(request).toHaveBeenNthCalledWith(2, 'source/listRepositories', {
+      sourceFolderPath: '/Users/nbonamy/src',
+    });
+    expect(snapshot.sourceFolder.recentRepoNames).toStrictEqual(['codex-claw']);
+    expect(persistence.save).toHaveBeenCalledWith(snapshot);
   });
 
   it('persists collaboration status updates emitted by MCP tools', async () => {
@@ -1845,6 +1907,43 @@ function createBackendClientWithEventEmitter(
     onEvent: vi.fn(onEvent),
     close: vi.fn().mockResolvedValue(undefined),
   };
+}
+
+function createBackendClient(overrides: {
+  request?: unknown;
+  onEvent?: unknown;
+} = {}): NonNullable<ConstructorParameters<typeof AppController>[2]> {
+  const request = (overrides.request ?? vi.fn().mockResolvedValue({})) as (method: string, params?: unknown) => Promise<unknown>;
+  const onEvent = (overrides.onEvent ?? vi.fn(() => () => undefined)) as (listener: (event: ClawBackendEvent) => void) => () => void;
+  return {
+    start: vi.fn().mockResolvedValue(undefined),
+    health: vi.fn().mockResolvedValue({ ok: true, name: 'clawd', version: '0.1.0', pid: 123 }),
+    request: <Result>(method: string, params?: unknown) => request(method, params) as Promise<Result>,
+    onEvent,
+    close: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+function createPersistence(snapshot: AppSnapshot): AppStatePersistence {
+  return {
+    load: vi.fn().mockResolvedValue(snapshot),
+    save: vi.fn().mockResolvedValue(undefined),
+  } as unknown as AppStatePersistence;
+}
+
+async function listSourceRepositories(controller: AppController): Promise<SourceRepository[]> {
+  return (controller as unknown as {
+    listSourceRepositories(): Promise<SourceRepository[]>;
+  }).listSourceRepositories();
+}
+
+async function createSourceWorktree(
+  controller: AppController,
+  input: CreateSourceWorktreeInput,
+): Promise<SourceWorktree> {
+  return (controller as unknown as {
+    createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree>;
+  }).createSourceWorktree(input);
 }
 
 async function recordLoopPromptStarted(

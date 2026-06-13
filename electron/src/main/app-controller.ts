@@ -5,14 +5,12 @@ import { listAgentFolderFiles } from './agent-files';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
 import { sendAgentPrompt, type SendAgentPromptHooks } from './agent-chat-service';
 import { ClawBackendProxyDriver } from './backend-proxy-driver';
-import { createSourceWorktree as createGitSourceWorktree } from './git-worktrees';
 import { logMain, warnMain } from './log';
 import { LoopRunner, type LoopPromptContext } from './loops/runner';
 import { LoopScheduler } from './loops/scheduler';
 import { createMainWindow } from './main-window';
 import { ClawMcpAgentCoordinator } from './mcp/agent-coordinator';
 import { agentMessagesPrompt } from './mcp/agent-prompts';
-import { detectSourceFolder, scanSourceRepositories } from './source-repositories';
 import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-permissions';
 import { transcribeWithAppleSpeechAnalyzer } from './transcription/apple-speech';
 import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
@@ -1307,7 +1305,9 @@ export class AppController {
       return;
     }
 
-    const detected = await detectSourceFolder();
+    const detected = this.backendClient
+      ? await this.backendClient.request<string>('source/detectFolder')
+      : '';
     this.snapshot.sourceFolder = {
       ...this.snapshot.sourceFolder,
       path: detected,
@@ -1321,14 +1321,25 @@ export class AppController {
     if (!sourceFolder) {
       return [];
     }
-    return scanSourceRepositories(sourceFolder);
+    return this.requireBackendClient().request('source/listRepositories', {
+      sourceFolderPath: sourceFolder,
+    });
   }
 
   private async createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {
-    const worktree = await createGitSourceWorktree(input);
+    const worktree = await this.requireBackendClient().request<SourceWorktree>('source/createWorktree', {
+      input,
+    });
     await this.addRecentSourceRepositoryByPath(input.repoPath);
     await this.persistSnapshot();
     return worktree;
+  }
+
+  private requireBackendClient(): ClawBackendClientPort {
+    if (!this.backendClient) {
+      throw new Error('clawd backend is not connected.');
+    }
+    return this.backendClient;
   }
 
   private async addRecentSourceRepositoryByPath(repoPath: string): Promise<void> {

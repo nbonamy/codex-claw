@@ -1,12 +1,14 @@
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/shared/backend-driver';
 import { unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
-import type { Agent, AgentBackend, SendPromptOptions } from '@codex-claw/shared/contracts';
+import type { Agent, AgentBackend, CreateSourceWorktreeInput, SendPromptOptions } from '@codex-claw/shared/contracts';
 import { ClaudeBackendDriver } from './claude/claude-driver';
 import { CodexAgentSessionManager } from './codex/agent-session';
 import { CodexBackendDriver } from './codex/codex-driver';
 import { CodexProcessTransport } from './codex/process-transport';
 import { CodexRpcClient } from './codex/rpc-client';
+import { createSourceWorktree } from './git-worktrees';
 import { buildCodexClawMcpConfigOverrides } from './mcp/codex-config';
+import { detectSourceFolder, scanSourceRepositories } from './source-repositories';
 
 export type BackendDriverRegistryOptions = {
   clawMcpServerUrl?: string | null;
@@ -163,6 +165,17 @@ export class BackendDriverRpc {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);
         return driver.listSkills ? driver.listSkills(agent) : [];
+      }
+      case 'source/detectFolder':
+        return detectSourceFolder();
+      case 'source/listRepositories': {
+        const record = requireRecord(params);
+        const sourceFolderPath = requireString(record.sourceFolderPath, 'sourceFolderPath').trim();
+        return sourceFolderPath ? scanSourceRepositories(sourceFolderPath) : [];
+      }
+      case 'source/createWorktree': {
+        const record = requireRecord(params);
+        return createSourceWorktree(record.input as CreateSourceWorktreeInput);
       }
       default:
         return undefined;

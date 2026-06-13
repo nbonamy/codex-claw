@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/shared/backend-driver';
 import type { Agent } from '@codex-claw/shared/contracts';
 import { BackendDriverRpc } from '../driver-rpc';
@@ -34,6 +37,26 @@ describe('BackendDriverRpc', () => {
     const rpc = new BackendDriverRpc(new Map([['codex', createDriver()]]));
 
     await expect(rpc.handle('backend/unknown', undefined)).resolves.toBeUndefined();
+  });
+
+  it('routes source repository discovery through backend-owned filesystem scanning', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-rpc-source-'));
+    const repoPath = path.join(tempDir, 'codex-claw');
+    const rpc = new BackendDriverRpc(new Map([['codex', createDriver()]]));
+
+    try {
+      await mkdir(path.join(repoPath, '.git'), { recursive: true });
+      await writeFile(path.join(repoPath, '.git', 'HEAD'), 'ref: refs/heads/main\n');
+
+      await expect(rpc.handle('source/listRepositories', { sourceFolderPath: tempDir })).resolves.toStrictEqual([{
+        name: 'codex-claw',
+        path: repoPath,
+        worktrees: [{ name: 'main', path: repoPath }],
+      }]);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+      await rpc.close();
+    }
   });
 
   it('fans out backend driver events', () => {
