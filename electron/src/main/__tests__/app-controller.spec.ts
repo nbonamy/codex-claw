@@ -12,6 +12,27 @@ import { ipcChannels } from '@codex-claw/shared/ipc';
 import type { LoopPromptContext } from '../loops/runner';
 
 describe('AppController', () => {
+  it('starts and health-checks the configured backend process client', async () => {
+    const snapshot = createInitialSnapshot();
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const backendClient = {
+      start: vi.fn().mockResolvedValue(undefined),
+      health: vi.fn().mockResolvedValue({ ok: true, name: 'clawd', version: '0.1.0', pid: 123 }),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const controller = new AppController(persistence, undefined, backendClient);
+
+    await controller.initialize();
+    await controller.shutdown();
+
+    expect(backendClient.start).toHaveBeenCalledOnce();
+    expect(backendClient.health).toHaveBeenCalledOnce();
+    expect(backendClient.close).toHaveBeenCalledOnce();
+  });
+
   it('persists collaboration status updates emitted by MCP tools', async () => {
     const snapshot = createInitialSnapshot();
     const persistence = {

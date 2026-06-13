@@ -51,6 +51,7 @@ import {
   updateAgentFolder,
 } from './snapshot-service';
 import { AppStatePersistence } from './state-persistence';
+import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from './backend-process-client';
 import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogAssignment, WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { approvalBackendDefaultsWithPreset, isApprovalPreset } from '@codex-claw/shared/approval-presets';
 import { ipcChannels } from '@codex-claw/shared/ipc';
@@ -109,12 +110,15 @@ export class AppController {
   private readonly loopRunner: LoopRunner;
   private readonly loopScheduler: LoopScheduler;
   private readonly powerSaveBlocker = new AgentActivityPowerSaveBlocker();
+  private readonly backendClient: Pick<ClawBackendProcessClient, 'start' | 'health' | 'close'> | null;
 
   constructor(
     persistence = new AppStatePersistence(path.join(defaultUserDataPath(), 'state.json')),
     workIntegrations?: WorkIntegrationManager,
+    backendClient: Pick<ClawBackendProcessClient, 'start' | 'health' | 'close'> | null = createRuntimeClawBackendClient(),
   ) {
     this.persistence = persistence;
+    this.backendClient = backendClient;
     this.workIntegrations = workIntegrations ?? new WorkIntegrationManager({
       drivers: [new GitHubWorkProviderDriver(() => githubOAuthClientId(this.snapshot))],
       getSnapshot: () => this.snapshot,
@@ -139,6 +143,7 @@ export class AppController {
 
   async initialize(): Promise<void> {
     this.snapshot = await this.persistence.load();
+    await this.initializeBackendClient();
     await this.initializeSourceFolderIfNeeded();
     await this.workIntegrations.hydrateConnections();
     this.syncPowerSaveBlocker();
@@ -548,9 +553,26 @@ export class AppController {
   async shutdown(): Promise<void> {
     this.loopScheduler.stop();
     this.powerSaveBlocker.stop();
+    await this.backendClient?.close();
     await this.codexBackendDriver?.close();
     await this.claudeBackendDriver?.close();
     await this.mcpServer?.stop();
+  }
+
+  private async initializeBackendClient(): Promise<void> {
+    if (!this.backendClient) {
+      return;
+    }
+
+    try {
+      await this.backendClient.start();
+      const health = await this.backendClient.health();
+      logMain('clawd', 'connected to backend process', { version: health.version, pid: health.pid });
+    } catch (error) {
+      warnMain('clawd', 'failed to connect to backend process', {
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   private async sendPrompt(
