@@ -133,6 +133,60 @@ describe('ClawBackendProcessClient', () => {
     expect(listener).toHaveBeenCalledOnce();
   });
 
+  it('handles backend-initiated desktop requests over stdio', async () => {
+    const child = createFakeChildProcess();
+    const openExternal = vi.fn().mockResolvedValue(true);
+    const client = new ClawBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+      requestHandlers: {
+        'desktop/openExternal': openExternal,
+      },
+      spawnProcess: vi.fn().mockReturnValue(child),
+    });
+
+    await client.start();
+    child.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: 'desktop-1',
+      method: 'desktop/openExternal',
+      params: { url: 'https://example.com' },
+    })}\n`);
+    await flushMicrotasks();
+
+    expect(openExternal).toHaveBeenCalledWith({ url: 'https://example.com' });
+    expect(JSON.parse(child.stdin.writes[0])).toStrictEqual({
+      jsonrpc: '2.0',
+      id: 'desktop-1',
+      result: true,
+    });
+  });
+
+  it('returns JSON-RPC errors for unknown backend-initiated desktop requests', async () => {
+    const child = createFakeChildProcess();
+    const client = new ClawBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+      spawnProcess: vi.fn().mockReturnValue(child),
+    });
+
+    await client.start();
+    child.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: 'desktop-1',
+      method: 'desktop/nope',
+      params: {},
+    })}\n`);
+    await flushMicrotasks();
+
+    expect(JSON.parse(child.stdin.writes[0])).toMatchObject({
+      jsonrpc: '2.0',
+      id: 'desktop-1',
+      error: {
+        code: -32601,
+        message: 'Unknown desktop method: desktop/nope',
+      },
+    });
+  });
+
   it('rejects pending requests when the process exits', async () => {
     const child = createFakeChildProcess();
     const client = new ClawBackendProcessClient({
@@ -178,6 +232,12 @@ describe('ClawBackendProcessClient', () => {
     expect(watcher.close).toHaveBeenCalledOnce();
   });
 });
+
+async function flushMicrotasks(): Promise<void> {
+  for (let index = 0; index < 4; index += 1) {
+    await Promise.resolve();
+  }
+}
 
 function createFakeChildProcess() {
   const stdout = new PassThrough();

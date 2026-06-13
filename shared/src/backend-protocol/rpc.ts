@@ -92,6 +92,12 @@ export function createClawRpcResult(id: ClawRpcId | null, result: unknown): Claw
   };
 }
 
+export function createClawRpcRequest(id: ClawRpcId, method: string, params?: unknown): ClawRpcRequest {
+  return params === undefined
+    ? { jsonrpc: '2.0', id, method }
+    : { jsonrpc: '2.0', id, method, params };
+}
+
 export function createClawRpcNotification(method: string, params?: unknown): ClawRpcNotification {
   return params === undefined
     ? { jsonrpc: '2.0', method }

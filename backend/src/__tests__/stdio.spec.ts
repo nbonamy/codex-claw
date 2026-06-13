@@ -1,6 +1,6 @@
 import { PassThrough } from 'node:stream';
 import { describe, expect, it } from 'vitest';
-import { startStdioRpcServer } from '../stdio';
+import { startStdioRpcServer, StdioRpcPeer } from '../stdio';
 
 describe('stdio JSON-RPC transport', () => {
   it('writes one JSON-RPC response per request line', async () => {
@@ -49,5 +49,54 @@ describe('stdio JSON-RPC transport', () => {
         code: -32700,
       },
     });
+  });
+
+  it('sends backend-initiated requests and resolves Electron responses', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const writes: string[] = [];
+    output.on('data', (chunk) => writes.push(chunk.toString()));
+    const peer = new StdioRpcPeer({
+      input,
+      output,
+      onMessage: () => undefined,
+    });
+    peer.start();
+
+    const resultPromise = peer.request('desktop/openExternal', { url: 'https://example.com' });
+    const request = JSON.parse(writes.join('')) as { id: string; method: string };
+    expect(request).toMatchObject({
+      jsonrpc: '2.0',
+      method: 'desktop/openExternal',
+      params: { url: 'https://example.com' },
+    });
+
+    input.write(`${JSON.stringify({ jsonrpc: '2.0', id: request.id, result: true })}\n`);
+    await expect(resultPromise).resolves.toBe(true);
+    peer.stop();
+  });
+
+  it('rejects backend-initiated requests when Electron returns an error', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const writes: string[] = [];
+    output.on('data', (chunk) => writes.push(chunk.toString()));
+    const peer = new StdioRpcPeer({
+      input,
+      output,
+      onMessage: () => undefined,
+    });
+    peer.start();
+
+    const resultPromise = peer.request('desktop/openExternal', { url: 'https://example.com' });
+    const request = JSON.parse(writes.join('')) as { id: string };
+    input.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: request.id,
+      error: { code: -32603, message: 'open failed' },
+    })}\n`);
+
+    await expect(resultPromise).rejects.toThrow('open failed');
+    peer.stop();
   });
 });

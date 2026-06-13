@@ -4,7 +4,7 @@ import { BackendDriverRpc, createDefaultBackendDrivers } from './driver-rpc';
 import { ClawMcpService } from './mcp/service';
 import { ClawBackendServer } from './server';
 import { loadBackendSnapshot, saveBackendSnapshot } from './state';
-import { startStdioRpcServer } from './stdio';
+import { StdioRpcPeer } from './stdio';
 
 export const CLAWD_VERSION = '0.1.0';
 
@@ -33,12 +33,18 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     });
     mcpService.setDriverRpc(driverRpc);
     mcpService.setEventSink((event) => server.emitEvent(event));
+    const stdio = new StdioRpcPeer({
+      input: process.stdin,
+      output: process.stdout,
+      onMessage: (message) => server.handleMessage(message),
+    });
     let stopping = false;
     const stop = async () => {
       if (stopping) {
         return;
       }
       stopping = true;
+      stdio.stop();
       await server.close();
       await mcpService.stop();
     };
@@ -51,11 +57,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     process.stdin.once('end', () => {
       void stop().finally(() => process.exit(0));
     });
-    startStdioRpcServer({
-      input: process.stdin,
-      output: process.stdout,
-      onMessage: (message) => server.handleMessage(message),
-    });
+    stdio.start();
     process.stdin.resume();
     return;
   }

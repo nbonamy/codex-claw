@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawRpcResponse, parseClawRpcMessage } from '../rpc';
+import { createClawRpcError, createClawRpcRequest, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawRpcResponse, parseClawRpcMessage } from '../rpc';
 
 describe('backend JSON-RPC protocol', () => {
   it('parses requests with string or number ids', () => {
@@ -27,6 +27,12 @@ describe('backend JSON-RPC protocol', () => {
   });
 
   it('creates success and error responses with stable shapes', () => {
+    expect(createClawRpcRequest('desktop-1', 'desktop/openExternal', { url: 'https://example.com' })).toStrictEqual({
+      jsonrpc: '2.0',
+      id: 'desktop-1',
+      method: 'desktop/openExternal',
+      params: { url: 'https://example.com' },
+    });
     expect(createClawRpcResult('health-1', { ok: true })).toStrictEqual({
       jsonrpc: '2.0',
       id: 'health-1',

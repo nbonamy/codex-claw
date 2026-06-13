@@ -1,7 +1,8 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { watch } from 'node:fs';
-import { createClawRpcError, clawRpcErrorCodes, isClawRpcNotification, isClawRpcResponse, parseClawRpcMessage, type ClawBackendEvent, type ClawBackendHealth, type ClawRpcId, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
+import { shell } from 'electron';
+import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawRpcResponse, parseClawRpcMessage, type ClawBackendEvent, type ClawBackendHealth, type ClawRpcId, type ClawRpcRequest, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { warnMain } from './log';
 import { runtimeClawdCommand, runtimeClawdWatchFile } from './runtime-config';
 
@@ -13,6 +14,7 @@ export type ClawBackendProcessCommand = {
 
 export type ClawBackendProcessClientOptions = {
   command: ClawBackendProcessCommand;
+  requestHandlers?: Record<string, (params: unknown) => unknown | Promise<unknown>>;
   spawnProcess?: typeof spawn;
   requestTimeoutMs?: number;
   watchFile?: string | null;
@@ -29,6 +31,7 @@ type PendingRequest = {
 
 export class ClawBackendProcessClient {
   private readonly command: ClawBackendProcessCommand;
+  private readonly requestHandlers: Record<string, (params: unknown) => unknown | Promise<unknown>>;
   private readonly spawnProcess: typeof spawn;
   private readonly requestTimeoutMs: number;
   private readonly watchFile: string | null;
@@ -43,6 +46,7 @@ export class ClawBackendProcessClient {
 
   constructor(options: ClawBackendProcessClientOptions) {
     this.command = options.command;
+    this.requestHandlers = options.requestHandlers ?? {};
     this.spawnProcess = options.spawnProcess ?? spawn;
     this.requestTimeoutMs = options.requestTimeoutMs ?? 5_000;
     this.watchFile = options.watchFile ?? null;
@@ -214,6 +218,10 @@ export class ClawBackendProcessClient {
         this.handleNotification(message);
         return;
       }
+      if (isClawRpcRequest(message)) {
+        this.handleRequest(message);
+        return;
+      }
       if (!isClawRpcResponse(message)) {
         warnMain('clawd', 'ignored non-response message from backend', { line });
         return;
@@ -245,6 +253,25 @@ export class ClawBackendProcessClient {
     pending.resolve(response.result);
   }
 
+  private handleRequest(message: ClawRpcRequest): void {
+    void this.handleRequestAsync(message);
+  }
+
+  private async handleRequestAsync(message: ClawRpcRequest): Promise<void> {
+    const handler = this.requestHandlers[message.method];
+    if (!handler) {
+      this.writeResponse(createClawRpcError(message.id, clawRpcErrorCodes.methodNotFound, `Unknown desktop method: ${message.method}`));
+      return;
+    }
+
+    try {
+      const result = await handler(message.params);
+      this.writeResponse(createClawRpcResult(message.id, result));
+    } catch (error) {
+      this.writeResponse(createClawRpcError(message.id, clawRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error)));
+    }
+  }
+
   private handleNotification(message: ReturnType<typeof parseClawRpcMessage>): void {
     if (!isClawRpcNotification(message)) {
       return;
@@ -273,6 +300,10 @@ export class ClawBackendProcessClient {
     }
     this.pending.clear();
   }
+
+  private writeResponse(response: ClawRpcResponse): void {
+    this.process?.stdin.write(`${JSON.stringify(response)}\n`);
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -281,7 +312,36 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export function createRuntimeClawBackendClient(): ClawBackendProcessClient | null {
   const command = runtimeClawdCommand();
-  return command ? new ClawBackendProcessClient({ command, watchFile: runtimeClawdWatchFile() }) : null;
+  return command ? new ClawBackendProcessClient({
+    command,
+    requestHandlers: desktopRequestHandlers(),
+    watchFile: runtimeClawdWatchFile(),
+  }) : null;
 }
 
 export type FakeChildProcess = ChildProcessWithoutNullStreams & EventEmitter;
+
+function desktopRequestHandlers(): Record<string, (params: unknown) => unknown | Promise<unknown>> {
+  return {
+    'desktop/openExternal': async (params) => {
+      const record = requireRecord(params);
+      const url = requireString(record.url, 'url');
+      await shell.openExternal(url);
+      return true;
+    },
+  };
+}
+
+function requireRecord(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) {
+    throw new Error('Invalid desktop request params.');
+  }
+  return value;
+}
+
+function requireString(value: unknown, name: string): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error(`Invalid ${name}.`);
+  }
+  return value;
+}

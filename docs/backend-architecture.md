@@ -46,6 +46,10 @@ Current implementation checkpoint:
   the Claw MCP HTTP server used by agent collaboration tools, source repository
   discovery, git worktree creation, agent file listing/reading, and Apple
   Speech transcription execution.
+- The stdio transport is now bidirectional JSON-RPC: Electron main can request
+  backend work, and `clawd` can request desktop-owned effects. The first
+  runtime desktop handler is `desktop/openExternal`, used as the foundation for
+  backend-owned work integrations.
 - Electron main no longer owns the MCP HTTP server. Desktop-facing MCP effects,
   such as displaying Markdown in the side panel, flow back to Electron as
   app-owned backend events.
@@ -318,10 +322,11 @@ quirk. Using real JSON-RPC 2.0 keeps the protocol boring, toolable, and
 transport-independent.
 
 The connection is duplex. Electron main sends UI requests to `clawd`, `clawd`
-sends responses and app events, and `clawd` may also send server-initiated
-requests to Electron main for desktop-owned effects such as folder pickers,
-open-external, secret lookup, or user confirmation. Those requests still use
-app-owned methods; they must not be raw Codex server requests.
+sends responses and app events, and `clawd` may also send JSON-RPC requests to
+Electron main for desktop-owned effects such as folder pickers, open-external,
+secret lookup, or user confirmation. Those requests still use app-owned
+methods; they must not be raw Codex server requests. The first implemented
+desktop method is `desktop/openExternal`.
 
 Initial request methods should mirror today's `CodexClawApi` surface, but with
 names that describe backend ownership:
