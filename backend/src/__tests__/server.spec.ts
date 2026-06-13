@@ -302,6 +302,125 @@ describe('ClawBackendServer', () => {
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
   });
 
+  it('derives plan side-panel preview events in clawd', () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const events: unknown[] = [];
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      onEvent: (event) => events.push(event),
+    });
+
+    server.emitEvent({
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-dina',
+      turnId: 'turn-plan',
+      type: 'turn.planUpdated',
+      payload: {
+        explanation: 'Current plan',
+        plan: [
+          { step: 'Inspect backend event', status: 'completed' },
+          { step: 'Preview markdown', status: 'inProgress' },
+        ],
+      },
+      occurredAt: '2026-06-13T00:00:00.000Z',
+    });
+
+    expect(snapshot.agents[0]?.plan?.markdown).toBe('Current plan\n- [x] Inspect backend event\n- [ ] Preview markdown');
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-plan',
+      type: 'sidePanel.markdownRequested',
+      payload: {
+        kind: 'markdown',
+        purpose: 'plan',
+        title: 'Plan',
+        content: 'Current plan\n- [x] Inspect backend event\n- [ ] Preview markdown',
+      },
+    }));
+
+    server.emitEvent({
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-dina',
+      turnId: 'turn-plan',
+      type: 'turn.completed',
+      payload: { status: 'completed' },
+      occurredAt: '2026-06-13T00:00:01.000Z',
+    });
+
+    expect(events.filter((event) => (
+      typeof event === 'object' &&
+      event !== null &&
+      'type' in event &&
+      event.type === 'sidePanel.markdownRequested'
+    ))).toHaveLength(2);
+  });
+
+  it('derives current-turn git diff side-panel preview events in clawd', () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const events: unknown[] = [];
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      onEvent: (event) => events.push(event),
+    });
+    const diff = 'diff --git a/a.ts b/a.ts\n';
+
+    server.emitEvent({
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-dina',
+      turnId: 'turn-diff',
+      type: 'diff.updated',
+      payload: {
+        addedLines: 1,
+        diff,
+        removedLines: 0,
+      },
+    });
+
+    expect(snapshot.turnGitDiffs['turn-diff']).toMatchObject({ diff });
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-diff',
+      type: 'sidePanel.gitDiffRequested',
+      payload: {
+        kind: 'gitDiff',
+        title: 'Git Diff',
+        subtitle: 'Current turn',
+        diff,
+      },
+    }));
+  });
+
   it('routes work provider requests through backend-owned work integrations', async () => {
     const snapshot = createTestSnapshot();
     const workIntegrations = {

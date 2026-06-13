@@ -562,7 +562,7 @@ describe('AppController', () => {
     expect(snapshot.accountRateLimits).toStrictEqual(rateLimits);
   });
 
-  it('caches plan updates and previews the completed plan as markdown', async () => {
+  it('caches plan updates emitted by clawd', async () => {
     const snapshot = createInitialSnapshot();
     const send = vi.fn();
     const controller = new AppController(snapshot, createBackendClient());
@@ -600,39 +600,14 @@ describe('AppController', () => {
       agentId: 'agent-dina',
       threadId: 'thread-dina',
       turnId: 'turn-plan',
-      type: 'sidePanel.markdownRequested',
-      payload: {
-        kind: 'markdown',
-        purpose: 'plan',
-        title: 'Plan',
-        content: 'Current plan\n- [x] Inspect app-server event\n- [ ] Preview markdown',
-      },
+      type: 'turn.planUpdated',
     }));
-
-    emitAndApply(controller, {
-      agentId: 'agent-dina',
-      threadId: 'thread-dina',
-      turnId: 'turn-plan',
-      type: 'turn.completed',
-      payload: { status: 'completed' },
-      occurredAt: '2026-06-05T10:11:20.000Z',
-    });
-
-    expect(send).toHaveBeenLastCalledWith(ipcChannels.event, expect.objectContaining({
-      agentId: 'agent-dina',
-      threadId: 'thread-dina',
-      turnId: 'turn-plan',
+    expect(send).not.toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
       type: 'sidePanel.markdownRequested',
-      payload: {
-        kind: 'markdown',
-        purpose: 'plan',
-        title: 'Plan',
-        content: 'Current plan\n- [x] Inspect app-server event\n- [ ] Preview markdown',
-      },
     }));
   });
 
-  it('caches and previews completed plan items', async () => {
+  it('caches completed plan items emitted by clawd', async () => {
     const snapshot = createInitialSnapshot();
     const send = vi.fn();
     const controller = new AppController(snapshot, createBackendClient());
@@ -664,36 +639,10 @@ describe('AppController', () => {
       agentId: 'agent-dina',
       threadId: 'thread-dina',
       turnId: 'turn-plan',
-      type: 'sidePanel.markdownRequested',
-      payload: {
-        kind: 'markdown',
-        purpose: 'plan',
-        title: 'Plan',
-        content: '# Dummy False Plan\n\n- [ ] Do not implement',
-      },
+      type: 'turn.proposedPlanCompleted',
     }));
-
-    emitAndApply(controller, {
-      agentId: 'agent-dina',
-      threadId: 'thread-dina',
-      turnId: 'turn-plan',
-      type: 'turn.completed',
-      payload: { status: 'completed' },
-      occurredAt: '2026-06-05T10:11:20.000Z',
-    });
-    await flushMicrotasks();
-
-    expect(send).toHaveBeenLastCalledWith(ipcChannels.event, expect.objectContaining({
-      agentId: 'agent-dina',
-      threadId: 'thread-dina',
-      turnId: 'turn-plan',
+    expect(send).not.toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
       type: 'sidePanel.markdownRequested',
-      payload: {
-        kind: 'markdown',
-        purpose: 'plan',
-        title: 'Plan',
-        content: '# Dummy False Plan\n\n- [ ] Do not implement',
-      },
     }));
   });
 
@@ -954,7 +903,7 @@ describe('AppController', () => {
     });
   });
 
-  it('prompts a git diff side panel preview from turn diff updates', async () => {
+  it('caches turn diff updates emitted by clawd without deriving side-panel previews', async () => {
     const snapshot = createInitialSnapshot();
     const controller = new AppController(snapshot, createBackendClient());
     await controller.initialize();
@@ -988,21 +937,12 @@ describe('AppController', () => {
       type: 'diff.updated',
       payload: expect.objectContaining({ diff }),
     }));
-    expect(send).toHaveBeenCalledWith('app:event', expect.objectContaining({
-      agentId: 'agent-dina',
-      threadId: 'thread-dina',
-      turnId: 'turn-1',
+    expect(send).not.toHaveBeenCalledWith('app:event', expect.objectContaining({
       type: 'sidePanel.gitDiffRequested',
-      payload: {
-        kind: 'gitDiff',
-        title: 'Git Diff',
-        subtitle: 'Current turn',
-        diff,
-      },
     }));
   });
 
-  it('ignores malformed turn diff preview payloads', async () => {
+  it('forwards side-panel requests emitted by clawd', async () => {
     const snapshot = createInitialSnapshot();
     const controller = new AppController(snapshot, createBackendClient());
     await controller.initialize();
@@ -1015,19 +955,26 @@ describe('AppController', () => {
       agentId: 'agent-dina',
       threadId: 'thread-dina',
       turnId: 'turn-1',
-      type: 'diff.updated',
+      type: 'sidePanel.gitDiffRequested',
       payload: {
-        turnId: 'turn-1',
-        addedLines: 1,
-        removedLines: 1,
+        kind: 'gitDiff',
+        title: 'Git Diff',
+        subtitle: 'Current turn',
+        diff: 'diff --git a/a.ts b/a.ts\n',
       },
     });
 
     expect(send).toHaveBeenCalledWith('app:event', expect.objectContaining({
-      type: 'diff.updated',
-    }));
-    expect(send).not.toHaveBeenCalledWith('app:event', expect.objectContaining({
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-1',
       type: 'sidePanel.gitDiffRequested',
+      payload: {
+        kind: 'gitDiff',
+        title: 'Git Diff',
+        subtitle: 'Current turn',
+        diff: 'diff --git a/a.ts b/a.ts\n',
+      },
     }));
   });
 

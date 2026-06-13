@@ -107,6 +107,10 @@ Current implementation checkpoint:
 - `clawd` now owns prompt dispatch, rollback-to-turn history replacement, and
   delete/edit/retry message orchestration. Electron forwards message actions by
   agent/message ids and adopts the returned snapshot.
+- `clawd` now owns derived side-panel requests for plans and current-turn diffs.
+  Electron applies backend events to its volatile cache and fans them to the
+  renderer; it no longer synthesizes `sidePanel.*` events from plan or diff
+  events.
 - `clawd` owns agent file listing/preview authority. Client-facing
   `agent/listFiles` and `agent/previewFile` take an `agentId`; Electron does not
   send workspace roots or read file bytes. Provider-specific file access remains

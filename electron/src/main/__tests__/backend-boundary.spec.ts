@@ -68,6 +68,16 @@ describe('Electron backend boundary', () => {
     await expect(readdir(path.join(mainDir, 'snapshot-service.ts'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
+  it('keeps derived side-panel events in clawd', async () => {
+    const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
+    const source = await readFile(appControllerPath, 'utf8');
+
+    expect(source).not.toContain('promptPlanPreview');
+    expect(source).not.toContain('promptGitDiffPreview');
+    expect(source).not.toContain("type: 'sidePanel.markdownRequested'");
+    expect(source).not.toContain("type: 'sidePanel.gitDiffRequested'");
+  });
+
   it('keeps source folder auto-detection in clawd', async () => {
     const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
     const source = await readFile(appControllerPath, 'utf8');

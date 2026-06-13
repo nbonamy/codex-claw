@@ -623,77 +623,10 @@ export class AppController {
     applyMainEventToSnapshot(this.snapshot, fullEvent);
     this.syncPowerSaveBlocker();
     this.mainWindow?.webContents.send(ipcChannels.event, fullEvent);
-
-    if (
-      fullEvent.type === 'turn.planUpdated' ||
-      fullEvent.type === 'turn.proposedPlanCompleted'
-    ) {
-      this.promptPlanPreview(fullEvent);
-    }
-
-    if (fullEvent.type === 'diff.updated') {
-      this.promptGitDiffPreview(fullEvent);
-    }
-
-    if (fullEvent.type === 'turn.completed' && fullEvent.agentId) {
-      this.promptPlanPreview(fullEvent);
-    }
-
   }
 
   private syncPowerSaveBlocker(): void {
     this.powerSaveBlocker.sync(this.snapshot);
-  }
-
-  private promptPlanPreview(event: MainToRendererEvent): void {
-    if (
-      !event.agentId ||
-      !event.turnId ||
-      (
-        event.type !== 'turn.completed' &&
-        event.type !== 'turn.planUpdated' &&
-        event.type !== 'turn.proposedPlanCompleted'
-      )
-    ) {
-      return;
-    }
-
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === event.agentId);
-    if (!agent?.plan || agent.plan.turnId !== event.turnId || !agent.plan.markdown.trim()) {
-      return;
-    }
-
-    this.emitAndApply({
-      agentId: event.agentId,
-      threadId: agent.plan.threadId,
-      turnId: event.turnId,
-      type: 'sidePanel.markdownRequested',
-      payload: {
-        kind: 'markdown',
-        purpose: 'plan',
-        title: 'Plan',
-        content: agent.plan.markdown,
-      },
-    });
-  }
-
-  private promptGitDiffPreview(event: MainToRendererEvent): void {
-    if (!event.agentId || !isRecord(event.payload) || typeof event.payload.diff !== 'string' || !event.payload.diff.trim()) {
-      return;
-    }
-
-    this.emitAndApply({
-      agentId: event.agentId,
-      threadId: event.threadId,
-      turnId: event.turnId,
-      type: 'sidePanel.gitDiffRequested',
-      payload: {
-        kind: 'gitDiff',
-        title: 'Git Diff',
-        subtitle: 'Current turn',
-        diff: event.payload.diff,
-      },
-    });
   }
 
 }

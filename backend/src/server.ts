@@ -968,34 +968,93 @@ export class ClawBackendServer {
   }
 
   private applyAndEmitBackendEvent(event: BackendEvent): void {
-    this.lastEventSeq += 1;
-    const fullEvent: MainToRendererEvent = {
-      ...event,
-      seq: this.lastEventSeq,
-      occurredAt: event.occurredAt ?? new Date().toISOString(),
-      payload: event.payload,
-    };
+    const fullEvent = this.nextMainEvent(event);
     applyMainEventToSnapshot(this.snapshot, fullEvent);
     this.recordClientRequestOwner(fullEvent);
     this.onEvent?.(fullEvent);
+    this.emitDerivedSidePanelEvents(fullEvent);
   }
 
   private handleBackendEvent(event: BackendEvent, options: { persist?: boolean } = {}): void {
-    this.lastEventSeq += 1;
-    const fullEvent: MainToRendererEvent = {
-      ...event,
-      seq: this.lastEventSeq,
-      occurredAt: event.occurredAt ?? new Date().toISOString(),
-      payload: event.payload,
-    };
+    const fullEvent = this.nextMainEvent(event);
+    applyMainEventToSnapshot(this.snapshot, fullEvent);
     this.recordClientRequestOwner(fullEvent);
     this.onEvent?.(fullEvent);
+    this.emitDerivedSidePanelEvents(fullEvent);
     if (options.persist !== false && shouldPersistSnapshotForEvent(event)) {
       void this.saveSnapshot?.(this.snapshot);
     }
     if (event.agentId && shouldRefreshGitStatusForEvent(event)) {
       void this.refreshAgentGitStatus(event.agentId);
     }
+  }
+
+  private nextMainEvent(event: BackendEvent): MainToRendererEvent {
+    this.lastEventSeq += 1;
+    return {
+      ...event,
+      seq: this.lastEventSeq,
+      occurredAt: event.occurredAt ?? new Date().toISOString(),
+      payload: event.payload,
+    };
+  }
+
+  private emitDerivedSidePanelEvents(event: MainToRendererEvent): void {
+    this.emitPlanPreviewForEvent(event);
+    this.emitGitDiffPreviewForEvent(event);
+  }
+
+  private emitPlanPreviewForEvent(event: MainToRendererEvent): void {
+    if (
+      !event.agentId ||
+      !event.turnId ||
+      (
+        event.type !== 'turn.completed' &&
+        event.type !== 'turn.planUpdated' &&
+        event.type !== 'turn.proposedPlanCompleted'
+      )
+    ) {
+      return;
+    }
+
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === event.agentId);
+    if (!agent?.plan || agent.plan.turnId !== event.turnId || !agent.plan.markdown.trim()) {
+      return;
+    }
+
+    this.applyAndEmitBackendEvent({
+      agentId: event.agentId,
+      backend: event.backend,
+      threadId: agent.plan.threadId,
+      turnId: event.turnId,
+      type: 'sidePanel.markdownRequested',
+      payload: {
+        kind: 'markdown',
+        purpose: 'plan',
+        title: 'Plan',
+        content: agent.plan.markdown,
+      },
+    });
+  }
+
+  private emitGitDiffPreviewForEvent(event: MainToRendererEvent): void {
+    if (event.type !== 'diff.updated' || !event.agentId || !isRecord(event.payload) || typeof event.payload.diff !== 'string' || !event.payload.diff.trim()) {
+      return;
+    }
+
+    this.applyAndEmitBackendEvent({
+      agentId: event.agentId,
+      backend: event.backend,
+      threadId: event.threadId,
+      turnId: event.turnId,
+      type: 'sidePanel.gitDiffRequested',
+      payload: {
+        kind: 'gitDiff',
+        title: 'Git Diff',
+        subtitle: 'Current turn',
+        diff: event.payload.diff,
+      },
+    });
   }
 
   private recordClientRequestOwner(event: MainToRendererEvent): void {
@@ -1135,10 +1194,14 @@ function validateTeamInput(input: CreateTeamInput): void {
 }
 
 function requireRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+  if (!isRecord(value)) {
     throw new Error('Invalid work integration request params.');
   }
-  return value as Record<string, unknown>;
+  return value;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function requireString(value: unknown, name: string): string {
