@@ -98,10 +98,13 @@ Current implementation checkpoint:
 - `clawd` now owns active-turn steering and interruption session mutations.
   Electron forwards steer/interrupt requests and adopts the returned snapshot;
   provider-only steer/interrupt calls use `driver/*` RPC methods.
+- `clawd` now owns rollback-to-turn history replacement and session mutation.
+  Electron's delete/edit/retry flows request backend rollback and then, for
+  edit/retry, continue with prompt dispatch as a separate remaining slice.
 - The remaining large slice is to move the rest of product orchestration out of
   `AppController` so Electron becomes only the desktop IPC/stdio layer. The
-  largest remaining owners are prompt dispatch and rollback/edit/retry flows,
-  plus remaining desktop-era driver shims.
+  largest remaining owners are prompt dispatch and the residual edit/retry
+  prompt send handoff, plus remaining desktop-era driver shims.
 
 ## Goals
 

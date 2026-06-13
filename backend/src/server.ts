@@ -4,7 +4,7 @@ import { applyMainEventToSnapshot, createAgentInSnapshot, createEmptySnapshot, u
 import type { AppSnapshot, BackendConversationRef, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { backendDisplayName } from '@codex-claw/shared/backend-driver';
-import type { BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
+import type { BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { assignWorkItemToAgentInSnapshot, closeAgentInSnapshot, deployBenchTemplateInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeBenchTemplateFromSnapshot, removeWorkItemAssignmentFromSnapshot, reorderAgentInTeam, restartAgentConversation, resumeAgentConversationInSnapshot, saveAgentToBench } from '@codex-claw/shared/agent-manager';
 import { clearLoopExecutionHistoryInSnapshot, createLoopInSnapshot, deleteLoopExecutionFromSnapshot, deleteLoopFromSnapshot, updateLoopInSnapshot } from '@codex-claw/shared/loop-manager';
@@ -310,6 +310,34 @@ export class ClawBackendServer {
         }
         return createClawRpcResult(message.id, this.snapshot);
       }
+      case 'agent/rollbackToTurn': {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const turnId = requireString(params.turnId, 'turnId');
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        const result = await this.requireDriverRpc().handle('driver/rollbackToTurn', { agent, turnId }) as BackendRollbackResult;
+        agent.backendSession = result.backendSession;
+        const sessionThread = result.backendSession.kind === 'codex' ? { threadId: result.backendSession.threadId } : {};
+        this.applyAndEmitBackendEvent({
+          agentId,
+          ...sessionThread,
+          type: 'thread.historyLoaded',
+          payload: {
+            messages: result.messages,
+            replace: true,
+          },
+        });
+        this.applyAndEmitBackendEvent({
+          agentId,
+          ...sessionThread,
+          type: 'agent.statusChanged',
+          payload: { type: 'idle' },
+        });
+        return createClawRpcResult(message.id, await this.persistSnapshotOnly());
+      }
       case 'team/create': {
         const input = requireTeamCreateInput(message.params);
         validateTeamInput(input);
@@ -506,6 +534,11 @@ export class ClawBackendServer {
       type: 'snapshot.updated',
       payload: this.snapshot,
     }, { persist: false });
+    return this.snapshot;
+  }
+
+  private async persistSnapshotOnly(): Promise<AppSnapshot> {
+    await this.saveSnapshot?.(this.snapshot);
     return this.snapshot;
   }
 

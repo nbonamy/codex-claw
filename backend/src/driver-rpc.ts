@@ -169,7 +169,7 @@ export class BackendDriverRpc {
         }
         return driver.steerPrompt(agent, requireString(record.prompt, 'prompt'));
       }
-      case 'agent/rollbackToTurn': {
+      case 'driver/rollbackToTurn': {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);

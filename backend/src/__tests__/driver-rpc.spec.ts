@@ -65,6 +65,10 @@ describe('BackendDriverRpc', () => {
       backendSession: { kind: 'codex', threadId: 'thread-interrupt' },
       turnId: 'turn-interrupt',
     });
+    const rollbackToTurn = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex', threadId: 'thread-rollback' },
+      messages: [],
+    });
     const resumeConversation = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-resumed' },
       messages: [],
@@ -74,6 +78,7 @@ describe('BackendDriverRpc', () => {
       clearGoal,
       forgetAgentSession,
       interrupt,
+      rollbackToTurn,
       resumeConversation,
       setApprovalPreset,
       setGoal,
@@ -101,6 +106,10 @@ describe('BackendDriverRpc', () => {
       backendSession: { kind: 'codex', threadId: 'thread-interrupt' },
       turnId: 'turn-interrupt',
     });
+    await expect(rpc.handle('driver/rollbackToTurn', { agent, turnId: 'turn-1' })).resolves.toStrictEqual({
+      backendSession: { kind: 'codex', threadId: 'thread-rollback' },
+      messages: [],
+    });
     await expect(rpc.handle('driver/resumeConversation', { agent, ref })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-resumed' },
       messages: [],
@@ -112,6 +121,7 @@ describe('BackendDriverRpc', () => {
     expect(setApprovalPreset).toHaveBeenCalledWith(agent, 'approve-for-me');
     expect(steerPrompt).toHaveBeenCalledWith(agent, 'try smaller');
     expect(interrupt).toHaveBeenCalledWith(agent);
+    expect(rollbackToTurn).toHaveBeenCalledWith(agent, 'turn-1');
     expect(resumeConversation).toHaveBeenCalledWith(agent, ref);
     expect(forgetAgentSession).toHaveBeenCalledWith('agent-dina');
   });

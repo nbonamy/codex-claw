@@ -84,6 +84,7 @@ describe('ClawBackendProxyDriver', () => {
     await driver.setApprovalPreset(agent, 'approve-for-me');
     await driver.steerPrompt(agent, 'try smaller');
     await driver.interrupt(agent);
+    await driver.rollbackToTurn(agent, 'turn-1');
     await expect(driver.resumeConversation(agent, ref)).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-resumed' },
       messages: [],
@@ -96,7 +97,8 @@ describe('ClawBackendProxyDriver', () => {
     expect(client.request).toHaveBeenNthCalledWith(4, 'driver/setApprovalPreset', { agent, preset: 'approve-for-me' });
     expect(client.request).toHaveBeenNthCalledWith(5, 'driver/steer', { agent, prompt: 'try smaller' });
     expect(client.request).toHaveBeenNthCalledWith(6, 'driver/interrupt', { agent });
-    expect(client.request).toHaveBeenNthCalledWith(7, 'driver/resumeConversation', { agent, ref });
-    expect(client.request).toHaveBeenNthCalledWith(8, 'driver/forgetSession', { backend: 'codex', agentId: 'agent-dina' });
+    expect(client.request).toHaveBeenNthCalledWith(7, 'driver/rollbackToTurn', { agent, turnId: 'turn-1' });
+    expect(client.request).toHaveBeenNthCalledWith(8, 'driver/resumeConversation', { agent, ref });
+    expect(client.request).toHaveBeenNthCalledWith(9, 'driver/forgetSession', { backend: 'codex', agentId: 'agent-dina' });
   });
 });

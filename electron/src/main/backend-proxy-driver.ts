@@ -113,7 +113,7 @@ export class ClawBackendProxyDriver implements AgentBackendDriver {
   }
 
   async rollbackToTurn(agent: Agent, turnId: string): Promise<BackendRollbackResult> {
-    return this.client.request('agent/rollbackToTurn', { agent, turnId });
+    return this.client.request('driver/rollbackToTurn', { agent, turnId });
   }
 
   async listModels(agent: Agent): Promise<BackendModelOption[]> {

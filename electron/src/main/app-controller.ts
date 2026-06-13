@@ -694,8 +694,7 @@ export class AppController {
       return this.snapshot;
     }
 
-    await this.rollbackAgentToTurn(action.agent, action.turnId);
-    await this.persistSnapshot();
+    await this.rollbackAgentToTurn(action.agent.id, action.turnId);
     return this.snapshot;
   }
 
@@ -706,8 +705,7 @@ export class AppController {
       return this.snapshot;
     }
 
-    await this.rollbackAgentToTurn(action.agent, action.turnId);
-    await this.persistSnapshot();
+    await this.rollbackAgentToTurn(action.agent.id, action.turnId);
     return this.sendPrompt(agentId, trimmedPrompt);
   }
 
@@ -717,34 +715,12 @@ export class AppController {
       return this.snapshot;
     }
 
-    await this.rollbackAgentToTurn(action.agent, action.turnId);
-    await this.persistSnapshot();
+    await this.rollbackAgentToTurn(action.agent.id, action.turnId);
     return this.sendPrompt(agentId, action.prompt);
   }
 
-  private async rollbackAgentToTurn(agent: Agent, turnId: string): Promise<void> {
-    const driver = await this.getBackendDriverForAgent(agent);
-    if (!driver.rollbackToTurn) {
-      throw unsupportedBackendFeature(agent, 'message rollback');
-    }
-
-    const result = await driver.rollbackToTurn(agent, turnId);
-    agent.backendSession = result.backendSession;
-    this.emitAndApply({
-      agentId: agent.id,
-      ...(result.backendSession.kind === 'codex' ? { threadId: result.backendSession.threadId } : {}),
-      type: 'thread.historyLoaded',
-      payload: {
-        messages: result.messages,
-        replace: true,
-      },
-    });
-    this.emitAndApply({
-      agentId: agent.id,
-      ...(result.backendSession.kind === 'codex' ? { threadId: result.backendSession.threadId } : {}),
-      type: 'agent.statusChanged',
-      payload: { type: 'idle' },
-    });
+  private async rollbackAgentToTurn(agentId: string, turnId: string): Promise<void> {
+    this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/rollbackToTurn', { agentId, turnId }));
   }
 
   private resolveMessageAction(agentId: string, messageId: string): { agent: Agent; message: RendererMessage; prompt: string | null; turnId: string } | null {

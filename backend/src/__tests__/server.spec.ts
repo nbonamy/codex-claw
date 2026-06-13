@@ -793,6 +793,75 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
+  it('owns rollback history replacement mutations', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      backendSession: { kind: 'codex', threadId: 'thread-old' },
+      status: { type: 'working' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    snapshot.messages = [
+      createTextMessage('old-dina', 'agent-dina', 'old'),
+      createTextMessage('old-jesse', 'agent-jesse', 'keep'),
+    ];
+    const rollbackMessages = [createTextMessage('rollback-dina', 'agent-dina', 'rolled back')];
+    const rollbackToTurn = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex', threadId: 'thread-rollback' },
+      messages: rollbackMessages,
+    });
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      rollbackToTurn,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const events: unknown[] = [];
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+      onEvent: (event) => events.push(event),
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'rollback',
+      method: 'agent/rollbackToTurn',
+      params: { agentId: 'agent-dina', turnId: 'turn-1' },
+    })).resolves.toMatchObject({
+      result: {
+        agents: [{ id: 'agent-dina', backendSession: { kind: 'codex', threadId: 'thread-rollback' }, status: { type: 'idle' } }],
+      },
+    });
+
+    expect(rollbackToTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-1');
+    expect(snapshot.messages.map((message) => [message.id, message.agentId])).toStrictEqual([
+      ['old-jesse', 'agent-jesse'],
+      ['rollback-dina', 'agent-dina'],
+    ]);
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'thread.historyLoaded', payload: { messages: rollbackMessages, replace: true } }),
+      expect.objectContaining({ type: 'agent.statusChanged', payload: { type: 'idle' } }),
+    ]));
+    expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
+    await server.close();
+  });
+
   it('owns bench mutations and validates deployed template folders', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-bench-'));
     const snapshot = createTestSnapshot();

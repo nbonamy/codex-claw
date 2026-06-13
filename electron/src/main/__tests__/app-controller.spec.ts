@@ -1202,6 +1202,7 @@ describe('AppController', () => {
 
   it('deletes a message by rolling back from its Codex turn and replacing history', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.sourceFolder.initialized = true;
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
     snapshot.messages = [
       userMessage('user-turn-1', 'turn-1', 'first prompt'),
@@ -1209,81 +1210,70 @@ describe('AppController', () => {
       userMessage('user-turn-2', 'turn-2', 'second prompt'),
       assistantMessage('assistant-turn-2', 'turn-2', 'second answer'),
     ];
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
-    const backendDriver = createFakeCodexBackendDriver({
-      rollbackToTurn: vi.fn().mockResolvedValue({
-        backendSession: { kind: 'codex', threadId: 'thread-dina' },
-        messages: snapshot.messages.slice(0, 2),
-      }),
-    });
+    const rollbackSnapshot = {
+      ...snapshot,
+      messages: snapshot.messages.slice(0, 2),
+    };
+    const request = vi.fn().mockResolvedValue(rollbackSnapshot);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
 
     await controller.initialize();
-    setCodexBackendDriver(controller, backendDriver);
-    await deleteMessage(controller, 'agent-dina', 'user-turn-2');
 
-    expect(backendDriver.rollbackToTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-2');
-    expect(snapshot.messages.map((message) => message.id)).toStrictEqual(['user-turn-1', 'assistant-turn-1']);
-    expect(persistence.save).toHaveBeenCalledWith(snapshot);
+    await expect(deleteMessage(controller, 'agent-dina', 'user-turn-2')).resolves.toBe(rollbackSnapshot);
+
+    expect(request).toHaveBeenCalledWith('agent/rollbackToTurn', { agentId: 'agent-dina', turnId: 'turn-2' });
   });
 
   it('retries an assistant message by rolling back and resending the matching user prompt', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.sourceFolder.initialized = true;
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
     snapshot.messages = [
       userMessage('user-turn-1', 'turn-1', 'first prompt'),
       assistantMessage('assistant-turn-1', 'turn-1', 'first answer'),
     ];
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
-    const backendDriver = createFakeCodexBackendDriver({
-      rollbackToTurn: vi.fn().mockResolvedValue({
-        backendSession: { kind: 'codex', threadId: 'thread-dina' },
-        messages: [],
-      }),
-      sendPrompt: vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'thread-dina' }, turnId: 'turn-retry' }),
-    });
+    const rollbackSnapshot = {
+      ...snapshot,
+      messages: [],
+    };
+    const request = vi.fn(async (method: string) => (
+      method === 'agent/rollbackToTurn'
+        ? rollbackSnapshot
+        : { backendSession: { kind: 'codex', threadId: 'thread-dina' }, turnId: 'turn-retry' }
+    ));
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
 
     await controller.initialize();
-    setCodexBackendDriver(controller, backendDriver);
     await retryMessage(controller, 'agent-dina', 'assistant-turn-1');
 
-    expect(backendDriver.rollbackToTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-1');
-    expect(backendDriver.sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'first prompt');
+    expect(request).toHaveBeenNthCalledWith(1, 'agent/rollbackToTurn', { agentId: 'agent-dina', turnId: 'turn-1' });
+    expect(request).toHaveBeenNthCalledWith(2, 'agent/sendPrompt', { agent: rollbackSnapshot.agents[0], prompt: 'first prompt', options: undefined });
   });
 
   it('edits a user message by rolling back and resending the edited prompt', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.sourceFolder.initialized = true;
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
     snapshot.messages = [
       userMessage('user-turn-1', 'turn-1', 'first prompt'),
       assistantMessage('assistant-turn-1', 'turn-1', 'first answer'),
     ];
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
-    const backendDriver = createFakeCodexBackendDriver({
-      rollbackToTurn: vi.fn().mockResolvedValue({
-        backendSession: { kind: 'codex', threadId: 'thread-dina' },
-        messages: [],
-      }),
-      sendPrompt: vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'thread-dina' }, turnId: 'turn-edit' }),
-    });
+    const rollbackSnapshot = {
+      ...snapshot,
+      messages: [],
+    };
+    const request = vi.fn(async (method: string) => (
+      method === 'agent/rollbackToTurn'
+        ? rollbackSnapshot
+        : { backendSession: { kind: 'codex', threadId: 'thread-dina' }, turnId: 'turn-edit' }
+    ));
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
 
     await controller.initialize();
-    setCodexBackendDriver(controller, backendDriver);
     await editMessage(controller, 'agent-dina', 'user-turn-1', ' edited prompt ');
 
-    expect(backendDriver.rollbackToTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-1');
-    expect(backendDriver.sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'edited prompt');
+    expect(request).toHaveBeenNthCalledWith(1, 'agent/rollbackToTurn', { agentId: 'agent-dina', turnId: 'turn-1' });
+    expect(request).toHaveBeenNthCalledWith(2, 'agent/sendPrompt', { agent: rollbackSnapshot.agents[0], prompt: 'edited prompt', options: undefined });
   });
 });
 
@@ -1660,21 +1650,21 @@ async function interruptAgent(controller: AppController, agentId: string): Promi
   }).interruptAgent(agentId);
 }
 
-async function deleteMessage(controller: AppController, agentId: string, messageId: string): Promise<void> {
-  await (controller as unknown as {
-    deleteMessage(agentId: string, messageId: string): Promise<void>;
+async function deleteMessage(controller: AppController, agentId: string, messageId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    deleteMessage(agentId: string, messageId: string): Promise<AppSnapshot>;
   }).deleteMessage(agentId, messageId);
 }
 
-async function retryMessage(controller: AppController, agentId: string, messageId: string): Promise<void> {
-  await (controller as unknown as {
-    retryMessage(agentId: string, messageId: string): Promise<void>;
+async function retryMessage(controller: AppController, agentId: string, messageId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    retryMessage(agentId: string, messageId: string): Promise<AppSnapshot>;
   }).retryMessage(agentId, messageId);
 }
 
-async function editMessage(controller: AppController, agentId: string, messageId: string, prompt: string): Promise<void> {
-  await (controller as unknown as {
-    editMessage(agentId: string, messageId: string, prompt: string): Promise<void>;
+async function editMessage(controller: AppController, agentId: string, messageId: string, prompt: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    editMessage(agentId: string, messageId: string, prompt: string): Promise<AppSnapshot>;
   }).editMessage(agentId, messageId, prompt);
 }
 
