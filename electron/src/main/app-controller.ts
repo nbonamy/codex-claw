@@ -499,17 +499,7 @@ export class AppController {
   }
 
   private async listAgentConversations(agentId: string): Promise<ConversationSummary[]> {
-    if (typeof agentId !== 'string' || !agentId.trim()) {
-      throw new Error('Invalid agent id.');
-    }
-
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent) {
-      throw new Error(`Agent not found: ${agentId}`);
-    }
-
-    const driver = await this.getBackendDriverForAgent(agent);
-    return driver.listConversations ? driver.listConversations(agent) : [];
+    return this.requireBackendClient().request('agent/listConversations', { agentId });
   }
 
   private async resumeAgentConversation(agentId: string, ref: unknown): Promise<AppSnapshot> {
@@ -517,18 +507,7 @@ export class AppController {
   }
 
   private async readConversationMessages(ref: unknown, agentId: string): Promise<RendererMessage[]> {
-    if (!isBackendConversationRef(ref) || typeof agentId !== 'string' || !agentId.trim()) {
-      throw new Error('Invalid conversation reference.');
-    }
-    if (!this.isStoredConversationRef(ref, agentId)) {
-      throw new Error('Conversation reference is not available.');
-    }
-
-    const driver = await this.getBackendDriver(ref.backend);
-    if (!driver.readConversationMessages) {
-      throw new Error(`${backendDisplayName(ref.backend)} does not support conversation history.`);
-    }
-    return driver.readConversationMessages(ref, agentId);
+    return this.requireBackendClient().request('agent/readConversationMessages', { ref, agentId });
   }
 
   private async setAgentGoal(agentId: string, objective: string): Promise<AppSnapshot> {
@@ -544,31 +523,11 @@ export class AppController {
   }
 
   private async listBackendModels(agentId: string): Promise<BackendModelOption[]> {
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent) {
-      throw new Error(`Agent not found: ${agentId}`);
-    }
-
-    const driver = await this.getBackendDriverForAgent(agent);
-    if (!driver.listModels) {
-      return [];
-    }
-
-    return driver.listModels(agent);
+    return this.requireBackendClient().request('agent/listModels', { agentId });
   }
 
   private async listBackendSkills(agentId: string): Promise<BackendSkillSummary[]> {
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent) {
-      throw new Error(`Agent not found: ${agentId}`);
-    }
-
-    const driver = await this.getBackendDriverForAgent(agent);
-    if (!driver.listSkills) {
-      return [];
-    }
-
-    return driver.listSkills(agent);
+    return this.requireBackendClient().request('agent/listSkills', { agentId });
   }
 
   private async listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]> {
@@ -636,15 +595,6 @@ export class AppController {
         },
       });
     }
-  }
-
-  private isStoredConversationRef(ref: BackendConversationRef, agentId: string): boolean {
-    return this.snapshot.loops.some((loop) => loop.executionLog.some((entry) => (
-      entry.createdAgents.some((createdAgent) => (
-        createdAgent.agentId === agentId &&
-        (createdAgent.conversationRef ? sameConversationRef(createdAgent.conversationRef, ref) : false)
-      ))
-    )));
   }
 
   private async steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot> {
@@ -1015,31 +965,6 @@ export function startMainApp(): void {
       controller.createWindow();
     }
   });
-}
-
-function isBackendConversationRef(value: unknown): value is BackendConversationRef {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-
-  const candidate = value as Record<string, unknown>;
-  if (candidate.backend === 'codex') {
-    return typeof candidate.threadId === 'string' && candidate.threadId.trim().length > 0;
-  }
-
-  return candidate.backend === 'claude' &&
-    typeof candidate.folder === 'string' &&
-    candidate.folder.trim().length > 0 &&
-    typeof candidate.sessionId === 'string' &&
-    candidate.sessionId.trim().length > 0;
-}
-
-function sameConversationRef(left: BackendConversationRef, right: BackendConversationRef): boolean {
-  if (left.backend === 'codex') {
-    return right.backend === 'codex' && left.threadId === right.threadId;
-  }
-
-  return right.backend === 'claude' && left.folder === right.folder && left.sessionId === right.sessionId;
 }
 
 function clientRequest(value: unknown): ClientRequest | null {

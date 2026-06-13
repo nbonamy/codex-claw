@@ -12,7 +12,7 @@ describe('BackendDriverRpc', () => {
     const listModels = vi.fn().mockResolvedValue([{ id: 'gpt-test', name: 'GPT Test' }]);
     const rpc = new BackendDriverRpc(new Map([['codex', createDriver({ listModels })]]));
 
-    await expect(rpc.handle('agent/listModels', { agent })).resolves.toStrictEqual([
+    await expect(rpc.handle('driver/listModels', { agent })).resolves.toStrictEqual([
       { id: 'gpt-test', name: 'GPT Test' },
     ]);
     expect(listModels).toHaveBeenCalledWith(agent);

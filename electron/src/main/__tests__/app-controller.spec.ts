@@ -870,32 +870,8 @@ describe('AppController', () => {
     });
   });
 
-  it('reads historical conversation messages through the referenced backend driver', async () => {
+  it('reads historical conversation messages through clawd', async () => {
     const snapshot = createInitialSnapshot();
-    snapshot.loops = [loopFixture({
-      cleanup: {
-        deleteAgent: false,
-      },
-      teamTarget: {
-        mode: 'existing',
-        teamId: 'team-codex-claw',
-      },
-    })];
-    snapshot.loops[0]!.executionLog = [{
-      id: 'loop-exec-1',
-      loopId: 'loop-bugs',
-      startedAt: '2026-06-09T10:00:00.000Z',
-      status: 'completed',
-      createdCount: 1,
-      createdAgents: [{
-        agentId: 'agent-dina',
-        agentName: 'Dina',
-        workItemId: 'github:nbonamy/codex-claw#12',
-        workItemTitle: 'Fix cockpit',
-        workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
-        conversationRef: { backend: 'codex', threadId: 'thread-dina' },
-      }],
-    }];
     const messages = [{
       id: 'user-thread-dina-user-1',
       agentId: 'agent-dina',
@@ -904,23 +880,19 @@ describe('AppController', () => {
       createdAt: '2026-06-09T10:00:00.000Z',
       parts: [{ type: 'text' as const, text: 'hello' }],
     }];
-    const backendDriver = createFakeCodexBackendDriver({
-      readConversationMessages: vi.fn().mockResolvedValue(messages),
-    });
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
+    const request = vi.fn().mockResolvedValue(messages);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
 
     await controller.initialize();
-    setCodexBackendDriver(controller, backendDriver);
 
     await expect(readConversationMessages(controller, { backend: 'codex', threadId: 'thread-dina' }, 'agent-dina')).resolves.toStrictEqual(messages);
-    expect(backendDriver.readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-dina' }, 'agent-dina');
+    expect(request).toHaveBeenCalledWith('agent/readConversationMessages', {
+      ref: { backend: 'codex', threadId: 'thread-dina' },
+      agentId: 'agent-dina',
+    });
   });
 
-  it('lists agent conversations through the agent backend driver', async () => {
+  it('lists agent conversations through clawd', async () => {
     const snapshot = createInitialSnapshot();
     const conversations: ConversationSummary[] = [{
       id: 'thread-dina',
@@ -929,20 +901,13 @@ describe('AppController', () => {
       messageCount: 3,
       ref: { backend: 'codex', threadId: 'thread-dina' },
     }];
-    const backendDriver = createFakeCodexBackendDriver({
-      listConversations: vi.fn().mockResolvedValue(conversations),
-    });
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
+    const request = vi.fn().mockResolvedValue(conversations);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
 
     await controller.initialize();
-    setCodexBackendDriver(controller, backendDriver);
 
     await expect(listAgentConversations(controller, 'agent-dina')).resolves.toStrictEqual(conversations);
-    expect(backendDriver.listConversations).toHaveBeenCalledWith(snapshot.agents[0]);
+    expect(request).toHaveBeenCalledWith('agent/listConversations', { agentId: 'agent-dina' });
   });
 
   it('routes agent conversation resume through clawd', async () => {
@@ -976,40 +941,32 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('agent/resumeConversation', { agentId: 'agent-dina', ref });
   });
 
-  it('rejects unrecorded historical conversation refs before reaching a backend driver', async () => {
+  it('lets clawd reject unrecorded historical conversation refs', async () => {
     const snapshot = createInitialSnapshot();
-    const backendDriver = createFakeCodexBackendDriver({
-      readConversationMessages: vi.fn().mockResolvedValue([]),
-    });
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
+    const request = vi.fn().mockRejectedValue(new Error('Conversation reference is not available.'));
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
 
     await controller.initialize();
-    setCodexBackendDriver(controller, backendDriver);
 
     await expect(readConversationMessages(controller, { backend: 'codex', threadId: 'thread-dina' }, 'agent-dina')).rejects.toThrow('Conversation reference is not available.');
-    expect(backendDriver.readConversationMessages).not.toHaveBeenCalled();
+    expect(request).toHaveBeenCalledWith('agent/readConversationMessages', {
+      ref: { backend: 'codex', threadId: 'thread-dina' },
+      agentId: 'agent-dina',
+    });
   });
 
-  it('rejects invalid historical conversation refs before reaching a backend driver', async () => {
+  it('lets clawd reject invalid historical conversation refs', async () => {
     const snapshot = createInitialSnapshot();
-    const backendDriver = createFakeCodexBackendDriver({
-      readConversationMessages: vi.fn().mockResolvedValue([]),
-    });
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
+    const request = vi.fn().mockRejectedValue(new Error('Invalid conversation reference.'));
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
 
     await controller.initialize();
-    setCodexBackendDriver(controller, backendDriver);
 
     await expect(readConversationMessages(controller, { backend: 'codex' }, 'agent-dina')).rejects.toThrow('Invalid conversation reference.');
-    expect(backendDriver.readConversationMessages).not.toHaveBeenCalled();
+    expect(request).toHaveBeenCalledWith('agent/readConversationMessages', {
+      ref: { backend: 'codex' },
+      agentId: 'agent-dina',
+    });
   });
 
   it('routes agent file listing and reads through clawd', async () => {

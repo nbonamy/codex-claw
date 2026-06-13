@@ -103,10 +103,15 @@ Current implementation checkpoint:
   `agent/listFiles` and `agent/readFile` take an `agentId`; Electron does not
   send workspace roots or read file bytes. The backend's folder-based file
   helpers are internal `driver/listFiles` and `driver/readFile` calls only.
+- `clawd` owns provider metadata and conversation-history reads. Electron asks
+  for models, skills, conversation lists, and loop-created conversation
+  messages by agent/ref ids; backend resolves agents and validates stored
+  conversation refs before calling provider drivers.
 - The remaining large slice is to move the rest of product orchestration out of
   `AppController` so Electron becomes only the desktop IPC/stdio layer. The
-  largest remaining owners are conversation-history listing/reading, backend
-  model/skill listing, git diff preview, and remaining desktop-era driver shims.
+  largest remaining owners are git status/diff preview, persisted-session
+  hydration on selection, client request ownership, and remaining desktop-era
+  driver shims.
 
 ## Goals
 

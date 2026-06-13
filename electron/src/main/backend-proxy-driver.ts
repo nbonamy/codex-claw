@@ -97,7 +97,7 @@ export class ClawBackendProxyDriver implements AgentBackendDriver {
   }
 
   async listConversations(agent: Agent): Promise<ConversationSummary[]> {
-    return this.client.request('agent/listConversations', { agent });
+    return this.client.request('driver/listConversations', { agent });
   }
 
   async resumeConversation(agent: Agent, ref: BackendConversationRef): Promise<BackendConversationResumeResult> {
@@ -105,7 +105,7 @@ export class ClawBackendProxyDriver implements AgentBackendDriver {
   }
 
   async readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]> {
-    return this.client.request('agent/readConversationMessages', { ref, agentId });
+    return this.client.request('driver/readConversationMessages', { ref, agentId });
   }
 
   async steerPrompt(agent: Agent, prompt: string): Promise<BackendSendResult> {
@@ -117,11 +117,11 @@ export class ClawBackendProxyDriver implements AgentBackendDriver {
   }
 
   async listModels(agent: Agent): Promise<BackendModelOption[]> {
-    return this.client.request('agent/listModels', { agent });
+    return this.client.request('driver/listModels', { agent });
   }
 
   async listSkills(agent: Agent): Promise<BackendSkillSummary[]> {
-    return this.client.request('agent/listSkills', { agent });
+    return this.client.request('driver/listSkills', { agent });
   }
 
   onEvent(listener: (event: BackendEvent) => void): () => void {

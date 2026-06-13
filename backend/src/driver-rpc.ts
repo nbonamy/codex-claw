@@ -140,7 +140,7 @@ export class BackendDriverRpc {
         const driver = this.requireDriver(agent.backend);
         return driver.hydrateAgent ? driver.hydrateAgent(agent) : null;
       }
-      case 'agent/listConversations': {
+      case 'driver/listConversations': {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);
         return driver.listConversations ? driver.listConversations(agent) : [];
@@ -154,7 +154,7 @@ export class BackendDriverRpc {
         }
         return driver.resumeConversation(agent, record.ref as never);
       }
-      case 'agent/readConversationMessages': {
+      case 'driver/readConversationMessages': {
         const record = requireRecord(params);
         const ref = requireRecord(record.ref);
         const backend = requireBackend(ref.backend);
@@ -182,12 +182,12 @@ export class BackendDriverRpc {
         }
         return driver.rollbackToTurn(agent, requireString(record.turnId, 'turnId'));
       }
-      case 'agent/listModels': {
+      case 'driver/listModels': {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);
         return driver.listModels ? driver.listModels(agent) : [];
       }
-      case 'agent/listSkills': {
+      case 'driver/listSkills': {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);
         return driver.listSkills ? driver.listSkills(agent) : [];

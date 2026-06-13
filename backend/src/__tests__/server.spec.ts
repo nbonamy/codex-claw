@@ -425,6 +425,125 @@ describe('ClawBackendServer', () => {
     }
   });
 
+  it('owns provider metadata and conversation-history reads by resolving agents internally', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    snapshot.loops = [{
+      id: 'loop-bugs',
+      name: 'GitHub bugs',
+      enabled: true,
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+      source: { provider: 'github', repositoryId: 'nbonamy/codex-claw' },
+      action: {
+        type: 'create-agent',
+        sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        teamTarget: { mode: 'existing', teamId: 'team-test' },
+      },
+      instructions: {},
+      executionLog: [{
+        id: 'loop-exec-1',
+        loopId: 'loop-bugs',
+        startedAt: '2026-06-13T00:00:00.000Z',
+        status: 'completed',
+        createdCount: 1,
+        createdAgents: [{
+          agentId: 'agent-dina',
+          agentName: 'Dina',
+          workItemId: 'github:nbonamy/codex-claw#12',
+          workItemTitle: 'Fix cockpit',
+          workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
+          conversationRef: { backend: 'codex', threadId: 'thread-dina' },
+        }],
+      }],
+    }];
+    const conversations = [{
+      id: 'thread-dina',
+      title: 'Read docs',
+      updatedAt: '2026-06-09T10:00:00.000Z',
+      messageCount: 3,
+      ref: { backend: 'codex' as const, threadId: 'thread-dina' },
+    }];
+    const messages = [createTextMessage('user-thread-dina-user-1', 'agent-dina', 'hello')];
+    const listModels = vi.fn().mockResolvedValue([{ id: 'gpt-test', name: 'GPT Test' }]);
+    const listSkills = vi.fn().mockResolvedValue([{ name: 'frontend-design', path: '/skills/frontend-design/SKILL.md' }]);
+    const listConversations = vi.fn().mockResolvedValue(conversations);
+    const readConversationMessages = vi.fn().mockResolvedValue(messages);
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      listConversations,
+      listModels,
+      listSkills,
+      readConversationMessages,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'models',
+      method: 'agent/listModels',
+      params: { agentId: 'agent-dina' },
+    })).resolves.toMatchObject({ result: [{ id: 'gpt-test', name: 'GPT Test' }] });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'skills',
+      method: 'agent/listSkills',
+      params: { agentId: 'agent-dina' },
+    })).resolves.toMatchObject({ result: [{ name: 'frontend-design' }] });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'conversations',
+      method: 'agent/listConversations',
+      params: { agentId: 'agent-dina' },
+    })).resolves.toMatchObject({ result: conversations });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'messages',
+      method: 'agent/readConversationMessages',
+      params: { agentId: 'agent-dina', ref: { backend: 'codex', threadId: 'thread-dina' } },
+    })).resolves.toMatchObject({ result: messages });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'unknown-ref',
+      method: 'agent/readConversationMessages',
+      params: { agentId: 'agent-dina', ref: { backend: 'codex', threadId: 'thread-unknown' } },
+    })).resolves.toMatchObject({ error: { message: 'Conversation reference is not available.' } });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'invalid-ref',
+      method: 'agent/readConversationMessages',
+      params: { agentId: 'agent-dina', ref: { backend: 'codex' } },
+    })).resolves.toMatchObject({ error: { message: 'Invalid conversation reference.' } });
+
+    expect(listModels).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(listSkills).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(listConversations).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-dina' }, 'agent-dina');
+    await server.close();
+  });
+
   it('owns work item assignment mutations', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];

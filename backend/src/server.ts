@@ -156,6 +156,42 @@ export class ClawBackendServer {
           filePath: requireString(params.filePath, 'filePath'),
         }));
       }
+      case 'agent/listModels': {
+        const agentId = requireAgentId(message.params);
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        return createClawRpcResult(message.id, await this.requireDriverRpc().handle('driver/listModels', { agent }));
+      }
+      case 'agent/listSkills': {
+        const agentId = requireAgentId(message.params);
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        return createClawRpcResult(message.id, await this.requireDriverRpc().handle('driver/listSkills', { agent }));
+      }
+      case 'agent/listConversations': {
+        const agentId = requireAgentId(message.params);
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        return createClawRpcResult(message.id, await this.requireDriverRpc().handle('driver/listConversations', { agent }));
+      }
+      case 'agent/readConversationMessages': {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const ref = params.ref;
+        if (!isBackendConversationRef(ref)) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Invalid conversation reference.');
+        }
+        if (!this.isStoredConversationRef(ref, agentId)) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Conversation reference is not available.');
+        }
+        return createClawRpcResult(message.id, await this.requireDriverRpc().handle('driver/readConversationMessages', { ref, agentId }));
+      }
       case 'agent/assignWorkItem': {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
@@ -725,6 +761,15 @@ export class ClawBackendServer {
     return null;
   }
 
+  private isStoredConversationRef(ref: BackendConversationRef, agentId: string): boolean {
+    return this.snapshot.loops.some((loop) => loop.executionLog.some((entry) => (
+      entry.createdAgents.some((createdAgent) => (
+        createdAgent.agentId === agentId &&
+        (createdAgent.conversationRef ? sameConversationRef(createdAgent.conversationRef, ref) : false)
+      ))
+    )));
+  }
+
   private addRecentSourceRepository(repoName: string): void {
     const trimmed = repoName.trim();
     if (!trimmed) {
@@ -931,6 +976,14 @@ function isBackendConversationRef(value: unknown): value is BackendConversationR
     candidate.folder.trim().length > 0 &&
     typeof candidate.sessionId === 'string' &&
     candidate.sessionId.trim().length > 0;
+}
+
+function sameConversationRef(left: BackendConversationRef, right: BackendConversationRef): boolean {
+  if (left.backend === 'codex') {
+    return right.backend === 'codex' && left.threadId === right.threadId;
+  }
+
+  return right.backend === 'claude' && left.folder === right.folder && left.sessionId === right.sessionId;
 }
 
 function rendererMessageText(message: RendererMessage): string {
