@@ -93,7 +93,7 @@ describe('AppController', () => {
       type: 'agent.statusChanged',
       payload: { type: 'working' },
     }));
-    expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.not.objectContaining({
+    expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
       snapshot: backendSnapshot,
     }));
     expect(unsubscribe).toHaveBeenCalledOnce();

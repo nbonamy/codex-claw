@@ -1075,6 +1075,7 @@ describe('useAppState', () => {
       type: 'turn.completed',
       payload: { status: 'completed' },
       occurredAt: '2026-06-05T00:00:02.000Z',
+      snapshot: createInitialSnapshot(),
     });
 
     await vi.waitFor(() => {
@@ -1226,6 +1227,16 @@ describe('useAppState', () => {
     expect(listeners).toHaveLength(1);
     const emitMainEvent = listeners[0] as (event: MainToRendererEvent) => void;
 
+    const streamedSnapshot = createInitialSnapshot();
+    streamedSnapshot.messages.push({
+      id: 'message-streamed',
+      agentId: 'agent-dina',
+      role: 'assistant',
+      status: 'streaming',
+      createdAt: '2026-06-05T00:00:02.000Z',
+      parts: [{ type: 'text', text: 'streamed' }],
+    });
+
     emitMainEvent({
       seq: 1,
       agentId: 'agent-dina',
@@ -1234,6 +1245,7 @@ describe('useAppState', () => {
       type: 'message.delta',
       payload: { delta: 'streamed' },
       occurredAt: '2026-06-05T00:00:02.000Z',
+      snapshot: streamedSnapshot,
     });
 
     expect(state.visibleMessages.value.at(-1)?.parts).toStrictEqual([{ type: 'text', text: 'streamed' }]);
@@ -2308,6 +2320,18 @@ describe('useAppState', () => {
       payload: { mode: 'plan' },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
+    const goalSnapshot = createInitialSnapshot();
+    goalSnapshot.agents[0].goal = {
+      threadId: 'thread-1',
+      objective: 'ship it',
+      status: 'active',
+      tokenBudget: null,
+      tokensUsed: 0,
+      timeUsedSeconds: 0,
+      createdAt: 0,
+      updatedAt: 0,
+    };
+
     listeners[0]?.({
       seq: 2,
       agentId: 'agent-dina',
@@ -2326,6 +2350,7 @@ describe('useAppState', () => {
         },
       },
       occurredAt: '2026-06-05T00:00:02.000Z',
+      snapshot: goalSnapshot,
     });
 
     expect(state.planMode.value).toBe(true);
@@ -2346,6 +2371,7 @@ describe('useAppState', () => {
       type: 'thread.goalCleared',
       payload: {},
       occurredAt: '2026-06-05T00:00:04.000Z',
+      snapshot: createInitialSnapshot(),
     });
 
     expect(state.planMode.value).toBe(false);

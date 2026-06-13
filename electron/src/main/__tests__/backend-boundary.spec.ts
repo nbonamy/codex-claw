@@ -82,6 +82,14 @@ describe('Electron backend boundary', () => {
     expect(source).not.toContain('driver/listFiles');
   });
 
+  it('keeps renderer product snapshot reduction behind clawd', async () => {
+    const appStatePath = path.resolve(__dirname, '../../renderer/app-state.ts');
+    const source = await readFile(appStatePath, 'utf8');
+
+    expect(source).not.toContain('applyMainEventToSnapshot');
+    expect(source).toContain('adoptSnapshotFromMainEvent');
+  });
+
   it('keeps durable snapshot persistence in clawd', async () => {
     const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
     const mainDir = path.resolve(__dirname, '..');

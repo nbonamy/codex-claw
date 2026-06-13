@@ -666,8 +666,7 @@ function isAppSnapshot(value: unknown): value is AppSnapshot {
 }
 
 function eventForRenderer(event: ClawBackendEvent): MainToRendererEvent {
-  const { snapshot: _snapshot, ...rendererEvent } = event;
-  return rendererEvent;
+  return event;
 }
 
 function snapshotFromBackendEvent(event: ClawBackendEvent): AppSnapshot | null {

@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue';
 import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { updateSettingsInSnapshot } from '@codex-claw/shared/settings';
-import { applyMainEventToSnapshot, createEmptySnapshot } from '@codex-claw/shared/snapshot';
+import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
 import { approvalPresetFromDefaults } from '@codex-claw/shared/approval-presets';
@@ -1180,7 +1180,7 @@ function subscribeToMainEvents(): void {
 
   unsubscribeMainEvents?.();
   unsubscribeMainEvents = window.codexClaw.onEvent((event: MainToRendererEvent) => {
-    applyMainEventToSnapshot(snapshot.value, event);
+    adoptSnapshotFromMainEvent(event);
     syncComposerModeFromMainEvent(event);
     syncSidePanelFromMainEvent(event);
     if (event.type === 'turn.completed' && event.agentId) {
@@ -1190,6 +1190,17 @@ function subscribeToMainEvents(): void {
       void loadBackendSkillsForActiveAgent();
     }
   });
+}
+
+function adoptSnapshotFromMainEvent(event: MainToRendererEvent): void {
+  if (isAppSnapshot(event.snapshot)) {
+    snapshot.value = event.snapshot;
+    return;
+  }
+
+  if (event.type === 'snapshot.updated' && isAppSnapshot(event.payload)) {
+    snapshot.value = event.payload;
+  }
 }
 
 async function loadActiveAgentCatalogs(): Promise<void> {
@@ -1481,6 +1492,10 @@ function markClientRequestAnswered(requestId: string): void {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function isAppSnapshot(value: unknown): value is AppSnapshot {
+  return isRecord(value) && Array.isArray(value.teams) && Array.isArray(value.agents);
 }
 
 function workProviderConnection(provider: WorkProviderKind) {

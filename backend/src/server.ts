@@ -1351,9 +1351,8 @@ function shouldPersistSnapshotForEvent(event: BackendEvent): boolean {
 }
 
 function shouldAttachSnapshotToBackendEvent(event: BackendEvent): boolean {
-  return event.type === 'agent.statusChanged' ||
-    event.type === 'diff.updated' ||
-    shouldPersistSnapshotForEvent(event);
+  return event.type !== 'sidePanel.markdownRequested' &&
+    event.type !== 'sidePanel.gitDiffRequested';
 }
 
 function shouldRefreshGitStatusForEvent(event: BackendEvent): boolean {

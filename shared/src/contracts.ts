@@ -640,6 +640,7 @@ export type MainToRendererEvent = {
   agentId?: string;
   backend?: AgentBackend;
   backendSessionId?: string;
+  snapshot?: AppSnapshot;
   threadId?: string;
   turnId?: string;
   type:

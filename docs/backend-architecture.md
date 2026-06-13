@@ -116,9 +116,10 @@ Current implementation checkpoint:
   Electron fans out backend events but no longer synthesizes `sidePanel.*`
   events from plan or diff events.
 - `clawd` now owns snapshot event application for the desktop bridge. Backend
-  event notifications may carry an authoritative snapshot for desktop-native
-  reactions, and Electron fetches `getSnapshot` from `clawd` instead of reducing
-  product events itself.
+  event notifications carry an authoritative snapshot for state-affecting
+  events, Electron caches that snapshot for desktop-native reactions, and the
+  renderer adopts the backend snapshot instead of reducing product events
+  itself.
 - `clawd` owns agent file listing/preview authority. Client-facing
   `agent/listFiles` and `agent/previewFile` take an `agentId`; Electron does not
   send workspace roots or request raw file reads. Provider-specific file preview
@@ -760,8 +761,10 @@ and future remote.
 `clawd` owns the durable `AppSnapshot` and persists `state.json` under the
 backend state directory. Electron main owns only desktop-window state plus a
 volatile renderer-facing snapshot cache. That cache is hydrated through
-`snapshot/get`, advanced by backend events, and never written back to disk by
-Electron.
+`snapshot/get`, replaced from backend-attached event snapshots, and never
+written back to disk by Electron. Renderer code keeps UI-only state and adopts
+backend-provided snapshots; it does not apply product reducers for backend
+events.
 
 Local migration path:
 
