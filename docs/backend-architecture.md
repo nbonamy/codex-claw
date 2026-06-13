@@ -101,7 +101,10 @@ Current implementation checkpoint:
 - `clawd` now owns agent file preview authority: clients request file lists and
   previews by agent id only, and the backend resolves the folder from its
   snapshot before touching storage. A mobile or web client uses the same
-  backend RPC over its transport; it never reads local workspace files.
+  backend RPC over its transport; it never reads local workspace files. If a
+  transcript contains an absolute or `file://` path, the client normalizes it to
+  an active-agent-relative preview path and refuses paths outside that agent
+  folder.
 - `clawd` now owns work item assignment and unassignment mutations. Electron
   forwards the item payload and adopts the backend snapshot instead of changing
   `workBacklog.assignments` locally.
@@ -372,7 +375,9 @@ renderer.
 - Renderer file previews and MCP `display-markdown` path reads use the same
   rule: clients ask `clawd` for content; Electron does not read agent workspace
   files on behalf of product features. This keeps the contract valid for a
-  mobile client connected to a remote backend.
+  mobile client connected to a remote backend. Renderer-side normalization is
+  only for turning displayed links into backend-relative preview requests, never
+  for granting arbitrary filesystem access.
 - Loop CRUD, scheduler, and runner.
 - Work-provider drivers where possible, with desktop-only services injected
   through ports.

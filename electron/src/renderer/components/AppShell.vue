@@ -797,7 +797,7 @@ function commentOnPlan(comments: PlanReviewComment[]): void {
 
 async function openFilePreview(filePath: string): Promise<void> {
   const agent = currentAgent.value;
-  const trimmedPath = normalizePreviewFilePath(filePath);
+  const trimmedPath = normalizePreviewFilePath(filePath, agent?.folder);
   if (!agent || !trimmedPath) {
     return;
   }
@@ -1082,21 +1082,47 @@ function isMarkdownPath(filePath: string): boolean {
   return /\.(md|markdown|mdown|mkdn)$/u.test(normalizedPath);
 }
 
-function normalizePreviewFilePath(filePath: string): string {
+function normalizePreviewFilePath(filePath: string, agentFolder?: string): string {
   const trimmedPath = filePath.trim();
   if (!trimmedPath.startsWith('file://')) {
-    return stripPreviewLineSuffix(trimmedPath);
+    return toBackendPreviewPath(stripPreviewLineSuffix(trimmedPath), agentFolder);
   }
 
   try {
-    return stripPreviewLineSuffix(decodeURIComponent(new URL(trimmedPath).pathname));
+    return toBackendPreviewPath(stripPreviewLineSuffix(decodeURIComponent(new URL(trimmedPath).pathname)), agentFolder);
   } catch {
-    return stripPreviewLineSuffix(trimmedPath);
+    return toBackendPreviewPath(stripPreviewLineSuffix(trimmedPath), agentFolder);
   }
 }
 
 function stripPreviewLineSuffix(filePath: string): string {
   return filePath.replace(/:(?:\d+)(?::\d+)?$/u, '');
+}
+
+function toBackendPreviewPath(filePath: string, agentFolder?: string): string {
+  const normalizedPath = normalizePathSeparators(filePath);
+  if (!isAbsolutePreviewPath(normalizedPath)) {
+    return normalizedPath;
+  }
+
+  const normalizedFolder = normalizePathSeparators(agentFolder ?? '').replace(/\/+$/u, '');
+  if (!normalizedFolder || !isAbsolutePreviewPath(normalizedFolder)) {
+    return '';
+  }
+
+  if (!normalizedPath.startsWith(`${normalizedFolder}/`)) {
+    return '';
+  }
+
+  return normalizedPath.slice(normalizedFolder.length + 1);
+}
+
+function normalizePathSeparators(filePath: string): string {
+  return filePath.replace(/\\/gu, '/');
+}
+
+function isAbsolutePreviewPath(filePath: string): boolean {
+  return filePath.startsWith('/') || /^[a-z]:\//iu.test(filePath);
 }
 
 function workItemsKey(provider: WorkProviderKind, repositoryId: string): string {

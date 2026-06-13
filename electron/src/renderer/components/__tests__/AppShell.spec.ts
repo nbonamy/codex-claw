@@ -228,8 +228,9 @@ describe('AppShell', () => {
 
   it('strips line and column suffixes from file URLs before reading previews', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.agents[0].folder = '/Users/nbonamy/src/id8';
     const previewAgentFile = vi.fn().mockResolvedValue({
-      path: '/Users/nbonamy/src/id8/README.md',
+      path: 'README.md',
       content: '# id8\n',
     });
     const wrapper = mount(AppShell, {
@@ -258,12 +259,13 @@ describe('AppShell', () => {
     await wrapper.get('a[href="file:///Users/nbonamy/src/id8/README.md:40:2"]').trigger('click');
     await flushPromises();
 
-    expect(previewAgentFile).toHaveBeenCalledWith('agent-dina', '/Users/nbonamy/src/id8/README.md');
+    expect(previewAgentFile).toHaveBeenCalledWith('agent-dina', 'README.md');
     expect(wrapper.text()).toContain('id8');
   });
 
   it('normalizes file URLs before opening source previews', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.agents[0].folder = '/Users/nbonamy/src/id8';
     const previewAgentFile = vi.fn().mockResolvedValue({
       path: 'src/file name.ts',
       content: 'export const value = true;\n',
@@ -279,7 +281,7 @@ describe('AppShell', () => {
             role: 'assistant',
             status: 'complete',
             createdAt: '2026-06-05T00:00:00.000Z',
-            parts: [{ type: 'text', text: 'Open [file](file:///Users/nbonamy/src/codex-claw/src/file%20name.ts).' }],
+            parts: [{ type: 'text', text: 'Open [file](file:///Users/nbonamy/src/id8/src/file%20name.ts).' }],
           },
         ],
         isLoading: false,
@@ -291,11 +293,47 @@ describe('AppShell', () => {
       },
     });
 
-    await wrapper.get('a[href="file:///Users/nbonamy/src/codex-claw/src/file%20name.ts"]').trigger('click');
+    await wrapper.get('a[href="file:///Users/nbonamy/src/id8/src/file%20name.ts"]').trigger('click');
     await flushPromises();
 
-    expect(previewAgentFile).toHaveBeenCalledWith('agent-dina', '/Users/nbonamy/src/codex-claw/src/file name.ts');
+    expect(previewAgentFile).toHaveBeenCalledWith('agent-dina', 'src/file name.ts');
     expect(wrapper.find('.source-preview-panel').exists()).toBe(true);
+  });
+
+  it('does not send absolute file preview paths outside the active agent folder', async () => {
+    const snapshot = createInitialSnapshot();
+    const previewAgentFile = vi.fn().mockResolvedValue({
+      path: 'README.md',
+      content: '# Codex Claw\n',
+    });
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [
+          {
+            id: 'message-outside-file-url',
+            agentId: 'agent-dina',
+            role: 'assistant',
+            status: 'complete',
+            createdAt: '2026-06-05T00:00:00.000Z',
+            parts: [{ type: 'text', text: 'Open [file](file:///Users/nbonamy/src/codex-claw/README.md).' }],
+          },
+        ],
+        isLoading: false,
+        isSending: false,
+        previewAgentFile,
+      },
+      global: {
+        plugins: [ElementPlus, i18n],
+      },
+    });
+
+    await wrapper.get('a[href="file:///Users/nbonamy/src/codex-claw/README.md"]').trigger('click');
+    await flushPromises();
+
+    expect(previewAgentFile).not.toHaveBeenCalled();
+    expect(wrapper.find('.side-panel').exists()).toBe(false);
   });
 
   it('ignores stale markdown reads after the side panel changes', async () => {

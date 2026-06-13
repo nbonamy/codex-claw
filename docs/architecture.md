@@ -162,7 +162,10 @@ client; provider drivers, provider protocols, app state, backend-owned
 filesystem work, git, loops, worktree path policy, and agent runtime state
 belong behind `clawd`. That includes file previews: desktop and future
 non-desktop clients may request file content from `clawd`, but they do not read
-backend-owned agent workspace paths themselves.
+backend-owned agent workspace paths themselves. If model output includes an
+absolute or `file://` link, the client may normalize it to a path relative to
+the active agent folder before requesting a preview; it must not forward an
+arbitrary absolute local path as read authority.
 
 Snapshot mutation is also backend-owned. `clawd` applies backend events to the
 authoritative snapshot; Electron fetches fresh snapshots from `clawd` for
