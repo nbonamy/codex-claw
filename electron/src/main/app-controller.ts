@@ -625,9 +625,8 @@ export class AppController {
 
   private emitBackendEvent(event: ClawBackendEvent): void {
     const rendererEvent = eventForRenderer(event);
-    const eventSnapshot = snapshotFromBackendEvent(event);
-    if (eventSnapshot) {
-      this.snapshot = eventSnapshot;
+    if (event.snapshot) {
+      this.snapshot = event.snapshot;
     }
     if (isDesktopState(event.desktopState)) {
       this.desktopState = event.desktopState;
@@ -691,22 +690,6 @@ function isDesktopState(value: unknown): value is DesktopState {
     typeof value.shouldPreventDisplaySleep === 'boolean';
 }
 
-function isAppSnapshot(value: unknown): value is AppSnapshot {
-  return isRecord(value) && Array.isArray(value.teams) && Array.isArray(value.agents);
-}
-
 function eventForRenderer(event: ClawBackendEvent): MainToRendererEvent {
   return event;
-}
-
-function snapshotFromBackendEvent(event: ClawBackendEvent): AppSnapshot | null {
-  if (isAppSnapshot(event.snapshot)) {
-    return event.snapshot;
-  }
-
-  if (event.type === 'snapshot.updated' && isAppSnapshot(event.payload)) {
-    return event.payload;
-  }
-
-  return null;
 }

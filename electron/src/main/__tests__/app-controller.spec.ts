@@ -112,6 +112,32 @@ describe('AppController', () => {
     expect(unsubscribe).toHaveBeenCalledOnce();
   });
 
+  it('does not derive Electron snapshot cache updates from backend event payloads', async () => {
+    const snapshot = createInitialSnapshot();
+    const payloadSnapshot = createInitialSnapshot();
+    payloadSnapshot.agents[0]!.status = { type: 'working' };
+    const controller = new AppController(snapshot, createBackendClient());
+    const send = vi.fn();
+
+    setMainWindowSend(controller, send);
+    await controller.initialize();
+    (controller as unknown as {
+      emitBackendEvent(event: ClawBackendEvent): void;
+    }).emitBackendEvent({
+      seq: 43,
+      type: 'snapshot.updated',
+      payload: payloadSnapshot,
+      occurredAt: '2026-06-13T00:00:00.000Z',
+    });
+
+    expect(currentSnapshot(controller)).toBe(snapshot);
+    expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
+      seq: 43,
+      type: 'snapshot.updated',
+      payload: payloadSnapshot,
+    }));
+  });
+
   it('routes client request responses through clawd', async () => {
     const snapshot = createInitialSnapshot();
     const backendSnapshot = {

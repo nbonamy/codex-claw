@@ -128,8 +128,9 @@ describe('Electron backend boundary', () => {
     expect(source).toContain('this.snapshot = initialSnapshot;');
     expect(source).toContain('this.snapshot = snapshot;');
     expect(source).toContain('this.snapshot = backendState.snapshot;');
-    expect(source).toContain('this.snapshot = eventSnapshot;');
+    expect(source).toContain('this.snapshot = event.snapshot;');
     expect(source).not.toContain('this.snapshot = result.snapshot;');
+    expect(source).not.toContain('snapshotFromBackendEvent');
     expect(source).not.toContain('applyMainEventToSnapshot');
     expect(source).not.toContain('updateSettingsInSnapshot');
   });
