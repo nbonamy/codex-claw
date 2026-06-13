@@ -101,6 +101,10 @@ Current implementation checkpoint:
 - `clawd` now owns rollback-to-turn history replacement and session mutation.
   Electron's delete/edit/retry flows request backend rollback and then, for
   edit/retry, continue with prompt dispatch as a separate remaining slice.
+- `clawd` owns agent file listing/preview authority. Client-facing
+  `agent/listFiles` and `agent/readFile` take an `agentId`; Electron does not
+  send workspace roots or read file bytes. The backend's folder-based file
+  helpers are internal `driver/listFiles` and `driver/readFile` calls only.
 - The remaining large slice is to move the rest of product orchestration out of
   `AppController` so Electron becomes only the desktop IPC/stdio layer. The
   largest remaining owners are prompt dispatch and the residual edit/retry

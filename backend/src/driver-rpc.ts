@@ -43,11 +43,11 @@ export class BackendDriverRpc {
 
   async handle(method: string, params: unknown): Promise<unknown> {
     switch (method) {
-      case 'agent/listFiles': {
+      case 'driver/listFiles': {
         const record = requireRecord(params);
         return listAgentFolderFiles(requireString(record.folder, 'folder'));
       }
-      case 'agent/readFile': {
+      case 'driver/readFile': {
         const record = requireRecord(params);
         return readAgentFolderFile(
           requireString(record.folder, 'folder'),

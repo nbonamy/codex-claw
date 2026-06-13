@@ -180,11 +180,11 @@ describe('BackendDriverRpc', () => {
       await writeFile(path.join(tempDir, 'README.md'), '# Read me\n');
       await writeFile(path.join(tempDir, 'src', 'main.ts'), 'main');
 
-      await expect(rpc.handle('agent/listFiles', { folder: tempDir })).resolves.toStrictEqual([
+      await expect(rpc.handle('driver/listFiles', { folder: tempDir })).resolves.toStrictEqual([
         { name: 'README.md', path: 'README.md' },
         { name: 'main.ts', path: 'src/main.ts' },
       ]);
-      await expect(rpc.handle('agent/readFile', { folder: tempDir, filePath: 'README.md' })).resolves.toStrictEqual({
+      await expect(rpc.handle('driver/readFile', { folder: tempDir, filePath: 'README.md' })).resolves.toStrictEqual({
         path: 'README.md',
         content: '# Read me\n',
       });

@@ -139,7 +139,7 @@ export class ClawBackendServer {
         if (!agent) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
         }
-        return createClawRpcResult(message.id, await this.requireDriverRpc().handle('agent/listFiles', {
+        return createClawRpcResult(message.id, await this.requireDriverRpc().handle('driver/listFiles', {
           folder: agent.folder,
         }));
       }
@@ -150,7 +150,7 @@ export class ClawBackendServer {
         if (!agent) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
         }
-        return createClawRpcResult(message.id, await this.requireDriverRpc().handle('agent/readFile', {
+        return createClawRpcResult(message.id, await this.requireDriverRpc().handle('driver/readFile', {
           folder: agent.folder,
           filePath: requireString(params.filePath, 'filePath'),
         }));
