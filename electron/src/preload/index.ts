@@ -48,7 +48,6 @@ const api: CodexClawApi = {
   restartAgent: (agentId: string) => ipcRenderer.invoke(ipcChannels.restartAgent, agentId),
   closeAgent: (agentId: string) => ipcRenderer.invoke(ipcChannels.closeAgent, agentId),
   selectAgent: (agentId: string) => ipcRenderer.invoke(ipcChannels.selectAgent, agentId),
-  selectAgentFolder: (agentId: string) => ipcRenderer.invoke(ipcChannels.selectAgentFolder, agentId),
   updateSettings: (input: UpdateSettingsInput) => ipcRenderer.invoke(ipcChannels.updateSettings, input),
   getSystemPermissions: () => ipcRenderer.invoke(ipcChannels.getSystemPermissions),
   openAccessibilitySettings: () => ipcRenderer.invoke(ipcChannels.openAccessibilitySettings),

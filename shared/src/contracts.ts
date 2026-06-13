@@ -844,7 +844,6 @@ export type CodexClawApi = {
   restartAgent(agentId: string): Promise<AppSnapshot>;
   closeAgent(agentId: string): Promise<AppSnapshot>;
   selectAgent(agentId: string): Promise<AppSnapshot>;
-  selectAgentFolder(agentId: string): Promise<AppSnapshot | null>;
   updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>;
   getSystemPermissions(): Promise<SystemPermissionsStatus>;
   openAccessibilitySettings(): Promise<SystemPermissionsStatus>;

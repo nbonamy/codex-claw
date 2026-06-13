@@ -212,19 +212,6 @@ export class AppController {
       return this.selectAgent(agentId);
     });
 
-    ipcMain.handle(ipcChannels.selectAgentFolder, async (_event, agentId: string) => {
-      const result = await dialog.showOpenDialog({
-        properties: ['openDirectory'],
-        title: 'Select agent folder',
-      });
-
-      if (result.canceled || !result.filePaths[0]) {
-        return null;
-      }
-
-      return this.updateAgentFolder(agentId, result.filePaths[0]);
-    });
-
     ipcMain.handle(ipcChannels.updateSettings, async (_event, input: UpdateSettingsInput) => {
       return this.updateSettings(input);
     });

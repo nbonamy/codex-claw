@@ -49,7 +49,6 @@ describe('ipc channels', () => {
       restartAgent: 'agent:restart',
       closeAgent: 'agent:close',
       selectAgent: 'agent:select',
-      selectAgentFolder: 'agent:select-folder',
       updateSettings: 'settings:update',
       getSystemPermissions: 'system-permissions:get',
       openAccessibilitySettings: 'system-permissions:accessibility:open',

@@ -115,6 +115,21 @@ describe('Electron backend boundary', () => {
     expect(source).not.toContain('agent/validateFolder');
   });
 
+  it('keeps folder picker IPC separate from backend mutations', async () => {
+    const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
+    const preloadPath = path.resolve(__dirname, '../../preload/index.ts');
+    const ipcPath = path.resolve(__dirname, '../../../../shared/src/ipc.ts');
+    const appController = await readFile(appControllerPath, 'utf8');
+    const preload = await readFile(preloadPath, 'utf8');
+    const ipc = await readFile(ipcPath, 'utf8');
+
+    expect(appController).toContain('chooseAgentFolder');
+    expect(appController).toContain('updateAgentFolder');
+    expect(appController).not.toContain('selectAgentFolder');
+    expect(preload).not.toContain('selectAgentFolder');
+    expect(ipc).not.toContain('agent:select-folder');
+  });
+
   it('keeps system permission API ownership in clawd', async () => {
     const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
     const source = await readFile(appControllerPath, 'utf8');
