@@ -1,6 +1,5 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { defaultUserDataPath } from './user-data';
 
 export type RuntimeClawdCommand = {
   command: string;
@@ -15,7 +14,6 @@ export type RuntimeClawdConfigDeps = {
   existsSync?: (filePath: string) => boolean;
   platform?: NodeJS.Platform;
   resourcesPath?: string;
-  userDataPath?: string;
 };
 
 export function runtimeClawdCommand(deps: RuntimeClawdConfigDeps = {}): RuntimeClawdCommand | null {
@@ -79,7 +77,7 @@ function packagedClawdCommand(deps: RuntimeClawdConfigDeps): RuntimeClawdCommand
 
   return {
     command: nodePath,
-    args: [bundlePath, '--stdio', '--state-dir', deps.userDataPath ?? defaultUserDataPath()],
+    args: [bundlePath, '--stdio'],
     env: {
       CODEX_CLAW_ASSETS_PATH: runtimeClawdAssetsPath(deps),
     },

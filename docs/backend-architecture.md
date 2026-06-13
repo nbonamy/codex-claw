@@ -53,8 +53,8 @@ Current implementation checkpoint:
   and `client/systemPermissions/*` for native permission prompts/settings.
 - Work integration token types now live in `shared`, and `clawd` owns token
   persistence through a backend token-store port. The current runtime uses an
-  encrypted file store under the backend state directory, so desktop and future
-  clients do not read or write provider tokens.
+  encrypted file store under `~/.codex-claw`, so desktop and future clients do
+  not read or write provider tokens.
 - `clawd` now owns the GitHub work integration manager/driver and exposes
   `workProvider/*` JSON-RPC methods. Electron proxies the existing renderer IPC
   work-provider calls to `clawd`.
@@ -394,8 +394,7 @@ renderer.
   through ports.
 - Durable snapshot persistence now uses the backend serializer/parser in
   `backend/src/state-persistence.ts`. `clawd` persists backend-owned snapshot
-  events when it runs with `--state-dir`; Electron never writes the durable
-  state file.
+  events under its backend home; Electron never writes the durable state file.
 
 The rule is simple: if the operation acts on a repository, agent, backend
 session, work item, transcript, or backend-owned path, it belongs in `clawd`.
@@ -554,14 +553,15 @@ The exact script names can change, but the shape should stay:
 - `dev:electron` runs the `electron` workspace's Electron Forge/Vite flow.
 - `dev:backend` watches `backend/src` and `shared/src`, then writes a bundled
   file such as `backend/dist/clawd-dev.mjs`.
-- `dev:backend:run` supervises `node backend/dist/clawd-dev.mjs --stdio
-  --state-dir <repo>/.codex-claw-dev/state`.
+- `dev:backend:run` supervises `node backend/dist/clawd-dev.mjs --stdio`.
 - Electron main receives the dev backend command from config or environment,
   for example `CODEX_CLAW_BACKEND_COMMAND=node` and
-  `CODEX_CLAW_BACKEND_ARGS=../backend/dist/clawd-dev.mjs,--stdio,...`.
+  `CODEX_CLAW_BACKEND_ARGS=../backend/dist/clawd-dev.mjs,--stdio`.
   It also passes `CODEX_CLAW_ASSETS_PATH=<repo>/assets` so backend-owned
   transcription can find the Apple Speech helper without per-request desktop
   path fields.
+- `clawd` reads and writes state under `~/.codex-claw` by default. The only
+  supported state-home override is `CODEX_CLAW_HOME`.
 
 Hot reload semantics:
 
@@ -573,7 +573,7 @@ Hot reload semantics:
   new one, reconnect Electron main, then call `snapshot/get`.
 - Active backend state survives only if it is already durable. Product state,
   completed messages, plans, goals, and agent sessions should reload from the
-  dev state directory. Active turns, pending approvals, open child processes,
+  backend home. Active turns, pending approvals, open child processes,
   and in-memory MCP sessions can be interrupted on backend restart during
   development until the always-on daemon/replay story exists.
 - Protocol/shared-contract changes can require both the backend process and
@@ -657,7 +657,7 @@ Runtime execution in a packaged app:
 2. Main starts the backend with stdio:
 
    ```ts
-   spawn(nodePath, [clawdBundle, "--stdio", "--state-dir", app.getPath("userData")], {
+   spawn(nodePath, [clawdBundle, "--stdio"], {
      stdio: ["pipe", "pipe", "pipe"],
    });
    ```
@@ -781,8 +781,10 @@ and future remote.
 
 ## State And Migration
 
-`clawd` owns the durable `AppSnapshot` and persists `state.json` under the
-backend state directory. Electron main owns only desktop-window state plus a
+`clawd` owns the durable `AppSnapshot` and persists `state.json` under
+`~/.codex-claw` by default. It also stores encrypted work-integration tokens in
+`~/.codex-claw/work-integration-tokens.json` plus its key file. Electron main
+owns only desktop-window state plus a
 volatile renderer-facing snapshot cache. That cache is hydrated through
 `snapshot/get`, replaced from backend-attached event snapshots, and never
 written back to disk by Electron. Renderer code keeps UI-only state and adopts
@@ -791,12 +793,13 @@ events.
 
 Local migration path:
 
-1. Electron main computes the existing app data directory and passes it to
-   local `clawd` during startup.
-2. `clawd` loads the existing `state.json` through the backend
+1. `clawd` creates `~/.codex-claw` on startup and treats it as the backend
+   home.
+2. `clawd` loads `~/.codex-claw/state.json` through the backend
    `AppStatePersistence` serializer/parser and writes backend-owned future
    changes using the same schema.
-3. Old development checkouts keep working because the state path is explicit.
+3. `CODEX_CLAW_HOME` is the only supported alternate backend home, used for
+   deliberate local isolation such as tests or one-off experiments.
 
 Remote migration path:
 
@@ -927,8 +930,7 @@ Goal: run the backend as a separate local process in development.
 
 Work:
 
-- Add `backend/src/clawd` entrypoint with `--stdio`, `--version`, and
-  `--state-dir`.
+- Add `backend/src/clawd` entrypoint with `--stdio` and `--version`.
 - Add newline-delimited JSON-RPC framing.
 - Add `ClawBackendProcessClient` in Electron main.
 - Add startup, health, restart, close, and crash error propagation.

@@ -6,3 +6,4 @@ out/
 coverage/
 *.log
 .env
+.codex-claw-dev/

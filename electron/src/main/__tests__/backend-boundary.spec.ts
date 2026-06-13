@@ -43,7 +43,6 @@ describe('Electron backend boundary', () => {
       'main-window.ts',
       'runtime-config.ts',
       'system-permissions.ts',
-      'user-data.ts',
     ]);
   });
 

@@ -67,14 +67,11 @@ describe('runtime config', () => {
       defaultApp: false,
       existsSync: (filePath) => filePath === '/app/resources/clawd/node' || filePath === '/app/resources/clawd/clawd.mjs',
       resourcesPath: '/app/resources',
-      userDataPath: '/Users/nbonamy/Library/Application Support/Codex Claw',
     })).toStrictEqual({
       command: '/app/resources/clawd/node',
       args: [
         '/app/resources/clawd/clawd.mjs',
         '--stdio',
-        '--state-dir',
-        '/Users/nbonamy/Library/Application Support/Codex Claw',
       ],
       env: {
         CODEX_CLAW_ASSETS_PATH: '/app/resources',
@@ -90,7 +87,6 @@ describe('runtime config', () => {
       existsSync: (filePath) => filePath === 'C:\\app\\resources/clawd/node.exe' || filePath === 'C:\\app\\resources/clawd/clawd.mjs',
       platform: 'win32',
       resourcesPath: 'C:\\app\\resources',
-      userDataPath: 'C:\\Users\\Nicolas\\AppData\\Roaming\\Codex Claw',
     })?.command).toBe('C:\\app\\resources/clawd/node.exe');
   });
 

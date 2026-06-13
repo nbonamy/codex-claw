@@ -636,10 +636,11 @@ Shiki theme or equivalent syntax theme adapter.
 
 ## Persistence
 
-Durable persistence is a versioned JSON file under the `clawd` state
-directory. Electron main passes the local app data directory to `clawd` at
-startup for local desktop builds, but only the backend reads and writes
-`state.json`. Keep the schema explicit and migration-friendly:
+Durable persistence is a versioned JSON file under the `clawd` backend home.
+The default backend home is `~/.codex-claw`; `CODEX_CLAW_HOME` is the only
+supported override. Electron does not pass its app data directory to `clawd`,
+and only the backend reads and writes `state.json`. Keep the schema explicit
+and migration-friendly:
 
 ```ts
 type PersistedStateV1 = {
@@ -661,15 +662,15 @@ Work backlog providers are app-owned integrations, not agent backend features.
 The renderer consumes provider-neutral `WorkRepository` and `WorkItem`
 contracts and emits assignment intents. GitHub-specific OAuth, REST payloads,
 token persistence, and provider polling live in `clawd`; Electron supplies
-desktop-only services such as browser opening through backend-initiated desktop
-RPC methods.
+desktop-only services such as browser opening through backend-initiated client
+callbacks.
 
 Provider tokens must not be stored in the persisted app snapshot. The snapshot
 can persist safe metadata such as connection status, account label, and
 provider-specific backlog configuration. GitHub currently stores the selected
 repository id and optional tag name as its backlog configuration. Secret
 material belongs behind the backend token-store port. The current local
-implementation stores encrypted token data under the backend state directory;
+implementation stores encrypted token data under `~/.codex-claw`;
 future packaged builds can replace that port with a native keychain or
 credential-helper implementation without moving ownership back to Electron.
 

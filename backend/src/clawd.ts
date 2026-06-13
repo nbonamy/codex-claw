@@ -11,24 +11,28 @@ import { LoopRunner } from './loops/runner';
 import { LoopScheduler } from './loops/scheduler';
 import { ClawMcpService } from './mcp/service';
 import { ClawBackendServer } from './server';
-import { loadBackendSnapshot, saveBackendSnapshot } from './state';
+import { backendWorkIntegrationTokensFilePath, loadBackendSnapshot, saveBackendSnapshot } from './state';
 import { StdioRpcPeer } from './stdio';
 import { EncryptedFileWorkIntegrationTokenStore } from './work-integrations/encrypted-file-token-store';
 import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
 import { WorkIntegrationManager } from './work-integrations/manager';
-import { MemoryWorkIntegrationTokenStore } from './work-integrations/memory-token-store';
 
 export const CLAWD_VERSION = '0.1.0';
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {
+  if (argv.includes('--state-dir')) {
+    process.stderr.write('Unsupported option: --state-dir. Set CODEX_CLAW_HOME to override ~/.codex-claw.\n');
+    process.exitCode = 1;
+    return;
+  }
+
   if (argv.includes('--version')) {
     process.stdout.write(`clawd ${CLAWD_VERSION}\n`);
     return;
   }
 
   if (argv.includes('--stdio')) {
-    const stateDir = readArgValue(argv, '--state-dir');
-    const snapshot = await loadBackendSnapshot(stateDir);
+    const snapshot = await loadBackendSnapshot();
     const mcpService = new ClawMcpService({ snapshot });
     const mcpServerUrl = await mcpService.start();
     const backendDrivers = createDefaultBackendDrivers({
@@ -45,10 +49,8 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       drivers: [new GitHubWorkProviderDriver(() => githubOAuthClientId(snapshot))],
       getSnapshot: () => snapshot,
       openExternal: (url) => stdio.request('client/openExternal', { url }),
-      saveSnapshot: () => saveBackendSnapshot(stateDir, snapshot),
-      tokenStore: stateDir
-        ? new EncryptedFileWorkIntegrationTokenStore(path.join(stateDir, 'work-integration-tokens.json'))
-        : new MemoryWorkIntegrationTokenStore(false),
+      saveSnapshot: () => saveBackendSnapshot(snapshot),
+      tokenStore: new EncryptedFileWorkIntegrationTokenStore(backendWorkIntegrationTokensFilePath()),
     });
     const loopRunner = new LoopRunner({
       getSnapshot: () => snapshot,
@@ -57,7 +59,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
         type: 'snapshot.updated',
         payload: snapshot,
       }),
-      saveSnapshot: () => saveBackendSnapshot(stateDir, snapshot),
+      saveSnapshot: () => saveBackendSnapshot(snapshot),
       sendPrompt: (agentId, prompt, context) => {
         const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
         if (!agent) {
@@ -72,7 +74,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
               updatedAt: new Date().toISOString(),
             });
             if (loop) {
-              await saveBackendSnapshot(stateDir, snapshot);
+              await saveBackendSnapshot(snapshot);
               server.emitEvent({
                 type: 'snapshot.updated',
                 payload: snapshot,
@@ -96,7 +98,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       onEvent: (event) => {
         process.stdout.write(`${JSON.stringify(createClawRpcNotification('backend/event', event))}\n`);
       },
-      saveSnapshot: (nextSnapshot) => saveBackendSnapshot(stateDir, nextSnapshot),
+      saveSnapshot: (nextSnapshot) => saveBackendSnapshot(nextSnapshot),
       workIntegrations,
       loopRunner,
       systemPermissions: {
@@ -132,13 +134,8 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     return;
   }
 
-  process.stderr.write('Usage: clawd --stdio [--state-dir <path>] | --version\n');
+  process.stderr.write('Usage: clawd --stdio | --version\nSet CODEX_CLAW_HOME to override ~/.codex-claw.\n');
   process.exitCode = 1;
-}
-
-function readArgValue(argv: string[], name: string): string | undefined {
-  const index = argv.indexOf(name);
-  return index >= 0 ? argv[index + 1] : undefined;
 }
 
 function githubOAuthClientId(snapshot: { workBacklog: { providerSettings: { github?: { oauthClientId?: string } } } }): string {
