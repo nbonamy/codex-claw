@@ -1,8 +1,12 @@
 import { PassThrough } from 'node:stream';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ClawBackendProcessClient } from '../backend-process-client';
 
 describe('ClawBackendProcessClient', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('sends backend health over stdio and resolves the response', async () => {
     const child = createFakeChildProcess();
     const spawnProcess = vi.fn().mockReturnValue(child);
@@ -71,6 +75,37 @@ describe('ClawBackendProcessClient', () => {
     child.emit('exit', 1, null);
 
     await expect(requestPromise).rejects.toThrow('clawd exited before responding');
+  });
+
+  it('restarts the backend when the watched bundle changes', async () => {
+    vi.useFakeTimers();
+    const firstChild = createFakeChildProcess();
+    const secondChild = createFakeChildProcess();
+    const spawnProcess = vi.fn()
+      .mockReturnValueOnce(firstChild)
+      .mockReturnValueOnce(secondChild);
+    const watcher = { close: vi.fn() };
+    const watchListenerRef: { current: (() => void) | null } = { current: null };
+    const watchFileSystem = vi.fn((_file: string, listener: () => void) => {
+      watchListenerRef.current = listener;
+      return watcher;
+    });
+    const client = new ClawBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+      spawnProcess,
+      watchFile: '/repo/backend/dist/clawd.mjs',
+      watchFileSystem,
+    });
+
+    await client.start();
+    expect(watchFileSystem).toHaveBeenCalledWith('/repo/backend/dist/clawd.mjs', expect.any(Function));
+    watchListenerRef.current?.();
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(firstChild.kill).toHaveBeenCalledOnce();
+    expect(spawnProcess).toHaveBeenCalledTimes(2);
+    await client.close();
+    expect(watcher.close).toHaveBeenCalledOnce();
   });
 });
 

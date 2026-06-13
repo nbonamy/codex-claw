@@ -20,3 +20,7 @@ export function runtimeClawdCommand(): { command: string; args: string[] } | nul
 
   return { command, args };
 }
+
+export function runtimeClawdWatchFile(): string | null {
+  return process.env.CODEX_CLAW_BACKEND_WATCH_FILE?.trim() || null;
+}

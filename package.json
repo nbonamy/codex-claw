@@ -8,7 +8,7 @@
     "electron"
   ],
   "scripts": {
-    "dev": "npm run dev -w @codex-claw/electron",
+    "dev": "node scripts/dev.mjs",
     "dev:electron": "npm run dev -w @codex-claw/electron",
     "dev:backend": "npm run dev -w @codex-claw/backend",
     "dev:backend:run": "npm run dev:run -w @codex-claw/backend",
