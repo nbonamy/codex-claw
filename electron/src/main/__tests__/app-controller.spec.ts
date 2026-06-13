@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ConversationSummary, CreateLoopInput, CreateSourceWorktreeInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, RendererMessage, SourceRepository, SourceWorktree, UpdateLoopInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ConversationSummary, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, RendererMessage, ReorderTeamsInput, SourceRepository, SourceWorktree, UpdateLoopInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import type { AppStatePersistence } from '@codex-claw/shared/state-persistence';
 import type { AgentBackendDriver, BackendSendResult } from '../backends/types';
@@ -196,6 +196,38 @@ describe('AppController', () => {
     expect(request).toHaveBeenNthCalledWith(1, 'workProvider/connect', { provider: 'github' });
     expect(request).toHaveBeenNthCalledWith(2, 'workProvider/configureBacklog', { input: { provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } } });
     expect(request).toHaveBeenNthCalledWith(3, 'workProvider/listItems', { provider: 'github', repositoryId: 'nbonamy/codex-claw' });
+  });
+
+  it('routes team mutations through clawd', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.sourceFolder.initialized = true;
+    const backendSnapshot = {
+      ...snapshot,
+      teams: [
+        ...snapshot.teams,
+        { id: 'team-backend', name: 'Backend', color: '#7158D4', agentIds: [] },
+      ],
+      activeTeamId: 'team-backend',
+    };
+    const request = vi.fn().mockResolvedValue(backendSnapshot);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const createInput: CreateTeamInput = { name: 'Backend', color: '#7158D4' };
+    const updateInput: UpdateTeamInput = { id: 'team-backend', name: 'Backend Core', color: '#AA4AB8' };
+    const reorderInput: ReorderTeamsInput = { teamId: 'team-backend', beforeTeamId: 'team-codex-claw' };
+
+    await controller.initialize();
+
+    await expect(createTeam(controller, createInput)).resolves.toBe(backendSnapshot);
+    await expect(updateTeam(controller, updateInput)).resolves.toBe(backendSnapshot);
+    await expect(reorderTeams(controller, reorderInput)).resolves.toBe(backendSnapshot);
+    await expect(closeTeam(controller, 'team-backend')).resolves.toBe(backendSnapshot);
+    await expect(selectTeam(controller, 'team-codex-claw')).resolves.toBe(backendSnapshot);
+
+    expect(request).toHaveBeenNthCalledWith(1, 'team/create', { input: createInput });
+    expect(request).toHaveBeenNthCalledWith(2, 'team/update', { input: updateInput });
+    expect(request).toHaveBeenNthCalledWith(3, 'team/reorder', { input: reorderInput });
+    expect(request).toHaveBeenNthCalledWith(4, 'team/close', { teamId: 'team-backend' });
+    expect(request).toHaveBeenNthCalledWith(5, 'team/select', { teamId: 'team-codex-claw' });
   });
 
   it('routes loop mutations and runs through clawd', async () => {
@@ -1365,6 +1397,36 @@ async function transcribeAppleSpeech(
   return (controller as unknown as {
     transcribeAppleSpeech(audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions): Promise<AppleSpeechTranscriptionResult>;
   }).transcribeAppleSpeech(audioData, options);
+}
+
+async function createTeam(controller: AppController, input: CreateTeamInput): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    createTeam(input: CreateTeamInput): Promise<AppSnapshot>;
+  }).createTeam(input);
+}
+
+async function updateTeam(controller: AppController, input: UpdateTeamInput): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    updateTeam(input: UpdateTeamInput): Promise<AppSnapshot>;
+  }).updateTeam(input);
+}
+
+async function reorderTeams(controller: AppController, input: ReorderTeamsInput): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    reorderTeams(input: ReorderTeamsInput): Promise<AppSnapshot>;
+  }).reorderTeams(input);
+}
+
+async function closeTeam(controller: AppController, teamId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    closeTeam(teamId: string): Promise<AppSnapshot>;
+  }).closeTeam(teamId);
+}
+
+async function selectTeam(controller: AppController, teamId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    selectTeam(teamId: string): Promise<AppSnapshot>;
+  }).selectTeam(teamId);
 }
 
 async function createLoop(controller: AppController, input: CreateLoopInput): Promise<AppSnapshot> {

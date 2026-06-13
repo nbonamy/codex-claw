@@ -69,10 +69,12 @@ Current implementation checkpoint:
 - `clawd` now owns loop CRUD, manual loop runs, and the loop scheduler/runner.
   Electron proxies loop IPC to backend RPC and adopts the returned snapshot
   while the broader state migration is still in flight.
+- `clawd` now owns team create/update/reorder/close/select mutations. Electron
+  proxies team IPC to backend RPC and adopts the returned snapshot.
 - The remaining large slice is to move the rest of product orchestration out of
   `AppController` so Electron becomes only the desktop IPC/stdio layer. The
-  largest remaining owners are direct team/agent/Bench/settings snapshot
-  mutation routes and remaining desktop-era driver shims.
+  largest remaining owners are direct agent/Bench/settings/source-selection
+  snapshot mutation routes and remaining desktop-era driver shims.
 
 ## Goals
 

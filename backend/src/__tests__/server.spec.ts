@@ -189,6 +189,80 @@ describe('ClawBackendServer', () => {
     expect(workIntegrations.listItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw');
   });
 
+  it('owns team mutations', async () => {
+    const snapshot = createTestSnapshot();
+    const events: unknown[] = [];
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+      onEvent: (event) => events.push(event),
+    });
+    const createInput = { name: 'Backend Team', color: '#7158D4' };
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'create-team',
+      method: 'team/create',
+      params: { input: createInput },
+    })).resolves.toMatchObject({
+      result: {
+        activeTeamId: expect.stringContaining('team-backend-team'),
+        teams: [{ id: 'team-test' }, { name: 'Backend Team', color: '#7158D4' }],
+      },
+    });
+    const teamId = snapshot.teams[1]?.id ?? '';
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'update-team',
+      method: 'team/update',
+      params: { input: { id: teamId, name: 'Backend Runtime', color: '#AA4AB8' } },
+    })).resolves.toMatchObject({
+      result: {
+        teams: [{ id: 'team-test' }, { id: teamId, name: 'Backend Runtime', color: '#AA4AB8' }],
+      },
+    });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'reorder-team',
+      method: 'team/reorder',
+      params: { input: { teamId, beforeTeamId: 'team-test' } },
+    })).resolves.toMatchObject({
+      result: {
+        teams: [{ id: teamId }, { id: 'team-test' }],
+      },
+    });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'select-team',
+      method: 'team/select',
+      params: { teamId: 'team-test' },
+    })).resolves.toMatchObject({
+      result: {
+        activeTeamId: 'team-test',
+      },
+    });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'close-team',
+      method: 'team/close',
+      params: { teamId },
+    })).resolves.toMatchObject({
+      result: {
+        teams: [{ id: 'team-test' }],
+      },
+    });
+
+    expect(saveSnapshot).toHaveBeenCalledTimes(5);
+    expect(events).toHaveLength(5);
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'snapshot.updated' }),
+    ]));
+  });
+
   it('owns loop mutations and loop runner dispatch', async () => {
     const snapshot = createTestSnapshot();
     const events: unknown[] = [];

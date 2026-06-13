@@ -19,7 +19,6 @@ import {
   resumeAgentConversationInSnapshot,
   saveAgentToBench,
 } from '@codex-claw/shared/agent-manager';
-import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selectTeam, updateTeamInSnapshot } from '@codex-claw/shared/team-manager';
 import { updateSettingsInSnapshot } from '@codex-claw/shared/settings';
 import {
   applyMainEventToSnapshot,
@@ -34,7 +33,6 @@ import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from '.
 import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { approvalBackendDefaultsWithPreset, isApprovalPreset } from '@codex-claw/shared/approval-presets';
 import { ipcChannels } from '@codex-claw/shared/ipc';
-import { teamColors } from '@codex-claw/shared/team-colors';
 import { sanitizeWorkItemAssignmentSource } from '@codex-claw/shared/work-assignments';
 import type { AgentBackendDriver, BackendSendResult } from './backends/types';
 import { backendDisplayName, unsupportedBackendFeature } from './backends/types';
@@ -144,44 +142,23 @@ export class AppController {
     });
 
     ipcMain.handle(ipcChannels.createTeam, async (_event, input: CreateTeamInput) => {
-      this.validateTeamInput(input);
-      createTeamInSnapshot(this.snapshot, input);
-      await this.persistSnapshot();
-      return this.snapshot;
+      return this.createTeam(input);
     });
 
     ipcMain.handle(ipcChannels.updateTeam, async (_event, input: UpdateTeamInput) => {
-      this.validateTeamInput(input);
-      const team = updateTeamInSnapshot(this.snapshot, input);
-      if (!team) {
-        throw new Error(`Team not found: ${input.id}`);
-      }
-      await this.persistSnapshot();
-      return this.snapshot;
+      return this.updateTeam(input);
     });
 
     ipcMain.handle(ipcChannels.reorderTeams, async (_event, input: ReorderTeamsInput) => {
-      const team = reorderTeamInSnapshot(this.snapshot, input.teamId, input.beforeTeamId);
-      if (!team) {
-        throw new Error(`Team reorder target not found: ${input.teamId}`);
-      }
-      await this.persistSnapshot();
-      return this.snapshot;
+      return this.reorderTeams(input);
     });
 
     ipcMain.handle(ipcChannels.closeTeam, async (_event, teamId: string) => {
-      const team = closeTeamInSnapshot(this.snapshot, teamId);
-      if (!team) {
-        throw new Error(`Team not found: ${teamId}`);
-      }
-      await this.persistSnapshot();
-      return this.snapshot;
+      return this.closeTeam(teamId);
     });
 
     ipcMain.handle(ipcChannels.selectTeam, async (_event, teamId: string) => {
-      selectTeam(this.snapshot, teamId);
-      await this.persistSnapshot();
-      return this.snapshot;
+      return this.selectTeam(teamId);
     });
 
     ipcMain.handle(ipcChannels.createLoop, async (_event, input: CreateLoopInput) => {
@@ -496,6 +473,26 @@ export class AppController {
 
   private async listWorkItems(provider: WorkProviderKind, repositoryId: string): Promise<WorkItem[]> {
     return this.requireBackendClient().request('workProvider/listItems', { provider, repositoryId });
+  }
+
+  private async createTeam(input: CreateTeamInput): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('team/create', { input }));
+  }
+
+  private async updateTeam(input: UpdateTeamInput): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('team/update', { input }));
+  }
+
+  private async reorderTeams(input: ReorderTeamsInput): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('team/reorder', { input }));
+  }
+
+  private async closeTeam(teamId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('team/close', { teamId }));
+  }
+
+  private async selectTeam(teamId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('team/select', { teamId }));
   }
 
   private async createLoop(input: CreateLoopInput): Promise<AppSnapshot> {
@@ -1172,16 +1169,6 @@ export class AppController {
     }
 
     await this.requireBackendClient().request('agent/validateFolder', { folder });
-  }
-
-  private validateTeamInput(input: CreateTeamInput): void {
-    if (!input.name.trim()) {
-      throw new Error('Team name is required.');
-    }
-
-    if (!teamColors.some((color) => color === input.color.trim().toUpperCase())) {
-      throw new Error('Team color is invalid.');
-    }
   }
 
   private async getBackendDriverForAgent(agent: Agent): Promise<AgentBackendDriver> {

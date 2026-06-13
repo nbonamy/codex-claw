@@ -1,10 +1,12 @@
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
-import type { AppSnapshot, CreateLoopInput, UpdateLoopInput } from '@codex-claw/shared/contracts';
+import type { AppSnapshot, CreateLoopInput, CreateTeamInput, ReorderTeamsInput, UpdateLoopInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { BackendEvent } from '@codex-claw/shared/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { clearLoopExecutionHistoryInSnapshot, createLoopInSnapshot, deleteLoopExecutionFromSnapshot, deleteLoopFromSnapshot, updateLoopInSnapshot } from '@codex-claw/shared/loop-manager';
+import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selectTeam, updateTeamInSnapshot } from '@codex-claw/shared/team-manager';
+import { teamColors } from '@codex-claw/shared/team-colors';
 import { BackendDriverRpc } from './driver-rpc';
 import type { LoopRunner } from './loops/runner';
 import type { WorkIntegrationManager } from './work-integrations/manager';
@@ -66,6 +68,41 @@ export class ClawBackendServer {
           snapshot: this.snapshot,
           lastEventSeq: this.lastEventSeq,
         });
+      case 'team/create': {
+        const input = requireTeamCreateInput(message.params);
+        validateTeamInput(input);
+        createTeamInSnapshot(this.snapshot, input);
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'team/update': {
+        const input = requireTeamUpdateInput(message.params);
+        validateTeamInput(input);
+        const team = updateTeamInSnapshot(this.snapshot, input);
+        if (!team) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Team not found: ${input.id}`);
+        }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'team/reorder': {
+        const input = requireTeamReorderInput(message.params);
+        const team = reorderTeamInSnapshot(this.snapshot, input.teamId, input.beforeTeamId);
+        if (!team) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Team reorder target not found: ${input.teamId}`);
+        }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'team/close': {
+        const teamId = requireTeamId(message.params);
+        const team = closeTeamInSnapshot(this.snapshot, teamId);
+        if (!team) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Team not found: ${teamId}`);
+        }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'team/select': {
+        selectTeam(this.snapshot, requireTeamId(message.params));
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
       case 'workProvider/connect':
         return createClawRpcResult(message.id, await this.requireWorkIntegrations().connect(requireWorkProvider(message.params)));
       case 'workProvider/openAuthorization':
@@ -227,6 +264,36 @@ function requireLoopUpdateInput(params: unknown): UpdateLoopInput {
 function requireLoopId(params: unknown): string {
   const record = requireRecord(params);
   return requireString(record.loopId, 'loopId');
+}
+
+function requireTeamCreateInput(params: unknown): CreateTeamInput {
+  const record = requireRecord(params);
+  return requireRecord(record.input) as CreateTeamInput;
+}
+
+function requireTeamUpdateInput(params: unknown): UpdateTeamInput {
+  const record = requireRecord(params);
+  return requireRecord(record.input) as UpdateTeamInput;
+}
+
+function requireTeamReorderInput(params: unknown): ReorderTeamsInput {
+  const record = requireRecord(params);
+  return requireRecord(record.input) as ReorderTeamsInput;
+}
+
+function requireTeamId(params: unknown): string {
+  const record = requireRecord(params);
+  return requireString(record.teamId, 'teamId');
+}
+
+function validateTeamInput(input: CreateTeamInput): void {
+  if (!input.name.trim()) {
+    throw new Error('Team name is required.');
+  }
+
+  if (!teamColors.some((color) => color === input.color.trim().toUpperCase())) {
+    throw new Error('Team color is invalid.');
+  }
 }
 
 function requireRecord(value: unknown): Record<string, unknown> {
