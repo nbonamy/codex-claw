@@ -10,6 +10,7 @@ import { BackendDriverRpc, createDefaultBackendDrivers } from './driver-rpc';
 import { LoopRunner } from './loops/runner';
 import { LoopScheduler } from './loops/scheduler';
 import { ClawMcpService } from './mcp/service';
+import { runtimeGitHubOAuthClientId } from './runtime-config';
 import { ClawBackendServer } from './server';
 import { backendWorkIntegrationTokensFilePath, loadBackendSnapshot, saveBackendSnapshot } from './state';
 import { StdioRpcPeer } from './stdio';
@@ -139,7 +140,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 }
 
 function githubOAuthClientId(snapshot: { workBacklog: { providerSettings: { github?: { oauthClientId?: string } } } }): string {
-  return snapshot.workBacklog.providerSettings.github?.oauthClientId ?? process.env.CODEX_CLAW_GITHUB_CLIENT_ID ?? '';
+  return runtimeGitHubOAuthClientId(snapshot.workBacklog.providerSettings.github);
 }
 
 function requireBackendDriver(drivers: Map<Agent['backend'], AgentBackendDriver>, agent: Agent): AgentBackendDriver {

@@ -675,11 +675,12 @@ future packaged builds can replace that port with a native keychain or
 credential-helper implementation without moving ownership back to Electron.
 
 GitHub uses OAuth device flow for the desktop app. It requires a public client
-ID but no client secret or localhost callback route. `clawd` reads
-`CODEX_CLAW_GITHUB_CLIENT_ID` from the environment as the default client ID,
-and Settings can persist a per-provider client ID override. Actual GitHub
-access tokens remain outside the persisted app snapshot in the backend token
-store.
+ID but no client secret or localhost callback route. `clawd` resolves the client
+ID from Settings, then `CODEX_CLAW_GITHUB_CLIENT_ID`, then an optional packaged
+backend default baked into official `clawd` builds. That packaged value is a
+public OAuth app identifier, not a secret, and belongs in the backend package so
+standalone `clawd` can run without Electron. Actual GitHub access tokens remain
+outside the persisted app snapshot in the backend token store.
 Starting device flow only returns the code to the renderer; opening GitHub is a
 separate user action so the user can see and copy the code before the browser
 takes focus. Electron owns that browser-open action through

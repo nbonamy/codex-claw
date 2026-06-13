@@ -31,9 +31,7 @@ export function runtimeClawdCommand(deps: RuntimeClawdConfigDeps = {}): RuntimeC
   return {
     command,
     args,
-    env: {
-      CODEX_CLAW_ASSETS_PATH: runtimeClawdAssetsPath(deps),
-    },
+    env: runtimeClawdEnv(deps),
   };
 }
 
@@ -78,8 +76,16 @@ function packagedClawdCommand(deps: RuntimeClawdConfigDeps): RuntimeClawdCommand
   return {
     command: nodePath,
     args: [bundlePath, '--stdio'],
-    env: {
-      CODEX_CLAW_ASSETS_PATH: runtimeClawdAssetsPath(deps),
-    },
+    env: runtimeClawdEnv(deps),
+  };
+}
+
+function runtimeClawdEnv(deps: RuntimeClawdConfigDeps): NodeJS.ProcessEnv {
+  const env = deps.env ?? process.env;
+  const githubClientId = env.CODEX_CLAW_GITHUB_CLIENT_ID?.trim();
+
+  return {
+    CODEX_CLAW_ASSETS_PATH: runtimeClawdAssetsPath(deps),
+    ...(githubClientId ? { CODEX_CLAW_GITHUB_CLIENT_ID: githubClientId } : {}),
   };
 }

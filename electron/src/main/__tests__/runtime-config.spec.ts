@@ -17,12 +17,15 @@ describe('runtime config', () => {
   });
 
   it('reads the backend command and comma-separated args from the environment', async () => {
-    vi.stubEnv('CODEX_CLAW_BACKEND_COMMAND', ' node ');
-    vi.stubEnv('CODEX_CLAW_BACKEND_ARGS', ' dist/clawd.mjs, --stdio ');
-
     const { runtimeClawdCommand } = await import('../runtime-config');
 
-    expect(runtimeClawdCommand({ cwd: process.cwd() })).toStrictEqual({
+    expect(runtimeClawdCommand({
+      cwd: process.cwd(),
+      env: {
+        CODEX_CLAW_BACKEND_COMMAND: ' node ',
+        CODEX_CLAW_BACKEND_ARGS: ' dist/clawd.mjs, --stdio ',
+      },
+    })).toStrictEqual({
       command: 'node',
       args: ['dist/clawd.mjs', '--stdio'],
       env: {
@@ -32,11 +35,14 @@ describe('runtime config', () => {
   });
 
   it('defaults backend args to stdio mode', async () => {
-    vi.stubEnv('CODEX_CLAW_BACKEND_COMMAND', 'clawd');
-
     const { runtimeClawdCommand } = await import('../runtime-config');
 
-    expect(runtimeClawdCommand({ cwd: process.cwd() })).toStrictEqual({
+    expect(runtimeClawdCommand({
+      cwd: process.cwd(),
+      env: {
+        CODEX_CLAW_BACKEND_COMMAND: 'clawd',
+      },
+    })).toStrictEqual({
       command: 'clawd',
       args: ['--stdio'],
       env: {
@@ -45,13 +51,34 @@ describe('runtime config', () => {
     });
   });
 
-  it('forwards an explicitly configured assets path to clawd', async () => {
-    vi.stubEnv('CODEX_CLAW_BACKEND_COMMAND', 'clawd');
-    vi.stubEnv('CODEX_CLAW_ASSETS_PATH', '/app/resources');
-
+  it('forwards the GitHub OAuth client ID when Electron starts clawd with one in its environment', async () => {
     const { runtimeClawdCommand } = await import('../runtime-config');
 
-    expect(runtimeClawdCommand()).toStrictEqual({
+    expect(runtimeClawdCommand({
+      cwd: process.cwd(),
+      env: {
+        CODEX_CLAW_BACKEND_COMMAND: 'clawd',
+        CODEX_CLAW_GITHUB_CLIENT_ID: ' github-client-id ',
+      },
+    })).toStrictEqual({
+      command: 'clawd',
+      args: ['--stdio'],
+      env: {
+        CODEX_CLAW_ASSETS_PATH: path.resolve(process.cwd(), 'assets'),
+        CODEX_CLAW_GITHUB_CLIENT_ID: 'github-client-id',
+      },
+    });
+  });
+
+  it('forwards an explicitly configured assets path to clawd', async () => {
+    const { runtimeClawdCommand } = await import('../runtime-config');
+
+    expect(runtimeClawdCommand({
+      env: {
+        CODEX_CLAW_BACKEND_COMMAND: 'clawd',
+        CODEX_CLAW_ASSETS_PATH: '/app/resources',
+      },
+    })).toStrictEqual({
       command: 'clawd',
       args: ['--stdio'],
       env: {
@@ -65,6 +92,7 @@ describe('runtime config', () => {
 
     expect(runtimeClawdCommand({
       defaultApp: false,
+      env: {},
       existsSync: (filePath) => filePath === '/app/resources/clawd/node' || filePath === '/app/resources/clawd/clawd.mjs',
       resourcesPath: '/app/resources',
     })).toStrictEqual({
@@ -84,6 +112,7 @@ describe('runtime config', () => {
 
     expect(runtimeClawdCommand({
       defaultApp: false,
+      env: {},
       existsSync: (filePath) => filePath === 'C:\\app\\resources/clawd/node.exe' || filePath === 'C:\\app\\resources/clawd/clawd.mjs',
       platform: 'win32',
       resourcesPath: 'C:\\app\\resources',
@@ -95,6 +124,7 @@ describe('runtime config', () => {
 
     expect(runtimeClawdCommand({
       defaultApp: false,
+      env: {},
       existsSync: () => false,
       resourcesPath: '/app/resources',
     })).toBeNull();
