@@ -19,6 +19,7 @@ describe('Electron backend boundary', () => {
     const mainDir = path.resolve(__dirname, '..');
     await expect(readdir(path.join(mainDir, 'codex'))).rejects.toMatchObject({ code: 'ENOENT' });
     await expect(readdir(path.join(mainDir, 'claude'))).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(readdir(path.join(mainDir, 'backends'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('keeps workspace file reads behind clawd', async () => {
