@@ -1,11 +1,11 @@
 import path from 'node:path';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
-import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
-import type { AppSnapshot, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ReorderTeamsInput, SourceWorktree, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
+import { createAgentInSnapshot, createEmptySnapshot, updateAgentFolder, updateAgentFromInput } from '@codex-claw/shared/snapshot';
+import type { AppSnapshot, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { BackendEvent } from '@codex-claw/shared/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
-import { deployBenchTemplateInSnapshot, removeBenchTemplateFromSnapshot, saveAgentToBench } from '@codex-claw/shared/agent-manager';
+import { closeAgentInSnapshot, deployBenchTemplateInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeBenchTemplateFromSnapshot, reorderAgentInTeam, saveAgentToBench } from '@codex-claw/shared/agent-manager';
 import { clearLoopExecutionHistoryInSnapshot, createLoopInSnapshot, deleteLoopExecutionFromSnapshot, deleteLoopFromSnapshot, updateLoopInSnapshot } from '@codex-claw/shared/loop-manager';
 import { updateSettingsInSnapshot } from '@codex-claw/shared/settings';
 import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selectTeam, updateTeamInSnapshot } from '@codex-claw/shared/team-manager';
@@ -71,6 +71,86 @@ export class ClawBackendServer {
           snapshot: this.snapshot,
           lastEventSeq: this.lastEventSeq,
         });
+      case 'agent/create': {
+        const input = requireAgentCreateInput(message.params);
+        await this.validateAgentInput(input);
+        createAgentInSnapshot(this.snapshot, input);
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'agent/update': {
+        const input = requireAgentUpdateInput(message.params);
+        await this.validateAgentInput(input);
+        const agent = updateAgentFromInput(this.snapshot, input);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${input.id}`);
+        }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'agent/duplicate': {
+        const agentId = requireAgentId(message.params);
+        const agent = duplicateAgentInSnapshot(this.snapshot, agentId);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'agent/moveToTeam': {
+        const input = requireMoveAgentInput(message.params);
+        const agent = moveAgentToTeamInSnapshot(this.snapshot, input.agentId, input.teamId);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent or team not found: ${input.agentId} -> ${input.teamId}`);
+        }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'agent/reorder': {
+        const input = requireReorderAgentsInput(message.params);
+        const agent = reorderAgentInTeam(this.snapshot, input.teamId, input.agentId, input.beforeAgentId);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent reorder target not found: ${input.agentId}`);
+        }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'agent/close': {
+        const agentId = requireAgentId(message.params);
+        const agent = closeAgentInSnapshot(this.snapshot, agentId);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'agent/updateFolder': {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const folder = requireString(params.folder, 'folder').trim();
+        if (!this.snapshot.agents.some((agent) => agent.id === agentId)) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        await this.validateAgentInput({ name: 'Agent', folder });
+        updateAgentFolder(this.snapshot, agentId, folder);
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'agent/listFiles': {
+        const agentId = requireAgentId(message.params);
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        return createClawRpcResult(message.id, await this.requireDriverRpc().handle('agent/listFiles', {
+          folder: agent.folder,
+        }));
+      }
+      case 'agent/readFile': {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        return createClawRpcResult(message.id, await this.requireDriverRpc().handle('agent/readFile', {
+          folder: agent.folder,
+          filePath: requireString(params.filePath, 'filePath'),
+        }));
+      }
       case 'team/create': {
         const input = requireTeamCreateInput(message.params);
         validateTeamInput(input);
@@ -280,6 +360,19 @@ export class ClawBackendServer {
     this.snapshot.sourceFolder.recentRepoNames = nextNames.slice(0, 5);
   }
 
+  private async validateAgentInput(input: Pick<CreateAgentInput, 'name' | 'folder'>): Promise<void> {
+    if (!input.name.trim()) {
+      throw new Error('Agent name is required.');
+    }
+
+    const folder = input.folder.trim();
+    if (!folder) {
+      throw new Error('Agent folder is required.');
+    }
+
+    await this.requireDriverRpc().handle('agent/validateFolder', { folder });
+  }
+
   private handleBackendEvent(event: BackendEvent, options: { persist?: boolean } = {}): void {
     this.lastEventSeq += 1;
     this.onEvent?.({
@@ -310,6 +403,26 @@ function requireWorkProvider(params: unknown): WorkProviderKind {
     throw new Error(`Unsupported work provider: ${provider}`);
   }
   return provider;
+}
+
+function requireAgentCreateInput(params: unknown): CreateAgentInput {
+  const record = requireRecord(params);
+  return requireRecord(record.input) as CreateAgentInput;
+}
+
+function requireAgentUpdateInput(params: unknown): UpdateAgentInput {
+  const record = requireRecord(params);
+  return requireRecord(record.input) as UpdateAgentInput;
+}
+
+function requireMoveAgentInput(params: unknown): MoveAgentToTeamInput {
+  const record = requireRecord(params);
+  return requireRecord(record.input) as MoveAgentToTeamInput;
+}
+
+function requireReorderAgentsInput(params: unknown): ReorderAgentsInput {
+  const record = requireRecord(params);
+  return requireRecord(record.input) as ReorderAgentsInput;
 }
 
 function requireLoopCreateInput(params: unknown): CreateLoopInput {

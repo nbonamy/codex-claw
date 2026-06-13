@@ -350,7 +350,8 @@ Renderer layers:
   not persisted; turn diff state comes from app-owned backend events such as
   Codex `turn/diff/updated`;
 - side-panel previews are read-only app artifacts. Markdown and source file
-  links read through the main-process agent file bridge; source highlighting
+  links request backend-owned agent resources by agent id; Electron must not
+  resolve or pass local workspace roots for file previews. Source highlighting
   uses Shiki, while git diff previews parse unified diff data and render with
   Claw-owned Vue components;
 - theme provider that applies semantic CSS custom properties to the document.

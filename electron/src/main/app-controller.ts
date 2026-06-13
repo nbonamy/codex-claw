@@ -8,21 +8,14 @@ import { createMainWindow } from './main-window';
 import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-permissions';
 import {
   assignWorkItemToAgentInSnapshot,
-  closeAgentInSnapshot,
-  duplicateAgentInSnapshot,
-  moveAgentToTeamInSnapshot,
   removeWorkItemAssignmentFromSnapshot,
-  reorderAgentInTeam,
   restartAgentConversation,
   resumeAgentConversationInSnapshot,
 } from '@codex-claw/shared/agent-manager';
 import {
   applyMainEventToSnapshot,
-  createAgentInSnapshot,
   createEmptySnapshot,
   selectAgent,
-  updateAgentFromInput,
-  updateAgentFolder,
 } from './snapshot-service';
 import { AppStatePersistence } from '@codex-claw/shared/state-persistence';
 import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from './backend-process-client';
@@ -194,24 +187,11 @@ export class AppController {
     });
 
     ipcMain.handle(ipcChannels.createAgent, async (_event, input: CreateAgentInput) => {
-      await this.validateAgentInput(input);
-      createAgentInSnapshot(this.snapshot, input);
-      await this.persistSnapshot();
-      if (this.snapshot.activeAgentId) {
-        await this.refreshAgentGitStatus(this.snapshot.activeAgentId);
-      }
-      return this.snapshot;
+      return this.createAgent(input);
     });
 
     ipcMain.handle(ipcChannels.updateAgent, async (_event, input: UpdateAgentInput) => {
-      await this.validateAgentInput(input);
-      const agent = updateAgentFromInput(this.snapshot, input);
-      if (!agent) {
-        throw new Error(`Agent not found: ${input.id}`);
-      }
-      await this.persistSnapshot();
-      await this.refreshAgentGitStatus(agent.id);
-      return this.snapshot;
+      return this.updateAgent(input);
     });
 
     ipcMain.handle(ipcChannels.assignWorkItemToAgent, async (_event, agentId: string, item: unknown) => {
@@ -241,30 +221,15 @@ export class AppController {
     });
 
     ipcMain.handle(ipcChannels.duplicateAgent, async (_event, agentId: string) => {
-      const agent = duplicateAgentInSnapshot(this.snapshot, agentId);
-      if (!agent) {
-        throw new Error(`Agent not found: ${agentId}`);
-      }
-      await this.persistSnapshot();
-      return this.snapshot;
+      return this.duplicateAgent(agentId);
     });
 
     ipcMain.handle(ipcChannels.moveAgentToTeam, async (_event, input: MoveAgentToTeamInput) => {
-      const agent = moveAgentToTeamInSnapshot(this.snapshot, input.agentId, input.teamId);
-      if (!agent) {
-        throw new Error(`Agent or team not found: ${input.agentId} -> ${input.teamId}`);
-      }
-      await this.persistSnapshot();
-      return this.snapshot;
+      return this.moveAgentToTeam(input);
     });
 
     ipcMain.handle(ipcChannels.reorderAgents, async (_event, input: ReorderAgentsInput) => {
-      const agent = reorderAgentInTeam(this.snapshot, input.teamId, input.agentId, input.beforeAgentId);
-      if (!agent) {
-        throw new Error(`Agent reorder target not found: ${input.agentId}`);
-      }
-      await this.persistSnapshot();
-      return this.snapshot;
+      return this.reorderAgents(input);
     });
 
     ipcMain.handle(ipcChannels.saveAgentToBench, async (_event, agentId: string) => {
@@ -284,12 +249,7 @@ export class AppController {
     });
 
     ipcMain.handle(ipcChannels.closeAgent, async (_event, agentId: string) => {
-      const agent = closeAgentInSnapshot(this.snapshot, agentId);
-      if (!agent) {
-        throw new Error(`Agent not found: ${agentId}`);
-      }
-      await this.persistSnapshot();
-      return this.snapshot;
+      return this.closeAgent(agentId);
     });
 
     ipcMain.handle(ipcChannels.selectAgent, async (_event, agentId: string) => {
@@ -310,9 +270,7 @@ export class AppController {
         return null;
       }
 
-      updateAgentFolder(this.snapshot, agentId, result.filePaths[0]);
-      await this.persistSnapshot();
-      return this.snapshot;
+      return this.updateAgentFolder(agentId, result.filePaths[0]);
     });
 
     ipcMain.handle(ipcChannels.updateSettings, async (_event, input: UpdateSettingsInput) => {
@@ -446,6 +404,40 @@ export class AppController {
 
   private async listWorkItems(provider: WorkProviderKind, repositoryId: string): Promise<WorkItem[]> {
     return this.requireBackendClient().request('workProvider/listItems', { provider, repositoryId });
+  }
+
+  private async createAgent(input: CreateAgentInput): Promise<AppSnapshot> {
+    const snapshot = this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/create', { input }));
+    if (snapshot.activeAgentId) {
+      await this.refreshAgentGitStatus(snapshot.activeAgentId);
+    }
+    return this.snapshot;
+  }
+
+  private async updateAgent(input: UpdateAgentInput): Promise<AppSnapshot> {
+    const snapshot = this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/update', { input }));
+    await this.refreshAgentGitStatus(input.id);
+    return snapshot;
+  }
+
+  private async duplicateAgent(agentId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/duplicate', { agentId }));
+  }
+
+  private async moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/moveToTeam', { input }));
+  }
+
+  private async reorderAgents(input: ReorderAgentsInput): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/reorder', { input }));
+  }
+
+  private async closeAgent(agentId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/close', { agentId }));
+  }
+
+  private async updateAgentFolder(agentId: string, folder: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/updateFolder', { agentId, folder }));
   }
 
   private async createTeam(input: CreateTeamInput): Promise<AppSnapshot> {
@@ -732,24 +724,14 @@ export class AppController {
   }
 
   private async listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]> {
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent) {
-      throw new Error(`Agent not found: ${agentId}`);
-    }
-
     return this.requireBackendClient().request('agent/listFiles', {
-      folder: agent.folder,
+      agentId,
     });
   }
 
   private async readAgentFile(agentId: string, filePath: string): Promise<AgentFileReadResult> {
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent) {
-      throw new Error(`Agent not found: ${agentId}`);
-    }
-
     return this.requireBackendClient().request('agent/readFile', {
-      folder: agent.folder,
+      agentId,
       filePath,
     });
   }

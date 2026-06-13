@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { AppSnapshot } from '@codex-claw/shared/contracts';
@@ -264,6 +264,165 @@ describe('ClawBackendServer', () => {
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'snapshot.updated' }),
     ]));
+  });
+
+  it('owns agent CRUD and layout mutations', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-agent-'));
+    const nextTempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-agent-next-'));
+    const snapshot = createTestSnapshot();
+    snapshot.teams.push({ id: 'team-other', name: 'Other Team', agentIds: [] });
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+      driverRpc: new BackendDriverRpc(new Map()),
+    });
+
+    try {
+      await expect(server.handleMessage({
+        jsonrpc: '2.0',
+        id: 'create-agent',
+        method: 'agent/create',
+        params: { input: { name: 'Dina', folder: tempDir, backend: 'codex', teamId: 'team-test' } },
+      })).resolves.toMatchObject({
+        result: {
+          activeAgentId: expect.stringContaining('agent-'),
+          agents: [{ name: 'Dina', folder: tempDir }],
+        },
+      });
+      const agentId = snapshot.agents[0]?.id ?? '';
+      expect(snapshot.teams.find((team) => team.id === 'team-test')?.agentIds).toStrictEqual([agentId]);
+
+      await expect(server.handleMessage({
+        jsonrpc: '2.0',
+        id: 'update-agent',
+        method: 'agent/update',
+        params: { input: { id: agentId, name: 'Dina Backend', folder: nextTempDir, backend: 'codex' } },
+      })).resolves.toMatchObject({
+        result: {
+          agents: [{ id: agentId, name: 'Dina Backend', folder: nextTempDir }],
+        },
+      });
+      await expect(server.handleMessage({
+        jsonrpc: '2.0',
+        id: 'duplicate-agent',
+        method: 'agent/duplicate',
+        params: { agentId },
+      })).resolves.toMatchObject({
+        result: {
+          agents: [{ id: agentId }, { name: 'Dina Backend (copy)' }],
+        },
+      });
+      const duplicateId = snapshot.agents[1]?.id ?? '';
+
+      await expect(server.handleMessage({
+        jsonrpc: '2.0',
+        id: 'move-agent',
+        method: 'agent/moveToTeam',
+        params: { input: { agentId: duplicateId, teamId: 'team-other' } },
+      })).resolves.toMatchObject({
+        result: {
+          activeTeamId: 'team-other',
+          activeAgentId: duplicateId,
+        },
+      });
+      await expect(server.handleMessage({
+        jsonrpc: '2.0',
+        id: 'reorder-agent',
+        method: 'agent/reorder',
+        params: { input: { teamId: 'team-test', agentId, beforeAgentId: null } },
+      })).resolves.toMatchObject({ result: { activeAgentId: expect.any(String) } });
+      expect(snapshot.teams.find((team) => team.id === 'team-test')?.agentIds).toStrictEqual([agentId]);
+      await expect(server.handleMessage({
+        jsonrpc: '2.0',
+        id: 'update-folder',
+        method: 'agent/updateFolder',
+        params: { agentId, folder: tempDir },
+      })).resolves.toMatchObject({ result: { activeAgentId: expect.any(String) } });
+      expect(snapshot.agents.find((agent) => agent.id === agentId)?.folder).toBe(tempDir);
+      await expect(server.handleMessage({
+        jsonrpc: '2.0',
+        id: 'close-agent',
+        method: 'agent/close',
+        params: { agentId: duplicateId },
+      })).resolves.toMatchObject({
+        result: {
+          agents: [{ id: agentId }],
+        },
+      });
+
+      expect(saveSnapshot).toHaveBeenCalled();
+    } finally {
+      await server.close();
+      await rm(tempDir, { recursive: true, force: true });
+      await rm(nextTempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('owns agent file listing and reads by resolving agent folders internally', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-agent-files-'));
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: tempDir,
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      driverRpc: new BackendDriverRpc(new Map()),
+    });
+
+    try {
+      await mkdir(path.join(tempDir, 'docs'), { recursive: true });
+      await writeFile(path.join(tempDir, 'README.md'), '# Read me\n');
+      await writeFile(path.join(tempDir, 'docs', 'architecture.md'), '# Architecture\n');
+
+      await expect(server.handleMessage({
+        jsonrpc: '2.0',
+        id: 'list-files',
+        method: 'agent/listFiles',
+        params: { agentId: 'agent-dina' },
+      })).resolves.toMatchObject({
+        result: expect.arrayContaining([
+          { name: 'README.md', path: 'README.md' },
+          { name: 'architecture.md', path: 'docs/architecture.md' },
+        ]),
+      });
+      await expect(server.handleMessage({
+        jsonrpc: '2.0',
+        id: 'read-file',
+        method: 'agent/readFile',
+        params: { agentId: 'agent-dina', filePath: 'README.md' },
+      })).resolves.toMatchObject({
+        result: {
+          path: 'README.md',
+          content: '# Read me\n',
+        },
+      });
+      await expect(server.handleMessage({
+        jsonrpc: '2.0',
+        id: 'missing-agent',
+        method: 'agent/readFile',
+        params: { agentId: 'agent-missing', filePath: 'README.md' },
+      })).resolves.toMatchObject({
+        error: {
+          message: 'Agent not found: agent-missing',
+        },
+      });
+    } finally {
+      await server.close();
+      await rm(tempDir, { recursive: true, force: true });
+    }
   });
 
   it('owns bench mutations and validates deployed template folders', async () => {

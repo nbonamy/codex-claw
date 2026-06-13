@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ConversationSummary, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, RendererMessage, ReorderTeamsInput, SourceRepository, SourceWorktree, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import type { AppStatePersistence } from '@codex-claw/shared/state-persistence';
 import type { AgentBackendDriver, BackendSendResult } from '../backends/types';
@@ -244,6 +244,63 @@ describe('AppController', () => {
     expect(request).toHaveBeenNthCalledWith(3, 'team/reorder', { input: reorderInput });
     expect(request).toHaveBeenNthCalledWith(4, 'team/close', { teamId: 'team-backend' });
     expect(request).toHaveBeenNthCalledWith(5, 'team/select', { teamId: 'team-codex-claw' });
+  });
+
+  it('routes agent CRUD and layout mutations through clawd', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.sourceFolder.initialized = true;
+    const backendSnapshot = {
+      ...snapshot,
+      agents: [{
+        ...snapshot.agents[0]!,
+        name: 'Backend Dina',
+      }],
+    };
+    const request = vi.fn(async (method: string) => (
+      method === 'agent/getGitStatus' ? null : backendSnapshot
+    ));
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const createInput: CreateAgentInput = {
+      name: 'Backend Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      teamId: 'team-codex-claw',
+    };
+    const updateInput: UpdateAgentInput = {
+      id: 'agent-dina',
+      name: 'Backend Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+    };
+    const moveInput: MoveAgentToTeamInput = {
+      agentId: 'agent-dina',
+      teamId: 'team-codex-claw',
+    };
+    const reorderInput: ReorderAgentsInput = {
+      teamId: 'team-codex-claw',
+      agentId: 'agent-dina',
+      beforeAgentId: null,
+    };
+
+    await controller.initialize();
+
+    await expect(createAgent(controller, createInput)).resolves.toBe(backendSnapshot);
+    await expect(updateAgent(controller, updateInput)).resolves.toBe(backendSnapshot);
+    await expect(duplicateAgent(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
+    await expect(moveAgentToTeam(controller, moveInput)).resolves.toBe(backendSnapshot);
+    await expect(reorderAgents(controller, reorderInput)).resolves.toBe(backendSnapshot);
+    await expect(updateAgentFolder(controller, 'agent-dina', '/Users/nbonamy/src/id8')).resolves.toBe(backendSnapshot);
+    await expect(closeAgent(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
+
+    expect(request).toHaveBeenNthCalledWith(1, 'agent/create', { input: createInput });
+    expect(request).toHaveBeenNthCalledWith(2, 'agent/getGitStatus', { agent: backendSnapshot.agents[0] });
+    expect(request).toHaveBeenNthCalledWith(3, 'agent/update', { input: updateInput });
+    expect(request).toHaveBeenNthCalledWith(4, 'agent/getGitStatus', { agent: backendSnapshot.agents[0] });
+    expect(request).toHaveBeenNthCalledWith(5, 'agent/duplicate', { agentId: 'agent-dina' });
+    expect(request).toHaveBeenNthCalledWith(6, 'agent/moveToTeam', { input: moveInput });
+    expect(request).toHaveBeenNthCalledWith(7, 'agent/reorder', { input: reorderInput });
+    expect(request).toHaveBeenNthCalledWith(8, 'agent/updateFolder', { agentId: 'agent-dina', folder: '/Users/nbonamy/src/id8' });
+    expect(request).toHaveBeenNthCalledWith(9, 'agent/close', { agentId: 'agent-dina' });
   });
 
   it('routes bench mutations through clawd', async () => {
@@ -1087,12 +1144,11 @@ describe('AppController', () => {
 
     await expect(listAgentFiles(controller, 'agent-dina')).resolves.toStrictEqual(files);
     await expect(readAgentFile(controller, 'agent-dina', 'README.md')).resolves.toStrictEqual(readResult);
-    await expect(readAgentFile(controller, 'agent-missing', 'README.md')).rejects.toThrow('Agent not found');
     expect(request).toHaveBeenNthCalledWith(1, 'agent/listFiles', {
-      folder: '/Users/nbonamy/src/codex-claw',
+      agentId: 'agent-dina',
     });
     expect(request).toHaveBeenNthCalledWith(2, 'agent/readFile', {
-      folder: '/Users/nbonamy/src/codex-claw',
+      agentId: 'agent-dina',
       filePath: 'README.md',
     });
   });
@@ -1463,6 +1519,48 @@ async function transcribeAppleSpeech(
   return (controller as unknown as {
     transcribeAppleSpeech(audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions): Promise<AppleSpeechTranscriptionResult>;
   }).transcribeAppleSpeech(audioData, options);
+}
+
+async function createAgent(controller: AppController, input: CreateAgentInput): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    createAgent(input: CreateAgentInput): Promise<AppSnapshot>;
+  }).createAgent(input);
+}
+
+async function updateAgent(controller: AppController, input: UpdateAgentInput): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    updateAgent(input: UpdateAgentInput): Promise<AppSnapshot>;
+  }).updateAgent(input);
+}
+
+async function duplicateAgent(controller: AppController, agentId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    duplicateAgent(agentId: string): Promise<AppSnapshot>;
+  }).duplicateAgent(agentId);
+}
+
+async function moveAgentToTeam(controller: AppController, input: MoveAgentToTeamInput): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot>;
+  }).moveAgentToTeam(input);
+}
+
+async function reorderAgents(controller: AppController, input: ReorderAgentsInput): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    reorderAgents(input: ReorderAgentsInput): Promise<AppSnapshot>;
+  }).reorderAgents(input);
+}
+
+async function closeAgent(controller: AppController, agentId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    closeAgent(agentId: string): Promise<AppSnapshot>;
+  }).closeAgent(agentId);
+}
+
+async function updateAgentFolder(controller: AppController, agentId: string, folder: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    updateAgentFolder(agentId: string, folder: string): Promise<AppSnapshot>;
+  }).updateAgentFolder(agentId, folder);
 }
 
 async function createTeam(controller: AppController, input: CreateTeamInput): Promise<AppSnapshot> {

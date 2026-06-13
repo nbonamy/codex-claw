@@ -79,10 +79,17 @@ Current implementation checkpoint:
 - `clawd` now owns source-folder initialization via `settings/update` and the
   recent-repository update after source worktree creation. Electron still owns
   native folder/save dialogs.
+- `clawd` now owns agent create/update/duplicate/move/reorder/close and folder
+  update mutations. Electron still performs desktop folder picking and
+  post-mutation git status refreshes while those UI reactions are being
+  migrated.
+- `clawd` now owns agent file preview authority: Electron requests file
+  listing/reading by agent id only, and the backend resolves the folder from
+  its snapshot before touching storage.
 - The remaining large slice is to move the rest of product orchestration out of
   `AppController` so Electron becomes only the desktop IPC/stdio layer. The
-  largest remaining owners are direct agent snapshot mutation routes and
-  remaining desktop-era driver shims.
+  largest remaining owners are direct work-assignment and conversation/session
+  mutation routes plus remaining desktop-era driver shims.
 
 ## Goals
 
@@ -369,7 +376,9 @@ names that describe backend ownership:
 - `loop/create`, `loop/update`, `loop/run`, `loop/delete`,
   `loop/clearHistory`, `loop/deleteExecution`
 - `source/listRepositories`, `source/createWorktree`
-- `file/search`, `file/read`
+- `agent/listFiles`, `agent/readFile` using agent ids only. `clawd` resolves
+  the workspace root from its snapshot so desktop, mobile, and future web
+  clients never transmit local filesystem roots as read authority.
 - `git/status`, `git/diff`
 - `workProvider/connect`, `workProvider/completeConnection`,
   `workProvider/disconnect`, `workProvider/listRepositories`,
