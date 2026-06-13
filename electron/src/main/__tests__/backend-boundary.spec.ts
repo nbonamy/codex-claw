@@ -134,6 +134,22 @@ describe('Electron backend boundary', () => {
     expect(source).not.toContain('suggestedName');
   });
 
+  it('keeps source recent-repository bookkeeping behind clawd', async () => {
+    const appStatePath = path.resolve(__dirname, '../../renderer/app-state.ts');
+    const appShellPath = path.resolve(__dirname, '../../renderer/components/AppShell.vue');
+    const agentDialogPath = path.resolve(__dirname, '../../renderer/components/AgentDialog.vue');
+    const sources = [
+      await readFile(appStatePath, 'utf8'),
+      await readFile(appShellPath, 'utf8'),
+      await readFile(agentDialogPath, 'utf8'),
+    ];
+
+    for (const source of sources) {
+      expect(source).not.toContain('addRecentSourceRepository');
+      expect(source).not.toContain('add-recent-source-repository');
+    }
+  });
+
   it('keeps folder picker IPC separate from backend mutations', async () => {
     const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
     const preloadPath = path.resolve(__dirname, '../../preload/index.ts');

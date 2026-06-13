@@ -248,7 +248,6 @@ describe('AgentDialog', () => {
 
   it('creates an agent from discovered source repositories and worktrees', async () => {
     const createAgent = vi.fn().mockResolvedValue(undefined);
-    const addRecentSourceRepository = vi.fn();
     const repositories: SourceRepository[] = [{
       name: 'codex-claw',
       path: '/Users/nbonamy/src/codex-claw',
@@ -258,7 +257,6 @@ describe('AgentDialog', () => {
       ],
     }];
     const wrapper = mountDialog({
-      addRecentSourceRepository,
       createAgent,
       sourceFolderPath: '~/src',
       sourceRepositories: repositories,
@@ -278,8 +276,8 @@ describe('AgentDialog', () => {
       avatar: '🤖',
       folder: '/Users/nbonamy/src/codex-claw-source-folder',
       backend: 'codex',
+      sourceRepositoryName: 'codex-claw',
     });
-    expect(addRecentSourceRepository).toHaveBeenCalledWith('codex-claw');
   });
 
   it('creates and selects a new source worktree from the dialog', async () => {
@@ -320,7 +318,6 @@ describe('AgentDialog', () => {
 });
 
 function mountDialog(overrides: Partial<{
-  addRecentSourceRepository: (repoName: string) => void;
   agent: Agent | null;
   chooseAgentFolder: () => Promise<string | null>;
   suggestSourceWorktreePath: (input: { branchName: string; repoPath: string }) => Promise<string>;
@@ -340,7 +337,6 @@ function mountDialog(overrides: Partial<{
   return mount(AgentDialog, {
     props: {
       agent: null,
-      addRecentSourceRepository: vi.fn(),
       chooseAgentFolder: vi.fn().mockResolvedValue(null),
       suggestSourceWorktreePath: vi.fn(async ({ branchName, repoPath }: { branchName: string; repoPath: string }) => {
         const repoName = repoPath.split(/[\\/]/).filter(Boolean).at(-1) ?? 'repo';

@@ -105,6 +105,7 @@ export class ClawBackendServer {
         const input = requireAgentCreateInput(message.params);
         await this.validateAgentInput(input);
         createAgentInSnapshot(this.snapshot, input);
+        this.addRecentSourceRepository(input.sourceRepositoryName);
         const snapshot = await this.persistAndEmitSnapshot();
         if (snapshot.activeAgentId) {
           await this.refreshAgentGitStatus(snapshot.activeAgentId);
@@ -919,8 +920,8 @@ export class ClawBackendServer {
     });
   }
 
-  private addRecentSourceRepository(repoName: string): void {
-    const trimmed = repoName.trim();
+  private addRecentSourceRepository(repoName?: string): void {
+    const trimmed = repoName?.trim() ?? '';
     if (!trimmed) {
       return;
     }

@@ -348,7 +348,6 @@ export type AgentDialogCreateInput = CreateAgentInput & {
 
 const props = withDefaults(defineProps<{
   agent: Agent | null;
-  addRecentSourceRepository?: (repoName: string) => void;
   chooseAgentFolder: () => Promise<string | null>;
   suggestSourceWorktreePath?: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>) => Promise<string>;
   chooseSourceWorktreeDestination?: (defaultPath: string) => Promise<string | null>;
@@ -598,7 +597,7 @@ async function submit(): Promise<void> {
       }
       const repository = selectedSourceRepository.value;
       if (repository && selectedSourceWorktreePath.value) {
-        props.addRecentSourceRepository?.(repository.name);
+        createInput.sourceRepositoryName = repository.name;
       }
 
       await props.createAgent(createInput);

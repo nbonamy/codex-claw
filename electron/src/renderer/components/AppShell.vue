@@ -196,7 +196,6 @@
       :visible="agentDialogVisible"
       :mode="agentDialogMode"
       :agent="editingAgent"
-      :add-recent-source-repository="addRecentSourceRepository"
       :choose-agent-folder="chooseAgentFolder"
       :choose-source-worktree-destination="chooseSourceWorktreeDestination"
       :create-agent="createAgentFromDialog"
@@ -292,7 +291,6 @@ const props = withDefaults(defineProps<{
   suggestSourceWorktreePath?: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>) => Promise<string>;
   chooseSourceWorktreeDestination?: (defaultPath: string) => Promise<string | null>;
   createSourceWorktree?: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
-  addRecentSourceRepository?: (repoName: string) => void;
   previewAgentFile?: (agentId: string, filePath: string) => Promise<AgentFilePreviewResult>;
   openAgentGitDiff?: (agentId: string) => Promise<void>;
   createAgent?: (input: CreateAgentInput) => Promise<Agent | null | void>;
@@ -343,7 +341,6 @@ const props = withDefaults(defineProps<{
   suggestSourceWorktreePath: async () => '',
   chooseSourceWorktreeDestination: async () => null,
   createSourceWorktree: async () => ({ name: '', path: '' }),
-  addRecentSourceRepository: () => undefined,
   previewAgentFile: async () => {
     throw new Error('File preview is not available.');
   },

@@ -698,6 +698,7 @@ export type CreateAgentInput = {
   avatar?: string;
   backend?: AgentBackend;
   backendDefaults?: BackendDefaults;
+  sourceRepositoryName?: string;
   teamId?: string;
 };
 

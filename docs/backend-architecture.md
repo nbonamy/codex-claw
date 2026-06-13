@@ -87,9 +87,10 @@ Current implementation checkpoint:
   reading local desktop state.
 - `clawd` now owns source-folder auto-detection, source repository/worktree
   listing from backend state, worktree destination suggestions and defaults,
-  settings updates, and the recent-repository update after source worktree
-  creation. Electron still owns native folder/save dialogs, but the dialog
-  default path is a backend suggestion instead of a desktop-side path policy.
+  settings updates, and recent-repository bookkeeping when agents or worktrees
+  are created from source repositories. Electron still owns native folder/save
+  dialogs, but the dialog default path is a backend suggestion instead of a
+  desktop-side path policy.
 - `clawd` now owns agent create/update/duplicate/move/reorder/close/select and
   folder update mutations. Electron still performs desktop folder picking, then
   forwards the selected folder to the backend.

@@ -188,18 +188,12 @@ describe('useAppState', () => {
     expect(quit).toHaveBeenCalledOnce();
   });
 
-  it('loads source repositories, creates worktrees, and stores recent repositories', async () => {
+  it('loads source repositories and creates worktrees through clawd', async () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.sourceFolder = {
       path: '~/src',
       initialized: true,
       recentRepoNames: [],
-    };
-    const updatedSnapshot = createInitialSnapshot();
-    updatedSnapshot.sourceFolder = {
-      path: '~/src',
-      initialized: true,
-      recentRepoNames: ['codex-claw'],
     };
     const repositories: SourceRepository[] = [{
       name: 'codex-claw',
@@ -214,13 +208,11 @@ describe('useAppState', () => {
       name: 'source-folder',
       path: '/Users/nbonamy/src/codex-claw-source-folder',
     });
-    const updateSettings = vi.fn().mockResolvedValue(updatedSnapshot);
     vi.stubGlobal('window', {
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         listSourceRepositories,
         createSourceWorktree,
-        updateSettings,
         onEvent: vi.fn(),
       } satisfies Partial<CodexClawApi>,
     });
@@ -239,15 +231,6 @@ describe('useAppState', () => {
       path: '/Users/nbonamy/src/codex-claw-source-folder',
     });
     expect(listSourceRepositories).toHaveBeenCalledTimes(2);
-
-    await state.addRecentSourceRepository('codex-claw');
-
-    expect(updateSettings).toHaveBeenCalledWith({
-      sourceFolder: {
-        recentRepoNames: ['codex-claw'],
-      },
-    });
-    expect(state.snapshot.value.sourceFolder.recentRepoNames).toStrictEqual(['codex-claw']);
   });
 
   it('uses source repository fallbacks when preload helpers are unavailable', async () => {
@@ -272,7 +255,6 @@ describe('useAppState', () => {
     })).rejects.toThrow('Source worktree creation is not available.');
 
     await state.loadSourceRepositories();
-    await state.addRecentSourceRepository('   ');
 
     expect(state.sourceRepositories.value).toStrictEqual([]);
     expect(state.sourceRepositoryStatus.value).toBe('notLoaded');

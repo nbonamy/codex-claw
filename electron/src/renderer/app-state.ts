@@ -337,20 +337,6 @@ export function useAppState() {
     }
   }
 
-  async function addRecentSourceRepository(repoName: string): Promise<void> {
-    const trimmed = repoName.trim();
-    if (!trimmed) {
-      return;
-    }
-    const nextNames = snapshot.value.sourceFolder.recentRepoNames.filter((name) => name !== trimmed);
-    nextNames.unshift(trimmed);
-    await updateSettings({
-      sourceFolder: {
-        recentRepoNames: nextNames.slice(0, 5),
-      },
-    });
-  }
-
   async function previewAgentFile(agentId: string, filePath: string): Promise<AgentFilePreviewResult> {
     if (!window.codexClaw?.previewAgentFile) {
       throw new Error('File preview is not available.');
@@ -940,7 +926,6 @@ export function useAppState() {
     suggestSourceWorktreePath,
     chooseSourceWorktreeDestination,
     createSourceWorktree,
-    addRecentSourceRepository,
     previewAgentFile,
     openAgentGitDiff,
     createAgent,

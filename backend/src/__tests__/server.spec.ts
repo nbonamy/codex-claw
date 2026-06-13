@@ -650,6 +650,11 @@ describe('ClawBackendServer', () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-agent-'));
     const nextTempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-agent-next-'));
     const snapshot = createTestSnapshot();
+    snapshot.sourceFolder = {
+      path: '/Users/nbonamy/src',
+      initialized: true,
+      recentRepoNames: ['id8'],
+    };
     snapshot.teams.push({ id: 'team-other', name: 'Other Team', agentIds: [] });
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
     const server = new ClawBackendServer({
@@ -665,11 +670,14 @@ describe('ClawBackendServer', () => {
         jsonrpc: '2.0',
         id: 'create-agent',
         method: 'agent/create',
-        params: { input: { name: 'Dina', folder: tempDir, backend: 'codex', teamId: 'team-test' } },
+        params: { input: { name: 'Dina', folder: tempDir, backend: 'codex', sourceRepositoryName: 'codex-claw', teamId: 'team-test' } },
       })).resolves.toMatchObject({
         result: {
           activeAgentId: expect.stringContaining('agent-'),
           agents: [{ name: 'Dina', folder: tempDir }],
+          sourceFolder: {
+            recentRepoNames: ['codex-claw', 'id8'],
+          },
         },
       });
       const agentId = snapshot.agents[0]?.id ?? '';

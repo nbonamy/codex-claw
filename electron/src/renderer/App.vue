@@ -31,7 +31,6 @@
     :suggest-source-worktree-path="suggestSourceWorktreePath"
     :choose-source-worktree-destination="chooseSourceWorktreeDestination"
     :create-source-worktree="createSourceWorktree"
-    :add-recent-source-repository="addRecentSourceRepository"
     :preview-agent-file="previewAgentFile"
     :open-agent-git-diff="openAgentGitDiff"
     :create-agent="createAgent"
@@ -131,7 +130,6 @@ const {
   suggestSourceWorktreePath,
   chooseSourceWorktreeDestination,
   createSourceWorktree,
-  addRecentSourceRepository,
   previewAgentFile,
   openAgentGitDiff,
   createAgent,
