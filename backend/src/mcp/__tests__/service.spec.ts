@@ -15,11 +15,12 @@ describe('ClawMcpService', () => {
 
   it('serves Claw collaboration tools from clawd and injects teammate messages through backend drivers', async () => {
     const snapshot = createInitialSnapshot();
+    const events: unknown[] = [];
     const sendPrompt = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-jesse' },
       turnId: 'turn-jesse',
     });
-    service = new ClawMcpService({ snapshot });
+    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
     service.setDriverRpc(new BackendDriverRpc(new Map([['codex', createDriver({ sendPrompt })]])));
     const url = await service.start();
     const dinaUrl = agentUrl(url, 'agent-dina');
@@ -57,6 +58,28 @@ describe('ClawMcpService', () => {
       expect.stringContaining('Can you review this branch?'),
       undefined,
     );
+    expect(snapshot.messages.at(-1)).toMatchObject({
+      agentId: 'agent-jesse',
+      role: 'user',
+      parts: [{
+        type: 'text',
+        text: expect.stringContaining('Can you review this branch?'),
+      }],
+    });
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-jesse',
+      type: 'snapshot.updated',
+      payload: expect.objectContaining({
+        messages: [expect.objectContaining({
+          agentId: 'agent-jesse',
+          role: 'user',
+          parts: [expect.objectContaining({
+            type: 'text',
+            text: expect.stringContaining('Can you review this branch?'),
+          })],
+        })],
+      }),
+    }));
   });
 });
 

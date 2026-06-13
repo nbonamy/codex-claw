@@ -248,6 +248,8 @@ When a recipient receives a direct or broadcast message:
 - if the recipient is idle, main drains unread messages for that agent and
   starts a normal backend turn containing the sender name, sender agent ID, and
   message body directly;
+- the delivery prompt is also appended to the recipient's visible conversation
+  as a user message, just like a normal prompt from the renderer;
 - if the recipient is busy, main waits until the current turn completes, then
   drains all pending unread messages into one direct delivery prompt.
 

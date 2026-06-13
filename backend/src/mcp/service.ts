@@ -1,8 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { BackendEvent } from '@codex-claw/shared/backend-driver';
-import type { Agent, AppSnapshot, CreateAgentInput, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, WorkBacklogAssignment } from '@codex-claw/shared/contracts';
+import { sendAgentPrompt } from '@codex-claw/shared/agent-chat-service';
+import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/shared/backend-driver';
+import type { Agent, AppSnapshot, CreateAgentInput, CreateSourceWorktreeInput, SendPromptOptions, SourceRepository, SourceWorktree, WorkBacklogAssignment } from '@codex-claw/shared/contracts';
 import { completeWorkItemAssignmentInSnapshot, markWorkItemCompletionInstructionsDeliveredInSnapshot } from '@codex-claw/shared/agent-manager';
 import { createAgentInSnapshot } from '@codex-claw/shared/snapshot';
 import { createSourceWorktree, listSourceWorktrees } from '../git-worktrees';
@@ -80,9 +81,61 @@ export class ClawMcpService {
       return;
     }
 
-    await this.driverRpc.handle('driver/sendPrompt', {
-      agent,
-      prompt: agentMessagesPrompt(messages),
+    sendAgentPrompt(
+      this.snapshot,
+      this.backendDriverForAgent(agent),
+      agent.id,
+      agentMessagesPrompt(messages),
+      undefined,
+      (event) => this.emit(event),
+      {
+        onBackendSessionUpdated: () => this.emitSnapshotUpdated(agent.id),
+      },
+    );
+    this.emitSnapshotUpdated(agent.id);
+  }
+
+  private backendDriverForAgent(agent: Agent): AgentBackendDriver {
+    return {
+      backend: agent.backend,
+      getRuntimeStatus: () => ({ backend: agent.backend, status: 'running' }),
+      getCapabilities: () => {
+        throw new Error('Backend capabilities are not needed during MCP prompt delivery.');
+      },
+      tryHandlePromptCommand: (currentAgent, prompt) => (
+        this.requireDriverRpc().tryHandlePromptCommand(currentAgent, prompt)
+      ),
+      sendPrompt: (currentAgent, prompt, options?: SendPromptOptions) => (
+        this.requireDriverRpc().handle('driver/sendPrompt', {
+          agent: currentAgent,
+          prompt,
+          ...(options ? { options } : {}),
+        }) as Promise<BackendSendResult>
+      ),
+      interrupt: (currentAgent) => this.requireDriverRpc().handle('driver/interrupt', { agent: currentAgent }) as Promise<BackendSendResult>,
+      respondToRequest: async (response) => {
+        await this.requireDriverRpc().handle('driver/respondToClientRequest', {
+          backend: agent.backend,
+          response,
+        });
+      },
+      onEvent: () => () => undefined,
+      close: () => Promise.resolve(),
+    };
+  }
+
+  private requireDriverRpc(): BackendDriverRpc {
+    if (!this.driverRpc) {
+      throw new Error('Backend driver RPC is not configured.');
+    }
+    return this.driverRpc;
+  }
+
+  private emitSnapshotUpdated(agentId: string): void {
+    this.emit({
+      agentId,
+      type: 'snapshot.updated',
+      payload: this.snapshot,
     });
   }
 
