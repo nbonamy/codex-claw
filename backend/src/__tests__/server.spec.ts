@@ -757,7 +757,7 @@ describe('ClawBackendServer', () => {
       });
       await expect(server.handleMessage({
         jsonrpc: '2.0',
-        id: 'read-file',
+        id: 'preview-file',
         method: 'agent/previewFile',
         params: { agentId: 'agent-dina', filePath: 'README.md' },
       })).resolves.toMatchObject({

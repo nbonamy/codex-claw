@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { listAgentFolderFiles, readAgentFolderFile } from '../agent-files';
+import { listAgentFolderFiles, previewAgentFolderFile } from '../agent-files';
 
 const tempFolders: string[] = [];
 
@@ -52,7 +52,7 @@ describe('listAgentFolderFiles', () => {
     const folder = await createTempFolder();
     await writeFile(path.join(folder, 'README.md'), '# Read me\n', 'utf8');
 
-    await expect(readAgentFolderFile(folder, 'README.md')).resolves.toStrictEqual({
+    await expect(previewAgentFolderFile(folder, 'README.md')).resolves.toStrictEqual({
       path: 'README.md',
       content: '# Read me\n',
     });
@@ -62,9 +62,9 @@ describe('listAgentFolderFiles', () => {
     const folder = await createTempFolder();
     await writeFile(path.join(folder, 'large.md'), 'xxxx', 'utf8');
 
-    await expect(readAgentFolderFile(folder, '../outside.md')).rejects.toThrow('outside the agent folder');
-    await expect(readAgentFolderFile(folder, '.')).rejects.toThrow('Path is not a file');
-    await expect(readAgentFolderFile(folder, 'large.md', { maxBytes: 3 })).rejects.toThrow('File is too large');
+    await expect(previewAgentFolderFile(folder, '../outside.md')).rejects.toThrow('outside the agent folder');
+    await expect(previewAgentFolderFile(folder, '.')).rejects.toThrow('Path is not a file');
+    await expect(previewAgentFolderFile(folder, 'large.md', { maxBytes: 3 })).rejects.toThrow('File is too large');
   });
 });
 

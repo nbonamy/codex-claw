@@ -190,7 +190,7 @@ export class ClawBackendServer {
         if (!agent) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
         }
-        return createClawRpcResult(message.id, await this.requireDriverRpc().handle('driver/readFile', {
+        return createClawRpcResult(message.id, await this.requireDriverRpc().handle('driver/previewFile', {
           folder: agent.folder,
           filePath: requireString(params.filePath, 'filePath'),
         }));

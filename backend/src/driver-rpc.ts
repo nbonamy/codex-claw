@@ -2,7 +2,7 @@ import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex
 import { unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
 import type { Agent, AgentBackend, AppleSpeechTranscriptionOptions, CreateSourceWorktreeInput, SendPromptOptions } from '@codex-claw/shared/contracts';
 import { stat } from 'node:fs/promises';
-import { listAgentFolderFiles, readAgentFolderFile } from './agent-files';
+import { listAgentFolderFiles, previewAgentFolderFile } from './agent-files';
 import { ClaudeBackendDriver } from './claude/claude-driver';
 import { CodexAgentSessionManager } from './codex/agent-session';
 import { CodexBackendDriver } from './codex/codex-driver';
@@ -47,9 +47,9 @@ export class BackendDriverRpc {
         const record = requireRecord(params);
         return listAgentFolderFiles(requireString(record.folder, 'folder'));
       }
-      case 'driver/readFile': {
+      case 'driver/previewFile': {
         const record = requireRecord(params);
-        return readAgentFolderFile(
+        return previewAgentFolderFile(
           requireString(record.folder, 'folder'),
           requireString(record.filePath, 'filePath'),
         );

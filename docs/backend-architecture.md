@@ -117,9 +117,9 @@ Current implementation checkpoint:
   events.
 - `clawd` owns agent file listing/preview authority. Client-facing
   `agent/listFiles` and `agent/previewFile` take an `agentId`; Electron does not
-  send workspace roots or read file bytes. Provider-specific file access remains
-  a backend-internal capability after `clawd` resolves the agent folder from
-  backend state.
+  send workspace roots or request raw file reads. Provider-specific file preview
+  access remains a backend-internal capability after `clawd` resolves the agent
+  folder from backend state.
 - `clawd` owns provider metadata and conversation-history reads. Electron asks
   for models, skills, conversation lists, and loop-created conversation
   messages by agent/ref ids; backend resolves agents and validates stored

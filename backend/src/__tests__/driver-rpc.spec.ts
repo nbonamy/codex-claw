@@ -192,7 +192,7 @@ describe('BackendDriverRpc', () => {
         { name: 'README.md', path: 'README.md' },
         { name: 'main.ts', path: 'src/main.ts' },
       ]);
-      await expect(rpc.handle('driver/readFile', { folder: tempDir, filePath: 'README.md' })).resolves.toStrictEqual({
+      await expect(rpc.handle('driver/previewFile', { folder: tempDir, filePath: 'README.md' })).resolves.toStrictEqual({
         path: 'README.md',
         content: '# Read me\n',
       });

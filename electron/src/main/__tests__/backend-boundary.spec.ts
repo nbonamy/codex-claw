@@ -49,13 +49,13 @@ describe('Electron backend boundary', () => {
     }
   });
 
-  it('keeps workspace file reads behind clawd', async () => {
+  it('keeps workspace file previews behind clawd', async () => {
     const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
     const source = await readFile(appControllerPath, 'utf8');
 
     expect(source).not.toMatch(/from ['"]node:fs/);
     expect(source).not.toMatch(/from ['"]fs/);
-    expect(source).not.toContain('driver/readFile');
+    expect(source).not.toContain('driver/previewFile');
     expect(source).not.toContain('driver/listFiles');
     expect(source).toContain("request('agent/previewFile'");
     expect(source).toContain('agentId');
@@ -67,7 +67,7 @@ describe('Electron backend boundary', () => {
     for (const { filePath, source } of sources) {
       expect(source, filePath).not.toMatch(/\breadFile(?:Sync)?\b/);
       expect(source, filePath).not.toMatch(/\bcreateReadStream\b/);
-      expect(source, filePath).not.toContain('driver/readFile');
+      expect(source, filePath).not.toContain('driver/previewFile');
       expect(source, filePath).not.toContain('driver/listFiles');
     }
   });
@@ -78,7 +78,7 @@ describe('Electron backend boundary', () => {
 
     expect(source).not.toMatch(/\breadFile(?:Sync)?\b/);
     expect(source).not.toMatch(/\bcreateReadStream\b/);
-    expect(source).not.toContain('driver/readFile');
+    expect(source).not.toContain('driver/previewFile');
     expect(source).not.toContain('driver/listFiles');
   });
 

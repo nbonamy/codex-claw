@@ -85,7 +85,7 @@ export async function listAgentFolderFiles(
   }
 }
 
-export async function readAgentFolderFile(
+export async function previewAgentFolderFile(
   folder: string,
   filePath: string,
   options: { maxBytes?: number } = {},
