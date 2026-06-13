@@ -53,7 +53,7 @@ export class ClawBackendProxyDriver implements AgentBackendDriver {
   }
 
   async getGitDiff(agent: Agent): Promise<string | null> {
-    return this.client.request('agent/getGitDiff', { agent });
+    return this.client.request('driver/getGitDiff', { agent });
   }
 
   preparePromptOptions(_agent: Agent, options?: SendPromptOptions): SendPromptOptions | undefined {

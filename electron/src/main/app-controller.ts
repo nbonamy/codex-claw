@@ -15,7 +15,7 @@ import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from '.
 import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 import type { AgentBackendDriver } from './backends/types';
-import { backendDisplayName, unsupportedBackendFeature } from './backends/types';
+import { backendDisplayName } from './backends/types';
 import { defaultUserDataPath } from './user-data';
 
 type ClawBackendClientPort = Pick<ClawBackendProcessClient, 'start' | 'health' | 'request' | 'onEvent' | 'close'>;
@@ -544,57 +544,7 @@ export class AppController {
   }
 
   private async openAgentGitDiff(agentId: string): Promise<void> {
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent) {
-      throw new Error(`Agent not found: ${agentId}`);
-    }
-
-    const driver = await this.getBackendDriverForAgent(agent);
-    const title = 'Git Diff';
-    const subtitle = agent.folder;
-
-    if (!driver.getGitDiff) {
-      this.emitAndApply({
-        agentId,
-        type: 'sidePanel.gitDiffRequested',
-        payload: {
-          kind: 'gitDiff',
-          title,
-          subtitle,
-          diff: '',
-          state: 'error',
-          error: unsupportedBackendFeature(agent, 'git diff preview').message,
-        },
-      });
-      return;
-    }
-
-    try {
-      const diff = await driver.getGitDiff(agent);
-      this.emitAndApply({
-        agentId,
-        type: 'sidePanel.gitDiffRequested',
-        payload: {
-          kind: 'gitDiff',
-          title,
-          subtitle,
-          diff: diff ?? '',
-        },
-      });
-    } catch (error) {
-      this.emitAndApply({
-        agentId,
-        type: 'sidePanel.gitDiffRequested',
-        payload: {
-          kind: 'gitDiff',
-          title,
-          subtitle,
-          diff: '',
-          state: 'error',
-          error: error instanceof Error ? error.message : String(error),
-        },
-      });
-    }
+    await this.requireBackendClient().request('agent/openGitDiff', { agentId });
   }
 
   private async steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot> {

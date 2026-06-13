@@ -544,6 +544,111 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
+  it('owns git diff preview side-panel events', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const getGitDiff = vi.fn().mockResolvedValue('diff --git a/a.ts b/a.ts\n');
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      getGitDiff,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const events: unknown[] = [];
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      onEvent: (event) => events.push(event),
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'open-diff',
+      method: 'agent/openGitDiff',
+      params: { agentId: 'agent-dina' },
+    })).resolves.toMatchObject({ result: true });
+
+    expect(getGitDiff).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-dina',
+      type: 'sidePanel.gitDiffRequested',
+      payload: {
+        kind: 'gitDiff',
+        title: 'Git Diff',
+        subtitle: '/Users/nbonamy/src/codex-claw',
+        diff: 'diff --git a/a.ts b/a.ts\n',
+      },
+    }));
+    await server.close();
+  });
+
+  it('emits git diff preview errors from clawd', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      getGitDiff: vi.fn().mockResolvedValue(null),
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const events: unknown[] = [];
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      onEvent: (event) => events.push(event),
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'open-diff',
+      method: 'agent/openGitDiff',
+      params: { agentId: 'agent-dina' },
+    });
+
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'sidePanel.gitDiffRequested',
+      payload: expect.objectContaining({
+        state: 'error',
+        error: 'Codex does not support git diff preview.',
+      }),
+    }));
+    await server.close();
+  });
+
   it('owns work item assignment mutations', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];

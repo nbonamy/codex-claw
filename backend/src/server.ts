@@ -4,7 +4,7 @@ import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNo
 import { applyMainEventToSnapshot, createAgentInSnapshot, createEmptySnapshot, updateAgentFolder, updateAgentFromInput } from '@codex-claw/shared/snapshot';
 import type { Agent, AppSnapshot, BackendConversationRef, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
-import { backendDisplayName } from '@codex-claw/shared/backend-driver';
+import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { assignWorkItemToAgentInSnapshot, closeAgentInSnapshot, deployBenchTemplateInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeBenchTemplateFromSnapshot, removeWorkItemAssignmentFromSnapshot, reorderAgentInTeam, restartAgentConversation, resumeAgentConversationInSnapshot, saveAgentToBench } from '@codex-claw/shared/agent-manager';
@@ -191,6 +191,15 @@ export class ClawBackendServer {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Conversation reference is not available.');
         }
         return createClawRpcResult(message.id, await this.requireDriverRpc().handle('driver/readConversationMessages', { ref, agentId }));
+      }
+      case 'agent/openGitDiff': {
+        const agentId = requireAgentId(message.params);
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        await this.openAgentGitDiff(agent);
+        return createClawRpcResult(message.id, true);
       }
       case 'agent/assignWorkItem': {
         const params = requireRecord(message.params);
@@ -768,6 +777,54 @@ export class ClawBackendServer {
         (createdAgent.conversationRef ? sameConversationRef(createdAgent.conversationRef, ref) : false)
       ))
     )));
+  }
+
+  private async openAgentGitDiff(agent: Agent): Promise<void> {
+    const title = 'Git Diff';
+    const subtitle = agent.folder;
+
+    try {
+      const diff = await this.requireDriverRpc().handle('driver/getGitDiff', { agent }) as string | null;
+      if (diff === null) {
+        this.applyAndEmitBackendEvent({
+          agentId: agent.id,
+          type: 'sidePanel.gitDiffRequested',
+          payload: {
+            kind: 'gitDiff',
+            title,
+            subtitle,
+            diff: '',
+            state: 'error',
+            error: unsupportedBackendFeature(agent, 'git diff preview').message,
+          },
+        });
+        return;
+      }
+
+      this.applyAndEmitBackendEvent({
+        agentId: agent.id,
+        type: 'sidePanel.gitDiffRequested',
+        payload: {
+          kind: 'gitDiff',
+          title,
+          subtitle,
+          diff,
+        },
+      });
+    } catch (error) {
+      this.applyAndEmitBackendEvent({
+        agentId: agent.id,
+        type: 'sidePanel.gitDiffRequested',
+        payload: {
+          kind: 'gitDiff',
+          title,
+          subtitle,
+          diff: '',
+          state: 'error',
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+    }
   }
 
   private addRecentSourceRepository(repoName: string): void {

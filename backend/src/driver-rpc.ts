@@ -67,7 +67,7 @@ export class BackendDriverRpc {
         const driver = this.requireDriver(agent.backend);
         return driver.getGitStatus ? driver.getGitStatus(agent) : null;
       }
-      case 'agent/getGitDiff': {
+      case 'driver/getGitDiff': {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);
         return driver.getGitDiff ? driver.getGitDiff(agent) : null;

@@ -107,11 +107,14 @@ Current implementation checkpoint:
   for models, skills, conversation lists, and loop-created conversation
   messages by agent/ref ids; backend resolves agents and validates stored
   conversation refs before calling provider drivers.
+- `clawd` owns manual git diff preview requests. Electron forwards
+  `agent/openGitDiff`, and the backend resolves the agent, calls the provider
+  git-diff capability, and emits the side-panel event.
 - The remaining large slice is to move the rest of product orchestration out of
   `AppController` so Electron becomes only the desktop IPC/stdio layer. The
-  largest remaining owners are git status/diff preview, persisted-session
-  hydration on selection, client request ownership, and remaining desktop-era
-  driver shims.
+  largest remaining owners are git status refresh, persisted-session hydration
+  on selection, client request ownership, and remaining desktop-era driver
+  shims.
 
 ## Goals
 

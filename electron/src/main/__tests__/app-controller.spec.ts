@@ -475,33 +475,15 @@ describe('AppController', () => {
     });
   });
 
-  it('opens repo git diff previews through the backend driver capability', async () => {
+  it('opens repo git diff previews through clawd', async () => {
     const snapshot = createInitialSnapshot();
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
-    const send = vi.fn();
-    const getGitDiff = vi.fn().mockResolvedValue('diff --git a/a.ts b/a.ts\n');
-    const backendDriver = createFakeCodexBackendDriver({ getGitDiff });
+    const request = vi.fn().mockResolvedValue(true);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
 
     await controller.initialize();
-    setMainWindowSend(controller, send);
-    setCodexBackendDriver(controller, backendDriver);
     await openAgentGitDiff(controller, 'agent-dina');
 
-    expect(getGitDiff).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
-    expect(send).toHaveBeenCalledWith('app:event', expect.objectContaining({
-      agentId: 'agent-dina',
-      type: 'sidePanel.gitDiffRequested',
-      payload: {
-        kind: 'gitDiff',
-        title: 'Git Diff',
-        subtitle: '~/src/codex-claw',
-        diff: 'diff --git a/a.ts b/a.ts\n',
-      },
-    }));
+    expect(request).toHaveBeenCalledWith('agent/openGitDiff', { agentId: 'agent-dina' });
   });
 
   it('routes agent restart through clawd', async () => {
