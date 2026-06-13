@@ -14,7 +14,9 @@
     "test:watch": "vitest watch"
   },
   "dependencies": {
-    "@codex-claw/shared": "0.1.0"
+    "@codex-claw/shared": "0.1.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",

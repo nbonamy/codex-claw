@@ -12,7 +12,6 @@ import { LoopScheduler } from './loops/scheduler';
 import { createMainWindow } from './main-window';
 import { ClawMcpAgentCoordinator } from './mcp/agent-coordinator';
 import { agentMessagesPrompt } from './mcp/agent-prompts';
-import { ClawMcpHttpServer } from './mcp/http-server';
 import { detectSourceFolder, scanSourceRepositories } from './source-repositories';
 import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-permissions';
 import { transcribeWithAppleSpeechAnalyzer } from './transcription/apple-speech';
@@ -95,9 +94,6 @@ export class AppController {
     onCreateSourceWorktree: (input) => this.createSourceWorktree(input),
     onCreateAgent: (agent, input) => this.createAgentFromMcp(agent, input),
   });
-  private mcpServer: ClawMcpHttpServer | null = null;
-  private mcpServerUrl: string | null = null;
-  private mcpServerStartPromise: Promise<string> | null = null;
   private readonly backendDrivers = new Map<AgentBackend, AgentBackendDriver>();
   private readonly backendDriverEventUnsubscribes = new Map<AgentBackend, () => void>();
   private readonly clientRequestBackends = new Map<string, AgentBackend>();
@@ -556,7 +552,6 @@ export class AppController {
     this.backendDriverEventUnsubscribes.clear();
     await this.backendClient?.close();
     await Promise.all([...this.backendDrivers.values()].map((driver) => driver.close()));
-    await this.mcpServer?.stop();
   }
 
   private async initializeBackendClient(): Promise<void> {
@@ -1460,24 +1455,6 @@ export class AppController {
 
   private getExistingBackendDriver(backend: AgentBackend): AgentBackendDriver | null {
     return this.backendDrivers.get(backend) ?? null;
-  }
-
-  private async ensureMcpServer(): Promise<string> {
-    if (this.mcpServerUrl) {
-      return this.mcpServerUrl;
-    }
-
-    if (!this.mcpServerStartPromise) {
-      this.mcpServer = new ClawMcpHttpServer({
-        coordinator: this.mcpCoordinator,
-      });
-      this.mcpServerStartPromise = this.mcpServer.start().then((url) => {
-        this.mcpServerUrl = url;
-        return url;
-      });
-    }
-
-    return this.mcpServerStartPromise;
   }
 
   private emitAndApply(

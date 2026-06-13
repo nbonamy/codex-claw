@@ -4,7 +4,7 @@ export function logMain(area: string, message: string, details?: Record<string, 
   }
 
   const suffix = details ? ` ${safeJson(details)}` : '';
-  console.info(`[clawd:${area}] ${message}${suffix}`);
+  console.error(`[clawd:${area}] ${message}${suffix}`);
 }
 
 export function warnMain(area: string, message: string, details?: Record<string, unknown>): void {

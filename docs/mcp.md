@@ -7,10 +7,12 @@ tools where possible and translate only the backend-specific enablement path.
 
 ## Boundary
 
-Electron main owns the MCP server, collaboration state, and all tool effects.
-The renderer never talks to MCP directly.
+`clawd` owns the MCP server, collaboration state, and backend-owned tool
+effects. Electron main does not start this HTTP server; it only receives
+app-owned backend events for desktop effects such as displaying Markdown in the
+side panel. The renderer never talks to MCP directly.
 
-Main responsibilities:
+Backend responsibilities:
 
 - start and stop the MCP server;
 - expose only tools backed by real Claw product behavior;
@@ -18,6 +20,12 @@ Main responsibilities:
 - enforce team visibility;
 - notify the right agent when inbox work arrives;
 - translate status updates into app-owned `agent.updated` events.
+
+Electron main responsibilities:
+
+- fan backend events out to renderer windows;
+- perform native desktop effects requested by app-owned backend events;
+- keep preload IPC independent from MCP SDK and provider protocol types.
 
 Renderer responsibilities:
 
@@ -35,9 +43,10 @@ loopback address:
 http://127.0.0.1:<port>/mcp
 ```
 
-The port is ephemeral by default. The server starts lazily before the first
-backend session that needs it. Keep the server loopback-only unless we
-explicitly design a remote-control product surface.
+The port is ephemeral by default. The server starts inside `clawd` before
+backend drivers are constructed so Codex and Claude sessions receive a valid
+backend-owned MCP URL. Keep the server loopback-only unless we explicitly
+design a remote-control product surface.
 
 The transport uses JSON responses for normal request/response calls
 (`enableJsonResponse: true`) rather than one-shot SSE responses. This mirrors
@@ -60,7 +69,7 @@ Backends should receive the MCP server through request-local or session-local
 configuration. Do not mutate a user's global tool configuration as part of the
 normal app path.
 
-For Codex, main starts `codex app-server` with only process-wide feature
+For Codex, `clawd` starts `codex app-server` with only process-wide feature
 overrides, then passes the Claw MCP server through each agent's
 `thread/start.config` or `thread/resume.config`:
 

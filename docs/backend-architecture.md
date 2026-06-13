@@ -42,9 +42,13 @@ Current implementation checkpoint:
   must not import provider drivers, provider transports, provider SDKs, or raw
   provider protocol modules.
 - `clawd` currently serves health, snapshot loading, the `AgentBackendDriver`
-  RPC surface, and sequenced `backend/event` notifications. The remaining large
-  slice is to move product orchestration out of `AppController` so Electron
-  becomes only the desktop IPC/stdio layer.
+  RPC surface, sequenced `backend/event` notifications, and the Claw MCP HTTP
+  server used by agent collaboration tools.
+- Electron main no longer owns the MCP HTTP server. Desktop-facing MCP effects,
+  such as displaying Markdown in the side panel, flow back to Electron as
+  app-owned backend events.
+- The remaining large slice is to move product orchestration out of
+  `AppController` so Electron becomes only the desktop IPC/stdio layer.
 
 ## Goals
 
@@ -256,7 +260,8 @@ renderer.
 - Backend drivers and protocol adapters for Codex, Claude, and future coding
   backends.
 - Codex app-server and Claude process lifecycle.
-- Claw MCP server and agent-to-agent collaboration state.
+- Claw MCP server and agent-to-agent collaboration state. This server must run
+  inside `clawd` so Codex/Claude sessions receive a backend-owned MCP URL.
 - File search/read, git status/diff/worktree creation, source repository
   discovery, artifact readback, markdown side-panel requests, and any future
   backend-location-owned filesystem behavior.

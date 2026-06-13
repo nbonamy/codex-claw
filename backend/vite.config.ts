@@ -8,17 +8,17 @@ export default defineConfig({
     },
   },
   build: {
-    lib: {
-      entry: path.resolve(__dirname, 'src/clawd.ts'),
-      formats: ['es'],
-      fileName: () => 'clawd.mjs',
-    },
+    ssr: path.resolve(__dirname, 'src/clawd.ts'),
     outDir: 'dist',
     emptyOutDir: true,
     sourcemap: true,
     minify: false,
     rollupOptions: {
       external: [/^node:/],
+      output: {
+        entryFileNames: 'clawd.mjs',
+        format: 'es',
+      },
     },
   },
 });

@@ -448,12 +448,12 @@ our IPC event types instead.
 ## Agent Collaboration MCP
 
 Codex Claw's MCP server is the app-owned collaboration protocol for agents.
-It lives in Electron main, exposes Skwad-shaped communication tools, stores
-runtime inbox state, and emits app-owned agent updates. Detailed behavior lives
-in `docs/mcp.md`.
+It lives in `clawd`, exposes Skwad-shaped communication tools, stores runtime
+inbox state, and emits app-owned agent updates back to Electron as backend
+events. Detailed behavior lives in `docs/mcp.md`.
 
 Backend drivers enable this server in backend-specific ways. Codex receives the
-server through app-server command-line config overrides for
+server through `thread/start.config` or `thread/resume.config` entries for
 `mcp_servers.codex_claw`. During MCP elicitation development, the scoped
 `default_tools_approval_mode = "approve"` override stays disabled so the
 approval UI path is exercised; we expect to bring it back for normal Claw MCP
@@ -690,7 +690,7 @@ Implemented product surfaces:
 - Settings can connect work backlog integrations, starting with GitHub OAuth.
 - Cockpit can show connected repository issues and assign them to agents by
   drag and drop.
-- Claw's local MCP server supports agent registration, status, listing,
+- Claw's backend-owned local MCP server supports agent registration, status, listing,
   direct messages, broadcast, and inbox checks.
 
 Still intentionally incomplete:

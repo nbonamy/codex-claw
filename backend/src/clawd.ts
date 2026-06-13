@@ -1,6 +1,7 @@
 import { pathToFileURL } from 'node:url';
 import { createClawRpcNotification } from '@codex-claw/shared/backend-protocol/rpc';
 import { BackendDriverRpc, createDefaultBackendDrivers } from './driver-rpc';
+import { ClawMcpService } from './mcp/service';
 import { ClawBackendServer } from './server';
 import { loadBackendSnapshot } from './state';
 import { startStdioRpcServer } from './stdio';
@@ -14,15 +15,39 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   }
 
   if (argv.includes('--stdio')) {
+    const snapshot = await loadBackendSnapshot(readArgValue(argv, '--state-dir'));
+    const mcpService = new ClawMcpService({ snapshot });
+    const mcpServerUrl = await mcpService.start();
+    const driverRpc = new BackendDriverRpc(createDefaultBackendDrivers({
+      clawMcpServerUrl: mcpServerUrl,
+    }));
     const server = new ClawBackendServer({
       version: CLAWD_VERSION,
-      snapshot: await loadBackendSnapshot(readArgValue(argv, '--state-dir')),
-      driverRpc: new BackendDriverRpc(createDefaultBackendDrivers({
-        clawMcpServerUrl: readArgValue(argv, '--mcp-server-url') ?? null,
-      })),
+      snapshot,
+      driverRpc,
       onEvent: (event) => {
         process.stdout.write(`${JSON.stringify(createClawRpcNotification('backend/event', event))}\n`);
       },
+    });
+    mcpService.setDriverRpc(driverRpc);
+    mcpService.setEventSink((event) => server.emitEvent(event));
+    let stopping = false;
+    const stop = async () => {
+      if (stopping) {
+        return;
+      }
+      stopping = true;
+      await server.close();
+      await mcpService.stop();
+    };
+    process.once('SIGTERM', () => {
+      void stop().finally(() => process.exit(0));
+    });
+    process.once('SIGINT', () => {
+      void stop().finally(() => process.exit(0));
+    });
+    process.stdin.once('end', () => {
+      void stop().finally(() => process.exit(0));
     });
     startStdioRpcServer({
       input: process.stdin,
@@ -33,7 +58,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     return;
   }
 
-  process.stderr.write('Usage: clawd --stdio [--state-dir <path>] [--mcp-server-url <url>] | --version\n');
+  process.stderr.write('Usage: clawd --stdio [--state-dir <path>] | --version\n');
   process.exitCode = 1;
 }
 

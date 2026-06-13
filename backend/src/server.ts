@@ -73,6 +73,10 @@ export class ClawBackendServer {
     await this.driverRpc?.close();
   }
 
+  emitEvent(event: BackendEvent): void {
+    this.handleBackendEvent(event);
+  }
+
   private handleBackendEvent(event: BackendEvent): void {
     this.lastEventSeq += 1;
     this.onEvent?.({
