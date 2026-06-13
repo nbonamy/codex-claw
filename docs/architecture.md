@@ -5,9 +5,9 @@ Status: updated for backend driver capability seam, 2026-06-11.
 Codex Claw is an Electron app that merges the team/agent product model from
 Skwad with the native chat and artifact rendering already built in id8. The app
 implements Codex through Codex app-server and Claude through the local Claude
-Code CLI stream-json surface behind a backend-aware main-process seam. It does not launch a
-terminal emulator as the primary user experience; main-process backend drivers
-own protocol/process communication and the renderer displays app-owned events.
+Code CLI stream-json surface behind the `clawd` backend. It does not launch a
+terminal emulator as the primary user experience; backend drivers own
+protocol/process communication and the renderer displays app-owned events.
 
 ## Goals
 
@@ -191,7 +191,7 @@ flowchart LR
   Main["Electron main: desktop adapter"]
   Client["ClawBackendClient"]
   Backend["clawd"]
-  Store["App store in userData"]
+  Store["Backend app state directory"]
   Server["Codex app-server / Claude Code"]
   CodexHome["Backend state and provider homes"]
 
@@ -470,9 +470,9 @@ The app-server can generate TypeScript protocol bindings with:
 codex app-server generate-ts --out <dir>
 ```
 
-Those generated types should live under a main-process protocol package, for
-example `src/main/codex-protocol/generated`. Renderer code should depend on
-our IPC event types instead.
+Those generated types should live under a backend provider protocol package, for
+example `backend/src/codex/generated`. Renderer and Electron main code should
+depend on app-owned IPC/event types instead.
 
 ## Agent Collaboration MCP
 
@@ -624,8 +624,10 @@ Shiki theme or equivalent syntax theme adapter.
 
 ## Persistence
 
-Initial persistence can be a versioned JSON file under Electron `userData`.
-Keep the schema explicit and migration-friendly:
+Durable persistence is a versioned JSON file under the `clawd` state
+directory. Electron main passes the local app data directory to `clawd` at
+startup for local desktop builds, but only the backend reads and writes
+`state.json`. Keep the schema explicit and migration-friendly:
 
 ```ts
 type PersistedStateV1 = {
@@ -637,8 +639,8 @@ type PersistedStateV1 = {
 }
 ```
 
-Move to SQLite only when we need local queryable app state beyond what
-app-server already persists. Conversation history should not be duplicated in
+Move to SQLite only when `clawd` needs queryable app state beyond what provider
+backends already persist. Conversation history should not be duplicated in
 Codex Claw unless we need an app-specific cache for performance.
 
 ## Work Backlog Integrations
@@ -646,23 +648,25 @@ Codex Claw unless we need an app-specific cache for performance.
 Work backlog providers are app-owned integrations, not agent backend features.
 The renderer consumes provider-neutral `WorkRepository` and `WorkItem`
 contracts and emits assignment intents. GitHub-specific OAuth, REST payloads,
-and provider polling live in `clawd`; Electron supplies desktop-only services
-such as encrypted token storage and browser opening through backend-initiated
-desktop RPC methods.
+token persistence, and provider polling live in `clawd`; Electron supplies
+desktop-only services such as browser opening through backend-initiated desktop
+RPC methods.
 
 Provider tokens must not be stored in the persisted app snapshot. The snapshot
 can persist safe metadata such as connection status, account label, and
 provider-specific backlog configuration. GitHub currently stores the selected
 repository id and optional tag name as its backlog configuration. Secret
-material belongs in the desktop token store, using Electron encrypted storage
-when available.
+material belongs behind the backend token-store port. The current local
+implementation stores encrypted token data under the backend state directory;
+future packaged builds can replace that port with a native keychain or
+credential-helper implementation without moving ownership back to Electron.
 
 GitHub uses OAuth device flow for the desktop app. It requires a public client
 ID but no client secret or localhost callback route. `clawd` reads
 `CODEX_CLAW_GITHUB_CLIENT_ID` from the environment as the default client ID,
 and Settings can persist a per-provider client ID override. Actual GitHub
-access tokens remain outside the persisted app snapshot in the encrypted
-desktop token store, accessed by `clawd` through the desktop token bridge.
+access tokens remain outside the persisted app snapshot in the backend token
+store.
 Starting device flow only returns the code to the renderer; opening GitHub is a
 separate user action so the user can see and copy the code before the browser
 takes focus. Electron owns that browser-open action through
@@ -697,7 +701,7 @@ cockpit tiles into provider-aware UI.
 - Unit-test `CodexEventAdapter` with captured app-server notifications.
 - Unit-test renderer reducers using ordered event sequences, including reload
   snapshots and duplicate events.
-- Contract-test main-process session flows against a fake app-server transport
+- Contract-test backend session flows against a fake app-server transport
   first.
 - Add a real app-server smoke test gated behind an environment variable once
   the first agent works.
@@ -714,9 +718,10 @@ Implemented product surfaces:
   Bench, restarted, closed, and selected.
 - Empty teams show a first-agent call to action instead of creating a default
   agent.
-- Main process starts/connects to Codex app-server, creates or resumes Codex
+- `clawd` starts/connects to Codex app-server, creates or resumes Codex
   threads, hydrates history, sends prompts, steers active turns, and
-  interrupts.
+  interrupts. Electron main forwards renderer IPC to `clawd` and owns desktop
+  affordances only.
 - Renderer displays ordered chat/tool parts, Markdown, links, diff stats,
   queued prompts, ask-user prompts, approvals, context usage, rate limits,
   file mentions, skills, plan/goal controls, and voice transcription controls.

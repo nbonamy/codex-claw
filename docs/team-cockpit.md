@@ -162,11 +162,11 @@ record does not need to become team-scoped because the assigned agent already
 implies the team, and assignments represent local work state rather than a
 filter preference.
 
-## IPC And Main Process
+## IPC And Backend
 
 The renderer should not mutate scoped backlog config locally as durable state.
 
-Main process should own:
+`clawd` should own:
 
 - validating the requested backlog scope;
 - saving global versus team-scoped provider configuration;
@@ -180,7 +180,7 @@ Renderer should own:
 - passing scoped `configureWorkBacklog` requests through typed IPC;
 - loading repositories/items for the selected scoped repository.
 
-`WorkIntegrationManager.configureBacklog` is the right main-process seam to
+`WorkIntegrationManager.configureBacklog` is the right backend seam to
 extend. The work-provider drivers do not need to know about cockpit scope.
 
 ## Dialog Behavior
@@ -217,7 +217,7 @@ When/if implemented, cover it in small slices:
   - sidebar Cockpit opens team scope;
   - switching teams keeps team Cockpit scoped to the current team;
   - team-scoped create/deploy dialogs hide team controls.
-- Main/persistence tests:
+- Backend/persistence tests:
   - global backlog config persists as before;
   - team-scoped backlog config persists per team;
   - closing a team removes only that team's scoped config;

@@ -1,12 +1,13 @@
 # Codex Integration
 
-Codex Claw talks to Codex through the Codex app-server. All communication with
-Codex happens in Electron main. The renderer receives app-owned events over
-typed IPC and never talks to the app-server directly.
+Codex Claw talks to Codex through the Codex app-server. All provider
+communication with Codex happens in `clawd`, not Electron main. Electron main
+forwards renderer IPC over the app-owned backend protocol, fans backend events
+to the renderer, and owns only desktop-native callbacks.
 
 ## Boundary
 
-Main process responsibilities:
+`clawd` responsibilities:
 
 - resolve the Codex executable;
 - start or connect to `codex app-server`;
@@ -17,6 +18,14 @@ Main process responsibilities:
 - adapt Codex events into app-owned events;
 - persist only app product state, not Codex transcripts.
 
+Electron main responsibilities:
+
+- spawn/connect to `clawd`;
+- translate renderer IPC calls into app-owned backend RPC calls;
+- provide desktop callbacks requested by `clawd`, such as open-external and
+  native permission prompts/settings;
+- fan backend events out to the renderer.
+
 Renderer responsibilities:
 
 - render app-owned message, tool, diff, plan, and approval state;
@@ -24,7 +33,10 @@ Renderer responsibilities:
 - never import generated Codex protocol types;
 - never spawn Codex or access `CODEX_HOME`.
 
-Preload is the only bridge between renderer and main.
+Preload is the only bridge between renderer and Electron main. It must not
+talk directly to Codex app-server, provider protocol modules, or local
+filesystem read APIs. Workspace file previews are backend resource requests,
+not desktop filesystem requests.
 
 ## Transport
 
@@ -79,33 +91,34 @@ the product mapping:
 One app-server process can host many threads. Agents are routed by `threadId`
 and app-owned `agentId`.
 
-If an agent has a persisted Codex `backendSession`, main resumes it with
+If an agent has a persisted Codex `backendSession`, `clawd` resumes it with
 `thread/resume` before starting the next turn. New agents without a Codex
 session use `thread/start`. After the app stores a newly created backend
 session, it sets the generic conversation title through the backend seam;
 Codex implements this with `thread/name/set`. `thread/settings/updated`
 confirms the active thread settings and should update the app-owned
-agent/session mapping so the id is saved in Electron `userData` and reused
+agent/session mapping so the id is saved in backend-owned state and reused
 after relaunch.
 
 Codex approval presets are app-owned shortcuts over Codex thread settings. The
-renderer only sees the Codex preset id; Electron main maps it to
+renderer only sees the Codex preset id; `clawd` maps it to
 `approvalPolicy`, `approvalsReviewer`, and sandbox settings for `thread/start`,
 `thread/resume`, and live `thread/settings/update` calls. Do not reuse these
 three Codex presets for Claude permission modes; Claude should expose its own
 backend-specific option set.
 
-`thread/resume` returns the thread's `turns` in app-server protocol v2. Main
+`thread/resume` returns the thread's `turns` in app-server protocol v2. `clawd`
 must translate those turns into app-owned `RendererMessage`s and emit a
-history hydration event before the next turn streams. The renderer asks main
-to re-select the active persisted agent after subscribing to main events, so
-relaunch restores visible history without the renderer importing Codex protocol
-types.
+history hydration event before the next turn streams. The renderer asks through
+the typed bridge to re-select the active persisted agent after subscribing to
+events, so relaunch restores visible history without the renderer importing
+Codex protocol types.
 
 The sidebar conversation history uses `thread/list` with the active agent
 folder as an exact `cwd` filter, `archived: false`, and newest-first
-`updated_at` sorting. Main sends app-owned `ConversationSummary` objects to the
-renderer. Clicking a Codex conversation calls `thread/resume`, stores the
+`updated_at` sorting. `clawd` sends app-owned `ConversationSummary` objects
+through backend RPC, which Electron forwards over typed IPC. Clicking a Codex
+conversation calls `thread/resume`, stores the
 returned `{ kind: "codex", threadId }` session on the agent, replaces that
 agent's visible messages with the resumed turns, and routes the next prompt to
 the selected thread. Resume is allowed only while the agent is idle.
@@ -124,8 +137,8 @@ Important requests for the first product:
 - `model/list`
 - `skills/list`
 
-The main process should expose these through app-level services such as
-`AgentSessionManager`, not directly through renderer IPC.
+`clawd` should expose these through app-level backend driver/session services,
+not directly through renderer IPC.
 
 ## Models And Reasoning Effort
 
@@ -135,9 +148,9 @@ level options. The response includes visible model entries, each model's
 `supportedReasoningEfforts` in the order Codex intends clients to display, and
 the model's `defaultReasoningEffort`.
 
-The renderer consumes an app-owned picker shape only. Main fetches and adapts
+The renderer consumes an app-owned picker shape only. `clawd` fetches and adapts
 the Codex catalog to `BackendModelOption[]`, the renderer stores the selected
-catalog model and reasoning effort, and prompt IPC sends the model plus
+catalog model and reasoning effort, and each prompt request sends the model plus
 Codex-specific reasoning under `backendOptions`.
 
 `turn/start` accepts `model` and `effort` overrides for the current turn and
@@ -160,14 +173,15 @@ cwd:
 }
 ```
 
-Main adapts the response into `BackendSkillSummary[]` and exposes that through
-typed IPC. The renderer uses this app-owned shape for the composer skill menu;
-it does not import generated app-server skill types.
+`clawd` adapts the response into `BackendSkillSummary[]` and exposes it through
+backend RPC, which Electron forwards over typed IPC. The renderer uses this
+app-owned shape for the composer skill menu; it does not import generated
+app-server skill types.
 
 When a prompt contains `$skill-name`, renderer state resolves the mention
 against the active skill catalog and sends those skills under
 `SendPromptOptions.backendOptions` with `kind: "codex"`. Slash skill fallback
-from `/` command search resolves the same way. Main then appends Codex
+from `/` command search resolves the same way. `clawd` then appends Codex
 `UserInput` skill items to `turn/start`, alongside the normal text input:
 
 ```json
@@ -210,7 +224,7 @@ thread metadata instead of starting a visible prompt turn:
 - bare `/goal` and `/goal edit` are reserved for the goal shelf/editor surface.
 
 `review/start` uses `delivery: "inline"`, so app-server should return the same
-`reviewThreadId` as the active thread. Main treats a different review thread id
+`reviewThreadId` as the active thread. `clawd` treats a different review thread id
 as a protocol error instead of moving the agent session. The review lifecycle
 streams `enteredReviewMode`/`exitedReviewMode` items; the final
 `exitedReviewMode.review` string is rendered as assistant text because it is the
@@ -218,7 +232,7 @@ plain-text review body, not hidden tool output. Review-mode markers are not
 tool parts and should not create a tool group in the renderer.
 
 This is preferred over relying on Codex to infer the skill from text alone.
-`skills/changed` is an invalidation notification; main emits app-owned
+`skills/changed` is an invalidation notification; `clawd` emits app-owned
 `skills.changed`, and the renderer refreshes the active agent's catalog.
 
 ## MCP Enablement
@@ -339,10 +353,10 @@ Current server-initiated request methods:
 - `applyPatchApproval`: legacy-ish and not implemented.
 - `execCommandApproval`: legacy-ish and not implemented.
 
-Server requests are not renderer implementation details. Main stores the
+Server requests are not renderer implementation details. `clawd` stores the
 pending request, emits an app-owned prompt event, and resolves or rejects the
 server request when the renderer answers. Until a request type is implemented,
-main must log `not implemented` and respond with a JSON-RPC error so the
+`clawd` must log `not implemented` and respond with a JSON-RPC error so the
 app-server does not wait forever.
 
 `mcpServer/elicitation/request` with `_meta.codex_approval_kind =
@@ -350,7 +364,7 @@ app-server does not wait forever.
 `kind: "confirm_tool"` with a stable request id, summary, integration/server
 name, tool name, arguments preview, and supported persistence choices. The
 renderer returns `allow`, `allow_conversation`, `always_allow`, or `deny`;
-main translates that back to Codex's `accept`/`decline` elicitation response
+`clawd` translates that back to Codex's `accept`/`decline` elicitation response
 and optional `_meta.persist`.
 
 `item/tool/requestUserInput` maps to an app-owned `ask_user` client request.
@@ -363,7 +377,7 @@ not wait forever. This is separate from tool approvals because the request is
 asking Nicolas for information, not for permission.
 
 Context compaction is primarily represented by the `contextCompaction`
-`ThreadItem`. Main converts the item into a `context.compactionStarted`
+`ThreadItem`. `clawd` converts the item into a `context.compactionStarted`
 app-owned event so the reducer can split the active assistant message and insert
 the visible compaction marker exactly where the item arrived in the stream. The
 deprecated `thread/compacted` notification maps to the same app-owned event for
@@ -375,23 +389,23 @@ a response because notifications cannot block the app-server.
 ## Plan And Goal Modes
 
 Composer Plan mode is sent through Codex's experimental
-`turn/start.collaborationMode` override. Main builds the `collaborationMode`
+`turn/start.collaborationMode` override. `clawd` builds the `collaborationMode`
 object from app-owned prompt options and the selected model/reasoning effort;
 renderer code only sees a boolean Plan toggle.
 Plan mode must be sent even when no model is selected in the renderer. In that
-case main omits `settings.model` and uses Codex's Plan preset default reasoning
+case `clawd` omits `settings.model` and uses Codex's Plan preset default reasoning
 effort of `medium`, with `developer_instructions: null` so the app-server keeps
 its built-in Plan instructions.
 Because Codex persists the thread collaboration mode, disabling Plan mode is
 also an app-server operation: native Codex prompts send `planMode: false`, and
-main maps that to `turn/start.collaborationMode.mode = "default"` with the
+`clawd` maps that to `turn/start.collaborationMode.mode = "default"` with the
 selected model/reasoning settings. Omitting `collaborationMode` would leave the
 thread in its previous mode.
 
 Codex goals are thread metadata, not composer modes. The renderer handles
 `/goal` commands before prompt submission:
 
-- `/goal <objective>` calls `thread/goal/set` through main, strips the slash
+- `/goal <objective>` calls `thread/goal/set` through `clawd`, strips the slash
   command, and does not start a turn or add a visible user prompt.
 - `/goal clear` calls `thread/goal/clear`, even when the agent is busy.
 - Bare `/goal` and `/goal edit` do not submit a turn yet; goal editing is
@@ -407,17 +421,17 @@ per-turn prompt options.
 Mode notifications stay app-owned:
 
 - `thread/settings/updated` is still emitted for persistence/thread mapping.
-- If the thread settings include `collaborationMode.mode`, main also emits
+- If the thread settings include `collaborationMode.mode`, `clawd` also emits
   `thread.modeUpdated` with `default` or `plan`.
 - `thread/goal/updated` and `thread/goal/cleared` become app-owned goal events
   so the agent metadata and shelf stay in sync.
-- `turn/plan/updated` is the structured plan artifact event. Main stores it as
+- `turn/plan/updated` is the structured plan artifact event. `clawd` stores it as
   `agent.plan`, persists it to `state.json`, and opens it in the markdown side
   panel when the corresponding turn completes.
 - Codex plan-mode output is a separate `ThreadItem` with `type: "plan"`, not a
-  normal assistant message. Main stores `item/plan/delta` as a draft
+  normal assistant message. `clawd` stores `item/plan/delta` as a draft
   `agent.plan` artifact only; the app-server marks those deltas experimental.
-- `item/completed` with `item.type === "plan"` is authoritative. Main overwrites
+- `item/completed` with `item.type === "plan"` is authoritative. `clawd` overwrites
   any draft plan with the completed item text, persists it to `state.json`, and
   opens it in the markdown side panel when the corresponding turn completes.
 - Raw response assistant messages are diagnostic only for this path. Do not use
@@ -466,7 +480,7 @@ Plan previews use the markdown side panel with plan-specific review actions:
 }
 ```
 
-Main converts this into `thread.tokenUsageUpdated` with an app-owned
+`clawd` converts this into `thread.tokenUsageUpdated` with an app-owned
 `contextUsage` payload. `total` is cumulative thread/session usage and can
 exceed the model window after a long conversation. Context occupancy uses
 `last.totalTokens`, which is the latest active context size, divided by
@@ -496,8 +510,8 @@ context fraction.
 ```
 
 The rate-limit notification is a sparse account-level update, not tied to an
-agent. Main emits `account.rateLimitsUpdated` and the reducer stores it as
-global app state. Main also persists the latest snapshot to `state.json` when
+agent. `clawd` emits `account.rateLimitsUpdated` and the reducer stores it as
+global app state. `clawd` also persists the latest snapshot to `state.json` when
 this event arrives because the app-server only sends it opportunistically
 during streaming.
 
@@ -509,10 +523,10 @@ The app-server can generate TypeScript bindings:
 codex app-server generate-ts --out <dir>
 ```
 
-Generated types should live in a main-process protocol package, for example:
+Generated types should live in a backend provider protocol package, for example:
 
 ```text
-src/main/codex-protocol/generated
+backend/src/codex/generated
 ```
 
 Renderer code depends on app IPC/event types instead. This keeps app-server
@@ -532,7 +546,7 @@ Renderer components consume app-owned state such as `RendererMessage`,
 Do not encode Codex tool calls as id8-style `<tool>` text tags. Those tags are
 an id8/multi-LLM parsing artifact. Codex app-server already emits structured
 `ThreadItem` payloads and item-specific progress notifications, so Codex Claw
-should preserve that structure in main-process adapters and expose app-owned
+should preserve that structure in backend adapters and expose app-owned
 tool parts to the renderer. The chat renderer preserves placement with ordered
 message parts (`text`, `tool`, `text`) so tool calls appear where they happened
 in the stream while the legacy id8 `<tool>` parser remains available for copied
@@ -555,7 +569,7 @@ Mapping sketch:
   the authoritative plan artifact. They are not replayed as normal assistant
   chat text.
 - MCP and dynamic tool calls become renderer tool calls.
-- `rawResponseItem/completed` is adapted in main into the same app-owned tool
+- `rawResponseItem/completed` is adapted in `clawd` into the same app-owned tool
   events when the app-server exposes raw function, shell, custom-tool, search,
   or output items.
 - approval and ask-user requests become pending UI prompts. MCP tool approval

@@ -392,9 +392,10 @@ renderer.
 - Loop CRUD, scheduler, and runner.
 - Work-provider drivers where possible, with desktop-only services injected
   through ports.
-- Durable snapshot persistence now uses a shared serializer/parser so Electron
-  and `clawd` write the same state shape. `clawd` persists backend-owned
-  snapshot events when it runs with `--state-dir`.
+- Durable snapshot persistence now uses the backend serializer/parser in
+  `backend/src/state-persistence.ts`. `clawd` persists backend-owned snapshot
+  events when it runs with `--state-dir`; Electron never writes the durable
+  state file.
 
 The rule is simple: if the operation acts on a repository, agent, backend
 session, work item, transcript, or backend-owned path, it belongs in `clawd`.
@@ -792,7 +793,7 @@ Local migration path:
 
 1. Electron main computes the existing app data directory and passes it to
    local `clawd` during startup.
-2. `clawd` loads the existing `state.json` through the shared
+2. `clawd` loads the existing `state.json` through the backend
    `AppStatePersistence` serializer/parser and writes backend-owned future
    changes using the same schema.
 3. Old development checkouts keep working because the state path is explicit.
