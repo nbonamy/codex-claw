@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ConversationSummary, CreateSourceWorktreeInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, RendererMessage, SourceRepository, SourceWorktree } from '@codex-claw/shared/contracts';
+import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ConversationSummary, CreateSourceWorktreeInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, RendererMessage, SourceRepository, SourceWorktree, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import type { AppStatePersistence } from '@codex-claw/shared/state-persistence';
 import type { AgentBackendDriver, BackendSendResult } from '../backends/types';
@@ -153,6 +153,50 @@ describe('AppController', () => {
       options: { locale: 'en-US' },
       assetsPath: path.resolve(process.cwd(), 'assets'),
     });
+  });
+
+  it('routes work provider actions through clawd when the backend client is connected', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.sourceFolder.initialized = true;
+    const configuredSnapshot = {
+      ...snapshot,
+      workBacklog: {
+        ...snapshot.workBacklog,
+        providerConfigurations: {
+          github: { repositoryId: 'nbonamy/codex-claw' },
+        },
+      },
+    };
+    const request = vi.fn(async (method: string) => {
+      if (method === 'workProvider/connect') {
+        return { snapshot, authorization: { provider: 'github', userCode: 'ABCD-1234', verificationUri: 'https://github.com/login/device', expiresAt: '2026-06-13T00:00:00.000Z' } };
+      }
+      if (method === 'workProvider/configureBacklog') {
+        return configuredSnapshot;
+      }
+      if (method === 'workProvider/listItems') {
+        return [{ provider: 'github', id: 'github:nbonamy/codex-claw#12', title: 'Fix bug', url: 'https://github.com/nbonamy/codex-claw/issues/12' }];
+      }
+      return snapshot;
+    });
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+
+    await controller.initialize();
+
+    await expect(connectWorkProvider(controller, 'github')).resolves.toMatchObject({
+      authorization: { provider: 'github', userCode: 'ABCD-1234' },
+    });
+    await expect(configureWorkBacklog(controller, { provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } })).resolves.toStrictEqual(configuredSnapshot);
+    await expect(listWorkItems(controller, 'github', 'nbonamy/codex-claw')).resolves.toStrictEqual([{
+      provider: 'github',
+      id: 'github:nbonamy/codex-claw#12',
+      title: 'Fix bug',
+      url: 'https://github.com/nbonamy/codex-claw/issues/12',
+    }]);
+
+    expect(request).toHaveBeenNthCalledWith(1, 'workProvider/connect', { provider: 'github' });
+    expect(request).toHaveBeenNthCalledWith(2, 'workProvider/configureBacklog', { input: { provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } } });
+    expect(request).toHaveBeenNthCalledWith(3, 'workProvider/listItems', { provider: 'github', repositoryId: 'nbonamy/codex-claw' });
   });
 
   it('persists collaboration status updates emitted by MCP tools', async () => {
@@ -1931,7 +1975,12 @@ function createBackendClient(overrides: {
   return {
     start: vi.fn().mockResolvedValue(undefined),
     health: vi.fn().mockResolvedValue({ ok: true, name: 'clawd', version: '0.1.0', pid: 123 }),
-    request: <Result>(method: string, params?: unknown) => request(method, params) as Promise<Result>,
+    request: <Result>(method: string, params?: unknown) => {
+      if (method === 'snapshot/get') {
+        return Promise.resolve({}) as Promise<Result>;
+      }
+      return request(method, params) as Promise<Result>;
+    },
     onEvent,
     close: vi.fn().mockResolvedValue(undefined),
   };
@@ -2061,6 +2110,24 @@ async function listAgentFiles(controller: AppController, agentId: string): Promi
   return (controller as unknown as {
     listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]>;
   }).listAgentFiles(agentId);
+}
+
+async function connectWorkProvider(controller: AppController, provider: WorkProviderKind): Promise<WorkProviderConnectResult> {
+  return (controller as unknown as {
+    connectWorkProvider(provider: WorkProviderKind): Promise<WorkProviderConnectResult>;
+  }).connectWorkProvider(provider);
+}
+
+async function configureWorkBacklog(controller: AppController, input: WorkBacklogConfigurationInput): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    configureWorkBacklog(input: WorkBacklogConfigurationInput): Promise<AppSnapshot>;
+  }).configureWorkBacklog(input);
+}
+
+async function listWorkItems(controller: AppController, provider: WorkProviderKind, repositoryId: string): Promise<WorkItem[]> {
+  return (controller as unknown as {
+    listWorkItems(provider: WorkProviderKind, repositoryId: string): Promise<WorkItem[]>;
+  }).listWorkItems(provider, repositoryId);
 }
 
 function userMessage(id: string, turnId: string, text: string) {

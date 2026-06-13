@@ -1,10 +1,13 @@
 import { pathToFileURL } from 'node:url';
 import { createClawRpcNotification } from '@codex-claw/shared/backend-protocol/rpc';
 import { BackendDriverRpc, createDefaultBackendDrivers } from './driver-rpc';
+import { DesktopWorkIntegrationTokenStore } from './desktop-work-integration-token-store';
 import { ClawMcpService } from './mcp/service';
 import { ClawBackendServer } from './server';
 import { loadBackendSnapshot, saveBackendSnapshot } from './state';
 import { StdioRpcPeer } from './stdio';
+import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
+import { WorkIntegrationManager } from './work-integrations/manager';
 
 export const CLAWD_VERSION = '0.1.0';
 
@@ -22,7 +25,20 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     const driverRpc = new BackendDriverRpc(createDefaultBackendDrivers({
       clawMcpServerUrl: mcpServerUrl,
     }));
-    const server = new ClawBackendServer({
+    let server: ClawBackendServer;
+    const stdio = new StdioRpcPeer({
+      input: process.stdin,
+      output: process.stdout,
+      onMessage: (message) => server.handleMessage(message),
+    });
+    const workIntegrations = new WorkIntegrationManager({
+      drivers: [new GitHubWorkProviderDriver(() => githubOAuthClientId(snapshot))],
+      getSnapshot: () => snapshot,
+      openExternal: (url) => stdio.request('desktop/openExternal', { url }),
+      saveSnapshot: () => saveBackendSnapshot(stateDir, snapshot),
+      tokenStore: new DesktopWorkIntegrationTokenStore(stdio),
+    });
+    server = new ClawBackendServer({
       version: CLAWD_VERSION,
       snapshot,
       driverRpc,
@@ -30,14 +46,10 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
         process.stdout.write(`${JSON.stringify(createClawRpcNotification('backend/event', event))}\n`);
       },
       saveSnapshot: (nextSnapshot) => saveBackendSnapshot(stateDir, nextSnapshot),
+      workIntegrations,
     });
     mcpService.setDriverRpc(driverRpc);
     mcpService.setEventSink((event) => server.emitEvent(event));
-    const stdio = new StdioRpcPeer({
-      input: process.stdin,
-      output: process.stdout,
-      onMessage: (message) => server.handleMessage(message),
-    });
     let stopping = false;
     const stop = async () => {
       if (stopping) {
@@ -69,6 +81,10 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 function readArgValue(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(name);
   return index >= 0 ? argv[index + 1] : undefined;
+}
+
+function githubOAuthClientId(snapshot: { workBacklog: { providerSettings: { github?: { oauthClientId?: string } } } }): string {
+  return snapshot.workBacklog.providerSettings.github?.oauthClientId ?? process.env.CODEX_CLAW_GITHUB_CLIENT_ID ?? '';
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

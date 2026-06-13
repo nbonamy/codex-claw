@@ -4,6 +4,7 @@ import type { AgentBackendDriver, BackendEvent } from '@codex-claw/shared/backen
 import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
+import type { WorkIntegrationManager } from '../work-integrations/manager';
 
 describe('ClawBackendServer', () => {
   it('responds to backend health requests', async () => {
@@ -133,6 +134,59 @@ describe('ClawBackendServer', () => {
 
     expect(saveSnapshot).toHaveBeenCalledOnce();
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
+  });
+
+  it('routes work provider requests through backend-owned work integrations', async () => {
+    const snapshot = createTestSnapshot();
+    const workIntegrations = {
+      connect: vi.fn().mockResolvedValue({
+        snapshot,
+        authorization: {
+          provider: 'github',
+          userCode: 'ABCD-1234',
+          verificationUri: 'https://github.com/login/device',
+          expiresAt: '2026-06-13T00:00:00.000Z',
+        },
+      }),
+      configureBacklog: vi.fn().mockResolvedValue(snapshot),
+      listItems: vi.fn().mockResolvedValue([{
+        provider: 'github',
+        id: 'github:nbonamy/codex-claw#12',
+        title: 'Fix bug',
+        url: 'https://github.com/nbonamy/codex-claw/issues/12',
+      }]),
+    } as unknown as WorkIntegrationManager;
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      workIntegrations,
+    });
+
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'connect', method: 'workProvider/connect', params: { provider: 'github' } })).resolves.toMatchObject({
+      result: {
+        snapshot,
+        authorization: { provider: 'github', userCode: 'ABCD-1234' },
+      },
+    });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'configure',
+      method: 'workProvider/configureBacklog',
+      params: { input: { provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } } },
+    })).resolves.toMatchObject({ result: snapshot });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'items',
+      method: 'workProvider/listItems',
+      params: { provider: 'github', repositoryId: 'nbonamy/codex-claw' },
+    })).resolves.toMatchObject({
+      result: [{ id: 'github:nbonamy/codex-claw#12' }],
+    });
+
+    expect(workIntegrations.connect).toHaveBeenCalledWith('github');
+    expect(workIntegrations.configureBacklog).toHaveBeenCalledWith({ provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } });
+    expect(workIntegrations.listItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw');
   });
 });
 

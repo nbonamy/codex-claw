@@ -42,7 +42,7 @@ import {
 } from './snapshot-service';
 import { AppStatePersistence } from '@codex-claw/shared/state-persistence';
 import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from './backend-process-client';
-import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogAssignment, WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogAssignment, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { approvalBackendDefaultsWithPreset, isApprovalPreset } from '@codex-claw/shared/approval-presets';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 import { teamColors } from '@codex-claw/shared/team-colors';
@@ -91,6 +91,7 @@ export class AppController {
   });
   private readonly backendDrivers = new Map<AgentBackend, AgentBackendDriver>();
   private readonly backendDriverEventUnsubscribes = new Map<AgentBackend, () => void>();
+  private backendClientEventUnsubscribe: (() => void) | null = null;
   private readonly clientRequestBackends = new Map<string, AgentBackend>();
   private seq = 0;
 
@@ -141,31 +142,31 @@ export class AppController {
     ipcMain.handle(ipcChannels.getSnapshot, () => this.snapshot);
 
     ipcMain.handle(ipcChannels.connectWorkProvider, async (_event, provider: WorkProviderKind) => {
-      return this.workIntegrations.connect(provider);
+      return this.connectWorkProvider(provider);
     });
 
     ipcMain.handle(ipcChannels.openWorkProviderAuthorization, async (_event, provider: WorkProviderKind) => {
-      return this.workIntegrations.openAuthorization(provider);
+      return this.openWorkProviderAuthorization(provider);
     });
 
     ipcMain.handle(ipcChannels.completeWorkProviderConnection, async (_event, provider: WorkProviderKind) => {
-      return this.workIntegrations.completeConnection(provider);
+      return this.completeWorkProviderConnection(provider);
     });
 
     ipcMain.handle(ipcChannels.disconnectWorkProvider, async (_event, provider: WorkProviderKind) => {
-      return this.workIntegrations.disconnect(provider);
+      return this.disconnectWorkProvider(provider);
     });
 
     ipcMain.handle(ipcChannels.listWorkRepositories, async (_event, provider: WorkProviderKind) => {
-      return this.workIntegrations.listRepositories(provider);
+      return this.listWorkRepositories(provider);
     });
 
     ipcMain.handle(ipcChannels.configureWorkBacklog, async (_event, input: WorkBacklogConfigurationInput) => {
-      return this.workIntegrations.configureBacklog(input);
+      return this.configureWorkBacklog(input);
     });
 
     ipcMain.handle(ipcChannels.listWorkItems, async (_event, provider: WorkProviderKind, repositoryId: string) => {
-      return this.workIntegrations.listItems(provider, repositoryId);
+      return this.listWorkItems(provider, repositoryId);
     });
 
     ipcMain.handle(ipcChannels.listBackendModels, async (_event, agentId: string) => {
@@ -539,6 +540,8 @@ export class AppController {
   async shutdown(): Promise<void> {
     this.loopScheduler.stop();
     this.powerSaveBlocker.stop();
+    this.backendClientEventUnsubscribe?.();
+    this.backendClientEventUnsubscribe = null;
     for (const unsubscribe of this.backendDriverEventUnsubscribes.values()) {
       unsubscribe();
     }
@@ -555,12 +558,83 @@ export class AppController {
     try {
       await this.backendClient.start();
       const health = await this.backendClient.health();
+      const backendState = await this.backendClient.request<unknown>('snapshot/get');
+      if (isBackendSnapshotState(backendState)) {
+        this.snapshot = backendState.snapshot;
+        this.seq = Math.max(this.seq, backendState.lastEventSeq);
+      }
+      this.backendClientEventUnsubscribe = this.backendClient.onEvent((event) => this.emitAndApply(event));
       logMain('clawd', 'connected to backend process', { version: health.version, pid: health.pid });
     } catch (error) {
       warnMain('clawd', 'failed to connect to backend process', {
         detail: error instanceof Error ? error.message : String(error),
       });
     }
+  }
+
+  private async connectWorkProvider(provider: WorkProviderKind): Promise<WorkProviderConnectResult> {
+    if (this.backendClient) {
+      const result = await this.backendClient.request<WorkProviderConnectResult>('workProvider/connect', { provider });
+      this.snapshot = result.snapshot;
+      this.syncPowerSaveBlocker();
+      return result;
+    }
+
+    return this.workIntegrations.connect(provider);
+  }
+
+  private async openWorkProviderAuthorization(provider: WorkProviderKind): Promise<AppSnapshot> {
+    if (this.backendClient) {
+      return this.adoptBackendSnapshot(await this.backendClient.request<AppSnapshot>('workProvider/openAuthorization', { provider }));
+    }
+
+    return this.workIntegrations.openAuthorization(provider);
+  }
+
+  private async completeWorkProviderConnection(provider: WorkProviderKind): Promise<AppSnapshot> {
+    if (this.backendClient) {
+      return this.adoptBackendSnapshot(await this.backendClient.request<AppSnapshot>('workProvider/completeConnection', { provider }));
+    }
+
+    return this.workIntegrations.completeConnection(provider);
+  }
+
+  private async disconnectWorkProvider(provider: WorkProviderKind): Promise<AppSnapshot> {
+    if (this.backendClient) {
+      return this.adoptBackendSnapshot(await this.backendClient.request<AppSnapshot>('workProvider/disconnect', { provider }));
+    }
+
+    return this.workIntegrations.disconnect(provider);
+  }
+
+  private async listWorkRepositories(provider: WorkProviderKind): Promise<WorkRepository[]> {
+    if (this.backendClient) {
+      return this.backendClient.request('workProvider/listRepositories', { provider });
+    }
+
+    return this.workIntegrations.listRepositories(provider);
+  }
+
+  private async configureWorkBacklog(input: WorkBacklogConfigurationInput): Promise<AppSnapshot> {
+    if (this.backendClient) {
+      return this.adoptBackendSnapshot(await this.backendClient.request<AppSnapshot>('workProvider/configureBacklog', { input }));
+    }
+
+    return this.workIntegrations.configureBacklog(input);
+  }
+
+  private async listWorkItems(provider: WorkProviderKind, repositoryId: string): Promise<WorkItem[]> {
+    if (this.backendClient) {
+      return this.backendClient.request('workProvider/listItems', { provider, repositoryId });
+    }
+
+    return this.workIntegrations.listItems(provider, repositoryId);
+  }
+
+  private adoptBackendSnapshot(snapshot: AppSnapshot): AppSnapshot {
+    this.snapshot = snapshot;
+    this.syncPowerSaveBlocker();
+    return this.snapshot;
   }
 
   private async sendPrompt(
@@ -1459,7 +1533,6 @@ export class AppController {
 
     const driver = new ClawBackendProxyDriver(backend, this.backendClient);
     this.backendDrivers.set(backend, driver);
-    this.backendDriverEventUnsubscribes.set(backend, driver.onEvent((event) => this.emitAndApply(event)));
     return driver;
   }
 
@@ -1780,6 +1853,10 @@ function clientRequest(value: unknown): ClientRequest | null {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isBackendSnapshotState(value: unknown): value is { snapshot: AppSnapshot; lastEventSeq: number } {
+  return isRecord(value) && isRecord(value.snapshot) && typeof value.lastEventSeq === 'number';
 }
 
 function appleSpeechAssetsPath(): string {

@@ -44,8 +44,8 @@ Current implementation checkpoint:
 - `clawd` currently serves health, shared-contract snapshot loading/saving, the
   `AgentBackendDriver` RPC surface, sequenced `backend/event` notifications,
   the Claw MCP HTTP server used by agent collaboration tools, source repository
-  discovery, git worktree creation, agent file listing/reading, and Apple
-  Speech transcription execution.
+  discovery, git worktree creation, agent file listing/reading, GitHub work
+  integrations, and Apple Speech transcription execution.
 - The stdio transport is now bidirectional JSON-RPC: Electron main can request
   backend work, and `clawd` can request desktop-owned effects. The first
   runtime desktop handler is `desktop/openExternal`, used as the foundation for
@@ -55,6 +55,11 @@ Current implementation checkpoint:
   `safeStorage` token file. `clawd` has a `DesktopWorkIntegrationTokenStore`
   adapter, so moving GitHub work integrations next does not require plaintext
   tokens or a persisted-token format change.
+- `clawd` now owns the GitHub work integration manager/driver and exposes
+  `workProvider/*` JSON-RPC methods. Electron proxies the existing renderer IPC
+  work-provider calls to `clawd` when the backend process is connected, with the
+  old in-process manager left only as a temporary fallback until the next
+  cleanup slice.
 - Electron main no longer owns the MCP HTTP server. Desktop-facing MCP effects,
   such as displaying Markdown in the side panel, flow back to Electron as
   app-owned backend events.
@@ -64,8 +69,8 @@ Current implementation checkpoint:
   path resolution, and renderer IPC fanout.
 - The remaining large slice is to move product orchestration out of
   `AppController` so Electron becomes only the desktop IPC/stdio layer. The
-  largest remaining owners are loop scheduler/runner, GitHub work integrations,
-  and direct snapshot mutation routes.
+  largest remaining owners are loop scheduler/runner, the temporary
+  in-process work integration fallback, and direct snapshot mutation routes.
 
 ## Goals
 
@@ -283,8 +288,8 @@ renderer.
 - File search/read, git status/diff/worktree creation, source repository
   discovery, artifact readback, markdown side-panel requests, and any future
   backend-location-owned filesystem behavior. Current code already routes
-  source discovery, worktree creation, agent file listing/reading, and Apple
-  Speech transcription through `clawd`.
+  source discovery, worktree creation, agent file listing/reading, GitHub work
+  integrations, and Apple Speech transcription through `clawd`.
 - Loop scheduler and loop runner.
 - Work-provider drivers where possible, with desktop-only services injected
   through ports.
