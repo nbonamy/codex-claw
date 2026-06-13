@@ -12,7 +12,6 @@ import { createMainWindow } from './main-window';
 import { ClawMcpAgentCoordinator } from './mcp/agent-coordinator';
 import { agentMessagesPrompt } from './mcp/agent-prompts';
 import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-permissions';
-import { transcribeWithAppleSpeechAnalyzer } from './transcription/apple-speech';
 import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
 import { WorkIntegrationManager } from './work-integrations/manager';
 import { SafeStorageWorkIntegrationTokenStore } from './work-integrations/token-store';
@@ -44,7 +43,7 @@ import {
 } from './snapshot-service';
 import { AppStatePersistence } from './state-persistence';
 import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from './backend-process-client';
-import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogAssignment, WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogAssignment, WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { approvalBackendDefaultsWithPreset, isApprovalPreset } from '@codex-claw/shared/approval-presets';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 import { teamColors } from '@codex-claw/shared/team-colors';
@@ -476,9 +475,7 @@ export class AppController {
     ipcMain.handle(ipcChannels.openAccessibilitySettings, () => openAccessibilitySettings());
 
     ipcMain.handle(ipcChannels.transcribeAppleSpeech, async (_event, audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions) => {
-      return transcribeWithAppleSpeechAnalyzer(Buffer.from(audioData), options, {
-        assetsPath: app.isPackaged ? process.resourcesPath : path.resolve(process.cwd(), 'assets'),
-      });
+      return this.transcribeAppleSpeech(audioData, options);
     });
 
     ipcMain.handle(ipcChannels.quit, () => {
@@ -1335,6 +1332,17 @@ export class AppController {
     return worktree;
   }
 
+  private async transcribeAppleSpeech(
+    audioData: ArrayBuffer,
+    options?: AppleSpeechTranscriptionOptions,
+  ): Promise<AppleSpeechTranscriptionResult> {
+    return this.requireBackendClient().request('transcription/appleSpeech', {
+      audioBase64: Buffer.from(audioData).toString('base64'),
+      options,
+      assetsPath: appleSpeechAssetsPath(),
+    });
+  }
+
   private requireBackendClient(): ClawBackendClientPort {
     if (!this.backendClient) {
       throw new Error('clawd backend is not connected.');
@@ -1793,6 +1801,11 @@ function defaultUserDataPath(): string {
   }
 
   return path.join(process.cwd(), '.codex-claw-test');
+}
+
+function appleSpeechAssetsPath(): string {
+  const isPackaged = Boolean((app as { isPackaged?: boolean } | undefined)?.isPackaged);
+  return isPackaged ? process.resourcesPath : path.resolve(process.cwd(), 'assets');
 }
 
 function githubOAuthClientId(snapshot: AppSnapshot): string {

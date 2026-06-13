@@ -1,6 +1,6 @@
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/shared/backend-driver';
 import { unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
-import type { Agent, AgentBackend, CreateSourceWorktreeInput, SendPromptOptions } from '@codex-claw/shared/contracts';
+import type { Agent, AgentBackend, AppleSpeechTranscriptionOptions, CreateSourceWorktreeInput, SendPromptOptions } from '@codex-claw/shared/contracts';
 import { ClaudeBackendDriver } from './claude/claude-driver';
 import { CodexAgentSessionManager } from './codex/agent-session';
 import { CodexBackendDriver } from './codex/codex-driver';
@@ -9,6 +9,7 @@ import { CodexRpcClient } from './codex/rpc-client';
 import { createSourceWorktree } from './git-worktrees';
 import { buildCodexClawMcpConfigOverrides } from './mcp/codex-config';
 import { detectSourceFolder, scanSourceRepositories } from './source-repositories';
+import { transcribeWithAppleSpeechAnalyzer } from './transcription/apple-speech';
 
 export type BackendDriverRegistryOptions = {
   clawMcpServerUrl?: string | null;
@@ -177,6 +178,18 @@ export class BackendDriverRpc {
         const record = requireRecord(params);
         return createSourceWorktree(record.input as CreateSourceWorktreeInput);
       }
+      case 'transcription/appleSpeech': {
+        const record = requireRecord(params);
+        const audioBase64 = requireString(record.audioBase64, 'audioBase64');
+        const assetsPath = typeof record.assetsPath === 'string' && record.assetsPath.trim()
+          ? record.assetsPath.trim()
+          : undefined;
+        return transcribeWithAppleSpeechAnalyzer(
+          Buffer.from(audioBase64, 'base64'),
+          transcriptionOptions(record.options),
+          assetsPath ? { assetsPath } : {},
+        );
+      }
       default:
         return undefined;
     }
@@ -246,4 +259,11 @@ function requireRecord(value: unknown): Record<string, unknown> {
     throw new Error('Invalid request params.');
   }
   return value as Record<string, unknown>;
+}
+
+function transcriptionOptions(value: unknown): AppleSpeechTranscriptionOptions | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  return requireRecord(value) as AppleSpeechTranscriptionOptions;
 }

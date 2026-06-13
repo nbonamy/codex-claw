@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AppSnapshot, BackendConversationRef, ConversationSummary, CreateSourceWorktreeInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, RendererMessage, SourceRepository, SourceWorktree } from '@codex-claw/shared/contracts';
+import type { AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ConversationSummary, CreateSourceWorktreeInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, RendererMessage, SourceRepository, SourceWorktree } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import type { AppStatePersistence } from '../state-persistence';
 import type { AgentBackendDriver, BackendSendResult } from '../backends/types';
@@ -135,6 +135,24 @@ describe('AppController', () => {
     });
     expect(snapshot.sourceFolder.recentRepoNames).toStrictEqual(['codex-claw']);
     expect(persistence.save).toHaveBeenCalledWith(snapshot);
+  });
+
+  it('routes Apple Speech transcription through clawd using a JSON-safe audio payload', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.sourceFolder.initialized = true;
+    const transcription: AppleSpeechTranscriptionResult = { text: 'ship it' };
+    const request = vi.fn().mockResolvedValue(transcription);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const audioData = new Uint8Array([1, 2, 3]).buffer;
+
+    await controller.initialize();
+
+    await expect(transcribeAppleSpeech(controller, audioData, { locale: 'en-US' })).resolves.toStrictEqual(transcription);
+    expect(request).toHaveBeenCalledWith('transcription/appleSpeech', {
+      audioBase64: Buffer.from(audioData).toString('base64'),
+      options: { locale: 'en-US' },
+      assetsPath: path.resolve(process.cwd(), 'assets'),
+    });
   });
 
   it('persists collaboration status updates emitted by MCP tools', async () => {
@@ -1944,6 +1962,16 @@ async function createSourceWorktree(
   return (controller as unknown as {
     createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree>;
   }).createSourceWorktree(input);
+}
+
+async function transcribeAppleSpeech(
+  controller: AppController,
+  audioData: ArrayBuffer,
+  options?: AppleSpeechTranscriptionOptions,
+): Promise<AppleSpeechTranscriptionResult> {
+  return (controller as unknown as {
+    transcribeAppleSpeech(audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions): Promise<AppleSpeechTranscriptionResult>;
+  }).transcribeAppleSpeech(audioData, options);
 }
 
 async function recordLoopPromptStarted(

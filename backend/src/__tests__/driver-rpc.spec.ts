@@ -59,6 +59,25 @@ describe('BackendDriverRpc', () => {
     }
   });
 
+  it('routes Apple Speech transcription through backend-owned CLI execution', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-rpc-transcription-'));
+    const rpc = new BackendDriverRpc(new Map([['codex', createDriver()]]));
+
+    try {
+      await expect(rpc.handle('transcription/appleSpeech', {
+        audioBase64: Buffer.from('audio').toString('base64'),
+        options: { locale: 'en-US' },
+        assetsPath: path.join(tempDir, 'missing-assets'),
+      })).resolves.toMatchObject({
+        text: '',
+        error: expect.stringContaining('Failed to spawn Apple speech CLI'),
+      });
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+      await rpc.close();
+    }
+  });
+
   it('fans out backend driver events', () => {
     let emitEvent: AgentBackendDriver['onEvent'] extends (listener: infer Listener) => () => void ? Listener : never;
     const driver = createDriver({

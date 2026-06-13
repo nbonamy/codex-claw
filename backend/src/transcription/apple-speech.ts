@@ -2,16 +2,7 @@ import { spawn as nodeSpawn } from 'node:child_process';
 import { promises as nodeFs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-
-export type AppleSpeechTranscriptionOptions = {
-  locale?: string;
-  live?: boolean;
-};
-
-export type AppleSpeechTranscriptionResult = {
-  text: string;
-  error?: string;
-};
+import type { AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult } from '@codex-claw/shared/contracts';
 
 type AppleSpeechFs = {
   mkdtemp(prefix: string): Promise<string>;
@@ -119,8 +110,9 @@ function runAppleSpeechCli(
 }
 
 function defaultAssetsPath(): string {
-  if (process.resourcesPath && !process.resourcesPath.endsWith('.vite/build')) {
-    return process.resourcesPath;
+  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+  if (resourcesPath && !resourcesPath.endsWith('.vite/build')) {
+    return resourcesPath;
   }
 
   return path.resolve(process.cwd(), 'assets');
