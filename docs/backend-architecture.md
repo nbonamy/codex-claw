@@ -2,11 +2,14 @@
 
 Status: exploration and implementation slicing, 2026-06-13.
 
-This document is the current architecture record for extracting most of Codex
-Claw's Electron main process into a separate TypeScript backend process,
-tentatively still called `clawd`. It supersedes the earlier sketch in
-`docs/clawd.md` by adding the transport, packaging, security, and migration
-decisions needed to slice the implementation safely.
+This document is the architecture record for extracting most of Codex Claw's
+Electron main process into a separate TypeScript backend process, tentatively
+still called `clawd`.
+
+`clawd` is not a replacement for Codex app-server. It is the Codex Claw product
+backend: the app-owned process that orchestrates Codex app-server, Claude Code,
+Claw MCP, git, file previews, backlog loops, work integrations, and persistent
+team state behind one app-owned protocol.
 
 ## Decision Summary
 
@@ -28,6 +31,33 @@ binary, but the first implementation should keep the runtime pluggable. Electron
 embedded Node through `ELECTRON_RUN_AS_NODE=1` is currently unavailable in this
 repo because `forge.config.ts` disables the `RunAsNode` fuse; enabling it is a
 security tradeoff, not a mechanical build tweak.
+
+## Goals
+
+- Keep agents and loops alive when the desktop app window is closed.
+- Let Electron main become a thin desktop adapter between renderer IPC and the
+  backend core.
+- Support local packaged desktop installs without requiring Node.js to be
+  installed on the target machine.
+- Leave room for remote execution over SSH, where the backend runs on another
+  development machine and owns that machine's file paths and tools.
+- Preserve the renderer boundary: the renderer talks only to preload and
+  app-owned contracts, never directly to Codex app-server, Claude, MCP, SSH, or
+  a raw daemon protocol.
+- Keep provider details inside backend drivers. Codex, Claude, and any future
+  backend emit app-owned conversation, tool, diff, plan, status, and approval
+  events.
+
+## Non-Goals
+
+- Do not rewrite the renderer around daemon protocol details.
+- Do not expose a LAN-accessible unauthenticated HTTP server.
+- Do not require a local Node.js installation for normal packaged desktop use.
+- Do not turn Claw into a lowest-common-denominator provider app. Codex and
+  Claude can keep different capabilities behind the same app-owned seams.
+- Do not move native desktop-only UX into the daemon. Native file dialogs,
+  window management, menus, shortcuts, notifications, and OS-specific UI
+  affordances remain in Electron main.
 
 ## Source Facts
 
@@ -768,8 +798,6 @@ and diff hygiene checks instead.
   OAuth?
 - Should the backend event buffer be in-memory only at first, or persisted so
   UI reconnect after backend restart can replay recent activity?
-- How much of the current `docs/clawd.md` should be deleted after this record
-  is accepted?
 
 ## Immediate Recommendation
 
