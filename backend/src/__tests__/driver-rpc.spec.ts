@@ -28,7 +28,7 @@ describe('BackendDriverRpc', () => {
     const sendPrompt = vi.fn();
     const rpc = new BackendDriverRpc(new Map([['codex', createDriver({ sendPrompt, tryHandlePromptCommand })]]));
 
-    await expect(rpc.handle('agent/sendPrompt', { agent, prompt: '/compact' })).resolves.toStrictEqual(commandResult);
+    await expect(rpc.handle('driver/tryHandlePromptCommand', { agent, prompt: '/compact' })).resolves.toStrictEqual(commandResult);
     expect(tryHandlePromptCommand).toHaveBeenCalledWith(agent, '/compact');
     expect(sendPrompt).not.toHaveBeenCalled();
   });

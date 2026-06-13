@@ -1,10 +1,11 @@
 import path from 'node:path';
+import { sendAgentPrompt } from '@codex-claw/shared/agent-chat-service';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { applyMainEventToSnapshot, createAgentInSnapshot, createEmptySnapshot, updateAgentFolder, updateAgentFromInput } from '@codex-claw/shared/snapshot';
-import type { AppSnapshot, BackendConversationRef, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
+import type { Agent, AppSnapshot, BackendConversationRef, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { backendDisplayName } from '@codex-claw/shared/backend-driver';
-import type { BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
+import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { assignWorkItemToAgentInSnapshot, closeAgentInSnapshot, deployBenchTemplateInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeBenchTemplateFromSnapshot, removeWorkItemAssignmentFromSnapshot, reorderAgentInTeam, restartAgentConversation, resumeAgentConversationInSnapshot, saveAgentToBench } from '@codex-claw/shared/agent-manager';
 import { clearLoopExecutionHistoryInSnapshot, createLoopInSnapshot, deleteLoopExecutionFromSnapshot, deleteLoopFromSnapshot, updateLoopInSnapshot } from '@codex-claw/shared/loop-manager';
@@ -272,6 +273,18 @@ export class ClawBackendServer {
         agent.backendDefaults = approvalBackendDefaultsWithPreset(agent.backendDefaults, result.approvalPreset);
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
+      case 'agent/sendPrompt': {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const prompt = requireString(params.prompt, 'prompt');
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent) {
+          return createClawRpcResult(message.id, this.snapshot);
+        }
+        const result = this.sendAgentPrompt(agentId, prompt, params.options as SendPromptOptions | undefined);
+        await this.persistSnapshotOnly();
+        return createClawRpcResult(message.id, result);
+      }
       case 'agent/steer': {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
@@ -314,29 +327,44 @@ export class ClawBackendServer {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
         const turnId = requireString(params.turnId, 'turnId');
-        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-        if (!agent) {
+        const snapshot = await this.rollbackAgentToTurn(agentId, turnId);
+        if (!snapshot) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
         }
-        const result = await this.requireDriverRpc().handle('driver/rollbackToTurn', { agent, turnId }) as BackendRollbackResult;
-        agent.backendSession = result.backendSession;
-        const sessionThread = result.backendSession.kind === 'codex' ? { threadId: result.backendSession.threadId } : {};
-        this.applyAndEmitBackendEvent({
-          agentId,
-          ...sessionThread,
-          type: 'thread.historyLoaded',
-          payload: {
-            messages: result.messages,
-            replace: true,
-          },
-        });
-        this.applyAndEmitBackendEvent({
-          agentId,
-          ...sessionThread,
-          type: 'agent.statusChanged',
-          payload: { type: 'idle' },
-        });
-        return createClawRpcResult(message.id, await this.persistSnapshotOnly());
+        return createClawRpcResult(message.id, snapshot);
+      }
+      case 'agent/deleteMessage': {
+        const action = this.resolveMessageAction(requireAgentId(message.params), requireMessageId(message.params));
+        if (!action) {
+          return createClawRpcResult(message.id, this.snapshot);
+        }
+        await this.rollbackAgentToTurn(action.agent.id, action.turnId);
+        return createClawRpcResult(message.id, this.snapshot);
+      }
+      case 'agent/editMessage': {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const prompt = requireString(params.prompt, 'prompt').trim();
+        const action = this.resolveMessageAction(agentId, requireString(params.messageId, 'messageId'));
+        if (!action || !prompt) {
+          return createClawRpcResult(message.id, this.snapshot);
+        }
+        await this.rollbackAgentToTurn(action.agent.id, action.turnId);
+        const result = this.sendAgentPrompt(agentId, prompt);
+        await this.persistSnapshotOnly();
+        return createClawRpcResult(message.id, result);
+      }
+      case 'agent/retryMessage': {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const action = this.resolveMessageAction(agentId, requireString(params.messageId, 'messageId'));
+        if (!action?.prompt) {
+          return createClawRpcResult(message.id, this.snapshot);
+        }
+        await this.rollbackAgentToTurn(action.agent.id, action.turnId);
+        const result = this.sendAgentPrompt(agentId, action.prompt);
+        await this.persistSnapshotOnly();
+        return createClawRpcResult(message.id, result);
       }
       case 'team/create': {
         const input = requireTeamCreateInput(message.params);
@@ -542,6 +570,161 @@ export class ClawBackendServer {
     return this.snapshot;
   }
 
+  private sendAgentPrompt(agentId: string, prompt: string, options?: SendPromptOptions): AppSnapshot {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) {
+      return this.snapshot;
+    }
+
+    return sendAgentPrompt(this.snapshot, this.backendDriverForAgent(agent), agentId, prompt, options, (event) => {
+      this.applyAndEmitBackendEvent(event);
+    }, {
+      onBackendSessionUpdated: async (_result, wasNewSession) => {
+        await this.setNewConversationTitle(agentId, wasNewSession);
+        await this.persistSnapshotOnly();
+      },
+    });
+  }
+
+  private backendDriverForAgent(agent: Agent): AgentBackendDriver {
+    return {
+      backend: agent.backend,
+      getRuntimeStatus: () => ({ backend: agent.backend, status: 'running' }),
+      getCapabilities: () => {
+        throw new Error('Backend capabilities are not needed during prompt dispatch.');
+      },
+      tryHandlePromptCommand: (currentAgent, prompt) => (
+        this.requireDriverRpc().tryHandlePromptCommand(currentAgent, prompt)
+      ),
+      preparePromptOptions: (_currentAgent, options) => options,
+      sendPrompt: async (currentAgent, prompt, options) => (
+        await this.requireDriverRpc().handle('driver/sendPrompt', { agent: currentAgent, prompt, options }) as BackendSendResult
+      ),
+      interrupt: async (currentAgent) => (
+        await this.requireDriverRpc().handle('driver/interrupt', { agent: currentAgent }) as BackendSendResult
+      ),
+      respondToRequest: async (response) => {
+        await this.requireDriverRpc().handle('agent/respondToClientRequest', { backend: agent.backend, response });
+      },
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+  }
+
+  private async rollbackAgentToTurn(agentId: string, turnId: string): Promise<AppSnapshot | null> {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) {
+      return null;
+    }
+    const result = await this.requireDriverRpc().handle('driver/rollbackToTurn', { agent, turnId }) as BackendRollbackResult;
+    agent.backendSession = result.backendSession;
+    const sessionThread = result.backendSession.kind === 'codex' ? { threadId: result.backendSession.threadId } : {};
+    this.applyAndEmitBackendEvent({
+      agentId,
+      ...sessionThread,
+      type: 'thread.historyLoaded',
+      payload: {
+        messages: result.messages,
+        replace: true,
+      },
+    });
+    this.applyAndEmitBackendEvent({
+      agentId,
+      ...sessionThread,
+      type: 'agent.statusChanged',
+      payload: { type: 'idle' },
+    });
+    return this.persistSnapshotOnly();
+  }
+
+  private resolveMessageAction(agentId: string, messageId: string): { agent: Agent; message: RendererMessage; prompt: string | null; turnId: string } | null {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) {
+      return null;
+    }
+
+    const messages = this.snapshot.messages.filter((message) => message.agentId === agentId);
+    const index = messages.findIndex((message) => message.id === messageId);
+    const message = messages[index];
+    if (index === -1 || !message) {
+      return null;
+    }
+
+    const turnId = this.resolveMessageTurnId(messages, index);
+    if (!turnId) {
+      return null;
+    }
+
+    return {
+      agent,
+      message,
+      prompt: this.promptForMessageRetry(messages, index, turnId),
+      turnId,
+    };
+  }
+
+  private resolveMessageTurnId(messages: RendererMessage[], index: number): string | null {
+    const message = messages[index];
+    if (!message) {
+      return null;
+    }
+
+    if (message.turnId) {
+      return message.turnId;
+    }
+
+    const idTurnId = turnIdFromRendererMessageId(message.id);
+    if (idTurnId) {
+      return idTurnId;
+    }
+
+    if (message.role === 'user') {
+      for (let offset = index + 1; offset < messages.length; offset += 1) {
+        const candidate = messages[offset];
+        if (candidate?.role === 'user') {
+          break;
+        }
+        const candidateTurnId = candidate ? candidate.turnId ?? turnIdFromRendererMessageId(candidate.id) : null;
+        if (candidateTurnId) {
+          return candidateTurnId;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private promptForMessageRetry(messages: RendererMessage[], index: number, turnId: string): string | null {
+    const message = messages[index];
+    if (!message) {
+      return null;
+    }
+
+    if (message.role === 'user') {
+      return rendererMessageText(message);
+    }
+
+    for (let offset = index - 1; offset >= 0; offset -= 1) {
+      const candidate = messages[offset];
+      if (!candidate || candidate.role !== 'user') {
+        continue;
+      }
+      const candidateTurnId = candidate.turnId ?? this.resolveMessageTurnId(messages, offset);
+      if (candidateTurnId === turnId) {
+        return rendererMessageText(candidate);
+      }
+    }
+
+    for (let offset = index - 1; offset >= 0; offset -= 1) {
+      const candidate = messages[offset];
+      if (candidate?.role === 'user') {
+        return rendererMessageText(candidate);
+      }
+    }
+
+    return null;
+  }
+
   private addRecentSourceRepository(repoName: string): void {
     const trimmed = repoName.trim();
     if (!trimmed) {
@@ -689,6 +872,11 @@ function requireAgentId(params: unknown): string {
   return requireString(record.agentId, 'agentId');
 }
 
+function requireMessageId(params: unknown): string {
+  const record = requireRecord(params);
+  return requireString(record.messageId, 'messageId');
+}
+
 function requireTemplateId(params: unknown): string {
   const record = requireRecord(params);
   return requireString(record.templateId, 'templateId');
@@ -743,6 +931,26 @@ function isBackendConversationRef(value: unknown): value is BackendConversationR
     candidate.folder.trim().length > 0 &&
     typeof candidate.sessionId === 'string' &&
     candidate.sessionId.trim().length > 0;
+}
+
+function rendererMessageText(message: RendererMessage): string {
+  return message.parts
+    .map((part) => part.type === 'text' || part.type === 'status' ? part.text : '')
+    .filter(Boolean)
+    .join('\n\n')
+    .trim();
+}
+
+function turnIdFromRendererMessageId(messageId: string): string | null {
+  if (messageId.startsWith('assistant-')) {
+    return messageId.slice('assistant-'.length).split('-segment-')[0] || null;
+  }
+
+  if (messageId.startsWith('compaction-')) {
+    return messageId.slice('compaction-'.length) || null;
+  }
+
+  return null;
 }
 
 function shouldPersistSnapshotForEvent(event: BackendEvent): boolean {

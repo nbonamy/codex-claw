@@ -842,103 +842,32 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('agent/interrupt', { agentId: 'agent-dina' });
   });
 
-  it('routes Claude prompts through the Claude backend driver', async () => {
+  it('routes prompts through clawd by agent id', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].backend = 'claude';
     snapshot.agents[0].backendDefaults = { kind: 'claude' };
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
-    const backendDriver = createFakeClaudeBackendDriver({
-      sendPrompt: vi.fn().mockResolvedValue({
-        backendSession: { kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' },
-        turnId: 'claude-turn-1',
-      }),
-    });
+    const backendSnapshot = {
+      ...snapshot,
+      messages: [
+        ...snapshot.messages,
+        userMessage('user-turn-1', 'turn-1', 'hello claude'),
+      ],
+      agents: [{
+        ...snapshot.agents[0]!,
+        backendSession: { kind: 'claude' as const, sessionId: 'claude-session-1', transport: 'stdio' as const },
+      }],
+    };
+    const request = vi.fn().mockResolvedValue(backendSnapshot);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
 
     await controller.initialize();
-    setClaudeBackendDriver(controller, backendDriver);
-    await sendPrompt(controller, 'agent-dina', 'hello claude');
-    await flushMicrotasks();
+    await expect(sendPrompt(controller, 'agent-dina', 'hello claude')).resolves.toBe(backendSnapshot);
 
-    expect(backendDriver.sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina', backend: 'claude' }), 'hello claude');
-    expect(snapshot.messages.at(-1)).toMatchObject({
+    expect(request).toHaveBeenCalledWith('agent/sendPrompt', {
       agentId: 'agent-dina',
-      role: 'user',
-      parts: [{ type: 'text', text: 'hello claude' }],
+      prompt: 'hello claude',
+      options: undefined,
     });
-    expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' });
-  });
-
-  it('sets a generic conversation title when a prompt creates a backend session', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date(2026, 5, 10, 15, 42));
-    try {
-      const snapshot = createInitialSnapshot();
-      const persistence = {
-        load: vi.fn().mockResolvedValue(snapshot),
-        save: vi.fn().mockResolvedValue(undefined),
-      } as unknown as AppStatePersistence;
-      const controller = new AppController(persistence);
-      const setConversationTitle = vi.fn().mockResolvedValue(undefined);
-      const backendDriver = createFakeCodexBackendDriver({ setConversationTitle });
-
-      await controller.initialize();
-      setCodexBackendDriver(controller, backendDriver);
-      await sendPrompt(controller, 'agent-dina', 'hello codex');
-      await flushMicrotasks();
-
-      expect(setConversationTitle).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: 'agent-dina',
-          backendSession: { kind: 'codex', threadId: 'thread-dina' },
-        }),
-        'Dina - Jun 10, 2026 3:42 PM',
-      );
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('does not retitle an existing backend session', async () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-existing' };
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
-    const setConversationTitle = vi.fn().mockResolvedValue(undefined);
-    const backendDriver = createFakeCodexBackendDriver({ setConversationTitle });
-
-    await controller.initialize();
-    setCodexBackendDriver(controller, backendDriver);
-    await sendPrompt(controller, 'agent-dina', 'continue');
-    await flushMicrotasks();
-
-    expect(setConversationTitle).not.toHaveBeenCalled();
-  });
-
-  it('keeps prompt startup successful when title assignment fails', async () => {
-    const snapshot = createInitialSnapshot();
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
-    const backendDriver = createFakeCodexBackendDriver({
-      setConversationTitle: vi.fn().mockRejectedValue(new Error('name unavailable')),
-    });
-
-    await controller.initialize();
-    setCodexBackendDriver(controller, backendDriver);
-    await sendPrompt(controller, 'agent-dina', 'hello codex');
-    await flushMicrotasks();
-
-    expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-dina' });
-    expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
   });
 
   it('reads historical conversation messages through the referenced backend driver', async () => {
@@ -1221,7 +1150,7 @@ describe('AppController', () => {
 
     await expect(deleteMessage(controller, 'agent-dina', 'user-turn-2')).resolves.toBe(rollbackSnapshot);
 
-    expect(request).toHaveBeenCalledWith('agent/rollbackToTurn', { agentId: 'agent-dina', turnId: 'turn-2' });
+    expect(request).toHaveBeenCalledWith('agent/deleteMessage', { agentId: 'agent-dina', messageId: 'user-turn-2' });
   });
 
   it('retries an assistant message by rolling back and resending the matching user prompt', async () => {
@@ -1236,18 +1165,13 @@ describe('AppController', () => {
       ...snapshot,
       messages: [],
     };
-    const request = vi.fn(async (method: string) => (
-      method === 'agent/rollbackToTurn'
-        ? rollbackSnapshot
-        : { backendSession: { kind: 'codex', threadId: 'thread-dina' }, turnId: 'turn-retry' }
-    ));
+    const request = vi.fn().mockResolvedValue(rollbackSnapshot);
     const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
 
     await controller.initialize();
     await retryMessage(controller, 'agent-dina', 'assistant-turn-1');
 
-    expect(request).toHaveBeenNthCalledWith(1, 'agent/rollbackToTurn', { agentId: 'agent-dina', turnId: 'turn-1' });
-    expect(request).toHaveBeenNthCalledWith(2, 'agent/sendPrompt', { agent: rollbackSnapshot.agents[0], prompt: 'first prompt', options: undefined });
+    expect(request).toHaveBeenCalledWith('agent/retryMessage', { agentId: 'agent-dina', messageId: 'assistant-turn-1' });
   });
 
   it('edits a user message by rolling back and resending the edited prompt', async () => {
@@ -1262,18 +1186,13 @@ describe('AppController', () => {
       ...snapshot,
       messages: [],
     };
-    const request = vi.fn(async (method: string) => (
-      method === 'agent/rollbackToTurn'
-        ? rollbackSnapshot
-        : { backendSession: { kind: 'codex', threadId: 'thread-dina' }, turnId: 'turn-edit' }
-    ));
+    const request = vi.fn().mockResolvedValue(rollbackSnapshot);
     const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
 
     await controller.initialize();
     await editMessage(controller, 'agent-dina', 'user-turn-1', ' edited prompt ');
 
-    expect(request).toHaveBeenNthCalledWith(1, 'agent/rollbackToTurn', { agentId: 'agent-dina', turnId: 'turn-1' });
-    expect(request).toHaveBeenNthCalledWith(2, 'agent/sendPrompt', { agent: rollbackSnapshot.agents[0], prompt: 'edited prompt', options: undefined });
+    expect(request).toHaveBeenCalledWith('agent/editMessage', { agentId: 'agent-dina', messageId: 'user-turn-1', prompt: ' edited prompt ' });
   });
 });
 
@@ -1368,9 +1287,9 @@ function createFakeClaudeBackendDriver(overrides: Partial<AgentBackendDriver> = 
   };
 }
 
-async function sendPrompt(controller: AppController, agentId: string, prompt: string): Promise<void> {
-  await (controller as unknown as {
-    sendPrompt(agentId: string, prompt: string): Promise<void>;
+async function sendPrompt(controller: AppController, agentId: string, prompt: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    sendPrompt(agentId: string, prompt: string): Promise<AppSnapshot>;
   }).sendPrompt(agentId, prompt);
 }
 

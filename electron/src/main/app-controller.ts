@@ -1,7 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import path from 'node:path';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
-import { sendAgentPrompt, type SendAgentPromptHooks } from '@codex-claw/shared/agent-chat-service';
 import { ClawBackendProxyDriver } from './backend-proxy-driver';
 import { logMain, warnMain } from './log';
 import { createMainWindow } from './main-window';
@@ -15,9 +14,8 @@ import { AppStatePersistence } from '@codex-claw/shared/state-persistence';
 import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from './backend-process-client';
 import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
-import type { AgentBackendDriver, BackendSendResult } from './backends/types';
+import type { AgentBackendDriver } from './backends/types';
 import { backendDisplayName, unsupportedBackendFeature } from './backends/types';
-import { formatConversationTitle } from '@codex-claw/shared/conversation-title';
 import { defaultUserDataPath } from './user-data';
 
 type ClawBackendClientPort = Pick<ClawBackendProcessClient, 'start' | 'health' | 'request' | 'onEvent' | 'close'>;
@@ -492,23 +490,8 @@ export class AppController {
     agentId: string,
     prompt: string,
     options?: SendPromptOptions,
-    hooks?: SendAgentPromptHooks,
   ): Promise<AppSnapshot> {
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent) {
-      return this.snapshot;
-    }
-
-    const driver = await this.getBackendDriverForAgent(agent);
-    return sendAgentPrompt(this.snapshot, driver, agentId, prompt, options, (event) => {
-      this.emitAndApply(event);
-    }, {
-      ...hooks,
-      onBackendSessionUpdated: async (result, wasNewSession) => {
-        await hooks?.onBackendSessionUpdated?.(result, wasNewSession);
-        await this.setNewConversationTitle(agent, driver, wasNewSession);
-      },
-    });
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/sendPrompt', { agentId, prompt, options }));
   }
 
   private async restartAgent(agentId: string): Promise<AppSnapshot> {
@@ -546,22 +529,6 @@ export class AppController {
       throw new Error(`${backendDisplayName(ref.backend)} does not support conversation history.`);
     }
     return driver.readConversationMessages(ref, agentId);
-  }
-
-  private async setNewConversationTitle(agent: Agent, driver: AgentBackendDriver, wasNewSession: boolean): Promise<void> {
-    if (!wasNewSession || !driver.setConversationTitle) {
-      return;
-    }
-
-    try {
-      await driver.setConversationTitle(agent, formatConversationTitle(agent));
-    } catch (error) {
-      warnMain('conversation-title', 'failed', {
-        agentId: agent.id,
-        backend: driver.backend,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
   }
 
   private async setAgentGoal(agentId: string, objective: string): Promise<AppSnapshot> {
@@ -689,126 +656,15 @@ export class AppController {
   }
 
   private async deleteMessage(agentId: string, messageId: string): Promise<AppSnapshot> {
-    const action = this.resolveMessageAction(agentId, messageId);
-    if (!action) {
-      return this.snapshot;
-    }
-
-    await this.rollbackAgentToTurn(action.agent.id, action.turnId);
-    return this.snapshot;
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/deleteMessage', { agentId, messageId }));
   }
 
   private async editMessage(agentId: string, messageId: string, prompt: string): Promise<AppSnapshot> {
-    const trimmedPrompt = prompt.trim();
-    const action = this.resolveMessageAction(agentId, messageId);
-    if (!action || !trimmedPrompt) {
-      return this.snapshot;
-    }
-
-    await this.rollbackAgentToTurn(action.agent.id, action.turnId);
-    return this.sendPrompt(agentId, trimmedPrompt);
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/editMessage', { agentId, messageId, prompt }));
   }
 
   private async retryMessage(agentId: string, messageId: string): Promise<AppSnapshot> {
-    const action = this.resolveMessageAction(agentId, messageId);
-    if (!action?.prompt) {
-      return this.snapshot;
-    }
-
-    await this.rollbackAgentToTurn(action.agent.id, action.turnId);
-    return this.sendPrompt(agentId, action.prompt);
-  }
-
-  private async rollbackAgentToTurn(agentId: string, turnId: string): Promise<void> {
-    this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/rollbackToTurn', { agentId, turnId }));
-  }
-
-  private resolveMessageAction(agentId: string, messageId: string): { agent: Agent; message: RendererMessage; prompt: string | null; turnId: string } | null {
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent) {
-      return null;
-    }
-
-    const messages = this.snapshot.messages.filter((message) => message.agentId === agentId);
-    const index = messages.findIndex((message) => message.id === messageId);
-    const message = messages[index];
-    if (index === -1 || !message) {
-      return null;
-    }
-
-    const turnId = this.resolveMessageTurnId(messages, index);
-    if (!turnId) {
-      return null;
-    }
-
-    return {
-      agent,
-      message,
-      prompt: this.promptForMessageRetry(messages, index, turnId),
-      turnId,
-    };
-  }
-
-  private resolveMessageTurnId(messages: RendererMessage[], index: number): string | null {
-    const message = messages[index];
-    if (!message) {
-      return null;
-    }
-
-    if (message.turnId) {
-      return message.turnId;
-    }
-
-    const idTurnId = turnIdFromRendererMessageId(message.id);
-    if (idTurnId) {
-      return idTurnId;
-    }
-
-    if (message.role === 'user') {
-      for (let offset = index + 1; offset < messages.length; offset += 1) {
-        const candidate = messages[offset];
-        if (candidate?.role === 'user') {
-          break;
-        }
-        const candidateTurnId = candidate ? candidate.turnId ?? turnIdFromRendererMessageId(candidate.id) : null;
-        if (candidateTurnId) {
-          return candidateTurnId;
-        }
-      }
-    }
-
-    return null;
-  }
-
-  private promptForMessageRetry(messages: RendererMessage[], index: number, turnId: string): string | null {
-    const message = messages[index];
-    if (!message) {
-      return null;
-    }
-
-    if (message.role === 'user') {
-      return rendererMessageText(message);
-    }
-
-    for (let offset = index - 1; offset >= 0; offset -= 1) {
-      const candidate = messages[offset];
-      if (!candidate || candidate.role !== 'user') {
-        continue;
-      }
-      const candidateTurnId = candidate.turnId ?? this.resolveMessageTurnId(messages, offset);
-      if (candidateTurnId === turnId) {
-        return rendererMessageText(candidate);
-      }
-    }
-
-    for (let offset = index - 1; offset >= 0; offset -= 1) {
-      const candidate = messages[offset];
-      if (candidate?.role === 'user') {
-        return rendererMessageText(candidate);
-      }
-    }
-
-    return null;
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/retryMessage', { agentId, messageId }));
   }
 
   private async hydrateAgentHistory(agentId: string): Promise<void> {
@@ -1161,14 +1017,6 @@ export function startMainApp(): void {
   });
 }
 
-function rendererMessageText(message: RendererMessage): string {
-  return message.parts
-    .map((part) => part.type === 'text' || part.type === 'status' ? part.text : '')
-    .filter(Boolean)
-    .join('\n\n')
-    .trim();
-}
-
 function isBackendConversationRef(value: unknown): value is BackendConversationRef {
   if (!value || typeof value !== 'object') {
     return false;
@@ -1192,18 +1040,6 @@ function sameConversationRef(left: BackendConversationRef, right: BackendConvers
   }
 
   return right.backend === 'claude' && left.folder === right.folder && left.sessionId === right.sessionId;
-}
-
-function turnIdFromRendererMessageId(messageId: string): string | null {
-  if (messageId.startsWith('assistant-')) {
-    return messageId.slice('assistant-'.length).split('-segment-')[0] || null;
-  }
-
-  if (messageId.startsWith('compaction-')) {
-    return messageId.slice('compaction-'.length) || null;
-  }
-
-  return null;
 }
 
 function clientRequest(value: unknown): ClientRequest | null {

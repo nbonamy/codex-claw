@@ -862,6 +862,203 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
+  it('owns prompt dispatch and conversation title assignment', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 10, 15, 42));
+    try {
+      const snapshot = createTestSnapshot();
+      snapshot.teams[0]!.agentIds = ['agent-dina'];
+      snapshot.agents = [{
+        id: 'agent-dina',
+        teamId: 'team-test',
+        name: 'Dina',
+        folder: '/Users/nbonamy/src/codex-claw',
+        backend: 'codex',
+        status: { type: 'idle' },
+        createdAt: '2026-06-13T00:00:00.000Z',
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      }];
+      const sendPrompt = vi.fn().mockResolvedValue({
+        backendSession: { kind: 'codex' as const, threadId: 'thread-dina' },
+        turnId: 'turn-1',
+      });
+      const setConversationTitle = vi.fn().mockResolvedValue(undefined);
+      const driver: AgentBackendDriver = {
+        backend: 'codex',
+        getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+        getCapabilities: () => codexBackendCapabilities,
+        sendPrompt,
+        interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+        respondToRequest: async () => undefined,
+        setConversationTitle,
+        onEvent: () => () => undefined,
+        close: async () => undefined,
+      };
+      const events: unknown[] = [];
+      const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+      const server = new ClawBackendServer({
+        version: 'test-version',
+        pid: 123,
+        snapshot,
+        saveSnapshot,
+        onEvent: (event) => events.push(event),
+        driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      });
+
+      await expect(server.handleMessage({
+        jsonrpc: '2.0',
+        id: 'send',
+        method: 'agent/sendPrompt',
+        params: { agentId: 'agent-dina', prompt: ' hello codex ' },
+      })).resolves.toMatchObject({
+        result: {
+          agents: [{ id: 'agent-dina', status: { type: 'starting' } }],
+          messages: [{ agentId: 'agent-dina', role: 'user', parts: [{ type: 'text', text: 'hello codex' }] }],
+        },
+      });
+      await flushMicrotasks();
+
+      expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'hello codex', undefined);
+      expect(snapshot.agents[0]?.backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-dina' });
+      expect(snapshot.agents[0]?.status).toStrictEqual({ type: 'working' });
+      expect(setConversationTitle).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'agent-dina', backendSession: { kind: 'codex', threadId: 'thread-dina' } }),
+        'Dina - Jun 10, 2026 3:42 PM',
+      );
+      expect(events).toEqual(expect.arrayContaining([
+        expect.objectContaining({ type: 'agent.statusChanged', payload: { type: 'starting' } }),
+        expect.objectContaining({ type: 'backend.statusChanged', payload: expect.objectContaining({ backend: 'codex', status: 'starting' }) }),
+        expect.objectContaining({ type: 'agent.statusChanged', payload: { type: 'working' } }),
+      ]));
+      await server.close();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps slash command prompts hidden while starting the backend turn', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const commandResult = Promise.resolve({
+      backendSession: { kind: 'codex' as const, threadId: 'thread-command' },
+      turnId: 'turn-command',
+    });
+    const tryHandlePromptCommand = vi.fn().mockReturnValue(commandResult);
+    const sendPrompt = vi.fn();
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt,
+      tryHandlePromptCommand,
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'send',
+      method: 'agent/sendPrompt',
+      params: { agentId: 'agent-dina', prompt: '/compact' },
+    });
+    await flushMicrotasks();
+
+    expect(tryHandlePromptCommand).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), '/compact');
+    expect(sendPrompt).not.toHaveBeenCalled();
+    expect(snapshot.messages).toHaveLength(0);
+    expect(snapshot.agents[0]?.backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-command' });
+    await server.close();
+  });
+
+  it('owns message retry and edit rollback orchestration', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      backendSession: { kind: 'codex', threadId: 'thread-old' },
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    snapshot.messages = [
+      createTextMessage('user-turn-1', 'agent-dina', 'first prompt', 'turn-1'),
+      createTextMessage('assistant-turn-1', 'agent-dina', 'first answer', 'turn-1', 'assistant'),
+    ];
+    const rollbackToTurn = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex' as const, threadId: 'thread-rollback' },
+      messages: [],
+    });
+    const sendPrompt = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex' as const, threadId: 'thread-dina' },
+      turnId: 'turn-new',
+    });
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt,
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      rollbackToTurn,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'retry',
+      method: 'agent/retryMessage',
+      params: { agentId: 'agent-dina', messageId: 'assistant-turn-1' },
+    });
+
+    expect(rollbackToTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-1');
+    expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'first prompt', undefined);
+
+    snapshot.agents[0]!.status = { type: 'idle' };
+    snapshot.messages = [
+      createTextMessage('user-turn-1', 'agent-dina', 'first prompt', 'turn-1'),
+      createTextMessage('assistant-turn-1', 'agent-dina', 'first answer', 'turn-1', 'assistant'),
+    ];
+
+    await server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'edit',
+      method: 'agent/editMessage',
+      params: { agentId: 'agent-dina', messageId: 'user-turn-1', prompt: ' edited prompt ' },
+    });
+
+    expect(sendPrompt).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'edited prompt', undefined);
+    await server.close();
+  });
+
   it('owns bench mutations and validates deployed template folders', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-bench-'));
     const snapshot = createTestSnapshot();
@@ -1169,11 +1366,18 @@ function createWorkItem(): WorkItem {
   };
 }
 
-function createTextMessage(id: string, agentId: string, text: string): RendererMessage {
+function createTextMessage(
+  id: string,
+  agentId: string,
+  text: string,
+  turnId?: string,
+  role: RendererMessage['role'] = 'user',
+): RendererMessage {
   return {
     id,
     agentId,
-    role: 'user',
+    role,
+    ...(turnId ? { turnId } : {}),
     status: 'complete',
     createdAt: '2026-06-13T00:00:00.000Z',
     parts: [{ type: 'text', text }],
@@ -1191,4 +1395,9 @@ function createThreadGoal(threadId: string, objective: string): ThreadGoal {
     createdAt: 0,
     updatedAt: 0,
   };
+}
+
+async function flushMicrotasks(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
 }

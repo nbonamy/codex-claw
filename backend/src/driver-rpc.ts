@@ -1,4 +1,4 @@
-import type { AgentBackendDriver, BackendEvent } from '@codex-claw/shared/backend-driver';
+import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/shared/backend-driver';
 import { unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
 import type { Agent, AgentBackend, AppleSpeechTranscriptionOptions, CreateSourceWorktreeInput, SendPromptOptions } from '@codex-claw/shared/contracts';
 import { stat } from 'node:fs/promises';
@@ -72,13 +72,17 @@ export class BackendDriverRpc {
         const driver = this.requireDriver(agent.backend);
         return driver.getGitDiff ? driver.getGitDiff(agent) : null;
       }
-      case 'agent/sendPrompt': {
+      case 'driver/tryHandlePromptCommand': {
+        const { agent } = requireAgentParams(params);
+        const record = requireRecord(params);
+        return this.tryHandlePromptCommand(agent, requireString(record.prompt, 'prompt'));
+      }
+      case 'driver/sendPrompt': {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);
         const prompt = requireString(record.prompt, 'prompt');
         const driver = this.requireDriver(agent.backend);
-        const commandResult = driver.tryHandlePromptCommand?.(agent, prompt) ?? null;
-        return commandResult ?? driver.sendPrompt(agent, prompt, record.options as SendPromptOptions | undefined);
+        return driver.sendPrompt(agent, prompt, record.options as SendPromptOptions | undefined);
       }
       case 'driver/setConversationTitle': {
         const { agent } = requireAgentParams(params);
@@ -221,6 +225,10 @@ export class BackendDriverRpc {
       unsubscribe();
     }
     await Promise.all([...this.drivers.values()].map((driver) => driver.close()));
+  }
+
+  tryHandlePromptCommand(agent: Agent, prompt: string): Promise<BackendSendResult> | null {
+    return this.requireDriver(agent.backend).tryHandlePromptCommand?.(agent, prompt) ?? null;
   }
 
   onEvent(listener: (event: BackendEvent) => void): () => void {

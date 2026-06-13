@@ -96,17 +96,17 @@ Current implementation checkpoint:
 - `clawd` now owns active-turn steering and interruption session mutations.
   Electron forwards steer/interrupt requests and adopts the returned snapshot;
   provider-only steer/interrupt calls use `driver/*` RPC methods.
-- `clawd` now owns rollback-to-turn history replacement and session mutation.
-  Electron's delete/edit/retry flows request backend rollback and then, for
-  edit/retry, continue with prompt dispatch as a separate remaining slice.
+- `clawd` now owns prompt dispatch, rollback-to-turn history replacement, and
+  delete/edit/retry message orchestration. Electron forwards message actions by
+  agent/message ids and adopts the returned snapshot.
 - `clawd` owns agent file listing/preview authority. Client-facing
   `agent/listFiles` and `agent/readFile` take an `agentId`; Electron does not
   send workspace roots or read file bytes. The backend's folder-based file
   helpers are internal `driver/listFiles` and `driver/readFile` calls only.
 - The remaining large slice is to move the rest of product orchestration out of
   `AppController` so Electron becomes only the desktop IPC/stdio layer. The
-  largest remaining owners are prompt dispatch and the residual edit/retry
-  prompt send handoff, plus remaining desktop-era driver shims.
+  largest remaining owners are conversation-history listing/reading, backend
+  model/skill listing, git diff preview, and remaining desktop-era driver shims.
 
 ## Goals
 
@@ -385,6 +385,7 @@ names that describe backend ownership:
 - `team/create`, `team/update`, `team/reorder`, `team/close`, `team/select`
 - `agent/create`, `agent/update`, `agent/close`, `agent/select`,
   `agent/restart`, `agent/sendPrompt`, `agent/steer`, `agent/interrupt`,
+  `agent/deleteMessage`, `agent/editMessage`, `agent/retryMessage`,
   `agent/respondToClientRequest`
 - `agent/validateFolder`, `agent/listModels`, `agent/listSkills`,
   `agent/listConversations`, `agent/resumeConversation`,

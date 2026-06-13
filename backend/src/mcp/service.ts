@@ -79,7 +79,7 @@ export class ClawMcpService {
       return;
     }
 
-    await this.driverRpc.handle('agent/sendPrompt', {
+    await this.driverRpc.handle('driver/sendPrompt', {
       agent,
       prompt: agentMessagesPrompt(messages),
     });

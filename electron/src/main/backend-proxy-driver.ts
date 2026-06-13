@@ -61,7 +61,7 @@ export class ClawBackendProxyDriver implements AgentBackendDriver {
   }
 
   async sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult> {
-    return this.client.request('agent/sendPrompt', { agent, prompt, options });
+    return this.client.request('driver/sendPrompt', { agent, prompt, options });
   }
 
   async setConversationTitle(agent: Agent, title: string): Promise<void> {
