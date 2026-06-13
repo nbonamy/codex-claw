@@ -41,9 +41,9 @@ Current implementation checkpoint:
 - Codex and Claude provider drivers now live under `backend/src`; Electron main
   must not import provider drivers, provider transports, provider SDKs, or raw
   provider protocol modules.
-- `clawd` currently serves health, snapshot loading, and the
-  `AgentBackendDriver` RPC surface. The remaining large slice is to move
-  product orchestration and backend events out of `AppController` so Electron
+- `clawd` currently serves health, snapshot loading, the `AgentBackendDriver`
+  RPC surface, and sequenced `backend/event` notifications. The remaining large
+  slice is to move product orchestration out of `AppController` so Electron
   becomes only the desktop IPC/stdio layer.
 
 ## Goals

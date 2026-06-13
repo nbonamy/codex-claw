@@ -1,4 +1,5 @@
 import { pathToFileURL } from 'node:url';
+import { createClawRpcNotification } from '@codex-claw/shared/backend-protocol/rpc';
 import { BackendDriverRpc, createDefaultBackendDrivers } from './driver-rpc';
 import { ClawBackendServer } from './server';
 import { loadBackendSnapshot } from './state';
@@ -19,6 +20,9 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       driverRpc: new BackendDriverRpc(createDefaultBackendDrivers({
         clawMcpServerUrl: readArgValue(argv, '--mcp-server-url') ?? null,
       })),
+      onEvent: (event) => {
+        process.stdout.write(`${JSON.stringify(createClawRpcNotification('backend/event', event))}\n`);
+      },
     });
     startStdioRpcServer({
       input: process.stdin,

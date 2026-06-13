@@ -63,6 +63,76 @@ describe('ClawBackendProcessClient', () => {
     await expect(requestPromise).rejects.toThrow('Unknown backend method: missing/method');
   });
 
+  it('emits backend event notifications from stdio', async () => {
+    const child = createFakeChildProcess();
+    const client = new ClawBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+      spawnProcess: vi.fn().mockReturnValue(child),
+    });
+    const listener = vi.fn();
+
+    await client.start();
+    client.onEvent(listener);
+    child.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'backend/event',
+      params: {
+        seq: 1,
+        backend: 'codex',
+        agentId: 'agent-dina',
+        type: 'agent.statusChanged',
+        payload: { type: 'working' },
+        occurredAt: '2026-06-13T00:00:00.000Z',
+      },
+    })}\n`);
+
+    expect(listener).toHaveBeenCalledWith({
+      seq: 1,
+      backend: 'codex',
+      agentId: 'agent-dina',
+      type: 'agent.statusChanged',
+      payload: { type: 'working' },
+      occurredAt: '2026-06-13T00:00:00.000Z',
+    });
+  });
+
+  it('keeps resolving requests when notifications arrive before responses', async () => {
+    const child = createFakeChildProcess();
+    const client = new ClawBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+      spawnProcess: vi.fn().mockReturnValue(child),
+    });
+    const listener = vi.fn();
+
+    await client.start();
+    client.onEvent(listener);
+    const healthPromise = client.health();
+    const request = JSON.parse(child.stdin.writes[0]);
+    child.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'backend/event',
+      params: {
+        seq: 1,
+        type: 'backend.statusChanged',
+        payload: { backend: 'codex', status: 'running' },
+        occurredAt: '2026-06-13T00:00:00.000Z',
+      },
+    })}\n`);
+    child.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: request.id,
+      result: {
+        ok: true,
+        name: 'clawd',
+        version: '0.1.0',
+        pid: 123,
+      },
+    })}\n`);
+
+    await expect(healthPromise).resolves.toMatchObject({ ok: true });
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
   it('rejects pending requests when the process exits', async () => {
     const child = createFakeChildProcess();
     const client = new ClawBackendProcessClient({

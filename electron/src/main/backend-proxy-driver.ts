@@ -28,11 +28,12 @@ import type {
 import type { ClawBackendProcessClient } from './backend-process-client';
 
 type ClawBackendClientPort = Pick<ClawBackendProcessClient, 'request'>;
+type ClawBackendEventPort = Pick<ClawBackendProcessClient, 'request' | 'onEvent'>;
 
 export class ClawBackendProxyDriver implements AgentBackendDriver {
   constructor(
     readonly backend: AgentBackend,
-    private readonly client: ClawBackendClientPort,
+    private readonly client: ClawBackendClientPort | ClawBackendEventPort,
   ) {}
 
   getRuntimeStatus(): BackendRuntimeStatus {
@@ -123,8 +124,16 @@ export class ClawBackendProxyDriver implements AgentBackendDriver {
     return this.client.request('agent/listSkills', { agent });
   }
 
-  onEvent(_listener: (event: BackendEvent) => void): () => void {
-    return () => {};
+  onEvent(listener: (event: BackendEvent) => void): () => void {
+    if (!('onEvent' in this.client)) {
+      return () => {};
+    }
+
+    return this.client.onEvent((event) => {
+      if (!event.backend || event.backend === this.backend) {
+        listener(event as BackendEvent);
+      }
+    });
   }
 
   async close(): Promise<void> {}

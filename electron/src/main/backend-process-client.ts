@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { watch } from 'node:fs';
-import { createClawRpcError, clawRpcErrorCodes, isClawRpcResponse, parseClawRpcMessage, type ClawBackendHealth, type ClawRpcId, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
+import { createClawRpcError, clawRpcErrorCodes, isClawRpcNotification, isClawRpcResponse, parseClawRpcMessage, type ClawBackendEvent, type ClawBackendHealth, type ClawRpcId, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { warnMain } from './log';
 import { runtimeClawdCommand, runtimeClawdWatchFile } from './runtime-config';
 
@@ -39,6 +39,7 @@ export class ClawBackendProcessClient {
   private stdoutBuffer = '';
   private nextRequestId = 1;
   private readonly pending = new Map<ClawRpcId, PendingRequest>();
+  private readonly eventListeners = new Set<(event: ClawBackendEvent) => void>();
 
   constructor(options: ClawBackendProcessClientOptions) {
     this.command = options.command;
@@ -104,6 +105,13 @@ export class ClawBackendProcessClient {
 
     this.process.stdin.write(`${JSON.stringify(message)}\n`);
     return result;
+  }
+
+  onEvent(listener: (event: ClawBackendEvent) => void): () => void {
+    this.eventListeners.add(listener);
+    return () => {
+      this.eventListeners.delete(listener);
+    };
   }
 
   async close(): Promise<void> {
@@ -202,6 +210,10 @@ export class ClawBackendProcessClient {
     let response: ClawRpcResponse;
     try {
       const message = parseClawRpcMessage(JSON.parse(line));
+      if (isClawRpcNotification(message)) {
+        this.handleNotification(message);
+        return;
+      }
       if (!isClawRpcResponse(message)) {
         warnMain('clawd', 'ignored non-response message from backend', { line });
         return;
@@ -233,6 +245,27 @@ export class ClawBackendProcessClient {
     pending.resolve(response.result);
   }
 
+  private handleNotification(message: ReturnType<typeof parseClawRpcMessage>): void {
+    if (!isClawRpcNotification(message)) {
+      return;
+    }
+
+    if (message.method !== 'backend/event') {
+      warnMain('clawd', 'ignored unknown backend notification', { method: message.method });
+      return;
+    }
+
+    if (!isRecord(message.params)) {
+      warnMain('clawd', 'ignored malformed backend event notification');
+      return;
+    }
+
+    const event = message.params as ClawBackendEvent;
+    for (const listener of this.eventListeners) {
+      listener(event);
+    }
+  }
+
   private rejectPending(error: Error): void {
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timeout);
@@ -240,6 +273,10 @@ export class ClawBackendProcessClient {
     }
     this.pending.clear();
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export function createRuntimeClawBackendClient(): ClawBackendProcessClient | null {

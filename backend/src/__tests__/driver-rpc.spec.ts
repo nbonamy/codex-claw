@@ -35,6 +35,33 @@ describe('BackendDriverRpc', () => {
 
     await expect(rpc.handle('backend/unknown', undefined)).resolves.toBeUndefined();
   });
+
+  it('fans out backend driver events', () => {
+    let emitEvent: AgentBackendDriver['onEvent'] extends (listener: infer Listener) => () => void ? Listener : never;
+    const driver = createDriver({
+      onEvent: vi.fn((listener) => {
+        emitEvent = listener as typeof emitEvent;
+        return () => undefined;
+      }),
+    });
+    const rpc = new BackendDriverRpc(new Map([['codex', driver]]));
+    const listener = vi.fn();
+
+    rpc.onEvent(listener);
+    emitEvent!({
+      backend: 'codex',
+      agentId: 'agent-dina',
+      type: 'agent.statusChanged',
+      payload: { type: 'working' },
+    });
+
+    expect(listener).toHaveBeenCalledWith({
+      backend: 'codex',
+      agentId: 'agent-dina',
+      type: 'agent.statusChanged',
+      payload: { type: 'working' },
+    });
+  });
 });
 
 function createDriver(overrides: Partial<AgentBackendDriver> = {}): AgentBackendDriver {

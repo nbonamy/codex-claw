@@ -1,6 +1,8 @@
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import type { AppSnapshot } from '@codex-claw/shared/contracts';
+import type { BackendEvent } from '@codex-claw/shared/backend-driver';
+import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { BackendDriverRpc } from './driver-rpc';
 
 export type ClawBackendServerOptions = {
@@ -8,6 +10,7 @@ export type ClawBackendServerOptions = {
   pid?: number;
   snapshot?: AppSnapshot;
   driverRpc?: BackendDriverRpc;
+  onEvent?: (event: ClawBackendEvent) => void;
 };
 
 export class ClawBackendServer {
@@ -15,6 +18,8 @@ export class ClawBackendServer {
   private readonly pid: number;
   private readonly snapshot: AppSnapshot;
   private readonly driverRpc?: BackendDriverRpc;
+  private readonly onEvent?: (event: ClawBackendEvent) => void;
+  private unsubscribeDriverEvents?: () => void;
   private lastEventSeq = 0;
 
   constructor(options: ClawBackendServerOptions) {
@@ -22,6 +27,8 @@ export class ClawBackendServer {
     this.pid = options.pid ?? process.pid;
     this.snapshot = options.snapshot ?? createEmptySnapshot();
     this.driverRpc = options.driverRpc;
+    this.onEvent = options.onEvent;
+    this.unsubscribeDriverEvents = this.driverRpc?.onEvent((event) => this.handleBackendEvent(event));
   }
 
   async handleMessage(message: ClawRpcMessage): Promise<ClawRpcResponse | undefined> {
@@ -62,6 +69,17 @@ export class ClawBackendServer {
   }
 
   async close(): Promise<void> {
+    this.unsubscribeDriverEvents?.();
     await this.driverRpc?.close();
+  }
+
+  private handleBackendEvent(event: BackendEvent): void {
+    this.lastEventSeq += 1;
+    this.onEvent?.({
+      ...event,
+      seq: this.lastEventSeq,
+      occurredAt: event.occurredAt ?? new Date().toISOString(),
+      payload: event.payload,
+    });
   }
 }

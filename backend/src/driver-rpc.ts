@@ -1,4 +1,4 @@
-import type { AgentBackendDriver } from '@codex-claw/shared/backend-driver';
+import type { AgentBackendDriver, BackendEvent } from '@codex-claw/shared/backend-driver';
 import { unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
 import type { Agent, AgentBackend, SendPromptOptions } from '@codex-claw/shared/contracts';
 import { ClaudeBackendDriver } from './claude/claude-driver';
@@ -29,7 +29,12 @@ export function createDefaultBackendDrivers(options: BackendDriverRegistryOption
 }
 
 export class BackendDriverRpc {
-  constructor(private readonly drivers: Map<AgentBackend, AgentBackendDriver>) {}
+  private readonly listeners = new Set<(event: BackendEvent) => void>();
+  private readonly unsubscribeDriverEvents: (() => void)[];
+
+  constructor(private readonly drivers: Map<AgentBackend, AgentBackendDriver>) {
+    this.unsubscribeDriverEvents = [...drivers.values()].map((driver) => driver.onEvent((event) => this.emit(event)));
+  }
 
   async handle(method: string, params: unknown): Promise<unknown> {
     switch (method) {
@@ -165,7 +170,17 @@ export class BackendDriverRpc {
   }
 
   async close(): Promise<void> {
+    for (const unsubscribe of this.unsubscribeDriverEvents) {
+      unsubscribe();
+    }
     await Promise.all([...this.drivers.values()].map((driver) => driver.close()));
+  }
+
+  onEvent(listener: (event: BackendEvent) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   }
 
   private requireDriver(backend: AgentBackend): AgentBackendDriver {
@@ -174,6 +189,12 @@ export class BackendDriverRpc {
       throw new Error(`Backend driver is not configured: ${backend}`);
     }
     return driver;
+  }
+
+  private emit(event: BackendEvent): void {
+    for (const listener of this.listeners) {
+      listener(event);
+    }
   }
 }
 
