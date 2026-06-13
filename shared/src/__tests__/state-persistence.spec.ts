@@ -3,8 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { AppStatePersistence, persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
-import { appendUserPrompt, createEmptySnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import { defaultThemeSettings } from '@codex-claw/shared/settings';
+import { appendUserPrompt, createEmptySnapshot, createInitialSnapshot } from '../snapshot';
+import { defaultThemeSettings } from '../settings';
 
 let tempDir: string | null = null;
 

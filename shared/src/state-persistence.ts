@@ -1,11 +1,11 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Loop, LoopAction, LoopExecutionCreatedAgent, LoopExecutionLogEntry, LoopExecutionStatus, LoopSourceConfiguration, LoopTeamTarget, SourceFolderState, Team, ThreadGoal, ThreadPlan, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/shared/contracts';
-import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '@codex-claw/shared/codex-approval-presets';
-import { normalizeGeneralSettings, normalizeSourceFolderState, normalizeThemeSettings } from '@codex-claw/shared/settings';
-import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
-import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
-import { defaultTeamColor } from '@codex-claw/shared/team-colors';
+import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Loop, LoopAction, LoopExecutionCreatedAgent, LoopExecutionLogEntry, LoopExecutionStatus, LoopSourceConfiguration, LoopTeamTarget, SourceFolderState, Team, ThreadGoal, ThreadPlan, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from './contracts';
+import { isCodexApprovalPreset, isCodexApprovalsReviewer } from './codex-approval-presets';
+import { normalizeGeneralSettings, normalizeSourceFolderState, normalizeThemeSettings } from './settings';
+import { createEmptySnapshot } from './snapshot';
+import { workItemAssignmentKey } from './work-assignments';
+import { defaultTeamColor } from './team-colors';
 
 type PersistedState = {
   teams: Team[];
