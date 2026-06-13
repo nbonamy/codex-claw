@@ -1,6 +1,6 @@
 # Codex Claw Architecture
 
-Status: updated for backend driver capability seam, 2026-06-11.
+Status: updated for backend protocol extraction, 2026-06-13.
 
 Codex Claw is an Electron app that merges the team/agent product model from
 Skwad with the native chat and artifact rendering already built in id8. The app
@@ -157,17 +157,18 @@ MCP server exposes the same app-owned operations with `list-repos`,
 
 ## Process Architecture
 
-The app is being extracted from an Electron-main backend into a separate
-`clawd` process. `docs/backend-architecture.md` is the canonical plan for that
-work. The target invariant is that Electron main is a desktop adapter and stdio
-client; provider drivers, provider protocols, app state, backend-owned
-filesystem work, git, loops, worktree path policy, and agent runtime state
-belong behind `clawd`. That includes file previews: desktop and future
-non-desktop clients may request file content from `clawd`, but they do not read
-backend-owned agent workspace paths themselves. If model output includes an
-absolute or `file://` link, the client may normalize it to a path relative to
-the active agent folder before requesting a preview; it must not forward an
-arbitrary absolute local path as read authority.
+The app is extracted from an Electron-main backend into a separate `clawd`
+process. `docs/backend-architecture.md` is the canonical extraction record, and
+`docs/protocol.md` is the concrete bidirectional message catalog. The target
+invariant is that Electron main is a desktop adapter and stdio client; provider
+drivers, provider protocols, app state, backend-owned filesystem work, git,
+loops, worktree path policy, and agent runtime state belong behind `clawd`.
+That includes file previews: desktop and future non-desktop clients may request
+file content from `clawd`, but they do not read backend-owned agent workspace
+paths themselves. If model output includes an absolute or `file://` link, the
+client may normalize it to a path relative to the active agent folder before
+requesting a preview; it must not forward an arbitrary absolute local path as
+read authority.
 
 Snapshot mutation is also backend-owned. `clawd` applies backend events to the
 authoritative snapshot; Electron fetches fresh snapshots from `clawd` for
@@ -231,6 +232,11 @@ Future transport options:
 - use SSH stdio to connect Electron to a remote `clawd`;
 - use Electron `utilityProcess` with message ports only if packaging forces it.
 
+The protocol itself must stay transport-neutral. Stdio is the first transport,
+but messages are app-owned JSON-RPC requests, responses, and notifications so
+the same contract can run over sockets, SSH, websocket, or a future remote
+backend. See `docs/protocol.md` for supported methods in both directions.
+
 ### Backend Seam
 
 Codex Claw should not pretend to be provider-agnostic on day one. The product
@@ -287,10 +293,10 @@ renderer UI. The required path is:
 3. Keep provider details inside backend driver/adapter code such as
    `backend/src/codex/*` or `backend/src/claude/*`.
 4. Route renderer requests through app controller/preload IPC and
-   `ClawBackendClient` using app-owned
-   contracts. Renderer components may branch on app capabilities or empty data,
-   but must not import Codex/Claude protocol types or know where a backend
-   stores history.
+   `ClawBackendClient` using the app-owned methods documented in
+   `docs/protocol.md`. Renderer components may branch on app capabilities or
+   empty data, but must not import Codex/Claude protocol types or know where a
+   backend stores history.
 5. Test the seam: fake backend-driver routing in controller tests, concrete
    provider adapter/session tests for protocol behavior, and renderer component
    tests against app-owned data.
@@ -379,11 +385,16 @@ Renderer layers:
   Claw-owned Vue components;
 - theme provider that applies semantic CSS custom properties to the document.
 
-## IPC Contract
+## IPC And Backend Protocol
 
-IPC should be app-domain events, not app-server messages. Every emitted event
-gets a monotonically increasing sequence number so the renderer can detect gaps
-after reloads.
+Renderer IPC and the backend protocol should be app-domain messages, not
+app-server messages. Renderer-to-Electron IPC remains a desktop preload detail;
+Electron forwards those calls to `clawd` as app-owned JSON-RPC methods.
+`docs/protocol.md` is the authoritative method catalog for the backend
+protocol.
+
+Every emitted backend event gets a monotonically increasing sequence number so
+the renderer can detect gaps after reloads.
 
 ```ts
 type MainToRendererEvent = {
@@ -424,9 +435,10 @@ type MainToRendererEvent = {
 }
 ```
 
-The main process should keep a bounded per-window event buffer. On renderer
-reload, `getSnapshot()` returns current app state plus enough recent events to
-rebuild in-flight UI without losing a streamed message.
+On renderer reload, the client calls `snapshot/get` and receives the current
+authoritative app state, the last backend event sequence number, and
+backend-derived desktop state. Electron and renderer code must not fabricate
+product state when `clawd` is unavailable.
 
 ## Codex App-Server Integration
 
