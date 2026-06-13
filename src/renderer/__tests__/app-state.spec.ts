@@ -122,7 +122,7 @@ describe('useAppState', () => {
     expect(state.visibleMessages.value).toStrictEqual(remoteSnapshot.messages);
   });
 
-  it('sets the active Codex approval preset through the preload bridge', async () => {
+  it('sets the active approval preset through the preload bridge', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();
     updatedSnapshot.agents[0].backendDefaults = {
@@ -132,22 +132,22 @@ describe('useAppState', () => {
       approvalsReviewer: 'auto_review',
       sandboxMode: 'workspace-write',
     };
-    const setAgentCodexApprovalPreset = vi.fn().mockResolvedValue(updatedSnapshot);
+    const setAgentApprovalPreset = vi.fn().mockResolvedValue(updatedSnapshot);
     vi.stubGlobal('window', {
       codexClaw: {
-        setAgentCodexApprovalPreset,
+        setAgentApprovalPreset,
       } satisfies Partial<CodexClawApi>,
     });
 
     const state = useAppState();
     state.snapshot.value = remoteSnapshot;
 
-    expect(state.activeCodexApprovalPreset.value).toBe('full-access');
-    await state.setCodexApprovalPreset('approve-for-me');
+    expect(state.activeApprovalPreset.value).toBe('full-access');
+    await state.setApprovalPreset('approve-for-me');
 
-    expect(setAgentCodexApprovalPreset).toHaveBeenCalledWith('agent-dina', 'approve-for-me');
+    expect(setAgentApprovalPreset).toHaveBeenCalledWith('agent-dina', 'approve-for-me');
     expect(state.snapshot.value).toStrictEqual(updatedSnapshot);
-    expect(state.activeCodexApprovalPreset.value).toBe('approve-for-me');
+    expect(state.activeApprovalPreset.value).toBe('approve-for-me');
   });
 
   it('updates settings and forwards quit through the preload bridge', async () => {
@@ -1795,10 +1795,7 @@ describe('useAppState', () => {
     expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'use the selected model', {
       model: 'gpt-5.1-codex-fast',
       planMode: false,
-      backendOptions: {
-        kind: 'codex',
-        reasoningEffort: 'low',
-      },
+      reasoningEffort: 'low',
     });
   });
 
@@ -2056,15 +2053,12 @@ describe('useAppState', () => {
 
     expect(sendPrompt).toHaveBeenCalledWith('agent-dina', '$frontend-design make the dialog beautiful', {
       planMode: false,
-      backendOptions: {
-        kind: 'codex',
-        skills: [
-          {
-            name: 'frontend-design',
-            path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
-          },
-        ],
-      },
+      skills: [
+        {
+          name: 'frontend-design',
+          path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
+        },
+      ],
     });
   });
 

@@ -2,11 +2,11 @@ import type {
   Agent,
   AgentBackend,
   AgentGitStatus,
+  ApprovalPreset,
   AppSnapshot,
   BackendCapabilities,
   BackendConversationRef,
   ConversationSummary,
-  CodexApprovalPreset,
   BackendModelOption,
   BackendPromptOptions,
   BackendRuntimeStatus,
@@ -42,9 +42,9 @@ export type BackendGoalResult = {
   cleared?: boolean;
 };
 
-export type BackendCodexApprovalPresetResult = {
-  backendSession: Extract<BackendSession, { kind: 'codex' }>;
-  approvalPreset: CodexApprovalPreset;
+export type BackendApprovalPresetResult = {
+  backendSession: BackendSession;
+  approvalPreset: ApprovalPreset;
 };
 
 export type AgentBackendDriver = {
@@ -54,11 +54,12 @@ export type AgentBackendDriver = {
   getGitStatus?(agent: Agent): Promise<AgentGitStatus | null>;
   getGitDiff?(agent: Agent): Promise<string | null>;
   tryHandlePromptCommand?(agent: Agent, prompt: string): Promise<BackendSendResult> | null;
+  preparePromptOptions?(agent: Agent, options?: SendPromptOptions): SendPromptOptions | undefined;
   sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>;
   setConversationTitle?(agent: Agent, title: string): Promise<void>;
   setGoal?(agent: Agent, objective: string): Promise<BackendGoalResult>;
   clearGoal?(agent: Agent): Promise<BackendGoalResult>;
-  setCodexApprovalPreset?(agent: Agent, preset: CodexApprovalPreset): Promise<BackendCodexApprovalPresetResult>;
+  setApprovalPreset?(agent: Agent, preset: ApprovalPreset): Promise<BackendApprovalPresetResult>;
   forgetAgentSession?(agentId: string): void;
   interrupt(agent: Agent): Promise<BackendSendResult>;
   respondToRequest(response: ClientRequestResponse): Promise<void>;

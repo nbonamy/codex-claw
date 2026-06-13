@@ -51,8 +51,8 @@ import {
   updateAgentFolder,
 } from './snapshot-service';
 import { AppStatePersistence } from './state-persistence';
-import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CodexApprovalPreset, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogAssignment, WorkBacklogConfigurationInput, WorkProviderKind } from '../shared/contracts';
-import { codexBackendDefaultsWithApprovalPreset, isCodexApprovalPreset } from '../shared/codex-approval-presets';
+import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogAssignment, WorkBacklogConfigurationInput, WorkProviderKind } from '../shared/contracts';
+import { approvalBackendDefaultsWithPreset, isApprovalPreset } from '../shared/approval-presets';
 import { ipcChannels } from '../shared/ipc';
 import { teamColors } from '../shared/team-colors';
 import { sanitizeWorkItemAssignmentSource } from '../shared/work-assignments';
@@ -497,8 +497,8 @@ export class AppController {
       return this.clearAgentGoal(agentId);
     });
 
-    ipcMain.handle(ipcChannels.setAgentCodexApprovalPreset, (_event, agentId: string, preset: CodexApprovalPreset) => {
-      return this.setAgentCodexApprovalPreset(agentId, preset);
+    ipcMain.handle(ipcChannels.setAgentApprovalPreset, (_event, agentId: string, preset: ApprovalPreset) => {
+      return this.setAgentApprovalPreset(agentId, preset);
     });
 
     ipcMain.handle(ipcChannels.sendPrompt, (_event, agentId: string, prompt: string, options?: SendPromptOptions) => {
@@ -748,26 +748,22 @@ export class AppController {
     return this.snapshot;
   }
 
-  private async setAgentCodexApprovalPreset(agentId: string, preset: CodexApprovalPreset): Promise<AppSnapshot> {
+  private async setAgentApprovalPreset(agentId: string, preset: ApprovalPreset): Promise<AppSnapshot> {
     const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent || !isCodexApprovalPreset(preset)) {
+    if (!agent || !isApprovalPreset(preset)) {
       return this.snapshot;
     }
 
-    if (agent.backend !== 'codex') {
-      throw unsupportedBackendFeature(agent, 'Codex approval presets');
-    }
-
     const driver = await this.getBackendDriverForAgent(agent);
-    if (!driver.setCodexApprovalPreset) {
-      throw unsupportedBackendFeature(agent, 'Codex approval presets');
+    if (!driver.setApprovalPreset) {
+      throw unsupportedBackendFeature(agent, 'approval presets');
     }
 
     const wasNewSession = !agent.backendSession;
-    const result = await driver.setCodexApprovalPreset(agent, preset);
+    const result = await driver.setApprovalPreset(agent, preset);
     agent.backendSession = result.backendSession;
     await this.setNewConversationTitle(agent, driver, wasNewSession);
-    agent.backendDefaults = codexBackendDefaultsWithApprovalPreset(agent.backendDefaults, result.approvalPreset);
+    agent.backendDefaults = approvalBackendDefaultsWithPreset(agent.backendDefaults, result.approvalPreset);
     await this.persistSnapshot();
 
     return this.snapshot;

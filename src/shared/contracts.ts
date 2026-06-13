@@ -16,7 +16,9 @@ export type Team = {
 
 export type AgentBackend = 'codex' | 'claude';
 
-export type CodexApprovalPreset = 'ask-for-approval' | 'approve-for-me' | 'full-access';
+export type ApprovalPreset = 'ask-for-approval' | 'approve-for-me' | 'full-access';
+
+export type CodexApprovalPreset = ApprovalPreset;
 
 export type CodexApprovalsReviewer = 'user' | 'auto_review' | 'guardian_subagent';
 
@@ -478,6 +480,8 @@ export type PromptSkillInput = {
 export type SendPromptOptions = {
   model?: string | null;
   planMode?: boolean;
+  reasoningEffort?: ReasoningEffort | null;
+  skills?: PromptSkillInput[];
   backendOptions?: BackendPromptOptions;
 };
 
@@ -848,7 +852,7 @@ export type CodexClawApi = {
   quit(): Promise<void>;
   setAgentGoal(agentId: string, objective: string): Promise<AppSnapshot>;
   clearAgentGoal(agentId: string): Promise<AppSnapshot>;
-  setAgentCodexApprovalPreset(agentId: string, preset: CodexApprovalPreset): Promise<AppSnapshot>;
+  setAgentApprovalPreset(agentId: string, preset: ApprovalPreset): Promise<AppSnapshot>;
   sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot>;
   steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot>;
   interruptAgent(agentId: string): Promise<AppSnapshot>;

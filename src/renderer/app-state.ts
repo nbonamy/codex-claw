@@ -1,10 +1,10 @@
 import { computed, ref } from 'vue';
-import type { Agent, AgentFileReadResult, AgentFileSearchItem, AppSnapshot, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../shared/contracts';
+import type { Agent, AgentFileReadResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../shared/contracts';
 import { updateSettingsInSnapshot } from '../shared/settings';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '../shared/snapshot';
 import { defaultBackendCapabilities } from '../shared/backend-capabilities';
 import { defaultBackendCommands } from '../shared/backend-commands';
-import { codexApprovalPresetFromDefaults } from '../shared/codex-approval-presets';
+import { approvalPresetFromDefaults } from '../shared/approval-presets';
 import { createQueuedChatPrompt, type QueuedChatPrompt } from './shared/chat/queued-prompts';
 import { promptSkillInputsFromText } from './shared/chat/composer-skills';
 import { workItemAssignmentPrompt } from '../shared/work-item-prompts';
@@ -61,9 +61,13 @@ export function useAppState() {
   });
 
   const activeGoal = computed(() => activeAgent.value?.goal ?? null);
-  const activeCodexApprovalPreset = computed<CodexApprovalPreset | null>(() => {
+  const activeApprovalPreset = computed<ApprovalPreset | null>(() => {
     const agent = activeAgent.value;
-    return agent?.backend === 'codex' ? codexApprovalPresetFromDefaults(agent.backendDefaults) : null;
+    if (!agent || !defaultBackendCapabilities(agent.backend).approvals) {
+      return null;
+    }
+
+    return approvalPresetFromDefaults(agent.backendDefaults);
   });
 
   const isSending = computed(() => {
@@ -878,20 +882,20 @@ export function useAppState() {
     planMode.value = enabled;
   }
 
-  async function setCodexApprovalPreset(preset: CodexApprovalPreset): Promise<void> {
+  async function setApprovalPreset(preset: ApprovalPreset): Promise<void> {
     const agent = activeAgent.value;
-    if (!agent || agent.backend !== 'codex' || !window.codexClaw?.setAgentCodexApprovalPreset) {
+    if (!agent || !messageActionCapabilities(agent.id).approvals || !window.codexClaw?.setAgentApprovalPreset) {
       return;
     }
 
-    snapshot.value = await window.codexClaw.setAgentCodexApprovalPreset(agent.id, preset);
+    snapshot.value = await window.codexClaw.setAgentApprovalPreset(agent.id, preset);
   }
 
   return {
     snapshot,
     activeAgent,
     activeGoal,
-    activeCodexApprovalPreset,
+    activeApprovalPreset,
     visibleMessages,
     activeQueuedPrompts,
     isLoading,
@@ -969,7 +973,7 @@ export function useAppState() {
     selectModel,
     selectReasoningEffort,
     setPlanMode,
-    setCodexApprovalPreset,
+    setApprovalPreset,
     selectAgent,
     selectTeam,
     clearActiveGoal,
@@ -1061,14 +1065,17 @@ function selectedPromptOptions(prompt: string): SendPromptOptions | undefined {
     : undefined;
   const capabilities = agent ? defaultBackendCapabilities(agent.backend) : defaultBackendCapabilities('codex');
   const promptModel = capabilities.models ? model : null;
-  const codexBackendOptions = codexPromptOptions({
-    backend: agent?.backend,
-    capabilities,
-    model: promptModel,
-    skills,
-  });
+  const selectedSkills = capabilities.skills ? skills : [];
+  const reasoningEffort = capabilities.reasoningEffort && promptModel
+    ? selectedReasoningEffort.value ?? defaultReasoningEffort(promptModel)
+    : null;
 
-  if (!promptModel && (capabilities.planMode === 'unsupported' || !planMode.value) && !codexBackendOptions) {
+  if (
+    !promptModel &&
+    (capabilities.planMode === 'unsupported' || !planMode.value) &&
+    !reasoningEffort &&
+    selectedSkills.length === 0
+  ) {
     return undefined;
   }
 
@@ -1076,30 +1083,6 @@ function selectedPromptOptions(prompt: string): SendPromptOptions | undefined {
     ...(promptModel ? { model: promptModel.model } : {}),
     ...(capabilities.planMode === 'native' ? { planMode: planMode.value } : {}),
     ...(capabilities.planMode === 'prompted' && planMode.value ? { planMode: true } : {}),
-    ...(codexBackendOptions ? { backendOptions: codexBackendOptions } : {}),
-  };
-}
-
-function codexPromptOptions(input: {
-  backend?: string;
-  capabilities: ReturnType<typeof defaultBackendCapabilities>;
-  model: BackendModelOption | null;
-  skills: ReturnType<typeof selectedPromptSkills>;
-}): SendPromptOptions['backendOptions'] | undefined {
-  if (input.backend !== 'codex') {
-    return undefined;
-  }
-
-  const selectedSkills = input.capabilities.skills ? input.skills : [];
-  const reasoningEffort = input.capabilities.reasoningEffort && input.model
-    ? selectedReasoningEffort.value ?? defaultReasoningEffort(input.model)
-    : null;
-  if (!reasoningEffort && selectedSkills.length === 0) {
-    return undefined;
-  }
-
-  return {
-    kind: 'codex',
     ...(reasoningEffort ? { reasoningEffort } : {}),
     ...(selectedSkills.length > 0 ? { skills: selectedSkills } : {}),
   };

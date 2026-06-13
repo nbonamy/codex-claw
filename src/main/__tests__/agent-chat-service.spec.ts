@@ -140,19 +140,27 @@ describe('agent chat service', () => {
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
   });
 
-  it('passes selected model and reasoning effort to the session manager', () => {
+  it('lets the backend driver prepare selected model and reasoning options', () => {
     const snapshot = createInitialSnapshot();
     const backendDriver = createFakeBackendDriver(Promise.resolve({ backendSession: { kind: 'codex', threadId: 'thread-1' }, turnId: 'turn-1' }));
+    backendDriver.preparePromptOptions = vi.fn((_agent, options) => ({
+      model: options?.model,
+      backendOptions: { kind: 'codex' as const, reasoningEffort: options?.reasoningEffort },
+    }));
 
     sendAgentPrompt(
       snapshot,
       backendDriver,
       'agent-dina',
       'hello',
-      { model: 'gpt-5.1-codex', backendOptions: { kind: 'codex', reasoningEffort: 'high' } },
+      { model: 'gpt-5.1-codex', reasoningEffort: 'high' },
       vi.fn(),
     );
 
+    expect(backendDriver.preparePromptOptions).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), {
+      model: 'gpt-5.1-codex',
+      reasoningEffort: 'high',
+    });
     expect(backendDriver.sendPrompt).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'agent-dina' }),
       'hello',
@@ -180,29 +188,32 @@ describe('agent chat service', () => {
     );
   });
 
-  it('passes selected prompt skills to the session manager', () => {
+  it('lets the backend driver prepare selected prompt skills', () => {
     const snapshot = createInitialSnapshot();
     const backendDriver = createFakeBackendDriver(Promise.resolve({ backendSession: { kind: 'codex', threadId: 'thread-1' }, turnId: 'turn-1' }));
+    backendDriver.preparePromptOptions = vi.fn((_agent, options) => ({
+      backendOptions: {
+        kind: 'codex' as const,
+        skills: options?.skills ?? [],
+      },
+    }));
+    const skills = [
+      {
+        name: 'frontend-design',
+        path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
+      },
+    ];
 
     sendAgentPrompt(
       snapshot,
       backendDriver,
       'agent-dina',
       '/frontend-design polish the composer',
-      {
-        backendOptions: {
-          kind: 'codex',
-          skills: [
-            {
-              name: 'frontend-design',
-              path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
-            },
-          ],
-        },
-      },
+      { skills },
       vi.fn(),
     );
 
+    expect(backendDriver.preparePromptOptions).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), { skills });
     expect(backendDriver.sendPrompt).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'agent-dina' }),
       '/frontend-design polish the composer',

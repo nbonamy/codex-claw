@@ -24,10 +24,10 @@ describe('ChatComposerActionMenu', () => {
     expect(wrapper.find('.chat-composer-action-menu').exists()).toBe(false);
   });
 
-  it('shows Codex approval presets and emits selected mode', async () => {
+  it('shows approval presets and emits selected mode', async () => {
     const wrapper = mountMenu({
-      codexApprovalPreset: 'full-access',
-      showCodexApprovalMenu: true,
+      approvalPreset: 'full-access',
+      showApprovalMenu: true,
     });
 
     await wrapper.get('.chat-composer-action-menu__button').trigger('click');
@@ -39,23 +39,23 @@ describe('ChatComposerActionMenu', () => {
     expect(wrapper.find('.app-menu__chevron').exists()).toBe(true);
     await wrapper.findAll('[role="menuitemradio"]')[1]?.trigger('click');
 
-    expect(wrapper.emitted('selectCodexApprovalPreset')).toStrictEqual([['approve-for-me']]);
+    expect(wrapper.emitted('selectApprovalPreset')).toStrictEqual([['approve-for-me']]);
     expect(wrapper.find('.chat-composer-action-menu').exists()).toBe(false);
   });
 });
 
 function mountMenu(props: Partial<{
-  codexApprovalPreset: 'ask-for-approval' | 'approve-for-me' | 'full-access' | null;
+  approvalPreset: 'ask-for-approval' | 'approve-for-me' | 'full-access' | null;
   disabled: boolean;
   planMode: boolean;
-  showCodexApprovalMenu: boolean;
+  showApprovalMenu: boolean;
 }> = {}) {
   return mount(ChatComposerActionMenu, {
     props: {
       disabled: false,
-      codexApprovalPreset: null,
+      approvalPreset: null,
       planMode: false,
-      showCodexApprovalMenu: false,
+      showApprovalMenu: false,
       ...props,
     },
     attachTo: document.body,
