@@ -91,7 +91,7 @@ describe('SettingsIntegrationsPanel', () => {
     expect(wrapper.emitted('disconnect')).toStrictEqual([['github']]);
   });
 
-  it('keeps unconfigured GitHub disabled when no client ID is saved', async () => {
+  it('lets unconfigured GitHub reach the backend because backend owns configuration', async () => {
     const updateSettings = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountPanel({
       connections: [{
@@ -103,13 +103,14 @@ describe('SettingsIntegrationsPanel', () => {
     });
 
     const connectButton = wrapper.findAll('button').find((button) => button.text() === 'Connect');
-    expect(connectButton?.attributes('disabled')).toBeDefined();
+    expect(connectButton?.attributes('disabled')).toBeUndefined();
+    expect(wrapper.text()).toContain('GitHub OAuth is not configured.');
 
     await connectButton?.trigger('click');
     await flushPromises();
 
     expect(updateSettings).not.toHaveBeenCalled();
-    expect(wrapper.emitted('connect')).toBeUndefined();
+    expect(wrapper.emitted('connect')).toStrictEqual([['github']]);
   });
 
   it('uses a saved client ID without forcing a settings update on connect', async () => {

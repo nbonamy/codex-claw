@@ -24,7 +24,6 @@
       <div class="settings-integrations-panel__actions">
         <el-button
           v-if="githubConnection.status !== 'connected'"
-          :disabled="connectDisabled"
           :loading="status === 'loading'"
           size="small"
           type="primary"
@@ -126,7 +125,7 @@
     </div>
 
     <p
-      v-if="configurationError || error"
+      v-if="configurationError || error || githubConnection.detail"
       class="settings-integrations-panel__detail"
     >
       {{ configurationError ?? error ?? githubConnection.detail }}
@@ -180,8 +179,6 @@ const savedClientId = computed(() => props.providerSettings.github?.oauthClientI
 
 const clientIdChanged = computed(() => clientIdInput.value.trim() !== savedClientId.value);
 
-const connectDisabled = computed(() => githubConnection.value.status === 'notConfigured' && !clientIdInput.value.trim());
-
 const githubDescription = computed(() => {
   const connection = githubConnection.value;
   if (connection.status === 'connected') {
@@ -191,7 +188,7 @@ const githubDescription = computed(() => {
     return 'Waiting for authorization';
   }
   if (connection.status === 'notConfigured') {
-    return 'Add a client ID to connect';
+    return 'GitHub OAuth is not configured';
   }
   return 'Issues and pull requests';
 });
@@ -225,11 +222,7 @@ async function saveClientId(): Promise<void> {
 }
 
 async function connectGithub(): Promise<void> {
-  if (connectDisabled.value) {
-    return;
-  }
-
-  if (clientIdChanged.value || githubConnection.value.status === 'notConfigured') {
+  if (clientIdChanged.value) {
     await saveClientId();
   }
   emit('connect', 'github');
