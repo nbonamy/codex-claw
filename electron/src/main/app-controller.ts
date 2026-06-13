@@ -3,10 +3,7 @@ import path from 'node:path';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
 import { logMain, warnMain } from './log';
 import { createMainWindow } from './main-window';
-import {
-  applyMainEventToSnapshot,
-  createEmptySnapshot,
-} from './snapshot-service';
+import { applyMainEventToSnapshot, createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from './backend-process-client';
 import type { AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
@@ -24,7 +21,6 @@ export class AppController {
 
   constructor(
     initialSnapshot: AppSnapshot = createEmptySnapshot(),
-    _workIntegrations?: unknown,
     backendClient: ClawBackendClientPort | null = createRuntimeClawBackendClient(),
   ) {
     this.snapshot = initialSnapshot;
@@ -608,19 +604,6 @@ export class AppController {
     return this.backendClient;
   }
 
-  private async validateAgentInput(input: Pick<CreateAgentInput, 'name' | 'folder'>): Promise<void> {
-    if (!input.name.trim()) {
-      throw new Error('Agent name is required.');
-    }
-
-    const folder = input.folder.trim();
-    if (!folder) {
-      throw new Error('Agent folder is required.');
-    }
-
-    await this.requireBackendClient().request('agent/validateFolder', { folder });
-  }
-
   private async respondToClientRequest(response: ClientRequestResponse): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('clientRequest/respond', { response }));
   }
@@ -747,12 +730,4 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isBackendSnapshotState(value: unknown): value is { snapshot: AppSnapshot; lastEventSeq: number } {
   return isRecord(value) && isRecord(value.snapshot) && typeof value.lastEventSeq === 'number';
-}
-
-function isAppSnapshot(value: unknown): value is AppSnapshot {
-  return isRecord(value) &&
-    Array.isArray(value.teams) &&
-    Array.isArray(value.agents) &&
-    isRecord(value.general) &&
-    isRecord(value.sourceFolder);
 }

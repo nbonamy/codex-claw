@@ -57,12 +57,15 @@ describe('Electron backend boundary', () => {
 
   it('keeps durable snapshot persistence in clawd', async () => {
     const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
+    const mainDir = path.resolve(__dirname, '..');
     const source = await readFile(appControllerPath, 'utf8');
 
     expect(source).not.toContain('AppStatePersistence');
     expect(source).not.toContain('state.json');
     expect(source).not.toContain('persistSnapshot');
+    expect(source).not.toContain('./snapshot-service');
     expect(source).toContain("request<unknown>('snapshot/get')");
+    await expect(readdir(path.join(mainDir, 'snapshot-service.ts'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('keeps source folder auto-detection in clawd', async () => {
@@ -70,6 +73,7 @@ describe('Electron backend boundary', () => {
     const source = await readFile(appControllerPath, 'utf8');
 
     expect(source).not.toContain('source/detectFolder');
+    expect(source).not.toContain('agent/validateFolder');
   });
 
   it('keeps system permission API ownership in clawd', async () => {

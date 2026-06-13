@@ -67,7 +67,8 @@ Current implementation checkpoint:
   resource path resolution, and renderer IPC fanout.
 - `clawd` owns durable snapshot loading and saving. Electron keeps only a
   volatile renderer-facing snapshot cache hydrated from `snapshot/get` and
-  backend events; it does not read or write `state.json`.
+  backend events; it does not read or write `state.json`, keep a local snapshot
+  service shim, or validate agent folders before backend mutations.
 - `clawd` now owns loop CRUD, manual loop runs, and the loop scheduler/runner.
   Electron proxies loop IPC to backend RPC and adopts the returned snapshot.
 - `clawd` now owns team create/update/reorder/close/select mutations. Electron
