@@ -287,9 +287,7 @@ describe('AppController', () => {
         name: 'Backend Dina',
       }],
     };
-    const request = vi.fn(async (method: string) => (
-      method === 'agent/getGitStatus' ? null : backendSnapshot
-    ));
+    const request = vi.fn().mockResolvedValue(backendSnapshot);
     const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
     const createInput: CreateAgentInput = {
       name: 'Backend Dina',
@@ -321,17 +319,17 @@ describe('AppController', () => {
     await expect(moveAgentToTeam(controller, moveInput)).resolves.toBe(backendSnapshot);
     await expect(reorderAgents(controller, reorderInput)).resolves.toBe(backendSnapshot);
     await expect(updateAgentFolder(controller, 'agent-dina', '/Users/nbonamy/src/id8')).resolves.toBe(backendSnapshot);
+    await expect(selectAgent(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
     await expect(closeAgent(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
 
     expect(request).toHaveBeenNthCalledWith(1, 'agent/create', { input: createInput });
-    expect(request).toHaveBeenNthCalledWith(2, 'agent/getGitStatus', { agent: backendSnapshot.agents[0] });
-    expect(request).toHaveBeenNthCalledWith(3, 'agent/update', { input: updateInput });
-    expect(request).toHaveBeenNthCalledWith(4, 'agent/getGitStatus', { agent: backendSnapshot.agents[0] });
-    expect(request).toHaveBeenNthCalledWith(5, 'agent/duplicate', { agentId: 'agent-dina' });
-    expect(request).toHaveBeenNthCalledWith(6, 'agent/moveToTeam', { input: moveInput });
-    expect(request).toHaveBeenNthCalledWith(7, 'agent/reorder', { input: reorderInput });
-    expect(request).toHaveBeenNthCalledWith(8, 'agent/updateFolder', { agentId: 'agent-dina', folder: '/Users/nbonamy/src/id8' });
-    expect(request).toHaveBeenNthCalledWith(9, 'agent/close', { agentId: 'agent-dina' });
+    expect(request).toHaveBeenNthCalledWith(2, 'agent/update', { input: updateInput });
+    expect(request).toHaveBeenNthCalledWith(3, 'agent/duplicate', { agentId: 'agent-dina' });
+    expect(request).toHaveBeenNthCalledWith(4, 'agent/moveToTeam', { input: moveInput });
+    expect(request).toHaveBeenNthCalledWith(5, 'agent/reorder', { input: reorderInput });
+    expect(request).toHaveBeenNthCalledWith(6, 'agent/updateFolder', { agentId: 'agent-dina', folder: '/Users/nbonamy/src/id8' });
+    expect(request).toHaveBeenNthCalledWith(7, 'agent/select', { agentId: 'agent-dina' });
+    expect(request).toHaveBeenNthCalledWith(8, 'agent/close', { agentId: 'agent-dina' });
   });
 
   it('routes bench mutations through clawd', async () => {
@@ -433,46 +431,6 @@ describe('AppController', () => {
     expect(request).toHaveBeenNthCalledWith(4, 'loop/history/clear', { loopId: 'loop-bugs' });
     expect(request).toHaveBeenNthCalledWith(5, 'loop/execution/delete', { loopId: 'loop-bugs', executionId: 'loop-exec-1' });
     expect(request).toHaveBeenNthCalledWith(6, 'loop/delete', { loopId: 'loop-bugs' });
-  });
-
-  it('refreshes git status through the backend driver capability', async () => {
-    const snapshot = createInitialSnapshot();
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
-    const getGitStatus = vi.fn().mockResolvedValue({
-      folder: '/Users/nbonamy/src/id8',
-      branch: 'main',
-      ahead: 0,
-      behind: 0,
-      changedFiles: 2,
-      addedLines: 12,
-      removedLines: 4,
-      hasUntracked: false,
-      state: 'dirty',
-      updatedAt: '2026-06-11T10:00:00.000Z',
-    });
-    const backendDriver = createFakeCodexBackendDriver({ getGitStatus });
-
-    await controller.initialize();
-    setCodexBackendDriver(controller, backendDriver);
-    await refreshAgentGitStatus(controller, 'agent-dina');
-
-    expect(getGitStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
-    expect(snapshot.agentGitStatuses['agent-dina']).toStrictEqual({
-      folder: '/Users/nbonamy/src/id8',
-      branch: 'main',
-      ahead: 0,
-      behind: 0,
-      changedFiles: 2,
-      addedLines: 12,
-      removedLines: 4,
-      hasUntracked: false,
-      state: 'dirty',
-      updatedAt: '2026-06-11T10:00:00.000Z',
-    });
   });
 
   it('opens repo git diff previews through clawd', async () => {
@@ -986,11 +944,7 @@ describe('AppController', () => {
     const send = vi.fn();
     (controller as unknown as {
       mainWindow: { webContents: { send: ReturnType<typeof vi.fn> } };
-      refreshAgentGitStatus(agentId: string): Promise<void>;
     }).mainWindow = { webContents: { send } };
-    (controller as unknown as {
-      refreshAgentGitStatus(agentId: string): Promise<void>;
-    }).refreshAgentGitStatus = vi.fn().mockResolvedValue(undefined);
     const diff = [
       'diff --git a/src/main.ts b/src/main.ts',
       '--- a/src/main.ts',
@@ -1042,11 +996,7 @@ describe('AppController', () => {
     const send = vi.fn();
     (controller as unknown as {
       mainWindow: { webContents: { send: ReturnType<typeof vi.fn> } };
-      refreshAgentGitStatus(agentId: string): Promise<void>;
     }).mainWindow = { webContents: { send } };
-    (controller as unknown as {
-      refreshAgentGitStatus(agentId: string): Promise<void>;
-    }).refreshAgentGitStatus = vi.fn().mockResolvedValue(undefined);
 
     emitAndApply(controller, {
       agentId: 'agent-dina',
@@ -1244,10 +1194,10 @@ async function openAgentGitDiff(controller: AppController, agentId: string): Pro
   }).openAgentGitDiff(agentId);
 }
 
-async function refreshAgentGitStatus(controller: AppController, agentId: string): Promise<void> {
-  await (controller as unknown as {
-    refreshAgentGitStatus(agentId: string): Promise<void>;
-  }).refreshAgentGitStatus(agentId);
+async function selectAgent(controller: AppController, agentId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    selectAgent(agentId: string): Promise<AppSnapshot>;
+  }).selectAgent(agentId);
 }
 
 async function getBackendDriver(controller: AppController, backend: 'codex' | 'claude'): Promise<AgentBackendDriver> {

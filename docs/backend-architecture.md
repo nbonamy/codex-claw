@@ -77,10 +77,9 @@ Current implementation checkpoint:
 - `clawd` now owns source-folder initialization via `settings/update` and the
   recent-repository update after source worktree creation. Electron still owns
   native folder/save dialogs.
-- `clawd` now owns agent create/update/duplicate/move/reorder/close and folder
-  update mutations. Electron still performs desktop folder picking and
-  post-mutation git status refreshes while those UI reactions are being
-  migrated.
+- `clawd` now owns agent create/update/duplicate/move/reorder/close/select and
+  folder update mutations. Electron still performs desktop folder picking, then
+  forwards the selected folder to the backend.
 - `clawd` now owns agent file preview authority: Electron requests file
   listing/reading by agent id only, and the backend resolves the folder from
   its snapshot before touching storage.
@@ -110,11 +109,15 @@ Current implementation checkpoint:
 - `clawd` owns manual git diff preview requests. Electron forwards
   `agent/openGitDiff`, and the backend resolves the agent, calls the provider
   git-diff capability, and emits the side-panel event.
+- `clawd` owns persisted-session hydration on agent selection and git-status
+  refreshes after agent create/update/select and provider turn/diff/completion
+  events. Electron receives the resulting snapshot/events instead of calling
+  provider drivers for status or history hydration.
 - The remaining large slice is to move the rest of product orchestration out of
   `AppController` so Electron becomes only the desktop IPC/stdio layer. The
-  largest remaining owners are git status refresh, persisted-session hydration
-  on selection, client request ownership, and remaining desktop-era driver
-  shims.
+  largest remaining owners are client request ownership/response routing and
+  remaining desktop-era runtime shims, such as launch-time PATH repair for
+  backend process execution.
 
 ## Goals
 

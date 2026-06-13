@@ -49,7 +49,7 @@ export class ClawBackendProxyDriver implements AgentBackendDriver {
   }
 
   async getGitStatus(agent: Agent): Promise<AgentGitStatus | null> {
-    return this.client.request('agent/getGitStatus', { agent });
+    return this.client.request('driver/getGitStatus', { agent });
   }
 
   async getGitDiff(agent: Agent): Promise<string | null> {
@@ -93,7 +93,7 @@ export class ClawBackendProxyDriver implements AgentBackendDriver {
   }
 
   async hydrateAgent(agent: Agent): Promise<BackendSession | null> {
-    return this.client.request('agent/hydrate', { agent });
+    return this.client.request('driver/hydrate', { agent });
   }
 
   async listConversations(agent: Agent): Promise<ConversationSummary[]> {

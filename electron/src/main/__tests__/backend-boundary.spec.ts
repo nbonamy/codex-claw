@@ -19,4 +19,16 @@ describe('Electron backend boundary', () => {
     await expect(readdir(path.join(mainDir, 'codex'))).rejects.toMatchObject({ code: 'ENOENT' });
     await expect(readdir(path.join(mainDir, 'claude'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
+
+  it('keeps workspace file reads behind clawd', async () => {
+    const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
+    const source = await readFile(appControllerPath, 'utf8');
+
+    expect(source).not.toMatch(/from ['"]node:fs/);
+    expect(source).not.toMatch(/from ['"]fs/);
+    expect(source).not.toContain('driver/readFile');
+    expect(source).not.toContain('driver/listFiles');
+    expect(source).toContain("request('agent/readFile'");
+    expect(source).toContain('agentId');
+  });
 });

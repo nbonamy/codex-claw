@@ -62,7 +62,7 @@ export class BackendDriverRpc {
         }
         return null;
       }
-      case 'agent/getGitStatus': {
+      case 'driver/getGitStatus': {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);
         return driver.getGitStatus ? driver.getGitStatus(agent) : null;
@@ -135,7 +135,7 @@ export class BackendDriverRpc {
         await this.requireDriver(backend).respondToRequest(record.response as never);
         return null;
       }
-      case 'agent/hydrate': {
+      case 'driver/hydrate': {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);
         return driver.hydrateAgent ? driver.hydrateAgent(agent) : null;

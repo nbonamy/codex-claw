@@ -192,6 +192,81 @@ describe('ClawBackendServer', () => {
     expect(workIntegrations.listItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw');
   });
 
+  it('owns agent selection hydration and git status refresh', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      backendSession: { kind: 'codex', threadId: 'thread-old' },
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const hydrateAgent = vi.fn().mockResolvedValue({ kind: 'codex', threadId: 'thread-hydrated' });
+    const getGitStatus = vi.fn().mockResolvedValue({
+      folder: '/Users/nbonamy/src/codex-claw',
+      branch: 'main',
+      ahead: 0,
+      behind: 0,
+      changedFiles: 2,
+      addedLines: 12,
+      removedLines: 4,
+      hasUntracked: false,
+      state: 'dirty',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    });
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      getGitStatus,
+      hydrateAgent,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const events: unknown[] = [];
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+      onEvent: (event) => events.push(event),
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'select',
+      method: 'agent/select',
+      params: { agentId: 'agent-dina' },
+    })).resolves.toMatchObject({
+      result: {
+        activeAgentId: 'agent-dina',
+        agents: [{ id: 'agent-dina', backendSession: { kind: 'codex', threadId: 'thread-hydrated' } }],
+        agentGitStatuses: {
+          'agent-dina': expect.objectContaining({ branch: 'main', state: 'dirty' }),
+        },
+      },
+    });
+
+    expect(hydrateAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(getGitStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina', backendSession: { kind: 'codex', threadId: 'thread-hydrated' } }));
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'snapshot.updated' }),
+      expect.objectContaining({ type: 'git.statusUpdated', agentId: 'agent-dina' }),
+    ]));
+    expect(saveSnapshot).toHaveBeenCalled();
+    await server.close();
+  });
+
   it('owns team mutations', async () => {
     const snapshot = createTestSnapshot();
     const events: unknown[] = [];

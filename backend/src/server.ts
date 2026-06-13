@@ -1,8 +1,8 @@
 import path from 'node:path';
 import { sendAgentPrompt } from '@codex-claw/shared/agent-chat-service';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
-import { applyMainEventToSnapshot, createAgentInSnapshot, createEmptySnapshot, updateAgentFolder, updateAgentFromInput } from '@codex-claw/shared/snapshot';
-import type { Agent, AppSnapshot, BackendConversationRef, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
+import { applyMainEventToSnapshot, createAgentInSnapshot, createEmptySnapshot, selectAgent, updateAgentFolder, updateAgentFromInput } from '@codex-claw/shared/snapshot';
+import type { Agent, AgentGitStatus, AppSnapshot, BackendConversationRef, BackendSession, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
@@ -80,7 +80,11 @@ export class ClawBackendServer {
         const input = requireAgentCreateInput(message.params);
         await this.validateAgentInput(input);
         createAgentInSnapshot(this.snapshot, input);
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        const snapshot = await this.persistAndEmitSnapshot();
+        if (snapshot.activeAgentId) {
+          await this.refreshAgentGitStatus(snapshot.activeAgentId);
+        }
+        return createClawRpcResult(message.id, snapshot);
       }
       case 'agent/update': {
         const input = requireAgentUpdateInput(message.params);
@@ -89,7 +93,17 @@ export class ClawBackendServer {
         if (!agent) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${input.id}`);
         }
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        const snapshot = await this.persistAndEmitSnapshot();
+        await this.refreshAgentGitStatus(input.id);
+        return createClawRpcResult(message.id, snapshot);
+      }
+      case 'agent/select': {
+        const agentId = requireAgentId(message.params);
+        selectAgent(this.snapshot, agentId);
+        const snapshot = await this.persistAndEmitSnapshot();
+        await this.hydrateAgentHistory(agentId);
+        await this.refreshAgentGitStatus(agentId);
+        return createClawRpcResult(message.id, snapshot);
       }
       case 'agent/duplicate': {
         const agentId = requireAgentId(message.params);
@@ -827,6 +841,46 @@ export class ClawBackendServer {
     }
   }
 
+  private async hydrateAgentHistory(agentId: string): Promise<void> {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent?.backendSession) {
+      return;
+    }
+
+    try {
+      const backendSession = await this.requireDriverRpc().handle('driver/hydrate', { agent });
+      if (isBackendSession(backendSession)) {
+        agent.backendSession = backendSession;
+        await this.persistSnapshotOnly();
+      }
+    } catch {
+      // Hydration is opportunistic; failed history restore should not block selection.
+    }
+  }
+
+  private async refreshAgentGitStatus(agentId: string): Promise<void> {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) {
+      return;
+    }
+
+    let status: AgentGitStatus | null = null;
+    try {
+      status = await this.requireDriverRpc().handle('driver/getGitStatus', { agent }) as AgentGitStatus | null;
+      if (!status) {
+        return;
+      }
+    } catch {
+      return;
+    }
+
+    this.applyAndEmitBackendEvent({
+      agentId,
+      type: 'git.statusUpdated',
+      payload: status,
+    });
+  }
+
   private addRecentSourceRepository(repoName: string): void {
     const trimmed = repoName.trim();
     if (!trimmed) {
@@ -892,6 +946,9 @@ export class ClawBackendServer {
     });
     if (options.persist !== false && shouldPersistSnapshotForEvent(event)) {
       void this.saveSnapshot?.(this.snapshot);
+    }
+    if (event.agentId && shouldRefreshGitStatusForEvent(event)) {
+      void this.refreshAgentGitStatus(event.agentId);
     }
   }
 }
@@ -1043,6 +1100,22 @@ function sameConversationRef(left: BackendConversationRef, right: BackendConvers
   return right.backend === 'claude' && left.folder === right.folder && left.sessionId === right.sessionId;
 }
 
+function isBackendSession(value: unknown): value is BackendSession {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+
+  const record = value as Record<string, unknown>;
+  if (record.kind === 'codex') {
+    return typeof record.threadId === 'string' && record.threadId.trim().length > 0;
+  }
+
+  return record.kind === 'claude' &&
+    typeof record.sessionId === 'string' &&
+    record.sessionId.trim().length > 0 &&
+    typeof record.transport === 'string';
+}
+
 function rendererMessageText(message: RendererMessage): string {
   return message.parts
     .map((part) => part.type === 'text' || part.type === 'status' ? part.text : '')
@@ -1072,4 +1145,10 @@ function shouldPersistSnapshotForEvent(event: BackendEvent): boolean {
     event.type === 'thread.tokenUsageUpdated' ||
     event.type === 'turn.planUpdated' ||
     event.type === 'turn.proposedPlanCompleted';
+}
+
+function shouldRefreshGitStatusForEvent(event: BackendEvent): boolean {
+  return event.type === 'turn.started' ||
+    event.type === 'diff.updated' ||
+    event.type === 'turn.completed';
 }

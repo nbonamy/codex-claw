@@ -8,7 +8,6 @@ import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-
 import {
   applyMainEventToSnapshot,
   createEmptySnapshot,
-  selectAgent,
 } from './snapshot-service';
 import { AppStatePersistence } from '@codex-claw/shared/state-persistence';
 import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from './backend-process-client';
@@ -225,11 +224,7 @@ export class AppController {
     });
 
     ipcMain.handle(ipcChannels.selectAgent, async (_event, agentId: string) => {
-      const snapshot = selectAgent(this.snapshot, agentId);
-      await this.persistSnapshot();
-      await this.hydrateAgentHistory(agentId);
-      await this.refreshAgentGitStatus(agentId);
-      return snapshot;
+      return this.selectAgent(agentId);
     });
 
     ipcMain.handle(ipcChannels.selectAgentFolder, async (_event, agentId: string) => {
@@ -379,17 +374,11 @@ export class AppController {
   }
 
   private async createAgent(input: CreateAgentInput): Promise<AppSnapshot> {
-    const snapshot = this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/create', { input }));
-    if (snapshot.activeAgentId) {
-      await this.refreshAgentGitStatus(snapshot.activeAgentId);
-    }
-    return this.snapshot;
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/create', { input }));
   }
 
   private async updateAgent(input: UpdateAgentInput): Promise<AppSnapshot> {
-    const snapshot = this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/update', { input }));
-    await this.refreshAgentGitStatus(input.id);
-    return snapshot;
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/update', { input }));
   }
 
   private async duplicateAgent(agentId: string): Promise<AppSnapshot> {
@@ -406,6 +395,10 @@ export class AppController {
 
   private async closeAgent(agentId: string): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/close', { agentId }));
+  }
+
+  private async selectAgent(agentId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/select', { agentId }));
   }
 
   private async updateAgentFolder(agentId: string, folder: string): Promise<AppSnapshot> {
@@ -567,31 +560,6 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/retryMessage', { agentId, messageId }));
   }
 
-  private async hydrateAgentHistory(agentId: string): Promise<void> {
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent?.backendSession) {
-      return;
-    }
-
-    try {
-      const driver = await this.getBackendDriverForAgent(agent);
-      if (!driver.hydrateAgent) {
-        return;
-      }
-
-      const backendSession = await driver.hydrateAgent(agent);
-      if (backendSession) {
-        agent.backendSession = backendSession;
-      }
-    } catch (error) {
-      warnMain('backend-history', 'failed to hydrate persisted session', {
-        agentId,
-        backend: agent.backend,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
   private async chooseAgentFolder(): Promise<string | null> {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory'],
@@ -698,14 +666,6 @@ export class AppController {
     await this.requireBackendClient().request('agent/validateFolder', { folder });
   }
 
-  private async getBackendDriverForAgent(agent: Agent): Promise<AgentBackendDriver> {
-    if (agent.backendSession && agent.backendSession.kind !== agent.backend) {
-      throw new Error(`Agent '${agent.id}' has mismatched backend session '${agent.backendSession.kind}' for backend '${agent.backend}'.`);
-    }
-
-    return this.getBackendDriver(agent.backend);
-  }
-
   private async getBackendDriver(backend: AgentBackend): Promise<AgentBackendDriver> {
     const existingDriver = this.backendDrivers.get(backend);
     if (existingDriver) {
@@ -773,37 +733,6 @@ export class AppController {
       this.promptPlanPreview(fullEvent);
     }
 
-    if (
-      fullEvent.agentId &&
-      (fullEvent.type === 'turn.started' || fullEvent.type === 'diff.updated' || fullEvent.type === 'turn.completed')
-    ) {
-      void this.refreshAgentGitStatus(fullEvent.agentId).catch((error: unknown) => {
-        warnMain('git-status', 'failed to refresh after event', {
-          agentId: fullEvent.agentId,
-          eventType: fullEvent.type,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      });
-    }
-  }
-
-  private async refreshAgentGitStatus(agentId: string): Promise<void> {
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent) {
-      return;
-    }
-
-    const driver = await this.getBackendDriverForAgent(agent);
-    const status = await driver.getGitStatus?.(agent);
-    if (!status) {
-      return;
-    }
-
-    this.emitAndApply({
-      agentId,
-      type: 'git.statusUpdated',
-      payload: status,
-    });
   }
 
   private syncPowerSaveBlocker(): void {
