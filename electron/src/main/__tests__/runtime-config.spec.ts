@@ -2,25 +2,36 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 afterEach(() => {
   vi.unstubAllEnvs();
-  vi.unstubAllGlobals();
   vi.resetModules();
 });
 
 describe('runtime config', () => {
-  it('reads the GitHub OAuth client ID from the live environment first', async () => {
-    vi.stubGlobal('__CODEX_CLAW_GITHUB_CLIENT_ID__', 'packaged-client-id');
-    vi.stubEnv('CODEX_CLAW_GITHUB_CLIENT_ID', ' env-client-id ');
+  it('returns null when no backend command is configured', async () => {
+    const { runtimeClawdCommand } = await import('../runtime-config');
 
-    const { runtimeGitHubOAuthClientId } = await import('../runtime-config');
-
-    expect(runtimeGitHubOAuthClientId()).toBe('env-client-id');
+    expect(runtimeClawdCommand()).toBeNull();
   });
 
-  it('falls back to the GitHub OAuth client ID baked into the packaged main bundle', async () => {
-    vi.stubGlobal('__CODEX_CLAW_GITHUB_CLIENT_ID__', ' packaged-client-id ');
+  it('reads the backend command and comma-separated args from the environment', async () => {
+    vi.stubEnv('CODEX_CLAW_BACKEND_COMMAND', ' node ');
+    vi.stubEnv('CODEX_CLAW_BACKEND_ARGS', ' dist/clawd.mjs, --stdio ');
 
-    const { runtimeGitHubOAuthClientId } = await import('../runtime-config');
+    const { runtimeClawdCommand } = await import('../runtime-config');
 
-    expect(runtimeGitHubOAuthClientId()).toBe('packaged-client-id');
+    expect(runtimeClawdCommand()).toStrictEqual({
+      command: 'node',
+      args: ['dist/clawd.mjs', '--stdio'],
+    });
+  });
+
+  it('defaults backend args to stdio mode', async () => {
+    vi.stubEnv('CODEX_CLAW_BACKEND_COMMAND', 'clawd');
+
+    const { runtimeClawdCommand } = await import('../runtime-config');
+
+    expect(runtimeClawdCommand()).toStrictEqual({
+      command: 'clawd',
+      args: ['--stdio'],
+    });
   });
 });

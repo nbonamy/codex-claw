@@ -11,9 +11,6 @@ import { createMainWindow } from './main-window';
 import { ClawMcpAgentCoordinator } from './mcp/agent-coordinator';
 import { agentMessagesPrompt } from './mcp/agent-prompts';
 import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-permissions';
-import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
-import { WorkIntegrationManager } from './work-integrations/manager';
-import { SafeStorageWorkIntegrationTokenStore } from './work-integrations/token-store';
 import {
   assignWorkItemToAgentInSnapshot,
   closeAgentInSnapshot,
@@ -51,7 +48,6 @@ import type { AgentBackendDriver, BackendSendResult } from './backends/types';
 import { backendDisplayName, unsupportedBackendFeature } from './backends/types';
 import { formatConversationTitle } from './backends/conversation-title';
 import { McpToolError, type DisplayMarkdownInput, type DisplayMarkdownResponse, type MarkWorkItemCompletedResponse } from './mcp/agent-coordinator';
-import { runtimeGitHubOAuthClientId } from './runtime-config';
 import { defaultUserDataPath } from './user-data';
 
 type ClawBackendClientPort = Pick<ClawBackendProcessClient, 'start' | 'health' | 'request' | 'onEvent' | 'close'>;
@@ -95,7 +91,6 @@ export class AppController {
   private readonly clientRequestBackends = new Map<string, AgentBackend>();
   private seq = 0;
 
-  private readonly workIntegrations: WorkIntegrationManager;
   private readonly loopRunner: LoopRunner;
   private readonly loopScheduler: LoopScheduler;
   private readonly powerSaveBlocker = new AgentActivityPowerSaveBlocker();
@@ -103,21 +98,16 @@ export class AppController {
 
   constructor(
     persistence = new AppStatePersistence(path.join(defaultUserDataPath(), 'state.json')),
-    workIntegrations?: WorkIntegrationManager,
+    _workIntegrations?: unknown,
     backendClient: ClawBackendClientPort | null = createRuntimeClawBackendClient(),
   ) {
     this.persistence = persistence;
     this.backendClient = backendClient;
-    this.workIntegrations = workIntegrations ?? new WorkIntegrationManager({
-      drivers: [new GitHubWorkProviderDriver(() => githubOAuthClientId(this.snapshot))],
-      getSnapshot: () => this.snapshot,
-      openExternal: (url) => shell.openExternal(url),
-      saveSnapshot: () => this.persistSnapshot(),
-      tokenStore: new SafeStorageWorkIntegrationTokenStore(path.join(defaultUserDataPath(), 'work-integration-tokens.json')),
-    });
     this.loopRunner = new LoopRunner({
       getSnapshot: () => this.snapshot,
-      listWorkItems: this.workIntegrations,
+      listWorkItems: {
+        listItems: (provider, repositoryId) => this.listWorkItems(provider, repositoryId),
+      },
       notifySnapshotUpdated: () => this.emitAndApply({
         type: 'snapshot.updated',
         payload: this.snapshot,
@@ -134,7 +124,6 @@ export class AppController {
     this.snapshot = await this.persistence.load();
     await this.initializeBackendClient();
     await this.initializeSourceFolderIfNeeded();
-    await this.workIntegrations.hydrateConnections();
     this.syncPowerSaveBlocker();
   }
 
@@ -458,12 +447,7 @@ export class AppController {
     });
 
     ipcMain.handle(ipcChannels.updateSettings, async (_event, input: UpdateSettingsInput) => {
-      const previousGitHubClientId = githubOAuthClientId(this.snapshot);
       updateSettingsInSnapshot(this.snapshot, input);
-      if (previousGitHubClientId && previousGitHubClientId !== githubOAuthClientId(this.snapshot)) {
-        await this.workIntegrations.disconnect('github');
-      }
-      await this.workIntegrations.hydrateConnections();
       await this.persistSnapshot();
       this.syncPowerSaveBlocker();
       return this.snapshot;
@@ -573,62 +557,34 @@ export class AppController {
   }
 
   private async connectWorkProvider(provider: WorkProviderKind): Promise<WorkProviderConnectResult> {
-    if (this.backendClient) {
-      const result = await this.backendClient.request<WorkProviderConnectResult>('workProvider/connect', { provider });
-      this.snapshot = result.snapshot;
-      this.syncPowerSaveBlocker();
-      return result;
-    }
-
-    return this.workIntegrations.connect(provider);
+    const result = await this.requireBackendClient().request<WorkProviderConnectResult>('workProvider/connect', { provider });
+    this.snapshot = result.snapshot;
+    this.syncPowerSaveBlocker();
+    return result;
   }
 
   private async openWorkProviderAuthorization(provider: WorkProviderKind): Promise<AppSnapshot> {
-    if (this.backendClient) {
-      return this.adoptBackendSnapshot(await this.backendClient.request<AppSnapshot>('workProvider/openAuthorization', { provider }));
-    }
-
-    return this.workIntegrations.openAuthorization(provider);
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('workProvider/openAuthorization', { provider }));
   }
 
   private async completeWorkProviderConnection(provider: WorkProviderKind): Promise<AppSnapshot> {
-    if (this.backendClient) {
-      return this.adoptBackendSnapshot(await this.backendClient.request<AppSnapshot>('workProvider/completeConnection', { provider }));
-    }
-
-    return this.workIntegrations.completeConnection(provider);
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('workProvider/completeConnection', { provider }));
   }
 
   private async disconnectWorkProvider(provider: WorkProviderKind): Promise<AppSnapshot> {
-    if (this.backendClient) {
-      return this.adoptBackendSnapshot(await this.backendClient.request<AppSnapshot>('workProvider/disconnect', { provider }));
-    }
-
-    return this.workIntegrations.disconnect(provider);
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('workProvider/disconnect', { provider }));
   }
 
   private async listWorkRepositories(provider: WorkProviderKind): Promise<WorkRepository[]> {
-    if (this.backendClient) {
-      return this.backendClient.request('workProvider/listRepositories', { provider });
-    }
-
-    return this.workIntegrations.listRepositories(provider);
+    return this.requireBackendClient().request('workProvider/listRepositories', { provider });
   }
 
   private async configureWorkBacklog(input: WorkBacklogConfigurationInput): Promise<AppSnapshot> {
-    if (this.backendClient) {
-      return this.adoptBackendSnapshot(await this.backendClient.request<AppSnapshot>('workProvider/configureBacklog', { input }));
-    }
-
-    return this.workIntegrations.configureBacklog(input);
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('workProvider/configureBacklog', { input }));
   }
 
   private async listWorkItems(provider: WorkProviderKind, repositoryId: string): Promise<WorkItem[]> {
-    if (this.backendClient) {
-      return this.backendClient.request('workProvider/listItems', { provider, repositoryId });
-    }
-
-    return this.workIntegrations.listItems(provider, repositoryId);
+    return this.requireBackendClient().request('workProvider/listItems', { provider, repositoryId });
   }
 
   private adoptBackendSnapshot(snapshot: AppSnapshot): AppSnapshot {
@@ -1862,8 +1818,4 @@ function isBackendSnapshotState(value: unknown): value is { snapshot: AppSnapsho
 function appleSpeechAssetsPath(): string {
   const isPackaged = Boolean((app as { isPackaged?: boolean } | undefined)?.isPackaged);
   return isPackaged ? process.resourcesPath : path.resolve(process.cwd(), 'assets');
-}
-
-function githubOAuthClientId(snapshot: AppSnapshot): string {
-  return snapshot.workBacklog.providerSettings.github?.oauthClientId ?? runtimeGitHubOAuthClientId();
 }

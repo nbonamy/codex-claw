@@ -57,9 +57,8 @@ Current implementation checkpoint:
   tokens or a persisted-token format change.
 - `clawd` now owns the GitHub work integration manager/driver and exposes
   `workProvider/*` JSON-RPC methods. Electron proxies the existing renderer IPC
-  work-provider calls to `clawd` when the backend process is connected, with the
-  old in-process manager left only as a temporary fallback until the next
-  cleanup slice.
+  work-provider calls to `clawd`; Electron keeps only the `safeStorage` token
+  bridge needed by the backend-owned manager.
 - Electron main no longer owns the MCP HTTP server. Desktop-facing MCP effects,
   such as displaying Markdown in the side panel, flow back to Electron as
   app-owned backend events.
@@ -69,8 +68,8 @@ Current implementation checkpoint:
   path resolution, and renderer IPC fanout.
 - The remaining large slice is to move product orchestration out of
   `AppController` so Electron becomes only the desktop IPC/stdio layer. The
-  largest remaining owners are loop scheduler/runner, the temporary
-  in-process work integration fallback, and direct snapshot mutation routes.
+  largest remaining owners are loop scheduler/runner and direct snapshot
+  mutation routes.
 
 ## Goals
 

@@ -617,25 +617,29 @@ Codex Claw unless we need an app-specific cache for performance.
 Work backlog providers are app-owned integrations, not agent backend features.
 The renderer consumes provider-neutral `WorkRepository` and `WorkItem`
 contracts and emits assignment intents. GitHub-specific OAuth, REST payloads,
-and token handling stay in Electron main behind the work-integration manager.
+and provider polling live in `clawd`; Electron supplies desktop-only services
+such as encrypted token storage and browser opening through backend-initiated
+desktop RPC methods.
 
 Provider tokens must not be stored in the persisted app snapshot. The snapshot
 can persist safe metadata such as connection status, account label, and
 provider-specific backlog configuration. GitHub currently stores the selected
 repository id and optional tag name as its backlog configuration. Secret
-material belongs in the main-process token store, using Electron encrypted
-storage when available.
+material belongs in the desktop token store, using Electron encrypted storage
+when available.
 
 GitHub uses OAuth device flow for the desktop app. It requires a public client
-ID but no client secret or localhost callback route. The main process reads
+ID but no client secret or localhost callback route. `clawd` reads
 `CODEX_CLAW_GITHUB_CLIENT_ID` from the environment as the default client ID,
 and Settings can persist a per-provider client ID override. Actual GitHub
-access tokens remain in the encrypted token store. Starting device flow only
-returns the code to the renderer; opening GitHub is a separate user action so
-the user can see and copy the code before the browser takes focus. The main
-process owns that browser-open action and may append the user code to the
-verification URL as a best-effort prefill. After the device flow starts, the
-renderer polls the main-process completion endpoint on the provider interval
+access tokens remain outside the persisted app snapshot in the encrypted
+desktop token store, accessed by `clawd` through the desktop token bridge.
+Starting device flow only returns the code to the renderer; opening GitHub is a
+separate user action so the user can see and copy the code before the browser
+takes focus. Electron owns that browser-open action through
+`desktop/openExternal` and may append the user code to the verification URL as a
+best-effort prefill. After the device flow starts, the renderer polls the
+work-provider completion endpoint on the provider interval
 instead of requiring a manual "finish connection" step.
 
 Dragging a work item onto an agent records provider-neutral assignment metadata
