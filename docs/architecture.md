@@ -174,7 +174,15 @@ authoritative snapshot; Electron fetches fresh snapshots from `clawd` for
 `getSnapshot` and may cache backend-provided snapshots only for desktop-native
 reactions. The renderer receives UI events, but state-affecting events include
 the backend snapshot, so renderer state adopts that snapshot instead of
-replaying product reducers.
+replaying product reducers. Electron-native affordances consume a backend
+derived `DesktopState` for details such as source-folder dialog defaults and
+whether display sleep should be prevented; Electron runs the native APIs but
+does not derive those decisions from agent/product state.
+
+`shared` is intentionally runtime-thin: contracts, protocol types, and pure
+normalization helpers only. Node filesystem persistence such as `state.json`
+loading/saving belongs in `clawd`, so desktop, mobile, and web clients share the
+same backend contract without inheriting local file-read authority.
 
 ```mermaid
 flowchart LR

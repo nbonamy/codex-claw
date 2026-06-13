@@ -1,8 +1,8 @@
 import path from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import type { AppSnapshot } from '@codex-claw/shared/contracts';
-import { AppStatePersistence } from '@codex-claw/shared/state-persistence';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
+import { AppStatePersistence } from './state-persistence';
 
 export async function loadBackendSnapshot(stateDir?: string): Promise<AppSnapshot> {
   if (!stateDir) {

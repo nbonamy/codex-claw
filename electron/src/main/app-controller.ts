@@ -5,7 +5,7 @@ import { createMainWindow } from './main-window';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from './backend-process-client';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
-import type { AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopState, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
 type ClawBackendClientPort = Pick<ClawBackendProcessClient, 'start' | 'health' | 'request' | 'onEvent' | 'close'>;
@@ -13,6 +13,7 @@ type ClawBackendClientPort = Pick<ClawBackendProcessClient, 'start' | 'health' |
 export class AppController {
   private mainWindow: BrowserWindow | null = null;
   private snapshot = createEmptySnapshot();
+  private desktopState: DesktopState = createEmptyDesktopState();
   private backendClientEventUnsubscribe: (() => void) | null = null;
   private seq = 0;
 
@@ -307,7 +308,7 @@ export class AppController {
 
   private async connectWorkProvider(provider: WorkProviderKind): Promise<WorkProviderConnectResult> {
     const result = await this.requireBackendClient().request<WorkProviderConnectResult>('workProvider/connect', { provider });
-    this.adoptBackendSnapshot(result.snapshot);
+    await this.adoptBackendSnapshot(result.snapshot);
     return result;
   }
 
@@ -435,9 +436,9 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('loop/delete', { loopId }));
   }
 
-  private adoptBackendSnapshot(snapshot: AppSnapshot): AppSnapshot {
+  private async adoptBackendSnapshot(snapshot: AppSnapshot): Promise<AppSnapshot> {
     this.snapshot = snapshot;
-    this.syncPowerSaveBlocker();
+    await this.refreshDesktopStateFromBackend();
     return this.snapshot;
   }
 
@@ -543,7 +544,7 @@ export class AppController {
       properties: ['openDirectory'],
       title: 'Select source folder',
       message: 'Select your source folder containing git repositories',
-      defaultPath: this.snapshot.sourceFolder.path || undefined,
+      defaultPath: this.desktopState.sourceFolderPath || undefined,
     });
 
     return result.canceled ? null : result.filePaths[0] ?? null;
@@ -600,9 +601,15 @@ export class AppController {
     const backendState = await this.requireBackendClient().request<unknown>('snapshot/get');
     if (isBackendSnapshotState(backendState)) {
       this.snapshot = backendState.snapshot;
+      this.desktopState = backendState.desktopState;
       this.seq = Math.max(this.seq, backendState.lastEventSeq);
       this.syncPowerSaveBlocker();
     }
+  }
+
+  private async refreshDesktopStateFromBackend(): Promise<void> {
+    this.desktopState = await this.requireBackendClient().request<DesktopState>('desktop/getState');
+    this.syncPowerSaveBlocker();
   }
 
   private requireBackendClient(): ClawBackendClientPort {
@@ -622,6 +629,9 @@ export class AppController {
     if (eventSnapshot) {
       this.snapshot = eventSnapshot;
     }
+    if (isDesktopState(event.desktopState)) {
+      this.desktopState = event.desktopState;
+    }
 
     this.seq = Math.max(this.seq, rendererEvent.seq);
     this.syncPowerSaveBlocker();
@@ -629,7 +639,7 @@ export class AppController {
   }
 
   private syncPowerSaveBlocker(): void {
-    this.powerSaveBlocker.sync(this.snapshot);
+    this.powerSaveBlocker.sync(this.desktopState.shouldPreventDisplaySleep);
   }
 
 }
@@ -664,8 +674,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function isBackendSnapshotState(value: unknown): value is { snapshot: AppSnapshot; lastEventSeq: number } {
-  return isRecord(value) && isRecord(value.snapshot) && typeof value.lastEventSeq === 'number';
+function createEmptyDesktopState(): DesktopState {
+  return {
+    sourceFolderPath: '',
+    shouldPreventDisplaySleep: false,
+  };
+}
+
+function isBackendSnapshotState(value: unknown): value is { snapshot: AppSnapshot; lastEventSeq: number; desktopState: DesktopState } {
+  return isRecord(value) && isRecord(value.snapshot) && typeof value.lastEventSeq === 'number' && isDesktopState(value.desktopState);
+}
+
+function isDesktopState(value: unknown): value is DesktopState {
+  return isRecord(value) &&
+    typeof value.sourceFolderPath === 'string' &&
+    typeof value.shouldPreventDisplaySleep === 'boolean';
 }
 
 function isAppSnapshot(value: unknown): value is AppSnapshot {

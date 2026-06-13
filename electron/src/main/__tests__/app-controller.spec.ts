@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { AppController } from '../app-controller';
 import { applyMainEventToSnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceRepository, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopState, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceRepository, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
@@ -40,13 +40,17 @@ describe('AppController', () => {
         recentRepoNames: ['codex-claw'],
       },
     };
+    const desktopState: DesktopState = {
+      sourceFolderPath: '/Users/nbonamy/src',
+      shouldPreventDisplaySleep: false,
+    };
     const request = vi.fn();
     const backendClient: NonNullable<ConstructorParameters<typeof AppController>[1]> = {
       start: vi.fn().mockResolvedValue(undefined),
       health: vi.fn().mockResolvedValue({ ok: true, name: 'clawd', version: '0.1.0', pid: 123 }),
       request: <Result,>(method: string): Promise<Result> => {
         request(method);
-        return Promise.resolve((method === 'snapshot/get' ? { snapshot: backendSnapshot, lastEventSeq: 17 } : {}) as Result);
+        return Promise.resolve((method === 'snapshot/get' ? { snapshot: backendSnapshot, lastEventSeq: 17, desktopState } : {}) as Result);
       },
       onEvent: vi.fn(() => () => undefined),
       close: vi.fn().mockResolvedValue(undefined),
@@ -57,6 +61,7 @@ describe('AppController', () => {
 
     expect(request).toHaveBeenCalledWith('snapshot/get');
     expect(currentSnapshot(controller)).toBe(backendSnapshot);
+    expect(currentDesktopState(controller)).toStrictEqual(desktopState);
   });
 
   it('caches authoritative snapshots from backend events emitted by the clawd process client', async () => {
@@ -81,6 +86,10 @@ describe('AppController', () => {
       type: 'agent.statusChanged',
       payload: { type: 'working' },
       occurredAt: '2026-06-13T00:00:00.000Z',
+      desktopState: {
+        sourceFolderPath: '/Users/nbonamy/src',
+        shouldPreventDisplaySleep: true,
+      },
       snapshot: backendSnapshot,
     });
     await controller.shutdown();
@@ -96,6 +105,10 @@ describe('AppController', () => {
     expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
       snapshot: backendSnapshot,
     }));
+    expect(currentDesktopState(controller)).toStrictEqual({
+      sourceFolderPath: '/Users/nbonamy/src',
+      shouldPreventDisplaySleep: true,
+    });
     expect(unsubscribe).toHaveBeenCalledOnce();
   });
 
@@ -1168,6 +1181,10 @@ function currentSnapshot(controller: AppController): AppSnapshot {
   return (controller as unknown as { snapshot: AppSnapshot }).snapshot;
 }
 
+function currentDesktopState(controller: AppController): DesktopState {
+  return (controller as unknown as { desktopState: DesktopState }).desktopState;
+}
+
 function createBackendClientWithEventEmitter(
   onEvent: (listener: (event: ClawBackendEvent) => void) => () => void,
 ) {
@@ -1183,15 +1200,23 @@ function createBackendClientWithEventEmitter(
 function createBackendClient(overrides: {
   request?: unknown;
   onEvent?: unknown;
+  desktopState?: DesktopState;
 } = {}): NonNullable<ConstructorParameters<typeof AppController>[1]> {
   const request = (overrides.request ?? vi.fn().mockResolvedValue({})) as (method: string, params?: unknown) => Promise<unknown>;
   const onEvent = (overrides.onEvent ?? vi.fn(() => () => undefined)) as (listener: (event: ClawBackendEvent) => void) => () => void;
+  const desktopState = overrides.desktopState ?? {
+    sourceFolderPath: '',
+    shouldPreventDisplaySleep: false,
+  };
   return {
     start: vi.fn().mockResolvedValue(undefined),
     health: vi.fn().mockResolvedValue({ ok: true, name: 'clawd', version: '0.1.0', pid: 123 }),
     request: <Result>(method: string, params?: unknown) => {
       if (method === 'snapshot/get') {
         return Promise.resolve({}) as Promise<Result>;
+      }
+      if (method === 'desktop/getState') {
+        return Promise.resolve(desktopState) as Promise<Result>;
       }
       return request(method, params) as Promise<Result>;
     },

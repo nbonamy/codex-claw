@@ -398,6 +398,11 @@ export type AppGeneralSettings = {
   preventSleepWhenAgentsRun: boolean;
 };
 
+export type DesktopState = {
+  sourceFolderPath: string;
+  shouldPreventDisplaySleep: boolean;
+};
+
 export type BackendReasoningEffortOption = {
   reasoningEffort: ReasoningEffort;
   description: string;

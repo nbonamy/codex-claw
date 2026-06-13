@@ -1,4 +1,4 @@
-import type { AppSnapshot, MainToRendererEvent } from '../contracts';
+import type { AppSnapshot, DesktopState, MainToRendererEvent } from '../contracts';
 
 export type ClawRpcId = string | number;
 
@@ -47,6 +47,7 @@ export type ClawBackendHealth = {
 export type ClawSnapshotGetResult = {
   snapshot: AppSnapshot;
   lastEventSeq: number;
+  desktopState: DesktopState;
 };
 
 export type ClawBackendEvent = {
@@ -59,6 +60,7 @@ export type ClawBackendEvent = {
   turnId?: string;
   payload: unknown;
   occurredAt: string;
+  desktopState?: DesktopState;
   snapshot?: AppSnapshot;
 };
 
@@ -70,6 +72,10 @@ export type ClawBackendRequestMap = {
   'snapshot/get': {
     params: undefined;
     result: ClawSnapshotGetResult;
+  };
+  'desktop/getState': {
+    params: undefined;
+    result: DesktopState;
   };
 };
 

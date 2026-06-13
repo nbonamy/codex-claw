@@ -96,12 +96,63 @@ describe('ClawBackendServer', () => {
       id: 2,
       result: {
         lastEventSeq: 0,
+        desktopState: {
+          sourceFolderPath: '',
+          shouldPreventDisplaySleep: false,
+        },
         snapshot: {
           activeTeamId: 'team-test',
           activeAgentId: null,
           teams: [{ id: 'team-test' }],
           agents: [],
         },
+      },
+    });
+  });
+
+  it('derives desktop state from backend-owned snapshot state', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.sourceFolder = {
+      path: '/Users/nbonamy/src',
+      initialized: true,
+      recentRepoNames: [],
+    };
+    snapshot.general.preventSleepWhenAgentsRun = true;
+    snapshot.agents = [{
+      id: 'agent-dina',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'working' },
+      createdAt: '2026-06-05T00:00:00.000Z',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    }];
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'desktop-state',
+      method: 'desktop/getState',
+    })).resolves.toMatchObject({
+      result: {
+        sourceFolderPath: '/Users/nbonamy/src',
+        shouldPreventDisplaySleep: true,
+      },
+    });
+
+    snapshot.general.preventSleepWhenAgentsRun = false;
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'desktop-state-disabled',
+      method: 'desktop/getState',
+    })).resolves.toMatchObject({
+      result: {
+        sourceFolderPath: '/Users/nbonamy/src',
+        shouldPreventDisplaySleep: false,
       },
     });
   });
@@ -205,6 +256,9 @@ describe('ClawBackendServer', () => {
       agentId: 'agent-dina',
       type: 'agent.statusChanged',
       payload: { type: 'working' },
+      desktopState: {
+        shouldPreventDisplaySleep: true,
+      },
       snapshot: {
         agents: [
           expect.objectContaining({

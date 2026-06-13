@@ -82,6 +82,18 @@ describe('Electron backend boundary', () => {
     expect(source).not.toContain('driver/listFiles');
   });
 
+  it('keeps the shared package free of Node filesystem runtime APIs', async () => {
+    const sources = await readElectronMainRuntimeSources(path.resolve(__dirname, '../../../../shared/src'));
+
+    for (const { filePath, source } of sources) {
+      expect(source, filePath).not.toMatch(/from ['"]node:fs/);
+      expect(source, filePath).not.toMatch(/from ['"]fs/);
+      expect(source, filePath).not.toMatch(/\breadFile(?:Sync)?\b/);
+      expect(source, filePath).not.toMatch(/\bwriteFile(?:Sync)?\b/);
+      expect(source, filePath).not.toMatch(/\bcreateReadStream\b/);
+    }
+  });
+
   it('keeps renderer product snapshot reduction behind clawd', async () => {
     const appStatePath = path.resolve(__dirname, '../../renderer/app-state.ts');
     const source = await readFile(appStatePath, 'utf8');
@@ -122,6 +134,20 @@ describe('Electron backend boundary', () => {
     expect(source).not.toContain('updateSettingsInSnapshot');
   });
 
+  it('keeps desktop-native power state derived by clawd', async () => {
+    const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
+    const powerSaveBlockerPath = path.resolve(__dirname, '../agent-activity-power-save-blocker.ts');
+    const appController = await readFile(appControllerPath, 'utf8');
+    const powerSaveBlocker = await readFile(powerSaveBlockerPath, 'utf8');
+
+    expect(appController).toContain("request<DesktopState>('desktop/getState')");
+    expect(appController).toContain('this.desktopState.shouldPreventDisplaySleep');
+    expect(powerSaveBlocker).not.toContain('AppSnapshot');
+    expect(powerSaveBlocker).not.toContain('AgentStatus');
+    expect(powerSaveBlocker).not.toContain('preventSleepWhenAgentsRun');
+    expect(powerSaveBlocker).not.toContain('.agents');
+  });
+
   it('keeps derived side-panel events in clawd', async () => {
     const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
     const source = await readFile(appControllerPath, 'utf8');
@@ -137,8 +163,8 @@ describe('Electron backend boundary', () => {
     const source = await readFile(appControllerPath, 'utf8');
 
     expect(source).not.toContain('source/detectFolder');
-    expect(source).not.toContain('sourceFolderPath');
     expect(source).not.toContain('agent/validateFolder');
+    expect(source).toContain('this.desktopState.sourceFolderPath');
   });
 
   it('keeps source worktree path policy in clawd', async () => {

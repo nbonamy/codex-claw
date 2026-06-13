@@ -1,5 +1,4 @@
 import { powerSaveBlocker } from 'electron';
-import type { AgentStatus, AppSnapshot } from '@codex-claw/shared/contracts';
 
 type PowerSaveBlockerDependencies = {
   start: (type: 'prevent-display-sleep') => number;
@@ -18,16 +17,13 @@ export class AgentActivityPowerSaveBlocker {
 
   constructor(private readonly dependencies: PowerSaveBlockerDependencies = defaultDependencies()) {}
 
-  sync(snapshot: AppSnapshot): void {
-    const shouldBlockSleep = snapshot.general.preventSleepWhenAgentsRun &&
-      snapshot.agents.some((agent) => isActiveStatus(agent.status));
-
-    if (shouldBlockSleep && this.blockerId === null) {
+  sync(shouldPreventDisplaySleep: boolean): void {
+    if (shouldPreventDisplaySleep && this.blockerId === null) {
       this.blockerId = this.dependencies.start('prevent-display-sleep');
       return;
     }
 
-    if (!shouldBlockSleep) {
+    if (!shouldPreventDisplaySleep) {
       this.stop();
     }
   }
@@ -40,8 +36,4 @@ export class AgentActivityPowerSaveBlocker {
     this.dependencies.stop(this.blockerId);
     this.blockerId = null;
   }
-}
-
-function isActiveStatus(status: AgentStatus): boolean {
-  return status.type === 'starting' || status.type === 'working' || status.type === 'awaitingInput';
 }

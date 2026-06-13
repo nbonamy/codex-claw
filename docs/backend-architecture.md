@@ -63,17 +63,23 @@ Current implementation checkpoint:
   app-owned backend events.
 - Electron main no longer contains backend orchestration implementation modules
   for loops, work integrations, MCP, source scanning, git worktrees, agent file
-  reads, or state persistence. Those live under `backend/src` or `shared/src`.
+  reads, or state persistence. Those live under `backend/src`; `shared/src`
+  stays limited to app contracts and pure cross-process helpers.
 - Electron main still owns native desktop affordances and selected adapters:
   window/menu/shortcut lifecycle, file/folder/save dialogs, URL opening,
   Electron `safeStorage`, native system-permission prompts/settings, packaged
-  resource path resolution, and renderer IPC fanout.
+  resource path resolution, power-save blocker execution, and renderer IPC
+  fanout. `clawd` derives the minimal `DesktopState` that tells Electron which
+  source folder path to use as a dialog default and whether display sleep should
+  be prevented.
 - `clawd` owns durable snapshot loading and saving. Electron keeps only a
   volatile renderer-facing snapshot cache hydrated from `snapshot/get` and
   backend events; it does not read or write `state.json`, keep a local snapshot
   service shim, or validate agent folders before backend mutations.
   Main-process product IPC handlers adopt snapshots returned by backend RPCs;
-  they do not perform direct product-state updates.
+  they do not perform direct product-state updates. Desktop-native state is
+  fetched from `desktop/getState` or received on backend events instead of
+  being recomputed from agent statuses in Electron.
 - `clawd` now owns loop CRUD, manual loop runs, and the loop scheduler/runner.
   Electron proxies loop IPC to backend RPC and adopts the returned snapshot.
 - `clawd` now owns team create/update/reorder/close/select mutations. Electron
@@ -380,6 +386,9 @@ renderer.
   mobile client connected to a remote backend. Renderer-side normalization is
   only for turning displayed links into backend-relative preview requests, never
   for granting arbitrary filesystem access.
+- Durable snapshot JSON persistence lives in `backend/src`, not `shared/src`,
+  because it is a Node filesystem concern. `shared` must remain usable by
+  desktop, mobile, and web clients without carrying local file-read authority.
 - Loop CRUD, scheduler, and runner.
 - Work-provider drivers where possible, with desktop-only services injected
   through ports.

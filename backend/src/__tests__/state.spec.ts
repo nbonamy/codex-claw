@@ -2,8 +2,8 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { persistedStateFromSnapshot } from '@codex-claw/shared/state-persistence';
 import { loadBackendSnapshot, saveBackendSnapshot } from '../state';
+import { persistedStateFromSnapshot } from '../state-persistence';
 
 describe('backend state loading', () => {
   let tempDir: string;
