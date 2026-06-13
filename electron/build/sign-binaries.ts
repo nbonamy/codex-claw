@@ -24,29 +24,31 @@ export function signDarwinBinaries(
   }
 
   const existsSync = deps.existsSync ?? fs.existsSync;
-  const helperPath = resolveAppleSpeechHelperPath(buildPath, existsSync);
-  if (!existsSync(helperPath)) {
-    logger.warn(`Apple speech helper not found for signing: ${helperPath}`);
-    return;
-  }
-
   const run = deps.execFileSync ?? execFileSync;
-  run('codesign', [
-    '--deep',
-    '--force',
-    '--verbose',
-    '--sign',
-    identify,
-    helperPath,
-  ], {
-    stdio: 'inherit',
-  });
+  const binaries = resolveDarwinBinaryPaths(buildPath, existsSync);
+  for (const binary of binaries) {
+    if (!existsSync(binary.path)) {
+      logger.warn(`${binary.label} not found for signing: ${binary.path}`);
+      continue;
+    }
+
+    run('codesign', [
+      '--deep',
+      '--force',
+      '--verbose',
+      '--sign',
+      identify,
+      binary.path,
+    ], {
+      stdio: 'inherit',
+    });
+  }
 }
 
-function resolveAppleSpeechHelperPath(
+function resolveDarwinBinaryPaths(
   buildPath: string,
   existsSync: (filePath: string) => boolean,
-): string {
+): Array<{ label: string; path: string }> {
   const normalizedBuildPath = path.normalize(buildPath);
   const resourcesAppPath = path.basename(normalizedBuildPath) === 'app'
     && path.basename(path.dirname(normalizedBuildPath)) === 'Resources'
@@ -68,5 +70,16 @@ function resolveAppleSpeechHelperPath(
     path.join(resourcePath, 'assets', 'apple-speechanalyzer-cli'),
   ]);
 
-  return helperPaths.find((helperPath) => existsSync(helperPath)) ?? helperPaths[0];
+  const clawdNodePaths = resourcePaths.map((resourcePath) => path.join(resourcePath, 'clawd', 'node'));
+
+  return [
+    {
+      label: 'Apple speech helper',
+      path: helperPaths.find((helperPath) => existsSync(helperPath)) ?? helperPaths[0],
+    },
+    {
+      label: 'clawd node runtime',
+      path: clawdNodePaths.find((runtimePath) => existsSync(runtimePath)) ?? clawdNodePaths[0],
+    },
+  ];
 }

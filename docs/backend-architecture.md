@@ -108,8 +108,9 @@ Current implementation checkpoint:
   agent/message ids and adopts the returned snapshot.
 - `clawd` owns agent file listing/preview authority. Client-facing
   `agent/listFiles` and `agent/previewFile` take an `agentId`; Electron does not
-  send workspace roots or read file bytes. The backend's folder-based file
-  helpers are internal `driver/listFiles` and `driver/readFile` calls only.
+  send workspace roots or read file bytes. Provider-specific file access remains
+  a backend-internal capability after `clawd` resolves the agent folder from
+  backend state.
 - `clawd` owns provider metadata and conversation-history reads. Electron asks
   for models, skills, conversation lists, and loop-created conversation
   messages by agent/ref ids; backend resolves agents and validates stored
@@ -574,9 +575,11 @@ Recommended build pipeline:
 
 3. Package the backend runtime:
 
+   - Current interim target: copy the current platform Node runtime plus the
+     bundled backend script into Electron resources, then spawn Node over stdio.
    - Preferred release target, after a spike: build a Node SEA executable from
      the bundled backend script.
-   - Temporary packaged-app fallback: run the bundled backend script in an
+   - Alternative packaged-app fallback: run the bundled backend script in an
      Electron `utilityProcess` and use the message-port transport, not stdio.
    - Not recommended by default: enable Electron `RunAsNode` and use
      `ELECTRON_RUN_AS_NODE=1`; that requires reversing the current fuse
@@ -587,13 +590,14 @@ Recommended build pipeline:
    ```text
    electron/resources/
      clawd/
-       clawd-macos-arm64
-       clawd-macos-x64
-       clawd-win32-x64.exe
-       clawd-linux-x64
+       node
+       clawd.mjs
+       clawd.mjs.map
    ```
 
-   Development builds can include only the current platform artifact.
+   Development builds include only the current platform Node runtime. Future SEA
+   or native executables can replace `node + clawd.mjs` in the same resource
+   directory.
 
 5. Package the Electron app with Forge. The current local verification command
    remains:
@@ -609,10 +613,14 @@ Runtime execution in a packaged app:
 
 1. Electron main resolves the packaged backend runtime under
    `process.resourcesPath` and passes `CODEX_CLAW_ASSETS_PATH` to `clawd`.
-2. Main starts the backend with stdio if it is a real executable:
+   The current interim TypeScript packaging copies the Node runtime to
+   `resources/clawd/node` and the backend bundle to `resources/clawd/clawd.mjs`;
+   this can later be replaced by a SEA or native executable without changing
+   renderer contracts.
+2. Main starts the backend with stdio:
 
    ```ts
-   spawn(clawdPath, ["--stdio", "--state-dir", app.getPath("userData")], {
+   spawn(nodePath, [clawdBundle, "--stdio", "--state-dir", app.getPath("userData")], {
      stdio: ["pipe", "pipe", "pipe"],
    });
    ```
@@ -630,8 +638,9 @@ Runtime execution in a packaged app:
 Signing implications:
 
 - macOS: the backend executable must be signed before app notarization. If it is
-  a Node SEA helper, treat it like the current Apple speech helper and sign it
-  from Forge's extra-resource hook or an equivalent release script.
+  the interim bundled Node runtime or a future SEA helper, treat it like the
+  current Apple speech helper and sign it from Forge's extra-resource hook or an
+  equivalent release script.
 - Windows: sign the backend `.exe` when we have the release certificate; local
   unsigned builds can still run for development.
 - Linux: no signing requirement by default, but the packaged artifact still

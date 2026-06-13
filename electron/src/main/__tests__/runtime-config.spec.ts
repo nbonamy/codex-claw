@@ -10,7 +10,10 @@ describe('runtime config', () => {
   it('returns null when no backend command is configured', async () => {
     const { runtimeClawdCommand } = await import('../runtime-config');
 
-    expect(runtimeClawdCommand()).toBeNull();
+    expect(runtimeClawdCommand({
+      defaultApp: true,
+      resourcesPath: '/app/resources',
+    })).toBeNull();
   });
 
   it('reads the backend command and comma-separated args from the environment', async () => {
@@ -19,7 +22,7 @@ describe('runtime config', () => {
 
     const { runtimeClawdCommand } = await import('../runtime-config');
 
-    expect(runtimeClawdCommand()).toStrictEqual({
+    expect(runtimeClawdCommand({ cwd: process.cwd() })).toStrictEqual({
       command: 'node',
       args: ['dist/clawd.mjs', '--stdio'],
       env: {
@@ -33,7 +36,7 @@ describe('runtime config', () => {
 
     const { runtimeClawdCommand } = await import('../runtime-config');
 
-    expect(runtimeClawdCommand()).toStrictEqual({
+    expect(runtimeClawdCommand({ cwd: process.cwd() })).toStrictEqual({
       command: 'clawd',
       args: ['--stdio'],
       env: {
@@ -55,5 +58,49 @@ describe('runtime config', () => {
         CODEX_CLAW_ASSETS_PATH: '/app/resources',
       },
     });
+  });
+
+  it('resolves the packaged clawd runtime from resources when no env command is configured', async () => {
+    const { runtimeClawdCommand } = await import('../runtime-config');
+
+    expect(runtimeClawdCommand({
+      defaultApp: false,
+      existsSync: (filePath) => filePath === '/app/resources/clawd/node' || filePath === '/app/resources/clawd/clawd.mjs',
+      resourcesPath: '/app/resources',
+      userDataPath: '/Users/nbonamy/Library/Application Support/Codex Claw',
+    })).toStrictEqual({
+      command: '/app/resources/clawd/node',
+      args: [
+        '/app/resources/clawd/clawd.mjs',
+        '--stdio',
+        '--state-dir',
+        '/Users/nbonamy/Library/Application Support/Codex Claw',
+      ],
+      env: {
+        CODEX_CLAW_ASSETS_PATH: '/app/resources',
+      },
+    });
+  });
+
+  it('uses the packaged Windows node executable name', async () => {
+    const { runtimeClawdCommand } = await import('../runtime-config');
+
+    expect(runtimeClawdCommand({
+      defaultApp: false,
+      existsSync: (filePath) => filePath === 'C:\\app\\resources/clawd/node.exe' || filePath === 'C:\\app\\resources/clawd/clawd.mjs',
+      platform: 'win32',
+      resourcesPath: 'C:\\app\\resources',
+      userDataPath: 'C:\\Users\\Nicolas\\AppData\\Roaming\\Codex Claw',
+    })?.command).toBe('C:\\app\\resources/clawd/node.exe');
+  });
+
+  it('returns null for packaged apps when the bundled runtime is missing', async () => {
+    const { runtimeClawdCommand } = await import('../runtime-config');
+
+    expect(runtimeClawdCommand({
+      defaultApp: false,
+      existsSync: () => false,
+      resourcesPath: '/app/resources',
+    })).toBeNull();
   });
 });
