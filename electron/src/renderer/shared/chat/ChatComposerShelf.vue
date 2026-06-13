@@ -1,0 +1,61 @@
+<template>
+  <div v-if="visible" class="chat-composer-shelf">
+    <!-- <ChatTurnGitInfo
+      v-if="turnGitDiff"
+      :diff="turnGitDiff"
+    /> -->
+    <ChatQueuedPrompts
+      :prompts="queuedPrompts"
+      @delete="$emit('deleteQueuedPrompt', $event)"
+      @steer="$emit('steerQueuedPrompt', $event)"
+    />
+    <ChatGoal
+      :goal="goal"
+      @clear="$emit('clearGoal')"
+      @edit="$emit('editGoal')"
+    />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue';
+import type { ThreadGoal, TurnGitDiff } from '@codex-claw/shared/contracts';
+import ChatGoal from './ChatGoal.vue';
+import ChatQueuedPrompts from './ChatQueuedPrompts.vue';
+// import ChatTurnGitInfo from './ChatTurnGitInfo.vue';
+import type { QueuedChatPrompt } from './queued-prompts';
+
+const props = defineProps<{
+  goal: ThreadGoal | null;
+  queuedPrompts: QueuedChatPrompt[];
+  turnGitDiff?: TurnGitDiff | null;
+}>();
+
+defineEmits<{
+  clearGoal: [];
+  deleteQueuedPrompt: [promptId: string];
+  editGoal: [];
+  steerQueuedPrompt: [promptId: string];
+}>();
+
+const visible = computed(() => Boolean(props.goal) || props.queuedPrompts.length > 0);
+</script>
+
+<style scoped>
+.chat-composer-shelf {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-composer-shelf:has(.chat-queued-prompts) {
+  &:deep() {
+    .chat-goal {
+      border-top-left-radius: 0;
+      border-top-right-radius: 0;
+    }
+  }
+}
+
+
+</style>

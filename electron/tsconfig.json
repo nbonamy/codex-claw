@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {},
+  "include": [
+    "forge.config.ts",
+    "vite.*.config.ts",
+    "vitest.config.ts",
+    "src/**/*.ts",
+    "src/**/*.vue",
+    "../shared/src/**/*.ts"
+  ],
+  "references": []
+}
