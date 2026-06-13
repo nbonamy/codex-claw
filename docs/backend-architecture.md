@@ -76,10 +76,13 @@ Current implementation checkpoint:
   agent.
 - `clawd` now owns settings updates. Electron adopts the returned snapshot and
   applies desktop-only reactions such as power-save blocker changes.
+- `clawd` now owns source-folder initialization via `settings/update` and the
+  recent-repository update after source worktree creation. Electron still owns
+  native folder/save dialogs.
 - The remaining large slice is to move the rest of product orchestration out of
   `AppController` so Electron becomes only the desktop IPC/stdio layer. The
-  largest remaining owners are direct agent/source-selection snapshot mutation
-  routes and remaining desktop-era driver shims.
+  largest remaining owners are direct agent snapshot mutation routes and
+  remaining desktop-era driver shims.
 
 ## Goals
 

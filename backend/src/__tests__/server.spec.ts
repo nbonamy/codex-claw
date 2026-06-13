@@ -374,6 +374,49 @@ describe('ClawBackendServer', () => {
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
   });
 
+  it('records recent repositories when creating source worktrees', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.sourceFolder = {
+      path: '/Users/nbonamy/src',
+      initialized: true,
+      recentRepoNames: ['id8'],
+    };
+    const worktree = {
+      name: 'backend-split',
+      path: '/Users/nbonamy/src/codex-claw-backend-split',
+    };
+    const driverRpc = {
+      handle: vi.fn().mockResolvedValue(worktree),
+      onEvent: vi.fn(() => () => undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    } as unknown as BackendDriverRpc;
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+      driverRpc,
+    });
+    const input = {
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      branchName: 'backend-split',
+    };
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'source-worktree',
+      method: 'source/createWorktree',
+      params: { input },
+    })).resolves.toMatchObject({
+      result: worktree,
+    });
+
+    expect(driverRpc.handle).toHaveBeenCalledWith('source/createWorktree', { input });
+    expect(snapshot.sourceFolder.recentRepoNames).toStrictEqual(['codex-claw', 'id8']);
+    expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
+  });
+
   it('owns loop mutations and loop runner dispatch', async () => {
     const snapshot = createTestSnapshot();
     const events: unknown[] = [];

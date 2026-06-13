@@ -1083,15 +1083,27 @@ export class AppController {
       return;
     }
 
-    const detected = this.backendClient
-      ? await this.backendClient.request<string>('source/detectFolder')
-      : '';
-    this.snapshot.sourceFolder = {
-      ...this.snapshot.sourceFolder,
-      path: detected,
-      initialized: true,
-    };
-    await this.persistSnapshot();
+    if (!this.backendClient) {
+      return;
+    }
+
+    try {
+      const detected = await this.backendClient.request<string>('source/detectFolder');
+      const updatedSnapshot = await this.backendClient.request<unknown>('settings/update', {
+        input: {
+          sourceFolder: {
+            path: typeof detected === 'string' ? detected : '',
+          },
+        },
+      });
+      if (isAppSnapshot(updatedSnapshot)) {
+        this.adoptBackendSnapshot(updatedSnapshot);
+      }
+    } catch (error) {
+      warnMain('source-folder', 'failed to initialize through backend', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   private async listSourceRepositories(): Promise<SourceRepository[]> {
@@ -1105,12 +1117,9 @@ export class AppController {
   }
 
   private async createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {
-    const worktree = await this.requireBackendClient().request<SourceWorktree>('source/createWorktree', {
+    return this.requireBackendClient().request<SourceWorktree>('source/createWorktree', {
       input,
     });
-    await this.addRecentSourceRepositoryByPath(input.repoPath);
-    await this.persistSnapshot();
-    return worktree;
   }
 
   private async transcribeAppleSpeech(
@@ -1129,22 +1138,6 @@ export class AppController {
       throw new Error('clawd backend is not connected.');
     }
     return this.backendClient;
-  }
-
-  private async addRecentSourceRepositoryByPath(repoPath: string): Promise<void> {
-    const repos = await this.listSourceRepositories();
-    const repoName = repos.find((repo) => repo.path === repoPath)?.name ?? path.basename(repoPath);
-    this.addRecentSourceRepository(repoName);
-  }
-
-  private addRecentSourceRepository(repoName: string): void {
-    const trimmed = repoName.trim();
-    if (!trimmed) {
-      return;
-    }
-    const nextNames = this.snapshot.sourceFolder.recentRepoNames.filter((name) => name !== trimmed);
-    nextNames.unshift(trimmed);
-    this.snapshot.sourceFolder.recentRepoNames = nextNames.slice(0, 5);
   }
 
   private async validateAgentInput(input: Pick<CreateAgentInput, 'name' | 'folder'>): Promise<void> {
@@ -1450,6 +1443,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isBackendSnapshotState(value: unknown): value is { snapshot: AppSnapshot; lastEventSeq: number } {
   return isRecord(value) && isRecord(value.snapshot) && typeof value.lastEventSeq === 'number';
+}
+
+function isAppSnapshot(value: unknown): value is AppSnapshot {
+  return isRecord(value) &&
+    Array.isArray(value.teams) &&
+    Array.isArray(value.agents) &&
+    isRecord(value.general) &&
+    isRecord(value.sourceFolder);
 }
 
 function appleSpeechAssetsPath(): string {

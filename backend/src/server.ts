@@ -1,6 +1,7 @@
+import path from 'node:path';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
-import type { AppSnapshot, CreateLoopInput, CreateTeamInput, ReorderTeamsInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
+import type { AppSnapshot, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ReorderTeamsInput, SourceWorktree, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { BackendEvent } from '@codex-claw/shared/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
@@ -139,6 +140,13 @@ export class ClawBackendServer {
       case 'settings/update':
         updateSettingsInSnapshot(this.snapshot, requireSettingsUpdateInput(message.params));
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      case 'source/createWorktree': {
+        const input = requireSourceWorktreeInput(message.params);
+        const worktree = await this.requireDriverRpc().handle('source/createWorktree', { input }) as SourceWorktree;
+        this.addRecentSourceRepository(path.basename(input.repoPath));
+        await this.persistAndEmitSnapshot();
+        return createClawRpcResult(message.id, worktree);
+      }
       case 'workProvider/connect':
         return createClawRpcResult(message.id, await this.requireWorkIntegrations().connect(requireWorkProvider(message.params)));
       case 'workProvider/openAuthorization':
@@ -262,6 +270,16 @@ export class ClawBackendServer {
     return this.snapshot;
   }
 
+  private addRecentSourceRepository(repoName: string): void {
+    const trimmed = repoName.trim();
+    if (!trimmed) {
+      return;
+    }
+    const nextNames = this.snapshot.sourceFolder.recentRepoNames.filter((name) => name !== trimmed);
+    nextNames.unshift(trimmed);
+    this.snapshot.sourceFolder.recentRepoNames = nextNames.slice(0, 5);
+  }
+
   private handleBackendEvent(event: BackendEvent, options: { persist?: boolean } = {}): void {
     this.lastEventSeq += 1;
     this.onEvent?.({
@@ -342,6 +360,11 @@ function requireTemplateId(params: unknown): string {
 function requireSettingsUpdateInput(params: unknown): UpdateSettingsInput {
   const record = requireRecord(params);
   return requireRecord(record.input) as UpdateSettingsInput;
+}
+
+function requireSourceWorktreeInput(params: unknown): CreateSourceWorktreeInput {
+  const record = requireRecord(params);
+  return requireRecord(record.input) as CreateSourceWorktreeInput;
 }
 
 function validateTeamInput(input: CreateTeamInput): void {

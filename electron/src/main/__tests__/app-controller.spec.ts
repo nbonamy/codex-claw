@@ -100,7 +100,35 @@ describe('AppController', () => {
     });
   });
 
-  it('routes source worktree creation through clawd and records the recent repository', async () => {
+  it('routes source folder initialization through backend settings', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.sourceFolder.initialized = false;
+    const backendSnapshot = {
+      ...snapshot,
+      sourceFolder: {
+        path: '/Users/nbonamy/src',
+        initialized: true,
+        recentRepoNames: [],
+      },
+    };
+    const request = vi.fn()
+      .mockResolvedValueOnce('/Users/nbonamy/src')
+      .mockResolvedValueOnce(backendSnapshot);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+
+    await controller.initialize();
+
+    expect(request).toHaveBeenNthCalledWith(1, 'source/detectFolder', undefined);
+    expect(request).toHaveBeenNthCalledWith(2, 'settings/update', {
+      input: {
+        sourceFolder: {
+          path: '/Users/nbonamy/src',
+        },
+      },
+    });
+  });
+
+  it('routes source worktree creation through clawd', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder = {
       path: '/Users/nbonamy/src',
@@ -111,15 +139,8 @@ describe('AppController', () => {
       name: 'backend-split',
       path: '/Users/nbonamy/src/codex-claw-backend-split',
     };
-    const request = vi.fn()
-      .mockResolvedValueOnce(worktree)
-      .mockResolvedValueOnce([{
-        name: 'codex-claw',
-        path: '/Users/nbonamy/src/codex-claw',
-        worktrees: [],
-      } satisfies SourceRepository]);
-    const persistence = createPersistence(snapshot);
-    const controller = new AppController(persistence, undefined, createBackendClient({ request }));
+    const request = vi.fn().mockResolvedValueOnce(worktree);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
     const input: CreateSourceWorktreeInput = {
       repoPath: '/Users/nbonamy/src/codex-claw',
       branchName: 'backend-split',
@@ -128,12 +149,7 @@ describe('AppController', () => {
     await controller.initialize();
 
     await expect(createSourceWorktree(controller, input)).resolves.toStrictEqual(worktree);
-    expect(request).toHaveBeenNthCalledWith(1, 'source/createWorktree', { input });
-    expect(request).toHaveBeenNthCalledWith(2, 'source/listRepositories', {
-      sourceFolderPath: '/Users/nbonamy/src',
-    });
-    expect(snapshot.sourceFolder.recentRepoNames).toStrictEqual(['codex-claw']);
-    expect(persistence.save).toHaveBeenCalledWith(snapshot);
+    expect(request).toHaveBeenCalledWith('source/createWorktree', { input });
   });
 
   it('routes Apple Speech transcription through clawd using a JSON-safe audio payload', async () => {
