@@ -4,10 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
-import type { AgentBackendDriver, BackendSendResult } from '../backends/types';
-import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
 describe('AppController', () => {
@@ -74,7 +72,6 @@ describe('AppController', () => {
 
     setMainWindowSend(controller, send);
     await controller.initialize();
-    await getBackendDriver(controller, 'codex');
     emitBackendEvent({
       seq: 42,
       backend: 'codex',
@@ -94,6 +91,26 @@ describe('AppController', () => {
       payload: { type: 'working' },
     }));
     expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it('routes client request responses through clawd', async () => {
+    const snapshot = createInitialSnapshot();
+    const backendSnapshot = {
+      ...snapshot,
+      agents: [{ ...snapshot.agents[0]!, status: { type: 'idle' as const } }],
+    };
+    const request = vi.fn().mockResolvedValue(backendSnapshot);
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
+    const response: ClientRequestResponse = {
+      id: 'approval-1',
+      payload: { decision: 'allow' },
+    };
+
+    await controller.initialize();
+    await expect(respondToClientRequest(controller, response)).resolves.toBe(backendSnapshot);
+
+    expect(request).toHaveBeenCalledWith('clientRequest/respond', { response });
+    expect(currentSnapshot(controller)).toBe(backendSnapshot);
   });
 
   it('routes source repository discovery through clawd', async () => {
@@ -1113,24 +1130,6 @@ function emitAndApply(
   }).emitAndApply(event);
 }
 
-function setCodexBackendDriver(
-  controller: AppController,
-  backendDriver: AgentBackendDriver,
-): void {
-  (controller as unknown as {
-    backendDrivers: Map<string, AgentBackendDriver>;
-  }).backendDrivers.set('codex', backendDriver);
-}
-
-function setClaudeBackendDriver(
-  controller: AppController,
-  backendDriver: AgentBackendDriver,
-): void {
-  (controller as unknown as {
-    backendDrivers: Map<string, AgentBackendDriver>;
-  }).backendDrivers.set('claude', backendDriver);
-}
-
 function setMainWindowSend(controller: AppController, send: ReturnType<typeof vi.fn>): void {
   (controller as unknown as {
     mainWindow: { webContents: { send: ReturnType<typeof vi.fn> } };
@@ -1138,35 +1137,6 @@ function setMainWindowSend(controller: AppController, send: ReturnType<typeof vi
     webContents: {
       send,
     },
-  };
-}
-
-function createFakeCodexBackendDriver(overrides: Partial<AgentBackendDriver> = {}): AgentBackendDriver {
-  return {
-    backend: 'codex',
-    getRuntimeStatus: () => ({ backend: 'codex', status: 'notConfigured' }),
-    getCapabilities: () => codexBackendCapabilities,
-    sendPrompt: vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'thread-dina' }, turnId: 'turn-1' }),
-    interrupt: vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'thread-dina' }, turnId: 'turn-1' }),
-    respondToRequest: vi.fn().mockResolvedValue(undefined),
-    rollbackToTurn: vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'thread-dina' }, messages: [] }),
-    onEvent: vi.fn(() => () => undefined),
-    close: vi.fn().mockResolvedValue(undefined),
-    ...overrides,
-  };
-}
-
-function createFakeClaudeBackendDriver(overrides: Partial<AgentBackendDriver> = {}): AgentBackendDriver {
-  return {
-    backend: 'claude',
-    getRuntimeStatus: () => ({ backend: 'claude', status: 'notConfigured' }),
-    getCapabilities: () => claudeBackendCapabilities,
-    sendPrompt: vi.fn().mockResolvedValue({ backendSession: { kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' }, turnId: 'claude-turn-1' }),
-    interrupt: vi.fn().mockResolvedValue({ backendSession: { kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' }, turnId: 'claude-turn-1' }),
-    respondToRequest: vi.fn().mockResolvedValue(undefined),
-    onEvent: vi.fn(() => () => undefined),
-    close: vi.fn().mockResolvedValue(undefined),
-    ...overrides,
   };
 }
 
@@ -1194,10 +1164,10 @@ async function selectAgent(controller: AppController, agentId: string): Promise<
   }).selectAgent(agentId);
 }
 
-async function getBackendDriver(controller: AppController, backend: 'codex' | 'claude'): Promise<AgentBackendDriver> {
+async function respondToClientRequest(controller: AppController, response: ClientRequestResponse): Promise<AppSnapshot> {
   return (controller as unknown as {
-    getBackendDriver(backend: 'codex' | 'claude'): Promise<AgentBackendDriver>;
-  }).getBackendDriver(backend);
+    respondToClientRequest(response: ClientRequestResponse): Promise<AppSnapshot>;
+  }).respondToClientRequest(response);
 }
 
 function currentSnapshot(controller: AppController): AppSnapshot {

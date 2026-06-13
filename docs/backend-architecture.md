@@ -37,7 +37,7 @@ Current implementation checkpoint:
 - The repo is split into `shared`, `backend`, and `electron` workspaces.
 - `clawd --stdio` speaks app-owned JSON-RPC over newline-delimited stdio.
 - Electron main starts `clawd` through `ClawBackendProcessClient` and reaches
-  backend features through `ClawBackendProxyDriver`.
+  backend features through app-owned RPC methods.
 - Codex and Claude provider drivers now live under `backend/src`; Electron main
   must not import provider drivers, provider transports, provider SDKs, or raw
   provider protocol modules.
@@ -115,11 +115,13 @@ Current implementation checkpoint:
   refreshes after agent create/update/select and provider turn/diff/completion
   events. Electron receives the resulting snapshot/events instead of calling
   provider drivers for status or history hydration.
+- `clawd` owns client request ownership and response routing. Electron forwards
+  renderer approval/user-input responses as `clientRequest/respond`; the backend
+  remembers which provider emitted the request and dispatches to that provider.
 - The remaining large slice is to move the rest of product orchestration out of
   `AppController` so Electron becomes only the desktop IPC/stdio layer. The
-  largest remaining owners are client request ownership/response routing and
-  remaining desktop-era runtime shims, such as launch-time PATH repair for
-  backend process execution.
+  largest remaining owners are remaining desktop-era runtime shims, such as
+  launch-time PATH repair for backend process execution.
 
 ## Goals
 
@@ -398,8 +400,8 @@ names that describe backend ownership:
 - `team/create`, `team/update`, `team/reorder`, `team/close`, `team/select`
 - `agent/create`, `agent/update`, `agent/close`, `agent/select`,
   `agent/restart`, `agent/sendPrompt`, `agent/steer`, `agent/interrupt`,
-  `agent/deleteMessage`, `agent/editMessage`, `agent/retryMessage`,
-  `agent/respondToClientRequest`
+  `agent/deleteMessage`, `agent/editMessage`, `agent/retryMessage`
+- `clientRequest/respond`
 - `agent/validateFolder`, `agent/listModels`, `agent/listSkills`,
   `agent/listConversations`, `agent/resumeConversation`,
   `agent/readConversationMessages`

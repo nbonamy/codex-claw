@@ -2,7 +2,7 @@ import path from 'node:path';
 import { sendAgentPrompt } from '@codex-claw/shared/agent-chat-service';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { applyMainEventToSnapshot, createAgentInSnapshot, createEmptySnapshot, selectAgent, updateAgentFolder, updateAgentFromInput } from '@codex-claw/shared/snapshot';
-import type { Agent, AgentGitStatus, AppSnapshot, BackendConversationRef, BackendSession, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
+import type { Agent, AgentBackend, AgentGitStatus, AppSnapshot, BackendConversationRef, BackendSession, ClientRequest, ClientRequestResponse, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
@@ -39,6 +39,7 @@ export class ClawBackendServer {
   private readonly saveSnapshot?: (snapshot: AppSnapshot) => Promise<void>;
   private readonly workIntegrations?: WorkIntegrationManager;
   private readonly loopRunner?: Pick<LoopRunner, 'runAll' | 'runLoop'>;
+  private readonly clientRequestBackends = new Map<string, AgentBackend>();
   private unsubscribeDriverEvents?: () => void;
   private lastEventSeq = 0;
 
@@ -76,6 +77,17 @@ export class ClawBackendServer {
           snapshot: this.snapshot,
           lastEventSeq: this.lastEventSeq,
         });
+      case 'clientRequest/respond': {
+        const response = requireClientRequestResponse(message.params);
+        const backend = this.clientRequestBackends.get(response.id);
+        if (!backend) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `No backend owns client request '${response.id}'.`);
+        }
+
+        await this.requireDriverRpc().handle('driver/respondToClientRequest', { backend, response });
+        this.clientRequestBackends.delete(response.id);
+        return createClawRpcResult(message.id, this.snapshot);
+      }
       case 'agent/create': {
         const input = requireAgentCreateInput(message.params);
         await this.validateAgentInput(input);
@@ -663,7 +675,7 @@ export class ClawBackendServer {
         await this.requireDriverRpc().handle('driver/interrupt', { agent: currentAgent }) as BackendSendResult
       ),
       respondToRequest: async (response) => {
-        await this.requireDriverRpc().handle('agent/respondToClientRequest', { backend: agent.backend, response });
+        await this.requireDriverRpc().handle('driver/respondToClientRequest', { backend: agent.backend, response });
       },
       onEvent: () => () => undefined,
       close: async () => undefined,
@@ -933,22 +945,41 @@ export class ClawBackendServer {
       payload: event.payload,
     };
     applyMainEventToSnapshot(this.snapshot, fullEvent);
+    this.recordClientRequestOwner(fullEvent);
     this.onEvent?.(fullEvent);
   }
 
   private handleBackendEvent(event: BackendEvent, options: { persist?: boolean } = {}): void {
     this.lastEventSeq += 1;
-    this.onEvent?.({
+    const fullEvent: MainToRendererEvent = {
       ...event,
       seq: this.lastEventSeq,
       occurredAt: event.occurredAt ?? new Date().toISOString(),
       payload: event.payload,
-    });
+    };
+    this.recordClientRequestOwner(fullEvent);
+    this.onEvent?.(fullEvent);
     if (options.persist !== false && shouldPersistSnapshotForEvent(event)) {
       void this.saveSnapshot?.(this.snapshot);
     }
     if (event.agentId && shouldRefreshGitStatusForEvent(event)) {
       void this.refreshAgentGitStatus(event.agentId);
+    }
+  }
+
+  private recordClientRequestOwner(event: MainToRendererEvent): void {
+    if (event.type !== 'approval.requested' && event.type !== 'toolInput.requested') {
+      return;
+    }
+
+    const request = clientRequest(event.payload);
+    if (!request) {
+      return;
+    }
+
+    const backend = event.backend ?? (event.agentId ? this.snapshot.agents.find((agent) => agent.id === event.agentId)?.backend : undefined);
+    if (backend) {
+      this.clientRequestBackends.set(request.id, backend);
     }
   }
 }
@@ -1051,6 +1082,17 @@ function requireSourceWorktreeInput(params: unknown): CreateSourceWorktreeInput 
   return requireRecord(record.input) as CreateSourceWorktreeInput;
 }
 
+function requireClientRequestResponse(params: unknown): ClientRequestResponse {
+  const record = requireRecord(params);
+  const response = requireRecord(record.response);
+  return {
+    id: requireString(response.id, 'request response id'),
+    payload: typeof response.payload === 'object' && response.payload && !Array.isArray(response.payload)
+      ? response.payload as ClientRequestResponse['payload']
+      : undefined,
+  };
+}
+
 function validateTeamInput(input: CreateTeamInput): void {
   if (!input.name.trim()) {
     throw new Error('Team name is required.');
@@ -1114,6 +1156,22 @@ function isBackendSession(value: unknown): value is BackendSession {
     typeof record.sessionId === 'string' &&
     record.sessionId.trim().length > 0 &&
     typeof record.transport === 'string';
+}
+
+function clientRequest(value: unknown): ClientRequest | null {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    !('id' in value) ||
+    !('kind' in value) ||
+    typeof value.id !== 'string' ||
+    (value.kind !== 'confirm_tool' && value.kind !== 'ask_user')
+  ) {
+    return null;
+  }
+
+  return value as ClientRequest;
 }
 
 function rendererMessageText(message: RendererMessage): string {

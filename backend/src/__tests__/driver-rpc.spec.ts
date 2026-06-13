@@ -74,10 +74,12 @@ describe('BackendDriverRpc', () => {
       messages: [],
     });
     const forgetAgentSession = vi.fn();
+    const respondToRequest = vi.fn().mockResolvedValue(undefined);
     const rpc = new BackendDriverRpc(new Map([['codex', createDriver({
       clearGoal,
       forgetAgentSession,
       interrupt,
+      respondToRequest,
       rollbackToTurn,
       resumeConversation,
       setApprovalPreset,
@@ -115,6 +117,10 @@ describe('BackendDriverRpc', () => {
       messages: [],
     });
     await expect(rpc.handle('driver/forgetSession', { backend: 'codex', agentId: 'agent-dina' })).resolves.toBeNull();
+    await expect(rpc.handle('driver/respondToClientRequest', {
+      backend: 'codex',
+      response: { id: 'approval-1', payload: { decision: 'allow' } },
+    })).resolves.toBeNull();
 
     expect(setGoal).toHaveBeenCalledWith(agent, 'Ship the goal shelf');
     expect(clearGoal).toHaveBeenCalledWith(agent);
@@ -124,6 +130,7 @@ describe('BackendDriverRpc', () => {
     expect(rollbackToTurn).toHaveBeenCalledWith(agent, 'turn-1');
     expect(resumeConversation).toHaveBeenCalledWith(agent, ref);
     expect(forgetAgentSession).toHaveBeenCalledWith('agent-dina');
+    expect(respondToRequest).toHaveBeenCalledWith({ id: 'approval-1', payload: { decision: 'allow' } });
   });
 
   it('returns undefined for methods outside the driver RPC surface', async () => {

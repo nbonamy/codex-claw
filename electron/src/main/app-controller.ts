@@ -1,7 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import path from 'node:path';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
-import { ClawBackendProxyDriver } from './backend-proxy-driver';
 import { logMain, warnMain } from './log';
 import { createMainWindow } from './main-window';
 import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-permissions';
@@ -10,20 +9,15 @@ import {
   createEmptySnapshot,
 } from './snapshot-service';
 import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from './backend-process-client';
-import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
-import type { AgentBackendDriver } from './backends/types';
-import { backendDisplayName } from './backends/types';
 
 type ClawBackendClientPort = Pick<ClawBackendProcessClient, 'start' | 'health' | 'request' | 'onEvent' | 'close'>;
 
 export class AppController {
   private mainWindow: BrowserWindow | null = null;
   private snapshot = createEmptySnapshot();
-  private readonly backendDrivers = new Map<AgentBackend, AgentBackendDriver>();
-  private readonly backendDriverEventUnsubscribes = new Map<AgentBackend, () => void>();
   private backendClientEventUnsubscribe: (() => void) | null = null;
-  private readonly clientRequestBackends = new Map<string, AgentBackend>();
   private seq = 0;
 
   private readonly powerSaveBlocker = new AgentActivityPowerSaveBlocker();
@@ -289,14 +283,7 @@ export class AppController {
     });
 
     ipcMain.handle(ipcChannels.respondToClientRequest, async (_event, response: ClientRequestResponse) => {
-      const backend = this.clientRequestBackends.get(response.id);
-      if (!backend) {
-        throw new Error(`No backend owns client request '${response.id}'.`);
-      }
-
-      await (await this.getBackendDriver(backend)).respondToRequest(response);
-      this.clientRequestBackends.delete(response.id);
-      return this.snapshot;
+      return this.respondToClientRequest(response);
     });
   }
 
@@ -308,12 +295,7 @@ export class AppController {
     this.powerSaveBlocker.stop();
     this.backendClientEventUnsubscribe?.();
     this.backendClientEventUnsubscribe = null;
-    for (const unsubscribe of this.backendDriverEventUnsubscribes.values()) {
-      unsubscribe();
-    }
-    this.backendDriverEventUnsubscribes.clear();
     await this.backendClient?.close();
-    await Promise.all([...this.backendDrivers.values()].map((driver) => driver.close()));
   }
 
   private async initializeBackendClient(): Promise<void> {
@@ -662,19 +644,8 @@ export class AppController {
     await this.requireBackendClient().request('agent/validateFolder', { folder });
   }
 
-  private async getBackendDriver(backend: AgentBackend): Promise<AgentBackendDriver> {
-    const existingDriver = this.backendDrivers.get(backend);
-    if (existingDriver) {
-      return existingDriver;
-    }
-
-    if (!this.backendClient) {
-      throw new Error(`${backendDisplayName(backend)} backend is not connected.`);
-    }
-
-    const driver = new ClawBackendProxyDriver(backend, this.backendClient);
-    this.backendDrivers.set(backend, driver);
-    return driver;
+  private async respondToClientRequest(response: ClientRequestResponse): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('clientRequest/respond', { response }));
   }
 
   private emitAndApply(
@@ -689,7 +660,6 @@ export class AppController {
       fullEvent.backend = this.snapshot.agents.find((agent) => agent.id === fullEvent.agentId)?.backend;
     }
 
-    this.recordClientRequestOwner(fullEvent);
     applyMainEventToSnapshot(this.snapshot, fullEvent);
     this.syncPowerSaveBlocker();
     this.mainWindow?.webContents.send(ipcChannels.event, fullEvent);
@@ -766,21 +736,6 @@ export class AppController {
     });
   }
 
-  private recordClientRequestOwner(event: MainToRendererEvent): void {
-    if (event.type !== 'approval.requested' && event.type !== 'toolInput.requested') {
-      return;
-    }
-
-    const request = clientRequest(event.payload);
-    if (!request) {
-      return;
-    }
-
-    const backend = event.backend ?? (event.agentId ? this.snapshot.agents.find((agent) => agent.id === event.agentId)?.backend : undefined);
-    if (backend) {
-      this.clientRequestBackends.set(request.id, backend);
-    }
-  }
 }
 
 export function startMainApp(): void {
@@ -807,22 +762,6 @@ export function startMainApp(): void {
       controller.createWindow();
     }
   });
-}
-
-function clientRequest(value: unknown): ClientRequest | null {
-  if (
-    !value ||
-    typeof value !== 'object' ||
-    Array.isArray(value) ||
-    !('id' in value) ||
-    !('kind' in value) ||
-    typeof value.id !== 'string' ||
-    (value.kind !== 'confirm_tool' && value.kind !== 'ask_user')
-  ) {
-    return null;
-  }
-
-  return value as ClientRequest;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

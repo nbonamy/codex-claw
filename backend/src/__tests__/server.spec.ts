@@ -109,6 +109,80 @@ describe('ClawBackendServer', () => {
     });
   });
 
+  it('owns client request response routing', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'working' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    let emitEvent: (event: BackendEvent) => void = () => undefined;
+    const respondToRequest = vi.fn().mockResolvedValue(undefined);
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest,
+      onEvent: (listener) => {
+        emitEvent = listener;
+        return () => undefined;
+      },
+      close: async () => undefined,
+    };
+    const events: unknown[] = [];
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      onEvent: (event) => events.push(event),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'unknown-response',
+      method: 'clientRequest/respond',
+      params: { response: { id: 'approval-missing', payload: { decision: 'allow' } } },
+    })).resolves.toMatchObject({
+      error: {
+        message: "No backend owns client request 'approval-missing'.",
+      },
+    });
+
+    emitEvent({
+      agentId: 'agent-dina',
+      type: 'approval.requested',
+      payload: {
+        id: 'approval-1',
+        kind: 'confirm_tool',
+        payload: { confirmation: { id: 'tool-1', title: 'Run tool', command: 'npm test' } },
+      },
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'known-response',
+      method: 'clientRequest/respond',
+      params: { response: { id: 'approval-1', payload: { decision: 'allow' } } },
+    })).resolves.toMatchObject({
+      result: snapshot,
+    });
+
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'approval.requested', agentId: 'agent-dina' }),
+    ]));
+    expect(respondToRequest).toHaveBeenCalledWith({ id: 'approval-1', payload: { decision: 'allow' } });
+    await server.close();
+  });
+
   it('persists backend-owned snapshot changes for stateful events', async () => {
     const snapshot = createTestSnapshot();
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);

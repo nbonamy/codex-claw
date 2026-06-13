@@ -129,7 +129,7 @@ export class BackendDriverRpc {
         const { agent } = requireAgentParams(params);
         return this.requireDriver(agent.backend).interrupt(agent);
       }
-      case 'agent/respondToClientRequest': {
+      case 'driver/respondToClientRequest': {
         const record = requireRecord(params);
         const backend = requireBackend(record.backend);
         await this.requireDriver(backend).respondToRequest(record.response as never);

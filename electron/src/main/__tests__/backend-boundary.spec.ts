@@ -11,7 +11,8 @@ describe('Electron backend boundary', () => {
     expect(source).not.toMatch(/from ['"]\.\/claude\//);
     expect(source).not.toContain('new CodexBackendDriver');
     expect(source).not.toContain('new ClaudeBackendDriver');
-    expect(source).toContain('ClawBackendProxyDriver');
+    expect(source).not.toContain('ClawBackendProxyDriver');
+    expect(source).toContain('createRuntimeClawBackendClient');
   });
 
   it('keeps provider implementation directories out of Electron main', async () => {

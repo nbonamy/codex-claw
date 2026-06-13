@@ -196,14 +196,11 @@ Modules:
 - `ClawBackendProcessClient`: starts the local `clawd` command, frames
   JSON-RPC over stdio, tracks request IDs/timeouts, restarts the dev backend
   bundle, and exposes app-owned requests to main-process callers.
-- `ClawBackendProxyDriver`: temporary adapter that implements the shared
-  `AgentBackendDriver` shape by forwarding every provider operation to
-  `clawd`. This keeps existing app-controller code working while provider
-  ownership moves out of Electron main.
-- `AppController`: still owns too much product orchestration during the
-  migration, but team mutations and loop CRUD/runs now proxy to `clawd`. Each
-  new slice should move product state and backend-owned operations to `clawd`,
-  leaving only desktop effects and IPC routing here.
+- `AppController`: desktop IPC and native-affordance adapter. Product state,
+  provider operations, client request ownership, durable snapshot persistence,
+  loops, work integrations, git/file/source operations, and transcription
+  belong in `clawd`; Electron forwards app-owned RPC requests and fans backend
+  events to renderer windows.
 
 Future transport options:
 
