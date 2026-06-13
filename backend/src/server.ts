@@ -11,6 +11,7 @@ export type ClawBackendServerOptions = {
   snapshot?: AppSnapshot;
   driverRpc?: BackendDriverRpc;
   onEvent?: (event: ClawBackendEvent) => void;
+  saveSnapshot?: (snapshot: AppSnapshot) => Promise<void>;
 };
 
 export class ClawBackendServer {
@@ -19,6 +20,7 @@ export class ClawBackendServer {
   private readonly snapshot: AppSnapshot;
   private readonly driverRpc?: BackendDriverRpc;
   private readonly onEvent?: (event: ClawBackendEvent) => void;
+  private readonly saveSnapshot?: (snapshot: AppSnapshot) => Promise<void>;
   private unsubscribeDriverEvents?: () => void;
   private lastEventSeq = 0;
 
@@ -28,6 +30,7 @@ export class ClawBackendServer {
     this.snapshot = options.snapshot ?? createEmptySnapshot();
     this.driverRpc = options.driverRpc;
     this.onEvent = options.onEvent;
+    this.saveSnapshot = options.saveSnapshot;
     this.unsubscribeDriverEvents = this.driverRpc?.onEvent((event) => this.handleBackendEvent(event));
   }
 
@@ -85,5 +88,19 @@ export class ClawBackendServer {
       occurredAt: event.occurredAt ?? new Date().toISOString(),
       payload: event.payload,
     });
+    if (shouldPersistSnapshotForEvent(event)) {
+      void this.saveSnapshot?.(this.snapshot);
+    }
   }
+}
+
+function shouldPersistSnapshotForEvent(event: BackendEvent): boolean {
+  return event.type === 'agent.updated' ||
+    event.type === 'snapshot.updated' ||
+    event.type === 'workBacklog.assignmentUpdated' ||
+    event.type === 'thread.started' ||
+    event.type === 'thread.settingsUpdated' ||
+    event.type === 'thread.tokenUsageUpdated' ||
+    event.type === 'turn.planUpdated' ||
+    event.type === 'turn.proposedPlanCompleted';
 }

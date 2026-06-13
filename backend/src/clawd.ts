@@ -3,7 +3,7 @@ import { createClawRpcNotification } from '@codex-claw/shared/backend-protocol/r
 import { BackendDriverRpc, createDefaultBackendDrivers } from './driver-rpc';
 import { ClawMcpService } from './mcp/service';
 import { ClawBackendServer } from './server';
-import { loadBackendSnapshot } from './state';
+import { loadBackendSnapshot, saveBackendSnapshot } from './state';
 import { startStdioRpcServer } from './stdio';
 
 export const CLAWD_VERSION = '0.1.0';
@@ -15,7 +15,8 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   }
 
   if (argv.includes('--stdio')) {
-    const snapshot = await loadBackendSnapshot(readArgValue(argv, '--state-dir'));
+    const stateDir = readArgValue(argv, '--state-dir');
+    const snapshot = await loadBackendSnapshot(stateDir);
     const mcpService = new ClawMcpService({ snapshot });
     const mcpServerUrl = await mcpService.start();
     const driverRpc = new BackendDriverRpc(createDefaultBackendDrivers({
@@ -28,6 +29,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       onEvent: (event) => {
         process.stdout.write(`${JSON.stringify(createClawRpcNotification('backend/event', event))}\n`);
       },
+      saveSnapshot: (nextSnapshot) => saveBackendSnapshot(stateDir, nextSnapshot),
     });
     mcpService.setDriverRpc(driverRpc);
     mcpService.setEventSink((event) => server.emitEvent(event));

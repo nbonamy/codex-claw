@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { AppSnapshot } from '@codex-claw/shared/contracts';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/shared/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
@@ -103,6 +103,36 @@ describe('ClawBackendServer', () => {
         lastEventSeq: 1,
       },
     });
+  });
+
+  it('persists backend-owned snapshot changes for stateful events', async () => {
+    const snapshot = createTestSnapshot();
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+    });
+
+    server.emitEvent({
+      agentId: 'agent-dina',
+      type: 'snapshot.updated',
+      payload: snapshot,
+    });
+    server.emitEvent({
+      agentId: 'agent-dina',
+      type: 'sidePanel.markdownRequested',
+      payload: {
+        kind: 'markdown',
+        title: 'Readme',
+        content: '# Readme',
+      },
+    });
+    await Promise.resolve();
+
+    expect(saveSnapshot).toHaveBeenCalledOnce();
+    expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
   });
 });
 
