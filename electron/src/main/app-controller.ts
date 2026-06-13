@@ -95,6 +95,10 @@ export class AppController {
       return this.listSourceRepositories();
     });
 
+    ipcMain.handle(ipcChannels.listSourceWorktrees, async (_event, repoPath: string) => {
+      return this.listSourceWorktrees(repoPath);
+    });
+
     ipcMain.handle(ipcChannels.suggestSourceWorktreePath, async (_event, input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>) => {
       return this.suggestSourceWorktreePath(input);
     });
@@ -558,6 +562,10 @@ export class AppController {
 
   private async listSourceRepositories(): Promise<SourceRepository[]> {
     return this.requireBackendClient().request('source/listRepositories');
+  }
+
+  private async listSourceWorktrees(repoPath: string): Promise<SourceWorktree[]> {
+    return this.requireBackendClient().request('source/listWorktrees', { repoPath });
   }
 
   private async suggestSourceWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>): Promise<string> {

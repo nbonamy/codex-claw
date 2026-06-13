@@ -19,6 +19,7 @@ const api: CodexClawApi = {
   chooseAgentFolder: () => ipcRenderer.invoke(ipcChannels.chooseAgentFolder),
   chooseSourceFolder: () => ipcRenderer.invoke(ipcChannels.chooseSourceFolder),
   listSourceRepositories: () => ipcRenderer.invoke(ipcChannels.listSourceRepositories),
+  listSourceWorktrees: (repoPath: string) => ipcRenderer.invoke(ipcChannels.listSourceWorktrees, repoPath),
   suggestSourceWorktreePath: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>) => ipcRenderer.invoke(ipcChannels.suggestSourceWorktreePath, input),
   chooseSourceWorktreeDestination: (defaultPath: string) => ipcRenderer.invoke(ipcChannels.chooseSourceWorktreeDestination, defaultPath),
   createSourceWorktree: (input: CreateSourceWorktreeInput) => ipcRenderer.invoke(ipcChannels.createSourceWorktree, input),

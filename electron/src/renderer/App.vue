@@ -28,6 +28,7 @@
     :source-repositories="sourceRepositories"
     :choose-agent-folder="chooseAgentFolder"
     :choose-source-folder="chooseSourceFolder"
+    :list-source-worktrees="listSourceWorktrees"
     :suggest-source-worktree-path="suggestSourceWorktreePath"
     :choose-source-worktree-destination="chooseSourceWorktreeDestination"
     :create-source-worktree="createSourceWorktree"
@@ -127,6 +128,7 @@ const {
   loadSnapshot,
   chooseAgentFolder,
   chooseSourceFolder,
+  listSourceWorktrees,
   suggestSourceWorktreePath,
   chooseSourceWorktreeDestination,
   createSourceWorktree,

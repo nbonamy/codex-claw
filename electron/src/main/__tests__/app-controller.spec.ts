@@ -143,6 +143,23 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('source/listRepositories', undefined);
   });
 
+  it('routes source worktree listing through clawd', async () => {
+    const snapshot = createInitialSnapshot();
+    const worktrees: SourceWorktree[] = [
+      { name: 'main', path: '/Users/nbonamy/src/codex-claw' },
+      { name: 'backend-split', path: '/Users/nbonamy/src/codex-claw-backend-split' },
+    ];
+    const request = vi.fn().mockResolvedValueOnce(worktrees);
+    const controller = new AppController(snapshot, createBackendClient({ request }));
+
+    await controller.initialize();
+
+    await expect(listSourceWorktrees(controller, '/Users/nbonamy/src/codex-claw')).resolves.toStrictEqual(worktrees);
+    expect(request).toHaveBeenCalledWith('source/listWorktrees', {
+      repoPath: '/Users/nbonamy/src/codex-claw',
+    });
+  });
+
   it('routes source worktree creation through clawd', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder = {
@@ -1187,6 +1204,12 @@ async function listSourceRepositories(controller: AppController): Promise<Source
   return (controller as unknown as {
     listSourceRepositories(): Promise<SourceRepository[]>;
   }).listSourceRepositories();
+}
+
+async function listSourceWorktrees(controller: AppController, repoPath: string): Promise<SourceWorktree[]> {
+  return (controller as unknown as {
+    listSourceWorktrees(repoPath: string): Promise<SourceWorktree[]>;
+  }).listSourceWorktrees(repoPath);
 }
 
 async function createSourceWorktree(

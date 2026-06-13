@@ -200,6 +200,7 @@
       :choose-source-worktree-destination="chooseSourceWorktreeDestination"
       :create-agent="createAgentFromDialog"
       :create-source-worktree="createSourceWorktree"
+      :list-source-worktrees="listSourceWorktrees"
       :suggest-source-worktree-path="suggestSourceWorktreePath"
       :initial-new-team-name="pendingNewAgentTeamName"
       :initial-team-id="agentDialogTeamId"
@@ -288,6 +289,7 @@ const props = withDefaults(defineProps<{
   chooseAgentFolder?: () => Promise<string | null>;
   chooseSourceFolder?: () => Promise<string | null>;
   sourceRepositories?: SourceRepository[];
+  listSourceWorktrees?: (repoPath: string) => Promise<SourceWorktree[]>;
   suggestSourceWorktreePath?: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>) => Promise<string>;
   chooseSourceWorktreeDestination?: (defaultPath: string) => Promise<string | null>;
   createSourceWorktree?: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;

@@ -145,8 +145,11 @@ describe('Electron backend boundary', () => {
     const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
     const source = await readFile(appControllerPath, 'utf8');
 
+    expect(source).toContain("request('source/listWorktrees'");
     expect(source).toContain("request('source/suggestWorktreePath'");
     expect(source).toContain("request<SourceWorktree>('source/createWorktree'");
+    expect(source).not.toContain('git worktree');
+    expect(source).not.toContain('worktree list');
     expect(source).not.toContain('path.dirname');
     expect(source).not.toContain('path.join');
     expect(source).not.toContain('suggestedName');

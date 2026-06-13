@@ -280,6 +280,38 @@ describe('AgentDialog', () => {
     });
   });
 
+  it('loads selected repository worktrees through the backend list action', async () => {
+    const createAgent = vi.fn().mockResolvedValue(undefined);
+    const listSourceWorktrees = vi.fn().mockResolvedValue([
+      { name: 'main', path: '/Users/nbonamy/src/codex-claw' },
+      { name: 'backend-split', path: '/Users/nbonamy/src/codex-claw-backend-split' },
+    ] satisfies SourceWorktree[]);
+    const wrapper = mountDialog({
+      createAgent,
+      listSourceWorktrees,
+      sourceFolderPath: '~/src',
+      sourceRepositories: [{
+        name: 'codex-claw',
+        path: '/Users/nbonamy/src/codex-claw',
+        worktrees: [{ name: 'stale-scan-result', path: '/Users/nbonamy/src/codex-claw-stale' }],
+      }],
+    });
+
+    await flushPromises();
+
+    expect(listSourceWorktrees).toHaveBeenCalledWith('/Users/nbonamy/src/codex-claw');
+    expect(wrapper.get<HTMLInputElement>('.agent-dialog__resolved-path-input').element.value).toBe('/Users/nbonamy/src/codex-claw');
+    await wrapper.findAllComponents({ name: 'ElSelect' })[2]?.vm.$emit('update:modelValue', '/Users/nbonamy/src/codex-claw-backend-split');
+    await nextTick();
+    await saveButton(wrapper).trigger('click');
+
+    expect(createAgent).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'codex-claw-backend-split',
+      folder: '/Users/nbonamy/src/codex-claw-backend-split',
+      sourceRepositoryName: 'codex-claw',
+    }));
+  });
+
   it('creates and selects a new source worktree from the dialog', async () => {
     const createAgent = vi.fn().mockResolvedValue(undefined);
     const createSourceWorktree = vi.fn().mockResolvedValue({
@@ -324,6 +356,7 @@ function mountDialog(overrides: Partial<{
   chooseSourceWorktreeDestination: (defaultPath: string) => Promise<string | null>;
   createAgent: (input: CreateAgentInput & { newTeamName?: string; teamId?: string }) => Promise<void>;
   createSourceWorktree: (input: { repoPath: string; branchName: string; destinationPath?: string }) => Promise<SourceWorktree>;
+  listSourceWorktrees: (repoPath: string) => Promise<SourceWorktree[]>;
   initialNewTeamName: string;
   initialTeamId: string | null;
   mode: 'create' | 'edit';

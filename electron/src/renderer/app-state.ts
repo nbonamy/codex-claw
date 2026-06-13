@@ -332,6 +332,14 @@ export function useAppState() {
     }
   }
 
+  async function listSourceWorktrees(repoPath: string): Promise<SourceWorktree[]> {
+    if (!window.codexClaw?.listSourceWorktrees) {
+      return [];
+    }
+
+    return window.codexClaw.listSourceWorktrees(repoPath);
+  }
+
   async function previewAgentFile(agentId: string, filePath: string): Promise<AgentFilePreviewResult> {
     if (!window.codexClaw?.previewAgentFile) {
       throw new Error('File preview is not available.');
@@ -897,6 +905,7 @@ export function useAppState() {
     loadSnapshot,
     chooseAgentFolder,
     chooseSourceFolder,
+    listSourceWorktrees,
     suggestSourceWorktreePath,
     chooseSourceWorktreeDestination,
     createSourceWorktree,

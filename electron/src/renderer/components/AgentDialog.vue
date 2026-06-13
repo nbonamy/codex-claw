@@ -349,6 +349,7 @@ export type AgentDialogCreateInput = CreateAgentInput & {
 const props = withDefaults(defineProps<{
   agent: Agent | null;
   chooseAgentFolder: () => Promise<string | null>;
+  listSourceWorktrees?: (repoPath: string) => Promise<SourceWorktree[]>;
   suggestSourceWorktreePath?: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>) => Promise<string>;
   chooseSourceWorktreeDestination?: (defaultPath: string) => Promise<string | null>;
   createAgent: (input: AgentDialogCreateInput) => Promise<Agent | null | void>;
@@ -395,6 +396,8 @@ const selectedSourceRepositoryPath = ref('');
 const selectedSourceWorktreePath = ref('');
 const repositoryControlValue = ref(customFolderOptionValue);
 const createdSourceWorktree = ref<SourceWorktree | null>(null);
+const listedSourceWorktrees = ref<SourceWorktree[]>([]);
+const listedSourceWorktreesRepoPath = ref('');
 const newSourceWorktreeDialogVisible = ref(false);
 
 type BackendOption = {
@@ -437,7 +440,9 @@ const showTeamSelector = computed(() => props.showTeamField && !isEditing.value)
 const sourceRepositories = computed(() => props.sourceRepositories ?? []);
 const selectedSourceRepository = computed(() => sourceRepositories.value.find((repository) => repository.path === selectedSourceRepositoryPath.value) ?? null);
 const selectedSourceWorktrees = computed(() => {
-  const worktrees = selectedSourceRepository.value?.worktrees ?? [];
+  const worktrees = listedSourceWorktreesRepoPath.value === selectedSourceRepositoryPath.value
+    ? listedSourceWorktrees.value
+    : selectedSourceRepository.value?.worktrees ?? [];
   const created = createdSourceWorktree.value;
   if (!created || worktrees.some((worktree) => worktree.path === created.path)) {
     return worktrees;
@@ -499,19 +504,49 @@ async function selectRepositoryControl(value: string): Promise<void> {
     return;
   }
 
-  selectSourceRepository(value);
+  await selectSourceRepository(value);
 }
 
-function selectSourceRepository(repoPath: string): void {
+async function selectSourceRepository(repoPath: string): Promise<void> {
   selectedSourceRepositoryPath.value = repoPath;
   repositoryControlValue.value = repoPath;
   createdSourceWorktree.value = null;
+  listedSourceWorktrees.value = [];
+  listedSourceWorktreesRepoPath.value = '';
   const worktree = selectedSourceRepository.value?.worktrees[0];
   if (worktree) {
     selectSourceWorktree(worktree.path);
   } else {
     selectedSourceWorktreePath.value = '';
     folder.value = '';
+  }
+  await loadSelectedSourceWorktrees(repoPath);
+}
+
+async function loadSelectedSourceWorktrees(repoPath: string): Promise<void> {
+  if (!props.listSourceWorktrees) {
+    return;
+  }
+
+  try {
+    const worktrees = await props.listSourceWorktrees(repoPath);
+    if (selectedSourceRepositoryPath.value !== repoPath) {
+      return;
+    }
+    listedSourceWorktrees.value = worktrees;
+    listedSourceWorktreesRepoPath.value = repoPath;
+    if (!worktrees.some((worktree) => worktree.path === selectedSourceWorktreePath.value)) {
+      const firstWorktree = worktrees[0];
+      if (firstWorktree) {
+        selectSourceWorktree(firstWorktree.path);
+      } else {
+        selectedSourceWorktreePath.value = '';
+        folder.value = '';
+      }
+    }
+  } catch {
+    listedSourceWorktrees.value = [];
+    listedSourceWorktreesRepoPath.value = '';
   }
 }
 
@@ -644,9 +679,11 @@ function resetForm(): void {
   selectedSourceWorktreePath.value = '';
   repositoryControlValue.value = customFolderOptionValue;
   createdSourceWorktree.value = null;
+  listedSourceWorktrees.value = [];
+  listedSourceWorktreesRepoPath.value = '';
   newSourceWorktreeDialogVisible.value = false;
   if (preferredRepositoryPath) {
-    selectSourceRepository(preferredRepositoryPath);
+    void selectSourceRepository(preferredRepositoryPath);
   }
 }
 

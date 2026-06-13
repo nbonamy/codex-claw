@@ -150,9 +150,10 @@ typed app APIs; they never scan arbitrary folders or spawn git directly.
 
 The renderer uses source repositories only as creation affordances: Settings
 chooses or clears the source folder, the agent dialog can pick a discovered
-repo/worktree or browse another folder, and new worktree creation can feed back
-into agent creation. The Claw MCP server exposes the same app-owned operations
-with `list-repos`, `list-worktrees`, `create-worktree`, and `create-agent`.
+repo, asks `clawd` for that repo's explicit worktree list, or browses another
+folder, and new worktree creation can feed back into agent creation. The Claw
+MCP server exposes the same app-owned operations with `list-repos`,
+`list-worktrees`, `create-worktree`, and `create-agent`.
 
 ## Process Architecture
 

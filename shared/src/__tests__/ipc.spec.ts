@@ -20,6 +20,7 @@ describe('ipc channels', () => {
       chooseAgentFolder: 'agent:choose-folder',
       chooseSourceFolder: 'source-folder:choose',
       listSourceRepositories: 'source-folder:repositories:list',
+      listSourceWorktrees: 'source-folder:worktrees:list',
       suggestSourceWorktreePath: 'source-folder:worktree-path:suggest',
       chooseSourceWorktreeDestination: 'source-folder:worktree-destination:choose',
       createSourceWorktree: 'source-folder:worktree:create',

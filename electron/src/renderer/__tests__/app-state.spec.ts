@@ -214,6 +214,10 @@ describe('useAppState', () => {
       }],
     }];
     const listSourceRepositories = vi.fn().mockResolvedValue(repositories);
+    const listSourceWorktrees = vi.fn().mockResolvedValue([
+      { name: 'main', path: '/Users/nbonamy/src/codex-claw' },
+      { name: 'source-folder', path: '/Users/nbonamy/src/codex-claw-source-folder' },
+    ]);
     const createSourceWorktree = vi.fn().mockResolvedValue({
       name: 'source-folder',
       path: '/Users/nbonamy/src/codex-claw-source-folder',
@@ -222,6 +226,7 @@ describe('useAppState', () => {
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         listSourceRepositories,
+        listSourceWorktrees,
         createSourceWorktree,
         onEvent: vi.fn(),
       } satisfies Partial<CodexClawApi>,
@@ -232,6 +237,10 @@ describe('useAppState', () => {
 
     expect(state.sourceRepositoryStatus.value).toBe('loaded');
     expect(state.sourceRepositories.value).toStrictEqual(repositories);
+    await expect(state.listSourceWorktrees('/Users/nbonamy/src/codex-claw')).resolves.toStrictEqual([
+      { name: 'main', path: '/Users/nbonamy/src/codex-claw' },
+      { name: 'source-folder', path: '/Users/nbonamy/src/codex-claw-source-folder' },
+    ]);
 
     await expect(state.createSourceWorktree({
       repoPath: '/Users/nbonamy/src/codex-claw',
@@ -258,6 +267,7 @@ describe('useAppState', () => {
       repoPath: '/Users/nbonamy/src/codex-claw',
       branchName: 'feature/source-folder',
     })).resolves.toBe('');
+    await expect(state.listSourceWorktrees('/Users/nbonamy/src/codex-claw')).resolves.toStrictEqual([]);
     await expect(state.chooseSourceWorktreeDestination('/Users/nbonamy/src/codex-claw-source-folder')).resolves.toBeNull();
     await expect(state.createSourceWorktree({
       repoPath: '/Users/nbonamy/src/codex-claw',
