@@ -59,6 +59,99 @@ security tradeoff, not a mechanical build tweak.
   window management, menus, shortcuts, notifications, and OS-specific UI
   affordances remain in Electron main.
 
+## Repository Layout
+
+The backend extraction should include a repo reorganization. The root should
+become a small npm workspace monorepo, not the Electron app package.
+
+Recommended top-level shape:
+
+```text
+codex-claw/
+  package.json
+  package-lock.json
+  tsconfig.base.json
+  docs/
+  shared/
+    package.json
+    src/
+  backend/
+    package.json
+    src/
+  electron/
+    package.json
+    forge.config.ts
+    src/
+      main/
+      preload/
+      renderer/
+    assets/
+    build/
+```
+
+Use npm workspaces because the repo already uses npm and lockfile v3. Do not
+switch package managers as part of this reorg.
+
+Root `package.json` should be private and orchestration-only:
+
+```json
+{
+  "name": "codex-claw",
+  "private": true,
+  "workspaces": ["shared", "backend", "electron"],
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:electron": "npm run dev -w @codex-claw/electron",
+    "dev:backend": "npm run dev -w @codex-claw/backend",
+    "dev:backend:run": "npm run dev:run -w @codex-claw/backend",
+    "build": "npm run build -ws",
+    "typecheck": "npm run typecheck -ws",
+    "lint": "npm run lint -ws",
+    "test": "npm run test -ws",
+    "package": "npm run package -w @codex-claw/electron"
+  }
+}
+```
+
+Workspace package names:
+
+- `@codex-claw/shared`
+- `@codex-claw/backend`
+- `@codex-claw/electron`
+
+Package ownership:
+
+- `shared` contains app contracts, backend protocol types/schemas,
+  `RendererMessage`, IPC-facing DTOs, IDs, pure reducers, and pure helpers used
+  by both backend and Electron. It must not import Electron, Vue, filesystem,
+  child process, Codex app-server, Claude, or MCP implementation modules.
+- `backend` contains `clawd`, Codex/Claude drivers, MCP collaboration, loops,
+  git/files/source discovery, persistence, work integrations, and backend
+  protocol server/client implementations. It depends on `@codex-claw/shared`.
+- `electron` contains Electron Forge config, main, preload, renderer, desktop
+  adapters, native dialogs, packaged resources, app icons, and release
+  packaging. It depends on `@codex-claw/shared`; it should talk to the backend
+  through the app-owned backend protocol/client rather than importing backend
+  internals.
+
+Dependency rules:
+
+- `shared` has no dependency on `backend` or `electron`.
+- `backend` may depend on `shared`, never on `electron`.
+- `electron` may depend on `shared`, but should not depend on `backend` at the
+  source-code level. In development it may spawn `backend`'s built `clawd`
+  artifact, and in release it may package the backend executable or bundled
+  script as a resource.
+- Cross-package imports should use package names such as
+  `@codex-claw/shared`, not deep relative paths across workspace boundaries.
+- TypeScript should use a root `tsconfig.base.json` plus package-level
+  `tsconfig.json` files. Package references are useful once the first move is
+  stable, but the first reorg can keep build wiring simple if needed.
+
+This layout makes the process boundary visible in the filesystem. Root is the
+product monorepo; `electron` is one client/runtime; `backend` is the product
+backend; `shared` is the only compile-time contract bridge.
+
 ## Source Facts
 
 - Codex app-server supports multiple transports today: stdio JSONL, an
@@ -295,9 +388,9 @@ Target commands:
 {
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "dev:electron": "electron-forge start",
-    "dev:backend": "vite build --config vite.backend.config.ts --watch",
-    "dev:backend:run": "node scripts/run-backend-dev.mjs"
+    "dev:electron": "npm run dev -w @codex-claw/electron",
+    "dev:backend": "npm run dev -w @codex-claw/backend",
+    "dev:backend:run": "npm run dev:run -w @codex-claw/backend"
   }
 }
 ```
@@ -305,15 +398,14 @@ Target commands:
 The exact script names can change, but the shape should stay:
 
 - `npm run dev` remains the normal entrypoint for app development.
-- `dev:electron` keeps the current Electron Forge/Vite flow.
-- `dev:backend` watches `src/backend-core`, `src/backend-protocol`, and
-  `src/clawd`, then writes a bundled file such as
-  `.vite/backend/clawd-dev.mjs`.
-- `dev:backend:run` supervises `node .vite/backend/clawd-dev.mjs --stdio
+- `dev:electron` runs the `electron` workspace's Electron Forge/Vite flow.
+- `dev:backend` watches `backend/src` and `shared/src`, then writes a bundled
+  file such as `backend/dist/clawd-dev.mjs`.
+- `dev:backend:run` supervises `node backend/dist/clawd-dev.mjs --stdio
   --state-dir <repo>/.codex-claw-dev/state`.
 - Electron main receives the dev backend command from config or environment,
   for example `CODEX_CLAW_BACKEND_COMMAND=node` and
-  `CODEX_CLAW_BACKEND_ARGS=.vite/backend/clawd-dev.mjs,--stdio,...`.
+  `CODEX_CLAW_BACKEND_ARGS=../backend/dist/clawd-dev.mjs,--stdio,...`.
 
 Hot reload semantics:
 
@@ -348,14 +440,13 @@ Recommended build pipeline:
 1. Typecheck the app:
 
    ```bash
-   vue-tsc --noEmit
-   tsc --noEmit
+   npm run typecheck -ws
    ```
 
 2. Bundle `clawd` from TypeScript into a standalone Node script:
 
    ```bash
-   vite build --config vite.backend.config.ts
+   npm run build -w @codex-claw/backend
    ```
 
    The bundle should have no `electron` imports, should bundle normal
@@ -376,7 +467,7 @@ Recommended build pipeline:
 4. Put the chosen backend runtime under Electron resources, for example:
 
    ```text
-   resources/
+   electron/resources/
      clawd/
        clawd-macos-arm64
        clawd-macos-x64
@@ -601,12 +692,18 @@ Goal: make the backend boundary real without adding a process boundary.
 
 Work:
 
-- Add a `src/backend-core` module with no `electron` imports.
+- Create the npm workspace layout: `shared`, `backend`, and `electron`.
+- Move the current Electron app package into `electron/` while preserving the
+  existing Forge/Vite behavior.
+- Move shared contracts and pure helpers from `src/shared` into
+  `shared/src`.
+- Add backend core modules under `backend/src` with no `electron` imports.
 - Define a `ClawCore` interface shaped around app-owned requests and events.
 - Move snapshot ownership, backend driver registry, MCP server ownership,
   loop runner/scheduler, source repository scanning, file/git services, and
   work-provider orchestration behind that interface incrementally.
-- Replace direct `AppController` mutation paths with calls into the core.
+- Replace direct Electron `AppController` mutation paths with calls into the
+  backend core.
 - Keep Electron main responsible for dialogs, open-external, app quit,
   system permissions, transcription, window state, and renderer IPC.
 
@@ -614,11 +711,14 @@ Tests:
 
 - Unit-test core request handlers without Electron.
 - Keep existing `AppController` tests passing by injecting an in-process core.
-- Add seam tests proving no backend-core file imports `electron`.
+- Add seam tests proving no `backend/src` or `shared/src` file imports
+  `electron`.
 
 Commit checkpoints:
 
+- `chore: split repo into npm workspaces`
 - `feat: add backend core interface`
+- `feat: move shared contracts into workspace`
 - `feat: move snapshot ownership into backend core`
 - `feat: route agent backend operations through core`
 - `feat: route source file git and loop services through core`
@@ -629,8 +729,9 @@ Goal: make process communication testable while still running in-process.
 
 Work:
 
-- Add `src/backend-protocol` with JSON-RPC envelope types, request/event maps,
-  error codes, and schema validation.
+- Add shared protocol contracts under `shared/src/backend-protocol` with
+  JSON-RPC envelope types, request/event maps, error codes, and schema
+  validation.
 - Add an in-process transport/client adapter that speaks the same request names
   without serialization.
 - Move event sequence ownership into the core.
@@ -655,7 +756,7 @@ Goal: run the backend as a separate local process in development.
 
 Work:
 
-- Add `src/clawd` or `src/backend` entrypoint with `--stdio`, `--version`, and
+- Add `backend/src/clawd` entrypoint with `--stdio`, `--version`, and
   `--state-dir`.
 - Add newline-delimited JSON-RPC framing.
 - Add `ClawBackendProcessClient` in Electron main.
@@ -760,7 +861,7 @@ app-owned contracts.
 
 Required gates per slice:
 
-- `npm run lint` for TypeScript and CSS when code changes.
+- `npm run lint` from the root for workspace-wide TypeScript and CSS checks.
 - Focused Vitest suites for touched core, main, protocol, transport, or driver
   files.
 - `git diff --check` before handoff.
@@ -776,7 +877,7 @@ Coverage areas:
 - State migration and persistence.
 - Capability checks in the backend.
 - Codex/Claude driver behavior behind the core seam.
-- No Electron imports in backend core.
+- No Electron imports in `backend` or `shared`.
 - No provider protocol imports in renderer.
 
 Docs-only exploration, like this file, does not require Vitest. Run markdown
@@ -784,8 +885,6 @@ and diff hygiene checks instead.
 
 ## Open Questions
 
-- Do we want the new code root named `src/backend-core`, `src/core`, or
-  `src/clawd/core`?
 - Should the first stdio process run only in development until the packaging
   spike lands, or should it be enabled behind a local feature flag in packaged
   builds too?
@@ -801,10 +900,12 @@ and diff hygiene checks instead.
 
 ## Immediate Recommendation
 
-Start with Phase 1 and Phase 2. They reduce risk without forcing the packaging
-decision. Once Electron main talks to a `ClawBackendClient` and the backend core
-has no Electron imports, add stdio in Phase 3 and run the packaging spike with
-real evidence.
+Start with the workspace reorg, then Phase 1 and Phase 2. The reorg is the
+foundation: root becomes orchestration-only, `electron` stays the desktop
+client, `backend` becomes `clawd`, and `shared` becomes the only compile-time
+contract bridge. Once Electron main talks to a `ClawBackendClient` and the
+backend package has no Electron imports, add stdio in Phase 3 and run the
+packaging spike with real evidence.
 
 The first hard decision after this document is packaging: Node SEA versus
 Electron utility process versus enabling `RunAsNode`. My recommendation is to
