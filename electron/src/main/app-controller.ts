@@ -34,7 +34,6 @@ export class AppController {
 
   async initialize(): Promise<void> {
     await this.initializeBackendClient();
-    await this.initializeSourceFolderIfNeeded();
     this.syncPowerSaveBlocker();
   }
 
@@ -567,34 +566,6 @@ export class AppController {
     });
 
     return result.canceled ? null : result.filePath ?? null;
-  }
-
-  private async initializeSourceFolderIfNeeded(): Promise<void> {
-    if (this.snapshot.sourceFolder.initialized) {
-      return;
-    }
-
-    if (!this.backendClient) {
-      return;
-    }
-
-    try {
-      const detected = await this.backendClient.request<string>('source/detectFolder');
-      const updatedSnapshot = await this.backendClient.request<unknown>('settings/update', {
-        input: {
-          sourceFolder: {
-            path: typeof detected === 'string' ? detected : '',
-          },
-        },
-      });
-      if (isAppSnapshot(updatedSnapshot)) {
-        this.adoptBackendSnapshot(updatedSnapshot);
-      }
-    } catch (error) {
-      warnMain('source-folder', 'failed to initialize through backend', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
   }
 
   private async listSourceRepositories(): Promise<SourceRepository[]> {

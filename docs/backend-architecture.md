@@ -76,7 +76,7 @@ Current implementation checkpoint:
   agent.
 - `clawd` now owns settings updates. Electron adopts the returned snapshot and
   applies desktop-only reactions such as power-save blocker changes.
-- `clawd` now owns source-folder initialization via `settings/update` and the
+- `clawd` now owns source-folder auto-detection, settings updates, and the
   recent-repository update after source worktree creation. Electron still owns
   native folder/save dialogs.
 - `clawd` now owns agent create/update/duplicate/move/reorder/close/select and

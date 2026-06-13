@@ -73,6 +73,7 @@ export class ClawBackendServer {
           pid: this.pid,
         });
       case 'snapshot/get':
+        await this.initializeSourceFolderIfNeeded();
         return createClawRpcResult(message.id, {
           snapshot: this.snapshot,
           lastEventSeq: this.lastEventSeq,
@@ -914,6 +915,24 @@ export class ClawBackendServer {
     }
 
     await this.requireDriverRpc().handle('agent/validateFolder', { folder });
+  }
+
+  private async initializeSourceFolderIfNeeded(): Promise<void> {
+    if (this.snapshot.sourceFolder.initialized || !this.driverRpc) {
+      return;
+    }
+
+    try {
+      const detected = await this.driverRpc.handle('source/detectFolder', undefined);
+      updateSettingsInSnapshot(this.snapshot, {
+        sourceFolder: {
+          path: typeof detected === 'string' ? detected : '',
+        },
+      });
+      await this.persistSnapshotOnly();
+    } catch {
+      // Source-folder detection is best effort; an explicit user setting can still initialize it.
+    }
   }
 
   private async setNewConversationTitle(agentId: string, wasNewSession: boolean): Promise<void> {

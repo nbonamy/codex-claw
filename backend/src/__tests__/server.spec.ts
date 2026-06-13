@@ -51,6 +51,40 @@ describe('ClawBackendServer', () => {
     });
   });
 
+  it('initializes source folder state from the backend when snapshots are requested', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.sourceFolder = { path: '', initialized: false, recentRepoNames: [] };
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const handle = vi.fn().mockResolvedValue('/Users/nbonamy/src');
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+      driverRpc: {
+        handle,
+        onEvent: vi.fn(() => () => undefined),
+        close: vi.fn().mockResolvedValue(undefined),
+      } as unknown as BackendDriverRpc,
+    });
+
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'snapshot', method: 'snapshot/get' })).resolves.toMatchObject({
+      result: {
+        snapshot: {
+          sourceFolder: {
+            path: '/Users/nbonamy/src',
+            initialized: true,
+            recentRepoNames: [],
+          },
+        },
+      },
+    });
+
+    expect(handle).toHaveBeenCalledWith('source/detectFolder', undefined);
+    expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
+    await server.close();
+  });
+
   it('returns method-not-found errors for unknown methods', async () => {
     const server = new ClawBackendServer({ version: 'test-version', pid: 123 });
 

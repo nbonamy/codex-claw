@@ -139,34 +139,6 @@ describe('AppController', () => {
     });
   });
 
-  it('routes source folder initialization through backend settings', async () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.sourceFolder.initialized = false;
-    const backendSnapshot = {
-      ...snapshot,
-      sourceFolder: {
-        path: '/Users/nbonamy/src',
-        initialized: true,
-        recentRepoNames: [],
-      },
-    };
-    const request = vi.fn()
-      .mockResolvedValueOnce('/Users/nbonamy/src')
-      .mockResolvedValueOnce(backendSnapshot);
-    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
-
-    await controller.initialize();
-
-    expect(request).toHaveBeenNthCalledWith(1, 'source/detectFolder', undefined);
-    expect(request).toHaveBeenNthCalledWith(2, 'settings/update', {
-      input: {
-        sourceFolder: {
-          path: '/Users/nbonamy/src',
-        },
-      },
-    });
-  });
-
   it('routes source worktree creation through clawd', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder = {

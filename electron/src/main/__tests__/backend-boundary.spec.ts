@@ -42,4 +42,11 @@ describe('Electron backend boundary', () => {
     expect(source).not.toContain('persistSnapshot');
     expect(source).toContain("request<unknown>('snapshot/get')");
   });
+
+  it('keeps source folder auto-detection in clawd', async () => {
+    const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
+    const source = await readFile(appControllerPath, 'utf8');
+
+    expect(source).not.toContain('source/detectFolder');
+  });
 });
