@@ -21,6 +21,7 @@ describe('AppController', () => {
     const backendClient = {
       start: vi.fn().mockResolvedValue(undefined),
       health: vi.fn().mockResolvedValue({ ok: true, name: 'clawd', version: '0.1.0', pid: 123 }),
+      request: vi.fn().mockResolvedValue({}),
       close: vi.fn().mockResolvedValue(undefined),
     };
     const controller = new AppController(persistence, undefined, backendClient);
@@ -1711,8 +1712,8 @@ function setCodexBackendDriver(
   backendDriver: AgentBackendDriver,
 ): void {
   (controller as unknown as {
-    codexBackendDriver: AgentBackendDriver;
-  }).codexBackendDriver = backendDriver;
+    backendDrivers: Map<string, AgentBackendDriver>;
+  }).backendDrivers.set('codex', backendDriver);
 }
 
 function setClaudeBackendDriver(
@@ -1720,8 +1721,8 @@ function setClaudeBackendDriver(
   backendDriver: AgentBackendDriver,
 ): void {
   (controller as unknown as {
-    claudeBackendDriver: AgentBackendDriver;
-  }).claudeBackendDriver = backendDriver;
+    backendDrivers: Map<string, AgentBackendDriver>;
+  }).backendDrivers.set('claude', backendDriver);
 }
 
 function setMainWindowSend(controller: AppController, send: ReturnType<typeof vi.fn>): void {

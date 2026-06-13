@@ -4,11 +4,7 @@ import path from 'node:path';
 import { listAgentFolderFiles } from './agent-files';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
 import { sendAgentPrompt, type SendAgentPromptHooks } from './agent-chat-service';
-import { ClaudeBackendDriver } from './claude/claude-driver';
-import { CodexAgentSessionManager } from './codex/agent-session';
-import { CodexBackendDriver } from './codex/codex-driver';
-import { CodexProcessTransport } from './codex/process-transport';
-import { CodexRpcClient } from './codex/rpc-client';
+import { ClawBackendProxyDriver } from './backend-proxy-driver';
 import { createSourceWorktree as createGitSourceWorktree } from './git-worktrees';
 import { logMain, warnMain } from './log';
 import { LoopRunner, type LoopPromptContext } from './loops/runner';
@@ -16,7 +12,6 @@ import { LoopScheduler } from './loops/scheduler';
 import { createMainWindow } from './main-window';
 import { ClawMcpAgentCoordinator } from './mcp/agent-coordinator';
 import { agentMessagesPrompt } from './mcp/agent-prompts';
-import { buildCodexClawMcpConfigOverrides } from './mcp/codex-config';
 import { ClawMcpHttpServer } from './mcp/http-server';
 import { detectSourceFolder, scanSourceRepositories } from './source-repositories';
 import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-permissions';
@@ -101,8 +96,7 @@ export class AppController {
   private mcpServer: ClawMcpHttpServer | null = null;
   private mcpServerUrl: string | null = null;
   private mcpServerStartPromise: Promise<string> | null = null;
-  private codexBackendDriver: CodexBackendDriver | null = null;
-  private claudeBackendDriver: ClaudeBackendDriver | null = null;
+  private readonly backendDrivers = new Map<AgentBackend, AgentBackendDriver>();
   private readonly clientRequestBackends = new Map<string, AgentBackend>();
   private seq = 0;
 
@@ -110,12 +104,12 @@ export class AppController {
   private readonly loopRunner: LoopRunner;
   private readonly loopScheduler: LoopScheduler;
   private readonly powerSaveBlocker = new AgentActivityPowerSaveBlocker();
-  private readonly backendClient: Pick<ClawBackendProcessClient, 'start' | 'health' | 'close'> | null;
+  private readonly backendClient: Pick<ClawBackendProcessClient, 'start' | 'health' | 'request' | 'close'> | null;
 
   constructor(
     persistence = new AppStatePersistence(path.join(defaultUserDataPath(), 'state.json')),
     workIntegrations?: WorkIntegrationManager,
-    backendClient: Pick<ClawBackendProcessClient, 'start' | 'health' | 'close'> | null = createRuntimeClawBackendClient(),
+    backendClient: Pick<ClawBackendProcessClient, 'start' | 'health' | 'request' | 'close'> | null = createRuntimeClawBackendClient(),
   ) {
     this.persistence = persistence;
     this.backendClient = backendClient;
@@ -554,8 +548,7 @@ export class AppController {
     this.loopScheduler.stop();
     this.powerSaveBlocker.stop();
     await this.backendClient?.close();
-    await this.codexBackendDriver?.close();
-    await this.claudeBackendDriver?.close();
+    await Promise.all([...this.backendDrivers.values()].map((driver) => driver.close()));
     await this.mcpServer?.stop();
   }
 
@@ -1443,57 +1436,22 @@ export class AppController {
   }
 
   private async getBackendDriver(backend: AgentBackend): Promise<AgentBackendDriver> {
-    if (backend === 'codex') {
-      return this.getCodexBackendDriver();
+    const existingDriver = this.backendDrivers.get(backend);
+    if (existingDriver) {
+      return existingDriver;
     }
 
-    if (this.claudeBackendDriver) {
-      return this.claudeBackendDriver;
+    if (!this.backendClient) {
+      throw new Error(`${backendDisplayName(backend)} backend is not connected.`);
     }
 
-    return this.getClaudeBackendDriver(await this.ensureMcpServer());
+    const driver = new ClawBackendProxyDriver(backend, this.backendClient);
+    this.backendDrivers.set(backend, driver);
+    return driver;
   }
 
   private getExistingBackendDriver(backend: AgentBackend): AgentBackendDriver | null {
-    if (backend === 'codex') {
-      return this.codexBackendDriver;
-    }
-
-    return this.claudeBackendDriver;
-  }
-
-  private getClaudeBackendDriver(clawMcpServerUrl: string): ClaudeBackendDriver {
-    if (this.claudeBackendDriver) {
-      return this.claudeBackendDriver;
-    }
-
-    this.claudeBackendDriver = new ClaudeBackendDriver(undefined, undefined, { clawMcpServerUrl });
-    this.claudeBackendDriver.onEvent((event) => {
-      this.emitAndApply(event);
-    });
-
-    return this.claudeBackendDriver;
-  }
-
-  private async getCodexBackendDriver(): Promise<CodexBackendDriver> {
-    if (this.codexBackendDriver) {
-      return this.codexBackendDriver;
-    }
-
-    const mcpServerUrl = await this.ensureMcpServer();
-    const transport = new CodexProcessTransport({
-      codexHome: process.env.CODEX_CLAW_CODEX_HOME,
-      configOverrides: buildCodexClawMcpConfigOverrides(),
-    });
-    const sessionManager = new CodexAgentSessionManager(new CodexRpcClient(transport), {
-      clawMcpServerUrl: mcpServerUrl,
-    });
-    this.codexBackendDriver = new CodexBackendDriver(sessionManager);
-    this.codexBackendDriver.onEvent((event) => {
-      this.emitAndApply(event);
-    });
-
-    return this.codexBackendDriver;
+    return this.backendDrivers.get(backend) ?? null;
   }
 
   private async ensureMcpServer(): Promise<string> {
