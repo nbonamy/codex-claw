@@ -82,9 +82,10 @@ Current implementation checkpoint:
   native macOS Accessibility status/open-settings implementation as a desktop
   host callback; non-desktop clients can call the same backend methods without
   reading local desktop state.
-- `clawd` now owns source-folder auto-detection, settings updates, and the
-  recent-repository update after source worktree creation. Electron still owns
-  native folder/save dialogs.
+- `clawd` now owns source-folder auto-detection, source repository/worktree
+  listing from backend state, settings updates, and the recent-repository update
+  after source worktree creation. Electron still owns native folder/save
+  dialogs.
 - `clawd` now owns agent create/update/duplicate/move/reorder/close/select and
   folder update mutations. Electron still performs desktop folder picking, then
   forwards the selected folder to the backend.

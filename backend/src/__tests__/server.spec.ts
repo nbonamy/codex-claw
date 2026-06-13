@@ -1748,6 +1748,73 @@ describe('ClawBackendServer', () => {
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
   });
 
+  it('owns source repository discovery path resolution', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.sourceFolder = {
+      path: '/Users/nbonamy/src',
+      initialized: true,
+      recentRepoNames: [],
+    };
+    const repositories = [{
+      name: 'codex-claw',
+      path: '/Users/nbonamy/src/codex-claw',
+      worktrees: [{ name: 'main', path: '/Users/nbonamy/src/codex-claw' }],
+    }];
+    const driverRpc = {
+      handle: vi.fn().mockResolvedValue(repositories),
+      onEvent: vi.fn(() => () => undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    } as unknown as BackendDriverRpc;
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      driverRpc,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'source-repositories',
+      method: 'source/listRepositories',
+    })).resolves.toMatchObject({
+      result: repositories,
+    });
+
+    expect(driverRpc.handle).toHaveBeenCalledWith('source/listRepositories', {
+      sourceFolderPath: '/Users/nbonamy/src',
+    });
+  });
+
+  it('returns no source repositories when no source folder is configured', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.sourceFolder = {
+      path: '',
+      initialized: true,
+      recentRepoNames: [],
+    };
+    const driverRpc = {
+      handle: vi.fn(),
+      onEvent: vi.fn(() => () => undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    } as unknown as BackendDriverRpc;
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      driverRpc,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'source-repositories',
+      method: 'source/listRepositories',
+    })).resolves.toMatchObject({
+      result: [],
+    });
+
+    expect(driverRpc.handle).not.toHaveBeenCalled();
+  });
+
   it('records recent repositories when creating source worktrees', async () => {
     const snapshot = createTestSnapshot();
     snapshot.sourceFolder = {

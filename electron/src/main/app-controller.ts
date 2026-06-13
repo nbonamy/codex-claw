@@ -564,13 +564,7 @@ export class AppController {
   }
 
   private async listSourceRepositories(): Promise<SourceRepository[]> {
-    const sourceFolder = this.snapshot.sourceFolder.path.trim();
-    if (!sourceFolder) {
-      return [];
-    }
-    return this.requireBackendClient().request('source/listRepositories', {
-      sourceFolderPath: sourceFolder,
-    });
+    return this.requireBackendClient().request('source/listRepositories');
   }
 
   private async createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {

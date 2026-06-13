@@ -83,6 +83,7 @@ describe('Electron backend boundary', () => {
     const source = await readFile(appControllerPath, 'utf8');
 
     expect(source).not.toContain('source/detectFolder');
+    expect(source).not.toContain('sourceFolderPath');
     expect(source).not.toContain('agent/validateFolder');
   });
 

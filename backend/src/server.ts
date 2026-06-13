@@ -519,6 +519,15 @@ export class ClawBackendServer {
       case 'settings/update':
         updateSettingsInSnapshot(this.snapshot, requireSettingsUpdateInput(message.params));
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      case 'source/listRepositories': {
+        const sourceFolderPath = this.snapshot.sourceFolder.path.trim();
+        if (!sourceFolderPath) {
+          return createClawRpcResult(message.id, []);
+        }
+        return createClawRpcResult(message.id, await this.requireDriverRpc().handle('source/listRepositories', {
+          sourceFolderPath,
+        }));
+      }
       case 'source/createWorktree': {
         const input = requireSourceWorktreeInput(message.params);
         const worktree = await this.requireDriverRpc().handle('source/createWorktree', { input }) as SourceWorktree;

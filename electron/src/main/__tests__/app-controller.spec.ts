@@ -134,9 +134,7 @@ describe('AppController', () => {
     await controller.initialize();
 
     await expect(listSourceRepositories(controller)).resolves.toStrictEqual(repositories);
-    expect(request).toHaveBeenCalledWith('source/listRepositories', {
-      sourceFolderPath: '/Users/nbonamy/src',
-    });
+    expect(request).toHaveBeenCalledWith('source/listRepositories', undefined);
   });
 
   it('routes source worktree creation through clawd', async () => {
