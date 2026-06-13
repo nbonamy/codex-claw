@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { AppSnapshot } from '@codex-claw/shared/contracts';
 import { ClawBackendServer } from '../server';
 
 describe('ClawBackendServer', () => {
@@ -18,7 +19,14 @@ describe('ClawBackendServer', () => {
   });
 
   it('returns an app snapshot with the backend event sequence', () => {
-    const server = new ClawBackendServer({ version: 'test-version', pid: 123 });
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot: {
+        ...createTestSnapshot(),
+        activeTeamId: 'team-test',
+      },
+    });
     const response = server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'snapshot/get' });
 
     expect(response).toMatchObject({
@@ -27,8 +35,9 @@ describe('ClawBackendServer', () => {
       result: {
         lastEventSeq: 0,
         snapshot: {
+          activeTeamId: 'team-test',
           activeAgentId: null,
-          teams: [{ id: 'team-codex-claw' }],
+          teams: [{ id: 'team-test' }],
           agents: [],
         },
       },
@@ -48,3 +57,43 @@ describe('ClawBackendServer', () => {
     });
   });
 });
+
+function createTestSnapshot(): AppSnapshot {
+  return {
+    teams: [{
+      id: 'team-test',
+      name: 'Test Team',
+      agentIds: [],
+    }],
+    agents: [],
+    bench: [],
+    loops: [],
+    activeTeamId: 'team-test',
+    activeAgentId: null,
+    messages: [],
+    agentGitStatuses: {},
+    turnGitDiffs: {},
+    backendRuntimes: [],
+    workBacklog: {
+      connections: [],
+      providerConfigurations: {},
+      providerSettings: {},
+      assignments: {},
+    },
+    general: {
+      preventSleepWhenAgentsRun: true,
+    },
+    sourceFolder: {
+      path: '',
+      initialized: false,
+      recentRepoNames: [],
+    },
+    theme: {
+      id: 'codex-claw-light',
+      mode: 'system',
+      uiFontSize: 14,
+      chatFontSize: 15,
+      codeFontSize: 13,
+    },
+  };
+}

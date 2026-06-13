@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite build --watch --config vite.config.ts",
-    "dev:run": "node dist/clawd.mjs --stdio",
+    "dev:run": "node dist/clawd.mjs --stdio --state-dir ../.codex-claw-dev/state",
     "build": "vite build --config vite.config.ts",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",

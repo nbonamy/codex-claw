@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const backendBundle = path.join(rootDir, 'backend/dist/clawd.mjs');
+const devStateDir = path.join(rootDir, '.codex-claw-dev/state');
 const children = new Set();
 let shuttingDown = false;
 
@@ -28,7 +29,7 @@ const electronDev = start('npm', ['run', 'dev:electron'], {
   name: 'electron',
   env: {
     CODEX_CLAW_BACKEND_COMMAND: process.execPath,
-    CODEX_CLAW_BACKEND_ARGS: `${backendBundle},--stdio`,
+    CODEX_CLAW_BACKEND_ARGS: `${backendBundle},--stdio,--state-dir,${devStateDir}`,
     CODEX_CLAW_BACKEND_WATCH_FILE: backendBundle,
   },
 });
