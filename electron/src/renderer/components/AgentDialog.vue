@@ -310,6 +310,7 @@
       :choose-destination="chooseSourceWorktreeDestination"
       :create-worktree="createSourceWorktree"
       :repo="selectedSourceRepository"
+      :suggest-destination="suggestSourceWorktreePath"
       :visible="newSourceWorktreeDialogVisible"
       @close="newSourceWorktreeDialogVisible = false"
       @created="selectCreatedSourceWorktree"
@@ -349,7 +350,8 @@ const props = withDefaults(defineProps<{
   agent: Agent | null;
   addRecentSourceRepository?: (repoName: string) => void;
   chooseAgentFolder: () => Promise<string | null>;
-  chooseSourceWorktreeDestination?: (repoPath: string, suggestedName: string) => Promise<string | null>;
+  suggestSourceWorktreePath?: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>) => Promise<string>;
+  chooseSourceWorktreeDestination?: (defaultPath: string) => Promise<string | null>;
   createAgent: (input: AgentDialogCreateInput) => Promise<Agent | null | void>;
   createSourceWorktree?: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   initialNewTeamName?: string;
@@ -534,8 +536,12 @@ function openNewSourceWorktreeDialog(): void {
   newSourceWorktreeDialogVisible.value = true;
 }
 
-function chooseSourceWorktreeDestination(repoPath: string, suggestedName: string): Promise<string | null> {
-  return props.chooseSourceWorktreeDestination?.(repoPath, suggestedName) ?? Promise.resolve(null);
+function suggestSourceWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>): Promise<string> {
+  return props.suggestSourceWorktreePath?.(input) ?? Promise.resolve('');
+}
+
+function chooseSourceWorktreeDestination(defaultPath: string): Promise<string | null> {
+  return props.chooseSourceWorktreeDestination?.(defaultPath) ?? Promise.resolve(null);
 }
 
 async function createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {

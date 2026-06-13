@@ -15,6 +15,7 @@ export const ipcChannels = {
   chooseAgentFolder: 'agent:choose-folder',
   chooseSourceFolder: 'source-folder:choose',
   listSourceRepositories: 'source-folder:repositories:list',
+  suggestSourceWorktreePath: 'source-folder:worktree-path:suggest',
   chooseSourceWorktreeDestination: 'source-folder:worktree-destination:choose',
   createSourceWorktree: 'source-folder:worktree:create',
   createTeam: 'team:create',

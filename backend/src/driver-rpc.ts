@@ -8,7 +8,7 @@ import { CodexAgentSessionManager } from './codex/agent-session';
 import { CodexBackendDriver } from './codex/codex-driver';
 import { CodexProcessTransport } from './codex/process-transport';
 import { CodexRpcClient } from './codex/rpc-client';
-import { createSourceWorktree } from './git-worktrees';
+import { createSourceWorktree, suggestedSourceWorktreePath } from './git-worktrees';
 import { buildCodexClawMcpConfigOverrides } from './mcp/codex-config';
 import { detectSourceFolder, scanSourceRepositories } from './source-repositories';
 import { transcribeWithAppleSpeechAnalyzer } from './transcription/apple-speech';
@@ -198,6 +198,11 @@ export class BackendDriverRpc {
         const record = requireRecord(params);
         const sourceFolderPath = requireString(record.sourceFolderPath, 'sourceFolderPath').trim();
         return sourceFolderPath ? scanSourceRepositories(sourceFolderPath) : [];
+      }
+      case 'source/suggestWorktreePath': {
+        const record = requireRecord(params);
+        const input = requireRecord(record.input) as Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>;
+        return suggestedSourceWorktreePath(input.repoPath, input.branchName);
       }
       case 'source/createWorktree': {
         const record = requireRecord(params);

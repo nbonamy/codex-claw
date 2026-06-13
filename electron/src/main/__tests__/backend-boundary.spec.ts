@@ -115,6 +115,17 @@ describe('Electron backend boundary', () => {
     expect(source).not.toContain('agent/validateFolder');
   });
 
+  it('keeps source worktree path policy in clawd', async () => {
+    const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
+    const source = await readFile(appControllerPath, 'utf8');
+
+    expect(source).toContain("request('source/suggestWorktreePath'");
+    expect(source).toContain("request<SourceWorktree>('source/createWorktree'");
+    expect(source).not.toContain('path.dirname');
+    expect(source).not.toContain('path.join');
+    expect(source).not.toContain('suggestedName');
+  });
+
   it('keeps folder picker IPC separate from backend mutations', async () => {
     const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
     const preloadPath = path.resolve(__dirname, '../../preload/index.ts');

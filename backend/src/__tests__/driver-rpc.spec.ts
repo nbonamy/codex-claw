@@ -159,6 +159,18 @@ describe('BackendDriverRpc', () => {
     }
   });
 
+  it('routes source worktree path suggestions through backend-owned path policy', async () => {
+    const rpc = new BackendDriverRpc(new Map([['codex', createDriver()]]));
+
+    await expect(rpc.handle('source/suggestWorktreePath', {
+      input: {
+        repoPath: '/Users/nbonamy/src/codex-claw',
+        branchName: 'feature/backend split',
+      },
+    })).resolves.toBe(path.join('/Users/nbonamy/src', 'codex-claw-feature-backend-split'));
+    await rpc.close();
+  });
+
   it('routes Apple Speech transcription through backend-owned CLI execution', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-rpc-transcription-'));
     const rpc = new BackendDriverRpc(new Map([['codex', createDriver()]]));

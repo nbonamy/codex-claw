@@ -312,7 +312,6 @@ describe('AgentDialog', () => {
     expect(createSourceWorktree).toHaveBeenCalledWith({
       repoPath: '/Users/nbonamy/src/codex-claw',
       branchName: 'feature/source-folder',
-      destinationPath: '/Users/nbonamy/src/codex-claw-feature-source-folder',
     });
     expect(createAgent).toHaveBeenCalledWith(expect.objectContaining({
       folder: '/Users/nbonamy/src/codex-claw-source-folder',
@@ -324,7 +323,8 @@ function mountDialog(overrides: Partial<{
   addRecentSourceRepository: (repoName: string) => void;
   agent: Agent | null;
   chooseAgentFolder: () => Promise<string | null>;
-  chooseSourceWorktreeDestination: (repoPath: string, suggestedName: string) => Promise<string | null>;
+  suggestSourceWorktreePath: (input: { branchName: string; repoPath: string }) => Promise<string>;
+  chooseSourceWorktreeDestination: (defaultPath: string) => Promise<string | null>;
   createAgent: (input: CreateAgentInput & { newTeamName?: string; teamId?: string }) => Promise<void>;
   createSourceWorktree: (input: { repoPath: string; branchName: string; destinationPath?: string }) => Promise<SourceWorktree>;
   initialNewTeamName: string;
@@ -342,6 +342,12 @@ function mountDialog(overrides: Partial<{
       agent: null,
       addRecentSourceRepository: vi.fn(),
       chooseAgentFolder: vi.fn().mockResolvedValue(null),
+      suggestSourceWorktreePath: vi.fn(async ({ branchName, repoPath }: { branchName: string; repoPath: string }) => {
+        const repoName = repoPath.split(/[\\/]/).filter(Boolean).at(-1) ?? 'repo';
+        const parent = repoPath.replace(/[\\/][^\\/]+$/u, '');
+        const slug = branchName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'worktree';
+        return `${parent}/${repoName}-${slug}`;
+      }),
       chooseSourceWorktreeDestination: vi.fn().mockResolvedValue(null),
       createAgent: vi.fn().mockResolvedValue(undefined),
       createSourceWorktree: vi.fn().mockResolvedValue({ name: 'worktree', path: '/tmp/worktree' }),

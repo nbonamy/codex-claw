@@ -261,7 +261,11 @@ describe('useAppState', () => {
     };
 
     await expect(state.chooseSourceFolder()).resolves.toBeNull();
-    await expect(state.chooseSourceWorktreeDestination('/Users/nbonamy/src/codex-claw', 'source-folder')).resolves.toBeNull();
+    await expect(state.suggestSourceWorktreePath({
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      branchName: 'feature/source-folder',
+    })).resolves.toBe('');
+    await expect(state.chooseSourceWorktreeDestination('/Users/nbonamy/src/codex-claw-source-folder')).resolves.toBeNull();
     await expect(state.createSourceWorktree({
       repoPath: '/Users/nbonamy/src/codex-claw',
       branchName: 'feature/source-folder',

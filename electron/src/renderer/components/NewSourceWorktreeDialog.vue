@@ -101,9 +101,10 @@ import type { CreateSourceWorktreeInput, SourceRepository, SourceWorktree } from
 import { FolderIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
-  chooseDestination: (repoPath: string, suggestedName: string) => Promise<string | null>;
+  chooseDestination: (defaultPath: string) => Promise<string | null>;
   createWorktree: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   repo: SourceRepository | null;
+  suggestDestination: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>) => Promise<string>;
   visible: boolean;
 }>(), {
   repo: null,
@@ -116,39 +117,41 @@ const emit = defineEmits<{
 
 const branchName = ref('');
 const customDestinationPath = ref('');
+const suggestedDestinationPath = ref('');
 const creating = ref(false);
 const errorMessage = ref<string | null>(null);
+let suggestionRequestId = 0;
 
 const canCreate = computed(() => Boolean(props.repo && branchName.value.trim() && !creating.value));
-const autoDestinationPath = computed(() => {
-  if (!props.repo || !branchName.value.trim()) {
-    return '';
-  }
-
-  return joinPath(parentPath(props.repo.path), `${baseName(props.repo.path)}-${slug(branchName.value)}`);
-});
-const destinationPath = computed(() => customDestinationPath.value || autoDestinationPath.value);
-const suggestedDestinationName = computed(() => (
-  branchName.value.trim()
-    ? `${baseName(props.repo?.path ?? 'repo')}-${slug(branchName.value)}`
-    : `${baseName(props.repo?.path ?? 'repo')}-worktree`
-));
+const destinationPath = computed(() => customDestinationPath.value || suggestedDestinationPath.value);
 
 watch(() => props.visible, (visible) => {
   if (visible) {
     branchName.value = '';
     customDestinationPath.value = '';
+    suggestedDestinationPath.value = '';
     errorMessage.value = null;
     creating.value = false;
   }
 });
+
+watch([
+  () => props.repo?.path ?? '',
+  branchName,
+], () => {
+  void refreshSuggestedDestinationPath();
+}, { immediate: true });
 
 async function chooseDestination(): Promise<void> {
   if (!props.repo) {
     return;
   }
 
-  const selected = await props.chooseDestination(props.repo.path, suggestedDestinationName.value);
+  const defaultPath = destinationPath.value || await props.suggestDestination({
+    repoPath: props.repo.path,
+    branchName: branchName.value,
+  });
+  const selected = await props.chooseDestination(defaultPath);
   if (selected) {
     customDestinationPath.value = selected;
   }
@@ -165,7 +168,7 @@ async function create(): Promise<void> {
     const worktree = await props.createWorktree({
       repoPath: props.repo.path,
       branchName: branchName.value,
-      destinationPath: destinationPath.value,
+      ...(customDestinationPath.value ? { destinationPath: customDestinationPath.value } : {}),
     });
     emit('created', worktree);
     close();
@@ -186,26 +189,27 @@ function close(): void {
   emit('close');
 }
 
-function baseName(value: string): string {
-  return value.split(/[\\/]/).filter(Boolean).at(-1) ?? 'repo';
-}
+async function refreshSuggestedDestinationPath(): Promise<void> {
+  const repo = props.repo;
+  const requestId = ++suggestionRequestId;
+  if (!repo || !branchName.value.trim()) {
+    suggestedDestinationPath.value = '';
+    return;
+  }
 
-function parentPath(value: string): string {
-  const normalized = value.replace(/[\\/]+$/g, '');
-  const index = Math.max(normalized.lastIndexOf('/'), normalized.lastIndexOf('\\'));
-  return index > 0 ? normalized.slice(0, index) : '';
-}
-
-function joinPath(parent: string, child: string): string {
-  return parent ? `${parent}/${child}` : child;
-}
-
-function slug(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '') || 'worktree';
+  try {
+    const suggestedPath = await props.suggestDestination({
+      repoPath: repo.path,
+      branchName: branchName.value,
+    });
+    if (requestId === suggestionRequestId) {
+      suggestedDestinationPath.value = suggestedPath;
+    }
+  } catch {
+    if (requestId === suggestionRequestId) {
+      suggestedDestinationPath.value = '';
+    }
+  }
 }
 </script>
 

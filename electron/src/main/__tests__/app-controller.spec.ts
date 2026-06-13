@@ -167,6 +167,22 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('source/createWorktree', { input });
   });
 
+  it('routes source worktree path suggestions through clawd', async () => {
+    const snapshot = createInitialSnapshot();
+    const suggestion = '/Users/nbonamy/src/codex-claw-backend-split';
+    const request = vi.fn().mockResolvedValueOnce(suggestion);
+    const controller = new AppController(snapshot, createBackendClient({ request }));
+    const input = {
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      branchName: 'backend-split',
+    };
+
+    await controller.initialize();
+
+    await expect(suggestSourceWorktreePath(controller, input)).resolves.toBe(suggestion);
+    expect(request).toHaveBeenCalledWith('source/suggestWorktreePath', { input });
+  });
+
   it('routes Apple Speech transcription through clawd using a JSON-safe audio payload', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
@@ -1180,6 +1196,15 @@ async function createSourceWorktree(
   return (controller as unknown as {
     createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree>;
   }).createSourceWorktree(input);
+}
+
+async function suggestSourceWorktreePath(
+  controller: AppController,
+  input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>,
+): Promise<string> {
+  return (controller as unknown as {
+    suggestSourceWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>): Promise<string>;
+  }).suggestSourceWorktreePath(input);
 }
 
 async function transcribeAppleSpeech(

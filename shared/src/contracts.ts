@@ -815,7 +815,8 @@ export type CodexClawApi = {
   chooseAgentFolder(): Promise<string | null>;
   chooseSourceFolder(): Promise<string | null>;
   listSourceRepositories(): Promise<SourceRepository[]>;
-  chooseSourceWorktreeDestination(repoPath: string, suggestedName: string): Promise<string | null>;
+  suggestSourceWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>): Promise<string>;
+  chooseSourceWorktreeDestination(defaultPath: string): Promise<string | null>;
   createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree>;
   createTeam(input: CreateTeamInput): Promise<AppSnapshot>;
   updateTeam(input: UpdateTeamInput): Promise<AppSnapshot>;

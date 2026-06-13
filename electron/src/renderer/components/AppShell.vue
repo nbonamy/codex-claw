@@ -201,6 +201,7 @@
       :choose-source-worktree-destination="chooseSourceWorktreeDestination"
       :create-agent="createAgentFromDialog"
       :create-source-worktree="createSourceWorktree"
+      :suggest-source-worktree-path="suggestSourceWorktreePath"
       :initial-new-team-name="pendingNewAgentTeamName"
       :initial-team-id="agentDialogTeamId"
       :source-folder-path="snapshot.sourceFolder.path"
@@ -288,7 +289,8 @@ const props = withDefaults(defineProps<{
   chooseAgentFolder?: () => Promise<string | null>;
   chooseSourceFolder?: () => Promise<string | null>;
   sourceRepositories?: SourceRepository[];
-  chooseSourceWorktreeDestination?: (repoPath: string, suggestedName: string) => Promise<string | null>;
+  suggestSourceWorktreePath?: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>) => Promise<string>;
+  chooseSourceWorktreeDestination?: (defaultPath: string) => Promise<string | null>;
   createSourceWorktree?: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   addRecentSourceRepository?: (repoName: string) => void;
   previewAgentFile?: (agentId: string, filePath: string) => Promise<AgentFilePreviewResult>;
@@ -338,6 +340,7 @@ const props = withDefaults(defineProps<{
   chooseAgentFolder: async () => null,
   chooseSourceFolder: async () => null,
   sourceRepositories: () => [],
+  suggestSourceWorktreePath: async () => '',
   chooseSourceWorktreeDestination: async () => null,
   createSourceWorktree: async () => ({ name: '', path: '' }),
   addRecentSourceRepository: () => undefined,

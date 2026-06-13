@@ -86,9 +86,10 @@ Current implementation checkpoint:
   host callback; non-desktop clients can call the same backend methods without
   reading local desktop state.
 - `clawd` now owns source-folder auto-detection, source repository/worktree
-  listing from backend state, settings updates, and the recent-repository update
-  after source worktree creation. Electron still owns native folder/save
-  dialogs.
+  listing from backend state, worktree destination suggestions and defaults,
+  settings updates, and the recent-repository update after source worktree
+  creation. Electron still owns native folder/save dialogs, but the dialog
+  default path is a backend suggestion instead of a desktop-side path policy.
 - `clawd` now owns agent create/update/duplicate/move/reorder/close/select and
   folder update mutations. Electron still performs desktop folder picking, then
   forwards the selected folder to the backend.
@@ -429,7 +430,7 @@ names that describe backend ownership:
 - `bench/saveAgent`, `bench/deployTemplate`, `bench/removeTemplate`
 - `loop/create`, `loop/update`, `loop/run`, `loop/delete`,
   `loop/clearHistory`, `loop/deleteExecution`
-- `source/listRepositories`, `source/createWorktree`
+- `source/listRepositories`, `source/suggestWorktreePath`, `source/createWorktree`
 - `agent/listFiles`, `agent/previewFile` using agent ids only. `clawd` resolves
   the workspace root from its snapshot so desktop, mobile, and future web
   clients never transmit local filesystem roots as read authority.

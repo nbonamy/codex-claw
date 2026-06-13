@@ -1838,6 +1838,36 @@ describe('ClawBackendServer', () => {
     expect(driverRpc.handle).not.toHaveBeenCalled();
   });
 
+  it('owns source worktree path suggestions', async () => {
+    const snapshot = createTestSnapshot();
+    const driverRpc = {
+      handle: vi.fn().mockResolvedValue('/Users/nbonamy/src/codex-claw-backend-split'),
+      onEvent: vi.fn(() => () => undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    } as unknown as BackendDriverRpc;
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      driverRpc,
+    });
+    const input = {
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      branchName: 'backend-split',
+    };
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'source-worktree-suggestion',
+      method: 'source/suggestWorktreePath',
+      params: { input },
+    })).resolves.toMatchObject({
+      result: '/Users/nbonamy/src/codex-claw-backend-split',
+    });
+
+    expect(driverRpc.handle).toHaveBeenCalledWith('source/suggestWorktreePath', { input });
+  });
+
   it('records recent repositories when creating source worktrees', async () => {
     const snapshot = createTestSnapshot();
     snapshot.sourceFolder = {

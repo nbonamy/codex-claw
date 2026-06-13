@@ -299,8 +299,12 @@ export function useAppState() {
     return await window.codexClaw?.chooseSourceFolder?.() ?? null;
   }
 
-  async function chooseSourceWorktreeDestination(repoPath: string, suggestedName: string): Promise<string | null> {
-    return await window.codexClaw?.chooseSourceWorktreeDestination?.(repoPath, suggestedName) ?? null;
+  async function suggestSourceWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>): Promise<string> {
+    return await window.codexClaw?.suggestSourceWorktreePath?.(input) ?? '';
+  }
+
+  async function chooseSourceWorktreeDestination(defaultPath: string): Promise<string | null> {
+    return await window.codexClaw?.chooseSourceWorktreeDestination?.(defaultPath) ?? null;
   }
 
   async function createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {
@@ -933,6 +937,7 @@ export function useAppState() {
     loadSnapshot,
     chooseAgentFolder,
     chooseSourceFolder,
+    suggestSourceWorktreePath,
     chooseSourceWorktreeDestination,
     createSourceWorktree,
     addRecentSourceRepository,

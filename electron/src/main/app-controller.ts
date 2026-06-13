@@ -1,5 +1,4 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
-import path from 'node:path';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
 import { logMain, warnMain } from './log';
 import { createMainWindow } from './main-window';
@@ -96,8 +95,12 @@ export class AppController {
       return this.listSourceRepositories();
     });
 
-    ipcMain.handle(ipcChannels.chooseSourceWorktreeDestination, async (_event, repoPath: string, suggestedName: string) => {
-      return this.chooseSourceWorktreeDestination(repoPath, suggestedName);
+    ipcMain.handle(ipcChannels.suggestSourceWorktreePath, async (_event, input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>) => {
+      return this.suggestSourceWorktreePath(input);
+    });
+
+    ipcMain.handle(ipcChannels.chooseSourceWorktreeDestination, async (_event, defaultPath: string) => {
+      return this.chooseSourceWorktreeDestination(defaultPath);
     });
 
     ipcMain.handle(ipcChannels.createSourceWorktree, async (_event, input: CreateSourceWorktreeInput) => {
@@ -543,11 +546,11 @@ export class AppController {
     return result.canceled ? null : result.filePaths[0] ?? null;
   }
 
-  private async chooseSourceWorktreeDestination(repoPath: string, suggestedName: string): Promise<string | null> {
+  private async chooseSourceWorktreeDestination(defaultPath: string): Promise<string | null> {
     const result = await dialog.showSaveDialog({
       title: 'Choose worktree folder',
       message: 'Choose location for the worktree',
-      defaultPath: path.join(path.dirname(repoPath), suggestedName),
+      defaultPath,
       properties: ['createDirectory'],
     });
 
@@ -556,6 +559,10 @@ export class AppController {
 
   private async listSourceRepositories(): Promise<SourceRepository[]> {
     return this.requireBackendClient().request('source/listRepositories');
+  }
+
+  private async suggestSourceWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>): Promise<string> {
+    return this.requireBackendClient().request('source/suggestWorktreePath', { input });
   }
 
   private async createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {

@@ -528,6 +528,10 @@ export class ClawBackendServer {
           sourceFolderPath,
         }));
       }
+      case 'source/suggestWorktreePath': {
+        const input = requireSourceWorktreeSuggestionInput(message.params);
+        return createClawRpcResult(message.id, await this.requireDriverRpc().handle('source/suggestWorktreePath', { input }));
+      }
       case 'source/createWorktree': {
         const input = requireSourceWorktreeInput(message.params);
         const worktree = await this.requireDriverRpc().handle('source/createWorktree', { input }) as SourceWorktree;
@@ -1188,6 +1192,14 @@ function requireSettingsUpdateInput(params: unknown): UpdateSettingsInput {
 function requireSourceWorktreeInput(params: unknown): CreateSourceWorktreeInput {
   const record = requireRecord(params);
   return requireRecord(record.input) as CreateSourceWorktreeInput;
+}
+
+function requireSourceWorktreeSuggestionInput(params: unknown): Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'> {
+  const input = requireSourceWorktreeInput(params);
+  return {
+    branchName: input.branchName,
+    repoPath: input.repoPath,
+  };
 }
 
 function requireClientRequestResponse(params: unknown): ClientRequestResponse {

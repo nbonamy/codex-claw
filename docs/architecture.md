@@ -159,10 +159,10 @@ The app is being extracted from an Electron-main backend into a separate
 `clawd` process. `docs/backend-architecture.md` is the canonical plan for that
 work. The target invariant is that Electron main is a desktop adapter and stdio
 client; provider drivers, provider protocols, app state, backend-owned
-filesystem work, git, loops, and agent runtime state belong behind `clawd`.
-That includes file previews: desktop and future non-desktop clients may request
-file content from `clawd`, but they do not read backend-owned agent workspace
-paths themselves.
+filesystem work, git, loops, worktree path policy, and agent runtime state
+belong behind `clawd`. That includes file previews: desktop and future
+non-desktop clients may request file content from `clawd`, but they do not read
+backend-owned agent workspace paths themselves.
 
 Snapshot mutation is also backend-owned. `clawd` applies backend events to the
 authoritative snapshot; Electron fetches fresh snapshots from `clawd` for
