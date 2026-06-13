@@ -34,6 +34,27 @@ describe('Electron backend boundary', () => {
     expect(source).toContain('agentId');
   });
 
+  it('does not expose raw filesystem reads from Electron main runtime files', async () => {
+    const sources = await readElectronMainRuntimeSources(path.resolve(__dirname, '..'));
+
+    for (const { filePath, source } of sources) {
+      expect(source, filePath).not.toMatch(/\breadFile(?:Sync)?\b/);
+      expect(source, filePath).not.toMatch(/\bcreateReadStream\b/);
+      expect(source, filePath).not.toContain('driver/readFile');
+      expect(source, filePath).not.toContain('driver/listFiles');
+    }
+  });
+
+  it('keeps preload free of raw file APIs', async () => {
+    const preloadPath = path.resolve(__dirname, '../../preload/index.ts');
+    const source = await readFile(preloadPath, 'utf8');
+
+    expect(source).not.toMatch(/\breadFile(?:Sync)?\b/);
+    expect(source).not.toMatch(/\bcreateReadStream\b/);
+    expect(source).not.toContain('driver/readFile');
+    expect(source).not.toContain('driver/listFiles');
+  });
+
   it('keeps durable snapshot persistence in clawd', async () => {
     const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
     const source = await readFile(appControllerPath, 'utf8');
@@ -80,3 +101,26 @@ describe('Electron backend boundary', () => {
     await expect(readdir(path.join(mainDir, 'utils.ts'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
 });
+
+async function readElectronMainRuntimeSources(
+  directory: string,
+): Promise<Array<{ filePath: string; source: string }>> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const sources: Array<{ filePath: string; source: string }> = [];
+
+  for (const entry of entries) {
+    const filePath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name !== '__tests__') {
+        sources.push(...(await readElectronMainRuntimeSources(filePath)));
+      }
+      continue;
+    }
+
+    if (entry.isFile() && filePath.endsWith('.ts')) {
+      sources.push({ filePath, source: await readFile(filePath, 'utf8') });
+    }
+  }
+
+  return sources;
+}

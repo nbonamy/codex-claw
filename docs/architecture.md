@@ -284,7 +284,11 @@ not know either storage model.
 ### Preload
 
 The preload script exposes a narrow typed bridge. It should be the only
-renderer entrypoint to Electron APIs.
+renderer entrypoint to Electron APIs. This bridge is desktop-specific: mobile
+and web clients should talk to `clawd` over the backend protocol instead of
+depending on Electron IPC or local filesystem access. File surfaces are
+product-level backend requests such as `listAgentFiles` and `previewAgentFile`
+by `agentId`; clients must not read workspace files themselves.
 
 ```ts
 type CodexClawApi = {
@@ -292,6 +296,7 @@ type CodexClawApi = {
   listBackendModels(agentId: string): Promise<BackendModelOption[]>
   listBackendSkills(agentId: string): Promise<BackendSkillSummary[]>
   listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]>
+  previewAgentFile(agentId: string, filePath: string): Promise<AgentFilePreviewResult>
   chooseAgentFolder(): Promise<string | null>
   createTeam(input: CreateTeamInput): Promise<AppSnapshot>
   updateTeam(input: UpdateTeamInput): Promise<AppSnapshot>
