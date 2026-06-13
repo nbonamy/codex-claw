@@ -80,7 +80,7 @@ export class ClawBackendProxyDriver implements AgentBackendDriver {
   }
 
   forgetAgentSession(agentId: string): void {
-    void this.client.request('agent/forgetSession', { agentId });
+    void this.client.request('agent/forgetSession', { backend: this.backend, agentId });
   }
 
   async interrupt(agent: Agent): Promise<BackendSendResult> {
@@ -88,7 +88,7 @@ export class ClawBackendProxyDriver implements AgentBackendDriver {
   }
 
   async respondToRequest(response: ClientRequestResponse): Promise<void> {
-    await this.client.request('agent/respondToClientRequest', { response });
+    await this.client.request('agent/respondToClientRequest', { backend: this.backend, response });
   }
 
   async hydrateAgent(agent: Agent): Promise<BackendSession | null> {

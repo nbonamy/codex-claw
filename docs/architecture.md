@@ -152,68 +152,60 @@ with `list-repos`, `list-worktrees`, `create-worktree`, and `create-agent`.
 
 ## Process Architecture
 
-The current implementation keeps the app backend core inside Electron main. A
-future extraction to a separate `clawd` process is documented in
-`docs/backend-architecture.md`; until that lands, this section describes the
-active architecture.
+The app is being extracted from an Electron-main backend into a separate
+`clawd` process. `docs/backend-architecture.md` is the canonical plan for that
+work. The target invariant is that Electron main is a desktop adapter and stdio
+client; provider drivers, provider protocols, app state, backend-owned
+filesystem work, git, loops, and agent runtime state belong behind `clawd`.
 
 ```mermaid
 flowchart LR
   Renderer["Renderer: Vue UI"]
   Preload["Preload: typed bridge"]
-  Main["Electron main"]
+  Main["Electron main: desktop adapter"]
+  Client["ClawBackendClient"]
+  Backend["clawd"]
   Store["App store in userData"]
-  Server["Codex app-server"]
-  CodexHome["CODEX_HOME sessions/config"]
+  Server["Codex app-server / Claude Code"]
+  CodexHome["Backend state and provider homes"]
 
   Renderer <--> Preload
   Preload <--> Main
-  Main <--> Store
-  Main <--> Server
+  Main <--> Client
+  Client <--> Backend
+  Backend <--> Store
+  Backend <--> Server
   Server <--> CodexHome
 ```
 
 ### Main Process
 
-The main process is the backend of the desktop app.
+The main process is no longer the provider runtime. It should become a thin
+desktop adapter: renderer IPC in, app-owned backend protocol over stdio out,
+then backend events fanned back to renderer windows. It may still own native
+desktop effects such as windows, dialogs, open-external, app quit, system
+permissions, packaged resources, and helper processes that truly require
+Electron APIs.
 
 Modules:
 
-- `AppServerManager`: resolves the Codex executable, starts or connects to
-  app-server, performs initialization, monitors readiness, restarts with
-  backoff, and exposes server health.
-- `CodexRpcClient`: owns the app-server JSON-RPC transport, request IDs,
-  request/response matching, notifications, server-initiated requests, and
-  backpressure.
-- `CodexAgentSessionManager`: maps app agents to Codex threads and active turns.
-  It starts/resumes/forks threads, starts turns, steers active turns,
-  interrupts turns, and routes events back to the right agent.
-- `AgentBackendDriver`: backend-facing interface used by app-level chat and
-  controller services. The first concrete driver wraps
-  `CodexAgentSessionManager`; future drivers can wrap Claude Code or another
-  agent without changing renderer IPC.
-- `CodexEventAdapter`: converts app-server notifications into the smaller
-  renderer event protocol. This is where app-server churn is contained.
-- `ApprovalCoordinator`: stores pending approval and user-input requests from
-  app-server, emits UI prompts, and resolves/rejects server requests when the
-  renderer answers. In the current implementation this coordination is owned by
-  backend session/controller code rather than a standalone module.
-- `AppStateStore`: persists teams, agents, settings, window state, and theme
-  preference under Electron `userData`.
-- `BenchManager`: creates, updates, removes, sorts, validates, and deploys
-  Bench templates. It is product state, so it belongs with the app store rather
-  than inside the Codex backend driver.
-
-Preferred first transport: spawn one app-server process from main using
-`codex app-server --stdio` or `codex app-server --listen stdio://`. A single
-app-server process can host many threads; agents are routed by `threadId`.
+- `ClawBackendProcessClient`: starts the local `clawd` command, frames
+  JSON-RPC over stdio, tracks request IDs/timeouts, restarts the dev backend
+  bundle, and exposes app-owned requests to main-process callers.
+- `ClawBackendProxyDriver`: temporary adapter that implements the shared
+  `AgentBackendDriver` shape by forwarding every provider operation to
+  `clawd`. This keeps existing app-controller code working while provider
+  ownership moves out of Electron main.
+- `AppController`: still owns too much product orchestration during the
+  migration. Each new slice should move product state and backend-owned
+  operations to `clawd`, leaving only desktop effects and IPC routing here.
 
 Future transport options:
 
-- connect to a managed daemon via the Unix control socket and
-  `codex app-server proxy`;
-- bundle a known Codex binary in the app resources;
-- use a user-installed Codex binary resolved from config, environment, or PATH.
+- run local `clawd` as an always-on daemon over a Unix socket or Windows named
+  pipe;
+- use SSH stdio to connect Electron to a remote `clawd`;
+- use Electron `utilityProcess` with message ports only if packaging forces it.
 
 ### Backend Seam
 
@@ -222,7 +214,8 @@ is Codex-native and should expose Codex semantics where they matter: app-server
 threads, turns, steering, approvals, diffs, and persisted Codex sessions.
 
 The important constraint is that renderer and IPC should be backend-shaped by
-our app, not by Codex. Keep one narrow main-process interface:
+our app, not by Codex or Claude. Keep one narrow shared interface behind the
+backend protocol:
 
 ```ts
 type AgentBackendDriver = {
@@ -250,11 +243,10 @@ type AgentBackendDriver = {
 }
 ```
 
-For the first implementation, `BackendEvent` is produced by the Codex
-app-server adapter. If Claude Code becomes a supported backend later, it gets
-its own driver and adapter that emit the same app-owned `BackendEvent` shape.
-That is the seam we want; a generic lowest-common-denominator provider model is
-not.
+`BackendEvent` is produced by backend drivers inside `clawd`. Codex and Claude
+get their own drivers/adapters that emit the same app-owned `BackendEvent`
+shape. That is the seam we want; a generic lowest-common-denominator provider
+model is not.
 
 #### Backend Feature Rule
 
@@ -266,11 +258,12 @@ renderer UI. The required path is:
    `ConversationSummary`, `BackendConversationRef`, `BackendModelOption`, and
    `BackendSkillSummary`.
 2. Add or extend an optional `AgentBackendDriver` method or declared backend
-   capability in Electron main. Optional methods are the parity boundary when
+   capability behind `clawd`. Optional methods are the parity boundary when
    Codex and Claude do not support the same feature yet.
-3. Keep provider details inside concrete driver/adapter code such as
-   `src/main/codex/*` or `src/main/claude/*`.
-4. Route renderer requests through app controller/preload IPC using app-owned
+3. Keep provider details inside backend driver/adapter code such as
+   `backend/src/codex/*` or `backend/src/claude/*`.
+4. Route renderer requests through app controller/preload IPC and
+   `ClawBackendClient` using app-owned
    contracts. Renderer components may branch on app capabilities or empty data,
    but must not import Codex/Claude protocol types or know where a backend
    stores history.

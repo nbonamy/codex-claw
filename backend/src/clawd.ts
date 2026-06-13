@@ -1,4 +1,5 @@
 import { pathToFileURL } from 'node:url';
+import { BackendDriverRpc, createDefaultBackendDrivers } from './driver-rpc';
 import { ClawBackendServer } from './server';
 import { loadBackendSnapshot } from './state';
 import { startStdioRpcServer } from './stdio';
@@ -15,6 +16,9 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     const server = new ClawBackendServer({
       version: CLAWD_VERSION,
       snapshot: await loadBackendSnapshot(readArgValue(argv, '--state-dir')),
+      driverRpc: new BackendDriverRpc(createDefaultBackendDrivers({
+        clawMcpServerUrl: readArgValue(argv, '--mcp-server-url') ?? null,
+      })),
     });
     startStdioRpcServer({
       input: process.stdin,
@@ -25,7 +29,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     return;
   }
 
-  process.stderr.write('Usage: clawd --stdio [--state-dir <path>] | --version\n');
+  process.stderr.write('Usage: clawd --stdio [--state-dir <path>] [--mcp-server-url <url>] | --version\n');
   process.exitCode = 1;
 }
 

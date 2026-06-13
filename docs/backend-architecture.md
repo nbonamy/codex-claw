@@ -32,6 +32,20 @@ embedded Node through `ELECTRON_RUN_AS_NODE=1` is currently unavailable in this
 repo because `forge.config.ts` disables the `RunAsNode` fuse; enabling it is a
 security tradeoff, not a mechanical build tweak.
 
+Current implementation checkpoint:
+
+- The repo is split into `shared`, `backend`, and `electron` workspaces.
+- `clawd --stdio` speaks app-owned JSON-RPC over newline-delimited stdio.
+- Electron main starts `clawd` through `ClawBackendProcessClient` and reaches
+  backend features through `ClawBackendProxyDriver`.
+- Codex and Claude provider drivers now live under `backend/src`; Electron main
+  must not import provider drivers, provider transports, provider SDKs, or raw
+  provider protocol modules.
+- `clawd` currently serves health, snapshot loading, and the
+  `AgentBackendDriver` RPC surface. The remaining large slice is to move
+  product orchestration and backend events out of `AppController` so Electron
+  becomes only the desktop IPC/stdio layer.
+
 ## Goals
 
 - Keep agents and loops alive when the desktop app window is closed.

@@ -3,10 +3,10 @@ import type { AppSnapshot } from '@codex-claw/shared/contracts';
 import { ClawBackendServer } from '../server';
 
 describe('ClawBackendServer', () => {
-  it('responds to backend health requests', () => {
+  it('responds to backend health requests', async () => {
     const server = new ClawBackendServer({ version: 'test-version', pid: 123 });
 
-    expect(server.handleMessage({ jsonrpc: '2.0', id: 'health-1', method: 'backend/health' })).toStrictEqual({
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'health-1', method: 'backend/health' })).resolves.toStrictEqual({
       jsonrpc: '2.0',
       id: 'health-1',
       result: {
@@ -18,7 +18,7 @@ describe('ClawBackendServer', () => {
     });
   });
 
-  it('returns an app snapshot with the backend event sequence', () => {
+  it('returns an app snapshot with the backend event sequence', async () => {
     const server = new ClawBackendServer({
       version: 'test-version',
       pid: 123,
@@ -27,7 +27,7 @@ describe('ClawBackendServer', () => {
         activeTeamId: 'team-test',
       },
     });
-    const response = server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'snapshot/get' });
+    const response = await server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'snapshot/get' });
 
     expect(response).toMatchObject({
       jsonrpc: '2.0',
@@ -44,10 +44,10 @@ describe('ClawBackendServer', () => {
     });
   });
 
-  it('returns method-not-found errors for unknown methods', () => {
+  it('returns method-not-found errors for unknown methods', async () => {
     const server = new ClawBackendServer({ version: 'test-version', pid: 123 });
 
-    expect(server.handleMessage({ jsonrpc: '2.0', id: 'missing', method: 'nope' })).toStrictEqual({
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'missing', method: 'nope' })).resolves.toStrictEqual({
       jsonrpc: '2.0',
       id: 'missing',
       error: {

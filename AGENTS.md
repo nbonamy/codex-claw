@@ -28,9 +28,13 @@ Core product surfaces:
 
 Preserve the product and process boundaries:
 
-- Electron main owns backend process lifecycle, transports, request IDs,
-  approvals, server requests, app persistence, and filesystem access. The
-  current concrete backend is Codex app-server.
+- Electron main is the desktop adapter. It owns windows, preload IPC, native
+  dialogs, app lifecycle, packaged resource resolution, and the stdio client
+  used to reach `clawd`.
+- `clawd` owns backend process lifecycle beyond the Electron-to-backend stdio
+  process, backend drivers, provider protocols, approvals, server requests,
+  app persistence, backend-owned filesystem access, git, loops, and agent
+  runtime state.
 - Renderer owns visual state and interactions. It must not talk directly to
   Codex app-server or any future backend process, spawn tools, read arbitrary
   local files, or depend on backend protocol types.
@@ -39,13 +43,13 @@ Preserve the product and process boundaries:
 - Codex-specific protocol data belongs in the Codex driver/adapter, not in
   reusable renderer components.
 - Backend-dependent features must enter through app-owned contracts and the
-  `AgentBackendDriver` seam first. Add or extend an optional driver method or
-  capability in Electron main, route it through typed IPC, and keep renderer
+  backend protocol first. Add or extend an optional driver method or capability
+  behind `clawd`, route Electron through `ClawBackendClient`, and keep renderer
   components free of Codex/Claude protocol branches.
 - `RendererMessage` is our app contract. It can borrow ideas from id8, but it
   is not bound to id8 or multi-llm-ts message shapes.
-- Future Claude Code support should arrive through a new backend driver and
-  translator behind the existing seam, not by making every renderer component
+- Future provider support should arrive through backend drivers and translators
+  behind `clawd`, not by making Electron main or renderer components
   provider-aware.
 - Theme support must use semantic tokens and CSS variables. Do not hard-code
   product colors inside components.

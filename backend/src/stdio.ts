@@ -4,7 +4,7 @@ import type { Readable, Writable } from 'node:stream';
 export type StdioRpcServerOptions = {
   input: Readable;
   output: Writable;
-  onMessage(message: ClawRpcMessage): ClawRpcResponse | undefined;
+  onMessage(message: ClawRpcMessage): ClawRpcResponse | undefined | Promise<ClawRpcResponse | undefined>;
 };
 
 export function startStdioRpcServer(options: StdioRpcServerOptions): () => void {
@@ -38,10 +38,14 @@ export function startStdioRpcServer(options: StdioRpcServerOptions): () => void 
 }
 
 function handleLine(line: string, options: StdioRpcServerOptions): void {
+  void handleLineAsync(line, options);
+}
+
+async function handleLineAsync(line: string, options: StdioRpcServerOptions): Promise<void> {
   try {
     const parsed = JSON.parse(line) as unknown;
     const message = parseClawRpcMessage(parsed);
-    const response = options.onMessage(message);
+    const response = await options.onMessage(message);
     if (response) {
       writeResponse(options.output, response);
     }
