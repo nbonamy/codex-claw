@@ -138,6 +138,33 @@ describe('AppController', () => {
     }));
   });
 
+  it('ignores malformed backend event snapshot fields', async () => {
+    const snapshot = createInitialSnapshot();
+    const controller = new AppController(snapshot, createBackendClient());
+    const send = vi.fn();
+
+    setMainWindowSend(controller, send);
+    await controller.initialize();
+    (controller as unknown as {
+      emitBackendEvent(event: ClawBackendEvent): void;
+    }).emitBackendEvent({
+      seq: 44,
+      type: 'snapshot.updated',
+      payload: {},
+      occurredAt: '2026-06-13T00:00:00.000Z',
+      snapshot: {
+        teams: [],
+        agents: [],
+      } as unknown as AppSnapshot,
+    });
+
+    expect(currentSnapshot(controller)).toBe(snapshot);
+    expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
+      seq: 44,
+      type: 'snapshot.updated',
+    }));
+  });
+
   it('routes client request responses through clawd', async () => {
     const snapshot = createInitialSnapshot();
     const backendSnapshot = {

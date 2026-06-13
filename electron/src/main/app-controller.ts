@@ -4,7 +4,7 @@ import { logMain, warnMain } from './log';
 import { createMainWindow } from './main-window';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from './backend-process-client';
-import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
+import { isAppSnapshot, isClawSnapshotGetResult, isDesktopState, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import type { AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopState, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
@@ -599,7 +599,7 @@ export class AppController {
 
   private async refreshSnapshotFromBackend(): Promise<void> {
     const backendState = await this.requireBackendClient().request<unknown>('snapshot/get');
-    if (isBackendSnapshotState(backendState)) {
+    if (isClawSnapshotGetResult(backendState)) {
       this.snapshot = backendState.snapshot;
       this.desktopState = backendState.desktopState;
       this.seq = Math.max(this.seq, backendState.lastEventSeq);
@@ -625,7 +625,7 @@ export class AppController {
 
   private emitBackendEvent(event: ClawBackendEvent): void {
     const rendererEvent = eventForRenderer(event);
-    if (event.snapshot) {
+    if (isAppSnapshot(event.snapshot)) {
       this.snapshot = event.snapshot;
     }
     if (isDesktopState(event.desktopState)) {
@@ -669,25 +669,11 @@ export function startMainApp(): void {
   });
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
 function createEmptyDesktopState(): DesktopState {
   return {
     sourceFolderPath: '',
     shouldPreventDisplaySleep: false,
   };
-}
-
-function isBackendSnapshotState(value: unknown): value is { snapshot: AppSnapshot; lastEventSeq: number; desktopState: DesktopState } {
-  return isRecord(value) && isRecord(value.snapshot) && typeof value.lastEventSeq === 'number' && isDesktopState(value.desktopState);
-}
-
-function isDesktopState(value: unknown): value is DesktopState {
-  return isRecord(value) &&
-    typeof value.sourceFolderPath === 'string' &&
-    typeof value.shouldPreventDisplaySleep === 'boolean';
 }
 
 function eventForRenderer(event: ClawBackendEvent): MainToRendererEvent {
