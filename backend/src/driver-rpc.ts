@@ -121,7 +121,7 @@ export class BackendDriverRpc {
         this.requireDriver(backend).forgetAgentSession?.(agentId);
         return null;
       }
-      case 'agent/interrupt': {
+      case 'driver/interrupt': {
         const { agent } = requireAgentParams(params);
         return this.requireDriver(agent.backend).interrupt(agent);
       }
@@ -160,7 +160,7 @@ export class BackendDriverRpc {
         }
         return driver.readConversationMessages(record.ref as never, requireString(record.agentId, 'agentId'));
       }
-      case 'agent/steer': {
+      case 'driver/steer': {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);

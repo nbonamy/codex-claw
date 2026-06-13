@@ -95,6 +95,9 @@ Current implementation checkpoint:
   boundary.
 - `clawd` now owns goal set/clear and approval-preset session mutations,
   including backend-session updates, goal events, and Codex approval defaults.
+- `clawd` now owns active-turn steering and interruption session mutations.
+  Electron forwards steer/interrupt requests and adopts the returned snapshot;
+  provider-only steer/interrupt calls use `driver/*` RPC methods.
 - The remaining large slice is to move the rest of product orchestration out of
   `AppController` so Electron becomes only the desktop IPC/stdio layer. The
   largest remaining owners are prompt dispatch and rollback/edit/retry flows,

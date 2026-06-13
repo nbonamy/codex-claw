@@ -673,6 +673,126 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
+  it('owns steer and interrupt session mutations', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'working' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const steerPrompt = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex', threadId: 'thread-steer' },
+      turnId: 'turn-steer',
+    });
+    const interrupt = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex', threadId: 'thread-interrupt' },
+      turnId: 'turn-interrupt',
+    });
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt,
+      respondToRequest: async () => undefined,
+      steerPrompt,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const events: unknown[] = [];
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      onEvent: (event) => events.push(event),
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'steer',
+      method: 'agent/steer',
+      params: { agentId: 'agent-dina', prompt: ' try smaller ' },
+    })).resolves.toMatchObject({
+      result: {
+        agents: [{ id: 'agent-dina', backendSession: { kind: 'codex', threadId: 'thread-steer' } }],
+      },
+    });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'interrupt',
+      method: 'agent/interrupt',
+      params: { agentId: 'agent-dina' },
+    })).resolves.toMatchObject({
+      result: {
+        agents: [{ id: 'agent-dina', backendSession: { kind: 'codex', threadId: 'thread-interrupt' } }],
+      },
+    });
+
+    expect(steerPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'try smaller');
+    expect(interrupt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(snapshot.messages.some((message) => message.parts.some((part) => part.type === 'text' && part.text === 'try smaller'))).toBe(true);
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'message.steer', payload: { prompt: 'try smaller' } }),
+    ]));
+    await server.close();
+  });
+
+  it('emits an app error event when interrupt fails', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'working' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: vi.fn().mockRejectedValue(new Error('no active turn')),
+      respondToRequest: async () => undefined,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const events: unknown[] = [];
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      onEvent: (event) => events.push(event),
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'interrupt',
+      method: 'agent/interrupt',
+      params: { agentId: 'agent-dina' },
+    })).resolves.toMatchObject({
+      result: {
+        agents: [{ id: 'agent-dina', status: { type: 'error', message: 'Failed to interrupt Codex: no active turn' } }],
+      },
+    });
+
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'error', payload: { message: 'Failed to interrupt Codex: no active turn' } }),
+    ]));
+    await server.close();
+  });
+
   it('owns bench mutations and validates deployed template folders', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-bench-'));
     const snapshot = createTestSnapshot();

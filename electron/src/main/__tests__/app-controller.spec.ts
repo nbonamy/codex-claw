@@ -801,24 +801,45 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('agent/setApprovalPreset', { agentId: 'agent-dina', preset: 'approve-for-me' });
   });
 
-  it('interrupts the active Codex turn and keeps status until completion arrives', async () => {
+  it('routes active-turn steering through clawd', async () => {
     const snapshot = createInitialSnapshot();
-    snapshot.agents[0].status = { type: 'working' };
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
-    const backendDriver = createFakeCodexBackendDriver({
-      interrupt: vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'thread-dina' }, turnId: 'turn-1' }),
-    });
+    snapshot.sourceFolder.initialized = true;
+    const backendSnapshot = {
+      ...snapshot,
+      agents: [{
+        ...snapshot.agents[0]!,
+        backendSession: { kind: 'codex' as const, threadId: 'thread-dina' },
+      }],
+    };
+    const request = vi.fn().mockResolvedValue(backendSnapshot);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
 
     await controller.initialize();
-    setCodexBackendDriver(controller, backendDriver);
-    await interruptAgent(controller, 'agent-dina');
 
-    expect(backendDriver.interrupt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
-    expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
+    await expect(steerPrompt(controller, 'agent-dina', ' try smaller ')).resolves.toBe(backendSnapshot);
+
+    expect(request).toHaveBeenCalledWith('agent/steer', { agentId: 'agent-dina', prompt: ' try smaller ' });
+  });
+
+  it('routes interruption through clawd', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].status = { type: 'working' };
+    snapshot.sourceFolder.initialized = true;
+    const backendSnapshot = {
+      ...snapshot,
+      agents: [{
+        ...snapshot.agents[0]!,
+        backendSession: { kind: 'codex' as const, threadId: 'thread-dina' },
+      }],
+    };
+    const request = vi.fn().mockResolvedValue(backendSnapshot);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+
+    await controller.initialize();
+
+    await expect(interruptAgent(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
+
+    expect(request).toHaveBeenCalledWith('agent/interrupt', { agentId: 'agent-dina' });
   });
 
   it('routes Claude prompts through the Claude backend driver', async () => {
@@ -1627,9 +1648,15 @@ async function resumeAgentConversation(
   }).resumeAgentConversation(agentId, ref);
 }
 
-async function interruptAgent(controller: AppController, agentId: string): Promise<void> {
-  await (controller as unknown as {
-    interruptAgent(agentId: string): Promise<void>;
+async function steerPrompt(controller: AppController, agentId: string, prompt: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot>;
+  }).steerPrompt(agentId, prompt);
+}
+
+async function interruptAgent(controller: AppController, agentId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    interruptAgent(agentId: string): Promise<AppSnapshot>;
   }).interruptAgent(agentId);
 }
 

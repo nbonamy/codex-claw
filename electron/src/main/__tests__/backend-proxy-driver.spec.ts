@@ -82,6 +82,8 @@ describe('ClawBackendProxyDriver', () => {
     await driver.setGoal(agent, 'Ship the goal shelf');
     await driver.clearGoal(agent);
     await driver.setApprovalPreset(agent, 'approve-for-me');
+    await driver.steerPrompt(agent, 'try smaller');
+    await driver.interrupt(agent);
     await expect(driver.resumeConversation(agent, ref)).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-resumed' },
       messages: [],
@@ -92,7 +94,9 @@ describe('ClawBackendProxyDriver', () => {
     expect(client.request).toHaveBeenNthCalledWith(2, 'driver/setGoal', { agent, objective: 'Ship the goal shelf' });
     expect(client.request).toHaveBeenNthCalledWith(3, 'driver/clearGoal', { agent });
     expect(client.request).toHaveBeenNthCalledWith(4, 'driver/setApprovalPreset', { agent, preset: 'approve-for-me' });
-    expect(client.request).toHaveBeenNthCalledWith(5, 'driver/resumeConversation', { agent, ref });
-    expect(client.request).toHaveBeenNthCalledWith(6, 'driver/forgetSession', { backend: 'codex', agentId: 'agent-dina' });
+    expect(client.request).toHaveBeenNthCalledWith(5, 'driver/steer', { agent, prompt: 'try smaller' });
+    expect(client.request).toHaveBeenNthCalledWith(6, 'driver/interrupt', { agent });
+    expect(client.request).toHaveBeenNthCalledWith(7, 'driver/resumeConversation', { agent, ref });
+    expect(client.request).toHaveBeenNthCalledWith(8, 'driver/forgetSession', { backend: 'codex', agentId: 'agent-dina' });
   });
 });

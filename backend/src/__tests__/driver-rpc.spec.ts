@@ -57,6 +57,14 @@ describe('BackendDriverRpc', () => {
       backendSession: { kind: 'codex', threadId: 'thread-approval' },
       approvalPreset: 'approve-for-me',
     });
+    const steerPrompt = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex', threadId: 'thread-steer' },
+      turnId: 'turn-steer',
+    });
+    const interrupt = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex', threadId: 'thread-interrupt' },
+      turnId: 'turn-interrupt',
+    });
     const resumeConversation = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-resumed' },
       messages: [],
@@ -65,9 +73,11 @@ describe('BackendDriverRpc', () => {
     const rpc = new BackendDriverRpc(new Map([['codex', createDriver({
       clearGoal,
       forgetAgentSession,
+      interrupt,
       resumeConversation,
       setApprovalPreset,
       setGoal,
+      steerPrompt,
     })]]));
     const ref = { backend: 'codex' as const, threadId: 'thread-resumed' };
 
@@ -83,6 +93,14 @@ describe('BackendDriverRpc', () => {
       backendSession: { kind: 'codex', threadId: 'thread-approval' },
       approvalPreset: 'approve-for-me',
     });
+    await expect(rpc.handle('driver/steer', { agent, prompt: 'try smaller' })).resolves.toStrictEqual({
+      backendSession: { kind: 'codex', threadId: 'thread-steer' },
+      turnId: 'turn-steer',
+    });
+    await expect(rpc.handle('driver/interrupt', { agent })).resolves.toStrictEqual({
+      backendSession: { kind: 'codex', threadId: 'thread-interrupt' },
+      turnId: 'turn-interrupt',
+    });
     await expect(rpc.handle('driver/resumeConversation', { agent, ref })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-resumed' },
       messages: [],
@@ -92,6 +110,8 @@ describe('BackendDriverRpc', () => {
     expect(setGoal).toHaveBeenCalledWith(agent, 'Ship the goal shelf');
     expect(clearGoal).toHaveBeenCalledWith(agent);
     expect(setApprovalPreset).toHaveBeenCalledWith(agent, 'approve-for-me');
+    expect(steerPrompt).toHaveBeenCalledWith(agent, 'try smaller');
+    expect(interrupt).toHaveBeenCalledWith(agent);
     expect(resumeConversation).toHaveBeenCalledWith(agent, ref);
     expect(forgetAgentSession).toHaveBeenCalledWith('agent-dina');
   });

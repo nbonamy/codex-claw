@@ -681,61 +681,11 @@ export class AppController {
   }
 
   private async steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot> {
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    const trimmedPrompt = prompt.trim();
-    if (!agent || !trimmedPrompt) {
-      return this.snapshot;
-    }
-
-    const driver = await this.getBackendDriverForAgent(agent);
-    if (!driver.steerPrompt) {
-      throw unsupportedBackendFeature(agent, 'active-turn steering');
-    }
-
-    const result = await driver.steerPrompt(agent, trimmedPrompt);
-    agent.backendSession = result.backendSession;
-    this.emitAndApply({
-      agentId,
-      ...(result.backendSession.kind === 'codex' ? { threadId: result.backendSession.threadId } : {}),
-      turnId: result.turnId,
-      type: 'message.steer',
-      payload: {
-        prompt: trimmedPrompt,
-      },
-    });
-    return this.snapshot;
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/steer', { agentId, prompt }));
   }
 
   private async interruptAgent(agentId: string): Promise<AppSnapshot> {
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent) {
-      return this.snapshot;
-    }
-
-    logMain('agent-interrupt', 'requested', {
-      agentId,
-      status: agent.status.type,
-    });
-
-    try {
-      const driver = await this.getBackendDriverForAgent(agent);
-      const result = await driver.interrupt(agent);
-      agent.backendSession = result.backendSession;
-      logMain('agent-interrupt', 'acknowledged', { agentId });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      warnMain('agent-interrupt', 'failed', {
-        agentId,
-        error: message,
-      });
-      this.emitAndApply({
-        agentId,
-        type: 'error',
-        payload: { message: `Failed to interrupt ${backendDisplayName(agent.backend)}: ${message}` },
-      });
-    }
-
-    return this.snapshot;
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/interrupt', { agentId }));
   }
 
   private async deleteMessage(agentId: string, messageId: string): Promise<AppSnapshot> {

@@ -1,9 +1,10 @@
 import path from 'node:path';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
-import { createAgentInSnapshot, createEmptySnapshot, updateAgentFolder, updateAgentFromInput } from '@codex-claw/shared/snapshot';
-import type { AppSnapshot, BackendConversationRef, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
+import { applyMainEventToSnapshot, createAgentInSnapshot, createEmptySnapshot, updateAgentFolder, updateAgentFromInput } from '@codex-claw/shared/snapshot';
+import type { AppSnapshot, BackendConversationRef, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
-import type { BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult } from '@codex-claw/shared/backend-driver';
+import { backendDisplayName } from '@codex-claw/shared/backend-driver';
+import type { BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { assignWorkItemToAgentInSnapshot, closeAgentInSnapshot, deployBenchTemplateInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeBenchTemplateFromSnapshot, removeWorkItemAssignmentFromSnapshot, reorderAgentInTeam, restartAgentConversation, resumeAgentConversationInSnapshot, saveAgentToBench } from '@codex-claw/shared/agent-manager';
 import { clearLoopExecutionHistoryInSnapshot, createLoopInSnapshot, deleteLoopExecutionFromSnapshot, deleteLoopFromSnapshot, updateLoopInSnapshot } from '@codex-claw/shared/loop-manager';
@@ -271,6 +272,44 @@ export class ClawBackendServer {
         agent.backendDefaults = approvalBackendDefaultsWithPreset(agent.backendDefaults, result.approvalPreset);
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
+      case 'agent/steer': {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const prompt = requireString(params.prompt, 'prompt').trim();
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent || !prompt) {
+          return createClawRpcResult(message.id, this.snapshot);
+        }
+        const result = await this.requireDriverRpc().handle('driver/steer', { agent, prompt }) as BackendSendResult;
+        agent.backendSession = result.backendSession;
+        this.applyAndEmitBackendEvent({
+          agentId,
+          ...(result.backendSession.kind === 'codex' ? { threadId: result.backendSession.threadId } : {}),
+          turnId: result.turnId,
+          type: 'message.steer',
+          payload: { prompt },
+        });
+        return createClawRpcResult(message.id, this.snapshot);
+      }
+      case 'agent/interrupt': {
+        const agentId = requireAgentId(message.params);
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent) {
+          return createClawRpcResult(message.id, this.snapshot);
+        }
+        try {
+          const result = await this.requireDriverRpc().handle('driver/interrupt', { agent }) as BackendSendResult;
+          agent.backendSession = result.backendSession;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          this.applyAndEmitBackendEvent({
+            agentId,
+            type: 'error',
+            payload: { message: `Failed to interrupt ${backendDisplayName(agent.backend)}: ${errorMessage}` },
+          });
+        }
+        return createClawRpcResult(message.id, this.snapshot);
+      }
       case 'team/create': {
         const input = requireTeamCreateInput(message.params);
         validateTeamInput(input);
@@ -511,6 +550,18 @@ export class ClawBackendServer {
     } catch {
       // A title failure should not fail the user action that created the session.
     }
+  }
+
+  private applyAndEmitBackendEvent(event: BackendEvent): void {
+    this.lastEventSeq += 1;
+    const fullEvent: MainToRendererEvent = {
+      ...event,
+      seq: this.lastEventSeq,
+      occurredAt: event.occurredAt ?? new Date().toISOString(),
+      payload: event.payload,
+    };
+    applyMainEventToSnapshot(this.snapshot, fullEvent);
+    this.onEvent?.(fullEvent);
   }
 
   private handleBackendEvent(event: BackendEvent, options: { persist?: boolean } = {}): void {

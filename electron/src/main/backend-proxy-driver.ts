@@ -85,7 +85,7 @@ export class ClawBackendProxyDriver implements AgentBackendDriver {
   }
 
   async interrupt(agent: Agent): Promise<BackendSendResult> {
-    return this.client.request('agent/interrupt', { agent });
+    return this.client.request('driver/interrupt', { agent });
   }
 
   async respondToRequest(response: ClientRequestResponse): Promise<void> {
@@ -109,7 +109,7 @@ export class ClawBackendProxyDriver implements AgentBackendDriver {
   }
 
   async steerPrompt(agent: Agent, prompt: string): Promise<BackendSendResult> {
-    return this.client.request('agent/steer', { agent, prompt });
+    return this.client.request('driver/steer', { agent, prompt });
   }
 
   async rollbackToTurn(agent: Agent, turnId: string): Promise<BackendRollbackResult> {
