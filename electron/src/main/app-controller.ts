@@ -3,8 +3,9 @@ import path from 'node:path';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
 import { logMain, warnMain } from './log';
 import { createMainWindow } from './main-window';
-import { applyMainEventToSnapshot, createEmptySnapshot } from '@codex-claw/shared/snapshot';
+import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from './backend-process-client';
+import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import type { AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
@@ -33,7 +34,7 @@ export class AppController {
   }
 
   registerIpcHandlers(): void {
-    ipcMain.handle(ipcChannels.getSnapshot, () => this.snapshot);
+    ipcMain.handle(ipcChannels.getSnapshot, () => this.getSnapshot());
 
     ipcMain.handle(ipcChannels.connectWorkProvider, async (_event, provider: WorkProviderKind) => {
       return this.connectWorkProvider(provider);
@@ -300,12 +301,8 @@ export class AppController {
     try {
       await this.backendClient.start();
       const health = await this.backendClient.health();
-      const backendState = await this.backendClient.request<unknown>('snapshot/get');
-      if (isBackendSnapshotState(backendState)) {
-        this.snapshot = backendState.snapshot;
-        this.seq = Math.max(this.seq, backendState.lastEventSeq);
-      }
-      this.backendClientEventUnsubscribe = this.backendClient.onEvent((event) => this.emitAndApply(event));
+      await this.refreshSnapshotFromBackend();
+      this.backendClientEventUnsubscribe = this.backendClient.onEvent((event) => this.emitBackendEvent(event));
       logMain('clawd', 'connected to backend process', { version: health.version, pid: health.pid });
     } catch (error) {
       warnMain('clawd', 'failed to connect to backend process', {
@@ -451,6 +448,13 @@ export class AppController {
     return this.snapshot;
   }
 
+  private async getSnapshot(): Promise<AppSnapshot> {
+    if (this.backendClient) {
+      await this.refreshSnapshotFromBackend();
+    }
+    return this.snapshot;
+  }
+
   private async sendPrompt(
     agentId: string,
     prompt: string,
@@ -591,6 +595,15 @@ export class AppController {
     return this.requireBackendClient().request('system/openAccessibilitySettings');
   }
 
+  private async refreshSnapshotFromBackend(): Promise<void> {
+    const backendState = await this.requireBackendClient().request<unknown>('snapshot/get');
+    if (isBackendSnapshotState(backendState)) {
+      this.snapshot = backendState.snapshot;
+      this.seq = Math.max(this.seq, backendState.lastEventSeq);
+      this.syncPowerSaveBlocker();
+    }
+  }
+
   private requireBackendClient(): ClawBackendClientPort {
     if (!this.backendClient) {
       throw new Error('clawd backend is not connected.');
@@ -602,21 +615,16 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('clientRequest/respond', { response }));
   }
 
-  private emitAndApply(
-    event: Omit<MainToRendererEvent, 'seq' | 'occurredAt'> & Partial<Pick<MainToRendererEvent, 'seq' | 'occurredAt'>>,
-  ): void {
-    const fullEvent: MainToRendererEvent = {
-      ...event,
-      seq: event.seq ?? ++this.seq,
-      occurredAt: event.occurredAt ?? new Date().toISOString(),
-    };
-    if (!fullEvent.backend && fullEvent.agentId) {
-      fullEvent.backend = this.snapshot.agents.find((agent) => agent.id === fullEvent.agentId)?.backend;
+  private emitBackendEvent(event: ClawBackendEvent): void {
+    const rendererEvent = eventForRenderer(event);
+    const eventSnapshot = snapshotFromBackendEvent(event);
+    if (eventSnapshot) {
+      this.snapshot = eventSnapshot;
     }
 
-    applyMainEventToSnapshot(this.snapshot, fullEvent);
+    this.seq = Math.max(this.seq, rendererEvent.seq);
     this.syncPowerSaveBlocker();
-    this.mainWindow?.webContents.send(ipcChannels.event, fullEvent);
+    this.mainWindow?.webContents.send(ipcChannels.event, rendererEvent);
   }
 
   private syncPowerSaveBlocker(): void {
@@ -657,4 +665,25 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isBackendSnapshotState(value: unknown): value is { snapshot: AppSnapshot; lastEventSeq: number } {
   return isRecord(value) && isRecord(value.snapshot) && typeof value.lastEventSeq === 'number';
+}
+
+function isAppSnapshot(value: unknown): value is AppSnapshot {
+  return isRecord(value) && Array.isArray(value.teams) && Array.isArray(value.agents);
+}
+
+function eventForRenderer(event: ClawBackendEvent): MainToRendererEvent {
+  const { snapshot: _snapshot, ...rendererEvent } = event;
+  return rendererEvent;
+}
+
+function snapshotFromBackendEvent(event: ClawBackendEvent): AppSnapshot | null {
+  if (isAppSnapshot(event.snapshot)) {
+    return event.snapshot;
+  }
+
+  if (event.type === 'snapshot.updated' && isAppSnapshot(event.payload)) {
+    return event.payload;
+  }
+
+  return null;
 }

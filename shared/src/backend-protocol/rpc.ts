@@ -59,6 +59,7 @@ export type ClawBackendEvent = {
   turnId?: string;
   payload: unknown;
   occurredAt: string;
+  snapshot?: AppSnapshot;
 };
 
 export type ClawBackendRequestMap = {

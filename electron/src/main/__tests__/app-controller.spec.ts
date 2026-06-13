@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { AppController } from '../app-controller';
-import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
+import { applyMainEventToSnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
 import type { AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceRepository, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { ipcChannels } from '@codex-claw/shared/ipc';
@@ -59,8 +59,10 @@ describe('AppController', () => {
     expect(currentSnapshot(controller)).toBe(backendSnapshot);
   });
 
-  it('applies backend events emitted by the clawd process client', async () => {
+  it('caches authoritative snapshots from backend events emitted by the clawd process client', async () => {
     const snapshot = createInitialSnapshot();
+    const backendSnapshot = createInitialSnapshot();
+    backendSnapshot.agents[0]!.status = { type: 'working' };
     const unsubscribe = vi.fn();
     let emitBackendEvent: (event: ClawBackendEvent) => void = () => undefined;
     const backendClient = createBackendClientWithEventEmitter((listener) => {
@@ -79,16 +81,20 @@ describe('AppController', () => {
       type: 'agent.statusChanged',
       payload: { type: 'working' },
       occurredAt: '2026-06-13T00:00:00.000Z',
+      snapshot: backendSnapshot,
     });
     await controller.shutdown();
 
-    expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
+    expect(currentSnapshot(controller)).toBe(backendSnapshot);
     expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
       seq: 42,
       backend: 'codex',
       agentId: 'agent-dina',
       type: 'agent.statusChanged',
       payload: { type: 'working' },
+    }));
+    expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.not.objectContaining({
+      snapshot: backendSnapshot,
     }));
     expect(unsubscribe).toHaveBeenCalledOnce();
   });
@@ -516,7 +522,7 @@ describe('AppController', () => {
     };
 
     await controller.initialize();
-    emitAndApply(controller, {
+    emitBackendEvent(controller, {
       agentId: 'agent-dina',
       threadId: 'thread-dina',
       turnId: 'turn-1',
@@ -551,7 +557,7 @@ describe('AppController', () => {
     };
 
     await controller.initialize();
-    emitAndApply(controller, {
+    emitBackendEvent(controller, {
       type: 'account.rateLimitsUpdated',
       payload: { rateLimits },
     });
@@ -567,7 +573,7 @@ describe('AppController', () => {
 
     await controller.initialize();
     setMainWindowSend(controller, send);
-    emitAndApply(controller, {
+    emitBackendEvent(controller, {
       agentId: 'agent-dina',
       threadId: 'thread-dina',
       turnId: 'turn-plan',
@@ -612,7 +618,7 @@ describe('AppController', () => {
 
     await controller.initialize();
     setMainWindowSend(controller, send);
-    emitAndApply(controller, {
+    emitBackendEvent(controller, {
       agentId: 'agent-dina',
       threadId: 'thread-dina',
       turnId: 'turn-plan',
@@ -918,7 +924,7 @@ describe('AppController', () => {
       '+new',
     ].join('\n');
 
-    emitAndApply(controller, {
+    emitBackendEvent(controller, {
       agentId: 'agent-dina',
       threadId: 'thread-dina',
       turnId: 'turn-1',
@@ -949,7 +955,7 @@ describe('AppController', () => {
       mainWindow: { webContents: { send: ReturnType<typeof vi.fn> } };
     }).mainWindow = { webContents: { send } };
 
-    emitAndApply(controller, {
+    emitBackendEvent(controller, {
       agentId: 'agent-dina',
       threadId: 'thread-dina',
       turnId: 'turn-1',
@@ -1066,15 +1072,23 @@ function loopFixture(input: { cleanup: LoopCleanup; teamTarget: LoopTeamTarget }
   };
 }
 
-function emitAndApply(
+function emitBackendEvent(
   controller: AppController,
   event: Omit<MainToRendererEvent, 'seq' | 'occurredAt'> & Partial<Pick<MainToRendererEvent, 'seq' | 'occurredAt'>>,
 ): void {
+  const fullEvent: MainToRendererEvent = {
+    ...event,
+    seq: event.seq ?? 1,
+    occurredAt: event.occurredAt ?? new Date().toISOString(),
+  };
+  const snapshot = currentSnapshot(controller);
+  applyMainEventToSnapshot(snapshot, fullEvent);
   (controller as unknown as {
-    emitAndApply(
-      event: Omit<MainToRendererEvent, 'seq' | 'occurredAt'> & Partial<Pick<MainToRendererEvent, 'seq' | 'occurredAt'>>,
-    ): void;
-  }).emitAndApply(event);
+    emitBackendEvent(event: ClawBackendEvent): void;
+  }).emitBackendEvent({
+    ...fullEvent,
+    snapshot,
+  });
 }
 
 function setMainWindowSend(controller: AppController, send: ReturnType<typeof vi.fn>): void {

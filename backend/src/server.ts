@@ -980,7 +980,7 @@ export class ClawBackendServer {
     const fullEvent = this.nextMainEvent(event);
     applyMainEventToSnapshot(this.snapshot, fullEvent);
     this.recordClientRequestOwner(fullEvent);
-    this.onEvent?.(fullEvent);
+    this.emitBackendEvent(fullEvent, shouldAttachSnapshotToBackendEvent(event));
     this.emitDerivedSidePanelEvents(fullEvent);
   }
 
@@ -988,7 +988,7 @@ export class ClawBackendServer {
     const fullEvent = this.nextMainEvent(event);
     applyMainEventToSnapshot(this.snapshot, fullEvent);
     this.recordClientRequestOwner(fullEvent);
-    this.onEvent?.(fullEvent);
+    this.emitBackendEvent(fullEvent, shouldAttachSnapshotToBackendEvent(event));
     this.emitDerivedSidePanelEvents(fullEvent);
     if (options.persist !== false && shouldPersistSnapshotForEvent(event)) {
       void this.saveSnapshot?.(this.snapshot);
@@ -1006,6 +1006,15 @@ export class ClawBackendServer {
       occurredAt: event.occurredAt ?? new Date().toISOString(),
       payload: event.payload,
     };
+  }
+
+  private emitBackendEvent(event: MainToRendererEvent, includeSnapshot: boolean): void {
+    this.onEvent?.(includeSnapshot
+      ? {
+        ...event,
+        snapshot: this.snapshot,
+      }
+      : event);
   }
 
   private emitDerivedSidePanelEvents(event: MainToRendererEvent): void {
@@ -1327,6 +1336,12 @@ function shouldPersistSnapshotForEvent(event: BackendEvent): boolean {
     event.type === 'thread.tokenUsageUpdated' ||
     event.type === 'turn.planUpdated' ||
     event.type === 'turn.proposedPlanCompleted';
+}
+
+function shouldAttachSnapshotToBackendEvent(event: BackendEvent): boolean {
+  return event.type === 'agent.statusChanged' ||
+    event.type === 'diff.updated' ||
+    shouldPersistSnapshotForEvent(event);
 }
 
 function shouldRefreshGitStatusForEvent(event: BackendEvent): boolean {

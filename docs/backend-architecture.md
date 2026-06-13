@@ -112,9 +112,12 @@ Current implementation checkpoint:
   delete/edit/retry message orchestration. Electron forwards message actions by
   agent/message ids and adopts the returned snapshot.
 - `clawd` now owns derived side-panel requests for plans and current-turn diffs.
-  Electron applies backend events to its volatile cache and fans them to the
-  renderer; it no longer synthesizes `sidePanel.*` events from plan or diff
-  events.
+  Electron fans out backend events but no longer synthesizes `sidePanel.*`
+  events from plan or diff events.
+- `clawd` now owns snapshot event application for the desktop bridge. Backend
+  event notifications may carry an authoritative snapshot for desktop-native
+  reactions, and Electron fetches `getSnapshot` from `clawd` instead of reducing
+  product events itself.
 - `clawd` owns agent file listing/preview authority. Client-facing
   `agent/listFiles` and `agent/previewFile` take an `agentId`; Electron does not
   send workspace roots or request raw file reads. Provider-specific file preview

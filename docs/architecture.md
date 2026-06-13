@@ -164,6 +164,11 @@ That includes file previews: desktop and future non-desktop clients may request
 file content from `clawd`, but they do not read backend-owned agent workspace
 paths themselves.
 
+Snapshot mutation is also backend-owned. `clawd` applies backend events to the
+authoritative snapshot; Electron fetches fresh snapshots from `clawd` for
+`getSnapshot` and may cache backend-provided snapshots only for desktop-native
+reactions while the renderer still receives incremental UI events.
+
 ```mermaid
 flowchart LR
   Renderer["Renderer: Vue UI"]

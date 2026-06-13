@@ -154,6 +154,20 @@ describe('ClawBackendServer', () => {
   });
 
   it('assigns backend event sequence numbers', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'idle' },
+      backendSession: { kind: 'codex', threadId: 'thread-test' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    snapshot.activeAgentId = 'agent-dina';
     const events: unknown[] = [];
     let emitEvent: (event: BackendEvent) => void = () => undefined;
     const driver: AgentBackendDriver = {
@@ -173,6 +187,7 @@ describe('ClawBackendServer', () => {
     const server = new ClawBackendServer({
       version: 'test-version',
       pid: 123,
+      snapshot,
       driverRpc,
       onEvent: (event) => events.push(event),
     });
@@ -190,6 +205,14 @@ describe('ClawBackendServer', () => {
       agentId: 'agent-dina',
       type: 'agent.statusChanged',
       payload: { type: 'working' },
+      snapshot: {
+        agents: [
+          expect.objectContaining({
+            id: 'agent-dina',
+            status: { type: 'working' },
+          }),
+        ],
+      },
     }]);
     await expect(server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'snapshot/get' })).resolves.toMatchObject({
       result: {
