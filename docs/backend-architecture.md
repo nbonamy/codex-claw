@@ -86,10 +86,13 @@ Current implementation checkpoint:
 - `clawd` now owns agent file preview authority: Electron requests file
   listing/reading by agent id only, and the backend resolves the folder from
   its snapshot before touching storage.
+- `clawd` now owns work item assignment and unassignment mutations. Electron
+  forwards the item payload and adopts the backend snapshot instead of changing
+  `workBacklog.assignments` locally.
 - The remaining large slice is to move the rest of product orchestration out of
   `AppController` so Electron becomes only the desktop IPC/stdio layer. The
-  largest remaining owners are direct work-assignment and conversation/session
-  mutation routes plus remaining desktop-era driver shims.
+  largest remaining owners are conversation/session mutation routes plus
+  remaining desktop-era driver shims.
 
 ## Goals
 

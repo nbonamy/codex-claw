@@ -7,8 +7,6 @@ import { logMain, warnMain } from './log';
 import { createMainWindow } from './main-window';
 import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-permissions';
 import {
-  assignWorkItemToAgentInSnapshot,
-  removeWorkItemAssignmentFromSnapshot,
   restartAgentConversation,
   resumeAgentConversationInSnapshot,
 } from '@codex-claw/shared/agent-manager';
@@ -22,7 +20,6 @@ import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from '.
 import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { approvalBackendDefaultsWithPreset, isApprovalPreset } from '@codex-claw/shared/approval-presets';
 import { ipcChannels } from '@codex-claw/shared/ipc';
-import { sanitizeWorkItemAssignmentSource } from '@codex-claw/shared/work-assignments';
 import type { AgentBackendDriver, BackendSendResult } from './backends/types';
 import { backendDisplayName, unsupportedBackendFeature } from './backends/types';
 import { formatConversationTitle } from '@codex-claw/shared/conversation-title';
@@ -195,29 +192,11 @@ export class AppController {
     });
 
     ipcMain.handle(ipcChannels.assignWorkItemToAgent, async (_event, agentId: string, item: unknown) => {
-      const assignmentSource = sanitizeWorkItemAssignmentSource(item);
-      if (!assignmentSource) {
-        throw new Error('Invalid work item assignment.');
-      }
-
-      const agent = assignWorkItemToAgentInSnapshot(this.snapshot, agentId, assignmentSource);
-      if (!agent) {
-        throw new Error(`Agent not found: ${agentId}`);
-      }
-      await this.persistSnapshot();
-      return this.snapshot;
+      return this.assignWorkItemToAgent(agentId, item);
     });
 
     ipcMain.handle(ipcChannels.removeWorkItemAssignment, async (_event, item: unknown) => {
-      const assignmentSource = sanitizeWorkItemAssignmentSource(item);
-      if (!assignmentSource) {
-        throw new Error('Invalid work item assignment.');
-      }
-
-      if (removeWorkItemAssignmentFromSnapshot(this.snapshot, assignmentSource)) {
-        await this.persistSnapshot();
-      }
-      return this.snapshot;
+      return this.removeWorkItemAssignment(item);
     });
 
     ipcMain.handle(ipcChannels.duplicateAgent, async (_event, agentId: string) => {
@@ -438,6 +417,14 @@ export class AppController {
 
   private async updateAgentFolder(agentId: string, folder: string): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/updateFolder', { agentId, folder }));
+  }
+
+  private async assignWorkItemToAgent(agentId: string, item: unknown): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/assignWorkItem', { agentId, item }));
+  }
+
+  private async removeWorkItemAssignment(item: unknown): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/removeWorkItemAssignment', { item }));
   }
 
   private async createTeam(input: CreateTeamInput): Promise<AppSnapshot> {

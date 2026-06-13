@@ -5,11 +5,12 @@ import type { AppSnapshot, CreateAgentInput, CreateLoopInput, CreateSourceWorktr
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { BackendEvent } from '@codex-claw/shared/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
-import { closeAgentInSnapshot, deployBenchTemplateInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeBenchTemplateFromSnapshot, reorderAgentInTeam, saveAgentToBench } from '@codex-claw/shared/agent-manager';
+import { assignWorkItemToAgentInSnapshot, closeAgentInSnapshot, deployBenchTemplateInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeBenchTemplateFromSnapshot, removeWorkItemAssignmentFromSnapshot, reorderAgentInTeam, saveAgentToBench } from '@codex-claw/shared/agent-manager';
 import { clearLoopExecutionHistoryInSnapshot, createLoopInSnapshot, deleteLoopExecutionFromSnapshot, deleteLoopFromSnapshot, updateLoopInSnapshot } from '@codex-claw/shared/loop-manager';
 import { updateSettingsInSnapshot } from '@codex-claw/shared/settings';
 import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selectTeam, updateTeamInSnapshot } from '@codex-claw/shared/team-manager';
 import { teamColors } from '@codex-claw/shared/team-colors';
+import { sanitizeWorkItemAssignmentSource } from '@codex-claw/shared/work-assignments';
 import { BackendDriverRpc } from './driver-rpc';
 import type { LoopRunner } from './loops/runner';
 import type { WorkIntegrationManager } from './work-integrations/manager';
@@ -150,6 +151,30 @@ export class ClawBackendServer {
           folder: agent.folder,
           filePath: requireString(params.filePath, 'filePath'),
         }));
+      }
+      case 'agent/assignWorkItem': {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const item = sanitizeWorkItemAssignmentSource(params.item);
+        if (!item) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Invalid work item assignment.');
+        }
+        const agent = assignWorkItemToAgentInSnapshot(this.snapshot, agentId, item);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'agent/removeWorkItemAssignment': {
+        const params = requireRecord(message.params);
+        const item = sanitizeWorkItemAssignmentSource(params.item);
+        if (!item) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Invalid work item assignment.');
+        }
+        if (removeWorkItemAssignmentFromSnapshot(this.snapshot, item)) {
+          return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        }
+        return createClawRpcResult(message.id, this.snapshot);
       }
       case 'team/create': {
         const input = requireTeamCreateInput(message.params);

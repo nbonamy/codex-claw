@@ -214,6 +214,37 @@ describe('AppController', () => {
     expect(request).toHaveBeenNthCalledWith(3, 'workProvider/listItems', { provider: 'github', repositoryId: 'nbonamy/codex-claw' });
   });
 
+  it('routes work item assignment mutations through clawd', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.sourceFolder.initialized = true;
+    const item = createWorkItem();
+    const backendSnapshot = {
+      ...snapshot,
+      workBacklog: {
+        ...snapshot.workBacklog,
+        assignments: {
+          'github:github:nbonamy/codex-claw#12': {
+            provider: 'github',
+            itemId: 'github:nbonamy/codex-claw#12',
+            agentId: 'agent-dina',
+            assignedAt: '2026-06-13T00:00:00.000Z',
+            status: 'working',
+          },
+        },
+      },
+    } satisfies AppSnapshot;
+    const request = vi.fn().mockResolvedValue(backendSnapshot);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+
+    await controller.initialize();
+
+    await expect(assignWorkItemToAgent(controller, 'agent-dina', item)).resolves.toBe(backendSnapshot);
+    await expect(removeWorkItemAssignment(controller, item)).resolves.toBe(backendSnapshot);
+
+    expect(request).toHaveBeenNthCalledWith(1, 'agent/assignWorkItem', { agentId: 'agent-dina', item });
+    expect(request).toHaveBeenNthCalledWith(2, 'agent/removeWorkItemAssignment', { item });
+  });
+
   it('routes team mutations through clawd', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
@@ -1521,6 +1552,18 @@ async function transcribeAppleSpeech(
   }).transcribeAppleSpeech(audioData, options);
 }
 
+async function assignWorkItemToAgent(controller: AppController, agentId: string, item: WorkItem): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    assignWorkItemToAgent(agentId: string, item: WorkItem): Promise<AppSnapshot>;
+  }).assignWorkItemToAgent(agentId, item);
+}
+
+async function removeWorkItemAssignment(controller: AppController, item: WorkItem): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    removeWorkItemAssignment(item: WorkItem): Promise<AppSnapshot>;
+  }).removeWorkItemAssignment(item);
+}
+
 async function createAgent(controller: AppController, input: CreateAgentInput): Promise<AppSnapshot> {
   return (controller as unknown as {
     createAgent(input: CreateAgentInput): Promise<AppSnapshot>;
@@ -1752,6 +1795,22 @@ async function listWorkItems(controller: AppController, provider: WorkProviderKi
   return (controller as unknown as {
     listWorkItems(provider: WorkProviderKind, repositoryId: string): Promise<WorkItem[]>;
   }).listWorkItems(provider, repositoryId);
+}
+
+function createWorkItem(): WorkItem {
+  return {
+    provider: 'github',
+    id: 'github:nbonamy/codex-claw#12',
+    repositoryId: 'nbonamy/codex-claw',
+    repositoryFullName: 'nbonamy/codex-claw',
+    number: 12,
+    title: 'Fix bug',
+    url: 'https://github.com/nbonamy/codex-claw/issues/12',
+    state: 'open',
+    labels: [],
+    createdAt: '2026-06-13T00:00:00.000Z',
+    updatedAt: '2026-06-13T00:00:00.000Z',
+  };
 }
 
 function userMessage(id: string, turnId: string, text: string) {

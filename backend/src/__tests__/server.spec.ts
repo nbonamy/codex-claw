@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { AppSnapshot } from '@codex-claw/shared/contracts';
+import type { AppSnapshot, WorkItem } from '@codex-claw/shared/contracts';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/shared/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { ClawBackendServer } from '../server';
@@ -425,6 +425,69 @@ describe('ClawBackendServer', () => {
     }
   });
 
+  it('owns work item assignment mutations', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+    });
+    const item = createWorkItem();
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'assign-item',
+      method: 'agent/assignWorkItem',
+      params: { agentId: 'agent-dina', item },
+    })).resolves.toMatchObject({
+      result: {
+        workBacklog: {
+          assignments: {
+            'github:github:nbonamy/codex-claw#12': {
+              agentId: 'agent-dina',
+              status: 'working',
+            },
+          },
+        },
+      },
+    });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'remove-item',
+      method: 'agent/removeWorkItemAssignment',
+      params: { item },
+    })).resolves.toMatchObject({
+      result: {
+        workBacklog: { assignments: {} },
+      },
+    });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'invalid-item',
+      method: 'agent/assignWorkItem',
+      params: { agentId: 'agent-dina', item: { id: 'missing-fields' } },
+    })).resolves.toMatchObject({
+      error: {
+        message: 'Invalid work item assignment.',
+      },
+    });
+
+    expect(saveSnapshot).toHaveBeenCalledTimes(2);
+  });
+
   it('owns bench mutations and validates deployed template folders', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-bench-'));
     const snapshot = createTestSnapshot();
@@ -713,5 +776,21 @@ function createTestSnapshot(): AppSnapshot {
       chatFontSize: 15,
       codeFontSize: 13,
     },
+  };
+}
+
+function createWorkItem(): WorkItem {
+  return {
+    provider: 'github',
+    id: 'github:nbonamy/codex-claw#12',
+    repositoryId: 'nbonamy/codex-claw',
+    repositoryFullName: 'nbonamy/codex-claw',
+    number: 12,
+    title: 'Fix bug',
+    url: 'https://github.com/nbonamy/codex-claw/issues/12',
+    state: 'open',
+    labels: [],
+    createdAt: '2026-06-13T00:00:00.000Z',
+    updatedAt: '2026-06-13T00:00:00.000Z',
   };
 }
