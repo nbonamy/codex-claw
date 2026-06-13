@@ -33,6 +33,26 @@ describe('BackendDriverRpc', () => {
     expect(sendPrompt).not.toHaveBeenCalled();
   });
 
+  it('routes provider session controls through driver-scoped RPC methods', async () => {
+    const agent = createAgent();
+    const resumeConversation = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex', threadId: 'thread-resumed' },
+      messages: [],
+    });
+    const forgetAgentSession = vi.fn();
+    const rpc = new BackendDriverRpc(new Map([['codex', createDriver({ resumeConversation, forgetAgentSession })]]));
+    const ref = { backend: 'codex' as const, threadId: 'thread-resumed' };
+
+    await expect(rpc.handle('driver/resumeConversation', { agent, ref })).resolves.toStrictEqual({
+      backendSession: { kind: 'codex', threadId: 'thread-resumed' },
+      messages: [],
+    });
+    await expect(rpc.handle('driver/forgetSession', { backend: 'codex', agentId: 'agent-dina' })).resolves.toBeNull();
+
+    expect(resumeConversation).toHaveBeenCalledWith(agent, ref);
+    expect(forgetAgentSession).toHaveBeenCalledWith('agent-dina');
+  });
+
   it('returns undefined for methods outside the driver RPC surface', async () => {
     const rpc = new BackendDriverRpc(new Map([['codex', createDriver()]]));
 

@@ -89,10 +89,15 @@ Current implementation checkpoint:
 - `clawd` now owns work item assignment and unassignment mutations. Electron
   forwards the item payload and adopts the backend snapshot instead of changing
   `workBacklog.assignments` locally.
+- `clawd` now owns agent restart and conversation resume snapshot mutations.
+  Electron forwards restart/resume requests and adopts the returned snapshot;
+  provider-only session controls use `driver/*` RPC methods behind the backend
+  boundary.
 - The remaining large slice is to move the rest of product orchestration out of
   `AppController` so Electron becomes only the desktop IPC/stdio layer. The
-  largest remaining owners are conversation/session mutation routes plus
-  remaining desktop-era driver shims.
+  largest remaining owners are prompt/session side effects such as goals,
+  approval presets, rollback/edit/retry, plus remaining desktop-era driver
+  shims.
 
 ## Goals
 
@@ -373,8 +378,9 @@ names that describe backend ownership:
 - `agent/create`, `agent/update`, `agent/close`, `agent/select`,
   `agent/restart`, `agent/sendPrompt`, `agent/steer`, `agent/interrupt`,
   `agent/respondToClientRequest`
-- `agent/validateFolder`, `agent/listModels`, `agent/listSkills`, `agent/listConversations`,
-  `agent/resumeConversation`, `agent/readConversationMessages`
+- `agent/validateFolder`, `agent/listModels`, `agent/listSkills`,
+  `agent/listConversations`, `agent/resumeConversation`,
+  `agent/readConversationMessages`
 - `bench/saveAgent`, `bench/deployTemplate`, `bench/removeTemplate`
 - `loop/create`, `loop/update`, `loop/run`, `loop/delete`,
   `loop/clearHistory`, `loop/deleteExecution`

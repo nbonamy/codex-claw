@@ -81,7 +81,7 @@ export class ClawBackendProxyDriver implements AgentBackendDriver {
   }
 
   forgetAgentSession(agentId: string): void {
-    void this.client.request('agent/forgetSession', { backend: this.backend, agentId });
+    void this.client.request('driver/forgetSession', { backend: this.backend, agentId });
   }
 
   async interrupt(agent: Agent): Promise<BackendSendResult> {
@@ -101,7 +101,7 @@ export class ClawBackendProxyDriver implements AgentBackendDriver {
   }
 
   async resumeConversation(agent: Agent, ref: BackendConversationRef): Promise<BackendConversationResumeResult> {
-    return this.client.request('agent/resumeConversation', { agent, ref });
+    return this.client.request('driver/resumeConversation', { agent, ref });
   }
 
   async readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]> {

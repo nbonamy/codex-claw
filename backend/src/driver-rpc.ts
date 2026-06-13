@@ -116,7 +116,7 @@ export class BackendDriverRpc {
         }
         return driver.setApprovalPreset(agent, record.preset as never);
       }
-      case 'agent/forgetSession': {
+      case 'driver/forgetSession': {
         const { backend, agentId } = requireBackendAgentIdParams(params);
         this.requireDriver(backend).forgetAgentSession?.(agentId);
         return null;
@@ -141,7 +141,7 @@ export class BackendDriverRpc {
         const driver = this.requireDriver(agent.backend);
         return driver.listConversations ? driver.listConversations(agent) : [];
       }
-      case 'agent/resumeConversation': {
+      case 'driver/resumeConversation': {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);

@@ -7,10 +7,6 @@ import { logMain, warnMain } from './log';
 import { createMainWindow } from './main-window';
 import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-permissions';
 import {
-  restartAgentConversation,
-  resumeAgentConversationInSnapshot,
-} from '@codex-claw/shared/agent-manager';
-import {
   applyMainEventToSnapshot,
   createEmptySnapshot,
   selectAgent,
@@ -517,16 +513,7 @@ export class AppController {
   }
 
   private async restartAgent(agentId: string): Promise<AppSnapshot> {
-    const backend = this.snapshot.agents.find((candidate) => candidate.id === agentId)?.backend;
-    const agent = restartAgentConversation(this.snapshot, agentId);
-    if (!agent) {
-      throw new Error(`Agent not found: ${agentId}`);
-    }
-    if (backend) {
-      this.getExistingBackendDriver(backend)?.forgetAgentSession?.(agentId);
-    }
-    await this.persistSnapshot();
-    return this.snapshot;
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/restart', { agentId }));
   }
 
   private async listAgentConversations(agentId: string): Promise<ConversationSummary[]> {
@@ -544,33 +531,7 @@ export class AppController {
   }
 
   private async resumeAgentConversation(agentId: string, ref: unknown): Promise<AppSnapshot> {
-    if (typeof agentId !== 'string' || !agentId.trim() || !isBackendConversationRef(ref)) {
-      throw new Error('Invalid conversation reference.');
-    }
-
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent) {
-      throw new Error(`Agent not found: ${agentId}`);
-    }
-    if (ref.backend !== agent.backend) {
-      throw new Error('Conversation backend does not match the agent backend.');
-    }
-    if (agent.status.type !== 'idle') {
-      throw new Error('Agent must be idle before resuming a conversation.');
-    }
-
-    const driver = await this.getBackendDriverForAgent(agent);
-    if (!driver.resumeConversation) {
-      throw new Error(`${backendDisplayName(agent.backend)} does not support conversation resume.`);
-    }
-
-    const result = await driver.resumeConversation(agent, ref);
-    const resumedAgent = resumeAgentConversationInSnapshot(this.snapshot, agentId, result.backendSession, result.messages);
-    if (!resumedAgent) {
-      throw new Error(`Agent not found: ${agentId}`);
-    }
-    await this.persistSnapshot();
-    return this.snapshot;
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/resumeConversation', { agentId, ref }));
   }
 
   private async readConversationMessages(ref: unknown, agentId: string): Promise<RendererMessage[]> {
@@ -1143,10 +1104,6 @@ export class AppController {
     const driver = new ClawBackendProxyDriver(backend, this.backendClient);
     this.backendDrivers.set(backend, driver);
     return driver;
-  }
-
-  private getExistingBackendDriver(backend: AgentBackend): AgentBackendDriver | null {
-    return this.backendDrivers.get(backend) ?? null;
   }
 
   private emitAndApply(

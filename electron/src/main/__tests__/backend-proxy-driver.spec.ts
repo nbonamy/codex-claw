@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
+import type { Agent } from '@codex-claw/shared/contracts';
 import { ClawBackendProxyDriver } from '../backend-proxy-driver';
 import type { ClawBackendProcessClient } from '../backend-process-client';
 
@@ -59,5 +60,31 @@ describe('ClawBackendProxyDriver', () => {
     });
 
     expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('uses driver-scoped RPC methods for provider session controls', async () => {
+    const client = {
+      request: vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'thread-resumed' }, messages: [] }),
+    } as unknown as Pick<ClawBackendProcessClient, 'request'>;
+    const driver = new ClawBackendProxyDriver('codex', client);
+    const agent: Agent = {
+      id: 'agent-dina',
+      name: 'Dina',
+      backend: 'codex',
+      folder: '/Users/nbonamy/src/codex-claw',
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    };
+    const ref = { backend: 'codex' as const, threadId: 'thread-resumed' };
+
+    await expect(driver.resumeConversation(agent, ref)).resolves.toStrictEqual({
+      backendSession: { kind: 'codex', threadId: 'thread-resumed' },
+      messages: [],
+    });
+    driver.forgetAgentSession('agent-dina');
+
+    expect(client.request).toHaveBeenNthCalledWith(1, 'driver/resumeConversation', { agent, ref });
+    expect(client.request).toHaveBeenNthCalledWith(2, 'driver/forgetSession', { backend: 'codex', agentId: 'agent-dina' });
   });
 });

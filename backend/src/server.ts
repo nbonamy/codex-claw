@@ -1,11 +1,11 @@
 import path from 'node:path';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { createAgentInSnapshot, createEmptySnapshot, updateAgentFolder, updateAgentFromInput } from '@codex-claw/shared/snapshot';
-import type { AppSnapshot, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
+import type { AppSnapshot, BackendConversationRef, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
-import type { BackendEvent } from '@codex-claw/shared/backend-driver';
+import type { BackendConversationResumeResult, BackendEvent } from '@codex-claw/shared/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
-import { assignWorkItemToAgentInSnapshot, closeAgentInSnapshot, deployBenchTemplateInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeBenchTemplateFromSnapshot, removeWorkItemAssignmentFromSnapshot, reorderAgentInTeam, saveAgentToBench } from '@codex-claw/shared/agent-manager';
+import { assignWorkItemToAgentInSnapshot, closeAgentInSnapshot, deployBenchTemplateInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeBenchTemplateFromSnapshot, removeWorkItemAssignmentFromSnapshot, reorderAgentInTeam, restartAgentConversation, resumeAgentConversationInSnapshot, saveAgentToBench } from '@codex-claw/shared/agent-manager';
 import { clearLoopExecutionHistoryInSnapshot, createLoopInSnapshot, deleteLoopExecutionFromSnapshot, deleteLoopFromSnapshot, updateLoopInSnapshot } from '@codex-claw/shared/loop-manager';
 import { updateSettingsInSnapshot } from '@codex-claw/shared/settings';
 import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selectTeam, updateTeamInSnapshot } from '@codex-claw/shared/team-manager';
@@ -175,6 +175,40 @@ export class ClawBackendServer {
           return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
         }
         return createClawRpcResult(message.id, this.snapshot);
+      }
+      case 'agent/restart': {
+        const agentId = requireAgentId(message.params);
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        restartAgentConversation(this.snapshot, agentId);
+        await this.driverRpc?.handle('driver/forgetSession', { backend: agent.backend, agentId });
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'agent/resumeConversation': {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const ref = params.ref;
+        if (!isBackendConversationRef(ref)) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Invalid conversation reference.');
+        }
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        if (ref.backend !== agent.backend) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Conversation backend does not match the agent backend.');
+        }
+        if (agent.status.type !== 'idle') {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Agent must be idle before resuming a conversation.');
+        }
+        const result = await this.requireDriverRpc().handle('driver/resumeConversation', { agent, ref }) as BackendConversationResumeResult;
+        const resumedAgent = resumeAgentConversationInSnapshot(this.snapshot, agentId, result.backendSession, result.messages);
+        if (!resumedAgent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case 'team/create': {
         const input = requireTeamCreateInput(message.params);
@@ -527,6 +561,23 @@ function requireString(value: unknown, name: string): string {
     throw new Error(`Invalid ${name}.`);
   }
   return value;
+}
+
+function isBackendConversationRef(value: unknown): value is BackendConversationRef {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  if (candidate.backend === 'codex') {
+    return typeof candidate.threadId === 'string' && candidate.threadId.trim().length > 0;
+  }
+
+  return candidate.backend === 'claude' &&
+    typeof candidate.folder === 'string' &&
+    candidate.folder.trim().length > 0 &&
+    typeof candidate.sessionId === 'string' &&
+    candidate.sessionId.trim().length > 0;
 }
 
 function shouldPersistSnapshotForEvent(event: BackendEvent): boolean {

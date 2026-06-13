@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { AppSnapshot, WorkItem } from '@codex-claw/shared/contracts';
+import type { AppSnapshot, RendererMessage, WorkItem } from '@codex-claw/shared/contracts';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/shared/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { ClawBackendServer } from '../server';
@@ -488,6 +488,83 @@ describe('ClawBackendServer', () => {
     expect(saveSnapshot).toHaveBeenCalledTimes(2);
   });
 
+  it('owns agent restart and conversation resume mutations', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      backendSession: { kind: 'codex', threadId: 'thread-old' },
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    snapshot.messages = [
+      createTextMessage('old-dina', 'agent-dina', 'old'),
+      createTextMessage('old-jesse', 'agent-jesse', 'keep'),
+    ];
+    const resumedMessages = [createTextMessage('new-dina', 'agent-dina', 'resumed')];
+    const forgetAgentSession = vi.fn();
+    const resumeConversation = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex', threadId: 'thread-new' },
+      messages: resumedMessages,
+    });
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      forgetAgentSession,
+      resumeConversation,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'restart-agent',
+      method: 'agent/restart',
+      params: { agentId: 'agent-dina' },
+    })).resolves.toMatchObject({
+      result: {
+        agents: [{ id: 'agent-dina' }],
+      },
+    });
+    expect(snapshot.agents[0]?.backendSession).toBeUndefined();
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'resume-agent',
+      method: 'agent/resumeConversation',
+      params: { agentId: 'agent-dina', ref: { backend: 'codex', threadId: 'thread-new' } },
+    })).resolves.toMatchObject({
+      result: {
+        agents: [{ id: 'agent-dina', backendSession: { kind: 'codex', threadId: 'thread-new' } }],
+      },
+    });
+
+    expect(forgetAgentSession).toHaveBeenCalledWith('agent-dina');
+    expect(resumeConversation).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), { backend: 'codex', threadId: 'thread-new' });
+    expect(snapshot.messages.map((message) => [message.id, message.agentId])).toStrictEqual([
+      ['old-jesse', 'agent-jesse'],
+      ['new-dina', 'agent-dina'],
+    ]);
+    expect(saveSnapshot).toHaveBeenCalledTimes(2);
+    await server.close();
+  });
+
   it('owns bench mutations and validates deployed template folders', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-bench-'));
     const snapshot = createTestSnapshot();
@@ -792,5 +869,16 @@ function createWorkItem(): WorkItem {
     labels: [],
     createdAt: '2026-06-13T00:00:00.000Z',
     updatedAt: '2026-06-13T00:00:00.000Z',
+  };
+}
+
+function createTextMessage(id: string, agentId: string, text: string): RendererMessage {
+  return {
+    id,
+    agentId,
+    role: 'user',
+    status: 'complete',
+    createdAt: '2026-06-13T00:00:00.000Z',
+    parts: [{ type: 'text', text }],
   };
 }

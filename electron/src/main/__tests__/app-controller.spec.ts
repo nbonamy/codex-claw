@@ -504,26 +504,22 @@ describe('AppController', () => {
     }));
   });
 
-  it('forgets backend session caches when restarting an agent', async () => {
+  it('routes agent restart through clawd', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-old' };
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
-    const backendDriver = createFakeCodexBackendDriver({
-      forgetAgentSession: vi.fn(),
-    });
+    const backendSnapshot = {
+      ...snapshot,
+      agents: [{ ...snapshot.agents[0]!, backendSession: undefined }],
+      messages: snapshot.messages.filter((message) => message.agentId !== 'agent-dina'),
+    };
+    const request = vi.fn().mockResolvedValue(backendSnapshot);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
 
     await controller.initialize();
-    setCodexBackendDriver(controller, backendDriver);
-    await restartAgent(controller, 'agent-dina');
 
-    expect(backendDriver.forgetAgentSession).toHaveBeenCalledWith('agent-dina');
-    expect(snapshot.agents[0].backendSession).toBeUndefined();
-    expect(snapshot.messages.filter((message) => message.agentId === 'agent-dina')).toStrictEqual([]);
-    expect(persistence.save).toHaveBeenCalledWith(snapshot);
+    await expect(restartAgent(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
+
+    expect(request).toHaveBeenCalledWith('agent/restart', { agentId: 'agent-dina' });
   });
 
   it('persists token usage updates emitted by Codex', async () => {
@@ -1050,78 +1046,35 @@ describe('AppController', () => {
     expect(backendDriver.listConversations).toHaveBeenCalledWith(snapshot.agents[0]);
   });
 
-  it('resumes an agent conversation through the backend driver and persists the selected session', async () => {
+  it('routes agent conversation resume through clawd', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-old' };
-    snapshot.messages = [{
-      id: 'user-old',
-      agentId: 'agent-dina',
-      role: 'user',
-      status: 'complete',
-      createdAt: '2026-06-09T09:00:00.000Z',
-      parts: [{ type: 'text', text: 'old' }],
-    }, {
-      id: 'user-jesse',
-      agentId: 'agent-jesse',
-      role: 'user',
-      status: 'complete',
-      createdAt: '2026-06-09T09:01:00.000Z',
-      parts: [{ type: 'text', text: 'keep' }],
-    }];
-    const resumedMessages: RendererMessage[] = [{
-      id: 'user-thread-dina',
-      agentId: 'agent-dina',
-      role: 'user',
-      status: 'complete',
-      createdAt: '2026-06-09T10:00:00.000Z',
-      parts: [{ type: 'text', text: 'resumed' }],
-    }];
-    const backendDriver = createFakeCodexBackendDriver({
-      resumeConversation: vi.fn().mockResolvedValue({
-        backendSession: { kind: 'codex', threadId: 'thread-dina' },
-        messages: resumedMessages,
-      }),
-    });
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
+    const backendSnapshot = {
+      ...snapshot,
+      agents: [{ ...snapshot.agents[0]!, backendSession: { kind: 'codex' as const, threadId: 'thread-dina' } }],
+    };
+    const request = vi.fn().mockResolvedValue(backendSnapshot);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const ref = { backend: 'codex' as const, threadId: 'thread-dina' };
 
     await controller.initialize();
-    setCodexBackendDriver(controller, backendDriver);
 
-    await expect(resumeAgentConversation(controller, 'agent-dina', { backend: 'codex', threadId: 'thread-dina' })).resolves.toBe(snapshot);
+    await expect(resumeAgentConversation(controller, 'agent-dina', ref)).resolves.toBe(backendSnapshot);
 
-    expect(backendDriver.resumeConversation).toHaveBeenCalledWith(snapshot.agents[0], { backend: 'codex', threadId: 'thread-dina' });
-    expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-dina' });
-    expect(snapshot.messages.map((message) => [message.agentId, message.parts[0]?.type === 'text' ? message.parts[0].text : ''])).toStrictEqual([
-      ['agent-jesse', 'keep'],
-      ['agent-dina', 'resumed'],
-    ]);
-    expect(persistence.save).toHaveBeenCalledWith(snapshot);
+    expect(request).toHaveBeenCalledWith('agent/resumeConversation', { agentId: 'agent-dina', ref });
   });
 
-  it('rejects conversation resume for busy agents before reaching the backend driver', async () => {
+  it('lets clawd validate busy agent conversation resume', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].status = { type: 'working' };
-    const backendDriver = createFakeCodexBackendDriver({
-      resumeConversation: vi.fn().mockResolvedValue({
-        backendSession: { kind: 'codex', threadId: 'thread-dina' },
-        messages: [],
-      }),
-    });
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
+    const request = vi.fn().mockRejectedValue(new Error('Agent must be idle before resuming a conversation.'));
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const ref = { backend: 'codex' as const, threadId: 'thread-dina' };
 
     await controller.initialize();
-    setCodexBackendDriver(controller, backendDriver);
 
-    await expect(resumeAgentConversation(controller, 'agent-dina', { backend: 'codex', threadId: 'thread-dina' })).rejects.toThrow('Agent must be idle before resuming a conversation.');
-    expect(backendDriver.resumeConversation).not.toHaveBeenCalled();
+    await expect(resumeAgentConversation(controller, 'agent-dina', ref)).rejects.toThrow('Agent must be idle before resuming a conversation.');
+    expect(request).toHaveBeenCalledWith('agent/resumeConversation', { agentId: 'agent-dina', ref });
   });
 
   it('rejects unrecorded historical conversation refs before reaching a backend driver', async () => {
@@ -1461,9 +1414,9 @@ async function sendPrompt(controller: AppController, agentId: string, prompt: st
   }).sendPrompt(agentId, prompt);
 }
 
-async function restartAgent(controller: AppController, agentId: string): Promise<void> {
-  await (controller as unknown as {
-    restartAgent(agentId: string): Promise<void>;
+async function restartAgent(controller: AppController, agentId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    restartAgent(agentId: string): Promise<AppSnapshot>;
   }).restartAgent(agentId);
 }
 
