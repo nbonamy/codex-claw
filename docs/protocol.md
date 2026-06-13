@@ -36,9 +36,9 @@ found, invalid params, internal error, backend unavailable, and timeout.
   `source/listWorktrees`, and `workProvider/listItems`.
 - `clawd` to client notifications: currently `backend/event`, carrying
   app-owned events and optional backend-derived snapshots.
-- `clawd` to Electron desktop requests: narrow desktop callbacks for native
-  affordances that only Electron can perform, currently browser opening and
-  macOS permission surfaces.
+- `clawd` to client requests: narrow host callbacks for native affordances
+  that the connected client must perform, currently Electron browser opening
+  and macOS permission surfaces.
 - Backend-internal driver RPC: `driver/*`, `source/detectFolder`, and
   `agent/validateFolder` are accepted by the server through the driver RPC
   fallback, but client code should prefer the app-level methods unless this
@@ -47,12 +47,12 @@ found, invalid params, internal error, backend unavailable, and timeout.
 ## Common Result Types
 
 - `AppSnapshot`: authoritative product snapshot owned by `clawd`.
-- `DesktopState`: backend-derived desktop hints:
+- `ClientState`: backend-derived client hints:
   `{ sourceFolderPath, shouldPreventDisplaySleep }`.
-- `ClawSnapshotGetResult`: `{ snapshot, lastEventSeq, desktopState }`.
+- `ClawSnapshotGetResult`: `{ snapshot, lastEventSeq, clientState }`.
 - `ClawBackendEvent`: event sent to clients:
   `{ seq, type, payload, occurredAt, agentId?, backend?, backendSessionId?,
-  threadId?, turnId?, desktopState?, snapshot? }`.
+  threadId?, turnId?, clientState?, snapshot? }`.
 
 State-mutating public methods generally return `AppSnapshot`. The returned
 snapshot is authoritative; clients should adopt it rather than replay product
@@ -64,7 +64,7 @@ reducers locally.
 | --- | --- | --- | --- |
 | `backend/health` | none | `ClawBackendHealth` | Liveness and version check. |
 | `snapshot/get` | none | `ClawSnapshotGetResult` | Initializes source folder if needed and returns the authoritative snapshot. |
-| `desktop/getState` | none | `DesktopState` | Backend-derived desktop hints only. |
+| `client/getState` | none | `ClientState` | Backend-derived client hints only. |
 | `clientRequest/respond` | `{ response: ClientRequestResponse }` | `AppSnapshot` | Resolves a provider-owned approval or ask-user request. |
 
 ## Client To `clawd`: System
@@ -72,7 +72,7 @@ reducers locally.
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
 | `system/getPermissions` | none | `SystemPermissionsStatus` | App-facing permission API owned by `clawd`; desktop status may be delegated to Electron. |
-| `system/openAccessibilitySettings` | none | `SystemPermissionsStatus` | Opens native settings through a desktop callback, then returns status. |
+| `system/openAccessibilitySettings` | none | `SystemPermissionsStatus` | Opens native settings through a client callback, then returns status. |
 
 ## Client To `clawd`: Transcription
 
@@ -151,7 +151,7 @@ state mutation happen in `clawd`.
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
 | `workProvider/connect` | `{ provider }` | `WorkProviderConnectResult` | Starts provider connection such as GitHub device flow. |
-| `workProvider/openAuthorization` | `{ provider }` | `AppSnapshot` | Requests browser opening through `desktop/openExternal`. |
+| `workProvider/openAuthorization` | `{ provider }` | `AppSnapshot` | Requests browser opening through `client/openExternal`. |
 | `workProvider/completeConnection` | `{ provider }` | `AppSnapshot` | Polls/completes pending provider auth. |
 | `workProvider/disconnect` | `{ provider }` | `AppSnapshot` | Removes provider connection and token. |
 | `workProvider/listRepositories` | `{ provider }` | `WorkRepository[]` | Lists provider repositories. |
@@ -212,7 +212,7 @@ implementation messages, not the preferred app protocol for clients.
 
 | Method | Params | Notes |
 | --- | --- | --- |
-| `backend/event` | `ClawBackendEvent` | App-owned event for renderer/UI state. May include `desktopState` and, for state-affecting events, authoritative `snapshot`. |
+| `backend/event` | `ClawBackendEvent` | App-owned event for renderer/UI state. May include `clientState` and, for state-affecting events, authoritative `snapshot`. |
 
 Event `type` values are the app-owned `MainToRendererEvent['type']` union from
 `shared/src/contracts.ts`. Current emitted examples include:
@@ -237,18 +237,20 @@ Event `type` values are the app-owned `MainToRendererEvent['type']` union from
 Clients must ignore unknown event types and refresh via `snapshot/get` if they
 detect sequence gaps.
 
-## `clawd` To Electron Desktop Requests
+## `clawd` To Client Requests
 
-These are backend-initiated JSON-RPC requests sent from `clawd` to the Electron
-process client. They are desktop callbacks, not general product APIs.
+These are backend-initiated JSON-RPC requests sent from `clawd` to the
+connected client. They are host callbacks, not general product APIs. Electron
+implements the callbacks today; future clients can implement the subset that
+matches their platform capabilities.
 
 | Method | Params | Result | Owner |
 | --- | --- | --- | --- |
-| `desktop/openExternal` | `{ url }` | `true` | Electron opens the URL with `shell.openExternal`. |
-| `desktop/systemPermissions/get` | none | `SystemPermissionsStatus` | Electron reads native permission status. |
-| `desktop/systemPermissions/openAccessibilitySettings` | none | `SystemPermissionsStatus` | Electron opens native settings and returns status. |
+| `client/openExternal` | `{ url }` | `true` | Electron opens the URL with `shell.openExternal`. |
+| `client/systemPermissions/get` | none | `SystemPermissionsStatus` | Electron reads native permission status. |
+| `client/systemPermissions/openAccessibilitySettings` | none | `SystemPermissionsStatus` | Electron opens native settings and returns status. |
 
-If a desktop request method is unknown, Electron responds with JSON-RPC
+If a client request method is unknown, the client responds with JSON-RPC
 `methodNotFound`. If the native callback throws, Electron responds with
 `internalError`.
 

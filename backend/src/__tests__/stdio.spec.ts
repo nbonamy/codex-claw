@@ -63,11 +63,11 @@ describe('stdio JSON-RPC transport', () => {
     });
     peer.start();
 
-    const resultPromise = peer.request('desktop/openExternal', { url: 'https://example.com' });
+    const resultPromise = peer.request('client/openExternal', { url: 'https://example.com' });
     const request = JSON.parse(writes.join('')) as { id: string; method: string };
     expect(request).toMatchObject({
       jsonrpc: '2.0',
-      method: 'desktop/openExternal',
+      method: 'client/openExternal',
       params: { url: 'https://example.com' },
     });
 
@@ -88,7 +88,7 @@ describe('stdio JSON-RPC transport', () => {
     });
     peer.start();
 
-    const resultPromise = peer.request('desktop/openExternal', { url: 'https://example.com' });
+    const resultPromise = peer.request('client/openExternal', { url: 'https://example.com' });
     const request = JSON.parse(writes.join('')) as { id: string };
     input.write(`${JSON.stringify({
       jsonrpc: '2.0',

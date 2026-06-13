@@ -158,13 +158,13 @@ describe('ClawBackendProcessClient', () => {
     expect(listener).toHaveBeenCalledOnce();
   });
 
-  it('handles backend-initiated desktop requests over stdio', async () => {
+  it('handles backend-initiated client requests over stdio', async () => {
     const child = createFakeChildProcess();
     const openExternal = vi.fn().mockResolvedValue(true);
     const client = new ClawBackendProcessClient({
       command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
       requestHandlers: {
-        'desktop/openExternal': openExternal,
+        'client/openExternal': openExternal,
       },
       spawnProcess: vi.fn().mockReturnValue(child),
     });
@@ -172,8 +172,8 @@ describe('ClawBackendProcessClient', () => {
     await client.start();
     child.stdout.write(`${JSON.stringify({
       jsonrpc: '2.0',
-      id: 'desktop-1',
-      method: 'desktop/openExternal',
+      id: 'client-1',
+      method: 'client/openExternal',
       params: { url: 'https://example.com' },
     })}\n`);
     await flushMicrotasks();
@@ -181,12 +181,12 @@ describe('ClawBackendProcessClient', () => {
     expect(openExternal).toHaveBeenCalledWith({ url: 'https://example.com' });
     expect(JSON.parse(child.stdin.writes[0])).toStrictEqual({
       jsonrpc: '2.0',
-      id: 'desktop-1',
+      id: 'client-1',
       result: true,
     });
   });
 
-  it('returns JSON-RPC errors for unknown backend-initiated desktop requests', async () => {
+  it('returns JSON-RPC errors for unknown backend-initiated client requests', async () => {
     const child = createFakeChildProcess();
     const client = new ClawBackendProcessClient({
       command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
@@ -196,18 +196,18 @@ describe('ClawBackendProcessClient', () => {
     await client.start();
     child.stdout.write(`${JSON.stringify({
       jsonrpc: '2.0',
-      id: 'desktop-1',
-      method: 'desktop/nope',
+      id: 'client-1',
+      method: 'client/nope',
       params: {},
     })}\n`);
     await flushMicrotasks();
 
     expect(JSON.parse(child.stdin.writes[0])).toMatchObject({
       jsonrpc: '2.0',
-      id: 'desktop-1',
+      id: 'client-1',
       error: {
         code: -32601,
-        message: 'Unknown desktop method: desktop/nope',
+        message: 'Unknown client method: client/nope',
       },
     });
   });

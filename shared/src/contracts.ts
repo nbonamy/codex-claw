@@ -398,7 +398,7 @@ export type AppGeneralSettings = {
   preventSleepWhenAgentsRun: boolean;
 };
 
-export type DesktopState = {
+export type ClientState = {
   sourceFolderPath: string;
   shouldPreventDisplaySleep: boolean;
 };

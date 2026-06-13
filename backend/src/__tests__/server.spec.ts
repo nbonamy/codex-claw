@@ -96,7 +96,7 @@ describe('ClawBackendServer', () => {
       id: 2,
       result: {
         lastEventSeq: 0,
-        desktopState: {
+        clientState: {
           sourceFolderPath: '',
           shouldPreventDisplaySleep: false,
         },
@@ -110,7 +110,7 @@ describe('ClawBackendServer', () => {
     });
   });
 
-  it('derives desktop state from backend-owned snapshot state', async () => {
+  it('derives client state from backend-owned snapshot state', async () => {
     const snapshot = createTestSnapshot();
     snapshot.sourceFolder = {
       path: '/Users/nbonamy/src',
@@ -136,7 +136,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'desktop-state',
-      method: 'desktop/getState',
+      method: 'client/getState',
     })).resolves.toMatchObject({
       result: {
         sourceFolderPath: '/Users/nbonamy/src',
@@ -148,7 +148,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'desktop-state-disabled',
-      method: 'desktop/getState',
+      method: 'client/getState',
     })).resolves.toMatchObject({
       result: {
         sourceFolderPath: '/Users/nbonamy/src',
@@ -256,7 +256,7 @@ describe('ClawBackendServer', () => {
       agentId: 'agent-dina',
       type: 'agent.statusChanged',
       payload: { type: 'working' },
-      desktopState: {
+      clientState: {
         shouldPreventDisplaySleep: true,
       },
       snapshot: {

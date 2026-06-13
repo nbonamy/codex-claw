@@ -44,7 +44,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     const workIntegrations = new WorkIntegrationManager({
       drivers: [new GitHubWorkProviderDriver(() => githubOAuthClientId(snapshot))],
       getSnapshot: () => snapshot,
-      openExternal: (url) => stdio.request('desktop/openExternal', { url }),
+      openExternal: (url) => stdio.request('client/openExternal', { url }),
       saveSnapshot: () => saveBackendSnapshot(stateDir, snapshot),
       tokenStore: stateDir
         ? new EncryptedFileWorkIntegrationTokenStore(path.join(stateDir, 'work-integration-tokens.json'))
@@ -100,8 +100,8 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       workIntegrations,
       loopRunner,
       systemPermissions: {
-        getStatus: () => stdio.request<SystemPermissionsStatus>('desktop/systemPermissions/get'),
-        openAccessibilitySettings: () => stdio.request<SystemPermissionsStatus>('desktop/systemPermissions/openAccessibilitySettings'),
+        getStatus: () => stdio.request<SystemPermissionsStatus>('client/systemPermissions/get'),
+        openAccessibilitySettings: () => stdio.request<SystemPermissionsStatus>('client/systemPermissions/openAccessibilitySettings'),
       },
     });
     mcpService.setDriverRpc(driverRpc);

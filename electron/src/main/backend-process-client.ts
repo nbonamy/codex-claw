@@ -2,7 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { watch } from 'node:fs';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawRpcResponse, parseClawRpcMessage, type ClawBackendEvent, type ClawBackendHealth, type ClawRpcId, type ClawRpcRequest, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
-import { createRuntimeDesktopRequestHandlers } from './desktop-request-handlers';
+import { createRuntimeClientRequestHandlers } from './client-request-handlers';
 import { warnMain } from './log';
 import { runtimeClawdCommand, runtimeClawdWatchFile } from './runtime-config';
 
@@ -262,7 +262,7 @@ export class ClawBackendProcessClient {
   private async handleRequestAsync(message: ClawRpcRequest): Promise<void> {
     const handler = this.requestHandlers[message.method];
     if (!handler) {
-      this.writeResponse(createClawRpcError(message.id, clawRpcErrorCodes.methodNotFound, `Unknown desktop method: ${message.method}`));
+      this.writeResponse(createClawRpcError(message.id, clawRpcErrorCodes.methodNotFound, `Unknown client method: ${message.method}`));
       return;
     }
 
@@ -316,7 +316,7 @@ export function createRuntimeClawBackendClient(): ClawBackendProcessClient | nul
   const command = runtimeClawdCommand();
   return command ? new ClawBackendProcessClient({
     command,
-    requestHandlers: createRuntimeDesktopRequestHandlers(),
+    requestHandlers: createRuntimeClientRequestHandlers(),
     watchFile: runtimeClawdWatchFile(),
   }) : null;
 }

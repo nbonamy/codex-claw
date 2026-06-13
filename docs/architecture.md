@@ -176,7 +176,7 @@ authoritative snapshot; Electron fetches fresh snapshots from `clawd` for
 reactions. The renderer receives UI events, but state-affecting events include
 the backend snapshot, so renderer state adopts that snapshot instead of
 replaying product reducers. Electron-native affordances consume a backend
-derived `DesktopState` for details such as source-folder dialog defaults and
+derived `ClientState` for details such as source-folder dialog defaults and
 whether display sleep should be prevented; Electron runs the native APIs but
 does not derive those decisions from agent/product state.
 
@@ -437,7 +437,7 @@ type MainToRendererEvent = {
 
 On renderer reload, the client calls `snapshot/get` and receives the current
 authoritative app state, the last backend event sequence number, and
-backend-derived desktop state. Electron and renderer code must not fabricate
+backend-derived client state. Electron and renderer code must not fabricate
 product state when `clawd` is unavailable.
 
 ## Codex App-Server Integration
@@ -682,7 +682,7 @@ store.
 Starting device flow only returns the code to the renderer; opening GitHub is a
 separate user action so the user can see and copy the code before the browser
 takes focus. Electron owns that browser-open action through
-`desktop/openExternal` and may append the user code to the verification URL as a
+`client/openExternal` and may append the user code to the verification URL as a
 best-effort prefill. After the device flow starts, the renderer polls the
 work-provider completion endpoint on the provider interval
 instead of requiring a manual "finish connection" step.

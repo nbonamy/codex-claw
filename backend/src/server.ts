@@ -2,7 +2,7 @@ import path from 'node:path';
 import { sendAgentPrompt } from '@codex-claw/shared/agent-chat-service';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { applyMainEventToSnapshot, createAgentInSnapshot, createEmptySnapshot, selectAgent, updateAgentFolder, updateAgentFromInput } from '@codex-claw/shared/snapshot';
-import type { Agent, AgentBackend, AgentGitStatus, AgentStatus, AppSnapshot, BackendConversationRef, BackendSession, ClientRequest, ClientRequestResponse, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopState, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
+import type { Agent, AgentBackend, AgentGitStatus, AgentStatus, AppSnapshot, BackendConversationRef, BackendSession, ClientRequest, ClientRequestResponse, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
@@ -85,11 +85,11 @@ export class ClawBackendServer {
         return createClawRpcResult(message.id, {
           snapshot: this.snapshot,
           lastEventSeq: this.lastEventSeq,
-          desktopState: desktopStateFromSnapshot(this.snapshot),
+          clientState: clientStateFromSnapshot(this.snapshot),
         });
-      case 'desktop/getState':
+      case 'client/getState':
         await this.initializeSourceFolderIfNeeded();
-        return createClawRpcResult(message.id, desktopStateFromSnapshot(this.snapshot));
+        return createClawRpcResult(message.id, clientStateFromSnapshot(this.snapshot));
       case 'system/getPermissions':
         return createClawRpcResult(message.id, await this.systemPermissions.getStatus());
       case 'system/openAccessibilitySettings':
@@ -1027,12 +1027,12 @@ export class ClawBackendServer {
     this.onEvent?.(includeSnapshot
       ? {
         ...event,
-        desktopState: desktopStateFromSnapshot(this.snapshot),
+        clientState: clientStateFromSnapshot(this.snapshot),
         snapshot: this.snapshot,
       }
       : {
         ...event,
-        desktopState: desktopStateFromSnapshot(this.snapshot),
+        clientState: clientStateFromSnapshot(this.snapshot),
       });
   }
 
@@ -1376,7 +1376,7 @@ function shouldRefreshGitStatusForEvent(event: BackendEvent): boolean {
     event.type === 'turn.completed';
 }
 
-function desktopStateFromSnapshot(snapshot: AppSnapshot): DesktopState {
+function clientStateFromSnapshot(snapshot: AppSnapshot): ClientState {
   return {
     sourceFolderPath: snapshot.sourceFolder.path,
     shouldPreventDisplaySleep: snapshot.general.preventSleepWhenAgentsRun &&

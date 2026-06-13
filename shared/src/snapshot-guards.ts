@@ -1,4 +1,4 @@
-import type { AppSnapshot, DesktopState } from './contracts';
+import type { AppSnapshot, ClientState } from './contracts';
 
 export function isAppSnapshot(value: unknown): value is AppSnapshot {
   return isRecord(value) &&
@@ -14,7 +14,7 @@ export function isAppSnapshot(value: unknown): value is AppSnapshot {
     isRecord(value.theme);
 }
 
-export function isDesktopState(value: unknown): value is DesktopState {
+export function isClientState(value: unknown): value is ClientState {
   return isRecord(value) &&
     typeof value.sourceFolderPath === 'string' &&
     typeof value.shouldPreventDisplaySleep === 'boolean';

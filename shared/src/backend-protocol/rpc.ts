@@ -1,5 +1,5 @@
-import type { AppSnapshot, DesktopState, MainToRendererEvent } from '../contracts';
-import { isAppSnapshot, isDesktopState } from '../snapshot-guards';
+import type { AppSnapshot, ClientState, MainToRendererEvent } from '../contracts';
+import { isAppSnapshot, isClientState } from '../snapshot-guards';
 
 export type ClawRpcId = string | number;
 
@@ -48,7 +48,7 @@ export type ClawBackendHealth = {
 export type ClawSnapshotGetResult = {
   snapshot: AppSnapshot;
   lastEventSeq: number;
-  desktopState: DesktopState;
+  clientState: ClientState;
 };
 
 export type ClawBackendEvent = {
@@ -61,7 +61,7 @@ export type ClawBackendEvent = {
   turnId?: string;
   payload: unknown;
   occurredAt: string;
-  desktopState?: DesktopState;
+  clientState?: ClientState;
   snapshot?: AppSnapshot;
 };
 
@@ -74,9 +74,9 @@ export type ClawBackendRequestMap = {
     params: undefined;
     result: ClawSnapshotGetResult;
   };
-  'desktop/getState': {
+  'client/getState': {
     params: undefined;
-    result: DesktopState;
+    result: ClientState;
   };
 };
 
@@ -84,7 +84,7 @@ export function isClawSnapshotGetResult(value: unknown): value is ClawSnapshotGe
   return isRecord(value) &&
     isAppSnapshot(value.snapshot) &&
     typeof value.lastEventSeq === 'number' &&
-    isDesktopState(value.desktopState);
+    isClientState(value.clientState);
 }
 
 export function isClawRpcRequest(message: ClawRpcMessage): message is ClawRpcRequest {

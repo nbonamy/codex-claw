@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createDesktopRequestHandlers } from '../desktop-request-handlers';
+import { createClientRequestHandlers } from '../client-request-handlers';
 
 vi.mock('electron', () => ({
   safeStorage: {
@@ -12,16 +12,16 @@ vi.mock('electron', () => ({
   },
 }));
 
-describe('createDesktopRequestHandlers', () => {
+describe('createClientRequestHandlers', () => {
   it('opens external URLs through the desktop port', async () => {
     const openExternal = vi.fn().mockResolvedValue(true);
-    const handlers = createDesktopRequestHandlers({
+    const handlers = createClientRequestHandlers({
       openExternal,
       getSystemPermissionsStatus: vi.fn(),
       openAccessibilitySettings: vi.fn(),
     });
 
-    await expect(handlers['desktop/openExternal']?.({ url: 'https://example.com' })).resolves.toBe(true);
+    await expect(handlers['client/openExternal']?.({ url: 'https://example.com' })).resolves.toBe(true);
     expect(openExternal).toHaveBeenCalledWith('https://example.com');
   });
 
@@ -34,13 +34,13 @@ describe('createDesktopRequestHandlers', () => {
       },
     };
     const getSystemPermissionsStatus = vi.fn().mockReturnValue(status);
-    const handlers = createDesktopRequestHandlers({
+    const handlers = createClientRequestHandlers({
       openExternal: vi.fn(),
       getSystemPermissionsStatus,
       openAccessibilitySettings: vi.fn(),
     });
 
-    expect(await handlers['desktop/systemPermissions/get']?.(undefined)).toStrictEqual(status);
+    expect(await handlers['client/systemPermissions/get']?.(undefined)).toStrictEqual(status);
     expect(getSystemPermissionsStatus).toHaveBeenCalledOnce();
   });
 
@@ -53,13 +53,13 @@ describe('createDesktopRequestHandlers', () => {
       },
     };
     const openAccessibilitySettings = vi.fn().mockResolvedValue(status);
-    const handlers = createDesktopRequestHandlers({
+    const handlers = createClientRequestHandlers({
       openExternal: vi.fn(),
       getSystemPermissionsStatus: vi.fn(),
       openAccessibilitySettings,
     });
 
-    await expect(handlers['desktop/systemPermissions/openAccessibilitySettings']?.(undefined)).resolves.toStrictEqual(status);
+    await expect(handlers['client/systemPermissions/openAccessibilitySettings']?.(undefined)).resolves.toStrictEqual(status);
     expect(openAccessibilitySettings).toHaveBeenCalledOnce();
   });
 });

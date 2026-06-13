@@ -48,9 +48,9 @@ Current implementation checkpoint:
   integrations, system permission API calls, and Apple Speech transcription
   execution.
 - The stdio transport is now bidirectional JSON-RPC: Electron main can request
-  backend work, and `clawd` can request desktop-owned effects. Runtime desktop
-  handlers include `desktop/openExternal` for backend-owned work integrations
-  and `desktop/systemPermissions/*` for native permission prompts/settings.
+  backend work, and `clawd` can request client-owned effects. Runtime client
+  handlers include `client/openExternal` for backend-owned work integrations
+  and `client/systemPermissions/*` for native permission prompts/settings.
 - Work integration token types now live in `shared`, and `clawd` owns token
   persistence through a backend token-store port. The current runtime uses an
   encrypted file store under the backend state directory, so desktop and future
@@ -69,7 +69,7 @@ Current implementation checkpoint:
   window/menu/shortcut lifecycle, file/folder/save dialogs, URL opening,
   Electron `safeStorage`, native system-permission prompts/settings, packaged
   resource path resolution, power-save blocker execution, and renderer IPC
-  fanout. `clawd` derives the minimal `DesktopState` that tells Electron which
+  fanout. `clawd` derives the minimal `ClientState` that tells Electron which
   source folder path to use as a dialog default and whether display sleep should
   be prevented.
 - `clawd` owns durable snapshot loading and saving. Electron keeps only a
@@ -78,7 +78,7 @@ Current implementation checkpoint:
   service shim, or validate agent folders before backend mutations.
   Main-process product IPC handlers adopt snapshots returned by backend RPCs;
   they do not perform direct product-state updates. Desktop-native state is
-  fetched from `desktop/getState` or received on backend events instead of
+  fetched from `client/getState` or received on backend events instead of
   being recomputed from agent statuses in Electron.
 - `clawd` now owns loop CRUD, manual loop runs, and the loop scheduler/runner.
   Electron proxies loop IPC to backend RPC and adopts the returned snapshot.
@@ -96,7 +96,7 @@ Current implementation checkpoint:
 - `clawd` now owns the app-facing system permission API. Electron supplies the
   native macOS Accessibility status/open-settings implementation as a desktop
   host callback; non-desktop clients can call the same backend methods without
-  reading local desktop state.
+  reading local client state.
 - `clawd` now owns source-folder auto-detection, source repository discovery,
   explicit `git worktree list`, worktree destination suggestions and defaults,
   settings updates, and recent-repository bookkeeping when agents or worktrees
@@ -350,7 +350,7 @@ renderer.
   remote folder browsing must become a backend-powered product surface.
 - Clipboard, shell open/external URL behavior, OS prompts, notifications, and
   native system permission prompts/settings. The app-facing permission API
-  belongs to `clawd`; Electron implements only the desktop callback.
+  belongs to `clawd`; Electron implements only the client callback.
 - Desktop-session helpers such as renderer audio capture handoff.
 - App-packaged resource resolution. For example, Electron may tell `clawd`
   where the packaged Apple Speech helper lives, but `clawd` owns temp-file and
@@ -436,7 +436,7 @@ sends responses and app events, and `clawd` may also send JSON-RPC requests to
 Electron main for desktop-owned effects such as folder pickers, open-external,
 secret lookup, or user confirmation. Those requests still use app-owned
 methods; they must not be raw Codex server requests. The first implemented
-desktop method is `desktop/openExternal`.
+client callback method is `client/openExternal`.
 
 Initial request methods should mirror today's `CodexClawApi` surface, but with
 names that describe backend ownership:

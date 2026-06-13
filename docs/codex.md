@@ -22,7 +22,7 @@ Electron main responsibilities:
 
 - spawn/connect to `clawd`;
 - translate renderer IPC calls into app-owned backend RPC calls;
-- provide desktop callbacks requested by `clawd`, such as open-external and
+- provide client callbacks requested by `clawd`, such as open-external and
   native permission prompts/settings;
 - fan backend events out to the renderer.
 

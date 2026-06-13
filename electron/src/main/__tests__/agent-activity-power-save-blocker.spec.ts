@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { AgentActivityPowerSaveBlocker } from '../agent-activity-power-save-blocker';
 
 describe('AgentActivityPowerSaveBlocker', () => {
-  it('starts a display sleep blocker when backend desktop state requests it', () => {
+  it('starts a display sleep blocker when backend client state requests it', () => {
     const start = vi.fn().mockReturnValue(42);
     const stop = vi.fn();
     const blocker = new AgentActivityPowerSaveBlocker({ start, stop });
@@ -15,7 +15,7 @@ describe('AgentActivityPowerSaveBlocker', () => {
     expect(stop).not.toHaveBeenCalled();
   });
 
-  it('stops the blocker when backend desktop state no longer requests it', () => {
+  it('stops the blocker when backend client state no longer requests it', () => {
     const start = vi.fn().mockReturnValue(42);
     const stop = vi.fn();
     const blocker = new AgentActivityPowerSaveBlocker({ start, stop });

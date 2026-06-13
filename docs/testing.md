@@ -5,8 +5,8 @@ handing off or committing.
 
 Codex Claw is a desktop app. It does not have an HTTP API server, so do not
 copy id8's API harness or endpoint coverage workflow here. When this repo says
-"contract" or "workflow" test, it means Electron IPC, desktop state, renderer
-behavior, or a fake Codex app-server transport.
+"contract" or "workflow" test, it means Electron IPC, client state, renderer
+behavior, or a fake backend transport.
 As the backend seam grows, prefer fake backend drivers for app-controller
 routing tests and fake Codex transports for Codex-driver/session tests.
 

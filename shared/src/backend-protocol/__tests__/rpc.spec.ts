@@ -27,10 +27,10 @@ describe('backend JSON-RPC protocol', () => {
   });
 
   it('creates success and error responses with stable shapes', () => {
-    expect(createClawRpcRequest('desktop-1', 'desktop/openExternal', { url: 'https://example.com' })).toStrictEqual({
+    expect(createClawRpcRequest('client-1', 'client/openExternal', { url: 'https://example.com' })).toStrictEqual({
       jsonrpc: '2.0',
-      id: 'desktop-1',
-      method: 'desktop/openExternal',
+      id: 'client-1',
+      method: 'client/openExternal',
       params: { url: 'https://example.com' },
     });
     expect(createClawRpcResult('health-1', { ok: true })).toStrictEqual({

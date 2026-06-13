@@ -36,7 +36,7 @@ describe('Electron backend boundary', () => {
       'app-menu.ts',
       'app-shortcuts.ts',
       'backend-process-client.ts',
-      'desktop-request-handlers.ts',
+      'client-request-handlers.ts',
       'forge-env.d.ts',
       'index.ts',
       'log.ts',
@@ -189,8 +189,8 @@ describe('Electron backend boundary', () => {
     const appController = await readFile(appControllerPath, 'utf8');
     const powerSaveBlocker = await readFile(powerSaveBlockerPath, 'utf8');
 
-    expect(appController).toContain("request<DesktopState>('desktop/getState')");
-    expect(appController).toContain('this.desktopState.shouldPreventDisplaySleep');
+    expect(appController).toContain("request<ClientState>('client/getState')");
+    expect(appController).toContain('this.clientState.shouldPreventDisplaySleep');
     expect(powerSaveBlocker).not.toContain('AppSnapshot');
     expect(powerSaveBlocker).not.toContain('AgentStatus');
     expect(powerSaveBlocker).not.toContain('preventSleepWhenAgentsRun');
@@ -213,7 +213,7 @@ describe('Electron backend boundary', () => {
 
     expect(source).not.toContain('source/detectFolder');
     expect(source).not.toContain('agent/validateFolder');
-    expect(source).toContain('this.desktopState.sourceFolderPath');
+    expect(source).toContain('this.clientState.sourceFolderPath');
   });
 
   it('keeps source worktree path policy in clawd', async () => {

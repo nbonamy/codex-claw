@@ -78,7 +78,7 @@ doc and update it when behavior changes:
 - `docs/backend-architecture.md`: architecture record and implementation
   slicing for extracting the backend core into a separate TypeScript process.
 - `docs/protocol.md`: app-owned JSON-RPC backend protocol between clients,
-  `clawd`, and Electron desktop callbacks.
+  `clawd`, and client callbacks implemented by Electron today.
 - `docs/architecture.md`: product model, process architecture, IPC,
   backend seam, persistence, and open architecture decisions.
 - `plans/codex-claw.md`: current product progression and commit checkpoints.

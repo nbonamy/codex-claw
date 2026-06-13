@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialSnapshot } from '../snapshot';
 import { isClawSnapshotGetResult } from '../backend-protocol/rpc';
-import { isAppSnapshot, isDesktopState } from '../snapshot-guards';
+import { isAppSnapshot, isClientState } from '../snapshot-guards';
 
 describe('backend protocol guards', () => {
   it('recognizes complete snapshot/get results from clawd', () => {
     expect(isClawSnapshotGetResult({
       snapshot: createInitialSnapshot(),
       lastEventSeq: 17,
-      desktopState: {
+      clientState: {
         sourceFolderPath: '/Users/nbonamy/src',
         shouldPreventDisplaySleep: true,
       },
@@ -26,15 +26,15 @@ describe('backend protocol guards', () => {
         agents: [],
       },
       lastEventSeq: 17,
-      desktopState: {
+      clientState: {
         sourceFolderPath: '/Users/nbonamy/src',
         shouldPreventDisplaySleep: false,
       },
     })).toBe(false);
   });
 
-  it('requires backend-derived desktop state in snapshot/get results', () => {
-    expect(isDesktopState({
+  it('requires backend-derived client state in snapshot/get results', () => {
+    expect(isClientState({
       sourceFolderPath: '/Users/nbonamy/src',
       shouldPreventDisplaySleep: false,
     })).toBe(true);
