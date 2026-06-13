@@ -1,4 +1,5 @@
 import { pathToFileURL } from 'node:url';
+import path from 'node:path';
 import { sendAgentPrompt } from '@codex-claw/shared/agent-chat-service';
 import { createClawRpcNotification } from '@codex-claw/shared/backend-protocol/rpc';
 import type { Agent, BackendConversationRef } from '@codex-claw/shared/contracts';
@@ -6,15 +7,16 @@ import { formatConversationTitle } from '@codex-claw/shared/conversation-title';
 import { updateLoopExecutionAgentConversationInSnapshot } from '@codex-claw/shared/loop-manager';
 import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/shared/backend-driver';
 import { BackendDriverRpc, createDefaultBackendDrivers } from './driver-rpc';
-import { DesktopWorkIntegrationTokenStore } from './desktop-work-integration-token-store';
 import { LoopRunner } from './loops/runner';
 import { LoopScheduler } from './loops/scheduler';
 import { ClawMcpService } from './mcp/service';
 import { ClawBackendServer } from './server';
 import { loadBackendSnapshot, saveBackendSnapshot } from './state';
 import { StdioRpcPeer } from './stdio';
+import { EncryptedFileWorkIntegrationTokenStore } from './work-integrations/encrypted-file-token-store';
 import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
 import { WorkIntegrationManager } from './work-integrations/manager';
+import { MemoryWorkIntegrationTokenStore } from './work-integrations/memory-token-store';
 
 export const CLAWD_VERSION = '0.1.0';
 
@@ -44,7 +46,9 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       getSnapshot: () => snapshot,
       openExternal: (url) => stdio.request('desktop/openExternal', { url }),
       saveSnapshot: () => saveBackendSnapshot(stateDir, snapshot),
-      tokenStore: new DesktopWorkIntegrationTokenStore(stdio),
+      tokenStore: stateDir
+        ? new EncryptedFileWorkIntegrationTokenStore(path.join(stateDir, 'work-integration-tokens.json'))
+        : new MemoryWorkIntegrationTokenStore(false),
     });
     const loopRunner = new LoopRunner({
       getSnapshot: () => snapshot,

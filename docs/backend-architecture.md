@@ -50,15 +50,13 @@ Current implementation checkpoint:
   backend work, and `clawd` can request desktop-owned effects. The first
   runtime desktop handler is `desktop/openExternal`, used as the foundation for
   backend-owned work integrations.
-- Work integration token types now live in `shared`, and Electron exposes
-  `desktop/workIntegrationToken/*` handlers backed by the existing
-  `safeStorage` token file. `clawd` has a `DesktopWorkIntegrationTokenStore`
-  adapter, so moving GitHub work integrations next does not require plaintext
-  tokens or a persisted-token format change.
+- Work integration token types now live in `shared`, and `clawd` owns token
+  persistence through a backend token-store port. The current runtime uses an
+  encrypted file store under the backend state directory, so desktop and future
+  clients do not read or write provider tokens.
 - `clawd` now owns the GitHub work integration manager/driver and exposes
   `workProvider/*` JSON-RPC methods. Electron proxies the existing renderer IPC
-  work-provider calls to `clawd`; Electron keeps only the `safeStorage` token
-  bridge needed by the backend-owned manager.
+  work-provider calls to `clawd`.
 - Electron main no longer owns the MCP HTTP server. Desktop-facing MCP effects,
   such as displaying Markdown in the side panel, flow back to Electron as
   app-owned backend events.
@@ -378,8 +376,7 @@ sends responses and app events, and `clawd` may also send JSON-RPC requests to
 Electron main for desktop-owned effects such as folder pickers, open-external,
 secret lookup, or user confirmation. Those requests still use app-owned
 methods; they must not be raw Codex server requests. The first implemented
-desktop methods are `desktop/openExternal` and
-`desktop/workIntegrationToken/{canStore,get,set,delete}`.
+desktop method is `desktop/openExternal`.
 
 Initial request methods should mirror today's `CodexClawApi` surface, but with
 names that describe backend ownership:
@@ -772,14 +769,13 @@ Rules:
 - Keep the Claw MCP server loopback-only unless a remote-control product
   surface is explicitly designed.
 
-Secret storage needs a real design decision. Electron `safeStorage` is tied to
-Electron, while a standalone backend should not import Electron. The first safe
-slice is now in place for work integrations: `clawd` uses a token-store port,
-and the Electron-spawned runtime services that port through
-`desktop/workIntegrationToken/*` JSON-RPC handlers backed by the existing
-encrypted token file. A standalone daemon can later use a native keychain
-package or a platform credential helper behind the same port after packaging is
-settled.
+Secret storage needs a real release-grade design decision. Electron
+`safeStorage` is tied to Electron, while a standalone backend should not import
+Electron. The first backend-owned slice is now in place for work integrations:
+`clawd` uses a token-store port backed by an encrypted file under the backend
+state directory. A standalone daemon can later replace that implementation with
+a native keychain package or platform credential helper behind the same port
+after packaging is settled.
 
 ## Implementation Slicing
 
