@@ -7,6 +7,7 @@ import { approvalPresetFromDefaults } from '@codex-claw/shared/approval-presets'
 import { createQueuedChatPrompt, type QueuedChatPrompt } from './shared/chat/queued-prompts';
 import { promptSkillInputsFromText } from './shared/chat/composer-skills';
 import { workItemAssignmentPrompt } from '@codex-claw/shared/work-item-prompts';
+import { isAppSnapshot } from '@codex-claw/shared/snapshot-guards';
 import { useConfetti } from './shared/confetti/use-confetti';
 
 const snapshot = ref<AppSnapshot>(createEmptySnapshot());
@@ -1163,11 +1164,6 @@ function subscribeToMainEvents(): void {
 function adoptSnapshotFromMainEvent(event: MainToRendererEvent): void {
   if (isAppSnapshot(event.snapshot)) {
     snapshot.value = event.snapshot;
-    return;
-  }
-
-  if (event.type === 'snapshot.updated' && isAppSnapshot(event.payload)) {
-    snapshot.value = event.payload;
   }
 }
 
@@ -1460,10 +1456,6 @@ function markClientRequestAnswered(requestId: string): void {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
-}
-
-function isAppSnapshot(value: unknown): value is AppSnapshot {
-  return isRecord(value) && Array.isArray(value.teams) && Array.isArray(value.agents);
 }
 
 function workProviderConnection(provider: WorkProviderKind) {

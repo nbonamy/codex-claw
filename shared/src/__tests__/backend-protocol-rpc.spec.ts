@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialSnapshot } from '../snapshot';
-import { isAppSnapshot, isClawSnapshotGetResult, isDesktopState } from '../backend-protocol/rpc';
+import { isClawSnapshotGetResult } from '../backend-protocol/rpc';
+import { isAppSnapshot, isDesktopState } from '../snapshot-guards';
 
 describe('backend protocol guards', () => {
   it('recognizes complete snapshot/get results from clawd', () => {

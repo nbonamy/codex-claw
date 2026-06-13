@@ -4,7 +4,8 @@ import { logMain, warnMain } from './log';
 import { createMainWindow } from './main-window';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from './backend-process-client';
-import { isAppSnapshot, isClawSnapshotGetResult, isDesktopState, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
+import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
+import { isAppSnapshot, isDesktopState } from '@codex-claw/shared/snapshot-guards';
 import type { AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopState, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 

@@ -102,6 +102,7 @@ describe('Electron backend boundary', () => {
     expect(source).not.toContain('updateSettingsInSnapshot');
     expect(source).not.toContain('snapshot.value.activeAgentId =');
     expect(source).not.toContain('snapshot.value.activeTeamId =');
+    expect(source).not.toContain("event.type === 'snapshot.updated' && isAppSnapshot(event.payload)");
     expect(source).toContain('adoptSnapshotFromMainEvent');
   });
 

@@ -132,6 +132,77 @@ describe('useAppState', () => {
     expect(state.visibleMessages.value).toStrictEqual(remoteSnapshot.messages);
   });
 
+  it('adopts snapshots from explicit main event snapshot fields', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    const eventSnapshot = createInitialSnapshot();
+    eventSnapshot.agents[0] = {
+      ...eventSnapshot.agents[0],
+      id: 'agent-ellie',
+      name: 'Ellie',
+    };
+    eventSnapshot.activeAgentId = 'agent-ellie';
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn((nextListener) => {
+          listeners.push(nextListener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    listeners[0]?.({
+      seq: 1,
+      type: 'snapshot.updated',
+      payload: {},
+      occurredAt: '2026-06-05T00:00:01.000Z',
+      snapshot: eventSnapshot,
+    });
+
+    expect(state.snapshot.value).toStrictEqual(eventSnapshot);
+    expect(state.activeAgent.value?.name).toBe('Ellie');
+  });
+
+  it('does not derive renderer snapshots from main event payloads', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    const payloadSnapshot = createInitialSnapshot();
+    payloadSnapshot.agents[0] = {
+      ...payloadSnapshot.agents[0],
+      id: 'agent-ellie',
+      name: 'Ellie',
+    };
+    payloadSnapshot.activeAgentId = 'agent-ellie';
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn((nextListener) => {
+          listeners.push(nextListener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    listeners[0]?.({
+      seq: 1,
+      type: 'snapshot.updated',
+      payload: payloadSnapshot,
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(state.snapshot.value).toStrictEqual(remoteSnapshot);
+    expect(state.activeAgent.value?.id).toBe('agent-dina');
+  });
+
   it('sets the active approval preset through the preload bridge', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();
