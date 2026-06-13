@@ -1,8 +1,8 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { watch } from 'node:fs';
-import { shell } from 'electron';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawRpcResponse, parseClawRpcMessage, type ClawBackendEvent, type ClawBackendHealth, type ClawRpcId, type ClawRpcRequest, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
+import { createRuntimeDesktopRequestHandlers } from './desktop-request-handlers';
 import { warnMain } from './log';
 import { runtimeClawdCommand, runtimeClawdWatchFile } from './runtime-config';
 
@@ -314,34 +314,9 @@ export function createRuntimeClawBackendClient(): ClawBackendProcessClient | nul
   const command = runtimeClawdCommand();
   return command ? new ClawBackendProcessClient({
     command,
-    requestHandlers: desktopRequestHandlers(),
+    requestHandlers: createRuntimeDesktopRequestHandlers(),
     watchFile: runtimeClawdWatchFile(),
   }) : null;
 }
 
 export type FakeChildProcess = ChildProcessWithoutNullStreams & EventEmitter;
-
-function desktopRequestHandlers(): Record<string, (params: unknown) => unknown | Promise<unknown>> {
-  return {
-    'desktop/openExternal': async (params) => {
-      const record = requireRecord(params);
-      const url = requireString(record.url, 'url');
-      await shell.openExternal(url);
-      return true;
-    },
-  };
-}
-
-function requireRecord(value: unknown): Record<string, unknown> {
-  if (!isRecord(value)) {
-    throw new Error('Invalid desktop request params.');
-  }
-  return value;
-}
-
-function requireString(value: unknown, name: string): string {
-  if (typeof value !== 'string' || value.trim().length === 0) {
-    throw new Error(`Invalid ${name}.`);
-  }
-  return value;
-}

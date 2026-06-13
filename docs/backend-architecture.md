@@ -50,6 +50,11 @@ Current implementation checkpoint:
   backend work, and `clawd` can request desktop-owned effects. The first
   runtime desktop handler is `desktop/openExternal`, used as the foundation for
   backend-owned work integrations.
+- Work integration token types now live in `shared`, and Electron exposes
+  `desktop/workIntegrationToken/*` handlers backed by the existing
+  `safeStorage` token file. `clawd` has a `DesktopWorkIntegrationTokenStore`
+  adapter, so moving GitHub work integrations next does not require plaintext
+  tokens or a persisted-token format change.
 - Electron main no longer owns the MCP HTTP server. Desktop-facing MCP effects,
   such as displaying Markdown in the side panel, flow back to Electron as
   app-owned backend events.
@@ -326,7 +331,8 @@ sends responses and app events, and `clawd` may also send JSON-RPC requests to
 Electron main for desktop-owned effects such as folder pickers, open-external,
 secret lookup, or user confirmation. Those requests still use app-owned
 methods; they must not be raw Codex server requests. The first implemented
-desktop method is `desktop/openExternal`.
+desktop methods are `desktop/openExternal` and
+`desktop/workIntegrationToken/{canStore,get,set,delete}`.
 
 Initial request methods should mirror today's `CodexClawApi` surface, but with
 names that describe backend ownership:
@@ -718,9 +724,11 @@ Rules:
 
 Secret storage needs a real design decision. Electron `safeStorage` is tied to
 Electron, while a standalone backend should not import Electron. The first safe
-slice is to keep a `SecretStorePort` in the core and provide an Electron-backed
-implementation for local app-spawned mode. A standalone daemon can later use a
-native keychain package or a platform credential helper after packaging is
+slice is now in place for work integrations: `clawd` uses a token-store port,
+and the Electron-spawned runtime services that port through
+`desktop/workIntegrationToken/*` JSON-RPC handlers backed by the existing
+encrypted token file. A standalone daemon can later use a native keychain
+package or a platform credential helper behind the same port after packaging is
 settled.
 
 ## Implementation Slicing
@@ -932,8 +940,8 @@ and diff hygiene checks instead.
 - Is macOS x64 part of the supported packaged release matrix for `clawd`?
 - Should local state remain one app-wide backend location, or should we model
   locations before the first daemon lands?
-- What is the minimum secret-store story for a standalone daemon with GitHub
-  OAuth?
+- Which standalone-daemon credential helper should back the work-integration
+  token-store port when `clawd` is launched without Electron?
 - Should the backend event buffer be in-memory only at first, or persisted so
   UI reconnect after backend restart can replay recent activity?
 

@@ -1,5 +1,5 @@
 import type { AppSnapshot, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkProviderAuthorization, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
-import type { WorkIntegrationTokenStore, WorkProviderToken } from './token-store';
+import type { WorkIntegrationTokenStore, WorkProviderToken } from '@codex-claw/shared/work-integration-tokens';
 import type { WorkProviderDeviceAuthorization, WorkProviderDriver } from './types';
 
 type WorkIntegrationManagerOptions = {
@@ -63,7 +63,7 @@ export class WorkIntegrationManager {
 
   async connect(provider: WorkProviderKind): Promise<WorkProviderConnectResult> {
     const driver = this.driver(provider);
-    if (!this.options.tokenStore.canStoreTokens()) {
+    if (!await this.options.tokenStore.canStoreTokens()) {
       this.setConnection({
         provider,
         status: 'error',

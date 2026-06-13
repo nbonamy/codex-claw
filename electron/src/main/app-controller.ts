@@ -52,6 +52,7 @@ import { backendDisplayName, unsupportedBackendFeature } from './backends/types'
 import { formatConversationTitle } from './backends/conversation-title';
 import { McpToolError, type DisplayMarkdownInput, type DisplayMarkdownResponse, type MarkWorkItemCompletedResponse } from './mcp/agent-coordinator';
 import { runtimeGitHubOAuthClientId } from './runtime-config';
+import { defaultUserDataPath } from './user-data';
 
 type ClawBackendClientPort = Pick<ClawBackendProcessClient, 'start' | 'health' | 'request' | 'onEvent' | 'close'>;
 
@@ -1779,18 +1780,6 @@ function clientRequest(value: unknown): ClientRequest | null {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function defaultUserDataPath(): string {
-  if (app?.getPath) {
-    try {
-      return app.getPath('userData');
-    } catch {
-      return path.join(process.cwd(), '.codex-claw-test');
-    }
-  }
-
-  return path.join(process.cwd(), '.codex-claw-test');
 }
 
 function appleSpeechAssetsPath(): string {

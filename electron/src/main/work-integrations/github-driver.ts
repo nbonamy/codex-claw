@@ -1,6 +1,6 @@
 import type { WorkItem, WorkItemLabel, WorkRepository } from '@codex-claw/shared/contracts';
+import type { WorkProviderToken } from '@codex-claw/shared/work-integration-tokens';
 import { runtimeGitHubOAuthClientId } from '../runtime-config';
-import type { WorkProviderToken } from './token-store';
 import type { WorkProviderDeviceAuthorization, WorkProviderDeviceTokenResult, WorkProviderDriver } from './types';
 
 const GITHUB_API_BASE_URL = 'https://api.github.com';

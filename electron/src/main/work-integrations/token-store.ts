@@ -2,22 +2,7 @@ import { safeStorage } from 'electron';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { WorkProviderKind } from '@codex-claw/shared/contracts';
-
-export type WorkProviderToken = {
-  provider: WorkProviderKind;
-  accessToken: string;
-  tokenType: string;
-  scope?: string;
-  accountLabel?: string;
-  connectedAt: string;
-};
-
-export interface WorkIntegrationTokenStore {
-  canStoreTokens(): boolean;
-  delete(provider: WorkProviderKind): Promise<void>;
-  get(provider: WorkProviderKind): Promise<WorkProviderToken | null>;
-  set(token: WorkProviderToken): Promise<void>;
-}
+import type { WorkIntegrationTokenStore, WorkProviderToken } from '@codex-claw/shared/work-integration-tokens';
 
 type PersistedToken = Omit<WorkProviderToken, 'accessToken'> & {
   encryptedAccessToken: string;

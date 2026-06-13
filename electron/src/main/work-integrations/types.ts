@@ -1,5 +1,5 @@
 import type { WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
-import type { WorkProviderToken } from './token-store';
+import type { WorkProviderToken } from '@codex-claw/shared/work-integration-tokens';
 
 export type WorkProviderDeviceAuthorization = WorkProviderAuthorization & {
   deviceCode: string;
