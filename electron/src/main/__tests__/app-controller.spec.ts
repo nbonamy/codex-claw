@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ConversationSummary, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, RendererMessage, ReorderTeamsInput, SourceRepository, SourceWorktree, UpdateLoopInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ConversationSummary, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, RendererMessage, ReorderTeamsInput, SourceRepository, SourceWorktree, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import type { AppStatePersistence } from '@codex-claw/shared/state-persistence';
 import type { AgentBackendDriver, BackendSendResult } from '../backends/types';
@@ -256,6 +256,28 @@ describe('AppController', () => {
     expect(request).toHaveBeenNthCalledWith(1, 'bench/saveAgent', { agentId: 'agent-dina' });
     expect(request).toHaveBeenNthCalledWith(2, 'bench/deployTemplate', { templateId: 'bench-dina', teamId: 'team-codex-claw' });
     expect(request).toHaveBeenNthCalledWith(3, 'bench/removeTemplate', { templateId: 'bench-dina' });
+  });
+
+  it('routes settings updates through clawd', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.sourceFolder.initialized = true;
+    const backendSnapshot = {
+      ...snapshot,
+      general: { preventSleepWhenAgentsRun: false },
+      theme: { ...snapshot.theme, mode: 'dark' as const },
+    };
+    const request = vi.fn().mockResolvedValue(backendSnapshot);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const input: UpdateSettingsInput = {
+      general: { preventSleepWhenAgentsRun: false },
+      theme: { mode: 'dark' },
+    };
+
+    await controller.initialize();
+
+    await expect(updateSettings(controller, input)).resolves.toBe(backendSnapshot);
+
+    expect(request).toHaveBeenCalledWith('settings/update', { input });
   });
 
   it('routes loop mutations and runs through clawd', async () => {
@@ -1473,6 +1495,12 @@ async function removeBenchTemplate(controller: AppController, templateId: string
   return (controller as unknown as {
     removeBenchTemplate(templateId: string): Promise<AppSnapshot>;
   }).removeBenchTemplate(templateId);
+}
+
+async function updateSettings(controller: AppController, input: UpdateSettingsInput): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>;
+  }).updateSettings(input);
 }
 
 async function createLoop(controller: AppController, input: CreateLoopInput): Promise<AppSnapshot> {

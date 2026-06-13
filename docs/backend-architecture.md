@@ -74,10 +74,12 @@ Current implementation checkpoint:
 - `clawd` now owns Bench save/deploy/remove mutations. Deploying a Bench
   template validates the target folder in the backend before creating the
   agent.
+- `clawd` now owns settings updates. Electron adopts the returned snapshot and
+  applies desktop-only reactions such as power-save blocker changes.
 - The remaining large slice is to move the rest of product orchestration out of
   `AppController` so Electron becomes only the desktop IPC/stdio layer. The
-  largest remaining owners are direct agent/settings/source-selection snapshot
-  mutation routes and remaining desktop-era driver shims.
+  largest remaining owners are direct agent/source-selection snapshot mutation
+  routes and remaining desktop-era driver shims.
 
 ## Goals
 

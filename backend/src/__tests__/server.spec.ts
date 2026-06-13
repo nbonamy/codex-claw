@@ -334,6 +334,46 @@ describe('ClawBackendServer', () => {
     }
   });
 
+  it('owns settings updates', async () => {
+    const snapshot = createTestSnapshot();
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'settings-update',
+      method: 'settings/update',
+      params: {
+        input: {
+          general: { preventSleepWhenAgentsRun: false },
+          sourceFolder: { path: '/Users/nbonamy/src', recentRepoNames: ['codex-claw', 'id8'] },
+          theme: { id: 'codex-claw-dark', mode: 'dark', uiFontSize: 18 },
+        },
+      },
+    })).resolves.toMatchObject({
+      result: {
+        general: { preventSleepWhenAgentsRun: false },
+        sourceFolder: {
+          path: '/Users/nbonamy/src',
+          initialized: true,
+          recentRepoNames: ['codex-claw', 'id8'],
+        },
+        theme: {
+          id: 'codex-claw-dark',
+          mode: 'dark',
+          uiFontSize: 18,
+        },
+      },
+    });
+
+    expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
+  });
+
   it('owns loop mutations and loop runner dispatch', async () => {
     const snapshot = createTestSnapshot();
     const events: unknown[] = [];

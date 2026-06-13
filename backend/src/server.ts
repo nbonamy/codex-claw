@@ -1,11 +1,12 @@
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
-import type { AppSnapshot, CreateLoopInput, CreateTeamInput, ReorderTeamsInput, UpdateLoopInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
+import type { AppSnapshot, CreateLoopInput, CreateTeamInput, ReorderTeamsInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { BackendEvent } from '@codex-claw/shared/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { deployBenchTemplateInSnapshot, removeBenchTemplateFromSnapshot, saveAgentToBench } from '@codex-claw/shared/agent-manager';
 import { clearLoopExecutionHistoryInSnapshot, createLoopInSnapshot, deleteLoopExecutionFromSnapshot, deleteLoopFromSnapshot, updateLoopInSnapshot } from '@codex-claw/shared/loop-manager';
+import { updateSettingsInSnapshot } from '@codex-claw/shared/settings';
 import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selectTeam, updateTeamInSnapshot } from '@codex-claw/shared/team-manager';
 import { teamColors } from '@codex-claw/shared/team-colors';
 import { BackendDriverRpc } from './driver-rpc';
@@ -135,6 +136,9 @@ export class ClawBackendServer {
         }
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
+      case 'settings/update':
+        updateSettingsInSnapshot(this.snapshot, requireSettingsUpdateInput(message.params));
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       case 'workProvider/connect':
         return createClawRpcResult(message.id, await this.requireWorkIntegrations().connect(requireWorkProvider(message.params)));
       case 'workProvider/openAuthorization':
@@ -333,6 +337,11 @@ function requireAgentId(params: unknown): string {
 function requireTemplateId(params: unknown): string {
   const record = requireRecord(params);
   return requireString(record.templateId, 'templateId');
+}
+
+function requireSettingsUpdateInput(params: unknown): UpdateSettingsInput {
+  const record = requireRecord(params);
+  return requireRecord(record.input) as UpdateSettingsInput;
 }
 
 function validateTeamInput(input: CreateTeamInput): void {

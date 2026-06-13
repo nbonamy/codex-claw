@@ -16,7 +16,6 @@ import {
   restartAgentConversation,
   resumeAgentConversationInSnapshot,
 } from '@codex-claw/shared/agent-manager';
-import { updateSettingsInSnapshot } from '@codex-claw/shared/settings';
 import {
   applyMainEventToSnapshot,
   createAgentInSnapshot,
@@ -317,10 +316,7 @@ export class AppController {
     });
 
     ipcMain.handle(ipcChannels.updateSettings, async (_event, input: UpdateSettingsInput) => {
-      updateSettingsInSnapshot(this.snapshot, input);
-      await this.persistSnapshot();
-      this.syncPowerSaveBlocker();
-      return this.snapshot;
+      return this.updateSettings(input);
     });
 
     ipcMain.handle(ipcChannels.getSystemPermissions, () => getSystemPermissionsStatus());
@@ -482,6 +478,10 @@ export class AppController {
 
   private async removeBenchTemplate(templateId: string): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('bench/removeTemplate', { templateId }));
+  }
+
+  private async updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('settings/update', { input }));
   }
 
   private async createLoop(input: CreateLoopInput): Promise<AppSnapshot> {
