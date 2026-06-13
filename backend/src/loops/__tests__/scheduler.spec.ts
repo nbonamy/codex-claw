@@ -52,11 +52,13 @@ describe('LoopScheduler', () => {
     const runLoops = vi.fn()
       .mockRejectedValueOnce(new Error('GitHub is unavailable'))
       .mockResolvedValue(undefined);
-    const scheduler = new LoopScheduler({ runLoops });
+    const onError = vi.fn();
+    const scheduler = new LoopScheduler({ runLoops, onError });
 
     await scheduler.check();
     await scheduler.check();
 
     expect(runLoops).toHaveBeenCalledTimes(2);
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'GitHub is unavailable' }));
   });
 });

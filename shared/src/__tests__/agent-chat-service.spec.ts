@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { sendAgentPrompt } from '../agent-chat-service';
-import { applyMainEventToSnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { MainToRendererEvent } from '@codex-claw/shared/contracts';
-import type { AgentBackendDriver, BackendSendResult } from '../backends/types';
-import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
+import { applyMainEventToSnapshot, createInitialSnapshot } from '../snapshot';
+import type { MainToRendererEvent } from '../contracts';
+import type { AgentBackendDriver, BackendSendResult } from '../backend-driver';
+import { codexBackendCapabilities } from '../backend-capabilities';
 
 describe('agent chat service', () => {
   it('queues a prompt immediately and records the returned thread id later', async () => {

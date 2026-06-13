@@ -201,8 +201,9 @@ Modules:
   `clawd`. This keeps existing app-controller code working while provider
   ownership moves out of Electron main.
 - `AppController`: still owns too much product orchestration during the
-  migration. Each new slice should move product state and backend-owned
-  operations to `clawd`, leaving only desktop effects and IPC routing here.
+  migration, but loop CRUD/runs now proxy to `clawd`. Each new slice should
+  move product state and backend-owned operations to `clawd`, leaving only
+  desktop effects and IPC routing here.
 
 Future transport options:
 

@@ -1,11 +1,9 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import path from 'node:path';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
-import { sendAgentPrompt, type SendAgentPromptHooks } from './agent-chat-service';
+import { sendAgentPrompt, type SendAgentPromptHooks } from '@codex-claw/shared/agent-chat-service';
 import { ClawBackendProxyDriver } from './backend-proxy-driver';
 import { logMain, warnMain } from './log';
-import { LoopRunner, type LoopPromptContext } from './loops/runner';
-import { LoopScheduler } from './loops/scheduler';
 import { createMainWindow } from './main-window';
 import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-permissions';
 import {
@@ -22,7 +20,6 @@ import {
   saveAgentToBench,
 } from '@codex-claw/shared/agent-manager';
 import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selectTeam, updateTeamInSnapshot } from '@codex-claw/shared/team-manager';
-import { clearLoopExecutionHistoryInSnapshot, createLoopInSnapshot, deleteLoopExecutionFromSnapshot, deleteLoopFromSnapshot, updateLoopExecutionAgentConversationInSnapshot, updateLoopInSnapshot } from '@codex-claw/shared/loop-manager';
 import { updateSettingsInSnapshot } from '@codex-claw/shared/settings';
 import {
   applyMainEventToSnapshot,
@@ -41,7 +38,7 @@ import { teamColors } from '@codex-claw/shared/team-colors';
 import { sanitizeWorkItemAssignmentSource } from '@codex-claw/shared/work-assignments';
 import type { AgentBackendDriver, BackendSendResult } from './backends/types';
 import { backendDisplayName, unsupportedBackendFeature } from './backends/types';
-import { formatConversationTitle } from './backends/conversation-title';
+import { formatConversationTitle } from '@codex-claw/shared/conversation-title';
 import { defaultUserDataPath } from './user-data';
 
 type ClawBackendClientPort = Pick<ClawBackendProcessClient, 'start' | 'health' | 'request' | 'onEvent' | 'close'>;
@@ -56,8 +53,6 @@ export class AppController {
   private readonly clientRequestBackends = new Map<string, AgentBackend>();
   private seq = 0;
 
-  private readonly loopRunner: LoopRunner;
-  private readonly loopScheduler: LoopScheduler;
   private readonly powerSaveBlocker = new AgentActivityPowerSaveBlocker();
   private readonly backendClient: ClawBackendClientPort | null;
 
@@ -68,21 +63,6 @@ export class AppController {
   ) {
     this.persistence = persistence;
     this.backendClient = backendClient;
-    this.loopRunner = new LoopRunner({
-      getSnapshot: () => this.snapshot,
-      listWorkItems: {
-        listItems: (provider, repositoryId) => this.listWorkItems(provider, repositoryId),
-      },
-      notifySnapshotUpdated: () => this.emitAndApply({
-        type: 'snapshot.updated',
-        payload: this.snapshot,
-      }),
-      saveSnapshot: () => this.persistSnapshot(),
-      sendPrompt: (agentId, prompt, context) => this.sendLoopPrompt(agentId, prompt, context),
-    });
-    this.loopScheduler = new LoopScheduler({
-      runLoops: () => this.loopRunner.runAll(),
-    });
   }
 
   async initialize(): Promise<void> {
@@ -205,56 +185,27 @@ export class AppController {
     });
 
     ipcMain.handle(ipcChannels.createLoop, async (_event, input: CreateLoopInput) => {
-      const loop = createLoopInSnapshot(this.snapshot, input);
-      if (!loop) {
-        throw new Error('Invalid loop configuration.');
-      }
-      await this.persistSnapshot();
-      return this.snapshot;
+      return this.createLoop(input);
     });
 
     ipcMain.handle(ipcChannels.updateLoop, async (_event, input: UpdateLoopInput) => {
-      const loop = updateLoopInSnapshot(this.snapshot, input);
-      if (!loop) {
-        throw new Error(`Loop not found or invalid: ${input.id}`);
-      }
-      await this.persistSnapshot();
-      return this.snapshot;
+      return this.updateLoop(input);
     });
 
     ipcMain.handle(ipcChannels.runLoop, async (_event, loopId: string) => {
-      if (!this.snapshot.loops.some((loop) => loop.id === loopId)) {
-        throw new Error(`Loop not found: ${loopId}`);
-      }
-      await this.loopRunner.runLoop(loopId);
-      return this.snapshot;
+      return this.runLoop(loopId);
     });
 
     ipcMain.handle(ipcChannels.clearLoopHistory, async (_event, loopId: string) => {
-      const loop = clearLoopExecutionHistoryInSnapshot(this.snapshot, loopId);
-      if (!loop) {
-        throw new Error(`Loop not found: ${loopId}`);
-      }
-      await this.persistSnapshot();
-      return this.snapshot;
+      return this.clearLoopHistory(loopId);
     });
 
     ipcMain.handle(ipcChannels.deleteLoopExecution, async (_event, loopId: string, executionId: string) => {
-      const loop = deleteLoopExecutionFromSnapshot(this.snapshot, loopId, executionId);
-      if (!loop) {
-        throw new Error(`Loop execution not found: ${loopId}/${executionId}`);
-      }
-      await this.persistSnapshot();
-      return this.snapshot;
+      return this.deleteLoopExecution(loopId, executionId);
     });
 
     ipcMain.handle(ipcChannels.deleteLoop, async (_event, loopId: string) => {
-      const loop = deleteLoopFromSnapshot(this.snapshot, loopId);
-      if (!loop) {
-        throw new Error(`Loop not found: ${loopId}`);
-      }
-      await this.persistSnapshot();
-      return this.snapshot;
+      return this.deleteLoop(loopId);
     });
 
     ipcMain.handle(ipcChannels.listAgentConversations, async (_event, agentId: string) => {
@@ -482,12 +433,7 @@ export class AppController {
     this.mainWindow = createMainWindow();
   }
 
-  startLoops(): void {
-    this.loopScheduler.start();
-  }
-
   async shutdown(): Promise<void> {
-    this.loopScheduler.stop();
     this.powerSaveBlocker.stop();
     this.backendClientEventUnsubscribe?.();
     this.backendClientEventUnsubscribe = null;
@@ -552,6 +498,30 @@ export class AppController {
     return this.requireBackendClient().request('workProvider/listItems', { provider, repositoryId });
   }
 
+  private async createLoop(input: CreateLoopInput): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('loop/create', { input }));
+  }
+
+  private async updateLoop(input: UpdateLoopInput): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('loop/update', { input }));
+  }
+
+  private async runLoop(loopId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('loop/run', { loopId }));
+  }
+
+  private async clearLoopHistory(loopId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('loop/history/clear', { loopId }));
+  }
+
+  private async deleteLoopExecution(loopId: string, executionId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('loop/execution/delete', { loopId, executionId }));
+  }
+
+  private async deleteLoop(loopId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('loop/delete', { loopId }));
+  }
+
   private adoptBackendSnapshot(snapshot: AppSnapshot): AppSnapshot {
     this.snapshot = snapshot;
     this.syncPowerSaveBlocker();
@@ -592,33 +562,6 @@ export class AppController {
     }
     await this.persistSnapshot();
     return this.snapshot;
-  }
-
-  private async sendLoopPrompt(agentId: string, prompt: string, context: LoopPromptContext): Promise<AppSnapshot> {
-    return this.sendPrompt(agentId, prompt, undefined, {
-      onPromptStarted: (result) => this.recordLoopPromptStarted(agentId, context, result),
-    });
-  }
-
-  private async recordLoopPromptStarted(agentId: string, context: LoopPromptContext, result: BackendSendResult): Promise<void> {
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent) {
-      return;
-    }
-
-    const loop = updateLoopExecutionAgentConversationInSnapshot(this.snapshot, context.loopId, context.executionId, agentId, {
-      conversationRef: conversationRefFromSendResult(agent, result),
-      updatedAt: new Date().toISOString(),
-    });
-    if (!loop) {
-      return;
-    }
-
-    await this.persistSnapshot();
-    this.emitAndApply({
-      type: 'snapshot.updated',
-      payload: this.snapshot,
-    });
   }
 
   private async listAgentConversations(agentId: string): Promise<ConversationSummary[]> {
@@ -1445,7 +1388,6 @@ export function startMainApp(): void {
   void app.whenReady().then(async () => {
     await controller.initialize();
     controller.createWindow();
-    controller.startLoops();
   });
 
   app.on('before-quit', () => {
@@ -1471,12 +1413,6 @@ function rendererMessageText(message: RendererMessage): string {
     .filter(Boolean)
     .join('\n\n')
     .trim();
-}
-
-function conversationRefFromSendResult(agent: Agent, result: BackendSendResult): BackendConversationRef {
-  return result.backendSession.kind === 'codex'
-    ? { backend: 'codex', threadId: result.backendSession.threadId }
-    : { backend: 'claude', folder: agent.folder, sessionId: result.backendSession.transcriptSessionId ?? result.backendSession.sessionId };
 }
 
 function isBackendConversationRef(value: unknown): value is BackendConversationRef {
@@ -1514,38 +1450,6 @@ function turnIdFromRendererMessageId(messageId: string): string | null {
   }
 
   return null;
-}
-
-function resolveAgentFilePath(folder: string, filePath: string): { absolutePath: string; relativePath: string } {
-  const root = resolveUserPath(folder);
-  const target = path.isAbsolute(filePath)
-    ? path.resolve(filePath)
-    : path.resolve(root, filePath);
-  const relativePath = path.relative(root, target);
-
-  if (relativePath === '..' || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath)) {
-    throw new Error(`File is outside the agent folder: ${filePath}`);
-  }
-
-  return {
-    absolutePath: target,
-    relativePath: relativePath.split(path.sep).join('/'),
-  };
-}
-
-function resolveUserPath(value: string): string {
-  if (value === '~') {
-    return app.getPath('home');
-  }
-  if (value.startsWith(`~${path.sep}`) || value.startsWith('~/')) {
-    return path.join(app.getPath('home'), value.slice(2));
-  }
-
-  return path.resolve(value);
-}
-
-function fileBasename(filePath: string): string {
-  return filePath.split('/').filter(Boolean).at(-1) ?? filePath;
 }
 
 function clientRequest(value: unknown): ClientRequest | null {

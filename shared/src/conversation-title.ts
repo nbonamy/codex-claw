@@ -1,4 +1,4 @@
-import type { Agent } from '@codex-claw/shared/contracts';
+import type { Agent } from './contracts';
 
 export function formatConversationTitle(agent: Agent, now: Date = new Date()): string {
   const parts = new Intl.DateTimeFormat('en-US', {

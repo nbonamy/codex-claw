@@ -4,13 +4,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ConversationSummary, CreateSourceWorktreeInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, RendererMessage, SourceRepository, SourceWorktree, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ConversationSummary, CreateLoopInput, CreateSourceWorktreeInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, RendererMessage, SourceRepository, SourceWorktree, UpdateLoopInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import type { AppStatePersistence } from '@codex-claw/shared/state-persistence';
 import type { AgentBackendDriver, BackendSendResult } from '../backends/types';
 import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { ipcChannels } from '@codex-claw/shared/ipc';
-import type { LoopPromptContext } from '../loops/runner';
 
 describe('AppController', () => {
   it('starts and health-checks the configured backend process client', async () => {
@@ -197,6 +196,57 @@ describe('AppController', () => {
     expect(request).toHaveBeenNthCalledWith(1, 'workProvider/connect', { provider: 'github' });
     expect(request).toHaveBeenNthCalledWith(2, 'workProvider/configureBacklog', { input: { provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } } });
     expect(request).toHaveBeenNthCalledWith(3, 'workProvider/listItems', { provider: 'github', repositoryId: 'nbonamy/codex-claw' });
+  });
+
+  it('routes loop mutations and runs through clawd', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.sourceFolder.initialized = true;
+    const backendSnapshot = {
+      ...snapshot,
+      loops: [loopFixture({
+        cleanup: { deleteAgent: false },
+        teamTarget: { mode: 'existing', teamId: 'team-codex-claw' },
+      })],
+    };
+    const request = vi.fn().mockResolvedValue(backendSnapshot);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const createInput: CreateLoopInput = {
+      name: 'GitHub bugs',
+      enabled: true,
+      source: {
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
+      },
+      action: {
+        type: 'create-agent-from-bench',
+        benchTemplateId: 'bench-dina',
+        teamTarget: {
+          mode: 'existing',
+          teamId: 'team-codex-claw',
+        },
+      },
+      instructions: {},
+    };
+    const updateInput: UpdateLoopInput = {
+      ...createInput,
+      id: 'loop-bugs',
+    };
+
+    await controller.initialize();
+
+    await expect(createLoop(controller, createInput)).resolves.toBe(backendSnapshot);
+    await expect(updateLoop(controller, updateInput)).resolves.toBe(backendSnapshot);
+    await expect(runLoop(controller, 'loop-bugs')).resolves.toBe(backendSnapshot);
+    await expect(clearLoopHistory(controller, 'loop-bugs')).resolves.toBe(backendSnapshot);
+    await expect(deleteLoopExecution(controller, 'loop-bugs', 'loop-exec-1')).resolves.toBe(backendSnapshot);
+    await expect(deleteLoop(controller, 'loop-bugs')).resolves.toBe(backendSnapshot);
+
+    expect(request).toHaveBeenNthCalledWith(1, 'loop/create', { input: createInput });
+    expect(request).toHaveBeenNthCalledWith(2, 'loop/update', { input: updateInput });
+    expect(request).toHaveBeenNthCalledWith(3, 'loop/run', { loopId: 'loop-bugs' });
+    expect(request).toHaveBeenNthCalledWith(4, 'loop/history/clear', { loopId: 'loop-bugs' });
+    expect(request).toHaveBeenNthCalledWith(5, 'loop/execution/delete', { loopId: 'loop-bugs', executionId: 'loop-exec-1' });
+    expect(request).toHaveBeenNthCalledWith(6, 'loop/delete', { loopId: 'loop-bugs' });
   });
 
   it('refreshes git status through the backend driver capability', async () => {
@@ -737,133 +787,6 @@ describe('AppController', () => {
 
     expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-dina' });
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
-  });
-
-  it('records loop execution conversation metadata when a loop prompt starts', async () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.loops = [{
-      id: 'loop-bugs',
-      name: 'GitHub bugs',
-      enabled: true,
-      source: {
-        provider: 'github',
-        repositoryId: 'nbonamy/codex-claw',
-        tagName: 'bug',
-      },
-      action: {
-        type: 'create-agent-from-bench',
-        benchTemplateId: 'bench-dina',
-        teamTarget: {
-          mode: 'existing',
-          teamId: 'team-codex-claw',
-        },
-      },
-      instructions: {},
-      executionLog: [{
-        id: 'loop-exec-1',
-        loopId: 'loop-bugs',
-        startedAt: '2026-06-09T10:00:00.000Z',
-        completedAt: '2026-06-09T10:01:00.000Z',
-        status: 'completed',
-        createdCount: 1,
-        createdAgents: [{
-          agentId: 'agent-dina',
-          agentName: 'Dina',
-          workItemId: 'github:nbonamy/codex-claw#12',
-          workItemTitle: 'Fix cockpit',
-          workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
-        }],
-      }],
-      createdAt: '2026-06-09T09:59:00.000Z',
-      updatedAt: '2026-06-09T10:01:00.000Z',
-      lastRunAt: '2026-06-09T10:00:00.000Z',
-      lastCreatedCount: 1,
-    }];
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
-    const send = vi.fn();
-
-    await controller.initialize();
-    setMainWindowSend(controller, send);
-    await recordLoopPromptStarted(controller, 'agent-dina', {
-      loopId: 'loop-bugs',
-      executionId: 'loop-exec-1',
-      workItemId: 'github:nbonamy/codex-claw#12',
-    }, {
-      backendSession: { kind: 'codex', threadId: 'thread-dina' },
-      turnId: 'turn-dina',
-    });
-
-    expect(snapshot.loops[0]?.executionLog[0]?.createdAgents[0]).toMatchObject({
-      conversationRef: { backend: 'codex', threadId: 'thread-dina' },
-    });
-    expect(persistence.save).toHaveBeenCalledWith(snapshot);
-    expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
-      type: 'snapshot.updated',
-      payload: snapshot,
-    }));
-  });
-
-  it('records Claude loop execution conversation refs from the created agent backend', async () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.agents[0].backend = 'claude';
-    snapshot.agents[0].folder = '/Users/nbonamy/src/id8';
-    snapshot.loops = [{
-      id: 'loop-bugs',
-      name: 'GitHub bugs',
-      enabled: true,
-      source: {
-        provider: 'github',
-        repositoryId: 'nbonamy/codex-claw',
-      },
-      action: {
-        type: 'create-agent-from-bench',
-        benchTemplateId: 'bench-dina',
-        teamTarget: {
-          mode: 'existing',
-          teamId: 'team-codex-claw',
-        },
-      },
-      instructions: {},
-      executionLog: [{
-        id: 'loop-exec-1',
-        loopId: 'loop-bugs',
-        startedAt: '2026-06-09T10:00:00.000Z',
-        status: 'working',
-        createdCount: 1,
-        createdAgents: [{
-          agentId: 'agent-dina',
-          agentName: 'Dina',
-          workItemId: 'github:nbonamy/codex-claw#12',
-          workItemTitle: 'Fix cockpit',
-          workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
-        }],
-      }],
-      createdAt: '2026-06-09T09:59:00.000Z',
-      updatedAt: '2026-06-09T10:01:00.000Z',
-    }];
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
-
-    await controller.initialize();
-    await recordLoopPromptStarted(controller, 'agent-dina', {
-      loopId: 'loop-bugs',
-      executionId: 'loop-exec-1',
-      workItemId: 'github:nbonamy/codex-claw#12',
-    }, {
-      backendSession: { kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' },
-      turnId: 'claude-turn-1',
-    });
-
-    expect(snapshot.loops[0]?.executionLog[0]?.createdAgents[0]).toMatchObject({
-      conversationRef: { backend: 'claude', folder: '/Users/nbonamy/src/id8', sessionId: 'claude-session-1' },
-    });
   });
 
   it('reads historical conversation messages through the referenced backend driver', async () => {
@@ -1444,15 +1367,40 @@ async function transcribeAppleSpeech(
   }).transcribeAppleSpeech(audioData, options);
 }
 
-async function recordLoopPromptStarted(
-  controller: AppController,
-  agentId: string,
-  context: LoopPromptContext,
-  result: BackendSendResult,
-): Promise<void> {
-  await (controller as unknown as {
-    recordLoopPromptStarted(agentId: string, context: LoopPromptContext, result: BackendSendResult): Promise<void>;
-  }).recordLoopPromptStarted(agentId, context, result);
+async function createLoop(controller: AppController, input: CreateLoopInput): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    createLoop(input: CreateLoopInput): Promise<AppSnapshot>;
+  }).createLoop(input);
+}
+
+async function updateLoop(controller: AppController, input: UpdateLoopInput): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    updateLoop(input: UpdateLoopInput): Promise<AppSnapshot>;
+  }).updateLoop(input);
+}
+
+async function runLoop(controller: AppController, loopId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    runLoop(loopId: string): Promise<AppSnapshot>;
+  }).runLoop(loopId);
+}
+
+async function clearLoopHistory(controller: AppController, loopId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    clearLoopHistory(loopId: string): Promise<AppSnapshot>;
+  }).clearLoopHistory(loopId);
+}
+
+async function deleteLoopExecution(controller: AppController, loopId: string, executionId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    deleteLoopExecution(loopId: string, executionId: string): Promise<AppSnapshot>;
+  }).deleteLoopExecution(loopId, executionId);
+}
+
+async function deleteLoop(controller: AppController, loopId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    deleteLoop(loopId: string): Promise<AppSnapshot>;
+  }).deleteLoop(loopId);
 }
 
 async function readConversationMessages(

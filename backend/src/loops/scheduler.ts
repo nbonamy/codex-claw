@@ -1,8 +1,7 @@
-import { warnMain } from '../log';
-
 export type LoopSchedulerOptions = {
   intervalMs?: number;
   runLoops: () => Promise<void>;
+  onError?: (error: unknown) => void;
 };
 
 const DEFAULT_LOOP_INTERVAL_MS = 1 * 60 * 1000;
@@ -37,9 +36,7 @@ export class LoopScheduler {
     try {
       await this.options.runLoops();
     } catch (error) {
-      warnMain('loops', 'scheduler check failed', {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      this.options.onError?.(error);
     } finally {
       this.running = false;
     }

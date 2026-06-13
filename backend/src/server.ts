@@ -1,10 +1,12 @@
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
-import type { AppSnapshot } from '@codex-claw/shared/contracts';
+import type { AppSnapshot, CreateLoopInput, UpdateLoopInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { BackendEvent } from '@codex-claw/shared/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
+import { clearLoopExecutionHistoryInSnapshot, createLoopInSnapshot, deleteLoopExecutionFromSnapshot, deleteLoopFromSnapshot, updateLoopInSnapshot } from '@codex-claw/shared/loop-manager';
 import { BackendDriverRpc } from './driver-rpc';
+import type { LoopRunner } from './loops/runner';
 import type { WorkIntegrationManager } from './work-integrations/manager';
 
 export type ClawBackendServerOptions = {
@@ -15,6 +17,7 @@ export type ClawBackendServerOptions = {
   onEvent?: (event: ClawBackendEvent) => void;
   saveSnapshot?: (snapshot: AppSnapshot) => Promise<void>;
   workIntegrations?: WorkIntegrationManager;
+  loopRunner?: Pick<LoopRunner, 'runAll' | 'runLoop'>;
 };
 
 export class ClawBackendServer {
@@ -25,6 +28,7 @@ export class ClawBackendServer {
   private readonly onEvent?: (event: ClawBackendEvent) => void;
   private readonly saveSnapshot?: (snapshot: AppSnapshot) => Promise<void>;
   private readonly workIntegrations?: WorkIntegrationManager;
+  private readonly loopRunner?: Pick<LoopRunner, 'runAll' | 'runLoop'>;
   private unsubscribeDriverEvents?: () => void;
   private lastEventSeq = 0;
 
@@ -36,6 +40,7 @@ export class ClawBackendServer {
     this.onEvent = options.onEvent;
     this.saveSnapshot = options.saveSnapshot;
     this.workIntegrations = options.workIntegrations;
+    this.loopRunner = options.loopRunner;
     this.unsubscribeDriverEvents = this.driverRpc?.onEvent((event) => this.handleBackendEvent(event));
   }
 
@@ -77,6 +82,59 @@ export class ClawBackendServer {
         const params = requireRecord(message.params);
         return createClawRpcResult(message.id, await this.requireWorkIntegrations().listItems(requireWorkProvider(params), requireString(params.repositoryId, 'repositoryId')));
       }
+      case 'loop/create': {
+        const loop = createLoopInSnapshot(this.snapshot, requireLoopCreateInput(message.params));
+        if (!loop) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Invalid loop configuration.');
+        }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'loop/update': {
+        const input = requireLoopUpdateInput(message.params);
+        const loop = updateLoopInSnapshot(this.snapshot, input);
+        if (!loop) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Loop not found or invalid: ${input.id}`);
+        }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'loop/run': {
+        const loopId = requireLoopId(message.params);
+        if (!this.snapshot.loops.some((loop) => loop.id === loopId)) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Loop not found: ${loopId}`);
+        }
+        await this.requireLoopRunner().runLoop(loopId);
+        return createClawRpcResult(message.id, this.snapshot);
+      }
+      case 'loop/runDue': {
+        await this.requireLoopRunner().runAll();
+        return createClawRpcResult(message.id, this.snapshot);
+      }
+      case 'loop/history/clear': {
+        const loopId = requireLoopId(message.params);
+        const loop = clearLoopExecutionHistoryInSnapshot(this.snapshot, loopId);
+        if (!loop) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Loop not found: ${loopId}`);
+        }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'loop/execution/delete': {
+        const params = requireRecord(message.params);
+        const loopId = requireString(params.loopId, 'loopId');
+        const executionId = requireString(params.executionId, 'executionId');
+        const loop = deleteLoopExecutionFromSnapshot(this.snapshot, loopId, executionId);
+        if (!loop) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Loop execution not found: ${loopId}/${executionId}`);
+        }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'loop/delete': {
+        const loopId = requireLoopId(message.params);
+        const loop = deleteLoopFromSnapshot(this.snapshot, loopId);
+        if (!loop) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Loop not found: ${loopId}`);
+        }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
       default:
         if (this.driverRpc) {
           try {
@@ -108,7 +166,23 @@ export class ClawBackendServer {
     return this.workIntegrations;
   }
 
-  private handleBackendEvent(event: BackendEvent): void {
+  private requireLoopRunner(): Pick<LoopRunner, 'runAll' | 'runLoop'> {
+    if (!this.loopRunner) {
+      throw new Error('Loop runner is not configured.');
+    }
+    return this.loopRunner;
+  }
+
+  private async persistAndEmitSnapshot(): Promise<AppSnapshot> {
+    await this.saveSnapshot?.(this.snapshot);
+    this.handleBackendEvent({
+      type: 'snapshot.updated',
+      payload: this.snapshot,
+    }, { persist: false });
+    return this.snapshot;
+  }
+
+  private handleBackendEvent(event: BackendEvent, options: { persist?: boolean } = {}): void {
     this.lastEventSeq += 1;
     this.onEvent?.({
       ...event,
@@ -116,7 +190,7 @@ export class ClawBackendServer {
       occurredAt: event.occurredAt ?? new Date().toISOString(),
       payload: event.payload,
     });
-    if (shouldPersistSnapshotForEvent(event)) {
+    if (options.persist !== false && shouldPersistSnapshotForEvent(event)) {
       void this.saveSnapshot?.(this.snapshot);
     }
   }
@@ -138,6 +212,21 @@ function requireWorkProvider(params: unknown): WorkProviderKind {
     throw new Error(`Unsupported work provider: ${provider}`);
   }
   return provider;
+}
+
+function requireLoopCreateInput(params: unknown): CreateLoopInput {
+  const record = requireRecord(params);
+  return requireRecord(record.input) as CreateLoopInput;
+}
+
+function requireLoopUpdateInput(params: unknown): UpdateLoopInput {
+  const record = requireRecord(params);
+  return requireRecord(record.input) as UpdateLoopInput;
+}
+
+function requireLoopId(params: unknown): string {
+  const record = requireRecord(params);
+  return requireString(record.loopId, 'loopId');
 }
 
 function requireRecord(value: unknown): Record<string, unknown> {

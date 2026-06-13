@@ -188,6 +188,105 @@ describe('ClawBackendServer', () => {
     expect(workIntegrations.configureBacklog).toHaveBeenCalledWith({ provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } });
     expect(workIntegrations.listItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw');
   });
+
+  it('owns loop mutations and loop runner dispatch', async () => {
+    const snapshot = createTestSnapshot();
+    const events: unknown[] = [];
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const loopRunner = {
+      runAll: vi.fn().mockResolvedValue(undefined),
+      runLoop: vi.fn().mockResolvedValue(undefined),
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+      loopRunner,
+      onEvent: (event) => events.push(event),
+    });
+    const input = {
+      name: 'GitHub bugs',
+      enabled: true,
+      source: {
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
+      },
+      action: {
+        type: 'create-agent',
+        sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        teamTarget: {
+          mode: 'existing',
+          teamId: 'team-test',
+        },
+      },
+      instructions: {},
+    };
+
+    const created = await server.handleMessage({ jsonrpc: '2.0', id: 'create', method: 'loop/create', params: { input } });
+    const loopId = snapshot.loops[0]?.id ?? '';
+    expect(created).toMatchObject({ result: { loops: [{ name: 'GitHub bugs' }] } });
+    expect(loopId).toBeTruthy();
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'update',
+      method: 'loop/update',
+      params: { input: { ...input, id: loopId, name: 'GitHub regressions' } },
+    })).resolves.toMatchObject({ result: { loops: [{ name: 'GitHub regressions' }] } });
+
+    snapshot.loops[0]?.executionLog.push({
+      id: 'loop-exec-1',
+      loopId,
+      startedAt: '2026-06-13T00:00:00.000Z',
+      status: 'working',
+      createdCount: 0,
+      createdAgents: [],
+    });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'delete-execution',
+      method: 'loop/execution/delete',
+      params: { loopId, executionId: 'loop-exec-1' },
+    })).resolves.toMatchObject({ result: { loops: [{ executionLog: [] }] } });
+
+    snapshot.loops[0]?.executionLog.push({
+      id: 'loop-exec-2',
+      loopId,
+      startedAt: '2026-06-13T00:01:00.000Z',
+      status: 'working',
+      createdCount: 0,
+      createdAgents: [],
+    });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'clear-history',
+      method: 'loop/history/clear',
+      params: { loopId },
+    })).resolves.toMatchObject({ result: { loops: [{ executionLog: [] }] } });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'run',
+      method: 'loop/run',
+      params: { loopId },
+    })).resolves.toMatchObject({ result: { loops: [{ id: loopId }] } });
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'run-due', method: 'loop/runDue' })).resolves.toMatchObject({ result: { loops: [{ id: loopId }] } });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'delete',
+      method: 'loop/delete',
+      params: { loopId },
+    })).resolves.toMatchObject({ result: { loops: [] } });
+
+    expect(loopRunner.runLoop).toHaveBeenCalledWith(loopId);
+    expect(loopRunner.runAll).toHaveBeenCalledOnce();
+    expect(saveSnapshot).toHaveBeenCalled();
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'snapshot.updated' }),
+    ]));
+  });
 });
 
 function createTestSnapshot(): AppSnapshot {

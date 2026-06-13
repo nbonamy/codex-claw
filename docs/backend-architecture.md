@@ -66,10 +66,13 @@ Current implementation checkpoint:
   window/menu/shortcut lifecycle, file/folder/save dialogs, URL opening,
   Electron `safeStorage`, Electron system permission APIs, packaged resource
   path resolution, and renderer IPC fanout.
-- The remaining large slice is to move product orchestration out of
+- `clawd` now owns loop CRUD, manual loop runs, and the loop scheduler/runner.
+  Electron proxies loop IPC to backend RPC and adopts the returned snapshot
+  while the broader state migration is still in flight.
+- The remaining large slice is to move the rest of product orchestration out of
   `AppController` so Electron becomes only the desktop IPC/stdio layer. The
-  largest remaining owners are loop scheduler/runner and direct snapshot
-  mutation routes.
+  largest remaining owners are direct team/agent/Bench/settings snapshot
+  mutation routes and remaining desktop-era driver shims.
 
 ## Goals
 
@@ -293,7 +296,7 @@ renderer.
   rule: clients ask `clawd` for content; Electron does not read agent workspace
   files on behalf of product features. This keeps the contract valid for a
   mobile client connected to a remote backend.
-- Loop scheduler and loop runner.
+- Loop CRUD, scheduler, and runner.
 - Work-provider drivers where possible, with desktop-only services injected
   through ports.
 - Durable snapshot persistence now uses a shared serializer/parser so Electron

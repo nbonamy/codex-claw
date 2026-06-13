@@ -1,9 +1,9 @@
 import {
   appendUserPrompt,
-} from './snapshot-service';
-import type { AgentStatus, AppSnapshot, MainToRendererEvent, SendPromptOptions } from '@codex-claw/shared/contracts';
-import type { AgentBackendDriver, BackendSendResult } from './backends/types';
-import { backendDisplayName } from './backends/types';
+} from './snapshot';
+import type { AgentStatus, AppSnapshot, MainToRendererEvent, SendPromptOptions } from './contracts';
+import type { AgentBackendDriver, BackendSendResult } from './backend-driver';
+import { backendDisplayName } from './backend-driver';
 
 export type AgentChatEventEmitter = (
   event: Omit<MainToRendererEvent, 'seq' | 'occurredAt'> & Partial<Pick<MainToRendererEvent, 'seq' | 'occurredAt'>>,
