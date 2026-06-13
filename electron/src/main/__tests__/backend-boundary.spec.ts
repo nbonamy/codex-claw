@@ -22,6 +22,50 @@ describe('Electron backend boundary', () => {
     await expect(readdir(path.join(mainDir, 'backends'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
+  it('keeps Electron main limited to desktop adapter modules', async () => {
+    const mainDir = path.resolve(__dirname, '..');
+    const entries = await readdir(mainDir, { withFileTypes: true });
+    const runtimeFiles = entries
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.ts'))
+      .map((entry) => entry.name)
+      .sort();
+
+    expect(runtimeFiles).toStrictEqual([
+      'agent-activity-power-save-blocker.ts',
+      'app-controller.ts',
+      'app-menu.ts',
+      'app-shortcuts.ts',
+      'backend-process-client.ts',
+      'desktop-request-handlers.ts',
+      'forge-env.d.ts',
+      'index.ts',
+      'log.ts',
+      'main-window.ts',
+      'runtime-config.ts',
+      'system-permissions.ts',
+      'user-data.ts',
+    ]);
+  });
+
+  it('keeps each extracted backend concern in the backend package', async () => {
+    const backendDir = path.resolve(__dirname, '../../../../backend/src');
+    const expectedBackendPaths = [
+      'loops/scheduler.ts',
+      'loops/runner.ts',
+      'work-integrations/manager.ts',
+      'work-integrations/github-driver.ts',
+      'git-worktrees.ts',
+      'state-persistence.ts',
+      'state.ts',
+      'transcription/apple-speech.ts',
+      'server.ts',
+    ];
+
+    for (const backendPath of expectedBackendPaths) {
+      await expect(readFile(path.join(backendDir, backendPath), 'utf8')).resolves.toEqual(expect.any(String));
+    }
+  });
+
   it('keeps backend orchestration implementation modules out of Electron main', async () => {
     const mainDir = path.resolve(__dirname, '..');
     const forbiddenPaths = [
@@ -31,7 +75,9 @@ describe('Electron backend boundary', () => {
       'loops',
       'mcp',
       'source-repositories.ts',
+      'state-persistence.ts',
       'state.ts',
+      'transcription',
       'work-integrations',
     ];
 
@@ -44,8 +90,8 @@ describe('Electron backend boundary', () => {
     const sources = await readElectronMainRuntimeSources(path.resolve(__dirname, '..'));
 
     for (const { filePath, source } of sources) {
-      expect(source, filePath).not.toMatch(/from ['"].*\/(loops|mcp|work-integrations|git-worktrees|source-repositories|agent-files|state)(\/|['"])/);
-      expect(source, filePath).not.toMatch(/\b(LoopRunner|LoopScheduler|WorkIntegrationManager|GitHubWorkProviderDriver|AgentCoordinator|McpService)\b/);
+      expect(source, filePath).not.toMatch(/from ['"].*\/(loops|mcp|work-integrations|git-worktrees|source-repositories|agent-files|state-persistence|state|transcription)(\/|['"])/);
+      expect(source, filePath).not.toMatch(/\b(LoopRunner|LoopScheduler|WorkIntegrationManager|GitHubWorkProviderDriver|AgentCoordinator|McpService|AppStatePersistence|transcribeWithAppleSpeechAnalyzer)\b/);
     }
   });
 
