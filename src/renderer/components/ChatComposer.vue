@@ -31,12 +31,12 @@
 
     <ChatComposerActionMenu
       :disabled="disabled"
-      :codex-approval-preset="codexApprovalPreset"
+      :approval-preset="approvalPreset"
       :plan-mode="planMode"
-      :show-codex-approval-menu="effectiveBackendCapabilities.approvals && Boolean(codexApprovalPreset)"
+      :show-approval-menu="effectiveBackendCapabilities.approvals && Boolean(approvalPreset)"
       :show-plan-mode="effectiveBackendCapabilities.planMode !== 'unsupported'"
       @attach="$emit('attach')"
-      @select-codex-approval-preset="$emit('selectCodexApprovalPreset', $event)"
+      @select-approval-preset="$emit('selectApprovalPreset', $event)"
       @update:plan-mode="$emit('update:planMode', $event)"
     />
 
@@ -128,7 +128,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import type { AgentContextUsage, AgentFileSearchItem, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendSkillSummary, CodexApprovalPreset, ReasoningEffort } from '../../shared/contracts';
+import type { AgentContextUsage, AgentFileSearchItem, ApprovalPreset, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ReasoningEffort } from '../../shared/contracts';
 import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import ChatComposerSendButton from '../shared/chat/ChatComposerSendButton.vue';
 import ChatComposerActionMenu from './ChatComposerActionMenu.vue';
@@ -158,7 +158,7 @@ const props = defineProps<{
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   models?: BackendModelOption[];
   placeholder: string;
-  codexApprovalPreset?: CodexApprovalPreset | null;
+  approvalPreset?: ApprovalPreset | null;
   planMode?: boolean;
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
@@ -172,7 +172,7 @@ const emit = defineEmits<{
   attach: [];
   interrupt: [];
   'update:modelId': [modelId: string];
-  selectCodexApprovalPreset: [preset: CodexApprovalPreset];
+  selectApprovalPreset: [preset: ApprovalPreset];
   'update:planMode': [enabled: boolean];
   'update:reasoningEffort': [reasoningEffort: ReasoningEffort];
 }>();

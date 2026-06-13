@@ -28,55 +28,52 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { Component } from 'vue';
-import type { CodexApprovalPreset } from '../../shared/contracts';
-import { codexApprovalPresetOptions } from '../../shared/codex-approval-presets';
+import type { ApprovalPreset } from '../../shared/contracts';
+import { approvalPresetOptions } from '../../shared/approval-presets';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import { HandStopIcon, ListDetailsIcon, PaperclipIcon, PlusIcon, ShieldCheckIcon, Sparkles } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
   disabled?: boolean;
-  codexApprovalPreset?: CodexApprovalPreset | null;
+  approvalPreset?: ApprovalPreset | null;
   planMode: boolean;
-  showCodexApprovalMenu?: boolean;
+  showApprovalMenu?: boolean;
   showPlanMode?: boolean;
 }>(), {
   disabled: false,
-  codexApprovalPreset: null,
-  showCodexApprovalMenu: false,
+  approvalPreset: null,
+  showApprovalMenu: false,
   showPlanMode: true,
 });
 
 const emit = defineEmits<{
   attach: [];
-  'selectCodexApprovalPreset': [preset: CodexApprovalPreset];
+  'selectApprovalPreset': [preset: ApprovalPreset];
   'update:planMode': [enabled: boolean];
 }>();
 
 const rootEl = ref<HTMLElement | null>(null);
 const menuOpen = ref(false);
-const codexApprovalOptions = codexApprovalPresetOptions;
-const selectedCodexApprovalLabel = computed(() => (
-  codexApprovalOptions.find((option) => option.id === props.codexApprovalPreset)?.label ?? 'Approval'
-));
+const approvalOptions = approvalPresetOptions;
 const menuItems = computed<AppMenuItem[]>(() => {
   const items: AppMenuItem[] = []
 
-  if (props.showCodexApprovalMenu) {
+  if (props.showApprovalMenu) {
     items.push({
-      id: 'codex-approval',
+      id: 'approval',
       type: 'submenu',
       label: 'Approval',
-      // value: selectedCodexApprovalLabel.value,
+      // value: selectedApprovalLabel.value,
       icon: ShieldCheckIcon,
       submenuWidth: 'wide',
-      items: codexApprovalOptions.map((option) => ({
-        id: codexApprovalItemId(option.id),
+      items: approvalOptions.map((option) => ({
+        id: approvalItemId(option.id),
         type: 'radio',
         label: option.label,
         description: option.description,
-        icon: codexApprovalIcon(option.id),
-        checked: option.id === props.codexApprovalPreset,
+        icon: approvalIcon(option.id),
+        checked: option.id === props.approvalPreset,
       })),
     });
   }
@@ -128,7 +125,7 @@ function closeOnOutsideClick(event: MouseEvent): void {
   }
 }
 
-function codexApprovalIcon(preset: CodexApprovalPreset): Component {
+function approvalIcon(preset: ApprovalPreset): Component {
   if (preset === 'ask-for-approval') {
     return HandStopIcon;
   }
@@ -144,19 +141,19 @@ function selectMenuItem(itemId: string): void {
     return;
   }
 
-  const codexApprovalPreset = codexApprovalPresetFromItemId(itemId);
-  if (codexApprovalPreset) {
-    emit('selectCodexApprovalPreset', codexApprovalPreset);
+  const approvalPreset = approvalPresetFromItemId(itemId);
+  if (approvalPreset) {
+    emit('selectApprovalPreset', approvalPreset);
     menuOpen.value = false;
   }
 }
 
-function codexApprovalItemId(preset: CodexApprovalPreset): string {
-  return `codex-approval:${preset}`;
+function approvalItemId(preset: ApprovalPreset): string {
+  return `approval:${preset}`;
 }
 
-function codexApprovalPresetFromItemId(itemId: string): CodexApprovalPreset | null {
-  const preset = itemId.replace(/^codex-approval:/, '');
+function approvalPresetFromItemId(itemId: string): ApprovalPreset | null {
+  const preset = itemId.replace(/^approval:/, '');
   return preset === 'ask-for-approval' || preset === 'approve-for-me' || preset === 'full-access'
     ? preset
     : null;

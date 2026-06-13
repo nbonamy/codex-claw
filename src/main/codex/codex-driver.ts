@@ -1,5 +1,6 @@
 import type {
   Agent,
+  ApprovalPreset,
   BackendCapabilities,
   BackendConversationRef,
   AgentGitStatus,
@@ -7,14 +8,13 @@ import type {
   BackendRuntimeStatus,
   BackendSession,
   BackendSkillSummary,
-  CodexApprovalPreset,
   ClientRequestResponse,
   ConversationSummary,
   RendererMessage,
   SendPromptOptions,
 } from '../../shared/contracts';
 import { codexBackendCapabilities } from '../../shared/backend-capabilities';
-import type { AgentBackendDriver, BackendCodexApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '../backends/types';
+import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '../backends/types';
 import { AgentGitService } from '../git/agent-git-service';
 import type { CodexAgentSessionManager } from './agent-session';
 import type { CodexReviewTarget } from './protocol';
@@ -68,6 +68,26 @@ export class CodexBackendDriver implements AgentBackendDriver {
     return this.runPromptCommand(agent, command);
   }
 
+  preparePromptOptions(_agent: Agent, options?: SendPromptOptions): SendPromptOptions | undefined {
+    const selectedSkills = options?.skills ?? [];
+    const existingCodexOptions = options?.backendOptions?.kind === 'codex' ? options.backendOptions : undefined;
+    const reasoningEffort = options?.reasoningEffort ?? existingCodexOptions?.reasoningEffort ?? null;
+    const skills = selectedSkills.length > 0 ? selectedSkills : existingCodexOptions?.skills ?? [];
+    const backendOptions = reasoningEffort || skills.length > 0
+      ? {
+        kind: 'codex' as const,
+        ...(reasoningEffort ? { reasoningEffort } : {}),
+        ...(skills.length > 0 ? { skills } : {}),
+      }
+      : undefined;
+
+    return cleanedPromptOptions({
+      model: options?.model ?? null,
+      planMode: options?.planMode,
+      ...(backendOptions ? { backendOptions } : {}),
+    });
+  }
+
   async sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult> {
     const result = await this.sessionManager.sendPrompt(agent, prompt, options);
     return {
@@ -96,7 +116,7 @@ export class CodexBackendDriver implements AgentBackendDriver {
     };
   }
 
-  async setCodexApprovalPreset(agent: Agent, preset: CodexApprovalPreset): Promise<BackendCodexApprovalPresetResult> {
+  async setApprovalPreset(agent: Agent, preset: ApprovalPreset): Promise<BackendApprovalPresetResult> {
     const result = await this.sessionManager.setApprovalPreset(agent, preset);
     return {
       backendSession: codexBackendSession(result.threadId),
@@ -187,6 +207,12 @@ export class CodexBackendDriver implements AgentBackendDriver {
   async close(): Promise<void> {
     await this.sessionManager.close();
   }
+}
+
+function cleanedPromptOptions(options: SendPromptOptions): SendPromptOptions | undefined {
+  return options.model || typeof options.planMode === 'boolean' || options.backendOptions
+    ? options
+    : undefined;
 }
 
 function codexBackendSession(threadId: string): Extract<BackendSession, { kind: 'codex' }> {

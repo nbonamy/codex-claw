@@ -14,7 +14,7 @@
     :model-catalog-status="modelCatalogStatus"
     :skill-catalog-status="skillCatalogStatus"
     :goal="activeGoal"
-    :codex-approval-preset="activeCodexApprovalPreset"
+    :approval-preset="activeApprovalPreset"
     :plan-mode="planMode"
     :selected-model-id="selectedModelId"
     :selected-reasoning-effort="selectedReasoningEffort"
@@ -72,7 +72,7 @@
     @select-team="selectTeam"
     @select-model="selectModel"
     @select-reasoning-effort="selectReasoningEffort"
-    @select-codex-approval-preset="setCodexApprovalPreset"
+    @select-approval-preset="setApprovalPreset"
     @update:plan-mode="setPlanMode"
     @clear-goal="clearActiveGoal"
     @client-response="respondToClientRequest"
@@ -100,7 +100,7 @@ const {
   snapshot,
   activeAgent,
   activeGoal,
-  activeCodexApprovalPreset,
+  activeApprovalPreset,
   visibleMessages,
   activeQueuedPrompts,
   isLoading,
@@ -168,7 +168,7 @@ const {
   respondToClientRequest,
   selectModel,
   selectReasoningEffort,
-  setCodexApprovalPreset,
+  setApprovalPreset,
   setPlanMode,
   clearActiveGoal,
   selectAgent,

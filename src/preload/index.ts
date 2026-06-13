@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AppleSpeechTranscriptionOptions, AppCommand, BackendConversationRef, ClientRequestResponse, CodexApprovalPreset, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '../shared/contracts';
+import type { AppleSpeechTranscriptionOptions, AppCommand, ApprovalPreset, BackendConversationRef, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '../shared/contracts';
 import { ipcChannels } from '../shared/ipc';
 
 const api: CodexClawApi = {
@@ -56,7 +56,7 @@ const api: CodexClawApi = {
   quit: () => ipcRenderer.invoke(ipcChannels.quit),
   setAgentGoal: (agentId: string, objective: string) => ipcRenderer.invoke(ipcChannels.setAgentGoal, agentId, objective),
   clearAgentGoal: (agentId: string) => ipcRenderer.invoke(ipcChannels.clearAgentGoal, agentId),
-  setAgentCodexApprovalPreset: (agentId: string, preset: CodexApprovalPreset) => ipcRenderer.invoke(ipcChannels.setAgentCodexApprovalPreset, agentId, preset),
+  setAgentApprovalPreset: (agentId: string, preset: ApprovalPreset) => ipcRenderer.invoke(ipcChannels.setAgentApprovalPreset, agentId, preset),
   sendPrompt: (agentId: string, prompt: string, options?: SendPromptOptions) => ipcRenderer.invoke(ipcChannels.sendPrompt, agentId, prompt, options),
   steerPrompt: (agentId: string, prompt: string) => ipcRenderer.invoke(ipcChannels.steerPrompt, agentId, prompt),
   interruptAgent: (agentId: string) => ipcRenderer.invoke(ipcChannels.interruptAgent, agentId),

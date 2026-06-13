@@ -83,11 +83,37 @@ describe('CodexBackendDriver', () => {
     expect(sessionManager.clearThreadGoal).toHaveBeenCalledWith(agent);
   });
 
-  it('sets Codex approval presets through the session manager', async () => {
+  it('prepares generic prompt options for Codex sessions', () => {
     const sessionManager = createSessionManager();
     const driver = new CodexBackendDriver(sessionManager);
 
-    await expect(driver.setCodexApprovalPreset(agent, 'full-access')).resolves.toStrictEqual({
+    expect(driver.preparePromptOptions(agent, {
+      model: 'gpt-5.1-codex',
+      planMode: false,
+      reasoningEffort: 'high',
+      skills: [{
+        name: 'frontend-design',
+        path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
+      }],
+    })).toStrictEqual({
+      model: 'gpt-5.1-codex',
+      planMode: false,
+      backendOptions: {
+        kind: 'codex',
+        reasoningEffort: 'high',
+        skills: [{
+          name: 'frontend-design',
+          path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
+        }],
+      },
+    });
+  });
+
+  it('sets approval presets through the session manager', async () => {
+    const sessionManager = createSessionManager();
+    const driver = new CodexBackendDriver(sessionManager);
+
+    await expect(driver.setApprovalPreset(agent, 'full-access')).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-approval' },
       approvalPreset: 'full-access',
     });

@@ -42,9 +42,10 @@ export function sendAgentPrompt(
     detail: `Starting ${backendDisplayName(backendDriver.backend)} backend...`,
   }, emit, snapshot);
 
+  const preparedOptions = backendDriver.preparePromptOptions?.(agent, options) ?? options;
   const sendResult = promptResult
-    ?? (hasPromptOptions(options)
-      ? backendDriver.sendPrompt(agent, trimmedPrompt, options)
+    ?? (hasPromptOptions(preparedOptions)
+      ? backendDriver.sendPrompt(agent, trimmedPrompt, preparedOptions)
       : backendDriver.sendPrompt(agent, trimmedPrompt));
 
   void sendResult
@@ -80,7 +81,13 @@ export function sendAgentPrompt(
 }
 
 function hasPromptOptions(options: SendPromptOptions | undefined): options is SendPromptOptions {
-  return Boolean(options?.model || typeof options?.planMode === 'boolean' || options?.backendOptions);
+  return Boolean(
+    options?.model ||
+    typeof options?.planMode === 'boolean' ||
+    options?.reasoningEffort ||
+    (options?.skills?.length ?? 0) > 0 ||
+    options?.backendOptions,
+  );
 }
 
 function isBusy(status: AgentStatus): boolean {

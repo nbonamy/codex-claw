@@ -155,7 +155,7 @@
             :skill-catalog-status="skillCatalogStatus"
             :goal="goal"
             :turn-git-diff="currentTurnGitDiff"
-            :codex-approval-preset="codexApprovalPreset"
+            :approval-preset="approvalPreset"
             :plan-mode="planMode"
             :selected-model-id="selectedModelId"
             :selected-reasoning-effort="selectedReasoningEffort"
@@ -172,7 +172,7 @@
             @retry-message="$emit('retry-message', $event)"
             @select-model="$emit('select-model', $event)"
             @select-reasoning-effort="$emit('select-reasoning-effort', $event)"
-            @select-codex-approval-preset="$emit('select-codex-approval-preset', $event)"
+            @select-approval-preset="$emit('select-approval-preset', $event)"
             @clear-goal="$emit('clear-goal')"
             @send-prompt="$emit('sendPrompt', $event)"
             @steer-prompt="$emit('steerPrompt', $event)"
@@ -237,7 +237,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { Agent, AgentFileReadResult, AgentFileSearchItem, AgentGitStatus, AppCommand, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, CodexApprovalPreset, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SidePanelRequest, SourceRepository, SourceWorktree, Team, ThreadGoal, TurnGitDiff, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../../shared/contracts';
+import type { Agent, AgentFileReadResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SidePanelRequest, SourceRepository, SourceWorktree, Team, ThreadGoal, TurnGitDiff, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '../../shared/contracts';
 import { defaultBackendCapabilities } from '../../shared/backend-capabilities';
 import { defaultTeamColor } from '../../shared/team-colors';
 import { findAssignedAgentForWorkItem } from '../../shared/work-assignments';
@@ -267,7 +267,7 @@ const props = withDefaults(defineProps<{
   isLoading: boolean;
   isSending: boolean;
   goal?: ThreadGoal | null;
-  codexApprovalPreset?: CodexApprovalPreset | null;
+  approvalPreset?: ApprovalPreset | null;
   answeredClientRequestIds?: Set<string>;
   backendModels?: BackendModelOption[];
   backendCommands?: BackendCommandSummary[];
@@ -327,7 +327,7 @@ const props = withDefaults(defineProps<{
   skillCatalogStatus: 'notLoaded',
   selectedModelId: null,
   selectedReasoningEffort: null,
-  codexApprovalPreset: null,
+  approvalPreset: null,
   queuedPrompts: () => [],
   sidePanelRequest: null,
   workProviderAuthorization: null,
@@ -399,7 +399,7 @@ const emit = defineEmits<{
   'select-agent': [agentId: string];
   'select-model': [modelId: string];
   'select-reasoning-effort': [reasoningEffort: ReasoningEffort];
-  'select-codex-approval-preset': [preset: CodexApprovalPreset];
+  'select-approval-preset': [preset: ApprovalPreset];
   'select-team': [teamId: string];
   'steer-queued-prompt': [promptId: string];
   'update:planMode': [enabled: boolean];
