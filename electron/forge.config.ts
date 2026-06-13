@@ -52,7 +52,7 @@ const config: ForgeConfig = {
     icon: 'assets/icon',
     appBundleId: 'com.nabocorp.codex-claw',
     executableName: 'codex-claw',
-    extraResource: ['assets/apple-speechanalyzer-cli'],
+    extraResource: ['assets/apple-speechanalyzer-cli', 'resources/clawd'],
     extendInfo: 'build/Info.plist',
     ...osxPackagerConfig,
     afterCopyExtraResources: [

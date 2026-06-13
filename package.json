@@ -12,14 +12,14 @@
     "dev:electron": "npm run dev -w @codex-claw/electron",
     "dev:backend": "npm run dev -w @codex-claw/backend",
     "dev:backend:run": "npm run dev:run -w @codex-claw/backend",
-    "build": "npm run build -ws",
+    "build": "npm run build -w @codex-claw/shared && npm run build -w @codex-claw/backend && node scripts/package-backend.mjs && npm run build -w @codex-claw/electron",
     "typecheck": "npm run typecheck -ws",
     "lint": "npm run lint -ws",
     "lint:css": "npm run lint:css -w @codex-claw/electron",
     "test": "npm run test -ws",
     "test:coverage": "npm run test:coverage -ws",
     "test:watch": "npm run test:watch -w @codex-claw/electron",
-    "package": "npm run package -w @codex-claw/electron",
-    "make": "npm run make -w @codex-claw/electron"
+    "package": "npm run build -w @codex-claw/backend && node scripts/package-backend.mjs && npm run package -w @codex-claw/electron",
+    "make": "npm run build -w @codex-claw/backend && node scripts/package-backend.mjs && npm run make -w @codex-claw/electron"
   }
 }
