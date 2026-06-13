@@ -44,12 +44,13 @@ Current implementation checkpoint:
 - `clawd` currently serves health, shared-contract snapshot loading/saving, the
   `AgentBackendDriver` RPC surface, sequenced `backend/event` notifications,
   the Claw MCP HTTP server used by agent collaboration tools, source repository
-  discovery, git worktree creation, agent file listing/reading, GitHub work
-  integrations, and Apple Speech transcription execution.
+  discovery, git worktree creation, agent file listing/previewing, GitHub work
+  integrations, system permission API calls, and Apple Speech transcription
+  execution.
 - The stdio transport is now bidirectional JSON-RPC: Electron main can request
-  backend work, and `clawd` can request desktop-owned effects. The first
-  runtime desktop handler is `desktop/openExternal`, used as the foundation for
-  backend-owned work integrations.
+  backend work, and `clawd` can request desktop-owned effects. Runtime desktop
+  handlers include `desktop/openExternal` for backend-owned work integrations
+  and `desktop/systemPermissions/*` for native permission prompts/settings.
 - Work integration token types now live in `shared`, and `clawd` owns token
   persistence through a backend token-store port. The current runtime uses an
   encrypted file store under the backend state directory, so desktop and future
@@ -62,8 +63,8 @@ Current implementation checkpoint:
   app-owned backend events.
 - Electron main still owns native desktop affordances and selected adapters:
   window/menu/shortcut lifecycle, file/folder/save dialogs, URL opening,
-  Electron `safeStorage`, Electron system permission APIs, packaged resource
-  path resolution, and renderer IPC fanout.
+  Electron `safeStorage`, native system-permission prompts/settings, packaged
+  resource path resolution, and renderer IPC fanout.
 - `clawd` owns durable snapshot loading and saving. Electron keeps only a
   volatile renderer-facing snapshot cache hydrated from `snapshot/get` and
   backend events; it does not read or write `state.json`.
@@ -76,6 +77,10 @@ Current implementation checkpoint:
   agent.
 - `clawd` now owns settings updates. Electron adopts the returned snapshot and
   applies desktop-only reactions such as power-save blocker changes.
+- `clawd` now owns the app-facing system permission API. Electron supplies the
+  native macOS Accessibility status/open-settings implementation as a desktop
+  host callback; non-desktop clients can call the same backend methods without
+  reading local desktop state.
 - `clawd` now owns source-folder auto-detection, settings updates, and the
   recent-repository update after source worktree creation. Electron still owns
   native folder/save dialogs.
@@ -313,7 +318,8 @@ renderer.
 - Native file/folder/save dialogs. Local folder picking stays desktop-native;
   remote folder browsing must become a backend-powered product surface.
 - Clipboard, shell open/external URL behavior, OS prompts, notifications, and
-  system permission UI.
+  native system permission prompts/settings. The app-facing permission API
+  belongs to `clawd`; Electron implements only the desktop callback.
 - Desktop-session helpers such as renderer audio capture handoff.
 - App-packaged resource resolution. For example, Electron may tell `clawd`
   where the packaged Apple Speech helper lives, but `clawd` owns temp-file and
@@ -340,8 +346,9 @@ renderer.
 - File search/read, git status/diff/worktree creation, source repository
   discovery, artifact readback, markdown side-panel requests, and any future
   backend-location-owned filesystem behavior. Current code already routes
-  source discovery, worktree creation, agent file listing/reading, GitHub work
-  integrations, and Apple Speech transcription through `clawd`.
+  source discovery, worktree creation, agent file listing/previewing, GitHub work
+  integrations, system permission API calls, and Apple Speech transcription
+  through `clawd`.
 - Renderer file previews and MCP `display-markdown` path reads use the same
   rule: clients ask `clawd` for content; Electron does not read agent workspace
   files on behalf of product features. This keeps the contract valid for a
@@ -614,7 +621,8 @@ Runtime execution in a packaged app:
 5. `clawd` owns Codex app-server, Claude Code, MCP, git/files, loops, and
    durable state.
 6. Electron main fans backend events to the renderer and owns desktop-only
-   requests such as dialogs, open-external, and native notifications.
+   host callbacks such as dialogs, open-external, native permission prompts, and
+   native notifications.
 
 Signing implications:
 
@@ -815,8 +823,9 @@ Work:
   work-provider orchestration behind that interface incrementally.
 - Replace direct Electron `AppController` mutation paths with calls into the
   backend core.
-- Keep Electron main responsible for dialogs, open-external, app quit,
-  system permissions, transcription, window state, and renderer IPC.
+- Keep Electron main responsible for dialogs, open-external, app quit, native
+  system permission callbacks, window state, and renderer IPC. Keep the
+  product-level system permission and transcription APIs in `clawd`.
 
 Tests:
 

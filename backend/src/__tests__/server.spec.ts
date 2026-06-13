@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { AppSnapshot, RendererMessage, ThreadGoal, WorkItem } from '@codex-claw/shared/contracts';
+import type { AppSnapshot, RendererMessage, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/shared/contracts';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/shared/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { ClawBackendServer } from '../server';
@@ -21,6 +21,61 @@ describe('ClawBackendServer', () => {
         name: 'clawd',
         version: 'test-version',
         pid: 123,
+      },
+    });
+  });
+
+  it('routes system permission requests through the backend system port', async () => {
+    const status: SystemPermissionsStatus = {
+      platform: 'darwin',
+      accessibility: {
+        required: true,
+        trusted: false,
+      },
+    };
+    const openedStatus: SystemPermissionsStatus = {
+      platform: 'darwin',
+      accessibility: {
+        required: true,
+        trusted: true,
+      },
+    };
+    const systemPermissions = {
+      getStatus: vi.fn().mockResolvedValue(status),
+      openAccessibilitySettings: vi.fn().mockResolvedValue(openedStatus),
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      systemPermissions,
+    });
+
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'permissions', method: 'system/getPermissions' })).resolves.toStrictEqual({
+      jsonrpc: '2.0',
+      id: 'permissions',
+      result: status,
+    });
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'open-permissions', method: 'system/openAccessibilitySettings' })).resolves.toStrictEqual({
+      jsonrpc: '2.0',
+      id: 'open-permissions',
+      result: openedStatus,
+    });
+    expect(systemPermissions.getStatus).toHaveBeenCalledOnce();
+    expect(systemPermissions.openAccessibilitySettings).toHaveBeenCalledOnce();
+  });
+
+  it('returns a non-desktop system permission status when no host port is configured', async () => {
+    const server = new ClawBackendServer({ version: 'test-version', pid: 123 });
+
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'permissions', method: 'system/getPermissions' })).resolves.toStrictEqual({
+      jsonrpc: '2.0',
+      id: 'permissions',
+      result: {
+        platform: 'unsupported',
+        accessibility: {
+          required: false,
+          trusted: true,
+        },
       },
     });
   });

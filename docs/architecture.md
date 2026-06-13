@@ -187,9 +187,9 @@ flowchart LR
 The main process is no longer the provider runtime. It should become a thin
 desktop adapter: renderer IPC in, app-owned backend protocol over stdio out,
 then backend events fanned back to renderer windows. It may still own native
-desktop effects such as windows, dialogs, open-external, app quit, system
-permissions, packaged resources, and helper processes that truly require
-Electron APIs.
+desktop effects such as windows, dialogs, open-external, app quit, native
+system permission prompts/settings, packaged resources, and helper processes
+that truly require Electron APIs.
 
 Modules:
 
@@ -198,9 +198,9 @@ Modules:
   bundle, and exposes app-owned requests to main-process callers.
 - `AppController`: desktop IPC and native-affordance adapter. Product state,
   provider operations, client request ownership, durable snapshot persistence,
-  loops, work integrations, git/file/source operations, and transcription
-  belong in `clawd`; Electron forwards app-owned RPC requests and fans backend
-  events to renderer windows.
+  loops, work integrations, git/file/source operations, system permission API
+  calls, and transcription belong in `clawd`; Electron forwards app-owned RPC
+  requests and fans backend events to renderer windows.
 
 Future transport options:
 

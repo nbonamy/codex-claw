@@ -2,7 +2,7 @@ import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { sendAgentPrompt } from '@codex-claw/shared/agent-chat-service';
 import { createClawRpcNotification } from '@codex-claw/shared/backend-protocol/rpc';
-import type { Agent, BackendConversationRef } from '@codex-claw/shared/contracts';
+import type { Agent, BackendConversationRef, SystemPermissionsStatus } from '@codex-claw/shared/contracts';
 import { formatConversationTitle } from '@codex-claw/shared/conversation-title';
 import { updateLoopExecutionAgentConversationInSnapshot } from '@codex-claw/shared/loop-manager';
 import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/shared/backend-driver';
@@ -99,6 +99,10 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       saveSnapshot: (nextSnapshot) => saveBackendSnapshot(stateDir, nextSnapshot),
       workIntegrations,
       loopRunner,
+      systemPermissions: {
+        getStatus: () => stdio.request<SystemPermissionsStatus>('desktop/systemPermissions/get'),
+        openAccessibilitySettings: () => stdio.request<SystemPermissionsStatus>('desktop/systemPermissions/openAccessibilitySettings'),
+      },
     });
     mcpService.setDriverRpc(driverRpc);
     mcpService.setEventSink((event) => server.emitEvent(event));

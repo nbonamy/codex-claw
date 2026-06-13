@@ -3,13 +3,12 @@ import path from 'node:path';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
 import { logMain, warnMain } from './log';
 import { createMainWindow } from './main-window';
-import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-permissions';
 import {
   applyMainEventToSnapshot,
   createEmptySnapshot,
 } from './snapshot-service';
 import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from './backend-process-client';
-import type { AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
 type ClawBackendClientPort = Pick<ClawBackendProcessClient, 'start' | 'health' | 'request' | 'onEvent' | 'close'>;
@@ -233,9 +232,9 @@ export class AppController {
       return this.updateSettings(input);
     });
 
-    ipcMain.handle(ipcChannels.getSystemPermissions, () => getSystemPermissionsStatus());
+    ipcMain.handle(ipcChannels.getSystemPermissions, () => this.getSystemPermissions());
 
-    ipcMain.handle(ipcChannels.openAccessibilitySettings, () => openAccessibilitySettings());
+    ipcMain.handle(ipcChannels.openAccessibilitySettings, () => this.openAccessibilitySettings());
 
     ipcMain.handle(ipcChannels.transcribeAppleSpeech, async (_event, audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions) => {
       return this.transcribeAppleSpeech(audioData, options);
@@ -593,6 +592,14 @@ export class AppController {
       options,
       assetsPath: appleSpeechAssetsPath(),
     });
+  }
+
+  private async getSystemPermissions(): Promise<SystemPermissionsStatus> {
+    return this.requireBackendClient().request('system/getPermissions');
+  }
+
+  private async openAccessibilitySettings(): Promise<SystemPermissionsStatus> {
+    return this.requireBackendClient().request('system/openAccessibilitySettings');
   }
 
   private requireBackendClient(): ClawBackendClientPort {

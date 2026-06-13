@@ -49,4 +49,13 @@ describe('Electron backend boundary', () => {
 
     expect(source).not.toContain('source/detectFolder');
   });
+
+  it('keeps system permission API ownership in clawd', async () => {
+    const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
+    const source = await readFile(appControllerPath, 'utf8');
+
+    expect(source).not.toContain('./system-permissions');
+    expect(source).toContain("request('system/getPermissions')");
+    expect(source).toContain("request('system/openAccessibilitySettings')");
+  });
 });

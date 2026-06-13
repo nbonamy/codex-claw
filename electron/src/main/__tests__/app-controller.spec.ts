@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceRepository, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
@@ -179,6 +179,36 @@ describe('AppController', () => {
       options: { locale: 'en-US' },
       assetsPath: path.resolve(process.cwd(), 'assets'),
     });
+  });
+
+  it('routes system permission actions through clawd', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.sourceFolder.initialized = true;
+    const permissionStatus: SystemPermissionsStatus = {
+      platform: 'darwin',
+      accessibility: {
+        required: true,
+        trusted: false,
+      },
+    };
+    const openedStatus: SystemPermissionsStatus = {
+      platform: 'darwin',
+      accessibility: {
+        required: true,
+        trusted: true,
+      },
+    };
+    const request = vi.fn()
+      .mockResolvedValueOnce(permissionStatus)
+      .mockResolvedValueOnce(openedStatus);
+    const controller = new AppController(snapshot, undefined, createBackendClient({ request }));
+
+    await controller.initialize();
+
+    await expect(getSystemPermissions(controller)).resolves.toStrictEqual(permissionStatus);
+    await expect(openAccessibilitySettings(controller)).resolves.toStrictEqual(openedStatus);
+    expect(request).toHaveBeenNthCalledWith(1, 'system/getPermissions', undefined);
+    expect(request).toHaveBeenNthCalledWith(2, 'system/openAccessibilitySettings', undefined);
   });
 
   it('routes work provider actions through clawd when the backend client is connected', async () => {
@@ -1204,6 +1234,18 @@ async function transcribeAppleSpeech(
   return (controller as unknown as {
     transcribeAppleSpeech(audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions): Promise<AppleSpeechTranscriptionResult>;
   }).transcribeAppleSpeech(audioData, options);
+}
+
+async function getSystemPermissions(controller: AppController): Promise<SystemPermissionsStatus> {
+  return (controller as unknown as {
+    getSystemPermissions(): Promise<SystemPermissionsStatus>;
+  }).getSystemPermissions();
+}
+
+async function openAccessibilitySettings(controller: AppController): Promise<SystemPermissionsStatus> {
+  return (controller as unknown as {
+    openAccessibilitySettings(): Promise<SystemPermissionsStatus>;
+  }).openAccessibilitySettings();
 }
 
 async function assignWorkItemToAgent(controller: AppController, agentId: string, item: WorkItem): Promise<AppSnapshot> {

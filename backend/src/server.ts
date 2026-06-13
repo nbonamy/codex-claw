@@ -2,7 +2,7 @@ import path from 'node:path';
 import { sendAgentPrompt } from '@codex-claw/shared/agent-chat-service';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { applyMainEventToSnapshot, createAgentInSnapshot, createEmptySnapshot, selectAgent, updateAgentFolder, updateAgentFromInput } from '@codex-claw/shared/snapshot';
-import type { Agent, AgentBackend, AgentGitStatus, AppSnapshot, BackendConversationRef, BackendSession, ClientRequest, ClientRequestResponse, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
+import type { Agent, AgentBackend, AgentGitStatus, AppSnapshot, BackendConversationRef, BackendSession, ClientRequest, ClientRequestResponse, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
@@ -28,6 +28,12 @@ export type ClawBackendServerOptions = {
   saveSnapshot?: (snapshot: AppSnapshot) => Promise<void>;
   workIntegrations?: WorkIntegrationManager;
   loopRunner?: Pick<LoopRunner, 'runAll' | 'runLoop'>;
+  systemPermissions?: SystemPermissionsPort;
+};
+
+export type SystemPermissionsPort = {
+  getStatus(): Promise<SystemPermissionsStatus>;
+  openAccessibilitySettings(): Promise<SystemPermissionsStatus>;
 };
 
 export class ClawBackendServer {
@@ -39,6 +45,7 @@ export class ClawBackendServer {
   private readonly saveSnapshot?: (snapshot: AppSnapshot) => Promise<void>;
   private readonly workIntegrations?: WorkIntegrationManager;
   private readonly loopRunner?: Pick<LoopRunner, 'runAll' | 'runLoop'>;
+  private readonly systemPermissions: SystemPermissionsPort;
   private readonly clientRequestBackends = new Map<string, AgentBackend>();
   private unsubscribeDriverEvents?: () => void;
   private lastEventSeq = 0;
@@ -52,6 +59,7 @@ export class ClawBackendServer {
     this.saveSnapshot = options.saveSnapshot;
     this.workIntegrations = options.workIntegrations;
     this.loopRunner = options.loopRunner;
+    this.systemPermissions = options.systemPermissions ?? createUnsupportedSystemPermissionsPort();
     this.unsubscribeDriverEvents = this.driverRpc?.onEvent((event) => this.handleBackendEvent(event));
   }
 
@@ -78,6 +86,10 @@ export class ClawBackendServer {
           snapshot: this.snapshot,
           lastEventSeq: this.lastEventSeq,
         });
+      case 'system/getPermissions':
+        return createClawRpcResult(message.id, await this.systemPermissions.getStatus());
+      case 'system/openAccessibilitySettings':
+        return createClawRpcResult(message.id, await this.systemPermissions.openAccessibilitySettings());
       case 'clientRequest/respond': {
         const response = requireClientRequestResponse(message.params);
         const backend = this.clientRequestBackends.get(response.id);
@@ -1134,6 +1146,27 @@ function requireString(value: unknown, name: string): string {
     throw new Error(`Invalid ${name}.`);
   }
   return value;
+}
+
+function createUnsupportedSystemPermissionsPort(): SystemPermissionsPort {
+  return {
+    async getStatus() {
+      return unsupportedSystemPermissionsStatus();
+    },
+    async openAccessibilitySettings() {
+      return unsupportedSystemPermissionsStatus();
+    },
+  };
+}
+
+function unsupportedSystemPermissionsStatus(): SystemPermissionsStatus {
+  return {
+    platform: 'unsupported',
+    accessibility: {
+      required: false,
+      trusted: true,
+    },
+  };
 }
 
 function isBackendConversationRef(value: unknown): value is BackendConversationRef {

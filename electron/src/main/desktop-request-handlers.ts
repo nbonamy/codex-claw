@@ -1,14 +1,20 @@
 import { shell } from 'electron';
+import type { SystemPermissionsStatus } from '@codex-claw/shared/contracts';
+import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-permissions';
 
 export type DesktopRequestHandler = (params: unknown) => unknown | Promise<unknown>;
 
 export type DesktopRequestHandlersOptions = {
   openExternal: (url: string) => Promise<unknown>;
+  getSystemPermissionsStatus: () => SystemPermissionsStatus;
+  openAccessibilitySettings: () => Promise<SystemPermissionsStatus>;
 };
 
 export function createRuntimeDesktopRequestHandlers(): Record<string, DesktopRequestHandler> {
   return createDesktopRequestHandlers({
     openExternal: (url) => shell.openExternal(url),
+    getSystemPermissionsStatus,
+    openAccessibilitySettings,
   });
 }
 
@@ -20,6 +26,8 @@ export function createDesktopRequestHandlers(options: DesktopRequestHandlersOpti
       await options.openExternal(url);
       return true;
     },
+    'desktop/systemPermissions/get': () => options.getSystemPermissionsStatus(),
+    'desktop/systemPermissions/openAccessibilitySettings': () => options.openAccessibilitySettings(),
   };
 }
 
