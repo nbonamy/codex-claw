@@ -249,6 +249,168 @@ Future transports:
 - SSH stdio for remote backend locations.
 - TCP/WebSocket only after an explicit authenticated remote-control design.
 
+## Development Execution
+
+The developer experience should use one command, but under the hood it should
+run three cooperating loops:
+
+1. Electron Forge/Vite for Electron main, preload, and renderer.
+2. A backend bundler/watch step that emits a Node-runnable `clawd` bundle.
+3. A small supervisor that starts `clawd --stdio`, restarts it when the backend
+   bundle changes, and lets Electron main reconnect.
+
+Target commands:
+
+```json
+{
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:electron": "electron-forge start",
+    "dev:backend": "vite build --config vite.backend.config.ts --watch",
+    "dev:backend:run": "node scripts/run-backend-dev.mjs"
+  }
+}
+```
+
+The exact script names can change, but the shape should stay:
+
+- `npm run dev` remains the normal entrypoint for app development.
+- `dev:electron` keeps the current Electron Forge/Vite flow.
+- `dev:backend` watches `src/backend-core`, `src/backend-protocol`, and
+  `src/clawd`, then writes a bundled file such as
+  `.vite/backend/clawd-dev.mjs`.
+- `dev:backend:run` supervises `node .vite/backend/clawd-dev.mjs --stdio
+  --state-dir <repo>/.codex-claw-dev/state`.
+- Electron main receives the dev backend command from config or environment,
+  for example `CODEX_CLAW_BACKEND_COMMAND=node` and
+  `CODEX_CLAW_BACKEND_ARGS=.vite/backend/clawd-dev.mjs,--stdio,...`.
+
+Hot reload semantics:
+
+- Renderer changes keep normal Vite HMR.
+- Electron main/preload changes keep the current Forge/Vite rebuild/relaunch
+  behavior.
+- Backend changes should not use in-process hot module replacement. They should
+  rebuild the backend bundle, gracefully stop the old backend process, start a
+  new one, reconnect Electron main, then call `snapshot/get`.
+- Active backend state survives only if it is already durable. Product state,
+  completed messages, plans, goals, and agent sessions should reload from the
+  dev state directory. Active turns, pending approvals, open child processes,
+  and in-memory MCP sessions can be interrupted on backend restart during
+  development until the always-on daemon/replay story exists.
+- Protocol/shared-contract changes can require both the backend process and
+  Electron main to restart. That is acceptable; the goal is a fast, predictable
+  restart, not magic live patching.
+
+The first extraction phase can run in-process and still use the current
+`electron-forge start` loop. As soon as the stdio process exists, local dev
+should use the separate process by default so process-boundary bugs show up
+early. Keep an escape hatch such as `CODEX_CLAW_BACKEND_MODE=in-process` for
+bisecting.
+
+## Release Build And Runtime
+
+Release packaging should have an explicit backend build stage before Electron
+Forge packages the app.
+
+Recommended build pipeline:
+
+1. Typecheck the app:
+
+   ```bash
+   vue-tsc --noEmit
+   tsc --noEmit
+   ```
+
+2. Bundle `clawd` from TypeScript into a standalone Node script:
+
+   ```bash
+   vite build --config vite.backend.config.ts
+   ```
+
+   The bundle should have no `electron` imports, should bundle normal
+   dependencies, should leave Node built-ins external, and should produce
+   sourcemaps for crash triage. Native dependencies should be avoided unless we
+   explicitly design their packaging/signing.
+
+3. Package the backend runtime:
+
+   - Preferred release target, after a spike: build a Node SEA executable from
+     the bundled backend script.
+   - Temporary packaged-app fallback: run the bundled backend script in an
+     Electron `utilityProcess` and use the message-port transport, not stdio.
+   - Not recommended by default: enable Electron `RunAsNode` and use
+     `ELECTRON_RUN_AS_NODE=1`; that requires reversing the current fuse
+     hardening choice.
+
+4. Put the chosen backend runtime under Electron resources, for example:
+
+   ```text
+   resources/
+     clawd/
+       clawd-macos-arm64
+       clawd-macos-x64
+       clawd-win32-x64.exe
+       clawd-linux-x64
+   ```
+
+   Development builds can include only the current platform artifact.
+
+5. Package the Electron app with Forge. The current local verification command
+   remains:
+
+   ```bash
+   CODEX_CLAW_SKIP_SIGNING=1 npm run package
+   ```
+
+   A real release build should sign and notarize the app and any helper
+   executable that ships inside resources.
+
+Runtime execution in a packaged app:
+
+1. Electron main resolves the packaged backend runtime under
+   `process.resourcesPath`.
+2. Main starts the backend with stdio if it is a real executable:
+
+   ```ts
+   spawn(clawdPath, ["--stdio", "--state-dir", app.getPath("userData")], {
+     stdio: ["pipe", "pipe", "pipe"],
+   });
+   ```
+
+3. If the chosen packaged runtime is `utilityProcess`, main forks the backend
+   script and uses the message-port transport because utility processes cannot
+   pipe stdin.
+4. Main sends the protocol initialize/health request, then `snapshot/get`.
+5. `clawd` owns Codex app-server, Claude Code, MCP, git/files, loops, and
+   durable state.
+6. Electron main fans backend events to the renderer and owns desktop-only
+   requests such as dialogs, open-external, and native notifications.
+
+Signing implications:
+
+- macOS: the backend executable must be signed before app notarization. If it is
+  a Node SEA helper, treat it like the current Apple speech helper and sign it
+  from Forge's extra-resource hook or an equivalent release script.
+- Windows: sign the backend `.exe` when we have the release certificate; local
+  unsigned builds can still run for development.
+- Linux: no signing requirement by default, but the packaged artifact still
+  needs smoke tests.
+- Local `CODEX_CLAW_SKIP_SIGNING=1` builds should skip app/helper signing but
+  still verify the backend runtime starts and answers `backend/health`.
+
+Minimum release smoke:
+
+```bash
+CODEX_CLAW_SKIP_SIGNING=1 npm run package
+./out/<platform>/Codex\ Claw.app/Contents/Resources/clawd/clawd --version
+./out/<platform>/Codex\ Claw.app/Contents/Resources/clawd/clawd --stdio
+```
+
+The stdio smoke should send `backend/health` and expect a valid JSON-RPC
+response. The packaged app smoke should launch the app, connect to the packaged
+backend, call `snapshot/get`, and quit cleanly.
+
 ## Packaging Options
 
 ### Option A: Node SEA
