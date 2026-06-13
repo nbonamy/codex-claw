@@ -2,7 +2,6 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
 import { logMain, warnMain } from './log';
 import { createMainWindow } from './main-window';
-import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from './backend-process-client';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { isAppSnapshot, isDesktopState } from '@codex-claw/shared/snapshot-guards';
@@ -13,7 +12,7 @@ type ClawBackendClientPort = Pick<ClawBackendProcessClient, 'start' | 'health' |
 
 export class AppController {
   private mainWindow: BrowserWindow | null = null;
-  private snapshot = createEmptySnapshot();
+  private snapshot: AppSnapshot | null = null;
   private desktopState: DesktopState = createEmptyDesktopState();
   private backendClientEventUnsubscribe: (() => void) | null = null;
   private seq = 0;
@@ -22,7 +21,7 @@ export class AppController {
   private readonly backendClient: ClawBackendClientPort | null;
 
   constructor(
-    initialSnapshot: AppSnapshot = createEmptySnapshot(),
+    initialSnapshot: AppSnapshot | null = null,
     backendClient: ClawBackendClientPort | null = createRuntimeClawBackendClient(),
   ) {
     this.snapshot = initialSnapshot;
@@ -440,12 +439,15 @@ export class AppController {
   private async adoptBackendSnapshot(snapshot: AppSnapshot): Promise<AppSnapshot> {
     this.snapshot = snapshot;
     await this.refreshDesktopStateFromBackend();
-    return this.snapshot;
+    return snapshot;
   }
 
   private async getSnapshot(): Promise<AppSnapshot> {
     if (this.backendClient) {
       await this.refreshSnapshotFromBackend();
+    }
+    if (!this.snapshot) {
+      throw new Error('clawd snapshot is not available.');
     }
     return this.snapshot;
   }

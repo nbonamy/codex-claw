@@ -162,6 +162,7 @@ describe('Electron backend boundary', () => {
     expect(source).not.toContain('persistSnapshot');
     expect(source).not.toContain('./snapshot-service');
     expect(source).not.toContain('applyMainEventToSnapshot');
+    expect(source).not.toContain('createEmptySnapshot');
     expect(source).toContain("request<unknown>('snapshot/get')");
     await expect(readdir(path.join(mainDir, 'snapshot-service.ts'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
