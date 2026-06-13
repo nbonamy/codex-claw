@@ -1,6 +1,5 @@
 import { computed, ref } from 'vue';
 import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
-import { updateSettingsInSnapshot } from '@codex-claw/shared/settings';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
@@ -508,29 +507,14 @@ export function useAppState() {
   }
 
   async function updateSettings(input: UpdateSettingsInput): Promise<void> {
-    const previousTheme = { ...snapshot.value.theme };
-    const previousGeneral = { ...snapshot.value.general };
-    const previousSourceFolder = {
-      ...snapshot.value.sourceFolder,
-      recentRepoNames: [...snapshot.value.sourceFolder.recentRepoNames],
-    };
-    const previousSourceFolderPath = snapshot.value.sourceFolder.path;
-    updateSettingsInSnapshot(snapshot.value, input);
-
     if (!window.codexClaw?.updateSettings) {
       return;
     }
 
-    try {
-      snapshot.value = await window.codexClaw.updateSettings(input);
-      if (input.sourceFolder && snapshot.value.sourceFolder.path !== previousSourceFolderPath) {
-        await loadSourceRepositories();
-      }
-    } catch (error) {
-      snapshot.value.theme = previousTheme;
-      snapshot.value.general = previousGeneral;
-      snapshot.value.sourceFolder = previousSourceFolder;
-      throw error;
+    const previousSourceFolderPath = snapshot.value.sourceFolder.path;
+    snapshot.value = await window.codexClaw.updateSettings(input);
+    if (input.sourceFolder && snapshot.value.sourceFolder.path !== previousSourceFolderPath) {
+      await loadSourceRepositories();
     }
   }
 

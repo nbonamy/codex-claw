@@ -80,7 +80,9 @@ Current implementation checkpoint:
   template validates the target folder in the backend before creating the
   agent.
 - `clawd` now owns settings updates. Electron adopts the returned snapshot and
-  applies desktop-only reactions such as power-save blocker changes.
+  applies desktop-only reactions such as power-save blocker changes. Renderer
+  settings controls send update requests and adopt the backend snapshot instead
+  of applying shared product reducers locally.
 - `clawd` now owns the app-facing system permission API. Electron supplies the
   native macOS Accessibility status/open-settings implementation as a desktop
   host callback; non-desktop clients can call the same backend methods without

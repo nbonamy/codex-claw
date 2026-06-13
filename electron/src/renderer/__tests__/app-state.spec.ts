@@ -176,8 +176,8 @@ describe('useAppState', () => {
     await state.loadSnapshot();
     const updatePromise = state.updateSettings({ theme: { id: 'github-dark', mode: 'dark' } });
 
-    expect(state.snapshot.value.theme.id).toBe('github-dark');
-    expect(state.snapshot.value.theme.mode).toBe('dark');
+    expect(state.snapshot.value.theme.id).toBe(remoteSnapshot.theme.id);
+    expect(state.snapshot.value.theme.mode).toBe(remoteSnapshot.theme.mode);
 
     resolveUpdateSettings(updatedSnapshot);
     await updatePromise;

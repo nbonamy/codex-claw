@@ -87,6 +87,7 @@ describe('Electron backend boundary', () => {
     const source = await readFile(appStatePath, 'utf8');
 
     expect(source).not.toContain('applyMainEventToSnapshot');
+    expect(source).not.toContain('updateSettingsInSnapshot');
     expect(source).toContain('adoptSnapshotFromMainEvent');
   });
 
