@@ -206,13 +206,9 @@ export class BackendDriverRpc {
       case 'transcription/appleSpeech': {
         const record = requireRecord(params);
         const audioBase64 = requireString(record.audioBase64, 'audioBase64');
-        const assetsPath = typeof record.assetsPath === 'string' && record.assetsPath.trim()
-          ? record.assetsPath.trim()
-          : undefined;
         return transcribeWithAppleSpeechAnalyzer(
           Buffer.from(audioBase64, 'base64'),
           transcriptionOptions(record.options),
-          assetsPath ? { assetsPath } : {},
         );
       }
       default:

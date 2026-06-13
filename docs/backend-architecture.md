@@ -521,6 +521,9 @@ The exact script names can change, but the shape should stay:
 - Electron main receives the dev backend command from config or environment,
   for example `CODEX_CLAW_BACKEND_COMMAND=node` and
   `CODEX_CLAW_BACKEND_ARGS=../backend/dist/clawd-dev.mjs,--stdio,...`.
+  It also passes `CODEX_CLAW_ASSETS_PATH=<repo>/assets` so backend-owned
+  transcription can find the Apple Speech helper without per-request desktop
+  path fields.
 
 Hot reload semantics:
 
@@ -605,7 +608,7 @@ Recommended build pipeline:
 Runtime execution in a packaged app:
 
 1. Electron main resolves the packaged backend runtime under
-   `process.resourcesPath`.
+   `process.resourcesPath` and passes `CODEX_CLAW_ASSETS_PATH` to `clawd`.
 2. Main starts the backend with stdio if it is a real executable:
 
    ```ts

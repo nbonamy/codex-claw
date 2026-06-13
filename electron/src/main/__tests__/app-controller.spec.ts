@@ -177,7 +177,6 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('transcription/appleSpeech', {
       audioBase64: Buffer.from(audioData).toString('base64'),
       options: { locale: 'en-US' },
-      assetsPath: path.resolve(process.cwd(), 'assets'),
     });
   });
 

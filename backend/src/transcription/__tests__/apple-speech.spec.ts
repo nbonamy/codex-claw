@@ -1,9 +1,13 @@
 import { EventEmitter } from 'node:events';
 import path from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { transcribeWithAppleSpeechAnalyzer } from '../apple-speech';
 
 describe('transcribeWithAppleSpeechAnalyzer', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('writes audio, invokes the Apple speech CLI, reads text, and cleans up', async () => {
     const fs = fakeFs('ship the feature\n');
     const spawn = fakeSpawn(0);
@@ -44,6 +48,21 @@ describe('transcribeWithAppleSpeechAnalyzer', () => {
       error: 'Apple speech CLI exited with code 2: permission denied',
     });
     expect(fs.rm).toHaveBeenCalledWith('/tmp/codex-claw-apple-stt-123', { recursive: true, force: true });
+  });
+
+  it('uses the backend assets path environment when no per-call override is provided', async () => {
+    vi.stubEnv('CODEX_CLAW_ASSETS_PATH', '/configured/assets');
+    const fs = fakeFs('from env\n');
+    const spawn = fakeSpawn(0);
+
+    const result = await transcribeWithAppleSpeechAnalyzer(Buffer.from('audio'), {}, {
+      fs,
+      spawn,
+      tmpdir: () => '/tmp',
+    });
+
+    expect(result).toStrictEqual({ text: 'from env' });
+    expect(spawn).toHaveBeenCalledWith('/configured/assets/apple-speechanalyzer-cli', expect.any(Array));
   });
 });
 

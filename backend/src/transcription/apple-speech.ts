@@ -110,6 +110,11 @@ function runAppleSpeechCli(
 }
 
 function defaultAssetsPath(): string {
+  const configuredAssetsPath = process.env.CODEX_CLAW_ASSETS_PATH?.trim();
+  if (configuredAssetsPath) {
+    return configuredAssetsPath;
+  }
+
   const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
   if (resourcesPath && !resourcesPath.endsWith('.vite/build')) {
     return resourcesPath;

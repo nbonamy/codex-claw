@@ -10,6 +10,7 @@ export type ClawBackendProcessCommand = {
   command: string;
   args: string[];
   cwd?: string;
+  env?: NodeJS.ProcessEnv;
 };
 
 export type ClawBackendProcessClientOptions = {
@@ -60,6 +61,7 @@ export class ClawBackendProcessClient {
 
     const child = this.spawnProcess(this.command.command, this.command.args, {
       cwd: this.command.cwd,
+      ...(this.command.env ? { env: { ...process.env, ...this.command.env } } : {}),
       stdio: 'pipe',
     });
 

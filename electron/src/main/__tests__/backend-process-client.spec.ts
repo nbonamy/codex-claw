@@ -63,6 +63,31 @@ describe('ClawBackendProcessClient', () => {
     await expect(requestPromise).rejects.toThrow('Unknown backend method: missing/method');
   });
 
+  it('passes configured backend environment to the spawned process', async () => {
+    const child = createFakeChildProcess();
+    const spawnProcess = vi.fn().mockReturnValue(child);
+    const client = new ClawBackendProcessClient({
+      command: {
+        command: 'node',
+        args: ['backend/dist/clawd.mjs', '--stdio'],
+        env: {
+          CODEX_CLAW_ASSETS_PATH: '/app/resources',
+        },
+      },
+      spawnProcess,
+    });
+
+    await client.start();
+
+    expect(spawnProcess).toHaveBeenCalledWith('node', ['backend/dist/clawd.mjs', '--stdio'], {
+      cwd: undefined,
+      env: expect.objectContaining({
+        CODEX_CLAW_ASSETS_PATH: '/app/resources',
+      }),
+      stdio: 'pipe',
+    });
+  });
+
   it('emits backend event notifications from stdio', async () => {
     const child = createFakeChildProcess();
     const client = new ClawBackendProcessClient({

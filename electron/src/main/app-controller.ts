@@ -590,7 +590,6 @@ export class AppController {
     return this.requireBackendClient().request('transcription/appleSpeech', {
       audioBase64: Buffer.from(audioData).toString('base64'),
       options,
-      assetsPath: appleSpeechAssetsPath(),
     });
   }
 
@@ -756,9 +755,4 @@ function isAppSnapshot(value: unknown): value is AppSnapshot {
     Array.isArray(value.agents) &&
     isRecord(value.general) &&
     isRecord(value.sourceFolder);
-}
-
-function appleSpeechAssetsPath(): string {
-  const isPackaged = Boolean((app as { isPackaged?: boolean } | undefined)?.isPackaged);
-  return isPackaged ? process.resourcesPath : path.resolve(process.cwd(), 'assets');
 }

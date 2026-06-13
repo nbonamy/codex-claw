@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import path from 'node:path';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -21,6 +22,9 @@ describe('runtime config', () => {
     expect(runtimeClawdCommand()).toStrictEqual({
       command: 'node',
       args: ['dist/clawd.mjs', '--stdio'],
+      env: {
+        CODEX_CLAW_ASSETS_PATH: path.resolve(process.cwd(), 'assets'),
+      },
     });
   });
 
@@ -32,6 +36,24 @@ describe('runtime config', () => {
     expect(runtimeClawdCommand()).toStrictEqual({
       command: 'clawd',
       args: ['--stdio'],
+      env: {
+        CODEX_CLAW_ASSETS_PATH: path.resolve(process.cwd(), 'assets'),
+      },
+    });
+  });
+
+  it('forwards an explicitly configured assets path to clawd', async () => {
+    vi.stubEnv('CODEX_CLAW_BACKEND_COMMAND', 'clawd');
+    vi.stubEnv('CODEX_CLAW_ASSETS_PATH', '/app/resources');
+
+    const { runtimeClawdCommand } = await import('../runtime-config');
+
+    expect(runtimeClawdCommand()).toStrictEqual({
+      command: 'clawd',
+      args: ['--stdio'],
+      env: {
+        CODEX_CLAW_ASSETS_PATH: '/app/resources',
+      },
     });
   });
 });

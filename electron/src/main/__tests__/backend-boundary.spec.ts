@@ -60,6 +60,15 @@ describe('Electron backend boundary', () => {
     expect(source).toContain("request('system/openAccessibilitySettings')");
   });
 
+  it('keeps Apple Speech helper paths out of per-request Electron IPC', async () => {
+    const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
+    const source = await readFile(appControllerPath, 'utf8');
+
+    expect(source).toContain("request('transcription/appleSpeech'");
+    expect(source).not.toContain('assetsPath');
+    expect(source).not.toContain('appleSpeechAssetsPath');
+  });
+
   it('keeps shell PATH repair out of Electron startup', async () => {
     const indexPath = path.resolve(__dirname, '../index.ts');
     const mainDir = path.resolve(__dirname, '..');

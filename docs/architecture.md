@@ -21,11 +21,13 @@ own protocol/process communication and the renderer displays app-owned events.
   Skwad's full multi-provider abstraction forward, but keep the narrow backend
   seam so coding backends such as Claude can be added without rewriting the UI.
 - Use the Codex app-server protocol as the long-term integration boundary.
-- Keep all app-server communication in Electron main. Renderer code never owns
-  Codex process lifecycle, JSON-RPC request IDs, approval callbacks, or auth.
-- Keep native helper execution in Electron main as well. For example, composer
-  voice dictation records browser audio in the renderer, sends audio bytes
-  through typed IPC, and lets main invoke the Apple speech helper.
+- Keep all app-server communication in `clawd`. Renderer and Electron main code
+  never own Codex process lifecycle, JSON-RPC request IDs, approval callbacks,
+  or auth.
+- Keep native helper execution behind backend-owned runtime services. For
+  example, composer voice dictation records browser audio in the renderer,
+  sends audio bytes through typed IPC/backend RPC, and lets `clawd` invoke the
+  Apple speech helper.
 - Reuse id8 renderer primitives for messages, streaming text, tool calls,
   approvals, markdown, mermaid, media, and diffs.
 - Build theme support from day one with semantic tokens, not hardcoded colors.
