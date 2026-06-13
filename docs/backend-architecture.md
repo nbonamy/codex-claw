@@ -41,14 +41,22 @@ Current implementation checkpoint:
 - Codex and Claude provider drivers now live under `backend/src`; Electron main
   must not import provider drivers, provider transports, provider SDKs, or raw
   provider protocol modules.
-- `clawd` currently serves health, snapshot loading, the `AgentBackendDriver`
-  RPC surface, sequenced `backend/event` notifications, and the Claw MCP HTTP
-  server used by agent collaboration tools.
+- `clawd` currently serves health, shared-contract snapshot loading/saving, the
+  `AgentBackendDriver` RPC surface, sequenced `backend/event` notifications,
+  the Claw MCP HTTP server used by agent collaboration tools, source repository
+  discovery, git worktree creation, agent file listing/reading, and Apple
+  Speech transcription execution.
 - Electron main no longer owns the MCP HTTP server. Desktop-facing MCP effects,
   such as displaying Markdown in the side panel, flow back to Electron as
   app-owned backend events.
+- Electron main still owns native desktop affordances and selected adapters:
+  window/menu/shortcut lifecycle, file/folder/save dialogs, URL opening,
+  Electron `safeStorage`, Electron system permission APIs, packaged resource
+  path resolution, and renderer IPC fanout.
 - The remaining large slice is to move product orchestration out of
-  `AppController` so Electron becomes only the desktop IPC/stdio layer.
+  `AppController` so Electron becomes only the desktop IPC/stdio layer. The
+  largest remaining owners are loop scheduler/runner, GitHub work integrations,
+  and direct snapshot mutation routes.
 
 ## Goals
 
@@ -240,9 +248,10 @@ renderer.
   remote folder browsing must become a backend-powered product surface.
 - Clipboard, shell open/external URL behavior, OS prompts, notifications, and
   system permission UI.
-- Desktop-session helpers such as renderer audio handoff and Apple speech
-  helper invocation.
-- App-packaged resource resolution.
+- Desktop-session helpers such as renderer audio capture handoff.
+- App-packaged resource resolution. For example, Electron may tell `clawd`
+  where the packaged Apple Speech helper lives, but `clawd` owns temp-file and
+  helper execution.
 - Secret storage only if it depends on Electron `safeStorage`. The backend
   should depend on an abstract secret store, not import Electron.
 - Optional desktop-only power management. The backend can emit activity state;
@@ -264,10 +273,15 @@ renderer.
   inside `clawd` so Codex/Claude sessions receive a backend-owned MCP URL.
 - File search/read, git status/diff/worktree creation, source repository
   discovery, artifact readback, markdown side-panel requests, and any future
-  backend-location-owned filesystem behavior.
+  backend-location-owned filesystem behavior. Current code already routes
+  source discovery, worktree creation, agent file listing/reading, and Apple
+  Speech transcription through `clawd`.
 - Loop scheduler and loop runner.
 - Work-provider drivers where possible, with desktop-only services injected
   through ports.
+- Durable snapshot persistence now uses a shared serializer/parser so Electron
+  and `clawd` write the same state shape. `clawd` persists backend-owned
+  snapshot events when it runs with `--state-dir`.
 
 The rule is simple: if the operation acts on a repository, agent, backend
 session, work item, transcript, or backend-owned path, it belongs in `clawd`.
@@ -643,8 +657,9 @@ Local migration path:
 
 1. Electron main computes the existing app data directory and passes it to
    local `clawd` during startup.
-2. `clawd` loads the existing `state.json`, runs migrations, and writes future
-   state.
+2. `clawd` loads the existing `state.json` through the shared
+   `AppStatePersistence` serializer/parser and writes backend-owned future
+   changes using the same schema.
 3. Electron main stops importing snapshot mutation helpers directly.
 4. Old development checkouts keep working because the state path is explicit.
 
