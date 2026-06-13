@@ -22,6 +22,33 @@ describe('Electron backend boundary', () => {
     await expect(readdir(path.join(mainDir, 'backends'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
+  it('keeps backend orchestration implementation modules out of Electron main', async () => {
+    const mainDir = path.resolve(__dirname, '..');
+    const forbiddenPaths = [
+      'agent-files.ts',
+      'git',
+      'git-worktrees.ts',
+      'loops',
+      'mcp',
+      'source-repositories.ts',
+      'state.ts',
+      'work-integrations',
+    ];
+
+    for (const forbiddenPath of forbiddenPaths) {
+      await expect(readdir(path.join(mainDir, forbiddenPath))).rejects.toMatchObject({ code: 'ENOENT' });
+    }
+  });
+
+  it('keeps backend orchestration types and imports out of Electron main runtime files', async () => {
+    const sources = await readElectronMainRuntimeSources(path.resolve(__dirname, '..'));
+
+    for (const { filePath, source } of sources) {
+      expect(source, filePath).not.toMatch(/from ['"].*\/(loops|mcp|work-integrations|git-worktrees|source-repositories|agent-files|state)(\/|['"])/);
+      expect(source, filePath).not.toMatch(/\b(LoopRunner|LoopScheduler|WorkIntegrationManager|GitHubWorkProviderDriver|AgentCoordinator|McpService)\b/);
+    }
+  });
+
   it('keeps workspace file reads behind clawd', async () => {
     const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
     const source = await readFile(appControllerPath, 'utf8');

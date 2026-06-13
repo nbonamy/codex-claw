@@ -61,6 +61,9 @@ Current implementation checkpoint:
 - Electron main no longer owns the MCP HTTP server. Desktop-facing MCP effects,
   such as displaying Markdown in the side panel, flow back to Electron as
   app-owned backend events.
+- Electron main no longer contains backend orchestration implementation modules
+  for loops, work integrations, MCP, source scanning, git worktrees, agent file
+  reads, or state persistence. Those live under `backend/src` or `shared/src`.
 - Electron main still owns native desktop affordances and selected adapters:
   window/menu/shortcut lifecycle, file/folder/save dialogs, URL opening,
   Electron `safeStorage`, native system-permission prompts/settings, packaged

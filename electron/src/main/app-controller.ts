@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import path from 'node:path';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
 import { logMain, warnMain } from './log';
