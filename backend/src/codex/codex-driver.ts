@@ -14,7 +14,7 @@ import type {
   SendPromptOptions,
 } from '@codex-claw/shared/contracts';
 import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
-import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '../backends/types';
+import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
 import { AgentGitService } from '../git/agent-git-service';
 import type { CodexAgentSessionManager } from './agent-session';
 import type { CodexReviewTarget } from './protocol';

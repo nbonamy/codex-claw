@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -12,5 +12,11 @@ describe('Electron backend boundary', () => {
     expect(source).not.toContain('new CodexBackendDriver');
     expect(source).not.toContain('new ClaudeBackendDriver');
     expect(source).toContain('ClawBackendProxyDriver');
+  });
+
+  it('keeps provider implementation directories out of Electron main', async () => {
+    const mainDir = path.resolve(__dirname, '..');
+    await expect(readdir(path.join(mainDir, 'codex'))).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(readdir(path.join(mainDir, 'claude'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
 });
