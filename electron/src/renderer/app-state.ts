@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { Agent, AgentFileReadResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { updateSettingsInSnapshot } from '@codex-claw/shared/settings';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
@@ -347,12 +347,12 @@ export function useAppState() {
     });
   }
 
-  async function readAgentFile(agentId: string, filePath: string): Promise<AgentFileReadResult> {
-    if (!window.codexClaw?.readAgentFile) {
+  async function previewAgentFile(agentId: string, filePath: string): Promise<AgentFilePreviewResult> {
+    if (!window.codexClaw?.previewAgentFile) {
       throw new Error('File preview is not available.');
     }
 
-    return window.codexClaw.readAgentFile(agentId, filePath);
+    return window.codexClaw.previewAgentFile(agentId, filePath);
   }
 
   async function openAgentGitDiff(agentId: string): Promise<void> {
@@ -936,7 +936,7 @@ export function useAppState() {
     chooseSourceWorktreeDestination,
     createSourceWorktree,
     addRecentSourceRepository,
-    readAgentFile,
+    previewAgentFile,
     openAgentGitDiff,
     createAgent,
     createTeam,

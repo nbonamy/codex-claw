@@ -448,7 +448,7 @@ export type AgentFileSearchItem = {
   path: string;
 };
 
-export type AgentFileReadResult = {
+export type AgentFilePreviewResult = {
   path: string;
   content: string;
 };
@@ -810,7 +810,7 @@ export type CodexClawApi = {
   listBackendModels(agentId: string): Promise<BackendModelOption[]>;
   listBackendSkills(agentId: string): Promise<BackendSkillSummary[]>;
   listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]>;
-  readAgentFile(agentId: string, filePath: string): Promise<AgentFileReadResult>;
+  previewAgentFile(agentId: string, filePath: string): Promise<AgentFilePreviewResult>;
   openAgentGitDiff(agentId: string): Promise<void>;
   chooseAgentFolder(): Promise<string | null>;
   chooseSourceFolder(): Promise<string | null>;

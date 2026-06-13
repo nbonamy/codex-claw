@@ -1,6 +1,6 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
-import type { AgentFileReadResult, AgentFileSearchItem } from '@codex-claw/shared/contracts';
+import type { AgentFilePreviewResult, AgentFileSearchItem } from '@codex-claw/shared/contracts';
 
 export const DEFAULT_AGENT_FILE_LIMIT = 1000;
 export const DEFAULT_AGENT_FILE_DEPTH = 8;
@@ -89,7 +89,7 @@ export async function readAgentFolderFile(
   folder: string,
   filePath: string,
   options: { maxBytes?: number } = {},
-): Promise<AgentFileReadResult> {
+): Promise<AgentFilePreviewResult> {
   const resolvedPath = resolveAgentFilePath(folder, filePath);
   const fileStat = await stat(resolvedPath.absolutePath);
   if (!fileStat.isFile()) {

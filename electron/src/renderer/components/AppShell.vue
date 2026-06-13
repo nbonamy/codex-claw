@@ -237,7 +237,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { Agent, AgentFileReadResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SidePanelRequest, SourceRepository, SourceWorktree, Team, ThreadGoal, TurnGitDiff, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SidePanelRequest, SourceRepository, SourceWorktree, Team, ThreadGoal, TurnGitDiff, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultTeamColor } from '@codex-claw/shared/team-colors';
 import { findAssignedAgentForWorkItem } from '@codex-claw/shared/work-assignments';
@@ -291,7 +291,7 @@ const props = withDefaults(defineProps<{
   chooseSourceWorktreeDestination?: (repoPath: string, suggestedName: string) => Promise<string | null>;
   createSourceWorktree?: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   addRecentSourceRepository?: (repoName: string) => void;
-  readAgentFile?: (agentId: string, filePath: string) => Promise<AgentFileReadResult>;
+  previewAgentFile?: (agentId: string, filePath: string) => Promise<AgentFilePreviewResult>;
   openAgentGitDiff?: (agentId: string) => Promise<void>;
   createAgent?: (input: CreateAgentInput) => Promise<Agent | null | void>;
   createTeam?: (input: CreateTeamInput) => Promise<Team | null | void>;
@@ -341,7 +341,7 @@ const props = withDefaults(defineProps<{
   chooseSourceWorktreeDestination: async () => null,
   createSourceWorktree: async () => ({ name: '', path: '' }),
   addRecentSourceRepository: () => undefined,
-  readAgentFile: async () => {
+  previewAgentFile: async () => {
     throw new Error('File preview is not available.');
   },
   openAgentGitDiff: async () => {
@@ -816,7 +816,7 @@ async function openFilePreview(filePath: string): Promise<void> {
   } as SidePanelState;
 
   try {
-    const result = await props.readAgentFile(agent.id, trimmedPath);
+    const result = await props.previewAgentFile(agent.id, trimmedPath);
     if (requestId !== sidePanelRequestId) {
       return;
     }

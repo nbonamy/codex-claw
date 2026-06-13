@@ -29,7 +29,7 @@ describe('Electron backend boundary', () => {
     expect(source).not.toMatch(/from ['"]fs/);
     expect(source).not.toContain('driver/readFile');
     expect(source).not.toContain('driver/listFiles');
-    expect(source).toContain("request('agent/readFile'");
+    expect(source).toContain("request('agent/previewFile'");
     expect(source).toContain('agentId');
   });
 

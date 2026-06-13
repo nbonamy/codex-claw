@@ -178,7 +178,7 @@ describe('BackendDriverRpc', () => {
     }
   });
 
-  it('routes agent file listing and reads through backend-owned filesystem access', async () => {
+  it('routes agent file listing and previews through backend-owned filesystem access', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-rpc-files-'));
     const rpc = new BackendDriverRpc(new Map([['codex', createDriver()]]));
 

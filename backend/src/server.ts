@@ -171,7 +171,7 @@ export class ClawBackendServer {
           folder: agent.folder,
         }));
       }
-      case 'agent/readFile': {
+      case 'agent/previewFile': {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
         const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);

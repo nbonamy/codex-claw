@@ -9,7 +9,7 @@ import {
   createEmptySnapshot,
 } from './snapshot-service';
 import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from './backend-process-client';
-import type { AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
 type ClawBackendClientPort = Pick<ClawBackendProcessClient, 'start' | 'health' | 'request' | 'onEvent' | 'close'>;
@@ -80,8 +80,8 @@ export class AppController {
       return this.listAgentFiles(agentId);
     });
 
-    ipcMain.handle(ipcChannels.readAgentFile, async (_event, agentId: string, filePath: string) => {
-      return this.readAgentFile(agentId, filePath);
+    ipcMain.handle(ipcChannels.previewAgentFile, async (_event, agentId: string, filePath: string) => {
+      return this.previewAgentFile(agentId, filePath);
     });
 
     ipcMain.handle(ipcChannels.openAgentGitDiff, async (_event, agentId: string) => {
@@ -506,8 +506,8 @@ export class AppController {
     });
   }
 
-  private async readAgentFile(agentId: string, filePath: string): Promise<AgentFileReadResult> {
-    return this.requireBackendClient().request('agent/readFile', {
+  private async previewAgentFile(agentId: string, filePath: string): Promise<AgentFilePreviewResult> {
+    return this.requireBackendClient().request('agent/previewFile', {
       agentId,
       filePath,
     });

@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
@@ -900,12 +900,12 @@ describe('AppController', () => {
     });
   });
 
-  it('routes agent file listing and reads through clawd', async () => {
+  it('routes agent file listing and previews through clawd', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     snapshot.agents[0].folder = '/Users/nbonamy/src/codex-claw';
     const files: AgentFileSearchItem[] = [{ name: 'README.md', path: 'README.md' }];
-    const readResult: AgentFileReadResult = { path: 'README.md', content: '# Read me\n' };
+    const readResult: AgentFilePreviewResult = { path: 'README.md', content: '# Read me\n' };
     const request = vi.fn()
       .mockResolvedValueOnce(files)
       .mockResolvedValueOnce(readResult);
@@ -914,11 +914,11 @@ describe('AppController', () => {
     await controller.initialize();
 
     await expect(listAgentFiles(controller, 'agent-dina')).resolves.toStrictEqual(files);
-    await expect(readAgentFile(controller, 'agent-dina', 'README.md')).resolves.toStrictEqual(readResult);
+    await expect(previewAgentFile(controller, 'agent-dina', 'README.md')).resolves.toStrictEqual(readResult);
     expect(request).toHaveBeenNthCalledWith(1, 'agent/listFiles', {
       agentId: 'agent-dina',
     });
-    expect(request).toHaveBeenNthCalledWith(2, 'agent/readFile', {
+    expect(request).toHaveBeenNthCalledWith(2, 'agent/previewFile', {
       agentId: 'agent-dina',
       filePath: 'README.md',
     });
@@ -1427,10 +1427,10 @@ async function setAgentApprovalPreset(controller: AppController, agentId: string
   }).setAgentApprovalPreset(agentId, preset);
 }
 
-async function readAgentFile(controller: AppController, agentId: string, filePath: string): Promise<unknown> {
+async function previewAgentFile(controller: AppController, agentId: string, filePath: string): Promise<unknown> {
   return (controller as unknown as {
-    readAgentFile(agentId: string, filePath: string): Promise<unknown>;
-  }).readAgentFile(agentId, filePath);
+    previewAgentFile(agentId: string, filePath: string): Promise<unknown>;
+  }).previewAgentFile(agentId, filePath);
 }
 
 async function listAgentFiles(controller: AppController, agentId: string): Promise<AgentFileSearchItem[]> {

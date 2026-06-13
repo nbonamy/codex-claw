@@ -82,9 +82,10 @@ Current implementation checkpoint:
 - `clawd` now owns agent create/update/duplicate/move/reorder/close/select and
   folder update mutations. Electron still performs desktop folder picking, then
   forwards the selected folder to the backend.
-- `clawd` now owns agent file preview authority: Electron requests file
-  listing/reading by agent id only, and the backend resolves the folder from
-  its snapshot before touching storage.
+- `clawd` now owns agent file preview authority: clients request file lists and
+  previews by agent id only, and the backend resolves the folder from its
+  snapshot before touching storage. A mobile or web client uses the same
+  backend RPC over its transport; it never reads local workspace files.
 - `clawd` now owns work item assignment and unassignment mutations. Electron
   forwards the item payload and adopts the backend snapshot instead of changing
   `workBacklog.assignments` locally.
@@ -101,7 +102,7 @@ Current implementation checkpoint:
   delete/edit/retry message orchestration. Electron forwards message actions by
   agent/message ids and adopts the returned snapshot.
 - `clawd` owns agent file listing/preview authority. Client-facing
-  `agent/listFiles` and `agent/readFile` take an `agentId`; Electron does not
+  `agent/listFiles` and `agent/previewFile` take an `agentId`; Electron does not
   send workspace roots or read file bytes. The backend's folder-based file
   helpers are internal `driver/listFiles` and `driver/readFile` calls only.
 - `clawd` owns provider metadata and conversation-history reads. Electron asks
@@ -409,7 +410,7 @@ names that describe backend ownership:
 - `loop/create`, `loop/update`, `loop/run`, `loop/delete`,
   `loop/clearHistory`, `loop/deleteExecution`
 - `source/listRepositories`, `source/createWorktree`
-- `agent/listFiles`, `agent/readFile` using agent ids only. `clawd` resolves
+- `agent/listFiles`, `agent/previewFile` using agent ids only. `clawd` resolves
   the workspace root from its snapshot so desktop, mobile, and future web
   clients never transmit local filesystem roots as read authority.
 - `git/status`, `git/diff`

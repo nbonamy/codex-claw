@@ -10,7 +10,7 @@ export const ipcChannels = {
   listBackendModels: 'backend:models:list',
   listBackendSkills: 'backend:skills:list',
   listAgentFiles: 'agent:files:list',
-  readAgentFile: 'agent:file:read',
+  previewAgentFile: 'agent:file:preview',
   openAgentGitDiff: 'agent:git-diff:open',
   chooseAgentFolder: 'agent:choose-folder',
   chooseSourceFolder: 'source-folder:choose',

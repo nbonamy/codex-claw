@@ -584,7 +584,7 @@ describe('ClawBackendServer', () => {
       await expect(server.handleMessage({
         jsonrpc: '2.0',
         id: 'read-file',
-        method: 'agent/readFile',
+        method: 'agent/previewFile',
         params: { agentId: 'agent-dina', filePath: 'README.md' },
       })).resolves.toMatchObject({
         result: {
@@ -595,7 +595,7 @@ describe('ClawBackendServer', () => {
       await expect(server.handleMessage({
         jsonrpc: '2.0',
         id: 'missing-agent',
-        method: 'agent/readFile',
+        method: 'agent/previewFile',
         params: { agentId: 'agent-missing', filePath: 'README.md' },
       })).resolves.toMatchObject({
         error: {

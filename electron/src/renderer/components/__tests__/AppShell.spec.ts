@@ -106,7 +106,7 @@ describe('AppShell', () => {
   it('opens markdown links in the side panel through the agent file bridge', async () => {
     const snapshot = createInitialSnapshot();
     let resolveReadAgentFile: (result: { content: string; path: string }) => void = () => undefined;
-    const readAgentFile = vi.fn().mockReturnValue(new Promise((resolve) => {
+    const previewAgentFile = vi.fn().mockReturnValue(new Promise((resolve) => {
       resolveReadAgentFile = resolve;
     }));
     const wrapper = mount(AppShell, {
@@ -125,7 +125,7 @@ describe('AppShell', () => {
         ],
         isLoading: false,
         isSending: false,
-        readAgentFile,
+        previewAgentFile,
       },
       global: {
         plugins: [ElementPlus, i18n],
@@ -134,7 +134,7 @@ describe('AppShell', () => {
 
     await wrapper.get('a[href="docs/architecture.md"]').trigger('click');
 
-    expect(readAgentFile).toHaveBeenCalledWith('agent-dina', 'docs/architecture.md');
+    expect(previewAgentFile).toHaveBeenCalledWith('agent-dina', 'docs/architecture.md');
     expect(wrapper.text()).toContain('Loading markdown...');
 
     resolveReadAgentFile({
@@ -153,7 +153,7 @@ describe('AppShell', () => {
 
   it('opens source file links as read-only source previews', async () => {
     const snapshot = createInitialSnapshot();
-    const readAgentFile = vi.fn().mockResolvedValue({
+    const previewAgentFile = vi.fn().mockResolvedValue({
       path: 'src/main.ts',
       content: 'const answer: number = 42;\n',
     });
@@ -173,7 +173,7 @@ describe('AppShell', () => {
         ],
         isLoading: false,
         isSending: false,
-        readAgentFile,
+        previewAgentFile,
       },
       global: {
         plugins: [ElementPlus, i18n],
@@ -183,7 +183,7 @@ describe('AppShell', () => {
     await wrapper.get('a[href="src/main.ts"]').trigger('click');
     await flushPromises();
 
-    expect(readAgentFile).toHaveBeenCalledWith('agent-dina', 'src/main.ts');
+    expect(previewAgentFile).toHaveBeenCalledWith('agent-dina', 'src/main.ts');
     expect(wrapper.find('.source-preview-panel').exists()).toBe(true);
     expect(wrapper.text()).toContain('src/main.ts');
     expect(wrapper.html()).toContain('shiki');
@@ -192,7 +192,7 @@ describe('AppShell', () => {
 
   it('strips editor-style line suffixes before reading file previews', async () => {
     const snapshot = createInitialSnapshot();
-    const readAgentFile = vi.fn().mockResolvedValue({
+    const previewAgentFile = vi.fn().mockResolvedValue({
       path: 'README.md',
       content: '# Codex Claw\n',
     });
@@ -212,7 +212,7 @@ describe('AppShell', () => {
         ],
         isLoading: false,
         isSending: false,
-        readAgentFile,
+        previewAgentFile,
       },
       global: {
         plugins: [ElementPlus, i18n],
@@ -222,13 +222,13 @@ describe('AppShell', () => {
     await wrapper.get('a[href="README.md:40"]').trigger('click');
     await flushPromises();
 
-    expect(readAgentFile).toHaveBeenCalledWith('agent-dina', 'README.md');
+    expect(previewAgentFile).toHaveBeenCalledWith('agent-dina', 'README.md');
     expect(wrapper.text()).toContain('Codex Claw');
   });
 
   it('strips line and column suffixes from file URLs before reading previews', async () => {
     const snapshot = createInitialSnapshot();
-    const readAgentFile = vi.fn().mockResolvedValue({
+    const previewAgentFile = vi.fn().mockResolvedValue({
       path: '/Users/nbonamy/src/id8/README.md',
       content: '# id8\n',
     });
@@ -248,7 +248,7 @@ describe('AppShell', () => {
         ],
         isLoading: false,
         isSending: false,
-        readAgentFile,
+        previewAgentFile,
       },
       global: {
         plugins: [ElementPlus, i18n],
@@ -258,13 +258,13 @@ describe('AppShell', () => {
     await wrapper.get('a[href="file:///Users/nbonamy/src/id8/README.md:40:2"]').trigger('click');
     await flushPromises();
 
-    expect(readAgentFile).toHaveBeenCalledWith('agent-dina', '/Users/nbonamy/src/id8/README.md');
+    expect(previewAgentFile).toHaveBeenCalledWith('agent-dina', '/Users/nbonamy/src/id8/README.md');
     expect(wrapper.text()).toContain('id8');
   });
 
   it('normalizes file URLs before opening source previews', async () => {
     const snapshot = createInitialSnapshot();
-    const readAgentFile = vi.fn().mockResolvedValue({
+    const previewAgentFile = vi.fn().mockResolvedValue({
       path: 'src/file name.ts',
       content: 'export const value = true;\n',
     });
@@ -284,7 +284,7 @@ describe('AppShell', () => {
         ],
         isLoading: false,
         isSending: false,
-        readAgentFile,
+        previewAgentFile,
       },
       global: {
         plugins: [ElementPlus, i18n],
@@ -294,14 +294,14 @@ describe('AppShell', () => {
     await wrapper.get('a[href="file:///Users/nbonamy/src/codex-claw/src/file%20name.ts"]').trigger('click');
     await flushPromises();
 
-    expect(readAgentFile).toHaveBeenCalledWith('agent-dina', '/Users/nbonamy/src/codex-claw/src/file name.ts');
+    expect(previewAgentFile).toHaveBeenCalledWith('agent-dina', '/Users/nbonamy/src/codex-claw/src/file name.ts');
     expect(wrapper.find('.source-preview-panel').exists()).toBe(true);
   });
 
   it('ignores stale markdown reads after the side panel changes', async () => {
     const snapshot = createInitialSnapshot();
     let resolveReadAgentFile: (result: { content: string; path: string }) => void = () => undefined;
-    const readAgentFile = vi.fn().mockReturnValue(new Promise((resolve) => {
+    const previewAgentFile = vi.fn().mockReturnValue(new Promise((resolve) => {
       resolveReadAgentFile = resolve;
     }));
     const wrapper = mount(AppShell, {
@@ -320,7 +320,7 @@ describe('AppShell', () => {
         ],
         isLoading: false,
         isSending: false,
-        readAgentFile,
+        previewAgentFile,
       },
       global: {
         plugins: [ElementPlus, i18n],
@@ -343,7 +343,7 @@ describe('AppShell', () => {
   it('ignores stale markdown read errors after switching agents', async () => {
     const snapshot = createInitialSnapshot();
     let rejectReadAgentFile: (error: Error) => void = () => undefined;
-    const readAgentFile = vi.fn().mockReturnValue(new Promise((_resolve, reject) => {
+    const previewAgentFile = vi.fn().mockReturnValue(new Promise((_resolve, reject) => {
       rejectReadAgentFile = reject;
     }));
     const wrapper = mount(AppShell, {
@@ -362,7 +362,7 @@ describe('AppShell', () => {
         ],
         isLoading: false,
         isSending: false,
-        readAgentFile,
+        previewAgentFile,
       },
       global: {
         plugins: [ElementPlus, i18n],
@@ -381,7 +381,7 @@ describe('AppShell', () => {
 
   it('shows markdown side panel read errors', async () => {
     const snapshot = createInitialSnapshot();
-    const readAgentFile = vi.fn().mockRejectedValue(new Error('File is outside the agent folder.'));
+    const previewAgentFile = vi.fn().mockRejectedValue(new Error('File is outside the agent folder.'));
     const wrapper = mount(AppShell, {
       props: {
         snapshot,
@@ -398,7 +398,7 @@ describe('AppShell', () => {
         ],
         isLoading: false,
         isSending: false,
-        readAgentFile,
+        previewAgentFile,
       },
       global: {
         plugins: [ElementPlus],
@@ -414,7 +414,7 @@ describe('AppShell', () => {
 
   it('ignores blank markdown file preview requests', async () => {
     const snapshot = createInitialSnapshot();
-    const readAgentFile = vi.fn().mockResolvedValue({
+    const previewAgentFile = vi.fn().mockResolvedValue({
       path: 'docs/architecture.md',
       content: '# Architecture',
     });
@@ -425,7 +425,7 @@ describe('AppShell', () => {
         messages: [],
         isLoading: false,
         isSending: false,
-        readAgentFile,
+        previewAgentFile,
       },
       global: {
         plugins: [ElementPlus],
@@ -435,7 +435,7 @@ describe('AppShell', () => {
     wrapper.findComponent({ name: 'ConversationPane' }).vm.$emit('open-file', '   ');
     await flushPromises();
 
-    expect(readAgentFile).not.toHaveBeenCalled();
+    expect(previewAgentFile).not.toHaveBeenCalled();
     expect(wrapper.find('.side-panel').exists()).toBe(false);
   });
 
