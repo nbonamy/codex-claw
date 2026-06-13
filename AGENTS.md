@@ -71,6 +71,8 @@ doc and update it when behavior changes:
   strategy, and remaining Claude-driver questions.
 - `docs/mcp.md`: how the app-owned MCP server exposes agent collaboration
   tools, inbox state, backend enablement, security, and tests.
+- `docs/backend-architecture.md`: architecture record and implementation
+  slicing for extracting the backend core into a separate TypeScript process.
 - `docs/architecture.md`: product model, process architecture, IPC,
   backend seam, persistence, and open architecture decisions.
 - `plans/codex-claw.md`: current product progression and commit checkpoints.

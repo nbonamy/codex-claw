@@ -154,8 +154,8 @@ with `list-repos`, `list-worktrees`, `create-worktree`, and `create-agent`.
 
 The current implementation keeps the app backend core inside Electron main. A
 future extraction to a separate `clawd` process is documented in
-`docs/clawd.md`; until that lands, this section describes the active
-architecture.
+`docs/backend-architecture.md`; until that lands, this section describes the
+active architecture.
 
 ```mermaid
 flowchart LR
