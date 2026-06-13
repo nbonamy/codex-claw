@@ -107,6 +107,21 @@ describe('Electron backend boundary', () => {
     await expect(readdir(path.join(mainDir, 'snapshot-service.ts'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
+  it('keeps Electron snapshot caching limited to backend-provided snapshots', async () => {
+    const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
+    const source = await readFile(appControllerPath, 'utf8');
+    const assignments = source.match(/\bthis\.snapshot\s*=/g) ?? [];
+
+    expect(assignments).toHaveLength(4);
+    expect(source).toContain('this.snapshot = initialSnapshot;');
+    expect(source).toContain('this.snapshot = snapshot;');
+    expect(source).toContain('this.snapshot = backendState.snapshot;');
+    expect(source).toContain('this.snapshot = eventSnapshot;');
+    expect(source).not.toContain('this.snapshot = result.snapshot;');
+    expect(source).not.toContain('applyMainEventToSnapshot');
+    expect(source).not.toContain('updateSettingsInSnapshot');
+  });
+
   it('keeps derived side-panel events in clawd', async () => {
     const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
     const source = await readFile(appControllerPath, 'utf8');

@@ -72,6 +72,8 @@ Current implementation checkpoint:
   volatile renderer-facing snapshot cache hydrated from `snapshot/get` and
   backend events; it does not read or write `state.json`, keep a local snapshot
   service shim, or validate agent folders before backend mutations.
+  Main-process product IPC handlers adopt snapshots returned by backend RPCs;
+  they do not perform direct product-state updates.
 - `clawd` now owns loop CRUD, manual loop runs, and the loop scheduler/runner.
   Electron proxies loop IPC to backend RPC and adopts the returned snapshot.
 - `clawd` now owns team create/update/reorder/close/select mutations. Electron

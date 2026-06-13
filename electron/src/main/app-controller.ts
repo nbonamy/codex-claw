@@ -303,8 +303,7 @@ export class AppController {
 
   private async connectWorkProvider(provider: WorkProviderKind): Promise<WorkProviderConnectResult> {
     const result = await this.requireBackendClient().request<WorkProviderConnectResult>('workProvider/connect', { provider });
-    this.snapshot = result.snapshot;
-    this.syncPowerSaveBlocker();
+    this.adoptBackendSnapshot(result.snapshot);
     return result;
   }
 
