@@ -5,6 +5,7 @@ import path from 'node:path';
 import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
 import type { AppSnapshot, BackendConversationRef, ConversationSummary, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, RendererMessage } from '@codex-claw/shared/contracts';
+import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import type { AppStatePersistence } from '../state-persistence';
 import type { AgentBackendDriver, BackendSendResult } from '../backends/types';
 import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
@@ -22,6 +23,7 @@ describe('AppController', () => {
       start: vi.fn().mockResolvedValue(undefined),
       health: vi.fn().mockResolvedValue({ ok: true, name: 'clawd', version: '0.1.0', pid: 123 }),
       request: vi.fn().mockResolvedValue({}),
+      onEvent: vi.fn(() => () => undefined),
       close: vi.fn().mockResolvedValue(undefined),
     };
     const controller = new AppController(persistence, undefined, backendClient);
@@ -32,6 +34,45 @@ describe('AppController', () => {
     expect(backendClient.start).toHaveBeenCalledOnce();
     expect(backendClient.health).toHaveBeenCalledOnce();
     expect(backendClient.close).toHaveBeenCalledOnce();
+  });
+
+  it('applies backend events emitted by the clawd process client', async () => {
+    const snapshot = createInitialSnapshot();
+    const persistence = {
+      load: vi.fn().mockResolvedValue(snapshot),
+      save: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AppStatePersistence;
+    const unsubscribe = vi.fn();
+    let emitBackendEvent: (event: ClawBackendEvent) => void = () => undefined;
+    const backendClient = createBackendClientWithEventEmitter((listener) => {
+      emitBackendEvent = listener;
+      return unsubscribe;
+    });
+    const controller = new AppController(persistence, undefined, backendClient);
+    const send = vi.fn();
+
+    setMainWindowSend(controller, send);
+    await controller.initialize();
+    await getBackendDriver(controller, 'codex');
+    emitBackendEvent({
+      seq: 42,
+      backend: 'codex',
+      agentId: 'agent-dina',
+      type: 'agent.statusChanged',
+      payload: { type: 'working' },
+      occurredAt: '2026-06-13T00:00:00.000Z',
+    });
+    await controller.shutdown();
+
+    expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
+    expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
+      seq: 42,
+      backend: 'codex',
+      agentId: 'agent-dina',
+      type: 'agent.statusChanged',
+      payload: { type: 'working' },
+    }));
+    expect(unsubscribe).toHaveBeenCalledOnce();
   });
 
   it('persists collaboration status updates emitted by MCP tools', async () => {
@@ -1786,6 +1827,24 @@ async function refreshAgentGitStatus(controller: AppController, agentId: string)
   await (controller as unknown as {
     refreshAgentGitStatus(agentId: string): Promise<void>;
   }).refreshAgentGitStatus(agentId);
+}
+
+async function getBackendDriver(controller: AppController, backend: 'codex' | 'claude'): Promise<AgentBackendDriver> {
+  return (controller as unknown as {
+    getBackendDriver(backend: 'codex' | 'claude'): Promise<AgentBackendDriver>;
+  }).getBackendDriver(backend);
+}
+
+function createBackendClientWithEventEmitter(
+  onEvent: (listener: (event: ClawBackendEvent) => void) => () => void,
+) {
+  return {
+    start: vi.fn().mockResolvedValue(undefined),
+    health: vi.fn().mockResolvedValue({ ok: true, name: 'clawd', version: '0.1.0', pid: 123 }),
+    request: vi.fn().mockResolvedValue({}),
+    onEvent: vi.fn(onEvent),
+    close: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 async function recordLoopPromptStarted(

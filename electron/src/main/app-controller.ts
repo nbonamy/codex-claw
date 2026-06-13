@@ -60,6 +60,8 @@ import { runtimeGitHubOAuthClientId } from './runtime-config';
 
 const MAX_AGENT_FILE_READ_BYTES = 2 * 1024 * 1024;
 
+type ClawBackendClientPort = Pick<ClawBackendProcessClient, 'start' | 'health' | 'request' | 'onEvent' | 'close'>;
+
 function completionInstructionsResponse(workItemId: string, instructions: string): MarkWorkItemCompletedResponse {
   return {
     success: true,
@@ -97,6 +99,7 @@ export class AppController {
   private mcpServerUrl: string | null = null;
   private mcpServerStartPromise: Promise<string> | null = null;
   private readonly backendDrivers = new Map<AgentBackend, AgentBackendDriver>();
+  private readonly backendDriverEventUnsubscribes = new Map<AgentBackend, () => void>();
   private readonly clientRequestBackends = new Map<string, AgentBackend>();
   private seq = 0;
 
@@ -104,12 +107,12 @@ export class AppController {
   private readonly loopRunner: LoopRunner;
   private readonly loopScheduler: LoopScheduler;
   private readonly powerSaveBlocker = new AgentActivityPowerSaveBlocker();
-  private readonly backendClient: Pick<ClawBackendProcessClient, 'start' | 'health' | 'request' | 'close'> | null;
+  private readonly backendClient: ClawBackendClientPort | null;
 
   constructor(
     persistence = new AppStatePersistence(path.join(defaultUserDataPath(), 'state.json')),
     workIntegrations?: WorkIntegrationManager,
-    backendClient: Pick<ClawBackendProcessClient, 'start' | 'health' | 'request' | 'close'> | null = createRuntimeClawBackendClient(),
+    backendClient: ClawBackendClientPort | null = createRuntimeClawBackendClient(),
   ) {
     this.persistence = persistence;
     this.backendClient = backendClient;
@@ -547,6 +550,10 @@ export class AppController {
   async shutdown(): Promise<void> {
     this.loopScheduler.stop();
     this.powerSaveBlocker.stop();
+    for (const unsubscribe of this.backendDriverEventUnsubscribes.values()) {
+      unsubscribe();
+    }
+    this.backendDriverEventUnsubscribes.clear();
     await this.backendClient?.close();
     await Promise.all([...this.backendDrivers.values()].map((driver) => driver.close()));
     await this.mcpServer?.stop();
@@ -1447,6 +1454,7 @@ export class AppController {
 
     const driver = new ClawBackendProxyDriver(backend, this.backendClient);
     this.backendDrivers.set(backend, driver);
+    this.backendDriverEventUnsubscribes.set(backend, driver.onEvent((event) => this.emitAndApply(event)));
     return driver;
   }
 
