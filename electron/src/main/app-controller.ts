@@ -14,7 +14,6 @@ import {
 import { AppStatePersistence } from '@codex-claw/shared/state-persistence';
 import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from './backend-process-client';
 import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
-import { approvalBackendDefaultsWithPreset, isApprovalPreset } from '@codex-claw/shared/approval-presets';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 import type { AgentBackendDriver, BackendSendResult } from './backends/types';
 import { backendDisplayName, unsupportedBackendFeature } from './backends/types';
@@ -566,81 +565,15 @@ export class AppController {
   }
 
   private async setAgentGoal(agentId: string, objective: string): Promise<AppSnapshot> {
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    const trimmedObjective = objective.trim();
-    if (!agent || !trimmedObjective) {
-      return this.snapshot;
-    }
-
-    const driver = await this.getBackendDriverForAgent(agent);
-    if (!driver.setGoal) {
-      throw new Error(`${agent.backend} does not support goals.`);
-    }
-
-    const wasNewSession = !agent.backendSession;
-    const result = await driver.setGoal(agent, trimmedObjective);
-    agent.backendSession = result.backendSession;
-    await this.setNewConversationTitle(agent, driver, wasNewSession);
-    if (result.goal) {
-      this.emitAndApply({
-        agentId,
-        threadId: result.goal.threadId,
-        type: 'thread.goalUpdated',
-        payload: { goal: result.goal },
-      });
-    }
-    await this.persistSnapshot();
-
-    return this.snapshot;
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/setGoal', { agentId, objective }));
   }
 
   private async clearAgentGoal(agentId: string): Promise<AppSnapshot> {
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent) {
-      return this.snapshot;
-    }
-
-    const driver = await this.getBackendDriverForAgent(agent);
-    if (!driver.clearGoal) {
-      throw new Error(`${agent.backend} does not support goals.`);
-    }
-
-    const wasNewSession = !agent.backendSession;
-    const result = await driver.clearGoal(agent);
-    agent.backendSession = result.backendSession;
-    await this.setNewConversationTitle(agent, driver, wasNewSession);
-    if (result.cleared) {
-      this.emitAndApply({
-        agentId,
-        threadId: result.backendSession.kind === 'codex' ? result.backendSession.threadId : undefined,
-        type: 'thread.goalCleared',
-        payload: {},
-      });
-    }
-    await this.persistSnapshot();
-
-    return this.snapshot;
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/clearGoal', { agentId }));
   }
 
   private async setAgentApprovalPreset(agentId: string, preset: ApprovalPreset): Promise<AppSnapshot> {
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent || !isApprovalPreset(preset)) {
-      return this.snapshot;
-    }
-
-    const driver = await this.getBackendDriverForAgent(agent);
-    if (!driver.setApprovalPreset) {
-      throw unsupportedBackendFeature(agent, 'approval presets');
-    }
-
-    const wasNewSession = !agent.backendSession;
-    const result = await driver.setApprovalPreset(agent, preset);
-    agent.backendSession = result.backendSession;
-    await this.setNewConversationTitle(agent, driver, wasNewSession);
-    agent.backendDefaults = approvalBackendDefaultsWithPreset(agent.backendDefaults, result.approvalPreset);
-    await this.persistSnapshot();
-
-    return this.snapshot;
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/setApprovalPreset', { agentId, preset }));
   }
 
   private async listBackendModels(agentId: string): Promise<BackendModelOption[]> {

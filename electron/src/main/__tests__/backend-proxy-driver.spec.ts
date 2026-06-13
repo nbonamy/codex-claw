@@ -78,13 +78,21 @@ describe('ClawBackendProxyDriver', () => {
     };
     const ref = { backend: 'codex' as const, threadId: 'thread-resumed' };
 
+    await driver.setConversationTitle(agent, 'Dina - Jun 13');
+    await driver.setGoal(agent, 'Ship the goal shelf');
+    await driver.clearGoal(agent);
+    await driver.setApprovalPreset(agent, 'approve-for-me');
     await expect(driver.resumeConversation(agent, ref)).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-resumed' },
       messages: [],
     });
     driver.forgetAgentSession('agent-dina');
 
-    expect(client.request).toHaveBeenNthCalledWith(1, 'driver/resumeConversation', { agent, ref });
-    expect(client.request).toHaveBeenNthCalledWith(2, 'driver/forgetSession', { backend: 'codex', agentId: 'agent-dina' });
+    expect(client.request).toHaveBeenNthCalledWith(1, 'driver/setConversationTitle', { agent, title: 'Dina - Jun 13' });
+    expect(client.request).toHaveBeenNthCalledWith(2, 'driver/setGoal', { agent, objective: 'Ship the goal shelf' });
+    expect(client.request).toHaveBeenNthCalledWith(3, 'driver/clearGoal', { agent });
+    expect(client.request).toHaveBeenNthCalledWith(4, 'driver/setApprovalPreset', { agent, preset: 'approve-for-me' });
+    expect(client.request).toHaveBeenNthCalledWith(5, 'driver/resumeConversation', { agent, ref });
+    expect(client.request).toHaveBeenNthCalledWith(6, 'driver/forgetSession', { backend: 'codex', agentId: 'agent-dina' });
   });
 });

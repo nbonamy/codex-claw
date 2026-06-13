@@ -65,19 +65,19 @@ export class ClawBackendProxyDriver implements AgentBackendDriver {
   }
 
   async setConversationTitle(agent: Agent, title: string): Promise<void> {
-    await this.client.request('agent/setConversationTitle', { agent, title });
+    await this.client.request('driver/setConversationTitle', { agent, title });
   }
 
   async setGoal(agent: Agent, objective: string): Promise<BackendGoalResult> {
-    return this.client.request('agent/setGoal', { agent, objective });
+    return this.client.request('driver/setGoal', { agent, objective });
   }
 
   async clearGoal(agent: Agent): Promise<BackendGoalResult> {
-    return this.client.request('agent/clearGoal', { agent });
+    return this.client.request('driver/clearGoal', { agent });
   }
 
   async setApprovalPreset(agent: Agent, preset: ApprovalPreset): Promise<BackendApprovalPresetResult> {
-    return this.client.request('agent/setApprovalPreset', { agent, preset });
+    return this.client.request('driver/setApprovalPreset', { agent, preset });
   }
 
   forgetAgentSession(agentId: string): void {

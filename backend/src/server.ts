@@ -3,7 +3,7 @@ import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNo
 import { createAgentInSnapshot, createEmptySnapshot, updateAgentFolder, updateAgentFromInput } from '@codex-claw/shared/snapshot';
 import type { AppSnapshot, BackendConversationRef, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
-import type { BackendConversationResumeResult, BackendEvent } from '@codex-claw/shared/backend-driver';
+import type { BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult } from '@codex-claw/shared/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { assignWorkItemToAgentInSnapshot, closeAgentInSnapshot, deployBenchTemplateInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeBenchTemplateFromSnapshot, removeWorkItemAssignmentFromSnapshot, reorderAgentInTeam, restartAgentConversation, resumeAgentConversationInSnapshot, saveAgentToBench } from '@codex-claw/shared/agent-manager';
 import { clearLoopExecutionHistoryInSnapshot, createLoopInSnapshot, deleteLoopExecutionFromSnapshot, deleteLoopFromSnapshot, updateLoopInSnapshot } from '@codex-claw/shared/loop-manager';
@@ -11,6 +11,8 @@ import { updateSettingsInSnapshot } from '@codex-claw/shared/settings';
 import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selectTeam, updateTeamInSnapshot } from '@codex-claw/shared/team-manager';
 import { teamColors } from '@codex-claw/shared/team-colors';
 import { sanitizeWorkItemAssignmentSource } from '@codex-claw/shared/work-assignments';
+import { approvalBackendDefaultsWithPreset, isApprovalPreset } from '@codex-claw/shared/approval-presets';
+import { formatConversationTitle } from '@codex-claw/shared/conversation-title';
 import { BackendDriverRpc } from './driver-rpc';
 import type { LoopRunner } from './loops/runner';
 import type { WorkIntegrationManager } from './work-integrations/manager';
@@ -208,6 +210,65 @@ export class ClawBackendServer {
         if (!resumedAgent) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
         }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'agent/setGoal': {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const objective = requireString(params.objective, 'objective').trim();
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent || !objective) {
+          return createClawRpcResult(message.id, this.snapshot);
+        }
+        const wasNewSession = !agent.backendSession;
+        const result = await this.requireDriverRpc().handle('driver/setGoal', { agent, objective }) as BackendGoalResult;
+        agent.backendSession = result.backendSession;
+        await this.setNewConversationTitle(agentId, wasNewSession);
+        if (result.goal) {
+          agent.goal = result.goal;
+          this.handleBackendEvent({
+            agentId,
+            threadId: result.goal.threadId,
+            type: 'thread.goalUpdated',
+            payload: { goal: result.goal },
+          }, { persist: false });
+        }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'agent/clearGoal': {
+        const agentId = requireAgentId(message.params);
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent) {
+          return createClawRpcResult(message.id, this.snapshot);
+        }
+        const wasNewSession = !agent.backendSession;
+        const result = await this.requireDriverRpc().handle('driver/clearGoal', { agent }) as BackendGoalResult;
+        agent.backendSession = result.backendSession;
+        await this.setNewConversationTitle(agentId, wasNewSession);
+        if (result.cleared) {
+          delete agent.goal;
+          this.handleBackendEvent({
+            agentId,
+            threadId: result.backendSession.kind === 'codex' ? result.backendSession.threadId : undefined,
+            type: 'thread.goalCleared',
+            payload: {},
+          }, { persist: false });
+        }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'agent/setApprovalPreset': {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const preset = params.preset;
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent || !isApprovalPreset(preset)) {
+          return createClawRpcResult(message.id, this.snapshot);
+        }
+        const wasNewSession = !agent.backendSession;
+        const result = await this.requireDriverRpc().handle('driver/setApprovalPreset', { agent, preset }) as BackendApprovalPresetResult;
+        agent.backendSession = result.backendSession;
+        await this.setNewConversationTitle(agentId, wasNewSession);
+        agent.backendDefaults = approvalBackendDefaultsWithPreset(agent.backendDefaults, result.approvalPreset);
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case 'team/create': {
@@ -430,6 +491,26 @@ export class ClawBackendServer {
     }
 
     await this.requireDriverRpc().handle('agent/validateFolder', { folder });
+  }
+
+  private async setNewConversationTitle(agentId: string, wasNewSession: boolean): Promise<void> {
+    if (!wasNewSession) {
+      return;
+    }
+
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) {
+      return;
+    }
+
+    try {
+      await this.requireDriverRpc().handle('driver/setConversationTitle', {
+        agent,
+        title: formatConversationTitle(agent),
+      });
+    } catch {
+      // A title failure should not fail the user action that created the session.
+    }
   }
 
   private handleBackendEvent(event: BackendEvent, options: { persist?: boolean } = {}): void {

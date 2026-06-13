@@ -35,20 +35,63 @@ describe('BackendDriverRpc', () => {
 
   it('routes provider session controls through driver-scoped RPC methods', async () => {
     const agent = createAgent();
+    const goal = {
+      threadId: 'thread-goal',
+      objective: 'Ship the goal shelf',
+      status: 'active' as const,
+      tokenBudget: null,
+      tokensUsed: 0,
+      timeUsedSeconds: 0,
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    const setGoal = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex', threadId: 'thread-goal' },
+      goal,
+    });
+    const clearGoal = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex', threadId: 'thread-goal' },
+      cleared: true,
+    });
+    const setApprovalPreset = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex', threadId: 'thread-approval' },
+      approvalPreset: 'approve-for-me',
+    });
     const resumeConversation = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-resumed' },
       messages: [],
     });
     const forgetAgentSession = vi.fn();
-    const rpc = new BackendDriverRpc(new Map([['codex', createDriver({ resumeConversation, forgetAgentSession })]]));
+    const rpc = new BackendDriverRpc(new Map([['codex', createDriver({
+      clearGoal,
+      forgetAgentSession,
+      resumeConversation,
+      setApprovalPreset,
+      setGoal,
+    })]]));
     const ref = { backend: 'codex' as const, threadId: 'thread-resumed' };
 
+    await expect(rpc.handle('driver/setGoal', { agent, objective: 'Ship the goal shelf' })).resolves.toStrictEqual({
+      backendSession: { kind: 'codex', threadId: 'thread-goal' },
+      goal,
+    });
+    await expect(rpc.handle('driver/clearGoal', { agent })).resolves.toStrictEqual({
+      backendSession: { kind: 'codex', threadId: 'thread-goal' },
+      cleared: true,
+    });
+    await expect(rpc.handle('driver/setApprovalPreset', { agent, preset: 'approve-for-me' })).resolves.toStrictEqual({
+      backendSession: { kind: 'codex', threadId: 'thread-approval' },
+      approvalPreset: 'approve-for-me',
+    });
     await expect(rpc.handle('driver/resumeConversation', { agent, ref })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-resumed' },
       messages: [],
     });
     await expect(rpc.handle('driver/forgetSession', { backend: 'codex', agentId: 'agent-dina' })).resolves.toBeNull();
 
+    expect(setGoal).toHaveBeenCalledWith(agent, 'Ship the goal shelf');
+    expect(clearGoal).toHaveBeenCalledWith(agent);
+    expect(setApprovalPreset).toHaveBeenCalledWith(agent, 'approve-for-me');
     expect(resumeConversation).toHaveBeenCalledWith(agent, ref);
     expect(forgetAgentSession).toHaveBeenCalledWith('agent-dina');
   });

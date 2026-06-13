@@ -736,120 +736,69 @@ describe('AppController', () => {
     }));
   });
 
-  it('sets and clears an agent goal through the backend driver', async () => {
+  it('routes agent goal mutations through clawd', async () => {
     const snapshot = createInitialSnapshot();
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
-    const backendDriver = createFakeCodexBackendDriver({
-      setGoal: vi.fn().mockResolvedValue({
-        backendSession: { kind: 'codex', threadId: 'thread-dina' },
+    snapshot.sourceFolder.initialized = true;
+    const goalSnapshot = {
+      ...snapshot,
+      agents: [{
+        ...snapshot.agents[0]!,
+        backendSession: { kind: 'codex' as const, threadId: 'thread-dina' },
         goal: {
           threadId: 'thread-dina',
           objective: 'Ship the goal shelf',
-          status: 'active',
+          status: 'active' as const,
           tokenBudget: null,
           tokensUsed: 0,
           timeUsedSeconds: 0,
           createdAt: 0,
           updatedAt: 0,
         },
-      }),
-      clearGoal: vi.fn().mockResolvedValue({
-        backendSession: { kind: 'codex', threadId: 'thread-dina' },
-        cleared: true,
-      }),
-    });
+      }],
+    };
+    const clearedSnapshot = {
+      ...goalSnapshot,
+      agents: [{ ...goalSnapshot.agents[0]!, goal: undefined }],
+    };
+    const request = vi.fn()
+      .mockResolvedValueOnce(goalSnapshot)
+      .mockResolvedValueOnce(clearedSnapshot);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
 
     await controller.initialize();
-    setCodexBackendDriver(controller, backendDriver);
-    await setAgentGoal(controller, 'agent-dina', ' Ship the goal shelf ');
 
-    expect(backendDriver.setGoal).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'Ship the goal shelf');
-    expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-dina' });
-    expect(snapshot.agents[0].goal?.objective).toBe('Ship the goal shelf');
-    expect(persistence.save).toHaveBeenCalledWith(snapshot);
+    await expect(setAgentGoal(controller, 'agent-dina', ' Ship the goal shelf ')).resolves.toBe(goalSnapshot);
+    await expect(clearAgentGoal(controller, 'agent-dina')).resolves.toBe(clearedSnapshot);
 
-    await clearAgentGoal(controller, 'agent-dina');
-
-    expect(backendDriver.clearGoal).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
-    expect(snapshot.agents[0].goal).toBeUndefined();
+    expect(request).toHaveBeenNthCalledWith(1, 'agent/setGoal', { agentId: 'agent-dina', objective: ' Ship the goal shelf ' });
+    expect(request).toHaveBeenNthCalledWith(2, 'agent/clearGoal', { agentId: 'agent-dina' });
   });
 
-  it('sets a generic conversation title when a goal creates a backend session', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date(2026, 5, 10, 15, 42));
-    try {
-      const snapshot = createInitialSnapshot();
-      const persistence = {
-        load: vi.fn().mockResolvedValue(snapshot),
-        save: vi.fn().mockResolvedValue(undefined),
-      } as unknown as AppStatePersistence;
-      const controller = new AppController(persistence);
-      const setConversationTitle = vi.fn().mockResolvedValue(undefined);
-      const backendDriver = createFakeCodexBackendDriver({
-        setConversationTitle,
-        setGoal: vi.fn().mockResolvedValue({
-          backendSession: { kind: 'codex', threadId: 'thread-dina' },
-          goal: {
-            threadId: 'thread-dina',
-            objective: 'Ship the goal shelf',
-            status: 'active',
-            tokenBudget: null,
-            tokensUsed: 0,
-            timeUsedSeconds: 0,
-            createdAt: 0,
-            updatedAt: 0,
-          },
-        }),
-      });
-
-      await controller.initialize();
-      setCodexBackendDriver(controller, backendDriver);
-      await setAgentGoal(controller, 'agent-dina', 'Ship the goal shelf');
-
-      expect(setConversationTitle).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: 'agent-dina',
-          backendSession: { kind: 'codex', threadId: 'thread-dina' },
-        }),
-        'Dina - Jun 10, 2026 3:42 PM',
-      );
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('sets an approval preset through the backend driver', async () => {
+  it('routes approval preset updates through clawd', async () => {
     const snapshot = createInitialSnapshot();
-    const persistence = {
-      load: vi.fn().mockResolvedValue(snapshot),
-      save: vi.fn().mockResolvedValue(undefined),
-    } as unknown as AppStatePersistence;
-    const controller = new AppController(persistence);
-    const backendDriver = createFakeCodexBackendDriver({
-      setApprovalPreset: vi.fn().mockResolvedValue({
-        backendSession: { kind: 'codex', threadId: 'thread-dina' },
-        approvalPreset: 'approve-for-me',
-      }),
-    });
+    snapshot.sourceFolder.initialized = true;
+    const backendSnapshot = {
+      ...snapshot,
+      agents: [{
+        ...snapshot.agents[0]!,
+        backendSession: { kind: 'codex' as const, threadId: 'thread-dina' },
+        backendDefaults: {
+          kind: 'codex' as const,
+          approvalPreset: 'approve-for-me' as const,
+          approvalPolicy: 'on-request' as const,
+          approvalsReviewer: 'auto_review' as const,
+          sandboxMode: 'workspace-write' as const,
+        },
+      }],
+    };
+    const request = vi.fn().mockResolvedValue(backendSnapshot);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
 
     await controller.initialize();
-    setCodexBackendDriver(controller, backendDriver);
-    await setAgentApprovalPreset(controller, 'agent-dina', 'approve-for-me');
 
-    expect(backendDriver.setApprovalPreset).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'approve-for-me');
-    expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-dina' });
-    expect(snapshot.agents[0].backendDefaults).toStrictEqual({
-      kind: 'codex',
-      approvalPreset: 'approve-for-me',
-      approvalPolicy: 'on-request',
-      approvalsReviewer: 'auto_review',
-      sandboxMode: 'workspace-write',
-    });
-    expect(persistence.save).toHaveBeenCalledWith(snapshot);
+    await expect(setAgentApprovalPreset(controller, 'agent-dina', 'approve-for-me')).resolves.toBe(backendSnapshot);
+
+    expect(request).toHaveBeenCalledWith('agent/setApprovalPreset', { agentId: 'agent-dina', preset: 'approve-for-me' });
   });
 
   it('interrupts the active Codex turn and keeps status until completion arrives', async () => {
@@ -1702,21 +1651,21 @@ async function editMessage(controller: AppController, agentId: string, messageId
   }).editMessage(agentId, messageId, prompt);
 }
 
-async function setAgentGoal(controller: AppController, agentId: string, objective: string): Promise<void> {
-  await (controller as unknown as {
-    setAgentGoal(agentId: string, objective: string): Promise<void>;
+async function setAgentGoal(controller: AppController, agentId: string, objective: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    setAgentGoal(agentId: string, objective: string): Promise<AppSnapshot>;
   }).setAgentGoal(agentId, objective);
 }
 
-async function clearAgentGoal(controller: AppController, agentId: string): Promise<void> {
-  await (controller as unknown as {
-    clearAgentGoal(agentId: string): Promise<void>;
+async function clearAgentGoal(controller: AppController, agentId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    clearAgentGoal(agentId: string): Promise<AppSnapshot>;
   }).clearAgentGoal(agentId);
 }
 
-async function setAgentApprovalPreset(controller: AppController, agentId: string, preset: 'ask-for-approval' | 'approve-for-me' | 'full-access'): Promise<void> {
-  await (controller as unknown as {
-    setAgentApprovalPreset(agentId: string, preset: 'ask-for-approval' | 'approve-for-me' | 'full-access'): Promise<void>;
+async function setAgentApprovalPreset(controller: AppController, agentId: string, preset: 'ask-for-approval' | 'approve-for-me' | 'full-access'): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    setAgentApprovalPreset(agentId: string, preset: 'ask-for-approval' | 'approve-for-me' | 'full-access'): Promise<AppSnapshot>;
   }).setAgentApprovalPreset(agentId, preset);
 }
 

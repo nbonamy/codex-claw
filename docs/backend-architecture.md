@@ -93,11 +93,12 @@ Current implementation checkpoint:
   Electron forwards restart/resume requests and adopts the returned snapshot;
   provider-only session controls use `driver/*` RPC methods behind the backend
   boundary.
+- `clawd` now owns goal set/clear and approval-preset session mutations,
+  including backend-session updates, goal events, and Codex approval defaults.
 - The remaining large slice is to move the rest of product orchestration out of
   `AppController` so Electron becomes only the desktop IPC/stdio layer. The
-  largest remaining owners are prompt/session side effects such as goals,
-  approval presets, rollback/edit/retry, plus remaining desktop-era driver
-  shims.
+  largest remaining owners are prompt dispatch and rollback/edit/retry flows,
+  plus remaining desktop-era driver shims.
 
 ## Goals
 

@@ -80,7 +80,7 @@ export class BackendDriverRpc {
         const commandResult = driver.tryHandlePromptCommand?.(agent, prompt) ?? null;
         return commandResult ?? driver.sendPrompt(agent, prompt, record.options as SendPromptOptions | undefined);
       }
-      case 'agent/setConversationTitle': {
+      case 'driver/setConversationTitle': {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);
@@ -90,7 +90,7 @@ export class BackendDriverRpc {
         await driver.setConversationTitle(agent, requireString(record.title, 'title'));
         return null;
       }
-      case 'agent/setGoal': {
+      case 'driver/setGoal': {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);
@@ -99,7 +99,7 @@ export class BackendDriverRpc {
         }
         return driver.setGoal(agent, requireString(record.objective, 'objective'));
       }
-      case 'agent/clearGoal': {
+      case 'driver/clearGoal': {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);
         if (!driver.clearGoal) {
@@ -107,7 +107,7 @@ export class BackendDriverRpc {
         }
         return driver.clearGoal(agent);
       }
-      case 'agent/setApprovalPreset': {
+      case 'driver/setApprovalPreset': {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);

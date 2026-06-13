@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { AppSnapshot, RendererMessage, WorkItem } from '@codex-claw/shared/contracts';
+import type { AppSnapshot, RendererMessage, ThreadGoal, WorkItem } from '@codex-claw/shared/contracts';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/shared/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { ClawBackendServer } from '../server';
@@ -565,6 +565,114 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
+  it('owns goal and approval preset session mutations', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const goal = createThreadGoal('thread-goal', 'Ship the goal shelf');
+    const setConversationTitle = vi.fn().mockResolvedValue(undefined);
+    const setGoal = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex', threadId: 'thread-goal' },
+      goal,
+    });
+    const clearGoal = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex', threadId: 'thread-goal' },
+      cleared: true,
+    });
+    const setApprovalPreset = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex', threadId: 'thread-approval' },
+      approvalPreset: 'approve-for-me',
+    });
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      clearGoal,
+      setApprovalPreset,
+      setConversationTitle,
+      setGoal,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const events: unknown[] = [];
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+      onEvent: (event) => events.push(event),
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'set-goal',
+      method: 'agent/setGoal',
+      params: { agentId: 'agent-dina', objective: ' Ship the goal shelf ' },
+    })).resolves.toMatchObject({
+      result: {
+        agents: [{ id: 'agent-dina', backendSession: { kind: 'codex', threadId: 'thread-goal' }, goal }],
+      },
+    });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'clear-goal',
+      method: 'agent/clearGoal',
+      params: { agentId: 'agent-dina' },
+    })).resolves.toMatchObject({
+      result: {
+        agents: [{ id: 'agent-dina', backendSession: { kind: 'codex', threadId: 'thread-goal' } }],
+      },
+    });
+    expect(snapshot.agents[0]?.goal).toBeUndefined();
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'set-preset',
+      method: 'agent/setApprovalPreset',
+      params: { agentId: 'agent-dina', preset: 'approve-for-me' },
+    })).resolves.toMatchObject({
+      result: {
+        agents: [{
+          id: 'agent-dina',
+          backendSession: { kind: 'codex', threadId: 'thread-approval' },
+          backendDefaults: {
+            kind: 'codex',
+            approvalPreset: 'approve-for-me',
+            approvalPolicy: 'on-request',
+            approvalsReviewer: 'auto_review',
+            sandboxMode: 'workspace-write',
+          },
+        }],
+      },
+    });
+
+    expect(setGoal).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'Ship the goal shelf');
+    expect(clearGoal).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(setApprovalPreset).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'approve-for-me');
+    expect(setConversationTitle).toHaveBeenCalledOnce();
+    expect(setConversationTitle).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), expect.stringContaining('Dina'));
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'thread.goalUpdated', payload: { goal } }),
+      expect.objectContaining({ type: 'thread.goalCleared' }),
+      expect.objectContaining({ type: 'snapshot.updated' }),
+    ]));
+    expect(saveSnapshot).toHaveBeenCalledTimes(3);
+    await server.close();
+  });
+
   it('owns bench mutations and validates deployed template folders', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-bench-'));
     const snapshot = createTestSnapshot();
@@ -880,5 +988,18 @@ function createTextMessage(id: string, agentId: string, text: string): RendererM
     status: 'complete',
     createdAt: '2026-06-13T00:00:00.000Z',
     parts: [{ type: 'text', text }],
+  };
+}
+
+function createThreadGoal(threadId: string, objective: string): ThreadGoal {
+  return {
+    threadId,
+    objective,
+    status: 'active',
+    tokenBudget: null,
+    tokensUsed: 0,
+    timeUsedSeconds: 0,
+    createdAt: 0,
+    updatedAt: 0,
   };
 }
