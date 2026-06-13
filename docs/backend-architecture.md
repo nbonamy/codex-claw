@@ -124,10 +124,10 @@ Current implementation checkpoint:
 - `clawd` owns client request ownership and response routing. Electron forwards
   renderer approval/user-input responses as `clientRequest/respond`; the backend
   remembers which provider emitted the request and dispatches to that provider.
-- The remaining large slice is to move the rest of product orchestration out of
-  `AppController` so Electron becomes only the desktop IPC/stdio layer. The
-  largest remaining owners are remaining desktop-era runtime shims, such as
-  launch-time PATH repair for backend process execution.
+- Electron startup no longer performs global shell PATH repair. Dev mode passes
+  an explicit Node executable and backend bundle path, packaged mode should use
+  a bundled/configured backend command, and provider CLI PATH normalization
+  belongs inside backend transports.
 
 ## Goals
 

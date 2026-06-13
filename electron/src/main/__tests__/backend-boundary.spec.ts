@@ -58,4 +58,15 @@ describe('Electron backend boundary', () => {
     expect(source).toContain("request('system/getPermissions')");
     expect(source).toContain("request('system/openAccessibilitySettings')");
   });
+
+  it('keeps shell PATH repair out of Electron startup', async () => {
+    const indexPath = path.resolve(__dirname, '../index.ts');
+    const mainDir = path.resolve(__dirname, '..');
+    const source = await readFile(indexPath, 'utf8');
+
+    expect(source).not.toContain('fixPath');
+    expect(source).not.toContain('./utils');
+    expect(source).not.toContain('child_process');
+    await expect(readdir(path.join(mainDir, 'utils.ts'))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
 });
