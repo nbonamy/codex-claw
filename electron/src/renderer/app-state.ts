@@ -278,15 +278,11 @@ export function useAppState() {
   }
 
   async function selectAgent(agentId: string): Promise<void> {
-    if (!snapshot.value.agents.some((agent) => agent.id === agentId)) {
+    if (!window.codexClaw?.selectAgent || !snapshot.value.agents.some((agent) => agent.id === agentId)) {
       return;
     }
 
-    snapshot.value.activeAgentId = agentId;
-
-    if (window.codexClaw?.selectAgent) {
-      snapshot.value = await window.codexClaw.selectAgent(agentId);
-    }
+    snapshot.value = await window.codexClaw.selectAgent(agentId);
     await loadActiveAgentCatalogs();
   }
 
@@ -404,17 +400,11 @@ export function useAppState() {
   }
 
   async function selectTeam(teamId: string): Promise<void> {
-    if (!snapshot.value.teams.some((team) => team.id === teamId)) {
+    if (!window.codexClaw?.selectTeam || !snapshot.value.teams.some((team) => team.id === teamId)) {
       return;
     }
 
-    snapshot.value.activeTeamId = teamId;
-    const team = snapshot.value.teams.find((candidate) => candidate.id === teamId);
-    snapshot.value.activeAgentId = team?.activeAgentId ?? team?.agentIds[0] ?? null;
-
-    if (window.codexClaw?.selectTeam) {
-      snapshot.value = await window.codexClaw.selectTeam(teamId);
-    }
+    snapshot.value = await window.codexClaw.selectTeam(teamId);
     await loadActiveAgentCatalogs();
   }
 

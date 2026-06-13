@@ -75,7 +75,9 @@ Current implementation checkpoint:
 - `clawd` now owns loop CRUD, manual loop runs, and the loop scheduler/runner.
   Electron proxies loop IPC to backend RPC and adopts the returned snapshot.
 - `clawd` now owns team create/update/reorder/close/select mutations. Electron
-  proxies team IPC to backend RPC and adopts the returned snapshot.
+  proxies team IPC to backend RPC and adopts the returned snapshot; renderer
+  selection controls also wait for backend snapshots instead of mutating active
+  team/agent ids locally.
 - `clawd` now owns Bench save/deploy/remove mutations. Deploying a Bench
   template validates the target folder in the backend before creating the
   agent.

@@ -44,15 +44,25 @@ describe('useAppState', () => {
     expect(state.isLoading.value).toBe(false);
   });
 
-  it('ignores missing agent selections and local-selects when main selection is unavailable', async () => {
+  it('ignores missing agent selections and does not local-select without preload', async () => {
     vi.stubGlobal('window', {});
     const state = useAppState();
     state.snapshot.value = createInitialSnapshot();
+    state.snapshot.value.agents.push({
+      id: 'agent-jesse',
+      teamId: 'team-codex-claw',
+      name: 'Jesse',
+      folder: '/Users/nbonamy/src/multi-llm-ts',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-06-05T00:00:00.000Z',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    });
 
     await state.selectAgent('agent-missing');
     expect(state.activeAgent.value?.id).toBe('agent-dina');
 
-    await state.selectAgent('agent-dina');
+    await state.selectAgent('agent-jesse');
     expect(state.activeAgent.value?.id).toBe('agent-dina');
   });
 
