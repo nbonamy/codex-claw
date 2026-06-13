@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import type { AppSnapshot } from '@codex-claw/shared/contracts';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/shared/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
@@ -261,6 +264,74 @@ describe('ClawBackendServer', () => {
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'snapshot.updated' }),
     ]));
+  });
+
+  it('owns bench mutations and validates deployed template folders', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-bench-'));
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: tempDir,
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    snapshot.activeAgentId = 'agent-dina';
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+      driverRpc: new BackendDriverRpc(new Map()),
+    });
+
+    try {
+      await expect(server.handleMessage({
+        jsonrpc: '2.0',
+        id: 'save-bench',
+        method: 'bench/saveAgent',
+        params: { agentId: 'agent-dina' },
+      })).resolves.toMatchObject({
+        result: {
+          bench: [{ name: 'Dina', folder: tempDir }],
+        },
+      });
+      const templateId = snapshot.bench[0]?.id ?? '';
+
+      await expect(server.handleMessage({
+        jsonrpc: '2.0',
+        id: 'deploy-bench',
+        method: 'bench/deployTemplate',
+        params: { templateId, teamId: 'team-test' },
+      })).resolves.toMatchObject({
+        result: {
+          agents: [
+            { id: 'agent-dina' },
+            { name: 'Dina', folder: tempDir, teamId: 'team-test' },
+          ],
+        },
+      });
+      await expect(server.handleMessage({
+        jsonrpc: '2.0',
+        id: 'remove-bench',
+        method: 'bench/removeTemplate',
+        params: { templateId },
+      })).resolves.toMatchObject({
+        result: {
+          bench: [],
+        },
+      });
+
+      expect(saveSnapshot).toHaveBeenCalledTimes(3);
+    } finally {
+      await server.close();
+      await rm(tempDir, { recursive: true, force: true });
+    }
   });
 
   it('owns loop mutations and loop runner dispatch', async () => {

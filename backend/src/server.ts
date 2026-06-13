@@ -4,6 +4,7 @@ import type { AppSnapshot, CreateLoopInput, CreateTeamInput, ReorderTeamsInput, 
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { BackendEvent } from '@codex-claw/shared/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
+import { deployBenchTemplateInSnapshot, removeBenchTemplateFromSnapshot, saveAgentToBench } from '@codex-claw/shared/agent-manager';
 import { clearLoopExecutionHistoryInSnapshot, createLoopInSnapshot, deleteLoopExecutionFromSnapshot, deleteLoopFromSnapshot, updateLoopInSnapshot } from '@codex-claw/shared/loop-manager';
 import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selectTeam, updateTeamInSnapshot } from '@codex-claw/shared/team-manager';
 import { teamColors } from '@codex-claw/shared/team-colors';
@@ -101,6 +102,37 @@ export class ClawBackendServer {
       }
       case 'team/select': {
         selectTeam(this.snapshot, requireTeamId(message.params));
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'bench/saveAgent': {
+        const agentId = requireAgentId(message.params);
+        const template = saveAgentToBench(this.snapshot, agentId);
+        if (!template) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'bench/deployTemplate': {
+        const params = requireRecord(message.params);
+        const templateId = requireString(params.templateId, 'templateId');
+        const teamId = typeof params.teamId === 'string' && params.teamId.trim() ? params.teamId : undefined;
+        const template = this.snapshot.bench.find((candidate) => candidate.id === templateId);
+        if (!template) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Bench template not found: ${templateId}`);
+        }
+        await this.requireDriverRpc().handle('agent/validateFolder', { folder: template.folder });
+        const agent = deployBenchTemplateInSnapshot(this.snapshot, templateId, teamId);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Bench template or team not found: ${templateId}`);
+        }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'bench/removeTemplate': {
+        const templateId = requireTemplateId(message.params);
+        const template = removeBenchTemplateFromSnapshot(this.snapshot, templateId);
+        if (!template) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Bench template not found: ${templateId}`);
+        }
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case 'workProvider/connect':
@@ -210,6 +242,13 @@ export class ClawBackendServer {
     return this.loopRunner;
   }
 
+  private requireDriverRpc(): BackendDriverRpc {
+    if (!this.driverRpc) {
+      throw new Error('Backend driver RPC is not configured.');
+    }
+    return this.driverRpc;
+  }
+
   private async persistAndEmitSnapshot(): Promise<AppSnapshot> {
     await this.saveSnapshot?.(this.snapshot);
     this.handleBackendEvent({
@@ -284,6 +323,16 @@ function requireTeamReorderInput(params: unknown): ReorderTeamsInput {
 function requireTeamId(params: unknown): string {
   const record = requireRecord(params);
   return requireString(record.teamId, 'teamId');
+}
+
+function requireAgentId(params: unknown): string {
+  const record = requireRecord(params);
+  return requireString(record.agentId, 'agentId');
+}
+
+function requireTemplateId(params: unknown): string {
+  const record = requireRecord(params);
+  return requireString(record.templateId, 'templateId');
 }
 
 function validateTeamInput(input: CreateTeamInput): void {

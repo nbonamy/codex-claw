@@ -9,15 +9,12 @@ import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-
 import {
   assignWorkItemToAgentInSnapshot,
   closeAgentInSnapshot,
-  deployBenchTemplateInSnapshot,
   duplicateAgentInSnapshot,
   moveAgentToTeamInSnapshot,
-  removeBenchTemplateFromSnapshot,
   removeWorkItemAssignmentFromSnapshot,
   reorderAgentInTeam,
   restartAgentConversation,
   resumeAgentConversationInSnapshot,
-  saveAgentToBench,
 } from '@codex-claw/shared/agent-manager';
 import { updateSettingsInSnapshot } from '@codex-claw/shared/settings';
 import {
@@ -272,35 +269,15 @@ export class AppController {
     });
 
     ipcMain.handle(ipcChannels.saveAgentToBench, async (_event, agentId: string) => {
-      const template = saveAgentToBench(this.snapshot, agentId);
-      if (!template) {
-        throw new Error(`Agent not found: ${agentId}`);
-      }
-      await this.persistSnapshot();
-      return this.snapshot;
+      return this.saveAgentToBench(agentId);
     });
 
     ipcMain.handle(ipcChannels.deployBenchTemplate, async (_event, templateId: string, teamId?: string) => {
-      const template = this.snapshot.bench.find((candidate) => candidate.id === templateId);
-      if (!template) {
-        throw new Error(`Bench template not found: ${templateId}`);
-      }
-      await this.validateAgentInput(template);
-      const agent = deployBenchTemplateInSnapshot(this.snapshot, templateId, teamId);
-      if (!agent) {
-        throw new Error(`Bench template or team not found: ${templateId}`);
-      }
-      await this.persistSnapshot();
-      return this.snapshot;
+      return this.deployBenchTemplate(templateId, teamId);
     });
 
     ipcMain.handle(ipcChannels.removeBenchTemplate, async (_event, templateId: string) => {
-      const template = removeBenchTemplateFromSnapshot(this.snapshot, templateId);
-      if (!template) {
-        throw new Error(`Bench template not found: ${templateId}`);
-      }
-      await this.persistSnapshot();
-      return this.snapshot;
+      return this.removeBenchTemplate(templateId);
     });
 
     ipcMain.handle(ipcChannels.restartAgent, async (_event, agentId: string) => {
@@ -493,6 +470,18 @@ export class AppController {
 
   private async selectTeam(teamId: string): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('team/select', { teamId }));
+  }
+
+  private async saveAgentToBench(agentId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('bench/saveAgent', { agentId }));
+  }
+
+  private async deployBenchTemplate(templateId: string, teamId?: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('bench/deployTemplate', { templateId, teamId }));
+  }
+
+  private async removeBenchTemplate(templateId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('bench/removeTemplate', { templateId }));
   }
 
   private async createLoop(input: CreateLoopInput): Promise<AppSnapshot> {

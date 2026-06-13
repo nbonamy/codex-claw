@@ -230,6 +230,34 @@ describe('AppController', () => {
     expect(request).toHaveBeenNthCalledWith(5, 'team/select', { teamId: 'team-codex-claw' });
   });
 
+  it('routes bench mutations through clawd', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.sourceFolder.initialized = true;
+    const backendSnapshot = {
+      ...snapshot,
+      bench: [{
+        id: 'bench-dina',
+        name: 'Dina',
+        folder: '/Users/nbonamy/src/codex-claw',
+        backend: 'codex' as const,
+        createdAt: '2026-06-13T00:00:00.000Z',
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      }],
+    };
+    const request = vi.fn().mockResolvedValue(backendSnapshot);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+
+    await controller.initialize();
+
+    await expect(saveAgentToBench(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
+    await expect(deployBenchTemplate(controller, 'bench-dina', 'team-codex-claw')).resolves.toBe(backendSnapshot);
+    await expect(removeBenchTemplate(controller, 'bench-dina')).resolves.toBe(backendSnapshot);
+
+    expect(request).toHaveBeenNthCalledWith(1, 'bench/saveAgent', { agentId: 'agent-dina' });
+    expect(request).toHaveBeenNthCalledWith(2, 'bench/deployTemplate', { templateId: 'bench-dina', teamId: 'team-codex-claw' });
+    expect(request).toHaveBeenNthCalledWith(3, 'bench/removeTemplate', { templateId: 'bench-dina' });
+  });
+
   it('routes loop mutations and runs through clawd', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
@@ -1427,6 +1455,24 @@ async function selectTeam(controller: AppController, teamId: string): Promise<Ap
   return (controller as unknown as {
     selectTeam(teamId: string): Promise<AppSnapshot>;
   }).selectTeam(teamId);
+}
+
+async function saveAgentToBench(controller: AppController, agentId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    saveAgentToBench(agentId: string): Promise<AppSnapshot>;
+  }).saveAgentToBench(agentId);
+}
+
+async function deployBenchTemplate(controller: AppController, templateId: string, teamId?: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    deployBenchTemplate(templateId: string, teamId?: string): Promise<AppSnapshot>;
+  }).deployBenchTemplate(templateId, teamId);
+}
+
+async function removeBenchTemplate(controller: AppController, templateId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    removeBenchTemplate(templateId: string): Promise<AppSnapshot>;
+  }).removeBenchTemplate(templateId);
 }
 
 async function createLoop(controller: AppController, input: CreateLoopInput): Promise<AppSnapshot> {
