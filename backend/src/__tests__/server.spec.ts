@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { AppSnapshot, RendererMessage, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/shared/contracts';
+import type { AppSnapshot, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/shared/contracts';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/shared/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { ClawBackendServer } from '../server';
@@ -1874,6 +1874,38 @@ describe('ClawBackendServer', () => {
     });
 
     expect(driverRpc.handle).toHaveBeenCalledWith('source/suggestWorktreePath', { input });
+  });
+
+  it('owns git worktree listing', async () => {
+    const snapshot = createTestSnapshot();
+    const worktrees: SourceWorktree[] = [
+      { name: 'main', path: '/Users/nbonamy/src/codex-claw' },
+      { name: 'backend-split', path: '/Users/nbonamy/src/codex-claw-backend-split' },
+    ];
+    const driverRpc = {
+      handle: vi.fn().mockResolvedValue(worktrees),
+      onEvent: vi.fn(() => () => undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    } as unknown as BackendDriverRpc;
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      driverRpc,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'source-worktrees',
+      method: 'source/listWorktrees',
+      params: { repoPath: '/Users/nbonamy/src/codex-claw' },
+    })).resolves.toMatchObject({
+      result: worktrees,
+    });
+
+    expect(driverRpc.handle).toHaveBeenCalledWith('source/listWorktrees', {
+      repoPath: '/Users/nbonamy/src/codex-claw',
+    });
   });
 
   it('records recent repositories when creating source worktrees', async () => {

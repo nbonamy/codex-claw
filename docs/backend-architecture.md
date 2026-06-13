@@ -91,8 +91,8 @@ Current implementation checkpoint:
   native macOS Accessibility status/open-settings implementation as a desktop
   host callback; non-desktop clients can call the same backend methods without
   reading local desktop state.
-- `clawd` now owns source-folder auto-detection, source repository/worktree
-  listing from backend state, worktree destination suggestions and defaults,
+- `clawd` now owns source-folder auto-detection, source repository discovery,
+  explicit `git worktree list`, worktree destination suggestions and defaults,
   settings updates, and recent-repository bookkeeping when agents or worktrees
   are created from source repositories. Electron still owns native folder/save
   dialogs, but the dialog default path is a backend suggestion instead of a
@@ -368,12 +368,12 @@ renderer.
 - Codex app-server and Claude process lifecycle.
 - Claw MCP server and agent-to-agent collaboration state. This server must run
   inside `clawd` so Codex/Claude sessions receive a backend-owned MCP URL.
-- File search/read, git status/diff/worktree creation, source repository
+- File search/read, git status/diff/worktree listing/worktree creation, source repository
   discovery, artifact readback, markdown side-panel requests, and any future
   backend-location-owned filesystem behavior. Current code already routes
-  source discovery, worktree creation, agent file listing/previewing, GitHub work
-  integrations, system permission API calls, and Apple Speech transcription
-  through `clawd`.
+  source discovery, `git worktree list`, worktree creation, agent file
+  listing/previewing, GitHub work integrations, system permission API calls, and
+  Apple Speech transcription through `clawd`.
 - Renderer file previews and MCP `display-markdown` path reads use the same
   rule: clients ask `clawd` for content; Electron does not read agent workspace
   files on behalf of product features. This keeps the contract valid for a
@@ -443,7 +443,8 @@ names that describe backend ownership:
 - `bench/saveAgent`, `bench/deployTemplate`, `bench/removeTemplate`
 - `loop/create`, `loop/update`, `loop/run`, `loop/delete`,
   `loop/clearHistory`, `loop/deleteExecution`
-- `source/listRepositories`, `source/suggestWorktreePath`, `source/createWorktree`
+- `source/listRepositories`, `source/listWorktrees`,
+  `source/suggestWorktreePath`, `source/createWorktree`
 - `agent/listFiles`, `agent/previewFile` using agent ids only. `clawd` resolves
   the workspace root from its snapshot so desktop, mobile, and future web
   clients never transmit local filesystem roots as read authority.

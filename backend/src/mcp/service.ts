@@ -5,7 +5,7 @@ import type { BackendEvent } from '@codex-claw/shared/backend-driver';
 import type { Agent, AppSnapshot, CreateAgentInput, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, WorkBacklogAssignment } from '@codex-claw/shared/contracts';
 import { completeWorkItemAssignmentInSnapshot, markWorkItemCompletionInstructionsDeliveredInSnapshot } from '@codex-claw/shared/agent-manager';
 import { createAgentInSnapshot } from '@codex-claw/shared/snapshot';
-import { createSourceWorktree } from '../git-worktrees';
+import { createSourceWorktree, listSourceWorktrees } from '../git-worktrees';
 import { scanSourceRepositories } from '../source-repositories';
 import type { BackendDriverRpc } from '../driver-rpc';
 import { ClawMcpAgentCoordinator, McpToolError, type DisplayMarkdownInput, type DisplayMarkdownResponse, type MarkWorkItemCompletedResponse } from './agent-coordinator';
@@ -46,6 +46,7 @@ export class ClawMcpService {
       onDisplayMarkdown: (agent, input) => this.displayMarkdownForAgent(agent, input),
       onMarkWorkItemCompleted: (agent, workItemId, confirmCompletion) => this.markWorkItemCompletedForAgent(agent, workItemId, confirmCompletion),
       onListSourceRepositories: () => this.listSourceRepositories(),
+      onListSourceWorktrees: (repoPath) => this.listSourceWorktrees(repoPath),
       onCreateSourceWorktree: (input) => this.createSourceWorktree(input),
       onCreateAgent: (agent, input) => this.createAgentFromMcp(agent, input),
     });
@@ -153,6 +154,10 @@ export class ClawMcpService {
   private async listSourceRepositories(): Promise<SourceRepository[]> {
     const sourceFolder = this.snapshot.sourceFolder.path.trim();
     return sourceFolder ? scanSourceRepositories(sourceFolder) : [];
+  }
+
+  private async listSourceWorktrees(repoPath: string): Promise<SourceWorktree[]> {
+    return listSourceWorktrees(repoPath);
   }
 
   private async createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {

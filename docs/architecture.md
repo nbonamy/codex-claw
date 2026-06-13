@@ -141,11 +141,12 @@ is also present under the source folder. Orphan worktrees are ignored.
 Discovery does not run `git` and must tolerate missing, unreadable, detached,
 or malformed git metadata.
 
-Creating a worktree is the one source-folder git write. It is an explicit
-backend operation that runs `git worktree add -b <branch> <destination>` for
-the selected repository, then refreshes discovery. Renderer code and MCP tools
-request this through typed app APIs; they never scan arbitrary folders or spawn
-git directly.
+Listing and creating worktrees are backend operations. Discovery can show
+shallow worktree hints from source-folder metadata, but an explicit worktree
+list runs `git worktree list --porcelain` inside `clawd`. Creating a worktree
+runs `git worktree add -b <branch> <destination>` for the selected repository,
+then refreshes discovery. Renderer code and MCP tools request this through
+typed app APIs; they never scan arbitrary folders or spawn git directly.
 
 The renderer uses source repositories only as creation affordances: Settings
 chooses or clears the source folder, the agent dialog can pick a discovered

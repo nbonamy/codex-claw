@@ -95,6 +95,7 @@ export type ClawMcpAgentCoordinatorOptions = {
   onDisplayMarkdown?: (agent: Agent, input: DisplayMarkdownInput) => DisplayMarkdownResponse | Promise<DisplayMarkdownResponse>;
   onMarkWorkItemCompleted?: (agent: Agent, workItemId: string, confirmCompletion: boolean) => MarkWorkItemCompletedResponse | Promise<MarkWorkItemCompletedResponse>;
   onListSourceRepositories?: () => SourceRepository[] | Promise<SourceRepository[]>;
+  onListSourceWorktrees?: (repoPath: string) => SourceWorktree[] | Promise<SourceWorktree[]>;
   onCreateSourceWorktree?: (input: CreateSourceWorktreeInput) => SourceWorktree | Promise<SourceWorktree>;
   onCreateAgent?: (agent: Agent, input: McpCreateAgentInput & { backend: AgentBackend; teamId?: string }) => McpCreateAgentResponse | Promise<McpCreateAgentResponse>;
   createId?: () => string;
@@ -116,6 +117,7 @@ export class ClawMcpAgentCoordinator {
   private readonly onDisplayMarkdown?: (agent: Agent, input: DisplayMarkdownInput) => DisplayMarkdownResponse | Promise<DisplayMarkdownResponse>;
   private readonly onMarkWorkItemCompleted?: (agent: Agent, workItemId: string, confirmCompletion: boolean) => MarkWorkItemCompletedResponse | Promise<MarkWorkItemCompletedResponse>;
   private readonly onListSourceRepositories?: () => SourceRepository[] | Promise<SourceRepository[]>;
+  private readonly onListSourceWorktrees?: (repoPath: string) => SourceWorktree[] | Promise<SourceWorktree[]>;
   private readonly onCreateSourceWorktree?: (input: CreateSourceWorktreeInput) => SourceWorktree | Promise<SourceWorktree>;
   private readonly onCreateAgent?: (agent: Agent, input: McpCreateAgentInput & { backend: AgentBackend; teamId?: string }) => McpCreateAgentResponse | Promise<McpCreateAgentResponse>;
   private readonly createId: () => string;
@@ -128,6 +130,7 @@ export class ClawMcpAgentCoordinator {
     this.onDisplayMarkdown = options.onDisplayMarkdown;
     this.onMarkWorkItemCompleted = options.onMarkWorkItemCompleted;
     this.onListSourceRepositories = options.onListSourceRepositories;
+    this.onListSourceWorktrees = options.onListSourceWorktrees;
     this.onCreateSourceWorktree = options.onCreateSourceWorktree;
     this.onCreateAgent = options.onCreateAgent;
     this.createId = options.createId ?? randomUUID;
@@ -262,7 +265,9 @@ export class ClawMcpAgentCoordinator {
 
     return {
       repoPath: normalizedRepoPath,
-      worktrees: repository.worktrees,
+      worktrees: this.onListSourceWorktrees
+        ? await this.onListSourceWorktrees(normalizedRepoPath)
+        : repository.worktrees,
     };
   }
 

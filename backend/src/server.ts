@@ -533,6 +533,12 @@ export class ClawBackendServer {
         const input = requireSourceWorktreeSuggestionInput(message.params);
         return createClawRpcResult(message.id, await this.requireDriverRpc().handle('source/suggestWorktreePath', { input }));
       }
+      case 'source/listWorktrees': {
+        const params = requireRecord(message.params);
+        return createClawRpcResult(message.id, await this.requireDriverRpc().handle('source/listWorktrees', {
+          repoPath: requireString(params.repoPath, 'repoPath'),
+        }));
+      }
       case 'source/createWorktree': {
         const input = requireSourceWorktreeInput(message.params);
         const worktree = await this.requireDriverRpc().handle('source/createWorktree', { input }) as SourceWorktree;
