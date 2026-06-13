@@ -1,7 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
-import { readFile, stat } from 'node:fs/promises';
+import { stat } from 'node:fs/promises';
 import path from 'node:path';
-import { listAgentFolderFiles } from './agent-files';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
 import { sendAgentPrompt, type SendAgentPromptHooks } from './agent-chat-service';
 import { ClawBackendProxyDriver } from './backend-proxy-driver';
@@ -53,8 +52,6 @@ import { backendDisplayName, unsupportedBackendFeature } from './backends/types'
 import { formatConversationTitle } from './backends/conversation-title';
 import { McpToolError, type DisplayMarkdownInput, type DisplayMarkdownResponse, type MarkWorkItemCompletedResponse } from './mcp/agent-coordinator';
 import { runtimeGitHubOAuthClientId } from './runtime-config';
-
-const MAX_AGENT_FILE_READ_BYTES = 2 * 1024 * 1024;
 
 type ClawBackendClientPort = Pick<ClawBackendProcessClient, 'start' | 'health' | 'request' | 'onEvent' | 'close'>;
 
@@ -815,7 +812,9 @@ export class AppController {
       throw new Error(`Agent not found: ${agentId}`);
     }
 
-    return listAgentFolderFiles(agent.folder);
+    return this.requireBackendClient().request('agent/listFiles', {
+      folder: agent.folder,
+    });
   }
 
   private async readAgentFile(agentId: string, filePath: string): Promise<AgentFileReadResult> {
@@ -824,19 +823,10 @@ export class AppController {
       throw new Error(`Agent not found: ${agentId}`);
     }
 
-    const resolvedPath = resolveAgentFilePath(agent.folder, filePath);
-    const fileStat = await stat(resolvedPath.absolutePath);
-    if (!fileStat.isFile()) {
-      throw new Error(`Path is not a file: ${resolvedPath.relativePath}`);
-    }
-    if (fileStat.size > MAX_AGENT_FILE_READ_BYTES) {
-      throw new Error(`File is too large to preview: ${resolvedPath.relativePath}`);
-    }
-
-    return {
-      path: resolvedPath.relativePath,
-      content: await readFile(resolvedPath.absolutePath, 'utf8'),
-    };
+    return this.requireBackendClient().request('agent/readFile', {
+      folder: agent.folder,
+      filePath,
+    });
   }
 
   private async openAgentGitDiff(agentId: string): Promise<void> {

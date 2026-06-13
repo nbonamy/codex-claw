@@ -1,9 +1,10 @@
-import { readdir } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
-import type { AgentFileSearchItem } from '@codex-claw/shared/contracts';
+import type { AgentFileReadResult, AgentFileSearchItem } from '@codex-claw/shared/contracts';
 
 export const DEFAULT_AGENT_FILE_LIMIT = 1000;
 export const DEFAULT_AGENT_FILE_DEPTH = 8;
+export const DEFAULT_AGENT_FILE_READ_BYTES = 2 * 1024 * 1024;
 
 const skippedDirectoryNames = new Set([
   '.git',
@@ -82,4 +83,42 @@ export async function listAgentFolderFiles(
       });
     }
   }
+}
+
+export async function readAgentFolderFile(
+  folder: string,
+  filePath: string,
+  options: { maxBytes?: number } = {},
+): Promise<AgentFileReadResult> {
+  const resolvedPath = resolveAgentFilePath(folder, filePath);
+  const fileStat = await stat(resolvedPath.absolutePath);
+  if (!fileStat.isFile()) {
+    throw new Error(`Path is not a file: ${resolvedPath.relativePath}`);
+  }
+
+  if (fileStat.size > (options.maxBytes ?? DEFAULT_AGENT_FILE_READ_BYTES)) {
+    throw new Error(`File is too large to preview: ${resolvedPath.relativePath}`);
+  }
+
+  return {
+    path: resolvedPath.relativePath,
+    content: await readFile(resolvedPath.absolutePath, 'utf8'),
+  };
+}
+
+export function resolveAgentFilePath(folder: string, filePath: string): { absolutePath: string; relativePath: string } {
+  const root = path.resolve(folder);
+  const target = path.isAbsolute(filePath)
+    ? path.resolve(filePath)
+    : path.resolve(root, filePath);
+  const relativePath = path.relative(root, target);
+
+  if (relativePath === '..' || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath)) {
+    throw new Error(`File is outside the agent folder: ${filePath}`);
+  }
+
+  return {
+    absolutePath: target,
+    relativePath: relativePath.split(path.sep).join('/'),
+  };
 }

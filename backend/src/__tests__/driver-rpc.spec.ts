@@ -78,6 +78,29 @@ describe('BackendDriverRpc', () => {
     }
   });
 
+  it('routes agent file listing and reads through backend-owned filesystem access', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-rpc-files-'));
+    const rpc = new BackendDriverRpc(new Map([['codex', createDriver()]]));
+
+    try {
+      await mkdir(path.join(tempDir, 'src'), { recursive: true });
+      await writeFile(path.join(tempDir, 'README.md'), '# Read me\n');
+      await writeFile(path.join(tempDir, 'src', 'main.ts'), 'main');
+
+      await expect(rpc.handle('agent/listFiles', { folder: tempDir })).resolves.toStrictEqual([
+        { name: 'README.md', path: 'README.md' },
+        { name: 'main.ts', path: 'src/main.ts' },
+      ]);
+      await expect(rpc.handle('agent/readFile', { folder: tempDir, filePath: 'README.md' })).resolves.toStrictEqual({
+        path: 'README.md',
+        content: '# Read me\n',
+      });
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+      await rpc.close();
+    }
+  });
+
   it('fans out backend driver events', () => {
     let emitEvent: AgentBackendDriver['onEvent'] extends (listener: infer Listener) => () => void ? Listener : never;
     const driver = createDriver({

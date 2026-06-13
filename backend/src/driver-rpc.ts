@@ -1,6 +1,7 @@
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/shared/backend-driver';
 import { unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
 import type { Agent, AgentBackend, AppleSpeechTranscriptionOptions, CreateSourceWorktreeInput, SendPromptOptions } from '@codex-claw/shared/contracts';
+import { listAgentFolderFiles, readAgentFolderFile } from './agent-files';
 import { ClaudeBackendDriver } from './claude/claude-driver';
 import { CodexAgentSessionManager } from './codex/agent-session';
 import { CodexBackendDriver } from './codex/codex-driver';
@@ -41,6 +42,17 @@ export class BackendDriverRpc {
 
   async handle(method: string, params: unknown): Promise<unknown> {
     switch (method) {
+      case 'agent/listFiles': {
+        const record = requireRecord(params);
+        return listAgentFolderFiles(requireString(record.folder, 'folder'));
+      }
+      case 'agent/readFile': {
+        const record = requireRecord(params);
+        return readAgentFolderFile(
+          requireString(record.folder, 'folder'),
+          requireString(record.filePath, 'filePath'),
+        );
+      }
       case 'agent/getGitStatus': {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);

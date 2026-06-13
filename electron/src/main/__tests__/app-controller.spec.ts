@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ConversationSummary, CreateSourceWorktreeInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, RendererMessage, SourceRepository, SourceWorktree } from '@codex-claw/shared/contracts';
+import type { AgentFileReadResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ConversationSummary, CreateSourceWorktreeInput, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, RendererMessage, SourceRepository, SourceWorktree } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import type { AppStatePersistence } from '../state-persistence';
 import type { AgentBackendDriver, BackendSendResult } from '../backends/types';
@@ -1520,78 +1520,73 @@ describe('AppController', () => {
     expect(backendDriver.readConversationMessages).not.toHaveBeenCalled();
   });
 
-  it('reads text files inside the active agent folder and rejects traversal', async () => {
-    const folder = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-agent-files-'));
-    try {
-      const snapshot = createInitialSnapshot();
-      snapshot.agents[0].folder = folder;
-      const persistence = {
-        load: vi.fn().mockResolvedValue(snapshot),
-        save: vi.fn().mockResolvedValue(undefined),
-      } as unknown as AppStatePersistence;
-      const controller = new AppController(persistence);
-      await writeFile(path.join(folder, 'README.md'), '# Read me\n', 'utf8');
+  it('routes agent file listing and reads through clawd', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.sourceFolder.initialized = true;
+    snapshot.agents[0].folder = '/Users/nbonamy/src/codex-claw';
+    const files: AgentFileSearchItem[] = [{ name: 'README.md', path: 'README.md' }];
+    const readResult: AgentFileReadResult = { path: 'README.md', content: '# Read me\n' };
+    const request = vi.fn()
+      .mockResolvedValueOnce(files)
+      .mockResolvedValueOnce(readResult);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
 
-      await controller.initialize();
+    await controller.initialize();
 
-      await expect(readAgentFile(controller, 'agent-dina', 'README.md')).resolves.toStrictEqual({
-        path: 'README.md',
-        content: '# Read me\n',
-      });
-      await expect(readAgentFile(controller, 'agent-missing', 'README.md')).rejects.toThrow('Agent not found');
-      await expect(readAgentFile(controller, 'agent-dina', '../outside.md')).rejects.toThrow('outside the agent folder');
-      await expect(readAgentFile(controller, 'agent-dina', '.')).rejects.toThrow('Path is not a file');
-
-      await writeFile(path.join(folder, 'large.md'), 'x'.repeat((2 * 1024 * 1024) + 1), 'utf8');
-      await expect(readAgentFile(controller, 'agent-dina', 'large.md')).rejects.toThrow('File is too large');
-    } finally {
-      await rm(folder, { force: true, recursive: true });
-    }
+    await expect(listAgentFiles(controller, 'agent-dina')).resolves.toStrictEqual(files);
+    await expect(readAgentFile(controller, 'agent-dina', 'README.md')).resolves.toStrictEqual(readResult);
+    await expect(readAgentFile(controller, 'agent-missing', 'README.md')).rejects.toThrow('Agent not found');
+    expect(request).toHaveBeenNthCalledWith(1, 'agent/listFiles', {
+      folder: '/Users/nbonamy/src/codex-claw',
+    });
+    expect(request).toHaveBeenNthCalledWith(2, 'agent/readFile', {
+      folder: '/Users/nbonamy/src/codex-claw',
+      filePath: 'README.md',
+    });
   });
 
   it('serves MCP display-markdown requests as side panel events', async () => {
-    const folder = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-display-markdown-'));
-    try {
-      const snapshot = createInitialSnapshot();
-      snapshot.agents[0].folder = folder;
-      const persistence = {
-        load: vi.fn().mockResolvedValue(snapshot),
-        save: vi.fn().mockResolvedValue(undefined),
-      } as unknown as AppStatePersistence;
-      const controller = new AppController(persistence);
-      const emittedEvents: Array<Omit<MainToRendererEvent, 'seq' | 'occurredAt'> & Partial<Pick<MainToRendererEvent, 'seq' | 'occurredAt'>>> = [];
-      (controller as unknown as {
-        emitAndApply(event: Omit<MainToRendererEvent, 'seq' | 'occurredAt'> & Partial<Pick<MainToRendererEvent, 'seq' | 'occurredAt'>>): void;
-      }).emitAndApply = (event) => {
-        emittedEvents.push(event);
-      };
-      await writeFile(path.join(folder, 'README.md'), '# Read me\n', 'utf8');
+    const snapshot = createInitialSnapshot();
+    snapshot.sourceFolder.initialized = true;
+    snapshot.agents[0].folder = '/Users/nbonamy/src/codex-claw';
+    const request = vi.fn().mockResolvedValue({
+      path: 'README.md',
+      content: '# Read me\n',
+    } satisfies AgentFileReadResult);
+    const controller = new AppController(createPersistence(snapshot), undefined, createBackendClient({ request }));
+    const emittedEvents: Array<Omit<MainToRendererEvent, 'seq' | 'occurredAt'> & Partial<Pick<MainToRendererEvent, 'seq' | 'occurredAt'>>> = [];
+    (controller as unknown as {
+      emitAndApply(event: Omit<MainToRendererEvent, 'seq' | 'occurredAt'> & Partial<Pick<MainToRendererEvent, 'seq' | 'occurredAt'>>): void;
+    }).emitAndApply = (event) => {
+      emittedEvents.push(event);
+    };
 
-      await controller.initialize();
-      await expect(mcpCoordinator(controller).displayMarkdown('agent-dina', {
-        path: 'README.md',
-      })).resolves.toStrictEqual({
-        success: true,
-        message: 'Displayed README.md in the side panel.',
-        path: 'README.md',
-        title: 'README.md',
-      });
+    await controller.initialize();
+    await expect(mcpCoordinator(controller).displayMarkdown('agent-dina', {
+      path: 'README.md',
+    })).resolves.toStrictEqual({
+      success: true,
+      message: 'Displayed README.md in the side panel.',
+      path: 'README.md',
+      title: 'README.md',
+    });
 
-      expect(emittedEvents).toStrictEqual([
-        {
-          agentId: 'agent-dina',
-          type: 'sidePanel.markdownRequested',
-          payload: {
-            kind: 'markdown',
-            title: 'README.md',
-            path: 'README.md',
-            content: '# Read me\n',
-          },
+    expect(request).toHaveBeenCalledWith('agent/readFile', {
+      folder: '/Users/nbonamy/src/codex-claw',
+      filePath: 'README.md',
+    });
+    expect(emittedEvents).toStrictEqual([
+      {
+        agentId: 'agent-dina',
+        type: 'sidePanel.markdownRequested',
+        payload: {
+          kind: 'markdown',
+          title: 'README.md',
+          path: 'README.md',
+          content: '# Read me\n',
         },
-      ]);
-    } finally {
-      await rm(folder, { force: true, recursive: true });
-    }
+      },
+    ]);
   });
 
   it('prompts a git diff side panel preview from turn diff updates', async () => {
@@ -2060,6 +2055,12 @@ async function readAgentFile(controller: AppController, agentId: string, filePat
   return (controller as unknown as {
     readAgentFile(agentId: string, filePath: string): Promise<unknown>;
   }).readAgentFile(agentId, filePath);
+}
+
+async function listAgentFiles(controller: AppController, agentId: string): Promise<AgentFileSearchItem[]> {
+  return (controller as unknown as {
+    listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]>;
+  }).listAgentFiles(agentId);
 }
 
 function userMessage(id: string, turnId: string, text: string) {
