@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { MemoryDesktopTokenStore } from '../desktop-token-store';
 import { createDesktopRequestHandlers } from '../desktop-request-handlers';
-import { MemoryWorkIntegrationTokenStore } from '../work-integrations/token-store';
 
 vi.mock('electron', () => ({
   safeStorage: {
@@ -18,7 +18,7 @@ describe('createDesktopRequestHandlers', () => {
     const openExternal = vi.fn().mockResolvedValue(true);
     const handlers = createDesktopRequestHandlers({
       openExternal,
-      tokenStore: new MemoryWorkIntegrationTokenStore(),
+      tokenStore: new MemoryDesktopTokenStore(),
     });
 
     await expect(handlers['desktop/openExternal']?.({ url: 'https://example.com' })).resolves.toBe(true);
@@ -26,7 +26,7 @@ describe('createDesktopRequestHandlers', () => {
   });
 
   it('stores work integration tokens through the desktop token store', async () => {
-    const tokenStore = new MemoryWorkIntegrationTokenStore();
+    const tokenStore = new MemoryDesktopTokenStore();
     const handlers = createDesktopRequestHandlers({
       openExternal: vi.fn(),
       tokenStore,
@@ -50,7 +50,7 @@ describe('createDesktopRequestHandlers', () => {
   it('rejects unsupported providers before touching the token store', async () => {
     const handlers = createDesktopRequestHandlers({
       openExternal: vi.fn(),
-      tokenStore: new MemoryWorkIntegrationTokenStore(),
+      tokenStore: new MemoryDesktopTokenStore(),
     });
 
     await expect(handlers['desktop/workIntegrationToken/get']?.({ provider: 'jira' })).rejects.toThrow('Unsupported work provider: jira');

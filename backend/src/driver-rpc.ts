@@ -1,6 +1,7 @@
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/shared/backend-driver';
 import { unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
 import type { Agent, AgentBackend, AppleSpeechTranscriptionOptions, CreateSourceWorktreeInput, SendPromptOptions } from '@codex-claw/shared/contracts';
+import { stat } from 'node:fs/promises';
 import { listAgentFolderFiles, readAgentFolderFile } from './agent-files';
 import { ClaudeBackendDriver } from './claude/claude-driver';
 import { CodexAgentSessionManager } from './codex/agent-session';
@@ -52,6 +53,14 @@ export class BackendDriverRpc {
           requireString(record.folder, 'folder'),
           requireString(record.filePath, 'filePath'),
         );
+      }
+      case 'agent/validateFolder': {
+        const record = requireRecord(params);
+        const folderStat = await stat(requireString(record.folder, 'folder').trim());
+        if (!folderStat.isDirectory()) {
+          throw new Error('Agent folder must be a directory.');
+        }
+        return null;
       }
       case 'agent/getGitStatus': {
         const { agent } = requireAgentParams(params);

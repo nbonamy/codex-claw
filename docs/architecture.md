@@ -126,23 +126,24 @@ or worktrees.
 
 Codex Claw persists the selected source folder path, whether initial detection
 has already run, and up to five recent repository names. On a fresh app state,
-main may initialize the source folder once from common source-code locations.
-After the user clears or changes the folder, the app respects that explicit
-choice and does not keep auto-detecting behind their back.
+`clawd` may initialize the source folder once from common source-code
+locations. After the user clears or changes the folder, the app respects that
+explicit choice and does not keep auto-detecting behind their back.
 
-Repository discovery is read-only and shallow. Electron main scans only direct
-children of the configured source folder; a child with a `.git` directory is a
-clone, and a child with a `.git` file pointing into a parent repo worktree is a
-worktree. Worktrees are grouped under their parent clone when that clone is
-also present under the source folder. Orphan worktrees are ignored. Discovery
-does not run `git` and must tolerate missing, unreadable, detached, or malformed
-git metadata.
+Repository discovery is read-only and shallow. `clawd` scans only direct
+children of the configured source folder because the source folder belongs to
+the backend location, not to a desktop window. A child with a `.git` directory
+is a clone, and a child with a `.git` file pointing into a parent repo worktree
+is a worktree. Worktrees are grouped under their parent clone when that clone
+is also present under the source folder. Orphan worktrees are ignored.
+Discovery does not run `git` and must tolerate missing, unreadable, detached,
+or malformed git metadata.
 
 Creating a worktree is the one source-folder git write. It is an explicit
-main-process operation that runs `git worktree add -b <branch> <destination>`
-for the selected repository, then refreshes discovery. Renderer code and MCP
-tools request this through typed app APIs; they never scan arbitrary folders or
-spawn git directly.
+backend operation that runs `git worktree add -b <branch> <destination>` for
+the selected repository, then refreshes discovery. Renderer code and MCP tools
+request this through typed app APIs; they never scan arbitrary folders or spawn
+git directly.
 
 The renderer uses source repositories only as creation affordances: Settings
 chooses or clears the source folder, the agent dialog can pick a discovered
@@ -157,6 +158,9 @@ The app is being extracted from an Electron-main backend into a separate
 work. The target invariant is that Electron main is a desktop adapter and stdio
 client; provider drivers, provider protocols, app state, backend-owned
 filesystem work, git, loops, and agent runtime state belong behind `clawd`.
+That includes file previews: desktop and future non-desktop clients may request
+file content from `clawd`, but they do not read backend-owned agent workspace
+paths themselves.
 
 ```mermaid
 flowchart LR

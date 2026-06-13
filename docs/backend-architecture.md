@@ -289,6 +289,10 @@ renderer.
   backend-location-owned filesystem behavior. Current code already routes
   source discovery, worktree creation, agent file listing/reading, GitHub work
   integrations, and Apple Speech transcription through `clawd`.
+- Renderer file previews and MCP `display-markdown` path reads use the same
+  rule: clients ask `clawd` for content; Electron does not read agent workspace
+  files on behalf of product features. This keeps the contract valid for a
+  mobile client connected to a remote backend.
 - Loop scheduler and loop runner.
 - Work-provider drivers where possible, with desktop-only services injected
   through ports.
@@ -346,7 +350,7 @@ names that describe backend ownership:
 - `agent/create`, `agent/update`, `agent/close`, `agent/select`,
   `agent/restart`, `agent/sendPrompt`, `agent/steer`, `agent/interrupt`,
   `agent/respondToClientRequest`
-- `agent/listModels`, `agent/listSkills`, `agent/listConversations`,
+- `agent/validateFolder`, `agent/listModels`, `agent/listSkills`, `agent/listConversations`,
   `agent/resumeConversation`, `agent/readConversationMessages`
 - `bench/saveAgent`, `bench/deployTemplate`, `bench/removeTemplate`
 - `loop/create`, `loop/update`, `loop/run`, `loop/delete`,

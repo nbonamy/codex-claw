@@ -2,8 +2,8 @@ import { shell } from 'electron';
 import path from 'node:path';
 import type { WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { WorkIntegrationTokenStore, WorkProviderToken } from '@codex-claw/shared/work-integration-tokens';
+import { SafeStorageDesktopTokenStore } from './desktop-token-store';
 import { defaultUserDataPath } from './user-data';
-import { SafeStorageWorkIntegrationTokenStore } from './work-integrations/token-store';
 
 export type DesktopRequestHandler = (params: unknown) => unknown | Promise<unknown>;
 
@@ -15,7 +15,7 @@ export type DesktopRequestHandlersOptions = {
 export function createRuntimeDesktopRequestHandlers(): Record<string, DesktopRequestHandler> {
   return createDesktopRequestHandlers({
     openExternal: (url) => shell.openExternal(url),
-    tokenStore: new SafeStorageWorkIntegrationTokenStore(path.join(defaultUserDataPath(), 'work-integration-tokens.json')),
+    tokenStore: new SafeStorageDesktopTokenStore(path.join(defaultUserDataPath(), 'work-integration-tokens.json')),
   });
 }
 

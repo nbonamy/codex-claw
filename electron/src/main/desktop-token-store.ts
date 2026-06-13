@@ -12,7 +12,7 @@ type PersistedTokenFile = {
   tokens?: Partial<Record<WorkProviderKind, PersistedToken>>;
 };
 
-export class SafeStorageWorkIntegrationTokenStore implements WorkIntegrationTokenStore {
+export class SafeStorageDesktopTokenStore implements WorkIntegrationTokenStore {
   constructor(private readonly filePath: string) {}
 
   canStoreTokens(): boolean {
@@ -88,7 +88,7 @@ export class SafeStorageWorkIntegrationTokenStore implements WorkIntegrationToke
   }
 }
 
-export class MemoryWorkIntegrationTokenStore implements WorkIntegrationTokenStore {
+export class MemoryDesktopTokenStore implements WorkIntegrationTokenStore {
   private readonly tokens = new Map<WorkProviderKind, WorkProviderToken>();
 
   constructor(private readonly available = true) {}

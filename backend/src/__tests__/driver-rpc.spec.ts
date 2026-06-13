@@ -101,6 +101,22 @@ describe('BackendDriverRpc', () => {
     }
   });
 
+  it('validates agent folders through backend-owned filesystem access', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-rpc-agent-folder-'));
+    const rpc = new BackendDriverRpc(new Map([['codex', createDriver()]]));
+
+    try {
+      const filePath = path.join(tempDir, 'README.md');
+      await writeFile(filePath, '# Read me\n');
+
+      await expect(rpc.handle('agent/validateFolder', { folder: tempDir })).resolves.toBeNull();
+      await expect(rpc.handle('agent/validateFolder', { folder: filePath })).rejects.toThrow('Agent folder must be a directory.');
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+      await rpc.close();
+    }
+  });
+
   it('fans out backend driver events', () => {
     let emitEvent: AgentBackendDriver['onEvent'] extends (listener: infer Listener) => () => void ? Listener : never;
     const driver = createDriver({

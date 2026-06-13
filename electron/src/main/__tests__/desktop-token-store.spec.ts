@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { safeStorage } from 'electron';
-import { SafeStorageWorkIntegrationTokenStore } from '../token-store';
+import { SafeStorageDesktopTokenStore } from '../desktop-token-store';
 
 vi.mock('electron', () => ({
   safeStorage: {
@@ -15,7 +15,7 @@ vi.mock('electron', () => ({
 
 const mockedSafeStorage = vi.mocked(safeStorage);
 
-describe('SafeStorageWorkIntegrationTokenStore', () => {
+describe('SafeStorageDesktopTokenStore', () => {
   let tmpDir: string;
 
   beforeEach(async () => {
@@ -31,7 +31,7 @@ describe('SafeStorageWorkIntegrationTokenStore', () => {
 
   it('persists access tokens encrypted outside the app snapshot state', async () => {
     const filePath = path.join(tmpDir, 'work-integration-tokens.json');
-    const store = new SafeStorageWorkIntegrationTokenStore(filePath);
+    const store = new SafeStorageDesktopTokenStore(filePath);
 
     await store.set({
       provider: 'github',
@@ -58,7 +58,7 @@ describe('SafeStorageWorkIntegrationTokenStore', () => {
 
   it('refuses to store tokens when Electron encryption is unavailable', async () => {
     mockedSafeStorage.isEncryptionAvailable.mockReturnValue(false);
-    const store = new SafeStorageWorkIntegrationTokenStore(path.join(tmpDir, 'work-integration-tokens.json'));
+    const store = new SafeStorageDesktopTokenStore(path.join(tmpDir, 'work-integration-tokens.json'));
 
     await expect(store.set({
       provider: 'github',

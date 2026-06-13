@@ -91,7 +91,7 @@ override authorizes only Claw's own collaboration tools; it does not authorize
 all Codex shell/file operations and does not mutate the user's global MCP
 config.
 
-For Claude, main passes the same request-scoped agent URL through the Claude
+For Claude, `clawd` passes the same request-scoped agent URL through the Claude
 CLI instead of mutating global Claude Code config:
 
 ```bash
@@ -104,7 +104,7 @@ claude -p "<prompt>" \
 The `--allowed-tools` pattern mirrors Skwad's Claude integration and
 authorizes only tools from the `codex_claw` MCP server.
 
-Main also adds developer instructions that give the backend agent its Claw
+`clawd` also adds developer instructions that give the backend agent its Claw
 agent ID/name/folder and tell it to set status, list agents, send messages,
 and check inboxes through the `codex_claw` MCP server. Agents do not need to
 register or pass their own agent ID to tools.

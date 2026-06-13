@@ -1,5 +1,4 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
-import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
 import { sendAgentPrompt, type SendAgentPromptHooks } from './agent-chat-service';
@@ -8,16 +7,12 @@ import { logMain, warnMain } from './log';
 import { LoopRunner, type LoopPromptContext } from './loops/runner';
 import { LoopScheduler } from './loops/scheduler';
 import { createMainWindow } from './main-window';
-import { ClawMcpAgentCoordinator } from './mcp/agent-coordinator';
-import { agentMessagesPrompt } from './mcp/agent-prompts';
 import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-permissions';
 import {
   assignWorkItemToAgentInSnapshot,
   closeAgentInSnapshot,
-  completeWorkItemAssignmentInSnapshot,
   deployBenchTemplateInSnapshot,
   duplicateAgentInSnapshot,
-  markWorkItemCompletionInstructionsDeliveredInSnapshot,
   moveAgentToTeamInSnapshot,
   removeBenchTemplateFromSnapshot,
   removeWorkItemAssignmentFromSnapshot,
@@ -27,7 +22,7 @@ import {
   saveAgentToBench,
 } from '@codex-claw/shared/agent-manager';
 import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selectTeam, updateTeamInSnapshot } from '@codex-claw/shared/team-manager';
-import { clearLoopExecutionHistoryInSnapshot, completeLoopExecutionInSnapshot, createLoopInSnapshot, deleteLoopExecutionFromSnapshot, deleteLoopFromSnapshot, updateLoopExecutionAgentConversationInSnapshot, updateLoopInSnapshot } from '@codex-claw/shared/loop-manager';
+import { clearLoopExecutionHistoryInSnapshot, createLoopInSnapshot, deleteLoopExecutionFromSnapshot, deleteLoopFromSnapshot, updateLoopExecutionAgentConversationInSnapshot, updateLoopInSnapshot } from '@codex-claw/shared/loop-manager';
 import { updateSettingsInSnapshot } from '@codex-claw/shared/settings';
 import {
   applyMainEventToSnapshot,
@@ -39,7 +34,7 @@ import {
 } from './snapshot-service';
 import { AppStatePersistence } from '@codex-claw/shared/state-persistence';
 import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from './backend-process-client';
-import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogAssignment, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { Agent, AgentBackend, AgentFileReadResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { approvalBackendDefaultsWithPreset, isApprovalPreset } from '@codex-claw/shared/approval-presets';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 import { teamColors } from '@codex-claw/shared/team-colors';
@@ -47,44 +42,14 @@ import { sanitizeWorkItemAssignmentSource } from '@codex-claw/shared/work-assign
 import type { AgentBackendDriver, BackendSendResult } from './backends/types';
 import { backendDisplayName, unsupportedBackendFeature } from './backends/types';
 import { formatConversationTitle } from './backends/conversation-title';
-import { McpToolError, type DisplayMarkdownInput, type DisplayMarkdownResponse, type MarkWorkItemCompletedResponse } from './mcp/agent-coordinator';
 import { defaultUserDataPath } from './user-data';
 
 type ClawBackendClientPort = Pick<ClawBackendProcessClient, 'start' | 'health' | 'request' | 'onEvent' | 'close'>;
-
-function completionInstructionsResponse(workItemId: string, instructions: string): MarkWorkItemCompletedResponse {
-  return {
-    success: true,
-    workItemId,
-    status: 'completion-instructions-required',
-    instructions,
-    message: 'Follow these completion instructions, then call mark-work-item-completed again with confirmCompletion set to true.',
-    confirmCompletionRequired: true,
-  };
-}
 
 export class AppController {
   private mainWindow: BrowserWindow | null = null;
   private snapshot = createEmptySnapshot();
   private readonly persistence: AppStatePersistence;
-  private readonly mcpCoordinator = new ClawMcpAgentCoordinator({
-    getAgents: () => this.snapshot.agents,
-    onAgentUpdated: (agent) => {
-      this.emitAndApply({
-        agentId: agent.id,
-        type: 'agent.updated',
-        payload: agent,
-      });
-    },
-    onInboxMessage: (agentId) => {
-      this.promptUnreadAgentMessages(agentId);
-    },
-    onDisplayMarkdown: (agent, input) => this.displayMarkdownForAgent(agent, input),
-    onMarkWorkItemCompleted: (agent, workItemId, confirmCompletion) => this.markWorkItemCompletedForAgent(agent, workItemId, confirmCompletion),
-    onListSourceRepositories: () => this.listSourceRepositories(),
-    onCreateSourceWorktree: (input) => this.createSourceWorktree(input),
-    onCreateAgent: (agent, input) => this.createAgentFromMcp(agent, input),
-  });
   private readonly backendDrivers = new Map<AgentBackend, AgentBackendDriver>();
   private readonly backendDriverEventUnsubscribes = new Map<AgentBackend, () => void>();
   private backendClientEventUnsubscribe: (() => void) | null = null;
@@ -914,118 +879,6 @@ export class AppController {
     }
   }
 
-  private async displayMarkdownForAgent(agent: Agent, input: DisplayMarkdownInput): Promise<DisplayMarkdownResponse> {
-    const content = input.markdown ?? (input.path ? (await this.readAgentFile(agent.id, input.path)).content : '');
-    const resolvedPath = input.path ? resolveAgentFilePath(agent.folder, input.path).relativePath : undefined;
-    const title = input.title ?? (resolvedPath ? fileBasename(resolvedPath) : 'Markdown');
-
-    this.emitAndApply({
-      agentId: agent.id,
-      type: 'sidePanel.markdownRequested',
-      payload: {
-        kind: 'markdown',
-        title,
-        ...(resolvedPath ? { path: resolvedPath } : {}),
-        content,
-      },
-    });
-
-    return {
-      success: true,
-      message: resolvedPath ? `Displayed ${resolvedPath} in the side panel.` : 'Displayed Markdown in the side panel.',
-      ...(resolvedPath ? { path: resolvedPath } : {}),
-      title,
-    };
-  }
-
-  private markWorkItemCompletedForAgent(agent: Agent, workItemId: string, confirmCompletion = false): MarkWorkItemCompletedResponse {
-    const assignment = this.snapshot.workBacklog.assignments[workItemId];
-    if (!assignment) {
-      throw new McpToolError(`Work item '${workItemId}' is not currently assigned. Use the exact Work item ID from your assignment prompt.`);
-    }
-    if (assignment.agentId !== agent.id) {
-      const assignedAgent = this.snapshot.agents.find((candidate) => candidate.id === assignment.agentId);
-      throw new McpToolError(`Work item '${workItemId}' is assigned to ${assignedAgent?.name ?? assignment.agentId}, not ${agent.name}.`);
-    }
-
-    const completionInstructions = this.loopCompletionInstructionsForAssignment(assignment.loopId);
-    if (completionInstructions) {
-      if (!assignment.completionInstructionsDeliveredAt) {
-        const deliveredAssignment = markWorkItemCompletionInstructionsDeliveredInSnapshot(this.snapshot, agent.id, workItemId, new Date().toISOString());
-        if (!deliveredAssignment) {
-          throw new McpToolError(`Completion instructions for work item '${workItemId}' could not be recorded.`);
-        }
-        this.emitAndApply({
-          agentId: agent.id,
-          type: 'workBacklog.assignmentUpdated',
-          payload: deliveredAssignment,
-        });
-        return completionInstructionsResponse(workItemId, completionInstructions);
-      }
-
-      if (!confirmCompletion) {
-        return completionInstructionsResponse(workItemId, completionInstructions);
-      }
-    }
-
-    const completedAt = new Date().toISOString();
-    const completedAssignment = completeWorkItemAssignmentInSnapshot(this.snapshot, agent.id, workItemId, completedAt);
-    if (!completedAssignment?.completedAt) {
-      throw new McpToolError(`Work item '${workItemId}' could not be marked completed.`);
-    }
-
-    this.emitAndApply({
-      agentId: agent.id,
-      type: 'workBacklog.assignmentUpdated',
-      payload: completedAssignment,
-    });
-    const completedLoop = completedAssignment.loopId &&
-      completedAssignment.loopExecutionId &&
-      this.isLoopExecutionComplete(completedAssignment.loopId, completedAssignment.loopExecutionId)
-      ? completeLoopExecutionInSnapshot(this.snapshot, completedAssignment.loopId, completedAssignment.loopExecutionId, completedAt)
-      : null;
-    if (this.cleanupCompletedLoopAssignment(agent, completedAssignment)) {
-      this.emitAndApply({
-        type: 'snapshot.updated',
-        payload: this.snapshot,
-      });
-    } else if (completedLoop) {
-      this.emitAndApply({
-        type: 'snapshot.updated',
-        payload: this.snapshot,
-      });
-    }
-
-    return {
-      success: true,
-      workItemId,
-      status: 'completed',
-      completedAt: completedAssignment.completedAt,
-    };
-  }
-
-  private loopCompletionInstructionsForAssignment(loopId?: string): string {
-    if (!loopId) {
-      return '';
-    }
-
-    const loop = this.snapshot.loops.find((candidate) => candidate.id === loopId);
-    return loop?.instructions.beforeCompletion?.trim() ?? '';
-  }
-
-  private isLoopExecutionComplete(loopId: string, executionId: string): boolean {
-    const execution = this.snapshot.loops
-      .find((candidate) => candidate.id === loopId)
-      ?.executionLog.find((candidate) => candidate.id === executionId);
-    if (!execution || execution.createdAgents.length === 0) {
-      return false;
-    }
-
-    return execution.createdAgents.every((createdAgent) => (
-      this.snapshot.workBacklog.assignments[createdAgent.workItemId]?.status === 'completed'
-    ));
-  }
-
   private isStoredConversationRef(ref: BackendConversationRef, agentId: string): boolean {
     return this.snapshot.loops.some((loop) => loop.executionLog.some((entry) => (
       entry.createdAgents.some((createdAgent) => (
@@ -1033,28 +886,6 @@ export class AppController {
         (createdAgent.conversationRef ? sameConversationRef(createdAgent.conversationRef, ref) : false)
       ))
     )));
-  }
-
-  private cleanupCompletedLoopAssignment(agent: Agent, assignment: WorkBacklogAssignment): boolean {
-    if (!assignment.loopId) {
-      return false;
-    }
-
-    const loop = this.snapshot.loops.find((candidate) => candidate.id === assignment.loopId);
-    if (!loop) {
-      return false;
-    }
-
-    const teamId = agent.teamId;
-    if (loop.action.teamTarget.mode === 'dedicated' && loop.action.cleanup?.deleteTeam !== false && teamId && this.snapshot.teams.length > 1) {
-      return Boolean(closeTeamInSnapshot(this.snapshot, teamId));
-    }
-
-    if (loop.action.teamTarget.mode === 'existing' && loop.action.cleanup?.deleteAgent !== false) {
-      return Boolean(closeAgentInSnapshot(this.snapshot, agent.id));
-    }
-
-    return false;
   }
 
   private async steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot> {
@@ -1387,62 +1218,6 @@ export class AppController {
     this.snapshot.sourceFolder.recentRepoNames = nextNames.slice(0, 5);
   }
 
-  private async createAgentFromMcp(
-    caller: Agent,
-    input: {
-      avatar?: string;
-      backend?: Agent['backend'];
-      branchName?: string;
-      createWorktree?: boolean;
-      destinationPath?: string;
-      name?: string;
-      repoPath: string;
-      teamId?: string;
-    },
-  ): Promise<{ success: boolean; agentId?: string; message: string }> {
-    const repoPath = input.repoPath.trim();
-    if (!repoPath) {
-      return { success: false, message: 'repoPath is required' };
-    }
-
-    let folder = repoPath;
-    if (input.createWorktree) {
-      const branchName = input.branchName?.trim();
-      if (!branchName) {
-        return { success: false, message: 'branchName is required when createWorktree is true' };
-      }
-      folder = (await this.createSourceWorktree({
-        repoPath,
-        branchName,
-        ...(input.destinationPath?.trim() ? { destinationPath: input.destinationPath.trim() } : {}),
-      })).path;
-    }
-
-    const createInput: CreateAgentInput = {
-      name: input.name?.trim() || path.basename(folder),
-      folder,
-      ...(input.avatar ? { avatar: input.avatar } : {}),
-      backend: input.backend ?? 'codex',
-      teamId: input.teamId ?? caller.teamId,
-    };
-
-    await this.validateAgentInput(createInput);
-    const previousAgentIds = new Set(this.snapshot.agents.map((agent) => agent.id));
-    createAgentInSnapshot(this.snapshot, createInput);
-    this.addRecentSourceRepository(path.basename(repoPath));
-    await this.persistSnapshot();
-    const agent = this.snapshot.agents.find((candidate) => !previousAgentIds.has(candidate.id));
-    this.emitAndApply({
-      type: 'snapshot.updated',
-      payload: this.snapshot,
-    });
-    return {
-      success: true,
-      ...(agent?.id ? { agentId: agent.id } : {}),
-      message: 'Agent created successfully',
-    };
-  }
-
   private async validateAgentInput(input: Pick<CreateAgentInput, 'name' | 'folder'>): Promise<void> {
     if (!input.name.trim()) {
       throw new Error('Agent name is required.');
@@ -1453,10 +1228,7 @@ export class AppController {
       throw new Error('Agent folder is required.');
     }
 
-    const folderStat = await stat(folder);
-    if (!folderStat.isDirectory()) {
-      throw new Error('Agent folder must be a directory.');
-    }
+    await this.requireBackendClient().request('agent/validateFolder', { folder });
   }
 
   private validateTeamInput(input: CreateTeamInput): void {
@@ -1546,7 +1318,6 @@ export class AppController {
 
     if (fullEvent.type === 'turn.completed' && fullEvent.agentId) {
       this.promptPlanPreview(fullEvent);
-      this.promptUnreadAgentMessages(fullEvent.agentId);
     }
 
     if (
@@ -1660,20 +1431,6 @@ export class AppController {
     if (backend) {
       this.clientRequestBackends.set(request.id, backend);
     }
-  }
-
-  private promptUnreadAgentMessages(agentId: string): void {
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent || agent.status.type !== 'idle') {
-      return;
-    }
-
-    const messages = this.mcpCoordinator.takeUnreadMessages(agentId);
-    if (messages.length === 0) {
-      return;
-    }
-
-    void this.sendPrompt(agentId, agentMessagesPrompt(messages));
   }
 
   private async persistSnapshot(): Promise<void> {
