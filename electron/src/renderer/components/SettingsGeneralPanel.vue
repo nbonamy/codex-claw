@@ -355,6 +355,7 @@ async function updateDaemonEnabled(value: boolean | string | number): Promise<vo
 
 .settings-general-panel__status-icon--ok {
   color: var(--color-success);
+  fill: currentColor;
 }
 
 .settings-general-panel__spinner {
