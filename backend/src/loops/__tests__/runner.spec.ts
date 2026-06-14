@@ -1,11 +1,24 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
 import { createLoopInSnapshot } from '@codex-claw/shared/loop-manager';
 import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
 import type { WorkItem } from '@codex-claw/shared/contracts';
 import { LoopRunner, matchingLoopItems } from '../runner';
 
+const logMainMock = vi.hoisted(() => vi.fn());
+const warnMainMock = vi.hoisted(() => vi.fn());
+
+vi.mock('../../log', () => ({
+  logMain: logMainMock,
+  warnMain: warnMainMock,
+}));
+
 describe('LoopRunner', () => {
+  beforeEach(() => {
+    logMainMock.mockReset();
+    warnMainMock.mockReset();
+  });
+
   it('creates agents from matching issues and preserves the active selection', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.bench.push({
@@ -100,6 +113,29 @@ describe('LoopRunner', () => {
         workItemId: 'github:nbonamy/codex-claw#12',
       },
     );
+    expect(logMainMock).toHaveBeenCalledWith('loop-runner', 'started', expect.objectContaining({
+      loopId: 'loop-bugs',
+      executionId: 'loop-exec-bugs',
+      repositoryId: 'nbonamy/codex-claw',
+    }));
+    expect(logMainMock).toHaveBeenCalledWith('loop-runner', 'listed work items', expect.objectContaining({
+      loopId: 'loop-bugs',
+      executionId: 'loop-exec-bugs',
+      itemCount: 2,
+      matchingCount: 1,
+    }));
+    expect(logMainMock).toHaveBeenCalledWith('loop-runner', 'created assignment', expect.objectContaining({
+      loopId: 'loop-bugs',
+      executionId: 'loop-exec-bugs',
+      agentId: assignment?.agentId,
+      workItemId: 'github:nbonamy/codex-claw#12',
+    }));
+    expect(logMainMock).toHaveBeenCalledWith('loop-runner', 'dispatching prompt', expect.objectContaining({
+      loopId: 'loop-bugs',
+      executionId: 'loop-exec-bugs',
+      agentId: assignment?.agentId,
+      workItemId: 'github:nbonamy/codex-claw#12',
+    }));
   });
 
   it('keeps the execution log when prompt dispatch fails after a real pickup', async () => {
@@ -140,6 +176,18 @@ describe('LoopRunner', () => {
     expect(saveSnapshot).toHaveBeenCalledTimes(2);
     expect(notifySnapshotUpdated).toHaveBeenCalledTimes(2);
     expect(sendPrompt).toHaveBeenCalledOnce();
+    expect(warnMainMock).toHaveBeenCalledWith('loop-runner', 'prompt dispatch failed', expect.objectContaining({
+      loopId: 'loop-all',
+      executionId: 'loop-exec-all',
+      workItemId: 'github:nbonamy/codex-claw#12',
+      message: 'backend offline',
+    }));
+    expect(warnMainMock).toHaveBeenCalledWith('loop-runner', 'failed', expect.objectContaining({
+      loopId: 'loop-all',
+      executionId: 'loop-exec-all',
+      createdCount: 1,
+      message: 'backend offline',
+    }));
   });
 
   it('logs created assignments if a later matching ticket fails before prompting', async () => {

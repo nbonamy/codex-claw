@@ -8,6 +8,7 @@ import { createTeamInSnapshot } from '@codex-claw/shared/team-manager';
 import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
 import { workItemAssignmentPrompt, workProviderLabel } from '@codex-claw/shared/work-item-prompts';
 import path from 'node:path';
+import { logMain, warnMain } from '../log';
 
 type WorkItemLister = {
   listItems(provider: WorkProviderKind, repositoryId: string): Promise<WorkItem[]>;
@@ -47,31 +48,64 @@ export class LoopRunner {
   async runLoop(loopId: string): Promise<void> {
     const loop = this.snapshot().loops.find((candidate) => candidate.id === loopId);
     if (!loop || !loop.enabled) {
+      logMain('loop-runner', 'skipped', {
+        loopId,
+        reason: loop ? 'disabled' : 'missing',
+      });
       return;
     }
 
     const executionId = this.createExecutionId();
     const startedAt = this.now().toISOString();
     const createdAssignments: CreatedLoopAssignment[] = [];
+    logMain('loop-runner', 'started', {
+      loopId: loop.id,
+      executionId,
+      provider: loop.source.provider,
+      repositoryId: loop.source.repositoryId,
+    });
     try {
       await this.createAssignmentsForLoop(loop, executionId, startedAt, createdAssignments);
       if (createdAssignments.length === 0) {
+        logMain('loop-runner', 'completed without assignments', {
+          loopId: loop.id,
+          executionId,
+        });
         return;
       }
       const entry = createLoopExecutionEntry(loop.id, executionId, startedAt, 'working', createdAssignments);
       recordLoopExecutionInSnapshot(this.snapshot(), loop.id, entry);
       await this.publishSnapshotUpdate();
+      logMain('loop-runner', 'recorded assignments', {
+        loopId: loop.id,
+        executionId,
+        createdCount: createdAssignments.length,
+      });
 
       let promptError: string | null = null;
       for (const assignment of createdAssignments) {
+        const workItemId = workItemAssignmentKey(assignment.item);
         try {
+          logMain('loop-runner', 'dispatching prompt', {
+            loopId: loop.id,
+            executionId,
+            agentId: assignment.agent.id,
+            workItemId,
+          });
           await this.options.sendPrompt(assignment.agent.id, workItemAssignmentPrompt(assignment.item, loop.instructions), {
             loopId: loop.id,
             executionId,
-            workItemId: workItemAssignmentKey(assignment.item),
+            workItemId,
           });
         } catch (error) {
           promptError = error instanceof Error ? error.message : String(error);
+          warnMain('loop-runner', 'prompt dispatch failed', {
+            loopId: loop.id,
+            executionId,
+            agentId: assignment.agent.id,
+            workItemId,
+            message: promptError,
+          });
         }
       }
 
@@ -83,27 +117,52 @@ export class LoopRunner {
           error: promptError,
         });
         await this.publishSnapshotUpdate();
+        warnMain('loop-runner', 'failed', {
+          loopId: loop.id,
+          executionId,
+          createdCount: createdAssignments.length,
+          message: promptError,
+        });
       }
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       recordLoopExecutionInSnapshot(this.snapshot(), loop.id, createLoopExecutionEntry(
         loop.id,
         executionId,
         startedAt,
         'failed',
         createdAssignments,
-        error instanceof Error ? error.message : String(error),
+        message,
         this.now().toISOString(),
       ));
       await this.publishSnapshotUpdate();
+      warnMain('loop-runner', 'failed', {
+        loopId: loop.id,
+        executionId,
+        createdCount: createdAssignments.length,
+        message,
+      });
     }
   }
 
   private async createAssignmentsForLoop(loop: Loop, executionId: string, createdAt: string, createdAssignments: CreatedLoopAssignment[]): Promise<void> {
     const items = await this.options.listWorkItems.listItems(loop.source.provider, loop.source.repositoryId);
+    const matchingItems = matchingLoopItems(items, loop);
+    logMain('loop-runner', 'listed work items', {
+      loopId: loop.id,
+      executionId,
+      itemCount: items.length,
+      matchingCount: matchingItems.length,
+    });
 
-    for (const item of matchingLoopItems(items, loop)) {
+    for (const item of matchingItems) {
       const assignmentKey = workItemAssignmentKey(item);
       if (this.snapshot().workBacklog.assignments[assignmentKey]?.status === 'working') {
+        logMain('loop-runner', 'skipped already assigned item', {
+          loopId: loop.id,
+          executionId,
+          workItemId: assignmentKey,
+        });
         continue;
       }
 
@@ -118,6 +177,12 @@ export class LoopRunner {
         loopId: loop.id,
       });
       createdAssignments.push({ agent, item });
+      logMain('loop-runner', 'created assignment', {
+        loopId: loop.id,
+        executionId,
+        agentId: agent.id,
+        workItemId: assignmentKey,
+      });
     }
   }
 
