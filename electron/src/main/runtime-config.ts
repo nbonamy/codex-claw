@@ -38,6 +38,18 @@ export function runtimeClawdCommand(deps: RuntimeClawdConfigDeps = {}): RuntimeC
   };
 }
 
+export function runtimeClawdServeCommand(deps: RuntimeClawdConfigDeps = {}): RuntimeClawdCommand | null {
+  const command = runtimeClawdCommand(deps);
+  if (!command) {
+    return null;
+  }
+
+  return {
+    ...command,
+    args: serveArgsFromStdioArgs(command.args),
+  };
+}
+
 export function runtimeClawdBackendMode(deps: RuntimeClawdConfigDeps = {}): RuntimeClawdBackendMode {
   const env = deps.env ?? process.env;
   const mode = env.CODEX_CLAW_BACKEND_MODE?.trim();
@@ -51,6 +63,11 @@ export function runtimeClawdSocketPath(deps: RuntimeClawdConfigDeps = {}): strin
     return configured;
   }
   return path.join(env.CODEX_CLAW_HOME?.trim() || path.join(homedir(), '.codex-claw'), 'clawd.sock');
+}
+
+export function runtimeClawdHome(deps: RuntimeClawdConfigDeps = {}): string {
+  const env = deps.env ?? process.env;
+  return env.CODEX_CLAW_HOME?.trim() || path.join(homedir(), '.codex-claw');
 }
 
 export function runtimeClawdWatchFile(deps: RuntimeClawdConfigDeps = {}): string | null {
@@ -104,6 +121,20 @@ function runtimeClawdEnv(deps: RuntimeClawdConfigDeps): NodeJS.ProcessEnv {
 
   return {
     CODEX_CLAW_ASSETS_PATH: runtimeClawdAssetsPath(deps),
+    CODEX_CLAW_HOME: runtimeClawdHome(deps),
     ...(githubClientId ? { CODEX_CLAW_GITHUB_CLIENT_ID: githubClientId } : {}),
   };
+}
+
+function serveArgsFromStdioArgs(args: string[]): string[] {
+  const stdioIndex = args.indexOf('--stdio');
+  if (stdioIndex >= 0) {
+    return [
+      ...args.slice(0, stdioIndex),
+      'serve',
+      ...args.slice(stdioIndex + 1),
+    ];
+  }
+
+  return args.includes('serve') ? args : [...args, 'serve'];
 }

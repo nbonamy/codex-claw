@@ -16,8 +16,11 @@
         <SettingsGeneralPanel
           v-if="activeTab === 'general'"
           :choose-source-folder="chooseSourceFolder"
+          :daemon-status="daemonStatus"
+          :daemon-status-error="daemonStatusError"
           :settings="generalSettings"
           :source-folder="sourceFolder"
+          :set-daemon-enabled="setDaemonEnabled"
           :update-settings="updateSettings"
         />
         <SettingsIntegrationsPanel
@@ -44,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import type { AppGeneralSettings, AppThemeSettings, SourceFolderState, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AppGeneralSettings, AppThemeSettings, ClawdDaemonStatus, SourceFolderState, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { defaultGeneralSettings, defaultSourceFolderState } from '@codex-claw/shared/settings';
 import SettingsAppearancePanel from './SettingsAppearancePanel.vue';
 import SettingsGeneralPanel from './SettingsGeneralPanel.vue';
@@ -57,6 +60,8 @@ withDefaults(defineProps<{
   settings: AppThemeSettings;
   generalSettings?: AppGeneralSettings;
   sourceFolder?: SourceFolderState;
+  daemonStatus?: ClawdDaemonStatus | null;
+  daemonStatusError?: string | null;
   chooseSourceFolder?: () => Promise<string | null>;
   workBacklogConnections?: WorkIntegrationConnection[];
   workBacklogError?: string | null;
@@ -67,6 +72,7 @@ withDefaults(defineProps<{
   connectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   disconnectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   openWorkProviderAuthorization?: (provider: WorkProviderKind) => Promise<void>;
+  setDaemonEnabled?: (enabled: boolean) => Promise<void>;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
 }>(), {
   activeTab: 'general',
@@ -77,11 +83,14 @@ withDefaults(defineProps<{
   workProviderAuthorization: null,
   generalSettings: () => ({ ...defaultGeneralSettings }),
   sourceFolder: () => ({ ...defaultSourceFolderState }),
+  daemonStatus: null,
+  daemonStatusError: null,
   chooseSourceFolder: async () => null,
   completeWorkProviderConnection: async () => undefined,
   connectWorkProvider: async () => undefined,
   disconnectWorkProvider: async () => undefined,
   openWorkProviderAuthorization: async () => undefined,
+  setDaemonEnabled: async () => undefined,
 });
 
 const emit = defineEmits<{

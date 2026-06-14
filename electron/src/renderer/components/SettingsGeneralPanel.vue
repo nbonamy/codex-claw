@@ -20,6 +20,31 @@
           />
         </template>
       </SettingsRow>
+      <SettingsRow
+        as="label"
+        title="Run backend in background"
+        :description="daemonDescription"
+        :error="daemonStatusError"
+      >
+        <template #control>
+          <span class="settings-general-panel__actions">
+            <span
+              class="settings-general-panel__status"
+              :class="{ 'settings-general-panel__status--granted': daemonRunning }"
+            >
+              <Circle aria-hidden="true" />
+              {{ daemonStatusLabel }}
+            </span>
+            <el-switch
+              :model-value="daemonEnabled"
+              :disabled="daemonSwitchDisabled"
+              :loading="settingDaemon"
+              aria-label="Run backend in background"
+              @update:model-value="updateDaemonEnabled"
+            />
+          </span>
+        </template>
+      </SettingsRow>
     </SettingsSection>
 
     <SettingsSection
@@ -101,12 +126,12 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import type { AppGeneralSettings, SourceFolderState, SystemPermissionsStatus, UpdateSettingsInput } from '@codex-claw/shared/contracts';
+import type { AppGeneralSettings, ClawdDaemonStatus, SourceFolderState, SystemPermissionsStatus, UpdateSettingsInput } from '@codex-claw/shared/contracts';
 import { defaultSourceFolderState } from '@codex-claw/shared/settings';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsRow from './SettingsRow.vue';
 import SettingsSection from './SettingsSection.vue';
-import { ShieldCheckIcon } from '../shared/icons/app-icons';
+import { Circle, ShieldCheckIcon } from '../shared/icons/app-icons';
 
 const defaultPermissionsStatus: SystemPermissionsStatus = {
   platform: 'unknown',
@@ -118,8 +143,11 @@ const defaultPermissionsStatus: SystemPermissionsStatus = {
 
 const props = defineProps<{
   chooseSourceFolder?: () => Promise<string | null>;
+  daemonStatus?: ClawdDaemonStatus | null;
+  daemonStatusError?: string | null;
   getSystemPermissions?: () => Promise<SystemPermissionsStatus>;
   openAccessibilitySettings?: () => Promise<SystemPermissionsStatus>;
+  setDaemonEnabled?: (enabled: boolean) => Promise<void>;
   settings: AppGeneralSettings;
   sourceFolder?: SourceFolderState;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
@@ -129,11 +157,33 @@ const permissions = ref<SystemPermissionsStatus | null>(null);
 const loadingPermissions = ref(false);
 const openingAccessibilitySettings = ref(false);
 const choosingSourceFolder = ref(false);
+const settingDaemon = ref(false);
 const sourceFolderError = ref<string | null>(null);
 
 const showSourceFolderSetting = computed(() => Boolean(props.sourceFolder));
 const sourceFolderState = computed(() => props.sourceFolder ?? defaultSourceFolderState);
 const sourceFolderLabel = computed(() => sourceFolderState.value.path || 'Not configured');
+const daemonEnabled = computed(() => props.daemonStatus?.installed ?? false);
+const daemonRunning = computed(() => props.daemonStatus?.running ?? false);
+const daemonSwitchDisabled = computed(() => settingDaemon.value || props.daemonStatus?.supported !== true);
+const daemonStatusLabel = computed(() => {
+  if (!props.daemonStatus) {
+    return 'Checking';
+  }
+  if (!props.daemonStatus.supported) {
+    return 'Unavailable';
+  }
+  if (props.daemonStatus.running) {
+    return 'Running';
+  }
+  return props.daemonStatus.installed ? 'Installed' : 'Off';
+});
+const daemonDescription = computed(() => {
+  if (props.daemonStatus?.supported === false) {
+    return props.daemonStatus.detail ?? 'Install is available in packaged macOS builds.';
+  }
+  return 'Start clawd at login and let Codex Claw connect to the local daemon.';
+});
 const accessibilityGranted = computed(() => permissions.value?.accessibility.trusted ?? false);
 const showGrantButton = computed(() => permissions.value?.accessibility.required === true && !accessibilityGranted.value);
 const accessibilityStatusLabel = computed(() => {
@@ -219,6 +269,15 @@ function updatePreventSleep(value: boolean | string | number): void {
       preventSleepWhenAgentsRun: value === true,
     },
   });
+}
+
+async function updateDaemonEnabled(value: boolean | string | number): Promise<void> {
+  settingDaemon.value = true;
+  try {
+    await props.setDaemonEnabled?.(value === true);
+  } finally {
+    settingDaemon.value = false;
+  }
 }
 </script>
 

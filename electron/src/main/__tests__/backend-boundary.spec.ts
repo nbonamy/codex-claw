@@ -39,6 +39,7 @@ describe('Electron backend boundary', () => {
       'backend-process-client.ts',
       'backend-socket-client.ts',
       'client-request-handlers.ts',
+      'daemon-launch-agent.ts',
       'forge-env.d.ts',
       'index.ts',
       'log.ts',

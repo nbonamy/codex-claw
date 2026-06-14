@@ -1,6 +1,6 @@
 # Backend Architecture
 
-Status: exploration and implementation slicing, 2026-06-13.
+Status: exploration and implementation slicing, 2026-06-14.
 
 This document is the architecture record for extracting most of Codex Claw's
 Electron main process into a separate TypeScript backend process, tentatively
@@ -42,6 +42,11 @@ Current implementation checkpoint:
   backend features through app-owned RPC methods. In
   `CODEX_CLAW_BACKEND_MODE=auto`, Electron first tries the local daemon socket
   and falls back to the bundled stdio process.
+- Settings > General exposes a macOS background-backend switch. Enabling it
+  installs a per-user LaunchAgent at
+  `~/Library/LaunchAgents/com.codex-claw.clawd.plist`, starts `clawd serve`,
+  and lets future app launches connect to the existing daemon. Disabling it
+  unloads the LaunchAgent and removes the plist.
 - Codex and Claude provider drivers now live under `backend/src`; Electron main
   must not import provider drivers, provider transports, provider SDKs, or raw
   provider protocol modules.
@@ -597,6 +602,16 @@ CODEX_CLAW_BACKEND_MODE=existing npm run dev:electron
 `CODEX_CLAW_BACKEND_MODE=auto` is the desktop default: connect to the local
 daemon if it is running, otherwise start the bundled stdio backend.
 
+For packaged macOS builds, Settings > General can install the background daemon
+automatically for the current user. In dev, the same installer is available only
+when `CODEX_CLAW_BACKEND_COMMAND` points at a usable clawd runtime; otherwise
+the Settings switch reports that no packaged runtime is available.
+
+Enabling the switch starts the LaunchAgent immediately, but the current Electron
+session keeps its already-selected backend transport. The guaranteed behavior is
+that the next app launch in `auto` mode connects to the running daemon. Live
+handoff from bundled stdio to the daemon should be a separate reconnect slice.
+
 The first extraction phase can run in-process and still use the current
 `electron-forge start` loop. As soon as the stdio process exists, local dev
 should use the separate process by default so process-boundary bugs show up
@@ -1000,13 +1015,15 @@ Goal: let agents and loops keep running when the UI window is closed.
 
 Work:
 
-- Add `clawd serve`.
-- Add Unix socket and Windows named-pipe transports.
+- Add `clawd serve`. Done for the Unix socket transport.
+- Add Unix socket and Windows named-pipe transports. Unix socket is done;
+  Windows named pipe remains.
+- Add per-user macOS LaunchAgent install/uninstall from Settings > General.
 - Add authenticated local connection handshake.
 - Add reconnect, daemon health, and stale-client cleanup.
-- Decide whether local `clawd` is per user, per app install, or per backend
-  location.
-- Add platform startup integration only after protocol stability.
+- Local `clawd` is per user for v1, with state and socket under
+  `CODEX_CLAW_HOME` or `~/.codex-claw`.
+- Add remaining platform startup integrations after protocol stability.
 
 Tests:
 
@@ -1018,6 +1035,7 @@ Tests:
 Commit checkpoints:
 
 - `feat: add local clawd daemon transport`
+- `feat: add macos clawd launchagent installer`
 - `feat: reconnect electron main to clawd`
 - `test: cover daemon auth and replay`
 

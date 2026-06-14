@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
-import type { SystemPermissionsStatus } from '@codex-claw/shared/contracts';
+import type { ClawdDaemonStatus, SystemPermissionsStatus } from '@codex-claw/shared/contracts';
 import { defaultGeneralSettings } from '@codex-claw/shared/settings';
 import SettingsGeneralPanel from '../SettingsGeneralPanel.vue';
 
@@ -19,6 +19,40 @@ describe('SettingsGeneralPanel', () => {
         preventSleepWhenAgentsRun: false,
       },
     });
+  });
+
+  it('toggles the background clawd daemon through Settings', async () => {
+    const setDaemonEnabled = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({
+      daemonStatus: daemonStatus({ installed: false, running: false }),
+      setDaemonEnabled,
+    });
+
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Run backend in background');
+    expect(wrapper.text()).toContain('Off');
+
+    const switches = wrapper.findAllComponents({ name: 'ElSwitch' });
+    await switches[1].vm.$emit('update:modelValue', true);
+
+    expect(setDaemonEnabled).toHaveBeenCalledWith(true);
+  });
+
+  it('disables daemon installation when the desktop adapter reports unsupported status', async () => {
+    const wrapper = mountPanel({
+      daemonStatus: daemonStatus({
+        supported: false,
+        detail: 'No packaged clawd runtime was found.',
+      }),
+      daemonStatusError: 'No packaged clawd runtime was found.',
+    });
+
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Unavailable');
+    expect(wrapper.text()).toContain('No packaged clawd runtime was found.');
+    expect(wrapper.findAllComponents({ name: 'ElSwitch' })[1].props('disabled')).toBe(true);
   });
 
   it('chooses and clears the configured source folder', async () => {
@@ -138,5 +172,16 @@ function permissionStatus(accessibility: SystemPermissionsStatus['accessibility'
   return {
     platform: 'darwin',
     accessibility,
+  };
+}
+
+function daemonStatus(overrides: Partial<ClawdDaemonStatus> = {}): ClawdDaemonStatus {
+  return {
+    supported: true,
+    installed: false,
+    running: false,
+    socketPath: '/Users/nicolas/.codex-claw/clawd.sock',
+    launchAgentPath: '/Users/nicolas/Library/LaunchAgents/com.codex-claw.clawd.plist',
+    ...overrides,
   };
 }

@@ -3,9 +3,10 @@ import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-block
 import { logMain, warnMain } from './log';
 import { createMainWindow } from './main-window';
 import { createRuntimeClawBackendClient, type ClawBackendClientPort } from './backend-client';
+import { getClawdDaemonStatus, setClawdDaemonEnabled } from './daemon-launch-agent';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards';
-import type { AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
 export class AppController {
@@ -222,6 +223,12 @@ export class AppController {
       return this.updateSettings(input);
     });
 
+    ipcMain.handle(ipcChannels.getDaemonStatus, () => this.getDaemonStatus());
+
+    ipcMain.handle(ipcChannels.setDaemonEnabled, async (_event, enabled: boolean) => {
+      return this.setDaemonEnabled(enabled);
+    });
+
     ipcMain.handle(ipcChannels.getSystemPermissions, () => this.getSystemPermissions());
 
     ipcMain.handle(ipcChannels.openAccessibilitySettings, () => this.openAccessibilitySettings());
@@ -408,6 +415,14 @@ export class AppController {
 
   private async updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('settings/update', { input }));
+  }
+
+  private async getDaemonStatus(): Promise<ClawdDaemonStatus> {
+    return getClawdDaemonStatus();
+  }
+
+  private async setDaemonEnabled(enabled: boolean): Promise<ClawdDaemonStatus> {
+    return setClawdDaemonEnabled(enabled);
   }
 
   private async createLoop(input: CreateLoopInput): Promise<AppSnapshot> {

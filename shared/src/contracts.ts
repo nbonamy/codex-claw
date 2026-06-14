@@ -520,6 +520,15 @@ export type SystemPermissionsStatus = {
   };
 };
 
+export type ClawdDaemonStatus = {
+  supported: boolean;
+  installed: boolean;
+  running: boolean;
+  socketPath: string;
+  launchAgentPath?: string;
+  detail?: string;
+};
+
 export type SourceWorktree = {
   name: string;
   path: string;
@@ -854,6 +863,8 @@ export type CodexClawApi = {
   closeAgent(agentId: string): Promise<AppSnapshot>;
   selectAgent(agentId: string): Promise<AppSnapshot>;
   updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>;
+  getDaemonStatus(): Promise<ClawdDaemonStatus>;
+  setDaemonEnabled(enabled: boolean): Promise<ClawdDaemonStatus>;
   getSystemPermissions(): Promise<SystemPermissionsStatus>;
   openAccessibilitySettings(): Promise<SystemPermissionsStatus>;
   transcribeAppleSpeech(audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions): Promise<AppleSpeechTranscriptionResult>;

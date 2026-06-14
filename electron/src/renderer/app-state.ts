@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
@@ -36,6 +36,8 @@ const workBacklogError = ref<string | null>(null);
 const sourceRepositories = ref<SourceRepository[]>([]);
 const sourceRepositoryStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
 const sourceRepositoryError = ref<string | null>(null);
+const daemonStatus = ref<ClawdDaemonStatus | null>(null);
+const daemonStatusError = ref<string | null>(null);
 let unsubscribeMainEvents: (() => void) | null = null;
 const workProviderAuthorizationPollTimers = new Map<WorkProviderKind, ReturnType<typeof globalThis.setTimeout>>();
 const WORK_PROVIDER_AUTHORIZATION_POLL_MS = 5_000;
@@ -97,6 +99,7 @@ export function useAppState() {
         loadActiveAgentCatalogs(),
         loadConnectedWorkBacklogs(),
         loadSourceRepositories(),
+        loadDaemonStatus(),
       ]);
     } finally {
       isLoading.value = false;
@@ -517,6 +520,38 @@ export function useAppState() {
     }
   }
 
+  async function loadDaemonStatus(): Promise<void> {
+    if (!window.codexClaw?.getDaemonStatus) {
+      return;
+    }
+
+    daemonStatusError.value = null;
+    try {
+      daemonStatus.value = await window.codexClaw.getDaemonStatus();
+    } catch (error) {
+      daemonStatusError.value = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  async function setDaemonEnabled(enabled: boolean): Promise<void> {
+    if (!window.codexClaw?.setDaemonEnabled) {
+      return;
+    }
+
+    daemonStatusError.value = null;
+    try {
+      daemonStatus.value = await window.codexClaw.setDaemonEnabled(enabled);
+    } catch (error) {
+      daemonStatusError.value = error instanceof Error ? error.message : String(error);
+      try {
+        const refreshed = await window.codexClaw.getDaemonStatus?.();
+        daemonStatus.value = refreshed ?? daemonStatus.value;
+      } catch {
+        // Keep the action error visible; status refresh failure is secondary.
+      }
+    }
+  }
+
   async function quit(): Promise<void> {
     await window.codexClaw?.quit?.();
   }
@@ -897,12 +932,15 @@ export function useAppState() {
     sourceRepositories,
     sourceRepositoryStatus,
     sourceRepositoryError,
+    daemonStatus,
+    daemonStatusError,
     loadBackendModels: loadBackendModelsForActiveAgent,
     loadBackendSkills: loadBackendSkillsForActiveAgent,
     loadAgentFiles: loadAgentFilesForActiveAgent,
     loadWorkRepositories,
     loadWorkItems,
     loadSourceRepositories,
+    loadDaemonStatus,
     loadSnapshot,
     chooseAgentFolder,
     chooseSourceFolder,
@@ -919,6 +957,7 @@ export function useAppState() {
     closeTeam,
     updateAgent,
     updateSettings,
+    setDaemonEnabled,
     connectWorkProvider,
     completeWorkProviderConnection,
     disconnectWorkProvider,

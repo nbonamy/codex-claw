@@ -61,12 +61,15 @@
         :work-backlog-status="workBacklogStatus"
         :work-provider-settings="snapshot.workBacklog.providerSettings"
         :work-provider-authorization="workProviderAuthorization"
+        :daemon-status="daemonStatus"
+        :daemon-status-error="daemonStatusError"
         :choose-source-folder="chooseSourceFolder"
         :connect-work-provider="connectWorkProvider"
         :open-work-provider-authorization="openWorkProviderAuthorization"
         :complete-work-provider-connection="completeWorkProviderConnection"
         :disconnect-work-provider="disconnectWorkProvider"
         :update-settings="updateSettings"
+        :set-daemon-enabled="setDaemonEnabled"
         @select-tab="settingsActiveTab = $event"
       />
       <LoopsView
@@ -238,7 +241,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SidePanelRequest, SourceRepository, SourceWorktree, Team, ThreadGoal, TurnGitDiff, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SidePanelRequest, SourceRepository, SourceWorktree, Team, ThreadGoal, TurnGitDiff, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultTeamColor } from '@codex-claw/shared/team-colors';
 import { findAssignedAgentForWorkItem } from '@codex-claw/shared/work-assignments';
@@ -286,6 +289,8 @@ const props = withDefaults(defineProps<{
   workItemsByRepository?: Record<string, WorkItem[]>;
   workBacklogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   workBacklogError?: string | null;
+  daemonStatus?: ClawdDaemonStatus | null;
+  daemonStatusError?: string | null;
   chooseAgentFolder?: () => Promise<string | null>;
   chooseSourceFolder?: () => Promise<string | null>;
   sourceRepositories?: SourceRepository[];
@@ -301,6 +306,7 @@ const props = withDefaults(defineProps<{
   updateTeam?: (input: UpdateTeamInput) => Promise<void>;
   updateAgent?: (input: UpdateAgentInput) => Promise<void>;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
+  setDaemonEnabled?: (enabled: boolean) => Promise<void>;
   createLoop?: (input: CreateLoopInput) => Promise<void>;
   updateLoop?: (input: UpdateLoopInput) => Promise<void>;
   runLoop?: (loopId: string) => Promise<void>;
@@ -337,6 +343,8 @@ const props = withDefaults(defineProps<{
   workItemsByRepository: () => ({}),
   workBacklogStatus: 'notLoaded',
   workBacklogError: null,
+  daemonStatus: null,
+  daemonStatusError: null,
   chooseAgentFolder: async () => null,
   chooseSourceFolder: async () => null,
   sourceRepositories: () => [],
@@ -355,6 +363,7 @@ const props = withDefaults(defineProps<{
   updateTeam: async () => undefined,
   updateAgent: async () => undefined,
   updateSettings: async () => undefined,
+  setDaemonEnabled: async () => undefined,
   createLoop: async () => undefined,
   updateLoop: async () => undefined,
   runLoop: async () => undefined,
@@ -962,6 +971,10 @@ function handleAppCommand(command: AppCommand): void {
 
 async function updateSettings(input: UpdateSettingsInput): Promise<void> {
   await props.updateSettings(input);
+}
+
+async function setDaemonEnabled(enabled: boolean): Promise<void> {
+  await props.setDaemonEnabled(enabled);
 }
 
 async function connectWorkProvider(provider: WorkProviderKind): Promise<void> {

@@ -52,6 +52,8 @@ describe('ipc channels', () => {
       closeAgent: 'agent:close',
       selectAgent: 'agent:select',
       updateSettings: 'settings:update',
+      getDaemonStatus: 'daemon:status:get',
+      setDaemonEnabled: 'daemon:enabled:set',
       getSystemPermissions: 'system-permissions:get',
       openAccessibilitySettings: 'system-permissions:accessibility:open',
       transcribeAppleSpeech: 'transcription:apple-speech',

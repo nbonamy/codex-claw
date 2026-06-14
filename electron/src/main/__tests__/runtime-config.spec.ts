@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import path from 'node:path';
+import { homedir } from 'node:os';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -30,6 +31,7 @@ describe('runtime config', () => {
       args: ['dist/clawd.mjs', '--stdio'],
       env: {
         CODEX_CLAW_ASSETS_PATH: path.resolve(process.cwd(), 'assets'),
+        CODEX_CLAW_HOME: path.join(homedir(), '.codex-claw'),
       },
     });
   });
@@ -47,6 +49,7 @@ describe('runtime config', () => {
       args: ['--stdio'],
       env: {
         CODEX_CLAW_ASSETS_PATH: path.resolve(process.cwd(), 'assets'),
+        CODEX_CLAW_HOME: path.join(homedir(), '.codex-claw'),
       },
     });
   });
@@ -65,6 +68,7 @@ describe('runtime config', () => {
       args: ['--stdio'],
       env: {
         CODEX_CLAW_ASSETS_PATH: path.resolve(process.cwd(), 'assets'),
+        CODEX_CLAW_HOME: path.join(homedir(), '.codex-claw'),
         CODEX_CLAW_GITHUB_CLIENT_ID: 'github-client-id',
       },
     });
@@ -83,6 +87,7 @@ describe('runtime config', () => {
       args: ['--stdio'],
       env: {
         CODEX_CLAW_ASSETS_PATH: '/app/resources',
+        CODEX_CLAW_HOME: path.join(homedir(), '.codex-claw'),
       },
     });
   });
@@ -103,6 +108,26 @@ describe('runtime config', () => {
       ],
       env: {
         CODEX_CLAW_ASSETS_PATH: '/app/resources',
+        CODEX_CLAW_HOME: path.join(homedir(), '.codex-claw'),
+      },
+    });
+  });
+
+  it('converts the runtime command to serve mode for daemon launches', async () => {
+    const { runtimeClawdServeCommand } = await import('../runtime-config');
+
+    expect(runtimeClawdServeCommand({
+      env: {
+        CODEX_CLAW_BACKEND_COMMAND: 'node',
+        CODEX_CLAW_BACKEND_ARGS: '/app/clawd.mjs,--stdio',
+        CODEX_CLAW_HOME: '/Users/nicolas/.codex-claw',
+      },
+    })).toStrictEqual({
+      command: 'node',
+      args: ['/app/clawd.mjs', 'serve'],
+      env: {
+        CODEX_CLAW_ASSETS_PATH: path.resolve(process.cwd(), 'assets'),
+        CODEX_CLAW_HOME: '/Users/nicolas/.codex-claw',
       },
     });
   });

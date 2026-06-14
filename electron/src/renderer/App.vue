@@ -25,6 +25,8 @@
     :work-items-by-repository="workItemsByRepository"
     :work-backlog-status="workBacklogStatus"
     :work-backlog-error="workBacklogError"
+    :daemon-status="daemonStatus"
+    :daemon-status-error="daemonStatusError"
     :source-repositories="sourceRepositories"
     :choose-agent-folder="chooseAgentFolder"
     :choose-source-folder="chooseSourceFolder"
@@ -40,6 +42,7 @@
     :update-team="updateTeam"
     :update-agent="updateAgent"
     :update-settings="updateSettings"
+    :set-daemon-enabled="setDaemonEnabled"
     :connect-work-provider="connectWorkProvider"
     :open-work-provider-authorization="openWorkProviderAuthorization"
     :complete-work-provider-connection="completeWorkProviderConnection"
@@ -123,6 +126,8 @@ const {
   workItemsByRepository,
   workBacklogStatus,
   workBacklogError,
+  daemonStatus,
+  daemonStatusError,
   sourceRepositories,
   loadBackendModels,
   loadSnapshot,
@@ -149,6 +154,7 @@ const {
   restartAgent,
   closeAgent,
   updateSettings,
+  setDaemonEnabled,
   connectWorkProvider,
   openWorkProviderAuthorization,
   completeWorkProviderConnection,
