@@ -8,7 +8,7 @@ import type { ClawdDaemonStatus } from '@codex-claw/shared/contracts';
 import { runtimeClawdHome, runtimeClawdServeCommand, runtimeClawdSocketPath, type RuntimeClawdConfigDeps, type RuntimeClawdCommand } from './runtime-config';
 
 const execFile = promisify(execFileCallback);
-const launchAgentLabel = 'com.codex-claw.clawd';
+const launchAgentLabel = 'com.nabocorp.codex-claw.clawd';
 
 type ExecFile = (file: string, args: string[]) => Promise<unknown>;
 
