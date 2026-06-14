@@ -1181,7 +1181,7 @@ describe('AppShell', () => {
       provider: 'github',
       configuration: {
         repositoryId: 'nbonamy/codex-claw',
-        assigneeLogin: null,
+        assigneeLogin: 'nbonamy',
         tagName: 'bug',
       },
     });

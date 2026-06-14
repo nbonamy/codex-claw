@@ -423,6 +423,12 @@ type WorkItemAssignmentIntent = {
   teamId?: string;
 };
 
+type CockpitBacklogConfiguration = {
+  assigneeLogin: string | null;
+  repositoryId: string | null;
+  tagName: string | null;
+};
+
 type AppSurface = 'agent' | 'cockpit' | 'loops' | 'settings';
 
 const agentSidebarCollapsed = ref(false);
@@ -438,6 +444,7 @@ const agentDialogTeamId = ref<string | null>(null);
 const pendingNewAgentWorkItem = ref<WorkItem | null>(null);
 const pendingBenchAgentWorkItem = ref<WorkItem | null>(null);
 const pendingBenchAgentTeamId = ref<string | null>(null);
+const pendingCockpitBacklogConfiguration = ref<CockpitBacklogConfiguration | null>(null);
 const benchAssignmentDialogVisible = ref(false);
 const teamDialogVisible = ref(false);
 const teamDialogMode = ref<'create' | 'edit'>('create');
@@ -489,6 +496,17 @@ const currentTurnGitDiff = computed<TurnGitDiff | null>(() => {
 
   return null;
 });
+const savedCockpitBacklogConfiguration = computed<CockpitBacklogConfiguration>(() => {
+  const configuration = props.snapshot.workBacklog.providerConfigurations.github ?? {};
+  return normalizedCockpitBacklogConfiguration({
+    repositoryId: configuration.repositoryId ?? null,
+    assigneeLogin: configuration.assigneeLogin ?? null,
+    tagName: configuration.tagName ?? null,
+  });
+});
+const effectiveCockpitBacklogConfiguration = computed<CockpitBacklogConfiguration>(() => (
+  pendingCockpitBacklogConfiguration.value ?? savedCockpitBacklogConfiguration.value
+));
 const cockpitWorkBacklog = computed(() => {
   const connection = props.snapshot.workBacklog.connections.find((candidate) => candidate.provider === 'github');
   if (!connection || connection.status !== 'connected') {
@@ -497,7 +515,7 @@ const cockpitWorkBacklog = computed(() => {
 
   const provider = connection.provider;
   const repositories = props.workRepositoriesByProvider[provider] ?? [];
-  const configuration = props.snapshot.workBacklog.providerConfigurations[provider] ?? {};
+  const configuration = effectiveCockpitBacklogConfiguration.value;
   const selectedRepositoryId = configuration.repositoryId ?? repositories[0]?.id ?? null;
 
   return {
@@ -511,6 +529,12 @@ const cockpitWorkBacklog = computed(() => {
     status: props.workBacklogStatus,
     error: props.workBacklogError,
   };
+});
+
+watch(savedCockpitBacklogConfiguration, (configuration) => {
+  if (pendingCockpitBacklogConfiguration.value && sameCockpitBacklogConfiguration(pendingCockpitBacklogConfiguration.value, configuration)) {
+    pendingCockpitBacklogConfiguration.value = null;
+  }
 });
 const showAgentDialogTeamSelector = computed(() => agentDialogMode.value === 'create' && pendingNewAgentWorkItem.value !== null);
 const pendingNewAgentTeamName = computed(() => pendingNewAgentWorkItem.value ? workItemTeamName(pendingNewAgentWorkItem.value) : '');
@@ -990,13 +1014,10 @@ async function disconnectWorkProvider(provider: WorkProviderKind): Promise<void>
 }
 
 async function selectWorkRepositoryForCockpit(repositoryId: string | null): Promise<void> {
-  await props.configureWorkBacklog({
-    provider: 'github',
-    configuration: {
-      repositoryId,
-      assigneeLogin: null,
-      tagName: null,
-    },
+  await configureCockpitWorkBacklog({
+    repositoryId,
+    assigneeLogin: null,
+    tagName: null,
   });
   if (repositoryId) {
     await props.loadWorkItems('github', repositoryId);
@@ -1005,26 +1026,55 @@ async function selectWorkRepositoryForCockpit(repositoryId: string | null): Prom
 
 async function selectWorkAssigneeForCockpit(assigneeLogin: string | null): Promise<void> {
   const repositoryId = cockpitWorkBacklog.value?.selectedRepositoryId ?? null;
-  await props.configureWorkBacklog({
-    provider: 'github',
-    configuration: {
-      repositoryId,
-      assigneeLogin,
-      tagName: cockpitWorkBacklog.value?.selectedTagName ?? null,
-    },
+  await configureCockpitWorkBacklog({
+    repositoryId,
+    assigneeLogin,
+    tagName: cockpitWorkBacklog.value?.selectedTagName ?? null,
   });
 }
 
 async function selectWorkTagForCockpit(tagName: string | null): Promise<void> {
   const repositoryId = cockpitWorkBacklog.value?.selectedRepositoryId ?? null;
-  await props.configureWorkBacklog({
-    provider: 'github',
-    configuration: {
-      repositoryId,
-      assigneeLogin: cockpitWorkBacklog.value?.selectedAssigneeLogin ?? null,
-      tagName,
-    },
+  await configureCockpitWorkBacklog({
+    repositoryId,
+    assigneeLogin: cockpitWorkBacklog.value?.selectedAssigneeLogin ?? null,
+    tagName,
   });
+}
+
+async function configureCockpitWorkBacklog(configuration: CockpitBacklogConfiguration): Promise<void> {
+  const normalized = normalizedCockpitBacklogConfiguration(configuration);
+  pendingCockpitBacklogConfiguration.value = normalized;
+  try {
+    await props.configureWorkBacklog({
+      provider: 'github',
+      configuration: normalized,
+    });
+  } catch (error) {
+    if (pendingCockpitBacklogConfiguration.value && sameCockpitBacklogConfiguration(pendingCockpitBacklogConfiguration.value, normalized)) {
+      pendingCockpitBacklogConfiguration.value = null;
+    }
+    throw error;
+  }
+}
+
+function normalizedCockpitBacklogConfiguration(configuration: CockpitBacklogConfiguration): CockpitBacklogConfiguration {
+  return {
+    repositoryId: normalizedOptionalString(configuration.repositoryId),
+    assigneeLogin: normalizedOptionalString(configuration.assigneeLogin),
+    tagName: normalizedOptionalString(configuration.tagName),
+  };
+}
+
+function sameCockpitBacklogConfiguration(left: CockpitBacklogConfiguration, right: CockpitBacklogConfiguration): boolean {
+  return left.repositoryId === right.repositoryId &&
+    left.assigneeLogin === right.assigneeLogin &&
+    left.tagName === right.tagName;
+}
+
+function normalizedOptionalString(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
 }
 
 async function refreshWorkItems(repositoryId: string | null): Promise<void> {
