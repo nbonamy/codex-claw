@@ -7,7 +7,7 @@ import { getClawdDaemonStatus, setClawdDaemonEnabled } from './daemon-launch-age
 import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards';
-import type { AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
 type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
@@ -41,6 +41,22 @@ export class AppController {
 
   registerIpcHandlers(): void {
     ipcMain.handle(ipcChannels.getSnapshot, () => this.getSnapshot());
+
+    ipcMain.handle(ipcChannels.listSshHosts, () => {
+      return this.listSshHosts();
+    });
+
+    ipcMain.handle(ipcChannels.addSshConnection, async (_event, input: AddSshConnectionInput) => {
+      return this.addSshConnection(input);
+    });
+
+    ipcMain.handle(ipcChannels.checkRemoteConnection, async (_event, connectionId: string) => {
+      return this.checkRemoteConnection(connectionId);
+    });
+
+    ipcMain.handle(ipcChannels.removeRemoteConnection, async (_event, connectionId: string) => {
+      return this.removeRemoteConnection(connectionId);
+    });
 
     ipcMain.handle(ipcChannels.connectWorkProvider, async (_event, provider: WorkProviderKind) => {
       return this.connectWorkProvider(provider);
@@ -330,6 +346,22 @@ export class AppController {
     const result = await this.requireBackendClient().request<WorkProviderConnectResult>('workProvider/connect', { provider });
     await this.adoptBackendSnapshot(result.snapshot);
     return result;
+  }
+
+  private async listSshHosts(): Promise<SshHostCandidate[]> {
+    return this.requireBackendClient().request('connections/listSshHosts');
+  }
+
+  private async addSshConnection(input: AddSshConnectionInput): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('connections/addSsh', { input }));
+  }
+
+  private async checkRemoteConnection(connectionId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('connections/check', { connectionId }));
+  }
+
+  private async removeRemoteConnection(connectionId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('connections/remove', { connectionId }));
   }
 
   private async openWorkProviderAuthorization(provider: WorkProviderKind): Promise<AppSnapshot> {

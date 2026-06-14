@@ -2,7 +2,7 @@ import path from 'node:path';
 import { sendAgentPrompt } from '@codex-claw/shared/agent-chat-service';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { applyMainEventToSnapshot, createAgentInSnapshot, createEmptySnapshot, selectAgent, updateAgentFolder, updateAgentFromInput } from '@codex-claw/shared/snapshot';
-import type { Agent, AgentBackend, AgentGitStatus, AgentStatus, AppSnapshot, BackendConversationRef, BackendSession, ClientRequest, ClientRequestResponse, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitStatus, AgentStatus, AppSnapshot, BackendConversationRef, BackendSession, ClientRequest, ClientRequestResponse, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
@@ -16,6 +16,7 @@ import { sanitizeWorkItemAssignmentSource } from '@codex-claw/shared/work-assign
 import { approvalBackendDefaultsWithPreset, isApprovalPreset } from '@codex-claw/shared/approval-presets';
 import { formatConversationTitle } from '@codex-claw/shared/conversation-title';
 import { BackendDriverRpc } from './driver-rpc';
+import { SshConnectionService } from './connections/ssh-connections';
 import type { LoopRunner } from './loops/runner';
 import type { WorkIntegrationManager } from './work-integrations/manager';
 
@@ -29,6 +30,7 @@ export type ClawBackendServerOptions = {
   workIntegrations?: WorkIntegrationManager;
   loopRunner?: Pick<LoopRunner, 'runAll' | 'runLoop'>;
   systemPermissions?: SystemPermissionsPort;
+  sshConnections?: SshConnectionService;
 };
 
 export type SystemPermissionsPort = {
@@ -46,6 +48,7 @@ export class ClawBackendServer {
   private readonly workIntegrations?: WorkIntegrationManager;
   private readonly loopRunner?: Pick<LoopRunner, 'runAll' | 'runLoop'>;
   private readonly systemPermissions: SystemPermissionsPort;
+  private readonly sshConnections: SshConnectionService;
   private readonly clientRequestBackends = new Map<string, AgentBackend>();
   private unsubscribeDriverEvents?: () => void;
   private lastEventSeq = 0;
@@ -60,6 +63,7 @@ export class ClawBackendServer {
     this.workIntegrations = options.workIntegrations;
     this.loopRunner = options.loopRunner;
     this.systemPermissions = options.systemPermissions ?? createUnsupportedSystemPermissionsPort();
+    this.sshConnections = options.sshConnections ?? new SshConnectionService();
     this.unsubscribeDriverEvents = this.driverRpc?.onEvent((event) => this.handleBackendEvent(event));
   }
 
@@ -94,6 +98,34 @@ export class ClawBackendServer {
         return createClawRpcResult(message.id, await this.systemPermissions.getStatus());
       case 'system/openAccessibilitySettings':
         return createClawRpcResult(message.id, await this.systemPermissions.openAccessibilitySettings());
+      case 'connections/listSshHosts':
+        return createClawRpcResult(message.id, await this.sshConnections.listHostCandidates());
+      case 'connections/addSsh': {
+        const input = requireAddSshConnectionInput(message.params);
+        const connection = await this.sshConnections.createConnection(input);
+        this.snapshot.remoteConnections.connections = [
+          ...this.snapshot.remoteConnections.connections.filter((candidate) => candidate.host !== connection.host),
+          connection,
+        ];
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'connections/check': {
+        const connectionId = requireConnectionId(message.params);
+        const connection = this.snapshot.remoteConnections.connections.find((candidate) => candidate.id === connectionId);
+        if (!connection) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Remote connection not found: ${connectionId}`);
+        }
+        const checked = await this.sshConnections.checkConnection(connection);
+        this.snapshot.remoteConnections.connections = this.snapshot.remoteConnections.connections.map((candidate) => (
+          candidate.id === connectionId ? checked : candidate
+        ));
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case 'connections/remove': {
+        const connectionId = requireConnectionId(message.params);
+        this.snapshot.remoteConnections.connections = this.snapshot.remoteConnections.connections.filter((candidate) => candidate.id !== connectionId);
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
       case 'clientRequest/respond': {
         const response = requireClientRequestResponse(message.params);
         const backend = this.clientRequestBackends.get(response.id);
@@ -1220,6 +1252,21 @@ function requireSettingsUpdateInput(params: unknown): UpdateSettingsInput {
   return requireRecord(record.input) as UpdateSettingsInput;
 }
 
+function requireAddSshConnectionInput(params: unknown): AddSshConnectionInput {
+  const record = requireRecord(params);
+  const input = requireRecord(record.input);
+  return {
+    host: requireString(input.host, 'host'),
+    ...(typeof input.name === 'string' ? { name: input.name } : {}),
+    ...(typeof input.hostName === 'string' ? { hostName: input.hostName } : {}),
+    ...(typeof input.user === 'string' ? { user: input.user } : {}),
+    ...(typeof input.port === 'number' ? { port: input.port } : {}),
+    ...(typeof input.identityFile === 'string' ? { identityFile: input.identityFile } : {}),
+    ...(typeof input.configPath === 'string' ? { configPath: input.configPath } : {}),
+    ...(typeof input.line === 'number' ? { line: input.line } : {}),
+  };
+}
+
 function requireSourceWorktreeInput(params: unknown): CreateSourceWorktreeInput {
   const record = requireRecord(params);
   return requireRecord(record.input) as CreateSourceWorktreeInput;
@@ -1231,6 +1278,11 @@ function requireSourceWorktreeSuggestionInput(params: unknown): Pick<CreateSourc
     branchName: input.branchName,
     repoPath: input.repoPath,
   };
+}
+
+function requireConnectionId(params: unknown): string {
+  const record = requireRecord(params);
+  return requireString(record.connectionId, 'connectionId');
 }
 
 function requireClientRequestResponse(params: unknown): ClientRequestResponse {

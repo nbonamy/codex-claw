@@ -37,6 +37,14 @@
           @disconnect="disconnectWorkProvider"
           @open-authorization="openWorkProviderAuthorization"
         />
+        <SettingsConnectionsPanel
+          v-else-if="activeTab === 'connections'"
+          :connections="remoteConnections"
+          :list-ssh-hosts="listSshHosts"
+          :add-ssh-connection="addSshConnection"
+          :check-remote-connection="checkRemoteConnection"
+          :remove-remote-connection="removeRemoteConnection"
+        />
         <SettingsAppearancePanel
           v-else
           :settings="settings"
@@ -48,9 +56,10 @@
 </template>
 
 <script setup lang="ts">
-import type { AppGeneralSettings, AppThemeSettings, ClawdDaemonStatus, SourceFolderState, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AppGeneralSettings, AppThemeSettings, ClawdDaemonStatus, RemoteConnection, SourceFolderState, SshHostCandidate, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { defaultGeneralSettings, defaultSourceFolderState } from '@codex-claw/shared/settings';
 import SettingsAppearancePanel from './SettingsAppearancePanel.vue';
+import SettingsConnectionsPanel from './SettingsConnectionsPanel.vue';
 import SettingsGeneralPanel from './SettingsGeneralPanel.vue';
 import SettingsIntegrationsPanel from './SettingsIntegrationsPanel.vue';
 import SettingsSidebar from './SettingsSidebar.vue';
@@ -69,6 +78,11 @@ withDefaults(defineProps<{
   workBacklogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   workProviderSettings?: WorkBacklogState['providerSettings'];
   workProviderAuthorization?: WorkProviderAuthorization | null;
+  remoteConnections?: RemoteConnection[];
+  listSshHosts?: () => Promise<SshHostCandidate[]>;
+  addSshConnection?: (input: AddSshConnectionInput) => Promise<void>;
+  checkRemoteConnection?: (connectionId: string) => Promise<void>;
+  removeRemoteConnection?: (connectionId: string) => Promise<void>;
   completeWorkProviderConnection?: (provider: WorkProviderKind) => Promise<void>;
   connectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   disconnectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
@@ -83,6 +97,11 @@ withDefaults(defineProps<{
   workBacklogStatus: 'notLoaded',
   workProviderSettings: () => ({}),
   workProviderAuthorization: null,
+  remoteConnections: () => [],
+  listSshHosts: async () => [],
+  addSshConnection: async () => undefined,
+  checkRemoteConnection: async () => undefined,
+  removeRemoteConnection: async () => undefined,
   generalSettings: () => ({ ...defaultGeneralSettings }),
   sourceFolder: () => ({ ...defaultSourceFolderState }),
   daemonStatus: null,

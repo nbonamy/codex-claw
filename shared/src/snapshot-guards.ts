@@ -9,6 +9,7 @@ export function isAppSnapshot(value: unknown): value is AppSnapshot {
     Array.isArray(value.messages) &&
     Array.isArray(value.backendRuntimes) &&
     isRecord(value.workBacklog) &&
+    isRecord(value.remoteConnections) &&
     isRecord(value.sourceFolder) &&
     isRecord(value.general) &&
     isRecord(value.theme);

@@ -64,4 +64,43 @@ describe('SettingsView', () => {
 
     expect(wrapper.text()).toContain('Accessibility');
   });
+
+  it('renders the connections tab and forwards SSH actions', async () => {
+    const listSshHosts = vi.fn().mockResolvedValue([]);
+    const addSshConnection = vi.fn().mockResolvedValue(undefined);
+    const checkRemoteConnection = vi.fn().mockResolvedValue(undefined);
+    const removeRemoteConnection = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mount(SettingsView, {
+      props: {
+        settings: defaultThemeSettings,
+        generalSettings: defaultGeneralSettings,
+        activeTab: 'connections',
+        remoteConnections: [{
+          id: 'connection-devbox',
+          kind: 'ssh',
+          name: 'devbox',
+          host: 'devbox',
+          status: 'saved',
+          createdAt: '2026-06-14T10:00:00.000Z',
+          updatedAt: '2026-06-14T10:00:00.000Z',
+        }],
+        listSshHosts,
+        addSshConnection,
+        checkRemoteConnection,
+        removeRemoteConnection,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.text()).toContain('Remote backends');
+    expect(wrapper.text()).toContain('devbox');
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Check')?.trigger('click');
+    await wrapper.findAll('button').find((button) => button.text() === 'Remove')?.trigger('click');
+
+    expect(checkRemoteConnection).toHaveBeenCalledWith('connection-devbox');
+    expect(removeRemoteConnection).toHaveBeenCalledWith('connection-devbox');
+  });
 });

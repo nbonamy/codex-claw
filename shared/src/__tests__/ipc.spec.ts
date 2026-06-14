@@ -5,6 +5,10 @@ describe('ipc channels', () => {
   it('keeps renderer bridge channels explicit', () => {
     expect(ipcChannels).toStrictEqual({
       getSnapshot: 'app:get-snapshot',
+      listSshHosts: 'connections:ssh-hosts:list',
+      addSshConnection: 'connections:ssh:add',
+      checkRemoteConnection: 'connections:remote:check',
+      removeRemoteConnection: 'connections:remote:remove',
       connectWorkProvider: 'work-provider:connect',
       openWorkProviderAuthorization: 'work-provider:authorization:open',
       completeWorkProviderConnection: 'work-provider:connection-complete',

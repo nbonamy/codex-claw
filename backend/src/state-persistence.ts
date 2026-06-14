@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Loop, LoopAction, LoopExecutionCreatedAgent, LoopExecutionLogEntry, LoopExecutionStatus, LoopSourceConfiguration, LoopTeamTarget, SourceFolderState, Team, ThreadGoal, ThreadPlan, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/shared/contracts';
+import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Loop, LoopAction, LoopExecutionCreatedAgent, LoopExecutionLogEntry, LoopExecutionStatus, LoopSourceConfiguration, LoopTeamTarget, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, Team, ThreadGoal, ThreadPlan, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/shared/contracts';
 import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '@codex-claw/shared/codex-approval-presets';
 import { normalizeGeneralSettings, normalizeSourceFolderState, normalizeThemeSettings } from '@codex-claw/shared/settings';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
@@ -16,6 +16,7 @@ type PersistedState = {
   activeAgentId: string | null;
   accountRateLimits?: AccountRateLimits;
   workBacklog?: WorkBacklogState;
+  remoteConnections?: RemoteConnectionsState;
   general?: AppGeneralSettings;
   sourceFolder?: SourceFolderState;
   theme: AppSnapshot['theme'];
@@ -65,6 +66,7 @@ export function persistedStateFromSnapshot(snapshot: AppSnapshot): PersistedStat
     activeAgentId: snapshot.activeAgentId,
     ...(snapshot.accountRateLimits ? { accountRateLimits: { ...snapshot.accountRateLimits } } : {}),
     workBacklog: cloneWorkBacklogState(snapshot.workBacklog),
+    remoteConnections: cloneRemoteConnectionsState(snapshot.remoteConnections),
     general: { ...snapshot.general },
     sourceFolder: {
       ...snapshot.sourceFolder,
@@ -107,6 +109,7 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
     : seed.teams;
   const accountRateLimits = sanitizeAccountRateLimits(value.accountRateLimits);
   const workBacklog = sanitizeWorkBacklogState(value.workBacklog, seed.workBacklog);
+  const remoteConnections = sanitizeRemoteConnectionsState(value.remoteConnections, seed.remoteConnections);
   workBacklog.assignments = {
     ...legacyWorkBacklogAssignments(value.agents, agents),
     ...workBacklog.assignments,
@@ -125,6 +128,7 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
     activeAgentId: typeof value.activeAgentId === 'string' ? value.activeAgentId : null,
     ...(accountRateLimits ? { accountRateLimits } : {}),
     workBacklog,
+    remoteConnections,
     general: normalizeGeneralSettings(value.general),
     sourceFolder: normalizeSourceFolderState(value.sourceFolder),
     theme: normalizeThemeSettings(value.theme),
@@ -325,6 +329,108 @@ function sanitizeAccountRateLimitWindow(value: unknown): AccountRateLimits['prim
 
 function nullableString(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
+}
+
+function cloneRemoteConnectionsState(state: RemoteConnectionsState): RemoteConnectionsState {
+  return {
+    connections: state.connections.map((connection) => ({
+      ...connection,
+      ...(connection.transport ? { transport: cloneRemoteConnectionTransport(connection.transport) } : {}),
+    })),
+  };
+}
+
+function cloneRemoteConnectionTransport(transport: RemoteConnectionTransport): RemoteConnectionTransport {
+  return {
+    type: transport.type,
+    command: transport.command,
+    args: [...transport.args],
+  };
+}
+
+function sanitizeRemoteConnectionsState(value: unknown, seed: RemoteConnectionsState): RemoteConnectionsState {
+  if (!isRecord(value) || !Array.isArray(value.connections)) {
+    return cloneRemoteConnectionsState(seed);
+  }
+
+  const seenIds = new Set<string>();
+  const connections: RemoteConnection[] = [];
+  for (const item of value.connections) {
+    const connection = sanitizeRemoteConnection(item);
+    if (!connection || seenIds.has(connection.id)) {
+      continue;
+    }
+    seenIds.add(connection.id);
+    connections.push(connection);
+  }
+
+  return { connections };
+}
+
+function sanitizeRemoteConnection(value: unknown): RemoteConnection | null {
+  if (
+    !isRecord(value) ||
+    value.kind !== 'ssh' ||
+    typeof value.id !== 'string' ||
+    typeof value.name !== 'string' ||
+    typeof value.host !== 'string' ||
+    typeof value.createdAt !== 'string' ||
+    typeof value.updatedAt !== 'string'
+  ) {
+    return null;
+  }
+
+  const name = value.name.trim();
+  const host = value.host.trim();
+  if (!name || !host) {
+    return null;
+  }
+
+  return {
+    id: value.id,
+    kind: 'ssh',
+    name,
+    host,
+    ...(typeof value.hostName === 'string' && value.hostName.trim() ? { hostName: value.hostName.trim() } : {}),
+    ...(typeof value.user === 'string' && value.user.trim() ? { user: value.user.trim() } : {}),
+    ...(sanitizePort(value.port) ? { port: sanitizePort(value.port)! } : {}),
+    ...(typeof value.identityFile === 'string' && value.identityFile.trim() ? { identityFile: value.identityFile.trim() } : {}),
+    status: isRemoteConnectionStatus(value.status) ? value.status : 'saved',
+    ...(typeof value.detail === 'string' && value.detail.trim() ? { detail: value.detail.trim() } : {}),
+    ...(sanitizeRemoteConnectionTransport(value.transport) ? { transport: sanitizeRemoteConnectionTransport(value.transport)! } : {}),
+    ...(typeof value.installedAt === 'string' ? { installedAt: value.installedAt } : {}),
+    ...(typeof value.lastCheckedAt === 'string' ? { lastCheckedAt: value.lastCheckedAt } : {}),
+    createdAt: value.createdAt,
+    updatedAt: value.updatedAt,
+  };
+}
+
+function sanitizeRemoteConnectionTransport(value: unknown): RemoteConnectionTransport | null {
+  if (!isRecord(value) || value.type !== 'ssh-stdio' || value.command !== 'ssh' || !Array.isArray(value.args)) {
+    return null;
+  }
+
+  const args = value.args.filter((arg): arg is string => typeof arg === 'string' && arg.trim().length > 0);
+  return args.length > 0
+    ? {
+      type: 'ssh-stdio',
+      command: 'ssh',
+      args,
+    }
+    : null;
+}
+
+function isRemoteConnectionStatus(value: unknown): value is RemoteConnectionStatus {
+  return value === 'saved' || value === 'checking' || value === 'ready' || value === 'error';
+}
+
+function sanitizePort(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+
+  const port = Math.floor(value);
+  return port > 0 && port <= 65535 ? port : null;
 }
 
 function cloneWorkBacklogState(state: WorkBacklogState): WorkBacklogState {

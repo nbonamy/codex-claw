@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { AppController } from '../app-controller';
 import { applyMainEventToSnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceRepository, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
@@ -556,6 +556,43 @@ describe('AppController', () => {
     await expect(updateSettings(controller, input)).resolves.toBe(backendSnapshot);
 
     expect(request).toHaveBeenCalledWith('settings/update', { input });
+  });
+
+  it('routes remote connection actions through clawd', async () => {
+    const snapshot = createInitialSnapshot();
+    const backendSnapshot = {
+      ...snapshot,
+      remoteConnections: {
+        connections: [{
+          id: 'connection-devbox',
+          kind: 'ssh' as const,
+          name: 'devbox',
+          host: 'devbox',
+          status: 'ready' as const,
+          createdAt: '2026-06-14T10:00:00.000Z',
+          updatedAt: '2026-06-14T10:00:00.000Z',
+        }],
+      },
+    };
+    const hosts: SshHostCandidate[] = [{ host: 'devbox', hostName: 'devbox.internal' }];
+    const request = vi.fn((method: string) => Promise.resolve(method === 'connections/listSshHosts' ? hosts : backendSnapshot));
+    const controller = new AppController(snapshot, createBackendClient({ request }));
+    const input: AddSshConnectionInput = {
+      host: 'devbox',
+      hostName: 'devbox.internal',
+    };
+
+    await controller.initialize();
+
+    await expect(listSshHosts(controller)).resolves.toBe(hosts);
+    await expect(addSshConnection(controller, input)).resolves.toBe(backendSnapshot);
+    await expect(checkRemoteConnection(controller, 'connection-devbox')).resolves.toBe(backendSnapshot);
+    await expect(removeRemoteConnection(controller, 'connection-devbox')).resolves.toBe(backendSnapshot);
+
+    expect(request).toHaveBeenCalledWith('connections/listSshHosts', undefined);
+    expect(request).toHaveBeenCalledWith('connections/addSsh', { input });
+    expect(request).toHaveBeenCalledWith('connections/check', { connectionId: 'connection-devbox' });
+    expect(request).toHaveBeenCalledWith('connections/remove', { connectionId: 'connection-devbox' });
   });
 
   it('routes loop mutations and runs through clawd', async () => {
@@ -1642,6 +1679,30 @@ async function connectWorkProvider(controller: AppController, provider: WorkProv
   return (controller as unknown as {
     connectWorkProvider(provider: WorkProviderKind): Promise<WorkProviderConnectResult>;
   }).connectWorkProvider(provider);
+}
+
+async function listSshHosts(controller: AppController): Promise<SshHostCandidate[]> {
+  return (controller as unknown as {
+    listSshHosts(): Promise<SshHostCandidate[]>;
+  }).listSshHosts();
+}
+
+async function addSshConnection(controller: AppController, input: AddSshConnectionInput): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    addSshConnection(input: AddSshConnectionInput): Promise<AppSnapshot>;
+  }).addSshConnection(input);
+}
+
+async function checkRemoteConnection(controller: AppController, connectionId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    checkRemoteConnection(connectionId: string): Promise<AppSnapshot>;
+  }).checkRemoteConnection(connectionId);
+}
+
+async function removeRemoteConnection(controller: AppController, connectionId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    removeRemoteConnection(connectionId: string): Promise<AppSnapshot>;
+  }).removeRemoteConnection(connectionId);
 }
 
 async function configureWorkBacklog(controller: AppController, input: WorkBacklogConfigurationInput): Promise<AppSnapshot> {

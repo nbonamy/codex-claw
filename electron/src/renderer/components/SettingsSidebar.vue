@@ -19,13 +19,17 @@
         <AffiliateIcon aria-hidden="true" />
         <span>Integrations</span>
       </el-menu-item>
+      <el-menu-item index="connections">
+        <TerminalIcon aria-hidden="true" />
+        <span>Connections</span>
+      </el-menu-item>
     </el-menu>
   </aside>
 </template>
 
 <script setup lang="ts">
 import type { SettingsTab } from './settings-tabs';
-import { AffiliateIcon, PaletteIcon, SettingsIcon } from '../shared/icons/app-icons';
+import { AffiliateIcon, PaletteIcon, SettingsIcon, TerminalIcon } from '../shared/icons/app-icons';
 
 defineProps<{
   activeTab: SettingsTab;
@@ -36,7 +40,7 @@ const emit = defineEmits<{
 }>();
 
 function selectTab(tab: string): void {
-  if (tab === 'general' || tab === 'appearance' || tab === 'integrations') {
+  if (tab === 'general' || tab === 'appearance' || tab === 'integrations' || tab === 'connections') {
     emit('select', tab);
   }
 }

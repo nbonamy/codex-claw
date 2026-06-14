@@ -1,9 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AppleSpeechTranscriptionOptions, AppCommand, ApprovalPreset, BackendConversationRef, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AppleSpeechTranscriptionOptions, AppCommand, ApprovalPreset, BackendConversationRef, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
 const api: CodexClawApi = {
   getSnapshot: () => ipcRenderer.invoke(ipcChannels.getSnapshot),
+  listSshHosts: () => ipcRenderer.invoke(ipcChannels.listSshHosts),
+  addSshConnection: (input: AddSshConnectionInput) => ipcRenderer.invoke(ipcChannels.addSshConnection, input),
+  checkRemoteConnection: (connectionId: string) => ipcRenderer.invoke(ipcChannels.checkRemoteConnection, connectionId),
+  removeRemoteConnection: (connectionId: string) => ipcRenderer.invoke(ipcChannels.removeRemoteConnection, connectionId),
   connectWorkProvider: (provider: WorkProviderKind) => ipcRenderer.invoke(ipcChannels.connectWorkProvider, provider),
   openWorkProviderAuthorization: (provider: WorkProviderKind) => ipcRenderer.invoke(ipcChannels.openWorkProviderAuthorization, provider),
   completeWorkProviderConnection: (provider: WorkProviderKind) => ipcRenderer.invoke(ipcChannels.completeWorkProviderConnection, provider),

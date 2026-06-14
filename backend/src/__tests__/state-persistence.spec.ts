@@ -424,6 +424,36 @@ describe('AppStatePersistence', () => {
     expect(restored.workBacklog).toStrictEqual(snapshot.workBacklog);
   });
 
+  it('persists remote backend connections', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.remoteConnections.connections = [{
+      id: 'connection-devbox',
+      kind: 'ssh',
+      name: 'devbox',
+      host: 'devbox',
+      hostName: 'devbox.internal',
+      user: 'nicolas',
+      port: 2222,
+      status: 'ready',
+      detail: 'Ready (clawd 0.1.0)',
+      transport: {
+        type: 'ssh-stdio',
+        command: 'ssh',
+        args: ['devbox', 'node ~/.codex-claw/clawd.mjs --stdio'],
+      },
+      installedAt: '2026-06-14T10:00:00.000Z',
+      lastCheckedAt: '2026-06-14T10:00:00.000Z',
+      createdAt: '2026-06-14T09:59:00.000Z',
+      updatedAt: '2026-06-14T10:00:00.000Z',
+    }];
+
+    const persisted = persistedStateFromSnapshot(snapshot);
+    const restored = snapshotFromPersistedState(persisted);
+
+    expect(persisted.remoteConnections).toStrictEqual(snapshot.remoteConnections);
+    expect(restored.remoteConnections).toStrictEqual(snapshot.remoteConnections);
+  });
+
   it('keeps work assignment status on load even when the assigned agent no longer exists', () => {
     const restored = snapshotFromPersistedState({
       teams: [],

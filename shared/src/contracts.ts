@@ -403,6 +403,50 @@ export type ClientState = {
   shouldPreventDisplaySleep: boolean;
 };
 
+export type SshHostCandidate = {
+  host: string;
+  hostName?: string;
+  user?: string;
+  port?: number;
+  identityFile?: string;
+  configPath?: string;
+  line?: number;
+};
+
+export type RemoteConnectionStatus = 'saved' | 'checking' | 'ready' | 'error';
+
+export type RemoteConnectionTransport = {
+  type: 'ssh-stdio';
+  command: 'ssh';
+  args: string[];
+};
+
+export type RemoteConnection = {
+  id: string;
+  kind: 'ssh';
+  name: string;
+  host: string;
+  hostName?: string;
+  user?: string;
+  port?: number;
+  identityFile?: string;
+  status: RemoteConnectionStatus;
+  detail?: string;
+  transport?: RemoteConnectionTransport;
+  installedAt?: string;
+  lastCheckedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RemoteConnectionsState = {
+  connections: RemoteConnection[];
+};
+
+export type AddSshConnectionInput = SshHostCandidate & {
+  name?: string;
+};
+
 export type BackendReasoningEffortOption = {
   reasoningEffort: ReasoningEffort;
   description: string;
@@ -640,6 +684,7 @@ export type AppSnapshot = {
   backendRuntimes: BackendRuntimeStatus[];
   accountRateLimits?: AccountRateLimits;
   workBacklog: WorkBacklogState;
+  remoteConnections: RemoteConnectionsState;
   general: AppGeneralSettings;
   sourceFolder: SourceFolderState;
   theme: AppThemeSettings;
@@ -818,6 +863,10 @@ export type ClientRequestResponse = {
 
 export type CodexClawApi = {
   getSnapshot(): Promise<AppSnapshot>;
+  listSshHosts(): Promise<SshHostCandidate[]>;
+  addSshConnection(input: AddSshConnectionInput): Promise<AppSnapshot>;
+  checkRemoteConnection(connectionId: string): Promise<AppSnapshot>;
+  removeRemoteConnection(connectionId: string): Promise<AppSnapshot>;
   connectWorkProvider(provider: WorkProviderKind): Promise<WorkProviderConnectResult>;
   openWorkProviderAuthorization(provider: WorkProviderKind): Promise<AppSnapshot>;
   completeWorkProviderConnection(provider: WorkProviderKind): Promise<AppSnapshot>;

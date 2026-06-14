@@ -55,6 +55,7 @@ export function createEmptySnapshot(): AppSnapshot {
       detail: 'Claude backend has not been started yet.',
     }],
     workBacklog: createDefaultWorkBacklogState(),
+    remoteConnections: createDefaultRemoteConnectionsState(),
     general: { ...defaultGeneralSettings },
     sourceFolder: { ...defaultSourceFolderState },
     theme: { ...defaultThemeSettings },
@@ -89,6 +90,7 @@ export function createInitialSnapshot(): AppSnapshot {
       detail: 'Claude backend has not been started yet.',
     }],
     workBacklog: createDefaultWorkBacklogState(),
+    remoteConnections: createDefaultRemoteConnectionsState(),
     general: { ...defaultGeneralSettings },
     sourceFolder: { ...defaultSourceFolderState },
     theme: { ...defaultThemeSettings },
@@ -104,6 +106,12 @@ function createDefaultWorkBacklogState(): AppSnapshot['workBacklog'] {
     providerConfigurations: {},
     providerSettings: {},
     assignments: {},
+  };
+}
+
+export function createDefaultRemoteConnectionsState(): AppSnapshot['remoteConnections'] {
+  return {
+    connections: [],
   };
 }
 

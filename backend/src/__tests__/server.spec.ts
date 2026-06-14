@@ -80,6 +80,141 @@ describe('ClawBackendServer', () => {
     });
   });
 
+  it('routes SSH connection discovery and persistence through clawd', async () => {
+    const snapshot = createTestSnapshot();
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const sshConnections = {
+      listHostCandidates: vi.fn().mockResolvedValue([{
+        host: 'devbox',
+        hostName: 'devbox.internal',
+        user: 'nicolas',
+      }]),
+      createConnection: vi.fn().mockResolvedValue({
+        id: 'connection-devbox',
+        kind: 'ssh',
+        name: 'devbox',
+        host: 'devbox',
+        status: 'ready',
+        transport: {
+          type: 'ssh-stdio',
+          command: 'ssh',
+          args: ['devbox', 'node ~/.codex-claw/clawd.mjs --stdio'],
+        },
+        createdAt: '2026-06-14T10:00:00.000Z',
+        updatedAt: '2026-06-14T10:00:00.000Z',
+      }),
+      checkConnection: vi.fn(),
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+      sshConnections: sshConnections as never,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'list-connections',
+      method: 'connections/listSshHosts',
+    })).resolves.toMatchObject({
+      result: [{
+        host: 'devbox',
+        hostName: 'devbox.internal',
+        user: 'nicolas',
+      }],
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'add-connection',
+      method: 'connections/addSsh',
+      params: {
+        input: {
+          host: 'devbox',
+          hostName: 'devbox.internal',
+          user: 'nicolas',
+        },
+      },
+    })).resolves.toMatchObject({
+      result: {
+        remoteConnections: {
+          connections: [{
+            id: 'connection-devbox',
+            host: 'devbox',
+            status: 'ready',
+          }],
+        },
+      },
+    });
+
+    expect(sshConnections.createConnection).toHaveBeenCalledWith({
+      host: 'devbox',
+      hostName: 'devbox.internal',
+      user: 'nicolas',
+    });
+    expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
+  });
+
+  it('checks and removes remote connections through clawd', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [{
+      id: 'connection-devbox',
+      kind: 'ssh',
+      name: 'devbox',
+      host: 'devbox',
+      status: 'saved',
+      createdAt: '2026-06-14T10:00:00.000Z',
+      updatedAt: '2026-06-14T10:00:00.000Z',
+    }];
+    const sshConnections = {
+      listHostCandidates: vi.fn(),
+      createConnection: vi.fn(),
+      checkConnection: vi.fn().mockResolvedValue({
+        ...snapshot.remoteConnections.connections[0],
+        status: 'ready',
+        detail: 'Ready (clawd 0.1.0)',
+        updatedAt: '2026-06-14T10:01:00.000Z',
+      }),
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      sshConnections: sshConnections as never,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'check-connection',
+      method: 'connections/check',
+      params: { connectionId: 'connection-devbox' },
+    })).resolves.toMatchObject({
+      result: {
+        remoteConnections: {
+          connections: [{
+            id: 'connection-devbox',
+            status: 'ready',
+            detail: 'Ready (clawd 0.1.0)',
+          }],
+        },
+      },
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'remove-connection',
+      method: 'connections/remove',
+      params: { connectionId: 'connection-devbox' },
+    })).resolves.toMatchObject({
+      result: {
+        remoteConnections: {
+          connections: [],
+        },
+      },
+    });
+  });
+
   it('returns an app snapshot with the backend event sequence', async () => {
     const server = new ClawBackendServer({
       version: 'test-version',
@@ -2289,6 +2424,9 @@ function createTestSnapshot(): AppSnapshot {
       providerConfigurations: {},
       providerSettings: {},
       assignments: {},
+    },
+    remoteConnections: {
+      connections: [],
     },
     general: {
       preventSleepWhenAgentsRun: true,

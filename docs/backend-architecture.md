@@ -879,9 +879,13 @@ type AgentFolder = {
 };
 ```
 
-Do not migrate this shape in the first extraction unless the first remote slice
-is part of the same milestone. Instead, keep a clear protocol boundary so the
-folder type can change behind Electron main later.
+The first remote slice now persists SSH connection records in `clawd`, parses
+the backend host's `~/.ssh/config`, probes the selected host, installs the
+bundled `clawd` script to `~/.codex-claw/clawd.mjs` when missing, and records
+the future stdio transport as `ssh <host> "node ~/.codex-claw/clawd.mjs
+--stdio"`. It does not yet migrate agent folders or create remote agents.
+Keep the protocol boundary clear so the folder type can change behind clients
+later.
 
 ## Security Model
 
@@ -1068,16 +1072,22 @@ Goal: run `clawd` on another machine without exposing a raw network daemon.
 
 Work:
 
-- Add backend location records.
-- Add SSH stdio transport.
+- Add backend location records. Started as persisted SSH connection records;
+  agent/session location scoping remains.
+- Add SSH stdio transport. The command model is recorded on ready connections;
+  the app still needs to attach backend clients and agents to it.
 - Make agent folders, source folders, repo discovery, git, files, and
   artifacts location-aware.
 - Add remote folder browsing and repo selection.
 - Keep native folder picker local-only.
+- Decide how remote hosts get a Node runtime or standalone `clawd` binary; the
+  first install slice copies bundled JavaScript and expects `node` on the
+  remote host.
 
 Tests:
 
-- Fake SSH stdio transport tests.
+- SSH config parser and install/probe tests. Done for connection management.
+- Fake SSH stdio transport tests for remote agent execution.
 - Location-aware path validation tests.
 - Renderer tests for local versus remote folder affordances.
 

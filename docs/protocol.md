@@ -148,6 +148,20 @@ Folder and save dialogs are not backend protocol messages. Electron may return
 selected paths through desktop IPC, but all validation, listing, creation, and
 state mutation happen in `clawd`.
 
+## Client To `clawd`: Remote Connections
+
+| Method | Params | Result | Notes |
+| --- | --- | --- | --- |
+| `connections/listSshHosts` | none | `SshHostCandidate[]` | Parses the backend host's `~/.ssh/config` and returns concrete `Host` aliases. Wildcard and negated patterns are ignored. |
+| `connections/addSsh` | `{ input: AddSshConnectionInput }` | `AppSnapshot` | Saves an SSH connection, probes the host non-interactively, installs the bundled `clawd` script under `~/.codex-claw` when missing, and records an `ssh` stdio transport when ready. |
+| `connections/check` | `{ connectionId }` | `AppSnapshot` | Re-runs the SSH probe/install/version check for a saved connection. |
+| `connections/remove` | `{ connectionId }` | `AppSnapshot` | Removes a saved remote connection from backend state. |
+
+Remote connection state is owned by `clawd`, not Electron. Today the SSH
+transport command model is `ssh <host> "node ~/.codex-claw/clawd.mjs --stdio"`.
+This slice does not yet create remote agents or switch the active backend
+location; it prepares the persisted connection and install/probe path.
+
 ## Client To `clawd`: Work Providers
 
 | Method | Params | Result | Notes |

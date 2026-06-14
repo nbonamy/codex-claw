@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
@@ -525,6 +525,38 @@ export function useAppState() {
     }
   }
 
+  async function listSshHosts(): Promise<SshHostCandidate[]> {
+    if (!window.codexClaw?.listSshHosts) {
+      return [];
+    }
+
+    return window.codexClaw.listSshHosts();
+  }
+
+  async function addSshConnection(input: AddSshConnectionInput): Promise<void> {
+    if (!window.codexClaw?.addSshConnection) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.addSshConnection(input);
+  }
+
+  async function checkRemoteConnection(connectionId: string): Promise<void> {
+    if (!window.codexClaw?.checkRemoteConnection) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.checkRemoteConnection(connectionId);
+  }
+
+  async function removeRemoteConnection(connectionId: string): Promise<void> {
+    if (!window.codexClaw?.removeRemoteConnection) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.removeRemoteConnection(connectionId);
+  }
+
   async function loadDaemonStatus(): Promise<void> {
     if (!window.codexClaw?.getDaemonStatus) {
       return;
@@ -967,6 +999,10 @@ export function useAppState() {
     closeTeam,
     updateAgent,
     updateSettings,
+    listSshHosts,
+    addSshConnection,
+    checkRemoteConnection,
+    removeRemoteConnection,
     setDaemonEnabled,
     connectWorkProvider,
     completeWorkProviderConnection,

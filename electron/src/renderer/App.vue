@@ -43,6 +43,10 @@
     :update-team="updateTeam"
     :update-agent="updateAgent"
     :update-settings="updateSettings"
+    :list-ssh-hosts="listSshHosts"
+    :add-ssh-connection="addSshConnection"
+    :check-remote-connection="checkRemoteConnection"
+    :remove-remote-connection="removeRemoteConnection"
     :set-daemon-enabled="setDaemonEnabled"
     :connect-work-provider="connectWorkProvider"
     :open-work-provider-authorization="openWorkProviderAuthorization"
@@ -157,6 +161,10 @@ const {
   restartAgent,
   closeAgent,
   updateSettings,
+  listSshHosts,
+  addSshConnection,
+  checkRemoteConnection,
+  removeRemoteConnection,
   setDaemonEnabled,
   connectWorkProvider,
   openWorkProviderAuthorization,

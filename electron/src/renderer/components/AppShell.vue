@@ -61,6 +61,11 @@
         :work-backlog-status="workBacklogStatus"
         :work-provider-settings="snapshot.workBacklog.providerSettings"
         :work-provider-authorization="workProviderAuthorization"
+        :remote-connections="snapshot.remoteConnections.connections"
+        :list-ssh-hosts="listSshHosts"
+        :add-ssh-connection="addSshConnection"
+        :check-remote-connection="checkRemoteConnection"
+        :remove-remote-connection="removeRemoteConnection"
         :daemon-status="daemonStatus"
         :daemon-status-error="daemonStatusError"
         :choose-source-folder="chooseSourceFolder"
@@ -242,7 +247,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SidePanelRequest, SourceRepository, SourceWorktree, Team, ThreadGoal, TurnGitDiff, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SidePanelRequest, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, TurnGitDiff, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultTeamColor } from '@codex-claw/shared/team-colors';
 import { findAssignedAgentForWorkItem } from '@codex-claw/shared/work-assignments';
@@ -308,6 +313,10 @@ const props = withDefaults(defineProps<{
   updateTeam?: (input: UpdateTeamInput) => Promise<void>;
   updateAgent?: (input: UpdateAgentInput) => Promise<void>;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
+  listSshHosts?: () => Promise<SshHostCandidate[]>;
+  addSshConnection?: (input: AddSshConnectionInput) => Promise<void>;
+  checkRemoteConnection?: (connectionId: string) => Promise<void>;
+  removeRemoteConnection?: (connectionId: string) => Promise<void>;
   setDaemonEnabled?: (enabled: boolean) => Promise<void>;
   restartApp?: () => Promise<void>;
   createLoop?: (input: CreateLoopInput) => Promise<void>;
@@ -367,6 +376,10 @@ const props = withDefaults(defineProps<{
   updateTeam: async () => undefined,
   updateAgent: async () => undefined,
   updateSettings: async () => undefined,
+  listSshHosts: async () => [],
+  addSshConnection: async () => undefined,
+  checkRemoteConnection: async () => undefined,
+  removeRemoteConnection: async () => undefined,
   setDaemonEnabled: async () => undefined,
   restartApp: async () => undefined,
   createLoop: async () => undefined,
