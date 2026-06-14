@@ -1,22 +1,9 @@
 import { pathToFileURL } from 'node:url';
-import path from 'node:path';
-import { sendAgentPrompt } from '@codex-claw/shared/agent-chat-service';
 import { createClawRpcNotification } from '@codex-claw/shared/backend-protocol/rpc';
-import type { Agent, BackendConversationRef, SystemPermissionsStatus } from '@codex-claw/shared/contracts';
-import { formatConversationTitle } from '@codex-claw/shared/conversation-title';
-import { updateLoopExecutionAgentConversationInSnapshot } from '@codex-claw/shared/loop-manager';
-import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/shared/backend-driver';
-import { BackendDriverRpc, createDefaultBackendDrivers } from './driver-rpc';
-import { LoopRunner } from './loops/runner';
-import { LoopScheduler } from './loops/scheduler';
-import { ClawMcpService } from './mcp/service';
-import { runtimeGitHubOAuthClientId } from './runtime-config';
-import { ClawBackendServer } from './server';
-import { backendWorkIntegrationTokensFilePath, loadBackendSnapshot, saveBackendSnapshot } from './state';
+import { createClawdRuntime, type ClawdRuntime } from './runtime';
+import { backendSocketPath } from './state';
+import { LocalSocketRpcServer } from './socket-server';
 import { StdioRpcPeer } from './stdio';
-import { EncryptedFileWorkIntegrationTokenStore } from './work-integrations/encrypted-file-token-store';
-import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
-import { WorkIntegrationManager } from './work-integrations/manager';
 
 export const CLAWD_VERSION = '0.1.0';
 
@@ -33,140 +20,90 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   }
 
   if (argv.includes('--stdio')) {
-    const snapshot = await loadBackendSnapshot();
-    const mcpService = new ClawMcpService({ snapshot });
-    const mcpServerUrl = await mcpService.start();
-    const backendDrivers = createDefaultBackendDrivers({
-      clawMcpServerUrl: mcpServerUrl,
-    });
-    const driverRpc = new BackendDriverRpc(backendDrivers);
-    let server: ClawBackendServer;
-    const stdio = new StdioRpcPeer({
-      input: process.stdin,
-      output: process.stdout,
-      onMessage: (message) => server.handleMessage(message),
-    });
-    const workIntegrations = new WorkIntegrationManager({
-      drivers: [new GitHubWorkProviderDriver(() => githubOAuthClientId(snapshot))],
-      getSnapshot: () => snapshot,
-      openExternal: (url) => stdio.request('client/openExternal', { url }),
-      saveSnapshot: () => saveBackendSnapshot(snapshot),
-      tokenStore: new EncryptedFileWorkIntegrationTokenStore(backendWorkIntegrationTokensFilePath()),
-    });
-    const loopRunner = new LoopRunner({
-      getSnapshot: () => snapshot,
-      listWorkItems: workIntegrations,
-      notifySnapshotUpdated: () => server.emitEvent({
-        type: 'snapshot.updated',
-        payload: snapshot,
-      }),
-      saveSnapshot: () => saveBackendSnapshot(snapshot),
-      sendPrompt: (agentId, prompt, context) => {
-        const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
-        if (!agent) {
-          return Promise.resolve(snapshot);
-        }
-        const driver = requireBackendDriver(backendDrivers, agent);
-        sendAgentPrompt(snapshot, driver, agentId, prompt, undefined, (event) => server.emitEvent(event), {
-          onBackendSessionUpdated: (result, wasNewSession) => setNewConversationTitle(agent, driver, wasNewSession),
-          onPromptStarted: async (result) => {
-            const loop = updateLoopExecutionAgentConversationInSnapshot(snapshot, context.loopId, context.executionId, agentId, {
-              conversationRef: conversationRefFromSendResult(agent, result),
-              updatedAt: new Date().toISOString(),
-            });
-            if (loop) {
-              await saveBackendSnapshot(snapshot);
-              server.emitEvent({
-                type: 'snapshot.updated',
-                payload: snapshot,
-              });
-            }
-          },
-        });
-        return Promise.resolve(snapshot);
-      },
-    });
-    const loopScheduler = new LoopScheduler({
-      runLoops: () => loopRunner.runAll(),
-      onError: (error) => {
-        process.stderr.write(`[loops] scheduler check failed: ${error instanceof Error ? error.message : String(error)}\n`);
-      },
-    });
-    server = new ClawBackendServer({
-      version: CLAWD_VERSION,
-      snapshot,
-      driverRpc,
-      onEvent: (event) => {
-        process.stdout.write(`${JSON.stringify(createClawRpcNotification('backend/event', event))}\n`);
-      },
-      saveSnapshot: (nextSnapshot) => saveBackendSnapshot(nextSnapshot),
-      workIntegrations,
-      loopRunner,
-      systemPermissions: {
-        getStatus: () => stdio.request<SystemPermissionsStatus>('client/systemPermissions/get'),
-        openAccessibilitySettings: () => stdio.request<SystemPermissionsStatus>('client/systemPermissions/openAccessibilitySettings'),
-      },
-    });
-    mcpService.setDriverRpc(driverRpc);
-    mcpService.setEventSink((event) => server.emitEvent(event));
-    loopScheduler.start();
-    let stopping = false;
-    const stop = async () => {
-      if (stopping) {
-        return;
-      }
-      stopping = true;
-      loopScheduler.stop();
-      stdio.stop();
-      await server.close();
-      await mcpService.stop();
-    };
-    process.once('SIGTERM', () => {
-      void stop().finally(() => process.exit(0));
-    });
-    process.once('SIGINT', () => {
-      void stop().finally(() => process.exit(0));
-    });
-    process.stdin.once('end', () => {
-      void stop().finally(() => process.exit(0));
-    });
-    stdio.start();
-    process.stdin.resume();
+    await runStdio();
     return;
   }
 
-  process.stderr.write('Usage: clawd --stdio | --version\nSet CODEX_CLAW_HOME to override ~/.codex-claw.\n');
+  if (argv.includes('serve')) {
+    await serve();
+    return;
+  }
+
+  process.stderr.write('Usage: clawd --stdio | serve | --version\nSet CODEX_CLAW_HOME to override ~/.codex-claw.\n');
   process.exitCode = 1;
 }
 
-function githubOAuthClientId(snapshot: { workBacklog: { providerSettings: { github?: { oauthClientId?: string } } } }): string {
-  return runtimeGitHubOAuthClientId(snapshot.workBacklog.providerSettings.github);
+async function runStdio(): Promise<void> {
+  let runtime: ClawdRuntime;
+  const stdio = new StdioRpcPeer({
+    input: process.stdin,
+    output: process.stdout,
+    onMessage: (message) => runtime.server.handleMessage(message),
+  });
+  runtime = await createClawdRuntime({
+    version: CLAWD_VERSION,
+    requestClient: (method, params) => stdio.request(method, params),
+    emitEvent: (event) => process.stdout.write(`${JSON.stringify(createClawRpcNotification('backend/event', event))}\n`),
+  });
+
+  let stopping = false;
+  const stop = async () => {
+    if (stopping) {
+      return;
+    }
+    stopping = true;
+    stdio.stop();
+    await runtime.stop();
+  };
+  process.once('SIGTERM', () => {
+    void stop().finally(() => process.exit(0));
+  });
+  process.once('SIGINT', () => {
+    void stop().finally(() => process.exit(0));
+  });
+  process.stdin.once('end', () => {
+    void stop().finally(() => process.exit(0));
+  });
+  stdio.start();
+  process.stdin.resume();
 }
 
-function requireBackendDriver(drivers: Map<Agent['backend'], AgentBackendDriver>, agent: Agent): AgentBackendDriver {
-  const driver = drivers.get(agent.backend);
-  if (!driver) {
-    throw new Error(`Backend driver is not configured: ${agent.backend}`);
-  }
-  return driver;
-}
+async function serve(): Promise<void> {
+  let socketServer: LocalSocketRpcServer | null = null;
+  const runtime = await createClawdRuntime({
+    version: CLAWD_VERSION,
+    requestClient: (method, params) => {
+      if (!socketServer) {
+        throw new Error(`No connected client can handle '${method}'.`);
+      }
+      return socketServer.requestFirstClient(method, params);
+    },
+    emitEvent: (event) => {
+      socketServer?.broadcastEvent(event);
+    },
+  });
+  socketServer = new LocalSocketRpcServer({
+    socketPath: backendSocketPath(),
+    onMessage: (message) => runtime.server.handleMessage(message),
+  });
+  await socketServer.start();
+  process.stderr.write(`[clawd:daemon] listening {"socketPath":"${backendSocketPath()}"}\n`);
 
-async function setNewConversationTitle(agent: Agent, driver: AgentBackendDriver, wasNewSession: boolean): Promise<void> {
-  if (!wasNewSession || !driver.setConversationTitle) {
-    return;
-  }
-
-  try {
-    await driver.setConversationTitle(agent, formatConversationTitle(agent));
-  } catch (error) {
-    process.stderr.write(`[conversation-title] failed for ${agent.id}: ${error instanceof Error ? error.message : String(error)}\n`);
-  }
-}
-
-function conversationRefFromSendResult(agent: Agent, result: BackendSendResult): BackendConversationRef {
-  return result.backendSession.kind === 'codex'
-    ? { backend: 'codex', threadId: result.backendSession.threadId }
-    : { backend: 'claude', folder: agent.folder, sessionId: result.backendSession.transcriptSessionId ?? result.backendSession.sessionId };
+  let stopping = false;
+  const stop = async () => {
+    if (stopping) {
+      return;
+    }
+    stopping = true;
+    await socketServer?.stop();
+    await runtime.stop();
+  };
+  process.once('SIGTERM', () => {
+    void stop().finally(() => process.exit(0));
+  });
+  process.once('SIGINT', () => {
+    void stop().finally(() => process.exit(0));
+  });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

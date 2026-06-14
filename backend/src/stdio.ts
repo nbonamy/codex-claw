@@ -1,4 +1,4 @@
-import { createClawRpcError, createClawRpcRequest, clawRpcErrorCodes, isClawRpcResponse, parseClawRpcMessage, type ClawRpcId, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
+import { createClawRpcError, createClawRpcNotification, createClawRpcRequest, clawRpcErrorCodes, isClawRpcResponse, parseClawRpcMessage, type ClawRpcId, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import type { Readable, Writable } from 'node:stream';
 
 export type StdioRpcServerOptions = {
@@ -68,6 +68,10 @@ export class StdioRpcPeer {
 
     this.write(message);
     return result;
+  }
+
+  notify(method: string, params?: unknown): void {
+    this.write(createClawRpcNotification(method, params));
   }
 
   private readonly onData = (chunk: Buffer | string) => {

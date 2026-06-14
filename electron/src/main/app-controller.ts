@@ -2,13 +2,11 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
 import { logMain, warnMain } from './log';
 import { createMainWindow } from './main-window';
-import { createRuntimeClawBackendClient, type ClawBackendProcessClient } from './backend-process-client';
+import { createRuntimeClawBackendClient, type ClawBackendClientPort } from './backend-client';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards';
 import type { AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
-
-type ClawBackendClientPort = Pick<ClawBackendProcessClient, 'start' | 'health' | 'request' | 'onEvent' | 'close'>;
 
 export class AppController {
   private mainWindow: BrowserWindow | null = null;
@@ -298,7 +296,7 @@ export class AppController {
       const health = await this.backendClient.health();
       await this.refreshSnapshotFromBackend();
       this.backendClientEventUnsubscribe = this.backendClient.onEvent((event) => this.emitBackendEvent(event));
-      logMain('clawd', 'connected to backend process', { version: health.version, pid: health.pid });
+      logMain('clawd', 'connected to backend', { version: health.version, pid: health.pid });
     } catch (error) {
       warnMain('clawd', 'failed to connect to backend process', {
         detail: error instanceof Error ? error.message : String(error),

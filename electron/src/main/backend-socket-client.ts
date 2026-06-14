@@ -1,27 +1,14 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { EventEmitter } from 'node:events';
-import { watch } from 'node:fs';
+import net, { type Socket } from 'node:net';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawRpcResponse, parseClawRpcMessage, type ClawBackendEvent, type ClawBackendHealth, type ClawRpcId, type ClawRpcRequest, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { createRuntimeClientRequestHandlers } from './client-request-handlers';
 import { warnMain } from './log';
 
-export type ClawBackendProcessCommand = {
-  command: string;
-  args: string[];
-  cwd?: string;
-  env?: NodeJS.ProcessEnv;
-};
-
-export type ClawBackendProcessClientOptions = {
-  command: ClawBackendProcessCommand;
+export type ClawBackendSocketClientOptions = {
+  connectSocket?: typeof net.createConnection;
   requestHandlers?: Record<string, (params: unknown) => unknown | Promise<unknown>>;
-  spawnProcess?: typeof spawn;
   requestTimeoutMs?: number;
-  watchFile?: string | null;
-  watchFileSystem?: WatchBackendFile;
+  socketPath: string;
 };
-
-export type WatchBackendFile = (filePath: string, listener: () => void) => { close(): void };
 
 type PendingRequest = {
   resolve(value: unknown): void;
@@ -29,56 +16,43 @@ type PendingRequest = {
   timeout: NodeJS.Timeout;
 };
 
-export class ClawBackendProcessClient {
-  private readonly command: ClawBackendProcessCommand;
+export class ClawBackendSocketClient {
+  private readonly connectSocket: typeof net.createConnection;
   private readonly requestHandlers: Record<string, (params: unknown) => unknown | Promise<unknown>>;
-  private readonly spawnProcess: typeof spawn;
   private readonly requestTimeoutMs: number;
-  private readonly watchFile: string | null;
-  private readonly watchFileSystem: WatchBackendFile;
-  private process: ChildProcessWithoutNullStreams | null = null;
-  private watcher: { close(): void } | null = null;
-  private restartTimer: NodeJS.Timeout | null = null;
-  private stdoutBuffer = '';
+  private socket: Socket | null = null;
+  private buffer = '';
   private nextRequestId = 1;
   private readonly pending = new Map<ClawRpcId, PendingRequest>();
   private readonly eventListeners = new Set<(event: ClawBackendEvent) => void>();
 
-  constructor(options: ClawBackendProcessClientOptions) {
-    this.command = options.command;
-    this.requestHandlers = options.requestHandlers ?? {};
-    this.spawnProcess = options.spawnProcess ?? spawn;
+  constructor(private readonly options: ClawBackendSocketClientOptions) {
+    this.connectSocket = options.connectSocket ?? net.createConnection;
+    this.requestHandlers = options.requestHandlers ?? createRuntimeClientRequestHandlers();
     this.requestTimeoutMs = options.requestTimeoutMs ?? 5_000;
-    this.watchFile = options.watchFile ?? null;
-    this.watchFileSystem = options.watchFileSystem ?? ((filePath, listener) => watch(filePath, listener));
   }
 
   async start(): Promise<void> {
-    if (this.process) {
+    if (this.socket) {
       return;
     }
 
-    const child = this.spawnProcess(this.command.command, this.command.args, {
-      cwd: this.command.cwd,
-      ...(this.command.env ? { env: { ...process.env, ...this.command.env } } : {}),
-      stdio: 'pipe',
+    const socket = this.connectSocket(this.options.socketPath);
+    this.socket = socket;
+    socket.on('data', (chunk) => this.handleData(chunk));
+    socket.once('close', () => {
+      this.socket = null;
+      this.rejectPending(new Error('clawd socket closed.'));
     });
-
-    this.process = child;
-    child.stdout.on('data', (chunk) => this.handleStdout(chunk));
-    child.stderr.on('data', (chunk) => {
-      warnMain('clawd', 'backend stderr', { detail: chunk.toString().trim() });
-    });
-    child.once('exit', (code, signal) => {
-      this.process = null;
-      this.rejectPending(new Error(`clawd exited before responding (code=${code ?? 'null'}, signal=${signal ?? 'null'}).`));
-    });
-    child.once('error', (error) => {
-      this.process = null;
+    socket.once('error', (error) => {
+      this.socket = null;
       this.rejectPending(error);
     });
 
-    this.startWatcher();
+    await new Promise<void>((resolve, reject) => {
+      socket.once('connect', resolve);
+      socket.once('error', reject);
+    });
   }
 
   async health(): Promise<ClawBackendHealth> {
@@ -86,8 +60,8 @@ export class ClawBackendProcessClient {
   }
 
   async request<Result>(method: string, params?: unknown): Promise<Result> {
-    if (!this.process) {
-      throw new Error('clawd is not running.');
+    if (!this.socket) {
+      throw new Error('clawd socket is not connected.');
     }
 
     const id = this.nextRequestId++;
@@ -98,7 +72,7 @@ export class ClawBackendProcessClient {
     const result = new Promise<Result>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pending.delete(id);
-        reject(new Error(`clawd request timed out: ${method}`));
+        reject(new Error(`clawd socket request timed out: ${method}`));
       }, this.requestTimeoutMs);
 
       this.pending.set(id, {
@@ -108,7 +82,7 @@ export class ClawBackendProcessClient {
       });
     });
 
-    this.process.stdin.write(`${JSON.stringify(message)}\n`);
+    this.socket.write(`${JSON.stringify(message)}\n`);
     return result;
   }
 
@@ -120,90 +94,30 @@ export class ClawBackendProcessClient {
   }
 
   async close(): Promise<void> {
-    this.stopWatcher();
-    const child = this.process;
-    this.process = null;
-    this.rejectPending(new Error('clawd client closed.'));
-
-    if (!child || child.killed) {
+    const socket = this.socket;
+    this.socket = null;
+    this.rejectPending(new Error('clawd socket client closed.'));
+    if (!socket || socket.destroyed) {
       return;
     }
-
     await new Promise<void>((resolve) => {
-      child.once('exit', () => resolve());
-      child.kill();
+      socket.once('close', resolve);
+      socket.end();
       setTimeout(resolve, 1_000).unref();
     });
   }
 
-  private startWatcher(): void {
-    if (!this.watchFile || this.watcher) {
-      return;
-    }
-
-    try {
-      this.watcher = this.watchFileSystem(this.watchFile, () => {
-        this.scheduleRestart();
-      });
-    } catch (error) {
-      warnMain('clawd', 'failed to watch backend bundle', {
-        detail: error instanceof Error ? error.message : String(error),
-        path: this.watchFile,
-      });
-    }
-  }
-
-  private stopWatcher(): void {
-    this.watcher?.close();
-    this.watcher = null;
-    if (this.restartTimer) {
-      clearTimeout(this.restartTimer);
-      this.restartTimer = null;
-    }
-  }
-
-  private scheduleRestart(): void {
-    if (this.restartTimer) {
-      clearTimeout(this.restartTimer);
-    }
-
-    this.restartTimer = setTimeout(() => {
-      this.restartTimer = null;
-      void this.restart();
-    }, 100);
-  }
-
-  private async restart(): Promise<void> {
-    const child = this.process;
-    if (!child || child.killed) {
-      return;
-    }
-
-    warnMain('clawd', 'restarting backend process after bundle change');
-    this.rejectPending(new Error('clawd restarted.'));
-    this.stdoutBuffer = '';
-    this.process = null;
-
-    await new Promise<void>((resolve) => {
-      child.once('exit', () => resolve());
-      child.kill();
-      setTimeout(resolve, 1_000).unref();
-    });
-
-    await this.start();
-  }
-
-  private handleStdout(chunk: Buffer | string): void {
-    this.stdoutBuffer += chunk.toString();
+  private handleData(chunk: Buffer | string): void {
+    this.buffer += chunk.toString();
 
     while (true) {
-      const newlineIndex = this.stdoutBuffer.indexOf('\n');
+      const newlineIndex = this.buffer.indexOf('\n');
       if (newlineIndex < 0) {
         break;
       }
 
-      const line = this.stdoutBuffer.slice(0, newlineIndex).trim();
-      this.stdoutBuffer = this.stdoutBuffer.slice(newlineIndex + 1);
+      const line = this.buffer.slice(0, newlineIndex).trim();
+      this.buffer = this.buffer.slice(newlineIndex + 1);
 
       if (line.length > 0) {
         this.handleLine(line);
@@ -224,7 +138,7 @@ export class ClawBackendProcessClient {
         return;
       }
       if (!isClawRpcResponse(message)) {
-        warnMain('clawd', 'ignored non-response message from backend', { line });
+        warnMain('clawd', 'ignored non-response socket message from backend', { line });
         return;
       }
       response = message;
@@ -233,13 +147,13 @@ export class ClawBackendProcessClient {
     }
 
     if (response.id === null) {
-      warnMain('clawd', 'backend response without request id', { response });
+      warnMain('clawd', 'backend socket response without request id', { response });
       return;
     }
 
     const pending = this.pending.get(response.id);
     if (!pending) {
-      warnMain('clawd', 'backend response for unknown request id', { id: response.id });
+      warnMain('clawd', 'backend socket response for unknown request id', { id: response.id });
       return;
     }
 
@@ -279,12 +193,12 @@ export class ClawBackendProcessClient {
     }
 
     if (message.method !== 'backend/event') {
-      warnMain('clawd', 'ignored unknown backend notification', { method: message.method });
+      warnMain('clawd', 'ignored unknown backend socket notification', { method: message.method });
       return;
     }
 
     if (!isRecord(message.params)) {
-      warnMain('clawd', 'ignored malformed backend event notification');
+      warnMain('clawd', 'ignored malformed backend socket event notification');
       return;
     }
 
@@ -303,12 +217,10 @@ export class ClawBackendProcessClient {
   }
 
   private writeResponse(response: ClawRpcResponse): void {
-    this.process?.stdin.write(`${JSON.stringify(response)}\n`);
+    this.socket?.write(`${JSON.stringify(response)}\n`);
   }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-
-export type FakeChildProcess = ChildProcessWithoutNullStreams & EventEmitter;

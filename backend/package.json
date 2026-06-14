@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite build --watch --config vite.config.ts",
     "dev:run": "node dist/clawd.mjs --stdio",
+    "serve": "node dist/clawd.mjs serve",
     "build": "vite build --config vite.config.ts",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",

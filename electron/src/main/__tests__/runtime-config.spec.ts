@@ -129,4 +129,20 @@ describe('runtime config', () => {
       resourcesPath: '/app/resources',
     })).toBeNull();
   });
+
+  it('defaults backend mode to auto and accepts explicit bundled or existing modes', async () => {
+    const { runtimeClawdBackendMode } = await import('../runtime-config');
+
+    expect(runtimeClawdBackendMode({ env: {} })).toBe('auto');
+    expect(runtimeClawdBackendMode({ env: { CODEX_CLAW_BACKEND_MODE: 'bundled' } })).toBe('bundled');
+    expect(runtimeClawdBackendMode({ env: { CODEX_CLAW_BACKEND_MODE: 'existing' } })).toBe('existing');
+    expect(runtimeClawdBackendMode({ env: { CODEX_CLAW_BACKEND_MODE: 'nope' } })).toBe('auto');
+  });
+
+  it('resolves the local clawd socket path from CODEX_CLAW_HOME or an explicit socket override', async () => {
+    const { runtimeClawdSocketPath } = await import('../runtime-config');
+
+    expect(runtimeClawdSocketPath({ env: { CODEX_CLAW_HOME: '/tmp/codex-claw' } })).toBe('/tmp/codex-claw/clawd.sock');
+    expect(runtimeClawdSocketPath({ env: { CODEX_CLAW_BACKEND_SOCKET: '/tmp/custom.sock' } })).toBe('/tmp/custom.sock');
+  });
 });

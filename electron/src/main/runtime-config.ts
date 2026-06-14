@@ -1,5 +1,8 @@
 import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
 import path from 'node:path';
+
+export type RuntimeClawdBackendMode = 'auto' | 'bundled' | 'existing';
 
 export type RuntimeClawdCommand = {
   command: string;
@@ -33,6 +36,21 @@ export function runtimeClawdCommand(deps: RuntimeClawdConfigDeps = {}): RuntimeC
     args,
     env: runtimeClawdEnv(deps),
   };
+}
+
+export function runtimeClawdBackendMode(deps: RuntimeClawdConfigDeps = {}): RuntimeClawdBackendMode {
+  const env = deps.env ?? process.env;
+  const mode = env.CODEX_CLAW_BACKEND_MODE?.trim();
+  return mode === 'bundled' || mode === 'existing' ? mode : 'auto';
+}
+
+export function runtimeClawdSocketPath(deps: RuntimeClawdConfigDeps = {}): string {
+  const env = deps.env ?? process.env;
+  const configured = env.CODEX_CLAW_BACKEND_SOCKET?.trim();
+  if (configured) {
+    return configured;
+  }
+  return path.join(env.CODEX_CLAW_HOME?.trim() || path.join(homedir(), '.codex-claw'), 'clawd.sock');
 }
 
 export function runtimeClawdWatchFile(deps: RuntimeClawdConfigDeps = {}): string | null {

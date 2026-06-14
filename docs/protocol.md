@@ -1,14 +1,15 @@
 # Backend Protocol
 
-Status: current backend JSON-RPC protocol, 2026-06-13.
+Status: current backend JSON-RPC protocol, 2026-06-14.
 
 This document catalogs the app-owned protocol between clients and `clawd`.
-Electron currently reaches this protocol through `ClawBackendProcessClient` over
-stdio JSONL. Future desktop, web, mobile, SSH, socket, or daemon clients should
-use the same app methods instead of depending on Electron IPC or local
-filesystem access.
+Electron can reach this protocol through `ClawBackendProcessClient` over stdio
+JSONL or through the local `clawd serve` Unix socket daemon. Future desktop,
+web, mobile, SSH, or network clients should use the same app methods instead of
+depending on Electron IPC or local filesystem access.
 
-The protocol is JSON-RPC 2.0 framed one JSON message per line for stdio:
+The protocol is JSON-RPC 2.0 framed one JSON message per line for stdio and the
+local Unix socket:
 
 ```json
 { "jsonrpc": "2.0", "id": 1, "method": "snapshot/get" }

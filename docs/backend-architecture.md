@@ -36,8 +36,12 @@ Current implementation checkpoint:
 
 - The repo is split into `shared`, `backend`, and `electron` workspaces.
 - `clawd --stdio` speaks app-owned JSON-RPC over newline-delimited stdio.
+- `clawd serve` speaks the same app-owned JSON-RPC over the local
+  `~/.codex-claw/clawd.sock` Unix socket for a single-host always-on daemon.
 - Electron main starts `clawd` through `ClawBackendProcessClient` and reaches
-  backend features through app-owned RPC methods.
+  backend features through app-owned RPC methods. In
+  `CODEX_CLAW_BACKEND_MODE=auto`, Electron first tries the local daemon socket
+  and falls back to the bundled stdio process.
 - Codex and Claude provider drivers now live under `backend/src`; Electron main
   must not import provider drivers, provider transports, provider SDKs, or raw
   provider protocol modules.
@@ -514,12 +518,14 @@ Initial transports:
   process boundaries.
 - `stdio`: newline-delimited JSON-RPC messages over stdin/stdout. This is the
   first real daemon transport and the one to keep compatible with SSH.
+- `localSocket`: newline-delimited JSON-RPC messages over
+  `~/.codex-claw/clawd.sock`. This supports a single-host always-on backend
+  while keeping the protocol identical to stdio.
 - `electronMessagePort`: optional packaged-app transport if we choose Electron
   `utilityProcess` instead of a real executable for the first local split.
 
 Future transports:
 
-- Unix domain socket for macOS/Linux local always-on daemon.
 - Windows named pipe for local always-on daemon.
 - SSH stdio for remote backend locations.
 - TCP/WebSocket only after an explicit authenticated remote-control design.
@@ -579,6 +585,17 @@ Hot reload semantics:
 - Protocol/shared-contract changes can require both the backend process and
   Electron main to restart. That is acceptable; the goal is a fast, predictable
   restart, not magic live patching.
+
+Daemon development:
+
+```bash
+npm run build -w @codex-claw/backend
+npm run dev:backend:serve
+CODEX_CLAW_BACKEND_MODE=existing npm run dev:electron
+```
+
+`CODEX_CLAW_BACKEND_MODE=auto` is the desktop default: connect to the local
+daemon if it is running, otherwise start the bundled stdio backend.
 
 The first extraction phase can run in-process and still use the current
 `electron-forge start` loop. As soon as the stdio process exists, local dev
@@ -839,8 +856,9 @@ Rules:
 - No unauthenticated LAN server.
 - Prefer stdio, Unix sockets, named pipes, and SSH before TCP.
 - Bind any local HTTP transport to loopback only.
-- Authenticate socket and pipe transports with per-user tokens and restrictive
-  filesystem permissions.
+- Keep local Unix sockets under a user-private `CODEX_CLAW_HOME` directory.
+  Add per-user tokens before named pipes, cross-user local access, or any
+  network transport.
 - Do not expose raw provider protocols to the renderer or to unauthenticated
   local clients.
 - Keep backend capability checks in `clawd`, not only in renderer UI.

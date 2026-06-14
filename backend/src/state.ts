@@ -19,13 +19,17 @@ export function backendWorkIntegrationTokensFilePath(): string {
   return path.join(backendHomeDir(), 'work-integration-tokens.json');
 }
 
+export function backendSocketPath(): string {
+  return path.join(backendHomeDir(), 'clawd.sock');
+}
+
 export async function loadBackendSnapshot(): Promise<AppSnapshot> {
-  await mkdir(backendHomeDir(), { recursive: true });
+  await mkdir(backendHomeDir(), { recursive: true, mode: 0o700 });
   return backendStatePersistence().load();
 }
 
 export async function saveBackendSnapshot(snapshot: AppSnapshot): Promise<void> {
-  await mkdir(backendHomeDir(), { recursive: true });
+  await mkdir(backendHomeDir(), { recursive: true, mode: 0o700 });
   await backendStatePersistence().save(snapshot);
 }
 
