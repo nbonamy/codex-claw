@@ -202,7 +202,7 @@ const daemonDescription = computed(() => {
   if (props.daemonStatus?.supported === false) {
     return props.daemonStatus.detail ?? 'Install is available in packaged macOS builds.';
   }
-  return 'Start the local agent service at login so the app can reconnect to it.';
+  return 'Start the Codex Claw agent to keep your loops running.';
 });
 const accessibilityGranted = computed(() => permissions.value?.accessibility.trusted ?? false);
 const showGrantButton = computed(() => permissions.value?.accessibility.required === true && !accessibilityGranted.value);
@@ -308,8 +308,8 @@ async function promptForRestartAfterDaemonChange(enabled: boolean): Promise<void
   try {
     await ElMessageBox.confirm(
       enabled
-        ? 'Codex Claw needs to restart to connect to the background backend.'
-        : 'Codex Claw needs to restart to use the local backend.',
+        ? 'Codex Claw needs to restart to connect to the background agent.'
+        : 'Codex Claw needs to restart to use the in-app agent.',
       'Restart Codex Claw?',
       {
         cancelButtonText: 'Later',
