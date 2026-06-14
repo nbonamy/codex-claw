@@ -231,7 +231,7 @@ describe('useAppState', () => {
     expect(state.activeApprovalPreset.value).toBe('approve-for-me');
   });
 
-  it('updates settings and forwards quit through the preload bridge', async () => {
+  it('updates settings and forwards app quit and restart through the preload bridge', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();
     updatedSnapshot.theme = {
@@ -244,11 +244,13 @@ describe('useAppState', () => {
       resolveUpdateSettings = resolve;
     }));
     const quit = vi.fn().mockResolvedValue(undefined);
+    const restartApp = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal('window', {
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         updateSettings,
         quit,
+        restartApp,
         onEvent: vi.fn(),
       } satisfies Partial<CodexClawApi>,
     });
@@ -263,10 +265,12 @@ describe('useAppState', () => {
     resolveUpdateSettings(updatedSnapshot);
     await updatePromise;
     await state.quit();
+    await state.restartApp();
 
     expect(updateSettings).toHaveBeenCalledWith({ theme: { id: 'github-dark', mode: 'dark' } });
     expect(state.snapshot.value.theme.id).toBe('github-dark');
     expect(quit).toHaveBeenCalledOnce();
+    expect(restartApp).toHaveBeenCalledOnce();
   });
 
   it('loads source repositories and creates worktrees through clawd', async () => {

@@ -70,6 +70,7 @@
         :disconnect-work-provider="disconnectWorkProvider"
         :update-settings="updateSettings"
         :set-daemon-enabled="setDaemonEnabled"
+        :restart-app="restartApp"
         @select-tab="settingsActiveTab = $event"
       />
       <LoopsView
@@ -307,6 +308,7 @@ const props = withDefaults(defineProps<{
   updateAgent?: (input: UpdateAgentInput) => Promise<void>;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
   setDaemonEnabled?: (enabled: boolean) => Promise<void>;
+  restartApp?: () => Promise<void>;
   createLoop?: (input: CreateLoopInput) => Promise<void>;
   updateLoop?: (input: UpdateLoopInput) => Promise<void>;
   runLoop?: (loopId: string) => Promise<void>;
@@ -364,6 +366,7 @@ const props = withDefaults(defineProps<{
   updateAgent: async () => undefined,
   updateSettings: async () => undefined,
   setDaemonEnabled: async () => undefined,
+  restartApp: async () => undefined,
   createLoop: async () => undefined,
   updateLoop: async () => undefined,
   runLoop: async () => undefined,
@@ -999,6 +1002,10 @@ async function updateSettings(input: UpdateSettingsInput): Promise<void> {
 
 async function setDaemonEnabled(enabled: boolean): Promise<void> {
   await props.setDaemonEnabled(enabled);
+}
+
+async function restartApp(): Promise<void> {
+  await props.restartApp();
 }
 
 async function connectWorkProvider(provider: WorkProviderKind): Promise<void> {

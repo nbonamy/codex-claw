@@ -554,6 +554,10 @@ export function useAppState() {
     await window.codexClaw?.quit?.();
   }
 
+  async function restartApp(): Promise<void> {
+    await window.codexClaw?.restartApp?.();
+  }
+
   async function connectWorkProvider(provider: WorkProviderKind): Promise<void> {
     if (!window.codexClaw?.connectWorkProvider) {
       return;
@@ -998,6 +1002,7 @@ export function useAppState() {
     steerQueuedPrompt,
     removeQueuedPrompt,
     quit,
+    restartApp,
   };
 }
 

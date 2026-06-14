@@ -21,6 +21,7 @@
           :settings="generalSettings"
           :source-folder="sourceFolder"
           :set-daemon-enabled="setDaemonEnabled"
+          :restart-app="restartApp"
           :update-settings="updateSettings"
         />
         <SettingsIntegrationsPanel
@@ -73,6 +74,7 @@ withDefaults(defineProps<{
   disconnectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   openWorkProviderAuthorization?: (provider: WorkProviderKind) => Promise<void>;
   setDaemonEnabled?: (enabled: boolean) => Promise<void>;
+  restartApp?: () => Promise<void>;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
 }>(), {
   activeTab: 'general',
@@ -91,6 +93,7 @@ withDefaults(defineProps<{
   disconnectWorkProvider: async () => undefined,
   openWorkProviderAuthorization: async () => undefined,
   setDaemonEnabled: async () => undefined,
+  restartApp: async () => undefined,
 });
 
 const emit = defineEmits<{

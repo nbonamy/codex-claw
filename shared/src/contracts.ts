@@ -869,6 +869,7 @@ export type CodexClawApi = {
   openAccessibilitySettings(): Promise<SystemPermissionsStatus>;
   transcribeAppleSpeech(audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions): Promise<AppleSpeechTranscriptionResult>;
   quit(): Promise<void>;
+  restartApp(): Promise<void>;
   setAgentGoal(agentId: string, objective: string): Promise<AppSnapshot>;
   clearAgentGoal(agentId: string): Promise<AppSnapshot>;
   setAgentApprovalPreset(agentId: string, preset: ApprovalPreset): Promise<AppSnapshot>;

@@ -136,6 +136,7 @@
 </template>
 
 <script setup lang="ts">
+import { ElMessageBox } from 'element-plus';
 import { computed, onMounted, ref } from 'vue';
 import type { AppGeneralSettings, ClawdDaemonStatus, SourceFolderState, SystemPermissionsStatus, UpdateSettingsInput } from '@codex-claw/shared/contracts';
 import { defaultSourceFolderState } from '@codex-claw/shared/settings';
@@ -158,6 +159,7 @@ const props = defineProps<{
   daemonStatusError?: string | null;
   getSystemPermissions?: () => Promise<SystemPermissionsStatus>;
   openAccessibilitySettings?: () => Promise<SystemPermissionsStatus>;
+  restartApp?: () => Promise<void>;
   setDaemonEnabled?: (enabled: boolean) => Promise<void>;
   settings: AppGeneralSettings;
   sourceFolder?: SourceFolderState;
@@ -295,10 +297,32 @@ async function updateDaemonEnabled(value: boolean | string | number): Promise<vo
   settingDaemon.value = true;
   try {
     await props.setDaemonEnabled?.(enabled);
+    await promptForRestartAfterDaemonChange(enabled);
   } finally {
     settingDaemon.value = false;
     daemonOperation.value = null;
   }
+}
+
+async function promptForRestartAfterDaemonChange(enabled: boolean): Promise<void> {
+  try {
+    await ElMessageBox.confirm(
+      enabled
+        ? 'Codex Claw needs to restart to connect to the background backend.'
+        : 'Codex Claw needs to restart to use the local backend.',
+      'Restart Codex Claw?',
+      {
+        cancelButtonText: 'Later',
+        confirmButtonText: 'Restart now',
+        distinguishCancelAndClose: true,
+        type: 'info',
+      },
+    );
+  } catch {
+    return;
+  }
+
+  await props.restartApp?.();
 }
 </script>
 

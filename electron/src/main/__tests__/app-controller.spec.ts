@@ -9,6 +9,21 @@ import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
 describe('AppController', () => {
+  it('relaunches the app when restart is requested', () => {
+    const appLifecycle = {
+      quit: vi.fn(),
+      relaunch: vi.fn(),
+      exit: vi.fn(),
+    };
+    const controller = new AppController(createInitialSnapshot(), null, appLifecycle);
+
+    restartApp(controller);
+
+    expect(appLifecycle.relaunch).toHaveBeenCalledOnce();
+    expect(appLifecycle.exit).toHaveBeenCalledWith(0);
+    expect(appLifecycle.quit).not.toHaveBeenCalled();
+  });
+
   it('starts and health-checks the configured backend process client', async () => {
     const snapshot = createInitialSnapshot();
     const backendClient = {
@@ -1236,6 +1251,10 @@ function currentSnapshot(controller: AppController): AppSnapshot {
 
 function currentClientState(controller: AppController): ClientState {
   return (controller as unknown as { clientState: ClientState }).clientState;
+}
+
+function restartApp(controller: AppController): void {
+  return (controller as unknown as { restartApp(): void }).restartApp();
 }
 
 function createBackendClientWithEventEmitter(

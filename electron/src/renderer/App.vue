@@ -60,6 +60,7 @@
     :load-work-repositories="loadWorkRepositories"
     :load-work-items="loadWorkItems"
     :quit="quit"
+    :restart-app="restartApp"
     @close-team="closeTeam"
     @close-agent="closeAgent"
     @duplicate-agent="duplicateAgent"
@@ -191,6 +192,7 @@ const {
   steerQueuedPrompt,
   removeQueuedPrompt,
   quit,
+  restartApp,
 } = useAppState();
 
 let unsubscribeSystemAppearance: (() => void) | null = null;

@@ -53,6 +53,7 @@ export const ipcChannels = {
   openAccessibilitySettings: 'system-permissions:accessibility:open',
   transcribeAppleSpeech: 'transcription:apple-speech',
   quit: 'app:quit',
+  restartApp: 'app:restart',
   setAgentGoal: 'agent:goal:set',
   clearAgentGoal: 'agent:goal:clear',
   setAgentApprovalPreset: 'agent:approval-preset:set',

@@ -57,6 +57,7 @@ const api: CodexClawApi = {
   openAccessibilitySettings: () => ipcRenderer.invoke(ipcChannels.openAccessibilitySettings),
   transcribeAppleSpeech: (audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions) => ipcRenderer.invoke(ipcChannels.transcribeAppleSpeech, audioData, options),
   quit: () => ipcRenderer.invoke(ipcChannels.quit),
+  restartApp: () => ipcRenderer.invoke(ipcChannels.restartApp),
   setAgentGoal: (agentId: string, objective: string) => ipcRenderer.invoke(ipcChannels.setAgentGoal, agentId, objective),
   clearAgentGoal: (agentId: string) => ipcRenderer.invoke(ipcChannels.clearAgentGoal, agentId),
   setAgentApprovalPreset: (agentId: string, preset: ApprovalPreset) => ipcRenderer.invoke(ipcChannels.setAgentApprovalPreset, agentId, preset),

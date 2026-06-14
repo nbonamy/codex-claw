@@ -9,6 +9,8 @@ import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards
 import type { AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
+type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
+
 export class AppController {
   private mainWindow: BrowserWindow | null = null;
   private snapshot: AppSnapshot | null = null;
@@ -22,6 +24,7 @@ export class AppController {
   constructor(
     initialSnapshot: AppSnapshot | null = null,
     backendClient: ClawBackendClientPort | null = createRuntimeClawBackendClient(),
+    private readonly appLifecycle: AppLifecycle = app,
   ) {
     this.snapshot = initialSnapshot;
     this.backendClient = backendClient;
@@ -238,7 +241,11 @@ export class AppController {
     });
 
     ipcMain.handle(ipcChannels.quit, () => {
-      app.quit();
+      this.appLifecycle.quit();
+    });
+
+    ipcMain.handle(ipcChannels.restartApp, () => {
+      this.restartApp();
     });
 
     ipcMain.handle(ipcChannels.setAgentGoal, (_event, agentId: string, objective: string) => {
@@ -423,6 +430,11 @@ export class AppController {
 
   private async setDaemonEnabled(enabled: boolean): Promise<ClawdDaemonStatus> {
     return setClawdDaemonEnabled(enabled);
+  }
+
+  private restartApp(): void {
+    this.appLifecycle.relaunch();
+    this.appLifecycle.exit(0);
   }
 
   private async createLoop(input: CreateLoopInput): Promise<AppSnapshot> {

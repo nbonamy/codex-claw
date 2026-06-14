@@ -1,11 +1,15 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
-import { describe, expect, it, vi } from 'vitest';
+import ElementPlus, { ElMessageBox } from 'element-plus';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ClawdDaemonStatus, SystemPermissionsStatus } from '@codex-claw/shared/contracts';
 import { defaultGeneralSettings } from '@codex-claw/shared/settings';
 import SettingsGeneralPanel from '../SettingsGeneralPanel.vue';
 
 describe('SettingsGeneralPanel', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('updates the prevent sleep setting', async () => {
     const updateSettings = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountPanel({ updateSettings });
@@ -22,6 +26,7 @@ describe('SettingsGeneralPanel', () => {
   });
 
   it('toggles the background service through Settings', async () => {
+    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue('cancel');
     let resolveInstall: () => void = () => undefined;
     const installing = new Promise<void>((resolve) => {
       resolveInstall = resolve;
@@ -49,6 +54,14 @@ describe('SettingsGeneralPanel', () => {
     await flushPromises();
 
     expect(wrapper.text()).not.toContain('Installing...');
+    expect(confirm).toHaveBeenCalledWith(
+      'Codex Claw needs to restart to connect to the background backend.',
+      'Restart Codex Claw?',
+      expect.objectContaining({
+        cancelButtonText: 'Later',
+        confirmButtonText: 'Restart now',
+      }),
+    );
   });
 
   it('uses a green status dot when the daemon is installed', async () => {
@@ -63,6 +76,7 @@ describe('SettingsGeneralPanel', () => {
   });
 
   it('shows a loading indicator while uninstalling the daemon', async () => {
+    vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue('cancel');
     let resolveUninstall: () => void = () => undefined;
     const uninstalling = new Promise<void>((resolve) => {
       resolveUninstall = resolve;
@@ -87,6 +101,44 @@ describe('SettingsGeneralPanel', () => {
     await flushPromises();
 
     expect(wrapper.text()).not.toContain('Uninstalling...');
+  });
+
+  it('restarts the app when the user accepts the daemon restart dialog', async () => {
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
+    const restartApp = vi.fn().mockResolvedValue(undefined);
+    const setDaemonEnabled = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({
+      daemonStatus: daemonStatus({ installed: false, running: false }),
+      restartApp,
+      setDaemonEnabled,
+    });
+
+    await flushPromises();
+    const switches = wrapper.findAllComponents({ name: 'ElSwitch' });
+    await switches[1].vm.$emit('update:modelValue', true);
+    await flushPromises();
+
+    expect(setDaemonEnabled).toHaveBeenCalledWith(true);
+    expect(restartApp).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the app running when the user postpones the daemon restart dialog', async () => {
+    vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue('cancel');
+    const restartApp = vi.fn().mockResolvedValue(undefined);
+    const setDaemonEnabled = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({
+      daemonStatus: daemonStatus({ installed: true, running: true }),
+      restartApp,
+      setDaemonEnabled,
+    });
+
+    await flushPromises();
+    const switches = wrapper.findAllComponents({ name: 'ElSwitch' });
+    await switches[1].vm.$emit('update:modelValue', false);
+    await flushPromises();
+
+    expect(setDaemonEnabled).toHaveBeenCalledWith(false);
+    expect(restartApp).not.toHaveBeenCalled();
   });
 
   it('disables daemon installation when the desktop adapter reports unsupported status', async () => {
