@@ -13,7 +13,7 @@ export function warnMain(area: string, message: string, details?: Record<string,
   }
 
   const suffix = details ? ` ${safeJson(details)}` : '';
-  console.warn(`[codex-claw:${area}] ${message}${suffix}`);
+  console.warn(`[codex-claw:${area}] ${message}${suffix}`.replaceAll(/[ ]+/g, ' '));
 }
 
 function safeJson(details: Record<string, unknown>): string {

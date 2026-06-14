@@ -67,7 +67,7 @@ export class ClawBackendProcessClient {
     this.process = child;
     child.stdout.on('data', (chunk) => this.handleStdout(chunk));
     child.stderr.on('data', (chunk) => {
-      warnMain('clawd', 'backend stderr', { detail: chunk.toString().trim() });
+      warnMain('clawd', '', { detail: chunk.toString().trim() });
     });
     child.once('exit', (code, signal) => {
       this.process = null;
