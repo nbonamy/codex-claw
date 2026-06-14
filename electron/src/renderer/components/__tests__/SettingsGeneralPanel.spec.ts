@@ -22,7 +22,11 @@ describe('SettingsGeneralPanel', () => {
   });
 
   it('toggles the background clawd daemon through Settings', async () => {
-    const setDaemonEnabled = vi.fn().mockResolvedValue(undefined);
+    let resolveInstall: () => void = () => undefined;
+    const installing = new Promise<void>((resolve) => {
+      resolveInstall = resolve;
+    });
+    const setDaemonEnabled = vi.fn().mockReturnValue(installing);
     const wrapper = mountPanel({
       daemonStatus: daemonStatus({ installed: false, running: false }),
       setDaemonEnabled,
@@ -35,8 +39,16 @@ describe('SettingsGeneralPanel', () => {
 
     const switches = wrapper.findAllComponents({ name: 'ElSwitch' });
     await switches[1].vm.$emit('update:modelValue', true);
+    await wrapper.vm.$nextTick();
 
     expect(setDaemonEnabled).toHaveBeenCalledWith(true);
+    expect(wrapper.text()).toContain('Installing...');
+    expect(wrapper.find('.settings-general-panel__spinner').exists()).toBe(true);
+
+    resolveInstall();
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain('Installing...');
   });
 
   it('disables daemon installation when the desktop adapter reports unsupported status', async () => {

@@ -30,9 +30,20 @@
           <span class="settings-general-panel__actions">
             <span
               class="settings-general-panel__status"
-              :class="{ 'settings-general-panel__status--granted': daemonRunning }"
+              :class="{
+                'settings-general-panel__status--granted': daemonRunning && !settingDaemon,
+                'settings-general-panel__status--loading': settingDaemon,
+              }"
             >
-              <Circle aria-hidden="true" />
+              <span
+                v-if="settingDaemon"
+                class="settings-general-panel__spinner"
+                aria-hidden="true"
+              />
+              <Circle
+                v-else
+                aria-hidden="true"
+              />
               {{ daemonStatusLabel }}
             </span>
             <el-switch
@@ -158,6 +169,7 @@ const loadingPermissions = ref(false);
 const openingAccessibilitySettings = ref(false);
 const choosingSourceFolder = ref(false);
 const settingDaemon = ref(false);
+const daemonOperation = ref<'installing' | 'stopping' | null>(null);
 const sourceFolderError = ref<string | null>(null);
 
 const showSourceFolderSetting = computed(() => Boolean(props.sourceFolder));
@@ -167,6 +179,12 @@ const daemonEnabled = computed(() => props.daemonStatus?.installed ?? false);
 const daemonRunning = computed(() => props.daemonStatus?.running ?? false);
 const daemonSwitchDisabled = computed(() => settingDaemon.value || props.daemonStatus?.supported !== true);
 const daemonStatusLabel = computed(() => {
+  if (daemonOperation.value === 'installing') {
+    return 'Installing...';
+  }
+  if (daemonOperation.value === 'stopping') {
+    return 'Stopping...';
+  }
   if (!props.daemonStatus) {
     return 'Checking';
   }
@@ -272,11 +290,14 @@ function updatePreventSleep(value: boolean | string | number): void {
 }
 
 async function updateDaemonEnabled(value: boolean | string | number): Promise<void> {
+  const enabled = value === true;
+  daemonOperation.value = enabled ? 'installing' : 'stopping';
   settingDaemon.value = true;
   try {
-    await props.setDaemonEnabled?.(value === true);
+    await props.setDaemonEnabled?.(enabled);
   } finally {
     settingDaemon.value = false;
+    daemonOperation.value = null;
   }
 }
 </script>
@@ -327,6 +348,25 @@ async function updateDaemonEnabled(value: boolean | string | number): Promise<vo
 
 .settings-general-panel__status--granted {
   color: var(--color-success);
+}
+
+.settings-general-panel__status--loading {
+  color: var(--color-accent);
+}
+
+.settings-general-panel__spinner {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 999px;
+  animation: settings-general-panel-spin 0.8s linear infinite;
+}
+
+@keyframes settings-general-panel-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 780px) {
