@@ -626,6 +626,93 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
+  it('hydrates the selected team active agent and refreshes git status', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams = [
+      { id: 'team-test', name: 'Test Team', agentIds: ['agent-dina'], activeAgentId: 'agent-dina' },
+      { id: 'team-other', name: 'Other Team', agentIds: ['agent-jesse'], activeAgentId: 'agent-jesse' },
+    ];
+    snapshot.activeTeamId = 'team-test';
+    snapshot.activeAgentId = 'agent-dina';
+    snapshot.agents = [
+      {
+        id: 'agent-dina',
+        teamId: 'team-test',
+        name: 'Dina',
+        folder: '/Users/nbonamy/src/codex-claw',
+        backend: 'codex',
+        status: { type: 'idle' },
+        createdAt: '2026-06-13T00:00:00.000Z',
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      },
+      {
+        id: 'agent-jesse',
+        teamId: 'team-other',
+        name: 'Jesse',
+        folder: '/Users/nbonamy/src/multi-llm-ts',
+        backend: 'codex',
+        backendSession: { kind: 'codex', threadId: 'thread-old' },
+        status: { type: 'idle' },
+        createdAt: '2026-06-13T00:00:00.000Z',
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      },
+    ];
+    const hydrateAgent = vi.fn().mockResolvedValue({ kind: 'codex', threadId: 'thread-hydrated' });
+    const getGitStatus = vi.fn().mockResolvedValue({
+      folder: '/Users/nbonamy/src/multi-llm-ts',
+      branch: 'main',
+      ahead: 0,
+      behind: 0,
+      changedFiles: 1,
+      addedLines: 3,
+      removedLines: 2,
+      hasUntracked: false,
+      state: 'dirty',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    });
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      getGitStatus,
+      hydrateAgent,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'select-team',
+      method: 'team/select',
+      params: { teamId: 'team-other' },
+    })).resolves.toMatchObject({
+      result: {
+        activeTeamId: 'team-other',
+        activeAgentId: 'agent-jesse',
+        agents: [
+          { id: 'agent-dina' },
+          { id: 'agent-jesse', backendSession: { kind: 'codex', threadId: 'thread-hydrated' } },
+        ],
+        agentGitStatuses: {
+          'agent-jesse': expect.objectContaining({ branch: 'main', state: 'dirty' }),
+        },
+      },
+    });
+
+    expect(hydrateAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-jesse' }));
+    expect(getGitStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-jesse', backendSession: { kind: 'codex', threadId: 'thread-hydrated' } }));
+    await server.close();
+  });
+
   it('owns team mutations', async () => {
     const snapshot = createTestSnapshot();
     const events: unknown[] = [];

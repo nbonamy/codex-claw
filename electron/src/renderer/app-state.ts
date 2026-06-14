@@ -286,8 +286,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.selectAgent(agentId);
-    await loadActiveAgentCatalogs();
+    await selectSnapshotWithLoading(() => window.codexClaw!.selectAgent(agentId));
   }
 
   async function chooseAgentFolder(): Promise<string | null> {
@@ -416,8 +415,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.selectTeam(teamId);
-    await loadActiveAgentCatalogs();
+    await selectSnapshotWithLoading(() => window.codexClaw!.selectTeam(teamId));
   }
 
   async function createLoop(input: CreateLoopInput): Promise<void> {
@@ -1406,6 +1404,16 @@ async function hydrateActiveAgentHistory(): Promise<void> {
   }
 
   snapshot.value = await window.codexClaw.selectAgent(activeAgent.id);
+}
+
+async function selectSnapshotWithLoading(selectSnapshot: () => Promise<AppSnapshot>): Promise<void> {
+  isLoading.value = true;
+  try {
+    snapshot.value = await selectSnapshot();
+    await loadActiveAgentCatalogs();
+  } finally {
+    isLoading.value = false;
+  }
 }
 
 function markAgentSending(agentId: string, sending: boolean): void {

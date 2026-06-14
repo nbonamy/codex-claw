@@ -131,8 +131,7 @@ export class ClawBackendServer {
         const agentId = requireAgentId(message.params);
         selectAgent(this.snapshot, agentId);
         const snapshot = await this.persistAndEmitSnapshot();
-        await this.hydrateAgentHistory(agentId);
-        await this.refreshAgentGitStatus(agentId);
+        await this.hydrateAndRefreshSelectedAgent(agentId);
         return createClawRpcResult(message.id, snapshot);
       }
       case 'agent/duplicate': {
@@ -488,7 +487,11 @@ export class ClawBackendServer {
       }
       case 'team/select': {
         selectTeam(this.snapshot, requireTeamId(message.params));
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        const snapshot = await this.persistAndEmitSnapshot();
+        if (snapshot.activeAgentId) {
+          await this.hydrateAndRefreshSelectedAgent(snapshot.activeAgentId);
+        }
+        return createClawRpcResult(message.id, snapshot);
       }
       case 'bench/saveAgent': {
         const agentId = requireAgentId(message.params);
@@ -905,6 +908,11 @@ export class ClawBackendServer {
     } catch {
       // Hydration is opportunistic; failed history restore should not block selection.
     }
+  }
+
+  private async hydrateAndRefreshSelectedAgent(agentId: string): Promise<void> {
+    await this.hydrateAgentHistory(agentId);
+    await this.refreshAgentGitStatus(agentId);
   }
 
   private async refreshAgentGitStatus(agentId: string): Promise<void> {

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { BackendConversationRef, CodexClawApi, ConversationSummary, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AppSnapshot, BackendConversationRef, CodexClawApi, ConversationSummary, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/shared/contracts';
 import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
 import { workItemAssignmentPrompt } from '@codex-claw/shared/work-item-prompts';
 import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';
@@ -929,6 +929,46 @@ describe('useAppState', () => {
 
     expect(selectTeam).not.toHaveBeenCalled();
     expect(state.snapshot.value.activeTeamId).toBe('team-codex-claw');
+  });
+
+  it('shows loading while agent and team selections hydrate conversation state', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const agentSelection = deferred<AppSnapshot>();
+    const teamSelection = deferred<AppSnapshot>();
+    const selectAgent = vi.fn().mockReturnValue(agentSelection.promise);
+    const selectTeam = vi.fn().mockReturnValue(teamSelection.promise);
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        selectAgent,
+        selectTeam,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    const agentPromise = state.selectAgent('agent-jesse');
+    expect(state.isLoading.value).toBe(true);
+    agentSelection.resolve({
+      ...remoteSnapshot,
+      activeAgentId: 'agent-jesse',
+    });
+    await agentPromise;
+    expect(state.isLoading.value).toBe(false);
+    expect(state.activeAgent.value?.id).toBe('agent-jesse');
+
+    const teamPromise = state.selectTeam('team-codex-claw');
+    expect(state.isLoading.value).toBe(true);
+    teamSelection.resolve({
+      ...remoteSnapshot,
+      activeAgentId: 'agent-dina',
+      activeTeamId: 'team-codex-claw',
+    });
+    await teamPromise;
+    expect(state.isLoading.value).toBe(false);
+    expect(state.activeAgent.value?.id).toBe('agent-dina');
   });
 
   it('sends prompts through preload and replaces the snapshot with the main result', async () => {
