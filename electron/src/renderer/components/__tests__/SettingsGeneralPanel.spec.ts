@@ -51,6 +51,42 @@ describe('SettingsGeneralPanel', () => {
     expect(wrapper.text()).not.toContain('Installing...');
   });
 
+  it('uses a green status dot when the daemon is installed', async () => {
+    const wrapper = mountPanel({
+      daemonStatus: daemonStatus({ installed: true, running: false }),
+    });
+
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Installed');
+    expect(wrapper.find('.settings-general-panel__status-icon--ok').exists()).toBe(true);
+  });
+
+  it('does not show a loading indicator while disabling the daemon', async () => {
+    let resolveStop: () => void = () => undefined;
+    const stopping = new Promise<void>((resolve) => {
+      resolveStop = resolve;
+    });
+    const setDaemonEnabled = vi.fn().mockReturnValue(stopping);
+    const wrapper = mountPanel({
+      daemonStatus: daemonStatus({ installed: true, running: true }),
+      setDaemonEnabled,
+    });
+
+    await flushPromises();
+
+    const switches = wrapper.findAllComponents({ name: 'ElSwitch' });
+    await switches[1].vm.$emit('update:modelValue', false);
+    await wrapper.vm.$nextTick();
+
+    expect(setDaemonEnabled).toHaveBeenCalledWith(false);
+    expect(wrapper.text()).not.toContain('Stopping...');
+    expect(wrapper.find('.settings-general-panel__spinner').exists()).toBe(false);
+
+    resolveStop();
+    await flushPromises();
+  });
+
   it('disables daemon installation when the desktop adapter reports unsupported status', async () => {
     const wrapper = mountPanel({
       daemonStatus: daemonStatus({

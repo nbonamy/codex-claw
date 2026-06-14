@@ -31,17 +31,18 @@
             <span
               class="settings-general-panel__status"
               :class="{
-                'settings-general-panel__status--granted': daemonRunning && !settingDaemon,
-                'settings-general-panel__status--loading': settingDaemon,
+                'settings-general-panel__status--loading': daemonOperation === 'installing',
               }"
             >
               <span
-                v-if="settingDaemon"
+                v-if="daemonOperation === 'installing'"
                 class="settings-general-panel__spinner"
                 aria-hidden="true"
               />
               <Circle
                 v-else
+                class="settings-general-panel__status-icon"
+                :class="{ 'settings-general-panel__status-icon--ok': daemonEnabled }"
                 aria-hidden="true"
               />
               {{ daemonStatusLabel }}
@@ -49,7 +50,7 @@
             <el-switch
               :model-value="daemonEnabled"
               :disabled="daemonSwitchDisabled"
-              :loading="settingDaemon"
+              :loading="daemonOperation === 'installing'"
               aria-label="Run backend in background"
               @update:model-value="updateDaemonEnabled"
             />
@@ -181,9 +182,6 @@ const daemonSwitchDisabled = computed(() => settingDaemon.value || props.daemonS
 const daemonStatusLabel = computed(() => {
   if (daemonOperation.value === 'installing') {
     return 'Installing...';
-  }
-  if (daemonOperation.value === 'stopping') {
-    return 'Stopping...';
   }
   if (!props.daemonStatus) {
     return 'Checking';
@@ -351,7 +349,12 @@ async function updateDaemonEnabled(value: boolean | string | number): Promise<vo
 }
 
 .settings-general-panel__status--loading {
-  color: var(--color-accent);
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-regular);
+}
+
+.settings-general-panel__status-icon--ok {
+  color: var(--color-success);
 }
 
 .settings-general-panel__spinner {
