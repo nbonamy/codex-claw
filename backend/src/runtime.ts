@@ -14,6 +14,7 @@ import { backendWorkIntegrationTokensFilePath, loadBackendSnapshot, saveBackendS
 import { EncryptedFileWorkIntegrationTokenStore } from './work-integrations/encrypted-file-token-store';
 import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
 import { WorkIntegrationManager } from './work-integrations/manager';
+import { warnMain } from './log';
 
 export type ClawdClientRequest = <Result>(method: string, params?: unknown) => Promise<Result>;
 
@@ -80,7 +81,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   const loopScheduler = new LoopScheduler({
     runLoops: () => loopRunner.runAll(),
     onError: (error) => {
-      process.stderr.write(`[loops] scheduler check failed: ${error instanceof Error ? error.message : String(error)}\n`);
+      warnMain('loop-scheduler', 'check failed', { message: error instanceof Error ? error.message : String(error) });
     },
   });
   server = new ClawBackendServer({
@@ -126,7 +127,10 @@ async function setNewConversationTitle(agent: Agent, driver: AgentBackendDriver,
   try {
     await driver.setConversationTitle(agent, formatConversationTitle(agent));
   } catch (error) {
-    process.stderr.write(`[conversation-title] failed for ${agent.id}: ${error instanceof Error ? error.message : String(error)}\n`);
+    warnMain('conversation-title', 'failed', {
+      agentId: agent.id,
+      message: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 

@@ -607,10 +607,21 @@ automatically for the current user. In dev, the same installer is available only
 when `CODEX_CLAW_BACKEND_COMMAND` points at a usable clawd runtime; otherwise
 the Settings switch reports that no packaged runtime is available.
 
-`clawd` writes its own durable operational log to
+`clawd` writes its canonical durable operational log as structured JSONL to
 `$CODEX_CLAW_HOME/logs/clawd.log` (default `~/.codex-claw/logs/clawd.log`).
-When launched by the macOS LaunchAgent, launchd also captures stdout and stderr
-to `~/Library/Logs/Codex Claw/clawd.out.log` and `clawd.err.log`.
+The log is produced through the backend logger, supports `trace`, `debug`,
+`info`, `warn`, `error`, `fatal`, and `silent` levels via
+`CODEX_CLAW_LOG_LEVEL`, and rotates by size. Defaults are 5 MiB per file and
+five retained archives; `CODEX_CLAW_LOG_MAX_BYTES` and
+`CODEX_CLAW_LOG_MAX_FILES` can override those values.
+
+Because `clawd --stdio` reserves stdout for JSON-RPC, console-side logs must
+only use stderr. The backend mirrors `warn` and above to stderr and writes lower
+levels only to the canonical log file. `CODEX_CLAW_LOG_STDERR_LEVEL` can raise
+or lower the stderr mirror threshold independently from the file log threshold.
+When launched by the macOS LaunchAgent, launchd captures stdout and stderr to
+`~/Library/Logs/Codex Claw/clawd.out.log` and `clawd.err.log`; those files are
+secondary process-capture logs, not the primary operational log.
 
 Enabling the switch starts the LaunchAgent immediately, but the current Electron
 session keeps its already-selected backend transport. The guaranteed behavior is

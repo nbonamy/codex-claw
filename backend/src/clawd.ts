@@ -4,6 +4,7 @@ import { createClawdRuntime, type ClawdRuntime } from './runtime';
 import { backendSocketPath } from './state';
 import { LocalSocketRpcServer } from './socket-server';
 import { StdioRpcPeer } from './stdio';
+import { flushBackendLogs, logMain } from './log';
 
 export const CLAWD_VERSION = '0.1.0';
 
@@ -54,6 +55,7 @@ async function runStdio(): Promise<void> {
     stopping = true;
     stdio.stop();
     await runtime.stop();
+    await flushBackendLogs();
   };
   process.once('SIGTERM', () => {
     void stop().finally(() => process.exit(0));
@@ -87,7 +89,7 @@ async function serve(): Promise<void> {
     onMessage: (message) => runtime.server.handleMessage(message),
   });
   await socketServer.start();
-  process.stderr.write(`[clawd:daemon] listening {"socketPath":"${backendSocketPath()}"}\n`);
+  logMain('daemon', 'listening', { socketPath: backendSocketPath() });
 
   let stopping = false;
   const stop = async () => {
@@ -97,6 +99,7 @@ async function serve(): Promise<void> {
     stopping = true;
     await socketServer?.stop();
     await runtime.stop();
+    await flushBackendLogs();
   };
   process.once('SIGTERM', () => {
     void stop().finally(() => process.exit(0));
