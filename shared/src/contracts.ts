@@ -526,6 +526,8 @@ export type ClawdDaemonStatus = {
   running: boolean;
   socketPath: string;
   launchAgentPath?: string;
+  version?: string;
+  pid?: number;
   detail?: string;
 };
 

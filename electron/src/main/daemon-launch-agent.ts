@@ -5,12 +5,15 @@ import path from 'node:path';
 import { execFile as execFileCallback } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { ClawdDaemonStatus } from '@codex-claw/shared/contracts';
-import { runtimeClawdHome, runtimeClawdServeCommand, runtimeClawdSocketPath, type RuntimeClawdConfigDeps, type RuntimeClawdCommand } from './runtime-config';
+import { runtimeClawdCommand, runtimeClawdHome, runtimeClawdServeCommand, runtimeClawdSocketPath, type RuntimeClawdConfigDeps, type RuntimeClawdCommand } from './runtime-config';
 
 const execFile = promisify(execFileCallback);
 const launchAgentLabel = 'com.nabocorp.codex-claw.clawd';
 
-type ExecFile = (file: string, args: string[]) => Promise<unknown>;
+type ExecFileResult = {
+  stdout?: string | Buffer;
+};
+type ExecFile = (file: string, args: string[]) => Promise<ExecFileResult>;
 
 export type DaemonLaunchAgentDependencies = RuntimeClawdConfigDeps & {
   access?: typeof access;
@@ -48,6 +51,8 @@ export async function getClawdDaemonStatus(
     running: health.ok,
     socketPath: resolved.socketPath,
     launchAgentPath: resolved.launchAgentPath,
+    ...(health.version ? { version: health.version } : {}),
+    ...(typeof health.pid === 'number' ? { pid: health.pid } : {}),
     detail: statusDetail({ command, health, platformSupported }),
   };
 }
@@ -82,6 +87,24 @@ export async function installClawdDaemon(
   await launchctl(['bootstrap', launchctlDomain(dependencies), resolved.launchAgentPath], dependencies);
   await launchctl(['kickstart', '-k', launchctlServiceTarget(dependencies)], dependencies);
   return getClawdDaemonStatus(dependencies);
+}
+
+export async function refreshClawdDaemon(
+  dependencies: DaemonLaunchAgentDependencies = {},
+): Promise<ClawdDaemonStatus> {
+  return installClawdDaemon(dependencies);
+}
+
+export async function getResolvedClawdVersion(
+  dependencies: DaemonLaunchAgentDependencies = {},
+): Promise<string | null> {
+  const command = runtimeClawdCommand(dependencies);
+  if (!command) {
+    return null;
+  }
+
+  const result = await (dependencies.execFile ?? execFile)(command.command, versionArgsFromRuntimeArgs(command.args));
+  return parseClawdVersion(result.stdout);
 }
 
 export async function uninstallClawdDaemon(
@@ -200,7 +223,7 @@ function isSupportedPlatform(dependencies: DaemonLaunchAgentDependencies): boole
 
 function statusDetail(options: {
   command: RuntimeClawdCommand | null;
-  health: { ok: boolean; error?: string };
+  health: ClawdHealthProbe;
   platformSupported: boolean;
 }): string | undefined {
   if (!options.platformSupported) {
@@ -215,16 +238,23 @@ function statusDetail(options: {
   return undefined;
 }
 
+type ClawdHealthProbe = {
+  ok: boolean;
+  error?: string;
+  version?: string;
+  pid?: number;
+};
+
 function probeClawdSocket(
   socketPath: string,
   dependencies: DaemonLaunchAgentDependencies,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<ClawdHealthProbe> {
   return new Promise((resolve) => {
     const socket = (dependencies.connectSocket ?? net.createConnection)(socketPath);
     let buffer = '';
     let done = false;
 
-    const finish = (result: { ok: boolean; error?: string }) => {
+    const finish = (result: ClawdHealthProbe) => {
       if (done) {
         return;
       }
@@ -246,7 +276,12 @@ function probeClawdSocket(
 
       try {
         const message = JSON.parse(buffer.slice(0, newlineIndex));
-        finish({ ok: message?.id === 1 && Boolean(message?.result) && !message.error });
+        const result = message?.result;
+        finish({
+          ok: message?.id === 1 && Boolean(result) && !message.error,
+          ...(typeof result?.version === 'string' ? { version: result.version } : {}),
+          ...(typeof result?.pid === 'number' ? { pid: result.pid } : {}),
+        });
       } catch (error) {
         finish({ ok: false, error: error instanceof Error ? error.message : 'Invalid daemon health response.' });
       }
@@ -254,4 +289,23 @@ function probeClawdSocket(
     socket.once('timeout', () => finish({ ok: false, error: 'clawd daemon health check timed out.' }));
     socket.once('error', (error) => finish({ ok: false, error: error.message }));
   });
+}
+
+function versionArgsFromRuntimeArgs(args: string[]): string[] {
+  const modeIndex = args.findIndex((arg) => arg === '--stdio' || arg === 'serve');
+  if (modeIndex >= 0) {
+    return [
+      ...args.slice(0, modeIndex),
+      '--version',
+      ...args.slice(modeIndex + 1),
+    ];
+  }
+
+  return [...args, '--version'];
+}
+
+function parseClawdVersion(stdout: string | Buffer | undefined): string | null {
+  const output = stdout?.toString().trim() ?? '';
+  const match = /^clawd\s+(.+)$/u.exec(output);
+  return match?.[1]?.trim() || null;
 }

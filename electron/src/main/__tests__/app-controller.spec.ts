@@ -43,6 +43,23 @@ describe('AppController', () => {
     expect(backendClient.close).toHaveBeenCalledOnce();
   });
 
+  it('runs startup daemon maintenance before connecting to clawd', async () => {
+    const order: string[] = [];
+    const backendClient = createBackendClient();
+    backendClient.start = vi.fn().mockImplementation(async () => {
+      order.push('backend-start');
+    });
+    const startupMaintenance = vi.fn().mockImplementation(async () => {
+      order.push('maintenance');
+    });
+    const controller = new AppController(createInitialSnapshot(), backendClient, fakeAppLifecycle(), startupMaintenance);
+
+    await controller.initialize();
+
+    expect(startupMaintenance).toHaveBeenCalledOnce();
+    expect(order).toStrictEqual(['maintenance', 'backend-start']);
+  });
+
   it('hydrates its renderer cache from clawd snapshot state', async () => {
     const initialSnapshot = createInitialSnapshot();
     const backendSnapshot = {
@@ -1255,6 +1272,14 @@ function currentClientState(controller: AppController): ClientState {
 
 function restartApp(controller: AppController): void {
   return (controller as unknown as { restartApp(): void }).restartApp();
+}
+
+function fakeAppLifecycle() {
+  return {
+    quit: vi.fn(),
+    relaunch: vi.fn(),
+    exit: vi.fn(),
+  };
 }
 
 function createBackendClientWithEventEmitter(

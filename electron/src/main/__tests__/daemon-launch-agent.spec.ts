@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import type { Socket } from 'node:net';
 import { describe, expect, it, vi } from 'vitest';
-import { getClawdDaemonStatus, installClawdDaemon, setClawdDaemonEnabled } from '../daemon-launch-agent';
+import { getClawdDaemonStatus, getResolvedClawdVersion, installClawdDaemon, setClawdDaemonEnabled } from '../daemon-launch-agent';
 
 describe('daemon launch agent', () => {
   it('reports unsupported status when no clawd runtime is available', async () => {
@@ -16,7 +16,7 @@ describe('daemon launch agent', () => {
       installed: false,
       running: false,
       socketPath: expect.stringContaining('.codex-claw/clawd.sock'),
-      launchAgentPath: '/Users/nicolas/Library/LaunchAgents/com.codex-claw.clawd.plist',
+      launchAgentPath: '/Users/nicolas/Library/LaunchAgents/com.nabocorp.codex-claw.clawd.plist',
       detail: 'No packaged clawd runtime was found.',
     });
   });
@@ -69,15 +69,17 @@ describe('daemon launch agent', () => {
       supported: true,
       installed: true,
       running: true,
-      launchAgentPath: '/Users/nicolas/Library/LaunchAgents/com.codex-claw.clawd.plist',
+      launchAgentPath: '/Users/nicolas/Library/LaunchAgents/com.nabocorp.codex-claw.clawd.plist',
       socketPath: '/Users/nicolas/.codex-claw/clawd.sock',
+      version: '0.1.0',
+      pid: 123,
     });
 
     expect(mkdir).toHaveBeenCalledWith('/Users/nicolas/Library/LaunchAgents', { recursive: true });
     expect(mkdir).toHaveBeenCalledWith('/Users/nicolas/Library/Logs/Codex Claw', { recursive: true });
     expect(mkdir).toHaveBeenCalledWith('/Users/nicolas/.codex-claw', { recursive: true, mode: 0o700 });
     expect(writeFile).toHaveBeenCalledWith(
-      '/Users/nicolas/Library/LaunchAgents/com.codex-claw.clawd.plist',
+      '/Users/nicolas/Library/LaunchAgents/com.nabocorp.codex-claw.clawd.plist',
       expect.stringContaining('<string>/Users/nicolas/.nvm/versions/node/v22.19.0/bin/node</string>'),
     );
 
@@ -93,17 +95,41 @@ describe('daemon launch agent', () => {
     expect(execFile).toHaveBeenNthCalledWith(1, 'launchctl', [
       'bootout',
       'gui/501',
-      '/Users/nicolas/Library/LaunchAgents/com.codex-claw.clawd.plist',
+      '/Users/nicolas/Library/LaunchAgents/com.nabocorp.codex-claw.clawd.plist',
     ]);
     expect(execFile).toHaveBeenNthCalledWith(2, 'launchctl', [
       'bootstrap',
       'gui/501',
-      '/Users/nicolas/Library/LaunchAgents/com.codex-claw.clawd.plist',
+      '/Users/nicolas/Library/LaunchAgents/com.nabocorp.codex-claw.clawd.plist',
     ]);
     expect(execFile).toHaveBeenNthCalledWith(3, 'launchctl', [
       'kickstart',
       '-k',
-      'gui/501/com.codex-claw.clawd',
+      'gui/501/com.nabocorp.codex-claw.clawd',
+    ]);
+  });
+
+  it('resolves the packaged clawd version through the runtime command', async () => {
+    const execFile = vi.fn().mockResolvedValue({ stdout: 'clawd 0.2.0\n' });
+
+    await expect(getResolvedClawdVersion({
+      defaultApp: false,
+      env: {
+        PATH: '/usr/bin:/Users/nicolas/.nvm/versions/node/v22.19.0/bin',
+      },
+      execFile,
+      execFileSync: vi.fn(() => {
+        throw new Error('login shell unavailable');
+      }),
+      existsSync: (filePath) => filePath === '/Applications/Codex Claw.app/Contents/Resources/clawd/clawd.mjs' ||
+        filePath === '/Users/nicolas/.nvm/versions/node/v22.19.0/bin/node',
+      homedir: () => '/Users/nicolas',
+      resourcesPath: '/Applications/Codex Claw.app/Contents/Resources',
+    })).resolves.toBe('0.2.0');
+
+    expect(execFile).toHaveBeenCalledWith('/Users/nicolas/.nvm/versions/node/v22.19.0/bin/node', [
+      '/Applications/Codex Claw.app/Contents/Resources/clawd/clawd.mjs',
+      '--version',
     ]);
   });
 
@@ -131,9 +157,9 @@ describe('daemon launch agent', () => {
     expect(execFile).toHaveBeenCalledWith('launchctl', [
       'bootout',
       'gui/501',
-      '/Users/nicolas/Library/LaunchAgents/com.codex-claw.clawd.plist',
+      '/Users/nicolas/Library/LaunchAgents/com.nabocorp.codex-claw.clawd.plist',
     ]);
-    expect(unlink).toHaveBeenCalledWith('/Users/nicolas/Library/LaunchAgents/com.codex-claw.clawd.plist');
+    expect(unlink).toHaveBeenCalledWith('/Users/nicolas/Library/LaunchAgents/com.nabocorp.codex-claw.clawd.plist');
   });
 });
 

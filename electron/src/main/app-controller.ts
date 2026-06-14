@@ -4,12 +4,14 @@ import { logMain, warnMain } from './log';
 import { createMainWindow } from './main-window';
 import { createRuntimeClawBackendClient, type ClawBackendClientPort } from './backend-client';
 import { getClawdDaemonStatus, setClawdDaemonEnabled } from './daemon-launch-agent';
+import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards';
 import type { AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
 type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
+type StartupMaintenance = () => Promise<void>;
 
 export class AppController {
   private mainWindow: BrowserWindow | null = null;
@@ -25,12 +27,14 @@ export class AppController {
     initialSnapshot: AppSnapshot | null = null,
     backendClient: ClawBackendClientPort | null = createRuntimeClawBackendClient(),
     private readonly appLifecycle: AppLifecycle = app,
+    private readonly startupMaintenance: StartupMaintenance = async () => undefined,
   ) {
     this.snapshot = initialSnapshot;
     this.backendClient = backendClient;
   }
 
   async initialize(): Promise<void> {
+    await this.startupMaintenance();
     await this.initializeBackendClient();
     this.syncPowerSaveBlocker();
   }
@@ -672,7 +676,7 @@ export class AppController {
 }
 
 export function startMainApp(): void {
-  const controller = new AppController();
+  const controller = new AppController(null, createRuntimeClawBackendClient(), app, ensureCurrentClawdDaemonForStartup);
   controller.registerIpcHandlers();
 
   void app.whenReady().then(async () => {

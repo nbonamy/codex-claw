@@ -55,7 +55,7 @@ describe('SettingsGeneralPanel', () => {
 
     expect(wrapper.text()).not.toContain('Installing...');
     expect(confirm).toHaveBeenCalledWith(
-      'Codex Claw needs to restart to connect to the background backend.',
+      'Codex Claw needs to restart to connect to the background agent.',
       'Restart Codex Claw?',
       expect.objectContaining({
         cancelButtonText: 'Later',
@@ -283,7 +283,7 @@ function daemonStatus(overrides: Partial<ClawdDaemonStatus> = {}): ClawdDaemonSt
     installed: false,
     running: false,
     socketPath: '/Users/nicolas/.codex-claw/clawd.sock',
-    launchAgentPath: '/Users/nicolas/Library/LaunchAgents/com.codex-claw.clawd.plist',
+    launchAgentPath: '/Users/nicolas/Library/LaunchAgents/com.nabocorp.codex-claw.clawd.plist',
     ...overrides,
   };
 }

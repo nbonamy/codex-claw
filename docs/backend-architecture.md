@@ -44,9 +44,9 @@ Current implementation checkpoint:
   and falls back to the bundled stdio process.
 - Settings > General exposes a macOS background-backend switch. Enabling it
   installs a per-user LaunchAgent at
-  `~/Library/LaunchAgents/com.codex-claw.clawd.plist`, starts `clawd serve`,
-  and lets future app launches connect to the existing daemon. Disabling it
-  unloads the LaunchAgent and removes the plist.
+  `~/Library/LaunchAgents/com.nabocorp.codex-claw.clawd.plist`, starts
+  `clawd serve`, and lets future app launches connect to the existing daemon.
+  Disabling it unloads the LaunchAgent and removes the plist.
 - Codex and Claude provider drivers now live under `backend/src`; Electron main
   must not import provider drivers, provider transports, provider SDKs, or raw
   provider protocol modules.
@@ -622,6 +622,13 @@ or lower the stderr mirror threshold independently from the file log threshold.
 When launched by the macOS LaunchAgent, launchd captures stdout and stderr to
 `~/Library/Logs/Codex Claw/clawd.out.log` and `clawd.err.log`; those files are
 secondary process-capture logs, not the primary operational log.
+
+On startup, packaged Electron resolves the current packaged `clawd --version`
+and compares it with the running daemon's `backend/health.version`. If an
+installed daemon is stale and idle, Electron refreshes the LaunchAgent before
+connecting. If active agents or loop executions are running, Electron asks the
+user whether to restart the daemon now or continue with the old backend for
+that launch.
 
 Enabling the switch starts the LaunchAgent immediately, but the current Electron
 session keeps its already-selected backend transport. The guaranteed behavior is
