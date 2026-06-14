@@ -781,7 +781,7 @@ describe('useAppState', () => {
     })).toContain('[Body truncated]');
   });
 
-  it('hydrates the active persisted thread after subscribing to main events', async () => {
+  it('lazy hydrates the active persisted thread after startup is interactive', async () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-persisted' };
     const hydratedSnapshot = {
@@ -797,11 +797,14 @@ describe('useAppState', () => {
         },
       ],
     };
-    const selectAgent = vi.fn().mockResolvedValue(hydratedSnapshot);
+    const hydration = deferred<AppSnapshot>();
+    const hydrateAgentHistory = vi.fn().mockReturnValue(hydration.promise);
+    const selectAgent = vi.fn();
     const onEvent = vi.fn();
     vi.stubGlobal('window', {
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        hydrateAgentHistory,
         selectAgent,
         onEvent,
       } satisfies Partial<CodexClawApi>,
@@ -811,17 +814,27 @@ describe('useAppState', () => {
     await state.loadSnapshot();
 
     expect(onEvent).toHaveBeenCalledOnce();
-    expect(selectAgent).toHaveBeenCalledWith('agent-dina');
+    expect(selectAgent).not.toHaveBeenCalled();
+    expect(hydrateAgentHistory).toHaveBeenCalledWith('agent-dina');
+    expect(state.isLoading.value).toBe(false);
+    expect(state.isHydratingActiveAgentHistory.value).toBe(true);
+    expect(state.visibleMessages.value).toStrictEqual([]);
+
+    hydration.resolve(hydratedSnapshot);
+    await hydration.promise;
+    await nextTick();
+
+    expect(state.isHydratingActiveAgentHistory.value).toBe(false);
     expect(state.visibleMessages.value).toStrictEqual(hydratedSnapshot.messages);
   });
 
   it('does not hydrate startup history for agents without a persisted thread', async () => {
     const remoteSnapshot = createInitialSnapshot();
-    const selectAgent = vi.fn();
+    const hydrateAgentHistory = vi.fn();
     vi.stubGlobal('window', {
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
-        selectAgent,
+        hydrateAgentHistory,
         onEvent: vi.fn(),
       } satisfies Partial<CodexClawApi>,
     });
@@ -829,18 +842,18 @@ describe('useAppState', () => {
     const state = useAppState();
     await state.loadSnapshot();
 
-    expect(selectAgent).not.toHaveBeenCalled();
+    expect(hydrateAgentHistory).not.toHaveBeenCalled();
     expect(state.activeAgent.value?.id).toBe('agent-dina');
   });
 
   it('does not hydrate startup history when no active agent is selected', async () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.activeAgentId = null;
-    const selectAgent = vi.fn();
+    const hydrateAgentHistory = vi.fn();
     vi.stubGlobal('window', {
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
-        selectAgent,
+        hydrateAgentHistory,
         onEvent: vi.fn(),
       } satisfies Partial<CodexClawApi>,
     });
@@ -848,11 +861,11 @@ describe('useAppState', () => {
     const state = useAppState();
     await state.loadSnapshot();
 
-    expect(selectAgent).not.toHaveBeenCalled();
+    expect(hydrateAgentHistory).not.toHaveBeenCalled();
     expect(state.activeAgent.value).toBeNull();
   });
 
-  it('loads persisted thread metadata without hydration when the preload bridge cannot select agents', async () => {
+  it('loads persisted thread metadata without hydration when the preload bridge cannot hydrate agents', async () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-persisted' };
     vi.stubGlobal('window', {

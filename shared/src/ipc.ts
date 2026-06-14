@@ -44,6 +44,7 @@ export const ipcChannels = {
   deployBenchTemplate: 'bench:deploy-template',
   removeBenchTemplate: 'bench:remove-template',
   restartAgent: 'agent:restart',
+  hydrateAgentHistory: 'agent:history:hydrate',
   closeAgent: 'agent:close',
   selectAgent: 'agent:select',
   updateSettings: 'settings:update',

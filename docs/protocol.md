@@ -106,6 +106,7 @@ reducers locally.
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
 | `agent/restart` | `{ agentId }` | `AppSnapshot` | Clears app-visible conversation state and forgets backend session. |
+| `agent/hydrateHistory` | `{ agentId }` | `AppSnapshot` | Lazily restores persisted session history without selecting the agent. |
 | `agent/listConversations` | `{ agentId }` | `ConversationSummary[]` | Lists provider history through the active agent backend. |
 | `agent/resumeConversation` | `{ agentId, ref: BackendConversationRef }` | `AppSnapshot` | Validates backend match and idle status, then replaces visible history. |
 | `agent/readConversationMessages` | `{ agentId, ref }` | `RendererMessage[]` | Reads historical messages through the owning backend. |

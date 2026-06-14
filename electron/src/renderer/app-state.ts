@@ -38,6 +38,7 @@ const sourceRepositoryStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>
 const sourceRepositoryError = ref<string | null>(null);
 const daemonStatus = ref<ClawdDaemonStatus | null>(null);
 const daemonStatusError = ref<string | null>(null);
+const hydratingAgentHistoryIds = ref(new Set<string>());
 let unsubscribeMainEvents: (() => void) | null = null;
 const workProviderAuthorizationPollTimers = new Map<WorkProviderKind, ReturnType<typeof globalThis.setTimeout>>();
 const WORK_PROVIDER_AUTHORIZATION_POLL_MS = 5_000;
@@ -55,6 +56,11 @@ export function useAppState() {
   const visibleMessages = computed(() => {
     const agentId = activeAgent.value?.id;
     return agentId ? snapshot.value.messages.filter((message) => message.agentId === agentId) : [];
+  });
+
+  const isHydratingActiveAgentHistory = computed(() => {
+    const agentId = activeAgent.value?.id;
+    return Boolean(agentId && hydratingAgentHistoryIds.value.has(agentId));
   });
 
   const activeQueuedPrompts = computed(() => {
@@ -94,7 +100,6 @@ export function useAppState() {
     try {
       snapshot.value = await window.codexClaw.getSnapshot();
       subscribeToMainEvents();
-      await hydrateActiveAgentHistory();
       await Promise.all([
         loadActiveAgentCatalogs(),
         loadConnectedWorkBacklogs(),
@@ -104,6 +109,8 @@ export function useAppState() {
     } finally {
       isLoading.value = false;
     }
+
+    void hydrateActiveAgentHistory().catch(() => undefined);
   }
 
   async function sendPrompt(prompt: string): Promise<void> {
@@ -909,6 +916,7 @@ export function useAppState() {
     visibleMessages,
     activeQueuedPrompts,
     isLoading,
+    isHydratingActiveAgentHistory,
     isSending,
     answeredClientRequestIds,
     backendModels,
@@ -1404,11 +1412,30 @@ async function hydrateActiveAgentHistory(): Promise<void> {
     ? snapshot.value.agents.find((agent) => agent.id === activeAgentId)
     : null;
 
-  if (!activeAgent?.backendSession || !window.codexClaw?.selectAgent) {
+  if (!activeAgent?.backendSession || !window.codexClaw?.hydrateAgentHistory) {
     return;
   }
 
-  snapshot.value = await window.codexClaw.selectAgent(activeAgent.id);
+  if (hydratingAgentHistoryIds.value.has(activeAgent.id) || snapshot.value.messages.some((message) => message.agentId === activeAgent.id)) {
+    return;
+  }
+
+  markAgentHistoryHydrating(activeAgent.id, true);
+  try {
+    snapshot.value = await window.codexClaw.hydrateAgentHistory(activeAgent.id);
+  } finally {
+    markAgentHistoryHydrating(activeAgent.id, false);
+  }
+}
+
+function markAgentHistoryHydrating(agentId: string, hydrating: boolean): void {
+  const next = new Set(hydratingAgentHistoryIds.value);
+  if (hydrating) {
+    next.add(agentId);
+  } else {
+    next.delete(agentId);
+  }
+  hydratingAgentHistoryIds.value = next;
 }
 
 async function selectSnapshotWithLoading(selectSnapshot: () => Promise<AppSnapshot>): Promise<void> {

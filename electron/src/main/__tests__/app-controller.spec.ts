@@ -638,6 +638,31 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('agent/restart', { agentId: 'agent-dina' });
   });
 
+  it('routes lazy agent history hydration through clawd', async () => {
+    const snapshot = createInitialSnapshot();
+    const backendSnapshot = {
+      ...snapshot,
+      messages: [
+        {
+          id: 'assistant-history',
+          agentId: 'agent-dina',
+          role: 'assistant' as const,
+          status: 'complete' as const,
+          createdAt: '2026-06-13T00:00:00.000Z',
+          parts: [{ type: 'text' as const, text: 'Restored.' }],
+        },
+      ],
+    };
+    const request = vi.fn().mockResolvedValue(backendSnapshot);
+    const controller = new AppController(snapshot, createBackendClient({ request }));
+
+    await controller.initialize();
+    await expect(hydrateAgentHistory(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
+
+    expect(request).toHaveBeenCalledWith('agent/hydrateHistory', { agentId: 'agent-dina' });
+    expect(currentSnapshot(controller)).toBe(backendSnapshot);
+  });
+
   it('caches token usage updates emitted by clawd', async () => {
     const snapshot = createInitialSnapshot();
     const controller = new AppController(snapshot, createBackendClient());
@@ -1242,6 +1267,12 @@ async function restartAgent(controller: AppController, agentId: string): Promise
   return (controller as unknown as {
     restartAgent(agentId: string): Promise<AppSnapshot>;
   }).restartAgent(agentId);
+}
+
+async function hydrateAgentHistory(controller: AppController, agentId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    hydrateAgentHistory(agentId: string): Promise<AppSnapshot>;
+  }).hydrateAgentHistory(agentId);
 }
 
 async function openAgentGitDiff(controller: AppController, agentId: string): Promise<void> {

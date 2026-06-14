@@ -48,6 +48,7 @@ const api: CodexClawApi = {
   deployBenchTemplate: (templateId: string, teamId?: string) => ipcRenderer.invoke(ipcChannels.deployBenchTemplate, templateId, teamId),
   removeBenchTemplate: (templateId: string) => ipcRenderer.invoke(ipcChannels.removeBenchTemplate, templateId),
   restartAgent: (agentId: string) => ipcRenderer.invoke(ipcChannels.restartAgent, agentId),
+  hydrateAgentHistory: (agentId: string) => ipcRenderer.invoke(ipcChannels.hydrateAgentHistory, agentId),
   closeAgent: (agentId: string) => ipcRenderer.invoke(ipcChannels.closeAgent, agentId),
   selectAgent: (agentId: string) => ipcRenderer.invoke(ipcChannels.selectAgent, agentId),
   updateSettings: (input: UpdateSettingsInput) => ipcRenderer.invoke(ipcChannels.updateSettings, input),

@@ -862,6 +862,7 @@ export type CodexClawApi = {
   deployBenchTemplate(templateId: string, teamId?: string): Promise<AppSnapshot>;
   removeBenchTemplate(templateId: string): Promise<AppSnapshot>;
   restartAgent(agentId: string): Promise<AppSnapshot>;
+  hydrateAgentHistory(agentId: string): Promise<AppSnapshot>;
   closeAgent(agentId: string): Promise<AppSnapshot>;
   selectAgent(agentId: string): Promise<AppSnapshot>;
   updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>;

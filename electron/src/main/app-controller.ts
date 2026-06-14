@@ -218,6 +218,10 @@ export class AppController {
       return this.restartAgent(agentId);
     });
 
+    ipcMain.handle(ipcChannels.hydrateAgentHistory, async (_event, agentId: string) => {
+      return this.hydrateAgentHistory(agentId);
+    });
+
     ipcMain.handle(ipcChannels.closeAgent, async (_event, agentId: string) => {
       return this.closeAgent(agentId);
     });
@@ -491,6 +495,10 @@ export class AppController {
 
   private async restartAgent(agentId: string): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/restart', { agentId }));
+  }
+
+  private async hydrateAgentHistory(agentId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/hydrateHistory', { agentId }));
   }
 
   private async listAgentConversations(agentId: string): Promise<ConversationSummary[]> {

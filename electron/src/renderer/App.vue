@@ -4,6 +4,7 @@
     :active-agent="activeAgent"
     :messages="visibleMessages"
     :is-loading="isLoading"
+    :is-conversation-loading="isHydratingActiveAgentHistory"
     :is-sending="isSending"
     :answered-client-request-ids="answeredClientRequestIds"
     :agent-files="agentFiles"
@@ -109,6 +110,7 @@ const {
   visibleMessages,
   activeQueuedPrompts,
   isLoading,
+  isHydratingActiveAgentHistory,
   isSending,
   answeredClientRequestIds,
   agentFiles,

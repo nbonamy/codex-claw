@@ -278,6 +278,14 @@ export class ClawBackendServer {
         await this.driverRpc?.handle('driver/forgetSession', { backend: agent.backend, agentId });
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
+      case 'agent/hydrateHistory': {
+        const agentId = requireAgentId(message.params);
+        if (!this.snapshot.agents.some((agent) => agent.id === agentId)) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        await this.hydrateAgentHistory(agentId);
+        return createClawRpcResult(message.id, this.snapshot);
+      }
       case 'agent/resumeConversation': {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');

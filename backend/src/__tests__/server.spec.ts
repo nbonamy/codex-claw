@@ -626,6 +626,74 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
+  it('hydrates persisted agent history without changing active selection', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.activeAgentId = 'agent-dina';
+    snapshot.agents = [
+      {
+        id: 'agent-dina',
+        teamId: 'team-test',
+        name: 'Dina',
+        folder: '/Users/nbonamy/src/codex-claw',
+        backend: 'codex',
+        status: { type: 'idle' },
+        createdAt: '2026-06-13T00:00:00.000Z',
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      },
+      {
+        id: 'agent-jesse',
+        teamId: 'team-test',
+        name: 'Jesse',
+        folder: '/Users/nbonamy/src/multi-llm-ts',
+        backend: 'codex',
+        backendSession: { kind: 'codex', threadId: 'thread-old' },
+        status: { type: 'idle' },
+        createdAt: '2026-06-13T00:00:00.000Z',
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      },
+    ];
+    const hydrateAgent = vi.fn().mockResolvedValue({ kind: 'codex', threadId: 'thread-hydrated' });
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      hydrateAgent,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'hydrate',
+      method: 'agent/hydrateHistory',
+      params: { agentId: 'agent-jesse' },
+    })).resolves.toMatchObject({
+      result: {
+        activeAgentId: 'agent-dina',
+        agents: [
+          { id: 'agent-dina' },
+          { id: 'agent-jesse', backendSession: { kind: 'codex', threadId: 'thread-hydrated' } },
+        ],
+      },
+    });
+
+    expect(hydrateAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-jesse' }));
+    expect(saveSnapshot).toHaveBeenCalled();
+    expect(snapshot.activeAgentId).toBe('agent-dina');
+    await server.close();
+  });
+
   it('hydrates the selected team active agent and refreshes git status', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams = [

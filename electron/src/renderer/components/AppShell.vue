@@ -148,7 +148,7 @@
             :messages="messages"
             :agent="currentAgent"
             :agent-files="agentFiles"
-            :is-loading="isLoading"
+            :is-loading="isLoading || isConversationLoading"
             :is-sending="isSending"
             :answered-client-request-ids="answeredClientRequestIds"
             :backend-models="backendModels"
@@ -270,6 +270,7 @@ const props = withDefaults(defineProps<{
   agentFiles?: AgentFileSearchItem[];
   messages: RendererMessage[];
   isLoading: boolean;
+  isConversationLoading?: boolean;
   isSending: boolean;
   goal?: ThreadGoal | null;
   approvalPreset?: ApprovalPreset | null;
@@ -333,6 +334,7 @@ const props = withDefaults(defineProps<{
   backendCommands: () => [],
   backendSkills: () => [],
   backendCapabilities: () => defaultBackendCapabilities('codex'),
+  isConversationLoading: false,
   modelCatalogStatus: 'notLoaded',
   skillCatalogStatus: 'notLoaded',
   selectedModelId: null,
