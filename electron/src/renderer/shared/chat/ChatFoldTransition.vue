@@ -23,7 +23,8 @@ defineProps<{
 }
 
 .chat-fold--open {
-  grid-template-rows: 1fr;
+  margin-top: var(--space-1);
+  display: flex;
   opacity: 1;
 }
 

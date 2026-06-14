@@ -50,7 +50,6 @@
             <el-switch
               :model-value="daemonEnabled"
               :disabled="daemonSwitchDisabled"
-              :loading="daemonOperation !== null"
               aria-label="Keep Codex Claw ready in the background"
               @update:model-value="updateDaemonEnabled"
             />

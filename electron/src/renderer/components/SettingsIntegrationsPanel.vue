@@ -119,16 +119,13 @@
           </span>
         </li>
       </ol>
-      <p class="settings-integrations-panel__authorization-expiry">
-        This code expires soon. Start over if GitHub says it is no longer valid.
-      </p>
     </div>
 
     <p
-      v-if="configurationError || error || githubConnection.detail"
+      v-if="configurationError || error"
       class="settings-integrations-panel__detail"
     >
-      {{ configurationError ?? error ?? githubConnection.detail }}
+      {{ configurationError ?? error }}
     </p>
   </SettingsPanelFrame>
 </template>
