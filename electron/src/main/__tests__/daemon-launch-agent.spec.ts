@@ -47,18 +47,23 @@ describe('daemon launch agent', () => {
     await expect(installClawdDaemon({
       access,
       connectSocket: healthySocket(),
+      defaultApp: false,
       env: {
-        CODEX_CLAW_ASSETS_PATH: '/Applications/Codex Claw.app/Contents/Resources',
-        CODEX_CLAW_BACKEND_ARGS: '/Applications/Codex Claw.app/Contents/Resources/clawd/clawd.mjs,--stdio',
-        CODEX_CLAW_BACKEND_COMMAND: '/Applications/Codex Claw.app/Contents/Resources/clawd/node',
+        PATH: '/usr/bin:/Users/nicolas/.nvm/versions/node/v22.19.0/bin',
         CODEX_CLAW_GITHUB_CLIENT_ID: 'github-client-id',
         CODEX_CLAW_HOME: '/Users/nicolas/.codex-claw',
       },
       execFile,
+      execFileSync: vi.fn(() => {
+        throw new Error('login shell unavailable');
+      }),
+      existsSync: (filePath) => filePath === '/Applications/Codex Claw.app/Contents/Resources/clawd/clawd.mjs' ||
+        filePath === '/Users/nicolas/.nvm/versions/node/v22.19.0/bin/node',
       getuid: () => 501,
       homedir: () => '/Users/nicolas',
       mkdir,
       platform: 'darwin',
+      resourcesPath: '/Applications/Codex Claw.app/Contents/Resources',
       writeFile,
     })).resolves.toMatchObject({
       supported: true,
@@ -73,7 +78,7 @@ describe('daemon launch agent', () => {
     expect(mkdir).toHaveBeenCalledWith('/Users/nicolas/.codex-claw', { recursive: true, mode: 0o700 });
     expect(writeFile).toHaveBeenCalledWith(
       '/Users/nicolas/Library/LaunchAgents/com.codex-claw.clawd.plist',
-      expect.stringContaining('<string>/Applications/Codex Claw.app/Contents/Resources/clawd/node</string>'),
+      expect.stringContaining('<string>/Users/nicolas/.nvm/versions/node/v22.19.0/bin/node</string>'),
     );
 
     const plist = writeFile.mock.calls[0][1] as string;
@@ -81,6 +86,8 @@ describe('daemon launch agent', () => {
     expect(plist).toContain('<string>serve</string>');
     expect(plist).toContain('<key>CODEX_CLAW_HOME</key>');
     expect(plist).toContain('<string>/Users/nicolas/.codex-claw</string>');
+    expect(plist).toContain('<key>HOME</key>');
+    expect(plist).toContain('<string>/Users/nicolas</string>');
     expect(plist).toContain('<key>CODEX_CLAW_GITHUB_CLIENT_ID</key>');
     expect(plist).toContain('<string>github-client-id</string>');
     expect(execFile).toHaveBeenNthCalledWith(1, 'launchctl', [

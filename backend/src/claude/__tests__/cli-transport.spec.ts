@@ -1,14 +1,17 @@
 import { EventEmitter } from 'node:events';
-import os from 'node:os';
-import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClaudeCliTransport } from '../cli-transport';
 
 const spawnMock = vi.hoisted(() => vi.fn());
+const execFileSyncMock = vi.hoisted(() => vi.fn(() => {
+  throw new Error('shell unavailable');
+}));
 
 vi.mock('node:child_process', () => ({
+  execFileSync: execFileSyncMock,
   spawn: spawnMock,
   default: {
+    execFileSync: execFileSyncMock,
     spawn: spawnMock,
   },
 }));
@@ -34,6 +37,10 @@ function createFakeChild(): FakeChild {
 describe('ClaudeCliTransport', () => {
   beforeEach(() => {
     spawnMock.mockReset();
+    execFileSyncMock.mockReset();
+    execFileSyncMock.mockImplementation(() => {
+      throw new Error('shell unavailable');
+    });
     vi.unstubAllEnvs();
   });
 
@@ -109,7 +116,21 @@ describe('ClaudeCliTransport', () => {
   it('prepends common user binary folders so Electron can find Claude outside shell PATH', async () => {
     const child = createFakeChild();
     spawnMock.mockReturnValue(child);
-    const transport = new ClaudeCliTransport({ env: { PATH: '/usr/bin' } });
+    const transport = new ClaudeCliTransport({
+      env: { PATH: '/usr/bin' },
+      runtimeDiscovery: {
+        execFileSync: vi.fn(() => '/opt/homebrew/bin:/usr/bin'),
+        existsSync: vi.fn((filePath: string) => [
+          '/Users/nicolas/.local/bin',
+          '/Users/nicolas/bin',
+          '/opt/homebrew/bin',
+          '/usr/local/bin',
+        ].includes(filePath)),
+        homedir: () => '/Users/nicolas',
+        pathDelimiter: ':',
+        platform: 'darwin',
+      },
+    });
 
     const handle = transport.startTurn({
       cwd: '/Users/nbonamy/src/codex-claw',
@@ -118,13 +139,13 @@ describe('ClaudeCliTransport', () => {
     child.emit('exit', 0, null);
     await handle.done;
 
-    expect(spawnMock.mock.calls[0][2].env.PATH.split(path.delimiter).slice(0, 4)).toStrictEqual([
-      path.join(os.homedir(), '.local/bin'),
-      path.join(os.homedir(), 'bin'),
+    expect(spawnMock.mock.calls[0][2].env.PATH.split(':')).toStrictEqual([
+      '/usr/bin',
       '/opt/homebrew/bin',
+      '/Users/nicolas/.local/bin',
+      '/Users/nicolas/bin',
       '/usr/local/bin',
     ]);
-    expect(spawnMock.mock.calls[0][2].env.PATH).toContain(`/usr/local/bin${path.delimiter}/usr/bin`);
   });
 
   it('does not leak Node inspector options into the Claude child process', async () => {

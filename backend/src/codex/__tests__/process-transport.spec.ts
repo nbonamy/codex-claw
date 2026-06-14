@@ -1,13 +1,17 @@
 import { EventEmitter } from 'node:events';
-import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CodexProcessTransport } from '../process-transport';
 
 const spawnMock = vi.hoisted(() => vi.fn());
+const execFileSyncMock = vi.hoisted(() => vi.fn(() => {
+  throw new Error('shell unavailable');
+}));
 
 vi.mock('node:child_process', () => ({
+  execFileSync: execFileSyncMock,
   spawn: spawnMock,
   default: {
+    execFileSync: execFileSyncMock,
     spawn: spawnMock,
   },
 }));
@@ -33,19 +37,36 @@ function createFakeChild(): FakeChild {
 describe('CodexProcessTransport', () => {
   beforeEach(() => {
     spawnMock.mockReset();
+    execFileSyncMock.mockReset();
+    execFileSyncMock.mockImplementation(() => {
+      throw new Error('shell unavailable');
+    });
   });
 
   it('inherits the user Codex home by default and writes JSONL requests', async () => {
     const child = createFakeChild();
     spawnMock.mockReturnValue(child);
-    const transport = new CodexProcessTransport({ env: { TEST_FLAG: '1' } });
+    const transport = new CodexProcessTransport({
+      env: {
+        PATH: '/usr/bin',
+        TEST_FLAG: '1',
+      },
+      runtimeDiscovery: {
+        execFileSync: vi.fn(() => {
+          throw new Error('shell unavailable');
+        }),
+        existsSync: vi.fn(() => false),
+        pathDelimiter: ':',
+        platform: 'darwin',
+      },
+    });
 
     await transport.start();
     transport.send({ id: 1, method: 'initialize', params: {} });
 
     expect(spawnMock).toHaveBeenCalledWith('codex', ['app-server', '--listen', 'stdio://'], expect.objectContaining({
       env: expect.objectContaining({
-        PATH: expect.stringContaining(path.dirname(process.execPath)),
+        PATH: '/usr/bin',
         TEST_FLAG: '1',
       }),
       stdio: 'pipe',

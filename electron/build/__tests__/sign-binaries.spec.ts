@@ -27,8 +27,7 @@ describe('signDarwinBinaries', () => {
         IDENTIFY_DARWIN_CODE: 'Developer ID Application: Codex Claw',
       },
       execFileSync,
-      existsSync: (filePath) => filePath === '/build/Codex Claw.app/Contents/Resources/apple-speechanalyzer-cli' ||
-        filePath === '/build/Codex Claw.app/Contents/Resources/clawd/node',
+      existsSync: (filePath) => filePath === '/build/Codex Claw.app/Contents/Resources/apple-speechanalyzer-cli',
       logger: {
         log: vi.fn(),
         warn: vi.fn(),
@@ -45,16 +44,7 @@ describe('signDarwinBinaries', () => {
     ], {
       stdio: 'inherit',
     });
-    expect(execFileSync).toHaveBeenNthCalledWith(2, 'codesign', [
-      '--deep',
-      '--force',
-      '--verbose',
-      '--sign',
-      'Developer ID Application: Codex Claw',
-      '/build/Codex Claw.app/Contents/Resources/clawd/node',
-    ], {
-      stdio: 'inherit',
-    });
+    expect(execFileSync).toHaveBeenCalledTimes(1);
   });
 
   it('supports the afterCopy app directory path used by older signing hooks', () => {
@@ -65,8 +55,7 @@ describe('signDarwinBinaries', () => {
         IDENTIFY_DARWIN_CODE: 'Developer ID Application: Codex Claw',
       },
       execFileSync,
-      existsSync: (filePath) => filePath === '/build/Codex Claw.app/Contents/Resources/apple-speechanalyzer-cli' ||
-        filePath === '/build/Codex Claw.app/Contents/Resources/clawd/node',
+      existsSync: (filePath) => filePath === '/build/Codex Claw.app/Contents/Resources/apple-speechanalyzer-cli',
       logger: {
         log: vi.fn(),
         warn: vi.fn(),
@@ -83,16 +72,7 @@ describe('signDarwinBinaries', () => {
     ], {
       stdio: 'inherit',
     });
-    expect(execFileSync).toHaveBeenNthCalledWith(2, 'codesign', [
-      '--deep',
-      '--force',
-      '--verbose',
-      '--sign',
-      'Developer ID Application: Codex Claw',
-      '/build/Codex Claw.app/Contents/Resources/clawd/node',
-    ], {
-      stdio: 'inherit',
-    });
+    expect(execFileSync).toHaveBeenCalledTimes(1);
   });
 
   it('supports the afterCopyExtraResources staging root before the app is renamed', () => {
@@ -103,8 +83,7 @@ describe('signDarwinBinaries', () => {
         IDENTIFY_DARWIN_CODE: 'Developer ID Application: Codex Claw',
       },
       execFileSync,
-      existsSync: (filePath) => filePath === '/var/folders/electron-packager/tmp-123/Electron.app/Contents/Resources/apple-speechanalyzer-cli' ||
-        filePath === '/var/folders/electron-packager/tmp-123/Electron.app/Contents/Resources/clawd/node',
+      existsSync: (filePath) => filePath === '/var/folders/electron-packager/tmp-123/Electron.app/Contents/Resources/apple-speechanalyzer-cli',
       logger: {
         log: vi.fn(),
         warn: vi.fn(),
@@ -121,16 +100,7 @@ describe('signDarwinBinaries', () => {
     ], {
       stdio: 'inherit',
     });
-    expect(execFileSync).toHaveBeenNthCalledWith(2, 'codesign', [
-      '--deep',
-      '--force',
-      '--verbose',
-      '--sign',
-      'Developer ID Application: Codex Claw',
-      '/var/folders/electron-packager/tmp-123/Electron.app/Contents/Resources/clawd/node',
-    ], {
-      stdio: 'inherit',
-    });
+    expect(execFileSync).toHaveBeenCalledTimes(1);
   });
 
   it('warns instead of failing when the helper has not been copied yet', () => {
@@ -153,8 +123,6 @@ describe('signDarwinBinaries', () => {
     expect(logger.warn).toHaveBeenCalledWith(
       'Apple speech helper not found for signing: /build/Codex Claw.app/Contents/Resources/apple-speechanalyzer-cli',
     );
-    expect(logger.warn).toHaveBeenCalledWith(
-      'clawd node runtime not found for signing: /build/Codex Claw.app/Contents/Resources/clawd/node',
-    );
+    expect(logger.warn).toHaveBeenCalledTimes(1);
   });
 });

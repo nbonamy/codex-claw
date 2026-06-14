@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { discoveredRuntimePath, resolveRuntimeExecutable, type RuntimeDiscoveryDependencies } from '@codex-claw/shared/runtime-discovery';
 
 export type RuntimeClawdBackendMode = 'auto' | 'bundled' | 'existing';
 
@@ -10,7 +11,7 @@ export type RuntimeClawdCommand = {
   env: NodeJS.ProcessEnv;
 };
 
-export type RuntimeClawdConfigDeps = {
+export type RuntimeClawdConfigDeps = RuntimeDiscoveryDependencies & {
   cwd?: string;
   defaultApp?: boolean;
   env?: NodeJS.ProcessEnv;
@@ -62,12 +63,12 @@ export function runtimeClawdSocketPath(deps: RuntimeClawdConfigDeps = {}): strin
   if (configured) {
     return configured;
   }
-  return path.join(env.CODEX_CLAW_HOME?.trim() || path.join(homedir(), '.codex-claw'), 'clawd.sock');
+  return path.join(env.CODEX_CLAW_HOME?.trim() || path.join((deps.homedir ?? homedir)(), '.codex-claw'), 'clawd.sock');
 }
 
 export function runtimeClawdHome(deps: RuntimeClawdConfigDeps = {}): string {
   const env = deps.env ?? process.env;
-  return env.CODEX_CLAW_HOME?.trim() || path.join(homedir(), '.codex-claw');
+  return env.CODEX_CLAW_HOME?.trim() || path.join((deps.homedir ?? homedir)(), '.codex-claw');
 }
 
 export function runtimeClawdWatchFile(deps: RuntimeClawdConfigDeps = {}): string | null {
@@ -101,15 +102,18 @@ function packagedClawdCommand(deps: RuntimeClawdConfigDeps): RuntimeClawdCommand
   }
 
   const runtimeDir = path.join(resourcesPath, 'clawd');
-  const nodePath = path.join(runtimeDir, (deps.platform ?? process.platform) === 'win32' ? 'node.exe' : 'node');
   const bundlePath = path.join(runtimeDir, 'clawd.mjs');
   const fileExists = deps.existsSync ?? existsSync;
-  if (!fileExists(nodePath) || !fileExists(bundlePath)) {
+  if (!fileExists(bundlePath)) {
+    return null;
+  }
+  const nodeCommand = resolveRuntimeExecutable('node', deps);
+  if (!nodeCommand) {
     return null;
   }
 
   return {
-    command: nodePath,
+    command: nodeCommand,
     args: [bundlePath, '--stdio'],
     env: runtimeClawdEnv(deps),
   };
@@ -118,10 +122,14 @@ function packagedClawdCommand(deps: RuntimeClawdConfigDeps): RuntimeClawdCommand
 function runtimeClawdEnv(deps: RuntimeClawdConfigDeps): NodeJS.ProcessEnv {
   const env = deps.env ?? process.env;
   const githubClientId = env.CODEX_CLAW_GITHUB_CLIENT_ID?.trim();
+  const runtimePath = !deps.env || env.PATH ? discoveredRuntimePath(deps) : '';
+  const home = env.HOME?.trim() || (deps.homedir ?? homedir)();
 
   return {
     CODEX_CLAW_ASSETS_PATH: runtimeClawdAssetsPath(deps),
     CODEX_CLAW_HOME: runtimeClawdHome(deps),
+    HOME: home,
+    ...(runtimePath ? { PATH: runtimePath } : {}),
     ...(githubClientId ? { CODEX_CLAW_GITHUB_CLIENT_ID: githubClientId } : {}),
   };
 }

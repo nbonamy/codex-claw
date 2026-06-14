@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
+import { withDiscoveredRuntimePath, type RuntimeDiscoveryDependencies } from '@codex-claw/shared/runtime-discovery';
 import type { Readable } from 'node:stream';
 import { logMain } from '../log';
 import { parseClaudeSdkMessage, type ClaudeSdkMessage } from './protocol';
@@ -8,6 +9,7 @@ import { parseClaudeSdkMessage, type ClaudeSdkMessage } from './protocol';
 export type ClaudeCliTransportOptions = {
   command?: string;
   env?: NodeJS.ProcessEnv;
+  runtimeDiscovery?: RuntimeDiscoveryDependencies;
 };
 
 export type ClaudeTurnParams = {
@@ -40,16 +42,16 @@ export class ClaudeCliTransport implements ClaudeTurnTransport {
     const command = this.options.command ?? process.env.CODEX_CLAW_CLAUDE_COMMAND ?? 'claude';
     const args = claudeArgs(params);
     const cwd = expandHome(params.cwd);
-    const path = claudePath(this.options.env?.PATH ?? process.env.PATH);
+    const env = claudeEnv(this.options.env, this.options.runtimeDiscovery);
     logMain('claude-cli-transport', 'starting claude command', {
       command,
       args: redactedClaudeArgs(args),
       cwd,
-      path,
+      path: env.PATH,
     });
     const child = spawn(command, args, {
       cwd,
-      env: claudeEnv(this.options.env, path),
+      env,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     this.children.add(child);
@@ -220,24 +222,8 @@ function expandHome(value: string): string {
   return value;
 }
 
-function claudePath(currentPath: string | undefined): string {
-  const entries = [
-    path.join(os.homedir(), '.local/bin'),
-    path.join(os.homedir(), 'bin'),
-    '/opt/homebrew/bin',
-    '/usr/local/bin',
-    ...(currentPath ? currentPath.split(path.delimiter) : []),
-  ];
-  const uniqueEntries = entries.filter((entry, index) => entry && entries.indexOf(entry) === index);
-  return uniqueEntries.join(path.delimiter);
-}
-
-function claudeEnv(overrides: NodeJS.ProcessEnv | undefined, resolvedPath: string): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    ...overrides,
-    PATH: resolvedPath,
-  };
+function claudeEnv(overrides: NodeJS.ProcessEnv | undefined, runtimeDiscovery: RuntimeDiscoveryDependencies | undefined): NodeJS.ProcessEnv {
+  const env = withDiscoveredRuntimePath(overrides, runtimeDiscovery);
 
   delete env.NODE_OPTIONS;
 

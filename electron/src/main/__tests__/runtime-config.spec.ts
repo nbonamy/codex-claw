@@ -32,6 +32,7 @@ describe('runtime config', () => {
       env: {
         CODEX_CLAW_ASSETS_PATH: path.resolve(process.cwd(), 'assets'),
         CODEX_CLAW_HOME: path.join(homedir(), '.codex-claw'),
+        HOME: homedir(),
       },
     });
   });
@@ -50,6 +51,7 @@ describe('runtime config', () => {
       env: {
         CODEX_CLAW_ASSETS_PATH: path.resolve(process.cwd(), 'assets'),
         CODEX_CLAW_HOME: path.join(homedir(), '.codex-claw'),
+        HOME: homedir(),
       },
     });
   });
@@ -70,6 +72,7 @@ describe('runtime config', () => {
         CODEX_CLAW_ASSETS_PATH: path.resolve(process.cwd(), 'assets'),
         CODEX_CLAW_HOME: path.join(homedir(), '.codex-claw'),
         CODEX_CLAW_GITHUB_CLIENT_ID: 'github-client-id',
+        HOME: homedir(),
       },
     });
   });
@@ -88,6 +91,7 @@ describe('runtime config', () => {
       env: {
         CODEX_CLAW_ASSETS_PATH: '/app/resources',
         CODEX_CLAW_HOME: path.join(homedir(), '.codex-claw'),
+        HOME: homedir(),
       },
     });
   });
@@ -97,18 +101,27 @@ describe('runtime config', () => {
 
     expect(runtimeClawdCommand({
       defaultApp: false,
-      env: {},
-      existsSync: (filePath) => filePath === '/app/resources/clawd/node' || filePath === '/app/resources/clawd/clawd.mjs',
+      env: {
+        PATH: '/usr/bin:/Users/nicolas/.nvm/versions/node/v22.19.0/bin',
+      },
+      execFileSync: vi.fn(() => {
+        throw new Error('login shell unavailable');
+      }),
+      existsSync: (filePath) => filePath === '/app/resources/clawd/clawd.mjs' ||
+        filePath === '/Users/nicolas/.nvm/versions/node/v22.19.0/bin/node',
+      homedir: () => '/Users/nicolas',
       resourcesPath: '/app/resources',
     })).toStrictEqual({
-      command: '/app/resources/clawd/node',
+      command: '/Users/nicolas/.nvm/versions/node/v22.19.0/bin/node',
       args: [
         '/app/resources/clawd/clawd.mjs',
         '--stdio',
       ],
       env: {
         CODEX_CLAW_ASSETS_PATH: '/app/resources',
-        CODEX_CLAW_HOME: path.join(homedir(), '.codex-claw'),
+        CODEX_CLAW_HOME: '/Users/nicolas/.codex-claw',
+        HOME: '/Users/nicolas',
+        PATH: '/usr/bin:/Users/nicolas/.nvm/versions/node/v22.19.0/bin',
       },
     });
   });
@@ -128,20 +141,25 @@ describe('runtime config', () => {
       env: {
         CODEX_CLAW_ASSETS_PATH: path.resolve(process.cwd(), 'assets'),
         CODEX_CLAW_HOME: '/Users/nicolas/.codex-claw',
+        HOME: homedir(),
       },
     });
   });
 
-  it('uses the packaged Windows node executable name', async () => {
+  it('returns null for packaged apps when node cannot be discovered', async () => {
     const { runtimeClawdCommand } = await import('../runtime-config');
 
     expect(runtimeClawdCommand({
       defaultApp: false,
-      env: {},
-      existsSync: (filePath) => filePath === 'C:\\app\\resources/clawd/node.exe' || filePath === 'C:\\app\\resources/clawd/clawd.mjs',
-      platform: 'win32',
-      resourcesPath: 'C:\\app\\resources',
-    })?.command).toBe('C:\\app\\resources/clawd/node.exe');
+      env: {
+        PATH: '/usr/bin',
+      },
+      execFileSync: vi.fn(() => {
+        throw new Error('login shell unavailable');
+      }),
+      existsSync: (filePath) => filePath === '/app/resources/clawd/clawd.mjs',
+      resourcesPath: '/app/resources',
+    })).toBeNull();
   });
 
   it('returns null for packaged apps when the bundled runtime is missing', async () => {

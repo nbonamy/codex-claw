@@ -1,6 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import os from 'node:os';
-import path from 'node:path';
+import { withDiscoveredRuntimePath, type RuntimeDiscoveryDependencies } from '@codex-claw/shared/runtime-discovery';
 import { logMain, warnMain } from '../log';
 import type { JsonRpcClientMessage, JsonRpcServerMessage } from './protocol';
 import type { CodexTransport } from './rpc-client';
@@ -10,6 +9,7 @@ export type CodexProcessTransportOptions = {
   codexHome?: string;
   env?: NodeJS.ProcessEnv;
   configOverrides?: string[];
+  runtimeDiscovery?: RuntimeDiscoveryDependencies;
 };
 
 export class CodexProcessTransport implements CodexTransport {
@@ -35,10 +35,8 @@ export class CodexProcessTransport implements CodexTransport {
       '--listen',
       'stdio://',
     ];
-    const env = {
-      ...process.env,
-      ...this.options.env,
-      PATH: codexPath(this.options.env?.PATH ?? process.env.PATH),
+    const env: NodeJS.ProcessEnv = {
+      ...withDiscoveredRuntimePath(this.options.env, this.options.runtimeDiscovery),
       ...(codexHome ? { CODEX_HOME: codexHome } : {}),
     };
 
@@ -141,15 +139,4 @@ export class CodexProcessTransport implements CodexTransport {
       listener(error);
     }
   }
-}
-
-function codexPath(currentPath: string | undefined): string {
-  const entries = [
-    path.dirname(process.execPath),
-    path.join(os.homedir(), '.local/bin'),
-    path.join(os.homedir(), 'bin'),
-    ...(currentPath ? currentPath.split(path.delimiter) : []),
-  ].filter(Boolean);
-
-  return [...new Set(entries)].join(path.delimiter);
 }

@@ -70,16 +70,8 @@ function resolveDarwinBinaryPaths(
     path.join(resourcePath, 'assets', 'apple-speechanalyzer-cli'),
   ]);
 
-  const clawdNodePaths = resourcePaths.map((resourcePath) => path.join(resourcePath, 'clawd', 'node'));
-
-  return [
-    {
-      label: 'Apple speech helper',
-      path: helperPaths.find((helperPath) => existsSync(helperPath)) ?? helperPaths[0],
-    },
-    {
-      label: 'clawd node runtime',
-      path: clawdNodePaths.find((runtimePath) => existsSync(runtimePath)) ?? clawdNodePaths[0],
-    },
-  ];
+  return [{
+    label: 'Apple speech helper',
+    path: helperPaths.find((helperPath) => existsSync(helperPath)) ?? helperPaths[0],
+  }];
 }
