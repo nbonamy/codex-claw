@@ -1,4 +1,5 @@
-import { chmod, copyFile, mkdir, stat } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, readFile, stat } from 'node:fs/promises';
+import { builtinModules } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -12,6 +13,7 @@ const nodeRuntimeName = process.platform === 'win32' ? 'node.exe' : 'node';
 
 await assertFile(backendBundle);
 await assertFile(nodeRuntime);
+await assertSelfContainedBackendBundle(backendBundle);
 await mkdir(resourcesDir, { recursive: true });
 await copyFile(backendBundle, path.join(resourcesDir, 'clawd.mjs'));
 await copyFile(nodeRuntime, path.join(resourcesDir, nodeRuntimeName));
@@ -47,4 +49,22 @@ async function fileExists(filePath) {
     }
     throw error;
   }
+}
+
+async function assertSelfContainedBackendBundle(filePath) {
+  const source = await readFile(filePath, 'utf8');
+  const bareImports = [...source.matchAll(/^\s*import(?:\s+[^'";]+?\s+from)?\s*["']([^"']+)["'];?/gm)]
+    .map((match) => match[1])
+    .filter((specifier) => !isBundledRuntimeSpecifier(specifier));
+
+  if (bareImports.length > 0) {
+    throw new Error(`Backend bundle is not self-contained; found bare package imports: ${[...new Set(bareImports)].join(', ')}`);
+  }
+}
+
+function isBundledRuntimeSpecifier(specifier) {
+  return specifier.startsWith('node:')
+    || specifier.startsWith('.')
+    || specifier.startsWith('/')
+    || builtinModules.includes(specifier);
 }

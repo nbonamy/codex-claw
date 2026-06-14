@@ -689,8 +689,10 @@ Minimum release smoke:
 
 ```bash
 CODEX_CLAW_SKIP_SIGNING=1 npm run package
-./out/<platform>/Codex\ Claw.app/Contents/Resources/clawd/clawd --version
-./out/<platform>/Codex\ Claw.app/Contents/Resources/clawd/clawd --stdio
+./out/<platform>/Codex\ Claw.app/Contents/Resources/clawd/node \
+  ./out/<platform>/Codex\ Claw.app/Contents/Resources/clawd/clawd.mjs --version
+./out/<platform>/Codex\ Claw.app/Contents/Resources/clawd/node \
+  ./out/<platform>/Codex\ Claw.app/Contents/Resources/clawd/clawd.mjs --stdio
 ```
 
 The stdio smoke should send `backend/health` and expect a valid JSON-RPC

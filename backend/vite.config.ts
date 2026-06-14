@@ -17,6 +17,9 @@ export default defineConfig(({ mode }) => {
         '@codex-claw/shared': path.resolve(__dirname, '../shared/src'),
       },
     },
+    ssr: {
+      noExternal: true,
+    },
     build: {
       ssr: path.resolve(__dirname, 'src/clawd.ts'),
       outDir: 'dist',
