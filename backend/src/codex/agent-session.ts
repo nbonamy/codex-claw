@@ -878,6 +878,12 @@ export class CodexAgentSessionManager {
         return;
       }
 
+      case 'paramKeys':
+      case 'mcpServer/startupStatus/updated':
+      case 'remoteControl/status/changed': {
+        return;
+      }
+
       default:
         warnMain('codex-notification', 'not implemented', {
           method: notification.method,
