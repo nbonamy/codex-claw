@@ -12,6 +12,7 @@ export type CodexTransport = {
 type PendingRequest = {
   resolve: (result: unknown) => void;
   reject: (error: Error) => void;
+  timeout: NodeJS.Timeout;
 };
 
 type JsonRpcServerRequest = {
@@ -27,6 +28,10 @@ export type CodexServerRequestResponder = {
   resolve(result: unknown): void;
 };
 
+export type CodexRpcClientOptions = {
+  requestTimeoutMs?: number;
+};
+
 const NOT_IMPLEMENTED_ERROR_CODE = -32000;
 
 export class CodexRpcClient {
@@ -38,7 +43,10 @@ export class CodexRpcClient {
   private unsubscribeMessage?: () => void;
   private unsubscribeError?: () => void;
 
-  constructor(private readonly transport: CodexTransport) {}
+  constructor(
+    private readonly transport: CodexTransport,
+    private readonly options: CodexRpcClientOptions = {},
+  ) {}
 
   async start(): Promise<void> {
     await this.transport.start();
@@ -78,9 +86,15 @@ export class CodexRpcClient {
     this.transport.send(message);
 
     return new Promise<T>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`Codex app-server request timed out: ${method}`));
+      }, this.options.requestTimeoutMs ?? 15_000);
+
       this.pending.set(id, {
         resolve: (result) => resolve(result as T),
         reject,
+        timeout,
       });
     });
   }
@@ -231,6 +245,7 @@ export class CodexRpcClient {
       return;
     }
 
+    clearTimeout(pending.timeout);
     this.pending.delete(message.id);
 
     if ('error' in message) {
@@ -243,6 +258,7 @@ export class CodexRpcClient {
 
   private rejectAll(error: Error): void {
     for (const pending of this.pending.values()) {
+      clearTimeout(pending.timeout);
       pending.reject(error);
     }
 

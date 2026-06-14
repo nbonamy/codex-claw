@@ -607,6 +607,11 @@ automatically for the current user. In dev, the same installer is available only
 when `CODEX_CLAW_BACKEND_COMMAND` points at a usable clawd runtime; otherwise
 the Settings switch reports that no packaged runtime is available.
 
+`clawd` writes its own durable operational log to
+`$CODEX_CLAW_HOME/logs/clawd.log` (default `~/.codex-claw/logs/clawd.log`).
+When launched by the macOS LaunchAgent, launchd also captures stdout and stderr
+to `~/Library/Logs/Codex Claw/clawd.out.log` and `clawd.err.log`.
+
 Enabling the switch starts the LaunchAgent immediately, but the current Electron
 session keeps its already-selected backend transport. The guaranteed behavior is
 that the next app launch in `auto` mode connects to the running daemon. Live

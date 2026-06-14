@@ -2,6 +2,7 @@ import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
+import { logMain } from '../log';
 import { parseClaudeSdkMessage, type ClaudeSdkMessage } from './protocol';
 
 export type ClaudeCliTransportOptions = {
@@ -40,7 +41,12 @@ export class ClaudeCliTransport implements ClaudeTurnTransport {
     const args = claudeArgs(params);
     const cwd = expandHome(params.cwd);
     const path = claudePath(this.options.env?.PATH ?? process.env.PATH);
-    console.log(`[codex-claw:claude:cli-transport] starting ${command} ${redactedClaudeArgs(args).join(' ')} in ${cwd} with PATH=${path}`);
+    logMain('claude-cli-transport', 'starting claude command', {
+      command,
+      args: redactedClaudeArgs(args),
+      cwd,
+      path,
+    });
     const child = spawn(command, args, {
       cwd,
       env: claudeEnv(this.options.env, path),

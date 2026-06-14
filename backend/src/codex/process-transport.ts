@@ -1,4 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import os from 'node:os';
+import path from 'node:path';
+import { logMain, warnMain } from '../log';
 import type { JsonRpcClientMessage, JsonRpcServerMessage } from './protocol';
 import type { CodexTransport } from './rpc-client';
 
@@ -32,13 +35,21 @@ export class CodexProcessTransport implements CodexTransport {
       '--listen',
       'stdio://',
     ];
+    const env = {
+      ...process.env,
+      ...this.options.env,
+      PATH: codexPath(this.options.env?.PATH ?? process.env.PATH),
+      ...(codexHome ? { CODEX_HOME: codexHome } : {}),
+    };
+
+    logMain('codex-process', 'starting app-server', {
+      command,
+      args,
+      path: env.PATH,
+    });
 
     this.child = spawn(command, args, {
-      env: {
-        ...process.env,
-        ...this.options.env,
-        ...(codexHome ? { CODEX_HOME: codexHome } : {}),
-      },
+      env,
       stdio: 'pipe',
     });
 
@@ -47,10 +58,19 @@ export class CodexProcessTransport implements CodexTransport {
     this.child.stdout.on('data', (chunk: string) => this.handleStdout(chunk));
     this.child.stderr.on('data', (chunk: string) => {
       this.stderrBuffer += chunk;
+      warnMain('codex-process', 'stderr', { detail: chunk.trim() });
     });
-    this.child.on('error', (error) => this.emitError(error));
+    this.child.on('error', (error) => {
+      warnMain('codex-process', 'spawn error', { message: error.message });
+      this.emitError(error);
+    });
     this.child.on('exit', (code, signal) => {
       const detail = this.stderrBuffer.trim();
+      warnMain('codex-process', 'exited', {
+        code,
+        signal,
+        ...(detail ? { detail } : {}),
+      });
       this.emitError(new Error(`Codex app-server exited (${code ?? signal ?? 'unknown'})${detail ? `: ${detail}` : ''}`));
       this.child = null;
     });
@@ -121,4 +141,15 @@ export class CodexProcessTransport implements CodexTransport {
       listener(error);
     }
   }
+}
+
+function codexPath(currentPath: string | undefined): string {
+  const entries = [
+    path.dirname(process.execPath),
+    path.join(os.homedir(), '.local/bin'),
+    path.join(os.homedir(), 'bin'),
+    ...(currentPath ? currentPath.split(path.delimiter) : []),
+  ].filter(Boolean);
+
+  return [...new Set(entries)].join(path.delimiter);
 }

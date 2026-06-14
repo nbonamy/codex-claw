@@ -107,7 +107,16 @@ export class StdioRpcPeer {
         return;
       }
 
-      const response = await this.options.onMessage(message);
+      let response: ClawRpcResponse | undefined;
+      try {
+        response = await this.options.onMessage(message);
+      } catch (error) {
+        response = createClawRpcError(
+          'id' in message ? message.id : null,
+          clawRpcErrorCodes.internalError,
+          error instanceof Error ? error.message : String(error),
+        );
+      }
       if (response) {
         this.write(response);
       }

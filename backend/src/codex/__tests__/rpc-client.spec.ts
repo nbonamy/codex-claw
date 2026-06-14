@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CodexRpcClient, type CodexTransport } from '../rpc-client';
 import type { JsonRpcClientMessage, JsonRpcServerMessage } from '../protocol';
 
@@ -38,6 +38,10 @@ class FakeTransport implements CodexTransport {
 }
 
 describe('CodexRpcClient', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('initializes the app-server connection and sends initialized notification', async () => {
     const transport = new FakeTransport();
     const client = new CodexRpcClient(transport);
@@ -92,6 +96,20 @@ describe('CodexRpcClient', () => {
     await expect(ok).resolves.toStrictEqual({ value: 42 });
     await expect(failed).rejects.toThrow('bad params');
   });
+
+  it('rejects requests that app-server never answers', async () => {
+    vi.useFakeTimers();
+    const transport = new FakeTransport();
+    const client = new CodexRpcClient(transport, { requestTimeoutMs: 25 });
+    await client.start();
+
+    const pending = client.request('model/list', {});
+    const expectation = expect(pending).rejects.toThrow('Codex app-server request timed out: model/list');
+    await vi.advanceTimersByTimeAsync(25);
+
+    await expectation;
+  });
+
 
   it('emits notifications and rejects pending work on transport errors', async () => {
     const transport = new FakeTransport();

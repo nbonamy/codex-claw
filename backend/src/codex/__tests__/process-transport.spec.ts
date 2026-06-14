@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CodexProcessTransport } from '../process-transport';
 
@@ -43,7 +44,10 @@ describe('CodexProcessTransport', () => {
     transport.send({ id: 1, method: 'initialize', params: {} });
 
     expect(spawnMock).toHaveBeenCalledWith('codex', ['app-server', '--listen', 'stdio://'], expect.objectContaining({
-      env: expect.objectContaining({ TEST_FLAG: '1' }),
+      env: expect.objectContaining({
+        PATH: expect.stringContaining(path.dirname(process.execPath)),
+        TEST_FLAG: '1',
+      }),
       stdio: 'pipe',
     }));
     expect(spawnMock.mock.calls[0][2].env.CODEX_HOME).toBe(process.env.CODEX_HOME);

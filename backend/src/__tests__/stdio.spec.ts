@@ -51,6 +51,34 @@ describe('stdio JSON-RPC transport', () => {
     });
   });
 
+  it('keeps the request id when a handler throws', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const responses: string[] = [];
+    output.on('data', (chunk) => responses.push(chunk.toString()));
+
+    const stop = startStdioRpcServer({
+      input,
+      output,
+      onMessage: () => {
+        throw new Error('handler failed');
+      },
+    });
+
+    input.write('{"jsonrpc":"2.0","id":"select-1","method":"agent/select"}\n');
+    await Promise.resolve();
+    stop();
+
+    expect(JSON.parse(responses.join(''))).toStrictEqual({
+      jsonrpc: '2.0',
+      id: 'select-1',
+      error: {
+        code: -32603,
+        message: 'handler failed',
+      },
+    });
+  });
+
   it('sends backend-initiated requests and resolves Electron responses', async () => {
     const input = new PassThrough();
     const output = new PassThrough();
