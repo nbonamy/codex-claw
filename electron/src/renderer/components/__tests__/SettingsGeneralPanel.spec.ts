@@ -21,7 +21,7 @@ describe('SettingsGeneralPanel', () => {
     });
   });
 
-  it('toggles the background clawd daemon through Settings', async () => {
+  it('toggles the background service through Settings', async () => {
     let resolveInstall: () => void = () => undefined;
     const installing = new Promise<void>((resolve) => {
       resolveInstall = resolve;
@@ -34,7 +34,7 @@ describe('SettingsGeneralPanel', () => {
 
     await flushPromises();
 
-    expect(wrapper.text()).toContain('Run backend in background');
+    expect(wrapper.text()).toContain('Keep Codex Claw ready in the background');
     expect(wrapper.text()).toContain('Off');
 
     const switches = wrapper.findAllComponents({ name: 'ElSwitch' });
@@ -62,12 +62,12 @@ describe('SettingsGeneralPanel', () => {
     expect(wrapper.find('.settings-general-panel__status-icon--ok').exists()).toBe(true);
   });
 
-  it('does not show a loading indicator while disabling the daemon', async () => {
-    let resolveStop: () => void = () => undefined;
-    const stopping = new Promise<void>((resolve) => {
-      resolveStop = resolve;
+  it('shows a loading indicator while uninstalling the daemon', async () => {
+    let resolveUninstall: () => void = () => undefined;
+    const uninstalling = new Promise<void>((resolve) => {
+      resolveUninstall = resolve;
     });
-    const setDaemonEnabled = vi.fn().mockReturnValue(stopping);
+    const setDaemonEnabled = vi.fn().mockReturnValue(uninstalling);
     const wrapper = mountPanel({
       daemonStatus: daemonStatus({ installed: true, running: true }),
       setDaemonEnabled,
@@ -80,11 +80,13 @@ describe('SettingsGeneralPanel', () => {
     await wrapper.vm.$nextTick();
 
     expect(setDaemonEnabled).toHaveBeenCalledWith(false);
-    expect(wrapper.text()).not.toContain('Stopping...');
-    expect(wrapper.find('.settings-general-panel__spinner').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Uninstalling...');
+    expect(wrapper.find('.settings-general-panel__spinner').exists()).toBe(true);
 
-    resolveStop();
+    resolveUninstall();
     await flushPromises();
+
+    expect(wrapper.text()).not.toContain('Uninstalling...');
   });
 
   it('disables daemon installation when the desktop adapter reports unsupported status', async () => {

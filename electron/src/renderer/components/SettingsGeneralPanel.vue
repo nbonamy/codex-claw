@@ -22,7 +22,7 @@
       </SettingsRow>
       <SettingsRow
         as="label"
-        title="Run backend in background"
+        title="Keep Codex Claw ready in the background"
         :description="daemonDescription"
         :error="daemonStatusError"
       >
@@ -31,11 +31,11 @@
             <span
               class="settings-general-panel__status"
               :class="{
-                'settings-general-panel__status--loading': daemonOperation === 'installing',
+                'settings-general-panel__status--loading': daemonOperation !== null,
               }"
             >
               <span
-                v-if="daemonOperation === 'installing'"
+                v-if="daemonOperation !== null"
                 class="settings-general-panel__spinner"
                 aria-hidden="true"
               />
@@ -50,8 +50,8 @@
             <el-switch
               :model-value="daemonEnabled"
               :disabled="daemonSwitchDisabled"
-              :loading="daemonOperation === 'installing'"
-              aria-label="Run backend in background"
+              :loading="daemonOperation !== null"
+              aria-label="Keep Codex Claw ready in the background"
               @update:model-value="updateDaemonEnabled"
             />
           </span>
@@ -170,7 +170,7 @@ const loadingPermissions = ref(false);
 const openingAccessibilitySettings = ref(false);
 const choosingSourceFolder = ref(false);
 const settingDaemon = ref(false);
-const daemonOperation = ref<'installing' | 'stopping' | null>(null);
+const daemonOperation = ref<'installing' | 'uninstalling' | null>(null);
 const sourceFolderError = ref<string | null>(null);
 
 const showSourceFolderSetting = computed(() => Boolean(props.sourceFolder));
@@ -182,6 +182,9 @@ const daemonSwitchDisabled = computed(() => settingDaemon.value || props.daemonS
 const daemonStatusLabel = computed(() => {
   if (daemonOperation.value === 'installing') {
     return 'Installing...';
+  }
+  if (daemonOperation.value === 'uninstalling') {
+    return 'Uninstalling...';
   }
   if (!props.daemonStatus) {
     return 'Checking';
@@ -198,7 +201,7 @@ const daemonDescription = computed(() => {
   if (props.daemonStatus?.supported === false) {
     return props.daemonStatus.detail ?? 'Install is available in packaged macOS builds.';
   }
-  return 'Start clawd at login and let Codex Claw connect to the local daemon.';
+  return 'Start the local agent service at login so the app can reconnect to it.';
 });
 const accessibilityGranted = computed(() => permissions.value?.accessibility.trusted ?? false);
 const showGrantButton = computed(() => permissions.value?.accessibility.required === true && !accessibilityGranted.value);
@@ -289,7 +292,7 @@ function updatePreventSleep(value: boolean | string | number): void {
 
 async function updateDaemonEnabled(value: boolean | string | number): Promise<void> {
   const enabled = value === true;
-  daemonOperation.value = enabled ? 'installing' : 'stopping';
+  daemonOperation.value = enabled ? 'installing' : 'uninstalling';
   settingDaemon.value = true;
   try {
     await props.setDaemonEnabled?.(enabled);
