@@ -387,6 +387,27 @@ describe('loop manager', () => {
     expect(loop).not.toHaveProperty('lastCreatedCount');
     expect(deleteLoopExecutionFromSnapshot(snapshot, 'loop-backlog', 'missing-run')).toBeNull();
 
+    const olderCompleted = createExecutionEntry('run-old', 'loop-backlog', 'completed');
+    olderCompleted.startedAt = '2026-06-09T12:00:00.000Z';
+    olderCompleted.createdCount = 2;
+    recordLoopExecutionInSnapshot(snapshot, 'loop-backlog', olderCompleted);
+    const latestFailed = createExecutionEntry('run-failed', 'loop-backlog', 'failed');
+    latestFailed.startedAt = '2026-06-09T12:10:00.000Z';
+    latestFailed.error = 'Latest failed';
+    recordLoopExecutionInSnapshot(snapshot, 'loop-backlog', latestFailed);
+    expect(deleteLoopExecutionFromSnapshot(snapshot, 'loop-backlog', 'run-failed', '2026-06-09T12:10:30.000Z')).toMatchObject({
+      lastRunAt: '2026-06-09T12:00:00.000Z',
+      lastCreatedCount: 2,
+      executionLog: [{
+        id: 'run-old',
+        status: 'completed',
+      }],
+    });
+    expect(loop).not.toHaveProperty('lastError');
+    expect(deleteLoopExecutionFromSnapshot(snapshot, 'loop-backlog', 'run-old')).toMatchObject({
+      executionLog: [],
+    });
+
     recordLoopExecutionInSnapshot(snapshot, 'loop-backlog', working);
     const loopWithConversation = updateLoopExecutionAgentConversationInSnapshot(snapshot, 'loop-backlog', 'run-1', 'agent-dina', {
       conversationRef: { backend: 'codex', threadId: 'thread-dina' },
@@ -409,6 +430,9 @@ describe('loop manager', () => {
       executionLog: [],
       updatedAt: '2026-06-09T12:06:00.000Z',
     });
+    expect(loop).not.toHaveProperty('lastRunAt');
+    expect(loop).not.toHaveProperty('lastCreatedCount');
+    expect(loop).not.toHaveProperty('lastError');
   });
 });
 

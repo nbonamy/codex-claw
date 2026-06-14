@@ -90,6 +90,9 @@ export function clearLoopExecutionHistoryInSnapshot(
 
   loop.executionLog = [];
   loop.updatedAt = updatedAt;
+  delete loop.lastRunAt;
+  delete loop.lastCreatedCount;
+  delete loop.lastError;
   return loop;
 }
 
@@ -106,16 +109,19 @@ export function deleteLoopExecutionFromSnapshot(
 
   loop.executionLog = loop.executionLog.filter((entry) => entry.id !== executionId);
   loop.updatedAt = updatedAt;
-  if (loop.lastError && loop.executionLog.every((entry) => entry.status !== 'failed')) {
-    delete loop.lastError;
-  }
   const latestEntry = loop.executionLog[0];
   if (latestEntry) {
     loop.lastRunAt = latestEntry.startedAt;
     loop.lastCreatedCount = latestEntry.createdCount;
+    if (latestEntry.status === 'failed' && latestEntry.error) {
+      loop.lastError = latestEntry.error;
+    } else {
+      delete loop.lastError;
+    }
   } else {
     delete loop.lastRunAt;
     delete loop.lastCreatedCount;
+    delete loop.lastError;
   }
 
   return loop;

@@ -2074,12 +2074,20 @@ describe('ClawBackendServer', () => {
       createdCount: 0,
       createdAgents: [],
     });
+    if (snapshot.loops[0]) {
+      snapshot.loops[0].lastRunAt = '2026-06-13T00:01:00.000Z';
+      snapshot.loops[0].lastCreatedCount = 0;
+      snapshot.loops[0].lastError = 'GitHub failed';
+    }
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'clear-history',
       method: 'loop/history/clear',
       params: { loopId },
     })).resolves.toMatchObject({ result: { loops: [{ executionLog: [] }] } });
+    expect(snapshot.loops[0]).not.toHaveProperty('lastRunAt');
+    expect(snapshot.loops[0]).not.toHaveProperty('lastCreatedCount');
+    expect(snapshot.loops[0]).not.toHaveProperty('lastError');
 
     await expect(server.handleMessage({
       jsonrpc: '2.0',
