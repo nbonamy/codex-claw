@@ -26,14 +26,37 @@ export class WorkIntegrationManager {
 
   async hydrateConnections(): Promise<void> {
     let changed = false;
-    for (const connection of this.snapshot().workBacklog.connections) {
-      const driver = this.driver(connection.provider);
-      if (!driver.configured()) {
+    const providers = new Set<WorkProviderKind>([
+      ...Array.from(this.drivers.keys()),
+      ...this.snapshot().workBacklog.connections.map((connection) => connection.provider),
+    ]);
+
+    for (const provider of providers) {
+      const driver = this.driver(provider);
+      const connection = this.snapshot().workBacklog.connections.find((candidate) => candidate.provider === provider);
+      const token = await this.options.tokenStore.get(provider);
+      if (token) {
         changed = this.setConnection({
-          provider: connection.provider,
-          status: 'notConfigured',
-          detail: `${providerLabel(connection.provider)} OAuth is not configured.`,
+          provider,
+          status: 'connected',
+          ...(token.accountLabel ? { accountLabel: token.accountLabel } : {}),
+          connectedAt: token.connectedAt,
         }) || changed;
+        continue;
+      }
+
+      if (!driver.configured()) {
+        if (connection) {
+          changed = this.setConnection({
+            provider,
+            status: 'notConfigured',
+            detail: `${providerLabel(provider)} OAuth is not configured.`,
+          }) || changed;
+        }
+        continue;
+      }
+
+      if (!connection) {
         continue;
       }
 
@@ -46,14 +69,11 @@ export class WorkIntegrationManager {
         continue;
       }
 
-      const token = await this.options.tokenStore.get(connection.provider);
-      if (!token) {
-        changed = this.setConnection({
-          provider: connection.provider,
-          status: 'disconnected',
-          detail: `${providerLabel(connection.provider)} needs to be reconnected.`,
-        }) || changed;
-      }
+      changed = this.setConnection({
+        provider,
+        status: 'disconnected',
+        detail: `${providerLabel(provider)} needs to be reconnected.`,
+      }) || changed;
     }
 
     if (changed) {

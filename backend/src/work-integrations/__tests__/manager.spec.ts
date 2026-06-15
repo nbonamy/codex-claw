@@ -85,6 +85,36 @@ describe('WorkIntegrationManager', () => {
     });
   });
 
+  it('hydrates connected provider state from copied tokens', async () => {
+    const snapshot = createInitialSnapshot();
+    const tokenStore = new MemoryWorkIntegrationTokenStore();
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    await tokenStore.set({
+      provider: 'github',
+      accessToken: 'gho_secret',
+      tokenType: 'bearer',
+      scope: 'repo read:user',
+      accountLabel: 'nbonamy',
+      connectedAt: '2026-06-14T10:00:00.000Z',
+    });
+    const manager = createManager({
+      driver: fakeDriver({ configured: false }),
+      snapshot,
+      saveSnapshot,
+      tokenStore,
+    });
+
+    await manager.hydrateConnections();
+
+    expect(snapshot.workBacklog.connections).toStrictEqual([{
+      provider: 'github',
+      status: 'connected',
+      accountLabel: 'nbonamy',
+      connectedAt: '2026-06-14T10:00:00.000Z',
+    }]);
+    expect(saveSnapshot).toHaveBeenCalledOnce();
+  });
+
   it('marks pending GitHub authorization expired before opening the browser', async () => {
     const snapshot = createInitialSnapshot();
     const openExternal = vi.fn().mockResolvedValue(undefined);

@@ -46,6 +46,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     saveSnapshot: () => saveBackendSnapshot(snapshot),
     tokenStore: new FileWorkIntegrationTokenStore(backendProviderTokensFilePath()),
   });
+  await workIntegrations.hydrateConnections();
   const loopRunner = new LoopRunner({
     getSnapshot: () => snapshot,
     listWorkItems: workIntegrations,

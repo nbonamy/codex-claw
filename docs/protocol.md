@@ -51,6 +51,8 @@ found, invalid params, internal error, backend unavailable, and timeout.
 - `ClientState`: backend-derived client hints:
   `{ sourceFolderPath, shouldPreventDisplaySleep }`.
 - `ClawSnapshotGetResult`: `{ snapshot, lastEventSeq, clientState }`.
+- `LoopLocation`: optional loop/work-provider location selector:
+  `{ kind: "local" }` or `{ kind: "remote", remoteConnectionId }`.
 - `ClawBackendEvent`: event sent to clients:
   `{ seq, type, payload, occurredAt, agentId?, backend?, backendSessionId?,
   threadId?, turnId?, clientState?, snapshot? }`.
@@ -159,7 +161,7 @@ and `~/sources` first.
 | --- | --- | --- | --- |
 | `connections/listSshHosts` | none | `SshHostCandidate[]` | Parses the backend host's `~/.ssh/config` and returns concrete `Host` aliases. Wildcard and negated patterns are ignored. |
 | `connections/addSsh` | `{ input: AddSshConnectionInput }` | `AppSnapshot` | Saves an SSH connection, probes the host non-interactively, syncs the bundled `clawd` script and provider token file under `~/.codex-claw`, and records an `ssh` stdio transport when ready. |
-| `connections/check` | `{ connectionId }` | `AppSnapshot` | Syncs a saved SSH connection: closes any cached remote stdio client, uploads the bundled `clawd` script, mirrors `provider-tokens.json`, restarts remote `clawd` processes, and reads the installed version. The renderer labels this action `Sync`. |
+| `connections/check` | `{ connectionId }` | `AppSnapshot` | Syncs a saved SSH connection: closes any cached remote stdio client, uploads the bundled `clawd` script, mirrors `provider-tokens.json`, restarts remote `clawd` processes, and reads the installed version. On next remote startup, `clawd` hydrates `workBacklog.connections` from the mirrored tokens instead of copying local `state.json`. The renderer labels this action `Sync`. |
 | `connections/update` | `{ connectionId, input: { sourceFolderPath? } }` | `AppSnapshot` | Updates SSH connection settings. Source-folder changes are forwarded to the remote `clawd` through `settings/update` and mirrored locally for settings UI defaults. |
 | `connections/remove` | `{ connectionId }` | `AppSnapshot` | Removes a saved remote connection and deletes teams attached to it. If every team used that connection, local `clawd` creates one empty local fallback team first. |
 
@@ -172,6 +174,12 @@ steering, interrupt, and rollback driver calls to the selected remote `clawd`
 over SSH stdio. Slash-command interception remains local-only for now; ordinary
 prompts route remotely.
 
+Loops are selected independently from the Loops screen. When the client omits
+`location`, loop and work-provider calls operate on local `clawd`. When the
+client passes `{ kind: "remote", remoteConnectionId }`, local `clawd` forwards
+the loop request to that remote backend and returns the remote snapshot without
+adopting it as the local product snapshot.
+
 ## Client To `clawd`: Work Providers
 
 | Method | Params | Result | Notes |
@@ -180,21 +188,28 @@ prompts route remotely.
 | `workProvider/openAuthorization` | `{ provider }` | `AppSnapshot` | Requests browser opening through `client/openExternal`. |
 | `workProvider/completeConnection` | `{ provider }` | `AppSnapshot` | Polls/completes pending provider auth. |
 | `workProvider/disconnect` | `{ provider }` | `AppSnapshot` | Removes provider connection and token. |
-| `workProvider/listRepositories` | `{ provider }` | `WorkRepository[]` | Lists provider repositories. |
+| `workProvider/listRepositories` | `{ provider, location? }` | `WorkRepository[]` | Lists provider repositories from local `clawd` or the selected remote loop location. |
 | `workProvider/configureBacklog` | `{ input: WorkBacklogConfigurationInput }` | `AppSnapshot` | Saves backlog configuration. |
-| `workProvider/listItems` | `{ provider, repositoryId }` | `WorkItem[]` | Lists provider work items for a repository. |
+| `workProvider/listItems` | `{ provider, repositoryId, location? }` | `WorkItem[]` | Lists provider work items from local `clawd` or the selected remote loop location. |
 
 ## Client To `clawd`: Loops
 
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
-| `loop/create` | `{ input: CreateLoopInput }` | `AppSnapshot` | Creates scheduler configuration. |
-| `loop/update` | `{ input: UpdateLoopInput }` | `AppSnapshot` | Updates scheduler configuration. |
-| `loop/run` | `{ loopId }` | `AppSnapshot` | Runs one loop immediately. |
+| `loop/snapshot` | `{ location? }` | `AppSnapshot` | Returns the local or remote loop-management snapshot for the selected Loops screen location. Remote snapshots are not adopted locally. |
+| `loop/create` | `{ input: CreateLoopInput, location? }` | `AppSnapshot` | Creates scheduler configuration in local `clawd` or the selected remote loop location. |
+| `loop/update` | `{ input: UpdateLoopInput, location? }` | `AppSnapshot` | Updates scheduler configuration in local `clawd` or the selected remote loop location. |
+| `loop/run` | `{ loopId, location? }` | `AppSnapshot` | Runs one loop immediately in local `clawd` or the selected remote loop location. |
 | `loop/runDue` | none | `AppSnapshot` | Runs due loops. Used by backend scheduler and tests. |
-| `loop/history/clear` | `{ loopId }` | `AppSnapshot` | Clears execution history. |
-| `loop/execution/delete` | `{ loopId, executionId }` | `AppSnapshot` | Deletes one execution log entry. |
-| `loop/delete` | `{ loopId }` | `AppSnapshot` | Deletes scheduler configuration. |
+| `loop/history/clear` | `{ loopId, location? }` | `AppSnapshot` | Clears execution history in local `clawd` or the selected remote loop location. |
+| `loop/execution/delete` | `{ loopId, executionId, location? }` | `AppSnapshot` | Deletes one execution log entry in local `clawd` or the selected remote loop location. |
+| `loop/delete` | `{ loopId, location? }` | `AppSnapshot` | Deletes scheduler configuration in local `clawd` or the selected remote loop location. |
+
+The Electron renderer exposes this as `Loops > Local|<remote>`. Create/edit
+forms use the selected location's teams, bench templates, source repositories,
+work-provider repositories, work items, and remote folder picker data. Loop
+history conversation previews pass the same location to
+`agent/readConversationMessages`.
 
 ## Client To `clawd`: Backend-Internal Driver RPC
 

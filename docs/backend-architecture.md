@@ -459,8 +459,8 @@ names that describe backend ownership:
   `agent/listConversations`, `agent/resumeConversation`,
   `agent/readConversationMessages`
 - `bench/saveAgent`, `bench/deployTemplate`, `bench/removeTemplate`
-- `loop/create`, `loop/update`, `loop/run`, `loop/delete`,
-  `loop/clearHistory`, `loop/deleteExecution`
+- `loop/snapshot`, `loop/create`, `loop/update`, `loop/run`, `loop/delete`,
+  `loop/history/clear`, `loop/execution/delete`
 - `source/listRepositories`, `source/listWorktrees`,
   `source/suggestWorktreePath`, `source/createWorktree`
 - `agent/listFiles`, `agent/previewFile` using agent ids only. `clawd` resolves
@@ -874,6 +874,12 @@ Remote migration path:
   record for settings UI defaults. Deleting a connection deletes teams attached
   to that connection, with one empty local fallback team created only when every
   team was remote-backed.
+- Loop management is also location-scoped, but independently selected in the
+  Loops surface rather than inherited from the active team. The UI shows
+  `Loops > Local|<remote>`, and local `clawd` forwards loop snapshot, CRUD,
+  run, history, work-provider repository/item, and history conversation reads
+  to the selected remote. Remote snapshots are returned to the UI without
+  replacing local `clawd`'s durable product snapshot.
 - Cross-location sync is a separate product problem and should not block the
   process extraction.
 
@@ -896,9 +902,15 @@ The first remote slices now persist SSH connection records in `clawd`, parse
 the backend host's `~/.ssh/config`, probe the selected host, install the
 bundled `clawd` script to `~/.codex-claw/clawd.mjs` when missing, and record
 the stdio transport as `ssh <host> "node ~/.codex-claw/clawd.mjs --stdio"`.
+Sync mirrors `provider-tokens.json` to the remote; it does not copy local
+`state.json`. The remote `clawd` hydrates safe work-integration connection
+metadata from those tokens during startup so remote loop management can see
+GitHub as connected while preserving the remote's own teams, agents, and loops.
 The Team dialog can select Local or a ready SSH connection before any agents are
 created. Agent creation inherits the target team's connection, and source
-repository/worktree controls query that backend location. Keep the protocol
+repository/worktree controls query that backend location. The Loops surface
+uses a separate location selector so users can inspect and manage local or
+remote schedulers without changing the selected team. Keep the protocol
 boundary clear so the folder type can change behind clients later.
 
 ## Security Model
