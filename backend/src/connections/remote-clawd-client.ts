@@ -36,7 +36,9 @@ export class RemoteClawdClientManager {
     onEvent?: (event: ClawBackendEvent) => void,
   ): Promise<Result> {
     const client = await this.client(connection);
-    client.setEventSink(onEvent ?? null);
+    if (onEvent) {
+      client.setEventSink(onEvent);
+    }
     return client.request<Result>(method, params);
   }
 
@@ -84,7 +86,7 @@ class RemoteClawdClient {
     private readonly options: RemoteClawdClientOptions,
   ) {}
 
-  setEventSink(eventSink: ((event: ClawBackendEvent) => void) | null): void {
+  setEventSink(eventSink: (event: ClawBackendEvent) => void): void {
     this.eventSink = eventSink;
   }
 

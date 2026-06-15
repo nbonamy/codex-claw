@@ -3,9 +3,23 @@ import os from 'node:os';
 import path from 'node:path';
 import { sendAgentPrompt } from '@codex-claw/shared/agent-chat-service';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/shared/backend-driver';
-import type { Agent, AppSnapshot, CreateAgentInput, CreateSourceWorktreeInput, SendPromptOptions, SourceRepository, SourceWorktree, WorkBacklogAssignment } from '@codex-claw/shared/contracts';
-import { completeWorkItemAssignmentInSnapshot, markWorkItemCompletionInstructionsDeliveredInSnapshot } from '@codex-claw/shared/agent-manager';
+import type {
+  Agent,
+  AppSnapshot,
+  BackendConversationRef,
+  CreateAgentInput,
+  CreateSourceWorktreeInput,
+  LoopAction,
+  LoopExecutionLogEntry,
+  SendPromptOptions,
+  SourceRepository,
+  SourceWorktree,
+  WorkBacklogAssignment,
+} from '@codex-claw/shared/contracts';
+import { closeAgentInSnapshot, completeWorkItemAssignmentInSnapshot, markWorkItemCompletionInstructionsDeliveredInSnapshot } from '@codex-claw/shared/agent-manager';
+import { completeLoopExecutionInSnapshot } from '@codex-claw/shared/loop-manager';
 import { createAgentInSnapshot } from '@codex-claw/shared/snapshot';
+import { closeTeamInSnapshot } from '@codex-claw/shared/team-manager';
 import { createSourceWorktree, listSourceWorktrees } from '../git-worktrees';
 import { scanSourceRepositories } from '../source-repositories';
 import type { BackendDriverRpc } from '../driver-rpc';
@@ -196,12 +210,85 @@ export class ClawMcpService {
     }
 
     this.emitWorkAssignmentUpdated(agent.id, completedAssignment);
+    this.completeOwningLoopExecutionIfReady(agent.id, completedAssignment, completedAt);
     return {
       success: true,
       workItemId,
       status: 'completed',
       completedAt: completedAssignment.completedAt,
     };
+  }
+
+  private completeOwningLoopExecutionIfReady(agentId: string, assignment: WorkBacklogAssignment, completedAt: string): void {
+    if (!assignment.loopId || !assignment.loopExecutionId) {
+      return;
+    }
+
+    const loop = this.snapshot.loops.find((candidate) => candidate.id === assignment.loopId);
+    const execution = loop?.executionLog.find((candidate) => candidate.id === assignment.loopExecutionId);
+    if (!loop || !execution || execution.status !== 'working') {
+      return;
+    }
+
+    const allCreatedAssignmentsCompleted = execution.createdAgents.every((createdAgent) => (
+      this.snapshot.workBacklog.assignments[createdAgent.workItemId]?.status === 'completed'
+    ));
+    if (!allCreatedAssignmentsCompleted) {
+      return;
+    }
+
+    this.preserveLoopExecutionConversationRefs(execution);
+    const completedLoop = completeLoopExecutionInSnapshot(this.snapshot, loop.id, execution.id, completedAt);
+    if (!completedLoop) {
+      return;
+    }
+
+    this.applyCompletedLoopCleanup(completedLoop.action, execution);
+    this.emitSnapshotUpdated(agentId);
+  }
+
+  private preserveLoopExecutionConversationRefs(execution: LoopExecutionLogEntry): void {
+    for (const createdAgent of execution.createdAgents) {
+      if (createdAgent.conversationRef) {
+        continue;
+      }
+      const agent = this.snapshot.agents.find((candidate) => candidate.id === createdAgent.agentId);
+      const conversationRef = agent ? conversationRefFromAgent(agent) : null;
+      if (conversationRef) {
+        createdAgent.conversationRef = conversationRef;
+      }
+    }
+  }
+
+  private applyCompletedLoopCleanup(action: LoopAction, execution: LoopExecutionLogEntry): void {
+    if (action.teamTarget.mode === 'dedicated') {
+      if (action.cleanup?.deleteTeam === false) {
+        return;
+      }
+
+      const teamIds = new Set<string>();
+      for (const createdAgent of execution.createdAgents) {
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === createdAgent.agentId);
+        if (agent?.teamId) {
+          teamIds.add(agent.teamId);
+        }
+      }
+
+      for (const teamId of teamIds) {
+        if (this.snapshot.teams.length > 1) {
+          closeTeamInSnapshot(this.snapshot, teamId);
+        }
+      }
+      return;
+    }
+
+    if (action.cleanup?.deleteAgent === false) {
+      return;
+    }
+
+    for (const createdAgent of execution.createdAgents) {
+      closeAgentInSnapshot(this.snapshot, createdAgent.agentId);
+    }
   }
 
   private async listSourceRepositories(): Promise<SourceRepository[]> {
@@ -305,6 +392,20 @@ function completionInstructionsResponse(workItemId: string, instructions: string
     message: 'Follow these completion instructions, then call mark-work-item-completed again with confirmCompletion set to true.',
     confirmCompletionRequired: true,
   };
+}
+
+function conversationRefFromAgent(agent: Agent): BackendConversationRef | null {
+  if (agent.backendSession?.kind === 'codex') {
+    return { backend: 'codex', threadId: agent.backendSession.threadId };
+  }
+  if (agent.backendSession?.kind === 'claude') {
+    return {
+      backend: 'claude',
+      folder: agent.folder,
+      sessionId: agent.backendSession.transcriptSessionId ?? agent.backendSession.sessionId,
+    };
+  }
+  return null;
 }
 
 async function readAgentMarkdownFile(filePath: string): Promise<string> {

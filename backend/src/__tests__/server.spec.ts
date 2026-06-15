@@ -1388,6 +1388,75 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
+  it('reads stored loop conversation messages after cleanup removes the agent', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.loops = [{
+      id: 'loop-bugs',
+      name: 'GitHub bugs',
+      enabled: true,
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+      source: { provider: 'github', repositoryId: 'nbonamy/codex-claw' },
+      action: {
+        type: 'create-agent',
+        sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        teamTarget: { mode: 'existing', teamId: 'team-test' },
+      },
+      instructions: {},
+      executionLog: [{
+        id: 'loop-exec-1',
+        loopId: 'loop-bugs',
+        startedAt: '2026-06-13T00:00:00.000Z',
+        status: 'completed',
+        completedAt: '2026-06-15T01:30:48.802Z',
+        createdCount: 1,
+        createdAgents: [{
+          agentId: 'agent-cleaned-up',
+          agentName: 'Cleaned Up',
+          workItemId: 'github:nbonamy/codex-claw#5',
+          workItemTitle: 'Fix cockpit',
+          workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/5',
+          conversationRef: { backend: 'codex', threadId: 'thread-cleaned-up' },
+        }],
+      }],
+    }];
+    const messages = [createTextMessage('user-thread-cleaned-up-user-1', 'agent-cleaned-up', 'done')];
+    const readConversationMessages = vi.fn().mockResolvedValue(messages);
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      readConversationMessages,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'messages',
+      method: 'agent/readConversationMessages',
+      params: { agentId: 'agent-cleaned-up', ref: { backend: 'codex', threadId: 'thread-cleaned-up' } },
+    })).resolves.toMatchObject({ result: messages });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'unknown-ref',
+      method: 'agent/readConversationMessages',
+      params: { agentId: 'agent-cleaned-up', ref: { backend: 'codex', threadId: 'thread-unknown' } },
+    })).resolves.toMatchObject({ error: { message: 'Conversation reference is not available.' } });
+
+    expect(readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-cleaned-up' }, 'agent-cleaned-up');
+    await server.close();
+  });
+
   it('owns git diff preview side-panel events', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
@@ -1774,11 +1843,13 @@ describe('ClawBackendServer', () => {
       close: async () => undefined,
     };
     const events: unknown[] = [];
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
     const server = new ClawBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
       onEvent: (event) => events.push(event),
+      saveSnapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
     });
 
@@ -1809,6 +1880,8 @@ describe('ClawBackendServer', () => {
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'message.steer', payload: { prompt: 'try smaller' } }),
     ]));
+    expect(saveSnapshot).toHaveBeenCalledTimes(2);
+    expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
     await server.close();
   });
 

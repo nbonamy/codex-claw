@@ -96,6 +96,54 @@ describe('AppController', () => {
     expect(currentClientState(controller)).toStrictEqual(clientState);
   });
 
+  it('subscribes to clawd events before hydrating its startup snapshot', async () => {
+    const initialSnapshot = createInitialSnapshot();
+    const backendSnapshot = createInitialSnapshot();
+    const eventSnapshot = createInitialSnapshot();
+    eventSnapshot.agents[0]!.status = { type: 'working' };
+    const clientState: ClientState = {
+      sourceFolderPath: '/Users/nbonamy/src',
+      shouldPreventDisplaySleep: false,
+    };
+    let emitBackendEvent: ((event: ClawBackendEvent) => void) | null = null;
+    const backendClient: NonNullable<ConstructorParameters<typeof AppController>[1]> = {
+      start: vi.fn().mockResolvedValue(undefined),
+      health: vi.fn().mockResolvedValue({ ok: true, name: 'clawd', version: '0.1.0', pid: 123 }),
+      request: <Result,>(method: string): Promise<Result> => {
+        if (method === 'snapshot/get') {
+          emitBackendEvent?.({
+            seq: 18,
+            backend: 'codex',
+            agentId: 'agent-dina',
+            type: 'agent.statusChanged',
+            payload: { type: 'working' },
+            occurredAt: '2026-06-13T00:00:00.000Z',
+            snapshot: eventSnapshot,
+          });
+          return Promise.resolve({ snapshot: backendSnapshot, lastEventSeq: 17, clientState } as Result);
+        }
+        return Promise.resolve({} as Result);
+      },
+      onEvent: vi.fn((listener) => {
+        emitBackendEvent = listener;
+        return () => undefined;
+      }),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const controller = new AppController(initialSnapshot, backendClient);
+    const send = vi.fn();
+
+    setMainWindowSend(controller, send);
+    await controller.initialize();
+
+    expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
+      seq: 18,
+      agentId: 'agent-dina',
+      type: 'agent.statusChanged',
+    }));
+    expect(currentSnapshot(controller)).toBe(backendSnapshot);
+  });
+
   it('caches authoritative snapshots from backend events emitted by the clawd process client', async () => {
     const snapshot = createInitialSnapshot();
     const backendSnapshot = createInitialSnapshot();

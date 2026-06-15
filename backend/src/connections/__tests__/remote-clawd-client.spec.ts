@@ -70,6 +70,55 @@ describe('RemoteClawdClientManager', () => {
     await manager.close();
   });
 
+  it('keeps the remote backend event sink across later requests without a sink', async () => {
+    const child = createChildProcess();
+    const manager = new RemoteClawdClientManager({ spawnProcess: vi.fn(() => child.process) as never });
+    const onEvent = vi.fn();
+
+    const streamingRequest = manager.request(readyConnection(), 'driver/sendPrompt', {
+      agent: { id: 'agent-remote', backend: 'codex' },
+      prompt: 'go',
+    }, onEvent);
+    await vi.waitFor(() => expect(child.stdinLines()).toHaveLength(1));
+    const firstRequest = JSON.parse(child.stdinLines()[0]!) as { id: number };
+    child.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: firstRequest.id,
+      result: { backendSession: { kind: 'codex', threadId: 'thread-remote' } },
+    })}\n`);
+    await expect(streamingRequest).resolves.toStrictEqual({ backendSession: { kind: 'codex', threadId: 'thread-remote' } });
+
+    const metadataRequest = manager.request(readyConnection(), 'agent/listModels', {
+      backend: 'codex',
+    });
+    await vi.waitFor(() => expect(child.stdinLines()).toHaveLength(2));
+    const secondRequest = JSON.parse(child.stdinLines()[1]!) as { id: number };
+    child.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'backend/event',
+      params: {
+        seq: 2,
+        type: 'agent.statusChanged',
+        agentId: 'agent-remote',
+        payload: { type: 'working' },
+        occurredAt: '2026-06-14T10:00:01.000Z',
+      },
+    })}\n`);
+    child.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: secondRequest.id,
+      result: [{ id: 'gpt-5', name: 'GPT-5' }],
+    })}\n`);
+
+    await expect(metadataRequest).resolves.toStrictEqual([{ id: 'gpt-5', name: 'GPT-5' }]);
+    expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({
+      seq: 2,
+      agentId: 'agent-remote',
+      type: 'agent.statusChanged',
+    }));
+    await manager.close();
+  });
+
   it('rejects requests for connections without a ready transport', async () => {
     const manager = new RemoteClawdClientManager();
 
@@ -139,5 +188,6 @@ function createChildProcess() {
     process,
     stdout,
     stdinOutput: () => Buffer.concat(stdinChunks).toString('utf8').trim(),
+    stdinLines: () => Buffer.concat(stdinChunks).toString('utf8').trim().split('\n').filter(Boolean),
   };
 }

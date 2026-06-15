@@ -301,12 +301,12 @@ export class ClawBackendServer {
         if (!isBackendConversationRef(ref)) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Invalid conversation reference.');
         }
-        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-        if (!agent) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
-        }
         if (!this.isStoredConversationRef(ref, agentId)) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Conversation reference is not available.');
+        }
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent) {
+          return createClawRpcResult(message.id, await this.requireDriverRpc().handle('driver/readConversationMessages', { ref, agentId }));
         }
         return createClawRpcResult(message.id, await this.handleAgentDriverRequest(agent, 'driver/readConversationMessages', { ref, agentId }));
       }
@@ -478,6 +478,7 @@ export class ClawBackendServer {
           type: 'message.steer',
           payload: { prompt },
         });
+        await this.persistSnapshotOnly();
         return createClawRpcResult(message.id, this.snapshot);
       }
       case 'agent/interrupt': {
@@ -489,6 +490,7 @@ export class ClawBackendServer {
         try {
           const result = await this.handleAgentDriverRequest(agent, 'driver/interrupt', { agent }) as BackendSendResult;
           agent.backendSession = result.backendSession;
+          await this.persistSnapshotOnly();
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
           this.applyAndEmitBackendEvent({

@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AgentBackendDriver } from '@codex-claw/shared/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
-import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
+import type { Agent, AppSnapshot, Loop } from '@codex-claw/shared/contracts';
+import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
 import { BackendDriverRpc } from '../../driver-rpc';
 import { ClawMcpService } from '../service';
 
@@ -81,6 +82,88 @@ describe('ClawMcpService', () => {
       }),
     }));
   });
+
+  it('completes existing-team loop executions only after every created assignment is done and deletes the created agents', async () => {
+    const snapshot = createLoopSnapshot({
+      teamTarget: { mode: 'existing', teamId: 'team-codex-claw' },
+      createdAgents: [{
+        agentId: 'agent-one',
+        agentName: 'One',
+        workItemId: 'github:nbonamy/codex-claw#5',
+        workItemTitle: 'Fix first issue',
+        workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/5',
+      }, {
+        agentId: 'agent-two',
+        agentName: 'Two',
+        workItemId: 'github:nbonamy/codex-claw#6',
+        workItemTitle: 'Fix second issue',
+        workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/6',
+      }],
+    });
+    service = new ClawMcpService({
+      snapshot,
+      now: () => new Date('2026-06-15T01:30:48.802Z'),
+    });
+    const url = await service.start();
+
+    await markWorkItemCompleted(url, 'agent-one', 'github:nbonamy/codex-claw#5');
+
+    expect(snapshot.agents.map((agent) => agent.id)).toEqual(expect.arrayContaining(['agent-one', 'agent-two']));
+    expect(snapshot.loops[0]?.executionLog[0]).toMatchObject({ status: 'working' });
+
+    await markWorkItemCompleted(url, 'agent-two', 'github:nbonamy/codex-claw#6');
+
+    expect(snapshot.loops[0]?.executionLog[0]).toMatchObject({
+      status: 'completed',
+      completedAt: '2026-06-15T01:30:48.802Z',
+      createdAgents: [
+        expect.objectContaining({
+          agentId: 'agent-one',
+          conversationRef: { backend: 'codex', threadId: 'thread-agent-one' },
+        }),
+        expect.objectContaining({
+          agentId: 'agent-two',
+          conversationRef: { backend: 'codex', threadId: 'thread-agent-two' },
+        }),
+      ],
+    });
+    expect(snapshot.agents.map((agent) => agent.id)).not.toEqual(expect.arrayContaining(['agent-one', 'agent-two']));
+    expect(snapshot.teams[0]?.agentIds).not.toEqual(expect.arrayContaining(['agent-one', 'agent-two']));
+    expect(snapshot.teams.map((team) => team.id)).toContain('team-codex-claw');
+  });
+
+  it('deletes the dedicated team when a dedicated-team loop execution completes', async () => {
+    const snapshot = createLoopSnapshot({
+      teamTarget: { mode: 'dedicated' },
+      dedicatedTeamId: 'team-github-5',
+      createdAgents: [{
+        agentId: 'agent-work-item',
+        agentName: 'Work Item',
+        workItemId: 'github:nbonamy/codex-claw#5',
+        workItemTitle: 'Fix issue',
+        workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/5',
+      }],
+    });
+    service = new ClawMcpService({
+      snapshot,
+      now: () => new Date('2026-06-15T01:30:48.802Z'),
+    });
+    const url = await service.start();
+
+    await markWorkItemCompleted(url, 'agent-work-item', 'github:nbonamy/codex-claw#5');
+
+    expect(snapshot.loops[0]?.executionLog[0]).toMatchObject({
+      status: 'completed',
+      completedAt: '2026-06-15T01:30:48.802Z',
+      createdAgents: [{
+        agentId: 'agent-work-item',
+        conversationRef: { backend: 'codex', threadId: 'thread-agent-work-item' },
+      }],
+    });
+    expect(snapshot.teams.map((team) => team.id)).not.toContain('team-github-5');
+    expect(snapshot.agents.map((agent) => agent.id)).not.toContain('agent-work-item');
+    expect(snapshot.teams.map((team) => team.id)).toContain('team-codex-claw');
+  });
 });
 
 function createDriver(overrides: Partial<AgentBackendDriver> = {}): AgentBackendDriver {
@@ -128,4 +211,99 @@ async function postJson(url: string, body: unknown): Promise<any> {
   }
 
   return JSON.parse(text);
+}
+
+async function markWorkItemCompleted(url: string, agentId: string, workItemId: string): Promise<void> {
+  const response = await postJson(agentUrl(url, agentId), {
+    jsonrpc: '2.0',
+    id: `complete-${agentId}`,
+    method: 'tools/call',
+    params: {
+      name: 'mark-work-item-completed',
+      arguments: {
+        workItemId,
+        confirmCompletion: true,
+      },
+    },
+  });
+
+  expect(response.result.isError).toBe(false);
+}
+
+function createLoopSnapshot(input: {
+  createdAgents: Loop['executionLog'][number]['createdAgents'];
+  dedicatedTeamId?: string;
+  teamTarget: Loop['action']['teamTarget'];
+}): AppSnapshot {
+  const snapshot = createEmptySnapshot();
+  const targetTeamId = input.teamTarget.mode === 'dedicated'
+    ? input.dedicatedTeamId ?? 'team-github-item'
+    : input.teamTarget.teamId;
+  const createdAgentIds = input.createdAgents.map((createdAgent) => createdAgent.agentId);
+  snapshot.teams[0] = {
+    ...snapshot.teams[0]!,
+    agentIds: input.teamTarget.mode === 'existing' ? createdAgentIds : [],
+    activeAgentId: input.teamTarget.mode === 'existing' ? createdAgentIds[0] : undefined,
+  };
+  if (input.teamTarget.mode === 'dedicated') {
+    snapshot.teams.push({
+      id: targetTeamId,
+      name: 'GitHub work item',
+      agentIds: createdAgentIds,
+      activeAgentId: createdAgentIds[0],
+    });
+  }
+  snapshot.agents = input.createdAgents.map((createdAgent) => createTestAgent(createdAgent.agentId, targetTeamId, createdAgent.agentName));
+  snapshot.activeTeamId = targetTeamId;
+  snapshot.activeAgentId = createdAgentIds[0] ?? null;
+  snapshot.loops = [{
+    id: 'loop-bugs',
+    name: 'Bug loop',
+    enabled: true,
+    createdAt: '2026-06-15T01:00:00.000Z',
+    updatedAt: '2026-06-15T01:00:00.000Z',
+    source: { provider: 'github', repositoryId: 'nbonamy/codex-claw' },
+    action: {
+      type: 'create-agent',
+      sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+      teamTarget: input.teamTarget,
+    },
+    instructions: {},
+    executionLog: [{
+      id: 'loop-exec-1',
+      loopId: 'loop-bugs',
+      startedAt: '2026-06-15T01:00:00.000Z',
+      status: 'working',
+      createdCount: input.createdAgents.length,
+      createdAgents: input.createdAgents,
+    }],
+  }];
+  for (const createdAgent of input.createdAgents) {
+    const [, itemId] = createdAgent.workItemId.split(':');
+    snapshot.workBacklog.assignments[createdAgent.workItemId] = {
+      provider: 'github',
+      itemId: itemId ?? createdAgent.workItemId,
+      agentId: createdAgent.agentId,
+      assignedAt: '2026-06-15T01:00:00.000Z',
+      status: 'working',
+      loopId: 'loop-bugs',
+      loopExecutionId: 'loop-exec-1',
+    };
+  }
+
+  return snapshot;
+}
+
+function createTestAgent(id: string, teamId: string, name: string): Agent {
+  return {
+    id,
+    teamId,
+    name,
+    folder: `/Users/nbonamy/src/${id}`,
+    backend: 'codex',
+    backendSession: { kind: 'codex', threadId: `thread-${id}` },
+    status: { type: 'idle' },
+    createdAt: '2026-06-15T01:00:00.000Z',
+    updatedAt: '2026-06-15T01:00:00.000Z',
+  };
 }

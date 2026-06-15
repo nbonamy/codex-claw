@@ -340,8 +340,9 @@ export class AppController {
     try {
       await this.backendClient.start();
       const health = await this.backendClient.health();
-      await this.refreshSnapshotFromBackend();
+      this.backendClientEventUnsubscribe?.();
       this.backendClientEventUnsubscribe = this.backendClient.onEvent((event) => this.emitBackendEvent(event));
+      await this.refreshSnapshotFromBackend();
       logMain('clawd', 'connected to backend', { version: health.version, pid: health.pid });
     } catch (error) {
       warnMain('clawd', 'failed to connect to backend process', {
