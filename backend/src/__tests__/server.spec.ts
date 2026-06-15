@@ -1457,6 +1457,100 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
+  it('routes remote loop snapshots and mutations without adopting remote snapshot events', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    const remoteSnapshot = createTestSnapshot();
+    remoteSnapshot.activeTeamId = 'team-remote';
+    remoteSnapshot.teams[0]!.id = 'team-remote';
+    remoteSnapshot.loops = [{
+      id: 'loop-remote',
+      name: 'Remote bugs',
+      enabled: true,
+      source: { provider: 'github', repositoryId: 'nbonamy/codex-claw' },
+      action: {
+        type: 'create-agent-from-bench',
+        benchTemplateId: 'bench-remote',
+        teamTarget: { mode: 'existing', teamId: 'team-remote' },
+      },
+      instructions: {},
+      executionLog: [],
+      createdAt: '2026-06-14T10:00:00.000Z',
+      updatedAt: '2026-06-14T10:00:00.000Z',
+    }];
+    const remoteClients = {
+      request: vi.fn(async (_connection, method: string, _params, onEvent?: (event: unknown) => void) => {
+        if (method === 'snapshot/get') {
+          return {
+            snapshot: remoteSnapshot,
+            lastEventSeq: 12,
+            clientState: {
+              sourceFolderPath: '/home/nicolas/src',
+              shouldPreventDisplaySleep: false,
+            },
+          };
+        }
+        onEvent?.({
+          seq: 13,
+          type: 'snapshot.updated',
+          payload: remoteSnapshot,
+          occurredAt: '2026-06-14T10:01:00.000Z',
+          snapshot: remoteSnapshot,
+        });
+        return remoteSnapshot;
+      }),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const events: unknown[] = [];
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      onEvent: (event) => events.push(event),
+      remoteClients: remoteClients as never,
+    });
+    const location = { kind: 'remote' as const, remoteConnectionId: 'connection-devbox' };
+    const createInput = {
+      source: { provider: 'github' as const, repositoryId: 'nbonamy/codex-claw' },
+      action: {
+        type: 'create-agent-from-bench' as const,
+        benchTemplateId: 'bench-remote',
+        teamTarget: { mode: 'existing' as const, teamId: 'team-remote' },
+      },
+    };
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'remote-loop-snapshot',
+      method: 'loop/snapshot',
+      params: { location },
+    })).resolves.toMatchObject({ result: remoteSnapshot });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'remote-loop-create',
+      method: 'loop/create',
+      params: { input: createInput, location },
+    })).resolves.toMatchObject({ result: remoteSnapshot });
+
+    expect(remoteClients.request).toHaveBeenNthCalledWith(
+      1,
+      snapshot.remoteConnections.connections[0],
+      'snapshot/get',
+      undefined,
+      expect.any(Function),
+    );
+    expect(remoteClients.request).toHaveBeenNthCalledWith(
+      2,
+      snapshot.remoteConnections.connections[0],
+      'loop/create',
+      { input: createInput },
+      expect.any(Function),
+    );
+    expect(snapshot.activeTeamId).toBe('team-test');
+    expect(events).not.toContainEqual(expect.objectContaining({ type: 'snapshot.updated' }));
+    await server.close();
+  });
+
   it('owns git diff preview side-panel events', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];

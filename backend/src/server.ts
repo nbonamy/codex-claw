@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { sendAgentPrompt } from '@codex-claw/shared/agent-chat-service';
-import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
+import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { applyMainEventToSnapshot, createAgentInSnapshot, createEmptySnapshot, selectAgent, updateAgentFolder, updateAgentFromInput } from '@codex-claw/shared/snapshot';
 import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitStatus, AgentStatus, AppSnapshot, BackendConversationRef, BackendSession, ClientRequest, ClientRequestResponse, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, MainToRendererEvent, MoveAgentToTeamInput, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
@@ -300,6 +300,10 @@ export class ClawBackendServer {
         const ref = params.ref;
         if (!isBackendConversationRef(ref)) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Invalid conversation reference.');
+        }
+        const remoteConnectionId = loopLocationRemoteConnectionId(params);
+        if (remoteConnectionId) {
+          return createClawRpcResult(message.id, await this.remoteRequest(remoteConnectionId, 'agent/readConversationMessages', { ref, agentId }));
         }
         if (!this.isStoredConversationRef(ref, agentId)) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Conversation reference is not available.');
@@ -684,15 +688,46 @@ export class ClawBackendServer {
         return createClawRpcResult(message.id, await this.requireWorkIntegrations().completeConnection(requireWorkProvider(message.params)));
       case 'workProvider/disconnect':
         return createClawRpcResult(message.id, await this.requireWorkIntegrations().disconnect(requireWorkProvider(message.params)));
-      case 'workProvider/listRepositories':
+      case 'workProvider/listRepositories': {
+        const remoteConnectionId = loopLocationRemoteConnectionId(message.params);
+        if (remoteConnectionId) {
+          return createClawRpcResult(message.id, await this.remoteRequest(remoteConnectionId, 'workProvider/listRepositories', {
+            provider: requireWorkProvider(message.params),
+          }));
+        }
         return createClawRpcResult(message.id, await this.requireWorkIntegrations().listRepositories(requireWorkProvider(message.params)));
+      }
       case 'workProvider/configureBacklog':
         return createClawRpcResult(message.id, await this.requireWorkIntegrations().configureBacklog(requireBacklogConfiguration(message.params)));
       case 'workProvider/listItems': {
         const params = requireRecord(message.params);
+        const remoteConnectionId = loopLocationRemoteConnectionId(params);
+        if (remoteConnectionId) {
+          return createClawRpcResult(message.id, await this.remoteRequest(remoteConnectionId, 'workProvider/listItems', {
+            provider: requireWorkProvider(params),
+            repositoryId: requireString(params.repositoryId, 'repositoryId'),
+          }));
+        }
         return createClawRpcResult(message.id, await this.requireWorkIntegrations().listItems(requireWorkProvider(params), requireString(params.repositoryId, 'repositoryId')));
       }
+      case 'loop/snapshot': {
+        const remoteConnectionId = loopLocationRemoteConnectionId(message.params);
+        if (remoteConnectionId) {
+          const remoteSnapshotResult = await this.remoteRequest(remoteConnectionId, 'snapshot/get');
+          if (!isClawSnapshotGetResult(remoteSnapshotResult)) {
+            return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Remote loop snapshot is invalid.');
+          }
+          return createClawRpcResult(message.id, remoteSnapshotResult.snapshot);
+        }
+        return createClawRpcResult(message.id, this.snapshot);
+      }
       case 'loop/create': {
+        const remoteConnectionId = loopLocationRemoteConnectionId(message.params);
+        if (remoteConnectionId) {
+          return createClawRpcResult(message.id, await this.remoteRequest(remoteConnectionId, 'loop/create', {
+            input: requireLoopCreateInput(message.params),
+          }));
+        }
         const loop = createLoopInSnapshot(this.snapshot, requireLoopCreateInput(message.params));
         if (!loop) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Invalid loop configuration.');
@@ -700,6 +735,12 @@ export class ClawBackendServer {
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case 'loop/update': {
+        const remoteConnectionId = loopLocationRemoteConnectionId(message.params);
+        if (remoteConnectionId) {
+          return createClawRpcResult(message.id, await this.remoteRequest(remoteConnectionId, 'loop/update', {
+            input: requireLoopUpdateInput(message.params),
+          }));
+        }
         const input = requireLoopUpdateInput(message.params);
         const loop = updateLoopInSnapshot(this.snapshot, input);
         if (!loop) {
@@ -708,6 +749,12 @@ export class ClawBackendServer {
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case 'loop/run': {
+        const remoteConnectionId = loopLocationRemoteConnectionId(message.params);
+        if (remoteConnectionId) {
+          return createClawRpcResult(message.id, await this.remoteRequest(remoteConnectionId, 'loop/run', {
+            loopId: requireLoopId(message.params),
+          }));
+        }
         const loopId = requireLoopId(message.params);
         if (!this.snapshot.loops.some((loop) => loop.id === loopId)) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Loop not found: ${loopId}`);
@@ -720,6 +767,12 @@ export class ClawBackendServer {
         return createClawRpcResult(message.id, this.snapshot);
       }
       case 'loop/history/clear': {
+        const remoteConnectionId = loopLocationRemoteConnectionId(message.params);
+        if (remoteConnectionId) {
+          return createClawRpcResult(message.id, await this.remoteRequest(remoteConnectionId, 'loop/history/clear', {
+            loopId: requireLoopId(message.params),
+          }));
+        }
         const loopId = requireLoopId(message.params);
         const loop = clearLoopExecutionHistoryInSnapshot(this.snapshot, loopId);
         if (!loop) {
@@ -731,6 +784,13 @@ export class ClawBackendServer {
         const params = requireRecord(message.params);
         const loopId = requireString(params.loopId, 'loopId');
         const executionId = requireString(params.executionId, 'executionId');
+        const remoteConnectionId = loopLocationRemoteConnectionId(params);
+        if (remoteConnectionId) {
+          return createClawRpcResult(message.id, await this.remoteRequest(remoteConnectionId, 'loop/execution/delete', {
+            loopId,
+            executionId,
+          }));
+        }
         const loop = deleteLoopExecutionFromSnapshot(this.snapshot, loopId, executionId);
         if (!loop) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Loop execution not found: ${loopId}/${executionId}`);
@@ -738,6 +798,12 @@ export class ClawBackendServer {
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case 'loop/delete': {
+        const remoteConnectionId = loopLocationRemoteConnectionId(message.params);
+        if (remoteConnectionId) {
+          return createClawRpcResult(message.id, await this.remoteRequest(remoteConnectionId, 'loop/delete', {
+            loopId: requireLoopId(message.params),
+          }));
+        }
         const loopId = requireLoopId(message.params);
         const loop = deleteLoopFromSnapshot(this.snapshot, loopId);
         if (!loop) {
@@ -837,8 +903,23 @@ export class ClawBackendServer {
   private async remoteRequest<Result = unknown>(connectionId: string, method: string, params?: unknown): Promise<Result> {
     const connection = this.remoteConnection(connectionId);
     return this.remoteClients.request<Result>(connection, method, params, (event) => {
-      this.applyAndEmitBackendEvent(event);
+      this.applyRemoteBackendEvent(event);
     });
+  }
+
+  private applyRemoteBackendEvent(event: ClawBackendEvent): void {
+    if (event.type === 'snapshot.updated') {
+      return;
+    }
+
+    const {
+      clientState: _clientState,
+      occurredAt: _occurredAt,
+      seq: _seq,
+      snapshot: _snapshot,
+      ...backendEvent
+    } = event;
+    this.applyAndEmitBackendEvent(backendEvent);
   }
 
   private remoteConnection(connectionId: string): RemoteConnection {
@@ -1496,6 +1577,25 @@ function requireOptionalConnectionId(params: unknown): string | null {
   }
   const record = requireRecord(params);
   return optionalTrimmedString(record.remoteConnectionId);
+}
+
+function loopLocationRemoteConnectionId(params: unknown): string | null {
+  if (params === undefined) {
+    return null;
+  }
+  const record = requireRecord(params);
+  const location = record.location;
+  if (location === undefined) {
+    return null;
+  }
+  const locationRecord = requireRecord(location);
+  if (locationRecord.kind === 'local') {
+    return null;
+  }
+  if (locationRecord.kind !== 'remote') {
+    throw new Error('Invalid loop location.');
+  }
+  return requireString(locationRecord.remoteConnectionId, 'remoteConnectionId');
 }
 
 function requireSourceFolderListInput(params: unknown): { path?: string; remoteConnectionId?: string } {

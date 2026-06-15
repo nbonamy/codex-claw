@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
@@ -437,66 +437,124 @@ export function useAppState() {
     await selectSnapshotWithLoading(() => window.codexClaw!.selectTeam(teamId));
   }
 
-  async function createLoop(input: CreateLoopInput): Promise<void> {
+  async function getLoopSnapshot(location?: LoopLocation): Promise<AppSnapshot> {
+    if (!window.codexClaw?.getLoopSnapshot || !isRemoteLoopLocation(location)) {
+      return snapshot.value;
+    }
+
+    return window.codexClaw.getLoopSnapshot(location);
+  }
+
+  async function createLoop(input: CreateLoopInput, location?: LoopLocation): Promise<AppSnapshot | void> {
     if (!window.codexClaw?.createLoop) {
       return;
     }
 
-    snapshot.value = await window.codexClaw.createLoop(input);
-  }
-
-  async function updateLoop(input: UpdateLoopInput): Promise<void> {
-    if (!window.codexClaw?.updateLoop || !snapshot.value.loops.some((loop) => loop.id === input.id)) {
-      return;
+    const nextSnapshot = location
+      ? await window.codexClaw.createLoop(input, location)
+      : await window.codexClaw.createLoop(input);
+    if (!isRemoteLoopLocation(location)) {
+      snapshot.value = nextSnapshot;
     }
-
-    snapshot.value = await window.codexClaw.updateLoop(input);
+    return nextSnapshot;
   }
 
-  async function runLoop(loopId: string): Promise<void> {
-    if (!window.codexClaw?.runLoop || !snapshot.value.loops.some((loop) => loop.id === loopId)) {
-      return;
-    }
-
-    snapshot.value = await window.codexClaw.runLoop(loopId);
-  }
-
-  async function deleteLoop(loopId: string): Promise<void> {
-    if (!window.codexClaw?.deleteLoop || !snapshot.value.loops.some((loop) => loop.id === loopId)) {
-      return;
-    }
-
-    snapshot.value = await window.codexClaw.deleteLoop(loopId);
-  }
-
-  async function clearLoopHistory(loopId: string): Promise<void> {
-    if (!window.codexClaw?.clearLoopHistory || !snapshot.value.loops.some((loop) => loop.id === loopId)) {
-      return;
-    }
-
-    snapshot.value = await window.codexClaw.clearLoopHistory(loopId);
-  }
-
-  async function deleteLoopExecution(loopId: string, executionId: string): Promise<void> {
+  async function updateLoop(input: UpdateLoopInput, location?: LoopLocation): Promise<AppSnapshot | void> {
     if (
-      !window.codexClaw?.deleteLoopExecution ||
-      !snapshot.value.loops.some((loop) => (
-        loop.id === loopId &&
-        loop.executionLog.some((entry) => entry.id === executionId)
-      ))
+      !window.codexClaw?.updateLoop ||
+      (!isRemoteLoopLocation(location) && !snapshot.value.loops.some((loop) => loop.id === input.id))
     ) {
       return;
     }
 
-    snapshot.value = await window.codexClaw.deleteLoopExecution(loopId, executionId);
+    const nextSnapshot = location
+      ? await window.codexClaw.updateLoop(input, location)
+      : await window.codexClaw.updateLoop(input);
+    if (!isRemoteLoopLocation(location)) {
+      snapshot.value = nextSnapshot;
+    }
+    return nextSnapshot;
   }
 
-  async function readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]> {
+  async function runLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot | void> {
+    if (
+      !window.codexClaw?.runLoop ||
+      (!isRemoteLoopLocation(location) && !snapshot.value.loops.some((loop) => loop.id === loopId))
+    ) {
+      return;
+    }
+
+    const nextSnapshot = location
+      ? await window.codexClaw.runLoop(loopId, location)
+      : await window.codexClaw.runLoop(loopId);
+    if (!isRemoteLoopLocation(location)) {
+      snapshot.value = nextSnapshot;
+    }
+    return nextSnapshot;
+  }
+
+  async function deleteLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot | void> {
+    if (
+      !window.codexClaw?.deleteLoop ||
+      (!isRemoteLoopLocation(location) && !snapshot.value.loops.some((loop) => loop.id === loopId))
+    ) {
+      return;
+    }
+
+    const nextSnapshot = location
+      ? await window.codexClaw.deleteLoop(loopId, location)
+      : await window.codexClaw.deleteLoop(loopId);
+    if (!isRemoteLoopLocation(location)) {
+      snapshot.value = nextSnapshot;
+    }
+    return nextSnapshot;
+  }
+
+  async function clearLoopHistory(loopId: string, location?: LoopLocation): Promise<AppSnapshot | void> {
+    if (
+      !window.codexClaw?.clearLoopHistory ||
+      (!isRemoteLoopLocation(location) && !snapshot.value.loops.some((loop) => loop.id === loopId))
+    ) {
+      return;
+    }
+
+    const nextSnapshot = location
+      ? await window.codexClaw.clearLoopHistory(loopId, location)
+      : await window.codexClaw.clearLoopHistory(loopId);
+    if (!isRemoteLoopLocation(location)) {
+      snapshot.value = nextSnapshot;
+    }
+    return nextSnapshot;
+  }
+
+  async function deleteLoopExecution(loopId: string, executionId: string, location?: LoopLocation): Promise<AppSnapshot | void> {
+    if (
+      !window.codexClaw?.deleteLoopExecution ||
+      (!isRemoteLoopLocation(location) && !snapshot.value.loops.some((loop) => (
+        loop.id === loopId &&
+        loop.executionLog.some((entry) => entry.id === executionId)
+      )))
+    ) {
+      return;
+    }
+
+    const nextSnapshot = location
+      ? await window.codexClaw.deleteLoopExecution(loopId, executionId, location)
+      : await window.codexClaw.deleteLoopExecution(loopId, executionId);
+    if (!isRemoteLoopLocation(location)) {
+      snapshot.value = nextSnapshot;
+    }
+    return nextSnapshot;
+  }
+
+  async function readConversationMessages(ref: BackendConversationRef, agentId: string, location?: LoopLocation): Promise<RendererMessage[]> {
     if (!window.codexClaw?.readConversationMessages) {
       return [];
     }
 
-    return window.codexClaw.readConversationMessages(plainConversationRef(ref), agentId);
+    return location
+      ? window.codexClaw.readConversationMessages(plainConversationRef(ref), agentId, location)
+      : window.codexClaw.readConversationMessages(plainConversationRef(ref), agentId);
   }
 
   async function listAgentConversations(agentId: string): Promise<ConversationSummary[]> {
@@ -748,14 +806,18 @@ export function useAppState() {
     workProviderAuthorizationPollTimers.set(provider, timer);
   }
 
-  async function loadWorkRepositories(provider: WorkProviderKind): Promise<void> {
+  async function loadWorkRepositories(provider: WorkProviderKind, location?: LoopLocation): Promise<WorkRepository[]> {
+    if (isRemoteLoopLocation(location)) {
+      return await window.codexClaw?.listWorkRepositories?.(provider, location) ?? [];
+    }
+
     if (!window.codexClaw?.listWorkRepositories || workProviderConnection(provider)?.status !== 'connected') {
       workRepositoriesByProvider.value = {
         ...workRepositoriesByProvider.value,
         [provider]: [],
       };
       workBacklogStatus.value = 'notLoaded';
-      return;
+      return [];
     }
 
     workBacklogStatus.value = 'loading';
@@ -783,6 +845,7 @@ export function useAppState() {
       } else if (selectedRepositoryId) {
         await loadWorkItems(provider, selectedRepositoryId);
       }
+      return repositories;
     } catch (error) {
       workRepositoriesByProvider.value = {
         ...workRepositoriesByProvider.value,
@@ -790,6 +853,7 @@ export function useAppState() {
       };
       workBacklogStatus.value = 'error';
       workBacklogError.value = error instanceof Error ? error.message : String(error);
+      return [];
     }
   }
 
@@ -801,9 +865,13 @@ export function useAppState() {
     snapshot.value = await window.codexClaw.configureWorkBacklog(input);
   }
 
-  async function loadWorkItems(provider: WorkProviderKind, repositoryId: string): Promise<void> {
+  async function loadWorkItems(provider: WorkProviderKind, repositoryId: string, location?: LoopLocation): Promise<WorkItem[]> {
     if (!window.codexClaw?.listWorkItems || !repositoryId) {
-      return;
+      return [];
+    }
+
+    if (isRemoteLoopLocation(location)) {
+      return await window.codexClaw.listWorkItems(provider, repositoryId, location);
     }
 
     workBacklogStatus.value = 'loading';
@@ -815,9 +883,11 @@ export function useAppState() {
         [workItemsKey(provider, repositoryId)]: items,
       };
       workBacklogStatus.value = 'loaded';
+      return items;
     } catch (error) {
       workBacklogStatus.value = 'error';
       workBacklogError.value = error instanceof Error ? error.message : String(error);
+      return [];
     }
   }
 
@@ -1033,6 +1103,7 @@ export function useAppState() {
     disconnectWorkProvider,
     openWorkProviderAuthorization,
     configureWorkBacklog,
+    getLoopSnapshot,
     createLoop,
     updateLoop,
     runLoop,
@@ -1599,6 +1670,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function workProviderConnection(provider: WorkProviderKind) {
   return snapshot.value.workBacklog.connections.find((connection) => connection.provider === provider) ?? null;
+}
+
+function isRemoteLoopLocation(location: LoopLocation | undefined): location is Extract<LoopLocation, { kind: 'remote' }> {
+  return location?.kind === 'remote' && location.remoteConnectionId.trim().length > 0;
 }
 
 function workItemsKey(provider: WorkProviderKind, repositoryId: string): string {

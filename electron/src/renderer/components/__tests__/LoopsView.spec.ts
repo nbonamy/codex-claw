@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus, { ElMessageBox } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AppSnapshot, BackendConversationRef, CreateLoopInput, Loop, RendererMessage, WorkItem, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AppSnapshot, BackendConversationRef, CreateLoopInput, Loop, LoopLocation, RemoteConnection, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/shared/contracts';
 import LoopsView from '../LoopsView.vue';
 
 afterEach(() => {
@@ -58,6 +58,117 @@ describe('LoopsView', () => {
         },
       },
     });
+  });
+
+  it('loads remote loop data and creates remote loops from the selected connection', async () => {
+    const localSnapshot = createInitialSnapshot();
+    localSnapshot.loops = [loop({ name: 'Local bugs' })];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.teams = [{
+      id: 'team-remote',
+      name: 'Remote Team',
+      color: '#46A857',
+      agentIds: [],
+    }];
+    remoteSnapshot.bench = [{
+      id: 'bench-remote',
+      name: 'Remote Dina',
+      folder: '/home/nicolas/src/codex-claw',
+      backend: 'codex',
+      createdAt: '2026-06-09T10:00:00.000Z',
+      updatedAt: '2026-06-09T10:00:00.000Z',
+    }];
+    remoteSnapshot.workBacklog.connections = [{
+      provider: 'github',
+      status: 'connected',
+      accountLabel: 'mnmt',
+    }];
+    remoteSnapshot.loops = [loop({
+      id: 'loop-remote',
+      name: 'Remote bugs',
+      action: {
+        type: 'create-agent-from-bench',
+        benchTemplateId: 'bench-remote',
+        teamTarget: {
+          mode: 'existing',
+          teamId: 'team-remote',
+        },
+      },
+    })];
+    const location: LoopLocation = { kind: 'remote', remoteConnectionId: 'connection-devbox' };
+    const getLoopSnapshot = vi.fn().mockResolvedValue(remoteSnapshot);
+    const createLoop = vi.fn().mockResolvedValue(remoteSnapshot);
+    const listSourceRepositories = vi.fn().mockResolvedValue([remoteSourceRepository()]);
+    const listSourceFolders = vi.fn().mockResolvedValue({
+      path: '/home/nicolas/src',
+      parentPath: '/home/nicolas',
+      entries: [{ name: 'codex-claw', path: '/home/nicolas/src/codex-claw' }],
+    } satisfies SourceFolderListing);
+    const loadWorkRepositories = vi.fn().mockResolvedValue([repository({
+      id: 'nbonamy/remote',
+      fullName: 'nbonamy/remote',
+      name: 'remote',
+    })]);
+    const wrapper = mountView({
+      createLoop,
+      getLoopSnapshot,
+      listSourceFolders,
+      listSourceRepositories,
+      loadWorkRepositories,
+      remoteConnections: [readyRemoteConnection()],
+      snapshot: localSnapshot,
+    });
+
+    wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'remote:connection-devbox');
+    await flushPromises();
+
+    expect(getLoopSnapshot).toHaveBeenCalledWith(location);
+    expect(listSourceRepositories).toHaveBeenCalledWith('connection-devbox');
+    expect(loadWorkRepositories).toHaveBeenCalledWith('github', location);
+    expect(wrapper.text()).toContain('Remote bugs');
+    expect(wrapper.text()).not.toContain('Local bugs');
+
+    const newLoopButton = wrapper.findAll('button').find((button) => button.text() === 'New Loop');
+    expect(newLoopButton).toBeDefined();
+    await newLoopButton!.trigger('click');
+    await flushPromises();
+
+    const editor = wrapper.findComponent({ name: 'LoopEditor' });
+    expect(editor.props('teams')).toStrictEqual(remoteSnapshot.teams);
+    expect(editor.props('benchTemplates')).toStrictEqual(remoteSnapshot.bench);
+    expect(editor.props('sourceRepositories')).toStrictEqual([remoteSourceRepository()]);
+
+    const chooseFolder = editor.props('chooseAgentFolder') as () => Promise<string | null>;
+    const choosePromise = chooseFolder();
+    await flushPromises();
+    wrapper.findComponent({ name: 'RemoteFolderPickerDialog' }).vm.$emit('select', '/home/nicolas/src/codex-claw');
+    await expect(choosePromise).resolves.toBe('/home/nicolas/src/codex-claw');
+    expect(listSourceFolders).toHaveBeenCalledWith(expect.objectContaining({
+      remoteConnectionId: 'connection-devbox',
+    }));
+
+    editor.vm.$emit('submit', {
+      source: {
+        provider: 'github',
+        repositoryId: 'nbonamy/remote',
+      },
+      action: {
+        type: 'create-agent-from-bench',
+        benchTemplateId: 'bench-remote',
+        teamTarget: {
+          mode: 'existing',
+          teamId: 'team-remote',
+        },
+      },
+    });
+    await flushPromises();
+
+    expect(createLoop).toHaveBeenCalledWith(expect.objectContaining({
+      source: {
+        provider: 'github',
+        repositoryId: 'nbonamy/remote',
+      },
+    }), location);
   });
 
   it('confirms before deleting a loop', async () => {
@@ -164,7 +275,7 @@ describe('LoopsView', () => {
       readConversationMessages,
     });
 
-    expect(wrapper.find('[aria-label="Current loops"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Loops"]').exists()).toBe(true);
     await wrapper.get('[aria-label="View logs for GitHub bugs"]').trigger('click');
 
     expect(wrapper.text()).toContain('2 executions');
@@ -270,14 +381,19 @@ describe('LoopsView', () => {
 });
 
 function mountView(overrides: Partial<{
-  clearLoopHistory: (loopId: string) => Promise<void>;
-  createLoop: (input: CreateLoopInput) => Promise<void>;
-  deleteLoopExecution: (loopId: string, executionId: string) => Promise<void>;
-  deleteLoop: (loopId: string) => Promise<void>;
+  clearLoopHistory: (loopId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
+  createLoop: (input: CreateLoopInput, location?: LoopLocation) => Promise<AppSnapshot | void>;
+  deleteLoopExecution: (loopId: string, executionId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
+  deleteLoop: (loopId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
+  getLoopSnapshot: (location?: LoopLocation) => Promise<AppSnapshot>;
+  listSourceFolders: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
+  listSourceRepositories: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
+  loadWorkRepositories: (provider: 'github', location?: LoopLocation) => Promise<WorkRepository[] | void>;
   loops: Loop[];
   messages: RendererMessage[];
-  readConversationMessages: (ref: BackendConversationRef, agentId: string) => Promise<RendererMessage[]>;
-  runLoop: (loopId: string) => Promise<void>;
+  readConversationMessages: (ref: BackendConversationRef, agentId: string, location?: LoopLocation) => Promise<RendererMessage[]>;
+  remoteConnections: RemoteConnection[];
+  runLoop: (loopId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
   snapshot: AppSnapshot;
 }> = {}) {
   const snapshot = overrides.snapshot ?? createInitialSnapshot();
@@ -303,11 +419,15 @@ function mountView(overrides: Partial<{
       createLoop: overrides.createLoop ?? vi.fn().mockResolvedValue(undefined),
       deleteLoopExecution: overrides.deleteLoopExecution ?? vi.fn().mockResolvedValue(undefined),
       deleteLoop: overrides.deleteLoop ?? vi.fn().mockResolvedValue(undefined),
+      getLoopSnapshot: overrides.getLoopSnapshot ?? vi.fn().mockResolvedValue(snapshot),
+      listSourceFolders: overrides.listSourceFolders ?? vi.fn().mockResolvedValue({ path: '', parentPath: null, entries: [] }),
+      listSourceRepositories: overrides.listSourceRepositories ?? vi.fn().mockResolvedValue([]),
       loadWorkItems: vi.fn().mockResolvedValue(undefined),
-      loadWorkRepositories: vi.fn().mockResolvedValue(undefined),
+      loadWorkRepositories: overrides.loadWorkRepositories ?? vi.fn().mockResolvedValue(undefined),
       loops: overrides.loops ?? [],
       messages: overrides.messages ?? snapshot.messages,
       readConversationMessages: overrides.readConversationMessages ?? vi.fn().mockResolvedValue([]),
+      remoteConnections: overrides.remoteConnections ?? [],
       runLoop: overrides.runLoop ?? vi.fn().mockResolvedValue(undefined),
       teams: snapshot.teams,
       updateLoop: vi.fn().mockResolvedValue(undefined),
@@ -358,7 +478,7 @@ function loop(overrides: Partial<Loop> = {}): Loop {
   };
 }
 
-function repository(): WorkRepository {
+function repository(overrides: Partial<WorkRepository> = {}): WorkRepository {
   return {
     provider: 'github',
     id: 'nbonamy/codex-claw',
@@ -367,6 +487,36 @@ function repository(): WorkRepository {
     fullName: 'nbonamy/codex-claw',
     url: 'https://github.com/nbonamy/codex-claw',
     isPrivate: true,
+    ...overrides,
+  };
+}
+
+function remoteSourceRepository(): SourceRepository {
+  return {
+    name: 'codex-claw',
+    path: '/home/nicolas/src/codex-claw',
+    worktrees: [{
+      name: 'main',
+      path: '/home/nicolas/src/codex-claw',
+    }],
+  };
+}
+
+function readyRemoteConnection(): RemoteConnection {
+  return {
+    id: 'connection-devbox',
+    kind: 'ssh',
+    name: 'devbox',
+    host: 'devbox',
+    status: 'ready',
+    sourceFolderPath: '/home/nicolas/src',
+    transport: {
+      type: 'ssh-stdio',
+      command: 'ssh',
+      args: ['devbox', 'node ~/.codex-claw/clawd.mjs --stdio'],
+    },
+    createdAt: '2026-06-14T10:00:00.000Z',
+    updatedAt: '2026-06-14T10:00:00.000Z',
   };
 }
 

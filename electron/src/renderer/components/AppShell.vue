@@ -90,11 +90,15 @@
         :create-loop="createLoop"
         :delete-loop-execution="deleteLoopExecution"
         :delete-loop="deleteLoop"
+        :get-loop-snapshot="getLoopSnapshot"
         :load-work-items="loadWorkItems"
         :load-work-repositories="loadWorkRepositories"
+        :list-source-folders="listSourceFolders"
+        :list-source-repositories="listSourceRepositories"
         :loops="snapshot.loops"
         :messages="snapshot.messages"
         :read-conversation-messages="readConversationMessages"
+        :remote-connections="snapshot.remoteConnections.connections"
         :run-loop="runLoop"
         :source-repositories="sourceRepositories"
         :teams="snapshot.teams"
@@ -254,8 +258,9 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, TurnGitDiff, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, TurnGitDiff, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
+import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultTeamColor } from '@codex-claw/shared/team-colors';
 import { findAssignedAgentForWorkItem } from '@codex-claw/shared/work-assignments';
 import AgentDialog from './AgentDialog.vue';
@@ -329,22 +334,23 @@ const props = withDefaults(defineProps<{
   removeRemoteConnection?: (connectionId: string) => Promise<void>;
   setDaemonEnabled?: (enabled: boolean) => Promise<void>;
   restartApp?: () => Promise<void>;
-  createLoop?: (input: CreateLoopInput) => Promise<void>;
-  updateLoop?: (input: UpdateLoopInput) => Promise<void>;
-  runLoop?: (loopId: string) => Promise<void>;
-  clearLoopHistory?: (loopId: string) => Promise<void>;
-  deleteLoopExecution?: (loopId: string, executionId: string) => Promise<void>;
-  deleteLoop?: (loopId: string) => Promise<void>;
+  getLoopSnapshot?: (location?: LoopLocation) => Promise<AppSnapshot>;
+  createLoop?: (input: CreateLoopInput, location?: LoopLocation) => Promise<AppSnapshot | void>;
+  updateLoop?: (input: UpdateLoopInput, location?: LoopLocation) => Promise<AppSnapshot | void>;
+  runLoop?: (loopId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
+  clearLoopHistory?: (loopId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
+  deleteLoopExecution?: (loopId: string, executionId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
+  deleteLoop?: (loopId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
   listAgentConversations?: (agentId: string) => Promise<ConversationSummary[]>;
   resumeAgentConversation?: (agentId: string, ref: BackendConversationRef) => Promise<void>;
-  readConversationMessages?: (ref: BackendConversationRef, agentId: string) => Promise<RendererMessage[]>;
+  readConversationMessages?: (ref: BackendConversationRef, agentId: string, location?: LoopLocation) => Promise<RendererMessage[]>;
   connectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   openWorkProviderAuthorization?: (provider: WorkProviderKind) => Promise<void>;
   completeWorkProviderConnection?: (provider: WorkProviderKind) => Promise<void>;
   disconnectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   configureWorkBacklog?: (input: WorkBacklogConfigurationInput) => Promise<void>;
-  loadWorkRepositories?: (provider: WorkProviderKind) => Promise<void>;
-  loadWorkItems?: (provider: WorkProviderKind, repositoryId: string) => Promise<void>;
+  loadWorkRepositories?: (provider: WorkProviderKind, location?: LoopLocation) => Promise<WorkRepository[] | void>;
+  loadWorkItems?: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation) => Promise<WorkItem[] | void>;
   quit?: () => Promise<void>;
 }>(), {
   answeredClientRequestIds: () => new Set<string>(),
@@ -395,6 +401,7 @@ const props = withDefaults(defineProps<{
   removeRemoteConnection: async () => undefined,
   setDaemonEnabled: async () => undefined,
   restartApp: async () => undefined,
+  getLoopSnapshot: async () => createEmptySnapshot(),
   createLoop: async () => undefined,
   updateLoop: async () => undefined,
   runLoop: async () => undefined,
@@ -793,32 +800,32 @@ function openSettings(): void {
   activeSurface.value = 'settings';
 }
 
-async function createLoop(input: CreateLoopInput): Promise<void> {
-  await props.createLoop(input);
+async function createLoop(input: CreateLoopInput, location?: LoopLocation): Promise<AppSnapshot | void> {
+  return props.createLoop(input, location);
 }
 
-async function updateLoop(input: UpdateLoopInput): Promise<void> {
-  await props.updateLoop(input);
+async function updateLoop(input: UpdateLoopInput, location?: LoopLocation): Promise<AppSnapshot | void> {
+  return props.updateLoop(input, location);
 }
 
-async function runLoop(loopId: string): Promise<void> {
-  await props.runLoop(loopId);
+async function runLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot | void> {
+  return props.runLoop(loopId, location);
 }
 
-async function clearLoopHistory(loopId: string): Promise<void> {
-  await props.clearLoopHistory(loopId);
+async function clearLoopHistory(loopId: string, location?: LoopLocation): Promise<AppSnapshot | void> {
+  return props.clearLoopHistory(loopId, location);
 }
 
-async function deleteLoopExecution(loopId: string, executionId: string): Promise<void> {
-  await props.deleteLoopExecution(loopId, executionId);
+async function deleteLoopExecution(loopId: string, executionId: string, location?: LoopLocation): Promise<AppSnapshot | void> {
+  return props.deleteLoopExecution(loopId, executionId, location);
 }
 
-async function deleteLoop(loopId: string): Promise<void> {
-  await props.deleteLoop(loopId);
+async function deleteLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot | void> {
+  return props.deleteLoop(loopId, location);
 }
 
-async function readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]> {
-  return props.readConversationMessages(ref, agentId);
+async function readConversationMessages(ref: BackendConversationRef, agentId: string, location?: LoopLocation): Promise<RendererMessage[]> {
+  return props.readConversationMessages(ref, agentId, location);
 }
 
 async function listAgentConversations(agentId: string): Promise<ConversationSummary[]> {

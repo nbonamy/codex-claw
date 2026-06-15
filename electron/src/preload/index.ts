@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AddSshConnectionInput, AppleSpeechTranscriptionOptions, AppCommand, ApprovalPreset, BackendConversationRef, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AppleSpeechTranscriptionOptions, AppCommand, ApprovalPreset, BackendConversationRef, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
 const api: CodexClawApi = {
@@ -13,9 +13,9 @@ const api: CodexClawApi = {
   openWorkProviderAuthorization: (provider: WorkProviderKind) => ipcRenderer.invoke(ipcChannels.openWorkProviderAuthorization, provider),
   completeWorkProviderConnection: (provider: WorkProviderKind) => ipcRenderer.invoke(ipcChannels.completeWorkProviderConnection, provider),
   disconnectWorkProvider: (provider: WorkProviderKind) => ipcRenderer.invoke(ipcChannels.disconnectWorkProvider, provider),
-  listWorkRepositories: (provider: WorkProviderKind) => ipcRenderer.invoke(ipcChannels.listWorkRepositories, provider),
+  listWorkRepositories: (provider: WorkProviderKind, location?: LoopLocation) => ipcRenderer.invoke(ipcChannels.listWorkRepositories, provider, location),
   configureWorkBacklog: (input: WorkBacklogConfigurationInput) => ipcRenderer.invoke(ipcChannels.configureWorkBacklog, input),
-  listWorkItems: (provider: WorkProviderKind, repositoryId: string) => ipcRenderer.invoke(ipcChannels.listWorkItems, provider, repositoryId),
+  listWorkItems: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation) => ipcRenderer.invoke(ipcChannels.listWorkItems, provider, repositoryId, location),
   listBackendModels: (agentId: string) => ipcRenderer.invoke(ipcChannels.listBackendModels, agentId),
   listBackendSkills: (agentId: string) => ipcRenderer.invoke(ipcChannels.listBackendSkills, agentId),
   listAgentFiles: (agentId: string) => ipcRenderer.invoke(ipcChannels.listAgentFiles, agentId),
@@ -34,15 +34,16 @@ const api: CodexClawApi = {
   reorderTeams: (input: ReorderTeamsInput) => ipcRenderer.invoke(ipcChannels.reorderTeams, input),
   closeTeam: (teamId: string) => ipcRenderer.invoke(ipcChannels.closeTeam, teamId),
   selectTeam: (teamId: string) => ipcRenderer.invoke(ipcChannels.selectTeam, teamId),
-  createLoop: (input: CreateLoopInput) => ipcRenderer.invoke(ipcChannels.createLoop, input),
-  updateLoop: (input: UpdateLoopInput) => ipcRenderer.invoke(ipcChannels.updateLoop, input),
-  runLoop: (loopId: string) => ipcRenderer.invoke(ipcChannels.runLoop, loopId),
-  clearLoopHistory: (loopId: string) => ipcRenderer.invoke(ipcChannels.clearLoopHistory, loopId),
-  deleteLoopExecution: (loopId: string, executionId: string) => ipcRenderer.invoke(ipcChannels.deleteLoopExecution, loopId, executionId),
-  deleteLoop: (loopId: string) => ipcRenderer.invoke(ipcChannels.deleteLoop, loopId),
+  getLoopSnapshot: (location?: LoopLocation) => ipcRenderer.invoke(ipcChannels.getLoopSnapshot, location),
+  createLoop: (input: CreateLoopInput, location?: LoopLocation) => ipcRenderer.invoke(ipcChannels.createLoop, input, location),
+  updateLoop: (input: UpdateLoopInput, location?: LoopLocation) => ipcRenderer.invoke(ipcChannels.updateLoop, input, location),
+  runLoop: (loopId: string, location?: LoopLocation) => ipcRenderer.invoke(ipcChannels.runLoop, loopId, location),
+  clearLoopHistory: (loopId: string, location?: LoopLocation) => ipcRenderer.invoke(ipcChannels.clearLoopHistory, loopId, location),
+  deleteLoopExecution: (loopId: string, executionId: string, location?: LoopLocation) => ipcRenderer.invoke(ipcChannels.deleteLoopExecution, loopId, executionId, location),
+  deleteLoop: (loopId: string, location?: LoopLocation) => ipcRenderer.invoke(ipcChannels.deleteLoop, loopId, location),
   listAgentConversations: (agentId: string) => ipcRenderer.invoke(ipcChannels.listAgentConversations, agentId),
   resumeAgentConversation: (agentId: string, ref: BackendConversationRef) => ipcRenderer.invoke(ipcChannels.resumeAgentConversation, agentId, ref),
-  readConversationMessages: (ref: BackendConversationRef, agentId: string) => ipcRenderer.invoke(ipcChannels.readConversationMessages, ref, agentId),
+  readConversationMessages: (ref: BackendConversationRef, agentId: string, location?: LoopLocation) => ipcRenderer.invoke(ipcChannels.readConversationMessages, ref, agentId, location),
   createAgent: (input: CreateAgentInput) => ipcRenderer.invoke(ipcChannels.createAgent, input),
   updateAgent: (input: UpdateAgentInput) => ipcRenderer.invoke(ipcChannels.updateAgent, input),
   assignWorkItemToAgent: (agentId: string, item: WorkItem) => ipcRenderer.invoke(ipcChannels.assignWorkItemToAgent, agentId, item),

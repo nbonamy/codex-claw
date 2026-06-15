@@ -337,6 +337,15 @@ export type Loop = {
   lastCreatedCount?: number;
 };
 
+export type LoopLocation =
+  | {
+    kind: 'local';
+  }
+  | {
+    kind: 'remote';
+    remoteConnectionId: string;
+  };
+
 export type CreateLoopInput = {
   name?: string;
   enabled?: boolean;
@@ -897,9 +906,9 @@ export type CodexClawApi = {
   openWorkProviderAuthorization(provider: WorkProviderKind): Promise<AppSnapshot>;
   completeWorkProviderConnection(provider: WorkProviderKind): Promise<AppSnapshot>;
   disconnectWorkProvider(provider: WorkProviderKind): Promise<AppSnapshot>;
-  listWorkRepositories(provider: WorkProviderKind): Promise<WorkRepository[]>;
+  listWorkRepositories(provider: WorkProviderKind, location?: LoopLocation): Promise<WorkRepository[]>;
   configureWorkBacklog(input: WorkBacklogConfigurationInput): Promise<AppSnapshot>;
-  listWorkItems(provider: WorkProviderKind, repositoryId: string): Promise<WorkItem[]>;
+  listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: LoopLocation): Promise<WorkItem[]>;
   listBackendModels(agentId: string): Promise<BackendModelOption[]>;
   listBackendSkills(agentId: string): Promise<BackendSkillSummary[]>;
   listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]>;
@@ -918,15 +927,16 @@ export type CodexClawApi = {
   reorderTeams(input: ReorderTeamsInput): Promise<AppSnapshot>;
   closeTeam(teamId: string): Promise<AppSnapshot>;
   selectTeam(teamId: string): Promise<AppSnapshot>;
-  createLoop(input: CreateLoopInput): Promise<AppSnapshot>;
-  updateLoop(input: UpdateLoopInput): Promise<AppSnapshot>;
-  runLoop(loopId: string): Promise<AppSnapshot>;
-  clearLoopHistory(loopId: string): Promise<AppSnapshot>;
-  deleteLoopExecution(loopId: string, executionId: string): Promise<AppSnapshot>;
-  deleteLoop(loopId: string): Promise<AppSnapshot>;
+  getLoopSnapshot(location?: LoopLocation): Promise<AppSnapshot>;
+  createLoop(input: CreateLoopInput, location?: LoopLocation): Promise<AppSnapshot>;
+  updateLoop(input: UpdateLoopInput, location?: LoopLocation): Promise<AppSnapshot>;
+  runLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot>;
+  clearLoopHistory(loopId: string, location?: LoopLocation): Promise<AppSnapshot>;
+  deleteLoopExecution(loopId: string, executionId: string, location?: LoopLocation): Promise<AppSnapshot>;
+  deleteLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot>;
   listAgentConversations(agentId: string): Promise<ConversationSummary[]>;
   resumeAgentConversation(agentId: string, ref: BackendConversationRef): Promise<AppSnapshot>;
-  readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]>;
+  readConversationMessages(ref: BackendConversationRef, agentId: string, location?: LoopLocation): Promise<RendererMessage[]>;
   createAgent(input: CreateAgentInput): Promise<AppSnapshot>;
   updateAgent(input: UpdateAgentInput): Promise<AppSnapshot>;
   assignWorkItemToAgent(agentId: string, item: WorkItem): Promise<AppSnapshot>;

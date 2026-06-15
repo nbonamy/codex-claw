@@ -35,6 +35,7 @@ describe('ipc channels', () => {
       reorderTeams: 'team:reorder',
       closeTeam: 'team:close',
       selectTeam: 'team:select',
+      getLoopSnapshot: 'loop:snapshot:get',
       createLoop: 'loop:create',
       updateLoop: 'loop:update',
       runLoop: 'loop:run',

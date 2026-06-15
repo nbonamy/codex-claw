@@ -12,19 +12,53 @@
           title="Loops"
           title-id="loops-title"
         >
+          <div
+            v-if="!editorVisible && !logLoop"
+            class="loops-view__list-header"
+          >
+            <div class="loops-view__location-heading">
+              <h3>Loops</h3>
+              <ChevronRightIcon aria-hidden="true" />
+              <el-select
+                v-model="selectedLocationValue"
+                class="loops-view__location-select"
+                aria-label="Loop location"
+                size="small"
+              >
+                <el-option
+                  label="Local"
+                  value="local"
+                />
+                <el-option
+                  v-for="connection in readyRemoteConnections"
+                  :key="connection.id"
+                  :label="connection.name"
+                  :value="remoteLocationValue(connection.id)"
+                />
+              </el-select>
+            </div>
+            <el-button
+              v-if="locationLoops.length > 0"
+              type="primary"
+              @click="openCreate"
+            >
+              New Loop
+            </el-button>
+          </div>
+
           <LoopEditor
             v-if="editorVisible"
             :key="editorKey"
             :backend-models="backendModels"
-            :bench-templates="bench"
-            :choose-agent-folder="chooseAgentFolder"
-            :connection="githubConnection"
-            :items-by-repository="workItemsByRepository"
+            :bench-templates="locationBench"
+            :choose-agent-folder="chooseLoopAgentFolder"
+            :connection="locationGithubConnection"
+            :items-by-repository="locationWorkItemsByRepository"
             :loop="editingLoop"
             :mode="editorMode"
-            :repositories="githubRepositories"
-            :source-repositories="sourceRepositories"
-            :teams="teams"
+            :repositories="locationGithubRepositories"
+            :source-repositories="locationSourceRepositories"
+            :teams="locationTeams"
             @cancel="closeEditor"
             @load-items="loadGitHubItems"
             @load-repositories="loadGitHubRepositories"
@@ -35,14 +69,28 @@
             v-else-if="logLoop"
             :loop="logLoop"
             :messages="messages"
-            :read-conversation-messages="readConversationMessages"
+            :read-conversation-messages="readLocationConversationMessages"
             @clear-history="confirmClearLoopHistory"
             @close="closeLog"
             @delete-execution="confirmDeleteLoopExecution"
           />
 
+          <div
+            v-else-if="locationStatus === 'loading'"
+            class="loops-view__location-state"
+          >
+            Loading loops...
+          </div>
+
+          <div
+            v-else-if="locationStatus === 'error'"
+            class="loops-view__error"
+          >
+            {{ locationError }}
+          </div>
+
           <LoopWelcome
-            v-else-if="loops.length === 0"
+            v-else-if="locationLoops.length === 0"
             @create="openCreate"
           />
 
@@ -51,20 +99,10 @@
             class="loops-view__list"
           >
             <AppDataList
-              title="Current"
-              aria-label="Current loops"
+              aria-label="Loops"
               :columns="loopColumns"
               :rows="loopRows"
             >
-              <template #headerActions>
-                <el-button
-                  type="primary"
-                  @click="openCreate"
-                >
-                  New Loop
-                </el-button>
-              </template>
-
               <template #cell-loop="{ row }">
                 <div class="loops-view__loop-cell">
                   <span
@@ -143,13 +181,23 @@
         </SettingsPanelFrame>
       </div>
     </main>
+
+    <RemoteFolderPickerDialog
+      :initial-path="remoteFolderPickerInitialPath"
+      :list-source-folders="listLoopSourceFolders"
+      :remote-connection-id="selectedRemoteConnectionId ?? ''"
+      :visible="remoteFolderPickerVisible"
+      @close="cancelRemoteFolderPicker"
+      @select="selectRemoteFolder"
+    />
   </section>
 </template>
 
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
-import { computed, onMounted, ref } from 'vue';
-import type { AppSnapshot, BackendConversationRef, BackendModelOption, CreateLoopInput, Loop, RendererMessage, SourceRepository, UpdateLoopInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import { computed, onMounted, ref, watch } from 'vue';
+import type { AppSnapshot, BackendConversationRef, BackendModelOption, CreateLoopInput, Loop, LoopLocation, RemoteConnection, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, UpdateLoopInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import AppDataList from './AppDataList.vue';
 import type { AppDataListColumn, AppDataListRow } from './app-data-list';
 import AppMenu from '../shared/menu/AppMenu.vue';
@@ -157,26 +205,31 @@ import type { AppMenuItem } from '../shared/menu/app-menu';
 import LoopEditor from './LoopEditor.vue';
 import LoopExecutionLog from './LoopExecutionLog.vue';
 import LoopWelcome from './LoopWelcome.vue';
+import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
-import { DotsVerticalIcon, LogsIcon, PencilIcon, PlayerPlayIcon, Trash2Icon } from '../shared/icons/app-icons';
+import { ChevronRightIcon, DotsVerticalIcon, LogsIcon, PencilIcon, PlayerPlayIcon, Trash2Icon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
   backendModels?: BackendModelOption[];
   bench: AppSnapshot['bench'];
   chooseAgentFolder?: () => Promise<string | null>;
-  clearLoopHistory?: (loopId: string) => Promise<void>;
-  createLoop?: (input: CreateLoopInput) => Promise<void>;
-  deleteLoopExecution?: (loopId: string, executionId: string) => Promise<void>;
-  deleteLoop?: (loopId: string) => Promise<void>;
-  loadWorkItems?: (provider: WorkProviderKind, repositoryId: string) => Promise<void>;
-  loadWorkRepositories?: (provider: WorkProviderKind) => Promise<void>;
+  clearLoopHistory?: (loopId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
+  createLoop?: (input: CreateLoopInput, location?: LoopLocation) => Promise<AppSnapshot | void>;
+  deleteLoopExecution?: (loopId: string, executionId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
+  deleteLoop?: (loopId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
+  getLoopSnapshot?: (location?: LoopLocation) => Promise<AppSnapshot>;
+  listSourceFolders?: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
+  listSourceRepositories?: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
+  loadWorkItems?: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation) => Promise<WorkItem[] | void>;
+  loadWorkRepositories?: (provider: WorkProviderKind, location?: LoopLocation) => Promise<WorkRepository[] | void>;
   loops: Loop[];
   messages?: RendererMessage[];
-  runLoop?: (loopId: string) => Promise<void>;
-  readConversationMessages?: (ref: BackendConversationRef, agentId: string) => Promise<RendererMessage[]>;
+  remoteConnections?: RemoteConnection[];
+  runLoop?: (loopId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
+  readConversationMessages?: (ref: BackendConversationRef, agentId: string, location?: LoopLocation) => Promise<RendererMessage[]>;
   sourceRepositories?: SourceRepository[];
   teams: AppSnapshot['teams'];
-  updateLoop?: (input: UpdateLoopInput) => Promise<void>;
+  updateLoop?: (input: UpdateLoopInput, location?: LoopLocation) => Promise<AppSnapshot | void>;
   workBacklog: AppSnapshot['workBacklog'];
   workBacklogError?: string | null;
   workBacklogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
@@ -189,10 +242,14 @@ const props = withDefaults(defineProps<{
   createLoop: async () => undefined,
   deleteLoopExecution: async () => undefined,
   deleteLoop: async () => undefined,
+  getLoopSnapshot: async () => createEmptySnapshot(),
+  listSourceFolders: async () => ({ path: '', parentPath: null, entries: [] }),
+  listSourceRepositories: async () => [],
   loadWorkItems: async () => undefined,
   loadWorkRepositories: async () => undefined,
   messages: () => [],
   readConversationMessages: async () => [],
+  remoteConnections: () => [],
   runLoop: async () => undefined,
   sourceRepositories: () => [],
   updateLoop: async () => undefined,
@@ -203,18 +260,58 @@ const props = withDefaults(defineProps<{
 });
 
 type EditorMode = 'create' | 'edit';
+type LocationStatus = 'idle' | 'loading' | 'error';
 
 const editorMode = ref<EditorMode>('create');
 const editingLoopId = ref<string | null>(null);
 const logLoopId = ref<string | null>(null);
 const openMenuLoopId = ref<string | null>(null);
+const selectedLocationValue = ref('local');
+const remoteSnapshot = ref<AppSnapshot | null>(null);
+const remoteSourceRepositories = ref<SourceRepository[]>([]);
+const remoteWorkRepositoriesByProvider = ref<Partial<Record<WorkProviderKind, WorkRepository[]>>>({});
+const remoteWorkItemsByRepository = ref<Record<string, WorkItem[]>>({});
+const locationStatus = ref<LocationStatus>('idle');
+const locationError = ref<string | null>(null);
+const remoteFolderPickerVisible = ref(false);
+const remoteFolderPickerInitialPath = ref('');
+let remoteFolderPickerResolve: ((path: string | null) => void) | null = null;
+let locationLoadId = 0;
+const emptyLocationSnapshot = createEmptySnapshot();
+
 const editorVisible = computed(() => editorMode.value === 'create' ? creating.value : Boolean(editingLoop.value));
 const creating = ref(false);
-const editingLoop = computed(() => editingLoopId.value ? props.loops.find((loop) => loop.id === editingLoopId.value) ?? null : null);
-const logLoop = computed(() => logLoopId.value ? props.loops.find((loop) => loop.id === logLoopId.value) ?? null : null);
+const readyRemoteConnections = computed(() => props.remoteConnections.filter((connection) => (
+  connection.status === 'ready' && Boolean(connection.transport)
+)));
+const selectedRemoteConnectionId = computed(() => (
+  selectedLocationValue.value.startsWith('remote:')
+    ? selectedLocationValue.value.slice('remote:'.length)
+    : null
+));
+const selectedRemoteConnection = computed(() => (
+  selectedRemoteConnectionId.value
+    ? readyRemoteConnections.value.find((connection) => connection.id === selectedRemoteConnectionId.value) ?? null
+    : null
+));
+const selectedLocation = computed<LoopLocation>(() => (
+  selectedRemoteConnectionId.value
+    ? { kind: 'remote', remoteConnectionId: selectedRemoteConnectionId.value }
+    : { kind: 'local' }
+));
+const isRemoteLocation = computed(() => selectedLocation.value.kind === 'remote');
+const locationLoops = computed(() => isRemoteLocation.value ? remoteSnapshot.value?.loops ?? [] : props.loops);
+const locationBench = computed(() => isRemoteLocation.value ? remoteSnapshot.value?.bench ?? [] : props.bench);
+const locationTeams = computed(() => isRemoteLocation.value ? remoteSnapshot.value?.teams ?? [] : props.teams);
+const locationWorkBacklog = computed(() => isRemoteLocation.value ? remoteSnapshot.value?.workBacklog ?? emptyLocationSnapshot.workBacklog : props.workBacklog);
+const locationSourceRepositories = computed(() => isRemoteLocation.value ? remoteSourceRepositories.value : props.sourceRepositories);
+const locationWorkRepositoriesByProvider = computed(() => isRemoteLocation.value ? remoteWorkRepositoriesByProvider.value : props.workRepositoriesByProvider);
+const locationWorkItemsByRepository = computed(() => isRemoteLocation.value ? remoteWorkItemsByRepository.value : props.workItemsByRepository);
+const editingLoop = computed(() => editingLoopId.value ? locationLoops.value.find((loop) => loop.id === editingLoopId.value) ?? null : null);
+const logLoop = computed(() => logLoopId.value ? locationLoops.value.find((loop) => loop.id === logLoopId.value) ?? null : null);
 const editorKey = computed(() => editingLoop.value?.id ?? `create-${creating.value ? 'open' : 'closed'}`);
-const githubConnection = computed(() => props.workBacklog.connections.find((connection) => connection.provider === 'github') ?? null);
-const githubRepositories = computed(() => props.workRepositoriesByProvider.github ?? []);
+const locationGithubConnection = computed(() => locationWorkBacklog.value.connections.find((connection) => connection.provider === 'github') ?? null);
+const locationGithubRepositories = computed(() => locationWorkRepositoriesByProvider.value.github ?? []);
 const loopColumns: AppDataListColumn[] = [{
   id: 'loop',
   label: 'Loop',
@@ -242,7 +339,7 @@ const loopMenuItems: AppMenuItem[] = [{
   icon: Trash2Icon,
   danger: true,
 }];
-const loopRows = computed<AppDataListRow[]>(() => props.loops.map((loop) => ({
+const loopRows = computed<AppDataListRow[]>(() => locationLoops.value.map((loop) => ({
   agentName: loopAgentName(loop),
   executionCount: loopExecutionCountLabel(loop),
   id: loop.id,
@@ -255,8 +352,25 @@ const loopRows = computed<AppDataListRow[]>(() => props.loops.map((loop) => ({
 })));
 
 onMounted(() => {
-  if (githubConnection.value?.status === 'connected' && githubRepositories.value.length === 0) {
+  if (locationGithubConnection.value?.status === 'connected' && locationGithubRepositories.value.length === 0) {
     void loadGitHubRepositories();
+  }
+});
+
+watch(selectedLocationValue, () => {
+  closeEditor();
+  closeLog();
+  remoteWorkRepositoriesByProvider.value = {};
+  remoteWorkItemsByRepository.value = {};
+  void loadSelectedLocation();
+});
+
+watch(readyRemoteConnections, (connections) => {
+  if (selectedLocationValue.value === 'local') {
+    return;
+  }
+  if (!connections.some((connection) => remoteLocationValue(connection.id) === selectedLocationValue.value)) {
+    selectedLocationValue.value = 'local';
   }
 });
 
@@ -292,20 +406,19 @@ function closeLog(): void {
 }
 
 async function saveLoop(input: CreateLoopInput): Promise<void> {
-  if (editorMode.value === 'edit' && editingLoop.value) {
-    await props.updateLoop({
+  const nextSnapshot = editorMode.value === 'edit' && editingLoop.value
+    ? await updateLocationLoop({
       ...input,
       id: editingLoop.value.id,
-    });
-  } else {
-    await props.createLoop(input);
-  }
+    })
+    : await createLocationLoop(input);
+  refreshLocationFromSnapshot(nextSnapshot);
   closeEditor();
 }
 
 async function runLoop(loopId: string): Promise<void> {
   openMenuLoopId.value = null;
-  await props.runLoop(loopId);
+  refreshLocationFromSnapshot(await runLocationLoop(loopId));
 }
 
 function setMenuVisible(loopId: string, visible: boolean): void {
@@ -322,7 +435,7 @@ function selectLoopMenuItem(loopId: string, itemId: string): void {
 }
 
 async function confirmDeleteLoop(loopId: string): Promise<void> {
-  const loop = props.loops.find((candidate) => candidate.id === loopId);
+  const loop = locationLoops.value.find((candidate) => candidate.id === loopId);
   if (!loop) {
     return;
   }
@@ -341,14 +454,14 @@ async function confirmDeleteLoop(loopId: string): Promise<void> {
     return;
   }
 
-  await props.deleteLoop(loop.id);
+  refreshLocationFromSnapshot(await deleteLocationLoop(loop.id));
   if (logLoopId.value === loop.id) {
     logLoopId.value = null;
   }
 }
 
 async function confirmClearLoopHistory(loopId: string): Promise<void> {
-  const loop = props.loops.find((candidate) => candidate.id === loopId);
+  const loop = locationLoops.value.find((candidate) => candidate.id === loopId);
   if (!loop || loop.executionLog.length === 0) {
     return;
   }
@@ -367,11 +480,11 @@ async function confirmClearLoopHistory(loopId: string): Promise<void> {
     return;
   }
 
-  await props.clearLoopHistory(loop.id);
+  refreshLocationFromSnapshot(await clearLocationLoopHistory(loop.id));
 }
 
 async function confirmDeleteLoopExecution(payload: { executionId: string; loopId: string }): Promise<void> {
-  const loop = props.loops.find((candidate) => candidate.id === payload.loopId);
+  const loop = locationLoops.value.find((candidate) => candidate.id === payload.loopId);
   const execution = loop?.executionLog.find((candidate) => candidate.id === payload.executionId);
   if (!loop || !execution) {
     return;
@@ -391,15 +504,165 @@ async function confirmDeleteLoopExecution(payload: { executionId: string; loopId
     return;
   }
 
-  await props.deleteLoopExecution(loop.id, execution.id);
+  refreshLocationFromSnapshot(await deleteLocationLoopExecution(loop.id, execution.id));
 }
 
 async function loadGitHubRepositories(): Promise<void> {
-  await props.loadWorkRepositories('github');
+  const location = requestLocation();
+  const repositories = location
+    ? await props.loadWorkRepositories('github', location)
+    : await props.loadWorkRepositories('github');
+  if (location?.kind === 'remote' && selectedLocationValue.value === remoteLocationValue(location.remoteConnectionId) && repositories) {
+    remoteWorkRepositoriesByProvider.value = {
+      ...remoteWorkRepositoriesByProvider.value,
+      github: repositories,
+    };
+  }
 }
 
 async function loadGitHubItems(repositoryId: string): Promise<void> {
-  await props.loadWorkItems('github', repositoryId);
+  const location = requestLocation();
+  const items = location
+    ? await props.loadWorkItems('github', repositoryId, location)
+    : await props.loadWorkItems('github', repositoryId);
+  if (location?.kind === 'remote' && selectedLocationValue.value === remoteLocationValue(location.remoteConnectionId) && items) {
+    remoteWorkItemsByRepository.value = {
+      ...remoteWorkItemsByRepository.value,
+      [workItemsKey('github', repositoryId)]: items,
+    };
+  }
+}
+
+async function readLocationConversationMessages(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]> {
+  const location = requestLocation();
+  return location
+    ? props.readConversationMessages(ref, agentId, location)
+    : props.readConversationMessages(ref, agentId);
+}
+
+async function chooseLoopAgentFolder(): Promise<string | null> {
+  if (!isRemoteLocation.value || !selectedRemoteConnection.value) {
+    return props.chooseAgentFolder();
+  }
+
+  remoteFolderPickerInitialPath.value = selectedRemoteConnection.value.sourceFolderPath ?? '';
+  remoteFolderPickerVisible.value = true;
+  return new Promise((resolve) => {
+    remoteFolderPickerResolve = resolve;
+  });
+}
+
+function listLoopSourceFolders(input?: SourceFolderListInput): Promise<SourceFolderListing> {
+  const remoteConnectionId = selectedRemoteConnectionId.value;
+  return props.listSourceFolders({
+    ...(input ?? {}),
+    ...(remoteConnectionId ? { remoteConnectionId } : {}),
+  });
+}
+
+function selectRemoteFolder(path: string): void {
+  remoteFolderPickerVisible.value = false;
+  remoteFolderPickerResolve?.(path);
+  remoteFolderPickerResolve = null;
+}
+
+function cancelRemoteFolderPicker(): void {
+  remoteFolderPickerVisible.value = false;
+  remoteFolderPickerResolve?.(null);
+  remoteFolderPickerResolve = null;
+}
+
+async function loadSelectedLocation(): Promise<void> {
+  const loadId = ++locationLoadId;
+  locationError.value = null;
+  if (!isRemoteLocation.value) {
+    remoteSnapshot.value = null;
+    remoteSourceRepositories.value = [];
+    locationStatus.value = 'idle';
+    if (locationGithubConnection.value?.status === 'connected' && locationGithubRepositories.value.length === 0) {
+      await loadGitHubRepositories();
+    }
+    return;
+  }
+
+  locationStatus.value = 'loading';
+  try {
+    const snapshot = await props.getLoopSnapshot(requestLocation());
+    if (loadId !== locationLoadId) {
+      return;
+    }
+    remoteSnapshot.value = snapshot;
+    const sourceRepositories = selectedRemoteConnectionId.value
+      ? await props.listSourceRepositories(selectedRemoteConnectionId.value)
+      : [];
+    if (loadId !== locationLoadId) {
+      return;
+    }
+    remoteSourceRepositories.value = sourceRepositories;
+    if (locationGithubConnection.value?.status === 'connected') {
+      await loadGitHubRepositories();
+    }
+    if (loadId !== locationLoadId) {
+      return;
+    }
+    locationStatus.value = 'idle';
+  } catch (error) {
+    if (loadId !== locationLoadId) {
+      return;
+    }
+    remoteSnapshot.value = null;
+    remoteSourceRepositories.value = [];
+    locationStatus.value = 'error';
+    locationError.value = error instanceof Error ? error.message : String(error);
+  }
+}
+
+function refreshLocationFromSnapshot(snapshot: AppSnapshot | void): void {
+  if (isRemoteLocation.value && snapshot) {
+    remoteSnapshot.value = snapshot;
+  }
+}
+
+function remoteLocationValue(connectionId: string): string {
+  return `remote:${connectionId}`;
+}
+
+function createLocationLoop(input: CreateLoopInput): Promise<AppSnapshot | void> {
+  const location = requestLocation();
+  return location ? props.createLoop(input, location) : props.createLoop(input);
+}
+
+function updateLocationLoop(input: UpdateLoopInput): Promise<AppSnapshot | void> {
+  const location = requestLocation();
+  return location ? props.updateLoop(input, location) : props.updateLoop(input);
+}
+
+function runLocationLoop(loopId: string): Promise<AppSnapshot | void> {
+  const location = requestLocation();
+  return location ? props.runLoop(loopId, location) : props.runLoop(loopId);
+}
+
+function clearLocationLoopHistory(loopId: string): Promise<AppSnapshot | void> {
+  const location = requestLocation();
+  return location ? props.clearLoopHistory(loopId, location) : props.clearLoopHistory(loopId);
+}
+
+function deleteLocationLoopExecution(loopId: string, executionId: string): Promise<AppSnapshot | void> {
+  const location = requestLocation();
+  return location ? props.deleteLoopExecution(loopId, executionId, location) : props.deleteLoopExecution(loopId, executionId);
+}
+
+function deleteLocationLoop(loopId: string): Promise<AppSnapshot | void> {
+  const location = requestLocation();
+  return location ? props.deleteLoop(loopId, location) : props.deleteLoop(loopId);
+}
+
+function requestLocation(): LoopLocation | undefined {
+  return isRemoteLocation.value ? selectedLocation.value : undefined;
+}
+
+function workItemsKey(provider: WorkProviderKind, repositoryId: string): string {
+  return `${provider}:${repositoryId}`;
 }
 
 function loopSourceLabel(loop: Loop): string {
@@ -417,7 +680,7 @@ function loopAgentName(loop: Loop): string {
     return 'New Agent';
   }
 
-  const template = props.bench.find((candidate) => candidate.id === action.benchTemplateId);
+  const template = locationBench.value.find((candidate) => candidate.id === action.benchTemplateId);
   return template ? template.name : 'Missing Bench agent';
 }
 
@@ -487,6 +750,48 @@ function formatShortDate(value: string): string {
   display: flex;
   flex-direction: column;
   gap: var(--space-12);
+}
+
+.loops-view__list-header {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-16);
+  padding-bottom: var(--space-12);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.loops-view__location-heading {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.loops-view__location-heading h3 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-16);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-24);
+}
+
+.loops-view__location-heading svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  color: var(--color-text-muted);
+}
+
+.loops-view__location-select {
+  width: 160px;
+}
+
+.loops-view__location-state {
+  padding: var(--space-12);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-18);
 }
 
 .loops-view__error {

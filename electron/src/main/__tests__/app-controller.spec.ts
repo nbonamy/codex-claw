@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { AppController } from '../app-controller';
 import { applyMainEventToSnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
@@ -711,6 +711,49 @@ describe('AppController', () => {
     expect(request).toHaveBeenNthCalledWith(4, 'loop/history/clear', { loopId: 'loop-bugs' });
     expect(request).toHaveBeenNthCalledWith(5, 'loop/execution/delete', { loopId: 'loop-bugs', executionId: 'loop-exec-1' });
     expect(request).toHaveBeenNthCalledWith(6, 'loop/delete', { loopId: 'loop-bugs' });
+  });
+
+  it('routes remote loop requests without adopting the remote snapshot', async () => {
+    const snapshot = createInitialSnapshot();
+    const remoteSnapshot = {
+      ...createInitialSnapshot(),
+      activeTeamId: 'team-remote',
+      loops: [loopFixture({
+        cleanup: { deleteAgent: false },
+        teamTarget: { mode: 'existing', teamId: 'team-remote' },
+      })],
+    };
+    const request = vi.fn().mockResolvedValue(remoteSnapshot);
+    const controller = new AppController(snapshot, createBackendClient({ request }));
+    const location: LoopLocation = { kind: 'remote', remoteConnectionId: 'connection-devbox' };
+    const createInput: CreateLoopInput = {
+      name: 'Remote bugs',
+      enabled: true,
+      source: {
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
+      },
+      action: {
+        type: 'create-agent-from-bench',
+        benchTemplateId: 'bench-dina',
+        teamTarget: {
+          mode: 'existing',
+          teamId: 'team-remote',
+        },
+      },
+      instructions: {},
+    };
+
+    await controller.initialize();
+
+    await expect(getLoopSnapshot(controller, location)).resolves.toBe(remoteSnapshot);
+    await expect(createLoop(controller, createInput, location)).resolves.toBe(remoteSnapshot);
+    await expect(runLoop(controller, 'loop-bugs', location)).resolves.toBe(remoteSnapshot);
+
+    expect(request).toHaveBeenNthCalledWith(1, 'loop/snapshot', { location });
+    expect(request).toHaveBeenNthCalledWith(2, 'loop/create', { input: createInput, location });
+    expect(request).toHaveBeenNthCalledWith(3, 'loop/run', { loopId: 'loop-bugs', location });
+    expect(currentSnapshot(controller)).toBe(snapshot);
   });
 
   it('opens repo git diff previews through clawd', async () => {
@@ -1617,50 +1660,57 @@ async function updateSettings(controller: AppController, input: UpdateSettingsIn
   }).updateSettings(input);
 }
 
-async function createLoop(controller: AppController, input: CreateLoopInput): Promise<AppSnapshot> {
+async function getLoopSnapshot(controller: AppController, location?: LoopLocation): Promise<AppSnapshot> {
   return (controller as unknown as {
-    createLoop(input: CreateLoopInput): Promise<AppSnapshot>;
-  }).createLoop(input);
+    getLoopSnapshot(location?: LoopLocation): Promise<AppSnapshot>;
+  }).getLoopSnapshot(location);
 }
 
-async function updateLoop(controller: AppController, input: UpdateLoopInput): Promise<AppSnapshot> {
+async function createLoop(controller: AppController, input: CreateLoopInput, location?: LoopLocation): Promise<AppSnapshot> {
   return (controller as unknown as {
-    updateLoop(input: UpdateLoopInput): Promise<AppSnapshot>;
-  }).updateLoop(input);
+    createLoop(input: CreateLoopInput, location?: LoopLocation): Promise<AppSnapshot>;
+  }).createLoop(input, location);
 }
 
-async function runLoop(controller: AppController, loopId: string): Promise<AppSnapshot> {
+async function updateLoop(controller: AppController, input: UpdateLoopInput, location?: LoopLocation): Promise<AppSnapshot> {
   return (controller as unknown as {
-    runLoop(loopId: string): Promise<AppSnapshot>;
-  }).runLoop(loopId);
+    updateLoop(input: UpdateLoopInput, location?: LoopLocation): Promise<AppSnapshot>;
+  }).updateLoop(input, location);
 }
 
-async function clearLoopHistory(controller: AppController, loopId: string): Promise<AppSnapshot> {
+async function runLoop(controller: AppController, loopId: string, location?: LoopLocation): Promise<AppSnapshot> {
   return (controller as unknown as {
-    clearLoopHistory(loopId: string): Promise<AppSnapshot>;
-  }).clearLoopHistory(loopId);
+    runLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot>;
+  }).runLoop(loopId, location);
 }
 
-async function deleteLoopExecution(controller: AppController, loopId: string, executionId: string): Promise<AppSnapshot> {
+async function clearLoopHistory(controller: AppController, loopId: string, location?: LoopLocation): Promise<AppSnapshot> {
   return (controller as unknown as {
-    deleteLoopExecution(loopId: string, executionId: string): Promise<AppSnapshot>;
-  }).deleteLoopExecution(loopId, executionId);
+    clearLoopHistory(loopId: string, location?: LoopLocation): Promise<AppSnapshot>;
+  }).clearLoopHistory(loopId, location);
 }
 
-async function deleteLoop(controller: AppController, loopId: string): Promise<AppSnapshot> {
+async function deleteLoopExecution(controller: AppController, loopId: string, executionId: string, location?: LoopLocation): Promise<AppSnapshot> {
   return (controller as unknown as {
-    deleteLoop(loopId: string): Promise<AppSnapshot>;
-  }).deleteLoop(loopId);
+    deleteLoopExecution(loopId: string, executionId: string, location?: LoopLocation): Promise<AppSnapshot>;
+  }).deleteLoopExecution(loopId, executionId, location);
+}
+
+async function deleteLoop(controller: AppController, loopId: string, location?: LoopLocation): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    deleteLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot>;
+  }).deleteLoop(loopId, location);
 }
 
 async function readConversationMessages(
   controller: AppController,
   ref: unknown,
   agentId: string,
+  location?: LoopLocation,
 ): Promise<RendererMessage[]> {
   return (controller as unknown as {
-    readConversationMessages(ref: unknown, agentId: string): Promise<RendererMessage[]>;
-  }).readConversationMessages(ref, agentId);
+    readConversationMessages(ref: unknown, agentId: string, location?: LoopLocation): Promise<RendererMessage[]>;
+  }).readConversationMessages(ref, agentId, location);
 }
 
 async function listAgentConversations(

@@ -55,6 +55,7 @@
     :open-work-provider-authorization="openWorkProviderAuthorization"
     :complete-work-provider-connection="completeWorkProviderConnection"
     :disconnect-work-provider="disconnectWorkProvider"
+    :get-loop-snapshot="getLoopSnapshot"
     :create-loop="createLoop"
     :update-loop="updateLoop"
     :run-loop="runLoop"
@@ -176,6 +177,7 @@ const {
   openWorkProviderAuthorization,
   completeWorkProviderConnection,
   disconnectWorkProvider,
+  getLoopSnapshot,
   createLoop,
   updateLoop,
   runLoop,

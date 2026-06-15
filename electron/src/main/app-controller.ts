@@ -7,7 +7,7 @@ import { getClawdDaemonStatus, setClawdDaemonEnabled } from './daemon-launch-age
 import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
 type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
@@ -78,16 +78,16 @@ export class AppController {
       return this.disconnectWorkProvider(provider);
     });
 
-    ipcMain.handle(ipcChannels.listWorkRepositories, async (_event, provider: WorkProviderKind) => {
-      return this.listWorkRepositories(provider);
+    ipcMain.handle(ipcChannels.listWorkRepositories, async (_event, provider: WorkProviderKind, location?: LoopLocation) => {
+      return this.listWorkRepositories(provider, location);
     });
 
     ipcMain.handle(ipcChannels.configureWorkBacklog, async (_event, input: WorkBacklogConfigurationInput) => {
       return this.configureWorkBacklog(input);
     });
 
-    ipcMain.handle(ipcChannels.listWorkItems, async (_event, provider: WorkProviderKind, repositoryId: string) => {
-      return this.listWorkItems(provider, repositoryId);
+    ipcMain.handle(ipcChannels.listWorkItems, async (_event, provider: WorkProviderKind, repositoryId: string, location?: LoopLocation) => {
+      return this.listWorkItems(provider, repositoryId, location);
     });
 
     ipcMain.handle(ipcChannels.listBackendModels, async (_event, agentId: string) => {
@@ -162,28 +162,32 @@ export class AppController {
       return this.selectTeam(teamId);
     });
 
-    ipcMain.handle(ipcChannels.createLoop, async (_event, input: CreateLoopInput) => {
-      return this.createLoop(input);
+    ipcMain.handle(ipcChannels.getLoopSnapshot, async (_event, location?: LoopLocation) => {
+      return this.getLoopSnapshot(location);
     });
 
-    ipcMain.handle(ipcChannels.updateLoop, async (_event, input: UpdateLoopInput) => {
-      return this.updateLoop(input);
+    ipcMain.handle(ipcChannels.createLoop, async (_event, input: CreateLoopInput, location?: LoopLocation) => {
+      return this.createLoop(input, location);
     });
 
-    ipcMain.handle(ipcChannels.runLoop, async (_event, loopId: string) => {
-      return this.runLoop(loopId);
+    ipcMain.handle(ipcChannels.updateLoop, async (_event, input: UpdateLoopInput, location?: LoopLocation) => {
+      return this.updateLoop(input, location);
     });
 
-    ipcMain.handle(ipcChannels.clearLoopHistory, async (_event, loopId: string) => {
-      return this.clearLoopHistory(loopId);
+    ipcMain.handle(ipcChannels.runLoop, async (_event, loopId: string, location?: LoopLocation) => {
+      return this.runLoop(loopId, location);
     });
 
-    ipcMain.handle(ipcChannels.deleteLoopExecution, async (_event, loopId: string, executionId: string) => {
-      return this.deleteLoopExecution(loopId, executionId);
+    ipcMain.handle(ipcChannels.clearLoopHistory, async (_event, loopId: string, location?: LoopLocation) => {
+      return this.clearLoopHistory(loopId, location);
     });
 
-    ipcMain.handle(ipcChannels.deleteLoop, async (_event, loopId: string) => {
-      return this.deleteLoop(loopId);
+    ipcMain.handle(ipcChannels.deleteLoopExecution, async (_event, loopId: string, executionId: string, location?: LoopLocation) => {
+      return this.deleteLoopExecution(loopId, executionId, location);
+    });
+
+    ipcMain.handle(ipcChannels.deleteLoop, async (_event, loopId: string, location?: LoopLocation) => {
+      return this.deleteLoop(loopId, location);
     });
 
     ipcMain.handle(ipcChannels.listAgentConversations, async (_event, agentId: string) => {
@@ -194,8 +198,8 @@ export class AppController {
       return this.resumeAgentConversation(agentId, ref);
     });
 
-    ipcMain.handle(ipcChannels.readConversationMessages, async (_event, ref: unknown, agentId: string) => {
-      return this.readConversationMessages(ref, agentId);
+    ipcMain.handle(ipcChannels.readConversationMessages, async (_event, ref: unknown, agentId: string, location?: LoopLocation) => {
+      return this.readConversationMessages(ref, agentId, location);
     });
 
     ipcMain.handle(ipcChannels.createAgent, async (_event, input: CreateAgentInput) => {
@@ -389,16 +393,23 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('workProvider/disconnect', { provider }));
   }
 
-  private async listWorkRepositories(provider: WorkProviderKind): Promise<WorkRepository[]> {
-    return this.requireBackendClient().request('workProvider/listRepositories', { provider });
+  private async listWorkRepositories(provider: WorkProviderKind, location?: LoopLocation): Promise<WorkRepository[]> {
+    return this.requireBackendClient().request('workProvider/listRepositories', {
+      provider,
+      ...(location ? { location } : {}),
+    });
   }
 
   private async configureWorkBacklog(input: WorkBacklogConfigurationInput): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('workProvider/configureBacklog', { input }));
   }
 
-  private async listWorkItems(provider: WorkProviderKind, repositoryId: string): Promise<WorkItem[]> {
-    return this.requireBackendClient().request('workProvider/listItems', { provider, repositoryId });
+  private async listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: LoopLocation): Promise<WorkItem[]> {
+    return this.requireBackendClient().request('workProvider/listItems', {
+      provider,
+      repositoryId,
+      ...(location ? { location } : {}),
+    });
   }
 
   private async createAgent(input: CreateAgentInput): Promise<AppSnapshot> {
@@ -490,28 +501,61 @@ export class AppController {
     this.appLifecycle.exit(0);
   }
 
-  private async createLoop(input: CreateLoopInput): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('loop/create', { input }));
+  private async getLoopSnapshot(location?: LoopLocation): Promise<AppSnapshot> {
+    if (isRemoteLoopLocation(location)) {
+      return this.requireBackendClient().request<AppSnapshot>('loop/snapshot', { location });
+    }
+    return this.getSnapshot();
   }
 
-  private async updateLoop(input: UpdateLoopInput): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('loop/update', { input }));
+  private async createLoop(input: CreateLoopInput, location?: LoopLocation): Promise<AppSnapshot> {
+    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>('loop/create', {
+      input,
+      ...(location ? { location } : {}),
+    }));
   }
 
-  private async runLoop(loopId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('loop/run', { loopId }));
+  private async updateLoop(input: UpdateLoopInput, location?: LoopLocation): Promise<AppSnapshot> {
+    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>('loop/update', {
+      input,
+      ...(location ? { location } : {}),
+    }));
   }
 
-  private async clearLoopHistory(loopId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('loop/history/clear', { loopId }));
+  private async runLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot> {
+    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>('loop/run', {
+      loopId,
+      ...(location ? { location } : {}),
+    }));
   }
 
-  private async deleteLoopExecution(loopId: string, executionId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('loop/execution/delete', { loopId, executionId }));
+  private async clearLoopHistory(loopId: string, location?: LoopLocation): Promise<AppSnapshot> {
+    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>('loop/history/clear', {
+      loopId,
+      ...(location ? { location } : {}),
+    }));
   }
 
-  private async deleteLoop(loopId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('loop/delete', { loopId }));
+  private async deleteLoopExecution(loopId: string, executionId: string, location?: LoopLocation): Promise<AppSnapshot> {
+    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>('loop/execution/delete', {
+      loopId,
+      executionId,
+      ...(location ? { location } : {}),
+    }));
+  }
+
+  private async deleteLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot> {
+    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>('loop/delete', {
+      loopId,
+      ...(location ? { location } : {}),
+    }));
+  }
+
+  private async adoptLoopSnapshot(location: LoopLocation | undefined, snapshot: AppSnapshot): Promise<AppSnapshot> {
+    if (isRemoteLoopLocation(location)) {
+      return snapshot;
+    }
+    return this.adoptBackendSnapshot(snapshot);
   }
 
   private async adoptBackendSnapshot(snapshot: AppSnapshot): Promise<AppSnapshot> {
@@ -554,8 +598,12 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/resumeConversation', { agentId, ref }));
   }
 
-  private async readConversationMessages(ref: unknown, agentId: string): Promise<RendererMessage[]> {
-    return this.requireBackendClient().request('agent/readConversationMessages', { ref, agentId });
+  private async readConversationMessages(ref: unknown, agentId: string, location?: LoopLocation): Promise<RendererMessage[]> {
+    return this.requireBackendClient().request('agent/readConversationMessages', {
+      ref,
+      agentId,
+      ...(location ? { location } : {}),
+    });
   }
 
   private async setAgentGoal(agentId: string, objective: string): Promise<AppSnapshot> {
@@ -766,6 +814,10 @@ function createEmptyClientState(): ClientState {
     sourceFolderPath: '',
     shouldPreventDisplaySleep: false,
   };
+}
+
+function isRemoteLoopLocation(location: LoopLocation | undefined): location is Extract<LoopLocation, { kind: 'remote' }> {
+  return location?.kind === 'remote' && location.remoteConnectionId.trim().length > 0;
 }
 
 function eventForRenderer(event: ClawBackendEvent): MainToRendererEvent {
