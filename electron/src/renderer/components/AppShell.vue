@@ -63,6 +63,7 @@
         :work-provider-authorization="workProviderAuthorization"
         :remote-connections="snapshot.remoteConnections.connections"
         :teams="snapshot.teams"
+        :list-source-folders="listSourceFolders"
         :list-ssh-hosts="listSshHosts"
         :add-ssh-connection="addSshConnection"
         :check-remote-connection="checkRemoteConnection"

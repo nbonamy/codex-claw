@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus, { ElMessageBox } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { SourceFolderListInput } from '@codex-claw/shared/contracts';
 import SettingsConnectionsPanel from '../SettingsConnectionsPanel.vue';
 
 describe('SettingsConnectionsPanel', () => {
@@ -13,6 +14,15 @@ describe('SettingsConnectionsPanel', () => {
     const checkRemoteConnection = vi.fn().mockResolvedValue(undefined);
     const updateRemoteConnection = vi.fn().mockResolvedValue(undefined);
     const removeRemoteConnection = vi.fn().mockResolvedValue(undefined);
+    const listSourceFolders = vi.fn(async (input?: SourceFolderListInput) => (
+      input?.path === '/home/nicolas/src'
+        ? { path: '/home/nicolas/src', parentPath: '/home/nicolas', entries: [] }
+        : {
+          path: '/home/nicolas',
+          parentPath: '/home',
+          entries: [{ name: 'src', path: '/home/nicolas/src' }],
+        }
+    ));
     vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
     const wrapper = mount(SettingsConnectionsPanel, {
       props: {
@@ -42,6 +52,7 @@ describe('SettingsConnectionsPanel', () => {
           remoteConnectionId: 'connection-devbox',
         }],
         checkRemoteConnection,
+        listSourceFolders,
         updateRemoteConnection,
         removeRemoteConnection,
       },
@@ -56,14 +67,19 @@ describe('SettingsConnectionsPanel', () => {
 
     await wrapper.get('[aria-label="Connection settings for devbox"]').trigger('click');
     await flushPromises();
-    wrapper.findComponent({ name: 'ElInput' }).vm.$emit('update:modelValue', '~/code');
+    bodyButton('Browse')?.click();
+    await flushPromises();
+    bodyRemoteFolderRow('src')?.click();
+    await flushPromises();
+    await flushPromises();
+    bodyButton('Select this folder')?.click();
     await flushPromises();
     bodyButton('Save')?.click();
     await flushPromises();
 
     await wrapper.get('[aria-label="devbox actions"]').trigger('click');
     await flushPromises();
-    bodyButton('Check')?.click();
+    bodyButton('Sync')?.click();
     await flushPromises();
 
     await wrapper.get('[aria-label="devbox actions"]').trigger('click');
@@ -71,7 +87,9 @@ describe('SettingsConnectionsPanel', () => {
     bodyButton('Delete')?.click();
     await flushPromises();
 
-    expect(updateRemoteConnection).toHaveBeenCalledWith('connection-devbox', { sourceFolderPath: '~/code' });
+    expect(listSourceFolders).toHaveBeenCalledWith({ remoteConnectionId: 'connection-devbox', path: '~/src' });
+    expect(listSourceFolders).toHaveBeenCalledWith({ remoteConnectionId: 'connection-devbox', path: '/home/nicolas/src' });
+    expect(updateRemoteConnection).toHaveBeenCalledWith('connection-devbox', { sourceFolderPath: '/home/nicolas/src' });
     expect(checkRemoteConnection).toHaveBeenCalledWith('connection-devbox');
     expect(ElMessageBox.confirm).toHaveBeenCalledWith(
       'devbox will be removed. This will also delete 1 connected team: Remote Team. Their agents and messages will be removed from Codex Claw.',
@@ -128,5 +146,10 @@ describe('SettingsConnectionsPanel', () => {
 
 function bodyButton(label: string): HTMLButtonElement | undefined {
   return [...document.body.querySelectorAll('button')]
+    .find((button) => button.textContent?.includes(label));
+}
+
+function bodyRemoteFolderRow(label: string): HTMLButtonElement | undefined {
+  return [...document.body.querySelectorAll<HTMLButtonElement>('.remote-folder-picker-dialog__row')]
     .find((button) => button.textContent?.includes(label));
 }

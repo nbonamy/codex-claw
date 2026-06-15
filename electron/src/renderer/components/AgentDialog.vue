@@ -316,89 +316,14 @@
       @created="selectCreatedSourceWorktree"
     />
 
-    <el-dialog
-      v-model="remoteFolderDialogVisible"
-      title="Choose remote folder"
-      width="560px"
-      append-to-body
-      class="claw-dialog agent-dialog__remote-folder-dialog"
-    >
-      <div class="agent-dialog__remote-folder">
-        <div class="agent-dialog__remote-folder-path">
-          <input
-            v-model="remoteFolderPath"
-            class="claw-form-dialog__text-input agent-dialog__text-input"
-            type="text"
-            aria-label="Remote folder path"
-            placeholder="$HOME"
-            @keydown.enter.prevent="loadRemoteFolders(remoteFolderPath)"
-          />
-          <el-button
-            :loading="remoteFolderLoading"
-            @click="loadRemoteFolders(remoteFolderPath)"
-          >
-            Go
-          </el-button>
-        </div>
-
-        <p
-          v-if="remoteFolderError"
-          class="agent-dialog__remote-folder-error"
-        >
-          {{ remoteFolderError }}
-        </p>
-
-        <div
-          v-if="remoteFolderLoading && remoteFolderEntries.length === 0"
-          class="agent-dialog__remote-folder-empty"
-        >
-          Loading folders...
-        </div>
-        <div
-          v-else
-          class="agent-dialog__remote-folder-list"
-        >
-          <button
-            v-if="remoteFolderListing?.parentPath"
-            type="button"
-            class="agent-dialog__remote-folder-row"
-            @click="loadRemoteFolders(remoteFolderListing.parentPath)"
-          >
-            <FolderIcon aria-hidden="true" />
-            <span>..</span>
-          </button>
-          <button
-            v-for="entry in remoteFolderEntries"
-            :key="entry.path"
-            type="button"
-            class="agent-dialog__remote-folder-row"
-            @click="loadRemoteFolders(entry.path)"
-          >
-            <FolderIcon aria-hidden="true" />
-            <span>{{ entry.name }}</span>
-          </button>
-          <div
-            v-if="!remoteFolderLoading && remoteFolderEntries.length === 0 && !remoteFolderListing?.parentPath"
-            class="agent-dialog__remote-folder-empty"
-          >
-            No folders
-          </div>
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="claw-dialog__footer">
-          <el-button @click="closeRemoteFolderDialog">Cancel</el-button>
-          <el-button
-            type="primary"
-            :disabled="!remoteFolderPath.trim()"
-            @click="selectRemoteFolder"
-          >
-            Select this folder
-          </el-button>
-        </div>
-      </template>
-    </el-dialog>
+    <RemoteFolderPickerDialog
+      :initial-path="folder"
+      :list-source-folders="listRemoteFolders"
+      :remote-connection-id="selectedRemoteConnectionId"
+      :visible="remoteFolderDialogVisible"
+      @close="remoteFolderDialogVisible = false"
+      @select="selectRemoteFolder"
+    />
 
     <template #footer>
       <div class="claw-dialog__footer">
@@ -421,9 +346,10 @@ import { computed, ref, watch } from 'vue';
 import type { Component } from 'vue';
 import type { Agent, AgentBackend, CreateAgentInput, CreateSourceWorktreeInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '@codex-claw/shared/contracts';
 import { ClaudeCodeBackendIcon, CodexBackendIcon } from '../shared/icons/backend-icons';
-import { ChevronDown, FolderIcon } from '../shared/icons/app-icons';
+import { ChevronDown } from '../shared/icons/app-icons';
 import AgentAvatarPicker from './AgentAvatarPicker.vue';
 import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
+import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 
 export type AgentDialogCreateInput = CreateAgentInput & {
   newTeamName?: string;
@@ -491,10 +417,6 @@ const remoteSourceRepositories = ref<SourceRepository[]>([]);
 const remoteSourceRepositoriesConnectionId = ref('');
 const loadingRemoteSourceRepositories = ref(false);
 const remoteFolderDialogVisible = ref(false);
-const remoteFolderLoading = ref(false);
-const remoteFolderError = ref<string | null>(null);
-const remoteFolderPath = ref('');
-const remoteFolderListing = ref<SourceFolderListing | null>(null);
 
 type BackendOption = {
   icon: Component;
@@ -550,7 +472,6 @@ const sourceRepositories = computed(() => {
     ? remoteSourceRepositories.value
     : [];
 });
-const remoteFolderEntries = computed(() => remoteFolderListing.value?.entries ?? []);
 const selectedSourceRepository = computed(() => sourceRepositories.value.find((repository) => repository.path === selectedSourceRepositoryPath.value) ?? null);
 const selectedSourceWorktrees = computed(() => {
   const worktrees = listedSourceWorktreesRepoPath.value === selectedSourceRepositoryPath.value
@@ -631,39 +552,14 @@ async function chooseFolder(): Promise<void> {
 
 async function openRemoteFolderDialog(): Promise<void> {
   remoteFolderDialogVisible.value = true;
-  remoteFolderError.value = null;
-  await loadRemoteFolders(folder.value || undefined);
 }
 
-function closeRemoteFolderDialog(): void {
-  remoteFolderDialogVisible.value = false;
-  remoteFolderError.value = null;
+function listRemoteFolders(input?: SourceFolderListInput): Promise<SourceFolderListing> {
+  return props.listSourceFolders?.(input) ?? Promise.resolve({ path: '', parentPath: null, entries: [] });
 }
 
-async function loadRemoteFolders(folderPath?: string | null): Promise<void> {
-  const remoteConnectionId = selectedRemoteConnectionId.value;
-  if (!remoteConnectionId) {
-    return;
-  }
-
-  remoteFolderLoading.value = true;
-  remoteFolderError.value = null;
-  try {
-    const listing = await props.listSourceFolders?.({
-      remoteConnectionId,
-      ...(folderPath?.trim() ? { path: folderPath.trim() } : {}),
-    }) ?? { path: '', parentPath: null, entries: [] };
-    remoteFolderListing.value = listing;
-    remoteFolderPath.value = listing.path;
-  } catch (error) {
-    remoteFolderError.value = error instanceof Error ? error.message : String(error);
-  } finally {
-    remoteFolderLoading.value = false;
-  }
-}
-
-function selectRemoteFolder(): void {
-  const selectedFolder = remoteFolderPath.value.trim();
+function selectRemoteFolder(path: string): void {
+  const selectedFolder = path.trim();
   if (!selectedFolder) {
     return;
   }
@@ -675,7 +571,6 @@ function selectRemoteFolder(): void {
   if (!name.value.trim()) {
     name.value = selectedFolder.split(/[\\/]/).filter(Boolean).at(-1) ?? '';
   }
-  closeRemoteFolderDialog();
 }
 
 async function selectRepositoryControl(value: string): Promise<void> {
@@ -910,10 +805,6 @@ function resetForm(): void {
   remoteSourceRepositoriesConnectionId.value = '';
   loadingRemoteSourceRepositories.value = false;
   remoteFolderDialogVisible.value = false;
-  remoteFolderLoading.value = false;
-  remoteFolderError.value = null;
-  remoteFolderPath.value = '';
-  remoteFolderListing.value = null;
   newSourceWorktreeDialogVisible.value = false;
   void resetSourceSelectionForConnection();
 }
@@ -1113,76 +1004,6 @@ function syncRepositoryControlValue(): void {
 
 .agent-dialog__source-custom-option {
   color: var(--color-text);
-}
-
-.agent-dialog__remote-folder {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-8);
-}
-
-.agent-dialog__remote-folder-path {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-8);
-  align-items: center;
-}
-
-.agent-dialog__remote-folder-error {
-  margin: 0;
-  color: var(--color-error);
-  font-size: var(--font-size-13);
-}
-
-.agent-dialog__remote-folder-list {
-  display: flex;
-  flex-direction: column;
-  max-height: 300px;
-  overflow: auto;
-  border: 1px solid var(--color-border);
-}
-
-.agent-dialog__remote-folder-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-8);
-  width: 100%;
-  padding: var(--space-8) var(--space-10);
-  border: 0;
-  border-bottom: 1px solid var(--color-border);
-  color: var(--color-text);
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-}
-
-.agent-dialog__remote-folder-row:last-child {
-  border-bottom: 0;
-}
-
-.agent-dialog__remote-folder-row:hover,
-.agent-dialog__remote-folder-row:focus-visible {
-  background: var(--color-surface-low);
-}
-
-.agent-dialog__remote-folder-row svg {
-  width: var(--icon-md);
-  height: var(--icon-md);
-  color: var(--color-text-muted);
-}
-
-.agent-dialog__remote-folder-row span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agent-dialog__remote-folder-empty {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-13);
-  padding: var(--space-10);
 }
 
 </style>

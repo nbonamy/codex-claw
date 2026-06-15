@@ -17,7 +17,7 @@ export class MemoryWorkIntegrationTokenStore implements WorkIntegrationTokenStor
 
   async set(token: WorkProviderToken): Promise<void> {
     if (!this.available) {
-      throw new Error('Encrypted token storage is not available on this device.');
+      throw new Error('Token storage is not available on this device.');
     }
     this.tokens.set(token.provider, { ...token });
   }

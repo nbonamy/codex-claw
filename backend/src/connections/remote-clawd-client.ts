@@ -45,6 +45,16 @@ export class RemoteClawdClientManager {
     this.clients.clear();
   }
 
+  async closeConnection(connectionId: string): Promise<void> {
+    const client = this.clients.get(connectionId);
+    if (!client) {
+      return;
+    }
+
+    this.clients.delete(connectionId);
+    await client.close();
+  }
+
   private async client(connection: RemoteConnection): Promise<RemoteClawdClient> {
     const existing = this.clients.get(connection.id);
     if (existing) {

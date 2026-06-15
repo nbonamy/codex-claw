@@ -158,8 +158,8 @@ and `~/sources` first.
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
 | `connections/listSshHosts` | none | `SshHostCandidate[]` | Parses the backend host's `~/.ssh/config` and returns concrete `Host` aliases. Wildcard and negated patterns are ignored. |
-| `connections/addSsh` | `{ input: AddSshConnectionInput }` | `AppSnapshot` | Saves an SSH connection, probes the host non-interactively, installs the bundled `clawd` script under `~/.codex-claw` when missing, and records an `ssh` stdio transport when ready. |
-| `connections/check` | `{ connectionId }` | `AppSnapshot` | Re-runs the SSH probe/install/version check for a saved connection. |
+| `connections/addSsh` | `{ input: AddSshConnectionInput }` | `AppSnapshot` | Saves an SSH connection, probes the host non-interactively, syncs the bundled `clawd` script and provider token file under `~/.codex-claw`, and records an `ssh` stdio transport when ready. |
+| `connections/check` | `{ connectionId }` | `AppSnapshot` | Syncs a saved SSH connection: closes any cached remote stdio client, uploads the bundled `clawd` script, mirrors `provider-tokens.json`, restarts remote `clawd` processes, and reads the installed version. The renderer labels this action `Sync`. |
 | `connections/update` | `{ connectionId, input: { sourceFolderPath? } }` | `AppSnapshot` | Updates SSH connection settings. Source-folder changes are forwarded to the remote `clawd` through `settings/update` and mirrored locally for settings UI defaults. |
 | `connections/remove` | `{ connectionId }` | `AppSnapshot` | Removes a saved remote connection and deletes teams attached to it. If every team used that connection, local `clawd` creates one empty local fallback team first. |
 

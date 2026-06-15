@@ -670,9 +670,10 @@ can persist safe metadata such as connection status, account label, and
 provider-specific backlog configuration. GitHub currently stores the selected
 repository id and optional tag name as its backlog configuration. Secret
 material belongs behind the backend token-store port. The current local
-implementation stores encrypted token data under `~/.codex-claw`;
-future packaged builds can replace that port with a native keychain or
-credential-helper implementation without moving ownership back to Electron.
+implementation stores token data in an owner-readable JSON file under
+`~/.codex-claw`; future packaged builds can replace that port with a native
+keychain or credential-helper implementation without moving ownership back to
+Electron.
 
 GitHub uses OAuth device flow for the desktop app. It requires a public client
 ID but no client secret or localhost callback route. `clawd` resolves the client

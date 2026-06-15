@@ -2,9 +2,9 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { EncryptedFileWorkIntegrationTokenStore } from '../encrypted-file-token-store';
+import { FileWorkIntegrationTokenStore } from '../file-token-store';
 
-describe('EncryptedFileWorkIntegrationTokenStore', () => {
+describe('FileWorkIntegrationTokenStore', () => {
   let tmpDir: string;
 
   beforeEach(async () => {
@@ -15,10 +15,9 @@ describe('EncryptedFileWorkIntegrationTokenStore', () => {
     await rm(tmpDir, { force: true, recursive: true });
   });
 
-  it('persists access tokens encrypted in backend state', async () => {
-    const filePath = path.join(tmpDir, 'work-integration-tokens.json');
-    const keyPath = path.join(tmpDir, 'work-integration-tokens.key');
-    const store = new EncryptedFileWorkIntegrationTokenStore(filePath, keyPath);
+  it('persists access tokens as plain provider token JSON', async () => {
+    const filePath = path.join(tmpDir, 'provider-tokens.json');
+    const store = new FileWorkIntegrationTokenStore(filePath);
 
     await store.set({
       provider: 'github',
@@ -30,11 +29,8 @@ describe('EncryptedFileWorkIntegrationTokenStore', () => {
     });
 
     const rawFile = await readFile(filePath, 'utf8');
-    const rawKey = await readFile(keyPath, 'utf8');
-    expect(rawFile).toContain('encryptedAccessToken');
-    expect(rawFile).not.toContain('gho_secret');
-    expect(rawFile).not.toContain('accessToken');
-    expect(rawKey.trim()).not.toContain('gho_secret');
+    expect(rawFile).toContain('"accessToken": "gho_secret"');
+    expect(rawFile).not.toContain('encryptedAccessToken');
     await expect(store.get('github')).resolves.toStrictEqual({
       provider: 'github',
       accessToken: 'gho_secret',
@@ -46,7 +42,7 @@ describe('EncryptedFileWorkIntegrationTokenStore', () => {
   });
 
   it('deletes persisted provider tokens', async () => {
-    const store = new EncryptedFileWorkIntegrationTokenStore(path.join(tmpDir, 'work-integration-tokens.json'));
+    const store = new FileWorkIntegrationTokenStore(path.join(tmpDir, 'provider-tokens.json'));
 
     await store.set({
       provider: 'github',

@@ -79,6 +79,19 @@ describe('RemoteClawdClientManager', () => {
       transport: undefined,
     }, 'backend/health')).rejects.toThrow('Remote connection is not ready');
   });
+
+  it('closes a cached client for a single connection', async () => {
+    const child = createChildProcess();
+    const manager = new RemoteClawdClientManager({ spawnProcess: vi.fn(() => child.process) as never });
+
+    const result = manager.request(readyConnection(), 'backend/health');
+    await vi.waitFor(() => expect(child.stdinOutput()).not.toBe(''));
+
+    await manager.closeConnection('connection-devbox');
+
+    await expect(result).rejects.toThrow('remote clawd client closed');
+    expect(child.process.kill).toHaveBeenCalledOnce();
+  });
 });
 
 function readyConnection(): RemoteConnection {

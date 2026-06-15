@@ -94,7 +94,16 @@
           <el-input
             v-model="settingsSourceFolderPath"
             placeholder="~/src"
-          />
+          >
+            <template #append>
+              <el-button
+                :disabled="!settingsConnection"
+                @click="openSettingsFolderPicker"
+              >
+                Browse
+              </el-button>
+            </template>
+          </el-input>
         </el-form-item>
         <p
           v-if="settingsError"
@@ -116,6 +125,16 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <RemoteFolderPickerDialog
+      v-if="settingsConnection"
+      :initial-path="settingsSourceFolderPath"
+      :list-source-folders="listRemoteFolders"
+      :remote-connection-id="settingsConnection.id"
+      :visible="settingsFolderPickerVisible"
+      @close="settingsFolderPickerVisible = false"
+      @select="selectSettingsSourceFolder"
+    />
 
     <el-dialog
       v-model="addDialogVisible"
@@ -171,10 +190,11 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, ref } from 'vue';
-import type { AddSshConnectionInput, RemoteConnection, SshHostCandidate, Team, UpdateRemoteConnectionInput } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, RemoteConnection, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateRemoteConnectionInput } from '@codex-claw/shared/contracts';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import { DotsVerticalIcon, RefreshIcon, SettingsIcon, Trash2Icon } from '../shared/icons/app-icons';
+import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsSection from './SettingsSection.vue';
 
@@ -182,6 +202,7 @@ const props = withDefaults(defineProps<{
   addSshConnection?: (input: AddSshConnectionInput) => Promise<void>;
   checkRemoteConnection?: (connectionId: string) => Promise<void>;
   connections?: RemoteConnection[];
+  listSourceFolders?: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
   listSshHosts?: () => Promise<SshHostCandidate[]>;
   teams?: Team[];
   updateRemoteConnection?: (connectionId: string, input: UpdateRemoteConnectionInput) => Promise<void>;
@@ -190,6 +211,7 @@ const props = withDefaults(defineProps<{
   addSshConnection: async () => undefined,
   checkRemoteConnection: async () => undefined,
   connections: () => [],
+  listSourceFolders: async () => ({ path: '', parentPath: null, entries: [] }),
   listSshHosts: async () => [],
   teams: () => [],
   updateRemoteConnection: async () => undefined,
@@ -208,6 +230,7 @@ const settingsConnection = ref<RemoteConnection | null>(null);
 const settingsSourceFolderPath = ref('');
 const settingsError = ref<string | null>(null);
 const savingConnectionSettings = ref(false);
+const settingsFolderPickerVisible = ref(false);
 
 const connections = computed(() => props.connections);
 const settingsDialogTitle = computed(() => (
@@ -274,6 +297,7 @@ function closeConnectionSettings(): void {
     return;
   }
   settingsDialogVisible.value = false;
+  settingsFolderPickerVisible.value = false;
   settingsConnection.value = null;
   settingsError.value = null;
 }
@@ -291,12 +315,25 @@ async function saveConnectionSettings(): Promise<void> {
       sourceFolderPath: settingsSourceFolderPath.value.trim(),
     });
     settingsDialogVisible.value = false;
+    settingsFolderPickerVisible.value = false;
     settingsConnection.value = null;
   } catch (error) {
     settingsError.value = error instanceof Error ? error.message : String(error);
   } finally {
     savingConnectionSettings.value = false;
   }
+}
+
+function openSettingsFolderPicker(): void {
+  settingsFolderPickerVisible.value = true;
+}
+
+function selectSettingsSourceFolder(path: string): void {
+  settingsSourceFolderPath.value = path;
+}
+
+function listRemoteFolders(input?: SourceFolderListInput): Promise<SourceFolderListing> {
+  return props.listSourceFolders(input);
 }
 
 function setMenuVisible(connectionId: string, visible: boolean): void {
@@ -307,7 +344,7 @@ function connectionMenuItems(connection: RemoteConnection): AppMenuItem[] {
   return [{
     id: 'check',
     type: 'action',
-    label: checkingConnectionId.value === connection.id ? 'Checking...' : 'Check',
+    label: checkingConnectionId.value === connection.id ? 'Syncing...' : 'Sync',
     disabled: checkingConnectionId.value === connection.id,
     icon: RefreshIcon,
   }, {

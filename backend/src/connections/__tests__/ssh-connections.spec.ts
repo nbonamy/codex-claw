@@ -49,11 +49,8 @@ Host bad;alias
     await expect(service.listHostCandidates()).resolves.toStrictEqual([]);
   });
 
-  it('installs clawd when the remote script is missing and stores the stdio transport', async () => {
+  it('syncs the clawd package, restarts remote clawd, and stores the stdio transport', async () => {
     const run = vi.fn(async (command: string, args: string[]) => {
-      if (command === 'ssh' && args.at(-1)?.includes('test -s')) {
-        return { stdout: 'missing', stderr: '' };
-      }
       if (command === 'ssh' && args.at(-1)?.includes('--version')) {
         return { stdout: 'clawd 0.1.0\n', stderr: '' };
       }
@@ -64,6 +61,7 @@ Host bad;alias
       assetsPath: '/Applications/Codex Claw.app/Contents/Resources',
       createId: () => 'connection-devbox',
       now: () => new Date('2026-06-14T10:00:00.000Z'),
+      providerTokensFilePath: '/Users/nicolas/.codex-claw/provider-tokens.json',
       run,
     });
 
@@ -97,10 +95,70 @@ Host bad;alias
       '/Applications/Codex Claw.app/Contents/Resources/clawd/clawd.mjs',
       'devbox:~/.codex-claw/clawd.mjs.tmp',
     ], { timeoutMs: 15000 });
+    expect(run).toHaveBeenCalledWith('scp', [
+      '-o',
+      'BatchMode=yes',
+      '-o',
+      'ConnectTimeout=10',
+      '/Users/nicolas/.codex-claw/provider-tokens.json',
+      'devbox:~/.codex-claw/provider-tokens.json.tmp',
+    ], { timeoutMs: 15000 });
+    expect(run).toHaveBeenCalledWith('ssh', [
+      '-o',
+      'BatchMode=yes',
+      '-o',
+      'ConnectTimeout=10',
+      'devbox',
+      `mv ~/.codex-claw/provider-tokens.json.tmp ~/.codex-claw/provider-tokens.json && chmod 600 ~/.codex-claw/provider-tokens.json`,
+    ], { timeoutMs: 15000 });
+    expect(run).toHaveBeenCalledWith('ssh', [
+      '-o',
+      'BatchMode=yes',
+      '-o',
+      'ConnectTimeout=10',
+      'devbox',
+      `pkill -f '[n]ode .*\\.codex-claw/clawd\\.mjs' || true`,
+    ], { timeoutMs: 15000 });
+  });
+
+  it('removes remote provider tokens when no local token file exists', async () => {
+    const run = vi.fn(async (command: string, args: string[]) => {
+      if (command === 'ssh' && args.at(-1)?.includes('--version')) {
+        return { stdout: 'clawd 0.1.0\n', stderr: '' };
+      }
+      return { stdout: '', stderr: '' };
+    });
+    const accessFile = vi.fn(async (filePath: string) => {
+      if (filePath.endsWith('provider-tokens.json')) {
+        throw Object.assign(new Error('missing'), { code: 'ENOENT' });
+      }
+    });
+    const service = new SshConnectionService({
+      accessFile,
+      assetsPath: '/Applications/Codex Claw.app/Contents/Resources',
+      createId: () => 'connection-devbox',
+      now: () => new Date('2026-06-14T10:00:00.000Z'),
+      providerTokensFilePath: '/Users/nicolas/.codex-claw/provider-tokens.json',
+      run,
+    });
+
+    await expect(service.createConnection({ host: 'devbox' })).resolves.toMatchObject({
+      status: 'ready',
+    });
+
+    expect(run).toHaveBeenCalledWith('ssh', [
+      '-o',
+      'BatchMode=yes',
+      '-o',
+      'ConnectTimeout=10',
+      'devbox',
+      'rm -f ~/.codex-claw/provider-tokens.json',
+    ], { timeoutMs: 15000 });
   });
 
   it('records connection errors without throwing', async () => {
     const service = new SshConnectionService({
+      accessFile: vi.fn().mockResolvedValue(undefined),
       createId: () => 'connection-devbox',
       now: () => new Date('2026-06-14T10:00:00.000Z'),
       run: vi.fn().mockRejectedValue(new Error('Permission denied (publickey).')),

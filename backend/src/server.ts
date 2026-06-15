@@ -119,6 +119,7 @@ export class ClawBackendServer {
         if (!connection) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Remote connection not found: ${connectionId}`);
         }
+        await this.remoteClients.closeConnection(connectionId);
         const checked = await this.sshConnections.checkConnection(connection);
         this.snapshot.remoteConnections.connections = this.snapshot.remoteConnections.connections.map((candidate) => (
           candidate.id === connectionId ? checked : candidate

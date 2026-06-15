@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { backendHomeDir, backendStateFilePath, backendWorkIntegrationTokensFilePath, loadBackendSnapshot, saveBackendSnapshot } from '../state';
+import { backendHomeDir, backendProviderTokensFilePath, backendStateFilePath, loadBackendSnapshot, saveBackendSnapshot } from '../state';
 import { persistedStateFromSnapshot } from '../state-persistence';
 
 describe('backend state loading', () => {
@@ -29,7 +29,7 @@ describe('backend state loading', () => {
   it('uses CODEX_CLAW_HOME as the only backend home override', () => {
     expect(backendHomeDir()).toBe(homeDir);
     expect(backendStateFilePath()).toBe(path.join(homeDir, 'state.json'));
-    expect(backendWorkIntegrationTokensFilePath()).toBe(path.join(homeDir, 'work-integration-tokens.json'));
+    expect(backendProviderTokensFilePath()).toBe(path.join(homeDir, 'provider-tokens.json'));
   });
 
   it('creates a default snapshot when no state file exists', async () => {

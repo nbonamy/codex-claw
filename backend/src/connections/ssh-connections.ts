@@ -5,6 +5,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import type { AddSshConnectionInput, RemoteConnection, SshHostCandidate } from '@codex-claw/shared/contracts';
 import { createEntityId } from '@codex-claw/shared/ids';
+import { backendProviderTokensFilePath } from '../state';
 
 type ExecResult = {
   stdout: string;
@@ -20,9 +21,11 @@ export type SshConnectionDependencies = {
   createId?: () => string;
   assetsPath?: string;
   argv?: string[];
+  providerTokensFilePath?: string;
 };
 
 const remoteClawdPath = '~/.codex-claw/clawd.mjs';
+const remoteProviderTokensPath = '~/.codex-claw/provider-tokens.json';
 const connectTimeoutMs = 15_000;
 
 export class SshConnectionService {
@@ -58,10 +61,9 @@ export class SshConnectionService {
     };
 
     try {
-      const installed = await this.isRemoteClawdInstalled(next.host);
-      if (!installed) {
-        await this.installRemoteClawd(next.host);
-      }
+      await this.installRemoteClawd(next.host);
+      await this.syncRemoteProviderTokens(next.host);
+      await this.restartRemoteClawd(next.host);
       const version = await this.remoteClawdVersion(next.host);
       next = {
         ...next,
@@ -84,19 +86,6 @@ export class SshConnectionService {
     }
 
     return next;
-  }
-
-  private async isRemoteClawdInstalled(host: string): Promise<boolean> {
-    const result = await this.run('ssh', [
-      '-o',
-      'BatchMode=yes',
-      '-o',
-      'ConnectTimeout=10',
-      host,
-      `mkdir -p ~/.codex-claw && test -s ${remoteClawdPath} && printf installed || printf missing`,
-    ]);
-
-    return result.stdout.trim() === 'installed';
   }
 
   private async installRemoteClawd(host: string): Promise<void> {
@@ -124,6 +113,54 @@ export class SshConnectionService {
       'ConnectTimeout=10',
       host,
       `mv ~/.codex-claw/clawd.mjs.tmp ${remoteClawdPath} && chmod 600 ${remoteClawdPath}`,
+    ]);
+  }
+
+  private async syncRemoteProviderTokens(host: string): Promise<void> {
+    const localProviderTokens = this.deps.providerTokensFilePath ?? backendProviderTokensFilePath();
+    try {
+      await (this.deps.accessFile ?? access)(localProviderTokens, fsConstants.R_OK);
+    } catch (error) {
+      if (isNodeError(error) && error.code === 'ENOENT') {
+        await this.run('ssh', [
+          '-o',
+          'BatchMode=yes',
+          '-o',
+          'ConnectTimeout=10',
+          host,
+          `rm -f ${remoteProviderTokensPath}`,
+        ]);
+        return;
+      }
+      throw error;
+    }
+
+    await this.run('scp', [
+      '-o',
+      'BatchMode=yes',
+      '-o',
+      'ConnectTimeout=10',
+      localProviderTokens,
+      `${host}:~/.codex-claw/provider-tokens.json.tmp`,
+    ]);
+    await this.run('ssh', [
+      '-o',
+      'BatchMode=yes',
+      '-o',
+      'ConnectTimeout=10',
+      host,
+      `mv ~/.codex-claw/provider-tokens.json.tmp ${remoteProviderTokensPath} && chmod 600 ${remoteProviderTokensPath}`,
+    ]);
+  }
+
+  private async restartRemoteClawd(host: string): Promise<void> {
+    await this.run('ssh', [
+      '-o',
+      'BatchMode=yes',
+      '-o',
+      'ConnectTimeout=10',
+      host,
+      `pkill -f '[n]ode .*\\.codex-claw/clawd\\.mjs' || true`,
     ]);
   }
 

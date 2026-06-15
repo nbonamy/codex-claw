@@ -67,7 +67,7 @@ export class WorkIntegrationManager {
       this.setConnection({
         provider,
         status: 'error',
-        detail: 'Encrypted token storage is not available on this device.',
+        detail: 'Token storage is not available on this device.',
       });
       await this.options.saveSnapshot();
       return { snapshot: this.snapshot() };

@@ -15,8 +15,8 @@ export function backendStateFilePath(): string {
   return path.join(backendHomeDir(), 'state.json');
 }
 
-export function backendWorkIntegrationTokensFilePath(): string {
-  return path.join(backendHomeDir(), 'work-integration-tokens.json');
+export function backendProviderTokensFilePath(): string {
+  return path.join(backendHomeDir(), 'provider-tokens.json');
 }
 
 export function backendSocketPath(): string {

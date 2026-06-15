@@ -62,8 +62,8 @@ Current implementation checkpoint:
   and `client/systemPermissions/*` for native permission prompts/settings.
 - Work integration token types now live in `shared`, and `clawd` owns token
   persistence through a backend token-store port. The current runtime uses an
-  encrypted file store under `~/.codex-claw`, so desktop and future clients do
-  not read or write provider tokens.
+  owner-readable JSON file under `~/.codex-claw`, so desktop and future clients
+  do not read or write provider tokens.
 - `clawd` now owns the GitHub work integration manager/driver and exposes
   `workProvider/*` JSON-RPC methods. Electron proxies the existing renderer IPC
   work-provider calls to `clawd`.
@@ -839,8 +839,8 @@ and future remote.
 ## State And Migration
 
 `clawd` owns the durable `AppSnapshot` and persists `state.json` under
-`~/.codex-claw` by default. It also stores encrypted work-integration tokens in
-`~/.codex-claw/work-integration-tokens.json` plus its key file. Electron main
+`~/.codex-claw` by default. It also stores work-integration tokens in
+`~/.codex-claw/provider-tokens.json`. Electron main
 owns only desktop-window state plus a
 volatile renderer-facing snapshot cache. That cache is hydrated through
 `snapshot/get`, replaced from backend-attached event snapshots, and never
@@ -928,10 +928,12 @@ Rules:
 Secret storage needs a real release-grade design decision. Electron
 `safeStorage` is tied to Electron, while a standalone backend should not import
 Electron. The first backend-owned slice is now in place for work integrations:
-`clawd` uses a token-store port backed by an encrypted file under the backend
-state directory. A standalone daemon can later replace that implementation with
-a native keychain package or platform credential helper behind the same port
-after packaging is settled.
+`clawd` uses a token-store port backed by an owner-readable JSON file under the
+backend state directory. The previous adjacent-key encryption was removed
+because the key lived beside the data and added no security boundary. A
+standalone daemon can later replace that implementation with a native keychain
+package or platform credential helper behind the same port after packaging is
+settled.
 
 ## Implementation Slicing
 

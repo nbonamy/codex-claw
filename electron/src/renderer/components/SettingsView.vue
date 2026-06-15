@@ -41,6 +41,7 @@
           v-else-if="activeTab === 'connections'"
           :connections="remoteConnections"
           :teams="teams"
+          :list-source-folders="listSourceFolders"
           :list-ssh-hosts="listSshHosts"
           :add-ssh-connection="addSshConnection"
           :check-remote-connection="checkRemoteConnection"
@@ -58,7 +59,7 @@
 </template>
 
 <script setup lang="ts">
-import type { AddSshConnectionInput, AppGeneralSettings, AppThemeSettings, ClawdDaemonStatus, RemoteConnection, SourceFolderState, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AppGeneralSettings, AppThemeSettings, ClawdDaemonStatus, RemoteConnection, SourceFolderListing, SourceFolderListInput, SourceFolderState, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { defaultGeneralSettings, defaultSourceFolderState } from '@codex-claw/shared/settings';
 import SettingsAppearancePanel from './SettingsAppearancePanel.vue';
 import SettingsConnectionsPanel from './SettingsConnectionsPanel.vue';
@@ -82,6 +83,7 @@ withDefaults(defineProps<{
   workProviderAuthorization?: WorkProviderAuthorization | null;
   remoteConnections?: RemoteConnection[];
   teams?: Team[];
+  listSourceFolders?: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
   listSshHosts?: () => Promise<SshHostCandidate[]>;
   addSshConnection?: (input: AddSshConnectionInput) => Promise<void>;
   checkRemoteConnection?: (connectionId: string) => Promise<void>;
@@ -103,6 +105,7 @@ withDefaults(defineProps<{
   workProviderAuthorization: null,
   remoteConnections: () => [],
   teams: () => [],
+  listSourceFolders: async () => ({ path: '', parentPath: null, entries: [] }),
   listSshHosts: async () => [],
   addSshConnection: async () => undefined,
   checkRemoteConnection: async () => undefined,

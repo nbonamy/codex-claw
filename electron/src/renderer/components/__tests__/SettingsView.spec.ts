@@ -114,7 +114,7 @@ describe('SettingsView', () => {
 
     await wrapper.get('[aria-label="devbox actions"]').trigger('click');
     await flushPromises();
-    bodyButton('Check')?.click();
+    bodyButton('Sync')?.click();
     await flushPromises();
     await wrapper.get('[aria-label="devbox actions"]').trigger('click');
     await flushPromises();

@@ -350,9 +350,9 @@ describe('AgentDialog', () => {
     await flushPromises();
     await chooseCustomFolder(wrapper);
     await flushPromises();
-    await wrapper.findAll('.agent-dialog__remote-folder-row').find((row) => row.text().includes('src'))?.trigger('click');
+    await wrapper.findAll('.remote-folder-picker-dialog__row').find((row) => row.text().includes('src'))?.trigger('click');
     await flushPromises();
-    await wrapper.findAll('.agent-dialog__remote-folder-row').find((row) => row.text().includes('witsy'))?.trigger('click');
+    await wrapper.findAll('.remote-folder-picker-dialog__row').find((row) => row.text().includes('witsy'))?.trigger('click');
     await flushPromises();
     await wrapper.findAll('button').find((button) => button.text() === 'Select this folder')?.trigger('click');
     await saveButton(wrapper).trigger('click');

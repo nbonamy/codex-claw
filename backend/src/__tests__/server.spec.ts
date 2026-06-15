@@ -177,11 +177,17 @@ describe('ClawBackendServer', () => {
         updatedAt: '2026-06-14T10:01:00.000Z',
       }),
     };
+    const remoteClients = {
+      request: vi.fn(),
+      close: vi.fn(),
+      closeConnection: vi.fn().mockResolvedValue(undefined),
+    };
     const server = new ClawBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
       sshConnections: sshConnections as never,
+      remoteClients: remoteClients as never,
     });
 
     await expect(server.handleMessage({
@@ -200,6 +206,7 @@ describe('ClawBackendServer', () => {
         },
       },
     });
+    expect(remoteClients.closeConnection).toHaveBeenCalledWith('connection-devbox');
 
     snapshot.teams[0].remoteConnectionId = 'connection-devbox';
     snapshot.teams[0].agentIds = ['agent-dina'];

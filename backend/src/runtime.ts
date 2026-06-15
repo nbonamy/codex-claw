@@ -11,8 +11,8 @@ import { LoopScheduler } from './loops/scheduler';
 import { ClawMcpService } from './mcp/service';
 import { runtimeGitHubOAuthClientId } from './runtime-config';
 import { ClawBackendServer } from './server';
-import { backendWorkIntegrationTokensFilePath, loadBackendSnapshot, saveBackendSnapshot } from './state';
-import { EncryptedFileWorkIntegrationTokenStore } from './work-integrations/encrypted-file-token-store';
+import { backendProviderTokensFilePath, loadBackendSnapshot, saveBackendSnapshot } from './state';
+import { FileWorkIntegrationTokenStore } from './work-integrations/file-token-store';
 import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
 import { WorkIntegrationManager } from './work-integrations/manager';
 import { warnMain } from './log';
@@ -44,7 +44,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     getSnapshot: () => snapshot,
     openExternal: (url) => options.requestClient('client/openExternal', { url }),
     saveSnapshot: () => saveBackendSnapshot(snapshot),
-    tokenStore: new EncryptedFileWorkIntegrationTokenStore(backendWorkIntegrationTokensFilePath()),
+    tokenStore: new FileWorkIntegrationTokenStore(backendProviderTokensFilePath()),
   });
   const loopRunner = new LoopRunner({
     getSnapshot: () => snapshot,
