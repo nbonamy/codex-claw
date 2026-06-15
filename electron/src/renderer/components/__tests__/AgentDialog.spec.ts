@@ -3,7 +3,7 @@ import ElementPlus from 'element-plus';
 import { nextTick } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import AgentDialog from '../AgentDialog.vue';
-import type { Agent, CreateAgentInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '@codex-claw/shared/contracts';
+import type { Agent, CreateAgentInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '@codex-claw/shared/contracts';
 
 const idleAgent: Agent = {
   id: 'agent-dina',
@@ -280,6 +280,94 @@ describe('AgentDialog', () => {
     });
   });
 
+  it('creates agents using the target team SSH connection for repositories and worktrees', async () => {
+    const createAgent = vi.fn().mockResolvedValue(undefined);
+    const listSourceRepositories = vi.fn().mockResolvedValue([{
+      name: 'codex-claw',
+      path: '/home/nicolas/src/codex-claw',
+      worktrees: [{ name: 'main', path: '/home/nicolas/src/codex-claw' }],
+    }] satisfies SourceRepository[]);
+    const listSourceWorktrees = vi.fn().mockResolvedValue([
+      { name: 'main', path: '/home/nicolas/src/codex-claw' },
+      { name: 'ssh-agent', path: '/home/nicolas/src/codex-claw-ssh-agent' },
+    ] satisfies SourceWorktree[]);
+    const wrapper = mountDialog({
+      createAgent,
+      listSourceRepositories,
+      listSourceWorktrees,
+      remoteConnectionId: 'connection-devbox',
+    });
+
+    await flushPromises();
+    await nextTick();
+
+    expect(wrapper.text()).not.toContain('Connection');
+    expect(listSourceRepositories).toHaveBeenCalledWith('connection-devbox');
+    expect(listSourceWorktrees).toHaveBeenCalledWith('/home/nicolas/src/codex-claw', 'connection-devbox');
+    await wrapper.findAllComponents({ name: 'ElSelect' })[2]?.vm.$emit('update:modelValue', '/home/nicolas/src/codex-claw-ssh-agent');
+    await nextTick();
+    await saveButton(wrapper).trigger('click');
+
+    expect(createAgent).toHaveBeenCalledWith({
+      name: 'codex-claw-ssh-agent',
+      avatar: '🤖',
+      folder: '/home/nicolas/src/codex-claw-ssh-agent',
+      backend: 'codex',
+      sourceRepositoryName: 'codex-claw',
+    });
+  });
+
+  it('picks a custom folder through the selected SSH connection', async () => {
+    const createAgent = vi.fn().mockResolvedValue(undefined);
+    const listSourceFolders = vi.fn(async (input?: SourceFolderListInput): Promise<SourceFolderListing> => {
+      if (input?.path === '/home/nicolas/src') {
+        return {
+          path: '/home/nicolas/src',
+          parentPath: '/home/nicolas',
+          entries: [{ name: 'witsy', path: '/home/nicolas/src/witsy' }],
+        };
+      }
+      if (input?.path === '/home/nicolas/src/witsy') {
+        return {
+          path: '/home/nicolas/src/witsy',
+          parentPath: '/home/nicolas/src',
+          entries: [],
+        };
+      }
+      return {
+        path: '/home/nicolas',
+        parentPath: '/home',
+        entries: [{ name: 'src', path: '/home/nicolas/src' }],
+      };
+    });
+    const wrapper = mountDialog({
+      createAgent,
+      listSourceFolders,
+      listSourceRepositories: vi.fn().mockResolvedValue([]),
+      remoteConnectionId: 'connection-devbox',
+    });
+
+    await flushPromises();
+    await chooseCustomFolder(wrapper);
+    await flushPromises();
+    await wrapper.findAll('.agent-dialog__remote-folder-row').find((row) => row.text().includes('src'))?.trigger('click');
+    await flushPromises();
+    await wrapper.findAll('.agent-dialog__remote-folder-row').find((row) => row.text().includes('witsy'))?.trigger('click');
+    await flushPromises();
+    await wrapper.findAll('button').find((button) => button.text() === 'Select this folder')?.trigger('click');
+    await saveButton(wrapper).trigger('click');
+
+    expect(listSourceFolders).toHaveBeenCalledWith({ remoteConnectionId: 'connection-devbox' });
+    expect(listSourceFolders).toHaveBeenCalledWith({ remoteConnectionId: 'connection-devbox', path: '/home/nicolas/src' });
+    expect(listSourceFolders).toHaveBeenCalledWith({ remoteConnectionId: 'connection-devbox', path: '/home/nicolas/src/witsy' });
+    expect(createAgent).toHaveBeenCalledWith({
+      name: 'witsy',
+      avatar: '🤖',
+      folder: '/home/nicolas/src/witsy',
+      backend: 'codex',
+    });
+  });
+
   it('loads selected repository worktrees through the backend list action', async () => {
     const createAgent = vi.fn().mockResolvedValue(undefined);
     const listSourceWorktrees = vi.fn().mockResolvedValue([
@@ -352,14 +440,17 @@ describe('AgentDialog', () => {
 function mountDialog(overrides: Partial<{
   agent: Agent | null;
   chooseAgentFolder: () => Promise<string | null>;
+  listSourceFolders: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
   suggestSourceWorktreePath: (input: { branchName: string; repoPath: string }) => Promise<string>;
   chooseSourceWorktreeDestination: (defaultPath: string) => Promise<string | null>;
   createAgent: (input: CreateAgentInput & { newTeamName?: string; teamId?: string }) => Promise<void>;
   createSourceWorktree: (input: { repoPath: string; branchName: string; destinationPath?: string }) => Promise<SourceWorktree>;
-  listSourceWorktrees: (repoPath: string) => Promise<SourceWorktree[]>;
+  listSourceRepositories: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
+  listSourceWorktrees: (repoPath: string, remoteConnectionId?: string) => Promise<SourceWorktree[]>;
   initialNewTeamName: string;
   initialTeamId: string | null;
   mode: 'create' | 'edit';
+  remoteConnectionId: string;
   showTeamField: boolean;
   sourceFolderPath: string;
   sourceRecentRepoNames: string[];
@@ -371,6 +462,7 @@ function mountDialog(overrides: Partial<{
     props: {
       agent: null,
       chooseAgentFolder: vi.fn().mockResolvedValue(null),
+      listSourceFolders: vi.fn().mockResolvedValue({ path: '', parentPath: null, entries: [] }),
       suggestSourceWorktreePath: vi.fn(async ({ branchName, repoPath }: { branchName: string; repoPath: string }) => {
         const repoName = repoPath.split(/[\\/]/).filter(Boolean).at(-1) ?? 'repo';
         const parent = repoPath.replace(/[\\/][^\\/]+$/u, '');
@@ -380,6 +472,8 @@ function mountDialog(overrides: Partial<{
       chooseSourceWorktreeDestination: vi.fn().mockResolvedValue(null),
       createAgent: vi.fn().mockResolvedValue(undefined),
       createSourceWorktree: vi.fn().mockResolvedValue({ name: 'worktree', path: '/tmp/worktree' }),
+      listSourceRepositories: vi.fn().mockResolvedValue([]),
+      remoteConnectionId: '',
       mode: 'create',
       sourceFolderPath: '',
       sourceRecentRepoNames: [],

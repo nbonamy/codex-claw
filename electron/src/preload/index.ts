@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AddSshConnectionInput, AppleSpeechTranscriptionOptions, AppCommand, ApprovalPreset, BackendConversationRef, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AppleSpeechTranscriptionOptions, AppCommand, ApprovalPreset, BackendConversationRef, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
 const api: CodexClawApi = {
@@ -7,6 +7,7 @@ const api: CodexClawApi = {
   listSshHosts: () => ipcRenderer.invoke(ipcChannels.listSshHosts),
   addSshConnection: (input: AddSshConnectionInput) => ipcRenderer.invoke(ipcChannels.addSshConnection, input),
   checkRemoteConnection: (connectionId: string) => ipcRenderer.invoke(ipcChannels.checkRemoteConnection, connectionId),
+  updateRemoteConnection: (connectionId: string, input: UpdateRemoteConnectionInput) => ipcRenderer.invoke(ipcChannels.updateRemoteConnection, connectionId, input),
   removeRemoteConnection: (connectionId: string) => ipcRenderer.invoke(ipcChannels.removeRemoteConnection, connectionId),
   connectWorkProvider: (provider: WorkProviderKind) => ipcRenderer.invoke(ipcChannels.connectWorkProvider, provider),
   openWorkProviderAuthorization: (provider: WorkProviderKind) => ipcRenderer.invoke(ipcChannels.openWorkProviderAuthorization, provider),
@@ -22,9 +23,10 @@ const api: CodexClawApi = {
   openAgentGitDiff: (agentId: string) => ipcRenderer.invoke(ipcChannels.openAgentGitDiff, agentId),
   chooseAgentFolder: () => ipcRenderer.invoke(ipcChannels.chooseAgentFolder),
   chooseSourceFolder: () => ipcRenderer.invoke(ipcChannels.chooseSourceFolder),
-  listSourceRepositories: () => ipcRenderer.invoke(ipcChannels.listSourceRepositories),
-  listSourceWorktrees: (repoPath: string) => ipcRenderer.invoke(ipcChannels.listSourceWorktrees, repoPath),
-  suggestSourceWorktreePath: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>) => ipcRenderer.invoke(ipcChannels.suggestSourceWorktreePath, input),
+  listSourceFolders: (input?: SourceFolderListInput) => ipcRenderer.invoke(ipcChannels.listSourceFolders, input),
+  listSourceRepositories: (remoteConnectionId?: string) => ipcRenderer.invoke(ipcChannels.listSourceRepositories, remoteConnectionId),
+  listSourceWorktrees: (repoPath: string, remoteConnectionId?: string) => ipcRenderer.invoke(ipcChannels.listSourceWorktrees, repoPath, remoteConnectionId),
+  suggestSourceWorktreePath: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>) => ipcRenderer.invoke(ipcChannels.suggestSourceWorktreePath, input),
   chooseSourceWorktreeDestination: (defaultPath: string) => ipcRenderer.invoke(ipcChannels.chooseSourceWorktreeDestination, defaultPath),
   createSourceWorktree: (input: CreateSourceWorktreeInput) => ipcRenderer.invoke(ipcChannels.createSourceWorktree, input),
   createTeam: (input: CreateTeamInput) => ipcRenderer.invoke(ipcChannels.createTeam, input),

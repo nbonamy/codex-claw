@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { AppController } from '../app-controller';
 import { applyMainEventToSnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, Loop, LoopCleanup, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
@@ -575,7 +575,16 @@ describe('AppController', () => {
       },
     };
     const hosts: SshHostCandidate[] = [{ host: 'devbox', hostName: 'devbox.internal' }];
-    const request = vi.fn((method: string) => Promise.resolve(method === 'connections/listSshHosts' ? hosts : backendSnapshot));
+    const folders = { path: '/home/nicolas', parentPath: '/home', entries: [{ name: 'src', path: '/home/nicolas/src' }] };
+    const request = vi.fn((method: string) => {
+      if (method === 'connections/listSshHosts') {
+        return Promise.resolve(hosts);
+      }
+      if (method === 'source/listFolders') {
+        return Promise.resolve(folders);
+      }
+      return Promise.resolve(backendSnapshot);
+    });
     const controller = new AppController(snapshot, createBackendClient({ request }));
     const input: AddSshConnectionInput = {
       host: 'devbox',
@@ -587,11 +596,21 @@ describe('AppController', () => {
     await expect(listSshHosts(controller)).resolves.toBe(hosts);
     await expect(addSshConnection(controller, input)).resolves.toBe(backendSnapshot);
     await expect(checkRemoteConnection(controller, 'connection-devbox')).resolves.toBe(backendSnapshot);
+    await expect(updateRemoteConnection(controller, 'connection-devbox', { sourceFolderPath: '~/src' })).resolves.toBe(backendSnapshot);
+    await expect(listSourceFolders(controller, { remoteConnectionId: 'connection-devbox', path: '/home/nicolas' })).resolves.toBe(folders);
     await expect(removeRemoteConnection(controller, 'connection-devbox')).resolves.toBe(backendSnapshot);
 
     expect(request).toHaveBeenCalledWith('connections/listSshHosts', undefined);
     expect(request).toHaveBeenCalledWith('connections/addSsh', { input });
     expect(request).toHaveBeenCalledWith('connections/check', { connectionId: 'connection-devbox' });
+    expect(request).toHaveBeenCalledWith('connections/update', {
+      connectionId: 'connection-devbox',
+      input: { sourceFolderPath: '~/src' },
+    });
+    expect(request).toHaveBeenCalledWith('source/listFolders', {
+      remoteConnectionId: 'connection-devbox',
+      path: '/home/nicolas',
+    });
     expect(request).toHaveBeenCalledWith('connections/remove', { connectionId: 'connection-devbox' });
   });
 
@@ -1697,6 +1716,18 @@ async function checkRemoteConnection(controller: AppController, connectionId: st
   return (controller as unknown as {
     checkRemoteConnection(connectionId: string): Promise<AppSnapshot>;
   }).checkRemoteConnection(connectionId);
+}
+
+async function listSourceFolders(controller: AppController, input: { remoteConnectionId: string; path: string }) {
+  return (controller as unknown as {
+    listSourceFolders(input: SourceFolderListInput): Promise<unknown>;
+  }).listSourceFolders(input);
+}
+
+async function updateRemoteConnection(controller: AppController, connectionId: string, input: UpdateRemoteConnectionInput): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    updateRemoteConnection(connectionId: string, input: UpdateRemoteConnectionInput): Promise<AppSnapshot>;
+  }).updateRemoteConnection(connectionId, input);
 }
 
 async function removeRemoteConnection(controller: AppController, connectionId: string): Promise<AppSnapshot> {

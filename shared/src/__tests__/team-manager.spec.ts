@@ -30,6 +30,23 @@ describe('team-manager', () => {
     }, '2026-06-05T10:11:12.000Z').color).toBe('#1B4FB2');
   });
 
+  it('preserves remote connection ids on team create and update', () => {
+    const snapshot = createEmptySnapshot();
+    const team = createTeamInSnapshot(snapshot, {
+      name: 'Remote Team',
+      color: '#0093FF',
+      remoteConnectionId: ' connection-devbox ',
+    }, '2026-06-05T10:11:12.000Z');
+
+    expect(team.remoteConnectionId).toBe('connection-devbox');
+
+    expect(updateTeamInSnapshot(snapshot, {
+      id: team.id,
+      name: 'Local Team',
+      color: '#46A857',
+    })?.remoteConnectionId).toBeUndefined();
+  });
+
   it('selects the team active agent or leaves an empty team agentless', () => {
     const snapshot = createInitialSnapshot();
     const emptyTeam = createTeamInSnapshot(snapshot, {
@@ -82,6 +99,17 @@ describe('team-manager', () => {
       color: '#46A857',
       agentIds: ['agent-dina', 'agent-jesse'],
     });
+  });
+
+  it('rejects changing a team connection once it has agents', () => {
+    const snapshot = createInitialSnapshot();
+
+    expect(() => updateTeamInSnapshot(snapshot, {
+      id: 'team-codex-claw',
+      name: 'Codex Claw',
+      color: '#1B4FB2',
+      remoteConnectionId: 'connection-devbox',
+    })).toThrow('Team connection cannot be changed while it has agents.');
   });
 
   it('reorders teams before a target or to the end without changing selection', () => {

@@ -4,7 +4,7 @@ import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { Agent, AppCommand, AppSnapshot, BackendConversationRef, CodexClawApi, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, RendererMessage, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { Agent, AppCommand, AppSnapshot, BackendConversationRef, CodexClawApi, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
 import { i18n } from '../../i18n';
 
@@ -1316,6 +1316,28 @@ describe('AppShell', () => {
     });
   });
 
+  it('loads new-agent repositories through the active team connection', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.teams[0].remoteConnectionId = 'connection-devbox';
+    const listSourceRepositories = vi.fn().mockResolvedValue([{
+      name: 'codex-claw',
+      path: '/home/nicolas/src/codex-claw',
+      worktrees: [{ name: 'main', path: '/home/nicolas/src/codex-claw' }],
+    }]);
+    const listSourceWorktrees = vi.fn().mockResolvedValue([{ name: 'main', path: '/home/nicolas/src/codex-claw' }]);
+    const wrapper = mountShell({
+      snapshot,
+      listSourceRepositories,
+      listSourceWorktrees,
+    });
+
+    await wrapper.get('.agent-sidebar__new').trigger('click');
+    await flushPromises();
+
+    expect(listSourceRepositories).toHaveBeenCalledWith('connection-devbox');
+    expect(listSourceWorktrees).toHaveBeenCalledWith('/home/nicolas/src/codex-claw', 'connection-devbox');
+  });
+
   it('creates agents in the team selected from the cockpit add card', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.teams.push({
@@ -1940,6 +1962,9 @@ function mountShell(overrides: Partial<{
   chooseAgentFolder: () => Promise<string | null>;
   createAgent: (input: CreateAgentInput) => Promise<Agent | null | void>;
   createTeam: (input: CreateTeamInput) => Promise<Team | null | void>;
+  listSourceFolders: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
+  listSourceRepositories: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
+  listSourceWorktrees: (repoPath: string, remoteConnectionId?: string) => Promise<SourceWorktree[]>;
   deployBenchTemplateAction: (input: string | DeployBenchTemplateInput) => Promise<Agent | null | void>;
   updateTeam: (input: UpdateTeamInput) => Promise<void>;
   updateAgent: (input: UpdateAgentInput) => Promise<void>;
@@ -1968,6 +1993,9 @@ function mountShell(overrides: Partial<{
       isLoading: false,
       isSending: false,
       chooseAgentFolder: overrides.chooseAgentFolder ?? vi.fn().mockResolvedValue(null),
+      listSourceFolders: overrides.listSourceFolders ?? vi.fn().mockResolvedValue({ path: '', parentPath: null, entries: [] }),
+      listSourceRepositories: overrides.listSourceRepositories ?? vi.fn().mockResolvedValue([]),
+      listSourceWorktrees: overrides.listSourceWorktrees ?? vi.fn().mockResolvedValue([]),
       createAgent: overrides.createAgent ?? vi.fn().mockResolvedValue(undefined),
       createTeam: overrides.createTeam ?? vi.fn().mockResolvedValue(undefined),
       deployBenchTemplateAction: overrides.deployBenchTemplateAction ?? vi.fn().mockResolvedValue(undefined),

@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
@@ -304,7 +304,11 @@ export function useAppState() {
     return await window.codexClaw?.chooseSourceFolder?.() ?? null;
   }
 
-  async function suggestSourceWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>): Promise<string> {
+  async function listSourceFolders(input?: SourceFolderListInput): Promise<SourceFolderListing> {
+    return await window.codexClaw?.listSourceFolders?.(input) ?? { path: '', parentPath: null, entries: [] };
+  }
+
+  async function suggestSourceWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>): Promise<string> {
     return await window.codexClaw?.suggestSourceWorktreePath?.(input) ?? '';
   }
 
@@ -342,12 +346,20 @@ export function useAppState() {
     }
   }
 
-  async function listSourceWorktrees(repoPath: string): Promise<SourceWorktree[]> {
+  async function listSourceRepositories(remoteConnectionId?: string): Promise<SourceRepository[]> {
+    if (!window.codexClaw?.listSourceRepositories) {
+      return [];
+    }
+
+    return window.codexClaw.listSourceRepositories(remoteConnectionId);
+  }
+
+  async function listSourceWorktrees(repoPath: string, remoteConnectionId?: string): Promise<SourceWorktree[]> {
     if (!window.codexClaw?.listSourceWorktrees) {
       return [];
     }
 
-    return window.codexClaw.listSourceWorktrees(repoPath);
+    return window.codexClaw.listSourceWorktrees(repoPath, remoteConnectionId);
   }
 
   async function previewAgentFile(agentId: string, filePath: string): Promise<AgentFilePreviewResult> {
@@ -547,6 +559,15 @@ export function useAppState() {
     }
 
     snapshot.value = await window.codexClaw.checkRemoteConnection(connectionId);
+  }
+
+  async function updateRemoteConnection(connectionId: string, input: UpdateRemoteConnectionInput): Promise<void> {
+    if (!window.codexClaw?.updateRemoteConnection) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.updateRemoteConnection(connectionId, input);
+    await loadSourceRepositories();
   }
 
   async function removeRemoteConnection(connectionId: string): Promise<void> {
@@ -986,6 +1007,8 @@ export function useAppState() {
     loadSnapshot,
     chooseAgentFolder,
     chooseSourceFolder,
+    listSourceFolders,
+    listSourceRepositories,
     listSourceWorktrees,
     suggestSourceWorktreePath,
     chooseSourceWorktreeDestination,
@@ -1002,6 +1025,7 @@ export function useAppState() {
     listSshHosts,
     addSshConnection,
     checkRemoteConnection,
+    updateRemoteConnection,
     removeRemoteConnection,
     setDaemonEnabled,
     connectWorkProvider,

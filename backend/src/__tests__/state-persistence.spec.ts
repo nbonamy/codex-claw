@@ -436,6 +436,7 @@ describe('AppStatePersistence', () => {
       port: 2222,
       status: 'ready',
       detail: 'Ready (clawd 0.1.0)',
+      sourceFolderPath: '~/src',
       transport: {
         type: 'ssh-stdio',
         command: 'ssh',
@@ -795,6 +796,56 @@ describe('AppStatePersistence', () => {
     const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
 
     expect(restored.sourceFolder).toStrictEqual(snapshot.sourceFolder);
+  });
+
+  it('persists remote team connections when the connection exists', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.remoteConnections.connections = [{
+      id: 'connection-devbox',
+      kind: 'ssh',
+      name: 'devbox',
+      host: 'devbox',
+      status: 'ready',
+      transport: {
+        type: 'ssh-stdio',
+        command: 'ssh',
+        args: ['devbox', 'node ~/.codex-claw/clawd.mjs --stdio'],
+      },
+      createdAt: '2026-06-14T10:00:00.000Z',
+      updatedAt: '2026-06-14T10:00:00.000Z',
+    }];
+    snapshot.teams[0].remoteConnectionId = 'connection-devbox';
+
+    const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
+
+    expect(restored.teams[0].remoteConnectionId).toBe('connection-devbox');
+    expect(restored.agents[0]).not.toHaveProperty('remoteConnectionId');
+  });
+
+  it('drops remote team connection ids when the connection is missing', () => {
+    const restored = snapshotFromPersistedState({
+      teams: [{
+        id: 'team-remote',
+        name: 'Remote',
+        remoteConnectionId: 'missing-connection',
+        agentIds: ['agent-remote'],
+      }],
+      agents: [{
+        id: 'agent-remote',
+        name: 'Remote',
+        folder: '/home/nicolas/src/codex-claw',
+        backend: 'codex',
+        createdAt: '2026-06-14T10:00:00.000Z',
+        updatedAt: '2026-06-14T10:00:00.000Z',
+      }],
+      bench: [],
+      activeTeamId: null,
+      activeAgentId: 'agent-remote',
+      theme: defaultThemeSettings,
+      remoteConnections: { connections: [] },
+    });
+
+    expect(restored.teams[0].remoteConnectionId).toBeUndefined();
   });
 
   it('sanitizes invalid source folder settings', () => {

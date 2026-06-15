@@ -101,15 +101,16 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
     return seed;
   }
 
-  const agents = Array.isArray(value.agents)
-    ? value.agents.map(sanitizeAgent).filter((agent): agent is Agent => Boolean(agent))
-    : [];
-  const teams = Array.isArray(value.teams)
-    ? value.teams.map((team) => sanitizeTeam(team, agents)).filter((team): team is Team => Boolean(team))
-    : seed.teams;
   const accountRateLimits = sanitizeAccountRateLimits(value.accountRateLimits);
   const workBacklog = sanitizeWorkBacklogState(value.workBacklog, seed.workBacklog);
   const remoteConnections = sanitizeRemoteConnectionsState(value.remoteConnections, seed.remoteConnections);
+  const remoteConnectionIds = new Set(remoteConnections.connections.map((connection) => connection.id));
+  const agents = Array.isArray(value.agents)
+    ? value.agents.map((agent) => sanitizeAgent(agent)).filter((agent): agent is Agent => Boolean(agent))
+    : [];
+  const teams = Array.isArray(value.teams)
+    ? value.teams.map((team) => sanitizeTeam(team, agents, remoteConnectionIds)).filter((team): team is Team => Boolean(team))
+    : seed.teams;
   workBacklog.assignments = {
     ...legacyWorkBacklogAssignments(value.agents, agents),
     ...workBacklog.assignments,
@@ -397,6 +398,7 @@ function sanitizeRemoteConnection(value: unknown): RemoteConnection | null {
     ...(typeof value.identityFile === 'string' && value.identityFile.trim() ? { identityFile: value.identityFile.trim() } : {}),
     status: isRemoteConnectionStatus(value.status) ? value.status : 'saved',
     ...(typeof value.detail === 'string' && value.detail.trim() ? { detail: value.detail.trim() } : {}),
+    ...(typeof value.sourceFolderPath === 'string' && value.sourceFolderPath.trim() ? { sourceFolderPath: value.sourceFolderPath.trim() } : {}),
     ...(sanitizeRemoteConnectionTransport(value.transport) ? { transport: sanitizeRemoteConnectionTransport(value.transport)! } : {}),
     ...(typeof value.installedAt === 'string' ? { installedAt: value.installedAt } : {}),
     ...(typeof value.lastCheckedAt === 'string' ? { lastCheckedAt: value.lastCheckedAt } : {}),
@@ -943,7 +945,7 @@ function isWorkBacklogAssignmentStatus(value: unknown): value is WorkBacklogAssi
   return value === 'working' || value === 'completed';
 }
 
-function sanitizeTeam(value: unknown, agents: Agent[]): Team | null {
+function sanitizeTeam(value: unknown, agents: Agent[], remoteConnectionIds: Set<string>): Team | null {
   if (!isRecord(value) || typeof value.id !== 'string' || typeof value.name !== 'string') {
     return null;
   }
@@ -957,6 +959,7 @@ function sanitizeTeam(value: unknown, agents: Agent[]): Team | null {
     name: value.name,
     avatar: typeof value.avatar === 'string' ? value.avatar : undefined,
     color: typeof value.color === 'string' ? value.color : defaultTeamColor,
+    ...(typeof value.remoteConnectionId === 'string' && remoteConnectionIds.has(value.remoteConnectionId) ? { remoteConnectionId: value.remoteConnectionId } : {}),
     agentIds,
     activeAgentId: typeof value.activeAgentId === 'string' && agentIds.includes(value.activeAgentId)
       ? value.activeAgentId

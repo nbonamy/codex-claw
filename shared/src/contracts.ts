@@ -10,6 +10,7 @@ export type Team = {
   name: string;
   avatar?: string;
   color?: string;
+  remoteConnectionId?: string;
   agentIds: string[];
   activeAgentId?: string;
 };
@@ -432,6 +433,7 @@ export type RemoteConnection = {
   identityFile?: string;
   status: RemoteConnectionStatus;
   detail?: string;
+  sourceFolderPath?: string;
   transport?: RemoteConnectionTransport;
   installedAt?: string;
   lastCheckedAt?: string;
@@ -445,6 +447,10 @@ export type RemoteConnectionsState = {
 
 export type AddSshConnectionInput = SshHostCandidate & {
   name?: string;
+};
+
+export type UpdateRemoteConnectionInput = {
+  sourceFolderPath?: string;
 };
 
 export type BackendReasoningEffortOption = {
@@ -586,6 +592,22 @@ export type SourceRepository = {
   worktrees: SourceWorktree[];
 };
 
+export type SourceFolderEntry = {
+  name: string;
+  path: string;
+};
+
+export type SourceFolderListing = {
+  path: string;
+  parentPath: string | null;
+  entries: SourceFolderEntry[];
+};
+
+export type SourceFolderListInput = {
+  path?: string;
+  remoteConnectionId?: string;
+};
+
 export type SourceFolderState = {
   path: string;
   initialized: boolean;
@@ -596,6 +618,7 @@ export type CreateSourceWorktreeInput = {
   repoPath: string;
   branchName: string;
   destinationPath?: string;
+  remoteConnectionId?: string;
 };
 
 export type UpdateSettingsInput = {
@@ -766,12 +789,14 @@ export type CreateAgentInput = {
 export type CreateTeamInput = {
   name: string;
   color: string;
+  remoteConnectionId?: string;
 };
 
 export type UpdateTeamInput = {
   id: string;
   name: string;
   color: string;
+  remoteConnectionId?: string;
 };
 
 export type ReorderTeamsInput = {
@@ -866,6 +891,7 @@ export type CodexClawApi = {
   listSshHosts(): Promise<SshHostCandidate[]>;
   addSshConnection(input: AddSshConnectionInput): Promise<AppSnapshot>;
   checkRemoteConnection(connectionId: string): Promise<AppSnapshot>;
+  updateRemoteConnection(connectionId: string, input: UpdateRemoteConnectionInput): Promise<AppSnapshot>;
   removeRemoteConnection(connectionId: string): Promise<AppSnapshot>;
   connectWorkProvider(provider: WorkProviderKind): Promise<WorkProviderConnectResult>;
   openWorkProviderAuthorization(provider: WorkProviderKind): Promise<AppSnapshot>;
@@ -881,9 +907,10 @@ export type CodexClawApi = {
   openAgentGitDiff(agentId: string): Promise<void>;
   chooseAgentFolder(): Promise<string | null>;
   chooseSourceFolder(): Promise<string | null>;
-  listSourceRepositories(): Promise<SourceRepository[]>;
-  listSourceWorktrees(repoPath: string): Promise<SourceWorktree[]>;
-  suggestSourceWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>): Promise<string>;
+  listSourceFolders(input?: SourceFolderListInput): Promise<SourceFolderListing>;
+  listSourceRepositories(remoteConnectionId?: string): Promise<SourceRepository[]>;
+  listSourceWorktrees(repoPath: string, remoteConnectionId?: string): Promise<SourceWorktree[]>;
+  suggestSourceWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>): Promise<string>;
   chooseSourceWorktreeDestination(defaultPath: string): Promise<string | null>;
   createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree>;
   createTeam(input: CreateTeamInput): Promise<AppSnapshot>;

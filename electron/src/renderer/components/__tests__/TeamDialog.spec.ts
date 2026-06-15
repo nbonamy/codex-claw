@@ -3,7 +3,7 @@ import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import TeamDialog from '../TeamDialog.vue';
 import { teamColors } from '@codex-claw/shared/team-colors';
-import type { CreateTeamInput, Team, UpdateTeamInput } from '@codex-claw/shared/contracts';
+import type { CreateTeamInput, RemoteConnection, Team, UpdateTeamInput } from '@codex-claw/shared/contracts';
 
 describe('TeamDialog', () => {
   it('renders the Skwad-style create team layout and disables save until named', () => {
@@ -11,8 +11,9 @@ describe('TeamDialog', () => {
 
     expect(wrapper.get('.claw-dialog__title').text()).toBe('Create Team');
     expect(wrapper.get('.claw-dialog__subtitle').text()).toBe('Add a team to Codex Claw');
-    expect(wrapper.findAll('.team-dialog__field')).toHaveLength(2);
+    expect(wrapper.findAll('.team-dialog__field')).toHaveLength(3);
     expect(wrapper.text()).toContain('Name');
+    expect(wrapper.text()).toContain('Connection');
     expect(wrapper.text()).toContain('Color');
     expect(wrapper.get('.team-dialog__text-input').attributes('placeholder')).toBe('Enter team name');
     expect(wrapper.findAll('.team-dialog__color')).toHaveLength(teamColors.length);
@@ -33,6 +34,24 @@ describe('TeamDialog', () => {
       color: '#46A857',
     });
     expect(wrapper.emitted('close')).toStrictEqual([[]]);
+  });
+
+  it('creates a team with a ready SSH connection', async () => {
+    const createTeam = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountDialog({
+      createTeam,
+      remoteConnections: [readyConnection()],
+    });
+
+    await wrapper.get('.team-dialog__text-input').setValue('Remote Team');
+    await wrapper.getComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'connection-devbox');
+    await saveButton(wrapper).trigger('click');
+
+    expect(createTeam).toHaveBeenCalledWith({
+      name: 'Remote Team',
+      color: '#1B4FB2',
+      remoteConnectionId: 'connection-devbox',
+    });
   });
 
   it('edits an existing team with prefilled values', async () => {
@@ -64,6 +83,23 @@ describe('TeamDialog', () => {
     expect(wrapper.emitted('close')).toStrictEqual([[]]);
   });
 
+  it('disables connection edits once a team has agents', () => {
+    const wrapper = mountDialog({
+      mode: 'edit',
+      remoteConnections: [readyConnection()],
+      team: {
+        id: 'team-codex-claw',
+        name: 'Codex Claw',
+        avatar: 'CC',
+        color: '#1B4FB2',
+        remoteConnectionId: 'connection-devbox',
+        agentIds: ['agent-dina'],
+      },
+    });
+
+    expect(wrapper.getComponent({ name: 'ElSelect' }).props('disabled')).toBe(true);
+  });
+
   it('keeps the dialog open and shows create errors', async () => {
     const createTeam = vi.fn().mockRejectedValue(new Error('Team color is invalid.'));
     const wrapper = mountDialog({ createTeam });
@@ -81,6 +117,7 @@ function mountDialog(overrides: Partial<{
   mode: 'create' | 'edit';
   team: Team | null;
   updateTeam: (input: UpdateTeamInput) => Promise<void>;
+  remoteConnections: RemoteConnection[];
 }> = {}) {
   return mount(TeamDialog, {
     props: {
@@ -104,6 +141,23 @@ function mountDialog(overrides: Partial<{
       },
     },
   });
+}
+
+function readyConnection(): RemoteConnection {
+  return {
+    id: 'connection-devbox',
+    kind: 'ssh',
+    name: 'devbox',
+    host: 'devbox',
+    status: 'ready',
+    transport: {
+      type: 'ssh-stdio',
+      command: 'ssh',
+      args: ['devbox', 'node ~/.codex-claw/clawd.mjs --stdio'],
+    },
+    createdAt: '2026-06-14T10:00:00.000Z',
+    updatedAt: '2026-06-14T10:00:00.000Z',
+  };
 }
 
 function saveButton(wrapper: ReturnType<typeof mountDialog>, label = 'Create Team') {

@@ -115,6 +115,23 @@ describe('snapshot reducer', () => {
     });
   });
 
+  it('creates agents without storing execution connection on the agent', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.teams[0].remoteConnectionId = 'connection-devbox';
+
+    createAgentInSnapshot(snapshot, {
+      name: 'Remote Dina',
+      folder: '/home/nicolas/src/codex-claw',
+    }, '2026-06-05T10:11:12.000Z', 'agent-remote-dina');
+
+    expect(snapshot.agents.at(-1)).toMatchObject({
+      id: 'agent-remote-dina',
+      name: 'Remote Dina',
+      folder: '/home/nicolas/src/codex-claw',
+    });
+    expect(snapshot.agents.at(-1)).not.toHaveProperty('remoteConnectionId');
+  });
+
   it('defaults a blank created agent name from the folder basename', () => {
     const snapshot = createInitialSnapshot();
 

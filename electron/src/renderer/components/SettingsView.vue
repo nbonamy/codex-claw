@@ -40,9 +40,11 @@
         <SettingsConnectionsPanel
           v-else-if="activeTab === 'connections'"
           :connections="remoteConnections"
+          :teams="teams"
           :list-ssh-hosts="listSshHosts"
           :add-ssh-connection="addSshConnection"
           :check-remote-connection="checkRemoteConnection"
+          :update-remote-connection="updateRemoteConnection"
           :remove-remote-connection="removeRemoteConnection"
         />
         <SettingsAppearancePanel
@@ -56,7 +58,7 @@
 </template>
 
 <script setup lang="ts">
-import type { AddSshConnectionInput, AppGeneralSettings, AppThemeSettings, ClawdDaemonStatus, RemoteConnection, SourceFolderState, SshHostCandidate, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AppGeneralSettings, AppThemeSettings, ClawdDaemonStatus, RemoteConnection, SourceFolderState, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { defaultGeneralSettings, defaultSourceFolderState } from '@codex-claw/shared/settings';
 import SettingsAppearancePanel from './SettingsAppearancePanel.vue';
 import SettingsConnectionsPanel from './SettingsConnectionsPanel.vue';
@@ -79,9 +81,11 @@ withDefaults(defineProps<{
   workProviderSettings?: WorkBacklogState['providerSettings'];
   workProviderAuthorization?: WorkProviderAuthorization | null;
   remoteConnections?: RemoteConnection[];
+  teams?: Team[];
   listSshHosts?: () => Promise<SshHostCandidate[]>;
   addSshConnection?: (input: AddSshConnectionInput) => Promise<void>;
   checkRemoteConnection?: (connectionId: string) => Promise<void>;
+  updateRemoteConnection?: (connectionId: string, input: UpdateRemoteConnectionInput) => Promise<void>;
   removeRemoteConnection?: (connectionId: string) => Promise<void>;
   completeWorkProviderConnection?: (provider: WorkProviderKind) => Promise<void>;
   connectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
@@ -98,9 +102,11 @@ withDefaults(defineProps<{
   workProviderSettings: () => ({}),
   workProviderAuthorization: null,
   remoteConnections: () => [],
+  teams: () => [],
   listSshHosts: async () => [],
   addSshConnection: async () => undefined,
   checkRemoteConnection: async () => undefined,
+  updateRemoteConnection: async () => undefined,
   removeRemoteConnection: async () => undefined,
   generalSettings: () => ({ ...defaultGeneralSettings }),
   sourceFolder: () => ({ ...defaultSourceFolderState }),

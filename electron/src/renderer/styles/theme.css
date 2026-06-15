@@ -24,6 +24,12 @@
   --el-menu-item-height: auto;
 }
 
+.el-button--danger {
+  --el-button-text-color: var(--el-color-danger);
+  --el-button-bg-color: var(--el-bg-color);
+  --el-button-hover-bg-color: var(--el-color-danger);
+}
+
 .el-dialog {
   --el-dialog-padding-primary: 0;
 }

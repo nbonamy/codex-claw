@@ -14,7 +14,7 @@
     </template>
 
     <SettingsSection
-      title="Remote backends"
+      title="Remote Codex Claw agents"
       title-id="settings-connections-remotes-title"
     >
       <div
@@ -41,28 +41,88 @@
           </div>
         </div>
         <div class="settings-connections-panel__actions">
-          <el-button
-            size="small"
-            :loading="checkingConnectionId === connection.id"
-            @click="checkConnection(connection.id)"
+          <button
+            type="button"
+            :aria-label="`Connection settings for ${connection.name}`"
+            title="Connection settings"
+            @click="openConnectionSettings(connection)"
           >
-            Check
-          </el-button>
-          <el-button
-            size="small"
-            @click="removeConnection(connection.id)"
+            <SettingsIcon aria-hidden="true" />
+          </button>
+          <el-popover
+            :visible="openMenuConnectionId === connection.id"
+            placement="bottom-end"
+            trigger="manual"
+            width="180"
+            :teleported="true"
+            popper-class="claw-popover settings-connections-panel__menu-popover"
+            @update:visible="setMenuVisible(connection.id, $event)"
           >
-            Remove
-          </el-button>
+            <template #reference>
+              <button
+                type="button"
+                :aria-label="`${connection.name} actions`"
+                @click="setMenuVisible(connection.id, openMenuConnectionId !== connection.id)"
+              >
+                <DotsVerticalIcon aria-hidden="true" />
+              </button>
+            </template>
+            <AppMenu
+              class="app-menu--embedded"
+              ariaLabel="Connection actions"
+              :items="connectionMenuItems(connection)"
+              @click.stop
+              @select="selectConnectionMenuItem(connection, $event)"
+            />
+          </el-popover>
         </div>
       </article>
     </SettingsSection>
+
+    <el-dialog
+      v-model="settingsDialogVisible"
+      :title="settingsDialogTitle"
+      width="520"
+      append-to-body
+      class="claw-dialog"
+    >
+      <el-form
+        class="settings-connections-panel__settings"
+        label-position="top"
+      >
+        <el-form-item label="Source folder">
+          <el-input
+            v-model="settingsSourceFolderPath"
+            placeholder="~/src"
+          />
+        </el-form-item>
+        <p
+          v-if="settingsError"
+          class="settings-connections-panel__error"
+        >
+          {{ settingsError }}
+        </p>
+      </el-form>
+      <template #footer>
+        <el-button @click="closeConnectionSettings">
+          Cancel
+        </el-button>
+        <el-button
+          type="primary"
+          :loading="savingConnectionSettings"
+          @click="saveConnectionSettings"
+        >
+          Save
+        </el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog
       v-model="addDialogVisible"
       title="Add SSH connection"
       width="680"
       append-to-body
+      class="claw-dialog"
     >
       <div class="settings-connections-panel__dialog">
         <p
@@ -83,7 +143,7 @@
         >
           No SSH hosts found
         </div>
-        <template v-else>
+        <div v-else>
           <article
             v-for="host in sshHosts"
             :key="host.host"
@@ -102,15 +162,19 @@
               Connect
             </el-button>
           </article>
-        </template>
+        </div>
       </div>
     </el-dialog>
   </SettingsPanelFrame>
 </template>
 
 <script setup lang="ts">
+import { ElMessageBox } from 'element-plus';
 import { computed, ref } from 'vue';
-import type { AddSshConnectionInput, RemoteConnection, SshHostCandidate } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, RemoteConnection, SshHostCandidate, Team, UpdateRemoteConnectionInput } from '@codex-claw/shared/contracts';
+import AppMenu from '../shared/menu/AppMenu.vue';
+import type { AppMenuItem } from '../shared/menu/app-menu';
+import { DotsVerticalIcon, RefreshIcon, SettingsIcon, Trash2Icon } from '../shared/icons/app-icons';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsSection from './SettingsSection.vue';
 
@@ -119,23 +183,36 @@ const props = withDefaults(defineProps<{
   checkRemoteConnection?: (connectionId: string) => Promise<void>;
   connections?: RemoteConnection[];
   listSshHosts?: () => Promise<SshHostCandidate[]>;
+  teams?: Team[];
+  updateRemoteConnection?: (connectionId: string, input: UpdateRemoteConnectionInput) => Promise<void>;
   removeRemoteConnection?: (connectionId: string) => Promise<void>;
 }>(), {
   addSshConnection: async () => undefined,
   checkRemoteConnection: async () => undefined,
   connections: () => [],
   listSshHosts: async () => [],
+  teams: () => [],
+  updateRemoteConnection: async () => undefined,
   removeRemoteConnection: async () => undefined,
 });
 
 const addDialogVisible = ref(false);
+const settingsDialogVisible = ref(false);
 const hosts = ref<SshHostCandidate[]>([]);
 const loadingHosts = ref(false);
 const hostError = ref<string | null>(null);
 const addingHost = ref<string | null>(null);
 const checkingConnectionId = ref<string | null>(null);
+const openMenuConnectionId = ref<string | null>(null);
+const settingsConnection = ref<RemoteConnection | null>(null);
+const settingsSourceFolderPath = ref('');
+const settingsError = ref<string | null>(null);
+const savingConnectionSettings = ref(false);
 
 const connections = computed(() => props.connections);
+const settingsDialogTitle = computed(() => (
+  settingsConnection.value ? `${settingsConnection.value.name} settings` : 'SSH settings'
+));
 const sshHosts = computed(() => {
   const connectedHosts = new Set(props.connections.map((connection) => connection.host));
   return hosts.value.filter((host) => !connectedHosts.has(host.host));
@@ -176,6 +253,7 @@ async function addConnection(host: SshHostCandidate): Promise<void> {
 }
 
 async function checkConnection(connectionId: string): Promise<void> {
+  openMenuConnectionId.value = null;
   checkingConnectionId.value = connectionId;
   try {
     await props.checkRemoteConnection(connectionId);
@@ -184,8 +262,103 @@ async function checkConnection(connectionId: string): Promise<void> {
   }
 }
 
-async function removeConnection(connectionId: string): Promise<void> {
-  await props.removeRemoteConnection(connectionId);
+function openConnectionSettings(connection: RemoteConnection): void {
+  settingsConnection.value = connection;
+  settingsSourceFolderPath.value = connection.sourceFolderPath ?? '';
+  settingsError.value = null;
+  settingsDialogVisible.value = true;
+}
+
+function closeConnectionSettings(): void {
+  if (savingConnectionSettings.value) {
+    return;
+  }
+  settingsDialogVisible.value = false;
+  settingsConnection.value = null;
+  settingsError.value = null;
+}
+
+async function saveConnectionSettings(): Promise<void> {
+  const connection = settingsConnection.value;
+  if (!connection) {
+    return;
+  }
+
+  savingConnectionSettings.value = true;
+  settingsError.value = null;
+  try {
+    await props.updateRemoteConnection(connection.id, {
+      sourceFolderPath: settingsSourceFolderPath.value.trim(),
+    });
+    settingsDialogVisible.value = false;
+    settingsConnection.value = null;
+  } catch (error) {
+    settingsError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    savingConnectionSettings.value = false;
+  }
+}
+
+function setMenuVisible(connectionId: string, visible: boolean): void {
+  openMenuConnectionId.value = visible ? connectionId : null;
+}
+
+function connectionMenuItems(connection: RemoteConnection): AppMenuItem[] {
+  return [{
+    id: 'check',
+    type: 'action',
+    label: checkingConnectionId.value === connection.id ? 'Checking...' : 'Check',
+    disabled: checkingConnectionId.value === connection.id,
+    icon: RefreshIcon,
+  }, {
+    id: 'delete',
+    type: 'action',
+    label: 'Delete',
+    danger: true,
+    icon: Trash2Icon,
+  }];
+}
+
+function selectConnectionMenuItem(connection: RemoteConnection, itemId: string): void {
+  openMenuConnectionId.value = null;
+  if (itemId === 'check') {
+    void checkConnection(connection.id);
+  } else if (itemId === 'delete') {
+    void confirmRemoveConnection(connection);
+  }
+}
+
+async function confirmRemoveConnection(connection: RemoteConnection): Promise<void> {
+  const connectedTeams = teamsForConnection(connection.id);
+  try {
+    await ElMessageBox.confirm(
+      connectionDeleteMessage(connection, connectedTeams),
+      `Delete ${connection.name}?`,
+      {
+        cancelButtonText: 'Cancel',
+        confirmButtonText: 'Delete',
+        type: 'warning',
+      },
+    );
+  } catch {
+    return;
+  }
+
+  await props.removeRemoteConnection(connection.id);
+}
+
+function teamsForConnection(connectionId: string): Team[] {
+  return props.teams.filter((team) => team.remoteConnectionId === connectionId);
+}
+
+function connectionDeleteMessage(connection: RemoteConnection, teams: Team[]): string {
+  if (teams.length === 0) {
+    return `${connection.name} will be removed.`;
+  }
+
+  const teamNames = teams.map((team) => team.name).join(', ');
+  const teamLabel = teams.length === 1 ? 'team' : 'teams';
+  return `${connection.name} will be removed. This will also delete ${teams.length} connected ${teamLabel}: ${teamNames}. Their agents and messages will be removed from Codex Claw.`;
 }
 
 function connectionLabel(connection: RemoteConnection): string {
@@ -224,11 +397,12 @@ function statusLabel(status: RemoteConnection['status']): string {
 </script>
 
 <style scoped>
+
 .settings-connections-panel__empty,
 .settings-connections-panel__loading {
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
-  padding: var(--space-8) 0;
+  padding: var(--space-8);
 }
 
 .settings-connections-panel__error {
@@ -243,7 +417,7 @@ function statusLabel(status: RemoteConnection['status']): string {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-12);
-  padding: var(--space-10) 0;
+  padding: var(--space-10);
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -264,7 +438,6 @@ function statusLabel(status: RemoteConnection['status']): string {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
 }
 
 .settings-connections-panel__identity strong,
@@ -289,7 +462,29 @@ function statusLabel(status: RemoteConnection['status']): string {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-6);
+  gap: var(--space-2);
+}
+
+.settings-connections-panel__actions button {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.settings-connections-panel__actions button:hover,
+.settings-connections-panel__actions button:focus-visible {
+  color: var(--color-text);
+}
+
+.settings-connections-panel__actions svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
 }
 
 .settings-connections-panel__dot {
@@ -317,5 +512,13 @@ function statusLabel(status: RemoteConnection['status']): string {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  max-height: 400px;
+  overflow: auto;
+}
+
+.settings-connections-panel__settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
 }
 </style>

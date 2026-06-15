@@ -31,6 +31,8 @@
     :source-repositories="sourceRepositories"
     :choose-agent-folder="chooseAgentFolder"
     :choose-source-folder="chooseSourceFolder"
+    :list-source-folders="listSourceFolders"
+    :list-source-repositories="listSourceRepositories"
     :list-source-worktrees="listSourceWorktrees"
     :suggest-source-worktree-path="suggestSourceWorktreePath"
     :choose-source-worktree-destination="chooseSourceWorktreeDestination"
@@ -46,6 +48,7 @@
     :list-ssh-hosts="listSshHosts"
     :add-ssh-connection="addSshConnection"
     :check-remote-connection="checkRemoteConnection"
+    :update-remote-connection="updateRemoteConnection"
     :remove-remote-connection="removeRemoteConnection"
     :set-daemon-enabled="setDaemonEnabled"
     :connect-work-provider="connectWorkProvider"
@@ -140,6 +143,8 @@ const {
   loadSnapshot,
   chooseAgentFolder,
   chooseSourceFolder,
+  listSourceFolders,
+  listSourceRepositories,
   listSourceWorktrees,
   suggestSourceWorktreePath,
   chooseSourceWorktreeDestination,
@@ -164,6 +169,7 @@ const {
   listSshHosts,
   addSshConnection,
   checkRemoteConnection,
+  updateRemoteConnection,
   removeRemoteConnection,
   setDaemonEnabled,
   connectWorkProvider,

@@ -44,6 +44,39 @@
 
       <section class="claw-form-dialog__field team-dialog__field">
         <div class="claw-form-dialog__field-heading team-dialog__field-heading">
+          <label
+            class="claw-form-dialog__label team-dialog__label"
+            for="team-dialog-connection"
+          >
+            Connection
+          </label>
+          <span class="claw-form-dialog__heading-separator team-dialog__heading-separator">•</span>
+          <p class="claw-form-dialog__help team-dialog__help">Choose where this team's agents run.</p>
+        </div>
+        <div class="claw-form-dialog__control team-dialog__input-shell team-dialog__input-shell--select">
+          <el-select
+            id="team-dialog-connection"
+            v-model="connectionSelection"
+            class="team-dialog__connection-select"
+            :disabled="connectionLocked"
+            :teleported="false"
+          >
+            <el-option
+              label="Local"
+              :value="localConnectionValue"
+            />
+            <el-option
+              v-for="connection in readyRemoteConnections"
+              :key="connection.id"
+              :label="connection.name"
+              :value="connection.id"
+            />
+          </el-select>
+        </div>
+      </section>
+
+      <section class="claw-form-dialog__field team-dialog__field">
+        <div class="claw-form-dialog__field-heading team-dialog__field-heading">
           <span class="claw-form-dialog__label team-dialog__label">Color</span>
           <span class="claw-form-dialog__heading-separator team-dialog__heading-separator">•</span>
           <p class="claw-form-dialog__help team-dialog__help">Choose the team rail color.</p>
@@ -100,18 +133,20 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { CreateTeamInput, Team, UpdateTeamInput } from '@codex-claw/shared/contracts';
+import type { CreateTeamInput, RemoteConnection, Team, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import { defaultTeamColor, teamColors } from '@codex-claw/shared/team-colors';
 import { CheckIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
   createTeam: (input: CreateTeamInput) => Promise<Team | null | void>;
   mode?: 'create' | 'edit';
+  remoteConnections?: RemoteConnection[];
   team?: Team | null;
   updateTeam?: (input: UpdateTeamInput) => Promise<void>;
   visible: boolean;
 }>(), {
   mode: 'create',
+  remoteConnections: () => [],
   team: null,
   updateTeam: async () => undefined,
 });
@@ -122,10 +157,19 @@ const emit = defineEmits<{
 
 const name = ref('');
 const selectedColor = ref<string>(defaultTeamColor);
+const localConnectionValue = '__local__';
+const connectionSelection = ref(localConnectionValue);
 const errorMessage = ref<string | null>(null);
 const submitting = ref(false);
 
 const canSave = computed(() => name.value.trim().length > 0 && !submitting.value);
+const readyRemoteConnections = computed(() => props.remoteConnections.filter((connection) => connection.status === 'ready'));
+const selectedRemoteConnectionId = computed(() => (
+  connectionLocked.value && props.team?.remoteConnectionId
+    ? props.team.remoteConnectionId
+    : connectionSelection.value === localConnectionValue ? '' : connectionSelection.value
+));
+const connectionLocked = computed(() => props.mode === 'edit' && (props.team?.agentIds.length ?? 0) > 0);
 const dialogTitle = computed(() => props.mode === 'edit' ? 'Edit Team' : 'Create Team');
 const dialogSubtitle = computed(() => props.mode === 'edit' ? 'Update team identity' : 'Add a team to Codex Claw');
 const submitLabel = computed(() => props.mode === 'edit' ? 'Save' : 'Create Team');
@@ -149,11 +193,13 @@ async function submit(): Promise<void> {
         id: props.team.id,
         name: name.value,
         color: selectedColor.value,
+        ...(selectedRemoteConnectionId.value ? { remoteConnectionId: selectedRemoteConnectionId.value } : {}),
       });
     } else {
       await props.createTeam({
         name: name.value,
         color: selectedColor.value,
+        ...(selectedRemoteConnectionId.value ? { remoteConnectionId: selectedRemoteConnectionId.value } : {}),
       });
     }
     close();
@@ -178,12 +224,27 @@ function close(): void {
 function resetForm(): void {
   name.value = props.mode === 'edit' ? props.team?.name ?? '' : '';
   selectedColor.value = props.mode === 'edit' ? props.team?.color ?? defaultTeamColor : defaultTeamColor;
+  connectionSelection.value = connectionValueForTeam();
   errorMessage.value = null;
   submitting.value = false;
+}
+
+function connectionValueForTeam(): string {
+  if (props.mode !== 'edit') {
+    return localConnectionValue;
+  }
+  const teamConnectionId = props.team?.remoteConnectionId;
+  return teamConnectionId && readyRemoteConnections.value.some((connection) => connection.id === teamConnectionId)
+    ? teamConnectionId
+    : localConnectionValue;
 }
 </script>
 
 <style scoped>
+.team-dialog__input-shell--select {
+  display: block;
+}
+
 .team-dialog__colors {
   display: grid;
   grid-template-columns: repeat(6, 32px);

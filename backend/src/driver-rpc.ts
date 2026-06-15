@@ -10,6 +10,7 @@ import { CodexProcessTransport } from './codex/process-transport';
 import { CodexRpcClient } from './codex/rpc-client';
 import { createSourceWorktree, listSourceWorktrees, suggestedSourceWorktreePath } from './git-worktrees';
 import { buildCodexClawMcpConfigOverrides } from './mcp/codex-config';
+import { listSourceFolders } from './source-folders';
 import { detectSourceFolder, scanSourceRepositories } from './source-repositories';
 import { transcribeWithAppleSpeechAnalyzer } from './transcription/apple-speech';
 
@@ -198,6 +199,10 @@ export class BackendDriverRpc {
         const record = requireRecord(params);
         const sourceFolderPath = requireString(record.sourceFolderPath, 'sourceFolderPath').trim();
         return sourceFolderPath ? scanSourceRepositories(sourceFolderPath) : [];
+      }
+      case 'source/listFolders': {
+        const record = params === undefined ? {} : requireRecord(params);
+        return listSourceFolders(typeof record.path === 'string' ? record.path : undefined);
       }
       case 'source/suggestWorktreePath': {
         const record = requireRecord(params);

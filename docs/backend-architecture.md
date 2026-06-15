@@ -860,13 +860,26 @@ Local migration path:
 
 Remote migration path:
 
-- A remote `clawd` owns its own state directory on the remote machine.
-- Teams and agents are initially scoped to the backend location.
+- Local `clawd` remains the product-state control plane for the desktop app.
+- A remote `clawd` owns execution on the remote machine: source scanning,
+  folder browsing, worktree creation, git status/diff, file previews, provider
+  models/skills, conversations, prompts, approvals, steering, interruption, and
+  rollback.
+- Remote-located teams persist `Team.remoteConnectionId`; agents inherit their
+  execution location from `Agent.teamId` plus the remote absolute `Agent.folder`
+  path. This is enough for single-host desktop control over SSH without
+  duplicating teams/agents into the remote state file.
+- SSH connection settings can update the remote `clawd` source folder through
+  remote `settings/update`; local `clawd` mirrors the path on the connection
+  record for settings UI defaults. Deleting a connection deletes teams attached
+  to that connection, with one empty local fallback team created only when every
+  team was remote-backed.
 - Cross-location sync is a separate product problem and should not block the
   process extraction.
 
-`Agent.folder: string` is a local-only shape. Remote support requires a later
-migration to location-aware folders:
+`Team.remoteConnectionId` plus `Agent.folder: string` is the interim remote
+shape. Longer-term remote support can migrate to explicit location-aware
+folders:
 
 ```ts
 type BackendLocation =
@@ -879,13 +892,14 @@ type AgentFolder = {
 };
 ```
 
-The first remote slice now persists SSH connection records in `clawd`, parses
-the backend host's `~/.ssh/config`, probes the selected host, installs the
-bundled `clawd` script to `~/.codex-claw/clawd.mjs` when missing, and records
-the future stdio transport as `ssh <host> "node ~/.codex-claw/clawd.mjs
---stdio"`. It does not yet migrate agent folders or create remote agents.
-Keep the protocol boundary clear so the folder type can change behind clients
-later.
+The first remote slices now persist SSH connection records in `clawd`, parse
+the backend host's `~/.ssh/config`, probe the selected host, install the
+bundled `clawd` script to `~/.codex-claw/clawd.mjs` when missing, and record
+the stdio transport as `ssh <host> "node ~/.codex-claw/clawd.mjs --stdio"`.
+The Team dialog can select Local or a ready SSH connection before any agents are
+created. Agent creation inherits the target team's connection, and source
+repository/worktree controls query that backend location. Keep the protocol
+boundary clear so the folder type can change behind clients later.
 
 ## Security Model
 
@@ -1073,7 +1087,7 @@ Goal: run `clawd` on another machine without exposing a raw network daemon.
 Work:
 
 - Add backend location records. Started as persisted SSH connection records;
-  agent/session location scoping remains.
+  team execution-location scoping is the app contract.
 - Add SSH stdio transport. The command model is recorded on ready connections;
   the app still needs to attach backend clients and agents to it.
 - Make agent folders, source folders, repo discovery, git, files, and

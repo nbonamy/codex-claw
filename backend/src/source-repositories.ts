@@ -6,12 +6,12 @@ import type { SourceRepository, SourceWorktree } from '@codex-claw/shared/contra
 export function sourceFolderCandidates(): string[] {
   return [
     '~/src',
-    '~/dev',
     '~/code',
+    '~/dev',
+    '~/sources',
     '~/projects',
     '~/repos',
     '~/source',
-    '~/sources',
     '~/workspace',
     '~/workspaces',
     '~/git',

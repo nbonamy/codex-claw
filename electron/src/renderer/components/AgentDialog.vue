@@ -316,6 +316,90 @@
       @created="selectCreatedSourceWorktree"
     />
 
+    <el-dialog
+      v-model="remoteFolderDialogVisible"
+      title="Choose remote folder"
+      width="560px"
+      append-to-body
+      class="claw-dialog agent-dialog__remote-folder-dialog"
+    >
+      <div class="agent-dialog__remote-folder">
+        <div class="agent-dialog__remote-folder-path">
+          <input
+            v-model="remoteFolderPath"
+            class="claw-form-dialog__text-input agent-dialog__text-input"
+            type="text"
+            aria-label="Remote folder path"
+            placeholder="$HOME"
+            @keydown.enter.prevent="loadRemoteFolders(remoteFolderPath)"
+          />
+          <el-button
+            :loading="remoteFolderLoading"
+            @click="loadRemoteFolders(remoteFolderPath)"
+          >
+            Go
+          </el-button>
+        </div>
+
+        <p
+          v-if="remoteFolderError"
+          class="agent-dialog__remote-folder-error"
+        >
+          {{ remoteFolderError }}
+        </p>
+
+        <div
+          v-if="remoteFolderLoading && remoteFolderEntries.length === 0"
+          class="agent-dialog__remote-folder-empty"
+        >
+          Loading folders...
+        </div>
+        <div
+          v-else
+          class="agent-dialog__remote-folder-list"
+        >
+          <button
+            v-if="remoteFolderListing?.parentPath"
+            type="button"
+            class="agent-dialog__remote-folder-row"
+            @click="loadRemoteFolders(remoteFolderListing.parentPath)"
+          >
+            <FolderIcon aria-hidden="true" />
+            <span>..</span>
+          </button>
+          <button
+            v-for="entry in remoteFolderEntries"
+            :key="entry.path"
+            type="button"
+            class="agent-dialog__remote-folder-row"
+            @click="loadRemoteFolders(entry.path)"
+          >
+            <FolderIcon aria-hidden="true" />
+            <span>{{ entry.name }}</span>
+          </button>
+          <div
+            v-if="!remoteFolderLoading && remoteFolderEntries.length === 0 && !remoteFolderListing?.parentPath"
+            class="agent-dialog__remote-folder-empty"
+          >
+            No folders
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="claw-dialog__footer">
+          <el-button @click="closeRemoteFolderDialog">Cancel</el-button>
+          <el-button
+            type="primary"
+            :disabled="!remoteFolderPath.trim()"
+            @click="selectRemoteFolder"
+          >
+            Select this folder
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <template #footer>
       <div class="claw-dialog__footer">
         <el-button @click="close">Cancel</el-button>
@@ -335,9 +419,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { Component } from 'vue';
-import type { Agent, AgentBackend, CreateAgentInput, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '@codex-claw/shared/contracts';
+import type { Agent, AgentBackend, CreateAgentInput, CreateSourceWorktreeInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '@codex-claw/shared/contracts';
 import { ClaudeCodeBackendIcon, CodexBackendIcon } from '../shared/icons/backend-icons';
-import { ChevronDown } from '../shared/icons/app-icons';
+import { ChevronDown, FolderIcon } from '../shared/icons/app-icons';
 import AgentAvatarPicker from './AgentAvatarPicker.vue';
 import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
 
@@ -349,14 +433,17 @@ export type AgentDialogCreateInput = CreateAgentInput & {
 const props = withDefaults(defineProps<{
   agent: Agent | null;
   chooseAgentFolder: () => Promise<string | null>;
-  listSourceWorktrees?: (repoPath: string) => Promise<SourceWorktree[]>;
-  suggestSourceWorktreePath?: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>) => Promise<string>;
+  listSourceFolders?: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
+  listSourceRepositories?: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
+  listSourceWorktrees?: (repoPath: string, remoteConnectionId?: string) => Promise<SourceWorktree[]>;
+  suggestSourceWorktreePath?: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>) => Promise<string>;
   chooseSourceWorktreeDestination?: (defaultPath: string) => Promise<string | null>;
   createAgent: (input: AgentDialogCreateInput) => Promise<Agent | null | void>;
   createSourceWorktree?: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   initialNewTeamName?: string;
   initialTeamId?: string | null;
   mode: 'create' | 'edit';
+  remoteConnectionId?: string;
   showTeamField?: boolean;
   sourceFolderPath?: string;
   sourceRecentRepoNames?: string[];
@@ -367,6 +454,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   initialNewTeamName: '',
   initialTeamId: null,
+  remoteConnectionId: '',
   showTeamField: false,
   sourceFolderPath: '',
   sourceRecentRepoNames: () => [],
@@ -399,6 +487,14 @@ const createdSourceWorktree = ref<SourceWorktree | null>(null);
 const listedSourceWorktrees = ref<SourceWorktree[]>([]);
 const listedSourceWorktreesRepoPath = ref('');
 const newSourceWorktreeDialogVisible = ref(false);
+const remoteSourceRepositories = ref<SourceRepository[]>([]);
+const remoteSourceRepositoriesConnectionId = ref('');
+const loadingRemoteSourceRepositories = ref(false);
+const remoteFolderDialogVisible = ref(false);
+const remoteFolderLoading = ref(false);
+const remoteFolderError = ref<string | null>(null);
+const remoteFolderPath = ref('');
+const remoteFolderListing = ref<SourceFolderListing | null>(null);
 
 type BackendOption = {
   icon: Component;
@@ -437,7 +533,24 @@ const selectedBackendOption = computed(() => (
 ));
 const teams = computed(() => props.teams);
 const showTeamSelector = computed(() => props.showTeamField && !isEditing.value);
-const sourceRepositories = computed(() => props.sourceRepositories ?? []);
+const selectedTeam = computed(() => teams.value.find((team) => team.id === teamSelection.value) ?? null);
+const selectedRemoteConnectionId = computed(() => {
+  if (showTeamSelector.value) {
+    return teamSelection.value === newTeamOptionId
+      ? ''
+      : selectedTeam.value?.remoteConnectionId ?? '';
+  }
+  return props.remoteConnectionId?.trim() ?? '';
+});
+const sourceRepositories = computed(() => {
+  if (!selectedRemoteConnectionId.value) {
+    return props.sourceRepositories ?? [];
+  }
+  return remoteSourceRepositoriesConnectionId.value === selectedRemoteConnectionId.value
+    ? remoteSourceRepositories.value
+    : [];
+});
+const remoteFolderEntries = computed(() => remoteFolderListing.value?.entries ?? []);
 const selectedSourceRepository = computed(() => sourceRepositories.value.find((repository) => repository.path === selectedSourceRepositoryPath.value) ?? null);
 const selectedSourceWorktrees = computed(() => {
   const worktrees = listedSourceWorktreesRepoPath.value === selectedSourceRepositoryPath.value
@@ -451,8 +564,14 @@ const selectedSourceWorktrees = computed(() => {
 });
 const showSourceWorktreeControl = computed(() => !isEditing.value && selectedSourceRepository.value !== null);
 const repositoryHelp = computed(() => (
-  props.sourceFolderPath && sourceRepositories.value.length > 0
+  loadingRemoteSourceRepositories.value
+    ? 'Loading repositories from the SSH connection.'
+    : props.sourceFolderPath && sourceRepositories.value.length > 0
     ? `Pick from ${props.sourceFolderPath}.`
+    : selectedRemoteConnectionId.value && sourceRepositories.value.length > 0
+      ? 'Pick from the selected SSH connection.'
+      : selectedRemoteConnectionId.value
+        ? 'No repositories found on the selected SSH connection.'
     : 'Pick a custom project folder.'
 ));
 const customFolderOptionLabel = computed(() => folder.value && !selectedSourceRepository.value ? 'Custom folder' : 'Choose folder...');
@@ -474,7 +593,19 @@ watch(() => [props.visible, props.mode, props.agent?.id, props.initialNewTeamNam
   }
 }, { immediate: true });
 
+watch(selectedRemoteConnectionId, async (connectionId, previousConnectionId) => {
+  if (!props.visible || isEditing.value || connectionId === previousConnectionId) {
+    return;
+  }
+  await resetSourceSelectionForConnection();
+});
+
 async function chooseFolder(): Promise<void> {
+  if (selectedRemoteConnectionId.value) {
+    await openRemoteFolderDialog();
+    return;
+  }
+
   errorMessage.value = null;
   choosingFolder.value = true;
   try {
@@ -498,6 +629,55 @@ async function chooseFolder(): Promise<void> {
   }
 }
 
+async function openRemoteFolderDialog(): Promise<void> {
+  remoteFolderDialogVisible.value = true;
+  remoteFolderError.value = null;
+  await loadRemoteFolders(folder.value || undefined);
+}
+
+function closeRemoteFolderDialog(): void {
+  remoteFolderDialogVisible.value = false;
+  remoteFolderError.value = null;
+}
+
+async function loadRemoteFolders(folderPath?: string | null): Promise<void> {
+  const remoteConnectionId = selectedRemoteConnectionId.value;
+  if (!remoteConnectionId) {
+    return;
+  }
+
+  remoteFolderLoading.value = true;
+  remoteFolderError.value = null;
+  try {
+    const listing = await props.listSourceFolders?.({
+      remoteConnectionId,
+      ...(folderPath?.trim() ? { path: folderPath.trim() } : {}),
+    }) ?? { path: '', parentPath: null, entries: [] };
+    remoteFolderListing.value = listing;
+    remoteFolderPath.value = listing.path;
+  } catch (error) {
+    remoteFolderError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    remoteFolderLoading.value = false;
+  }
+}
+
+function selectRemoteFolder(): void {
+  const selectedFolder = remoteFolderPath.value.trim();
+  if (!selectedFolder) {
+    return;
+  }
+
+  selectedSourceRepositoryPath.value = '';
+  selectedSourceWorktreePath.value = '';
+  repositoryControlValue.value = customFolderOptionValue;
+  folder.value = selectedFolder;
+  if (!name.value.trim()) {
+    name.value = selectedFolder.split(/[\\/]/).filter(Boolean).at(-1) ?? '';
+  }
+  closeRemoteFolderDialog();
+}
+
 async function selectRepositoryControl(value: string): Promise<void> {
   if (value === customFolderOptionValue) {
     await chooseFolder();
@@ -505,6 +685,46 @@ async function selectRepositoryControl(value: string): Promise<void> {
   }
 
   await selectSourceRepository(value);
+}
+
+async function resetSourceSelectionForConnection(): Promise<void> {
+  selectedSourceRepositoryPath.value = '';
+  selectedSourceWorktreePath.value = '';
+  repositoryControlValue.value = customFolderOptionValue;
+  folder.value = '';
+  createdSourceWorktree.value = null;
+  listedSourceWorktrees.value = [];
+  listedSourceWorktreesRepoPath.value = '';
+
+  if (selectedRemoteConnectionId.value) {
+    await loadRemoteSourceRepositories(selectedRemoteConnectionId.value);
+  }
+
+  const preferredRepositoryPath = preferredSourceRepositoryPath();
+  if (preferredRepositoryPath) {
+    await selectSourceRepository(preferredRepositoryPath);
+  }
+}
+
+async function loadRemoteSourceRepositories(connectionId: string): Promise<void> {
+  if (!props.listSourceRepositories) {
+    remoteSourceRepositories.value = [];
+    remoteSourceRepositoriesConnectionId.value = connectionId;
+    return;
+  }
+
+  loadingRemoteSourceRepositories.value = true;
+  errorMessage.value = null;
+  try {
+    remoteSourceRepositories.value = await props.listSourceRepositories(connectionId);
+    remoteSourceRepositoriesConnectionId.value = connectionId;
+  } catch (error) {
+    remoteSourceRepositories.value = [];
+    remoteSourceRepositoriesConnectionId.value = connectionId;
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    loadingRemoteSourceRepositories.value = false;
+  }
 }
 
 async function selectSourceRepository(repoPath: string): Promise<void> {
@@ -529,7 +749,9 @@ async function loadSelectedSourceWorktrees(repoPath: string): Promise<void> {
   }
 
   try {
-    const worktrees = await props.listSourceWorktrees(repoPath);
+    const worktrees = selectedRemoteConnectionId.value
+      ? await props.listSourceWorktrees(repoPath, selectedRemoteConnectionId.value)
+      : await props.listSourceWorktrees(repoPath);
     if (selectedSourceRepositoryPath.value !== repoPath) {
       return;
     }
@@ -571,7 +793,10 @@ function openNewSourceWorktreeDialog(): void {
 }
 
 function suggestSourceWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>): Promise<string> {
-  return props.suggestSourceWorktreePath?.(input) ?? Promise.resolve('');
+  return props.suggestSourceWorktreePath?.({
+    ...input,
+    ...(selectedRemoteConnectionId.value ? { remoteConnectionId: selectedRemoteConnectionId.value } : {}),
+  }) ?? Promise.resolve('');
 }
 
 function chooseSourceWorktreeDestination(defaultPath: string): Promise<string | null> {
@@ -587,6 +812,7 @@ async function createSourceWorktree(input: CreateSourceWorktreeInput): Promise<S
     repoPath: input.repoPath,
     branchName: input.branchName,
     destinationPath: input.destinationPath,
+    ...(selectedRemoteConnectionId.value ? { remoteConnectionId: selectedRemoteConnectionId.value } : {}),
   });
 }
 
@@ -674,17 +900,22 @@ function resetForm(): void {
   backend.value = 'codex';
   teamSelection.value = initialTeamSelection();
   newTeamName.value = props.initialNewTeamName;
-  const preferredRepositoryPath = preferredSourceRepositoryPath();
   selectedSourceRepositoryPath.value = '';
   selectedSourceWorktreePath.value = '';
   repositoryControlValue.value = customFolderOptionValue;
   createdSourceWorktree.value = null;
   listedSourceWorktrees.value = [];
   listedSourceWorktreesRepoPath.value = '';
+  remoteSourceRepositories.value = [];
+  remoteSourceRepositoriesConnectionId.value = '';
+  loadingRemoteSourceRepositories.value = false;
+  remoteFolderDialogVisible.value = false;
+  remoteFolderLoading.value = false;
+  remoteFolderError.value = null;
+  remoteFolderPath.value = '';
+  remoteFolderListing.value = null;
   newSourceWorktreeDialogVisible.value = false;
-  if (preferredRepositoryPath) {
-    void selectSourceRepository(preferredRepositoryPath);
-  }
+  void resetSourceSelectionForConnection();
 }
 
 function preferredSourceRepositoryPath(): string {
@@ -882,6 +1113,76 @@ function syncRepositoryControlValue(): void {
 
 .agent-dialog__source-custom-option {
   color: var(--color-text);
+}
+
+.agent-dialog__remote-folder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.agent-dialog__remote-folder-path {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-8);
+  align-items: center;
+}
+
+.agent-dialog__remote-folder-error {
+  margin: 0;
+  color: var(--color-error);
+  font-size: var(--font-size-13);
+}
+
+.agent-dialog__remote-folder-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 300px;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+}
+
+.agent-dialog__remote-folder-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-8);
+  width: 100%;
+  padding: var(--space-8) var(--space-10);
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agent-dialog__remote-folder-row:last-child {
+  border-bottom: 0;
+}
+
+.agent-dialog__remote-folder-row:hover,
+.agent-dialog__remote-folder-row:focus-visible {
+  background: var(--color-surface-low);
+}
+
+.agent-dialog__remote-folder-row svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  color: var(--color-text-muted);
+}
+
+.agent-dialog__remote-folder-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-dialog__remote-folder-empty {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  padding: var(--space-10);
 }
 
 </style>

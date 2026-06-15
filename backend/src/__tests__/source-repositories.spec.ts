@@ -2,6 +2,7 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { listSourceFolders } from '../source-folders';
 import { scanSourceRepositories, sourceFolderCandidates, sourceFolderPathExists } from '../source-repositories';
 
 describe('source repository discovery', () => {
@@ -75,9 +76,24 @@ describe('source repository discovery', () => {
   });
 
   it('expands tilde paths and validates configured folders', async () => {
-    expect(sourceFolderCandidates()).toContain('~/src');
+    expect(sourceFolderCandidates().slice(0, 4)).toStrictEqual(['~/src', '~/code', '~/dev', '~/sources']);
     await expect(sourceFolderPathExists(tempDir)).resolves.toBe(true);
     await expect(sourceFolderPathExists(path.join(tempDir, 'missing'))).resolves.toBe(false);
+  });
+
+  it('lists child folders for remote folder picking', async () => {
+    await mkdir(path.join(tempDir, 'zeta'));
+    await mkdir(path.join(tempDir, 'alpha'));
+    await writeFile(path.join(tempDir, 'README.md'), '# Read me\n');
+
+    await expect(listSourceFolders(tempDir)).resolves.toStrictEqual({
+      path: tempDir,
+      parentPath: path.dirname(tempDir),
+      entries: [
+        { name: 'alpha', path: path.join(tempDir, 'alpha') },
+        { name: 'zeta', path: path.join(tempDir, 'zeta') },
+      ],
+    });
   });
 
   async function createClone(name: string, branch: string | null = 'main'): Promise<void> {

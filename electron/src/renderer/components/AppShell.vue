@@ -62,9 +62,11 @@
         :work-provider-settings="snapshot.workBacklog.providerSettings"
         :work-provider-authorization="workProviderAuthorization"
         :remote-connections="snapshot.remoteConnections.connections"
+        :teams="snapshot.teams"
         :list-ssh-hosts="listSshHosts"
         :add-ssh-connection="addSshConnection"
         :check-remote-connection="checkRemoteConnection"
+        :update-remote-connection="updateRemoteConnection"
         :remove-remote-connection="removeRemoteConnection"
         :daemon-status="daemonStatus"
         :daemon-status-error="daemonStatusError"
@@ -209,13 +211,16 @@
       :choose-source-worktree-destination="chooseSourceWorktreeDestination"
       :create-agent="createAgentFromDialog"
       :create-source-worktree="createSourceWorktree"
+      :list-source-folders="listSourceFolders"
       :list-source-worktrees="listSourceWorktrees"
       :suggest-source-worktree-path="suggestSourceWorktreePath"
       :initial-new-team-name="pendingNewAgentTeamName"
       :initial-team-id="agentDialogTeamId"
+      :remote-connection-id="agentDialogRemoteConnectionId"
       :source-folder-path="snapshot.sourceFolder.path"
       :source-recent-repo-names="snapshot.sourceFolder.recentRepoNames"
       :source-repositories="sourceRepositories"
+      :list-source-repositories="listSourceRepositories"
       :update-agent="updateAgent"
       :teams="snapshot.teams"
       :show-team-field="showAgentDialogTeamSelector"
@@ -237,6 +242,7 @@
       :visible="teamDialogVisible"
       :mode="teamDialogMode"
       :team="editingTeam"
+      :remote-connections="snapshot.remoteConnections.connections"
       :create-team="createTeam"
       :update-team="updateTeam"
       @close="teamDialogVisible = false"
@@ -247,7 +253,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SidePanelRequest, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, TurnGitDiff, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, TurnGitDiff, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultTeamColor } from '@codex-claw/shared/team-colors';
 import { findAssignedAgentForWorkItem } from '@codex-claw/shared/work-assignments';
@@ -300,9 +306,11 @@ const props = withDefaults(defineProps<{
   daemonStatusError?: string | null;
   chooseAgentFolder?: () => Promise<string | null>;
   chooseSourceFolder?: () => Promise<string | null>;
+  listSourceFolders?: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
   sourceRepositories?: SourceRepository[];
-  listSourceWorktrees?: (repoPath: string) => Promise<SourceWorktree[]>;
-  suggestSourceWorktreePath?: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>) => Promise<string>;
+  listSourceRepositories?: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
+  listSourceWorktrees?: (repoPath: string, remoteConnectionId?: string) => Promise<SourceWorktree[]>;
+  suggestSourceWorktreePath?: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>) => Promise<string>;
   chooseSourceWorktreeDestination?: (defaultPath: string) => Promise<string | null>;
   createSourceWorktree?: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   previewAgentFile?: (agentId: string, filePath: string) => Promise<AgentFilePreviewResult>;
@@ -316,6 +324,7 @@ const props = withDefaults(defineProps<{
   listSshHosts?: () => Promise<SshHostCandidate[]>;
   addSshConnection?: (input: AddSshConnectionInput) => Promise<void>;
   checkRemoteConnection?: (connectionId: string) => Promise<void>;
+  updateRemoteConnection?: (connectionId: string, input: UpdateRemoteConnectionInput) => Promise<void>;
   removeRemoteConnection?: (connectionId: string) => Promise<void>;
   setDaemonEnabled?: (enabled: boolean) => Promise<void>;
   restartApp?: () => Promise<void>;
@@ -360,7 +369,9 @@ const props = withDefaults(defineProps<{
   daemonStatusError: null,
   chooseAgentFolder: async () => null,
   chooseSourceFolder: async () => null,
+  listSourceFolders: async () => ({ path: '', parentPath: null, entries: [] }),
   sourceRepositories: () => [],
+  listSourceRepositories: async () => [],
   suggestSourceWorktreePath: async () => '',
   chooseSourceWorktreeDestination: async () => null,
   createSourceWorktree: async () => ({ name: '', path: '' }),
@@ -379,6 +390,7 @@ const props = withDefaults(defineProps<{
   listSshHosts: async () => [],
   addSshConnection: async () => undefined,
   checkRemoteConnection: async () => undefined,
+  updateRemoteConnection: async () => undefined,
   removeRemoteConnection: async () => undefined,
   setDaemonEnabled: async () => undefined,
   restartApp: async () => undefined,
@@ -570,6 +582,13 @@ const editingAgent = computed(() => (
 const editingTeam = computed(() => (
   editingTeamId.value ? props.snapshot.teams.find((team) => team.id === editingTeamId.value) ?? null : null
 ));
+const agentDialogTargetTeam = computed(() => {
+  const targetTeamId = agentDialogTeamId.value ?? activeTeam.value?.id ?? props.snapshot.activeTeamId;
+  return targetTeamId
+    ? props.snapshot.teams.find((team) => team.id === targetTeamId) ?? null
+    : null;
+});
+const agentDialogRemoteConnectionId = computed(() => agentDialogTargetTeam.value?.remoteConnectionId ?? '');
 const isPlanPreviewUpdating = computed(() => {
   if (sidePanel.value?.kind !== 'markdown' || sidePanel.value.purpose !== 'plan') {
     return false;

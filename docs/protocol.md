@@ -85,7 +85,7 @@ reducers locally.
 
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
-| `agent/create` | `{ input: CreateAgentInput }` | `AppSnapshot` | Validates folder in backend before creating. |
+| `agent/create` | `{ input: CreateAgentInput }` | `AppSnapshot` | Validates the folder in the target team's execution location before creating. New agents inherit their team's connection; `CreateAgentInput` does not carry a connection id. |
 | `agent/update` | `{ input: UpdateAgentInput }` | `AppSnapshot` | Validates folder and refreshes git status. |
 | `agent/select` | `{ agentId }` | `AppSnapshot` | Selects, hydrates history, and refreshes git status. |
 | `agent/duplicate` | `{ agentId }` | `AppSnapshot` | Duplicates product agent state. |
@@ -125,8 +125,8 @@ reducers locally.
 
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
-| `team/create` | `{ input: CreateTeamInput }` | `AppSnapshot` | Creates and selects a team. |
-| `team/update` | `{ input: UpdateTeamInput }` | `AppSnapshot` | Updates name/color. |
+| `team/create` | `{ input: CreateTeamInput }` | `AppSnapshot` | Creates and selects a team. `input.remoteConnectionId` optionally selects the team's SSH execution location; omitted means local. |
+| `team/update` | `{ input: UpdateTeamInput }` | `AppSnapshot` | Updates name/color and, while the team has no agents, the optional team connection. Connection changes are rejected once the team has agents. |
 | `team/reorder` | `{ input: ReorderTeamsInput }` | `AppSnapshot` | Reorders team rail state. |
 | `team/close` | `{ teamId }` | `AppSnapshot` | Closes team and associated agents. |
 | `team/select` | `{ teamId }` | `AppSnapshot` | Selects team and active agent. |
@@ -139,14 +139,19 @@ reducers locally.
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
 | `settings/update` | `{ input: UpdateSettingsInput }` | `AppSnapshot` | Updates general/theme/source settings. |
-| `source/listRepositories` | none | `SourceRepository[]` | Scans the configured backend source folder. |
-| `source/suggestWorktreePath` | `{ input: { repoPath, branchName } }` | `string` | Backend-owned path policy. |
-| `source/listWorktrees` | `{ repoPath }` | `SourceWorktree[]` | Runs `git worktree list --porcelain` in `clawd`. |
-| `source/createWorktree` | `{ input: CreateSourceWorktreeInput }` | `SourceWorktree` | Runs `git worktree add` in `clawd` and persists recent repo metadata. |
+| `source/listFolders` | `{ path?, remoteConnectionId? }` | `SourceFolderListing` | Lists child directories from local or remote `clawd`; when `path` is omitted, the target backend starts at its `$HOME`. Used by renderer fake folder pickers without desktop filesystem access. |
+| `source/listRepositories` | `{ remoteConnectionId? }` | `SourceRepository[]` | Scans the configured source folder in local `clawd` or the selected remote `clawd`. |
+| `source/suggestWorktreePath` | `{ input: { repoPath, branchName, remoteConnectionId? } }` | `string` | Backend-owned path policy in local or remote location. |
+| `source/listWorktrees` | `{ repoPath, remoteConnectionId? }` | `SourceWorktree[]` | Runs `git worktree list --porcelain` in local or remote `clawd`. |
+| `source/createWorktree` | `{ input: CreateSourceWorktreeInput }` | `SourceWorktree` | Runs `git worktree add` in local or remote `clawd`. Local creations persist recent repo metadata. |
 
 Folder and save dialogs are not backend protocol messages. Electron may return
 selected paths through desktop IPC, but all validation, listing, creation, and
 state mutation happen in `clawd`.
+
+When the source folder path is unset or was persisted as empty, `clawd`
+initializes it before repository listing by trying `~/src`, `~/code`, `~/dev`,
+and `~/sources` first.
 
 ## Client To `clawd`: Remote Connections
 
@@ -155,12 +160,17 @@ state mutation happen in `clawd`.
 | `connections/listSshHosts` | none | `SshHostCandidate[]` | Parses the backend host's `~/.ssh/config` and returns concrete `Host` aliases. Wildcard and negated patterns are ignored. |
 | `connections/addSsh` | `{ input: AddSshConnectionInput }` | `AppSnapshot` | Saves an SSH connection, probes the host non-interactively, installs the bundled `clawd` script under `~/.codex-claw` when missing, and records an `ssh` stdio transport when ready. |
 | `connections/check` | `{ connectionId }` | `AppSnapshot` | Re-runs the SSH probe/install/version check for a saved connection. |
-| `connections/remove` | `{ connectionId }` | `AppSnapshot` | Removes a saved remote connection from backend state. |
+| `connections/update` | `{ connectionId, input: { sourceFolderPath? } }` | `AppSnapshot` | Updates SSH connection settings. Source-folder changes are forwarded to the remote `clawd` through `settings/update` and mirrored locally for settings UI defaults. |
+| `connections/remove` | `{ connectionId }` | `AppSnapshot` | Removes a saved remote connection and deletes teams attached to it. If every team used that connection, local `clawd` creates one empty local fallback team first. |
 
 Remote connection state is owned by `clawd`, not Electron. Today the SSH
 transport command model is `ssh <host> "node ~/.codex-claw/clawd.mjs --stdio"`.
-This slice does not yet create remote agents or switch the active backend
-location; it prepares the persisted connection and install/probe path.
+Teams store `Team.remoteConnectionId`; agents inherit execution location from
+their owning team. Local `clawd` remains the product-state authority and brokers
+source, git, file, model, skill, conversation, prompt, approval-response,
+steering, interrupt, and rollback driver calls to the selected remote `clawd`
+over SSH stdio. Slash-command interception remains local-only for now; ordinary
+prompts route remotely.
 
 ## Client To `clawd`: Work Providers
 

@@ -230,6 +230,29 @@ describe('BackendDriverRpc', () => {
     }
   });
 
+  it('lists source folders through backend-owned filesystem access', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-rpc-source-folders-'));
+    const rpc = new BackendDriverRpc(new Map([['codex', createDriver()]]));
+
+    try {
+      await mkdir(path.join(tempDir, 'src'));
+      await mkdir(path.join(tempDir, 'code'));
+      await writeFile(path.join(tempDir, 'README.md'), '# Read me\n');
+
+      await expect(rpc.handle('source/listFolders', { path: tempDir })).resolves.toStrictEqual({
+        path: tempDir,
+        parentPath: path.dirname(tempDir),
+        entries: [
+          { name: 'code', path: path.join(tempDir, 'code') },
+          { name: 'src', path: path.join(tempDir, 'src') },
+        ],
+      });
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+      await rpc.close();
+    }
+  });
+
   it('fans out backend driver events', () => {
     let emitEvent: AgentBackendDriver['onEvent'] extends (listener: infer Listener) => () => void ? Listener : never;
     const driver = createDriver({

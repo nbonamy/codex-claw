@@ -1,10 +1,15 @@
-import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
-import { describe, expect, it, vi } from 'vitest';
+import { flushPromises, mount } from '@vue/test-utils';
+import ElementPlus, { ElMessageBox } from 'element-plus';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import SettingsView from '../SettingsView.vue';
 import { defaultGeneralSettings, defaultThemeSettings } from '@codex-claw/shared/settings';
 
 describe('SettingsView', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    document.body.innerHTML = '';
+  });
+
   it('opens on general by default and emits tab selections', async () => {
     const wrapper = mount(SettingsView, {
       props: {
@@ -69,7 +74,9 @@ describe('SettingsView', () => {
     const listSshHosts = vi.fn().mockResolvedValue([]);
     const addSshConnection = vi.fn().mockResolvedValue(undefined);
     const checkRemoteConnection = vi.fn().mockResolvedValue(undefined);
+    const updateRemoteConnection = vi.fn().mockResolvedValue(undefined);
     const removeRemoteConnection = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
     const wrapper = mount(SettingsView, {
       props: {
         settings: defaultThemeSettings,
@@ -84,9 +91,17 @@ describe('SettingsView', () => {
           createdAt: '2026-06-14T10:00:00.000Z',
           updatedAt: '2026-06-14T10:00:00.000Z',
         }],
+        teams: [{
+          id: 'team-remote',
+          name: 'Remote',
+          color: '#1B4FB2',
+          agentIds: [],
+          remoteConnectionId: 'connection-devbox',
+        }],
         listSshHosts,
         addSshConnection,
         checkRemoteConnection,
+        updateRemoteConnection,
         removeRemoteConnection,
       },
       global: {
@@ -94,13 +109,24 @@ describe('SettingsView', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('Remote backends');
+    expect(wrapper.text()).toContain('Remote Codex Claw agents');
     expect(wrapper.text()).toContain('devbox');
 
-    await wrapper.findAll('button').find((button) => button.text() === 'Check')?.trigger('click');
-    await wrapper.findAll('button').find((button) => button.text() === 'Remove')?.trigger('click');
+    await wrapper.get('[aria-label="devbox actions"]').trigger('click');
+    await flushPromises();
+    bodyButton('Check')?.click();
+    await flushPromises();
+    await wrapper.get('[aria-label="devbox actions"]').trigger('click');
+    await flushPromises();
+    bodyButton('Delete')?.click();
+    await flushPromises();
 
     expect(checkRemoteConnection).toHaveBeenCalledWith('connection-devbox');
     expect(removeRemoteConnection).toHaveBeenCalledWith('connection-devbox');
   });
 });
+
+function bodyButton(label: string): HTMLButtonElement | undefined {
+  return [...document.body.querySelectorAll('button')]
+    .find((button) => button.textContent?.includes(label));
+}

@@ -7,7 +7,7 @@ import { getClawdDaemonStatus, setClawdDaemonEnabled } from './daemon-launch-age
 import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
 type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
@@ -52,6 +52,10 @@ export class AppController {
 
     ipcMain.handle(ipcChannels.checkRemoteConnection, async (_event, connectionId: string) => {
       return this.checkRemoteConnection(connectionId);
+    });
+
+    ipcMain.handle(ipcChannels.updateRemoteConnection, async (_event, connectionId: string, input: UpdateRemoteConnectionInput) => {
+      return this.updateRemoteConnection(connectionId, input);
     });
 
     ipcMain.handle(ipcChannels.removeRemoteConnection, async (_event, connectionId: string) => {
@@ -114,15 +118,19 @@ export class AppController {
       return this.chooseSourceFolder();
     });
 
-    ipcMain.handle(ipcChannels.listSourceRepositories, async () => {
-      return this.listSourceRepositories();
+    ipcMain.handle(ipcChannels.listSourceFolders, async (_event, input?: SourceFolderListInput) => {
+      return this.listSourceFolders(input);
     });
 
-    ipcMain.handle(ipcChannels.listSourceWorktrees, async (_event, repoPath: string) => {
-      return this.listSourceWorktrees(repoPath);
+    ipcMain.handle(ipcChannels.listSourceRepositories, async (_event, remoteConnectionId?: string) => {
+      return this.listSourceRepositories(remoteConnectionId);
     });
 
-    ipcMain.handle(ipcChannels.suggestSourceWorktreePath, async (_event, input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>) => {
+    ipcMain.handle(ipcChannels.listSourceWorktrees, async (_event, repoPath: string, remoteConnectionId?: string) => {
+      return this.listSourceWorktrees(repoPath, remoteConnectionId);
+    });
+
+    ipcMain.handle(ipcChannels.suggestSourceWorktreePath, async (_event, input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>) => {
       return this.suggestSourceWorktreePath(input);
     });
 
@@ -358,6 +366,10 @@ export class AppController {
 
   private async checkRemoteConnection(connectionId: string): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('connections/check', { connectionId }));
+  }
+
+  private async updateRemoteConnection(connectionId: string, input: UpdateRemoteConnectionInput): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('connections/update', { connectionId, input }));
   }
 
   private async removeRemoteConnection(connectionId: string): Promise<AppSnapshot> {
@@ -633,15 +645,22 @@ export class AppController {
     return result.canceled ? null : result.filePath ?? null;
   }
 
-  private async listSourceRepositories(): Promise<SourceRepository[]> {
-    return this.requireBackendClient().request('source/listRepositories');
+  private async listSourceRepositories(remoteConnectionId?: string): Promise<SourceRepository[]> {
+    return this.requireBackendClient().request('source/listRepositories', remoteConnectionId ? { remoteConnectionId } : undefined);
   }
 
-  private async listSourceWorktrees(repoPath: string): Promise<SourceWorktree[]> {
-    return this.requireBackendClient().request('source/listWorktrees', { repoPath });
+  private async listSourceFolders(input?: SourceFolderListInput): Promise<SourceFolderListing> {
+    return this.requireBackendClient().request('source/listFolders', input);
   }
 
-  private async suggestSourceWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>): Promise<string> {
+  private async listSourceWorktrees(repoPath: string, remoteConnectionId?: string): Promise<SourceWorktree[]> {
+    return this.requireBackendClient().request('source/listWorktrees', {
+      repoPath,
+      ...(remoteConnectionId ? { remoteConnectionId } : {}),
+    });
+  }
+
+  private async suggestSourceWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>): Promise<string> {
     return this.requireBackendClient().request('source/suggestWorktreePath', { input });
   }
 
