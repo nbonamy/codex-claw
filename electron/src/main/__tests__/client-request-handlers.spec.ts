@@ -21,7 +21,7 @@ describe('createClientRequestHandlers', () => {
       openAccessibilitySettings: vi.fn(),
     });
 
-    await expect(handlers['client/openExternal']?.({ url: 'https://example.com' })).resolves.toBe(true);
+    await expect(handlers['client/external/open']?.({ url: 'https://example.com' })).resolves.toBe(true);
     expect(openExternal).toHaveBeenCalledWith('https://example.com');
   });
 
@@ -40,7 +40,7 @@ describe('createClientRequestHandlers', () => {
       openAccessibilitySettings: vi.fn(),
     });
 
-    expect(await handlers['client/systemPermissions/get']?.(undefined)).toStrictEqual(status);
+    expect(await handlers['client/system/permissions/get']?.(undefined)).toStrictEqual(status);
     expect(getSystemPermissionsStatus).toHaveBeenCalledOnce();
   });
 
@@ -59,7 +59,7 @@ describe('createClientRequestHandlers', () => {
       openAccessibilitySettings,
     });
 
-    await expect(handlers['client/systemPermissions/openAccessibilitySettings']?.(undefined)).resolves.toStrictEqual(status);
+    await expect(handlers['client/system/permissions/accessibility/open']?.(undefined)).resolves.toStrictEqual(status);
     expect(openAccessibilitySettings).toHaveBeenCalledOnce();
   });
 });

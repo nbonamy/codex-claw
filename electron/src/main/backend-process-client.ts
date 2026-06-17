@@ -1,3 +1,4 @@
+import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { watch } from 'node:fs';
@@ -82,7 +83,7 @@ export class ClawBackendProcessClient {
   }
 
   async health(): Promise<ClawBackendHealth> {
-    return this.request<ClawBackendHealth>('backend/health');
+    return this.request<ClawBackendHealth>(backendMethods.backendHealthGet);
   }
 
   async request<Result>(method: string, params?: unknown): Promise<Result> {
@@ -278,7 +279,7 @@ export class ClawBackendProcessClient {
       return;
     }
 
-    if (message.method !== 'backend/event') {
+    if (message.method !== backendMethods.backendEventNotify) {
       warnMain('clawd', 'ignored unknown backend notification', { method: message.method });
       return;
     }

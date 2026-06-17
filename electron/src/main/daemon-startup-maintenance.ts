@@ -1,3 +1,4 @@
+import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { dialog } from 'electron';
 import { isClawSnapshotGetResult } from '@codex-claw/shared/backend-protocol/rpc';
 import type { AppSnapshot } from '@codex-claw/shared/contracts';
@@ -70,7 +71,7 @@ async function daemonHasActiveWork(
   const client = dependencies.createSnapshotClient?.(socketPath) ?? new ClawBackendSocketClient({ socketPath });
   try {
     await client.start();
-    const result = await client.request<unknown>('snapshot/get');
+    const result = await client.request<unknown>(backendMethods.snapshotGet);
     if (!isClawSnapshotGetResult(result)) {
       return true;
     }

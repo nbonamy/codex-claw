@@ -1,3 +1,4 @@
+import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
 import { logMain, warnMain } from './log';
@@ -7,7 +8,7 @@ import { getClawdDaemonStatus, setClawdDaemonEnabled } from './daemon-launch-age
 import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
 type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
@@ -162,6 +163,10 @@ export class AppController {
       return this.selectTeam(teamId);
     });
 
+    ipcMain.handle(ipcChannels.getBenchSnapshot, async (_event, location?: BenchLocation) => {
+      return this.getBenchSnapshot(location);
+    });
+
     ipcMain.handle(ipcChannels.getLoopSnapshot, async (_event, location?: LoopLocation) => {
       return this.getLoopSnapshot(location);
     });
@@ -234,12 +239,12 @@ export class AppController {
       return this.saveAgentToBench(agentId);
     });
 
-    ipcMain.handle(ipcChannels.deployBenchTemplate, async (_event, templateId: string, teamId?: string) => {
-      return this.deployBenchTemplate(templateId, teamId);
+    ipcMain.handle(ipcChannels.deployBenchTemplate, async (_event, templateId: string, teamId?: string, location?: BenchLocation) => {
+      return this.deployBenchTemplate(templateId, teamId, location);
     });
 
-    ipcMain.handle(ipcChannels.removeBenchTemplate, async (_event, templateId: string) => {
-      return this.removeBenchTemplate(templateId);
+    ipcMain.handle(ipcChannels.removeBenchTemplate, async (_event, templateId: string, location?: BenchLocation) => {
+      return this.removeBenchTemplate(templateId, location);
     });
 
     ipcMain.handle(ipcChannels.restartAgent, async (_event, agentId: string) => {
@@ -356,56 +361,56 @@ export class AppController {
   }
 
   private async connectWorkProvider(provider: WorkProviderKind): Promise<WorkProviderConnectResult> {
-    const result = await this.requireBackendClient().request<WorkProviderConnectResult>('workProvider/connect', { provider });
+    const result = await this.requireBackendClient().request<WorkProviderConnectResult>(backendMethods.workProviderConnect, { provider });
     await this.adoptBackendSnapshot(result.snapshot);
     return result;
   }
 
   private async listSshHosts(): Promise<SshHostCandidate[]> {
-    return this.requireBackendClient().request('connections/listSshHosts');
+    return this.requireBackendClient().request(backendMethods.connectionsSshHostsList);
   }
 
   private async addSshConnection(input: AddSshConnectionInput): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('connections/addSsh', { input }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.connectionsSshCreate, { input }));
   }
 
   private async checkRemoteConnection(connectionId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('connections/check', { connectionId }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.connectionsSync, { connectionId }));
   }
 
   private async updateRemoteConnection(connectionId: string, input: UpdateRemoteConnectionInput): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('connections/update', { connectionId, input }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.connectionsUpdate, { connectionId, input }));
   }
 
   private async removeRemoteConnection(connectionId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('connections/remove', { connectionId }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.connectionsDelete, { connectionId }));
   }
 
   private async openWorkProviderAuthorization(provider: WorkProviderKind): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('workProvider/openAuthorization', { provider }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.workProviderAuthorizationOpen, { provider }));
   }
 
   private async completeWorkProviderConnection(provider: WorkProviderKind): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('workProvider/completeConnection', { provider }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.workProviderConnectionComplete, { provider }));
   }
 
   private async disconnectWorkProvider(provider: WorkProviderKind): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('workProvider/disconnect', { provider }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.workProviderDisconnect, { provider }));
   }
 
   private async listWorkRepositories(provider: WorkProviderKind, location?: LoopLocation): Promise<WorkRepository[]> {
-    return this.requireBackendClient().request('workProvider/listRepositories', {
+    return this.requireBackendClient().request(backendMethods.workProviderRepositoriesList, {
       provider,
       ...(location ? { location } : {}),
     });
   }
 
   private async configureWorkBacklog(input: WorkBacklogConfigurationInput): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('workProvider/configureBacklog', { input }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.workProviderBacklogConfigure, { input }));
   }
 
   private async listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: LoopLocation): Promise<WorkItem[]> {
-    return this.requireBackendClient().request('workProvider/listItems', {
+    return this.requireBackendClient().request(backendMethods.workProviderItemsList, {
       provider,
       repositoryId,
       ...(location ? { location } : {}),
@@ -413,79 +418,110 @@ export class AppController {
   }
 
   private async createAgent(input: CreateAgentInput): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/create', { input }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCreate, { input }));
   }
 
   private async updateAgent(input: UpdateAgentInput): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/update', { input }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentUpdate, { input }));
   }
 
   private async duplicateAgent(agentId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/duplicate', { agentId }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentDuplicate, { agentId }));
   }
 
   private async moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/moveToTeam', { input }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentTeamMove, { input }));
   }
 
   private async reorderAgents(input: ReorderAgentsInput): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/reorder', { input }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentReorder, { input }));
   }
 
   private async closeAgent(agentId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/close', { agentId }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentDelete, { agentId }));
   }
 
   private async selectAgent(agentId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/select', { agentId }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentSelect, { agentId }));
   }
 
   private async updateAgentFolder(agentId: string, folder: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/updateFolder', { agentId, folder }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentFolderUpdate, { agentId, folder }));
   }
 
   private async assignWorkItemToAgent(agentId: string, item: unknown): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/assignWorkItem', { agentId, item }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentWorkItemAssign, { agentId, item }));
   }
 
   private async removeWorkItemAssignment(item: unknown): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/removeWorkItemAssignment', { item }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentWorkItemAssignmentDelete, { item }));
   }
 
   private async createTeam(input: CreateTeamInput): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('team/create', { input }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.teamCreate, { input }));
   }
 
   private async updateTeam(input: UpdateTeamInput): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('team/update', { input }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.teamUpdate, { input }));
   }
 
   private async reorderTeams(input: ReorderTeamsInput): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('team/reorder', { input }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.teamReorder, { input }));
   }
 
   private async closeTeam(teamId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('team/close', { teamId }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.teamDelete, { teamId }));
   }
 
   private async selectTeam(teamId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('team/select', { teamId }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.teamSelect, { teamId }));
+  }
+
+  private async getBenchSnapshot(location?: BenchLocation): Promise<AppSnapshot> {
+    if (isRemoteBenchLocation(location)) {
+      return this.requireBackendClient().request<AppSnapshot>(backendMethods.snapshotBenchGet, { location });
+    }
+    return this.getSnapshot();
   }
 
   private async saveAgentToBench(agentId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('bench/saveAgent', { agentId }));
+    const location = this.benchLocationForAgent(agentId);
+    const snapshot = await this.requireBackendClient().request<AppSnapshot>(backendMethods.benchAgentTemplateCreate, { agentId });
+    if (isRemoteBenchLocation(location)) {
+      return snapshot;
+    }
+    return this.adoptBackendSnapshot(snapshot);
   }
 
-  private async deployBenchTemplate(templateId: string, teamId?: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('bench/deployTemplate', { templateId, teamId }));
+  private async deployBenchTemplate(templateId: string, teamId?: string, location?: BenchLocation): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.benchTemplateDeploy, {
+      templateId,
+      teamId,
+      ...(location ? { location } : {}),
+    }));
   }
 
-  private async removeBenchTemplate(templateId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('bench/removeTemplate', { templateId }));
+  private async removeBenchTemplate(templateId: string, location?: BenchLocation): Promise<AppSnapshot> {
+    const snapshot = await this.requireBackendClient().request<AppSnapshot>(backendMethods.benchTemplateDelete, {
+      templateId,
+      ...(location ? { location } : {}),
+    });
+    if (isRemoteBenchLocation(location)) {
+      return snapshot;
+    }
+    return this.adoptBackendSnapshot(snapshot);
+  }
+
+  private benchLocationForAgent(agentId: string): BenchLocation | undefined {
+    const agent = this.snapshot?.agents.find((candidate) => candidate.id === agentId) ?? null;
+    const team = agent?.teamId
+      ? this.snapshot?.teams.find((candidate) => candidate.id === agent.teamId) ?? null
+      : null;
+    return benchLocationForRemoteConnectionId(team?.remoteConnectionId);
   }
 
   private async updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('settings/update', { input }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.settingsUpdate, { input }));
   }
 
   private async getDaemonStatus(): Promise<ClawdDaemonStatus> {
@@ -503,41 +539,41 @@ export class AppController {
 
   private async getLoopSnapshot(location?: LoopLocation): Promise<AppSnapshot> {
     if (isRemoteLoopLocation(location)) {
-      return this.requireBackendClient().request<AppSnapshot>('loop/snapshot', { location });
+      return this.requireBackendClient().request<AppSnapshot>(backendMethods.snapshotLoopsGet, { location });
     }
     return this.getSnapshot();
   }
 
   private async createLoop(input: CreateLoopInput, location?: LoopLocation): Promise<AppSnapshot> {
-    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>('loop/create', {
+    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>(backendMethods.loopCreate, {
       input,
       ...(location ? { location } : {}),
     }));
   }
 
   private async updateLoop(input: UpdateLoopInput, location?: LoopLocation): Promise<AppSnapshot> {
-    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>('loop/update', {
+    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>(backendMethods.loopUpdate, {
       input,
       ...(location ? { location } : {}),
     }));
   }
 
   private async runLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot> {
-    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>('loop/run', {
+    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>(backendMethods.loopRun, {
       loopId,
       ...(location ? { location } : {}),
     }));
   }
 
   private async clearLoopHistory(loopId: string, location?: LoopLocation): Promise<AppSnapshot> {
-    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>('loop/history/clear', {
+    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>(backendMethods.loopHistoryClear, {
       loopId,
       ...(location ? { location } : {}),
     }));
   }
 
   private async deleteLoopExecution(loopId: string, executionId: string, location?: LoopLocation): Promise<AppSnapshot> {
-    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>('loop/execution/delete', {
+    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>(backendMethods.loopExecutionDelete, {
       loopId,
       executionId,
       ...(location ? { location } : {}),
@@ -545,7 +581,7 @@ export class AppController {
   }
 
   private async deleteLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot> {
-    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>('loop/delete', {
+    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>(backendMethods.loopDelete, {
       loopId,
       ...(location ? { location } : {}),
     }));
@@ -579,27 +615,27 @@ export class AppController {
     prompt: string,
     options?: SendPromptOptions,
   ): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/sendPrompt', { agentId, prompt, options }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentPromptSend, { agentId, prompt, options }));
   }
 
   private async restartAgent(agentId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/restart', { agentId }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentRestart, { agentId }));
   }
 
   private async hydrateAgentHistory(agentId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/hydrateHistory', { agentId }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentHistoryHydrate, { agentId }));
   }
 
   private async listAgentConversations(agentId: string): Promise<ConversationSummary[]> {
-    return this.requireBackendClient().request('agent/listConversations', { agentId });
+    return this.requireBackendClient().request(backendMethods.agentConversationsList, { agentId });
   }
 
   private async resumeAgentConversation(agentId: string, ref: unknown): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/resumeConversation', { agentId, ref }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentConversationResume, { agentId, ref }));
   }
 
   private async readConversationMessages(ref: unknown, agentId: string, location?: LoopLocation): Promise<RendererMessage[]> {
-    return this.requireBackendClient().request('agent/readConversationMessages', {
+    return this.requireBackendClient().request(backendMethods.agentConversationMessagesGet, {
       ref,
       agentId,
       ...(location ? { location } : {}),
@@ -607,60 +643,60 @@ export class AppController {
   }
 
   private async setAgentGoal(agentId: string, objective: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/setGoal', { agentId, objective }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentGoalUpdate, { agentId, objective }));
   }
 
   private async clearAgentGoal(agentId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/clearGoal', { agentId }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentGoalClear, { agentId }));
   }
 
   private async setAgentApprovalPreset(agentId: string, preset: ApprovalPreset): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/setApprovalPreset', { agentId, preset }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentApprovalPresetUpdate, { agentId, preset }));
   }
 
   private async listBackendModels(agentId: string): Promise<BackendModelOption[]> {
-    return this.requireBackendClient().request('agent/listModels', { agentId });
+    return this.requireBackendClient().request(backendMethods.agentModelsList, { agentId });
   }
 
   private async listBackendSkills(agentId: string): Promise<BackendSkillSummary[]> {
-    return this.requireBackendClient().request('agent/listSkills', { agentId });
+    return this.requireBackendClient().request(backendMethods.agentSkillsList, { agentId });
   }
 
   private async listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]> {
-    return this.requireBackendClient().request('agent/listFiles', {
+    return this.requireBackendClient().request(backendMethods.agentFilesList, {
       agentId,
     });
   }
 
   private async previewAgentFile(agentId: string, filePath: string): Promise<AgentFilePreviewResult> {
-    return this.requireBackendClient().request('agent/previewFile', {
+    return this.requireBackendClient().request(backendMethods.agentFilePreview, {
       agentId,
       filePath,
     });
   }
 
   private async openAgentGitDiff(agentId: string): Promise<void> {
-    await this.requireBackendClient().request('agent/openGitDiff', { agentId });
+    await this.requireBackendClient().request(backendMethods.agentGitDiffOpen, { agentId });
   }
 
   private async steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/steer', { agentId, prompt }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentPromptSteer, { agentId, prompt }));
   }
 
   private async interruptAgent(agentId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/interrupt', { agentId }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentInterrupt, { agentId }));
   }
 
   private async deleteMessage(agentId: string, messageId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/deleteMessage', { agentId, messageId }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentMessageDelete, { agentId, messageId }));
   }
 
   private async editMessage(agentId: string, messageId: string, prompt: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/editMessage', { agentId, messageId, prompt }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentMessageUpdate, { agentId, messageId, prompt }));
   }
 
   private async retryMessage(agentId: string, messageId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('agent/retryMessage', { agentId, messageId }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentMessageRetry, { agentId, messageId }));
   }
 
   private async chooseAgentFolder(): Promise<string | null> {
@@ -695,26 +731,26 @@ export class AppController {
   }
 
   private async listSourceRepositories(remoteConnectionId?: string): Promise<SourceRepository[]> {
-    return this.requireBackendClient().request('source/listRepositories', remoteConnectionId ? { remoteConnectionId } : undefined);
+    return this.requireBackendClient().request(backendMethods.sourceRepositoriesList, remoteConnectionId ? { remoteConnectionId } : undefined);
   }
 
   private async listSourceFolders(input?: SourceFolderListInput): Promise<SourceFolderListing> {
-    return this.requireBackendClient().request('source/listFolders', input);
+    return this.requireBackendClient().request(backendMethods.sourceFoldersList, input);
   }
 
   private async listSourceWorktrees(repoPath: string, remoteConnectionId?: string): Promise<SourceWorktree[]> {
-    return this.requireBackendClient().request('source/listWorktrees', {
+    return this.requireBackendClient().request(backendMethods.sourceWorktreesList, {
       repoPath,
       ...(remoteConnectionId ? { remoteConnectionId } : {}),
     });
   }
 
   private async suggestSourceWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>): Promise<string> {
-    return this.requireBackendClient().request('source/suggestWorktreePath', { input });
+    return this.requireBackendClient().request(backendMethods.sourceWorktreePathSuggest, { input });
   }
 
   private async createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {
-    return this.requireBackendClient().request<SourceWorktree>('source/createWorktree', {
+    return this.requireBackendClient().request<SourceWorktree>(backendMethods.sourceWorktreeCreate, {
       input,
     });
   }
@@ -723,22 +759,22 @@ export class AppController {
     audioData: ArrayBuffer,
     options?: AppleSpeechTranscriptionOptions,
   ): Promise<AppleSpeechTranscriptionResult> {
-    return this.requireBackendClient().request('transcription/appleSpeech', {
+    return this.requireBackendClient().request(backendMethods.transcriptionAppleSpeechCreate, {
       audioBase64: Buffer.from(audioData).toString('base64'),
       options,
     });
   }
 
   private async getSystemPermissions(): Promise<SystemPermissionsStatus> {
-    return this.requireBackendClient().request('system/getPermissions');
+    return this.requireBackendClient().request(backendMethods.systemPermissionsGet);
   }
 
   private async openAccessibilitySettings(): Promise<SystemPermissionsStatus> {
-    return this.requireBackendClient().request('system/openAccessibilitySettings');
+    return this.requireBackendClient().request(backendMethods.systemPermissionsAccessibilityOpen);
   }
 
   private async refreshSnapshotFromBackend(): Promise<void> {
-    const backendState = await this.requireBackendClient().request<unknown>('snapshot/get');
+    const backendState = await this.requireBackendClient().request<unknown>(backendMethods.snapshotGet);
     if (isClawSnapshotGetResult(backendState)) {
       this.snapshot = backendState.snapshot;
       this.clientState = backendState.clientState;
@@ -748,7 +784,7 @@ export class AppController {
   }
 
   private async refreshClientStateFromBackend(): Promise<void> {
-    this.clientState = await this.requireBackendClient().request<ClientState>('client/getState');
+    this.clientState = await this.requireBackendClient().request<ClientState>(backendMethods.clientStateGet);
     this.syncPowerSaveBlocker();
   }
 
@@ -760,7 +796,7 @@ export class AppController {
   }
 
   private async respondToClientRequest(response: ClientRequestResponse): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>('clientRequest/respond', { response }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.clientRequestRespond, { response }));
   }
 
   private emitBackendEvent(event: ClawBackendEvent): void {
@@ -818,6 +854,15 @@ function createEmptyClientState(): ClientState {
 
 function isRemoteLoopLocation(location: LoopLocation | undefined): location is Extract<LoopLocation, { kind: 'remote' }> {
   return location?.kind === 'remote' && location.remoteConnectionId.trim().length > 0;
+}
+
+function isRemoteBenchLocation(location: BenchLocation | undefined): location is Extract<BenchLocation, { kind: 'remote' }> {
+  return location?.kind === 'remote' && location.remoteConnectionId.trim().length > 0;
+}
+
+function benchLocationForRemoteConnectionId(remoteConnectionId: string | undefined): BenchLocation | undefined {
+  const normalized = remoteConnectionId?.trim() ?? '';
+  return normalized ? { kind: 'remote', remoteConnectionId: normalized } : { kind: 'local' };
 }
 
 function eventForRenderer(event: ClawBackendEvent): MainToRendererEvent {

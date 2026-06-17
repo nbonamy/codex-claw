@@ -48,7 +48,7 @@ describe('ClawBackendSocketClient', () => {
     client.onEvent(listener);
     socket.writeFromServer(`${JSON.stringify({
       jsonrpc: '2.0',
-      method: 'backend/event',
+      method: 'backend/event/notify',
       params: {
         seq: 1,
         type: 'snapshot.updated',
@@ -72,7 +72,7 @@ describe('ClawBackendSocketClient', () => {
       socketPath: '/tmp/clawd.sock',
       connectSocket: vi.fn().mockReturnValue(socket),
       requestHandlers: {
-        'client/openExternal': openExternal,
+        'client/external/open': openExternal,
       },
     });
 
@@ -82,7 +82,7 @@ describe('ClawBackendSocketClient', () => {
     socket.writeFromServer(`${JSON.stringify({
       jsonrpc: '2.0',
       id: 'client-1',
-      method: 'client/openExternal',
+      method: 'client/external/open',
       params: { url: 'https://example.com' },
     })}\n`);
     await flushMicrotasks();

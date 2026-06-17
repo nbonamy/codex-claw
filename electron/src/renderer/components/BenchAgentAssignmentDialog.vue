@@ -146,6 +146,7 @@ export type BenchAgentAssignmentDialogSubmit = {
 
 const props = withDefaults(defineProps<{
   benchTemplates?: BenchTemplate[];
+  benchTemplatesByTeamId?: Record<string, BenchTemplate[]>;
   confirmLabel?: string;
   initialNewTeamName?: string;
   initialTeamId?: string | null;
@@ -155,6 +156,7 @@ const props = withDefaults(defineProps<{
   visible: boolean;
 }>(), {
   benchTemplates: () => [],
+  benchTemplatesByTeamId: () => ({}),
   confirmLabel: 'Continue',
   initialNewTeamName: '',
   initialTeamId: null,
@@ -172,7 +174,12 @@ const benchTemplateId = ref('');
 const teamSelection = ref('');
 const newTeamName = ref('');
 
-const benchTemplates = computed(() => props.benchTemplates);
+const benchTemplates = computed(() => {
+  if (teamSelection.value && teamSelection.value !== newTeamOptionId) {
+    return props.benchTemplatesByTeamId[teamSelection.value] ?? props.benchTemplates;
+  }
+  return props.benchTemplates;
+});
 const teams = computed(() => props.teams);
 const selectedBenchTemplate = computed(() => benchTemplates.value.find((template) => template.id === benchTemplateId.value) ?? null);
 const canSave = computed(() => (
@@ -185,6 +192,12 @@ watch(() => [props.visible, props.initialNewTeamName, props.initialTeamId, props
     resetForm();
   }
 }, { immediate: true });
+
+watch(benchTemplates, (templates) => {
+  if (!templates.some((template) => template.id === benchTemplateId.value)) {
+    benchTemplateId.value = templates[0]?.id ?? '';
+  }
+});
 
 function submit(): void {
   if (!canSave.value) {

@@ -26,6 +26,9 @@
     :work-items-by-repository="workItemsByRepository"
     :work-backlog-status="workBacklogStatus"
     :work-backlog-error="workBacklogError"
+    :remote-bench-by-connection-id="remoteBenchByConnectionId"
+    :remote-bench-status-by-connection-id="remoteBenchStatusByConnectionId"
+    :remote-bench-error-by-connection-id="remoteBenchErrorByConnectionId"
     :daemon-status="daemonStatus"
     :daemon-status-error="daemonStatusError"
     :source-repositories="sourceRepositories"
@@ -55,6 +58,7 @@
     :open-work-provider-authorization="openWorkProviderAuthorization"
     :complete-work-provider-connection="completeWorkProviderConnection"
     :disconnect-work-provider="disconnectWorkProvider"
+    :load-bench="loadBench"
     :get-loop-snapshot="getLoopSnapshot"
     :create-loop="createLoop"
     :update-loop="updateLoop"
@@ -137,6 +141,9 @@ const {
   workItemsByRepository,
   workBacklogStatus,
   workBacklogError,
+  remoteBenchByConnectionId,
+  remoteBenchStatusByConnectionId,
+  remoteBenchErrorByConnectionId,
   daemonStatus,
   daemonStatusError,
   sourceRepositories,
@@ -177,6 +184,7 @@ const {
   openWorkProviderAuthorization,
   completeWorkProviderConnection,
   disconnectWorkProvider,
+  loadBench,
   getLoopSnapshot,
   createLoop,
   updateLoop,

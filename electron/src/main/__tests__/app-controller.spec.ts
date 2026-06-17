@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { AppController } from '../app-controller';
 import { applyMainEventToSnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, BenchLocation, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
@@ -261,7 +261,7 @@ describe('AppController', () => {
     await controller.initialize();
     await expect(respondToClientRequest(controller, response)).resolves.toBe(backendSnapshot);
 
-    expect(request).toHaveBeenCalledWith('clientRequest/respond', { response });
+    expect(request).toHaveBeenCalledWith('client/request/respond', { response });
     expect(currentSnapshot(controller)).toBe(backendSnapshot);
   });
 
@@ -286,7 +286,7 @@ describe('AppController', () => {
     await controller.initialize();
 
     await expect(listSourceRepositories(controller)).resolves.toStrictEqual(repositories);
-    expect(request).toHaveBeenCalledWith('source/listRepositories', undefined);
+    expect(request).toHaveBeenCalledWith('source/repositories/list', undefined);
   });
 
   it('routes source worktree listing through clawd', async () => {
@@ -301,7 +301,7 @@ describe('AppController', () => {
     await controller.initialize();
 
     await expect(listSourceWorktrees(controller, '/Users/nbonamy/src/codex-claw')).resolves.toStrictEqual(worktrees);
-    expect(request).toHaveBeenCalledWith('source/listWorktrees', {
+    expect(request).toHaveBeenCalledWith('source/worktrees/list', {
       repoPath: '/Users/nbonamy/src/codex-claw',
     });
   });
@@ -327,7 +327,7 @@ describe('AppController', () => {
     await controller.initialize();
 
     await expect(createSourceWorktree(controller, input)).resolves.toStrictEqual(worktree);
-    expect(request).toHaveBeenCalledWith('source/createWorktree', { input });
+    expect(request).toHaveBeenCalledWith('source/worktree/create', { input });
   });
 
   it('routes source worktree path suggestions through clawd', async () => {
@@ -343,7 +343,7 @@ describe('AppController', () => {
     await controller.initialize();
 
     await expect(suggestSourceWorktreePath(controller, input)).resolves.toBe(suggestion);
-    expect(request).toHaveBeenCalledWith('source/suggestWorktreePath', { input });
+    expect(request).toHaveBeenCalledWith('source/worktree/path/suggest', { input });
   });
 
   it('routes Apple Speech transcription through clawd using a JSON-safe audio payload', async () => {
@@ -357,7 +357,7 @@ describe('AppController', () => {
     await controller.initialize();
 
     await expect(transcribeAppleSpeech(controller, audioData, { locale: 'en-US' })).resolves.toStrictEqual(transcription);
-    expect(request).toHaveBeenCalledWith('transcription/appleSpeech', {
+    expect(request).toHaveBeenCalledWith('transcription/appleSpeech/create', {
       audioBase64: Buffer.from(audioData).toString('base64'),
       options: { locale: 'en-US' },
     });
@@ -389,8 +389,8 @@ describe('AppController', () => {
 
     await expect(getSystemPermissions(controller)).resolves.toStrictEqual(permissionStatus);
     await expect(openAccessibilitySettings(controller)).resolves.toStrictEqual(openedStatus);
-    expect(request).toHaveBeenNthCalledWith(1, 'system/getPermissions', undefined);
-    expect(request).toHaveBeenNthCalledWith(2, 'system/openAccessibilitySettings', undefined);
+    expect(request).toHaveBeenNthCalledWith(1, 'system/permissions/get', undefined);
+    expect(request).toHaveBeenNthCalledWith(2, 'system/permissions/accessibility/open', undefined);
   });
 
   it('routes work provider actions through clawd when the backend client is connected', async () => {
@@ -409,10 +409,10 @@ describe('AppController', () => {
       if (method === 'workProvider/connect') {
         return { snapshot, authorization: { provider: 'github', userCode: 'ABCD-1234', verificationUri: 'https://github.com/login/device', expiresAt: '2026-06-13T00:00:00.000Z' } };
       }
-      if (method === 'workProvider/configureBacklog') {
+      if (method === 'workProvider/backlog/configure') {
         return configuredSnapshot;
       }
-      if (method === 'workProvider/listItems') {
+      if (method === 'workProvider/items/list') {
         return [{ provider: 'github', id: 'github:nbonamy/codex-claw#12', title: 'Fix bug', url: 'https://github.com/nbonamy/codex-claw/issues/12' }];
       }
       return snapshot;
@@ -433,8 +433,8 @@ describe('AppController', () => {
     }]);
 
     expect(request).toHaveBeenNthCalledWith(1, 'workProvider/connect', { provider: 'github' });
-    expect(request).toHaveBeenNthCalledWith(2, 'workProvider/configureBacklog', { input: { provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } } });
-    expect(request).toHaveBeenNthCalledWith(3, 'workProvider/listItems', { provider: 'github', repositoryId: 'nbonamy/codex-claw' });
+    expect(request).toHaveBeenNthCalledWith(2, 'workProvider/backlog/configure', { input: { provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } } });
+    expect(request).toHaveBeenNthCalledWith(3, 'workProvider/items/list', { provider: 'github', repositoryId: 'nbonamy/codex-claw' });
   });
 
   it('routes work item assignment mutations through clawd', async () => {
@@ -464,8 +464,8 @@ describe('AppController', () => {
     await expect(assignWorkItemToAgent(controller, 'agent-dina', item)).resolves.toBe(backendSnapshot);
     await expect(removeWorkItemAssignment(controller, item)).resolves.toBe(backendSnapshot);
 
-    expect(request).toHaveBeenNthCalledWith(1, 'agent/assignWorkItem', { agentId: 'agent-dina', item });
-    expect(request).toHaveBeenNthCalledWith(2, 'agent/removeWorkItemAssignment', { item });
+    expect(request).toHaveBeenNthCalledWith(1, 'agent/workItem/assign', { agentId: 'agent-dina', item });
+    expect(request).toHaveBeenNthCalledWith(2, 'agent/workItem/assignment/delete', { item });
   });
 
   it('routes team mutations through clawd', async () => {
@@ -496,7 +496,7 @@ describe('AppController', () => {
     expect(request).toHaveBeenNthCalledWith(1, 'team/create', { input: createInput });
     expect(request).toHaveBeenNthCalledWith(2, 'team/update', { input: updateInput });
     expect(request).toHaveBeenNthCalledWith(3, 'team/reorder', { input: reorderInput });
-    expect(request).toHaveBeenNthCalledWith(4, 'team/close', { teamId: 'team-backend' });
+    expect(request).toHaveBeenNthCalledWith(4, 'team/delete', { teamId: 'team-backend' });
     expect(request).toHaveBeenNthCalledWith(5, 'team/select', { teamId: 'team-codex-claw' });
   });
 
@@ -548,12 +548,12 @@ describe('AppController', () => {
     expect(request).toHaveBeenNthCalledWith(1, 'agent/create', { input: createInput });
     expect(request).toHaveBeenNthCalledWith(2, 'agent/update', { input: updateInput });
     expect(request).toHaveBeenNthCalledWith(3, 'agent/duplicate', { agentId: 'agent-dina' });
-    expect(request).toHaveBeenNthCalledWith(4, 'agent/moveToTeam', { input: moveInput });
+    expect(request).toHaveBeenNthCalledWith(4, 'agent/team/move', { input: moveInput });
     expect(request).toHaveBeenNthCalledWith(5, 'agent/reorder', { input: reorderInput });
-    expect(request).toHaveBeenNthCalledWith(6, 'agent/updateFolder', { agentId: 'agent-dina', folder: '/Users/nbonamy/src/id8' });
+    expect(request).toHaveBeenNthCalledWith(6, 'agent/folder/update', { agentId: 'agent-dina', folder: '/Users/nbonamy/src/id8' });
     expect(request).toHaveBeenNthCalledWith(7, 'agent/select', { agentId: 'agent-dina' });
-    expect(request).toHaveBeenNthCalledWith(8, 'agent/close', { agentId: 'agent-dina' });
-    expect(request).not.toHaveBeenCalledWith('agent/validateFolder', expect.anything());
+    expect(request).toHaveBeenNthCalledWith(8, 'agent/delete', { agentId: 'agent-dina' });
+    expect(request).not.toHaveBeenCalledWith('agent/folder/validate', expect.anything());
   });
 
   it('routes bench mutations through clawd', async () => {
@@ -579,9 +579,97 @@ describe('AppController', () => {
     await expect(deployBenchTemplate(controller, 'bench-dina', 'team-codex-claw')).resolves.toBe(backendSnapshot);
     await expect(removeBenchTemplate(controller, 'bench-dina')).resolves.toBe(backendSnapshot);
 
-    expect(request).toHaveBeenNthCalledWith(1, 'bench/saveAgent', { agentId: 'agent-dina' });
-    expect(request).toHaveBeenNthCalledWith(2, 'bench/deployTemplate', { templateId: 'bench-dina', teamId: 'team-codex-claw' });
-    expect(request).toHaveBeenNthCalledWith(3, 'bench/removeTemplate', { templateId: 'bench-dina' });
+    expect(request).toHaveBeenNthCalledWith(1, 'bench/agent/template/create', { agentId: 'agent-dina' });
+    expect(request).toHaveBeenNthCalledWith(2, 'bench/template/deploy', { templateId: 'bench-dina', teamId: 'team-codex-claw' });
+    expect(request).toHaveBeenNthCalledWith(3, 'bench/template/delete', { templateId: 'bench-dina' });
+  });
+
+  it('keeps remote Bench snapshots out of the local desktop snapshot', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.sourceFolder.initialized = true;
+    snapshot.remoteConnections.connections = [{
+      id: 'connection-devbox',
+      kind: 'ssh',
+      name: 'devbox',
+      host: 'devbox',
+      status: 'ready',
+      createdAt: '2026-06-14T10:00:00.000Z',
+      updatedAt: '2026-06-14T10:00:00.000Z',
+    }];
+    snapshot.teams[0]!.remoteConnectionId = 'connection-devbox';
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-codex-claw',
+      name: 'Dina',
+      folder: '/home/nicolas/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const remoteLocation: BenchLocation = { kind: 'remote', remoteConnectionId: 'connection-devbox' };
+    const remoteBenchSnapshot = {
+      ...createInitialSnapshot(),
+      bench: [{
+        id: 'bench-remote-dina',
+        name: 'Remote Dina',
+        folder: '/home/nicolas/src/codex-claw',
+        backend: 'codex' as const,
+        createdAt: '2026-06-13T00:00:00.000Z',
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      }],
+    };
+    const deployedLocalSnapshot = {
+      ...snapshot,
+      agents: [
+        ...snapshot.agents,
+        {
+          id: 'agent-from-remote-bench',
+          teamId: 'team-codex-claw',
+          name: 'Remote Dina',
+          folder: '/home/nicolas/src/codex-claw',
+          backend: 'codex' as const,
+          status: { type: 'idle' as const },
+          createdAt: '2026-06-13T00:00:00.000Z',
+          updatedAt: '2026-06-13T00:00:00.000Z',
+        },
+      ],
+    };
+    const request = vi.fn().mockImplementation((method: string) => {
+      if (method === 'bench/template/deploy') {
+        return Promise.resolve(deployedLocalSnapshot);
+      }
+      return Promise.resolve(remoteBenchSnapshot);
+    });
+    const controller = new AppController(snapshot, createBackendClient({ request }));
+
+    await controller.initialize();
+
+    await expect(getBenchSnapshot(controller, remoteLocation)).resolves.toBe(remoteBenchSnapshot);
+    await expect(saveAgentToBench(controller, 'agent-dina')).resolves.toBe(remoteBenchSnapshot);
+    await expect(getSnapshot(controller)).resolves.toMatchObject({
+      teams: [{ id: 'team-codex-claw', remoteConnectionId: 'connection-devbox' }],
+      bench: [],
+    });
+
+    await expect(removeBenchTemplate(controller, 'bench-remote-dina', remoteLocation)).resolves.toBe(remoteBenchSnapshot);
+    await expect(getSnapshot(controller)).resolves.toMatchObject({
+      teams: [{ id: 'team-codex-claw', remoteConnectionId: 'connection-devbox' }],
+      bench: [],
+    });
+
+    await expect(deployBenchTemplate(controller, 'bench-remote-dina', 'team-codex-claw', remoteLocation)).resolves.toBe(deployedLocalSnapshot);
+    await expect(getSnapshot(controller)).resolves.toBe(deployedLocalSnapshot);
+
+    expect(request).toHaveBeenCalledWith('snapshot/bench/get', { location: remoteLocation });
+    expect(request).toHaveBeenCalledWith('bench/agent/template/create', { agentId: 'agent-dina' });
+    expect(request).toHaveBeenCalledWith('bench/template/delete', { templateId: 'bench-remote-dina', location: remoteLocation });
+    expect(request).toHaveBeenCalledWith('bench/template/deploy', {
+      templateId: 'bench-remote-dina',
+      teamId: 'team-codex-claw',
+      location: remoteLocation,
+    });
   });
 
   it('routes settings updates through clawd', async () => {
@@ -625,10 +713,10 @@ describe('AppController', () => {
     const hosts: SshHostCandidate[] = [{ host: 'devbox', hostName: 'devbox.internal' }];
     const folders = { path: '/home/nicolas', parentPath: '/home', entries: [{ name: 'src', path: '/home/nicolas/src' }] };
     const request = vi.fn((method: string) => {
-      if (method === 'connections/listSshHosts') {
+      if (method === 'connections/sshHosts/list') {
         return Promise.resolve(hosts);
       }
-      if (method === 'source/listFolders') {
+      if (method === 'source/folders/list') {
         return Promise.resolve(folders);
       }
       return Promise.resolve(backendSnapshot);
@@ -648,18 +736,18 @@ describe('AppController', () => {
     await expect(listSourceFolders(controller, { remoteConnectionId: 'connection-devbox', path: '/home/nicolas' })).resolves.toBe(folders);
     await expect(removeRemoteConnection(controller, 'connection-devbox')).resolves.toBe(backendSnapshot);
 
-    expect(request).toHaveBeenCalledWith('connections/listSshHosts', undefined);
-    expect(request).toHaveBeenCalledWith('connections/addSsh', { input });
-    expect(request).toHaveBeenCalledWith('connections/check', { connectionId: 'connection-devbox' });
+    expect(request).toHaveBeenCalledWith('connections/sshHosts/list', undefined);
+    expect(request).toHaveBeenCalledWith('connections/ssh/create', { input });
+    expect(request).toHaveBeenCalledWith('connections/sync', { connectionId: 'connection-devbox' });
     expect(request).toHaveBeenCalledWith('connections/update', {
       connectionId: 'connection-devbox',
       input: { sourceFolderPath: '~/src' },
     });
-    expect(request).toHaveBeenCalledWith('source/listFolders', {
+    expect(request).toHaveBeenCalledWith('source/folders/list', {
       remoteConnectionId: 'connection-devbox',
       path: '/home/nicolas',
     });
-    expect(request).toHaveBeenCalledWith('connections/remove', { connectionId: 'connection-devbox' });
+    expect(request).toHaveBeenCalledWith('connections/delete', { connectionId: 'connection-devbox' });
   });
 
   it('routes loop mutations and runs through clawd', async () => {
@@ -750,7 +838,7 @@ describe('AppController', () => {
     await expect(createLoop(controller, createInput, location)).resolves.toBe(remoteSnapshot);
     await expect(runLoop(controller, 'loop-bugs', location)).resolves.toBe(remoteSnapshot);
 
-    expect(request).toHaveBeenNthCalledWith(1, 'loop/snapshot', { location });
+    expect(request).toHaveBeenNthCalledWith(1, 'snapshot/loops/get', { location });
     expect(request).toHaveBeenNthCalledWith(2, 'loop/create', { input: createInput, location });
     expect(request).toHaveBeenNthCalledWith(3, 'loop/run', { loopId: 'loop-bugs', location });
     expect(currentSnapshot(controller)).toBe(snapshot);
@@ -764,7 +852,7 @@ describe('AppController', () => {
     await controller.initialize();
     await openAgentGitDiff(controller, 'agent-dina');
 
-    expect(request).toHaveBeenCalledWith('agent/openGitDiff', { agentId: 'agent-dina' });
+    expect(request).toHaveBeenCalledWith('agent/git/diff/open', { agentId: 'agent-dina' });
   });
 
   it('routes agent restart through clawd', async () => {
@@ -806,7 +894,7 @@ describe('AppController', () => {
     await controller.initialize();
     await expect(hydrateAgentHistory(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
 
-    expect(request).toHaveBeenCalledWith('agent/hydrateHistory', { agentId: 'agent-dina' });
+    expect(request).toHaveBeenCalledWith('agent/history/hydrate', { agentId: 'agent-dina' });
     expect(currentSnapshot(controller)).toBe(backendSnapshot);
   });
 
@@ -987,8 +1075,8 @@ describe('AppController', () => {
     await expect(setAgentGoal(controller, 'agent-dina', ' Ship the goal shelf ')).resolves.toBe(goalSnapshot);
     await expect(clearAgentGoal(controller, 'agent-dina')).resolves.toBe(clearedSnapshot);
 
-    expect(request).toHaveBeenNthCalledWith(1, 'agent/setGoal', { agentId: 'agent-dina', objective: ' Ship the goal shelf ' });
-    expect(request).toHaveBeenNthCalledWith(2, 'agent/clearGoal', { agentId: 'agent-dina' });
+    expect(request).toHaveBeenNthCalledWith(1, 'agent/goal/update', { agentId: 'agent-dina', objective: ' Ship the goal shelf ' });
+    expect(request).toHaveBeenNthCalledWith(2, 'agent/goal/clear', { agentId: 'agent-dina' });
   });
 
   it('routes approval preset updates through clawd', async () => {
@@ -1015,7 +1103,7 @@ describe('AppController', () => {
 
     await expect(setAgentApprovalPreset(controller, 'agent-dina', 'approve-for-me')).resolves.toBe(backendSnapshot);
 
-    expect(request).toHaveBeenCalledWith('agent/setApprovalPreset', { agentId: 'agent-dina', preset: 'approve-for-me' });
+    expect(request).toHaveBeenCalledWith('agent/approvalPreset/update', { agentId: 'agent-dina', preset: 'approve-for-me' });
   });
 
   it('routes active-turn steering through clawd', async () => {
@@ -1035,7 +1123,7 @@ describe('AppController', () => {
 
     await expect(steerPrompt(controller, 'agent-dina', ' try smaller ')).resolves.toBe(backendSnapshot);
 
-    expect(request).toHaveBeenCalledWith('agent/steer', { agentId: 'agent-dina', prompt: ' try smaller ' });
+    expect(request).toHaveBeenCalledWith('agent/prompt/steer', { agentId: 'agent-dina', prompt: ' try smaller ' });
   });
 
   it('routes interruption through clawd', async () => {
@@ -1080,7 +1168,7 @@ describe('AppController', () => {
     await controller.initialize();
     await expect(sendPrompt(controller, 'agent-dina', 'hello claude')).resolves.toBe(backendSnapshot);
 
-    expect(request).toHaveBeenCalledWith('agent/sendPrompt', {
+    expect(request).toHaveBeenCalledWith('agent/prompt/send', {
       agentId: 'agent-dina',
       prompt: 'hello claude',
       options: undefined,
@@ -1103,7 +1191,7 @@ describe('AppController', () => {
     await controller.initialize();
 
     await expect(readConversationMessages(controller, { backend: 'codex', threadId: 'thread-dina' }, 'agent-dina')).resolves.toStrictEqual(messages);
-    expect(request).toHaveBeenCalledWith('agent/readConversationMessages', {
+    expect(request).toHaveBeenCalledWith('agent/conversation/messages/get', {
       ref: { backend: 'codex', threadId: 'thread-dina' },
       agentId: 'agent-dina',
     });
@@ -1124,7 +1212,7 @@ describe('AppController', () => {
     await controller.initialize();
 
     await expect(listAgentConversations(controller, 'agent-dina')).resolves.toStrictEqual(conversations);
-    expect(request).toHaveBeenCalledWith('agent/listConversations', { agentId: 'agent-dina' });
+    expect(request).toHaveBeenCalledWith('agent/conversations/list', { agentId: 'agent-dina' });
   });
 
   it('routes agent conversation resume through clawd', async () => {
@@ -1142,7 +1230,7 @@ describe('AppController', () => {
 
     await expect(resumeAgentConversation(controller, 'agent-dina', ref)).resolves.toBe(backendSnapshot);
 
-    expect(request).toHaveBeenCalledWith('agent/resumeConversation', { agentId: 'agent-dina', ref });
+    expect(request).toHaveBeenCalledWith('agent/conversation/resume', { agentId: 'agent-dina', ref });
   });
 
   it('lets clawd validate busy agent conversation resume', async () => {
@@ -1155,7 +1243,7 @@ describe('AppController', () => {
     await controller.initialize();
 
     await expect(resumeAgentConversation(controller, 'agent-dina', ref)).rejects.toThrow('Agent must be idle before resuming a conversation.');
-    expect(request).toHaveBeenCalledWith('agent/resumeConversation', { agentId: 'agent-dina', ref });
+    expect(request).toHaveBeenCalledWith('agent/conversation/resume', { agentId: 'agent-dina', ref });
   });
 
   it('lets clawd reject unrecorded historical conversation refs', async () => {
@@ -1166,7 +1254,7 @@ describe('AppController', () => {
     await controller.initialize();
 
     await expect(readConversationMessages(controller, { backend: 'codex', threadId: 'thread-dina' }, 'agent-dina')).rejects.toThrow('Conversation reference is not available.');
-    expect(request).toHaveBeenCalledWith('agent/readConversationMessages', {
+    expect(request).toHaveBeenCalledWith('agent/conversation/messages/get', {
       ref: { backend: 'codex', threadId: 'thread-dina' },
       agentId: 'agent-dina',
     });
@@ -1180,7 +1268,7 @@ describe('AppController', () => {
     await controller.initialize();
 
     await expect(readConversationMessages(controller, { backend: 'codex' }, 'agent-dina')).rejects.toThrow('Invalid conversation reference.');
-    expect(request).toHaveBeenCalledWith('agent/readConversationMessages', {
+    expect(request).toHaveBeenCalledWith('agent/conversation/messages/get', {
       ref: { backend: 'codex' },
       agentId: 'agent-dina',
     });
@@ -1201,10 +1289,10 @@ describe('AppController', () => {
 
     await expect(listAgentFiles(controller, 'agent-dina')).resolves.toStrictEqual(files);
     await expect(previewAgentFile(controller, 'agent-dina', 'README.md')).resolves.toStrictEqual(readResult);
-    expect(request).toHaveBeenNthCalledWith(1, 'agent/listFiles', {
+    expect(request).toHaveBeenNthCalledWith(1, 'agent/files/list', {
       agentId: 'agent-dina',
     });
-    expect(request).toHaveBeenNthCalledWith(2, 'agent/previewFile', {
+    expect(request).toHaveBeenNthCalledWith(2, 'agent/file/preview', {
       agentId: 'agent-dina',
       filePath: 'README.md',
     });
@@ -1306,7 +1394,7 @@ describe('AppController', () => {
 
     await expect(deleteMessage(controller, 'agent-dina', 'user-turn-2')).resolves.toBe(rollbackSnapshot);
 
-    expect(request).toHaveBeenCalledWith('agent/deleteMessage', { agentId: 'agent-dina', messageId: 'user-turn-2' });
+    expect(request).toHaveBeenCalledWith('agent/message/delete', { agentId: 'agent-dina', messageId: 'user-turn-2' });
   });
 
   it('retries an assistant message by rolling back and resending the matching user prompt', async () => {
@@ -1327,7 +1415,7 @@ describe('AppController', () => {
     await controller.initialize();
     await retryMessage(controller, 'agent-dina', 'assistant-turn-1');
 
-    expect(request).toHaveBeenCalledWith('agent/retryMessage', { agentId: 'agent-dina', messageId: 'assistant-turn-1' });
+    expect(request).toHaveBeenCalledWith('agent/message/retry', { agentId: 'agent-dina', messageId: 'assistant-turn-1' });
   });
 
   it('edits a user message by rolling back and resending the edited prompt', async () => {
@@ -1348,7 +1436,7 @@ describe('AppController', () => {
     await controller.initialize();
     await editMessage(controller, 'agent-dina', 'user-turn-1', ' edited prompt ');
 
-    expect(request).toHaveBeenCalledWith('agent/editMessage', { agentId: 'agent-dina', messageId: 'user-turn-1', prompt: ' edited prompt ' });
+    expect(request).toHaveBeenCalledWith('agent/message/update', { agentId: 'agent-dina', messageId: 'user-turn-1', prompt: ' edited prompt ' });
   });
 });
 
@@ -1490,7 +1578,7 @@ function createBackendClient(overrides: {
       if (method === 'snapshot/get') {
         return Promise.resolve({}) as Promise<Result>;
       }
-      if (method === 'client/getState') {
+      if (method === 'client/state/get') {
         return Promise.resolve(clientState) as Promise<Result>;
       }
       return request(method, params) as Promise<Result>;
@@ -1636,22 +1724,34 @@ async function selectTeam(controller: AppController, teamId: string): Promise<Ap
   }).selectTeam(teamId);
 }
 
+async function getSnapshot(controller: AppController): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    getSnapshot(): Promise<AppSnapshot>;
+  }).getSnapshot();
+}
+
+async function getBenchSnapshot(controller: AppController, location?: BenchLocation): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    getBenchSnapshot(location?: BenchLocation): Promise<AppSnapshot>;
+  }).getBenchSnapshot(location);
+}
+
 async function saveAgentToBench(controller: AppController, agentId: string): Promise<AppSnapshot> {
   return (controller as unknown as {
     saveAgentToBench(agentId: string): Promise<AppSnapshot>;
   }).saveAgentToBench(agentId);
 }
 
-async function deployBenchTemplate(controller: AppController, templateId: string, teamId?: string): Promise<AppSnapshot> {
+async function deployBenchTemplate(controller: AppController, templateId: string, teamId?: string, location?: BenchLocation): Promise<AppSnapshot> {
   return (controller as unknown as {
-    deployBenchTemplate(templateId: string, teamId?: string): Promise<AppSnapshot>;
-  }).deployBenchTemplate(templateId, teamId);
+    deployBenchTemplate(templateId: string, teamId?: string, location?: BenchLocation): Promise<AppSnapshot>;
+  }).deployBenchTemplate(templateId, teamId, location);
 }
 
-async function removeBenchTemplate(controller: AppController, templateId: string): Promise<AppSnapshot> {
+async function removeBenchTemplate(controller: AppController, templateId: string, location?: BenchLocation): Promise<AppSnapshot> {
   return (controller as unknown as {
-    removeBenchTemplate(templateId: string): Promise<AppSnapshot>;
-  }).removeBenchTemplate(templateId);
+    removeBenchTemplate(templateId: string, location?: BenchLocation): Promise<AppSnapshot>;
+  }).removeBenchTemplate(templateId, location);
 }
 
 async function updateSettings(controller: AppController, input: UpdateSettingsInput): Promise<AppSnapshot> {

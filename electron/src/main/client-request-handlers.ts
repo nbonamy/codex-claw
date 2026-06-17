@@ -1,3 +1,4 @@
+import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { shell } from 'electron';
 import type { SystemPermissionsStatus } from '@codex-claw/shared/contracts';
 import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-permissions';
@@ -20,14 +21,14 @@ export function createRuntimeClientRequestHandlers(): Record<string, ClientReque
 
 export function createClientRequestHandlers(options: ClientRequestHandlersOptions): Record<string, ClientRequestHandler> {
   return {
-    'client/openExternal': async (params) => {
+    [backendMethods.clientExternalOpen]: async (params) => {
       const record = requireRecord(params);
       const url = requireString(record.url, 'url');
       await options.openExternal(url);
       return true;
     },
-    'client/systemPermissions/get': () => options.getSystemPermissionsStatus(),
-    'client/systemPermissions/openAccessibilitySettings': () => options.openAccessibilitySettings(),
+    [backendMethods.clientSystemPermissionsGet]: () => options.getSystemPermissionsStatus(),
+    [backendMethods.clientSystemPermissionsAccessibilityOpen]: () => options.openAccessibilitySettings(),
   };
 }
 

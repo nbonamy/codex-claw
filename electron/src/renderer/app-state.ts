@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendCommandSummary, BackendConversationRef, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendCommandSummary, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
@@ -33,6 +33,9 @@ const workRepositoriesByProvider = ref<Partial<Record<WorkProviderKind, WorkRepo
 const workItemsByRepository = ref<Record<string, WorkItem[]>>({});
 const workBacklogStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
 const workBacklogError = ref<string | null>(null);
+const remoteBenchByConnectionId = ref<Record<string, BenchTemplate[]>>({});
+const remoteBenchStatusByConnectionId = ref<Record<string, 'notLoaded' | 'loading' | 'loaded' | 'error'>>({});
+const remoteBenchErrorByConnectionId = ref<Record<string, string | null>>({});
 const sourceRepositories = ref<SourceRepository[]>([]);
 const sourceRepositoryStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
 const sourceRepositoryError = ref<string | null>(null);
@@ -99,6 +102,7 @@ export function useAppState() {
 
     try {
       snapshot.value = await window.codexClaw.getSnapshot();
+      pruneRemoteBenchCache();
       subscribeToMainEvents();
       await Promise.all([
         loadActiveAgentCatalogs(),
@@ -891,6 +895,48 @@ export function useAppState() {
     }
   }
 
+  async function getBenchSnapshot(location?: BenchLocation): Promise<AppSnapshot> {
+    if (!window.codexClaw?.getBenchSnapshot) {
+      return isRemoteBenchLocation(location) ? createEmptySnapshot() : snapshot.value;
+    }
+
+    if (isRemoteBenchLocation(location)) {
+      return window.codexClaw.getBenchSnapshot(location);
+    }
+
+    return snapshot.value;
+  }
+
+  async function loadBench(location?: BenchLocation): Promise<BenchTemplate[]> {
+    if (!isRemoteBenchLocation(location)) {
+      return snapshot.value.bench;
+    }
+
+    const connectionId = location.remoteConnectionId.trim();
+    if (!window.codexClaw?.getBenchSnapshot) {
+      setRemoteBenchState(connectionId, [], 'error', 'Bench is not available.');
+      return [];
+    }
+
+    remoteBenchStatusByConnectionId.value = {
+      ...remoteBenchStatusByConnectionId.value,
+      [connectionId]: 'loading',
+    };
+    remoteBenchErrorByConnectionId.value = {
+      ...remoteBenchErrorByConnectionId.value,
+      [connectionId]: null,
+    };
+
+    try {
+      const benchSnapshot = await window.codexClaw.getBenchSnapshot(location);
+      cacheRemoteBenchSnapshot(location, benchSnapshot);
+      return benchSnapshot.bench;
+    } catch (error) {
+      setRemoteBenchState(connectionId, [], 'error', error instanceof Error ? error.message : String(error));
+      return [];
+    }
+  }
+
   async function assignWorkItemToAgent(payload: { agentId: string; item: WorkItem }): Promise<void> {
     if (!window.codexClaw?.assignWorkItemToAgent) {
       return;
@@ -948,28 +994,51 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.saveAgentToBench(agentId);
+    const location = benchLocationForAgent(agentId);
+    const nextSnapshot = await window.codexClaw.saveAgentToBench(agentId);
+    if (isRemoteBenchLocation(location)) {
+      cacheRemoteBenchSnapshot(location, nextSnapshot);
+      return;
+    }
+
+    snapshot.value = nextSnapshot;
   }
 
   async function deployBenchTemplate(input: string | DeployBenchTemplateInput): Promise<Agent | null> {
     const templateId = typeof input === 'string' ? input : input.templateId;
     const teamId = typeof input === 'string' ? snapshot.value.activeTeamId ?? undefined : input.teamId;
-    if (!window.codexClaw?.deployBenchTemplate || !snapshot.value.bench.some((template) => template.id === templateId)) {
+    const location = benchLocationForTeamId(teamId);
+    const bench = await benchForLocation(location);
+    if (!window.codexClaw?.deployBenchTemplate || !bench.some((template) => template.id === templateId)) {
       return null;
     }
 
     const previousAgentIds = new Set(snapshot.value.agents.map((agent) => agent.id));
-    snapshot.value = await window.codexClaw.deployBenchTemplate(templateId, teamId);
+    snapshot.value = isRemoteBenchLocation(location)
+      ? await window.codexClaw.deployBenchTemplate(templateId, teamId, location)
+      : await window.codexClaw.deployBenchTemplate(templateId, teamId);
     await loadActiveAgentCatalogs();
     return snapshot.value.agents.find((agent) => !previousAgentIds.has(agent.id)) ?? activeAgent.value;
   }
 
-  async function removeBenchTemplate(templateId: string): Promise<void> {
-    if (!window.codexClaw?.removeBenchTemplate || !snapshot.value.bench.some((template) => template.id === templateId)) {
+  async function removeBenchTemplate(input: string | RemoveBenchTemplateInput): Promise<void> {
+    const templateId = typeof input === 'string' ? input : input.templateId;
+    const teamId = typeof input === 'string' ? snapshot.value.activeTeamId ?? undefined : input.teamId;
+    const location = benchLocationForTeamId(teamId);
+    const bench = await benchForLocation(location);
+    if (!window.codexClaw?.removeBenchTemplate || !bench.some((template) => template.id === templateId)) {
       return;
     }
 
-    snapshot.value = await window.codexClaw.removeBenchTemplate(templateId);
+    const nextSnapshot = isRemoteBenchLocation(location)
+      ? await window.codexClaw.removeBenchTemplate(templateId, location)
+      : await window.codexClaw.removeBenchTemplate(templateId);
+    if (isRemoteBenchLocation(location)) {
+      cacheRemoteBenchSnapshot(location, nextSnapshot);
+      return;
+    }
+
+    snapshot.value = nextSnapshot;
   }
 
   async function restartAgent(agentId: string): Promise<void> {
@@ -1031,6 +1100,32 @@ export function useAppState() {
     snapshot.value = await window.codexClaw.setAgentApprovalPreset(agent.id, preset);
   }
 
+  async function benchForLocation(location: BenchLocation): Promise<BenchTemplate[]> {
+    if (!isRemoteBenchLocation(location)) {
+      return snapshot.value.bench;
+    }
+
+    const cached = remoteBenchByConnectionId.value[location.remoteConnectionId];
+    if (cached) {
+      return cached;
+    }
+
+    return loadBench(location);
+  }
+
+  function benchLocationForAgent(agentId: string): BenchLocation {
+    const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId) ?? null;
+    return benchLocationForTeamId(agent?.teamId);
+  }
+
+  function benchLocationForTeamId(teamId: string | null | undefined): BenchLocation {
+    const team = teamId
+      ? snapshot.value.teams.find((candidate) => candidate.id === teamId) ?? null
+      : snapshot.value.teams.find((candidate) => candidate.id === snapshot.value.activeTeamId) ?? snapshot.value.teams[0] ?? null;
+    const remoteConnectionId = team?.remoteConnectionId?.trim() ?? '';
+    return remoteConnectionId ? { kind: 'remote', remoteConnectionId } : { kind: 'local' };
+  }
+
   return {
     snapshot,
     activeAgent,
@@ -1062,6 +1157,9 @@ export function useAppState() {
     workItemsByRepository,
     workBacklogStatus,
     workBacklogError,
+    remoteBenchByConnectionId,
+    remoteBenchStatusByConnectionId,
+    remoteBenchErrorByConnectionId,
     sourceRepositories,
     sourceRepositoryStatus,
     sourceRepositoryError,
@@ -1103,6 +1201,8 @@ export function useAppState() {
     disconnectWorkProvider,
     openWorkProviderAuthorization,
     configureWorkBacklog,
+    getBenchSnapshot,
+    loadBench,
     getLoopSnapshot,
     createLoop,
     updateLoop,
@@ -1674,6 +1774,51 @@ function workProviderConnection(provider: WorkProviderKind) {
 
 function isRemoteLoopLocation(location: LoopLocation | undefined): location is Extract<LoopLocation, { kind: 'remote' }> {
   return location?.kind === 'remote' && location.remoteConnectionId.trim().length > 0;
+}
+
+function isRemoteBenchLocation(location: BenchLocation | undefined): location is Extract<BenchLocation, { kind: 'remote' }> {
+  return location?.kind === 'remote' && location.remoteConnectionId.trim().length > 0;
+}
+
+function cacheRemoteBenchSnapshot(location: Extract<BenchLocation, { kind: 'remote' }>, benchSnapshot: AppSnapshot): void {
+  setRemoteBenchState(location.remoteConnectionId.trim(), benchSnapshot.bench, 'loaded', null);
+}
+
+function setRemoteBenchState(
+  connectionId: string,
+  bench: BenchTemplate[],
+  status: 'notLoaded' | 'loading' | 'loaded' | 'error',
+  error: string | null,
+): void {
+  remoteBenchByConnectionId.value = {
+    ...remoteBenchByConnectionId.value,
+    [connectionId]: bench,
+  };
+  remoteBenchStatusByConnectionId.value = {
+    ...remoteBenchStatusByConnectionId.value,
+    [connectionId]: status,
+  };
+  remoteBenchErrorByConnectionId.value = {
+    ...remoteBenchErrorByConnectionId.value,
+    [connectionId]: error,
+  };
+}
+
+function pruneRemoteBenchCache(): void {
+  const connectionIds = new Set(snapshot.value.remoteConnections.connections.map((connection) => connection.id));
+  remoteBenchByConnectionId.value = filterRecordByKeys(remoteBenchByConnectionId.value, connectionIds);
+  remoteBenchStatusByConnectionId.value = filterRecordByKeys(remoteBenchStatusByConnectionId.value, connectionIds);
+  remoteBenchErrorByConnectionId.value = filterRecordByKeys(remoteBenchErrorByConnectionId.value, connectionIds);
+}
+
+function filterRecordByKeys<T>(record: Record<string, T>, keys: Set<string>): Record<string, T> {
+  const next: Record<string, T> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (keys.has(key)) {
+      next[key] = value;
+    }
+  }
+  return next;
 }
 
 function workItemsKey(provider: WorkProviderKind, repositoryId: string): string {

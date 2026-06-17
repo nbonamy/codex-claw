@@ -42,7 +42,7 @@
         :status="workBacklog.status"
         :assigned-agents-by-work-item-key="assignedAgentsByWorkItemKey"
         :assignments="workBacklog.assignments"
-        :can-assign-to-bench="bench.length > 0"
+        :can-assign-to-bench="hasAnyBench"
         @assign-to-bench-agent="emit('assign-work-item-to-bench-agent', { item: $event })"
         @assign-to-new-agent="emit('assign-work-item-to-new-agent', { item: $event })"
         @refresh="emit('refresh-work-items', $event)"
@@ -94,10 +94,10 @@
               label="Add Agent"
               size="small"
               tone="ghost"
-              :bench="bench"
+              :bench="benchForTeam(section.team.id)"
               @deploy-bench-template="emit('deploy-bench-template', { templateId: $event, teamId: section.team.id })"
               @new-agent="emit('add-agent', section.team.id)"
-              @remove-bench-template="emit('remove-bench-template', $event)"
+              @remove-bench-template="emit('remove-bench-template', { templateId: $event, teamId: section.team.id })"
             />
           </header>
 
@@ -129,7 +129,7 @@
 
             <CockpitAddAgentTile
               v-if="section.showGridAdd"
-              :bench="bench"
+              :bench="benchForTeam(section.team.id)"
               :dragged-work-item="draggedWorkItem"
               :team-id="section.team.id"
               :team-name="section.team.name"
@@ -137,7 +137,7 @@
               @assign-to-new-agent="assignDraggedWorkItemToNewAgent"
               @deploy-bench-template="emit('deploy-bench-template', $event)"
               @new-agent="emit('add-agent', $event)"
-              @remove-bench-template="emit('remove-bench-template', $event)"
+              @remove-bench-template="emit('remove-bench-template', { templateId: $event, teamId: section.team.id })"
             />
           </div>
         </section>
@@ -159,7 +159,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { ComponentPublicInstance } from 'vue';
-import type { Agent, AgentStatus, BenchTemplate, DeployBenchTemplateInput, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/shared/contracts';
+import type { Agent, AgentStatus, BenchTemplate, DeployBenchTemplateInput, RemoveBenchTemplateInput, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/shared/contracts';
 import { defaultTeamColor } from '@codex-claw/shared/team-colors';
 import { assignedAgentsByWorkItemKey as collectAssignedAgentsByWorkItemKey } from '@codex-claw/shared/work-assignments';
 import AgentContextMenu from './AgentContextMenu.vue';
@@ -205,6 +205,7 @@ const DEFAULT_GRID_COLUMNS = 3;
 const props = defineProps<{
   agents: Agent[];
   bench?: BenchTemplate[];
+  benchByTeamId?: Record<string, BenchTemplate[]>;
   teams: Team[];
   workBacklog?: CockpitWorkBacklog | null;
 }>();
@@ -221,7 +222,7 @@ const emit = defineEmits<{
   'move-agent-to-team': [payload: { agentId: string; teamId: string }];
   'prompt-agent': [payload: { agentId: string; prompt: string }];
   'refresh-work-items': [repositoryId: string | null];
-  'remove-bench-template': [templateId: string];
+  'remove-bench-template': [input: RemoveBenchTemplateInput];
   'remove-work-item-assignment': [item: WorkItem];
   'restart-agent': [agentId: string];
   'save-agent-to-bench': [agentId: string];
@@ -239,7 +240,7 @@ const contextMenuPosition = ref({ x: 0, y: 0 });
 const columnsByTeam = ref<Record<string, number>>({});
 const gridElements = new Map<string, HTMLElement>();
 let resizeObserver: ResizeObserver | null = null;
-const bench = computed(() => props.bench ?? []);
+const hasAnyBench = computed(() => props.teams.some((team) => benchForTeam(team.id).length > 0));
 
 const agentsById = computed(() => new Map(props.agents.map((agent) => [agent.id, agent])));
 const contextMenuAgent = computed(() => (
@@ -318,6 +319,10 @@ function setGridRef(teamId: string, element: Element | ComponentPublicInstance |
   gridElements.set(teamId, htmlElement);
   resizeObserver?.observe(htmlElement);
   measureGridColumns(teamId, htmlElement);
+}
+
+function benchForTeam(teamId: string): BenchTemplate[] {
+  return props.benchByTeamId?.[teamId] ?? props.bench ?? [];
 }
 
 function resolvedElement(element: Element | ComponentPublicInstance | null): HTMLElement | null {

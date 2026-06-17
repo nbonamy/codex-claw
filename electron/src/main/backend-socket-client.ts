@@ -1,3 +1,4 @@
+import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import net, { type Socket } from 'node:net';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawRpcResponse, parseClawRpcMessage, type ClawBackendEvent, type ClawBackendHealth, type ClawRpcId, type ClawRpcRequest, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { createRuntimeClientRequestHandlers } from './client-request-handlers';
@@ -56,7 +57,7 @@ export class ClawBackendSocketClient {
   }
 
   async health(): Promise<ClawBackendHealth> {
-    return this.request<ClawBackendHealth>('backend/health');
+    return this.request<ClawBackendHealth>(backendMethods.backendHealthGet);
   }
 
   async request<Result>(method: string, params?: unknown): Promise<Result> {
@@ -192,7 +193,7 @@ export class ClawBackendSocketClient {
       return;
     }
 
-    if (message.method !== 'backend/event') {
+    if (message.method !== backendMethods.backendEventNotify) {
       warnMain('clawd', 'ignored unknown backend socket notification', { method: message.method });
       return;
     }

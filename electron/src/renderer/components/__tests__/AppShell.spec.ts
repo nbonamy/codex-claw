@@ -4,7 +4,7 @@ import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { Agent, AppCommand, AppSnapshot, BackendConversationRef, CodexClawApi, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { Agent, AppCommand, AppSnapshot, BackendConversationRef, BenchLocation, BenchTemplate, CodexClawApi, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
 import { i18n } from '../../i18n';
 
@@ -1285,8 +1285,14 @@ describe('AppShell', () => {
     await wrapper.get('[aria-label="Remove Dina from Bench"]').trigger('click');
     await flushPromises();
 
-    expect(wrapper.emitted('deploy-bench-template')).toStrictEqual([['bench-dina']]);
-    expect(wrapper.emitted('remove-bench-template')).toStrictEqual([['bench-dina']]);
+    expect(wrapper.emitted('deploy-bench-template')).toStrictEqual([[{
+      templateId: 'bench-dina',
+      teamId: 'team-codex-claw',
+    }]]);
+    expect(wrapper.emitted('remove-bench-template')).toStrictEqual([[{
+      templateId: 'bench-dina',
+      teamId: 'team-codex-claw',
+    }]]);
   });
 
   it('opens the new agent dialog from the sidebar and forwards create requests', async () => {
@@ -1765,8 +1771,66 @@ describe('AppShell', () => {
     await wrapper.get('[aria-label="Remove Dina from Bench"]').trigger('click');
     await flushPromises();
 
-    expect(wrapper.emitted('deploy-bench-template')).toStrictEqual([['bench-dina']]);
-    expect(wrapper.emitted('remove-bench-template')).toStrictEqual([['bench-dina']]);
+    expect(wrapper.emitted('deploy-bench-template')).toStrictEqual([[{
+      templateId: 'bench-dina',
+      teamId: 'team-codex-claw',
+    }]]);
+    expect(wrapper.emitted('remove-bench-template')).toStrictEqual([[{
+      templateId: 'bench-dina',
+      teamId: 'team-codex-claw',
+    }]]);
+  });
+
+  it('shows the active remote team Bench instead of the local Bench', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.remoteConnections.connections = [{
+      id: 'connection-devbox',
+      kind: 'ssh',
+      name: 'devbox',
+      host: 'devbox',
+      status: 'ready',
+      createdAt: '2026-06-14T10:00:00.000Z',
+      updatedAt: '2026-06-14T10:00:00.000Z',
+    }];
+    snapshot.teams[0]!.remoteConnectionId = 'connection-devbox';
+    snapshot.bench.push({
+      id: 'bench-local',
+      name: 'Local Template',
+      folder: '/Users/nbonamy/src/local',
+      backend: 'codex',
+      createdAt: '2026-06-05T00:00:00.000Z',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    });
+    const loadBench = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({
+      snapshot,
+      loadBench,
+      remoteBenchByConnectionId: {
+        'connection-devbox': [{
+          id: 'bench-remote',
+          name: 'Remote Template',
+          folder: '/home/nicolas/src/remote',
+          backend: 'codex',
+          createdAt: '2026-06-05T00:00:00.000Z',
+          updatedAt: '2026-06-05T00:00:00.000Z',
+        }],
+      },
+      remoteBenchStatusByConnectionId: {
+        'connection-devbox': 'loaded',
+      },
+    });
+
+    await wrapper.get('[aria-label="Open Bench"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Remote Template');
+    expect(wrapper.text()).not.toContain('Local Template');
+    await wrapper.findAll('.new-agent-menu__template').find((row) => row.text().includes('Remote Template'))?.trigger('click');
+    expect(wrapper.emitted('deploy-bench-template')).toStrictEqual([[{
+      templateId: 'bench-remote',
+      teamId: 'team-codex-claw',
+    }]]);
+    expect(loadBench).not.toHaveBeenCalled();
   });
 
   it('forwards agent move targets from the context menu', async () => {
@@ -1980,6 +2044,9 @@ function mountShell(overrides: Partial<{
   configureWorkBacklog: (input: WorkBacklogConfigurationInput) => Promise<void>;
   loadWorkRepositories: (provider: WorkProviderKind) => Promise<void>;
   loadWorkItems: (provider: WorkProviderKind, repositoryId: string) => Promise<void>;
+  loadBench: (location?: BenchLocation) => Promise<void>;
+  remoteBenchByConnectionId: Record<string, BenchTemplate[]>;
+  remoteBenchStatusByConnectionId: Record<string, 'notLoaded' | 'loading' | 'loaded' | 'error'>;
   quit: () => Promise<void>;
   workRepositoriesByProvider: Partial<Record<WorkProviderKind, WorkRepository[]>>;
   workItemsByRepository: Record<string, WorkItem[]>;
@@ -2013,6 +2080,9 @@ function mountShell(overrides: Partial<{
       configureWorkBacklog: overrides.configureWorkBacklog ?? vi.fn().mockResolvedValue(undefined),
       loadWorkRepositories: overrides.loadWorkRepositories ?? vi.fn().mockResolvedValue(undefined),
       loadWorkItems: overrides.loadWorkItems ?? vi.fn().mockResolvedValue(undefined),
+      loadBench: overrides.loadBench ?? vi.fn().mockResolvedValue(undefined),
+      remoteBenchByConnectionId: overrides.remoteBenchByConnectionId ?? {},
+      remoteBenchStatusByConnectionId: overrides.remoteBenchStatusByConnectionId ?? {},
       workRepositoriesByProvider: overrides.workRepositoriesByProvider ?? {},
       workItemsByRepository: overrides.workItemsByRepository ?? {},
       quit: overrides.quit ?? vi.fn().mockResolvedValue(undefined),

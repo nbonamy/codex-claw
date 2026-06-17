@@ -1,5 +1,6 @@
 import { PassThrough } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { ClawBackendProcessClient } from '../backend-process-client';
 
 describe('ClawBackendProcessClient', () => {
@@ -100,7 +101,7 @@ describe('ClawBackendProcessClient', () => {
     client.onEvent(listener);
     child.stdout.write(`${JSON.stringify({
       jsonrpc: '2.0',
-      method: 'backend/event',
+      method: backendMethods.backendEventNotify,
       params: {
         seq: 1,
         backend: 'codex',
@@ -121,6 +122,30 @@ describe('ClawBackendProcessClient', () => {
     });
   });
 
+  it('ignores legacy backend event notification names', async () => {
+    const child = createFakeChildProcess();
+    const client = new ClawBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+      spawnProcess: vi.fn().mockReturnValue(child),
+    });
+    const listener = vi.fn();
+
+    await client.start();
+    client.onEvent(listener);
+    child.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'backend/event',
+      params: {
+        seq: 1,
+        type: 'snapshot.updated',
+        payload: { ok: true },
+        occurredAt: '2026-06-13T00:00:00.000Z',
+      },
+    })}\n`);
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
   it('keeps resolving requests when notifications arrive before responses', async () => {
     const child = createFakeChildProcess();
     const client = new ClawBackendProcessClient({
@@ -135,7 +160,7 @@ describe('ClawBackendProcessClient', () => {
     const request = JSON.parse(child.stdin.writes[0]);
     child.stdout.write(`${JSON.stringify({
       jsonrpc: '2.0',
-      method: 'backend/event',
+      method: backendMethods.backendEventNotify,
       params: {
         seq: 1,
         type: 'backend.statusChanged',
@@ -164,7 +189,7 @@ describe('ClawBackendProcessClient', () => {
     const client = new ClawBackendProcessClient({
       command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
       requestHandlers: {
-        'client/openExternal': openExternal,
+        'client/external/open': openExternal,
       },
       spawnProcess: vi.fn().mockReturnValue(child),
     });
@@ -173,7 +198,7 @@ describe('ClawBackendProcessClient', () => {
     child.stdout.write(`${JSON.stringify({
       jsonrpc: '2.0',
       id: 'client-1',
-      method: 'client/openExternal',
+      method: 'client/external/open',
       params: { url: 'https://example.com' },
     })}\n`);
     await flushMicrotasks();

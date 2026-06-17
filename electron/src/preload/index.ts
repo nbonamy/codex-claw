@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AddSshConnectionInput, AppleSpeechTranscriptionOptions, AppCommand, ApprovalPreset, BackendConversationRef, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AppleSpeechTranscriptionOptions, AppCommand, ApprovalPreset, BackendConversationRef, BenchLocation, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
 const api: CodexClawApi = {
@@ -34,6 +34,7 @@ const api: CodexClawApi = {
   reorderTeams: (input: ReorderTeamsInput) => ipcRenderer.invoke(ipcChannels.reorderTeams, input),
   closeTeam: (teamId: string) => ipcRenderer.invoke(ipcChannels.closeTeam, teamId),
   selectTeam: (teamId: string) => ipcRenderer.invoke(ipcChannels.selectTeam, teamId),
+  getBenchSnapshot: (location?: BenchLocation) => ipcRenderer.invoke(ipcChannels.getBenchSnapshot, location),
   getLoopSnapshot: (location?: LoopLocation) => ipcRenderer.invoke(ipcChannels.getLoopSnapshot, location),
   createLoop: (input: CreateLoopInput, location?: LoopLocation) => ipcRenderer.invoke(ipcChannels.createLoop, input, location),
   updateLoop: (input: UpdateLoopInput, location?: LoopLocation) => ipcRenderer.invoke(ipcChannels.updateLoop, input, location),
@@ -52,8 +53,8 @@ const api: CodexClawApi = {
   moveAgentToTeam: (input: MoveAgentToTeamInput) => ipcRenderer.invoke(ipcChannels.moveAgentToTeam, input),
   reorderAgents: (input: ReorderAgentsInput) => ipcRenderer.invoke(ipcChannels.reorderAgents, input),
   saveAgentToBench: (agentId: string) => ipcRenderer.invoke(ipcChannels.saveAgentToBench, agentId),
-  deployBenchTemplate: (templateId: string, teamId?: string) => ipcRenderer.invoke(ipcChannels.deployBenchTemplate, templateId, teamId),
-  removeBenchTemplate: (templateId: string) => ipcRenderer.invoke(ipcChannels.removeBenchTemplate, templateId),
+  deployBenchTemplate: (templateId: string, teamId?: string, location?: BenchLocation) => ipcRenderer.invoke(ipcChannels.deployBenchTemplate, templateId, teamId, location),
+  removeBenchTemplate: (templateId: string, location?: BenchLocation) => ipcRenderer.invoke(ipcChannels.removeBenchTemplate, templateId, location),
   restartAgent: (agentId: string) => ipcRenderer.invoke(ipcChannels.restartAgent, agentId),
   hydrateAgentHistory: (agentId: string) => ipcRenderer.invoke(ipcChannels.hydrateAgentHistory, agentId),
   closeAgent: (agentId: string) => ipcRenderer.invoke(ipcChannels.closeAgent, agentId),

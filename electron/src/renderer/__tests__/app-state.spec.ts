@@ -1615,6 +1615,92 @@ describe('useAppState', () => {
     expect(state.snapshot.value).toStrictEqual(closedTeamSnapshot);
   });
 
+  it('keeps remote Bench catalogs cached separately from the local snapshot', async () => {
+    const localSnapshot = createInitialSnapshot();
+    localSnapshot.remoteConnections.connections = [{
+      id: 'connection-devbox',
+      kind: 'ssh',
+      name: 'devbox',
+      host: 'devbox',
+      status: 'ready',
+      createdAt: '2026-06-14T10:00:00.000Z',
+      updatedAt: '2026-06-14T10:00:00.000Z',
+    }];
+    localSnapshot.teams[0]!.remoteConnectionId = 'connection-devbox';
+    localSnapshot.agents[0]!.teamId = 'team-codex-claw';
+    localSnapshot.agents[0]!.folder = '/home/nicolas/src/codex-claw';
+    const remoteLocation = { kind: 'remote' as const, remoteConnectionId: 'connection-devbox' };
+    const remoteBenchSnapshot = {
+      ...createInitialSnapshot(),
+      bench: [{
+        id: 'bench-remote-dina',
+        name: 'Remote Dina',
+        folder: '/home/nicolas/src/codex-claw',
+        backend: 'codex' as const,
+        createdAt: '2026-06-13T00:00:00.000Z',
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      }],
+    };
+    const remoteBenchRemovedSnapshot = {
+      ...createInitialSnapshot(),
+      bench: [],
+    };
+    const deployedLocalSnapshot = {
+      ...localSnapshot,
+      agents: [
+        ...localSnapshot.agents,
+        {
+          id: 'agent-from-remote-bench',
+          teamId: 'team-codex-claw',
+          name: 'Remote Dina',
+          folder: '/home/nicolas/src/codex-claw',
+          backend: 'codex' as const,
+          status: { type: 'idle' as const },
+          createdAt: '2026-06-13T00:00:00.000Z',
+          updatedAt: '2026-06-13T00:00:00.000Z',
+        },
+      ],
+    };
+    const getBenchSnapshot = vi.fn().mockResolvedValue(remoteBenchSnapshot);
+    const saveAgentToBench = vi.fn().mockResolvedValue(remoteBenchSnapshot);
+    const deployBenchTemplate = vi.fn().mockResolvedValue(deployedLocalSnapshot);
+    const removeBenchTemplate = vi.fn().mockResolvedValue(remoteBenchRemovedSnapshot);
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(localSnapshot),
+        onEvent: vi.fn(),
+        getBenchSnapshot,
+        saveAgentToBench,
+        deployBenchTemplate,
+        removeBenchTemplate,
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    await expect(state.loadBench(remoteLocation)).resolves.toStrictEqual(remoteBenchSnapshot.bench);
+    expect(state.remoteBenchByConnectionId.value['connection-devbox']).toStrictEqual(remoteBenchSnapshot.bench);
+
+    await state.saveAgentToBench('agent-dina');
+    expect(state.snapshot.value.bench).toStrictEqual([]);
+    expect(state.remoteBenchByConnectionId.value['connection-devbox']).toStrictEqual(remoteBenchSnapshot.bench);
+
+    await expect(state.deployBenchTemplate({ templateId: 'bench-remote-dina', teamId: 'team-codex-claw' })).resolves.toMatchObject({
+      id: 'agent-from-remote-bench',
+    });
+    expect(state.snapshot.value).toStrictEqual(deployedLocalSnapshot);
+
+    await state.removeBenchTemplate({ templateId: 'bench-remote-dina', teamId: 'team-codex-claw' });
+    expect(state.snapshot.value).toStrictEqual(deployedLocalSnapshot);
+    expect(state.remoteBenchByConnectionId.value['connection-devbox']).toStrictEqual([]);
+
+    expect(getBenchSnapshot).toHaveBeenCalledWith(remoteLocation);
+    expect(saveAgentToBench).toHaveBeenCalledWith('agent-dina');
+    expect(deployBenchTemplate).toHaveBeenCalledWith('bench-remote-dina', 'team-codex-claw', remoteLocation);
+    expect(removeBenchTemplate).toHaveBeenCalledWith('bench-remote-dina', remoteLocation);
+  });
+
   it('returns safe defaults when optional agent preload helpers are unavailable', async () => {
     const remoteSnapshot = createInitialSnapshot();
     vi.stubGlobal('window', {

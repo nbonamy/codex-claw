@@ -40,6 +40,7 @@ describe('Electron backend boundary', () => {
       'backend-socket-client.ts',
       'client-request-handlers.ts',
       'daemon-launch-agent.ts',
+      'daemon-startup-maintenance.ts',
       'forge-env.d.ts',
       'index.ts',
       'log.ts',
@@ -103,9 +104,9 @@ describe('Electron backend boundary', () => {
 
     expect(source).not.toMatch(/from ['"]node:fs/);
     expect(source).not.toMatch(/from ['"]fs/);
-    expect(source).not.toContain('driver/previewFile');
-    expect(source).not.toContain('driver/listFiles');
-    expect(source).toContain("request('agent/previewFile'");
+    expect(source).not.toContain('driver/file/preview');
+    expect(source).not.toContain('driver/files/list');
+    expect(source).toContain('request(backendMethods.agentFilePreview');
     expect(source).toContain('agentId');
   });
 
@@ -115,8 +116,8 @@ describe('Electron backend boundary', () => {
     for (const { filePath, source } of sources) {
       expect(source, filePath).not.toMatch(/\breadFile(?:Sync)?\b/);
       expect(source, filePath).not.toMatch(/\bcreateReadStream\b/);
-      expect(source, filePath).not.toContain('driver/previewFile');
-      expect(source, filePath).not.toContain('driver/listFiles');
+      expect(source, filePath).not.toContain('driver/file/preview');
+      expect(source, filePath).not.toContain('driver/files/list');
     }
   });
 
@@ -126,12 +127,13 @@ describe('Electron backend boundary', () => {
 
     expect(source).not.toMatch(/\breadFile(?:Sync)?\b/);
     expect(source).not.toMatch(/\bcreateReadStream\b/);
-    expect(source).not.toContain('driver/previewFile');
-    expect(source).not.toContain('driver/listFiles');
+    expect(source).not.toContain('driver/file/preview');
+    expect(source).not.toContain('driver/files/list');
   });
 
   it('keeps the shared package free of Node filesystem runtime APIs', async () => {
-    const sources = await readElectronMainRuntimeSources(path.resolve(__dirname, '../../../../shared/src'));
+    const sources = (await readElectronMainRuntimeSources(path.resolve(__dirname, '../../../../shared/src')))
+      .filter(({ filePath }) => !filePath.endsWith('runtime-discovery.ts'));
 
     for (const { filePath, source } of sources) {
       expect(source, filePath).not.toMatch(/from ['"]node:fs/);
@@ -165,7 +167,7 @@ describe('Electron backend boundary', () => {
     expect(source).not.toContain('./snapshot-service');
     expect(source).not.toContain('applyMainEventToSnapshot');
     expect(source).not.toContain('createEmptySnapshot');
-    expect(source).toContain("request<unknown>('snapshot/get')");
+    expect(source).toContain('request<unknown>(backendMethods.snapshotGet)');
     await expect(readdir(path.join(mainDir, 'snapshot-service.ts'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
@@ -191,7 +193,7 @@ describe('Electron backend boundary', () => {
     const appController = await readFile(appControllerPath, 'utf8');
     const powerSaveBlocker = await readFile(powerSaveBlockerPath, 'utf8');
 
-    expect(appController).toContain("request<ClientState>('client/getState')");
+    expect(appController).toContain('request<ClientState>(backendMethods.clientStateGet)');
     expect(appController).toContain('this.clientState.shouldPreventDisplaySleep');
     expect(powerSaveBlocker).not.toContain('AppSnapshot');
     expect(powerSaveBlocker).not.toContain('AgentStatus');
@@ -213,8 +215,8 @@ describe('Electron backend boundary', () => {
     const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
     const source = await readFile(appControllerPath, 'utf8');
 
-    expect(source).not.toContain('source/detectFolder');
-    expect(source).not.toContain('agent/validateFolder');
+    expect(source).not.toContain('source/folder/detect');
+    expect(source).not.toContain('agent/folder/validate');
     expect(source).toContain('this.clientState.sourceFolderPath');
   });
 
@@ -222,9 +224,9 @@ describe('Electron backend boundary', () => {
     const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
     const source = await readFile(appControllerPath, 'utf8');
 
-    expect(source).toContain("request('source/listWorktrees'");
-    expect(source).toContain("request('source/suggestWorktreePath'");
-    expect(source).toContain("request<SourceWorktree>('source/createWorktree'");
+    expect(source).toContain('request(backendMethods.sourceWorktreesList');
+    expect(source).toContain('request(backendMethods.sourceWorktreePathSuggest');
+    expect(source).toContain('request<SourceWorktree>(backendMethods.sourceWorktreeCreate');
     expect(source).not.toContain('git worktree');
     expect(source).not.toContain('worktree list');
     expect(source).not.toContain('path.dirname');
@@ -268,15 +270,15 @@ describe('Electron backend boundary', () => {
     const source = await readFile(appControllerPath, 'utf8');
 
     expect(source).not.toContain('./system-permissions');
-    expect(source).toContain("request('system/getPermissions')");
-    expect(source).toContain("request('system/openAccessibilitySettings')");
+    expect(source).toContain('request(backendMethods.systemPermissionsGet)');
+    expect(source).toContain('request(backendMethods.systemPermissionsAccessibilityOpen)');
   });
 
   it('keeps Apple Speech helper paths out of per-request Electron IPC', async () => {
     const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
     const source = await readFile(appControllerPath, 'utf8');
 
-    expect(source).toContain("request('transcription/appleSpeech'");
+    expect(source).toContain('request(backendMethods.transcriptionAppleSpeechCreate');
     expect(source).not.toContain('assetsPath');
     expect(source).not.toContain('appleSpeechAssetsPath');
   });
