@@ -1,3 +1,4 @@
+import { backendMethods } from './methods';
 import type { AppSnapshot, ClientState, MainToRendererEvent } from '../contracts';
 import { isAppSnapshot, isClientState } from '../snapshot-guards';
 
@@ -66,15 +67,15 @@ export type ClawBackendEvent = {
 };
 
 export type ClawBackendRequestMap = {
-  'backend/health': {
+  [backendMethods.backendHealthGet]: {
     params: undefined;
     result: ClawBackendHealth;
   };
-  'snapshot/get': {
+  [backendMethods.snapshotGet]: {
     params: undefined;
     result: ClawSnapshotGetResult;
   };
-  'client/getState': {
+  [backendMethods.clientStateGet]: {
     params: undefined;
     result: ClientState;
   };

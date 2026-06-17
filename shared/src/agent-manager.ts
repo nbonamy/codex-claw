@@ -1,4 +1,4 @@
-import type { Agent, AppSnapshot, BackendSession, BenchTemplate, RendererMessage, WorkBacklogAssignment } from './contracts';
+import type { Agent, AppSnapshot, BackendSession, BenchTemplate, CreateBenchTemplateInput, RendererMessage, WorkBacklogAssignment } from './contracts';
 import { createEntityId, createUniqueEntityId, type IdGenerator } from './ids';
 import { workBacklogAssignmentFromWorkItem, workItemAssignmentKey, type WorkItemAssignmentSource } from './work-assignments';
 
@@ -34,13 +34,26 @@ export function saveAgentToBench(snapshot: AppSnapshot, agentId: string, created
     return null;
   }
 
-  const template: BenchTemplate = {
-    id: uniqueBenchId(snapshot, agent.name, createdAt),
+  return saveBenchTemplateToSnapshot(snapshot, {
     name: agent.name,
     avatar: agent.avatar,
     folder: agent.folder,
     backend: agent.backend,
     backendDefaults: agent.backendDefaults ? { ...agent.backendDefaults } : undefined,
+  }, createdAt);
+}
+
+export function saveBenchTemplateToSnapshot(snapshot: AppSnapshot, input: CreateBenchTemplateInput, createdAt = new Date().toISOString()): BenchTemplate {
+  const name = input.name.trim();
+  const folder = input.folder.trim();
+
+  const template: BenchTemplate = {
+    id: uniqueBenchId(snapshot, name, createdAt),
+    name,
+    avatar: input.avatar,
+    folder,
+    backend: input.backend,
+    backendDefaults: input.backendDefaults ? { ...input.backendDefaults } : undefined,
     createdAt,
     updatedAt: createdAt,
   };
@@ -58,10 +71,25 @@ export function deployBenchTemplateInSnapshot(
   options: { select?: boolean } = {},
 ): Agent | null {
   const template = snapshot.bench.find((candidate) => candidate.id === templateId);
+  if (!template) {
+    return null;
+  }
+
+  return deployBenchTemplateToSnapshot(snapshot, template, teamId, createdAt, createId, options);
+}
+
+export function deployBenchTemplateToSnapshot(
+  snapshot: AppSnapshot,
+  template: BenchTemplate,
+  teamId?: string,
+  createdAt = new Date().toISOString(),
+  createId: IdGenerator = () => createEntityId('agent'),
+  options: { select?: boolean } = {},
+): Agent | null {
   const targetTeam = teamId
     ? snapshot.teams.find((team) => team.id === teamId)
     : snapshot.teams.find((team) => team.id === snapshot.activeTeamId) ?? snapshot.teams[0];
-  if (!template || !targetTeam) {
+  if (!targetTeam) {
     return null;
   }
 

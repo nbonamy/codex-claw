@@ -30,6 +30,7 @@ export const ipcChannels = {
   reorderTeams: 'team:reorder',
   closeTeam: 'team:close',
   selectTeam: 'team:select',
+  getBenchSnapshot: 'bench:snapshot:get',
   getLoopSnapshot: 'loop:snapshot:get',
   createLoop: 'loop:create',
   updateLoop: 'loop:update',

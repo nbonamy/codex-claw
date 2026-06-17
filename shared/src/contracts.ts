@@ -346,6 +346,8 @@ export type LoopLocation =
     remoteConnectionId: string;
   };
 
+export type BenchLocation = LoopLocation;
+
 export type CreateLoopInput = {
   name?: string;
   enabled?: boolean;
@@ -369,7 +371,20 @@ export type BenchTemplate = {
   updatedAt: string;
 };
 
+export type CreateBenchTemplateInput = {
+  name: string;
+  avatar?: string;
+  folder: string;
+  backend: AgentBackend;
+  backendDefaults?: BackendDefaults;
+};
+
 export type DeployBenchTemplateInput = {
+  templateId: string;
+  teamId?: string;
+};
+
+export type RemoveBenchTemplateInput = {
   templateId: string;
   teamId?: string;
 };
@@ -927,6 +942,7 @@ export type CodexClawApi = {
   reorderTeams(input: ReorderTeamsInput): Promise<AppSnapshot>;
   closeTeam(teamId: string): Promise<AppSnapshot>;
   selectTeam(teamId: string): Promise<AppSnapshot>;
+  getBenchSnapshot(location?: BenchLocation): Promise<AppSnapshot>;
   getLoopSnapshot(location?: LoopLocation): Promise<AppSnapshot>;
   createLoop(input: CreateLoopInput, location?: LoopLocation): Promise<AppSnapshot>;
   updateLoop(input: UpdateLoopInput, location?: LoopLocation): Promise<AppSnapshot>;
@@ -945,8 +961,8 @@ export type CodexClawApi = {
   moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot>;
   reorderAgents(input: ReorderAgentsInput): Promise<AppSnapshot>;
   saveAgentToBench(agentId: string): Promise<AppSnapshot>;
-  deployBenchTemplate(templateId: string, teamId?: string): Promise<AppSnapshot>;
-  removeBenchTemplate(templateId: string): Promise<AppSnapshot>;
+  deployBenchTemplate(templateId: string, teamId?: string, location?: BenchLocation): Promise<AppSnapshot>;
+  removeBenchTemplate(templateId: string, location?: BenchLocation): Promise<AppSnapshot>;
   restartAgent(agentId: string): Promise<AppSnapshot>;
   hydrateAgentHistory(agentId: string): Promise<AppSnapshot>;
   closeAgent(agentId: string): Promise<AppSnapshot>;

@@ -4,6 +4,7 @@ import {
   closeAgentInSnapshot,
   completeWorkItemAssignmentInSnapshot,
   deployBenchTemplateInSnapshot,
+  deployBenchTemplateToSnapshot,
   duplicateAgentInSnapshot,
   moveAgentToTeamInSnapshot,
   removeBenchTemplateFromSnapshot,
@@ -12,6 +13,7 @@ import {
   restartAgentConversation,
   resumeAgentConversationInSnapshot,
   saveAgentToBench,
+  saveBenchTemplateToSnapshot,
 } from '../agent-manager';
 import { appendUserPrompt, createInitialSnapshot } from '../snapshot';
 import { createTeamInSnapshot } from '../team-manager';
@@ -160,6 +162,33 @@ describe('agent-manager', () => {
     expect(snapshot.teams[1].activeAgentId).toBe(agent?.id);
     expect(snapshot.activeTeamId).toBe('team-skwad');
     expect(snapshot.activeAgentId).toBe(agent?.id);
+  });
+
+  it('saves and deploys Bench template payloads without requiring a local Bench entry', () => {
+    const snapshot = createInitialSnapshot();
+    const template = saveBenchTemplateToSnapshot(snapshot, {
+      name: ' Remote Dina ',
+      folder: ' /home/nicolas/src/codex-claw ',
+      backend: 'codex',
+      backendDefaults: { kind: 'codex', model: 'gpt-5-codex' },
+    }, '2026-06-05T10:11:12.000Z');
+    const targetSnapshot = createInitialSnapshot();
+
+    const agent = deployBenchTemplateToSnapshot(targetSnapshot, template, 'team-codex-claw', '2026-06-05T10:12:13.000Z', () => 'agent-remote-bench');
+
+    expect(template).toMatchObject({
+      id: 'bench-remote-dina-20260605t101112000z',
+      name: 'Remote Dina',
+      folder: '/home/nicolas/src/codex-claw',
+    });
+    expect(targetSnapshot.bench).toStrictEqual([]);
+    expect(agent).toMatchObject({
+      id: 'agent-remote-bench',
+      teamId: 'team-codex-claw',
+      name: 'Remote Dina',
+      folder: '/home/nicolas/src/codex-claw',
+      backendDefaults: { kind: 'codex', model: 'gpt-5-codex' },
+    });
   });
 
   it('removes a Bench template without touching active agents', () => {
