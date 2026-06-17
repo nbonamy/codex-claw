@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { sendAgentPrompt } from '@codex-claw/shared/agent-chat-service';
+import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/shared/backend-driver';
 import type {
   Agent,
@@ -120,15 +121,15 @@ export class ClawMcpService {
         this.requireDriverRpc().tryHandlePromptCommand(currentAgent, prompt)
       ),
       sendPrompt: (currentAgent, prompt, options?: SendPromptOptions) => (
-        this.requireDriverRpc().handle('driver/sendPrompt', {
+        this.requireDriverRpc().handle(backendMethods.driverPromptSend, {
           agent: currentAgent,
           prompt,
           ...(options ? { options } : {}),
         }) as Promise<BackendSendResult>
       ),
-      interrupt: (currentAgent) => this.requireDriverRpc().handle('driver/interrupt', { agent: currentAgent }) as Promise<BackendSendResult>,
+      interrupt: (currentAgent) => this.requireDriverRpc().handle(backendMethods.driverInterrupt, { agent: currentAgent }) as Promise<BackendSendResult>,
       respondToRequest: async (response) => {
-        await this.requireDriverRpc().handle('driver/respondToClientRequest', {
+        await this.requireDriverRpc().handle(backendMethods.driverClientRequestRespond, {
           backend: agent.backend,
           response,
         });

@@ -1,3 +1,4 @@
+import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { sendAgentPrompt } from '@codex-claw/shared/agent-chat-service';
 import type { Agent, BackendConversationRef, SystemPermissionsStatus } from '@codex-claw/shared/contracts';
 import { formatConversationTitle } from '@codex-claw/shared/conversation-title';
@@ -42,7 +43,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   const workIntegrations = new WorkIntegrationManager({
     drivers: [new GitHubWorkProviderDriver(() => runtimeGitHubOAuthClientId(snapshot.workBacklog.providerSettings.github))],
     getSnapshot: () => snapshot,
-    openExternal: (url) => options.requestClient('client/openExternal', { url }),
+    openExternal: (url) => options.requestClient(backendMethods.clientExternalOpen, { url }),
     saveSnapshot: () => saveBackendSnapshot(snapshot),
     tokenStore: new FileWorkIntegrationTokenStore(backendProviderTokensFilePath()),
   });
@@ -96,8 +97,8 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     loopRunner,
     sshConnections: new SshConnectionService(),
     systemPermissions: {
-      getStatus: () => options.requestClient<SystemPermissionsStatus>('client/systemPermissions/get'),
-      openAccessibilitySettings: () => options.requestClient<SystemPermissionsStatus>('client/systemPermissions/openAccessibilitySettings'),
+      getStatus: () => options.requestClient<SystemPermissionsStatus>(backendMethods.clientSystemPermissionsGet),
+      openAccessibilitySettings: () => options.requestClient<SystemPermissionsStatus>(backendMethods.clientSystemPermissionsAccessibilityOpen),
     },
   });
   mcpService.setDriverRpc(driverRpc);

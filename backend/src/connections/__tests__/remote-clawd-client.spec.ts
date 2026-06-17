@@ -3,14 +3,15 @@ import { PassThrough } from 'node:stream';
 import { describe, expect, it, vi } from 'vitest';
 import type { RemoteConnection } from '@codex-claw/shared/contracts';
 import { RemoteClawdClientManager } from '../remote-clawd-client';
+import { sshStdioTransport } from '../ssh-connections';
 
 describe('RemoteClawdClientManager', () => {
-  it('sends JSON-RPC requests over the SSH stdio transport', async () => {
+  it('normalizes persisted SSH stdio transports to the daemon-first command', async () => {
     const child = createChildProcess();
     const spawnProcess = vi.fn(() => child.process);
     const manager = new RemoteClawdClientManager({ spawnProcess: spawnProcess as never });
 
-    const result = manager.request(readyConnection(), 'source/listWorktrees', {
+    const result = manager.request(readyConnection(), 'source/worktrees/list', {
       repoPath: '/home/nicolas/src/codex-claw',
     });
     await vi.waitFor(() => expect(child.stdinOutput()).not.toBe(''));
@@ -22,12 +23,12 @@ describe('RemoteClawdClientManager', () => {
     })}\n`);
 
     await expect(result).resolves.toStrictEqual([{ name: 'main', path: '/home/nicolas/src/codex-claw' }]);
-    expect(spawnProcess).toHaveBeenCalledWith('ssh', ['devbox', 'node ~/.codex-claw/clawd.mjs --stdio'], {
+    expect(spawnProcess).toHaveBeenCalledWith('ssh', sshStdioTransport('devbox')!.args, {
       stdio: 'pipe',
     });
     expect(request).toMatchObject({
       jsonrpc: '2.0',
-      method: 'source/listWorktrees',
+      method: 'source/worktrees/list',
       params: { repoPath: '/home/nicolas/src/codex-claw' },
     });
     await manager.close();
@@ -38,7 +39,7 @@ describe('RemoteClawdClientManager', () => {
     const manager = new RemoteClawdClientManager({ spawnProcess: vi.fn(() => child.process) as never });
     const onEvent = vi.fn();
 
-    const result = manager.request(readyConnection(), 'driver/sendPrompt', {
+    const result = manager.request(readyConnection(), 'driver/prompt/send', {
       agent: { id: 'agent-remote', backend: 'codex' },
       prompt: 'go',
     }, onEvent);
@@ -46,7 +47,7 @@ describe('RemoteClawdClientManager', () => {
     const request = JSON.parse(child.stdinOutput()) as { id: number };
     child.stdout.write(`${JSON.stringify({
       jsonrpc: '2.0',
-      method: 'backend/event',
+      method: 'backend/event/notify',
       params: {
         seq: 1,
         type: 'agent.statusChanged',
@@ -75,7 +76,7 @@ describe('RemoteClawdClientManager', () => {
     const manager = new RemoteClawdClientManager({ spawnProcess: vi.fn(() => child.process) as never });
     const onEvent = vi.fn();
 
-    const streamingRequest = manager.request(readyConnection(), 'driver/sendPrompt', {
+    const streamingRequest = manager.request(readyConnection(), 'driver/prompt/send', {
       agent: { id: 'agent-remote', backend: 'codex' },
       prompt: 'go',
     }, onEvent);
@@ -88,14 +89,14 @@ describe('RemoteClawdClientManager', () => {
     })}\n`);
     await expect(streamingRequest).resolves.toStrictEqual({ backendSession: { kind: 'codex', threadId: 'thread-remote' } });
 
-    const metadataRequest = manager.request(readyConnection(), 'agent/listModels', {
+    const metadataRequest = manager.request(readyConnection(), 'agent/models/list', {
       backend: 'codex',
     });
     await vi.waitFor(() => expect(child.stdinLines()).toHaveLength(2));
     const secondRequest = JSON.parse(child.stdinLines()[1]!) as { id: number };
     child.stdout.write(`${JSON.stringify({
       jsonrpc: '2.0',
-      method: 'backend/event',
+      method: 'backend/event/notify',
       params: {
         seq: 2,
         type: 'agent.statusChanged',
@@ -126,14 +127,14 @@ describe('RemoteClawdClientManager', () => {
       ...readyConnection(),
       status: 'saved',
       transport: undefined,
-    }, 'backend/health')).rejects.toThrow('Remote connection is not ready');
+    }, 'backend/health/get')).rejects.toThrow('Remote connection is not ready');
   });
 
   it('closes a cached client for a single connection', async () => {
     const child = createChildProcess();
     const manager = new RemoteClawdClientManager({ spawnProcess: vi.fn(() => child.process) as never });
 
-    const result = manager.request(readyConnection(), 'backend/health');
+    const result = manager.request(readyConnection(), 'backend/health/get');
     await vi.waitFor(() => expect(child.stdinOutput()).not.toBe(''));
 
     await manager.closeConnection('connection-devbox');

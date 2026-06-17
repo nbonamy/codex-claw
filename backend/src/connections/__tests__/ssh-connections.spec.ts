@@ -49,7 +49,7 @@ Host bad;alias
     await expect(service.listHostCandidates()).resolves.toStrictEqual([]);
   });
 
-  it('syncs the clawd package, restarts remote clawd, and stores the stdio transport', async () => {
+  it('syncs the clawd package and stores the daemon-first stdio transport', async () => {
     const run = vi.fn(async (command: string, args: string[]) => {
       if (command === 'ssh' && args.at(-1)?.includes('--version')) {
         return { stdout: 'clawd 0.1.0\n', stderr: '' };
@@ -111,14 +111,21 @@ Host bad;alias
       'devbox',
       `mv ~/.codex-claw/provider-tokens.json.tmp ~/.codex-claw/provider-tokens.json && chmod 600 ~/.codex-claw/provider-tokens.json`,
     ], { timeoutMs: 15000 });
-    expect(run).toHaveBeenCalledWith('ssh', [
-      '-o',
-      'BatchMode=yes',
-      '-o',
-      'ConnectTimeout=10',
-      'devbox',
-      `pkill -f '[n]ode .*\\.codex-claw/clawd\\.mjs' || true`,
-    ], { timeoutMs: 15000 });
+    expect(run.mock.calls.some(([command, args]) => (
+      command === 'ssh' &&
+      args.some((arg) => arg.includes('pkill') || arg.includes('killall'))
+    ))).toBe(false);
+  });
+
+  it('prefers a remote daemon socket before falling back to one-shot stdio', () => {
+    expect(sshStdioTransport('devbox')).toStrictEqual({
+      type: 'ssh-stdio',
+      command: 'ssh',
+      args: [
+        'devbox',
+        'node ~/.codex-claw/clawd.mjs connect || exec node ~/.codex-claw/clawd.mjs --stdio',
+      ],
+    });
   });
 
   it('removes remote provider tokens when no local token file exists', async () => {

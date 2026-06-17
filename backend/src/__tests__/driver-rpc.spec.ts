@@ -12,7 +12,7 @@ describe('BackendDriverRpc', () => {
     const listModels = vi.fn().mockResolvedValue([{ id: 'gpt-test', name: 'GPT Test' }]);
     const rpc = new BackendDriverRpc(new Map([['codex', createDriver({ listModels })]]));
 
-    await expect(rpc.handle('driver/listModels', { agent })).resolves.toStrictEqual([
+    await expect(rpc.handle('driver/models/list', { agent })).resolves.toStrictEqual([
       { id: 'gpt-test', name: 'GPT Test' },
     ]);
     expect(listModels).toHaveBeenCalledWith(agent);
@@ -28,7 +28,7 @@ describe('BackendDriverRpc', () => {
     const sendPrompt = vi.fn();
     const rpc = new BackendDriverRpc(new Map([['codex', createDriver({ sendPrompt, tryHandlePromptCommand })]]));
 
-    await expect(rpc.handle('driver/tryHandlePromptCommand', { agent, prompt: '/compact' })).resolves.toStrictEqual(commandResult);
+    await expect(rpc.handle('driver/promptCommand/handle', { agent, prompt: '/compact' })).resolves.toStrictEqual(commandResult);
     expect(tryHandlePromptCommand).toHaveBeenCalledWith(agent, '/compact');
     expect(sendPrompt).not.toHaveBeenCalled();
   });
@@ -88,19 +88,19 @@ describe('BackendDriverRpc', () => {
     })]]));
     const ref = { backend: 'codex' as const, threadId: 'thread-resumed' };
 
-    await expect(rpc.handle('driver/setGoal', { agent, objective: 'Ship the goal shelf' })).resolves.toStrictEqual({
+    await expect(rpc.handle('driver/goal/update', { agent, objective: 'Ship the goal shelf' })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-goal' },
       goal,
     });
-    await expect(rpc.handle('driver/clearGoal', { agent })).resolves.toStrictEqual({
+    await expect(rpc.handle('driver/goal/clear', { agent })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-goal' },
       cleared: true,
     });
-    await expect(rpc.handle('driver/setApprovalPreset', { agent, preset: 'approve-for-me' })).resolves.toStrictEqual({
+    await expect(rpc.handle('driver/approvalPreset/update', { agent, preset: 'approve-for-me' })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-approval' },
       approvalPreset: 'approve-for-me',
     });
-    await expect(rpc.handle('driver/steer', { agent, prompt: 'try smaller' })).resolves.toStrictEqual({
+    await expect(rpc.handle('driver/prompt/steer', { agent, prompt: 'try smaller' })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-steer' },
       turnId: 'turn-steer',
     });
@@ -108,16 +108,16 @@ describe('BackendDriverRpc', () => {
       backendSession: { kind: 'codex', threadId: 'thread-interrupt' },
       turnId: 'turn-interrupt',
     });
-    await expect(rpc.handle('driver/rollbackToTurn', { agent, turnId: 'turn-1' })).resolves.toStrictEqual({
+    await expect(rpc.handle('driver/turn/rollback', { agent, turnId: 'turn-1' })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-rollback' },
       messages: [],
     });
-    await expect(rpc.handle('driver/resumeConversation', { agent, ref })).resolves.toStrictEqual({
+    await expect(rpc.handle('driver/conversation/resume', { agent, ref })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-resumed' },
       messages: [],
     });
-    await expect(rpc.handle('driver/forgetSession', { backend: 'codex', agentId: 'agent-dina' })).resolves.toBeNull();
-    await expect(rpc.handle('driver/respondToClientRequest', {
+    await expect(rpc.handle('driver/session/forget', { backend: 'codex', agentId: 'agent-dina' })).resolves.toBeNull();
+    await expect(rpc.handle('driver/clientRequest/respond', {
       backend: 'codex',
       response: { id: 'approval-1', payload: { decision: 'allow' } },
     })).resolves.toBeNull();
@@ -148,7 +148,7 @@ describe('BackendDriverRpc', () => {
       await mkdir(path.join(repoPath, '.git'), { recursive: true });
       await writeFile(path.join(repoPath, '.git', 'HEAD'), 'ref: refs/heads/main\n');
 
-      await expect(rpc.handle('source/listRepositories', { sourceFolderPath: tempDir })).resolves.toStrictEqual([{
+      await expect(rpc.handle('source/repositories/list', { sourceFolderPath: tempDir })).resolves.toStrictEqual([{
         name: 'codex-claw',
         path: repoPath,
         worktrees: [{ name: 'main', path: repoPath }],
@@ -162,7 +162,7 @@ describe('BackendDriverRpc', () => {
   it('routes source worktree path suggestions through backend-owned path policy', async () => {
     const rpc = new BackendDriverRpc(new Map([['codex', createDriver()]]));
 
-    await expect(rpc.handle('source/suggestWorktreePath', {
+    await expect(rpc.handle('source/worktree/path/suggest', {
       input: {
         repoPath: '/Users/nbonamy/src/codex-claw',
         branchName: 'feature/backend split',
@@ -177,7 +177,7 @@ describe('BackendDriverRpc', () => {
     vi.stubEnv('CODEX_CLAW_ASSETS_PATH', path.join(tempDir, 'missing-assets'));
 
     try {
-      await expect(rpc.handle('transcription/appleSpeech', {
+      await expect(rpc.handle('transcription/appleSpeech/create', {
         audioBase64: Buffer.from('audio').toString('base64'),
         options: { locale: 'en-US' },
       })).resolves.toMatchObject({
@@ -200,11 +200,11 @@ describe('BackendDriverRpc', () => {
       await writeFile(path.join(tempDir, 'README.md'), '# Read me\n');
       await writeFile(path.join(tempDir, 'src', 'main.ts'), 'main');
 
-      await expect(rpc.handle('driver/listFiles', { folder: tempDir })).resolves.toStrictEqual([
+      await expect(rpc.handle('driver/files/list', { folder: tempDir })).resolves.toStrictEqual([
         { name: 'README.md', path: 'README.md' },
         { name: 'main.ts', path: 'src/main.ts' },
       ]);
-      await expect(rpc.handle('driver/previewFile', { folder: tempDir, filePath: 'README.md' })).resolves.toStrictEqual({
+      await expect(rpc.handle('driver/file/preview', { folder: tempDir, filePath: 'README.md' })).resolves.toStrictEqual({
         path: 'README.md',
         content: '# Read me\n',
       });
@@ -222,8 +222,8 @@ describe('BackendDriverRpc', () => {
       const filePath = path.join(tempDir, 'README.md');
       await writeFile(filePath, '# Read me\n');
 
-      await expect(rpc.handle('agent/validateFolder', { folder: tempDir })).resolves.toBeNull();
-      await expect(rpc.handle('agent/validateFolder', { folder: filePath })).rejects.toThrow('Agent folder must be a directory.');
+      await expect(rpc.handle('agent/folder/validate', { folder: tempDir })).resolves.toBeNull();
+      await expect(rpc.handle('agent/folder/validate', { folder: filePath })).rejects.toThrow('Agent folder must be a directory.');
     } finally {
       await rm(tempDir, { recursive: true, force: true });
       await rpc.close();
@@ -239,7 +239,7 @@ describe('BackendDriverRpc', () => {
       await mkdir(path.join(tempDir, 'code'));
       await writeFile(path.join(tempDir, 'README.md'), '# Read me\n');
 
-      await expect(rpc.handle('source/listFolders', { path: tempDir })).resolves.toStrictEqual({
+      await expect(rpc.handle('source/folders/list', { path: tempDir })).resolves.toStrictEqual({
         path: tempDir,
         parentPath: path.dirname(tempDir),
         entries: [

@@ -1,3 +1,4 @@
+import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { mkdir, unlink } from 'node:fs/promises';
 import net, { type Server, type Socket } from 'node:net';
 import path from 'node:path';
@@ -53,7 +54,7 @@ export class LocalSocketRpcServer {
 
   broadcastEvent(event: ClawBackendEvent): void {
     for (const peer of this.peers) {
-      peer.notify('backend/event', event);
+      peer.notify(backendMethods.backendEventNotify, event);
     }
   }
 

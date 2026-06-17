@@ -1,3 +1,4 @@
+import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import {
   createClawRpcRequest,
@@ -12,6 +13,7 @@ import {
 } from '@codex-claw/shared/backend-protocol/rpc';
 import type { RemoteConnection } from '@codex-claw/shared/contracts';
 import { warnMain } from '../log';
+import { sshStdioTransport } from './ssh-connections';
 
 export type RemoteClawdClientOptions = {
   spawnProcess?: typeof spawn;
@@ -95,7 +97,7 @@ class RemoteClawdClient {
       return;
     }
 
-    const transport = this.connection.transport;
+    const transport = remoteConnectionTransport(this.connection);
     if (!transport) {
       throw new Error(`Remote connection has no transport: ${this.connection.name}`);
     }
@@ -181,7 +183,7 @@ class RemoteClawdClient {
   private handleLine(line: string): void {
     const message = parseClawRpcMessage(JSON.parse(line));
     if (isClawRpcNotification(message)) {
-      if (message.method === 'backend/event' && isRemoteBackendEvent(message.params)) {
+      if (message.method === backendMethods.backendEventNotify && isRemoteBackendEvent(message.params)) {
         this.eventSink?.(message.params);
       }
       return;
@@ -237,6 +239,13 @@ class RemoteClawdClient {
     }
     this.pending.clear();
   }
+}
+
+function remoteConnectionTransport(connection: RemoteConnection): RemoteConnection['transport'] {
+  if (connection.kind === 'ssh' && connection.transport?.type === 'ssh-stdio') {
+    return sshStdioTransport(connection.host);
+  }
+  return connection.transport;
 }
 
 function isRemoteBackendEvent(value: unknown): value is ClawBackendEvent {

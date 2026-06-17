@@ -1,3 +1,4 @@
+import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/shared/backend-driver';
 import { unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
 import type { Agent, AgentBackend, AppleSpeechTranscriptionOptions, CreateSourceWorktreeInput, SendPromptOptions } from '@codex-claw/shared/contracts';
@@ -44,18 +45,18 @@ export class BackendDriverRpc {
 
   async handle(method: string, params: unknown): Promise<unknown> {
     switch (method) {
-      case 'driver/listFiles': {
+      case backendMethods.driverFilesList: {
         const record = requireRecord(params);
         return listAgentFolderFiles(requireString(record.folder, 'folder'));
       }
-      case 'driver/previewFile': {
+      case backendMethods.driverFilePreview: {
         const record = requireRecord(params);
         return previewAgentFolderFile(
           requireString(record.folder, 'folder'),
           requireString(record.filePath, 'filePath'),
         );
       }
-      case 'agent/validateFolder': {
+      case backendMethods.agentFolderValidate: {
         const record = requireRecord(params);
         const folderStat = await stat(requireString(record.folder, 'folder').trim());
         if (!folderStat.isDirectory()) {
@@ -63,29 +64,29 @@ export class BackendDriverRpc {
         }
         return null;
       }
-      case 'driver/getGitStatus': {
+      case backendMethods.driverGitStatusGet: {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);
         return driver.getGitStatus ? driver.getGitStatus(agent) : null;
       }
-      case 'driver/getGitDiff': {
+      case backendMethods.driverGitDiffGet: {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);
         return driver.getGitDiff ? driver.getGitDiff(agent) : null;
       }
-      case 'driver/tryHandlePromptCommand': {
+      case backendMethods.driverPromptCommandHandle: {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);
         return this.tryHandlePromptCommand(agent, requireString(record.prompt, 'prompt'));
       }
-      case 'driver/sendPrompt': {
+      case backendMethods.driverPromptSend: {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);
         const prompt = requireString(record.prompt, 'prompt');
         const driver = this.requireDriver(agent.backend);
         return driver.sendPrompt(agent, prompt, record.options as SendPromptOptions | undefined);
       }
-      case 'driver/setConversationTitle': {
+      case backendMethods.driverConversationTitleUpdate: {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);
@@ -95,7 +96,7 @@ export class BackendDriverRpc {
         await driver.setConversationTitle(agent, requireString(record.title, 'title'));
         return null;
       }
-      case 'driver/setGoal': {
+      case backendMethods.driverGoalUpdate: {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);
@@ -104,7 +105,7 @@ export class BackendDriverRpc {
         }
         return driver.setGoal(agent, requireString(record.objective, 'objective'));
       }
-      case 'driver/clearGoal': {
+      case backendMethods.driverGoalClear: {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);
         if (!driver.clearGoal) {
@@ -112,7 +113,7 @@ export class BackendDriverRpc {
         }
         return driver.clearGoal(agent);
       }
-      case 'driver/setApprovalPreset': {
+      case backendMethods.driverApprovalPresetUpdate: {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);
@@ -121,32 +122,32 @@ export class BackendDriverRpc {
         }
         return driver.setApprovalPreset(agent, record.preset as never);
       }
-      case 'driver/forgetSession': {
+      case backendMethods.driverSessionForget: {
         const { backend, agentId } = requireBackendAgentIdParams(params);
         this.requireDriver(backend).forgetAgentSession?.(agentId);
         return null;
       }
-      case 'driver/interrupt': {
+      case backendMethods.driverInterrupt: {
         const { agent } = requireAgentParams(params);
         return this.requireDriver(agent.backend).interrupt(agent);
       }
-      case 'driver/respondToClientRequest': {
+      case backendMethods.driverClientRequestRespond: {
         const record = requireRecord(params);
         const backend = requireBackend(record.backend);
         await this.requireDriver(backend).respondToRequest(record.response as never);
         return null;
       }
-      case 'driver/hydrate': {
+      case backendMethods.driverHistoryHydrate: {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);
         return driver.hydrateAgent ? driver.hydrateAgent(agent) : null;
       }
-      case 'driver/listConversations': {
+      case backendMethods.driverConversationsList: {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);
         return driver.listConversations ? driver.listConversations(agent) : [];
       }
-      case 'driver/resumeConversation': {
+      case backendMethods.driverConversationResume: {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);
@@ -155,7 +156,7 @@ export class BackendDriverRpc {
         }
         return driver.resumeConversation(agent, record.ref as never);
       }
-      case 'driver/readConversationMessages': {
+      case backendMethods.driverConversationMessagesGet: {
         const record = requireRecord(params);
         const ref = requireRecord(record.ref);
         const backend = requireBackend(ref.backend);
@@ -165,7 +166,7 @@ export class BackendDriverRpc {
         }
         return driver.readConversationMessages(record.ref as never, requireString(record.agentId, 'agentId'));
       }
-      case 'driver/steer': {
+      case backendMethods.driverPromptSteer: {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);
@@ -174,7 +175,7 @@ export class BackendDriverRpc {
         }
         return driver.steerPrompt(agent, requireString(record.prompt, 'prompt'));
       }
-      case 'driver/rollbackToTurn': {
+      case backendMethods.driverTurnRollback: {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);
@@ -183,41 +184,41 @@ export class BackendDriverRpc {
         }
         return driver.rollbackToTurn(agent, requireString(record.turnId, 'turnId'));
       }
-      case 'driver/listModels': {
+      case backendMethods.driverModelsList: {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);
         return driver.listModels ? driver.listModels(agent) : [];
       }
-      case 'driver/listSkills': {
+      case backendMethods.driverSkillsList: {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);
         return driver.listSkills ? driver.listSkills(agent) : [];
       }
-      case 'source/detectFolder':
+      case backendMethods.sourceFolderDetect:
         return detectSourceFolder();
-      case 'source/listRepositories': {
+      case backendMethods.sourceRepositoriesList: {
         const record = requireRecord(params);
         const sourceFolderPath = requireString(record.sourceFolderPath, 'sourceFolderPath').trim();
         return sourceFolderPath ? scanSourceRepositories(sourceFolderPath) : [];
       }
-      case 'source/listFolders': {
+      case backendMethods.sourceFoldersList: {
         const record = params === undefined ? {} : requireRecord(params);
         return listSourceFolders(typeof record.path === 'string' ? record.path : undefined);
       }
-      case 'source/suggestWorktreePath': {
+      case backendMethods.sourceWorktreePathSuggest: {
         const record = requireRecord(params);
         const input = requireRecord(record.input) as Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>;
         return suggestedSourceWorktreePath(input.repoPath, input.branchName);
       }
-      case 'source/listWorktrees': {
+      case backendMethods.sourceWorktreesList: {
         const record = requireRecord(params);
         return listSourceWorktrees(requireString(record.repoPath, 'repoPath'));
       }
-      case 'source/createWorktree': {
+      case backendMethods.sourceWorktreeCreate: {
         const record = requireRecord(params);
         return createSourceWorktree(record.input as CreateSourceWorktreeInput);
       }
-      case 'transcription/appleSpeech': {
+      case backendMethods.transcriptionAppleSpeechCreate: {
         const record = requireRecord(params);
         const audioBase64 = requireString(record.audioBase64, 'audioBase64');
         return transcribeWithAppleSpeechAnalyzer(

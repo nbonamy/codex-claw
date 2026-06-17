@@ -63,7 +63,6 @@ export class SshConnectionService {
     try {
       await this.installRemoteClawd(next.host);
       await this.syncRemoteProviderTokens(next.host);
-      await this.restartRemoteClawd(next.host);
       const version = await this.remoteClawdVersion(next.host);
       next = {
         ...next,
@@ -153,17 +152,6 @@ export class SshConnectionService {
     ]);
   }
 
-  private async restartRemoteClawd(host: string): Promise<void> {
-    await this.run('ssh', [
-      '-o',
-      'BatchMode=yes',
-      '-o',
-      'ConnectTimeout=10',
-      host,
-      `pkill -f '[n]ode .*\\.codex-claw/clawd\\.mjs' || true`,
-    ]);
-  }
-
   private async remoteClawdVersion(host: string): Promise<string> {
     const result = await this.run('ssh', [
       '-o',
@@ -246,7 +234,7 @@ export function sshStdioTransport(host: string): RemoteConnection['transport'] {
     command: 'ssh',
     args: [
       host,
-      `node ${remoteClawdPath} --stdio`,
+      `node ${remoteClawdPath} connect || exec node ${remoteClawdPath} --stdio`,
     ],
   };
 }

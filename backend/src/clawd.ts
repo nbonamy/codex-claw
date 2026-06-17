@@ -1,4 +1,7 @@
+import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { pathToFileURL } from 'node:url';
+import net from 'node:net';
+import type { Readable, Writable } from 'node:stream';
 import { createClawRpcNotification } from '@codex-claw/shared/backend-protocol/rpc';
 import { createClawdRuntime, type ClawdRuntime } from './runtime';
 import { backendSocketPath } from './state';
@@ -30,8 +33,72 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     return;
   }
 
-  process.stderr.write('Usage: clawd --stdio | serve | --version\nSet CODEX_CLAW_HOME to override ~/.codex-claw.\n');
+  if (argv.includes('connect')) {
+    process.exitCode = await connectToDaemon();
+    return;
+  }
+
+  process.stderr.write('Usage: clawd --stdio | serve | connect | --version\nSet CODEX_CLAW_HOME to override ~/.codex-claw.\n');
   process.exitCode = 1;
+}
+
+export type ConnectToDaemonOptions = {
+  connectSocket?: typeof net.createConnection;
+  input?: Readable;
+  output?: Writable;
+  socketPath?: string;
+  stderr?: Writable;
+};
+
+export async function connectToDaemon(options: ConnectToDaemonOptions = {}): Promise<number> {
+  const input = options.input ?? process.stdin;
+  const output = options.output ?? process.stdout;
+  const stderr = options.stderr ?? process.stderr;
+  const socketPath = options.socketPath ?? backendSocketPath();
+  const socket = (options.connectSocket ?? net.createConnection)(socketPath);
+  let connectErrorMessage = socketPath;
+
+  const connected = await new Promise<boolean>((resolve) => {
+    const onConnect = () => {
+      socket.off('error', onError);
+      resolve(true);
+    };
+    const onError = (error: Error) => {
+      socket.off('connect', onConnect);
+      connectErrorMessage = error.message;
+      resolve(false);
+    };
+    socket.once('connect', onConnect);
+    socket.once('error', onError);
+  });
+
+  if (!connected) {
+    socket.destroy();
+    stderr.write(`clawd daemon socket unavailable: ${connectErrorMessage}\n`);
+    return 1;
+  }
+
+  return new Promise<number>((resolve) => {
+    let finished = false;
+    const finish = (code: number) => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      input.unpipe(socket);
+      socket.unpipe(output);
+      socket.destroy();
+      resolve(code);
+    };
+
+    socket.once('close', () => finish(0));
+    socket.once('error', () => finish(1));
+    input.once('error', () => finish(1));
+    output.once('error', () => finish(1));
+    input.pipe(socket);
+    socket.pipe(output);
+    input.resume();
+  });
 }
 
 async function runStdio(): Promise<void> {
@@ -44,7 +111,7 @@ async function runStdio(): Promise<void> {
   runtime = await createClawdRuntime({
     version: CLAWD_VERSION,
     requestClient: (method, params) => stdio.request(method, params),
-    emitEvent: (event) => process.stdout.write(`${JSON.stringify(createClawRpcNotification('backend/event', event))}\n`),
+    emitEvent: (event) => process.stdout.write(`${JSON.stringify(createClawRpcNotification(backendMethods.backendEventNotify, event))}\n`),
   });
 
   let stopping = false;

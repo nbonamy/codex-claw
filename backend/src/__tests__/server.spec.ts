@@ -13,7 +13,7 @@ describe('ClawBackendServer', () => {
   it('responds to backend health requests', async () => {
     const server = new ClawBackendServer({ version: 'test-version', pid: 123 });
 
-    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'health-1', method: 'backend/health' })).resolves.toStrictEqual({
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'health-1', method: 'backend/health/get' })).resolves.toStrictEqual({
       jsonrpc: '2.0',
       id: 'health-1',
       result: {
@@ -50,12 +50,12 @@ describe('ClawBackendServer', () => {
       systemPermissions,
     });
 
-    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'permissions', method: 'system/getPermissions' })).resolves.toStrictEqual({
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'permissions', method: 'system/permissions/get' })).resolves.toStrictEqual({
       jsonrpc: '2.0',
       id: 'permissions',
       result: status,
     });
-    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'open-permissions', method: 'system/openAccessibilitySettings' })).resolves.toStrictEqual({
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'open-permissions', method: 'system/permissions/accessibility/open' })).resolves.toStrictEqual({
       jsonrpc: '2.0',
       id: 'open-permissions',
       result: openedStatus,
@@ -67,7 +67,7 @@ describe('ClawBackendServer', () => {
   it('returns a non-desktop system permission status when no host port is configured', async () => {
     const server = new ClawBackendServer({ version: 'test-version', pid: 123 });
 
-    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'permissions', method: 'system/getPermissions' })).resolves.toStrictEqual({
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'permissions', method: 'system/permissions/get' })).resolves.toStrictEqual({
       jsonrpc: '2.0',
       id: 'permissions',
       result: {
@@ -116,7 +116,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'list-connections',
-      method: 'connections/listSshHosts',
+      method: 'connections/sshHosts/list',
     })).resolves.toMatchObject({
       result: [{
         host: 'devbox',
@@ -128,7 +128,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'add-connection',
-      method: 'connections/addSsh',
+      method: 'connections/ssh/create',
       params: {
         input: {
           host: 'devbox',
@@ -193,7 +193,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'check-connection',
-      method: 'connections/check',
+      method: 'connections/sync',
       params: { connectionId: 'connection-devbox' },
     })).resolves.toMatchObject({
       result: {
@@ -224,7 +224,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'remove-connection',
-      method: 'connections/remove',
+      method: 'connections/delete',
       params: { connectionId: 'connection-devbox' },
     })).resolves.toMatchObject({
       result: {
@@ -348,7 +348,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'desktop-state',
-      method: 'client/getState',
+      method: 'client/state/get',
     })).resolves.toMatchObject({
       result: {
         sourceFolderPath: '/Users/nbonamy/src',
@@ -360,7 +360,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'desktop-state-disabled',
-      method: 'client/getState',
+      method: 'client/state/get',
     })).resolves.toMatchObject({
       result: {
         sourceFolderPath: '/Users/nbonamy/src',
@@ -398,7 +398,7 @@ describe('ClawBackendServer', () => {
       },
     });
 
-    expect(handle).toHaveBeenCalledWith('source/detectFolder', undefined);
+    expect(handle).toHaveBeenCalledWith('source/folder/detect', undefined);
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
     await server.close();
   });
@@ -414,6 +414,21 @@ describe('ClawBackendServer', () => {
         message: 'Unknown backend method: nope',
       },
     });
+  });
+
+  it('does not accept legacy backend method names', async () => {
+    const server = new ClawBackendServer({ version: 'test-version', pid: 123 });
+
+    for (const method of ['bench/snapshot', 'agent/listFiles']) {
+      await expect(server.handleMessage({ jsonrpc: '2.0', id: method, method })).resolves.toStrictEqual({
+        jsonrpc: '2.0',
+        id: method,
+        error: {
+          code: -32601,
+          message: `Unknown backend method: ${method}`,
+        },
+      });
+    }
   });
 
   it('assigns backend event sequence numbers', async () => {
@@ -527,7 +542,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'unknown-response',
-      method: 'clientRequest/respond',
+      method: 'client/request/respond',
       params: { response: { id: 'approval-missing', payload: { decision: 'allow' } } },
     })).resolves.toMatchObject({
       error: {
@@ -548,7 +563,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'known-response',
-      method: 'clientRequest/respond',
+      method: 'client/request/respond',
       params: { response: { id: 'approval-1', payload: { decision: 'allow' } } },
     })).resolves.toMatchObject({
       result: snapshot,
@@ -746,13 +761,13 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'configure',
-      method: 'workProvider/configureBacklog',
+      method: 'workProvider/backlog/configure',
       params: { input: { provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } } },
     })).resolves.toMatchObject({ result: snapshot });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'items',
-      method: 'workProvider/listItems',
+      method: 'workProvider/items/list',
       params: { provider: 'github', repositoryId: 'nbonamy/codex-claw' },
     })).resolves.toMatchObject({
       result: [{ id: 'github:nbonamy/codex-claw#12' }],
@@ -888,7 +903,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'hydrate',
-      method: 'agent/hydrateHistory',
+      method: 'agent/history/hydrate',
       params: { agentId: 'agent-jesse' },
     })).resolves.toMatchObject({
       result: {
@@ -1052,7 +1067,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'close-team',
-      method: 'team/close',
+      method: 'team/delete',
       params: { teamId },
     })).resolves.toMatchObject({
       result: {
@@ -1164,7 +1179,7 @@ describe('ClawBackendServer', () => {
       await expect(server.handleMessage({
         jsonrpc: '2.0',
         id: 'move-agent',
-        method: 'agent/moveToTeam',
+        method: 'agent/team/move',
         params: { input: { agentId: duplicateId, teamId: 'team-other' } },
       })).resolves.toMatchObject({
         result: {
@@ -1182,14 +1197,14 @@ describe('ClawBackendServer', () => {
       await expect(server.handleMessage({
         jsonrpc: '2.0',
         id: 'update-folder',
-        method: 'agent/updateFolder',
+        method: 'agent/folder/update',
         params: { agentId, folder: tempDir },
       })).resolves.toMatchObject({ result: { activeAgentId: expect.any(String) } });
       expect(snapshot.agents.find((agent) => agent.id === agentId)?.folder).toBe(tempDir);
       await expect(server.handleMessage({
         jsonrpc: '2.0',
         id: 'close-agent',
-        method: 'agent/close',
+        method: 'agent/delete',
         params: { agentId: duplicateId },
       })).resolves.toMatchObject({
         result: {
@@ -1234,7 +1249,7 @@ describe('ClawBackendServer', () => {
       await expect(server.handleMessage({
         jsonrpc: '2.0',
         id: 'list-files',
-        method: 'agent/listFiles',
+        method: 'agent/files/list',
         params: { agentId: 'agent-dina' },
       })).resolves.toMatchObject({
         result: expect.arrayContaining([
@@ -1245,7 +1260,7 @@ describe('ClawBackendServer', () => {
       await expect(server.handleMessage({
         jsonrpc: '2.0',
         id: 'preview-file',
-        method: 'agent/previewFile',
+        method: 'agent/file/preview',
         params: { agentId: 'agent-dina', filePath: 'README.md' },
       })).resolves.toMatchObject({
         result: {
@@ -1256,7 +1271,7 @@ describe('ClawBackendServer', () => {
       await expect(server.handleMessage({
         jsonrpc: '2.0',
         id: 'missing-agent',
-        method: 'agent/previewFile',
+        method: 'agent/file/preview',
         params: { agentId: 'agent-missing', filePath: 'README.md' },
       })).resolves.toMatchObject({
         error: {
@@ -1347,37 +1362,37 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'models',
-      method: 'agent/listModels',
+      method: 'agent/models/list',
       params: { agentId: 'agent-dina' },
     })).resolves.toMatchObject({ result: [{ id: 'gpt-test', name: 'GPT Test' }] });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'skills',
-      method: 'agent/listSkills',
+      method: 'agent/skills/list',
       params: { agentId: 'agent-dina' },
     })).resolves.toMatchObject({ result: [{ name: 'frontend-design' }] });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'conversations',
-      method: 'agent/listConversations',
+      method: 'agent/conversations/list',
       params: { agentId: 'agent-dina' },
     })).resolves.toMatchObject({ result: conversations });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'messages',
-      method: 'agent/readConversationMessages',
+      method: 'agent/conversation/messages/get',
       params: { agentId: 'agent-dina', ref: { backend: 'codex', threadId: 'thread-dina' } },
     })).resolves.toMatchObject({ result: messages });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'unknown-ref',
-      method: 'agent/readConversationMessages',
+      method: 'agent/conversation/messages/get',
       params: { agentId: 'agent-dina', ref: { backend: 'codex', threadId: 'thread-unknown' } },
     })).resolves.toMatchObject({ error: { message: 'Conversation reference is not available.' } });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'invalid-ref',
-      method: 'agent/readConversationMessages',
+      method: 'agent/conversation/messages/get',
       params: { agentId: 'agent-dina', ref: { backend: 'codex' } },
     })).resolves.toMatchObject({ error: { message: 'Invalid conversation reference.' } });
 
@@ -1443,13 +1458,13 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'messages',
-      method: 'agent/readConversationMessages',
+      method: 'agent/conversation/messages/get',
       params: { agentId: 'agent-cleaned-up', ref: { backend: 'codex', threadId: 'thread-cleaned-up' } },
     })).resolves.toMatchObject({ result: messages });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'unknown-ref',
-      method: 'agent/readConversationMessages',
+      method: 'agent/conversation/messages/get',
       params: { agentId: 'agent-cleaned-up', ref: { backend: 'codex', threadId: 'thread-unknown' } },
     })).resolves.toMatchObject({ error: { message: 'Conversation reference is not available.' } });
 
@@ -1522,7 +1537,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'remote-loop-snapshot',
-      method: 'loop/snapshot',
+      method: 'snapshot/loops/get',
       params: { location },
     })).resolves.toMatchObject({ result: remoteSnapshot });
     await expect(server.handleMessage({
@@ -1588,7 +1603,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'open-diff',
-      method: 'agent/openGitDiff',
+      method: 'agent/git/diff/open',
       params: { agentId: 'agent-dina' },
     })).resolves.toMatchObject({ result: true });
 
@@ -1642,7 +1657,7 @@ describe('ClawBackendServer', () => {
     await server.handleMessage({
       jsonrpc: '2.0',
       id: 'open-diff',
-      method: 'agent/openGitDiff',
+      method: 'agent/git/diff/open',
       params: { agentId: 'agent-dina' },
     });
 
@@ -1681,7 +1696,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'assign-item',
-      method: 'agent/assignWorkItem',
+      method: 'agent/workItem/assign',
       params: { agentId: 'agent-dina', item },
     })).resolves.toMatchObject({
       result: {
@@ -1698,7 +1713,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'remove-item',
-      method: 'agent/removeWorkItemAssignment',
+      method: 'agent/workItem/assignment/delete',
       params: { item },
     })).resolves.toMatchObject({
       result: {
@@ -1708,7 +1723,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'invalid-item',
-      method: 'agent/assignWorkItem',
+      method: 'agent/workItem/assign',
       params: { agentId: 'agent-dina', item: { id: 'missing-fields' } },
     })).resolves.toMatchObject({
       error: {
@@ -1778,7 +1793,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'resume-agent',
-      method: 'agent/resumeConversation',
+      method: 'agent/conversation/resume',
       params: { agentId: 'agent-dina', ref: { backend: 'codex', threadId: 'thread-new' } },
     })).resolves.toMatchObject({
       result: {
@@ -1851,7 +1866,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'set-goal',
-      method: 'agent/setGoal',
+      method: 'agent/goal/update',
       params: { agentId: 'agent-dina', objective: ' Ship the goal shelf ' },
     })).resolves.toMatchObject({
       result: {
@@ -1861,7 +1876,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'clear-goal',
-      method: 'agent/clearGoal',
+      method: 'agent/goal/clear',
       params: { agentId: 'agent-dina' },
     })).resolves.toMatchObject({
       result: {
@@ -1872,7 +1887,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'set-preset',
-      method: 'agent/setApprovalPreset',
+      method: 'agent/approvalPreset/update',
       params: { agentId: 'agent-dina', preset: 'approve-for-me' },
     })).resolves.toMatchObject({
       result: {
@@ -1950,7 +1965,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'steer',
-      method: 'agent/steer',
+      method: 'agent/prompt/steer',
       params: { agentId: 'agent-dina', prompt: ' try smaller ' },
     })).resolves.toMatchObject({
       result: {
@@ -2076,7 +2091,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'rollback',
-      method: 'agent/rollbackToTurn',
+      method: 'agent/turn/rollback',
       params: { agentId: 'agent-dina', turnId: 'turn-1' },
     })).resolves.toMatchObject({
       result: {
@@ -2143,7 +2158,7 @@ describe('ClawBackendServer', () => {
       await expect(server.handleMessage({
         jsonrpc: '2.0',
         id: 'send',
-        method: 'agent/sendPrompt',
+        method: 'agent/prompt/send',
         params: { agentId: 'agent-dina', prompt: ' hello codex ' },
       })).resolves.toMatchObject({
         result: {
@@ -2211,7 +2226,7 @@ describe('ClawBackendServer', () => {
     await server.handleMessage({
       jsonrpc: '2.0',
       id: 'send',
-      method: 'agent/sendPrompt',
+      method: 'agent/prompt/send',
       params: { agentId: 'agent-dina', prompt: '/compact' },
     });
     await flushMicrotasks();
@@ -2270,7 +2285,7 @@ describe('ClawBackendServer', () => {
     await server.handleMessage({
       jsonrpc: '2.0',
       id: 'retry',
-      method: 'agent/retryMessage',
+      method: 'agent/message/retry',
       params: { agentId: 'agent-dina', messageId: 'assistant-turn-1' },
     });
 
@@ -2286,7 +2301,7 @@ describe('ClawBackendServer', () => {
     await server.handleMessage({
       jsonrpc: '2.0',
       id: 'edit',
-      method: 'agent/editMessage',
+      method: 'agent/message/update',
       params: { agentId: 'agent-dina', messageId: 'user-turn-1', prompt: ' edited prompt ' },
     });
 
@@ -2322,7 +2337,7 @@ describe('ClawBackendServer', () => {
       await expect(server.handleMessage({
         jsonrpc: '2.0',
         id: 'save-bench',
-        method: 'bench/saveAgent',
+        method: 'bench/agent/template/create',
         params: { agentId: 'agent-dina' },
       })).resolves.toMatchObject({
         result: {
@@ -2334,7 +2349,7 @@ describe('ClawBackendServer', () => {
       await expect(server.handleMessage({
         jsonrpc: '2.0',
         id: 'deploy-bench',
-        method: 'bench/deployTemplate',
+        method: 'bench/template/deploy',
         params: { templateId, teamId: 'team-test' },
       })).resolves.toMatchObject({
         result: {
@@ -2347,7 +2362,7 @@ describe('ClawBackendServer', () => {
       await expect(server.handleMessage({
         jsonrpc: '2.0',
         id: 'remove-bench',
-        method: 'bench/removeTemplate',
+        method: 'bench/template/delete',
         params: { templateId },
       })).resolves.toMatchObject({
         result: {
@@ -2360,6 +2375,138 @@ describe('ClawBackendServer', () => {
       await server.close();
       await rm(tempDir, { recursive: true, force: true });
     }
+  });
+
+  it('uses the team clawd Bench for remote team save deploy and remove', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    snapshot.teams[0]!.remoteConnectionId = 'connection-devbox';
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Remote Dina',
+      folder: '/home/nicolas/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    snapshot.activeAgentId = 'agent-dina';
+    const remoteTemplate = {
+      id: 'bench-remote-dina',
+      name: 'Remote Dina',
+      folder: '/home/nicolas/src/codex-claw',
+      backend: 'codex' as const,
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    };
+    const remoteSnapshotWithBench = {
+      ...createTestSnapshot(),
+      bench: [remoteTemplate],
+    };
+    const remoteSnapshotWithoutBench = {
+      ...createTestSnapshot(),
+      bench: [],
+    };
+    const remoteClients = {
+      request: vi.fn().mockImplementation((_connection, method: string) => {
+        if (method === 'bench/template/create' || method === 'snapshot/bench/get') {
+          return Promise.resolve(remoteSnapshotWithBench);
+        }
+        if (method === 'bench/template/delete') {
+          return Promise.resolve(remoteSnapshotWithoutBench);
+        }
+        return Promise.resolve(null);
+      }),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+      remoteClients: remoteClients as never,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'save-remote-bench',
+      method: 'bench/agent/template/create',
+      params: { agentId: 'agent-dina' },
+    })).resolves.toMatchObject({
+      result: {
+        bench: [{ id: 'bench-remote-dina' }],
+      },
+    });
+    expect(snapshot.bench).toStrictEqual([]);
+    expect(remoteClients.request).toHaveBeenCalledWith(
+      snapshot.remoteConnections.connections[0],
+      'bench/template/create',
+      {
+        input: {
+          name: 'Remote Dina',
+          folder: '/home/nicolas/src/codex-claw',
+          backend: 'codex',
+        },
+      },
+      expect.any(Function),
+    );
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'deploy-remote-bench',
+      method: 'bench/template/deploy',
+      params: {
+        templateId: 'bench-remote-dina',
+        teamId: 'team-test',
+        location: { kind: 'remote', remoteConnectionId: 'connection-devbox' },
+      },
+    })).resolves.toMatchObject({
+      result: {
+        agents: [
+          { id: 'agent-dina' },
+          { name: 'Remote Dina', folder: '/home/nicolas/src/codex-claw', teamId: 'team-test' },
+        ],
+        bench: [],
+      },
+    });
+    expect(remoteClients.request).toHaveBeenCalledWith(
+      snapshot.remoteConnections.connections[0],
+      'snapshot/bench/get',
+      undefined,
+      expect.any(Function),
+    );
+    expect(remoteClients.request).toHaveBeenCalledWith(
+      snapshot.remoteConnections.connections[0],
+      'agent/folder/validate',
+      { folder: '/home/nicolas/src/codex-claw' },
+      expect.any(Function),
+    );
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'remove-remote-bench',
+      method: 'bench/template/delete',
+      params: {
+        templateId: 'bench-remote-dina',
+        location: { kind: 'remote', remoteConnectionId: 'connection-devbox' },
+      },
+    })).resolves.toMatchObject({
+      result: {
+        bench: [],
+      },
+    });
+    expect(remoteClients.request).toHaveBeenCalledWith(
+      snapshot.remoteConnections.connections[0],
+      'bench/template/delete',
+      { templateId: 'bench-remote-dina' },
+      expect.any(Function),
+    );
+    expect(saveSnapshot).toHaveBeenCalledOnce();
+
+    await server.close();
   });
 
   it('owns settings updates', async () => {
@@ -2429,12 +2576,12 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'source-repositories',
-      method: 'source/listRepositories',
+      method: 'source/repositories/list',
     })).resolves.toMatchObject({
       result: repositories,
     });
 
-    expect(driverRpc.handle).toHaveBeenCalledWith('source/listRepositories', {
+    expect(driverRpc.handle).toHaveBeenCalledWith('source/repositories/list', {
       sourceFolderPath: '/Users/nbonamy/src',
     });
   });
@@ -2461,7 +2608,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'remote-source-repositories',
-      method: 'source/listRepositories',
+      method: 'source/repositories/list',
       params: { remoteConnectionId: 'connection-devbox' },
     })).resolves.toMatchObject({
       result: repositories,
@@ -2469,7 +2616,7 @@ describe('ClawBackendServer', () => {
 
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
-      'source/listRepositories',
+      'source/repositories/list',
       undefined,
       expect.any(Function),
     );
@@ -2500,7 +2647,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'remote-source-folders',
-      method: 'source/listFolders',
+      method: 'source/folders/list',
       params: { remoteConnectionId: 'connection-devbox', path: '/home/nicolas' },
     })).resolves.toMatchObject({
       result: listing,
@@ -2508,7 +2655,7 @@ describe('ClawBackendServer', () => {
 
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
-      'source/listFolders',
+      'source/folders/list',
       { path: '/home/nicolas' },
       expect.any(Function),
     );
@@ -2528,10 +2675,10 @@ describe('ClawBackendServer', () => {
     }];
     const driverRpc = {
       handle: vi.fn(async (method: string, params: unknown) => {
-        if (method === 'source/detectFolder') {
+        if (method === 'source/folder/detect') {
           return '~/src';
         }
-        if (method === 'source/listRepositories') {
+        if (method === 'source/repositories/list') {
           expect(params).toStrictEqual({ sourceFolderPath: '~/src' });
           return repositories;
         }
@@ -2550,13 +2697,13 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'source-repositories',
-      method: 'source/listRepositories',
+      method: 'source/repositories/list',
     })).resolves.toMatchObject({
       result: repositories,
     });
 
-    expect(driverRpc.handle).toHaveBeenNthCalledWith(1, 'source/detectFolder', undefined);
-    expect(driverRpc.handle).toHaveBeenNthCalledWith(2, 'source/listRepositories', {
+    expect(driverRpc.handle).toHaveBeenNthCalledWith(1, 'source/folder/detect', undefined);
+    expect(driverRpc.handle).toHaveBeenNthCalledWith(2, 'source/repositories/list', {
       sourceFolderPath: '~/src',
     });
     expect(snapshot.sourceFolder).toMatchObject({
@@ -2586,13 +2733,13 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'source-worktree-suggestion',
-      method: 'source/suggestWorktreePath',
+      method: 'source/worktree/path/suggest',
       params: { input },
     })).resolves.toMatchObject({
       result: '/Users/nbonamy/src/codex-claw-backend-split',
     });
 
-    expect(driverRpc.handle).toHaveBeenCalledWith('source/suggestWorktreePath', { input });
+    expect(driverRpc.handle).toHaveBeenCalledWith('source/worktree/path/suggest', { input });
   });
 
   it('owns git worktree listing', async () => {
@@ -2616,13 +2763,13 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'source-worktrees',
-      method: 'source/listWorktrees',
+      method: 'source/worktrees/list',
       params: { repoPath: '/Users/nbonamy/src/codex-claw' },
     })).resolves.toMatchObject({
       result: worktrees,
     });
 
-    expect(driverRpc.handle).toHaveBeenCalledWith('source/listWorktrees', {
+    expect(driverRpc.handle).toHaveBeenCalledWith('source/worktrees/list', {
       repoPath: '/Users/nbonamy/src/codex-claw',
     });
   });
@@ -2659,13 +2806,13 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'source-worktree',
-      method: 'source/createWorktree',
+      method: 'source/worktree/create',
       params: { input },
     })).resolves.toMatchObject({
       result: worktree,
     });
 
-    expect(driverRpc.handle).toHaveBeenCalledWith('source/createWorktree', { input });
+    expect(driverRpc.handle).toHaveBeenCalledWith('source/worktree/create', { input });
     expect(snapshot.sourceFolder.recentRepoNames).toStrictEqual(['codex-claw', 'id8']);
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
   });
@@ -2691,7 +2838,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'remote-source-worktree',
-      method: 'source/createWorktree',
+      method: 'source/worktree/create',
       params: {
         input: {
           repoPath: '/home/nicolas/src/codex-claw',
@@ -2705,7 +2852,7 @@ describe('ClawBackendServer', () => {
 
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
-      'source/createWorktree',
+      'source/worktree/create',
       {
         input: {
           repoPath: '/home/nicolas/src/codex-claw',
@@ -2761,13 +2908,13 @@ describe('ClawBackendServer', () => {
 
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
-      'agent/validateFolder',
+      'agent/folder/validate',
       { folder: '/home/nicolas/src/codex-claw' },
       expect.any(Function),
     );
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
-      'driver/getGitStatus',
+      'driver/git/status/get',
       { agent: expect.not.objectContaining({ remoteConnectionId: expect.any(String) }) },
       expect.any(Function),
     );
@@ -2780,7 +2927,7 @@ describe('ClawBackendServer', () => {
     snapshot.teams[0].remoteConnectionId = 'connection-devbox';
     const remoteClients = {
       request: vi.fn((_: unknown, method: string) => (
-        method === 'agent/validateFolder'
+        method === 'agent/folder/validate'
           ? Promise.resolve(null)
           : new Promise(() => undefined)
       )),
@@ -2825,7 +2972,7 @@ describe('ClawBackendServer', () => {
     });
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
-      'driver/getGitStatus',
+      'driver/git/status/get',
       { agent: expect.objectContaining({ name: 'Remote Dina' }) },
       expect.any(Function),
     );
@@ -2921,7 +3068,7 @@ describe('ClawBackendServer', () => {
       method: 'loop/run',
       params: { loopId },
     })).resolves.toMatchObject({ result: { loops: [{ id: loopId }] } });
-    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'run-due', method: 'loop/runDue' })).resolves.toMatchObject({ result: { loops: [{ id: loopId }] } });
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'run-due', method: 'loop/due/run' })).resolves.toMatchObject({ result: { loops: [{ id: loopId }] } });
 
     await expect(server.handleMessage({
       jsonrpc: '2.0',

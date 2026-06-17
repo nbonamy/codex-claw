@@ -28,13 +28,13 @@ describe('LocalSocketRpcServer', () => {
     const responses: string[] = [];
     socket.on('data', (chunk) => responses.push(chunk.toString()));
 
-    socket.write('{"jsonrpc":"2.0","id":"health","method":"backend/health"}\n');
-    await waitFor(() => responses.join('').includes('"backend/health"'));
+    socket.write('{"jsonrpc":"2.0","id":"health","method":"backend/health/get"}\n');
+    await waitFor(() => responses.join('').includes('"backend/health/get"'));
 
     expect(JSON.parse(responses.join(''))).toStrictEqual({
       jsonrpc: '2.0',
       id: 'health',
-      result: { method: 'backend/health' },
+      result: { method: 'backend/health/get' },
     });
     socket.destroy();
   });
@@ -56,11 +56,11 @@ describe('LocalSocketRpcServer', () => {
       payload: { ok: true },
       occurredAt: '2026-06-14T00:00:00.000Z',
     });
-    await waitFor(() => responses.join('').includes('backend/event'));
+    await waitFor(() => responses.join('').includes('backend/event/notify'));
 
     expect(JSON.parse(responses.join(''))).toStrictEqual({
       jsonrpc: '2.0',
-      method: 'backend/event',
+      method: 'backend/event/notify',
       params: {
         seq: 1,
         type: 'snapshot.updated',
@@ -86,7 +86,7 @@ describe('LocalSocketRpcServer', () => {
       socket.write(`${JSON.stringify({ jsonrpc: '2.0', id: message.id, result: true })}\n`);
     });
 
-    await expect(server.requestFirstClient('client/openExternal', { url: 'https://example.com' })).resolves.toBe(true);
+    await expect(server.requestFirstClient('client/external/open', { url: 'https://example.com' })).resolves.toBe(true);
     expect(requestId).toMatch(/^backend-/);
     socket.destroy();
   });

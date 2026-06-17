@@ -19,11 +19,11 @@ describe('stdio JSON-RPC transport', () => {
       }),
     });
 
-    input.write('{"jsonrpc":"2.0","id":"1","method":"backend/health"}\n');
+    input.write('{"jsonrpc":"2.0","id":"1","method":"backend/health/get"}\n');
     await Promise.resolve();
     stop();
 
-    expect(responses.join('')).toBe('{"jsonrpc":"2.0","id":"1","result":{"method":"backend/health"}}\n');
+    expect(responses.join('')).toBe('{"jsonrpc":"2.0","id":"1","result":{"method":"backend/health/get"}}\n');
   });
 
   it('returns parse errors for invalid JSON lines', async () => {
@@ -91,11 +91,11 @@ describe('stdio JSON-RPC transport', () => {
     });
     peer.start();
 
-    const resultPromise = peer.request('client/openExternal', { url: 'https://example.com' });
+    const resultPromise = peer.request('client/external/open', { url: 'https://example.com' });
     const request = JSON.parse(writes.join('')) as { id: string; method: string };
     expect(request).toMatchObject({
       jsonrpc: '2.0',
-      method: 'client/openExternal',
+      method: 'client/external/open',
       params: { url: 'https://example.com' },
     });
 
@@ -116,7 +116,7 @@ describe('stdio JSON-RPC transport', () => {
     });
     peer.start();
 
-    const resultPromise = peer.request('client/openExternal', { url: 'https://example.com' });
+    const resultPromise = peer.request('client/external/open', { url: 'https://example.com' });
     const request = JSON.parse(writes.join('')) as { id: string };
     input.write(`${JSON.stringify({
       jsonrpc: '2.0',
