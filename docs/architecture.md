@@ -685,7 +685,7 @@ outside the persisted app snapshot in the backend token store.
 Starting device flow only returns the code to the renderer; opening GitHub is a
 separate user action so the user can see and copy the code before the browser
 takes focus. Electron owns that browser-open action through
-`client/openExternal` and may append the user code to the verification URL as a
+`client/external/open` and may append the user code to the verification URL as a
 best-effort prefill. After the device flow starts, the renderer polls the
 work-provider completion endpoint on the provider interval
 instead of requiring a manual "finish connection" step.

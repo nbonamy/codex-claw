@@ -51,14 +51,14 @@ Current implementation checkpoint:
   must not import provider drivers, provider transports, provider SDKs, or raw
   provider protocol modules.
 - `clawd` currently serves health, shared-contract snapshot loading/saving, the
-  `AgentBackendDriver` RPC surface, sequenced `backend/event` notifications,
+  `AgentBackendDriver` RPC surface, sequenced `backend/event/notify` notifications,
   the Claw MCP HTTP server used by agent collaboration tools, source repository
   discovery, git worktree creation, agent file listing/previewing, GitHub work
   integrations, system permission API calls, and Apple Speech transcription
   execution.
 - The stdio transport is now bidirectional JSON-RPC: Electron main can request
   backend work, and `clawd` can request client-owned effects. Runtime client
-  handlers include `client/openExternal` for backend-owned work integrations
+  handlers include `client/external/open` for backend-owned work integrations
   and `client/systemPermissions/*` for native permission prompts/settings.
 - Work integration token types now live in `shared`, and `clawd` owns token
   persistence through a backend token-store port. The current runtime uses an
@@ -87,7 +87,7 @@ Current implementation checkpoint:
   service shim, or validate agent folders before backend mutations.
   Main-process product IPC handlers adopt snapshots returned by backend RPCs;
   they do not perform direct product-state updates. Desktop-native state is
-  fetched from `client/getState` or received on backend events instead of
+  fetched from `client/state/get` or received on backend events instead of
   being recomputed from agent statuses in Electron.
 - `clawd` now owns loop CRUD, manual loop runs, and the loop scheduler/runner.
   Electron proxies loop IPC to backend RPC and adopts the returned snapshot.
@@ -95,9 +95,11 @@ Current implementation checkpoint:
   proxies team IPC to backend RPC and adopts the returned snapshot; renderer
   selection controls also wait for backend snapshots instead of mutating active
   team/agent ids locally.
-- `clawd` now owns Bench save/deploy/remove mutations. Deploying a Bench
-  template validates the target folder in the backend before creating the
-  agent.
+- Bench belongs to a `clawd` instance. Local teams see and mutate the local
+  Bench; teams with `Team.remoteConnectionId` see and mutate that remote
+  `clawd` Bench. Deploying a remote Bench template creates the visible product
+  agent in the local remote-backed team after validating the remote folder,
+  without copying the remote Bench catalog into local `snapshot.bench`.
 - `clawd` now owns settings updates. Electron adopts the returned snapshot and
   applies desktop-only reactions such as power-save blocker changes. Renderer
   settings controls send update requests and adopt the backend snapshot instead
@@ -146,7 +148,7 @@ Current implementation checkpoint:
   renderer adopts the backend snapshot instead of reducing product events
   itself.
 - `clawd` owns agent file listing/preview authority. Client-facing
-  `agent/listFiles` and `agent/previewFile` take an `agentId`; Electron does not
+  `agent/files/list` and `agent/file/preview` take an `agentId`; Electron does not
   send workspace roots or request raw file reads. Provider-specific file preview
   access remains a backend-internal capability after `clawd` resolves the agent
   folder from backend state.
@@ -155,14 +157,14 @@ Current implementation checkpoint:
   messages by agent/ref ids; backend resolves agents and validates stored
   conversation refs before calling provider drivers.
 - `clawd` owns manual git diff preview requests. Electron forwards
-  `agent/openGitDiff`, and the backend resolves the agent, calls the provider
+  `agent/git/diff/open`, and the backend resolves the agent, calls the provider
   git-diff capability, and emits the side-panel event.
 - `clawd` owns persisted-session hydration on agent selection and git-status
   refreshes after agent create/update/select and provider turn/diff/completion
   events. Electron receives the resulting snapshot/events instead of calling
   provider drivers for status or history hydration.
 - `clawd` owns client request ownership and response routing. Electron forwards
-  renderer approval/user-input responses as `clientRequest/respond`; the backend
+  renderer approval/user-input responses as `client/request/respond`; the backend
   remembers which provider emitted the request and dispatches to that provider.
 - Electron startup no longer performs global shell PATH repair. Dev mode passes
   an explicit Node executable and backend bundle path, packaged mode should use
@@ -444,34 +446,41 @@ sends responses and app events, and `clawd` may also send JSON-RPC requests to
 Electron main for desktop-owned effects such as folder pickers, open-external,
 secret lookup, or user confirmation. Those requests still use app-owned
 methods; they must not be raw Codex server requests. The first implemented
-client callback method is `client/openExternal`.
+client callback method is `client/external/open`.
+
+`clawd` method names use the path-style convention
+`resource[/subresource]/verb`, with values centralized in
+`shared/src/backend-protocol/methods.ts`. This is a breaking dev protocol
+surface: old method names are not aliased, so stale local and remote daemons
+must be restarted or synced after a rename.
 
 Initial request methods should mirror today's `CodexClawApi` surface, but with
 names that describe backend ownership:
 
 - `snapshot/get`
-- `team/create`, `team/update`, `team/reorder`, `team/close`, `team/select`
-- `agent/create`, `agent/update`, `agent/close`, `agent/select`,
-  `agent/restart`, `agent/sendPrompt`, `agent/steer`, `agent/interrupt`,
-  `agent/deleteMessage`, `agent/editMessage`, `agent/retryMessage`
-- `clientRequest/respond`
-- `agent/validateFolder`, `agent/listModels`, `agent/listSkills`,
-  `agent/listConversations`, `agent/resumeConversation`,
-  `agent/readConversationMessages`
-- `bench/saveAgent`, `bench/deployTemplate`, `bench/removeTemplate`
-- `loop/snapshot`, `loop/create`, `loop/update`, `loop/run`, `loop/delete`,
+- `team/create`, `team/update`, `team/reorder`, `team/delete`, `team/select`
+- `agent/create`, `agent/update`, `agent/delete`, `agent/select`,
+  `agent/restart`, `agent/prompt/send`, `agent/prompt/steer`, `agent/interrupt`,
+  `agent/message/delete`, `agent/message/update`, `agent/message/retry`
+- `client/request/respond`
+- `agent/folder/validate`, `agent/models/list`, `agent/skills/list`,
+  `agent/conversations/list`, `agent/conversation/resume`,
+  `agent/conversation/messages/get`
+- `snapshot/bench/get`, `bench/agent/template/create`, `bench/template/create`,
+  `bench/template/deploy`, `bench/template/delete`
+- `snapshot/loops/get`, `loop/create`, `loop/update`, `loop/run`, `loop/delete`,
   `loop/history/clear`, `loop/execution/delete`
-- `source/listRepositories`, `source/listWorktrees`,
-  `source/suggestWorktreePath`, `source/createWorktree`
-- `agent/listFiles`, `agent/previewFile` using agent ids only. `clawd` resolves
+- `source/repositories/list`, `source/worktrees/list`,
+  `source/worktree/path/suggest`, `source/worktree/create`
+- `agent/files/list`, `agent/file/preview` using agent ids only. `clawd` resolves
   the workspace root from its snapshot so desktop, mobile, and future web
   clients never transmit local filesystem roots as read authority.
 - `git/status`, `git/diff`
-- `workProvider/connect`, `workProvider/completeConnection`,
-  `workProvider/disconnect`, `workProvider/listRepositories`,
-  `workProvider/configureBacklog`, `workProvider/listItems`
+- `workProvider/connect`, `workProvider/connection/complete`,
+  `workProvider/disconnect`, `workProvider/repositories/list`,
+  `workProvider/backlog/configure`, `workProvider/items/list`
 - `settings/update`
-- `backend/health`
+- `backend/health/get`
 
 Backend events should reuse today's app-owned `MainToRendererEvent` vocabulary
 where it is already right. The backend should assign event sequence numbers
@@ -624,7 +633,7 @@ When launched by the macOS LaunchAgent, launchd captures stdout and stderr to
 secondary process-capture logs, not the primary operational log.
 
 On startup, packaged Electron resolves the current packaged `clawd --version`
-and compares it with the running daemon's `backend/health.version`. If an
+and compares it with the running daemon's `backend/health/get.version`. If an
 installed daemon is stale and idle, Electron refreshes the LaunchAgent before
 connecting. If active agents or loop executions are running, Electron asks the
 user whether to restart the daemon now or continue with the old backend for
@@ -738,7 +747,7 @@ Signing implications:
 - Linux: no signing requirement by default, but the packaged artifact still
   needs smoke tests.
 - Local `CODEX_CLAW_SKIP_SIGNING=1` builds should skip app/helper signing but
-  still verify the backend runtime starts and answers `backend/health`.
+  still verify the backend runtime starts and answers `backend/health/get`.
 
 Minimum release smoke:
 
@@ -750,7 +759,7 @@ CODEX_CLAW_SKIP_SIGNING=1 npm run package
   ./out/<platform>/Codex\ Claw.app/Contents/Resources/clawd/clawd.mjs --stdio
 ```
 
-The stdio smoke should send `backend/health` and expect a valid JSON-RPC
+The stdio smoke should send `backend/health/get` and expect a valid JSON-RPC
 response. The packaged app smoke should launch the app, connect to the packaged
 backend, call `snapshot/get`, and quit cleanly.
 
@@ -880,6 +889,14 @@ Remote migration path:
   run, history, work-provider repository/item, and history conversation reads
   to the selected remote. Remote snapshots are returned to the UI without
   replacing local `clawd`'s durable product snapshot.
+- Bench management is location-scoped by team. The active or target team's
+  `clawd` instance supplies the Bench catalog shown in New Agent and Bench
+  assignment flows. Saving an agent in a remote-backed team serializes the
+  local product agent into a template payload and stores it in the remote
+  `clawd`; removing a template removes it from that same remote catalog.
+  Deploying a remote template resolves it from the team's remote `clawd`, then
+  creates the local product agent in that team so teams and agents remain
+  controlled by local `clawd`.
 - Cross-location sync is a separate product problem and should not block the
   process extraction.
 
@@ -901,7 +918,13 @@ type AgentFolder = {
 The first remote slices now persist SSH connection records in `clawd`, parse
 the backend host's `~/.ssh/config`, probe the selected host, install the
 bundled `clawd` script to `~/.codex-claw/clawd.mjs` when missing, and record
-the stdio transport as `ssh <host> "node ~/.codex-claw/clawd.mjs --stdio"`.
+the stdio transport as
+`ssh <host> "node ~/.codex-claw/clawd.mjs connect || exec node ~/.codex-claw/clawd.mjs --stdio"`.
+The remote `connect` mode bridges SSH stdio to the remote host's
+`~/.codex-claw/clawd.sock` when an externally managed `clawd serve` daemon is
+already running; otherwise the shell fallback keeps the previous one-shot
+`--stdio` behavior. Sync does not install, start, or restart the persistent
+remote daemon.
 Sync mirrors `provider-tokens.json` to the remote; it does not copy local
 `state.json`. The remote `clawd` hydrates safe work-integration connection
 metadata from those tokens during startup so remote loop management can see
