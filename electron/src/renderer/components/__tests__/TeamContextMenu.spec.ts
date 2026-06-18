@@ -50,6 +50,28 @@ describe('TeamContextMenu', () => {
     expect(wrapper.emitted('request-close-team')).toStrictEqual([['team-codex-claw']]);
   });
 
+  it('shows separate disconnect and delete actions for remote teams', async () => {
+    const wrapper = mountMenu({
+      team: {
+        ...team,
+        remoteConnectionId: 'connection-devbox',
+        remoteTeamId: 'team-remote',
+      },
+    });
+
+    expect(wrapper.findAll('[role="menuitem"]').map((item) => item.text())).toStrictEqual([
+      'Edit Team',
+      'Disconnect',
+      'Delete Team',
+    ]);
+
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Disconnect')?.trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Delete Team')?.trigger('click');
+
+    expect(wrapper.emitted('request-disconnect-team')).toStrictEqual([['team-codex-claw']]);
+    expect(wrapper.emitted('request-close-team')).toStrictEqual([['team-codex-claw']]);
+  });
+
   it('disables close when the rail has only one team', async () => {
     const wrapper = mountMenu({ canClose: false });
 

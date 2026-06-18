@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import TeamDialog from '../TeamDialog.vue';
@@ -54,6 +54,35 @@ describe('TeamDialog', () => {
     });
   });
 
+  it('connects to an existing remote team from a ready SSH connection', async () => {
+    const createTeam = vi.fn().mockResolvedValue(undefined);
+    const loadRemoteTeams = vi.fn().mockResolvedValue([{
+      id: 'team-remote',
+      name: 'Remote Core',
+      color: '#46A857',
+      agentIds: ['agent-remote'],
+    }]);
+    const wrapper = mountDialog({
+      createTeam,
+      loadRemoteTeams,
+      remoteConnections: [readyConnection()],
+    });
+
+    await wrapper.getComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'connection-devbox');
+    await flushPromises();
+    await wrapper.findAllComponents({ name: 'ElSelect' })[1]?.vm.$emit('update:modelValue', 'team-remote');
+    await flushPromises();
+    await saveButton(wrapper).trigger('click');
+
+    expect(loadRemoteTeams).toHaveBeenCalledWith('connection-devbox');
+    expect(createTeam).toHaveBeenCalledWith({
+      name: 'Remote Core',
+      color: '#46A857',
+      remoteConnectionId: 'connection-devbox',
+      remoteTeamId: 'team-remote',
+    });
+  });
+
   it('edits an existing team with prefilled values', async () => {
     const updateTeam = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountDialog({
@@ -79,6 +108,45 @@ describe('TeamDialog', () => {
       id: 'team-codex-claw',
       name: 'Skwad Core',
       color: '#46A857',
+    });
+    expect(wrapper.emitted('close')).toStrictEqual([[]]);
+  });
+
+  it('connects an empty existing team to an existing remote team', async () => {
+    const updateTeam = vi.fn().mockResolvedValue(undefined);
+    const loadRemoteTeams = vi.fn().mockResolvedValue([{
+      id: 'team-remote',
+      name: 'Remote Core',
+      color: '#46A857',
+      agentIds: ['agent-remote'],
+    }]);
+    const wrapper = mountDialog({
+      mode: 'edit',
+      remoteConnections: [readyConnection()],
+      team: {
+        id: 'team-codex-claw',
+        name: 'Local Empty',
+        avatar: 'LE',
+        color: '#1B4FB2',
+        agentIds: [],
+      },
+      loadRemoteTeams,
+      updateTeam,
+    });
+
+    await wrapper.getComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'connection-devbox');
+    await flushPromises();
+    await wrapper.findAllComponents({ name: 'ElSelect' })[1]?.vm.$emit('update:modelValue', 'team-remote');
+    await flushPromises();
+    await saveButton(wrapper, 'Save').trigger('click');
+
+    expect(loadRemoteTeams).toHaveBeenCalledWith('connection-devbox');
+    expect(updateTeam).toHaveBeenCalledWith({
+      id: 'team-codex-claw',
+      name: 'Remote Core',
+      color: '#46A857',
+      remoteConnectionId: 'connection-devbox',
+      remoteTeamId: 'team-remote',
     });
     expect(wrapper.emitted('close')).toStrictEqual([[]]);
   });
@@ -114,6 +182,7 @@ describe('TeamDialog', () => {
 
 function mountDialog(overrides: Partial<{
   createTeam: (input: CreateTeamInput) => Promise<Team | null | void>;
+  loadRemoteTeams: (connectionId: string) => Promise<Team[]>;
   mode: 'create' | 'edit';
   team: Team | null;
   updateTeam: (input: UpdateTeamInput) => Promise<void>;

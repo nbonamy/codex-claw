@@ -291,6 +291,70 @@ describe('TeamRail', () => {
     expect(wrapper.emitted('close-team')).toStrictEqual([['team-claw']]);
   });
 
+  it('confirms before disconnecting a remote team without closing it remotely', async () => {
+    const remoteTeams: Team[] = [
+      teams[0],
+      {
+        ...teams[1],
+        remoteConnectionId: 'connection-devbox',
+        remoteTeamId: 'team-remote',
+      },
+    ];
+    const wrapper = mountRail({
+      teams: remoteTeams,
+      activeTeamId: 'team-sk',
+    });
+    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
+
+    await wrapper.get('[aria-label="Codex Claw"]').trigger('contextmenu');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Disconnect')?.trigger('click');
+    await flushPromises();
+
+    expect(confirm).toHaveBeenCalledWith(
+      'Codex Claw will be removed from this app. Its agents keep running on the remote backend.',
+      'Disconnect from Codex Claw?',
+      {
+        cancelButtonText: 'Cancel',
+        confirmButtonText: 'Disconnect',
+        type: 'info',
+      },
+    );
+    expect(wrapper.emitted('disconnect-team')).toStrictEqual([['team-claw']]);
+    expect(wrapper.emitted('close-team')).toBeUndefined();
+  });
+
+  it('confirms before deleting a remote team on the remote backend', async () => {
+    const remoteTeams: Team[] = [
+      teams[0],
+      {
+        ...teams[1],
+        remoteConnectionId: 'connection-devbox',
+        remoteTeamId: 'team-remote',
+      },
+    ];
+    const wrapper = mountRail({
+      teams: remoteTeams,
+      activeTeamId: 'team-sk',
+    });
+    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
+
+    await wrapper.get('[aria-label="Codex Claw"]').trigger('contextmenu');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Delete Team')?.trigger('click');
+    await flushPromises();
+
+    expect(confirm).toHaveBeenCalledWith(
+      'Codex Claw will be deleted on the remote backend. Its agents and conversations will stop there.',
+      'Delete Codex Claw?',
+      {
+        cancelButtonText: 'Cancel',
+        confirmButtonText: 'Delete Team',
+        type: 'warning',
+      },
+    );
+    expect(wrapper.emitted('close-team')).toStrictEqual([['team-claw']]);
+    expect(wrapper.emitted('disconnect-team')).toBeUndefined();
+  });
+
   it('keeps floating UI open for inside clicks and closes it for escape or outside clicks', async () => {
     const wrapper = mountRail({
       teams,

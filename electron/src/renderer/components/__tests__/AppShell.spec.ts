@@ -4,7 +4,7 @@ import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { Agent, AppCommand, AppSnapshot, BackendConversationRef, BenchLocation, BenchTemplate, CodexClawApi, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { Agent, AppCommand, AppSnapshot, BackendConversationRef, BenchLocation, BenchTemplate, CodexClawApi, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
 import { i18n } from '../../i18n';
 
@@ -1833,6 +1833,36 @@ describe('AppShell', () => {
     expect(loadBench).not.toHaveBeenCalled();
   });
 
+  it('loads existing remote teams for the Team dialog from the selected connection backend', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.remoteConnections.connections = [{
+      id: 'connection-devbox',
+      kind: 'ssh',
+      name: 'devbox',
+      host: 'devbox',
+      status: 'ready',
+      createdAt: '2026-06-14T10:00:00.000Z',
+      updatedAt: '2026-06-14T10:00:00.000Z',
+    }];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.teams = [{
+      id: 'team-remote',
+      name: 'Remote Core',
+      color: '#277da1',
+      agentIds: [],
+    }];
+    const getLoopSnapshot = vi.fn().mockResolvedValue(remoteSnapshot);
+    const wrapper = mountShell({ snapshot, getLoopSnapshot });
+
+    const loadRemoteTeams = wrapper.findComponent({ name: 'TeamDialog' }).props('loadRemoteTeams') as (connectionId: string) => Promise<Team[]>;
+    await expect(loadRemoteTeams('connection-devbox')).resolves.toStrictEqual(remoteSnapshot.teams);
+
+    expect(getLoopSnapshot).toHaveBeenCalledWith({
+      kind: 'remote',
+      remoteConnectionId: 'connection-devbox',
+    });
+  });
+
   it('forwards agent move targets from the context menu', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.teams.push({
@@ -2045,6 +2075,7 @@ function mountShell(overrides: Partial<{
   loadWorkRepositories: (provider: WorkProviderKind) => Promise<void>;
   loadWorkItems: (provider: WorkProviderKind, repositoryId: string) => Promise<void>;
   loadBench: (location?: BenchLocation) => Promise<void>;
+  getLoopSnapshot: (location?: LoopLocation) => Promise<AppSnapshot>;
   remoteBenchByConnectionId: Record<string, BenchTemplate[]>;
   remoteBenchStatusByConnectionId: Record<string, 'notLoaded' | 'loading' | 'loaded' | 'error'>;
   quit: () => Promise<void>;
@@ -2081,6 +2112,7 @@ function mountShell(overrides: Partial<{
       loadWorkRepositories: overrides.loadWorkRepositories ?? vi.fn().mockResolvedValue(undefined),
       loadWorkItems: overrides.loadWorkItems ?? vi.fn().mockResolvedValue(undefined),
       loadBench: overrides.loadBench ?? vi.fn().mockResolvedValue(undefined),
+      getLoopSnapshot: overrides.getLoopSnapshot ?? vi.fn().mockResolvedValue(createEmptySnapshot()),
       remoteBenchByConnectionId: overrides.remoteBenchByConnectionId ?? {},
       remoteBenchStatusByConnectionId: overrides.remoteBenchStatusByConnectionId ?? {},
       workRepositoriesByProvider: overrides.workRepositoriesByProvider ?? {},

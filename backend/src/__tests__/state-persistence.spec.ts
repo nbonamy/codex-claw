@@ -815,10 +815,12 @@ describe('AppStatePersistence', () => {
       updatedAt: '2026-06-14T10:00:00.000Z',
     }];
     snapshot.teams[0].remoteConnectionId = 'connection-devbox';
+    snapshot.teams[0].remoteTeamId = 'team-remote';
 
     const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
 
     expect(restored.teams[0].remoteConnectionId).toBe('connection-devbox');
+    expect(restored.teams[0].remoteTeamId).toBe('team-remote');
     expect(restored.agents[0]).not.toHaveProperty('remoteConnectionId');
   });
 
@@ -828,6 +830,7 @@ describe('AppStatePersistence', () => {
         id: 'team-remote',
         name: 'Remote',
         remoteConnectionId: 'missing-connection',
+        remoteTeamId: 'team-remote',
         agentIds: ['agent-remote'],
       }],
       agents: [{
@@ -846,6 +849,7 @@ describe('AppStatePersistence', () => {
     });
 
     expect(restored.teams[0].remoteConnectionId).toBeUndefined();
+    expect(restored.teams[0].remoteTeamId).toBeUndefined();
   });
 
   it('sanitizes invalid source folder settings', () => {

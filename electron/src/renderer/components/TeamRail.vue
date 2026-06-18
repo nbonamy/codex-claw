@@ -81,6 +81,7 @@
       :y="contextMenuPosition.y"
       @edit-team="selectEditTeam"
       @request-close-team="requestCloseTeam"
+      @request-disconnect-team="requestDisconnectTeam"
       @close="contextMenuTeamId = null"
     />
   </aside>
@@ -96,7 +97,7 @@ import { useListReorderDrag } from '../shared/use-list-reorder-drag';
 import CockpitIcon from './CockpitIcon.vue';
 import SettingsMenu from './SettingsMenu.vue';
 import TeamContextMenu from './TeamContextMenu.vue';
-import { confirmCloseTeam } from './team-close-confirmation';
+import { confirmCloseTeam, confirmDisconnectTeam } from './team-close-confirmation';
 
 const props = defineProps<{
   teams: Team[];
@@ -109,6 +110,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'close-team': [teamId: string];
+  'disconnect-team': [teamId: string];
   'edit-team': [teamId: string];
   'new-team': [];
   'open-settings': [];
@@ -169,6 +171,24 @@ async function requestCloseTeam(teamId: string): Promise<void> {
 
   if (await confirmCloseTeam(team)) {
     emit('close-team', team.id);
+  }
+}
+
+async function requestDisconnectTeam(teamId: string): Promise<void> {
+  if (props.teams.length <= 1) {
+    return;
+  }
+
+  const team = props.teams.find((candidate) => candidate.id === teamId);
+  if (!team?.remoteConnectionId) {
+    return;
+  }
+
+  contextMenuTeamId.value = null;
+  await nextTick();
+
+  if (await confirmDisconnectTeam(team)) {
+    emit('disconnect-team', team.id);
   }
 }
 

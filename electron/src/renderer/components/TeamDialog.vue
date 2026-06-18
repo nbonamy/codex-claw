@@ -19,28 +19,6 @@
       class="claw-form-dialog team-dialog__form"
       @submit.prevent="submit"
     >
-      <section class="claw-form-dialog__field team-dialog__field">
-        <div class="claw-form-dialog__field-heading team-dialog__field-heading">
-          <label
-            class="claw-form-dialog__label team-dialog__label"
-            for="team-dialog-name"
-          >
-            Name
-          </label>
-          <span class="claw-form-dialog__heading-separator team-dialog__heading-separator">•</span>
-          <p class="claw-form-dialog__help team-dialog__help">Give this team a name for the sidebar.</p>
-        </div>
-        <div class="claw-form-dialog__control claw-form-dialog__input-control team-dialog__input-shell">
-          <input
-            id="team-dialog-name"
-            v-model="name"
-            class="claw-form-dialog__text-input team-dialog__text-input"
-            type="text"
-            placeholder="Enter team name"
-            autofocus
-          />
-        </div>
-      </section>
 
       <section class="claw-form-dialog__field team-dialog__field">
         <div class="claw-form-dialog__field-heading team-dialog__field-heading">
@@ -72,6 +50,68 @@
               :value="connection.id"
             />
           </el-select>
+        </div>
+      </section>
+
+      <section
+        v-if="showRemoteTeamSelection"
+        class="claw-form-dialog__field team-dialog__field"
+      >
+        <div class="claw-form-dialog__field-heading team-dialog__field-heading">
+          <label
+            class="claw-form-dialog__label team-dialog__label"
+            for="team-dialog-remote-team"
+          >
+            Remote Team
+          </label>
+          <span class="claw-form-dialog__heading-separator team-dialog__heading-separator">•</span>
+          <p class="claw-form-dialog__help team-dialog__help">Create a new team or connect to one already on that backend.</p>
+        </div>
+        <div class="claw-form-dialog__control team-dialog__input-shell team-dialog__input-shell--select">
+          <el-select
+            id="team-dialog-remote-team"
+            v-model="remoteTeamSelection"
+            class="team-dialog__connection-select"
+            :loading="remoteTeamsLoading"
+            :teleported="false"
+          >
+            <el-option
+              label="Create new remote team"
+              :value="newRemoteTeamValue"
+            />
+            <el-option
+              v-for="teamOption in remoteTeamOptions"
+              :key="teamOption.id"
+              :label="teamOption.name"
+              :value="teamOption.id"
+            />
+          </el-select>
+        </div>
+      </section>
+
+      <section
+        v-if="showTeamNameInput"
+        class="claw-form-dialog__field team-dialog__field"
+      >
+        <div class="claw-form-dialog__field-heading team-dialog__field-heading">
+          <label
+            class="claw-form-dialog__label team-dialog__label"
+            for="team-dialog-name"
+          >
+            Name
+          </label>
+          <span class="claw-form-dialog__heading-separator team-dialog__heading-separator">•</span>
+          <p class="claw-form-dialog__help team-dialog__help">Give this team a name for the sidebar.</p>
+        </div>
+        <div class="claw-form-dialog__control claw-form-dialog__input-control team-dialog__input-shell">
+          <input
+            id="team-dialog-name"
+            v-model="name"
+            class="claw-form-dialog__text-input team-dialog__text-input"
+            type="text"
+            placeholder="Enter team name"
+            autofocus
+          />
         </div>
       </section>
 
@@ -139,6 +179,7 @@ import { CheckIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
   createTeam: (input: CreateTeamInput) => Promise<Team | null | void>;
+  loadRemoteTeams?: (connectionId: string) => Promise<Team[]>;
   mode?: 'create' | 'edit';
   remoteConnections?: RemoteConnection[];
   team?: Team | null;
@@ -158,11 +199,18 @@ const emit = defineEmits<{
 const name = ref('');
 const selectedColor = ref<string>(defaultTeamColor);
 const localConnectionValue = '__local__';
+const newRemoteTeamValue = '__new_remote_team__';
 const connectionSelection = ref(localConnectionValue);
+const remoteTeamSelection = ref(newRemoteTeamValue);
+const remoteTeamOptions = ref<Team[]>([]);
+const remoteTeamsLoading = ref(false);
 const errorMessage = ref<string | null>(null);
 const submitting = ref(false);
 
-const canSave = computed(() => name.value.trim().length > 0 && !submitting.value);
+const selectedExistingRemoteTeam = computed(() => remoteTeamOptions.value.find((team) => team.id === remoteTeamSelection.value) ?? null);
+const showRemoteTeamSelection = computed(() => shouldLoadRemoteTeamOptions(selectedRemoteConnectionId.value));
+const showTeamNameInput = computed(() => props.mode === 'edit' || connectionSelection.value === localConnectionValue || remoteTeamSelection.value === newRemoteTeamValue);
+const canSave = computed(() => (name.value.trim().length > 0 || Boolean(selectedExistingRemoteTeam.value)) && !submitting.value);
 const readyRemoteConnections = computed(() => props.remoteConnections.filter((connection) => connection.status === 'ready'));
 const selectedRemoteConnectionId = computed(() => (
   connectionLocked.value && props.team?.remoteConnectionId
@@ -180,6 +228,18 @@ watch(() => props.visible, (visible) => {
   }
 }, { immediate: true });
 
+watch(selectedRemoteConnectionId, (connectionId) => {
+  void loadRemoteTeamOptions(connectionId);
+});
+
+watch(selectedExistingRemoteTeam, (team) => {
+  if (!team) {
+    return;
+  }
+  name.value = team.name;
+  selectedColor.value = team.color ?? selectedColor.value;
+});
+
 async function submit(): Promise<void> {
   if (!canSave.value) {
     return;
@@ -189,17 +249,21 @@ async function submit(): Promise<void> {
   errorMessage.value = null;
   try {
     if (props.mode === 'edit' && props.team) {
+      const existingRemoteTeam = selectedExistingRemoteTeam.value;
       await props.updateTeam({
         id: props.team.id,
-        name: name.value,
-        color: selectedColor.value,
+        name: existingRemoteTeam?.name ?? name.value,
+        color: existingRemoteTeam?.color ?? selectedColor.value,
         ...(selectedRemoteConnectionId.value ? { remoteConnectionId: selectedRemoteConnectionId.value } : {}),
+        ...(existingRemoteTeam ? { remoteTeamId: existingRemoteTeam.id } : {}),
       });
     } else {
+      const existingRemoteTeam = selectedExistingRemoteTeam.value;
       await props.createTeam({
-        name: name.value,
-        color: selectedColor.value,
+        name: existingRemoteTeam?.name ?? name.value,
+        color: existingRemoteTeam?.color ?? selectedColor.value,
         ...(selectedRemoteConnectionId.value ? { remoteConnectionId: selectedRemoteConnectionId.value } : {}),
+        ...(existingRemoteTeam ? { remoteTeamId: existingRemoteTeam.id } : {}),
       });
     }
     close();
@@ -225,8 +289,11 @@ function resetForm(): void {
   name.value = props.mode === 'edit' ? props.team?.name ?? '' : '';
   selectedColor.value = props.mode === 'edit' ? props.team?.color ?? defaultTeamColor : defaultTeamColor;
   connectionSelection.value = connectionValueForTeam();
+  remoteTeamSelection.value = newRemoteTeamValue;
+  remoteTeamOptions.value = [];
   errorMessage.value = null;
   submitting.value = false;
+  void loadRemoteTeamOptions(selectedRemoteConnectionId.value);
 }
 
 function connectionValueForTeam(): string {
@@ -237,6 +304,33 @@ function connectionValueForTeam(): string {
   return teamConnectionId && readyRemoteConnections.value.some((connection) => connection.id === teamConnectionId)
     ? teamConnectionId
     : localConnectionValue;
+}
+
+async function loadRemoteTeamOptions(connectionId: string): Promise<void> {
+  remoteTeamOptions.value = [];
+  remoteTeamSelection.value = newRemoteTeamValue;
+  if (!shouldLoadRemoteTeamOptions(connectionId) || !props.loadRemoteTeams) {
+    return;
+  }
+
+  remoteTeamsLoading.value = true;
+  try {
+    remoteTeamOptions.value = await props.loadRemoteTeams(connectionId);
+  } catch {
+    remoteTeamOptions.value = [];
+  } finally {
+    remoteTeamsLoading.value = false;
+  }
+}
+
+function shouldLoadRemoteTeamOptions(connectionId: string): boolean {
+  if (!connectionId || connectionLocked.value) {
+    return false;
+  }
+  if (props.mode === 'create') {
+    return true;
+  }
+  return connectionId !== (props.team?.remoteConnectionId?.trim() ?? '');
 }
 </script>
 

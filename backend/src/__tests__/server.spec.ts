@@ -8,6 +8,7 @@ import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilitie
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import type { WorkIntegrationManager } from '../work-integrations/manager';
+import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
 
 describe('ClawBackendServer', () => {
   it('responds to backend health requests', async () => {
@@ -290,6 +291,713 @@ describe('ClawBackendServer', () => {
       },
     );
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
+  });
+
+  it('creates remote teams as local pointers only', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    const remoteSnapshot = createRemoteTeamSnapshot();
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const remoteClients = {
+      request: vi.fn().mockResolvedValue(remoteSnapshot),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+      remoteClients: remoteClients as never,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'create-remote-team',
+      method: 'team/create',
+      params: {
+        input: {
+          name: 'Remote Core',
+          color: '#46A857',
+          remoteConnectionId: 'connection-devbox',
+        },
+      },
+    })).resolves.toMatchObject({
+      result: {
+        teams: expect.arrayContaining([expect.objectContaining({
+          remoteConnectionId: 'connection-devbox',
+          remoteTeamId: 'team-remote',
+          agentIds: [],
+        })]),
+        agents: [],
+      },
+    });
+
+    expect(remoteClients.request).toHaveBeenCalledWith(
+      snapshot.remoteConnections.connections[0],
+      'team/create',
+      {
+        input: {
+          name: 'Remote Core',
+          color: '#46A857',
+        },
+      },
+      expect.any(Function),
+    );
+    expect(snapshot.teams[1]).toMatchObject({
+      remoteConnectionId: 'connection-devbox',
+      remoteTeamId: 'team-remote',
+      agentIds: [],
+    });
+    expect(snapshot.agents).toStrictEqual([]);
+    expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
+  });
+
+  it('creates agents in the remote team without saving local proxy agents', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    snapshot.teams = [{
+      id: 'team-pointer',
+      name: 'Remote Core',
+      color: '#46A857',
+      remoteConnectionId: 'connection-devbox',
+      remoteTeamId: 'team-remote',
+      agentIds: [],
+    }];
+    snapshot.activeTeamId = 'team-pointer';
+    const remoteSnapshot = createRemoteTeamSnapshot([createRemoteAgent()]);
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const remoteClients = {
+      request: vi.fn().mockResolvedValue(remoteSnapshot),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+      remoteClients: remoteClients as never,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'create-remote-agent',
+      method: 'agent/create',
+      params: {
+        input: {
+          name: 'Dina',
+          folder: '/home/mnmt/src/codex-claw',
+          teamId: 'team-pointer',
+        },
+      },
+    })).resolves.toMatchObject({
+      result: {
+        activeTeamId: 'team-pointer',
+        activeAgentId: 'agent-remote',
+        teams: [{
+          id: 'team-pointer',
+          agentIds: ['agent-remote'],
+        }],
+        agents: [{
+          id: 'agent-remote',
+          teamId: 'team-pointer',
+        }],
+      },
+    });
+
+    expect(remoteClients.request).toHaveBeenCalledWith(
+      snapshot.remoteConnections.connections[0],
+      'agent/create',
+      {
+        input: {
+          name: 'Dina',
+          folder: '/home/mnmt/src/codex-claw',
+          teamId: 'team-remote',
+        },
+      },
+      expect.any(Function),
+    );
+    expect(snapshot.agents).toStrictEqual([]);
+    expect(snapshot.teams[0]?.agentIds).toStrictEqual([]);
+    expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
+  });
+
+  it('routes remote agent prompts to the owning remote clawd', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    snapshot.teams = [{
+      id: 'team-pointer',
+      name: 'Remote Core',
+      remoteConnectionId: 'connection-devbox',
+      remoteTeamId: 'team-remote',
+      agentIds: [],
+    }];
+    snapshot.activeTeamId = 'team-pointer';
+    snapshot.activeAgentId = 'agent-remote';
+    const remoteAgent = createRemoteAgent();
+    const remoteSnapshot = createRemoteTeamSnapshot([remoteAgent]);
+    const remoteSnapshotWithMessage = {
+      ...remoteSnapshot,
+      messages: [createTextMessage('message-user', 'agent-remote', 'hello')],
+    };
+    const remoteClients = {
+      request: vi.fn()
+        .mockResolvedValueOnce({
+          snapshot: remoteSnapshot,
+          lastEventSeq: 0,
+          clientState: {
+            sourceFolderPath: '',
+            shouldPreventDisplaySleep: false,
+          },
+        })
+        .mockResolvedValueOnce(remoteSnapshotWithMessage),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      remoteClients: remoteClients as never,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'prompt',
+      method: 'agent/prompt/send',
+      params: {
+        agentId: 'agent-remote',
+        prompt: 'hello',
+      },
+    })).resolves.toMatchObject({
+      result: {
+        activeAgentId: 'agent-remote',
+        agents: [{
+          id: 'agent-remote',
+          teamId: 'team-pointer',
+        }],
+        messages: [{
+          agentId: 'agent-remote',
+          parts: [{ type: 'text', text: 'hello' }],
+        }],
+      },
+    });
+
+    expect(remoteClients.request).toHaveBeenNthCalledWith(
+      1,
+      snapshot.remoteConnections.connections[0],
+      'snapshot/get',
+      undefined,
+      expect.any(Function),
+    );
+    expect(remoteClients.request).toHaveBeenNthCalledWith(
+      2,
+      snapshot.remoteConnections.connections[0],
+      'agent/prompt/send',
+      {
+        agentId: 'agent-remote',
+        prompt: 'hello',
+        options: undefined,
+      },
+      expect.any(Function),
+    );
+    expect(snapshot.agents).toStrictEqual([]);
+  });
+
+  it('projects and removes remote work item assignments through the owning remote clawd', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    snapshot.teams = [{
+      id: 'team-pointer',
+      name: 'Remote Core',
+      remoteConnectionId: 'connection-devbox',
+      remoteTeamId: 'team-remote',
+      agentIds: [],
+    }];
+    snapshot.activeTeamId = 'team-pointer';
+    snapshot.activeAgentId = 'agent-remote';
+    const item = createWorkItem();
+    const sanitizedItem = {
+      provider: item.provider,
+      id: item.id,
+      repositoryId: item.repositoryId,
+      repositoryFullName: item.repositoryFullName,
+      number: item.number,
+      title: item.title,
+      url: item.url,
+    };
+    const assignmentKey = workItemAssignmentKey(item);
+    const remoteAgent = createRemoteAgent();
+    const remoteSnapshot = createRemoteTeamSnapshot([remoteAgent]);
+    const assignedRemoteSnapshot = {
+      ...remoteSnapshot,
+      workBacklog: {
+        ...remoteSnapshot.workBacklog,
+        assignments: {
+          [assignmentKey]: {
+            provider: 'github',
+            itemId: item.id,
+            agentId: remoteAgent.id,
+            assignedAt: '2026-06-14T10:00:00.000Z',
+            status: 'working' as const,
+          },
+        },
+      },
+    };
+    const unassignedRemoteSnapshot = {
+      ...remoteSnapshot,
+      workBacklog: {
+        ...remoteSnapshot.workBacklog,
+        assignments: {},
+      },
+    };
+    const remoteClients = {
+      request: vi.fn(async (_connection, method: string) => {
+        if (method === 'snapshot/get') {
+          return {
+            snapshot: remoteSnapshot,
+            lastEventSeq: 0,
+            clientState: {
+              sourceFolderPath: '',
+              shouldPreventDisplaySleep: false,
+            },
+          };
+        }
+        if (method === 'agent/workItem/assign') {
+          return assignedRemoteSnapshot;
+        }
+        if (method === 'agent/workItem/assignment/delete') {
+          return unassignedRemoteSnapshot;
+        }
+        return remoteSnapshot;
+      }),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      remoteClients: remoteClients as never,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'assign-remote-item',
+      method: 'agent/workItem/assign',
+      params: { agentId: remoteAgent.id, item },
+    })).resolves.toMatchObject({
+      result: {
+        workBacklog: {
+          assignments: {
+            [assignmentKey]: {
+              agentId: remoteAgent.id,
+              status: 'working',
+            },
+          },
+        },
+      },
+    });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'remove-remote-item',
+      method: 'agent/workItem/assignment/delete',
+      params: { item },
+    })).resolves.toMatchObject({
+      result: {
+        workBacklog: { assignments: {} },
+      },
+    });
+
+    expect(remoteClients.request).toHaveBeenNthCalledWith(
+      1,
+      snapshot.remoteConnections.connections[0],
+      'snapshot/get',
+      undefined,
+      expect.any(Function),
+    );
+    expect(remoteClients.request).toHaveBeenNthCalledWith(
+      2,
+      snapshot.remoteConnections.connections[0],
+      'agent/workItem/assign',
+      { agentId: remoteAgent.id, item: sanitizedItem },
+      expect.any(Function),
+    );
+    expect(remoteClients.request).toHaveBeenNthCalledWith(
+      3,
+      snapshot.remoteConnections.connections[0],
+      'agent/workItem/assignment/delete',
+      { item: sanitizedItem },
+      expect.any(Function),
+    );
+    expect(snapshot.workBacklog.assignments).toStrictEqual({});
+  });
+
+  it('routes remote message actions to the owning remote clawd', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    snapshot.teams = [{
+      id: 'team-pointer',
+      name: 'Remote Core',
+      remoteConnectionId: 'connection-devbox',
+      remoteTeamId: 'team-remote',
+      agentIds: [],
+    }];
+    snapshot.activeTeamId = 'team-pointer';
+    snapshot.activeAgentId = 'agent-remote';
+    const remoteAgent = createRemoteAgent();
+    const remoteSnapshot = createRemoteTeamSnapshot([remoteAgent]);
+    remoteSnapshot.messages = [
+      createTextMessage('user-turn-1', remoteAgent.id, 'first prompt', 'turn-1'),
+      createTextMessage('assistant-turn-1', remoteAgent.id, 'first answer', 'turn-1', 'assistant'),
+    ];
+    const remoteSnapshotAfterAction = {
+      ...remoteSnapshot,
+      messages: [createTextMessage('message-after-action', remoteAgent.id, 'after action')],
+    };
+    const remoteClients = {
+      request: vi.fn(async (_connection, method: string) => {
+        if (method === 'snapshot/get') {
+          return {
+            snapshot: remoteSnapshot,
+            lastEventSeq: 0,
+            clientState: {
+              sourceFolderPath: '',
+              shouldPreventDisplaySleep: false,
+            },
+          };
+        }
+        return remoteSnapshotAfterAction;
+      }),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      remoteClients: remoteClients as never,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'rollback',
+      method: 'agent/turn/rollback',
+      params: { agentId: 'agent-remote', turnId: 'turn-1' },
+    })).resolves.toMatchObject({
+      result: {
+        messages: [{ id: 'message-after-action', agentId: 'agent-remote' }],
+      },
+    });
+    await server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'delete',
+      method: 'agent/message/delete',
+      params: { agentId: 'agent-remote', messageId: 'user-turn-1' },
+    });
+    await server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'edit',
+      method: 'agent/message/update',
+      params: { agentId: 'agent-remote', messageId: 'user-turn-1', prompt: 'edited prompt' },
+    });
+    await server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'retry',
+      method: 'agent/message/retry',
+      params: { agentId: 'agent-remote', messageId: 'assistant-turn-1' },
+    });
+
+    expect(remoteClients.request).toHaveBeenNthCalledWith(
+      1,
+      snapshot.remoteConnections.connections[0],
+      'snapshot/get',
+      undefined,
+      expect.any(Function),
+    );
+    expect(remoteClients.request).toHaveBeenNthCalledWith(
+      2,
+      snapshot.remoteConnections.connections[0],
+      'agent/turn/rollback',
+      { agentId: 'agent-remote', turnId: 'turn-1' },
+      expect.any(Function),
+    );
+    expect(remoteClients.request).toHaveBeenNthCalledWith(
+      3,
+      snapshot.remoteConnections.connections[0],
+      'agent/message/delete',
+      { agentId: 'agent-remote', messageId: 'user-turn-1' },
+      expect.any(Function),
+    );
+    expect(remoteClients.request).toHaveBeenNthCalledWith(
+      4,
+      snapshot.remoteConnections.connections[0],
+      'agent/message/update',
+      { agentId: 'agent-remote', messageId: 'user-turn-1', prompt: 'edited prompt' },
+      expect.any(Function),
+    );
+    expect(remoteClients.request).toHaveBeenNthCalledWith(
+      5,
+      snapshot.remoteConnections.connections[0],
+      'agent/message/retry',
+      { agentId: 'agent-remote', messageId: 'assistant-turn-1' },
+      expect.any(Function),
+    );
+    expect(snapshot.messages).toStrictEqual([]);
+  });
+
+  it('rejects moving a local agent into a remote team pointer', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    snapshot.teams = [
+      {
+        id: 'team-local',
+        name: 'Local',
+        agentIds: ['agent-local'],
+      },
+      {
+        id: 'team-pointer',
+        name: 'Remote Core',
+        remoteConnectionId: 'connection-devbox',
+        remoteTeamId: 'team-remote',
+        agentIds: [],
+      },
+    ];
+    snapshot.activeTeamId = 'team-local';
+    snapshot.activeAgentId = 'agent-local';
+    snapshot.agents = [{
+      id: 'agent-local',
+      teamId: 'team-local',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-06-14T10:00:00.000Z',
+      updatedAt: '2026-06-14T10:00:00.000Z',
+    }];
+    const remoteClients = {
+      request: vi.fn(),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      remoteClients: remoteClients as never,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'move-local-to-remote',
+      method: 'agent/team/move',
+      params: { input: { agentId: 'agent-local', teamId: 'team-pointer' } },
+    })).resolves.toMatchObject({
+      error: {
+        code: -32603,
+        message: 'Agents cannot be moved between backend locations.',
+      },
+    });
+
+    expect(snapshot.agents[0]).toMatchObject({ id: 'agent-local', teamId: 'team-local' });
+    expect(snapshot.teams.find((team) => team.id === 'team-local')?.agentIds).toStrictEqual(['agent-local']);
+    expect(snapshot.teams.find((team) => team.id === 'team-pointer')?.agentIds).toStrictEqual([]);
+    expect(remoteClients.request).not.toHaveBeenCalled();
+  });
+
+  it('projects only the selected remote team state into local snapshots', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    snapshot.teams = [{
+      id: 'team-pointer',
+      name: 'Remote Core',
+      remoteConnectionId: 'connection-devbox',
+      remoteTeamId: 'team-remote',
+      agentIds: [],
+    }];
+    snapshot.activeTeamId = 'team-pointer';
+    const remoteAgent = createRemoteAgent();
+    const otherRemoteAgent = {
+      ...createRemoteAgent(),
+      id: 'agent-other-remote',
+      teamId: 'team-other-remote',
+      name: 'Other Remote',
+    };
+    const remoteSnapshot = createRemoteTeamSnapshot([remoteAgent]);
+    remoteSnapshot.teams.push({
+      id: 'team-other-remote',
+      name: 'Other Remote Team',
+      agentIds: [otherRemoteAgent.id],
+      activeAgentId: otherRemoteAgent.id,
+    });
+    remoteSnapshot.agents.push(otherRemoteAgent);
+    remoteSnapshot.messages = [
+      createTextMessage('message-remote', remoteAgent.id, 'hello from selected team', 'turn-selected'),
+      createTextMessage('message-other-remote', otherRemoteAgent.id, 'hello from other team', 'turn-other'),
+    ];
+    remoteSnapshot.agentGitStatuses = {
+      [remoteAgent.id]: {
+        folder: remoteAgent.folder,
+        branch: 'main',
+        ahead: 0,
+        behind: 0,
+        changedFiles: 1,
+        addedLines: 3,
+        removedLines: 0,
+        hasUntracked: false,
+        state: 'dirty',
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      },
+      [otherRemoteAgent.id]: {
+        folder: otherRemoteAgent.folder,
+        branch: 'other',
+        ahead: 0,
+        behind: 0,
+        changedFiles: 4,
+        addedLines: 10,
+        removedLines: 1,
+        hasUntracked: false,
+        state: 'dirty',
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      },
+    };
+    remoteSnapshot.turnGitDiffs = {
+      'turn-selected': {
+        turnId: 'turn-selected',
+        addedLines: 3,
+        removedLines: 0,
+        diff: 'selected diff',
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      },
+      'turn-other': {
+        turnId: 'turn-other',
+        addedLines: 10,
+        removedLines: 1,
+        diff: 'other diff',
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      },
+    };
+    const remoteClients = {
+      request: vi.fn().mockResolvedValue({
+        snapshot: remoteSnapshot,
+        lastEventSeq: 0,
+        clientState: {
+          sourceFolderPath: '',
+          shouldPreventDisplaySleep: false,
+        },
+      }),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      remoteClients: remoteClients as never,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'snapshot',
+      method: 'snapshot/get',
+    })).resolves.toMatchObject({
+      result: {
+        snapshot: {
+          agents: [expect.objectContaining({ id: remoteAgent.id, teamId: 'team-pointer' })],
+          messages: [expect.objectContaining({ id: 'message-remote', agentId: remoteAgent.id })],
+          agentGitStatuses: {
+            [remoteAgent.id]: expect.objectContaining({ branch: 'main' }),
+          },
+          turnGitDiffs: {
+            'turn-selected': expect.objectContaining({ diff: 'selected diff' }),
+          },
+        },
+      },
+    });
+    const response = await server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'snapshot-assertions',
+      method: 'snapshot/get',
+    });
+    expect(response).toHaveProperty('result');
+    const projectedSnapshot = (response as { result: { snapshot: AppSnapshot } }).result.snapshot;
+    expect(projectedSnapshot.agents.some((agent) => agent.id === otherRemoteAgent.id)).toBe(false);
+    expect(projectedSnapshot.messages.some((message) => message.id === 'message-other-remote')).toBe(false);
+    expect(projectedSnapshot.agentGitStatuses[otherRemoteAgent.id]).toBeUndefined();
+    expect(projectedSnapshot.turnGitDiffs['turn-other']).toBeUndefined();
+  });
+
+  it('forwards remote events only for agents in connected remote team pointers', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    snapshot.teams = [{
+      id: 'team-pointer',
+      name: 'Remote Core',
+      remoteConnectionId: 'connection-devbox',
+      remoteTeamId: 'team-remote',
+      agentIds: [],
+    }];
+    const remoteAgent = createRemoteAgent();
+    const otherRemoteAgent = {
+      ...createRemoteAgent(),
+      id: 'agent-other-remote',
+      teamId: 'team-other-remote',
+      name: 'Other Remote',
+    };
+    const remoteSnapshot = createRemoteTeamSnapshot([remoteAgent]);
+    remoteSnapshot.teams.push({
+      id: 'team-other-remote',
+      name: 'Other Remote Team',
+      agentIds: [otherRemoteAgent.id],
+      activeAgentId: otherRemoteAgent.id,
+    });
+    remoteSnapshot.agents.push(otherRemoteAgent);
+    const events: unknown[] = [];
+    const remoteClients = {
+      request: vi.fn(async (_connection, _method: string, _params, onEvent?: (event: unknown) => void) => {
+        onEvent?.({
+          seq: 1,
+          type: 'agent.statusChanged',
+          agentId: otherRemoteAgent.id,
+          payload: { type: 'working' },
+          occurredAt: '2026-06-13T00:00:00.000Z',
+          snapshot: remoteSnapshot,
+        });
+        onEvent?.({
+          seq: 2,
+          type: 'agent.statusChanged',
+          agentId: remoteAgent.id,
+          payload: { type: 'working' },
+          occurredAt: '2026-06-13T00:00:01.000Z',
+          snapshot: remoteSnapshot,
+        });
+        return {
+          snapshot: remoteSnapshot,
+          lastEventSeq: 0,
+          clientState: {
+            sourceFolderPath: '',
+            shouldPreventDisplaySleep: false,
+          },
+        };
+      }),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      remoteClients: remoteClients as never,
+      onEvent: (event) => events.push(event),
+    });
+
+    await server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'snapshot',
+      method: 'snapshot/get',
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events).toStrictEqual([
+      expect.objectContaining({
+        type: 'agent.statusChanged',
+        agentId: remoteAgent.id,
+        payload: { type: 'working' },
+      }),
+    ]);
   });
 
   it('returns an app snapshot with the backend event sequence', async () => {
@@ -1114,7 +1822,264 @@ describe('ClawBackendServer', () => {
           remoteConnectionId: 'connection-devbox',
         },
       },
-    })).rejects.toThrow('Team connection cannot be changed while it has agents.');
+    })).resolves.toMatchObject({
+      error: {
+        code: -32603,
+        message: 'Team connection cannot be changed while it has agents.',
+      },
+    });
+  });
+
+  it('creates a remote team pointer when updating an empty local team to a remote connection', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    const remoteSnapshot = createRemoteTeamSnapshot();
+    const remoteClients = {
+      request: vi.fn().mockResolvedValue(remoteSnapshot),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      remoteClients: remoteClients as never,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'update-local-to-remote',
+      method: 'team/update',
+      params: {
+        input: {
+          id: 'team-test',
+          name: 'Remote Core',
+          color: '#46A857',
+          remoteConnectionId: 'connection-devbox',
+        },
+      },
+    })).resolves.toMatchObject({
+      result: {
+        teams: [expect.objectContaining({
+          id: 'team-test',
+          remoteConnectionId: 'connection-devbox',
+          remoteTeamId: 'team-remote',
+        })],
+      },
+    });
+
+    expect(remoteClients.request).toHaveBeenCalledWith(
+      snapshot.remoteConnections.connections[0],
+      'team/create',
+      {
+        input: {
+          name: 'Remote Core',
+          color: '#46A857',
+        },
+      },
+      expect.any(Function),
+    );
+    expect(snapshot.teams[0]).toMatchObject({
+      remoteConnectionId: 'connection-devbox',
+      remoteTeamId: 'team-remote',
+    });
+  });
+
+  it('connects an empty local team to an existing remote team when updating to a remote connection', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    const remoteSnapshot = createRemoteTeamSnapshot();
+    remoteSnapshot.teams[0]!.name = 'Remote Existing';
+    remoteSnapshot.teams[0]!.color = '#46A857';
+    const remoteClients = {
+      request: vi.fn().mockResolvedValue({
+        snapshot: remoteSnapshot,
+        lastEventSeq: 0,
+        clientState: {
+          sourceFolderPath: '',
+          shouldPreventDisplaySleep: false,
+        },
+      }),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      remoteClients: remoteClients as never,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'update-local-to-existing-remote',
+      method: 'team/update',
+      params: {
+        input: {
+          id: 'team-test',
+          name: 'Remote Existing',
+          color: '#46A857',
+          remoteConnectionId: 'connection-devbox',
+          remoteTeamId: 'team-remote',
+        },
+      },
+    })).resolves.toMatchObject({
+      result: {
+        teams: [expect.objectContaining({
+          id: 'team-test',
+          name: 'Remote Existing',
+          remoteConnectionId: 'connection-devbox',
+          remoteTeamId: 'team-remote',
+        })],
+      },
+    });
+
+    expect(remoteClients.request).toHaveBeenCalledWith(
+      snapshot.remoteConnections.connections[0],
+      'snapshot/get',
+      undefined,
+      expect.any(Function),
+    );
+    expect(remoteClients.request).not.toHaveBeenCalledWith(
+      snapshot.remoteConnections.connections[0],
+      'team/create',
+      expect.anything(),
+      expect.any(Function),
+    );
+  });
+
+  it('rejects changing a remote team connection when the remote team has agents', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    snapshot.teams[0].remoteConnectionId = 'connection-devbox';
+    snapshot.teams[0].remoteTeamId = 'team-remote';
+    const remoteClients = {
+      request: vi.fn().mockResolvedValue({
+        snapshot: createRemoteTeamSnapshot([createRemoteAgent()]),
+        lastEventSeq: 0,
+        clientState: {
+          sourceFolderPath: '',
+          shouldPreventDisplaySleep: false,
+        },
+      }),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      remoteClients: remoteClients as never,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'update-remote-to-local',
+      method: 'team/update',
+      params: {
+        input: {
+          id: 'team-test',
+          name: 'Remote Core',
+          color: '#46A857',
+        },
+      },
+    })).resolves.toMatchObject({
+      error: {
+        code: -32603,
+        message: 'Team connection cannot be changed while it has agents.',
+      },
+    });
+
+    expect(remoteClients.request).toHaveBeenCalledWith(
+      snapshot.remoteConnections.connections[0],
+      'snapshot/get',
+      undefined,
+      expect.any(Function),
+    );
+    expect(snapshot.teams[0]).toMatchObject({
+      remoteConnectionId: 'connection-devbox',
+      remoteTeamId: 'team-remote',
+    });
+  });
+
+  it('deletes an only remote team by creating a local fallback after remote delete', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    snapshot.teams[0].remoteConnectionId = 'connection-devbox';
+    snapshot.teams[0].remoteTeamId = 'team-remote';
+    snapshot.activeTeamId = 'team-test';
+    snapshot.activeAgentId = 'agent-remote';
+    const remoteClients = {
+      request: vi.fn().mockResolvedValue(createRemoteTeamSnapshot()),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      remoteClients: remoteClients as never,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'delete-only-remote-team',
+      method: 'team/delete',
+      params: { teamId: 'team-test' },
+    })).resolves.toMatchObject({
+      result: {
+        teams: [expect.objectContaining({
+          name: 'Local',
+        })],
+        activeAgentId: null,
+      },
+    });
+
+    expect(remoteClients.request).toHaveBeenCalledWith(
+      snapshot.remoteConnections.connections[0],
+      'team/delete',
+      { teamId: 'team-remote' },
+      expect.any(Function),
+    );
+    expect(snapshot.teams).toHaveLength(1);
+    expect(snapshot.teams[0]).toMatchObject({ name: 'Local' });
+    expect(snapshot.teams[0]?.remoteConnectionId).toBeUndefined();
+    expect(snapshot.teams[0]?.remoteTeamId).toBeUndefined();
+  });
+
+  it('disconnects an only remote team by creating a local fallback without deleting the remote team', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    snapshot.teams[0].remoteConnectionId = 'connection-devbox';
+    snapshot.teams[0].remoteTeamId = 'team-remote';
+    snapshot.activeTeamId = 'team-test';
+    snapshot.activeAgentId = 'agent-remote';
+    const remoteClients = {
+      request: vi.fn(),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      remoteClients: remoteClients as never,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'disconnect-only-remote-team',
+      method: 'team/disconnect',
+      params: { teamId: 'team-test' },
+    })).resolves.toMatchObject({
+      result: {
+        teams: [expect.objectContaining({
+          name: 'Local',
+        })],
+        activeAgentId: null,
+      },
+    });
+
+    expect(remoteClients.request).not.toHaveBeenCalled();
+    expect(snapshot.teams).toHaveLength(1);
+    expect(snapshot.teams[0]).toMatchObject({ name: 'Local' });
+    expect(snapshot.teams[0]?.remoteConnectionId).toBeUndefined();
+    expect(snapshot.teams[0]?.remoteTeamId).toBeUndefined();
   });
 
   it('owns agent CRUD and layout mutations', async () => {
@@ -1546,6 +2511,52 @@ describe('ClawBackendServer', () => {
       method: 'loop/create',
       params: { input: createInput, location },
     })).resolves.toMatchObject({ result: remoteSnapshot });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'remote-backlog-configure',
+      method: 'workProvider/backlog/configure',
+      params: {
+        input: { provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } },
+        location,
+      },
+    })).resolves.toMatchObject({ result: remoteSnapshot });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'remote-loop-update',
+      method: 'loop/update',
+      params: {
+        input: {
+          ...createInput,
+          id: 'loop-remote',
+          name: 'Remote regressions',
+        },
+        location,
+      },
+    })).resolves.toMatchObject({ result: remoteSnapshot });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'remote-loop-run',
+      method: 'loop/run',
+      params: { loopId: 'loop-remote', location },
+    })).resolves.toMatchObject({ result: remoteSnapshot });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'remote-loop-history-clear',
+      method: 'loop/history/clear',
+      params: { loopId: 'loop-remote', location },
+    })).resolves.toMatchObject({ result: remoteSnapshot });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'remote-loop-execution-delete',
+      method: 'loop/execution/delete',
+      params: { loopId: 'loop-remote', executionId: 'loop-exec-1', location },
+    })).resolves.toMatchObject({ result: remoteSnapshot });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'remote-loop-delete',
+      method: 'loop/delete',
+      params: { loopId: 'loop-remote', location },
+    })).resolves.toMatchObject({ result: remoteSnapshot });
 
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       1,
@@ -1559,6 +2570,54 @@ describe('ClawBackendServer', () => {
       snapshot.remoteConnections.connections[0],
       'loop/create',
       { input: createInput },
+      expect.any(Function),
+    );
+    expect(remoteClients.request).toHaveBeenNthCalledWith(
+      3,
+      snapshot.remoteConnections.connections[0],
+      'workProvider/backlog/configure',
+      { input: { provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } } },
+      expect.any(Function),
+    );
+    expect(remoteClients.request).toHaveBeenNthCalledWith(
+      4,
+      snapshot.remoteConnections.connections[0],
+      'loop/update',
+      {
+        input: {
+          ...createInput,
+          id: 'loop-remote',
+          name: 'Remote regressions',
+        },
+      },
+      expect.any(Function),
+    );
+    expect(remoteClients.request).toHaveBeenNthCalledWith(
+      5,
+      snapshot.remoteConnections.connections[0],
+      'loop/run',
+      { loopId: 'loop-remote' },
+      expect.any(Function),
+    );
+    expect(remoteClients.request).toHaveBeenNthCalledWith(
+      6,
+      snapshot.remoteConnections.connections[0],
+      'loop/history/clear',
+      { loopId: 'loop-remote' },
+      expect.any(Function),
+    );
+    expect(remoteClients.request).toHaveBeenNthCalledWith(
+      7,
+      snapshot.remoteConnections.connections[0],
+      'loop/execution/delete',
+      { loopId: 'loop-remote', executionId: 'loop-exec-1' },
+      expect.any(Function),
+    );
+    expect(remoteClients.request).toHaveBeenNthCalledWith(
+      8,
+      snapshot.remoteConnections.connections[0],
+      'loop/delete',
+      { loopId: 'loop-remote' },
       expect.any(Function),
     );
     expect(snapshot.activeTeamId).toBe('team-test');
@@ -2381,18 +3440,19 @@ describe('ClawBackendServer', () => {
     const snapshot = createTestSnapshot();
     snapshot.remoteConnections.connections = [readyRemoteConnection()];
     snapshot.teams[0]!.remoteConnectionId = 'connection-devbox';
-    snapshot.teams[0]!.agentIds = ['agent-dina'];
-    snapshot.agents = [{
+    snapshot.teams[0]!.remoteTeamId = 'team-remote';
+    snapshot.agents = [];
+    snapshot.activeAgentId = 'agent-dina';
+    const remoteAgent: AppSnapshot['agents'][number] = {
       id: 'agent-dina',
-      teamId: 'team-test',
+      teamId: 'team-remote',
       name: 'Remote Dina',
       folder: '/home/nicolas/src/codex-claw',
-      backend: 'codex',
+      backend: 'codex' as const,
       status: { type: 'idle' },
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
-    }];
-    snapshot.activeAgentId = 'agent-dina';
+    };
     const remoteTemplate = {
       id: 'bench-remote-dina',
       name: 'Remote Dina',
@@ -2401,18 +3461,37 @@ describe('ClawBackendServer', () => {
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
     };
+    const remoteSnapshotWithAgent = createRemoteTeamSnapshot([remoteAgent]);
     const remoteSnapshotWithBench = {
-      ...createTestSnapshot(),
+      ...createRemoteTeamSnapshot([remoteAgent]),
       bench: [remoteTemplate],
     };
     const remoteSnapshotWithoutBench = {
-      ...createTestSnapshot(),
+      ...createRemoteTeamSnapshot([remoteAgent]),
       bench: [],
     };
+    const remoteSnapshotWithDeployedAgent = createRemoteTeamSnapshot([remoteAgent, {
+      ...createRemoteAgent(),
+      name: 'Remote Dina',
+      folder: '/home/nicolas/src/codex-claw',
+    }]);
     const remoteClients = {
       request: vi.fn().mockImplementation((_connection, method: string) => {
-        if (method === 'bench/template/create' || method === 'snapshot/bench/get') {
+        if (method === 'snapshot/get') {
+          return Promise.resolve({
+            snapshot: remoteSnapshotWithAgent,
+            lastEventSeq: 0,
+            clientState: {
+              sourceFolderPath: '',
+              shouldPreventDisplaySleep: false,
+            },
+          });
+        }
+        if (method === 'bench/agent/template/create' || method === 'snapshot/bench/get') {
           return Promise.resolve(remoteSnapshotWithBench);
+        }
+        if (method === 'bench/template/deploy') {
+          return Promise.resolve(remoteSnapshotWithDeployedAgent);
         }
         if (method === 'bench/template/delete') {
           return Promise.resolve(remoteSnapshotWithoutBench);
@@ -2443,14 +3522,8 @@ describe('ClawBackendServer', () => {
     expect(snapshot.bench).toStrictEqual([]);
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
-      'bench/template/create',
-      {
-        input: {
-          name: 'Remote Dina',
-          folder: '/home/nicolas/src/codex-claw',
-          backend: 'codex',
-        },
-      },
+      'bench/agent/template/create',
+      { agentId: 'agent-dina' },
       expect.any(Function),
     );
 
@@ -2467,7 +3540,7 @@ describe('ClawBackendServer', () => {
       result: {
         agents: [
           { id: 'agent-dina' },
-          { name: 'Remote Dina', folder: '/home/nicolas/src/codex-claw', teamId: 'team-test' },
+          { id: 'agent-remote', name: 'Remote Dina', folder: '/home/nicolas/src/codex-claw', teamId: 'team-test' },
         ],
         bench: [],
       },
@@ -2480,8 +3553,11 @@ describe('ClawBackendServer', () => {
     );
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
-      'agent/folder/validate',
-      { folder: '/home/nicolas/src/codex-claw' },
+      'bench/template/deploy',
+      {
+        templateId: 'bench-remote-dina',
+        teamId: 'team-remote',
+      },
       expect.any(Function),
     );
 
@@ -2868,8 +3944,14 @@ describe('ClawBackendServer', () => {
     const snapshot = createTestSnapshot();
     snapshot.remoteConnections.connections = [readyRemoteConnection()];
     snapshot.teams[0].remoteConnectionId = 'connection-devbox';
+    snapshot.teams[0].remoteTeamId = 'team-remote';
+    const remoteSnapshot = createRemoteTeamSnapshot([{
+      ...createRemoteAgent(),
+      name: 'Remote Dina',
+      folder: '/home/nicolas/src/codex-claw',
+    }]);
     const remoteClients = {
-      request: vi.fn().mockResolvedValue(null),
+      request: vi.fn().mockResolvedValue(remoteSnapshot),
       close: vi.fn().mockResolvedValue(undefined),
     };
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
@@ -2897,27 +3979,32 @@ describe('ClawBackendServer', () => {
         teams: [{
           id: 'team-test',
           remoteConnectionId: 'connection-devbox',
+          remoteTeamId: 'team-remote',
+          agentIds: ['agent-remote'],
         }],
         agents: [{
-          id: expect.any(String),
+          id: 'agent-remote',
           name: 'Remote Dina',
           folder: '/home/nicolas/src/codex-claw',
+          teamId: 'team-test',
         }],
       },
     });
 
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
-      'agent/folder/validate',
-      { folder: '/home/nicolas/src/codex-claw' },
+      'agent/create',
+      {
+        input: {
+          name: 'Remote Dina',
+          folder: '/home/nicolas/src/codex-claw',
+          backend: 'codex',
+          teamId: 'team-remote',
+        },
+      },
       expect.any(Function),
     );
-    expect(remoteClients.request).toHaveBeenCalledWith(
-      snapshot.remoteConnections.connections[0],
-      'driver/git/status/get',
-      { agent: expect.not.objectContaining({ remoteConnectionId: expect.any(String) }) },
-      expect.any(Function),
-    );
+    expect(snapshot.agents).toStrictEqual([]);
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
   });
 
@@ -2925,12 +4012,14 @@ describe('ClawBackendServer', () => {
     const snapshot = createTestSnapshot();
     snapshot.remoteConnections.connections = [readyRemoteConnection()];
     snapshot.teams[0].remoteConnectionId = 'connection-devbox';
+    snapshot.teams[0].remoteTeamId = 'team-remote';
+    const remoteSnapshot = createRemoteTeamSnapshot([{
+      ...createRemoteAgent(),
+      name: 'Remote Dina',
+      folder: '/home/nicolas/src/codex-claw',
+    }]);
     const remoteClients = {
-      request: vi.fn((_: unknown, method: string) => (
-        method === 'agent/folder/validate'
-          ? Promise.resolve(null)
-          : new Promise(() => undefined)
-      )),
+      request: vi.fn().mockResolvedValue(remoteSnapshot),
       close: vi.fn().mockResolvedValue(undefined),
     };
     const server = new ClawBackendServer({
@@ -2965,15 +4054,22 @@ describe('ClawBackendServer', () => {
     expect(response).toMatchObject({
       result: {
         agents: [{
-          id: expect.any(String),
+          id: 'agent-remote',
           name: 'Remote Dina',
         }],
       },
     });
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
-      'driver/git/status/get',
-      { agent: expect.objectContaining({ name: 'Remote Dina' }) },
+      'agent/create',
+      {
+        input: {
+          name: 'Remote Dina',
+          folder: '/home/nicolas/src/codex-claw',
+          backend: 'codex',
+          teamId: 'team-remote',
+        },
+      },
       expect.any(Function),
     );
   });
@@ -3144,6 +4240,34 @@ function readyRemoteConnection(): AppSnapshot['remoteConnections']['connections'
     createdAt: '2026-06-14T10:00:00.000Z',
     updatedAt: '2026-06-14T10:00:00.000Z',
   };
+}
+
+function createRemoteAgent(): AppSnapshot['agents'][number] {
+  return {
+    id: 'agent-remote',
+    teamId: 'team-remote',
+    name: 'Dina',
+    folder: '/home/mnmt/src/codex-claw',
+    backend: 'codex',
+    status: { type: 'idle' },
+    createdAt: '2026-06-14T10:00:00.000Z',
+    updatedAt: '2026-06-14T10:00:00.000Z',
+  };
+}
+
+function createRemoteTeamSnapshot(agents: AppSnapshot['agents'] = []): AppSnapshot {
+  const snapshot = createTestSnapshot();
+  snapshot.teams = [{
+    id: 'team-remote',
+    name: 'Remote Core',
+    color: '#46A857',
+    agentIds: agents.map((agent) => agent.id),
+    activeAgentId: agents[0]?.id,
+  }];
+  snapshot.agents = agents;
+  snapshot.activeTeamId = 'team-remote';
+  snapshot.activeAgentId = agents[0]?.id ?? null;
+  return snapshot;
 }
 
 function createWorkItem(): WorkItem {

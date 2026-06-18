@@ -36,15 +36,18 @@ describe('team-manager', () => {
       name: 'Remote Team',
       color: '#0093FF',
       remoteConnectionId: ' connection-devbox ',
+      remoteTeamId: ' team-remote ',
     }, '2026-06-05T10:11:12.000Z');
 
     expect(team.remoteConnectionId).toBe('connection-devbox');
+    expect(team.remoteTeamId).toBe('team-remote');
 
     expect(updateTeamInSnapshot(snapshot, {
       id: team.id,
       name: 'Local Team',
       color: '#46A857',
     })?.remoteConnectionId).toBeUndefined();
+    expect(team.remoteTeamId).toBeUndefined();
   });
 
   it('selects the team active agent or leaves an empty team agentless', () => {

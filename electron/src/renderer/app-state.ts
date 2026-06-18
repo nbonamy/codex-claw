@@ -433,6 +433,15 @@ export function useAppState() {
     await loadActiveAgentCatalogs();
   }
 
+  async function disconnectTeam(teamId: string): Promise<void> {
+    if (!window.codexClaw?.disconnectTeam || snapshot.value.teams.length <= 1 || !snapshot.value.teams.some((team) => team.id === teamId)) {
+      return;
+    }
+
+    snapshot.value = await window.codexClaw.disconnectTeam(teamId);
+    await loadActiveAgentCatalogs();
+  }
+
   async function selectTeam(teamId: string): Promise<void> {
     if (!window.codexClaw?.selectTeam || !snapshot.value.teams.some((team) => team.id === teamId)) {
       return;
@@ -861,12 +870,17 @@ export function useAppState() {
     }
   }
 
-  async function configureWorkBacklog(input: WorkBacklogConfigurationInput): Promise<void> {
+  async function configureWorkBacklog(input: WorkBacklogConfigurationInput, location?: LoopLocation): Promise<void> {
     if (!window.codexClaw?.configureWorkBacklog) {
       return;
     }
 
-    snapshot.value = await window.codexClaw.configureWorkBacklog(input);
+    const nextSnapshot = location
+      ? await window.codexClaw.configureWorkBacklog(input, location)
+      : await window.codexClaw.configureWorkBacklog(input);
+    if (!isRemoteLoopLocation(location)) {
+      snapshot.value = nextSnapshot;
+    }
   }
 
   async function loadWorkItems(provider: WorkProviderKind, repositoryId: string, location?: LoopLocation): Promise<WorkItem[]> {
@@ -1188,6 +1202,7 @@ export function useAppState() {
     updateTeam,
     reorderTeams,
     closeTeam,
+    disconnectTeam,
     updateAgent,
     updateSettings,
     listSshHosts,

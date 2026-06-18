@@ -724,6 +724,42 @@ describe('useAppState', () => {
     expect(state.workBacklogStatus.value).toBe('notLoaded');
   });
 
+  it('configures remote work backlog without adopting the remote snapshot locally', async () => {
+    const localSnapshot = createInitialSnapshot();
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.teams[0]!.id = 'team-remote';
+    remoteSnapshot.workBacklog.providerConfigurations.github = {
+      repositoryId: 'nbonamy/remote',
+    };
+    const configureWorkBacklog = vi.fn().mockResolvedValue(remoteSnapshot);
+    vi.stubGlobal('window', {
+      codexClaw: {
+        configureWorkBacklog,
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    state.snapshot.value = localSnapshot;
+    const location = { kind: 'remote' as const, remoteConnectionId: 'connection-devbox' };
+
+    await state.configureWorkBacklog({
+      provider: 'github',
+      configuration: {
+        repositoryId: 'nbonamy/remote',
+        tagName: null,
+      },
+    }, location);
+
+    expect(configureWorkBacklog).toHaveBeenCalledWith({
+      provider: 'github',
+      configuration: {
+        repositoryId: 'nbonamy/remote',
+        tagName: null,
+      },
+    }, location);
+    expect(state.snapshot.value).toStrictEqual(localSnapshot);
+    expect(state.snapshot.value.workBacklog.providerConfigurations.github).toBeUndefined();
+  });
+
   it('loads selected work repositories and empty repository lists', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.workBacklog.connections = [{
@@ -1627,6 +1663,7 @@ describe('useAppState', () => {
       updatedAt: '2026-06-14T10:00:00.000Z',
     }];
     localSnapshot.teams[0]!.remoteConnectionId = 'connection-devbox';
+    localSnapshot.teams[0]!.remoteTeamId = 'team-remote';
     localSnapshot.agents[0]!.teamId = 'team-codex-claw';
     localSnapshot.agents[0]!.folder = '/home/nicolas/src/codex-claw';
     const remoteLocation = { kind: 'remote' as const, remoteConnectionId: 'connection-devbox' };
@@ -1645,7 +1682,7 @@ describe('useAppState', () => {
       ...createInitialSnapshot(),
       bench: [],
     };
-    const deployedLocalSnapshot = {
+    const projectedRemoteTeamSnapshot = {
       ...localSnapshot,
       agents: [
         ...localSnapshot.agents,
@@ -1663,7 +1700,7 @@ describe('useAppState', () => {
     };
     const getBenchSnapshot = vi.fn().mockResolvedValue(remoteBenchSnapshot);
     const saveAgentToBench = vi.fn().mockResolvedValue(remoteBenchSnapshot);
-    const deployBenchTemplate = vi.fn().mockResolvedValue(deployedLocalSnapshot);
+    const deployBenchTemplate = vi.fn().mockResolvedValue(projectedRemoteTeamSnapshot);
     const removeBenchTemplate = vi.fn().mockResolvedValue(remoteBenchRemovedSnapshot);
     vi.stubGlobal('window', {
       codexClaw: {
@@ -1689,10 +1726,10 @@ describe('useAppState', () => {
     await expect(state.deployBenchTemplate({ templateId: 'bench-remote-dina', teamId: 'team-codex-claw' })).resolves.toMatchObject({
       id: 'agent-from-remote-bench',
     });
-    expect(state.snapshot.value).toStrictEqual(deployedLocalSnapshot);
+    expect(state.snapshot.value).toStrictEqual(projectedRemoteTeamSnapshot);
 
     await state.removeBenchTemplate({ templateId: 'bench-remote-dina', teamId: 'team-codex-claw' });
-    expect(state.snapshot.value).toStrictEqual(deployedLocalSnapshot);
+    expect(state.snapshot.value).toStrictEqual(projectedRemoteTeamSnapshot);
     expect(state.remoteBenchByConnectionId.value['connection-devbox']).toStrictEqual([]);
 
     expect(getBenchSnapshot).toHaveBeenCalledWith(remoteLocation);

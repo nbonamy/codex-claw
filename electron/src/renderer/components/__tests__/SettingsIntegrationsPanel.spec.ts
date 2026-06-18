@@ -104,7 +104,7 @@ describe('SettingsIntegrationsPanel', () => {
 
     const connectButton = wrapper.findAll('button').find((button) => button.text() === 'Connect');
     expect(connectButton?.attributes('disabled')).toBeUndefined();
-    expect(wrapper.text()).toContain('GitHub OAuth is not configured.');
+    expect(wrapper.text()).toContain('GitHub OAuth is not configured');
 
     await connectButton?.trigger('click');
     await flushPromises();

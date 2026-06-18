@@ -10,12 +10,14 @@ export function createTeamInSnapshot(
   const name = normalizedTeamName(input.name);
   const color = normalizedTeamColor(input.color);
   const remoteConnectionId = normalizedOptionalString(input.remoteConnectionId);
+  const remoteTeamId = normalizedOptionalString(input.remoteTeamId);
   const team: Team = {
     id: uniqueTeamId(snapshot, name, createdAt),
     name,
     avatar: teamInitials(name),
     color,
     ...(remoteConnectionId ? { remoteConnectionId } : {}),
+    ...(remoteTeamId ? { remoteTeamId } : {}),
     agentIds: [],
   };
 
@@ -61,6 +63,12 @@ export function updateTeamInSnapshot(snapshot: AppSnapshot, input: UpdateTeamInp
     team.remoteConnectionId = nextRemoteConnectionId;
   } else {
     delete team.remoteConnectionId;
+  }
+  const nextRemoteTeamId = normalizedOptionalString(input.remoteTeamId);
+  if (nextRemoteTeamId) {
+    team.remoteTeamId = nextRemoteTeamId;
+  } else if (!nextRemoteConnectionId) {
+    delete team.remoteTeamId;
   }
   return team;
 }

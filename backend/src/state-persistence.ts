@@ -954,12 +954,20 @@ function sanitizeTeam(value: unknown, agents: Agent[], remoteConnectionIds: Set<
     ? value.agentIds.filter((agentId): agentId is string => typeof agentId === 'string' && agents.some((agent) => agent.id === agentId))
     : [];
 
+  const remoteConnectionId = typeof value.remoteConnectionId === 'string' && remoteConnectionIds.has(value.remoteConnectionId)
+    ? value.remoteConnectionId
+    : null;
+  const remoteTeamId = remoteConnectionId && typeof value.remoteTeamId === 'string' && value.remoteTeamId.trim()
+    ? value.remoteTeamId
+    : null;
+
   return {
     id: value.id,
     name: value.name,
     avatar: typeof value.avatar === 'string' ? value.avatar : undefined,
     color: typeof value.color === 'string' ? value.color : defaultTeamColor,
-    ...(typeof value.remoteConnectionId === 'string' && remoteConnectionIds.has(value.remoteConnectionId) ? { remoteConnectionId: value.remoteConnectionId } : {}),
+    ...(remoteConnectionId ? { remoteConnectionId } : {}),
+    ...(remoteTeamId ? { remoteTeamId } : {}),
     agentIds,
     activeAgentId: typeof value.activeAgentId === 'string' && agentIds.includes(value.activeAgentId)
       ? value.activeAgentId

@@ -11,6 +11,7 @@
       :rate-limits="snapshot.accountRateLimits"
       class="app-shell__team-rail"
       @close-team="$emit('close-team', $event)"
+      @disconnect-team="$emit('disconnect-team', $event)"
       @edit-team="openEditTeam"
       @new-team="openNewTeam"
       @open-settings="openSettings"
@@ -250,6 +251,7 @@
       :team="editingTeam"
       :remote-connections="snapshot.remoteConnections.connections"
       :create-team="createTeam"
+      :load-remote-teams="loadRemoteTeams"
       :update-team="updateTeam"
       @close="teamDialogVisible = false"
     />
@@ -432,6 +434,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   'close-team': [teamId: string];
+  'disconnect-team': [teamId: string];
   'close-agent': [agentId: string];
   attach: [];
   'clear-goal': [];
@@ -725,6 +728,11 @@ function openEditTeam(teamId: string): void {
   teamDialogMode.value = 'edit';
   editingTeamId.value = teamId;
   teamDialogVisible.value = true;
+}
+
+async function loadRemoteTeams(connectionId: string): Promise<Team[]> {
+  const remoteSnapshot = await props.getLoopSnapshot?.({ kind: 'remote', remoteConnectionId: connectionId });
+  return remoteSnapshot?.teams ?? [];
 }
 
 function openEditAgent(agentId: string): void {

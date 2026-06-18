@@ -83,8 +83,8 @@ export class AppController {
       return this.listWorkRepositories(provider, location);
     });
 
-    ipcMain.handle(ipcChannels.configureWorkBacklog, async (_event, input: WorkBacklogConfigurationInput) => {
-      return this.configureWorkBacklog(input);
+    ipcMain.handle(ipcChannels.configureWorkBacklog, async (_event, input: WorkBacklogConfigurationInput, location?: LoopLocation) => {
+      return this.configureWorkBacklog(input, location);
     });
 
     ipcMain.handle(ipcChannels.listWorkItems, async (_event, provider: WorkProviderKind, repositoryId: string, location?: LoopLocation) => {
@@ -157,6 +157,10 @@ export class AppController {
 
     ipcMain.handle(ipcChannels.closeTeam, async (_event, teamId: string) => {
       return this.closeTeam(teamId);
+    });
+
+    ipcMain.handle(ipcChannels.disconnectTeam, async (_event, teamId: string) => {
+      return this.disconnectTeam(teamId);
     });
 
     ipcMain.handle(ipcChannels.selectTeam, async (_event, teamId: string) => {
@@ -405,8 +409,12 @@ export class AppController {
     });
   }
 
-  private async configureWorkBacklog(input: WorkBacklogConfigurationInput): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.workProviderBacklogConfigure, { input }));
+  private async configureWorkBacklog(input: WorkBacklogConfigurationInput, location?: LoopLocation): Promise<AppSnapshot> {
+    const snapshot = await this.requireBackendClient().request<AppSnapshot>(backendMethods.workProviderBacklogConfigure, {
+      input,
+      ...(location ? { location } : {}),
+    });
+    return location?.kind === 'remote' ? snapshot : this.adoptBackendSnapshot(snapshot);
   }
 
   private async listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: LoopLocation): Promise<WorkItem[]> {
@@ -471,6 +479,10 @@ export class AppController {
 
   private async closeTeam(teamId: string): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.teamDelete, { teamId }));
+  }
+
+  private async disconnectTeam(teamId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.teamDisconnect, { teamId }));
   }
 
   private async selectTeam(teamId: string): Promise<AppSnapshot> {

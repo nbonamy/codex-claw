@@ -412,6 +412,71 @@ describe('AgentSidebar', () => {
     }]]);
   });
 
+  it('hides cross-location move targets from the context menu submenu', async () => {
+    const remoteTeam: Team = {
+      id: 'team-remote',
+      name: 'Remote Core',
+      remoteConnectionId: 'connection-devbox',
+      remoteTeamId: 'team-remote-upstream',
+      agentIds: [],
+    };
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: agents.map((agent) => ({ ...agent, teamId: 'team-codex-claw' })),
+        activeAgentId: 'agent-dina',
+        teams: [...teams, remoteTeam],
+        teamName: 'Codex Claw',
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    await wrapper.findAll('.agent-sidebar__agent')[0].trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80,
+    });
+
+    expect(wrapper.findAll('[role="menuitem"]').some((item) => item.text() === 'Skwad')).toBe(true);
+    expect(wrapper.findAll('[role="menuitem"]').some((item) => item.text() === 'Remote Core')).toBe(false);
+  });
+
+  it('hides all move targets for remote agents', async () => {
+    const remoteAgent: Agent = {
+      ...agents[0],
+      id: 'agent-remote',
+      teamId: 'team-remote',
+    };
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: [remoteAgent],
+        activeAgentId: 'agent-remote',
+        teams: [
+          ...teams,
+          {
+            id: 'team-remote',
+            name: 'Remote Core',
+            remoteConnectionId: 'connection-devbox',
+            remoteTeamId: 'team-remote-upstream',
+            agentIds: ['agent-remote'],
+          },
+        ],
+        teamName: 'Remote Core',
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    await wrapper.findAll('.agent-sidebar__agent')[0].trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80,
+    });
+
+    expect(wrapper.findAll('[role="menuitem"]').some((item) => item.text() === 'Skwad')).toBe(false);
+    expect(wrapper.findAll('[role="menuitem"]').some((item) => item.text() === 'Codex Claw')).toBe(false);
+  });
+
   it('closes the context menu when the menu emits close', async () => {
     const wrapper = mount(AgentSidebar, {
       props: {

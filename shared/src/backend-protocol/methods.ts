@@ -88,6 +88,7 @@ export const backendMethods = {
   systemPermissionsGet: 'system/permissions/get',
   teamCreate: 'team/create',
   teamDelete: 'team/delete',
+  teamDisconnect: 'team/disconnect',
   teamReorder: 'team/reorder',
   teamSelect: 'team/select',
   teamUpdate: 'team/update',

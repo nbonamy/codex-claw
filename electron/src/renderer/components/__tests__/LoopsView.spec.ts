@@ -98,6 +98,7 @@ describe('LoopsView', () => {
     const location: LoopLocation = { kind: 'remote', remoteConnectionId: 'connection-devbox' };
     const getLoopSnapshot = vi.fn().mockResolvedValue(remoteSnapshot);
     const createLoop = vi.fn().mockResolvedValue(remoteSnapshot);
+    const deleteLoop = vi.fn().mockResolvedValue(remoteSnapshot);
     const listSourceRepositories = vi.fn().mockResolvedValue([remoteSourceRepository()]);
     const listSourceFolders = vi.fn().mockResolvedValue({
       path: '/home/nicolas/src',
@@ -109,13 +110,17 @@ describe('LoopsView', () => {
       fullName: 'nbonamy/remote',
       name: 'remote',
     })]);
+    const runLoop = vi.fn().mockResolvedValue(remoteSnapshot);
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
     const wrapper = mountView({
       createLoop,
+      deleteLoop,
       getLoopSnapshot,
       listSourceFolders,
       listSourceRepositories,
       loadWorkRepositories,
       remoteConnections: [readyRemoteConnection()],
+      runLoop,
       snapshot: localSnapshot,
     });
 
@@ -127,6 +132,10 @@ describe('LoopsView', () => {
     expect(loadWorkRepositories).toHaveBeenCalledWith('github', location);
     expect(wrapper.text()).toContain('Remote bugs');
     expect(wrapper.text()).not.toContain('Local bugs');
+
+    await wrapper.get('[aria-label="Run Remote bugs"]').trigger('click');
+    await flushPromises();
+    expect(runLoop).toHaveBeenCalledWith('loop-remote', location);
 
     const newLoopButton = wrapper.findAll('button').find((button) => button.text() === 'New Loop');
     expect(newLoopButton).toBeDefined();
@@ -169,6 +178,13 @@ describe('LoopsView', () => {
         repositoryId: 'nbonamy/remote',
       },
     }), location);
+
+    await wrapper.get('[aria-label="Remote bugs actions"]').trigger('click');
+    await flushPromises();
+    bodyButton('Delete').click();
+    await flushPromises();
+
+    expect(deleteLoop).toHaveBeenCalledWith('loop-remote', location);
   });
 
   it('confirms before deleting a loop', async () => {

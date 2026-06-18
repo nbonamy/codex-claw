@@ -11,6 +11,7 @@ export type Team = {
   avatar?: string;
   color?: string;
   remoteConnectionId?: string;
+  remoteTeamId?: string;
   agentIds: string[];
   activeAgentId?: string;
 };
@@ -814,6 +815,7 @@ export type CreateTeamInput = {
   name: string;
   color: string;
   remoteConnectionId?: string;
+  remoteTeamId?: string;
 };
 
 export type UpdateTeamInput = {
@@ -821,6 +823,7 @@ export type UpdateTeamInput = {
   name: string;
   color: string;
   remoteConnectionId?: string;
+  remoteTeamId?: string;
 };
 
 export type ReorderTeamsInput = {
@@ -922,7 +925,7 @@ export type CodexClawApi = {
   completeWorkProviderConnection(provider: WorkProviderKind): Promise<AppSnapshot>;
   disconnectWorkProvider(provider: WorkProviderKind): Promise<AppSnapshot>;
   listWorkRepositories(provider: WorkProviderKind, location?: LoopLocation): Promise<WorkRepository[]>;
-  configureWorkBacklog(input: WorkBacklogConfigurationInput): Promise<AppSnapshot>;
+  configureWorkBacklog(input: WorkBacklogConfigurationInput, location?: LoopLocation): Promise<AppSnapshot>;
   listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: LoopLocation): Promise<WorkItem[]>;
   listBackendModels(agentId: string): Promise<BackendModelOption[]>;
   listBackendSkills(agentId: string): Promise<BackendSkillSummary[]>;
@@ -941,6 +944,7 @@ export type CodexClawApi = {
   updateTeam(input: UpdateTeamInput): Promise<AppSnapshot>;
   reorderTeams(input: ReorderTeamsInput): Promise<AppSnapshot>;
   closeTeam(teamId: string): Promise<AppSnapshot>;
+  disconnectTeam(teamId: string): Promise<AppSnapshot>;
   selectTeam(teamId: string): Promise<AppSnapshot>;
   getBenchSnapshot(location?: BenchLocation): Promise<AppSnapshot>;
   getLoopSnapshot(location?: LoopLocation): Promise<AppSnapshot>;

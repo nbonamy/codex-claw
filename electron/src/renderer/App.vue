@@ -75,6 +75,7 @@
     :quit="quit"
     :restart-app="restartApp"
     @close-team="closeTeam"
+    @disconnect-team="disconnectTeam"
     @close-agent="closeAgent"
     @duplicate-agent="duplicateAgent"
     @move-agent-to-team="moveAgentToTeam"
@@ -164,6 +165,7 @@ const {
   updateTeam,
   reorderTeams,
   closeTeam,
+  disconnectTeam,
   updateAgent,
   duplicateAgent,
   moveAgentToTeam,

@@ -99,11 +99,11 @@ reducers locally.
 
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
-| `agent/create` | `{ input: CreateAgentInput }` | `AppSnapshot` | Validates the folder in the target team's execution location before creating. New agents inherit their team's connection; `CreateAgentInput` does not carry a connection id. |
+| `agent/create` | `{ input: CreateAgentInput }` | `AppSnapshot` | Creates the agent in the owning team's backend location. For remote-team pointers, local `clawd` forwards creation to the remote `clawd` with the remote team id and does not persist a local proxy agent. |
 | `agent/update` | `{ input: UpdateAgentInput }` | `AppSnapshot` | Validates folder and refreshes git status. |
 | `agent/select` | `{ agentId }` | `AppSnapshot` | Selects, hydrates history, and refreshes git status. |
 | `agent/duplicate` | `{ agentId }` | `AppSnapshot` | Duplicates product agent state. |
-| `agent/team/move` | `{ input: MoveAgentToTeamInput }` | `AppSnapshot` | Moves agent to another team. |
+| `agent/team/move` | `{ input: MoveAgentToTeamInput }` | `AppSnapshot` | Moves a local agent between local teams. Cross-backend moves are rejected; create a new agent in the target remote team instead. |
 | `agent/reorder` | `{ input: ReorderAgentsInput }` | `AppSnapshot` | Reorders within a team. |
 | `agent/delete` | `{ agentId }` | `AppSnapshot` | Removes the active product agent. |
 | `agent/folder/update` | `{ agentId, folder }` | `AppSnapshot` | Folder picker remains client-side; mutation and validation are backend-owned. |
@@ -112,8 +112,8 @@ reducers locally.
 | `agent/models/list` | `{ agentId }` | `BackendModelOption[]` | Provider-specific catalog adapted to app-owned shape. |
 | `agent/skills/list` | `{ agentId }` | `BackendSkillSummary[]` | Provider-specific skills adapted to app-owned shape. |
 | `agent/git/diff/open` | `{ agentId }` | `true` | Emits a side-panel git diff event from backend-owned git state. |
-| `agent/workItem/assign` | `{ agentId, item }` | `AppSnapshot` | Records provider-neutral work item assignment. |
-| `agent/workItem/assignment/delete` | `{ item }` | `AppSnapshot` | Clears provider-neutral assignment state. |
+| `agent/workItem/assign` | `{ agentId, item }` | `AppSnapshot` | Records provider-neutral work item assignment in the owning backend location. Remote assignments are projected for connected remote-team pointers. |
+| `agent/workItem/assignment/delete` | `{ item }` | `AppSnapshot` | Clears provider-neutral assignment state from the backend location that owns the assigned agent. |
 
 ## Client To `clawd`: Conversations And Turns
 
@@ -127,10 +127,10 @@ reducers locally.
 | `agent/prompt/send` | `{ agentId, prompt, options? }` | `AppSnapshot` | Starts or continues a backend turn. |
 | `agent/prompt/steer` | `{ agentId, prompt }` | `AppSnapshot` | Sends active-turn steering and emits `message.steer`. |
 | `agent/interrupt` | `{ agentId }` | `AppSnapshot` | Interrupts the active backend turn if supported. |
-| `agent/turn/rollback` | `{ agentId, turnId }` | `AppSnapshot` | Rolls back provider history and replaces visible history. |
-| `agent/message/delete` | `{ agentId, messageId }` | `AppSnapshot` | Resolves message to turn, rolls back, and persists. |
-| `agent/message/update` | `{ agentId, messageId, prompt }` | `AppSnapshot` | Rolls back then sends edited prompt. |
-| `agent/message/retry` | `{ agentId, messageId }` | `AppSnapshot` | Rolls back then resends the matching user prompt. |
+| `agent/turn/rollback` | `{ agentId, turnId }` | `AppSnapshot` | Resolves the owning backend location, rolls back provider history, and replaces visible history. |
+| `agent/message/delete` | `{ agentId, messageId }` | `AppSnapshot` | Resolves the owning backend location, maps message to turn, rolls back, and persists. |
+| `agent/message/update` | `{ agentId, messageId, prompt }` | `AppSnapshot` | Resolves the owning backend location, rolls back, then sends edited prompt. |
+| `agent/message/retry` | `{ agentId, messageId }` | `AppSnapshot` | Resolves the owning backend location, rolls back, then resends the matching user prompt. |
 | `agent/goal/update` | `{ agentId, objective }` | `AppSnapshot` | Sets provider goal metadata and updates agent goal state. |
 | `agent/goal/clear` | `{ agentId }` | `AppSnapshot` | Clears provider goal metadata and agent goal state. |
 | `agent/approvalPreset/update` | `{ agentId, preset: ApprovalPreset }` | `AppSnapshot` | Applies app-owned approval preset through the backend driver. |
@@ -139,15 +139,16 @@ reducers locally.
 
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
-| `team/create` | `{ input: CreateTeamInput }` | `AppSnapshot` | Creates and selects a team. `input.remoteConnectionId` optionally selects the team's SSH execution location; omitted means local. |
-| `team/update` | `{ input: UpdateTeamInput }` | `AppSnapshot` | Updates name/color and, while the team has no agents, the optional team connection. Connection changes are rejected once the team has agents. |
+| `team/create` | `{ input: CreateTeamInput }` | `AppSnapshot` | Creates and selects a team. Omitted `remoteConnectionId` creates a local team. With `remoteConnectionId`, local `clawd` creates a real team on the remote `clawd` or connects to `input.remoteTeamId`, then persists only a local pointer `{ remoteConnectionId, remoteTeamId }`. |
+| `team/update` | `{ input: UpdateTeamInput }` | `AppSnapshot` | Updates name/color and, while the team has no local or remote agents, the optional team connection. Changing an empty local team to a remote connection creates a real remote team or connects to `input.remoteTeamId`, then stores the remote pointer; connection changes are rejected once either side has agents. |
 | `team/reorder` | `{ input: ReorderTeamsInput }` | `AppSnapshot` | Reorders team rail state. |
-| `team/delete` | `{ teamId }` | `AppSnapshot` | Closes team and associated agents. |
+| `team/delete` | `{ teamId }` | `AppSnapshot` | Deletes the team in its owning backend location. For remote pointers, this calls remote `team/delete` for `remoteTeamId`, then removes the local pointer. If that pointer is the only local team, local `clawd` creates an empty Local fallback first. |
+| `team/disconnect` | `{ teamId }` | `AppSnapshot` | Removes only the local remote-team pointer and leaves the remote team/agents running. If that pointer is the only local team, local `clawd` creates an empty Local fallback first. Local teams use `team/delete`. |
 | `team/select` | `{ teamId }` | `AppSnapshot` | Selects team and active agent. |
 | `snapshot/bench/get` | `{ location? }` | `AppSnapshot` | Returns the selected `clawd` Bench catalog. Remote Bench snapshots are not adopted as the local product snapshot. |
-| `bench/agent/template/create` | `{ agentId }` | `AppSnapshot` | Saves the agent as a deployable template in the agent team's `clawd` Bench. Remote saves serialize the local product agent into a template payload stored by the remote `clawd`. |
-| `bench/template/create` | `{ input: CreateBenchTemplateInput }` | `AppSnapshot` | Backend-to-backend helper used when local `clawd` saves a local product agent into a remote `clawd` Bench. Clients should prefer `bench/agent/template/create`. |
-| `bench/template/deploy` | `{ templateId, teamId?, location? }` | `AppSnapshot` | Resolves the template from the target team's `clawd` Bench, validates the folder in that team's execution location, then creates the local product agent in the target team. |
+| `bench/agent/template/create` | `{ agentId }` | `AppSnapshot` | Saves the agent as a deployable template in the agent team's `clawd` Bench. Remote agents are saved by the remote `clawd`; local `clawd` does not serialize a proxy copy. |
+| `bench/template/create` | `{ input: CreateBenchTemplateInput }` | `AppSnapshot` | Creates a template directly in the receiving `clawd` Bench. Clients should prefer `bench/agent/template/create` when saving an existing agent. |
+| `bench/template/deploy` | `{ templateId, teamId?, location? }` | `AppSnapshot` | Resolves and deploys the template in the target team's backend location. Remote deployment creates the agent on the remote `clawd`; local `clawd` returns a projected snapshot for the local team pointer. |
 | `bench/template/delete` | `{ templateId, location? }` | `AppSnapshot` | Removes template from the selected `clawd` Bench. Remote removes return the remote snapshot without replacing local product state. |
 
 Bench belongs to a `clawd` instance, not to Electron globally. Local teams can
@@ -182,7 +183,7 @@ and `~/sources` first.
 | `connections/ssh/create` | `{ input: AddSshConnectionInput }` | `AppSnapshot` | Saves an SSH connection, probes the host non-interactively, syncs the bundled `clawd` script and provider token file under `~/.codex-claw`, and records an `ssh` stdio transport when ready. |
 | `connections/sync` | `{ connectionId }` | `AppSnapshot` | Syncs a saved SSH connection: closes any cached remote stdio client, uploads the bundled `clawd` script, mirrors `provider-tokens.json`, records the daemon-first SSH transport, and reads the installed version. Sync does not start or restart a persistent remote daemon. On next remote startup, `clawd` hydrates `workBacklog.connections` from the mirrored tokens instead of copying local `state.json`. The renderer labels this action `Sync`. |
 | `connections/update` | `{ connectionId, input: { sourceFolderPath? } }` | `AppSnapshot` | Updates SSH connection settings. Source-folder changes are forwarded to the remote `clawd` through `settings/update` and mirrored locally for settings UI defaults. |
-| `connections/delete` | `{ connectionId }` | `AppSnapshot` | Removes a saved remote connection and deletes teams attached to it. If every team used that connection, local `clawd` creates one empty local fallback team first. |
+| `connections/delete` | `{ connectionId }` | `AppSnapshot` | Removes a saved remote connection and removes local team pointers attached to it. Remote teams, agents, messages, and loops keep running on the SSH host. If every local team used that connection, local `clawd` creates one empty local fallback team first. |
 
 Remote connection state is owned by `clawd`, not Electron. The SSH transport
 command model is
@@ -190,17 +191,22 @@ command model is
 `connect` bridges to the remote host's `~/.codex-claw/clawd.sock` when an
 externally managed `clawd serve` daemon is running; otherwise the shell
 fallback spawns one one-shot stdio backend for that SSH session.
-Teams store `Team.remoteConnectionId`; agents inherit execution location from
-their owning team. Local `clawd` remains the product-state authority and brokers
-source, git, file, model, skill, conversation, prompt, approval-response,
-steering, interrupt, and rollback driver calls to the selected remote `clawd`
-over SSH stdio. Slash-command interception remains local-only for now; ordinary
-prompts route remotely.
+Remote teams store a local pointer with `Team.remoteConnectionId` and
+`Team.remoteTeamId`. Local `clawd` owns the connection list and the user's local
+navigation pointers; the remote `clawd` owns the actual remote team composition,
+agents, messages, sessions, MCP-visible membership, and remote Bench catalog.
+Generic location-scoped requests first resolve an internal `BackendLocation`.
+Agent-scoped requests resolve an internal `AgentLocation` so projected remote
+agents can still route to the owning remote `clawd` over SSH stdio.
+Remote backend events use the same boundary: local `clawd` forwards agent events
+only when the remote agent belongs to a connected remote-team pointer.
+Slash-command interception remains local-only for now; ordinary prompts route
+remotely.
 
 Bench follows the same team-owned `clawd` selection for catalogs, saves, and
-removes. Deploying a remote Bench template still creates the visible product
-agent in the local team snapshot; the remote `clawd` supplies the template and
-validates remote execution resources.
+removes. Deploying a remote Bench template creates the agent in the remote team;
+local `clawd` projects the remote team's agents/messages into the local pointer
+snapshot for clients.
 
 Loops are selected independently from the Loops screen. When the client omits
 `location`, loop and work-provider calls operate on local `clawd`. When the
@@ -217,7 +223,7 @@ adopting it as the local product snapshot.
 | `workProvider/connection/complete` | `{ provider }` | `AppSnapshot` | Polls/completes pending provider auth. |
 | `workProvider/disconnect` | `{ provider }` | `AppSnapshot` | Removes provider connection and token. |
 | `workProvider/repositories/list` | `{ provider, location? }` | `WorkRepository[]` | Lists provider repositories from local `clawd` or the selected remote loop location. |
-| `workProvider/backlog/configure` | `{ input: WorkBacklogConfigurationInput }` | `AppSnapshot` | Saves backlog configuration. |
+| `workProvider/backlog/configure` | `{ input: WorkBacklogConfigurationInput, location? }` | `AppSnapshot` | Saves backlog configuration in local `clawd` or the selected remote loop location. Remote snapshots are returned but not adopted as local product state. |
 | `workProvider/items/list` | `{ provider, repositoryId, location? }` | `WorkItem[]` | Lists provider work items from local `clawd` or the selected remote loop location. |
 
 ## Client To `clawd`: Loops

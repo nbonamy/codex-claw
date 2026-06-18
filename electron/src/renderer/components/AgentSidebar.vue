@@ -162,8 +162,12 @@ const contextMenuMoveTargets = computed(() => {
   if (!agent) {
     return [];
   }
+  const sourceTeam = (props.teams ?? []).find((team) => team.id === agent.teamId) ?? null;
+  if (sourceTeam?.remoteConnectionId) {
+    return [];
+  }
 
-  return (props.teams ?? []).filter((team) => team.id !== agent.teamId);
+  return (props.teams ?? []).filter((team) => team.id !== agent.teamId && !team.remoteConnectionId);
 });
 const agentReorder = useListReorderDrag<string>({
   itemIds: () => props.agents.map((agent) => agent.id),

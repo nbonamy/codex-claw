@@ -96,10 +96,11 @@ Current implementation checkpoint:
   selection controls also wait for backend snapshots instead of mutating active
   team/agent ids locally.
 - Bench belongs to a `clawd` instance. Local teams see and mutate the local
-  Bench; teams with `Team.remoteConnectionId` see and mutate that remote
-  `clawd` Bench. Deploying a remote Bench template creates the visible product
-  agent in the local remote-backed team after validating the remote folder,
-  without copying the remote Bench catalog into local `snapshot.bench`.
+  Bench; remote team pointers see and mutate that remote `clawd` Bench.
+  Deploying a remote Bench template creates the agent on the remote `clawd`;
+  local `clawd` projects the remote team's agents/messages into the local team
+  pointer instead of copying the remote Bench catalog into local
+  `snapshot.bench`.
 - `clawd` now owns settings updates. Electron adopts the returned snapshot and
   applies desktop-only reactions such as power-save blocker changes. Renderer
   settings controls send update requests and adopt the backend snapshot instead
@@ -116,7 +117,11 @@ Current implementation checkpoint:
   desktop-side path policy.
 - `clawd` now owns agent create/update/duplicate/move/reorder/close/select and
   folder update mutations. Electron still performs desktop folder picking, then
-  forwards the selected folder to the backend.
+  forwards the selected folder to the backend. Generic location-scoped
+  operations resolve a `BackendLocation` before requesting local drivers or a
+  remote `clawd`; agent-scoped requests resolve an `AgentLocation` so projected
+  remote-team agents are forwarded to the owning remote `clawd` and projected
+  back into the local pointer snapshot for clients.
 - `clawd` now owns agent file preview authority: clients request file lists and
   previews by agent id only, and the backend resolves the folder from its
   snapshot before touching storage. A mobile or web client uses the same
@@ -869,20 +874,43 @@ Local migration path:
 
 Remote migration path:
 
-- Local `clawd` remains the product-state control plane for the desktop app.
-- A remote `clawd` owns execution on the remote machine: source scanning,
+- Local `clawd` remains the desktop app's connection and navigation control
+  plane. For a remote team it persists only a local pointer:
+  `Team.remoteConnectionId` plus `Team.remoteTeamId`.
+- The remote `clawd` owns the real remote team composition: agents, active
+  agent, backend sessions, messages, MCP-visible membership, source scanning,
   folder browsing, worktree creation, git status/diff, file previews, provider
-  models/skills, conversations, prompts, approvals, steering, interruption, and
-  rollback.
-- Remote-located teams persist `Team.remoteConnectionId`; agents inherit their
-  execution location from `Agent.teamId` plus the remote absolute `Agent.folder`
-  path. This is enough for single-host desktop control over SSH without
-  duplicating teams/agents into the remote state file.
+  models/skills, conversations, prompts, approvals, steering, interruption,
+  rollback, and work-item assignments for remote agents.
+- Agents do not move across backend locations. A local agent can move only
+  between local teams; a remote agent remains owned by its remote team. To use
+  a different location, create or deploy an agent in that location.
+- `snapshot/get` returns a projected client snapshot. Local `clawd` overlays
+  remote team state onto local remote-team pointers for the UI, but it does not
+  persist remote agents as local proxy agents.
+- Remote backend events are filtered through the same ownership boundary:
+  agent-scoped events only fan out locally when the remote agent belongs to a
+  connected remote-team pointer.
+- Generic location-scoped RPC handlers resolve an internal `BackendLocation`
+  and then execute through a `BackendHandle`. Local handles use local
+  drivers/state; remote handles forward the same app-owned method to the
+  selected remote `clawd`.
+- Agent-scoped RPC handlers resolve an internal `AgentLocation` and then use
+  the same backend-handle shape. Projected remote agents are found through the
+  remote-team pointer and cached remote snapshot, then forwarded to the owning
+  remote `clawd`.
+- Closing a remote team is destructive and forwards `team/delete` to the remote
+  team before removing the local pointer. Disconnecting a remote team removes
+  only the local pointer and leaves the remote team and agents running.
+- The Team dialog can create a new remote team or connect a local pointer to an
+  existing remote team. Empty local teams can be edited into either kind of
+  remote pointer; teams with agents keep their connection locked.
 - SSH connection settings can update the remote `clawd` source folder through
   remote `settings/update`; local `clawd` mirrors the path on the connection
-  record for settings UI defaults. Deleting a connection deletes teams attached
-  to that connection, with one empty local fallback team created only when every
-  team was remote-backed.
+  record for settings UI defaults. Deleting a connection removes only local
+  team pointers attached to that connection; remote teams, agents, messages, and
+  loops keep running on the SSH host. One empty local fallback team is created
+  only when every local team was remote-backed.
 - Loop management is also location-scoped, but independently selected in the
   Loops surface rather than inherited from the active team. The UI shows
   `Loops > Local|<remote>`, and local `clawd` forwards loop snapshot, CRUD,
@@ -891,18 +919,16 @@ Remote migration path:
   replacing local `clawd`'s durable product snapshot.
 - Bench management is location-scoped by team. The active or target team's
   `clawd` instance supplies the Bench catalog shown in New Agent and Bench
-  assignment flows. Saving an agent in a remote-backed team serializes the
-  local product agent into a template payload and stores it in the remote
-  `clawd`; removing a template removes it from that same remote catalog.
-  Deploying a remote template resolves it from the team's remote `clawd`, then
-  creates the local product agent in that team so teams and agents remain
-  controlled by local `clawd`.
+  assignment flows. Saving a projected remote agent asks the remote `clawd` to
+  save its real agent as a template. Deploying a remote template creates the
+  real agent on the remote `clawd`; local `clawd` only returns the projected
+  snapshot for the remote-team pointer.
 - Cross-location sync is a separate product problem and should not block the
   process extraction.
 
-`Team.remoteConnectionId` plus `Agent.folder: string` is the interim remote
+`Team.remoteConnectionId` plus `Team.remoteTeamId` is the remote-team pointer
 shape. Longer-term remote support can migrate to explicit location-aware
-folders:
+folders without changing the UI contract:
 
 ```ts
 type BackendLocation =
@@ -930,11 +956,14 @@ Sync mirrors `provider-tokens.json` to the remote; it does not copy local
 metadata from those tokens during startup so remote loop management can see
 GitHub as connected while preserving the remote's own teams, agents, and loops.
 The Team dialog can select Local or a ready SSH connection before any agents are
-created. Agent creation inherits the target team's connection, and source
-repository/worktree controls query that backend location. The Loops surface
-uses a separate location selector so users can inspect and manage local or
-remote schedulers without changing the selected team. Keep the protocol
-boundary clear so the folder type can change behind clients later.
+created. It can also connect to an existing remote team by storing the remote
+team id on the local pointer. Agent creation inherits the target team's backend
+location; for remote-team pointers, creation is forwarded to the remote team and
+no local proxy agent is saved. Source repository/worktree controls query that
+backend location. The Loops surface uses a separate location selector so users
+can inspect and manage local or remote schedulers without changing the selected
+team. Keep the protocol boundary clear so the folder type can change behind
+clients later.
 
 ## Security Model
 
@@ -1124,11 +1153,15 @@ Goal: run `clawd` on another machine without exposing a raw network daemon.
 Work:
 
 - Add backend location records. Started as persisted SSH connection records;
-  team execution-location scoping is the app contract.
+  team remote pointers and agent-location routing are the app contract.
 - Add SSH stdio transport. The command model is recorded on ready connections;
-  the app still needs to attach backend clients and agents to it.
+  remote clients now prefer an existing remote daemon and fall back to one-shot
+  stdio.
 - Make agent folders, source folders, repo discovery, git, files, and
-  artifacts location-aware.
+  artifacts location-aware. Source, git, files, Bench, and most agent-scoped
+  handlers are routed through `BackendLocation`, `AgentLocation`, and
+  `BackendHandle`; keep collapsing remaining one-off routing branches into
+  those helpers when the semantics are not genuinely special.
 - Add remote folder browsing and repo selection.
 - Keep native folder picker local-only.
 - Decide how remote hosts get a Node runtime or standalone `clawd` binary; the

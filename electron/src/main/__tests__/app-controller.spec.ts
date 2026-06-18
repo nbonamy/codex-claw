@@ -431,10 +431,19 @@ describe('AppController', () => {
       title: 'Fix bug',
       url: 'https://github.com/nbonamy/codex-claw/issues/12',
     }]);
+    await expect(configureWorkBacklog(
+      controller,
+      { provider: 'github', configuration: { repositoryId: 'nbonamy/remote' } },
+      { kind: 'remote', remoteConnectionId: 'connection-devbox' },
+    )).resolves.toStrictEqual(configuredSnapshot);
 
     expect(request).toHaveBeenNthCalledWith(1, 'workProvider/connect', { provider: 'github' });
     expect(request).toHaveBeenNthCalledWith(2, 'workProvider/backlog/configure', { input: { provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } } });
     expect(request).toHaveBeenNthCalledWith(3, 'workProvider/items/list', { provider: 'github', repositoryId: 'nbonamy/codex-claw' });
+    expect(request).toHaveBeenNthCalledWith(4, 'workProvider/backlog/configure', {
+      input: { provider: 'github', configuration: { repositoryId: 'nbonamy/remote' } },
+      location: { kind: 'remote', remoteConnectionId: 'connection-devbox' },
+    });
   });
 
   it('routes work item assignment mutations through clawd', async () => {
@@ -1934,10 +1943,10 @@ async function removeRemoteConnection(controller: AppController, connectionId: s
   }).removeRemoteConnection(connectionId);
 }
 
-async function configureWorkBacklog(controller: AppController, input: WorkBacklogConfigurationInput): Promise<AppSnapshot> {
+async function configureWorkBacklog(controller: AppController, input: WorkBacklogConfigurationInput, location?: LoopLocation): Promise<AppSnapshot> {
   return (controller as unknown as {
-    configureWorkBacklog(input: WorkBacklogConfigurationInput): Promise<AppSnapshot>;
-  }).configureWorkBacklog(input);
+    configureWorkBacklog(input: WorkBacklogConfigurationInput, location?: LoopLocation): Promise<AppSnapshot>;
+  }).configureWorkBacklog(input, location);
 }
 
 async function listWorkItems(controller: AppController, provider: WorkProviderKind, repositoryId: string): Promise<WorkItem[]> {
