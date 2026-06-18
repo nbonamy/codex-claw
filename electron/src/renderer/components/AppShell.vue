@@ -72,6 +72,7 @@
         :remove-remote-connection="removeRemoteConnection"
         :daemon-status="daemonStatus"
         :daemon-status-error="daemonStatusError"
+        :choose-codex-binary="chooseCodexBinary"
         :choose-source-folder="chooseSourceFolder"
         :connect-work-provider="connectWorkProvider"
         :open-work-provider-authorization="openWorkProviderAuthorization"
@@ -317,6 +318,7 @@ const props = withDefaults(defineProps<{
   daemonStatus?: ClawdDaemonStatus | null;
   daemonStatusError?: string | null;
   chooseAgentFolder?: () => Promise<string | null>;
+  chooseCodexBinary?: () => Promise<string | null>;
   chooseSourceFolder?: () => Promise<string | null>;
   listSourceFolders?: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
   sourceRepositories?: SourceRepository[];
@@ -385,6 +387,7 @@ const props = withDefaults(defineProps<{
   daemonStatus: null,
   daemonStatusError: null,
   chooseAgentFolder: async () => null,
+  chooseCodexBinary: async () => null,
   chooseSourceFolder: async () => null,
   listSourceFolders: async () => ({ path: '', parentPath: null, entries: [] }),
   sourceRepositories: () => [],

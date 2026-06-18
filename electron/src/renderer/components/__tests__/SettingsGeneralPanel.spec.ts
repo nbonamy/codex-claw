@@ -217,6 +217,54 @@ describe('SettingsGeneralPanel', () => {
     expect(wrapper.text()).toContain('Dialog failed');
   });
 
+  it('chooses, edits, and clears the Codex executable path', async () => {
+    const chooseCodexBinary = vi.fn().mockResolvedValue('/opt/homebrew/bin/codex');
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({
+      chooseCodexBinary,
+      settings: {
+        ...defaultGeneralSettings,
+        codexBinaryPath: '',
+      },
+      updateSettings,
+    });
+
+    await flushPromises();
+    expect(wrapper.text()).toContain('Advanced');
+    expect(wrapper.text()).toContain('Codex executable');
+
+    const codexInput = wrapper.find('input[aria-label="Codex executable path"]');
+    await codexInput.setValue('/usr/local/bin/codex');
+    await codexInput.trigger('change');
+    expect(updateSettings).toHaveBeenCalledWith({
+      general: {
+        codexBinaryPath: '/usr/local/bin/codex',
+      },
+    });
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Choose')?.trigger('click');
+    await flushPromises();
+    expect(chooseCodexBinary).toHaveBeenCalledOnce();
+    expect(updateSettings).toHaveBeenCalledWith({
+      general: {
+        codexBinaryPath: '/opt/homebrew/bin/codex',
+      },
+    });
+
+    await wrapper.setProps({
+      settings: {
+        ...defaultGeneralSettings,
+        codexBinaryPath: '/opt/homebrew/bin/codex',
+      },
+    } as never);
+    await wrapper.findAll('button').find((button) => button.text() === 'Clear')?.trigger('click');
+    expect(updateSettings).toHaveBeenCalledWith({
+      general: {
+        codexBinaryPath: '',
+      },
+    });
+  });
+
   it('shows a grant action when macOS Accessibility is required', async () => {
     const getSystemPermissions = vi.fn().mockResolvedValue(permissionStatus({
       required: true,
@@ -254,7 +302,8 @@ describe('SettingsGeneralPanel', () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain('Not needed');
-    expect(wrapper.findAll('button').map((button) => button.text())).toStrictEqual([]);
+    expect(wrapper.findAll('button').map((button) => button.text())).not.toContain('Grant');
+    expect(wrapper.findAll('button').map((button) => button.text())).not.toContain('Refresh');
   });
 });
 

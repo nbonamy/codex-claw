@@ -75,6 +75,12 @@ environment by default so existing authentication works. Set
 `CODEX_CLAW_CODEX_HOME` to point the spawned app-server at an isolated Codex
 home when testing or when we later build a dedicated auth/onboarding flow.
 
+The General settings Advanced section can store a Codex executable path. Empty
+means the backend resolves `codex` from its process `PATH`. A non-empty value
+is passed as the executable for `codex app-server --listen stdio://`. Changing
+the path persists the setting and relaunches Codex Claw so the backend and
+app-server start from a clean lifecycle.
+
 ## Thread And Agent Mapping
 
 Codex app-server owns conversation history and thread storage. Codex Claw owns

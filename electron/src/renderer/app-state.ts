@@ -304,6 +304,10 @@ export function useAppState() {
     return await window.codexClaw?.chooseAgentFolder?.() ?? null;
   }
 
+  async function chooseCodexBinary(): Promise<string | null> {
+    return await window.codexClaw?.chooseCodexBinary?.() ?? null;
+  }
+
   async function chooseSourceFolder(): Promise<string | null> {
     return await window.codexClaw?.chooseSourceFolder?.() ?? null;
   }
@@ -1188,6 +1192,7 @@ export function useAppState() {
     loadDaemonStatus,
     loadSnapshot,
     chooseAgentFolder,
+    chooseCodexBinary,
     chooseSourceFolder,
     listSourceFolders,
     listSourceRepositories,

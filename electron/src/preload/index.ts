@@ -22,6 +22,7 @@ const api: CodexClawApi = {
   previewAgentFile: (agentId: string, filePath: string) => ipcRenderer.invoke(ipcChannels.previewAgentFile, agentId, filePath),
   openAgentGitDiff: (agentId: string) => ipcRenderer.invoke(ipcChannels.openAgentGitDiff, agentId),
   chooseAgentFolder: () => ipcRenderer.invoke(ipcChannels.chooseAgentFolder),
+  chooseCodexBinary: () => ipcRenderer.invoke(ipcChannels.chooseCodexBinary),
   chooseSourceFolder: () => ipcRenderer.invoke(ipcChannels.chooseSourceFolder),
   listSourceFolders: (input?: SourceFolderListInput) => ipcRenderer.invoke(ipcChannels.listSourceFolders, input),
   listSourceRepositories: (remoteConnectionId?: string) => ipcRenderer.invoke(ipcChannels.listSourceRepositories, remoteConnectionId),

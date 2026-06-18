@@ -5,8 +5,10 @@ import { defaultGeneralSettings, defaultThemeSettings, normalizeGeneralSettings,
 describe('settings contracts', () => {
   it('normalizes general settings', () => {
     expect(normalizeGeneralSettings({
+      codexBinaryPath: ' /opt/homebrew/bin/codex ',
       preventSleepWhenAgentsRun: false,
     })).toStrictEqual({
+      codexBinaryPath: '/opt/homebrew/bin/codex',
       preventSleepWhenAgentsRun: false,
     });
 
@@ -61,6 +63,7 @@ describe('settings contracts', () => {
     });
 
     expect(snapshot.general).toStrictEqual({
+      codexBinaryPath: '',
       preventSleepWhenAgentsRun: false,
     });
     expect(snapshot.teams).toHaveLength(1);

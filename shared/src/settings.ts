@@ -2,6 +2,7 @@ import type { AppGeneralSettings, AppSnapshot, AppThemeSettings, SourceFolderSta
 
 export const defaultGeneralSettings: AppGeneralSettings = {
   preventSleepWhenAgentsRun: true,
+  codexBinaryPath: '',
 };
 
 export const defaultSourceFolderState: SourceFolderState = {
@@ -68,6 +69,7 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
 
   return {
     preventSleepWhenAgentsRun: value.preventSleepWhenAgentsRun !== false,
+    codexBinaryPath: normalizeString(value.codexBinaryPath) ?? defaultGeneralSettings.codexBinaryPath,
   };
 }
 

@@ -15,6 +15,7 @@
       <div class="settings-view__panel">
         <SettingsGeneralPanel
           v-if="activeTab === 'general'"
+          :choose-codex-binary="chooseCodexBinary"
           :choose-source-folder="chooseSourceFolder"
           :daemon-status="daemonStatus"
           :daemon-status-error="daemonStatusError"
@@ -75,6 +76,7 @@ withDefaults(defineProps<{
   sourceFolder?: SourceFolderState;
   daemonStatus?: ClawdDaemonStatus | null;
   daemonStatusError?: string | null;
+  chooseCodexBinary?: () => Promise<string | null>;
   chooseSourceFolder?: () => Promise<string | null>;
   workBacklogConnections?: WorkIntegrationConnection[];
   workBacklogError?: string | null;
@@ -115,6 +117,7 @@ withDefaults(defineProps<{
   sourceFolder: () => ({ ...defaultSourceFolderState }),
   daemonStatus: null,
   daemonStatusError: null,
+  chooseCodexBinary: async () => null,
   chooseSourceFolder: async () => null,
   completeWorkProviderConnection: async () => undefined,
   connectWorkProvider: async () => undefined,

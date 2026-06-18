@@ -33,6 +33,7 @@
     :daemon-status-error="daemonStatusError"
     :source-repositories="sourceRepositories"
     :choose-agent-folder="chooseAgentFolder"
+    :choose-codex-binary="chooseCodexBinary"
     :choose-source-folder="chooseSourceFolder"
     :list-source-folders="listSourceFolders"
     :list-source-repositories="listSourceRepositories"
@@ -151,6 +152,7 @@ const {
   loadBackendModels,
   loadSnapshot,
   chooseAgentFolder,
+  chooseCodexBinary,
   chooseSourceFolder,
   listSourceFolders,
   listSourceRepositories,

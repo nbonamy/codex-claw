@@ -23,6 +23,7 @@ describe('ipc channels', () => {
       previewAgentFile: 'agent:file:preview',
       openAgentGitDiff: 'agent:git-diff:open',
       chooseAgentFolder: 'agent:choose-folder',
+      chooseCodexBinary: 'codex:binary:choose',
       chooseSourceFolder: 'source-folder:choose',
       listSourceFolders: 'source-folder:folders:list',
       listSourceRepositories: 'source-folder:repositories:list',

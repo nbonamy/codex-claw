@@ -1,7 +1,7 @@
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/shared/backend-driver';
 import { unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
-import type { Agent, AgentBackend, AppleSpeechTranscriptionOptions, CreateSourceWorktreeInput, SendPromptOptions } from '@codex-claw/shared/contracts';
+import type { Agent, AgentBackend, AppGeneralSettings, AppleSpeechTranscriptionOptions, CreateSourceWorktreeInput, SendPromptOptions } from '@codex-claw/shared/contracts';
 import { stat } from 'node:fs/promises';
 import { listAgentFolderFiles, previewAgentFolderFile } from './agent-files';
 import { ClaudeBackendDriver } from './claude/claude-driver';
@@ -17,11 +17,13 @@ import { transcribeWithAppleSpeechAnalyzer } from './transcription/apple-speech'
 
 export type BackendDriverRegistryOptions = {
   clawMcpServerUrl?: string | null;
+  generalSettings?: AppGeneralSettings;
 };
 
 export function createDefaultBackendDrivers(options: BackendDriverRegistryOptions = {}): Map<AgentBackend, AgentBackendDriver> {
   const codexSessionManager = new CodexAgentSessionManager(
     new CodexRpcClient(new CodexProcessTransport({
+      command: options.generalSettings?.codexBinaryPath,
       configOverrides: buildCodexClawMcpConfigOverrides(),
     })),
     { clawMcpServerUrl: options.clawMcpServerUrl ?? null },

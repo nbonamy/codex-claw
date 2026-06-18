@@ -786,6 +786,18 @@ describe('AppStatePersistence', () => {
     expect(restored.theme).toStrictEqual(snapshot.theme);
   });
 
+  it('persists and restores normalized general settings', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.general = {
+      preventSleepWhenAgentsRun: false,
+      codexBinaryPath: '/opt/homebrew/bin/codex',
+    };
+
+    const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
+
+    expect(restored.general).toStrictEqual(snapshot.general);
+  });
+
   it('persists and restores source folder settings', () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder = {

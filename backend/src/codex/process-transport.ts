@@ -26,7 +26,7 @@ export class CodexProcessTransport implements CodexTransport {
       return;
     }
 
-    const command = this.options.command ?? 'codex';
+    const command = this.options.command?.trim() || 'codex';
     const codexHome = this.options.codexHome;
     const configOverrideArgs = this.options.configOverrides?.flatMap((override) => ['-c', override]) ?? [];
     const args = [

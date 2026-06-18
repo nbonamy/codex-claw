@@ -115,6 +115,10 @@ export class AppController {
       return this.chooseAgentFolder();
     });
 
+    ipcMain.handle(ipcChannels.chooseCodexBinary, async () => {
+      return this.chooseCodexBinary();
+    });
+
     ipcMain.handle(ipcChannels.chooseSourceFolder, async () => {
       return this.chooseSourceFolder();
     });
@@ -533,7 +537,12 @@ export class AppController {
   }
 
   private async updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.settingsUpdate, { input }));
+    const previousCodexBinaryPath = this.snapshot?.general.codexBinaryPath ?? '';
+    const snapshot = await this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.settingsUpdate, { input }));
+    if (previousCodexBinaryPath !== snapshot.general.codexBinaryPath) {
+      this.restartApp();
+    }
+    return snapshot;
   }
 
   private async getDaemonStatus(): Promise<ClawdDaemonStatus> {
@@ -715,6 +724,15 @@ export class AppController {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory'],
       title: 'Select agent folder',
+    });
+
+    return result.canceled ? null : result.filePaths[0] ?? null;
+  }
+
+  private async chooseCodexBinary(): Promise<string | null> {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      title: 'Select Codex executable',
     });
 
     return result.canceled ? null : result.filePaths[0] ?? null;

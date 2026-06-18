@@ -422,6 +422,7 @@ export type AppThemeSettings = {
 
 export type AppGeneralSettings = {
   preventSleepWhenAgentsRun: boolean;
+  codexBinaryPath: string;
 };
 
 export type ClientState = {
@@ -933,6 +934,7 @@ export type CodexClawApi = {
   previewAgentFile(agentId: string, filePath: string): Promise<AgentFilePreviewResult>;
   openAgentGitDiff(agentId: string): Promise<void>;
   chooseAgentFolder(): Promise<string | null>;
+  chooseCodexBinary(): Promise<string | null>;
   chooseSourceFolder(): Promise<string | null>;
   listSourceFolders(input?: SourceFolderListInput): Promise<SourceFolderListing>;
   listSourceRepositories(remoteConnectionId?: string): Promise<SourceRepository[]>;

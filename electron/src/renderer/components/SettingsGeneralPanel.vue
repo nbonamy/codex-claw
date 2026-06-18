@@ -132,12 +132,51 @@
         </template>
       </SettingsRow>
     </SettingsSection>
+
+    <SettingsSection
+      title="Advanced"
+      title-id="settings-general-advanced-title"
+    >
+      <SettingsRow
+        title="Codex executable"
+        description="Leave empty to find codex from PATH. Changing this restarts Codex Claw."
+        :error="codexBinaryError"
+      >
+        <template #control>
+          <span class="settings-general-panel__codex-binary">
+            <el-input
+              v-model="codexBinaryDraft"
+              aria-label="Codex executable path"
+              clearable
+              placeholder="codex from PATH"
+              size="small"
+              @change="updateCodexBinaryPath"
+              @clear="clearCodexBinaryPath"
+            />
+            <el-button
+              size="small"
+              :loading="choosingCodexBinary"
+              @click="chooseCodexBinary"
+            >
+              Choose
+            </el-button>
+            <el-button
+              v-if="settings.codexBinaryPath"
+              size="small"
+              @click="clearCodexBinaryPath"
+            >
+              Clear
+            </el-button>
+          </span>
+        </template>
+      </SettingsRow>
+    </SettingsSection>
   </SettingsPanelFrame>
 </template>
 
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import type { AppGeneralSettings, ClawdDaemonStatus, SourceFolderState, SystemPermissionsStatus, UpdateSettingsInput } from '@codex-claw/shared/contracts';
 import { defaultSourceFolderState } from '@codex-claw/shared/settings';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
@@ -154,6 +193,7 @@ const defaultPermissionsStatus: SystemPermissionsStatus = {
 };
 
 const props = defineProps<{
+  chooseCodexBinary?: () => Promise<string | null>;
   chooseSourceFolder?: () => Promise<string | null>;
   daemonStatus?: ClawdDaemonStatus | null;
   daemonStatusError?: string | null;
@@ -170,9 +210,12 @@ const permissions = ref<SystemPermissionsStatus | null>(null);
 const loadingPermissions = ref(false);
 const openingAccessibilitySettings = ref(false);
 const choosingSourceFolder = ref(false);
+const choosingCodexBinary = ref(false);
 const settingDaemon = ref(false);
 const daemonOperation = ref<'installing' | 'uninstalling' | null>(null);
 const sourceFolderError = ref<string | null>(null);
+const codexBinaryError = ref<string | null>(null);
+const codexBinaryDraft = ref(props.settings.codexBinaryPath);
 
 const showSourceFolderSetting = computed(() => Boolean(props.sourceFolder));
 const sourceFolderState = computed(() => props.sourceFolder ?? defaultSourceFolderState);
@@ -229,6 +272,10 @@ onMounted(() => {
   void loadPermissions();
 });
 
+watch(() => props.settings.codexBinaryPath, (path) => {
+  codexBinaryDraft.value = path;
+});
+
 async function loadPermissions(): Promise<void> {
   loadingPermissions.value = true;
   try {
@@ -273,6 +320,37 @@ function clearSourceFolder(): void {
       path: '',
     },
   });
+}
+
+async function chooseCodexBinary(): Promise<void> {
+  codexBinaryError.value = null;
+  choosingCodexBinary.value = true;
+  try {
+    const selected = await props.chooseCodexBinary?.();
+    if (selected) {
+      codexBinaryDraft.value = selected;
+      await updateCodexBinaryPath(selected);
+    }
+  } catch (error) {
+    codexBinaryError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    choosingCodexBinary.value = false;
+  }
+}
+
+function updateCodexBinaryPath(value: string | number): Promise<void> | void {
+  codexBinaryError.value = null;
+  return props.updateSettings?.({
+    general: {
+      codexBinaryPath: String(value),
+    },
+  });
+}
+
+function clearCodexBinaryPath(): void {
+  codexBinaryError.value = null;
+  codexBinaryDraft.value = '';
+  void updateCodexBinaryPath('');
 }
 
 async function getSystemPermissions(): Promise<SystemPermissionsStatus> {
@@ -338,6 +416,21 @@ async function promptForRestartAfterDaemonChange(enabled: boolean): Promise<void
 
 .settings-general-panel__actions--source {
   width: min(360px, 100%);
+}
+
+.settings-general-panel__codex-binary {
+  min-width: 0;
+  width: min(520px, 100%);
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  justify-content: flex-end;
+  gap: var(--space-8);
+}
+
+.settings-general-panel__codex-binary :deep(.el-input) {
+  min-width: 180px;
+  flex: 1 1 auto;
 }
 
 .settings-general-panel__path {

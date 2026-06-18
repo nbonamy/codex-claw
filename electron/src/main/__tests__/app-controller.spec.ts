@@ -686,7 +686,7 @@ describe('AppController', () => {
     snapshot.sourceFolder.initialized = true;
     const backendSnapshot = {
       ...snapshot,
-      general: { preventSleepWhenAgentsRun: false },
+      general: { ...snapshot.general, preventSleepWhenAgentsRun: false },
       theme: { ...snapshot.theme, mode: 'dark' as const },
     };
     const request = vi.fn().mockResolvedValue(backendSnapshot);
@@ -701,6 +701,33 @@ describe('AppController', () => {
     await expect(updateSettings(controller, input)).resolves.toBe(backendSnapshot);
 
     expect(request).toHaveBeenCalledWith('settings/update', { input });
+  });
+
+  it('restarts the app when the Codex executable setting changes', async () => {
+    const snapshot = createInitialSnapshot();
+    const backendSnapshot = {
+      ...snapshot,
+      general: {
+        ...snapshot.general,
+        codexBinaryPath: '/opt/homebrew/bin/codex',
+      },
+    };
+    const request = vi.fn().mockResolvedValue(backendSnapshot);
+    const appLifecycle = fakeAppLifecycle();
+    const controller = new AppController(snapshot, createBackendClient({ request }), appLifecycle);
+    const input: UpdateSettingsInput = {
+      general: {
+        codexBinaryPath: ' /opt/homebrew/bin/codex ',
+      },
+    };
+
+    await controller.initialize();
+
+    await expect(updateSettings(controller, input)).resolves.toBe(backendSnapshot);
+
+    expect(request).toHaveBeenCalledWith('settings/update', { input });
+    expect(appLifecycle.relaunch).toHaveBeenCalledOnce();
+    expect(appLifecycle.exit).toHaveBeenCalledWith(0);
   });
 
   it('routes remote connection actions through clawd', async () => {

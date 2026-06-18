@@ -87,6 +87,16 @@ describe('CodexProcessTransport', () => {
     });
   });
 
+  it('uses a configured Codex executable when provided', async () => {
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const transport = new CodexProcessTransport({ command: ' /opt/homebrew/bin/codex ' });
+
+    await transport.start();
+
+    expect(spawnMock.mock.calls[0][0]).toBe('/opt/homebrew/bin/codex');
+  });
+
   it('passes config overrides before the app-server subcommand', async () => {
     const child = createFakeChild();
     spawnMock.mockReturnValue(child);

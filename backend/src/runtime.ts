@@ -38,6 +38,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   const mcpServerUrl = await mcpService.start();
   const backendDrivers = createDefaultBackendDrivers({
     clawMcpServerUrl: mcpServerUrl,
+    generalSettings: snapshot.general,
   });
   const driverRpc = new BackendDriverRpc(backendDrivers);
   let server: ClawBackendServer;
