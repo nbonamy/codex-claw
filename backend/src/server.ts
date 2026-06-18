@@ -146,6 +146,15 @@ export class ClawBackendServer {
         this.snapshot.remoteConnections.connections = this.snapshot.remoteConnections.connections.map((candidate) => (
           candidate.id === connectionId ? checked : candidate
         ));
+        if (checked.status === 'ready' && checked.transport) {
+          const remoteSnapshot = await this.remoteClients.request<AppSnapshot>(
+            checked,
+            backendMethods.workProviderConnectionsReload,
+            undefined,
+            (event) => this.applyRemoteBackendEvent(connectionId, event),
+          );
+          this.remoteSnapshots.set(connectionId, remoteSnapshot);
+        }
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.connectionsUpdate: {
@@ -935,6 +944,10 @@ export class ClawBackendServer {
         return createClawRpcResult(message.id, await this.requireWorkIntegrations().openAuthorization(requireWorkProvider(message.params)));
       case backendMethods.workProviderConnectionComplete:
         return createClawRpcResult(message.id, await this.requireWorkIntegrations().completeConnection(requireWorkProvider(message.params)));
+      case backendMethods.workProviderConnectionsReload: {
+        await this.requireWorkIntegrations().hydrateConnections();
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
       case backendMethods.workProviderDisconnect:
         return createClawRpcResult(message.id, await this.requireWorkIntegrations().disconnect(requireWorkProvider(message.params)));
       case backendMethods.workProviderRepositoriesList: {

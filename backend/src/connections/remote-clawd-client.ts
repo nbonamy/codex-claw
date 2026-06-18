@@ -1,7 +1,10 @@
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import {
+  createClawRpcError,
   createClawRpcRequest,
+  createClawRpcResult,
+  clawRpcErrorCodes,
   isClawRpcNotification,
   isClawRpcRequest,
   isClawRpcResponse,
@@ -16,6 +19,7 @@ import { warnMain } from '../log';
 import { sshStdioTransport } from './ssh-connections';
 
 export type RemoteClawdClientOptions = {
+  requestHandlers?: Record<string, (params: unknown) => unknown | Promise<unknown>>;
   spawnProcess?: typeof spawn;
   requestTimeoutMs?: number;
 };
@@ -198,10 +202,21 @@ class RemoteClawdClient {
   }
 
   private handleRequest(message: ClawRpcRequest): void {
-    warnMain('remote-clawd', 'ignored backend request from remote connection', {
-      connectionId: this.connection.id,
-      method: message.method,
-    });
+    void this.handleRequestAsync(message);
+  }
+
+  private async handleRequestAsync(message: ClawRpcRequest): Promise<void> {
+    const handler = this.options.requestHandlers?.[message.method];
+    if (!handler) {
+      this.writeResponse(createClawRpcError(message.id, clawRpcErrorCodes.methodNotFound, `Unknown client method: ${message.method}`));
+      return;
+    }
+
+    try {
+      this.writeResponse(createClawRpcResult(message.id, await handler(message.params)));
+    } catch (error) {
+      this.writeResponse(createClawRpcError(message.id, clawRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error)));
+    }
   }
 
   private handleResponse(response: ClawRpcResponse): void {
@@ -238,6 +253,10 @@ class RemoteClawdClient {
       pending.reject(error);
     }
     this.pending.clear();
+  }
+
+  private writeResponse(response: ClawRpcResponse): void {
+    this.process?.stdin.write(`${JSON.stringify(response)}\n`);
   }
 }
 

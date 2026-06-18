@@ -6,6 +6,7 @@ import { updateLoopExecutionAgentConversationInSnapshot } from '@codex-claw/shar
 import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/shared/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { BackendDriverRpc, createDefaultBackendDrivers } from './driver-rpc';
+import { RemoteClawdClientManager } from './connections/remote-clawd-client';
 import { SshConnectionService } from './connections/ssh-connections';
 import { LoopRunner } from './loops/runner';
 import { LoopScheduler } from './loops/scheduler';
@@ -95,6 +96,13 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     saveSnapshot: (nextSnapshot) => saveBackendSnapshot(nextSnapshot),
     workIntegrations,
     loopRunner,
+    remoteClients: new RemoteClawdClientManager({
+      requestHandlers: {
+        [backendMethods.clientExternalOpen]: (params) => options.requestClient(backendMethods.clientExternalOpen, params),
+        [backendMethods.clientSystemPermissionsGet]: (params) => options.requestClient(backendMethods.clientSystemPermissionsGet, params),
+        [backendMethods.clientSystemPermissionsAccessibilityOpen]: (params) => options.requestClient(backendMethods.clientSystemPermissionsAccessibilityOpen, params),
+      },
+    }),
     sshConnections: new SshConnectionService(),
     systemPermissions: {
       getStatus: () => options.requestClient<SystemPermissionsStatus>(backendMethods.clientSystemPermissionsGet),

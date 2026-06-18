@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { describe, expect, it, vi } from 'vitest';
+import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import type { RemoteConnection } from '@codex-claw/shared/contracts';
 import { RemoteClawdClientManager } from '../remote-clawd-client';
 import { sshStdioTransport } from '../ssh-connections';
@@ -117,6 +118,117 @@ describe('RemoteClawdClientManager', () => {
       agentId: 'agent-remote',
       type: 'agent.statusChanged',
     }));
+    await manager.close();
+  });
+
+  it('answers remote backend client requests through injected request handlers', async () => {
+    const child = createChildProcess();
+    const openExternal = vi.fn().mockResolvedValue(true);
+    const manager = new RemoteClawdClientManager({
+      requestHandlers: {
+        [backendMethods.clientExternalOpen]: openExternal,
+      },
+      spawnProcess: vi.fn(() => child.process) as never,
+    });
+
+    const result = manager.request(readyConnection(), 'backend/health/get');
+    await vi.waitFor(() => expect(child.stdinLines()).toHaveLength(1));
+    const healthRequest = JSON.parse(child.stdinLines()[0]!) as { id: number };
+
+    child.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: 'client-1',
+      method: backendMethods.clientExternalOpen,
+      params: { url: 'https://github.com/login/device?user_code=ABCD-1234' },
+    })}\n`);
+    await vi.waitFor(() => expect(child.stdinLines()).toHaveLength(2));
+
+    expect(openExternal).toHaveBeenCalledWith({ url: 'https://github.com/login/device?user_code=ABCD-1234' });
+    expect(JSON.parse(child.stdinLines()[1]!)).toStrictEqual({
+      jsonrpc: '2.0',
+      id: 'client-1',
+      result: true,
+    });
+
+    child.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: healthRequest.id,
+      result: { ok: true },
+    })}\n`);
+    await expect(result).resolves.toStrictEqual({ ok: true });
+    await manager.close();
+  });
+
+  it('returns method-not-found for unknown remote backend client requests', async () => {
+    const child = createChildProcess();
+    const manager = new RemoteClawdClientManager({ spawnProcess: vi.fn(() => child.process) as never });
+
+    const result = manager.request(readyConnection(), 'backend/health/get');
+    await vi.waitFor(() => expect(child.stdinLines()).toHaveLength(1));
+    const healthRequest = JSON.parse(child.stdinLines()[0]!) as { id: number };
+
+    child.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: 'client-unknown',
+      method: 'client/nope',
+      params: {},
+    })}\n`);
+    await vi.waitFor(() => expect(child.stdinLines()).toHaveLength(2));
+
+    expect(JSON.parse(child.stdinLines()[1]!)).toStrictEqual({
+      jsonrpc: '2.0',
+      id: 'client-unknown',
+      error: {
+        code: -32601,
+        message: 'Unknown client method: client/nope',
+      },
+    });
+
+    child.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: healthRequest.id,
+      result: { ok: true },
+    })}\n`);
+    await expect(result).resolves.toStrictEqual({ ok: true });
+    await manager.close();
+  });
+
+  it('returns internal errors for failed remote backend client requests and keeps later requests alive', async () => {
+    const child = createChildProcess();
+    const manager = new RemoteClawdClientManager({
+      requestHandlers: {
+        [backendMethods.clientExternalOpen]: vi.fn().mockRejectedValue(new Error('browser unavailable')),
+      },
+      spawnProcess: vi.fn(() => child.process) as never,
+    });
+
+    const result = manager.request(readyConnection(), 'backend/health/get');
+    await vi.waitFor(() => expect(child.stdinLines()).toHaveLength(1));
+    const healthRequest = JSON.parse(child.stdinLines()[0]!) as { id: number };
+
+    child.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: 'client-failed',
+      method: backendMethods.clientExternalOpen,
+      params: { url: 'https://example.com' },
+    })}\n`);
+    await vi.waitFor(() => expect(child.stdinLines()).toHaveLength(2));
+
+    expect(JSON.parse(child.stdinLines()[1]!)).toStrictEqual({
+      jsonrpc: '2.0',
+      id: 'client-failed',
+      error: {
+        code: -32603,
+        message: 'browser unavailable',
+      },
+    });
+
+    child.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: healthRequest.id,
+      result: { ok: true },
+    })}\n`);
+    await expect(result).resolves.toStrictEqual({ ok: true });
     await manager.close();
   });
 

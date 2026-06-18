@@ -175,11 +175,16 @@ describe('ClawBackendServer', () => {
         ...snapshot.remoteConnections.connections[0],
         status: 'ready',
         detail: 'Ready (clawd 0.1.0)',
+        transport: {
+          type: 'ssh-stdio',
+          command: 'ssh',
+          args: ['devbox', 'node ~/.codex-claw/clawd.mjs connect || exec node ~/.codex-claw/clawd.mjs --stdio'],
+        },
         updatedAt: '2026-06-14T10:01:00.000Z',
       }),
     };
     const remoteClients = {
-      request: vi.fn(),
+      request: vi.fn().mockResolvedValue(createTestSnapshot()),
       close: vi.fn(),
       closeConnection: vi.fn().mockResolvedValue(undefined),
     };
@@ -208,6 +213,15 @@ describe('ClawBackendServer', () => {
       },
     });
     expect(remoteClients.closeConnection).toHaveBeenCalledWith('connection-devbox');
+    expect(remoteClients.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'connection-devbox',
+        status: 'ready',
+      }),
+      'workProvider/connections/reload',
+      undefined,
+      expect.any(Function),
+    );
 
     snapshot.teams[0].remoteConnectionId = 'connection-devbox';
     snapshot.teams[0].agentIds = ['agent-dina'];
@@ -1484,6 +1498,47 @@ describe('ClawBackendServer', () => {
     expect(workIntegrations.connect).toHaveBeenCalledWith('github');
     expect(workIntegrations.configureBacklog).toHaveBeenCalledWith({ provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } });
     expect(workIntegrations.listItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw');
+  });
+
+  it('reloads work provider connections from token storage', async () => {
+    const snapshot = createTestSnapshot();
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const workIntegrations = {
+      hydrateConnections: vi.fn(async () => {
+        snapshot.workBacklog.connections = [{
+          provider: 'github',
+          status: 'connected',
+          accountLabel: 'nbonamy',
+          connectedAt: '2026-06-14T10:00:00.000Z',
+        }];
+      }),
+    } as unknown as WorkIntegrationManager;
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+      workIntegrations,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'reload-work-providers',
+      method: 'workProvider/connections/reload',
+    })).resolves.toMatchObject({
+      result: {
+        workBacklog: {
+          connections: [{
+            provider: 'github',
+            status: 'connected',
+            accountLabel: 'nbonamy',
+          }],
+        },
+      },
+    });
+
+    expect(workIntegrations.hydrateConnections).toHaveBeenCalledOnce();
+    expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
   });
 
   it('owns agent selection hydration and git status refresh', async () => {

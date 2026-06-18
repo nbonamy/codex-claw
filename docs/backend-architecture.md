@@ -482,8 +482,9 @@ names that describe backend ownership:
   clients never transmit local filesystem roots as read authority.
 - `git/status`, `git/diff`
 - `workProvider/connect`, `workProvider/connection/complete`,
-  `workProvider/disconnect`, `workProvider/repositories/list`,
-  `workProvider/backlog/configure`, `workProvider/items/list`
+  `workProvider/connections/reload`, `workProvider/disconnect`,
+  `workProvider/repositories/list`, `workProvider/backlog/configure`,
+  `workProvider/items/list`
 - `settings/update`
 - `backend/health/get`
 
@@ -951,10 +952,12 @@ The remote `connect` mode bridges SSH stdio to the remote host's
 already running; otherwise the shell fallback keeps the previous one-shot
 `--stdio` behavior. Sync does not install, start, or restart the persistent
 remote daemon.
-Sync mirrors `provider-tokens.json` to the remote; it does not copy local
+Sync mirrors `provider-tokens.json` to the remote, then asks the remote
+`clawd` to run `workProvider/connections/reload`; it does not copy local
 `state.json`. The remote `clawd` hydrates safe work-integration connection
-metadata from those tokens during startup so remote loop management can see
-GitHub as connected while preserving the remote's own teams, agents, and loops.
+metadata from those tokens during startup and on explicit reload, so remote
+loop management can see GitHub as connected while preserving the remote's own
+teams, agents, and loops.
 The Team dialog can select Local or a ready SSH connection before any agents are
 created. It can also connect to an existing remote team by storing the remote
 team id on the local pointer. Agent creation inherits the target team's backend

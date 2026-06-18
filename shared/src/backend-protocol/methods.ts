@@ -97,6 +97,7 @@ export const backendMethods = {
   workProviderBacklogConfigure: 'workProvider/backlog/configure',
   workProviderConnect: 'workProvider/connect',
   workProviderConnectionComplete: 'workProvider/connection/complete',
+  workProviderConnectionsReload: 'workProvider/connections/reload',
   workProviderDisconnect: 'workProvider/disconnect',
   workProviderItemsList: 'workProvider/items/list',
   workProviderRepositoriesList: 'workProvider/repositories/list',
