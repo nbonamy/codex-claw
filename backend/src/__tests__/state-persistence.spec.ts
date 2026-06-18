@@ -877,6 +877,45 @@ describe('AppStatePersistence', () => {
     expect(restored.activeAgentId).toBe('agent-local');
   });
 
+  it('repairs orphaned local agents to a local team instead of a remote pointer', () => {
+    const restored = snapshotFromPersistedState({
+      teams: [
+        {
+          id: 'team-remote-pointer',
+          name: 'Remote Pointer',
+          remoteConnectionId: 'connection-devbox',
+          remoteTeamId: 'team-remote',
+          agentIds: [],
+        },
+        {
+          id: 'team-local',
+          name: 'Local',
+          agentIds: [],
+        },
+      ],
+      agents: [{
+        id: 'agent-orphan',
+        teamId: 'team-missing',
+        name: 'Orphan',
+        folder: '/Users/nicolas/src/local',
+        backend: 'codex',
+        createdAt: '2026-06-14T10:00:00.000Z',
+        updatedAt: '2026-06-14T10:00:00.000Z',
+      }],
+      bench: [],
+      activeTeamId: 'team-local',
+      activeAgentId: 'agent-orphan',
+      remoteConnections: { connections: [readyRemoteConnection()] },
+      theme: defaultThemeSettings,
+    });
+
+    expect(restored.teams.find((team) => team.id === 'team-remote-pointer')?.agentIds).toStrictEqual([]);
+    expect(restored.teams.find((team) => team.id === 'team-local')?.agentIds).toStrictEqual(['agent-orphan']);
+    expect(restored.agents[0].teamId).toBe('team-local');
+    expect(restored.activeTeamId).toBe('team-local');
+    expect(restored.activeAgentId).toBe('agent-orphan');
+  });
+
   it('drops remote team connection ids when the connection is missing', () => {
     const restored = snapshotFromPersistedState({
       teams: [{

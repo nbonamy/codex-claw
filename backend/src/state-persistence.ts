@@ -986,7 +986,7 @@ function sanitizeTeam(value: unknown, agents: Agent[], remoteConnectionIds: Set<
 function localRemoteTeamPointerIds(teams: Team[]): Set<string> {
   const ids = new Set<string>();
   for (const team of teams) {
-    if (!team.remoteConnectionId || !team.remoteTeamId) {
+    if (!isRemoteTeamPointer(team)) {
       continue;
     }
     // `remoteTeamId` is owned by another clawd and can collide with local team ids.
@@ -1127,13 +1127,14 @@ function sanitizeClaudeThinking(value: unknown): Extract<BackendDefaults, { kind
 }
 
 function repairTeamMembership(snapshot: AppSnapshot): void {
-  const firstTeam = snapshot.teams[0];
-  if (!firstTeam) {
+  const fallbackTeam = snapshot.teams.find((team) => !isRemoteTeamPointer(team));
+  if (!fallbackTeam) {
+    snapshot.agents = [];
     return;
   }
 
   for (const agent of snapshot.agents) {
-    const team = snapshot.teams.find((candidate) => candidate.id === agent.teamId) ?? firstTeam;
+    const team = snapshot.teams.find((candidate) => candidate.id === agent.teamId && !isRemoteTeamPointer(candidate)) ?? fallbackTeam;
     agent.teamId = team.id;
     if (!team.agentIds.includes(agent.id)) {
       team.agentIds.push(agent.id);
@@ -1152,6 +1153,10 @@ function repairedActiveTeamId(snapshot: AppSnapshot): string | null {
   }
 
   return snapshot.teams[0]?.id ?? null;
+}
+
+function isRemoteTeamPointer(team: Team): boolean {
+  return Boolean(team.remoteConnectionId && team.remoteTeamId);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
