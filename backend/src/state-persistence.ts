@@ -105,16 +105,23 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
   const workBacklog = sanitizeWorkBacklogState(value.workBacklog, seed.workBacklog);
   const remoteConnections = sanitizeRemoteConnectionsState(value.remoteConnections, seed.remoteConnections);
   const remoteConnectionIds = new Set(remoteConnections.connections.map((connection) => connection.id));
-  const agents = Array.isArray(value.agents)
+  const allAgents = Array.isArray(value.agents)
     ? value.agents.map((agent) => sanitizeAgent(agent)).filter((agent): agent is Agent => Boolean(agent))
     : [];
   const teams = Array.isArray(value.teams)
-    ? value.teams.map((team) => sanitizeTeam(team, agents, remoteConnectionIds)).filter((team): team is Team => Boolean(team))
+    ? value.teams.map((team) => sanitizeTeam(team, allAgents, remoteConnectionIds)).filter((team): team is Team => Boolean(team))
     : seed.teams;
-  workBacklog.assignments = {
+  const remotePointerTeamIds = localRemoteTeamPointerIds(teams);
+  const agents = allAgents.filter((agent) => !agent.teamId || !remotePointerTeamIds.has(agent.teamId));
+  const droppedRemoteAgentIds = new Set(
+    allAgents
+      .filter((agent) => agent.teamId && remotePointerTeamIds.has(agent.teamId))
+      .map((agent) => agent.id),
+  );
+  workBacklog.assignments = assignmentsWithoutAgents({
     ...legacyWorkBacklogAssignments(value.agents, agents),
     ...workBacklog.assignments,
-  };
+  }, droppedRemoteAgentIds);
   const snapshot: AppSnapshot = {
     ...seed,
     teams: teams.length > 0 ? teams : seed.teams,
@@ -960,6 +967,7 @@ function sanitizeTeam(value: unknown, agents: Agent[], remoteConnectionIds: Set<
   const remoteTeamId = remoteConnectionId && typeof value.remoteTeamId === 'string' && value.remoteTeamId.trim()
     ? value.remoteTeamId
     : null;
+  const teamAgentIds = remoteConnectionId && remoteTeamId ? [] : agentIds;
 
   return {
     id: value.id,
@@ -968,11 +976,30 @@ function sanitizeTeam(value: unknown, agents: Agent[], remoteConnectionIds: Set<
     color: typeof value.color === 'string' ? value.color : defaultTeamColor,
     ...(remoteConnectionId ? { remoteConnectionId } : {}),
     ...(remoteTeamId ? { remoteTeamId } : {}),
-    agentIds,
-    activeAgentId: typeof value.activeAgentId === 'string' && agentIds.includes(value.activeAgentId)
+    agentIds: teamAgentIds,
+    activeAgentId: typeof value.activeAgentId === 'string' && teamAgentIds.includes(value.activeAgentId)
       ? value.activeAgentId
       : undefined,
   };
+}
+
+function localRemoteTeamPointerIds(teams: Team[]): Set<string> {
+  const ids = new Set<string>();
+  for (const team of teams) {
+    if (!team.remoteConnectionId || !team.remoteTeamId) {
+      continue;
+    }
+    // `remoteTeamId` is owned by another clawd and can collide with local team ids.
+    // Only the local pointer team's id participates in local state repair/migration.
+    ids.add(team.id);
+  }
+  return ids;
+}
+
+function assignmentsWithoutAgents(assignments: WorkBacklogState['assignments'], agentIds: Set<string>): WorkBacklogState['assignments'] {
+  return Object.fromEntries(
+    Object.entries(assignments).filter(([, assignment]) => !agentIds.has(assignment.agentId)),
+  );
 }
 
 function sanitizeBenchTemplate(value: unknown): BenchTemplate | null {

@@ -66,14 +66,22 @@ export class RemoteClawdClientManager {
   private async client(connection: RemoteConnection): Promise<RemoteClawdClient> {
     const existing = this.clients.get(connection.id);
     if (existing) {
-      return existing;
+      if (existing.isRunning()) {
+        return existing;
+      }
+      this.clients.delete(connection.id);
     }
 
     if (connection.status !== 'ready' || !connection.transport) {
       throw new Error(`Remote connection is not ready: ${connection.name}`);
     }
 
-    const client = new RemoteClawdClient(connection, this.options);
+    let client: RemoteClawdClient;
+    client = new RemoteClawdClient(connection, this.options, () => {
+      if (this.clients.get(connection.id) === client) {
+        this.clients.delete(connection.id);
+      }
+    });
     await client.start();
     this.clients.set(connection.id, client);
     return client;
@@ -90,10 +98,15 @@ class RemoteClawdClient {
   constructor(
     private readonly connection: RemoteConnection,
     private readonly options: RemoteClawdClientOptions,
+    private readonly onStopped: () => void,
   ) {}
 
   setEventSink(eventSink: (event: ClawBackendEvent) => void): void {
     this.eventSink = eventSink;
+  }
+
+  isRunning(): boolean {
+    return Boolean(this.process);
   }
 
   async start(): Promise<void> {
@@ -120,10 +133,12 @@ class RemoteClawdClient {
     child.once('exit', (code, signal) => {
       this.process = null;
       this.rejectPending(new Error(`remote clawd exited before responding (code=${code ?? 'null'}, signal=${signal ?? 'null'}).`));
+      this.onStopped();
     });
     child.once('error', (error) => {
       this.process = null;
       this.rejectPending(error);
+      this.onStopped();
     });
   }
 

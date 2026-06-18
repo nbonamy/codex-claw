@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { AppStatePersistence, persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 import { appendUserPrompt, createEmptySnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
 import { defaultThemeSettings } from '@codex-claw/shared/settings';
+import type { RemoteConnection } from '@codex-claw/shared/contracts';
 
 let tempDir: string | null = null;
 
@@ -798,30 +799,82 @@ describe('AppStatePersistence', () => {
     expect(restored.sourceFolder).toStrictEqual(snapshot.sourceFolder);
   });
 
-  it('persists remote team connections when the connection exists', () => {
+  it('restores remote teams as pointer-only state when the connection exists', () => {
     const snapshot = createInitialSnapshot();
-    snapshot.remoteConnections.connections = [{
-      id: 'connection-devbox',
-      kind: 'ssh',
-      name: 'devbox',
-      host: 'devbox',
-      status: 'ready',
-      transport: {
-        type: 'ssh-stdio',
-        command: 'ssh',
-        args: ['devbox', 'node ~/.codex-claw/clawd.mjs --stdio'],
-      },
-      createdAt: '2026-06-14T10:00:00.000Z',
-      updatedAt: '2026-06-14T10:00:00.000Z',
-    }];
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
     snapshot.teams[0].remoteConnectionId = 'connection-devbox';
     snapshot.teams[0].remoteTeamId = 'team-remote';
+    snapshot.workBacklog.assignments = {
+      'github:nbonamy/codex-claw#12': {
+        provider: 'github',
+        itemId: 'nbonamy/codex-claw#12',
+        agentId: 'agent-dina',
+        assignedAt: '2026-06-14T10:00:00.000Z',
+        status: 'working',
+      },
+    };
 
     const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
 
     expect(restored.teams[0].remoteConnectionId).toBe('connection-devbox');
     expect(restored.teams[0].remoteTeamId).toBe('team-remote');
-    expect(restored.agents[0]).not.toHaveProperty('remoteConnectionId');
+    expect(restored.teams[0].agentIds).toStrictEqual([]);
+    expect(restored.teams[0].activeAgentId).toBeUndefined();
+    expect(restored.agents).toStrictEqual([]);
+    expect(restored.activeAgentId).toBeNull();
+    expect(restored.workBacklog.assignments).toStrictEqual({});
+  });
+
+  it('does not treat a remote team id collision as local team membership', () => {
+    const restored = snapshotFromPersistedState({
+      teams: [
+        {
+          id: 'team-remote-pointer',
+          name: 'Remote Pointer',
+          remoteConnectionId: 'connection-devbox',
+          remoteTeamId: 'team-codex-claw',
+          agentIds: ['agent-stale-remote'],
+          activeAgentId: 'agent-stale-remote',
+        },
+        {
+          id: 'team-codex-claw',
+          name: 'Local',
+          agentIds: ['agent-local'],
+          activeAgentId: 'agent-local',
+        },
+      ],
+      agents: [
+        {
+          id: 'agent-stale-remote',
+          teamId: 'team-remote-pointer',
+          name: 'Stale Remote',
+          folder: '/home/nicolas/src/remote',
+          backend: 'codex',
+          createdAt: '2026-06-14T10:00:00.000Z',
+          updatedAt: '2026-06-14T10:00:00.000Z',
+        },
+        {
+          id: 'agent-local',
+          teamId: 'team-codex-claw',
+          name: 'Local',
+          folder: '/Users/nicolas/src/local',
+          backend: 'codex',
+          createdAt: '2026-06-14T10:00:00.000Z',
+          updatedAt: '2026-06-14T10:00:00.000Z',
+        },
+      ],
+      bench: [],
+      activeTeamId: 'team-codex-claw',
+      activeAgentId: 'agent-local',
+      remoteConnections: { connections: [readyRemoteConnection()] },
+      theme: defaultThemeSettings,
+    });
+
+    expect(restored.teams.find((team) => team.id === 'team-remote-pointer')?.agentIds).toStrictEqual([]);
+    expect(restored.teams.find((team) => team.id === 'team-codex-claw')?.agentIds).toStrictEqual(['agent-local']);
+    expect(restored.agents.map((agent) => agent.id)).toStrictEqual(['agent-local']);
+    expect(restored.activeTeamId).toBe('team-codex-claw');
+    expect(restored.activeAgentId).toBe('agent-local');
   });
 
   it('drops remote team connection ids when the connection is missing', () => {
@@ -878,4 +931,21 @@ describe('AppStatePersistence', () => {
 async function tempStatePath(): Promise<string> {
   tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-state-'));
   return path.join(tempDir, 'state.json');
+}
+
+function readyRemoteConnection(): RemoteConnection {
+  return {
+    id: 'connection-devbox',
+    kind: 'ssh' as const,
+    name: 'devbox',
+    host: 'devbox',
+    status: 'ready' as const,
+    transport: {
+      type: 'ssh-stdio' as const,
+      command: 'ssh',
+      args: ['devbox', 'node ~/.codex-claw/clawd.mjs --stdio'],
+    },
+    createdAt: '2026-06-14T10:00:00.000Z',
+    updatedAt: '2026-06-14T10:00:00.000Z',
+  };
 }

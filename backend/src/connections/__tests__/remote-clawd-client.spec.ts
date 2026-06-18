@@ -242,6 +242,40 @@ describe('RemoteClawdClientManager', () => {
     }, 'backend/health/get')).rejects.toThrow('Remote connection is not ready');
   });
 
+  it('evicts exited clients so the next request reconnects', async () => {
+    const firstChild = createChildProcess();
+    const secondChild = createChildProcess();
+    const spawnProcess = vi.fn()
+      .mockReturnValueOnce(firstChild.process)
+      .mockReturnValueOnce(secondChild.process);
+    const manager = new RemoteClawdClientManager({ spawnProcess: spawnProcess as never });
+
+    const firstResult = manager.request(readyConnection(), 'backend/health/get');
+    await vi.waitFor(() => expect(firstChild.stdinLines()).toHaveLength(1));
+    const firstRequest = JSON.parse(firstChild.stdinLines()[0]!) as { id: number };
+    firstChild.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: firstRequest.id,
+      result: { ok: true },
+    })}\n`);
+    await expect(firstResult).resolves.toStrictEqual({ ok: true });
+
+    firstChild.process.emit('exit', 0, null);
+
+    const secondResult = manager.request(readyConnection(), 'backend/health/get');
+    await vi.waitFor(() => expect(secondChild.stdinLines()).toHaveLength(1));
+    const secondRequest = JSON.parse(secondChild.stdinLines()[0]!) as { id: number };
+    secondChild.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: secondRequest.id,
+      result: { ok: true },
+    })}\n`);
+
+    await expect(secondResult).resolves.toStrictEqual({ ok: true });
+    expect(spawnProcess).toHaveBeenCalledTimes(2);
+    await manager.close();
+  });
+
   it('closes a cached client for a single connection', async () => {
     const child = createChildProcess();
     const manager = new RemoteClawdClientManager({ spawnProcess: vi.fn(() => child.process) as never });

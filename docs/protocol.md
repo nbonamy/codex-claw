@@ -195,6 +195,9 @@ Remote teams store a local pointer with `Team.remoteConnectionId` and
 `Team.remoteTeamId`. Local `clawd` owns the connection list and the user's local
 navigation pointers; the remote `clawd` owns the actual remote team composition,
 agents, messages, sessions, MCP-visible membership, and remote Bench catalog.
+`Team.id` is the local pointer id. `Team.remoteTeamId` is only the remote lookup
+key and must not be used for local membership, active-agent repair, assignment
+cleanup, or migrations because remote team ids can collide with local team ids.
 Generic location-scoped requests first resolve an internal `BackendLocation`.
 Agent-scoped requests resolve an internal `AgentLocation` so projected remote
 agents can still route to the owning remote `clawd` over SSH stdio.

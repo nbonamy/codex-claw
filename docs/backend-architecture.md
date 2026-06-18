@@ -878,6 +878,11 @@ Remote migration path:
 - Local `clawd` remains the desktop app's connection and navigation control
   plane. For a remote team it persists only a local pointer:
   `Team.remoteConnectionId` plus `Team.remoteTeamId`.
+- `Team.id` is the local pointer id. `Team.remoteTeamId` is foreign state owned
+  by the remote `clawd`; it must never be used for local team membership,
+  local active-agent repair, local work-assignment cleanup, or persistence
+  migration. Remote daemons can use ids such as `team-codex-claw`, so
+  `remoteTeamId` can legitimately collide with a local team id.
 - The remote `clawd` owns the real remote team composition: agents, active
   agent, backend sessions, messages, MCP-visible membership, source scanning,
   folder browsing, worktree creation, git status/diff, file previews, provider
@@ -928,8 +933,10 @@ Remote migration path:
   process extraction.
 
 `Team.remoteConnectionId` plus `Team.remoteTeamId` is the remote-team pointer
-shape. Longer-term remote support can migrate to explicit location-aware
-folders without changing the UI contract:
+shape. In local persisted state, `Team.id` is always the local pointer id and
+`Team.remoteTeamId` is only the remote lookup key. Longer-term remote support
+can migrate to explicit location-aware folders without changing the UI
+contract:
 
 ```ts
 type BackendLocation =
