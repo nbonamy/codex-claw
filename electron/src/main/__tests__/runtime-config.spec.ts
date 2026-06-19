@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import path from 'node:path';
 import { homedir } from 'node:os';
+import { readFileSync } from 'node:fs';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -94,6 +95,13 @@ describe('runtime config', () => {
         HOME: homedir(),
       },
     });
+  });
+
+  it('starts dev clawd with the moved Electron assets path', () => {
+    const devScript = readFileSync(path.resolve(__dirname, '../../../../scripts/dev.mjs'), 'utf8');
+
+    expect(devScript).toContain("CODEX_CLAW_ASSETS_PATH: path.join(rootDir, 'electron', 'assets')");
+    expect(devScript).not.toContain("CODEX_CLAW_ASSETS_PATH: path.join(rootDir, 'assets')");
   });
 
   it('resolves the packaged clawd runtime from resources when no env command is configured', async () => {

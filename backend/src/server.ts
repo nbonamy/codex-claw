@@ -178,6 +178,7 @@ export class ClawBackendServer {
       }
       case backendMethods.connectionsDelete: {
         const connectionId = requireConnectionId(message.params);
+        await this.remoteClients.closeConnection(connectionId);
         this.deleteTeamsForRemoteConnection(connectionId);
         this.snapshot.remoteConnections.connections = this.snapshot.remoteConnections.connections.filter((candidate) => candidate.id !== connectionId);
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());

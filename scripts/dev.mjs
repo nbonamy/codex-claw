@@ -30,7 +30,7 @@ const electronDev = start('npm', ['run', 'dev:electron'], {
     CODEX_CLAW_BACKEND_COMMAND: process.execPath,
     CODEX_CLAW_BACKEND_ARGS: `${backendBundle},--stdio`,
     CODEX_CLAW_BACKEND_WATCH_FILE: backendBundle,
-    CODEX_CLAW_ASSETS_PATH: path.join(rootDir, 'assets'),
+    CODEX_CLAW_ASSETS_PATH: path.join(rootDir, 'electron', 'assets'),
   },
 });
 

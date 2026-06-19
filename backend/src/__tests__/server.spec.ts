@@ -235,6 +235,7 @@ describe('ClawBackendServer', () => {
       createdAt: '2026-06-05T00:00:00.000Z',
       updatedAt: '2026-06-05T00:00:00.000Z',
     }];
+    remoteClients.closeConnection.mockClear();
 
     await expect(server.handleMessage({
       jsonrpc: '2.0',
@@ -253,6 +254,7 @@ describe('ClawBackendServer', () => {
         agents: [],
       },
     });
+    expect(remoteClients.closeConnection).toHaveBeenCalledWith('connection-devbox');
   });
 
   it('updates remote connection source folder settings on the remote clawd', async () => {
