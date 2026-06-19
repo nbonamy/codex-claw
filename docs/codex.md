@@ -113,6 +113,15 @@ renderer only sees the Codex preset id; `clawd` maps it to
 three Codex presets for Claude permission modes; Claude should expose its own
 backend-specific option set.
 
+Before applying a Codex approval preset, production `clawd` reads
+`configRequirements/read` from app-server. Managed requirements can disallow
+specific approval policies, reviewers, sandbox modes, or permission profiles.
+When the configured/default Claw preset is not allowed, the Codex adapter clamps
+to the best compatible preset (`approve-for-me`, then `ask-for-approval`, then
+`full-access`). If none of Claw's presets satisfy the app-server requirements,
+`clawd` omits approval/sandbox overrides and lets app-server use its effective
+configuration instead of sending a known-invalid `danger-full-access` request.
+
 `thread/resume` returns the thread's `turns` in app-server protocol v2. `clawd`
 must translate those turns into app-owned `RendererMessage`s and emit a
 history hydration event before the next turn streams. The renderer asks through

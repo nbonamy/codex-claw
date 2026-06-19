@@ -37,12 +37,14 @@ import { HandStopIcon, ListDetailsIcon, PaperclipIcon, PlusIcon, ShieldCheckIcon
 const props = withDefaults(defineProps<{
   disabled?: boolean;
   approvalPreset?: ApprovalPreset | null;
+  approvalPresets?: ApprovalPreset[];
   planMode: boolean;
   showApprovalMenu?: boolean;
   showPlanMode?: boolean;
 }>(), {
   disabled: false,
   approvalPreset: null,
+  approvalPresets: () => [],
   showApprovalMenu: false,
   showPlanMode: true,
 });
@@ -55,7 +57,7 @@ const emit = defineEmits<{
 
 const rootEl = ref<HTMLElement | null>(null);
 const menuOpen = ref(false);
-const approvalOptions = approvalPresetOptions;
+const allowedApprovalPresets = computed(() => new Set(props.approvalPresets));
 const menuItems = computed<AppMenuItem[]>(() => {
   const items: AppMenuItem[] = []
 
@@ -67,13 +69,14 @@ const menuItems = computed<AppMenuItem[]>(() => {
       // value: selectedApprovalLabel.value,
       icon: ShieldCheckIcon,
       submenuWidth: 'wide',
-      items: approvalOptions.map((option) => ({
+      items: approvalPresetOptions.map((option) => ({
         id: approvalItemId(option.id),
         type: 'radio',
         label: option.label,
         description: option.description,
         icon: approvalIcon(option.id),
         checked: option.id === props.approvalPreset,
+        disabled: !allowedApprovalPresets.value.has(option.id),
       })),
     });
   }

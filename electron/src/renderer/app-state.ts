@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendCommandSummary, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
@@ -53,7 +53,7 @@ export function useAppState() {
     return snapshot.value.agents.find((agent) => agent.id === snapshot.value.activeAgentId) ?? null;
   });
 
-  const activeBackendCapabilities = computed(() => defaultBackendCapabilities(activeAgent.value?.backend ?? 'codex'));
+  const activeBackendCapabilities = computed(() => backendCapabilitiesForAgent(activeAgent.value));
   const activeBackendCommands = computed<BackendCommandSummary[]>(() => defaultBackendCommands(activeAgent.value?.backend ?? 'codex'));
 
   const visibleMessages = computed(() => {
@@ -74,11 +74,18 @@ export function useAppState() {
   const activeGoal = computed(() => activeAgent.value?.goal ?? null);
   const activeApprovalPreset = computed<ApprovalPreset | null>(() => {
     const agent = activeAgent.value;
-    if (!agent || !defaultBackendCapabilities(agent.backend).approvals) {
+    const capabilities = backendCapabilitiesForAgent(agent);
+    if (!agent || !capabilities.approvals) {
       return null;
     }
 
-    return approvalPresetFromDefaults(agent.backendDefaults);
+    const allowedPresets = capabilities.approvalPresets ?? [];
+    const storedPreset = approvalPresetFromDefaults(agent.backendDefaults);
+    if (allowedPresets.includes(storedPreset)) {
+      return storedPreset;
+    }
+
+    return allowedPresets[0] ?? null;
   });
 
   const isSending = computed(() => {
@@ -1111,7 +1118,13 @@ export function useAppState() {
 
   async function setApprovalPreset(preset: ApprovalPreset): Promise<void> {
     const agent = activeAgent.value;
-    if (!agent || !messageActionCapabilities(agent.id).approvals || !window.codexClaw?.setAgentApprovalPreset) {
+    const capabilities = agent ? messageActionCapabilities(agent.id) : null;
+    if (
+      !agent ||
+      !capabilities?.approvals ||
+      !(capabilities.approvalPresets ?? []).includes(preset) ||
+      !window.codexClaw?.setAgentApprovalPreset
+    ) {
       return;
     }
 
@@ -1311,7 +1324,7 @@ function activeMessageAction(index: number): { agentId: string; messageId: strin
 
 function messageActionCapabilities(agentId: string) {
   const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
-  return defaultBackendCapabilities(agent?.backend ?? 'codex');
+  return backendCapabilitiesForAgent(agent ?? null);
 }
 
 function selectDefaultModelIfNeeded(): void {
@@ -1338,7 +1351,7 @@ function selectedPromptOptions(prompt: string): SendPromptOptions | undefined {
   const agent = snapshot.value.activeAgentId
     ? snapshot.value.agents.find((candidate) => candidate.id === snapshot.value.activeAgentId)
     : undefined;
-  const capabilities = agent ? defaultBackendCapabilities(agent.backend) : defaultBackendCapabilities('codex');
+  const capabilities = backendCapabilitiesForAgent(agent ?? null);
   const promptModel = capabilities.models ? model : null;
   const selectedSkills = capabilities.skills ? skills : [];
   const reasoningEffort = capabilities.reasoningEffort && promptModel
@@ -1360,6 +1373,16 @@ function selectedPromptOptions(prompt: string): SendPromptOptions | undefined {
     ...(capabilities.planMode === 'prompted' && planMode.value ? { planMode: true } : {}),
     ...(reasoningEffort ? { reasoningEffort } : {}),
     ...(selectedSkills.length > 0 ? { skills: selectedSkills } : {}),
+  };
+}
+
+function backendCapabilitiesForAgent(agent: Agent | null): BackendCapabilities {
+  const backend = agent?.backend ?? 'codex';
+  const defaults = defaultBackendCapabilities(backend);
+  const runtime = snapshot.value.backendRuntimes.find((candidate) => candidate.backend === backend);
+  return {
+    ...defaults,
+    ...runtime?.capabilities,
   };
 }
 

@@ -27,6 +27,7 @@ describe('ChatComposerActionMenu', () => {
   it('shows approval presets and emits selected mode', async () => {
     const wrapper = mountMenu({
       approvalPreset: 'full-access',
+      approvalPresets: ['ask-for-approval', 'approve-for-me', 'full-access'],
       showApprovalMenu: true,
     });
 
@@ -42,10 +43,31 @@ describe('ChatComposerActionMenu', () => {
     expect(wrapper.emitted('selectApprovalPreset')).toStrictEqual([['approve-for-me']]);
     expect(wrapper.find('.chat-composer-action-menu').exists()).toBe(false);
   });
+
+  it('disables approval presets unavailable from backend capabilities', async () => {
+    const wrapper = mountMenu({
+      approvalPreset: 'ask-for-approval',
+      approvalPresets: ['ask-for-approval'],
+      showApprovalMenu: true,
+    });
+
+    await wrapper.get('.chat-composer-action-menu__button').trigger('click');
+
+    expect(wrapper.text()).toContain('Approval');
+    expect(wrapper.text()).toContain('Ask for approval');
+    expect(wrapper.text()).toContain('Approve for me');
+    expect(wrapper.text()).toContain('Full access');
+    expect(wrapper.findAll('[role="menuitemradio"]').map((item) => item.attributes('disabled'))).toStrictEqual([
+      undefined,
+      '',
+      '',
+    ]);
+  });
 });
 
 function mountMenu(props: Partial<{
   approvalPreset: 'ask-for-approval' | 'approve-for-me' | 'full-access' | null;
+  approvalPresets: ('ask-for-approval' | 'approve-for-me' | 'full-access')[];
   disabled: boolean;
   planMode: boolean;
   showApprovalMenu: boolean;

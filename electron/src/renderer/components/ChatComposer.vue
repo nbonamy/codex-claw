@@ -32,8 +32,9 @@
     <ChatComposerActionMenu
       :disabled="disabled"
       :approval-preset="approvalPreset"
+      :approval-presets="effectiveBackendCapabilities.approvalPresets ?? []"
       :plan-mode="planMode"
-      :show-approval-menu="effectiveBackendCapabilities.approvals && Boolean(approvalPreset)"
+      :show-approval-menu="effectiveBackendCapabilities.approvals && Boolean(approvalPreset) && (effectiveBackendCapabilities.approvalPresets?.length ?? 0) > 0"
       :show-plan-mode="effectiveBackendCapabilities.planMode !== 'unsupported'"
       @attach="$emit('attach')"
       @select-approval-preset="$emit('selectApprovalPreset', $event)"

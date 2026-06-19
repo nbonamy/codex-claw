@@ -40,7 +40,7 @@ export class CodexBackendDriver implements AgentBackendDriver {
   }
 
   getCapabilities(_agent: Agent): BackendCapabilities {
-    return codexBackendCapabilities;
+    return this.sessionManager.getCapabilities?.() ?? codexBackendCapabilities;
   }
 
   async getGitStatus(agent: Agent): Promise<AgentGitStatus> {

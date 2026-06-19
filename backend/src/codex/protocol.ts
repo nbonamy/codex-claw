@@ -157,6 +157,17 @@ export type CodexSkillsListResponse = {
   data: CodexSkillsListEntry[];
 };
 
+export type CodexConfigRequirements = {
+  allowedApprovalPolicies?: unknown[] | null;
+  allowedApprovalsReviewers?: unknown[] | null;
+  allowedSandboxModes?: unknown[] | null;
+  allowedPermissions?: unknown[] | null;
+};
+
+export type CodexConfigRequirementsReadResponse = {
+  requirements: CodexConfigRequirements | null;
+};
+
 export type CodexSkillsListEntry = {
   cwd: string;
   skills: CodexSkill[];

@@ -131,6 +131,222 @@ describe('CodexAgentSessionManager', () => {
     ]);
   });
 
+  it('clamps the default full-access preset to app-server config requirements before starting a thread', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport), {
+      readConfigRequirements: true,
+    });
+    const events: unknown[] = [];
+    manager.onEvent((event) => events.push(event));
+
+    const prompt = manager.sendPrompt(agent, 'hello managed codex');
+    await waitForSentCount(transport, 1);
+    transport.receive({
+      id: 1,
+      result: {
+        userAgent: 'codex',
+        codexHome: '/tmp/codex-home',
+        platformFamily: 'unix',
+        platformOs: 'macos',
+      },
+    });
+    await waitForSentCount(transport, 3);
+    expect(transport.sent[2]).toStrictEqual({
+      id: 2,
+      method: 'configRequirements/read',
+    });
+    transport.receive({
+      id: 2,
+      result: {
+        requirements: {
+          allowedApprovalPolicies: ['on-request'],
+          allowedApprovalsReviewers: ['auto_review', 'user'],
+          allowedSandboxModes: ['workspace-write'],
+          allowedPermissions: [':workspace'],
+        },
+      },
+    });
+    await waitForSentCount(transport, 4);
+    expect(transport.sent[3]).toStrictEqual({
+      id: 3,
+      method: 'thread/start',
+      params: {
+        cwd: expandHome('~/src/codex-claw'),
+        approvalPolicy: 'on-request',
+        approvalsReviewer: 'auto_review',
+        sandbox: 'workspace-write',
+        serviceName: 'codex_claw',
+      },
+    });
+    transport.receive({
+      id: 3,
+      result: {
+        thread: {
+          id: 'thread-managed',
+          cwd: '/Users/nbonamy/src/codex-claw',
+        },
+      },
+    });
+    await waitForSentCount(transport, 5);
+    transport.receive({
+      id: 4,
+      result: {
+        turn: {
+          id: 'turn-managed',
+          status: 'running',
+        },
+      },
+    });
+
+    await expect(prompt).resolves.toStrictEqual({
+      threadId: 'thread-managed',
+      turnId: 'turn-managed',
+    });
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'backend.statusChanged',
+      payload: expect.objectContaining({
+        backend: 'codex',
+        status: 'running',
+        capabilities: expect.objectContaining({
+          approvalPresets: ['ask-for-approval', 'approve-for-me'],
+        }),
+      }),
+    }));
+    expect(manager.getCapabilities().approvalPresets).toStrictEqual(['ask-for-approval', 'approve-for-me']);
+  });
+
+  it('does not allow full access when app-server permissions forbid the full-access profile', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport), {
+      readConfigRequirements: true,
+    });
+
+    const prompt = manager.sendPrompt(agent, 'hello permission-limited codex');
+    await waitForSentCount(transport, 1);
+    transport.receive({
+      id: 1,
+      result: {
+        userAgent: 'codex',
+        codexHome: '/tmp/codex-home',
+        platformFamily: 'unix',
+        platformOs: 'macos',
+      },
+    });
+    await waitForSentCount(transport, 3);
+    transport.receive({
+      id: 2,
+      result: {
+        requirements: {
+          allowedApprovalPolicies: ['never', 'on-request'],
+          allowedApprovalsReviewers: ['user', 'auto_review'],
+          allowedSandboxModes: ['danger-full-access', 'workspace-write'],
+          allowedPermissions: [':workspace'],
+        },
+      },
+    });
+    await waitForSentCount(transport, 4);
+    expect(transport.sent[3]).toStrictEqual({
+      id: 3,
+      method: 'thread/start',
+      params: {
+        cwd: expandHome('~/src/codex-claw'),
+        approvalPolicy: 'on-request',
+        approvalsReviewer: 'auto_review',
+        sandbox: 'workspace-write',
+        serviceName: 'codex_claw',
+      },
+    });
+    transport.receive({
+      id: 3,
+      result: {
+        thread: {
+          id: 'thread-permission-limited',
+          cwd: '/Users/nbonamy/src/codex-claw',
+        },
+      },
+    });
+    await waitForSentCount(transport, 5);
+    transport.receive({
+      id: 4,
+      result: {
+        turn: {
+          id: 'turn-permission-limited',
+          status: 'running',
+        },
+      },
+    });
+
+    await expect(prompt).resolves.toStrictEqual({
+      threadId: 'thread-permission-limited',
+      turnId: 'turn-permission-limited',
+    });
+    expect(manager.getCapabilities().approvalPresets).toStrictEqual(['ask-for-approval', 'approve-for-me']);
+  });
+
+  it('omits approval overrides when no Claw preset satisfies app-server config requirements', async () => {
+    const transport = new FakeTransport();
+    const manager = new CodexAgentSessionManager(new CodexRpcClient(transport), {
+      readConfigRequirements: true,
+    });
+
+    const prompt = manager.sendPrompt(agent, 'hello read-only codex');
+    await waitForSentCount(transport, 1);
+    transport.receive({
+      id: 1,
+      result: {
+        userAgent: 'codex',
+        codexHome: '/tmp/codex-home',
+        platformFamily: 'unix',
+        platformOs: 'macos',
+      },
+    });
+    await waitForSentCount(transport, 3);
+    transport.receive({
+      id: 2,
+      result: {
+        requirements: {
+          allowedApprovalPolicies: ['on-request'],
+          allowedApprovalsReviewers: ['user'],
+          allowedSandboxModes: ['read-only'],
+          allowedPermissions: [':read-only'],
+        },
+      },
+    });
+    await waitForSentCount(transport, 4);
+    expect(transport.sent[3]).toStrictEqual({
+      id: 3,
+      method: 'thread/start',
+      params: {
+        cwd: expandHome('~/src/codex-claw'),
+        serviceName: 'codex_claw',
+      },
+    });
+    transport.receive({
+      id: 3,
+      result: {
+        thread: {
+          id: 'thread-read-only',
+          cwd: '/Users/nbonamy/src/codex-claw',
+        },
+      },
+    });
+    await waitForSentCount(transport, 5);
+    transport.receive({
+      id: 4,
+      result: {
+        turn: {
+          id: 'turn-read-only',
+          status: 'running',
+        },
+      },
+    });
+
+    await expect(prompt).resolves.toStrictEqual({
+      threadId: 'thread-read-only',
+      turnId: 'turn-read-only',
+    });
+  });
+
   it('sets a Codex thread name for a conversation title', async () => {
     const transport = new FakeTransport();
     const manager = new CodexAgentSessionManager(new CodexRpcClient(transport));

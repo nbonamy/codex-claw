@@ -29,9 +29,14 @@ describe('agent chat service', () => {
     }), 'hello');
     expect(snapshot.messages.at(-1)?.parts).toStrictEqual([{ type: 'text', text: 'hello' }]);
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'starting' });
-    expect(events.map((event) => event.payload)).toStrictEqual([
+    expect(events.map((event) => event.payload)).toMatchObject([
       { type: 'starting' },
-      { backend: 'codex', status: 'starting', detail: 'Starting Codex backend...' },
+      {
+        backend: 'codex',
+        status: 'starting',
+        detail: 'Starting Codex backend...',
+        capabilities: { approvalPresets: ['ask-for-approval', 'approve-for-me', 'full-access'] },
+      },
     ]);
 
     completion.resolve({
@@ -42,11 +47,21 @@ describe('agent chat service', () => {
 
     expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-1' });
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
-    expect(events.map((event) => event.payload)).toStrictEqual([
+    expect(events.map((event) => event.payload)).toMatchObject([
       { type: 'starting' },
-      { backend: 'codex', status: 'starting', detail: 'Starting Codex backend...' },
+      {
+        backend: 'codex',
+        status: 'starting',
+        detail: 'Starting Codex backend...',
+        capabilities: { approvalPresets: ['ask-for-approval', 'approve-for-me', 'full-access'] },
+      },
       { type: 'working' },
-      { backend: 'codex', status: 'running', detail: 'Codex backend connected.' },
+      {
+        backend: 'codex',
+        status: 'running',
+        detail: 'Codex backend connected.',
+        capabilities: { approvalPresets: ['ask-for-approval', 'approve-for-me', 'full-access'] },
+      },
     ]);
   });
 

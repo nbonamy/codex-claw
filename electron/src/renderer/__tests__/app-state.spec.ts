@@ -231,6 +231,36 @@ describe('useAppState', () => {
     expect(state.activeApprovalPreset.value).toBe('approve-for-me');
   });
 
+  it('uses the first allowed approval preset when stored defaults are forbidden', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.backendRuntimes = [{
+      backend: 'codex',
+      status: 'running',
+      capabilities: {
+        approvalPresets: ['ask-for-approval'],
+      },
+    }];
+    remoteSnapshot.agents[0].backendDefaults = {
+      kind: 'codex',
+      approvalPreset: 'full-access',
+      approvalPolicy: 'never',
+      sandboxMode: 'danger-full-access',
+    };
+    const setAgentApprovalPreset = vi.fn();
+    vi.stubGlobal('window', {
+      codexClaw: {
+        setAgentApprovalPreset,
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    state.snapshot.value = remoteSnapshot;
+
+    expect(state.activeApprovalPreset.value).toBe('ask-for-approval');
+    await state.setApprovalPreset('full-access');
+    expect(setAgentApprovalPreset).not.toHaveBeenCalled();
+  });
+
   it('updates settings and forwards app quit and restart through the preload bridge', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();

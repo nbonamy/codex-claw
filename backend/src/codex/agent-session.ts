@@ -2,6 +2,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Agent, AgentContextUsage, AgentStatus, AskUserAnswers, AskUserQuestion, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CodexApprovalPreset, ConfirmToolRequest, ConversationSummary, MainToRendererEvent, RendererMessage, SendPromptOptions, ToolConfirmationDecision } from '@codex-claw/shared/contracts';
 import { codexApprovalPresetFromDefaults } from '@codex-claw/shared/codex-approval-presets';
+import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { logMain, warnMain } from '../log';
 import { buildCodexClawThreadConfig } from '../mcp/codex-config';
 import type { CodexRpcClient, CodexServerRequest, CodexServerRequestResponder } from './rpc-client';
@@ -19,6 +20,8 @@ import {
 import type {
   CodexNotification,
   CodexModelListResponse,
+  CodexConfigRequirements,
+  CodexConfigRequirementsReadResponse,
   CodexRawResponseItem,
   CodexRateLimitSnapshot,
   CodexReviewTarget,
@@ -62,6 +65,7 @@ type EventListener = (event: CodexSessionEvent) => void;
 
 export type CodexAgentSessionManagerOptions = {
   clawMcpServerUrl?: string | null;
+  readConfigRequirements?: boolean;
 };
 
 export type CodexSessionCommandResult = {
@@ -95,6 +99,8 @@ export class CodexAgentSessionManager {
   private readonly listeners = new Set<EventListener>();
   private initialized = false;
   private startPromise: Promise<void> | null = null;
+  private configRequirements: CodexConfigRequirements | null = null;
+  private configRequirementsPromise: Promise<CodexConfigRequirements | null> | null = null;
 
   constructor(
     private readonly client: CodexRpcClient,
@@ -114,6 +120,7 @@ export class CodexAgentSessionManager {
         await this.client.start();
         await this.client.initialize();
         this.initialized = true;
+        await this.readConfigRequirements();
       })();
     }
 
@@ -142,6 +149,13 @@ export class CodexAgentSessionManager {
     } while (cursor);
 
     return models;
+  }
+
+  getCapabilities() {
+    return {
+      ...codexBackendCapabilities,
+      approvalPresets: allowedCodexApprovalPresets(this.configRequirements),
+    };
   }
 
   async listSkills(agent: Agent, forceReload = false): Promise<BackendSkillSummary[]> {
@@ -278,14 +292,22 @@ export class CodexAgentSessionManager {
     await this.start();
 
     const session = await this.ensureSession(agent);
+    const effectivePreset = await this.effectiveApprovalPreset(preset);
+    if (!effectivePreset) {
+      warnMain('codex', 'codex approval preset update skipped because no Claw preset satisfies app-server config requirements', {
+        requestedPreset: preset,
+      });
+      throw new Error('No Claw approval preset satisfies the Codex app-server requirements.');
+    }
+
     await this.client.request('thread/settings/update', {
       threadId: session.threadId,
-      ...codexApprovalThreadSettingsUpdateParams(preset, expandHome(agent.folder)),
+      ...codexApprovalThreadSettingsUpdateParams(effectivePreset, expandHome(agent.folder)),
     });
 
     return {
       threadId: session.threadId,
-      approvalPreset: preset,
+      approvalPreset: effectivePreset,
     };
   }
 
@@ -448,12 +470,12 @@ export class CodexAgentSessionManager {
     await this.start();
 
     const cwd = expandHome(agent.folder);
-    const approvalSettings = codexApprovalThreadStartParams(codexApprovalPresetFromDefaults(agent.backendDefaults));
+    const approvalSettings = await this.approvalThreadStartParamsForAgent(agent);
     const threadConfig = buildCodexClawThreadConfig(agent, this.options.clawMcpServerUrl ?? null);
     const response = await this.client.request<ThreadResumeResponse>('thread/resume', {
       threadId,
       cwd,
-      ...approvalSettings,
+      ...approvalSettings.params,
       ...threadConfig,
     });
     this.recordSession(agent.id, response.thread.id);
@@ -515,7 +537,7 @@ export class CodexAgentSessionManager {
     }
 
     const cwd = expandHome(agent.folder);
-    const approvalSettings = codexApprovalThreadStartParams(codexApprovalPresetFromDefaults(agent.backendDefaults));
+    const approvalSettings = await this.approvalThreadStartParamsForAgent(agent);
     const threadConfig = buildCodexClawThreadConfig(agent, this.options.clawMcpServerUrl ?? null);
     const existingThreadId = codexThreadId(agent);
     const shouldResume = Boolean(existingThreadId);
@@ -523,12 +545,12 @@ export class CodexAgentSessionManager {
       ? await this.client.request<ThreadResumeResponse>('thread/resume', {
         threadId: existingThreadId,
         cwd,
-        ...approvalSettings,
+        ...approvalSettings.params,
         ...threadConfig,
       })
       : await this.client.request<ThreadStartResponse>('thread/start', {
         cwd,
-        ...approvalSettings,
+        ...approvalSettings.params,
         serviceName: 'codex_claw',
         ...threadConfig,
       });
@@ -551,6 +573,74 @@ export class CodexAgentSessionManager {
     }
 
     return session;
+  }
+
+  private async approvalThreadStartParamsForAgent(agent: Agent): Promise<{
+    preset: CodexApprovalPreset | null;
+    params: ReturnType<typeof codexApprovalThreadStartParams> | Record<string, never>;
+  }> {
+    const requestedPreset = codexApprovalPresetFromDefaults(agent.backendDefaults);
+    const effectivePreset = await this.effectiveApprovalPreset(requestedPreset);
+    if (!effectivePreset) {
+      warnMain('codex', 'codex approval settings omitted because no Claw preset satisfies app-server config requirements', {
+        agentId: agent.id,
+        requestedPreset,
+      });
+      return {
+        preset: null,
+        params: {},
+      };
+    }
+
+    if (effectivePreset !== requestedPreset) {
+      warnMain('codex', 'codex approval preset clamped to app-server config requirements', {
+        agentId: agent.id,
+        requestedPreset,
+        effectivePreset,
+      });
+    }
+
+    return {
+      preset: effectivePreset,
+      params: codexApprovalThreadStartParams(effectivePreset),
+    };
+  }
+
+  private async effectiveApprovalPreset(requestedPreset: CodexApprovalPreset): Promise<CodexApprovalPreset | null> {
+    const requirements = await this.readConfigRequirements();
+    return effectiveCodexApprovalPreset(requestedPreset, requirements);
+  }
+
+  private async readConfigRequirements(): Promise<CodexConfigRequirements | null> {
+    if (!this.options.readConfigRequirements) {
+      return null;
+    }
+
+    if (!this.configRequirementsPromise) {
+      this.configRequirementsPromise = this.client.request<CodexConfigRequirementsReadResponse>('configRequirements/read', undefined)
+        .then((response) => {
+          this.configRequirements = response.requirements ?? null;
+          this.emit({
+            backend: 'codex',
+            type: 'backend.statusChanged',
+            payload: {
+              backend: 'codex',
+              status: 'running',
+              detail: 'Codex backend connected.',
+              capabilities: this.getCapabilities(),
+            },
+          });
+          return this.configRequirements;
+        })
+        .catch((error: unknown) => {
+          warnMain('codex', 'Unable to read Codex config requirements; falling back to configured approval defaults.', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return null;
+        });
+    }
+
+    return this.configRequirementsPromise;
   }
 
   private recordSession(agentId: string, threadId: string): AgentSession {
@@ -1173,6 +1263,57 @@ function codexApprovalThreadSettingsUpdateParams(preset: CodexApprovalPreset, cw
       excludeSlashTmp: false,
     },
   };
+}
+
+function effectiveCodexApprovalPreset(
+  requestedPreset: CodexApprovalPreset,
+  requirements: CodexConfigRequirements | null,
+): CodexApprovalPreset | null {
+  if (isCodexApprovalPresetAllowed(requestedPreset, requirements)) {
+    return requestedPreset;
+  }
+
+  for (const candidate of ['approve-for-me', 'ask-for-approval', 'full-access'] as const) {
+    if (isCodexApprovalPresetAllowed(candidate, requirements)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function allowedCodexApprovalPresets(requirements: CodexConfigRequirements | null): CodexApprovalPreset[] {
+  return (['ask-for-approval', 'approve-for-me', 'full-access'] as const)
+    .filter((preset) => isCodexApprovalPresetAllowed(preset, requirements));
+}
+
+function isCodexApprovalPresetAllowed(
+  preset: CodexApprovalPreset,
+  requirements: CodexConfigRequirements | null,
+): boolean {
+  if (!requirements) {
+    return true;
+  }
+
+  if (preset === 'full-access') {
+    return (
+      requirementAllows(requirements.allowedApprovalPolicies, 'never') &&
+      requirementAllows(requirements.allowedApprovalsReviewers, 'user') &&
+      requirementAllows(requirements.allowedSandboxModes, 'danger-full-access') &&
+      requirementAllows(requirements.allowedPermissions, ':danger-full-access')
+    );
+  }
+
+  return (
+    requirementAllows(requirements.allowedApprovalPolicies, 'on-request') &&
+    requirementAllows(requirements.allowedApprovalsReviewers, preset === 'approve-for-me' ? 'auto_review' : 'user') &&
+    requirementAllows(requirements.allowedSandboxModes, 'workspace-write') &&
+    requirementAllows(requirements.allowedPermissions, ':workspace')
+  );
+}
+
+function requirementAllows(values: unknown[] | null | undefined, value: string): boolean {
+  return !Array.isArray(values) || values.length === 0 || values.includes(value);
 }
 
 function codexModelToOption(model: CodexModelListResponse['data'][number]): BackendModelOption {

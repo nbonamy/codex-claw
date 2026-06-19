@@ -11,6 +11,7 @@ import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { assignWorkItemToAgentInSnapshot, closeAgentInSnapshot, deployBenchTemplateInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeBenchTemplateFromSnapshot, removeWorkItemAssignmentFromSnapshot, reorderAgentInTeam, restartAgentConversation, resumeAgentConversationInSnapshot, saveAgentToBench, saveBenchTemplateToSnapshot } from '@codex-claw/shared/agent-manager';
 import { clearLoopExecutionHistoryInSnapshot, createLoopInSnapshot, deleteLoopExecutionFromSnapshot, deleteLoopFromSnapshot, updateLoopInSnapshot } from '@codex-claw/shared/loop-manager';
 import { updateSettingsInSnapshot } from '@codex-claw/shared/settings';
+import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selectTeam, updateTeamInSnapshot } from '@codex-claw/shared/team-manager';
 import { teamColors } from '@codex-claw/shared/team-colors';
 import { sanitizeWorkItemAssignmentSource, workItemAssignmentKey, type WorkItemAssignmentSource } from '@codex-claw/shared/work-assignments';
@@ -1622,9 +1623,7 @@ export class ClawBackendServer {
     return {
       backend: agent.backend,
       getRuntimeStatus: () => ({ backend: agent.backend, status: 'running' }),
-      getCapabilities: () => {
-        throw new Error('Backend capabilities are not needed during prompt dispatch.');
-      },
+      getCapabilities: () => defaultBackendCapabilities(agent.backend),
       tryHandlePromptCommand: (currentAgent, prompt) => (
         this.remoteConnectionIdForAgent(currentAgent) ? null : this.requireDriverRpc().tryHandlePromptCommand(currentAgent, prompt)
       ),

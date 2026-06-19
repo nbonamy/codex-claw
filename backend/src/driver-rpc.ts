@@ -26,7 +26,10 @@ export function createDefaultBackendDrivers(options: BackendDriverRegistryOption
       command: options.generalSettings?.codexBinaryPath,
       configOverrides: buildCodexClawMcpConfigOverrides(),
     })),
-    { clawMcpServerUrl: options.clawMcpServerUrl ?? null },
+    {
+      clawMcpServerUrl: options.clawMcpServerUrl ?? null,
+      readConfigRequirements: true,
+    },
   );
 
   return new Map<AgentBackend, AgentBackendDriver>([

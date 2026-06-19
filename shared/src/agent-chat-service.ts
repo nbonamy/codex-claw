@@ -40,6 +40,7 @@ export function sendAgentPrompt(
     backend: backendDriver.backend,
     status: 'starting',
     detail: `Starting ${backendDisplayName(backendDriver.backend)} backend...`,
+    capabilities: backendDriver.getCapabilities(agent),
   }, emit, snapshot);
 
   const preparedOptions = backendDriver.preparePromptOptions?.(agent, options) ?? options;
@@ -60,6 +61,7 @@ export function sendAgentPrompt(
         backend: backendDriver.backend,
         status: 'running',
         detail: `${backendDisplayName(backendDriver.backend)} backend connected.`,
+        capabilities: backendDriver.getCapabilities(agent),
       }, emit, snapshot);
       void Promise.resolve(hooks?.onPromptStarted?.(result)).catch(() => undefined);
     })

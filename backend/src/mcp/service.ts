@@ -4,6 +4,7 @@ import path from 'node:path';
 import { sendAgentPrompt } from '@codex-claw/shared/agent-chat-service';
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/shared/backend-driver';
+import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import type {
   Agent,
   AppSnapshot,
@@ -114,9 +115,7 @@ export class ClawMcpService {
     return {
       backend: agent.backend,
       getRuntimeStatus: () => ({ backend: agent.backend, status: 'running' }),
-      getCapabilities: () => {
-        throw new Error('Backend capabilities are not needed during MCP prompt delivery.');
-      },
+      getCapabilities: () => defaultBackendCapabilities(agent.backend),
       tryHandlePromptCommand: (currentAgent, prompt) => (
         this.requireDriverRpc().tryHandlePromptCommand(currentAgent, prompt)
       ),

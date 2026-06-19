@@ -426,12 +426,26 @@ describe('snapshot reducer', () => {
       seq: 2,
       type: 'backend.statusChanged',
       backend: 'codex',
-      payload: { backend: 'codex', status: 'running', detail: 'connected' },
+      payload: {
+        backend: 'codex',
+        status: 'running',
+        detail: 'connected',
+        capabilities: {
+          approvalPresets: ['ask-for-approval', 'not-a-preset'],
+        },
+      },
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
 
     expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-1' });
-    expect(snapshot.backendRuntimes).toContainEqual({ backend: 'codex', status: 'running', detail: 'connected' });
+    expect(snapshot.backendRuntimes).toContainEqual({
+      backend: 'codex',
+      status: 'running',
+      detail: 'connected',
+      capabilities: {
+        approvalPresets: ['ask-for-approval'],
+      },
+    });
   });
 
   it('records Claude session starts without requiring a Codex thread id', () => {

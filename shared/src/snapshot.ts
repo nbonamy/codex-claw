@@ -2,6 +2,7 @@ import type {
   Agent,
   AgentBackend,
   AgentContextUsage,
+  ApprovalPreset,
   BackendDefaults,
   AgentGitStatus,
   AgentStatus,
@@ -262,6 +263,7 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
         backend: payload.backend,
         status: payload.status,
         detail: typeof payload.detail === 'string' ? payload.detail : undefined,
+        capabilities: isRecord(payload.capabilities) ? backendCapabilities(payload.capabilities) : undefined,
       });
     }
     return;
@@ -1206,6 +1208,18 @@ function isBackend(value: unknown): value is AppSnapshot['backendRuntimes'][numb
 
 function isBackendRuntimeStatus(value: unknown): value is AppSnapshot['backendRuntimes'][number]['status'] {
   return value === 'notConfigured' || value === 'starting' || value === 'running' || value === 'error';
+}
+
+type BackendRuntimeCapabilities = NonNullable<AppSnapshot['backendRuntimes'][number]['capabilities']>;
+
+function backendCapabilities(value: Record<string, unknown>): Partial<BackendRuntimeCapabilities> {
+  return {
+    ...(Array.isArray(value.approvalPresets) ? { approvalPresets: value.approvalPresets.filter(isApprovalPreset) } : {}),
+  };
+}
+
+function isApprovalPreset(value: unknown): value is ApprovalPreset {
+  return value === 'ask-for-approval' || value === 'approve-for-me' || value === 'full-access';
 }
 
 function upsertAssistantToolPart(snapshot: AppSnapshot, agentId: string, turnId: string, toolPart: ToolPart): void {

@@ -14,6 +14,7 @@ export const codexBackendCapabilities: BackendCapabilities = {
   editMessage: true,
   retryMessage: true,
   approvals: true,
+  approvalPresets: ['ask-for-approval', 'approve-for-me', 'full-access'],
 };
 
 export const claudeBackendCapabilities: BackendCapabilities = {
@@ -30,6 +31,7 @@ export const claudeBackendCapabilities: BackendCapabilities = {
   editMessage: false,
   retryMessage: false,
   approvals: false,
+  approvalPresets: [],
 };
 
 export function defaultBackendCapabilities(backend: AgentBackend): BackendCapabilities {

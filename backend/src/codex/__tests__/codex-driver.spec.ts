@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { CodexBackendDriver } from '../codex-driver';
 import type { CodexAgentSessionManager } from '../agent-session';
 import type { Agent } from '@codex-claw/shared/contracts';
+import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 
 const agent: Agent = {
   id: 'agent-dina',
@@ -118,6 +119,18 @@ describe('CodexBackendDriver', () => {
       approvalPreset: 'full-access',
     });
     expect(sessionManager.setApprovalPreset).toHaveBeenCalledWith(agent, 'full-access');
+  });
+
+  it('exposes capabilities from the session manager', () => {
+    const sessionManager = createSessionManager({
+      getCapabilities: vi.fn().mockReturnValue({
+        ...codexBackendCapabilities,
+        approvalPresets: ['ask-for-approval'],
+      }),
+    });
+    const driver = new CodexBackendDriver(sessionManager);
+
+    expect(driver.getCapabilities(agent).approvalPresets).toStrictEqual(['ask-for-approval']);
   });
 
   it('sets conversation titles through the session manager', async () => {

@@ -408,6 +408,7 @@ export type BackendCapabilities = {
   editMessage: boolean;
   retryMessage: boolean;
   approvals: boolean;
+  approvalPresets?: ApprovalPreset[];
 };
 
 export type AppearanceMode = 'dark' | 'light' | 'system';
@@ -743,6 +744,7 @@ export type BackendRuntimeStatus = {
   backend: AgentBackend;
   status: 'notConfigured' | 'starting' | 'running' | 'error';
   detail?: string;
+  capabilities?: Partial<BackendCapabilities>;
 };
 
 export type MainToRendererEvent = {
