@@ -3,11 +3,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import { afterEach, describe, expect, it } from 'vitest';
-import { connectToDaemon, main } from '../clawd';
+import backendPackage from '../../package.json';
+import { CLAWD_VERSION, connectToDaemon, main } from '../clawd';
 import { LocalSocketRpcServer } from '../socket-server';
 
 describe('clawd entrypoint', () => {
   const originalExitCode = process.exitCode;
+  const originalStdoutWrite = process.stdout.write;
   const originalStderrWrite = process.stderr.write;
   let socketServer: LocalSocketRpcServer | null = null;
 
@@ -15,7 +17,21 @@ describe('clawd entrypoint', () => {
     await socketServer?.stop();
     socketServer = null;
     process.exitCode = originalExitCode;
+    process.stdout.write = originalStdoutWrite;
     process.stderr.write = originalStderrWrite;
+  });
+
+  it('uses the backend package version', async () => {
+    const writes: string[] = [];
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+
+    await main(['--version']);
+
+    expect(CLAWD_VERSION).toBe(backendPackage.version);
+    expect(writes.join('')).toBe(`clawd ${backendPackage.version}\n`);
   });
 
   it('rejects --state-dir so CODEX_CLAW_HOME is the only state-home override', async () => {

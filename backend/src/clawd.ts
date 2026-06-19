@@ -8,8 +8,9 @@ import { backendSocketPath } from './state';
 import { LocalSocketRpcServer } from './socket-server';
 import { StdioRpcPeer } from './stdio';
 import { flushBackendLogs, logMain } from './log';
+import backendPackage from '../package.json';
 
-export const CLAWD_VERSION = '0.1.0';
+export const CLAWD_VERSION = backendPackage.version;
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   if (argv.includes('--state-dir')) {

@@ -7,9 +7,7 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import { signDarwinBinaries } from './build/sign-binaries';
 
 import dotenv from 'dotenv';
-dotenv.config({
-  path: '../'
-});
+dotenv.config();
 
 // macOS signing/notarization is release-only. Agents should set
 // CODEX_CLAW_SKIP_SIGNING=1 for local package/build verification.
