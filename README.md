@@ -1,5 +1,5 @@
 <p align="center">
-   <img src="assets/icon.png" width="128" height="128" alt="Codex Claw App Icon" />
+   <img src="electron/assets/icon.png" width="128" height="128" alt="Codex Claw App Icon" />
 </p>
 
 # Codex Claw
