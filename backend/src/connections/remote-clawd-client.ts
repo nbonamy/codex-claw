@@ -200,7 +200,13 @@ class RemoteClawdClient {
   }
 
   private handleLine(line: string): void {
-    const message = parseClawRpcMessage(JSON.parse(line));
+    let message: ReturnType<typeof parseClawRpcMessage>;
+    try {
+      message = parseClawRpcMessage(JSON.parse(line));
+    } catch (error) {
+      this.handleProtocolError(error);
+      return;
+    }
     if (isClawRpcNotification(message)) {
       if (message.method === backendMethods.backendEventNotify && isRemoteBackendEvent(message.params)) {
         this.eventSink?.(message.params);
@@ -213,6 +219,21 @@ class RemoteClawdClient {
     }
     if (isClawRpcResponse(message)) {
       this.handleResponse(message);
+    }
+  }
+
+  private handleProtocolError(error: unknown): void {
+    const message = error instanceof Error ? error.message : String(error);
+    warnMain('remote-clawd', 'invalid remote backend response', {
+      connectionId: this.connection.id,
+      detail: message,
+    });
+    this.rejectPending(new Error(`Invalid remote backend response: ${message}`));
+
+    const child = this.process;
+    this.process = null;
+    if (child && !child.killed) {
+      child.kill();
     }
   }
 

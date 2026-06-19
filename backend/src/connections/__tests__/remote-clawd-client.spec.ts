@@ -121,6 +121,35 @@ describe('RemoteClawdClientManager', () => {
     await manager.close();
   });
 
+  it('rejects pending requests and reconnects after malformed remote stdout', async () => {
+    const firstChild = createChildProcess();
+    const secondChild = createChildProcess();
+    const spawnProcess = vi.fn()
+      .mockReturnValueOnce(firstChild.process)
+      .mockReturnValueOnce(secondChild.process);
+    const manager = new RemoteClawdClientManager({ spawnProcess: spawnProcess as never });
+
+    const firstResult = manager.request(readyConnection(), 'backend/health/get');
+    await vi.waitFor(() => expect(firstChild.stdinLines()).toHaveLength(1));
+    firstChild.stdout.write('not json-rpc\n');
+
+    await expect(firstResult).rejects.toThrow('Invalid remote backend response');
+    expect(firstChild.process.kill).toHaveBeenCalledOnce();
+
+    const secondResult = manager.request(readyConnection(), 'backend/health/get');
+    await vi.waitFor(() => expect(secondChild.stdinLines()).toHaveLength(1));
+    const secondRequest = JSON.parse(secondChild.stdinLines()[0]!) as { id: number };
+    secondChild.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: secondRequest.id,
+      result: { ok: true },
+    })}\n`);
+
+    await expect(secondResult).resolves.toStrictEqual({ ok: true });
+    expect(spawnProcess).toHaveBeenCalledTimes(2);
+    await manager.close();
+  });
+
   it('answers remote backend client requests through injected request handlers', async () => {
     const child = createChildProcess();
     const openExternal = vi.fn().mockResolvedValue(true);
