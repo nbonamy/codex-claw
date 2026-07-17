@@ -19,7 +19,7 @@
     "test:watch": "vitest watch"
   },
   "dependencies": {
-    "@codex-claw/shared": "0.1.0",
+    "@codex-claw/shared": "0.2.0",
     "@shikijs/engine-javascript": "^4.2.0",
     "@shikijs/langs": "^4.2.0",
     "@shikijs/themes": "^4.2.0",
