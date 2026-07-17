@@ -1,21 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { RpcMessage } from 'codex-app-sdk/codex';
 import { CodexAgentSessionManager, expandHome } from '../agent-session';
 import { CodexRpcClient, type CodexTransport } from '../rpc-client';
 import type { Agent } from '@codex-claw/shared/contracts';
-import type { JsonRpcClientMessage, JsonRpcServerMessage } from '../protocol';
 
 class FakeTransport implements CodexTransport {
-  sent: JsonRpcClientMessage[] = [];
-  private messageListener: ((message: JsonRpcServerMessage) => void) | null = null;
+  sent: RpcMessage[] = [];
+  private messageListener: ((message: unknown) => void) | null = null;
 
   start = vi.fn(async () => undefined);
   close = vi.fn(async () => undefined);
 
-  send(message: JsonRpcClientMessage): void {
+  send(message: RpcMessage): void {
     this.sent.push(message);
   }
 
-  onMessage(listener: (message: JsonRpcServerMessage) => void): () => void {
+  onMessage(listener: (message: unknown) => void): () => void {
     this.messageListener = listener;
     return () => {
       this.messageListener = null;
@@ -26,7 +26,7 @@ class FakeTransport implements CodexTransport {
     return () => undefined;
   }
 
-  receive(message: JsonRpcServerMessage): void {
+  receive(message: unknown): void {
     this.messageListener?.(message);
   }
 }
@@ -521,7 +521,7 @@ describe('CodexAgentSessionManager', () => {
     await waitForSentCount(transport, 1);
     transport.receive({ id: 1, result: { userAgent: 'codex', codexHome: '/tmp/codex-home', platformFamily: 'unix', platformOs: 'macos' } });
     await waitForSentCount(transport, 3);
-    transport.receive({ id: 2, result: { thread: { id: 'thread-1', cwd: '/Users/nbonamy/src/codex-claw' } } });
+    transport.receive({ id: 2, result: { model: 'gpt-5.1-codex', thread: { id: 'thread-1', cwd: '/Users/nbonamy/src/codex-claw' } } });
     await waitForSentCount(transport, 4);
     transport.receive({ id: 3, result: { turn: { id: 'turn-1', status: 'running' } } });
 
@@ -604,7 +604,7 @@ describe('CodexAgentSessionManager', () => {
     await waitForSentCount(transport, 1);
     transport.receive({ id: 1, result: { userAgent: 'codex', codexHome: '/tmp/codex-home', platformFamily: 'unix', platformOs: 'macos' } });
     await waitForSentCount(transport, 3);
-    transport.receive({ id: 2, result: { thread: { id: 'thread-1', cwd: '/Users/nbonamy/src/codex-claw' } } });
+    transport.receive({ id: 2, result: { model: 'gpt-5.1-codex', thread: { id: 'thread-1', cwd: '/Users/nbonamy/src/codex-claw' } } });
     await waitForSentCount(transport, 4);
     transport.receive({ id: 3, result: { turn: { id: 'turn-1', status: 'running' } } });
 
@@ -626,6 +626,7 @@ describe('CodexAgentSessionManager', () => {
         collaborationMode: {
           mode: 'plan',
           settings: {
+            model: 'gpt-5.1-codex',
             reasoning_effort: 'medium',
             developer_instructions: null,
           },

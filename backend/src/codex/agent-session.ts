@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { Agent, AgentContextUsage, AgentStatus, AskUserAnswers, AskUserQuestion, BackendModelOption, BackendSkillSummary, ClientRequest, ClientRequestResponse, CodexApprovalPreset, ConfirmToolRequest, ConversationSummary, MainToRendererEvent, RendererMessage, SendPromptOptions, ToolConfirmationDecision } from '@codex-claw/shared/contracts';
 import { codexApprovalPresetFromDefaults } from '@codex-claw/shared/codex-approval-presets';
 import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
+import type { Settings, v2 } from 'codex-app-sdk/codex';
 import { logMain, warnMain } from '../log';
 import { buildCodexClawThreadConfig } from '../mcp/codex-config';
 import type { CodexRpcClient, CodexServerRequest, CodexServerRequestResponder } from './rpc-client';
@@ -52,6 +53,7 @@ import { codexThreadHistoryToRendererMessages } from './thread-history-adapter';
 type AgentSession = {
   agentId: string;
   threadId: string;
+  model: string | null;
 };
 
 type PendingClientRequest = {
@@ -60,6 +62,9 @@ type PendingClientRequest = {
   threadId: string;
   turnId?: string;
 };
+
+type McpServerElicitationRequest = Extract<CodexServerRequest, { method: 'mcpServer/elicitation/request' }>;
+type ToolRequestUserInputRequest = Extract<CodexServerRequest, { method: 'item/tool/requestUserInput' }>;
 
 type EventListener = (event: CodexSessionEvent) => void;
 
@@ -107,7 +112,7 @@ export class CodexAgentSessionManager {
     private readonly options: CodexAgentSessionManagerOptions = {},
   ) {
     this.client.onNotification((message) => this.handleNotification(message as CodexNotification));
-    this.client.onServerRequest((request, responder) => this.handleServerRequest(request, responder));
+    this.client.onAnyServerRequest((request, responder) => this.handleServerRequest(request, responder));
   }
 
   async start(): Promise<void> {
@@ -140,7 +145,7 @@ export class CodexAgentSessionManager {
     let cursor: string | null | undefined = null;
 
     do {
-      const response: CodexModelListResponse = await this.client.request<CodexModelListResponse>('model/list', {
+      const response: v2.ModelListResponse = await this.client.request('model/list', {
         cursor,
         includeHidden,
       });
@@ -161,7 +166,7 @@ export class CodexAgentSessionManager {
   async listSkills(agent: Agent, forceReload = false): Promise<BackendSkillSummary[]> {
     await this.start();
 
-    const response = await this.client.request<CodexSkillsListResponse>('skills/list', {
+    const response = await this.client.request('skills/list', {
       cwds: [expandHome(agent.folder)],
       forceReload,
     });
@@ -180,7 +185,7 @@ export class CodexAgentSessionManager {
 
     const session = await this.ensureSession(agent);
     const codexOptions = options.backendOptions?.kind === 'codex' ? options.backendOptions : undefined;
-    const turnParams: Record<string, unknown> = {
+    const turnParams: v2.TurnStartParams = {
       threadId: session.threadId,
       input: [
         {
@@ -188,7 +193,7 @@ export class CodexAgentSessionManager {
           text: prompt,
           text_elements: [],
         },
-        ...(codexOptions?.skills ?? []).map((skill) => ({
+        ...(codexOptions?.skills ?? []).map((skill): v2.UserInput => ({
           type: 'skill',
           name: skill.name,
           path: skill.path,
@@ -202,30 +207,23 @@ export class CodexAgentSessionManager {
     if (codexOptions?.reasoningEffort) {
       turnParams.effort = codexOptions.reasoningEffort;
     }
-    if (options.planMode) {
-      const collaborationSettings: Record<string, unknown> = {
-        reasoning_effort: codexOptions?.reasoningEffort ?? 'medium',
+    if (typeof options.planMode === 'boolean') {
+      const collaborationModel = options.model ?? session.model;
+      if (!collaborationModel) {
+        throw new Error('Codex did not report the active model required for collaboration mode.');
+      }
+      const collaborationSettings: Settings = {
+        model: collaborationModel,
+        reasoning_effort: codexOptions?.reasoningEffort ?? (options.planMode ? 'medium' : null),
         developer_instructions: null,
       };
-      if (options.model) {
-        collaborationSettings.model = options.model;
-      }
       turnParams.collaborationMode = {
-        mode: 'plan',
+        mode: options.planMode ? 'plan' : 'default',
         settings: collaborationSettings,
-      };
-    } else if (options.planMode === false && options.model) {
-      turnParams.collaborationMode = {
-        mode: 'default',
-        settings: {
-          model: options.model,
-          reasoning_effort: codexOptions?.reasoningEffort ?? null,
-          developer_instructions: null,
-        },
       };
     }
 
-    const response = await this.client.request<TurnStartResponse>('turn/start', turnParams);
+    const response = await this.client.request('turn/start', turnParams);
     this.activeTurnIdsByThreadId.set(session.threadId, response.turn.id);
     this.recordTurnId(session.threadId, response.turn.id);
 
@@ -239,7 +237,7 @@ export class CodexAgentSessionManager {
     await this.start();
 
     const session = await this.ensureSession(agent);
-    await this.client.request<ThreadCompactStartResponse>('thread/compact/start', {
+    await this.client.request('thread/compact/start', {
       threadId: session.threadId,
     });
 
@@ -252,7 +250,7 @@ export class CodexAgentSessionManager {
     await this.start();
 
     const session = await this.ensureSession(agent);
-    await this.client.request<ThreadSetNameResponse>('thread/name/set', {
+    await this.client.request('thread/name/set', {
       threadId: session.threadId,
       name: title,
     });
@@ -262,7 +260,7 @@ export class CodexAgentSessionManager {
     await this.start();
 
     const session = await this.ensureSession(agent);
-    const response = await this.client.request<{ goal: CodexThreadGoal }>('thread/goal/set', {
+    const response = await this.client.request('thread/goal/set', {
       threadId: session.threadId,
       objective,
       status: 'active',
@@ -278,7 +276,7 @@ export class CodexAgentSessionManager {
     await this.start();
 
     const session = await this.ensureSession(agent);
-    const response = await this.client.request<{ cleared: boolean }>('thread/goal/clear', {
+    const response = await this.client.request('thread/goal/clear', {
       threadId: session.threadId,
     });
 
@@ -315,7 +313,7 @@ export class CodexAgentSessionManager {
     await this.start();
 
     const session = await this.ensureSession(agent);
-    const response = await this.client.request<ReviewStartResponse>('review/start', {
+    const response = await this.client.request('review/start', {
       threadId: session.threadId,
       target,
       delivery: 'inline',
@@ -341,7 +339,7 @@ export class CodexAgentSessionManager {
       throw new Error('No active Codex turn to steer.');
     }
 
-    const response = await this.client.request<TurnSteerResponse>('turn/steer', {
+    const response = await this.client.request('turn/steer', {
       threadId: session.threadId,
       expectedTurnId,
       input: [
@@ -375,7 +373,7 @@ export class CodexAgentSessionManager {
       turnId,
     });
 
-    await this.client.request<TurnInterruptResponse>('turn/interrupt', {
+    await this.client.request('turn/interrupt', {
       threadId: session.threadId,
       turnId,
     });
@@ -421,7 +419,7 @@ export class CodexAgentSessionManager {
       throw new Error('Cannot roll back without at least one Codex turn.');
     }
 
-    const response = await this.client.request<ThreadRollbackResponse>('thread/rollback', {
+    const response = await this.client.request('thread/rollback', {
       threadId: session.threadId,
       numTurns,
     });
@@ -436,7 +434,7 @@ export class CodexAgentSessionManager {
 
   async readConversationMessages(threadId: string, agentId: string): Promise<RendererMessage[]> {
     await this.start();
-    const response = await this.client.request<ThreadReadResponse>('thread/read', {
+    const response = await this.client.request('thread/read', {
       threadId,
       includeTurns: true,
     });
@@ -446,7 +444,7 @@ export class CodexAgentSessionManager {
 
   async listConversations(agent: Agent): Promise<ConversationSummary[]> {
     await this.start();
-    const response = await this.client.request<ThreadListResponse>('thread/list', {
+    const response = await this.client.request('thread/list', {
       cwd: expandHome(agent.folder),
       archived: false,
       sortKey: 'updated_at',
@@ -472,13 +470,13 @@ export class CodexAgentSessionManager {
     const cwd = expandHome(agent.folder);
     const approvalSettings = await this.approvalThreadStartParamsForAgent(agent);
     const threadConfig = buildCodexClawThreadConfig(agent, this.options.clawMcpServerUrl ?? null);
-    const response = await this.client.request<ThreadResumeResponse>('thread/resume', {
+    const response = await this.client.request('thread/resume', {
       threadId,
       cwd,
       ...approvalSettings.params,
       ...threadConfig,
     });
-    this.recordSession(agent.id, response.thread.id);
+    this.recordSession(agent.id, response.thread.id, response.model);
     this.recordThreadTurns(response.thread);
     this.activeTurnIdsByThreadId.delete(response.thread.id);
 
@@ -540,25 +538,24 @@ export class CodexAgentSessionManager {
     const approvalSettings = await this.approvalThreadStartParamsForAgent(agent);
     const threadConfig = buildCodexClawThreadConfig(agent, this.options.clawMcpServerUrl ?? null);
     const existingThreadId = codexThreadId(agent);
-    const shouldResume = Boolean(existingThreadId);
-    const response = shouldResume
-      ? await this.client.request<ThreadResumeResponse>('thread/resume', {
+    const response = existingThreadId
+      ? await this.client.request('thread/resume', {
         threadId: existingThreadId,
         cwd,
         ...approvalSettings.params,
         ...threadConfig,
       })
-      : await this.client.request<ThreadStartResponse>('thread/start', {
+      : await this.client.request('thread/start', {
         cwd,
         ...approvalSettings.params,
         serviceName: 'codex_claw',
         ...threadConfig,
       });
 
-    const session = this.recordSession(agent.id, response.thread.id);
+    const session = this.recordSession(agent.id, response.thread.id, response.model);
     this.recordThreadTurns(response.thread);
 
-    if (shouldResume) {
+    if (existingThreadId) {
       const messages = codexThreadHistoryToRendererMessages(response.thread, agent.id);
       if (messages.length > 0) {
         this.emit({
@@ -617,7 +614,7 @@ export class CodexAgentSessionManager {
     }
 
     if (!this.configRequirementsPromise) {
-      this.configRequirementsPromise = this.client.request<CodexConfigRequirementsReadResponse>('configRequirements/read', undefined)
+      this.configRequirementsPromise = this.client.request('configRequirements/read', undefined)
         .then((response) => {
           this.configRequirements = response.requirements ?? null;
           this.emit({
@@ -643,7 +640,7 @@ export class CodexAgentSessionManager {
     return this.configRequirementsPromise;
   }
 
-  private recordSession(agentId: string, threadId: string): AgentSession {
+  private recordSession(agentId: string, threadId: string, model: string | null = null): AgentSession {
     const existing = this.sessionsByAgentId.get(agentId);
     if (existing && existing.threadId !== threadId && this.agentIdsByThreadId.get(existing.threadId) === agentId) {
       this.agentIdsByThreadId.delete(existing.threadId);
@@ -653,6 +650,7 @@ export class CodexAgentSessionManager {
     const session = {
       agentId,
       threadId,
+      model,
     };
     this.sessionsByAgentId.set(agentId, session);
     this.agentIdsByThreadId.set(threadId, agentId);
@@ -993,7 +991,7 @@ export class CodexAgentSessionManager {
     }
   }
 
-  private handleMcpServerElicitationRequest(request: CodexServerRequest, responder: CodexServerRequestResponder): boolean {
+  private handleMcpServerElicitationRequest(request: McpServerElicitationRequest, responder: CodexServerRequestResponder): boolean {
     const clientRequest = clientRequestFromMcpServerElicitation(request);
     if (!clientRequest || !isRecord(request.params) || typeof request.params.threadId !== 'string') {
       return false;
@@ -1021,7 +1019,7 @@ export class CodexAgentSessionManager {
     return true;
   }
 
-  private handleToolRequestUserInput(request: CodexServerRequest, responder: CodexServerRequestResponder): boolean {
+  private handleToolRequestUserInput(request: ToolRequestUserInputRequest, responder: CodexServerRequestResponder): boolean {
     const clientRequest = clientRequestFromToolRequestUserInput(request);
     if (!clientRequest || !isRecord(request.params) || typeof request.params.threadId !== 'string') {
       return false;
@@ -1127,7 +1125,7 @@ export class CodexAgentSessionManager {
       return knownTurnIds;
     }
 
-    const response = await this.client.request<ThreadReadResponse>('thread/read', {
+    const response = await this.client.request('thread/read', {
       threadId,
       includeTurns: true,
     });
@@ -1240,7 +1238,7 @@ function codexApprovalThreadStartParams(preset: CodexApprovalPreset): {
 function codexApprovalThreadSettingsUpdateParams(preset: CodexApprovalPreset, cwd: string): {
   approvalPolicy: 'never' | 'on-request';
   approvalsReviewer: 'user' | 'auto_review';
-  sandboxPolicy: Record<string, unknown>;
+  sandboxPolicy: v2.SandboxPolicy;
 } {
   if (preset === 'full-access') {
     return {
@@ -1387,7 +1385,7 @@ function agentStatusFromCodexThreadStatus(status: CodexThreadStatus): AgentStatu
   }
 }
 
-function clientRequestFromMcpServerElicitation(request: CodexServerRequest): ClientRequest | null {
+function clientRequestFromMcpServerElicitation(request: McpServerElicitationRequest): ClientRequest | null {
   if (!isRecord(request.params)) {
     return null;
   }
@@ -1425,7 +1423,7 @@ function clientRequestFromMcpServerElicitation(request: CodexServerRequest): Cli
   };
 }
 
-function clientRequestFromToolRequestUserInput(request: CodexServerRequest): ClientRequest | null {
+function clientRequestFromToolRequestUserInput(request: ToolRequestUserInputRequest): ClientRequest | null {
   if (!isRecord(request.params)) {
     return null;
   }

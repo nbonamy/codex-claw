@@ -1,20 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { RpcMessage, ServerNotification } from 'codex-app-sdk/codex';
 import { CodexRpcClient, type CodexTransport } from '../rpc-client';
-import type { JsonRpcClientMessage, JsonRpcServerMessage } from '../protocol';
 
 class FakeTransport implements CodexTransport {
-  sent: JsonRpcClientMessage[] = [];
-  private messageListener: ((message: JsonRpcServerMessage) => void) | null = null;
+  sent: RpcMessage[] = [];
+  private messageListener: ((message: unknown) => void) | null = null;
   private errorListener: ((error: Error) => void) | null = null;
 
   start = vi.fn(async () => undefined);
   close = vi.fn(async () => undefined);
 
-  send(message: JsonRpcClientMessage): void {
+  send(message: RpcMessage): void {
     this.sent.push(message);
   }
 
-  onMessage(listener: (message: JsonRpcServerMessage) => void): () => void {
+  onMessage(listener: (message: unknown) => void): () => void {
     this.messageListener = listener;
     return () => {
       this.messageListener = null;
@@ -28,7 +28,7 @@ class FakeTransport implements CodexTransport {
     };
   }
 
-  receive(message: JsonRpcServerMessage): void {
+  receive(message: unknown): void {
     this.messageListener?.(message);
   }
 
@@ -87,7 +87,7 @@ describe('CodexRpcClient', () => {
     const client = new CodexRpcClient(transport);
     await client.start();
 
-    const ok = client.request<{ value: number }>('model/list', {});
+    const ok = client.request('model/list', {});
     const failed = client.request('thread/start', {});
 
     transport.receive({ id: 1, result: { value: 42 } });
@@ -114,7 +114,7 @@ describe('CodexRpcClient', () => {
   it('emits notifications and rejects pending work on transport errors', async () => {
     const transport = new FakeTransport();
     const client = new CodexRpcClient(transport);
-    const notifications: JsonRpcServerMessage[] = [];
+    const notifications: ServerNotification[] = [];
     await client.start();
     client.onNotification((message) => notifications.push(message));
 
@@ -131,7 +131,7 @@ describe('CodexRpcClient', () => {
   it('rejects unimplemented app-server requests so turns do not hang forever', async () => {
     const transport = new FakeTransport();
     const client = new CodexRpcClient(transport);
-    const notifications: JsonRpcServerMessage[] = [];
+    const notifications: ServerNotification[] = [];
     await client.start();
     client.onNotification((message) => notifications.push(message));
 
@@ -162,7 +162,7 @@ describe('CodexRpcClient', () => {
     const client = new CodexRpcClient(transport);
     await client.start();
 
-    client.onServerRequest((request, responder) => {
+    client.onServerRequest('mcpServer/elicitation/request', (request, responder) => {
       expect(request).toStrictEqual({
         id: 'elicitation-1',
         method: 'mcpServer/elicitation/request',

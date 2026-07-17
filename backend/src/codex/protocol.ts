@@ -1,19 +1,5 @@
 import type { Agent, BackendSkillSummary, MainToRendererEvent, ThreadGoal } from '@codex-claw/shared/contracts';
-
-export type JsonRpcId = number | string;
-
-export type JsonRpcError = { code: number; message: string; data?: unknown };
-
-export type JsonRpcClientMessage =
-  | { id: JsonRpcId; method: string; params?: unknown }
-  | { method: string; params?: unknown }
-  | { id: JsonRpcId; result: unknown }
-  | { id: JsonRpcId; error: JsonRpcError };
-
-export type JsonRpcServerMessage =
-  | { id: JsonRpcId; result: unknown }
-  | { id: JsonRpcId; error: JsonRpcError }
-  | { id?: JsonRpcId; method: string; params?: unknown };
+import type { RpcId } from 'codex-app-sdk/codex';
 
 export type CodexThread = {
   id: string;
@@ -22,7 +8,7 @@ export type CodexThread = {
   createdAt?: number;
   updatedAt?: number;
   name?: string | null;
-  status?: string;
+  status?: string | CodexThreadStatus;
   turns?: CodexThreadTurn[];
 };
 
@@ -229,7 +215,7 @@ export type CodexNotification =
   | { method: 'item/fileChange/patchUpdated'; params: { threadId: string; turnId: string; itemId: string; changes: unknown[] } }
   | { method: 'item/mcpToolCall/progress'; params: { threadId: string; turnId: string; itemId: string; message: string } }
   | { method: 'thread/compacted'; params: { threadId: string; turnId: string } }
-  | { method: 'serverRequest/resolved'; params: { threadId: string; requestId: JsonRpcId } }
+  | { method: 'serverRequest/resolved'; params: { threadId: string; requestId: RpcId } }
   | { method: 'account/rateLimits/updated'; params: { rateLimits: CodexRateLimitSnapshot } }
   | { method: 'turn/plan/updated'; params: { threadId: string; turnId: string; explanation: string | null; plan: CodexTurnPlanStep[] } }
   | { method: 'turn/completed'; params: { threadId: string; turn: CodexTurn } }
