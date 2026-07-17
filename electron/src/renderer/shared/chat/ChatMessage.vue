@@ -1,22 +1,10 @@
 <template>
-  <div
+  <ChatCompactionMessage
     v-if="message.type === 'compaction'"
-    class="chat-message chat-message--compaction"
-    :class="{ 'chat-message--compaction-running': message.compactionStatus === 'running' }"
-  >
-    <div class="chat-message__compaction-line" />
-    <span
-      class="chat-message__compaction-title"
-      :data-label="compactionTitle"
-    >
-      <span
-        class="chat-message__compaction-label"
-        :class="{ 'text-shimmer': message.compactionStatus === 'running' }"
-      >
-        {{ compactionTitle }}
-      </span>
-    </span>
-  </div>
+    :completed-title="t('chat.compaction.completed')"
+    :running-title="t('chat.compaction.running')"
+    :status="message.compactionStatus"
+  />
   <!-- <div v-else-if="message.type === 'steer'" class="chat-message chat-message--steer">
     <div class="chat-message__steer-line" />
     <div class="chat-message__steer-body">
@@ -31,27 +19,15 @@
   >
     <div class="chat-message__body">
       <div class="chat-message__stack">
-        <template v-if="isEditing">
-          <div class="chat-message__edit-card">
-            <textarea
-              ref="editInput"
-              v-model="draft"
-              class="chat-message__edit-input"
-              :aria-label="t('chat.actions.editPrompt')"
-              @keydown.escape.prevent="cancelEdit"
-              @keydown.meta.enter.prevent="saveEdit"
-              @keydown.ctrl.enter.prevent="saveEdit"
-            />
-            <div class="chat-message__edit-actions">
-              <button type="button" class="chat-message__edit-button" @click="cancelEdit">
-                {{ t('chat.actions.cancel') }}
-              </button>
-              <button type="button" class="chat-message__edit-button chat-message__edit-button--primary" @click="saveEdit">
-                {{ t('chat.actions.resubmit') }}
-              </button>
-            </div>
-          </div>
-        </template>
+        <ChatMessageEditor
+          v-if="isEditing"
+          :cancel-label="t('chat.actions.cancel')"
+          :content="message.content"
+          :input-label="t('chat.actions.editPrompt')"
+          :save-label="t('chat.actions.resubmit')"
+          @cancel="cancelEdit"
+          @save="saveEdit"
+        />
         <template v-else>
           <ChatMessageBlock
             v-for="(block, blockIndex) in blocks"
@@ -102,13 +78,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { ClientRequestResponse } from '@codex-claw/shared/contracts'
 import type { Message } from './types'
 import type { MessageBlock } from './message-blocks'
 import ChatMessageBlock from './ChatMessageBlock.vue'
 import ChatMessageActions from './ChatMessageActions.vue'
+import ChatCompactionMessage from './ChatCompactionMessage.vue'
+import ChatMessageEditor from './ChatMessageEditor.vue'
 import { computeMessageBlocks } from './message-blocks'
 import { copyMessageToClipboard } from './message-actions'
 
@@ -143,11 +121,8 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const blocks = computed(() => computeMessageBlocks(props.message))
 const copied = ref(false)
-const draft = ref('')
-const editInput = ref<HTMLTextAreaElement | null>(null)
 const isEditing = ref(false)
 let copyResetTimeout: ReturnType<typeof setTimeout> | null = null
-let editFocusFrame: number | null = null
 
 const showActions = computed(() => (
   props.message.type !== 'compaction' &&
@@ -169,46 +144,19 @@ const showStreamingDot = computed(() => (
   props.message.streaming === true &&
   hasVisibleAssistantActivity.value
 ))
-const compactionTitle = computed(() => (
-  props.message.compactionStatus === 'running'
-    ? t('chat.compaction.running')
-    : t('chat.compaction.completed')
-))
-
-watch(() => props.message.content, (content) => {
-  if (isEditing.value) {
-    draft.value = content
-  }
-})
-
 function startEdit() {
   if (props.message.role !== 'user' || !props.canEditMessage) {
     return
   }
 
-  draft.value = props.message.content
   isEditing.value = true
-  editFocusFrame = requestAnimationFrame(() => {
-    focusEditInput()
-    editFocusFrame = null
-  })
 }
 
 function cancelEdit() {
-  if (editFocusFrame !== null) {
-    cancelAnimationFrame(editFocusFrame)
-    editFocusFrame = null
-  }
   isEditing.value = false
-  draft.value = ''
 }
 
-function saveEdit() {
-  const content = draft.value.trim()
-  if (!content) {
-    return
-  }
-
+function saveEdit(content: string) {
   emit('edit-message', { content, index: props.index })
   cancelEdit()
 }
@@ -244,16 +192,6 @@ async function copyMessage() {
   }, 1500)
 }
 
-function focusEditInput() {
-  const input = editInput.value
-  if (!input) {
-    return
-  }
-
-  input.focus()
-  input.setSelectionRange(input.value.length, input.value.length)
-}
-
 function isVisibleAssistantBlock(block: MessageBlock) {
   if (block.type === 'text') {
     return block.content.trim().length > 0
@@ -265,9 +203,6 @@ function isVisibleAssistantBlock(block: MessageBlock) {
 onBeforeUnmount(() => {
   if (copyResetTimeout) {
     clearTimeout(copyResetTimeout)
-  }
-  if (editFocusFrame !== null) {
-    cancelAnimationFrame(editFocusFrame)
   }
 })
 </script>
@@ -285,41 +220,10 @@ onBeforeUnmount(() => {
   justify-content: flex-start;
 }
 
-.chat-message--compaction {
-  position: relative;
-  align-items: center;
-  justify-content: center;
-  min-height: 28px;
-}
-
-.chat-message--compaction-running .chat-message__compaction-line {
-  opacity: 0.64;
-}
-
 .chat-message--steer {
   margin-top: var(--space-1);
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
-}
-
-.chat-message__compaction-line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  border-top: 1px solid var(--color-border);
-}
-
-.chat-message__compaction-title {
-  z-index: 1;
-  display: inline-block;
-  padding: 0 var(--space-6);
-  background: var(--color-surface-lowest);
-}
-
-.chat-message__compaction-label {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-14);
 }
 
 .chat-message__steer-line {
@@ -417,69 +321,6 @@ onBeforeUnmount(() => {
 .chat-message:hover .chat-message__actions--reserved,
 .chat-message:focus-within .chat-message__actions--reserved {
   visibility: hidden;
-}
-
-.chat-message__edit-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-8);
-  box-sizing: border-box;
-  width: 100%;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-8);
-  background: var(--color-surface-lowest);
-  color: var(--color-text);
-}
-
-.chat-message__edit-input {
-  min-height: calc(var(--line-height-24) * 4);
-  width: 100%;
-  box-sizing: border-box;
-  resize: vertical;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  line-height: var(--line-height-24);
-  outline: none;
-}
-
-.chat-message__edit-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-}
-
-.chat-message__edit-button {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-6);
-  background: var(--color-surface-lowest);
-  color: var(--color-text);
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--font-size-13);
-  font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-18);
-}
-
-.chat-message__edit-button:hover,
-.chat-message__edit-button:focus-visible {
-  background: var(--color-surface-low);
-}
-
-.chat-message__edit-button--primary {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-}
-
-.chat-message__edit-button--primary:hover,
-.chat-message__edit-button--primary:focus-visible {
-  border-color: var(--color-on-primary-container);
-  background: var(--color-on-primary-container);
 }
 
 .chat-message__thinking {
