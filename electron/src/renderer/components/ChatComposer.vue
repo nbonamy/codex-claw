@@ -116,11 +116,12 @@
       >
         <MicrophoneIcon aria-hidden="true" />
       </button>
-      <ChatComposerSendButton
+      <CodexComposerSendButton
+        class="chat-composer__send"
         :disabled="sendButtonDisabled"
-        :loading="sendButtonLoading"
-        :label="sendButtonLabel"
-        cancel-label="Codex is working"
+        :busy="sendButtonLoading"
+        :submit-label="sendButtonLabel"
+        interrupt-label="Codex is working"
         @click="handleSendButtonClick"
       />
     </div>
@@ -131,7 +132,7 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import type { AgentContextUsage, AgentFileSearchItem, ApprovalPreset, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ReasoningEffort } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
-import ChatComposerSendButton from '../shared/chat/ChatComposerSendButton.vue';
+import { CodexComposerSendButton } from 'codex-app-sdk/vue';
 import ChatComposerActionMenu from './ChatComposerActionMenu.vue';
 import ChatContextUsageIndicator from './ChatContextUsageIndicator.vue';
 import ChatModelReasoningSelector from './ChatModelReasoningSelector.vue';
@@ -689,6 +690,10 @@ function resizeTextareaSoon(): void {
 
 <style scoped>
 .chat-composer {
+  --codex-composer-button-background: var(--color-on-surface-variant);
+  --codex-composer-button-foreground: var(--color-surface);
+  --codex-composer-button-hover-background: var(--color-on-surface);
+  --codex-composer-button-size: var(--chat-composer-button-size);
   --chat-composer-button-size: 36px;
   --chat-composer-button-size-small: 28px;
   --chat-composer-input-max-height: calc(var(--line-height-24) + var(--line-height-24) + var(--line-height-24) + var(--space-4) + var(--space-4));
