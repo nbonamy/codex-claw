@@ -97,6 +97,8 @@ Renderer component tests use Vue Test Utils, Vitest, and jsdom.
 Rules:
 
 - Co-locate component tests in `__tests__/` folders.
+- Give each component its own same-named spec file. Do not accumulate unrelated
+  Vue components in a catch-all component suite.
 - Test user-visible rendering and emitted actions.
 - Use the real Element Plus plugin for controls.
 - Narrow stubs are OK for brittle container primitives such as dialogs,
@@ -128,6 +130,8 @@ Rules:
 - Keep snapshots rare. Prefer explicit assertions that explain the behavior.
 - If a component is too hard to test in isolation, split it before adding
   brittle tests around the whole shell.
+- Keep shared SDK behavior in the SDK component's isolated spec and keep only
+  Codex Claw wrapper, adapter, and product-policy assertions in this repo.
 
 Use integration-style renderer tests only when testing composition between
 components, stores, router state, and IPC events.

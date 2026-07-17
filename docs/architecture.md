@@ -479,12 +479,14 @@ Important app-server messages for the current native agent:
 The app-server can generate TypeScript protocol bindings with:
 
 ```sh
-codex app-server generate-ts --out <dir>
+codex app-server generate-ts --experimental --out <dir>
 ```
 
-Those generated types should live under a backend provider protocol package, for
-example `backend/src/codex/generated`. Renderer and Electron main code should
-depend on app-owned IPC/event types instead.
+Those generated types live in the local `codex-app-sdk` package. The package
+also owns typed bidirectional request routing and transport framing. Codex Claw
+depends on that package through a local npm dependency while `clawd` keeps all
+product policy and app-event adaptation. Renderer and Electron main code still
+depend on app-owned IPC/event types instead of generated provider types.
 
 ## Agent Collaboration MCP
 
@@ -501,7 +503,7 @@ approval UI path is exercised; we expect to bring it back for normal Claw MCP
 collaboration after that flow is proven. Future backends should keep the Claw
 tool semantics and only change the backend-specific enablement path.
 
-## SDK Decision
+## Codex Exec SDK Decision
 
 The TypeScript SDK is useful, but it is not the target integration boundary. It
 wraps `codex exec --experimental-json`, spawns the CLI, and streams JSONL
@@ -516,6 +518,28 @@ diff updates, server-initiated requests, and future realtime/control surfaces.
 If we temporarily use the SDK, it must sit behind the same
 `AgentBackendDriver` interface as the app-server implementation so the renderer
 and IPC contract do not change when it is removed.
+
+This section refers to the Codex exec SDK, not the app-server client library in
+`../codex-app-sdk`. The latter speaks the full app-server protocol and is the
+shared transport/type boundary used by the current implementation.
+
+## App-Server Client SDK Boundary
+
+`codex-app-sdk` is deliberately product-neutral:
+
+- it uses Codex naming only and contains no Codex Claw identifiers;
+- generated protocol types are the source of truth for requests, results,
+  notifications, and server-initiated requests;
+- its Electron helpers provide typed invoke/event mechanics, not app channels
+  or app policy;
+- its Vue components provide generic composer, extensible menu, message, and
+  sticky-list primitives through typed props, events, and slots;
+- Codex Claw wrappers map approval presets, plan mode, message actions, and
+  design tokens onto those primitives.
+
+The SDK boundary is enforced by tests. Codex Claw separately tests its adapter
+policy and wrapper behavior, so generic SDK behavior and host-product behavior
+do not share a catch-all suite.
 
 ## Event Adaptation
 

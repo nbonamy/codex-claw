@@ -18,6 +18,13 @@ to the renderer, and owns only desktop-native callbacks.
 - adapt Codex events into app-owned events;
 - persist only app product state, not Codex transcripts.
 
+The local `codex-app-sdk` dependency owns generated app-server protocol types,
+request/response inference, bidirectional request routing, and stdio JSONL
+framing. `clawd` remains the product adapter: it owns executable discovery,
+initialization metadata, session policy, approval presets, event adaptation,
+and recovery behavior. Product policy must not be added to the SDK to make a
+Codex Claw call compile.
+
 Electron main responsibilities:
 
 - spawn/connect to `clawd`;
@@ -121,6 +128,8 @@ to the best compatible preset (`approve-for-me`, then `ask-for-approval`, then
 `full-access`). If none of Claw's presets satisfy the app-server requirements,
 `clawd` omits approval/sandbox overrides and lets app-server use its effective
 configuration instead of sending a known-invalid `danger-full-access` request.
+The adapter returns the generated app-server `SandboxPolicy` shape directly;
+the shared SDK does not define or normalize a second sandbox-policy model.
 
 `thread/resume` returns the thread's `turns` in app-server protocol v2. `clawd`
 must translate those turns into app-owned `RendererMessage`s and emit a

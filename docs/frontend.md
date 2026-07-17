@@ -61,6 +61,10 @@ Rules:
   or clearly belongs to a shared rendering primitive.
 - Co-locate component tests with the component and test it in isolation when
   the behavior is local.
+- Use `codex-app-sdk/vue` for product-neutral composer, menu, send-button, and
+  sticky message-list behavior. Keep Codex Claw policy in small wrappers.
+- Extend composer actions with typed menu entries and slots; do not fork the
+  menu component when an app builder needs another action.
 
 ## App Shell
 
