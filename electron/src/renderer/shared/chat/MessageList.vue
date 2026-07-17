@@ -1,9 +1,7 @@
 <template>
-  <div class="message-list" ref="el" @scroll="updateStickiness($event)">
-    <div class="message-list__content">
+  <CodexMessageList class="message-list" :messages="messages">
+    <template #message="{ message: msg, index }">
       <ChatMessage
-        v-for="(msg, index) in messages"
-        :key="index"
         :actions-disabled="actionsDisabled"
         :answered-client-request-ids="answeredClientRequestIds"
         :can-delete-message="canDeleteMessage"
@@ -24,13 +22,13 @@
         @send-follow-up="emit('send-follow-up', $event)"
         @undo-change-set="emit('undo-change-set', $event)"
       />
-    </div>
-  </div>
+    </template>
+  </CodexMessageList>
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from 'vue'
 import type { ClientRequestResponse } from '@codex-claw/shared/contracts'
+import { CodexMessageList } from 'codex-app-sdk/vue'
 import type { Message } from './types'
 import ChatMessage from './ChatMessage.vue'
 
@@ -61,64 +59,14 @@ const emit = defineEmits<{
   'undo-change-set': [changeSetId: string]
 }>()
 
-const el = ref<HTMLElement | null>(null)
-const stickToBottom = ref(true)
-const previousMessagesRef = ref<Message[] | null>(props.messages)
-const previousMessageCount = ref(props.messages.length)
-const bottomThreshold = 24
-
-function isAtBottom(element: HTMLElement) {
-  return element.scrollHeight - element.scrollTop - element.clientHeight <= bottomThreshold
-}
-
-function scrollToBottom() {
-  if (!el.value) {
-    return
-  }
-
-  el.value.scrollTop = el.value.scrollHeight
-  stickToBottom.value = true
-}
-
-function updateStickiness(event: Event) {
-  stickToBottom.value = isAtBottom(event.currentTarget as HTMLElement)
-}
-
-onMounted(async () => {
-  await nextTick()
-  scrollToBottom()
-})
-
-watch(() => props.messages, async (messages) => {
-  const forceScroll = messages !== previousMessagesRef.value || messages.length > previousMessageCount.value
-  const shouldScroll = forceScroll || stickToBottom.value
-  previousMessagesRef.value = messages
-  previousMessageCount.value = messages.length
-
-  await nextTick()
-  if (shouldScroll) {
-    scrollToBottom()
-  }
-}, { deep: true })
 </script>
 
 <style scoped>
 .message-list {
-  flex: 1 1 auto;
-  height: 100%;
-  min-height: 0;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  padding: var(--space-8) var(--space-16);
-}
-
-.message-list__content {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-8);
-  width: min(100%, var(--message-list-content-width, 100%));
-  margin: 0 auto;
-  padding:
+  --codex-message-list-padding: var(--space-8) var(--space-16);
+  --codex-message-list-gap: var(--space-8);
+  --codex-message-list-content-width: var(--message-list-content-width, 100%);
+  --codex-message-list-content-padding:
     calc(var(--message-list-content-padding-top, 0) + var(--space-2))
     0
     calc(var(--message-list-content-padding-bottom, 0) + var(--space-2));
