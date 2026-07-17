@@ -1,5 +1,7 @@
-import { withDiscoveredRuntimePath, type RuntimeDiscoveryDependencies } from '@codex-claw/shared/runtime-discovery';
-import { CodexAppServerStdioTransport } from 'codex-app-sdk/node';
+import {
+  CodexAppServerStdioTransport,
+  type CodexExecutableDiscoveryDependencies,
+} from 'codex-app-sdk/node';
 import { logMain, warnMain } from '../log';
 
 export type CodexProcessTransportOptions = {
@@ -7,26 +9,25 @@ export type CodexProcessTransportOptions = {
   codexHome?: string;
   env?: NodeJS.ProcessEnv;
   configOverrides?: string[];
-  runtimeDiscovery?: RuntimeDiscoveryDependencies;
+  runtimeDiscovery?: CodexExecutableDiscoveryDependencies;
 };
 
 export class CodexProcessTransport extends CodexAppServerStdioTransport {
   constructor(options: CodexProcessTransportOptions = {}) {
-    const command = options.command?.trim() || 'codex';
+    const command = options.command?.trim() || undefined;
     const configOverrideArgs = options.configOverrides?.flatMap((override) => ['-c', override]) ?? [];
     const args = [...configOverrideArgs, 'app-server', '--listen', 'stdio://'];
-    const env = withDiscoveredRuntimePath(options.env, options.runtimeDiscovery);
-
     logMain('codex-process', 'starting app-server', {
-      command,
+      command: command ?? 'codex',
       args,
     });
 
     super({
-      command,
+      ...(command ? { command } : {}),
       codexHome: options.codexHome,
       configOverrides: options.configOverrides,
-      env,
+      env: options.env,
+      executableDiscovery: options.runtimeDiscovery,
       onStderr: (detail) => {
         warnMain('codex-process', 'stderr', { detail: detail.trim() });
       },

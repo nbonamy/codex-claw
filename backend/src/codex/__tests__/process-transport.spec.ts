@@ -110,6 +110,30 @@ describe('CodexProcessTransport', () => {
     expect(spawnMock.mock.calls[0][0]).toBe('/opt/homebrew/bin/codex');
   });
 
+  it('delegates GUI executable discovery to the SDK transport', async () => {
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const transport = new CodexProcessTransport({
+      env: { PATH: '/usr/bin' },
+      runtimeDiscovery: {
+        execFileSync: vi.fn(() => {
+          throw new Error('shell unavailable');
+        }),
+        existsSync: vi.fn((filePath: string) => [
+          '/opt/homebrew/bin',
+          '/opt/homebrew/bin/codex',
+        ].includes(filePath)),
+        homedir: () => '/Users/tester',
+        pathDelimiter: ':',
+        platform: 'darwin',
+      },
+    });
+
+    await transport.start();
+
+    expect(spawnMock.mock.calls[0][0]).toBe('/opt/homebrew/bin/codex');
+  });
+
   it('passes config overrides before the app-server subcommand', async () => {
     const child = createFakeChild();
     spawnMock.mockReturnValue(child);

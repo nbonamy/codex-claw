@@ -9,7 +9,7 @@ to the renderer, and owns only desktop-native callbacks.
 
 `clawd` responsibilities:
 
-- resolve the Codex executable;
+- choose an explicit Codex executable override when configured;
 - start or connect to `codex app-server`;
 - initialize the app-server session;
 - own JSON-RPC request IDs and response matching;
@@ -18,12 +18,12 @@ to the renderer, and owns only desktop-native callbacks.
 - adapt Codex events into app-owned events;
 - persist only app product state, not Codex transcripts.
 
-The local `codex-app-sdk` dependency owns generated app-server protocol types,
-request/response inference, bidirectional request routing, and stdio JSONL
-framing. `clawd` remains the product adapter: it owns executable discovery,
-initialization metadata, session policy, approval presets, event adaptation,
-and recovery behavior. Product policy must not be added to the SDK to make a
-Codex Claw call compile.
+The local `codex-app-sdk` dependency owns Codex executable discovery, generated
+app-server protocol types, request/response inference, bidirectional request
+routing, and stdio JSONL framing. `clawd` remains the product adapter: it owns
+explicit executable selection, initialization metadata, agent/session policy,
+approval presets, event adaptation, and recovery behavior. Product policy must
+not be added to the SDK to make a Codex Claw call compile.
 
 Electron main responsibilities:
 
@@ -67,7 +67,8 @@ binary.
 
 Connection flow:
 
-1. Resolve the Codex executable.
+1. Let the SDK discover the Codex executable, unless the user configured an
+   explicit path.
 2. Start app-server with the chosen environment.
 3. Send `initialize` with `clientInfo.name = "codex_claw"` and
    `capabilities.experimentalApi = true`.
@@ -83,10 +84,11 @@ environment by default so existing authentication works. Set
 home when testing or when we later build a dedicated auth/onboarding flow.
 
 The General settings Advanced section can store a Codex executable path. Empty
-means the backend resolves `codex` from its process `PATH`. A non-empty value
-is passed as the executable for `codex app-server --listen stdio://`. Changing
-the path persists the setting and relaunches Codex Claw so the backend and
-app-server start from a clean lifecycle.
+uses SDK discovery across the inherited and login-shell `PATH`, common user and
+Homebrew bins, nvm installs, and Windows executable extensions. A non-empty
+value is passed as the executable for `codex app-server --listen stdio://` and
+always wins. Changing the path persists the setting and relaunches Codex Claw
+so the backend and app-server start from a clean lifecycle.
 
 ## Thread And Agent Mapping
 
