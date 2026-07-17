@@ -1,38 +1,44 @@
 <template>
-  <div
-    ref="rootEl"
+  <CodexComposerMenu
     class="chat-composer-action-menu__root"
+    menu-class="chat-composer-action-menu"
+    aria-label="Composer actions"
+    button-label="Composer actions"
+    :disabled="disabled"
+    :items="menuItems"
+    @select="selectMenuItem"
   >
-    <button
-      class="chat-composer-action-menu__button"
-      type="button"
-      aria-label="Composer actions"
-      :disabled="disabled"
-      aria-haspopup="menu"
-      :aria-expanded="menuOpen"
-      @click="toggleMenu"
-    >
-      <PlusIcon />
-    </button>
-
-    <AppMenu
-      v-if="menuOpen"
-      class="chat-composer-action-menu"
-      ariaLabel="Composer actions"
-      :items="menuItems"
-      @select="selectMenuItem"
-    />
-  </div>
+    <template #trigger="{ open, toggle }">
+      <button
+        class="chat-composer-action-menu__button"
+        type="button"
+        aria-label="Composer actions"
+        aria-haspopup="menu"
+        :aria-expanded="open"
+        :disabled="disabled"
+        @click="toggle"
+      >
+        <PlusIcon />
+      </button>
+    </template>
+  </CodexComposerMenu>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { Component } from 'vue';
+import { computed, type Component } from 'vue';
 import type { ApprovalPreset } from '@codex-claw/shared/contracts';
 import { approvalPresetOptions } from '@codex-claw/shared/approval-presets';
-import AppMenu from '../shared/menu/AppMenu.vue';
-import type { AppMenuItem } from '../shared/menu/app-menu';
+import {
+  CodexComposerMenu,
+  type CodexComposerMenuItem,
+  type CodexComposerMenuSelectableItem,
+} from 'codex-app-sdk/vue';
 import { HandStopIcon, ListDetailsIcon, PaperclipIcon, PlusIcon, ShieldCheckIcon, Sparkles } from '../shared/icons/app-icons';
+
+type ComposerMenuAction =
+  | { kind: 'approval'; preset: ApprovalPreset }
+  | { kind: 'attach' }
+  | { kind: 'plan-mode' };
 
 const props = withDefaults(defineProps<{
   disabled?: boolean;
@@ -51,32 +57,29 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   attach: [];
-  'selectApprovalPreset': [preset: ApprovalPreset];
+  selectApprovalPreset: [preset: ApprovalPreset];
   'update:planMode': [enabled: boolean];
 }>();
 
-const rootEl = ref<HTMLElement | null>(null);
-const menuOpen = ref(false);
 const allowedApprovalPresets = computed(() => new Set(props.approvalPresets));
-const menuItems = computed<AppMenuItem[]>(() => {
-  const items: AppMenuItem[] = []
+const menuItems = computed<CodexComposerMenuItem<ComposerMenuAction>[]>(() => {
+  const items: CodexComposerMenuItem<ComposerMenuAction>[] = [];
 
   if (props.showApprovalMenu) {
     items.push({
       id: 'approval',
       type: 'submenu',
       label: 'Approval',
-      // value: selectedApprovalLabel.value,
       icon: ShieldCheckIcon,
-      submenuWidth: 'wide',
       items: approvalPresetOptions.map((option) => ({
-        id: approvalItemId(option.id),
+        id: `approval:${option.id}`,
         type: 'radio',
         label: option.label,
         description: option.description,
         icon: approvalIcon(option.id),
         checked: option.id === props.approvalPreset,
         disabled: !allowedApprovalPresets.value.has(option.id),
+        payload: { kind: 'approval', preset: option.id },
       })),
     });
   }
@@ -86,47 +89,26 @@ const menuItems = computed<AppMenuItem[]>(() => {
       id: 'plan-mode',
       type: 'checkbox',
       label: 'Plan mode',
-      accessory: 'switch',
       checked: props.planMode,
-      icon: ListDetailsIcon
+      icon: ListDetailsIcon,
+      payload: { kind: 'plan-mode' },
     });
   }
 
-  items.push(  { id: 'group-attach', type: 'separator' });
-
-  items.push({
+  items.push(
+    { id: 'group-attach', type: 'separator' },
+    {
       id: 'attach',
       type: 'action',
       label: 'Add Files & Photos',
       icon: PaperclipIcon,
       disabled: true,
+      payload: { kind: 'attach' },
     },
   );
 
   return items;
 });
-
-onMounted(() => {
-  document.addEventListener('click', closeOnOutsideClick);
-});
-
-onBeforeUnmount(() => {
-  document.removeEventListener('click', closeOnOutsideClick);
-});
-
-function toggleMenu(event: MouseEvent): void {
-  event.stopPropagation();
-  if (!props.disabled) {
-    menuOpen.value = !menuOpen.value;
-  }
-}
-
-function closeOnOutsideClick(event: MouseEvent): void {
-  const root = rootEl.value;
-  if (root && event.target && !root.contains(event.target as Node)) {
-    menuOpen.value = false;
-  }
-}
 
 function approvalIcon(preset: ApprovalPreset): Component {
   if (preset === 'ask-for-approval') {
@@ -138,35 +120,31 @@ function approvalIcon(preset: ApprovalPreset): Component {
   return ShieldCheckIcon;
 }
 
-function selectMenuItem(itemId: string): void {
-  if (itemId === 'plan-mode') {
-    emit('update:planMode', !props.planMode);
+function selectMenuItem(item: CodexComposerMenuSelectableItem<ComposerMenuAction>): void {
+  const action = item.payload;
+  if (!action) {
     return;
   }
-
-  const approvalPreset = approvalPresetFromItemId(itemId);
-  if (approvalPreset) {
-    emit('selectApprovalPreset', approvalPreset);
-    menuOpen.value = false;
+  if (action.kind === 'plan-mode') {
+    emit('update:planMode', !props.planMode);
+  } else if (action.kind === 'approval') {
+    emit('selectApprovalPreset', action.preset);
+  } else {
+    emit('attach');
   }
-}
-
-function approvalItemId(preset: ApprovalPreset): string {
-  return `approval:${preset}`;
-}
-
-function approvalPresetFromItemId(itemId: string): ApprovalPreset | null {
-  const preset = itemId.replace(/^approval:/, '');
-  return preset === 'ask-for-approval' || preset === 'approve-for-me' || preset === 'full-access'
-    ? preset
-    : null;
 }
 </script>
 
 <style scoped>
 .chat-composer-action-menu__root {
-  position: relative;
-  flex: 0 0 auto;
+  --codex-border-color: var(--color-border);
+  --codex-composer-button-size: var(--chat-composer-button-size, 36px);
+  --codex-composer-menu-radius: var(--radius-xl);
+  --codex-composer-menu-shadow: var(--shadow-menu);
+  --codex-hover-color: var(--color-surface-low);
+  --codex-muted-text-color: var(--color-text-muted);
+  --codex-surface-color: var(--color-surface-lowest);
+  --codex-text-color: var(--color-text);
 }
 
 .chat-composer-action-menu__button {
@@ -196,10 +174,8 @@ function approvalPresetFromItemId(itemId: string): ApprovalPreset | null {
   height: var(--icon-lg);
 }
 
-.chat-composer-action-menu {
-  position: absolute;
-  left: 0;
-  bottom: calc(100% + var(--space-4));
-  z-index: 10;
+:deep(.chat-composer-action-menu .codex-composer-menu-list__submenu-list) {
+  width: 360px;
+  max-width: min(360px, calc(100vw - var(--space-12)));
 }
 </style>

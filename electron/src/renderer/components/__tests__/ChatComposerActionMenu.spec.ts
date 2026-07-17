@@ -37,7 +37,7 @@ describe('ChatComposerActionMenu', () => {
     expect(wrapper.text()).toContain('Ask for approval');
     expect(wrapper.text()).toContain('Approve for me');
     expect(wrapper.text()).toContain('Full access');
-    expect(wrapper.find('.app-menu__chevron').exists()).toBe(true);
+    expect(wrapper.find('.codex-composer-menu-list__chevron').exists()).toBe(true);
     await wrapper.findAll('[role="menuitemradio"]')[1]?.trigger('click');
 
     expect(wrapper.emitted('selectApprovalPreset')).toStrictEqual([['approve-for-me']]);
