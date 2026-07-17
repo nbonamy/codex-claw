@@ -20,7 +20,6 @@ export class CodexProcessTransport extends CodexAppServerStdioTransport {
     logMain('codex-process', 'starting app-server', {
       command,
       args,
-      path: env.PATH,
     });
 
     super({

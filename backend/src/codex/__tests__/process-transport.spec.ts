@@ -6,6 +6,8 @@ const spawnMock = vi.hoisted(() => vi.fn());
 const execFileSyncMock = vi.hoisted(() => vi.fn(() => {
   throw new Error('shell unavailable');
 }));
+const logMainMock = vi.hoisted(() => vi.fn());
+const warnMainMock = vi.hoisted(() => vi.fn());
 
 vi.mock('node:child_process', () => ({
   execFileSync: execFileSyncMock,
@@ -14,6 +16,11 @@ vi.mock('node:child_process', () => ({
     execFileSync: execFileSyncMock,
     spawn: spawnMock,
   },
+}));
+
+vi.mock('../../log', () => ({
+  logMain: logMainMock,
+  warnMain: warnMainMock,
 }));
 
 type FakeChild = EventEmitter & {
@@ -38,6 +45,8 @@ describe('CodexProcessTransport', () => {
   beforeEach(() => {
     spawnMock.mockReset();
     execFileSyncMock.mockReset();
+    logMainMock.mockReset();
+    warnMainMock.mockReset();
     execFileSyncMock.mockImplementation(() => {
       throw new Error('shell unavailable');
     });
@@ -73,6 +82,10 @@ describe('CodexProcessTransport', () => {
     }));
     expect(spawnMock.mock.calls[0][2].env.CODEX_HOME).toBe(process.env.CODEX_HOME);
     expect(child.stdin.write).toHaveBeenCalledWith('{"id":1,"method":"initialize","params":{}}\n');
+    expect(logMainMock).toHaveBeenCalledWith('codex-process', 'starting app-server', {
+      command: 'codex',
+      args: ['app-server', '--listen', 'stdio://'],
+    });
   });
 
   it('sets CODEX_HOME only when Codex Claw requests an override', async () => {
