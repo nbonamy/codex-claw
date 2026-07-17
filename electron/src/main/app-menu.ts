@@ -1,7 +1,7 @@
 import { Menu, type BrowserWindow, type MenuItemConstructorOptions } from 'electron';
 import type { AppCommand } from '@codex-claw/shared/contracts';
-import { ipcChannels } from '@codex-claw/shared/ipc';
 import { cycleTeamsAccelerator } from './app-shortcuts';
+import { sendAppCommand } from './ipc-events';
 
 export type AppMenuOptions = {
   debugMode: boolean;
@@ -16,7 +16,7 @@ export type AppMenuCallbacks = {
 export function installAppMenu(window: BrowserWindow, options: AppMenuOptions): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(buildAppMenuTemplate({
     reload: () => window.webContents.reload(),
-    sendAppCommand: (command) => window.webContents.send(ipcChannels.appCommand, command),
+    sendAppCommand: (command) => sendAppCommand(window.webContents, command),
     toggleDeveloperTools: () => window.webContents.toggleDevTools(),
   }, options)));
 }

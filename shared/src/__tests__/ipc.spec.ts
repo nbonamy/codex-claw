@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { ipcChannels } from '../ipc';
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import type { AppCommand, AppSnapshot, MainToRendererEvent, SendPromptOptions } from '../contracts';
+import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '../ipc';
 
 describe('ipc channels', () => {
   it('keeps renderer bridge channels explicit', () => {
@@ -83,5 +84,16 @@ describe('ipc channels', () => {
       event: 'app:event',
       appCommand: 'app:command',
     });
+  });
+
+  it('derives request and event payloads from the preload API contract', () => {
+    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.sendPrompt]['args']>()
+      .toEqualTypeOf<[agentId: string, prompt: string, options?: SendPromptOptions]>();
+    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.sendPrompt]['result']>()
+      .toEqualTypeOf<AppSnapshot>();
+    expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.event]>()
+      .toEqualTypeOf<MainToRendererEvent>();
+    expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.appCommand]>()
+      .toEqualTypeOf<AppCommand>();
   });
 });

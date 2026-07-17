@@ -1,3 +1,5 @@
+import type { AppCommand, CodexClawApi, MainToRendererEvent } from './contracts';
+
 export const ipcChannels = {
   getSnapshot: 'app:get-snapshot',
   listSshHosts: 'connections:ssh-hosts:list',
@@ -80,3 +82,20 @@ export const ipcChannels = {
 } as const;
 
 export type IpcChannel = typeof ipcChannels[keyof typeof ipcChannels];
+
+type CodexClawIpcRequestApi = Omit<CodexClawApi, 'onAppCommand' | 'onEvent'>;
+
+type IpcRequestFor<Method> = Method extends (...args: infer Arguments) => infer Result
+  ? { args: Arguments; result: Awaited<Result> }
+  : never;
+
+export type CodexClawIpcRequests = {
+  [Name in keyof CodexClawIpcRequestApi as Name extends keyof typeof ipcChannels
+    ? (typeof ipcChannels)[Name]
+    : never]: IpcRequestFor<CodexClawIpcRequestApi[Name]>;
+};
+
+export type CodexClawIpcEvents = {
+  [ipcChannels.event]: MainToRendererEvent;
+  [ipcChannels.appCommand]: AppCommand;
+};

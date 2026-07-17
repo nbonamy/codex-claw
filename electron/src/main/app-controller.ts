@@ -1,5 +1,6 @@
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { TypedIpcMain } from 'codex-app-sdk/electron';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
 import { logMain, warnMain } from './log';
 import { createMainWindow } from './main-window';
@@ -9,7 +10,8 @@ import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards';
 import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
-import { ipcChannels } from '@codex-claw/shared/ipc';
+import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
+import { sendRendererEvent } from './ipc-events';
 
 type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
 type StartupMaintenance = () => Promise<void>;
@@ -41,299 +43,300 @@ export class AppController {
   }
 
   registerIpcHandlers(): void {
-    ipcMain.handle(ipcChannels.getSnapshot, () => this.getSnapshot());
+    const ipc = new TypedIpcMain<CodexClawIpcRequests>(ipcMain);
+    ipc.handle(ipcChannels.getSnapshot, () => this.getSnapshot());
 
-    ipcMain.handle(ipcChannels.listSshHosts, () => {
+    ipc.handle(ipcChannels.listSshHosts, () => {
       return this.listSshHosts();
     });
 
-    ipcMain.handle(ipcChannels.addSshConnection, async (_event, input: AddSshConnectionInput) => {
+    ipc.handle(ipcChannels.addSshConnection, async (_event, input: AddSshConnectionInput) => {
       return this.addSshConnection(input);
     });
 
-    ipcMain.handle(ipcChannels.checkRemoteConnection, async (_event, connectionId: string) => {
+    ipc.handle(ipcChannels.checkRemoteConnection, async (_event, connectionId: string) => {
       return this.checkRemoteConnection(connectionId);
     });
 
-    ipcMain.handle(ipcChannels.updateRemoteConnection, async (_event, connectionId: string, input: UpdateRemoteConnectionInput) => {
+    ipc.handle(ipcChannels.updateRemoteConnection, async (_event, connectionId: string, input: UpdateRemoteConnectionInput) => {
       return this.updateRemoteConnection(connectionId, input);
     });
 
-    ipcMain.handle(ipcChannels.removeRemoteConnection, async (_event, connectionId: string) => {
+    ipc.handle(ipcChannels.removeRemoteConnection, async (_event, connectionId: string) => {
       return this.removeRemoteConnection(connectionId);
     });
 
-    ipcMain.handle(ipcChannels.connectWorkProvider, async (_event, provider: WorkProviderKind) => {
+    ipc.handle(ipcChannels.connectWorkProvider, async (_event, provider: WorkProviderKind) => {
       return this.connectWorkProvider(provider);
     });
 
-    ipcMain.handle(ipcChannels.openWorkProviderAuthorization, async (_event, provider: WorkProviderKind) => {
+    ipc.handle(ipcChannels.openWorkProviderAuthorization, async (_event, provider: WorkProviderKind) => {
       return this.openWorkProviderAuthorization(provider);
     });
 
-    ipcMain.handle(ipcChannels.completeWorkProviderConnection, async (_event, provider: WorkProviderKind) => {
+    ipc.handle(ipcChannels.completeWorkProviderConnection, async (_event, provider: WorkProviderKind) => {
       return this.completeWorkProviderConnection(provider);
     });
 
-    ipcMain.handle(ipcChannels.disconnectWorkProvider, async (_event, provider: WorkProviderKind) => {
+    ipc.handle(ipcChannels.disconnectWorkProvider, async (_event, provider: WorkProviderKind) => {
       return this.disconnectWorkProvider(provider);
     });
 
-    ipcMain.handle(ipcChannels.listWorkRepositories, async (_event, provider: WorkProviderKind, location?: LoopLocation) => {
+    ipc.handle(ipcChannels.listWorkRepositories, async (_event, provider: WorkProviderKind, location?: LoopLocation) => {
       return this.listWorkRepositories(provider, location);
     });
 
-    ipcMain.handle(ipcChannels.configureWorkBacklog, async (_event, input: WorkBacklogConfigurationInput, location?: LoopLocation) => {
+    ipc.handle(ipcChannels.configureWorkBacklog, async (_event, input: WorkBacklogConfigurationInput, location?: LoopLocation) => {
       return this.configureWorkBacklog(input, location);
     });
 
-    ipcMain.handle(ipcChannels.listWorkItems, async (_event, provider: WorkProviderKind, repositoryId: string, location?: LoopLocation) => {
+    ipc.handle(ipcChannels.listWorkItems, async (_event, provider: WorkProviderKind, repositoryId: string, location?: LoopLocation) => {
       return this.listWorkItems(provider, repositoryId, location);
     });
 
-    ipcMain.handle(ipcChannels.listBackendModels, async (_event, agentId: string) => {
+    ipc.handle(ipcChannels.listBackendModels, async (_event, agentId: string) => {
       return this.listBackendModels(agentId);
     });
 
-    ipcMain.handle(ipcChannels.listBackendSkills, async (_event, agentId: string) => {
+    ipc.handle(ipcChannels.listBackendSkills, async (_event, agentId: string) => {
       return this.listBackendSkills(agentId);
     });
 
-    ipcMain.handle(ipcChannels.listAgentFiles, async (_event, agentId: string) => {
+    ipc.handle(ipcChannels.listAgentFiles, async (_event, agentId: string) => {
       return this.listAgentFiles(agentId);
     });
 
-    ipcMain.handle(ipcChannels.previewAgentFile, async (_event, agentId: string, filePath: string) => {
+    ipc.handle(ipcChannels.previewAgentFile, async (_event, agentId: string, filePath: string) => {
       return this.previewAgentFile(agentId, filePath);
     });
 
-    ipcMain.handle(ipcChannels.openAgentGitDiff, async (_event, agentId: string) => {
+    ipc.handle(ipcChannels.openAgentGitDiff, async (_event, agentId: string) => {
       return this.openAgentGitDiff(agentId);
     });
 
-    ipcMain.handle(ipcChannels.chooseAgentFolder, async () => {
+    ipc.handle(ipcChannels.chooseAgentFolder, async () => {
       return this.chooseAgentFolder();
     });
 
-    ipcMain.handle(ipcChannels.chooseCodexBinary, async () => {
+    ipc.handle(ipcChannels.chooseCodexBinary, async () => {
       return this.chooseCodexBinary();
     });
 
-    ipcMain.handle(ipcChannels.chooseSourceFolder, async () => {
+    ipc.handle(ipcChannels.chooseSourceFolder, async () => {
       return this.chooseSourceFolder();
     });
 
-    ipcMain.handle(ipcChannels.listSourceFolders, async (_event, input?: SourceFolderListInput) => {
+    ipc.handle(ipcChannels.listSourceFolders, async (_event, input?: SourceFolderListInput) => {
       return this.listSourceFolders(input);
     });
 
-    ipcMain.handle(ipcChannels.listSourceRepositories, async (_event, remoteConnectionId?: string) => {
+    ipc.handle(ipcChannels.listSourceRepositories, async (_event, remoteConnectionId?: string) => {
       return this.listSourceRepositories(remoteConnectionId);
     });
 
-    ipcMain.handle(ipcChannels.listSourceWorktrees, async (_event, repoPath: string, remoteConnectionId?: string) => {
+    ipc.handle(ipcChannels.listSourceWorktrees, async (_event, repoPath: string, remoteConnectionId?: string) => {
       return this.listSourceWorktrees(repoPath, remoteConnectionId);
     });
 
-    ipcMain.handle(ipcChannels.suggestSourceWorktreePath, async (_event, input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>) => {
+    ipc.handle(ipcChannels.suggestSourceWorktreePath, async (_event, input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>) => {
       return this.suggestSourceWorktreePath(input);
     });
 
-    ipcMain.handle(ipcChannels.chooseSourceWorktreeDestination, async (_event, defaultPath: string) => {
+    ipc.handle(ipcChannels.chooseSourceWorktreeDestination, async (_event, defaultPath: string) => {
       return this.chooseSourceWorktreeDestination(defaultPath);
     });
 
-    ipcMain.handle(ipcChannels.createSourceWorktree, async (_event, input: CreateSourceWorktreeInput) => {
+    ipc.handle(ipcChannels.createSourceWorktree, async (_event, input: CreateSourceWorktreeInput) => {
       return this.createSourceWorktree(input);
     });
 
-    ipcMain.handle(ipcChannels.createTeam, async (_event, input: CreateTeamInput) => {
+    ipc.handle(ipcChannels.createTeam, async (_event, input: CreateTeamInput) => {
       return this.createTeam(input);
     });
 
-    ipcMain.handle(ipcChannels.updateTeam, async (_event, input: UpdateTeamInput) => {
+    ipc.handle(ipcChannels.updateTeam, async (_event, input: UpdateTeamInput) => {
       return this.updateTeam(input);
     });
 
-    ipcMain.handle(ipcChannels.reorderTeams, async (_event, input: ReorderTeamsInput) => {
+    ipc.handle(ipcChannels.reorderTeams, async (_event, input: ReorderTeamsInput) => {
       return this.reorderTeams(input);
     });
 
-    ipcMain.handle(ipcChannels.closeTeam, async (_event, teamId: string) => {
+    ipc.handle(ipcChannels.closeTeam, async (_event, teamId: string) => {
       return this.closeTeam(teamId);
     });
 
-    ipcMain.handle(ipcChannels.disconnectTeam, async (_event, teamId: string) => {
+    ipc.handle(ipcChannels.disconnectTeam, async (_event, teamId: string) => {
       return this.disconnectTeam(teamId);
     });
 
-    ipcMain.handle(ipcChannels.selectTeam, async (_event, teamId: string) => {
+    ipc.handle(ipcChannels.selectTeam, async (_event, teamId: string) => {
       return this.selectTeam(teamId);
     });
 
-    ipcMain.handle(ipcChannels.getBenchSnapshot, async (_event, location?: BenchLocation) => {
+    ipc.handle(ipcChannels.getBenchSnapshot, async (_event, location?: BenchLocation) => {
       return this.getBenchSnapshot(location);
     });
 
-    ipcMain.handle(ipcChannels.getLoopSnapshot, async (_event, location?: LoopLocation) => {
+    ipc.handle(ipcChannels.getLoopSnapshot, async (_event, location?: LoopLocation) => {
       return this.getLoopSnapshot(location);
     });
 
-    ipcMain.handle(ipcChannels.createLoop, async (_event, input: CreateLoopInput, location?: LoopLocation) => {
+    ipc.handle(ipcChannels.createLoop, async (_event, input: CreateLoopInput, location?: LoopLocation) => {
       return this.createLoop(input, location);
     });
 
-    ipcMain.handle(ipcChannels.updateLoop, async (_event, input: UpdateLoopInput, location?: LoopLocation) => {
+    ipc.handle(ipcChannels.updateLoop, async (_event, input: UpdateLoopInput, location?: LoopLocation) => {
       return this.updateLoop(input, location);
     });
 
-    ipcMain.handle(ipcChannels.runLoop, async (_event, loopId: string, location?: LoopLocation) => {
+    ipc.handle(ipcChannels.runLoop, async (_event, loopId: string, location?: LoopLocation) => {
       return this.runLoop(loopId, location);
     });
 
-    ipcMain.handle(ipcChannels.clearLoopHistory, async (_event, loopId: string, location?: LoopLocation) => {
+    ipc.handle(ipcChannels.clearLoopHistory, async (_event, loopId: string, location?: LoopLocation) => {
       return this.clearLoopHistory(loopId, location);
     });
 
-    ipcMain.handle(ipcChannels.deleteLoopExecution, async (_event, loopId: string, executionId: string, location?: LoopLocation) => {
+    ipc.handle(ipcChannels.deleteLoopExecution, async (_event, loopId: string, executionId: string, location?: LoopLocation) => {
       return this.deleteLoopExecution(loopId, executionId, location);
     });
 
-    ipcMain.handle(ipcChannels.deleteLoop, async (_event, loopId: string, location?: LoopLocation) => {
+    ipc.handle(ipcChannels.deleteLoop, async (_event, loopId: string, location?: LoopLocation) => {
       return this.deleteLoop(loopId, location);
     });
 
-    ipcMain.handle(ipcChannels.listAgentConversations, async (_event, agentId: string) => {
+    ipc.handle(ipcChannels.listAgentConversations, async (_event, agentId: string) => {
       return this.listAgentConversations(agentId);
     });
 
-    ipcMain.handle(ipcChannels.resumeAgentConversation, async (_event, agentId: string, ref: unknown) => {
+    ipc.handle(ipcChannels.resumeAgentConversation, async (_event, agentId: string, ref: unknown) => {
       return this.resumeAgentConversation(agentId, ref);
     });
 
-    ipcMain.handle(ipcChannels.readConversationMessages, async (_event, ref: unknown, agentId: string, location?: LoopLocation) => {
+    ipc.handle(ipcChannels.readConversationMessages, async (_event, ref: unknown, agentId: string, location?: LoopLocation) => {
       return this.readConversationMessages(ref, agentId, location);
     });
 
-    ipcMain.handle(ipcChannels.createAgent, async (_event, input: CreateAgentInput) => {
+    ipc.handle(ipcChannels.createAgent, async (_event, input: CreateAgentInput) => {
       return this.createAgent(input);
     });
 
-    ipcMain.handle(ipcChannels.updateAgent, async (_event, input: UpdateAgentInput) => {
+    ipc.handle(ipcChannels.updateAgent, async (_event, input: UpdateAgentInput) => {
       return this.updateAgent(input);
     });
 
-    ipcMain.handle(ipcChannels.assignWorkItemToAgent, async (_event, agentId: string, item: unknown) => {
+    ipc.handle(ipcChannels.assignWorkItemToAgent, async (_event, agentId: string, item: unknown) => {
       return this.assignWorkItemToAgent(agentId, item);
     });
 
-    ipcMain.handle(ipcChannels.removeWorkItemAssignment, async (_event, item: unknown) => {
+    ipc.handle(ipcChannels.removeWorkItemAssignment, async (_event, item: unknown) => {
       return this.removeWorkItemAssignment(item);
     });
 
-    ipcMain.handle(ipcChannels.duplicateAgent, async (_event, agentId: string) => {
+    ipc.handle(ipcChannels.duplicateAgent, async (_event, agentId: string) => {
       return this.duplicateAgent(agentId);
     });
 
-    ipcMain.handle(ipcChannels.moveAgentToTeam, async (_event, input: MoveAgentToTeamInput) => {
+    ipc.handle(ipcChannels.moveAgentToTeam, async (_event, input: MoveAgentToTeamInput) => {
       return this.moveAgentToTeam(input);
     });
 
-    ipcMain.handle(ipcChannels.reorderAgents, async (_event, input: ReorderAgentsInput) => {
+    ipc.handle(ipcChannels.reorderAgents, async (_event, input: ReorderAgentsInput) => {
       return this.reorderAgents(input);
     });
 
-    ipcMain.handle(ipcChannels.saveAgentToBench, async (_event, agentId: string) => {
+    ipc.handle(ipcChannels.saveAgentToBench, async (_event, agentId: string) => {
       return this.saveAgentToBench(agentId);
     });
 
-    ipcMain.handle(ipcChannels.deployBenchTemplate, async (_event, templateId: string, teamId?: string, location?: BenchLocation) => {
+    ipc.handle(ipcChannels.deployBenchTemplate, async (_event, templateId: string, teamId?: string, location?: BenchLocation) => {
       return this.deployBenchTemplate(templateId, teamId, location);
     });
 
-    ipcMain.handle(ipcChannels.removeBenchTemplate, async (_event, templateId: string, location?: BenchLocation) => {
+    ipc.handle(ipcChannels.removeBenchTemplate, async (_event, templateId: string, location?: BenchLocation) => {
       return this.removeBenchTemplate(templateId, location);
     });
 
-    ipcMain.handle(ipcChannels.restartAgent, async (_event, agentId: string) => {
+    ipc.handle(ipcChannels.restartAgent, async (_event, agentId: string) => {
       return this.restartAgent(agentId);
     });
 
-    ipcMain.handle(ipcChannels.hydrateAgentHistory, async (_event, agentId: string) => {
+    ipc.handle(ipcChannels.hydrateAgentHistory, async (_event, agentId: string) => {
       return this.hydrateAgentHistory(agentId);
     });
 
-    ipcMain.handle(ipcChannels.closeAgent, async (_event, agentId: string) => {
+    ipc.handle(ipcChannels.closeAgent, async (_event, agentId: string) => {
       return this.closeAgent(agentId);
     });
 
-    ipcMain.handle(ipcChannels.selectAgent, async (_event, agentId: string) => {
+    ipc.handle(ipcChannels.selectAgent, async (_event, agentId: string) => {
       return this.selectAgent(agentId);
     });
 
-    ipcMain.handle(ipcChannels.updateSettings, async (_event, input: UpdateSettingsInput) => {
+    ipc.handle(ipcChannels.updateSettings, async (_event, input: UpdateSettingsInput) => {
       return this.updateSettings(input);
     });
 
-    ipcMain.handle(ipcChannels.getDaemonStatus, () => this.getDaemonStatus());
+    ipc.handle(ipcChannels.getDaemonStatus, () => this.getDaemonStatus());
 
-    ipcMain.handle(ipcChannels.setDaemonEnabled, async (_event, enabled: boolean) => {
+    ipc.handle(ipcChannels.setDaemonEnabled, async (_event, enabled: boolean) => {
       return this.setDaemonEnabled(enabled);
     });
 
-    ipcMain.handle(ipcChannels.getSystemPermissions, () => this.getSystemPermissions());
+    ipc.handle(ipcChannels.getSystemPermissions, () => this.getSystemPermissions());
 
-    ipcMain.handle(ipcChannels.openAccessibilitySettings, () => this.openAccessibilitySettings());
+    ipc.handle(ipcChannels.openAccessibilitySettings, () => this.openAccessibilitySettings());
 
-    ipcMain.handle(ipcChannels.transcribeAppleSpeech, async (_event, audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions) => {
+    ipc.handle(ipcChannels.transcribeAppleSpeech, async (_event, audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions) => {
       return this.transcribeAppleSpeech(audioData, options);
     });
 
-    ipcMain.handle(ipcChannels.quit, () => {
+    ipc.handle(ipcChannels.quit, () => {
       this.appLifecycle.quit();
     });
 
-    ipcMain.handle(ipcChannels.restartApp, () => {
+    ipc.handle(ipcChannels.restartApp, () => {
       this.restartApp();
     });
 
-    ipcMain.handle(ipcChannels.setAgentGoal, (_event, agentId: string, objective: string) => {
+    ipc.handle(ipcChannels.setAgentGoal, (_event, agentId: string, objective: string) => {
       return this.setAgentGoal(agentId, objective);
     });
 
-    ipcMain.handle(ipcChannels.clearAgentGoal, (_event, agentId: string) => {
+    ipc.handle(ipcChannels.clearAgentGoal, (_event, agentId: string) => {
       return this.clearAgentGoal(agentId);
     });
 
-    ipcMain.handle(ipcChannels.setAgentApprovalPreset, (_event, agentId: string, preset: ApprovalPreset) => {
+    ipc.handle(ipcChannels.setAgentApprovalPreset, (_event, agentId: string, preset: ApprovalPreset) => {
       return this.setAgentApprovalPreset(agentId, preset);
     });
 
-    ipcMain.handle(ipcChannels.sendPrompt, (_event, agentId: string, prompt: string, options?: SendPromptOptions) => {
+    ipc.handle(ipcChannels.sendPrompt, (_event, agentId: string, prompt: string, options?: SendPromptOptions) => {
       return this.sendPrompt(agentId, prompt, options);
     });
 
-    ipcMain.handle(ipcChannels.steerPrompt, (_event, agentId: string, prompt: string) => {
+    ipc.handle(ipcChannels.steerPrompt, (_event, agentId: string, prompt: string) => {
       return this.steerPrompt(agentId, prompt);
     });
 
-    ipcMain.handle(ipcChannels.interruptAgent, (_event, agentId: string) => {
+    ipc.handle(ipcChannels.interruptAgent, (_event, agentId: string) => {
       return this.interruptAgent(agentId);
     });
 
-    ipcMain.handle(ipcChannels.deleteMessage, (_event, agentId: string, messageId: string) => {
+    ipc.handle(ipcChannels.deleteMessage, (_event, agentId: string, messageId: string) => {
       return this.deleteMessage(agentId, messageId);
     });
 
-    ipcMain.handle(ipcChannels.editMessage, (_event, agentId: string, messageId: string, prompt: string) => {
+    ipc.handle(ipcChannels.editMessage, (_event, agentId: string, messageId: string, prompt: string) => {
       return this.editMessage(agentId, messageId, prompt);
     });
 
-    ipcMain.handle(ipcChannels.retryMessage, (_event, agentId: string, messageId: string) => {
+    ipc.handle(ipcChannels.retryMessage, (_event, agentId: string, messageId: string) => {
       return this.retryMessage(agentId, messageId);
     });
 
-    ipcMain.handle(ipcChannels.respondToClientRequest, async (_event, response: ClientRequestResponse) => {
+    ipc.handle(ipcChannels.respondToClientRequest, async (_event, response: ClientRequestResponse) => {
       return this.respondToClientRequest(response);
     });
   }
@@ -840,7 +843,9 @@ export class AppController {
 
     this.seq = Math.max(this.seq, rendererEvent.seq);
     this.syncPowerSaveBlocker();
-    this.mainWindow?.webContents.send(ipcChannels.event, rendererEvent);
+    if (this.mainWindow) {
+      sendRendererEvent(this.mainWindow.webContents, rendererEvent);
+    }
   }
 
   private syncPowerSaveBlocker(): void {

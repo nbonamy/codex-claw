@@ -8,7 +8,7 @@ import {
 } from './app-shortcuts';
 import { installAppMenu } from './app-menu';
 import { warnMain } from './log';
-import { ipcChannels } from '@codex-claw/shared/ipc';
+import { sendAppCommand } from './ipc-events';
 
 export function createMainWindow(): BrowserWindow {
   const releaseMode = isReleaseMode();
@@ -28,7 +28,7 @@ export function createMainWindow(): BrowserWindow {
     }
 
     event.preventDefault();
-    window.webContents.send(ipcChannels.appCommand, command);
+    sendAppCommand(window.webContents, command);
   });
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -83,7 +83,7 @@ function isReleaseMode(): boolean {
 function installFocusedAppShortcuts(window: BrowserWindow): void {
   const sendCycleTeamsCommand = (): void => {
     if (window.isFocused()) {
-      window.webContents.send(ipcChannels.appCommand, { type: 'cycle-teams' });
+      sendAppCommand(window.webContents, { type: 'cycle-teams' });
     }
   };
 
