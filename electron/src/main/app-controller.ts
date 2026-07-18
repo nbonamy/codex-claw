@@ -1,6 +1,6 @@
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
-import { TypedIpcMain } from 'codex-app-sdk/electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
+import { registerCodexNativeIpc, TypedIpcMain } from 'codex-app-sdk/electron';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
 import { logMain, warnMain } from './log';
 import { createMainWindow } from './main-window';
@@ -9,7 +9,7 @@ import { getClawdDaemonStatus, setClawdDaemonEnabled } from './daemon-launch-age
 import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, ApprovalPreset, AppSnapshot, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
 import { sendRendererEvent } from './ipc-events';
 
@@ -21,6 +21,7 @@ export class AppController {
   private snapshot: AppSnapshot | null = null;
   private clientState: ClientState = createEmptyClientState();
   private backendClientEventUnsubscribe: (() => void) | null = null;
+  private nativeIpcUnregister: (() => void) | null = null;
   private seq = 0;
 
   private readonly powerSaveBlocker = new AgentActivityPowerSaveBlocker();
@@ -43,6 +44,8 @@ export class AppController {
   }
 
   registerIpcHandlers(): void {
+    this.nativeIpcUnregister?.();
+    this.nativeIpcUnregister = registerCodexNativeIpc({ clipboard, dialog, ipcMain, shell });
     const ipc = new TypedIpcMain<CodexClawIpcRequests>(ipcMain);
     ipc.handle(ipcChannels.getSnapshot, () => this.getSnapshot());
 
@@ -288,10 +291,6 @@ export class AppController {
 
     ipc.handle(ipcChannels.openAccessibilitySettings, () => this.openAccessibilitySettings());
 
-    ipc.handle(ipcChannels.transcribeAppleSpeech, async (_event, audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions) => {
-      return this.transcribeAppleSpeech(audioData, options);
-    });
-
     ipc.handle(ipcChannels.quit, () => {
       this.appLifecycle.quit();
     });
@@ -347,6 +346,8 @@ export class AppController {
 
   async shutdown(): Promise<void> {
     this.powerSaveBlocker.stop();
+    this.nativeIpcUnregister?.();
+    this.nativeIpcUnregister = null;
     this.backendClientEventUnsubscribe?.();
     this.backendClientEventUnsubscribe = null;
     await this.backendClient?.close();
@@ -785,16 +786,6 @@ export class AppController {
   private async createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {
     return this.requireBackendClient().request<SourceWorktree>(backendMethods.sourceWorktreeCreate, {
       input,
-    });
-  }
-
-  private async transcribeAppleSpeech(
-    audioData: ArrayBuffer,
-    options?: AppleSpeechTranscriptionOptions,
-  ): Promise<AppleSpeechTranscriptionResult> {
-    return this.requireBackendClient().request(backendMethods.transcriptionAppleSpeechCreate, {
-      audioBase64: Buffer.from(audioData).toString('base64'),
-      options,
     });
   }
 

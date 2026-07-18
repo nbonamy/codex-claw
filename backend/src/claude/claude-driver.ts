@@ -14,7 +14,7 @@ import type {
   SendPromptOptions,
 } from '@codex-claw/shared/contracts';
 import { claudeBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
-import type { AgentBackendDriver, BackendConversationResumeResult, BackendEvent, BackendSendResult } from '@codex-claw/shared/backend-driver';
+import { unsupportedBackendFeature, type AgentBackendDriver, type BackendConversationResumeResult, type BackendEvent, type BackendSendResult } from '@codex-claw/shared/backend-driver';
 import { agentScopedMcpUrl } from '../mcp/codex-config';
 import { codexClawDeveloperInstructions } from '../mcp/agent-prompts';
 import { ClaudeCliTransport, type ClaudeTurnHandle, type ClaudeTurnParams, type ClaudeTurnTransport } from './cli-transport';
@@ -99,6 +99,9 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
   async sendPrompt(agent: Agent, prompt: string, options: SendPromptOptions = {}): Promise<BackendSendResult> {
     if (this.activeTurnsByAgentId.has(agent.id)) {
       throw new Error('Claude already has an active turn for this agent.');
+    }
+    if ((options.attachments?.length ?? 0) > 0) {
+      throw unsupportedBackendFeature(agent, 'prompt attachments');
     }
 
     const turnId = this.nextTurnId();

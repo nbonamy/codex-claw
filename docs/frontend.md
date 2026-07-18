@@ -45,9 +45,9 @@ keeps streaming/product state from leaking into every part of the tree.
 
 Rules:
 
-- Split shell, navigation, agent rows, headers, composer, message parts, tool
-  calls, approval prompts, diff blocks, and artifact panes into focused
-  components.
+- Split shell, navigation, agent rows, headers, diff blocks, and artifact panes
+  into focused product components. Use the SDK conversation pane for composer,
+  message, tool, and approval UI.
 - Keep components named after product concepts, not implementation mechanics.
 - Pass typed props and emit typed events. Avoid reaching into parent stores
   from deep children unless the component is intentionally store-owned.
@@ -61,10 +61,15 @@ Rules:
   or clearly belongs to a shared rendering primitive.
 - Co-locate component tests with the component and test it in isolation when
   the behavior is local.
-- Use `codex-app-sdk/vue` for product-neutral composer, menu, send-button, and
-  sticky message-list behavior. Keep Codex Claw policy in small wrappers.
+- Use `CodexConversationPane` from `codex-app-sdk/vue` for the complete
+  product-neutral conversation surface, including composer, messages, tools,
+  approvals, copy, attachments, paste/drop, and voice transcription. Keep the
+  Claw wrapper limited to provider/agent state mapping and product side-panel
+  routing.
 - Extend composer actions with typed menu entries and slots; do not fork the
   menu component when an app builder needs another action.
+- Do not copy SDK leaf components, CSS, audio helpers, clipboard logic, or
+  attachment plumbing into the renderer.
 
 ## App Shell
 
@@ -107,8 +112,8 @@ Token categories should include:
 - borders and dividers;
 - accent, danger, success, warning, and working/status colors;
 - composer and input surfaces;
-- composer voice dictation, where the renderer records browser audio and sends
-  audio bytes through preload for main-process transcription;
+- SDK conversation surfaces, bridged through the documented `--codex-*`
+  semantic theme tokens and `data-codex-theme` appearance attribute;
 - tool call, approval, plan, and reasoning surfaces;
 - diff added, removed, changed, and gutter colors;
 - code and syntax colors.
@@ -117,6 +122,8 @@ Theme rules:
 
 - Components consume semantic tokens only.
 - Theme switching should update CSS variables at the document root.
+- Theme application should bridge the active Claw palette into the SDK's
+  optional `--codex-*` token contract rather than restyling SDK internals.
 - Element Plus theme overrides should be derived from the same app tokens.
 - Syntax highlighting and diff rendering should be fed by the same theme
   source whenever practical. Source previews use Shiki; git diff previews use

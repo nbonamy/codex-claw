@@ -9,7 +9,7 @@
   >
     <div
       v-if="state === 'loading'"
-      class="source-preview-panel__empty text-shimmer"
+      class="source-preview-panel__empty codex-text-shimmer"
     >
       Loading source...
     </div>
@@ -21,7 +21,7 @@
     </div>
     <div
       v-else-if="content.trim()"
-      class="source-preview-panel__content"
+      class="source-preview-panel__content codex-markdown"
       v-html="renderCodeBlock(content, language ?? undefined)"
     />
     <div
@@ -34,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-import { renderCodeBlock } from '../shared/chat/syntax-highlighting';
+import { renderCodeBlock } from 'codex-app-sdk/vue';
 
 withDefaults(defineProps<{
   content: string;

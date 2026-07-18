@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AppSnapshot, BackendConversationRef, CodexClawApi, ConversationSummary, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/shared/contracts';
 import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
 import { workItemAssignmentPrompt } from '@codex-claw/shared/work-item-prompts';
 import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';
@@ -78,6 +78,156 @@ describe('useAppState', () => {
     });
 
     expect(state.answeredClientRequestIds.value.has('request-local')).toBe(true);
+  });
+
+  it('stores detailed approvals by agent and maps every resolution through the existing client-response bridge', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    const respondToClientRequest = vi.fn().mockResolvedValue(remoteSnapshot);
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        respondToClientRequest,
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const approval: BackendApprovalRequest = {
+      id: 'approval-native-1',
+      kind: 'permissions',
+      conversationId: 'thread-1',
+      turnId: 'turn-1',
+      itemId: 'item-1',
+      title: 'Allow workspace and network access',
+      description: 'The tool needs both permissions.',
+      cwd: '/tmp/project',
+      requestedPermissions: [
+        { kind: 'filesystem', access: 'write', path: '/tmp/project' },
+        { kind: 'network', enabled: true, host: 'example.com', protocol: 'https' },
+      ],
+      allowedScopes: ['once', 'session'],
+      canDeny: true,
+    };
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'backendApproval.requested',
+      payload: { approval },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    listeners[0]?.({
+      seq: 2,
+      agentId: 'agent-jesse',
+      backend: 'codex',
+      threadId: 'thread-other',
+      type: 'backendApproval.requested',
+      payload: { approval: { ...approval, id: 'approval-other', conversationId: 'thread-other' } },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(state.activeBackendApprovals.value).toStrictEqual([approval]);
+    await state.resolveBackendApproval('approval-native-1', 'approve', 'session');
+
+    expect(respondToClientRequest).toHaveBeenCalledWith({
+      id: 'approval-native-1',
+      payload: { decision: 'allow_conversation' },
+    });
+    expect(state.activeBackendApprovals.value).toStrictEqual([]);
+    expect(state.answeredClientRequestIds.value.has('approval-native-1')).toBe(true);
+
+    listeners[0]?.({
+      seq: 3,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'backendApproval.requested',
+      payload: { approval: { ...approval, id: 'approval-once' } },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+    await state.resolveBackendApproval('approval-once', 'approve', 'once');
+
+    expect(respondToClientRequest).toHaveBeenNthCalledWith(2, {
+      id: 'approval-once',
+      payload: { decision: 'allow' },
+    });
+
+    listeners[0]?.({
+      seq: 4,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'backendApproval.requested',
+      payload: { approval: { ...approval, id: 'approval-deny' } },
+      occurredAt: '2026-06-05T00:00:04.000Z',
+    });
+    await state.resolveBackendApproval('approval-deny', 'deny', 'once');
+
+    expect(respondToClientRequest).toHaveBeenNthCalledWith(3, {
+      id: 'approval-deny',
+      payload: { decision: 'deny' },
+    });
+    expect(state.activeBackendApprovals.value).toStrictEqual([]);
+    expect(state.answeredClientRequestIds.value.has('approval-once')).toBe(true);
+    expect(state.answeredClientRequestIds.value.has('approval-deny')).toBe(true);
+  });
+
+  it('removes externally resolved detailed approvals and marks generic requests answered', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const approval: BackendApprovalRequest = {
+      id: 'approval-server',
+      kind: 'command',
+      conversationId: 'thread-1',
+      itemId: 'command-1',
+      title: 'Run tests',
+      command: 'npm test',
+    };
+    const state = useAppState();
+    await state.loadSnapshot();
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'backendApproval.requested',
+      payload: { approval },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    listeners[0]?.({
+      seq: 2,
+      agentId: 'agent-dina',
+      type: 'backendApproval.resolved',
+      payload: { approval, decision: null, scope: null, reason: 'server' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+    listeners[0]?.({
+      seq: 3,
+      agentId: 'agent-dina',
+      type: 'clientRequest.resolved',
+      payload: { id: 'question-1' },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+
+    expect(state.activeBackendApprovals.value).toStrictEqual([]);
+    expect(state.answeredClientRequestIds.value.has('approval-server')).toBe(true);
+    expect(state.answeredClientRequestIds.value.has('question-1')).toBe(true);
   });
 
   it('loads snapshots without subscribing when main events are unavailable', async () => {
@@ -1279,6 +1429,69 @@ describe('useAppState', () => {
     });
     expect(state.activeQueuedPrompts.value).toStrictEqual([]);
     expect(state.visibleMessages.value.at(-1)?.id).toBe('message-drained');
+  });
+
+  it('preserves attachment descriptors in a busy conversation queue until normal drain', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0].status = { type: 'working' };
+    const sendPrompt = vi.fn().mockResolvedValue(createInitialSnapshot());
+    const steerPrompt = vi.fn().mockResolvedValue(remoteSnapshot);
+    const attachments = [
+      {
+        type: 'image' as const,
+        path: '/tmp/screenshot.png',
+        detail: 'original' as const,
+        name: 'screenshot.png',
+        mimeType: 'image/png',
+        previewUrl: 'data:image/png;base64,cG5n',
+      },
+      { type: 'file' as const, path: '/tmp/report.txt', name: 'report.txt', mimeType: 'text/plain' },
+    ];
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        sendPrompt,
+        steerPrompt,
+        onEvent: vi.fn((nextListener) => {
+          listeners.push(nextListener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await state.sendPrompt('review these files', { attachments });
+
+    expect(state.activeQueuedPrompts.value).toStrictEqual([
+      expect.objectContaining({
+        text: 'review these files',
+        options: { attachments },
+      }),
+    ]);
+
+    const queuedPromptId = state.activeQueuedPrompts.value[0]?.id;
+    await state.steerQueuedPrompt(queuedPromptId as string);
+    expect(steerPrompt).not.toHaveBeenCalled();
+    expect(state.activeQueuedPrompts.value).toHaveLength(1);
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'turn.completed',
+      payload: { status: 'completed' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+      snapshot: createInitialSnapshot(),
+    });
+
+    await vi.waitFor(() => {
+      expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'review these files', { attachments });
+    });
+    expect(state.activeQueuedPrompts.value).toStrictEqual([]);
   });
 
   it('steers busy drafts and queued prompts through preload', async () => {

@@ -68,13 +68,13 @@
           type="button"
           @click="emit('open-git-diff')"
         >
-          <ChatAnimatedDiffStat
+          <CodexAnimatedDiffStat
             v-if="gitStatus?.addedLines"
             kind="added"
             label="Added lines"
             :value="gitStatus?.addedLines ?? 0"
           />
-          <ChatAnimatedDiffStat
+          <CodexAnimatedDiffStat
             v-if="gitStatus?.removedLines"
             kind="deleted"
             label="Removed lines"
@@ -90,7 +90,7 @@
 import { computed } from 'vue';
 import type { Agent, AgentGitStatus, BackendRuntimeStatus } from '@codex-claw/shared/contracts';
 import { PanelLeftOpenIcon } from '../shared/icons/app-icons';
-import ChatAnimatedDiffStat from '../shared/chat/ChatAnimatedDiffStat.vue';
+import { CodexAnimatedDiffStat } from 'codex-app-sdk/vue';
 import AgentAvatar from './AgentAvatar.vue';
 
 const props = defineProps<{

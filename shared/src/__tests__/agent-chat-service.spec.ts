@@ -203,6 +203,57 @@ describe('agent chat service', () => {
     );
   });
 
+  it('preserves provider-neutral attachment descriptors for the backend driver', () => {
+    const snapshot = createInitialSnapshot();
+    const backendDriver = createFakeBackendDriver(Promise.resolve({ backendSession: { kind: 'codex', threadId: 'thread-1' }, turnId: 'turn-1' }));
+    const attachments = [
+      {
+        type: 'image' as const,
+        path: '/tmp/screenshot.png',
+        detail: 'high' as const,
+        name: 'screenshot.png',
+        mimeType: 'image/png',
+        previewUrl: 'data:image/png;base64,cG5n',
+      },
+      { type: 'file' as const, path: '/tmp/report.txt', name: 'report.txt', mimeType: 'text/plain' },
+    ];
+
+    sendAgentPrompt(
+      snapshot,
+      backendDriver,
+      'agent-dina',
+      'review these files',
+      { attachments },
+      vi.fn(),
+    );
+
+    expect(backendDriver.sendPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-dina' }),
+      'review these files',
+      { attachments },
+    );
+    expect(snapshot.messages).toHaveLength(1);
+    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([
+      { type: 'text', text: 'review these files' },
+      {
+        type: 'attachment',
+        attachment: {
+          kind: 'image',
+          name: 'screenshot.png',
+          path: '/tmp/screenshot.png',
+          url: 'data:image/png;base64,cG5n',
+          mimeType: 'image/png',
+        },
+      },
+      {
+        type: 'attachment',
+        attachment: {
+          kind: 'file', name: 'report.txt', path: '/tmp/report.txt', mimeType: 'text/plain',
+        },
+      },
+    ]);
+  });
+
   it('lets the backend driver prepare selected prompt skills', () => {
     const snapshot = createInitialSnapshot();
     const backendDriver = createFakeBackendDriver(Promise.resolve({ backendSession: { kind: 'codex', threadId: 'thread-1' }, turnId: 'turn-1' }));

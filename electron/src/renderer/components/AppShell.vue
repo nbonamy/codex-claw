@@ -172,27 +172,26 @@
             :model-catalog-status="modelCatalogStatus"
             :skill-catalog-status="skillCatalogStatus"
             :goal="goal"
+            :approvals="approvals"
             :turn-git-diff="currentTurnGitDiff"
             :approval-preset="approvalPreset"
             :plan-mode="planMode"
             :selected-model-id="selectedModelId"
             :selected-reasoning-effort="selectedReasoningEffort"
             :queued-prompts="queuedPrompts"
-            @attach="$emit('attach')"
             @client-response="$emit('client-response', $event)"
-            @copy-message="$emit('copy-message', $event)"
             @delete-message="$emit('delete-message', $event)"
             @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
             @edit-message="$emit('edit-message', $event)"
             @interrupt-agent="$emit('interrupt-agent')"
             @open-file="openFilePreview"
-            @quote-message="$emit('quote-message', $event)"
             @retry-message="$emit('retry-message', $event)"
             @select-model="$emit('select-model', $event)"
             @select-reasoning-effort="$emit('select-reasoning-effort', $event)"
             @select-approval-preset="$emit('select-approval-preset', $event)"
+            @resolve-approval="forwardApprovalResolution"
             @clear-goal="$emit('clear-goal')"
-            @send-prompt="$emit('sendPrompt', $event)"
+            @send-prompt="forwardPrompt"
             @steer-prompt="$emit('steerPrompt', $event)"
             @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
             @update:plan-mode="$emit('update:planMode', $event)"
@@ -262,7 +261,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, MoveAgentToTeamInput, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SidePanelMarkdownRequest, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, TurnGitDiff, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, MoveAgentToTeamInput, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelMarkdownRequest, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, TurnGitDiff, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultTeamColor } from '@codex-claw/shared/team-colors';
@@ -281,8 +280,10 @@ import BenchAgentAssignmentDialog from './BenchAgentAssignmentDialog.vue';
 import SettingsView from './SettingsView.vue';
 import type { SettingsTab } from './settings-tabs';
 import { confirmCloseTeam } from './team-close-confirmation';
-import type { QueuedChatPrompt } from '../shared/chat/queued-prompts';
-import { languageForFilePath } from '../shared/chat/syntax-highlighting';
+import {
+  languageForFilePath,
+  type CodexQueuedPromptData as QueuedChatPrompt,
+} from 'codex-app-sdk/vue';
 import type { PlanReviewComment, SidePanelState } from './side-panel';
 
 const props = withDefaults(defineProps<{
@@ -294,6 +295,7 @@ const props = withDefaults(defineProps<{
   isConversationLoading?: boolean;
   isSending: boolean;
   goal?: ThreadGoal | null;
+  approvals?: BackendApprovalRequest[];
   approvalPreset?: ApprovalPreset | null;
   answeredClientRequestIds?: Set<string>;
   backendModels?: BackendModelOption[];
@@ -363,6 +365,7 @@ const props = withDefaults(defineProps<{
   quit?: () => Promise<void>;
 }>(), {
   answeredClientRequestIds: () => new Set<string>(),
+  approvals: () => [],
   agentFiles: () => [],
   backendModels: () => [],
   backendCommands: () => [],
@@ -439,10 +442,8 @@ const emit = defineEmits<{
   'close-team': [teamId: string];
   'disconnect-team': [teamId: string];
   'close-agent': [agentId: string];
-  attach: [];
   'clear-goal': [];
   'client-response': [response: ClientRequestResponse];
-  'copy-message': [index: number];
   'delete-message': [index: number];
   'delete-queued-prompt': [promptId: string];
   'deploy-bench-template': [input: string | DeployBenchTemplateInput];
@@ -450,13 +451,13 @@ const emit = defineEmits<{
   'edit-message': [payload: { content: string; index: number }];
   'interrupt-agent': [];
   'move-agent-to-team': [input: MoveAgentToTeamInput];
-  'quote-message': [index: number];
   'reorder-agents': [input: ReorderAgentsInput];
   'reorder-teams': [input: ReorderTeamsInput];
   'assign-work-item': [payload: { agentId: string; item: WorkItem }];
   'remove-work-item-assignment': [item: WorkItem];
   'restart-agent': [agentId: string];
   'remove-bench-template': [input: string | RemoveBenchTemplateInput];
+  'resolve-approval': [approvalId: string, decision: BackendApprovalDecision, scope: BackendApprovalScope];
   'retry-message': [index: number];
   'save-agent-to-bench': [agentId: string];
   'send-agent-prompt': [payload: { agentId: string; prompt: string }];
@@ -467,7 +468,7 @@ const emit = defineEmits<{
   'select-team': [teamId: string];
   'steer-queued-prompt': [promptId: string];
   'update:planMode': [enabled: boolean];
-  sendPrompt: [prompt: string];
+  sendPrompt: [prompt: string, options?: SendPromptOptions];
   steerPrompt: [prompt: string];
 }>();
 
@@ -901,6 +902,22 @@ function closeSidePanel(): void {
 function confirmPlan(): void {
   emit('update:planMode', false);
   emit('sendPrompt', 'implement the plan');
+}
+
+function forwardApprovalResolution(
+  approvalId: string,
+  decision: BackendApprovalDecision,
+  scope: BackendApprovalScope,
+): void {
+  emit('resolve-approval', approvalId, decision, scope);
+}
+
+function forwardPrompt(prompt: string, options?: SendPromptOptions): void {
+  if (options) {
+    emit('sendPrompt', prompt, options);
+  } else {
+    emit('sendPrompt', prompt);
+  }
 }
 
 function cancelPlanReview(): void {

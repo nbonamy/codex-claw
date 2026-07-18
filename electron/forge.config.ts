@@ -4,6 +4,7 @@ import { MakerZIP } from '@electron-forge/maker-zip';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import path from 'node:path';
 import { signDarwinBinaries } from './build/sign-binaries';
 
 import dotenv from 'dotenv';
@@ -12,6 +13,10 @@ dotenv.config();
 // macOS signing/notarization is release-only. Agents should set
 // CODEX_CLAW_SKIP_SIGNING=1 for local package/build verification.
 const skipMacSigning = Boolean(process.env.TEST) || process.env.CODEX_CLAW_SKIP_SIGNING === '1';
+const appleSpeechHelperPath = path.resolve(
+  __dirname,
+  '../node_modules/codex-app-sdk/assets/apple-speechanalyzer-cli',
+);
 
 // osx special configuration
 let osxPackagerConfig = {}
@@ -52,7 +57,7 @@ const config: ForgeConfig = {
     icon: 'assets/icon',
     appBundleId: 'com.nabocorp.codex-claw',
     executableName: 'codex-claw',
-    extraResource: ['assets/apple-speechanalyzer-cli', 'resources/clawd'],
+    extraResource: [appleSpeechHelperPath, 'resources/clawd'],
     extendInfo: 'build/Info.plist',
     ...osxPackagerConfig,
     afterCopyExtraResources: [

@@ -2047,12 +2047,18 @@ export class ClawBackendServer {
   }
 
   private recordClientRequestOwner(event: MainToRendererEvent, remoteConnectionIdOverride?: string): void {
-    if (event.type !== 'approval.requested' && event.type !== 'toolInput.requested') {
+    if (
+      event.type !== 'approval.requested' &&
+      event.type !== 'backendApproval.requested' &&
+      event.type !== 'toolInput.requested'
+    ) {
       return;
     }
 
-    const request = clientRequest(event.payload);
-    if (!request) {
+    const requestId = event.type === 'backendApproval.requested'
+      ? backendApprovalRequestId(event.payload)
+      : clientRequest(event.payload)?.id ?? null;
+    if (!requestId) {
       return;
     }
 
@@ -2062,7 +2068,7 @@ export class ClawBackendServer {
         ? this.snapshot.agents.find((agent) => agent.id === event.agentId)
         : undefined;
       const remoteConnectionId = remoteConnectionIdOverride ?? (ownerAgent ? this.remoteConnectionIdForAgent(ownerAgent) : null);
-      this.clientRequestOwners.set(request.id, {
+      this.clientRequestOwners.set(requestId, {
         backend,
         ...(remoteConnectionId ? { remoteConnectionId } : {}),
       });
@@ -2539,6 +2545,20 @@ function clientRequest(value: unknown): ClientRequest | null {
   }
 
   return value as ClientRequest;
+}
+
+function backendApprovalRequestId(value: unknown): string | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  const approval = (value as Record<string, unknown>).approval;
+  if (!approval || typeof approval !== 'object' || Array.isArray(approval)) {
+    return null;
+  }
+
+  const id = (approval as Record<string, unknown>).id;
+  return typeof id === 'string' && id.trim().length > 0 ? id : null;
 }
 
 function rendererMessageText(message: RendererMessage): string {

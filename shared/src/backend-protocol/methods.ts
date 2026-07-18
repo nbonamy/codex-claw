@@ -92,7 +92,6 @@ export const backendMethods = {
   teamReorder: 'team/reorder',
   teamSelect: 'team/select',
   teamUpdate: 'team/update',
-  transcriptionAppleSpeechCreate: 'transcription/appleSpeech/create',
   workProviderAuthorizationOpen: 'workProvider/authorization/open',
   workProviderBacklogConfigure: 'workProvider/backlog/configure',
   workProviderConnect: 'workProvider/connect',

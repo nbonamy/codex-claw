@@ -139,12 +139,15 @@ components, stores, router state, and IPC events.
 High-priority renderer coverage:
 
 - Agent list, team rail, Bench menu/surface, and status indicators.
-- Composer behavior, disabled states, interrupt, and steer.
-- Streaming assistant text and tool output.
-- Approval and ask-user prompts.
+- Provider capability mapping and the thin `CodexConversationPane` integration.
+- Active-agent/conversation switching without draft or scroll leakage.
 - Plan updates, reasoning summaries, command output, file changes, and diffs.
-- Theme switching and token application.
+- Theme switching and SDK token bridging.
 - Reload recovery from snapshots and buffered events.
+
+Composer, message rendering, clipboard, attachment, paste/drop, transcription,
+approval, and ask-user behavior belong to the SDK test suite and should not be
+reimplemented or exhaustively retested in Codex Claw.
 
 ## Contract Fixtures
 

@@ -319,6 +319,16 @@ describe('ClaudeBackendDriver', () => {
     });
   });
 
+  it('rejects attachment descriptors when the Claude adapter capability is disabled', async () => {
+    const transport = createFakeTransport();
+    const driver = new ClaudeBackendDriver(transport);
+
+    await expect(driver.sendPrompt(agent, 'review this', {
+      attachments: [{ type: 'file', path: '/tmp/report.txt', name: 'report.txt' }],
+    })).rejects.toThrow('Claude does not support prompt attachments.');
+    expect(transport.startTurn).not.toHaveBeenCalled();
+  });
+
   it('maps Claude plan-mode tool flow into app-owned proposed plan events', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);

@@ -38,15 +38,15 @@
       >
         {{ error }}
       </div>
-      <MessageList
-        v-else-if="chatMessages.length > 0"
+      <CodexMessageList
+        v-else-if="messages.length > 0"
         class="loop-execution-conversation-overlay__messages"
         actions-disabled
         :can-delete-message="false"
         :can-edit-message="false"
         :can-retry-message="false"
         follow-ups-disabled
-        :messages="chatMessages"
+        :messages="messages"
       />
       <div
         v-else
@@ -59,10 +59,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import type { RendererMessage } from '@codex-claw/shared/contracts';
-import MessageList from '../shared/chat/MessageList.vue';
-import { rendererMessagesToChatMessages } from '../shared/chat/renderer-message-adapter';
+import { CodexMessageList } from 'codex-app-sdk/vue';
 import { X } from '../shared/icons/app-icons';
 
 const props = defineProps<{
@@ -77,7 +75,6 @@ const emit = defineEmits<{
   close: [];
 }>();
 
-const chatMessages = computed(() => rendererMessagesToChatMessages(props.messages));
 </script>
 
 <style scoped>

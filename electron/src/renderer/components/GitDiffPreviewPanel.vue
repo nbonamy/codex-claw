@@ -6,7 +6,7 @@
   >
     <div
       v-if="state === 'loading'"
-      class="git-diff-preview-panel__empty text-shimmer"
+      class="git-diff-preview-panel__empty codex-text-shimmer"
     >
       Loading diff...
     </div>

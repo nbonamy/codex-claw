@@ -14,6 +14,7 @@ export function applyAppTheme(settings: AppThemeSettings): void {
   const theme = effectiveTheme(settings, mediaQuery?.matches ?? false);
 
   root.dataset.appearance = settings.mode;
+  root.dataset.codexTheme = theme.appearance;
   root.dataset.effectiveAppearance = theme.appearance;
   root.dataset.theme = theme.id;
   root.classList.toggle('dark', theme.appearance === 'dark');
@@ -43,6 +44,37 @@ export function applyAppTheme(settings: AppThemeSettings): void {
   root.style.setProperty('--app-ui-font-size', `${settings.uiFontSize}px`);
   root.style.setProperty('--chat-font-size', `${settings.chatFontSize}px`);
   root.style.setProperty('--code-font-size', `${settings.codeFontSize}px`);
+  applyCodexThemeTokens(root, theme.colors, theme.appearance);
+}
+
+function applyCodexThemeTokens(
+  root: HTMLElement,
+  colors: Record<string, string>,
+  appearance: 'dark' | 'light',
+): void {
+  const shellMain = appearance === 'dark'
+    ? colors['--color-surface-low']
+    : colors['--color-surface-lowest'];
+  const tokens: Record<string, string | undefined> = {
+    '--codex-app-surface-color': colors['--color-surface'],
+    '--codex-background-color': colors['--color-surface'],
+    '--codex-border-color': colors['--color-outline-variant'],
+    '--codex-hover-color': colors['--color-surface-low'],
+    '--codex-muted-text-color': colors['--color-on-surface-variant'],
+    '--codex-primary-color': colors['--color-primary'],
+    '--codex-secondary-color': colors['--color-secondary'],
+    '--codex-shell-main-color': shellMain,
+    '--codex-strong-border-color': colors['--color-outline'],
+    '--codex-surface-color': colors['--color-surface-lowest'],
+    '--codex-surface-high-color': colors['--color-surface-high'],
+    '--codex-surface-highest-color': colors['--color-surface-highest'],
+    '--codex-surface-raised-color': colors['--color-surface-base'],
+    '--codex-text-color': colors['--color-on-surface'],
+  };
+
+  for (const [token, value] of Object.entries(tokens)) {
+    if (value) root.style.setProperty(token, value);
+  }
 }
 
 export function subscribeToSystemAppearance(): () => void {

@@ -1,141 +1,90 @@
 <template>
-  <section
+  <CodexConversationPane
+    v-model="composerDraft"
     class="conversation-pane"
-    aria-label="Conversation"
-    @click="handleConversationClick"
-  >
-    <WorkbenchLayout
-      v-if="started"
-      class="conversation-pane__layout"
-      scroll-mode="child"
-    >
-      <MessageList
-        class="conversation-pane__messages"
-        :messages="chatMessages"
-        :actions-disabled="isSending"
-        :answered-client-request-ids="answeredClientRequestIds"
-        :can-delete-message="backendCapabilities.rollback"
-        :can-edit-message="backendCapabilities.editMessage"
-        :can-retry-message="backendCapabilities.retryMessage"
-        @copy-message="$emit('copy-message', $event)"
-        @client-response="$emit('client-response', $event)"
-        @delete-message="$emit('delete-message', $event)"
-        @edit-message="$emit('edit-message', $event)"
-        @quote-message="quoteMessage"
-        @retry-message="$emit('retry-message', $event)"
-      />
-
-      <template #footer>
-        <ChatComposerShelf
-          class="conversation-pane__composer-shelf"
-          :goal="goal ?? null"
-          :queued-prompts="queuedPrompts"
-          :turn-git-diff="turnGitDiff"
-          @clear-goal="$emit('clear-goal')"
-          @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
-          @edit-goal="editGoal"
-          @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
-        />
-        <ChatComposer
-          class="conversation-pane__composer"
-          :disabled="!agent"
-          :files="agentFiles"
-          :is-sending="isSending"
-          :placeholder="composerPlaceholder"
-          :models="backendModels"
-          :commands="backendCommands"
-          :skills="backendSkills"
-          :backend-capabilities="backendCapabilities"
-          :model-catalog-status="modelCatalogStatus"
-          :skill-catalog-status="skillCatalogStatus"
-          :draft="composerDraft"
-          :draft-revision="composerDraftRevision"
-          :approval-preset="approvalPreset"
-          :plan-mode="planMode"
-          :selected-model-id="selectedModelId"
-          :selected-reasoning-effort="selectedReasoningEffort"
-          @attach="$emit('attach')"
-          @update:model-id="$emit('select-model', $event)"
-          @select-approval-preset="$emit('select-approval-preset', $event)"
-          @update:plan-mode="$emit('update:planMode', $event)"
-          @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
-          @interrupt="$emit('interrupt-agent')"
-          @send="$emit('sendPrompt', $event)"
-          @steer="$emit('steerPrompt', $event)"
-        />
-      </template>
-    </WorkbenchLayout>
-
-    <ConversationHistoryLoader
-      v-else-if="isHydratingHistory"
-      class="conversation-pane__history-loader"
-    />
-
-    <div
-      v-else
-      class="conversation-pane__hero"
-    >
-      <div class="conversation-pane__hero-copy">
-        <h1>{{ heroHeadline }}</h1>
-        <p>{{ heroSubhead }}</p>
-      </div>
-      <ChatComposerShelf
-        class="conversation-pane__composer-shelf"
-        :goal="goal ?? null"
-        :queued-prompts="queuedPrompts"
-        :turn-git-diff="turnGitDiff"
-        @clear-goal="$emit('clear-goal')"
-        @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
-        @edit-goal="editGoal"
-        @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
-      />
-      <ChatComposer
-        class="conversation-pane__composer"
-        :disabled="!agent"
-        :files="agentFiles"
-        :is-sending="isSending"
-        :placeholder="composerPlaceholder"
-        :models="backendModels"
-        :commands="backendCommands"
-        :skills="backendSkills"
-        :backend-capabilities="backendCapabilities"
-        :model-catalog-status="modelCatalogStatus"
-        :skill-catalog-status="skillCatalogStatus"
-        :draft="composerDraft"
-        :draft-revision="composerDraftRevision"
-        :approval-preset="approvalPreset"
-        :plan-mode="planMode"
-        :selected-model-id="selectedModelId"
-        :selected-reasoning-effort="selectedReasoningEffort"
-        @attach="$emit('attach')"
-        @update:model-id="$emit('select-model', $event)"
-        @select-approval-preset="$emit('select-approval-preset', $event)"
-        @update:plan-mode="$emit('update:planMode', $event)"
-        @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
-        @interrupt="$emit('interrupt-agent')"
-        @send="$emit('sendPrompt', $event)"
-        @steer="$emit('steerPrompt', $event)"
-      />
-    </div>
-  </section>
+    :answered-client-request-ids="answeredClientRequestIds"
+    :approvals="approvals"
+    :approval-preset="approvalPreset"
+    :attach-enabled="backendCapabilities.attachments"
+    :busy="isSending"
+    :can-delete-message="backendCapabilities.rollback"
+    :can-edit-message="backendCapabilities.editMessage"
+    :can-retry-message="backendCapabilities.retryMessage"
+    :capabilities="conversationCapabilities"
+    :commands="backendCommands"
+    :context-usage="agent?.contextUsage ?? null"
+    :conversation-key="conversationKey"
+    :disabled="!agent"
+    :empty-description="heroSubhead"
+    :empty-title="heroHeadline"
+    :files="agentFiles"
+    :goal="goal ?? null"
+    :history-loading="isHydratingHistory"
+    :messages="chatMessages"
+    :model-catalog-status="modelCatalogStatus"
+    :models="backendModels"
+    :placeholder="composerPlaceholder"
+    :plan-mode="planMode"
+    :queued-prompts="queuedPrompts"
+    :selected-model-id="selectedModelId"
+    :selected-reasoning-effort="selectedReasoningEffort"
+    :skill-catalog-status="skillCatalogStatus"
+    :skills="backendSkills"
+    :turn-git-diff="turnGitDiff ?? null"
+    @clear-goal="$emit('clear-goal')"
+    @client-response="$emit('client-response', $event)"
+    @delete-message="$emit('delete-message', $event)"
+    @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
+    @edit-message="$emit('edit-message', $event)"
+    @interrupt="$emit('interrupt-agent')"
+    @open-link="openLink"
+    @retry-message="$emit('retry-message', $event)"
+    @resolve-approval="resolveApproval"
+    @select-approval-preset="$emit('select-approval-preset', $event)"
+    @steer="$emit('steerPrompt', $event)"
+    @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
+    @submit="submitPrompt"
+    @update:model-id="$emit('select-model', $event)"
+    @update:plan-mode="$emit('update:planMode', $event)"
+    @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
+  />
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import type { Agent, AgentFileSearchItem, ApprovalPreset, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendSkillSummary, ClientRequestResponse, ReasoningEffort, RendererMessage, TurnGitDiff } from '@codex-claw/shared/contracts';
+import { computed, ref, watch } from 'vue';
+import {
+  CodexConversationPane,
+  toCodexChatMessages,
+  type CodexCapabilities,
+  type CodexConversationLink,
+  type CodexQueuedPromptData as QueuedChatPrompt,
+  type SendCodexMessageOptions,
+} from 'codex-app-sdk/vue';
+import type {
+  Agent,
+  AgentFileSearchItem,
+  ApprovalPreset,
+  BackendApprovalDecision,
+  BackendApprovalRequest,
+  BackendApprovalScope,
+  BackendCapabilities,
+  BackendCommandSummary,
+  BackendModelOption,
+  BackendSkillSummary,
+  ClientRequestResponse,
+  PromptAttachment,
+  ReasoningEffort,
+  RendererMessage,
+  SendPromptOptions,
+  TurnGitDiff,
+} from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
-import WorkbenchLayout from './WorkbenchLayout.vue';
-import ChatComposer from './ChatComposer.vue';
-import ConversationHistoryLoader from './ConversationHistoryLoader.vue';
-import ChatComposerShelf from '../shared/chat/ChatComposerShelf.vue';
-import MessageList from '../shared/chat/MessageList.vue';
-import { rendererMessagesToChatMessages } from '../shared/chat/renderer-message-adapter';
-import type { QueuedChatPrompt } from '../shared/chat/queued-prompts';
 
 const props = withDefaults(defineProps<{
   messages: RendererMessage[];
   agent: Agent | null;
   agentFiles?: AgentFileSearchItem[];
+  approvals?: BackendApprovalRequest[];
   goal?: Agent['goal'] | null;
   turnGitDiff?: TurnGitDiff | null;
   isLoading: boolean;
@@ -155,6 +104,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   queuedPrompts: () => [],
   agentFiles: () => [],
+  approvals: () => [],
   backendModels: () => [],
   backendCommands: () => [],
   backendSkills: () => [],
@@ -164,189 +114,95 @@ const props = withDefaults(defineProps<{
 });
 
 const emit = defineEmits<{
-  attach: [];
   'clear-goal': [];
   'client-response': [response: ClientRequestResponse];
-  'copy-message': [index: number];
   'delete-message': [index: number];
   'delete-queued-prompt': [promptId: string];
   'edit-message': [payload: { content: string; index: number }];
   'interrupt-agent': [];
-  'quote-message': [index: number];
-  'retry-message': [index: number];
   'open-file': [filePath: string];
+  'resolve-approval': [approvalId: string, decision: BackendApprovalDecision, scope: BackendApprovalScope];
+  'retry-message': [index: number];
   'select-model': [modelId: string];
   'select-reasoning-effort': [reasoningEffort: ReasoningEffort];
   'select-approval-preset': [preset: ApprovalPreset];
   'steer-queued-prompt': [promptId: string];
   'update:planMode': [enabled: boolean];
-  sendPrompt: [prompt: string];
+  sendPrompt: [prompt: string, options?: SendPromptOptions];
   steerPrompt: [prompt: string];
 }>();
 
+const composerDraft = ref('');
+const chatMessages = computed(() => toCodexChatMessages(props.messages));
+const conversationKey = computed(() => {
+  const session = props.agent?.backendSession;
+  if (session?.kind === 'codex') return `codex:${session.threadId}`;
+  if (session?.kind === 'claude') return `claude:${session.sessionId}`;
+  return props.agent ? `agent:${props.agent.id}` : 'no-agent';
+});
+const conversationCapabilities = computed<CodexCapabilities>(() => ({
+  models: props.backendCapabilities.models,
+  skills: props.backendCapabilities.skills,
+  reasoningEffort: props.backendCapabilities.reasoningEffort,
+  planMode: props.backendCapabilities.planMode !== 'unsupported',
+  goals: props.backendCapabilities.goals,
+  steerPrompt: props.backendCapabilities.steerPrompt,
+  interrupt: props.backendCapabilities.interrupt,
+  history: props.backendCapabilities.history,
+  rollback: props.backendCapabilities.rollback,
+  editMessage: props.backendCapabilities.editMessage,
+  retryMessage: props.backendCapabilities.retryMessage,
+  approvals: props.backendCapabilities.approvals,
+  approvalPresets: props.backendCapabilities.approvalPresets ?? [],
+}));
 const composerPlaceholder = computed(() => {
-  if (!props.agent) {
-    return 'Select an agent';
-  }
-
+  if (!props.agent) return 'Select an agent';
   return props.isSending ? `${backendLabel.value} is working...` : 'Ask for follow-up changes';
 });
 const backendLabel = computed(() => (props.agent?.backend === 'claude' ? 'Claude' : 'Codex'));
-
-const chatMessages = computed(() => rendererMessagesToChatMessages(props.messages));
-const composerDraft = ref('');
-const composerDraftRevision = ref(0);
-const started = computed(() => chatMessages.value.length > 0 || props.isSending);
-const isHydratingHistory = computed(() => Boolean(props.agent?.backendSession) && props.messages.length === 0 && props.isLoading);
+const isHydratingHistory = computed(() => (
+  Boolean(props.agent?.backendSession)
+  && props.messages.length === 0
+  && props.isLoading
+));
 const heroHeadline = computed(() => (props.agent ? `Chat with ${props.agent.name}` : 'Select an agent'));
 const heroSubhead = computed(() => {
-  if (!props.agent) {
-    return 'Choose an agent from the left to start a native backend session.';
-  }
-
+  if (!props.agent) return 'Choose an agent from the left to start a native backend session.';
   return props.agent.folder;
 });
 
-function quoteMessage(index: number): void {
-  const message = chatMessages.value[index];
-  if (!message || message.role !== 'user' || !message.content.trim()) {
-    return;
-  }
+watch(conversationKey, () => {
+  composerDraft.value = '';
+});
 
-  composerDraft.value = message.content;
-  composerDraftRevision.value += 1;
+function openLink(link: CodexConversationLink): void {
+  if (link.kind === 'file') emit('open-file', link.path);
 }
 
-function editGoal(): void {
-  if (!props.goal?.objective.trim()) {
-    return;
-  }
-
-  composerDraft.value = `/goal ${props.goal.objective}`;
-  composerDraftRevision.value += 1;
+function resolveApproval(
+  approvalId: string,
+  decision: BackendApprovalDecision,
+  scope: BackendApprovalScope,
+): void {
+  emit('resolve-approval', approvalId, decision, scope);
 }
 
-function handleConversationClick(event: MouseEvent): void {
-  const target = event.target instanceof Element ? event.target : null;
-  const anchor = target?.closest('a[href]');
-  if (!anchor) {
-    return;
+function submitPrompt(prompt: string, options?: SendCodexMessageOptions): void {
+  const attachments = options?.attachments?.map<PromptAttachment>((attachment) => ({
+    ...attachment,
+  }));
+  if (attachments?.length) {
+    emit('sendPrompt', prompt, { attachments });
+  } else {
+    emit('sendPrompt', prompt);
   }
-
-  const href = anchor.getAttribute('href') ?? '';
-  if (!isLocalFileHref(href)) {
-    return;
-  }
-
-  event.preventDefault();
-  emit('open-file', stripLinkFragment(href));
-}
-
-function isLocalFileHref(href: string): boolean {
-  const trimmedHref = href.trim();
-  if (!trimmedHref || trimmedHref.startsWith('#')) {
-    return false;
-  }
-
-  try {
-    const url = new URL(trimmedHref);
-    if (url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'mailto:' || url.protocol === 'tel:') {
-      return false;
-    }
-  } catch {
-    // Relative links land here.
-  }
-
-  return Boolean(stripLinkFragment(trimmedHref).trim());
-}
-
-function stripLinkFragment(href: string): string {
-  return href.split('#')[0]?.split('?')[0] ?? href;
 }
 </script>
 
 <style scoped>
 .conversation-pane {
-  --conversation-content-width: 860px;
   flex: 1 1 auto;
-  width: 100%;
-  height: 100%;
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr);
-  background: var(--color-shell-main);
-}
-
-.conversation-pane__layout {
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-  --workbench-layout-footer-padding: var(--space-8) 0 var(--space-8);
-  --workbench-layout-footer-background: linear-gradient(
-    to bottom,
-    rgb(255 255 255 / 0%),
-    var(--color-shell-main) 24%
-  );
-  --workbench-layout-scrollbar-gutter: 8px;
-}
-
-.conversation-pane__messages {
-  flex: 1 1 auto;
-  height: 100%;
-  min-height: 0;
-  overflow-y: auto;
-  background: var(--color-shell-main);
-  --message-list-content-width: var(--conversation-content-width);
-  --message-list-content-padding-top: var(--space-12);
-  --message-list-content-padding-bottom: calc(var(--workbench-layout-footer-offset) + var(--space-12));
-  --message-list-padding-inline-start: var(--space-8);
-  --message-list-padding-inline-end: var(--space-8);
-}
-
-.conversation-pane__composer {
-  width: min(calc(100% - var(--space-16) * 2), var(--conversation-content-width));
-  margin: 0 auto;
-  margin-bottom: var(--space-8);
-}
-
-.conversation-pane__composer-shelf {
-  width: calc(min(calc(100% - var(--space-16) * 2), var(--conversation-content-width)) * 0.9);
-  margin: 0 auto;
-}
-
-.conversation-pane__hero {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  gap: var(--space-24);
-  width: min(calc(100% - var(--space-16) * 2), var(--conversation-content-width));
-  height: 100%;
-  margin: 0 auto;
-  padding: var(--space-8) 0;
-  padding-top: 33vh;
-}
-
-.conversation-pane__hero-copy {
-  display: grid;
-  gap: var(--space-2);
-  text-align: center;
-}
-
-.conversation-pane__hero h1,
-.conversation-pane__hero p {
-  margin: 0;
-}
-
-.conversation-pane__hero h1 {
-  color: var(--color-text);
-  font-size: var(--font-size-24);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-28);
-}
-
-.conversation-pane__hero p {
-  color: var(--color-text-muted);
 }
 </style>

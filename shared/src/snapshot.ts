@@ -11,6 +11,7 @@ import type {
   ClientRequest,
   CreateAgentInput,
   MainToRendererEvent,
+  PromptAttachment,
   RendererMessage,
   RendererMessagePart,
   RendererToolPart,
@@ -174,8 +175,14 @@ export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentIn
   return agent;
 }
 
-export function appendUserPrompt(snapshot: AppSnapshot, agentId: string, prompt: string, createdAt = new Date().toISOString()): RendererMessage {
-  const message = createUserMessage(agentId, prompt, createdAt);
+export function appendUserPrompt(
+  snapshot: AppSnapshot,
+  agentId: string,
+  prompt: string,
+  createdAt = new Date().toISOString(),
+  attachments: readonly PromptAttachment[] = [],
+): RendererMessage {
+  const message = createUserMessage(agentId, prompt, createdAt, 'message', undefined, attachments);
   snapshot.messages.push(message);
   pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
 
@@ -1110,7 +1117,27 @@ function isRendererMessagePart(value: unknown): value is RendererMessagePart {
     return typeof value.text === 'string';
   }
 
+  if (value.type === 'attachment') {
+    return isRendererMessageAttachment(value.attachment);
+  }
+
   return rendererToolPart(value) !== null;
+}
+
+function isRendererMessageAttachment(value: unknown): boolean {
+  if (
+    !isRecord(value) ||
+    (value.kind !== 'file' && value.kind !== 'image') ||
+    typeof value.name !== 'string'
+  ) {
+    return false;
+  }
+
+  return optionalString(value.path) && optionalString(value.url) && optionalString(value.mimeType);
+}
+
+function optionalString(value: unknown): boolean {
+  return value === undefined || typeof value === 'string';
 }
 
 function isRendererMessageRole(value: unknown): value is RendererMessage['role'] {
@@ -1586,7 +1613,14 @@ function compactionMessageId(turnId: string): string {
   return `compaction-${turnId}`;
 }
 
-function createUserMessage(agentId: string, prompt: string, createdAt: string, idPrefix = 'message', turnId?: string): RendererMessage {
+function createUserMessage(
+  agentId: string,
+  prompt: string,
+  createdAt: string,
+  idPrefix = 'message',
+  turnId?: string,
+  attachments: readonly PromptAttachment[] = [],
+): RendererMessage {
   const isSteer = idPrefix.startsWith('steer-');
   return {
     id: `${idPrefix}-${createdAt.replace(/\W/g, '').toLowerCase()}`,
@@ -1596,8 +1630,31 @@ function createUserMessage(agentId: string, prompt: string, createdAt: string, i
     status: 'complete',
     ...(turnId ? { turnId } : {}),
     createdAt,
-    parts: [{ type: 'text', text: prompt }],
+    parts: [
+      { type: 'text', text: prompt },
+      ...attachments.map(promptAttachmentPart),
+    ],
   };
+}
+
+function promptAttachmentPart(attachment: PromptAttachment): RendererMessagePart {
+  const name = attachment.name?.trim() || attachmentFileName(attachment.path) || (
+    attachment.type === 'image' ? 'Image' : 'File'
+  );
+  return {
+    type: 'attachment',
+    attachment: {
+      kind: attachment.type,
+      name,
+      path: attachment.path,
+      ...('mimeType' in attachment && attachment.mimeType ? { mimeType: attachment.mimeType } : {}),
+      ...(attachment.type === 'image' && attachment.previewUrl ? { url: attachment.previewUrl } : {}),
+    },
+  };
+}
+
+function attachmentFileName(filePath: string): string {
+  return filePath.split(/[\\/]/).at(-1)?.trim() ?? '';
 }
 
 function setAgentStatus(snapshot: AppSnapshot, agentId: string, status: AgentStatus): void {

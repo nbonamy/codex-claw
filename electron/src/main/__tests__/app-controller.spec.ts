@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
 import { AppController } from '../app-controller';
 import { applyMainEventToSnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, AppleSpeechTranscriptionOptions, AppleSpeechTranscriptionResult, BackendConversationRef, BenchLocation, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { ipcChannels } from '@codex-claw/shared/ipc';
 
@@ -344,23 +341,6 @@ describe('AppController', () => {
 
     await expect(suggestSourceWorktreePath(controller, input)).resolves.toBe(suggestion);
     expect(request).toHaveBeenCalledWith('source/worktree/path/suggest', { input });
-  });
-
-  it('routes Apple Speech transcription through clawd using a JSON-safe audio payload', async () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.sourceFolder.initialized = true;
-    const transcription: AppleSpeechTranscriptionResult = { text: 'ship it' };
-    const request = vi.fn().mockResolvedValue(transcription);
-    const controller = new AppController(snapshot, createBackendClient({ request }));
-    const audioData = new Uint8Array([1, 2, 3]).buffer;
-
-    await controller.initialize();
-
-    await expect(transcribeAppleSpeech(controller, audioData, { locale: 'en-US' })).resolves.toStrictEqual(transcription);
-    expect(request).toHaveBeenCalledWith('transcription/appleSpeech/create', {
-      audioBase64: Buffer.from(audioData).toString('base64'),
-      options: { locale: 'en-US' },
-    });
   });
 
   it('routes system permission actions through clawd', async () => {
@@ -1652,16 +1632,6 @@ async function suggestSourceWorktreePath(
   return (controller as unknown as {
     suggestSourceWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>): Promise<string>;
   }).suggestSourceWorktreePath(input);
-}
-
-async function transcribeAppleSpeech(
-  controller: AppController,
-  audioData: ArrayBuffer,
-  options?: AppleSpeechTranscriptionOptions,
-): Promise<AppleSpeechTranscriptionResult> {
-  return (controller as unknown as {
-    transcribeAppleSpeech(audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions): Promise<AppleSpeechTranscriptionResult>;
-  }).transcribeAppleSpeech(audioData, options);
 }
 
 async function getSystemPermissions(controller: AppController): Promise<SystemPermissionsStatus> {

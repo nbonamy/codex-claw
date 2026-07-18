@@ -16,31 +16,27 @@ import type {
 import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
 import { AgentGitService } from '../git/agent-git-service';
-import type { CodexAgentSessionManager } from './agent-session';
-import type { CodexReviewTarget } from './protocol';
+import type { CodexSurfaceReviewTarget } from 'codex-app-sdk/surface';
+import type { CodexSurfaceAgentAdapter } from './codex-surface-adapter';
 
 type CodexPromptCommand =
   | { type: 'compact' }
-  | { type: 'review'; target: CodexReviewTarget };
+  | { type: 'review'; target: CodexSurfaceReviewTarget };
 
 export class CodexBackendDriver implements AgentBackendDriver {
   readonly backend = 'codex' as const;
 
   constructor(
-    private readonly sessionManager: CodexAgentSessionManager,
+    private readonly sessionManager: CodexSurfaceAgentAdapter,
     private readonly gitService = new AgentGitService(),
   ) {}
 
   getRuntimeStatus(): BackendRuntimeStatus {
-    return {
-      backend: this.backend,
-      status: 'notConfigured',
-      detail: 'Codex backend is not connected yet.',
-    };
+    return this.sessionManager.getRuntimeStatus();
   }
 
-  getCapabilities(_agent: Agent): BackendCapabilities {
-    return this.sessionManager.getCapabilities?.() ?? codexBackendCapabilities;
+  getCapabilities(agent: Agent): BackendCapabilities {
+    return this.sessionManager.getCapabilities?.(agent) ?? codexBackendCapabilities;
   }
 
   async getGitStatus(agent: Agent): Promise<AgentGitStatus> {
@@ -82,8 +78,9 @@ export class CodexBackendDriver implements AgentBackendDriver {
       : undefined;
 
     return cleanedPromptOptions({
+      ...(options?.attachments?.length ? { attachments: options.attachments } : {}),
       model: options?.model ?? null,
-      planMode: options?.planMode,
+      ...(typeof options?.planMode === 'boolean' ? { planMode: options.planMode } : {}),
       ...(backendOptions ? { backendOptions } : {}),
     });
   }
@@ -210,7 +207,7 @@ export class CodexBackendDriver implements AgentBackendDriver {
 }
 
 function cleanedPromptOptions(options: SendPromptOptions): SendPromptOptions | undefined {
-  return options.model || typeof options.planMode === 'boolean' || options.backendOptions
+  return (options.attachments?.length ?? 0) > 0 || options.model || typeof options.planMode === 'boolean' || options.backendOptions
     ? options
     : undefined;
 }

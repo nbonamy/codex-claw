@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AddSshConnectionInput, AppleSpeechTranscriptionOptions, AppCommand, ApprovalPreset, BackendConversationRef, BenchLocation, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AppCommand, ApprovalPreset, BackendConversationRef, BenchLocation, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
-import { TypedIpcRenderer } from 'codex-app-sdk/electron';
+import { exposeCodexNativeRendererApi, TypedIpcRenderer } from 'codex-app-sdk/electron/preload';
 
 const ipc = new TypedIpcRenderer<CodexClawIpcRequests, CodexClawIpcEvents>(ipcRenderer);
 
@@ -69,7 +69,6 @@ const api: CodexClawApi = {
   setDaemonEnabled: (enabled: boolean) => ipc.invoke(ipcChannels.setDaemonEnabled, enabled),
   getSystemPermissions: () => ipc.invoke(ipcChannels.getSystemPermissions),
   openAccessibilitySettings: () => ipc.invoke(ipcChannels.openAccessibilitySettings),
-  transcribeAppleSpeech: (audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions) => ipc.invoke(ipcChannels.transcribeAppleSpeech, audioData, options),
   quit: () => ipc.invoke(ipcChannels.quit),
   restartApp: () => ipc.invoke(ipcChannels.restartApp),
   setAgentGoal: (agentId: string, objective: string) => ipc.invoke(ipcChannels.setAgentGoal, agentId, objective),
@@ -91,3 +90,4 @@ const api: CodexClawApi = {
 };
 
 contextBridge.exposeInMainWorld('codexClaw', api);
+exposeCodexNativeRendererApi(contextBridge, ipcRenderer);

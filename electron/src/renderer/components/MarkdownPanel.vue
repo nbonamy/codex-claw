@@ -5,7 +5,7 @@
   >
     <div
       v-if="state === 'loading'"
-      class="markdown-panel__empty text-shimmer"
+      class="markdown-panel__empty codex-text-shimmer"
     >
       Loading markdown...
     </div>
@@ -17,7 +17,7 @@
     </div>
     <div
       v-else-if="content.trim()"
-      class="markdown-panel__content claw-markdown"
+      class="markdown-panel__content codex-markdown"
       v-html="renderMarkdown(content)"
     />
     <div
@@ -30,7 +30,7 @@
 </template>
 
 <script setup lang="ts">
-import { renderMarkdown } from '../shared/chat/message-markdown';
+import { renderMarkdown } from 'codex-app-sdk/vue';
 
 withDefaults(defineProps<{
   content: string;

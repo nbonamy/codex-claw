@@ -24,12 +24,13 @@ protocol/process communication and the renderer displays app-owned events.
 - Keep all app-server communication in `clawd`. Renderer and Electron main code
   never own Codex process lifecycle, JSON-RPC request IDs, approval callbacks,
   or auth.
-- Keep native helper execution behind backend-owned runtime services. For
-  example, composer voice dictation records browser audio in the renderer,
-  sends audio bytes through typed IPC/backend RPC, and lets `clawd` invoke the
-  Apple speech helper.
-- Reuse id8 renderer primitives for messages, streaming text, tool calls,
-  approvals, markdown, mermaid, media, and diffs.
+- Use the SDK's Electron native-capability bridge for product-neutral desktop
+  behavior such as clipboard copy, attachment ingestion, safe external links,
+  and voice transcription. Keep Claw-specific native effects in its desktop
+  adapter.
+- Use the SDK conversation pane for messages, streaming text, tool calls,
+  approvals, composer behavior, markdown, mermaid, and media. Keep Claw's
+  workspace/agent shell and artifact panes product-owned.
 - Build theme support from day one with semantic tokens, not hardcoded colors.
 - Keep milestones demoable: product state is teams plus agents, while backend
   drivers own session/thread details and renderer UI stays app-owned.
@@ -221,9 +222,9 @@ Modules:
   bundle, and exposes app-owned requests to main-process callers.
 - `AppController`: desktop IPC and native-affordance adapter. Product state,
   provider operations, client request ownership, durable snapshot persistence,
-  loops, work integrations, git/file/source operations, system permission API
-  calls, and transcription belong in `clawd`; Electron forwards app-owned RPC
-  requests and fans backend events to renderer windows.
+  loops, work integrations, git/file/source operations, and system permission
+  API calls belong in `clawd`; Electron forwards app-owned RPC requests, fans
+  backend events to renderer windows, and registers the SDK native bridge.
 
 Future transport options:
 
@@ -341,7 +342,6 @@ type CodexClawApi = {
   closeAgent(agentId: string): Promise<AppSnapshot>
   selectAgent(agentId: string): Promise<AppSnapshot>
   updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>
-  transcribeAppleSpeech(audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions): Promise<AppleSpeechTranscriptionResult>
   quit(): Promise<void>
   sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot>
   steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot>
@@ -371,9 +371,10 @@ Renderer layers:
   and eventually supporting faster deployment into any team;
 - chat state store that reduces `MainToRendererEvent` into message/tool/diff
   state;
-- id8-derived components for `MessageList`, `ChatMessage`, `ChatToolCall`,
-  composer, markdown, mermaid, media, and diff summaries. These components are
-  a rendering starting point, not a required data contract;
+- the SDK `CodexConversationPane` for product-neutral message, tool, approval,
+  composer, markdown, mermaid, media, clipboard, attachment, and transcription
+  behavior; the Claw wrapper only adapts provider capabilities and product
+  events;
 - git status and turn diff display consume runtime snapshot state. Repo git
   status is requested through the active `AgentBackendDriver` capability and is
   not persisted; turn diff state comes from app-owned backend events such as
@@ -530,10 +531,11 @@ shared transport/type boundary used by the current implementation.
 - it uses Codex naming only and contains no Codex Claw identifiers;
 - generated protocol types are the source of truth for requests, results,
   notifications, and server-initiated requests;
-- its Electron helpers provide typed invoke/event mechanics, not app channels
-  or app policy;
-- its Vue components provide generic composer, extensible menu, message, and
-  sticky-list primitives through typed props, events, and slots;
+- its Electron helpers provide typed app-server IPC plus product-neutral native
+  capabilities such as clipboard, attachments, safe links, and transcription;
+- its Vue components provide the complete generic conversation pane and its
+  extensible composer/message primitives through typed props, events, and
+  slots;
 - Codex Claw wrappers map approval presets, plan mode, message actions, and
   design tokens onto those primitives.
 
@@ -591,10 +593,10 @@ id8 chat rendering currently expects a compact stream shape:
 - tool chunks with `preparing | running | completed | canceled | error`;
 - usage/error/done.
 
-Codex app-server emits richer thread items. The adapter should map them into
-Codex Claw's UI model first. Compatibility helpers for id8-derived components
-are allowed, but they should sit at the edge and should not dictate the core
-message schema.
+Codex app-server emits richer thread items. The adapter maps them into Codex
+Claw's provider-neutral renderer-message contract, then the thin renderer
+wrapper adapts that contract to the SDK conversation pane. The SDK component
+contract must not dictate Claw's stored product schema.
 
 Mapping sketch:
 

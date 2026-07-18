@@ -439,8 +439,8 @@ Codex goals are thread metadata, not composer modes. The renderer handles
   `/goal <objective>` into the composer as the editing draft.
 - `/goal pause` and `/goal resume` are intentionally unsupported for now.
 
-The active goal is displayed by `ChatComposerShelf`, below queued prompts and
-closest to the composer. That keeps the future editor/clear controls out of
+The active goal is displayed by the SDK conversation shelf, below queued
+prompts and closest to the composer. That keeps editor/clear controls out of
 the composer mode chip row and avoids mixing durable thread state with
 per-turn prompt options.
 

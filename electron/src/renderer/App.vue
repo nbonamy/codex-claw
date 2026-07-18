@@ -15,6 +15,7 @@
     :model-catalog-status="modelCatalogStatus"
     :skill-catalog-status="skillCatalogStatus"
     :goal="activeGoal"
+    :approvals="activeBackendApprovals"
     :approval-preset="activeApprovalPreset"
     :plan-mode="planMode"
     :selected-model-id="selectedModelId"
@@ -93,6 +94,7 @@
     @select-model="selectModel"
     @select-reasoning-effort="selectReasoningEffort"
     @select-approval-preset="setApprovalPreset"
+    @resolve-approval="resolveBackendApproval"
     @update:plan-mode="setPlanMode"
     @clear-goal="clearActiveGoal"
     @client-response="respondToClientRequest"
@@ -120,6 +122,7 @@ const {
   snapshot,
   activeAgent,
   activeGoal,
+  activeBackendApprovals,
   activeApprovalPreset,
   visibleMessages,
   activeQueuedPrompts,
@@ -204,6 +207,7 @@ const {
   loadWorkItems,
   assignWorkItemToAgent,
   removeWorkItemAssignment,
+  resolveBackendApproval,
   respondToClientRequest,
   selectModel,
   selectReasoningEffort,

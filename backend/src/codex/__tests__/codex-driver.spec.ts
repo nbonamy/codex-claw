@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CodexBackendDriver } from '../codex-driver';
-import type { CodexAgentSessionManager } from '../agent-session';
+import type { CodexSurfaceAgentAdapter } from '../codex-surface-adapter';
 import type { Agent } from '@codex-claw/shared/contracts';
 import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 
@@ -110,6 +110,24 @@ describe('CodexBackendDriver', () => {
     });
   });
 
+  it('preserves image and file attachments through prepared options into the surface adapter', async () => {
+    const sendPrompt = vi.fn().mockResolvedValue({ threadId: 'thread-attachments', turnId: 'turn-attachments' });
+    const sessionManager = createSessionManager({ sendPrompt });
+    const driver = new CodexBackendDriver(sessionManager);
+    const attachments = [
+      { type: 'image' as const, path: '/tmp/screenshot.png', detail: 'high' as const },
+      { type: 'file' as const, path: '/tmp/README.md', name: 'README' },
+    ];
+    const prepared = driver.preparePromptOptions(agent, { attachments });
+
+    expect(prepared).toStrictEqual({ attachments, model: null });
+    await expect(driver.sendPrompt(agent, 'Inspect these', prepared)).resolves.toStrictEqual({
+      backendSession: { kind: 'codex', threadId: 'thread-attachments' },
+      turnId: 'turn-attachments',
+    });
+    expect(sendPrompt).toHaveBeenCalledWith(agent, 'Inspect these', { attachments, model: null });
+  });
+
   it('sets approval presets through the session manager', async () => {
     const sessionManager = createSessionManager();
     const driver = new CodexBackendDriver(sessionManager);
@@ -203,11 +221,12 @@ describe('CodexBackendDriver', () => {
   });
 });
 
-function createSessionManager(overrides: Partial<CodexAgentSessionManager> = {}): CodexAgentSessionManager {
+function createSessionManager(overrides: Partial<CodexSurfaceAgentAdapter> = {}): CodexSurfaceAgentAdapter {
   return {
     compactThread: vi.fn().mockResolvedValue({ threadId: 'thread-compact' }),
     clearThreadGoal: vi.fn().mockResolvedValue({ threadId: 'thread-goal', cleared: true }),
     reviewThread: vi.fn().mockResolvedValue({ threadId: 'thread-review', turnId: 'turn-review' }),
+    getRuntimeStatus: vi.fn().mockReturnValue({ backend: 'codex', status: 'notConfigured' }),
     sendPrompt: vi.fn(),
     listConversations: vi.fn().mockResolvedValue([]),
     resumeConversation: vi.fn().mockResolvedValue({ threadId: 'thread-dina', messages: [] }),
@@ -228,5 +247,5 @@ function createSessionManager(overrides: Partial<CodexAgentSessionManager> = {})
       },
     }),
     ...overrides,
-  } as unknown as CodexAgentSessionManager;
+  } as unknown as CodexSurfaceAgentAdapter;
 }

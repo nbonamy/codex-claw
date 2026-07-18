@@ -64,7 +64,6 @@ export const ipcChannels = {
   setDaemonEnabled: 'daemon:enabled:set',
   getSystemPermissions: 'system-permissions:get',
   openAccessibilitySettings: 'system-permissions:accessibility:open',
-  transcribeAppleSpeech: 'transcription:apple-speech',
   quit: 'app:quit',
   restartApp: 'app:restart',
   setAgentGoal: 'agent:goal:set',

@@ -54,8 +54,7 @@ Current implementation checkpoint:
   `AgentBackendDriver` RPC surface, sequenced `backend/event/notify` notifications,
   the Claw MCP HTTP server used by agent collaboration tools, source repository
   discovery, git worktree creation, agent file listing/previewing, GitHub work
-  integrations, system permission API calls, and Apple Speech transcription
-  execution.
+  integrations, and system permission API calls.
 - The stdio transport is now bidirectional JSON-RPC: Electron main can request
   backend work, and `clawd` can request client-owned effects. Runtime client
   handlers include `client/external/open` for backend-owned work integrations
@@ -364,13 +363,12 @@ renderer.
 - Browser windows, menus, app lifecycle, shortcuts, and renderer event fanout.
 - Native file/folder/save dialogs. Local folder picking stays desktop-native;
   remote folder browsing must become a backend-powered product surface.
-- Clipboard, shell open/external URL behavior, OS prompts, notifications, and
-  native system permission prompts/settings. The app-facing permission API
-  belongs to `clawd`; Electron implements only the client callback.
-- Desktop-session helpers such as renderer audio capture handoff.
-- App-packaged resource resolution. For example, Electron may tell `clawd`
-  where the packaged Apple Speech helper lives, but `clawd` owns temp-file and
-  helper execution.
+- Claw-specific OS prompts, notifications, and native system permission
+  prompts/settings. The app-facing permission API belongs to `clawd`; Electron
+  implements only the client callback.
+- The SDK native IPC bridge for product-neutral clipboard, safe external-link,
+  attachment-ingestion, and transcription behavior. The SDK owns its packaged
+  speech helper and resource resolution.
 - Secret storage only if it depends on Electron `safeStorage`. The backend
   should depend on an abstract secret store, not import Electron.
 - Optional desktop-only power management. The backend can emit activity state;
@@ -395,7 +393,7 @@ renderer.
   backend-location-owned filesystem behavior. Current code already routes
   source discovery, `git worktree list`, worktree creation, agent file
   listing/previewing, GitHub work integrations, system permission API calls, and
-  Apple Speech transcription through `clawd`.
+  other backend-location-owned operations through `clawd`.
 - Renderer file previews and MCP `display-markdown` path reads use the same
   rule: clients ask `clawd` for content; Electron does not read agent workspace
   files on behalf of product features. This keeps the contract valid for a
@@ -583,9 +581,6 @@ The exact script names can change, but the shape should stay:
 - Electron main receives the dev backend command from config or environment,
   for example `CODEX_CLAW_BACKEND_COMMAND=node` and
   `CODEX_CLAW_BACKEND_ARGS=../backend/dist/clawd-dev.mjs,--stdio`.
-  It also passes `CODEX_CLAW_ASSETS_PATH=<repo>/assets` so backend-owned
-  transcription can find the Apple Speech helper without per-request desktop
-  path fields.
 - `clawd` reads and writes state under `~/.codex-claw` by default. The only
   supported state-home override is `CODEX_CLAW_HOME`.
 

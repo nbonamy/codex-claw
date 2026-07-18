@@ -1,20 +1,28 @@
 import { computed, ref } from 'vue';
-import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
 import { approvalPresetFromDefaults } from '@codex-claw/shared/approval-presets';
-import { createQueuedChatPrompt, type QueuedChatPrompt } from './shared/chat/queued-prompts';
-import { promptSkillInputsFromText } from './shared/chat/composer-skills';
+import {
+  createQueuedChatPrompt,
+  promptSkillInputsFromText,
+  type CodexQueuedPromptData as QueuedChatPrompt,
+} from 'codex-app-sdk/vue';
 import { workItemAssignmentPrompt } from '@codex-claw/shared/work-item-prompts';
 import { isAppSnapshot } from '@codex-claw/shared/snapshot-guards';
 import { useConfetti } from './shared/confetti/use-confetti';
 
+type QueuedAgentPrompt = QueuedChatPrompt & {
+  options?: SendPromptOptions;
+};
+
 const snapshot = ref<AppSnapshot>(createEmptySnapshot());
 const isLoading = ref(false);
 const sendingAgentIds = ref(new Set<string>());
-const queuedPromptsByAgentId = ref<Record<string, QueuedChatPrompt[]>>({});
+const queuedPromptsByAgentId = ref<Record<string, QueuedAgentPrompt[]>>({});
 const answeredClientRequestIds = ref(new Set<string>());
+const backendApprovalsByAgentId = ref<Record<string, BackendApprovalRequest[]>>({});
 const backendModels = ref<BackendModelOption[]>([]);
 const modelCatalogStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
 const modelCatalogError = ref<string | null>(null);
@@ -71,6 +79,11 @@ export function useAppState() {
     return agentId ? queuedPromptsByAgentId.value[agentId] ?? [] : [];
   });
 
+  const activeBackendApprovals = computed(() => {
+    const agentId = activeAgent.value?.id;
+    return agentId ? backendApprovalsByAgentId.value[agentId] ?? [] : [];
+  });
+
   const activeGoal = computed(() => activeAgent.value?.goal ?? null);
   const activeApprovalPreset = computed<ApprovalPreset | null>(() => {
     const agent = activeAgent.value;
@@ -109,6 +122,7 @@ export function useAppState() {
 
     try {
       snapshot.value = await window.codexClaw.getSnapshot();
+      backendApprovalsByAgentId.value = {};
       pruneRemoteBenchCache();
       subscribeToMainEvents();
       await Promise.all([
@@ -124,7 +138,7 @@ export function useAppState() {
     void hydrateActiveAgentHistory().catch(() => undefined);
   }
 
-  async function sendPrompt(prompt: string): Promise<void> {
+  async function sendPrompt(prompt: string, submissionOptions?: SendPromptOptions): Promise<void> {
     const agentId = activeAgent.value?.id;
     if (!agentId || !window.codexClaw) {
       return;
@@ -150,11 +164,11 @@ export function useAppState() {
     }
 
     if (isAgentSending(agentId)) {
-      enqueuePrompt(agentId, trimmed);
+      enqueuePrompt(agentId, trimmed, resolvedPromptOptions(agentId, trimmed, submissionOptions));
       return;
     }
 
-    await sendPromptForAgent(agentId, trimmed);
+    await sendPromptForAgent(agentId, trimmed, submissionOptions);
   }
 
   async function steerPrompt(prompt: string): Promise<void> {
@@ -251,6 +265,16 @@ export function useAppState() {
       return;
     }
 
+    if (!isAgentSending(agentId)) {
+      await sendPreparedPromptForAgent(agentId, queuedPrompt.text, queuedPrompt.options);
+      return;
+    }
+
+    if ((queuedPrompt.options?.attachments?.length ?? 0) > 0) {
+      prependQueuedPrompt(agentId, queuedPrompt);
+      return;
+    }
+
     try {
       await steerPrompt(queuedPrompt.text);
     } catch (error) {
@@ -266,7 +290,23 @@ export function useAppState() {
     }
   }
 
-  async function sendPromptForAgent(agentId: string, prompt: string): Promise<void> {
+  async function sendPromptForAgent(
+    agentId: string,
+    prompt: string,
+    submissionOptions?: SendPromptOptions,
+  ): Promise<void> {
+    await sendPreparedPromptForAgent(
+      agentId,
+      prompt,
+      resolvedPromptOptions(agentId, prompt, submissionOptions),
+    );
+  }
+
+  async function sendPreparedPromptForAgent(
+    agentId: string,
+    prompt: string,
+    options?: SendPromptOptions,
+  ): Promise<void> {
     const api = window.codexClaw;
     if (!api) {
       return;
@@ -275,7 +315,6 @@ export function useAppState() {
     markAgentSending(agentId, true);
 
     try {
-      const options = selectedPromptOptions(prompt);
       snapshot.value = options
         ? await api.sendPrompt(agentId, prompt, options)
         : await api.sendPrompt(agentId, prompt);
@@ -292,7 +331,7 @@ export function useAppState() {
     }
 
     if (isAgentSending(agent.id)) {
-      enqueuePrompt(agent.id, trimmed);
+      enqueuePrompt(agent.id, trimmed, selectedPromptOptions(agent.id, trimmed));
       return;
     }
 
@@ -1093,6 +1132,38 @@ export function useAppState() {
     snapshot.value = await window.codexClaw.respondToClientRequest(response);
   }
 
+  async function resolveBackendApproval(
+    approvalId: string,
+    decision: BackendApprovalDecision,
+    scope: BackendApprovalScope,
+  ): Promise<void> {
+    const agentId = activeAgent.value?.id;
+    const approval = agentId
+      ? backendApprovalsByAgentId.value[agentId]?.find((candidate) => candidate.id === approvalId)
+      : undefined;
+    if (
+      !agentId ||
+      !approval ||
+      !window.codexClaw ||
+      (decision === 'deny' && approval.canDeny === false) ||
+      (decision === 'approve' && approval.allowedScopes && !approval.allowedScopes.includes(scope))
+    ) {
+      return;
+    }
+
+    await respondToClientRequest({
+      id: approvalId,
+      payload: {
+        decision: decision === 'deny'
+          ? 'deny'
+          : scope === 'session'
+            ? 'allow_conversation'
+            : 'allow',
+      },
+    });
+    removeBackendApproval(agentId, approvalId);
+  }
+
   function selectModel(modelId: string): void {
     const model = backendModels.value.find((candidate) => candidate.id === modelId);
     if (!model) {
@@ -1161,6 +1232,7 @@ export function useAppState() {
     snapshot,
     activeAgent,
     activeGoal,
+    activeBackendApprovals,
     activeApprovalPreset,
     visibleMessages,
     activeQueuedPrompts,
@@ -1256,6 +1328,7 @@ export function useAppState() {
     removeBenchTemplate,
     restartAgent,
     closeAgent,
+    resolveBackendApproval,
     respondToClientRequest,
     selectModel,
     selectReasoningEffort,
@@ -1345,12 +1418,11 @@ function defaultReasoningEffort(model: BackendModelOption): ReasoningEffort | nu
   return model.defaultReasoningEffort || (model.supportedReasoningEfforts?.[0]?.reasoningEffort ?? null);
 }
 
-function selectedPromptOptions(prompt: string): SendPromptOptions | undefined {
-  const model = selectedModelFromCatalog();
-  const skills = selectedPromptSkills(prompt);
-  const agent = snapshot.value.activeAgentId
-    ? snapshot.value.agents.find((candidate) => candidate.id === snapshot.value.activeAgentId)
-    : undefined;
+function selectedPromptOptions(agentId: string, prompt: string): SendPromptOptions | undefined {
+  const isActiveAgent = agentId === snapshot.value.activeAgentId;
+  const model = isActiveAgent ? selectedModelFromCatalog() : null;
+  const skills = isActiveAgent ? selectedPromptSkills(prompt) : [];
+  const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
   const capabilities = backendCapabilitiesForAgent(agent ?? null);
   const promptModel = capabilities.models ? model : null;
   const selectedSkills = capabilities.skills ? skills : [];
@@ -1360,7 +1432,7 @@ function selectedPromptOptions(prompt: string): SendPromptOptions | undefined {
 
   if (
     !promptModel &&
-    (capabilities.planMode === 'unsupported' || !planMode.value) &&
+    (capabilities.planMode === 'unsupported' || !isActiveAgent || !planMode.value) &&
     !reasoningEffort &&
     selectedSkills.length === 0
   ) {
@@ -1369,10 +1441,29 @@ function selectedPromptOptions(prompt: string): SendPromptOptions | undefined {
 
   return {
     ...(promptModel ? { model: promptModel.model } : {}),
-    ...(capabilities.planMode === 'native' ? { planMode: planMode.value } : {}),
-    ...(capabilities.planMode === 'prompted' && planMode.value ? { planMode: true } : {}),
+    ...(capabilities.planMode === 'native' && isActiveAgent ? { planMode: planMode.value } : {}),
+    ...(capabilities.planMode === 'prompted' && isActiveAgent && planMode.value ? { planMode: true } : {}),
     ...(reasoningEffort ? { reasoningEffort } : {}),
     ...(selectedSkills.length > 0 ? { skills: selectedSkills } : {}),
+  };
+}
+
+function resolvedPromptOptions(
+  agentId: string,
+  prompt: string,
+  submissionOptions?: SendPromptOptions,
+): SendPromptOptions | undefined {
+  const selectedOptions = selectedPromptOptions(agentId, prompt);
+  const attachments = submissionOptions?.attachments?.length
+    ? [...submissionOptions.attachments]
+    : undefined;
+  if (!selectedOptions && !submissionOptions) {
+    return undefined;
+  }
+  return {
+    ...selectedOptions,
+    ...submissionOptions,
+    ...(attachments ? { attachments } : {}),
   };
 }
 
@@ -1474,6 +1565,8 @@ function subscribeToMainEvents(): void {
   unsubscribeMainEvents?.();
   unsubscribeMainEvents = window.codexClaw.onEvent((event: MainToRendererEvent) => {
     adoptSnapshotFromMainEvent(event);
+    syncBackendApprovalsFromMainEvent(event);
+    syncAnsweredClientRequestsFromMainEvent(event);
     syncComposerModeFromMainEvent(event);
     syncSidePanelFromMainEvent(event);
     if (event.type === 'turn.completed' && event.agentId) {
@@ -1483,6 +1576,113 @@ function subscribeToMainEvents(): void {
       void loadBackendSkillsForActiveAgent();
     }
   });
+}
+
+function syncBackendApprovalsFromMainEvent(event: MainToRendererEvent): void {
+  if (event.type === 'backendApproval.requested') {
+    const approval = backendApprovalRequest(event.payload);
+    if (!event.agentId || !approval) return;
+    const approvals = backendApprovalsByAgentId.value[event.agentId] ?? [];
+    backendApprovalsByAgentId.value = {
+      ...backendApprovalsByAgentId.value,
+      [event.agentId]: [
+        ...approvals.filter((candidate) => candidate.id !== approval.id),
+        approval,
+      ],
+    };
+    return;
+  }
+
+  if (event.type !== 'backendApproval.resolved') return;
+  const approval = backendApprovalRequest(event.payload);
+  if (!approval) return;
+  removeBackendApproval(event.agentId, approval.id);
+  markClientRequestAnswered(approval.id);
+}
+
+function syncAnsweredClientRequestsFromMainEvent(event: MainToRendererEvent): void {
+  if (event.type !== 'clientRequest.resolved' || !isRecord(event.payload)) return;
+  const id = event.payload.id;
+  if (typeof id === 'string' && id) markClientRequestAnswered(id);
+}
+
+function removeBackendApproval(agentId: string | undefined, approvalId: string): void {
+  const next = { ...backendApprovalsByAgentId.value };
+  const agentIds = agentId ? [agentId] : Object.keys(next);
+  for (const candidateAgentId of agentIds) {
+    const approvals = next[candidateAgentId];
+    if (!approvals) continue;
+    const remaining = approvals.filter((approval) => approval.id !== approvalId);
+    if (remaining.length > 0) next[candidateAgentId] = remaining;
+    else delete next[candidateAgentId];
+  }
+  backendApprovalsByAgentId.value = next;
+}
+
+function backendApprovalRequest(payload: unknown): BackendApprovalRequest | null {
+  if (!isRecord(payload) || !isRecord(payload.approval)) return null;
+  const approval = payload.approval;
+  if (
+    typeof approval.id !== 'string' ||
+    (approval.kind !== 'command' && approval.kind !== 'file-change' && approval.kind !== 'permissions') ||
+    typeof approval.conversationId !== 'string' ||
+    typeof approval.itemId !== 'string' ||
+    typeof approval.title !== 'string' ||
+    !optionalString(approval.turnId) ||
+    !optionalString(approval.description) ||
+    !optionalString(approval.command) ||
+    !optionalString(approval.cwd) ||
+    (approval.canDeny !== undefined && typeof approval.canDeny !== 'boolean') ||
+    !backendApprovalScopes(approval.allowedScopes) ||
+    !backendRequestedPermissions(approval.requestedPermissions)
+  ) {
+    return null;
+  }
+
+  return {
+    id: approval.id,
+    kind: approval.kind,
+    conversationId: approval.conversationId,
+    itemId: approval.itemId,
+    title: approval.title,
+    ...(approval.turnId === undefined ? {} : { turnId: approval.turnId }),
+    ...(approval.description === undefined ? {} : { description: approval.description }),
+    ...(approval.command === undefined ? {} : { command: approval.command }),
+    ...(approval.cwd === undefined ? {} : { cwd: approval.cwd }),
+    ...(approval.requestedPermissions === undefined
+      ? {}
+      : { requestedPermissions: approval.requestedPermissions.map((permission) => ({ ...permission })) }),
+    ...(approval.allowedScopes === undefined ? {} : { allowedScopes: [...approval.allowedScopes] }),
+    ...(approval.canDeny === undefined ? {} : { canDeny: approval.canDeny }),
+  };
+}
+
+function optionalString(value: unknown): value is string | undefined {
+  return value === undefined || typeof value === 'string';
+}
+
+function backendApprovalScopes(value: unknown): value is BackendApprovalScope[] | undefined {
+  return value === undefined || (
+    Array.isArray(value) && value.every((scope) => scope === 'once' || scope === 'session')
+  );
+}
+
+function backendRequestedPermissions(
+  value: unknown,
+): value is BackendApprovalRequest['requestedPermissions'] {
+  return value === undefined || (
+    Array.isArray(value) && value.every((permission) => {
+      if (!isRecord(permission) || typeof permission.kind !== 'string') return false;
+      if (permission.kind === 'filesystem') {
+        return (permission.access === 'read' || permission.access === 'write' || permission.access === 'deny')
+          && typeof permission.path === 'string';
+      }
+      return permission.kind === 'network'
+        && typeof permission.enabled === 'boolean'
+        && optionalString(permission.host)
+        && optionalString(permission.protocol);
+    })
+  );
 }
 
 function adoptSnapshotFromMainEvent(event: MainToRendererEvent): void {
@@ -1740,11 +1940,14 @@ function isAgentSending(agentId: string): boolean {
     agent?.status.type === 'awaitingInput';
 }
 
-function enqueuePrompt(agentId: string, prompt: string): void {
-  appendQueuedPrompt(agentId, createQueuedChatPrompt(prompt));
+function enqueuePrompt(agentId: string, prompt: string, options?: SendPromptOptions): void {
+  appendQueuedPrompt(agentId, {
+    ...createQueuedChatPrompt(prompt),
+    ...(options ? { options: clonePromptOptions(options) } : {}),
+  });
 }
 
-function appendQueuedPrompt(agentId: string, prompt: QueuedChatPrompt): void {
+function appendQueuedPrompt(agentId: string, prompt: QueuedAgentPrompt): void {
   queuedPromptsByAgentId.value = {
     ...queuedPromptsByAgentId.value,
     [agentId]: [
@@ -1754,7 +1957,7 @@ function appendQueuedPrompt(agentId: string, prompt: QueuedChatPrompt): void {
   };
 }
 
-function prependQueuedPrompt(agentId: string, prompt: QueuedChatPrompt): void {
+function prependQueuedPrompt(agentId: string, prompt: QueuedAgentPrompt): void {
   queuedPromptsByAgentId.value = {
     ...queuedPromptsByAgentId.value,
     [agentId]: [
@@ -1764,7 +1967,7 @@ function prependQueuedPrompt(agentId: string, prompt: QueuedChatPrompt): void {
   };
 }
 
-function removeQueuedPromptForAgent(agentId: string, promptId: string): QueuedChatPrompt | null {
+function removeQueuedPromptForAgent(agentId: string, promptId: string): QueuedAgentPrompt | null {
   const prompts = queuedPromptsByAgentId.value[agentId] ?? [];
   const prompt = prompts.find((candidate) => candidate.id === promptId) ?? null;
   if (!prompt) {
@@ -1792,13 +1995,32 @@ async function drainQueuedPrompts(agentId: string): Promise<void> {
   markAgentSending(agentId, true);
 
   try {
-    const options = selectedPromptOptions(nextPrompt.text);
-    snapshot.value = options
-      ? await window.codexClaw.sendPrompt(agentId, nextPrompt.text, options)
+    snapshot.value = nextPrompt.options
+      ? await window.codexClaw.sendPrompt(agentId, nextPrompt.text, nextPrompt.options)
       : await window.codexClaw.sendPrompt(agentId, nextPrompt.text);
   } finally {
     markAgentSending(agentId, false);
   }
+}
+
+function clonePromptOptions(options: SendPromptOptions): SendPromptOptions {
+  return {
+    ...options,
+    ...(options.attachments ? { attachments: options.attachments.map((attachment) => ({ ...attachment })) } : {}),
+    ...(options.skills ? { skills: options.skills.map((skill) => ({ ...skill })) } : {}),
+    ...(options.backendOptions?.kind === 'codex'
+      ? {
+        backendOptions: {
+          ...options.backendOptions,
+          ...(options.backendOptions.skills
+            ? { skills: options.backendOptions.skills.map((skill) => ({ ...skill })) }
+            : {}),
+        },
+      }
+      : options.backendOptions
+        ? { backendOptions: { ...options.backendOptions } }
+        : {}),
+  };
 }
 
 function markClientRequestAnswered(requestId: string): void {

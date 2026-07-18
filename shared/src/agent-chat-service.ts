@@ -31,7 +31,7 @@ export function sendAgentPrompt(
 
   const promptResult = backendDriver.tryHandlePromptCommand?.(agent, trimmedPrompt) ?? null;
   if (!promptResult) {
-    appendUserPrompt(snapshot, agentId, trimmedPrompt);
+    appendUserPrompt(snapshot, agentId, trimmedPrompt, undefined, options?.attachments);
   }
   const hadBackendSession = Boolean(agent.backendSession);
 
@@ -84,6 +84,7 @@ export function sendAgentPrompt(
 
 function hasPromptOptions(options: SendPromptOptions | undefined): options is SendPromptOptions {
   return Boolean(
+    (options?.attachments?.length ?? 0) > 0 ||
     options?.model ||
     typeof options?.planMode === 'boolean' ||
     options?.reasoningEffort ||

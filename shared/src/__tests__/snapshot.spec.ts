@@ -647,7 +647,25 @@ describe('snapshot reducer', () => {
             role: 'user',
             status: 'complete',
             createdAt: '2026-06-05T00:00:01.000Z',
-            parts: [{ type: 'text', text: 'older prompt' }],
+            parts: [
+              { type: 'text', text: 'older prompt' },
+              {
+                type: 'attachment',
+                attachment: {
+                  kind: 'image',
+                  name: 'screenshot.png',
+                  path: '/tmp/screenshot.png',
+                  url: 'file:///tmp/screenshot.png',
+                  mimeType: 'image/png',
+                },
+              },
+              {
+                type: 'attachment',
+                attachment: {
+                  kind: 'file', name: 'report.txt', path: '/tmp/report.txt', mimeType: 'text/plain',
+                },
+              },
+            ],
           },
           {
             id: 'assistant-turn-old',
@@ -666,6 +684,23 @@ describe('snapshot reducer', () => {
       'user-thread-1-turn-old-user-old',
       'assistant-turn-old',
       'message-20260605t000003000z',
+    ]);
+    expect(snapshot.messages[0]?.parts).toStrictEqual([
+      { type: 'text', text: 'older prompt' },
+      {
+        type: 'attachment',
+        attachment: {
+          kind: 'image',
+          name: 'screenshot.png',
+          path: '/tmp/screenshot.png',
+          url: 'file:///tmp/screenshot.png',
+          mimeType: 'image/png',
+        },
+      },
+      {
+        type: 'attachment',
+        attachment: { kind: 'file', name: 'report.txt', path: '/tmp/report.txt', mimeType: 'text/plain' },
+      },
     ]);
 
     applyMainEventToSnapshot(snapshot, {
@@ -793,6 +828,14 @@ describe('snapshot reducer', () => {
             status: 'complete',
             createdAt: '2026-06-05T00:00:02.000Z',
             parts: [{ type: 'text' }],
+          },
+          {
+            id: 'bad-attachment-message',
+            agentId: 'agent-dina',
+            role: 'user',
+            status: 'complete',
+            createdAt: '2026-06-05T00:00:02.000Z',
+            parts: [{ type: 'attachment', attachment: { kind: 'image', name: 42 } }],
           },
         ],
       },

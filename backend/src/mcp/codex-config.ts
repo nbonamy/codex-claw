@@ -1,5 +1,5 @@
 import type { Agent } from '@codex-claw/shared/contracts';
-import type { v2 } from 'codex-app-sdk/codex';
+import type { CodexThreadStartExtension } from 'codex-app-sdk/node';
 import { codexClawDeveloperInstructions } from './agent-prompts';
 
 export function buildCodexClawMcpConfigOverrides(): string[] {
@@ -8,10 +8,10 @@ export function buildCodexClawMcpConfigOverrides(): string[] {
   ];
 }
 
-export function buildCodexClawThreadConfig(agent: Agent, mcpServerUrl: string | null): {
-  config?: NonNullable<v2.ThreadStartParams['config']>;
-  developerInstructions?: string;
-} {
+export function buildCodexClawThreadConfig(
+  agent: Agent,
+  mcpServerUrl: string | null,
+): CodexThreadStartExtension {
   if (!mcpServerUrl) {
     return {};
   }

@@ -7,6 +7,8 @@ import type { AgentBackendDriver, BackendEvent } from '@codex-claw/shared/backen
 import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
+import { CodexBackendDriver } from '../codex/codex-driver';
+import type { CodexSurfaceAgentAdapter } from '../codex/codex-surface-adapter';
 import type { WorkIntegrationManager } from '../work-integrations/manager';
 import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
 
@@ -1297,6 +1299,78 @@ describe('ClawBackendServer', () => {
       expect.objectContaining({ type: 'approval.requested', agentId: 'agent-dina' }),
     ]));
     expect(respondToRequest).toHaveBeenCalledWith({ id: 'approval-1', payload: { decision: 'allow' } });
+    await server.close();
+  });
+
+  it('routes native SDK approval responses through the Codex driver into its surface adapter', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'working' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    let emitAdapterEvent: (event: BackendEvent) => void = () => undefined;
+    const respondToClientRequest = vi.fn().mockResolvedValue(undefined);
+    const adapter = {
+      onEvent: (listener: (event: BackendEvent) => void) => {
+        emitAdapterEvent = listener;
+        return () => undefined;
+      },
+      respondToClientRequest,
+      close: vi.fn().mockResolvedValue(undefined),
+    } as unknown as CodexSurfaceAgentAdapter;
+    const driver = new CodexBackendDriver(adapter);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    emitAdapterEvent({
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-test',
+      turnId: 'turn-test',
+      type: 'backendApproval.requested',
+      payload: {
+        approval: {
+          id: 'approval-native-1',
+          kind: 'command',
+          conversationId: 'thread-test',
+          turnId: 'turn-test',
+          itemId: 'item-test',
+          title: 'Run command',
+          command: 'npm test',
+          allowedScopes: ['once', 'session'],
+          canDeny: true,
+        },
+      },
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'native-approval-response',
+      method: 'client/request/respond',
+      params: {
+        response: {
+          id: 'approval-native-1',
+          payload: { decision: 'allow_conversation' },
+        },
+      },
+    })).resolves.toMatchObject({ result: snapshot });
+
+    expect(respondToClientRequest).toHaveBeenCalledOnce();
+    expect(respondToClientRequest).toHaveBeenCalledWith({
+      id: 'approval-native-1',
+      payload: { decision: 'allow_conversation' },
+    });
     await server.close();
   });
 

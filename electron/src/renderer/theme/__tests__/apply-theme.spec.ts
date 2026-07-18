@@ -5,6 +5,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   document.documentElement.removeAttribute('data-appearance');
   document.documentElement.removeAttribute('data-effective-appearance');
+  document.documentElement.removeAttribute('data-codex-theme');
   document.documentElement.removeAttribute('data-theme');
   document.documentElement.classList.remove('dark');
   document.documentElement.removeAttribute('style');
@@ -39,10 +40,13 @@ describe('applyAppTheme', () => {
     const root = document.documentElement;
     expect(root.dataset.appearance).toBe('dark');
     expect(root.dataset.effectiveAppearance).toBe('dark');
+    expect(root.dataset.codexTheme).toBe('dark');
     expect(root.dataset.theme).toBe('github-dark');
     expect(root.classList.contains('dark')).toBe(true);
     expect(root.style.colorScheme).toBe('dark');
     expect(root.style.getPropertyValue('--color-surface-lowest')).toBe('#010409');
+    expect(root.style.getPropertyValue('--codex-surface-color')).toBe('#010409');
+    expect(root.style.getPropertyValue('--codex-text-color')).toBe('#e6edf3');
     expect(root.style.getPropertyValue('--color-text')).toBe('var(--color-on-surface)');
     expect(root.style.getPropertyValue('--color-shell-main')).toBe('var(--color-surface-low)');
     expect(root.style.getPropertyValue('--color-shell-sidebar')).toBe('var(--color-surface-lowest)');

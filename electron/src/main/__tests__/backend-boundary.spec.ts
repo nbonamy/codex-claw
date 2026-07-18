@@ -61,7 +61,6 @@ describe('Electron backend boundary', () => {
       'git-worktrees.ts',
       'state-persistence.ts',
       'state.ts',
-      'transcription/apple-speech.ts',
       'server.ts',
     ];
 
@@ -95,7 +94,7 @@ describe('Electron backend boundary', () => {
 
     for (const { filePath, source } of sources) {
       expect(source, filePath).not.toMatch(/from ['"].*\/(loops|mcp|work-integrations|git-worktrees|source-repositories|agent-files|state-persistence|state|transcription)(\/|['"])/);
-      expect(source, filePath).not.toMatch(/\b(LoopRunner|LoopScheduler|WorkIntegrationManager|GitHubWorkProviderDriver|AgentCoordinator|McpService|AppStatePersistence|transcribeWithAppleSpeechAnalyzer)\b/);
+      expect(source, filePath).not.toMatch(/\b(LoopRunner|LoopScheduler|WorkIntegrationManager|GitHubWorkProviderDriver|AgentCoordinator|McpService|AppStatePersistence)\b/);
     }
   });
 
@@ -275,13 +274,29 @@ describe('Electron backend boundary', () => {
     expect(source).toContain('request(backendMethods.systemPermissionsAccessibilityOpen)');
   });
 
-  it('keeps Apple Speech helper paths out of per-request Electron IPC', async () => {
+  it('uses the SDK native bridge instead of app-owned transcription IPC', async () => {
     const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
-    const source = await readFile(appControllerPath, 'utf8');
+    const preloadPath = path.resolve(__dirname, '../../preload/index.ts');
+    const backendMethodsPath = path.resolve(__dirname, '../../../../shared/src/backend-protocol/methods.ts');
+    const appController = await readFile(appControllerPath, 'utf8');
+    const preload = await readFile(preloadPath, 'utf8');
+    const backendMethods = await readFile(backendMethodsPath, 'utf8');
 
-    expect(source).toContain('request(backendMethods.transcriptionAppleSpeechCreate');
-    expect(source).not.toContain('assetsPath');
-    expect(source).not.toContain('appleSpeechAssetsPath');
+    expect(appController).toContain('registerCodexNativeIpc');
+    expect(preload).toContain('exposeCodexNativeRendererApi');
+    expect(preload).toContain("from 'codex-app-sdk/electron/preload'");
+    expect(preload).not.toContain("from 'codex-app-sdk/electron';");
+    expect(appController).not.toContain('transcriptionAppleSpeech');
+    expect(preload).not.toContain('transcribeAppleSpeech');
+    expect(backendMethods).not.toContain('transcription/appleSpeech/create');
+  });
+
+  it('packages the SDK-owned Apple Speech helper instead of a Claw copy', async () => {
+    const forgeConfigPath = path.resolve(__dirname, '../../../forge.config.ts');
+    const source = await readFile(forgeConfigPath, 'utf8');
+
+    expect(source).toContain('node_modules/codex-app-sdk/assets/apple-speechanalyzer-cli');
+    expect(source).not.toContain("extraResource: ['assets/apple-speechanalyzer-cli'");
   });
 
   it('keeps shell PATH repair out of Electron startup', async () => {

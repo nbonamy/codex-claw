@@ -171,26 +171,6 @@ describe('BackendDriverRpc', () => {
     await rpc.close();
   });
 
-  it('routes Apple Speech transcription through backend-owned CLI execution', async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-rpc-transcription-'));
-    const rpc = new BackendDriverRpc(new Map([['codex', createDriver()]]));
-    vi.stubEnv('CODEX_CLAW_ASSETS_PATH', path.join(tempDir, 'missing-assets'));
-
-    try {
-      await expect(rpc.handle('transcription/appleSpeech/create', {
-        audioBase64: Buffer.from('audio').toString('base64'),
-        options: { locale: 'en-US' },
-      })).resolves.toMatchObject({
-        text: '',
-        error: expect.stringContaining('Failed to spawn Apple speech CLI'),
-      });
-    } finally {
-      vi.unstubAllEnvs();
-      await rm(tempDir, { recursive: true, force: true });
-      await rpc.close();
-    }
-  });
-
   it('routes agent file listing and previews through backend-owned filesystem access', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-rpc-files-'));
     const rpc = new BackendDriverRpc(new Map([['codex', createDriver()]]));

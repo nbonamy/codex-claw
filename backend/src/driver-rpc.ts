@@ -1,19 +1,17 @@
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/shared/backend-driver';
 import { unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
-import type { Agent, AgentBackend, AppGeneralSettings, AppleSpeechTranscriptionOptions, CreateSourceWorktreeInput, SendPromptOptions } from '@codex-claw/shared/contracts';
+import type { Agent, AgentBackend, AppGeneralSettings, CreateSourceWorktreeInput, SendPromptOptions } from '@codex-claw/shared/contracts';
 import { stat } from 'node:fs/promises';
 import { listAgentFolderFiles, previewAgentFolderFile } from './agent-files';
 import { ClaudeBackendDriver } from './claude/claude-driver';
-import { CodexAgentSessionManager } from './codex/agent-session';
 import { CodexBackendDriver } from './codex/codex-driver';
-import { CodexProcessTransport } from './codex/process-transport';
-import { CodexRpcClient } from './codex/rpc-client';
+import { CodexSurfaceAgentAdapter } from './codex/codex-surface-adapter';
+import { createCodexSurface } from 'codex-app-sdk/node';
 import { createSourceWorktree, listSourceWorktrees, suggestedSourceWorktreePath } from './git-worktrees';
-import { buildCodexClawMcpConfigOverrides } from './mcp/codex-config';
+import { buildCodexClawMcpConfigOverrides, buildCodexClawThreadConfig } from './mcp/codex-config';
 import { listSourceFolders } from './source-folders';
 import { detectSourceFolder, scanSourceRepositories } from './source-repositories';
-import { transcribeWithAppleSpeechAnalyzer } from './transcription/apple-speech';
 
 export type BackendDriverRegistryOptions = {
   clawMcpServerUrl?: string | null;
@@ -21,16 +19,22 @@ export type BackendDriverRegistryOptions = {
 };
 
 export function createDefaultBackendDrivers(options: BackendDriverRegistryOptions = {}): Map<AgentBackend, AgentBackendDriver> {
-  const codexSessionManager = new CodexAgentSessionManager(
-    new CodexRpcClient(new CodexProcessTransport({
+  const codexSurface = createCodexSurface({
+    autoSelectFirstConversation: false,
+    clientInfo: { name: 'codex_claw', title: 'Codex Claw', version: '0.2.0' },
+    transport: {
       command: options.generalSettings?.codexBinaryPath,
       configOverrides: buildCodexClawMcpConfigOverrides(),
-    })),
-    {
-      clawMcpServerUrl: options.clawMcpServerUrl ?? null,
-      readConfigRequirements: true,
     },
-  );
+    extensions: [{
+      configureConversation: ({ extensionContext }) => (
+        isAgent(extensionContext)
+          ? buildCodexClawThreadConfig(extensionContext, options.clawMcpServerUrl ?? null)
+          : {}
+      ),
+    }],
+  });
+  const codexSessionManager = new CodexSurfaceAgentAdapter(codexSurface);
 
   return new Map<AgentBackend, AgentBackendDriver>([
     ['codex', new CodexBackendDriver(codexSessionManager)],
@@ -38,6 +42,12 @@ export function createDefaultBackendDrivers(options: BackendDriverRegistryOption
       clawMcpServerUrl: options.clawMcpServerUrl ?? null,
     })],
   ]);
+}
+
+function isAgent(value: unknown): value is Agent {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return record.backend === 'codex' && typeof record.id === 'string' && typeof record.folder === 'string';
 }
 
 export class BackendDriverRpc {
@@ -223,14 +233,6 @@ export class BackendDriverRpc {
         const record = requireRecord(params);
         return createSourceWorktree(record.input as CreateSourceWorktreeInput);
       }
-      case backendMethods.transcriptionAppleSpeechCreate: {
-        const record = requireRecord(params);
-        const audioBase64 = requireString(record.audioBase64, 'audioBase64');
-        return transcribeWithAppleSpeechAnalyzer(
-          Buffer.from(audioBase64, 'base64'),
-          transcriptionOptions(record.options),
-        );
-      }
       default:
         return undefined;
     }
@@ -304,11 +306,4 @@ function requireRecord(value: unknown): Record<string, unknown> {
     throw new Error('Invalid request params.');
   }
   return value as Record<string, unknown>;
-}
-
-function transcriptionOptions(value: unknown): AppleSpeechTranscriptionOptions | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-  return requireRecord(value) as AppleSpeechTranscriptionOptions;
 }

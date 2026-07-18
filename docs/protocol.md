@@ -89,12 +89,6 @@ reducers locally.
 | `system/permissions/get` | none | `SystemPermissionsStatus` | App-facing permission API owned by `clawd`; desktop status may be delegated to Electron. |
 | `system/permissions/accessibility/open` | none | `SystemPermissionsStatus` | Opens native settings through a client callback, then returns status. |
 
-## Client To `clawd`: Transcription
-
-| Method | Params | Result | Notes |
-| --- | --- | --- | --- |
-| `transcription/appleSpeech/create` | `{ audioBase64, options? }` | `AppleSpeechTranscriptionResult` | Runs the Apple Speech helper from `clawd`; renderer audio is encoded into a JSON-safe payload before crossing the backend protocol. |
-
 ## Client To `clawd`: Agents
 
 | Method | Params | Result | Notes |

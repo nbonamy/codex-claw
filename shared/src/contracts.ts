@@ -19,6 +19,34 @@ export type Team = {
 export type AgentBackend = 'codex' | 'claude';
 
 export type ApprovalPreset = 'ask-for-approval' | 'approve-for-me' | 'full-access';
+export type BackendApprovalDecision = 'approve' | 'deny';
+export type BackendApprovalScope = 'once' | 'session';
+export type BackendRequestedPermission =
+  | {
+    kind: 'filesystem';
+    access: 'read' | 'write' | 'deny';
+    path: string;
+  }
+  | {
+    kind: 'network';
+    enabled: boolean;
+    host?: string;
+    protocol?: string;
+  };
+export type BackendApprovalRequest = {
+  id: string;
+  kind: 'command' | 'file-change' | 'permissions';
+  conversationId: string;
+  turnId?: string;
+  itemId: string;
+  title: string;
+  description?: string;
+  command?: string;
+  cwd?: string;
+  requestedPermissions?: BackendRequestedPermission[];
+  allowedScopes?: BackendApprovalScope[];
+  canDeny?: boolean;
+};
 
 export type CodexApprovalPreset = ApprovalPreset;
 
@@ -395,6 +423,7 @@ export type ReasoningEffort = string;
 export type BackendPlanModeSupport = 'native' | 'prompted' | 'unsupported';
 
 export type BackendCapabilities = {
+  attachments: boolean;
   models: boolean;
   skills: boolean;
   reasoningEffort: boolean;
@@ -559,7 +588,24 @@ export type PromptSkillInput = {
   path: string;
 };
 
+export type PromptAttachment =
+  | {
+    type: 'image';
+    path: string;
+    detail?: 'auto' | 'low' | 'high' | 'original';
+    name?: string;
+    mimeType?: string;
+    previewUrl?: string;
+  }
+  | {
+    type: 'file';
+    path: string;
+    name?: string;
+    mimeType?: string;
+  };
+
 export type SendPromptOptions = {
+  attachments?: readonly PromptAttachment[];
   model?: string | null;
   planMode?: boolean;
   reasoningEffort?: ReasoningEffort | null;
@@ -578,16 +624,6 @@ export type BackendPromptOptions =
     thinkingBudgetTokens?: number | null;
     permissionMode?: string | null;
   };
-
-export type AppleSpeechTranscriptionOptions = {
-  locale?: string;
-  live?: boolean;
-};
-
-export type AppleSpeechTranscriptionResult = {
-  text: string;
-  error?: string;
-};
 
 export type SystemPermissionsStatus = {
   platform: string;
@@ -655,7 +691,16 @@ export type UpdateSettingsInput = {
   workProviders?: Partial<Record<WorkProviderKind, WorkProviderSettings>>;
 };
 
+export type RendererMessageAttachment = {
+  kind: 'file' | 'image';
+  name: string;
+  path?: string;
+  url?: string;
+  mimeType?: string;
+};
+
 export type RendererMessagePart =
+  | { type: 'attachment'; attachment: RendererMessageAttachment }
   | { type: 'text'; text: string; itemId?: string }
   | {
     type: 'tool';
@@ -786,6 +831,9 @@ export type MainToRendererEvent = {
     | 'diff.updated'
     | 'git.statusUpdated'
     | 'approval.requested'
+    | 'backendApproval.requested'
+    | 'backendApproval.resolved'
+    | 'clientRequest.resolved'
     | 'toolInput.requested'
     | 'error';
   payload: unknown;
@@ -980,7 +1028,6 @@ export type CodexClawApi = {
   setDaemonEnabled(enabled: boolean): Promise<ClawdDaemonStatus>;
   getSystemPermissions(): Promise<SystemPermissionsStatus>;
   openAccessibilitySettings(): Promise<SystemPermissionsStatus>;
-  transcribeAppleSpeech(audioData: ArrayBuffer, options?: AppleSpeechTranscriptionOptions): Promise<AppleSpeechTranscriptionResult>;
   quit(): Promise<void>;
   restartApp(): Promise<void>;
   setAgentGoal(agentId: string, objective: string): Promise<AppSnapshot>;
