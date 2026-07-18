@@ -1121,6 +1121,10 @@ function isRendererMessagePart(value: unknown): value is RendererMessagePart {
     return isRendererMessageAttachment(value.attachment);
   }
 
+  if (value.type === 'media') {
+    return isRendererMessageMedia(value.media) && optionalString(value.itemId);
+  }
+
   return rendererToolPart(value) !== null;
 }
 
@@ -1134,6 +1138,15 @@ function isRendererMessageAttachment(value: unknown): boolean {
   }
 
   return optionalString(value.path) && optionalString(value.url) && optionalString(value.mimeType);
+}
+
+function isRendererMessageMedia(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.url === 'string' &&
+    optionalString(value.alt) &&
+    optionalString(value.mimeType) &&
+    optionalString(value.prompt) &&
+    optionalString(value.title);
 }
 
 function optionalString(value: unknown): boolean {

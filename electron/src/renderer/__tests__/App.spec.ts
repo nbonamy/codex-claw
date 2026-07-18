@@ -1,9 +1,13 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../App.vue';
 import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
 import type { CodexClawApi } from '@codex-claw/shared/contracts';
+
+afterEach(() => {
+  delete window.codexClaw;
+});
 
 describe('App', () => {
   it('loads the main-process snapshot on mount', async () => {
@@ -15,8 +19,9 @@ describe('App', () => {
     }];
 
     const getSnapshot = vi.fn().mockResolvedValue(snapshot);
-    vi.stubGlobal('window', {
-      codexClaw: {
+    Object.defineProperty(window, 'codexClaw', {
+      configurable: true,
+      value: {
         getSnapshot,
         onEvent: vi.fn(),
       } satisfies Partial<CodexClawApi>,

@@ -290,6 +290,64 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
   });
 
+  it('projects completed generated images into renderer media parts', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
+    await adapter.hydrateAgent(agentA);
+    events.length = 0;
+
+    transport.emit({
+      method: 'item/started',
+      params: {
+        threadId: 'thread-a', turnId: 'turn-image', startedAtMs: 1,
+        item: {
+          type: 'imageGeneration', id: 'image-live', status: 'inProgress',
+          revisedPrompt: null, result: '',
+        },
+      },
+    });
+    transport.emit({
+      method: 'item/completed',
+      params: {
+        threadId: 'thread-a', turnId: 'turn-image', completedAtMs: 2,
+        item: {
+          type: 'imageGeneration', id: 'image-live', status: 'completed',
+          revisedPrompt: 'Draw the route map', result: generatedPngBase64,
+          savedPath: '/tmp/generated route.png',
+        },
+      },
+    });
+
+    await vi.waitFor(() => {
+      const history = [...events].reverse().find((event) => event.type === 'thread.historyLoaded');
+      expect(history).toMatchObject({
+        agentId: 'agent-a',
+        threadId: 'thread-a',
+        payload: {
+          messages: [expect.objectContaining({
+            parts: [
+              expect.objectContaining({
+                type: 'tool', id: 'image-live', status: 'completed',
+              }),
+              {
+                type: 'media',
+                itemId: 'image-live',
+                media: {
+                  url: `data:image/png;base64,${generatedPngBase64}`,
+                  alt: 'Generated image',
+                  mimeType: 'image/png',
+                  prompt: 'Draw the route map',
+                  title: 'Generated image',
+                },
+              },
+            ],
+          })],
+        },
+      });
+    });
+  });
+
   it('refreshes models and uses handle-scoped approval capabilities', async () => {
     const { adapter, transport } = createAdapter();
     const driver = new CodexBackendDriver(adapter);
@@ -386,6 +444,7 @@ describe('CodexSurfaceAgentAdapter', () => {
 
 const agentA = createAgent('agent-a', 'thread-a', '/workspace/a');
 const agentB = createAgent('agent-b', 'thread-b', '/workspace/b');
+const generatedPngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
 function createAdapter(): { adapter: CodexSurfaceAgentAdapter; transport: FakeTransport } {
   const transport = new FakeTransport();
@@ -434,6 +493,7 @@ function resumeResponse(value: Record<string, unknown>): Record<string, unknown>
     },
     activePermissionProfile: { id: ':workspace', extends: null },
     reasoningEffort: 'medium',
+    initialTurnsPage: { data: [], nextCursor: null, backwardsCursor: null },
   };
 }
 

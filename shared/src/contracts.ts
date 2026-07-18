@@ -699,8 +699,17 @@ export type RendererMessageAttachment = {
   mimeType?: string;
 };
 
+export type RendererMessageMedia = {
+  url: string;
+  alt?: string;
+  mimeType?: string;
+  prompt?: string;
+  title?: string;
+};
+
 export type RendererMessagePart =
   | { type: 'attachment'; attachment: RendererMessageAttachment }
+  | { type: 'media'; media: RendererMessageMedia; itemId?: string }
   | { type: 'text'; text: string; itemId?: string }
   | {
     type: 'tool';

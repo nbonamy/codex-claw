@@ -673,7 +673,20 @@ describe('snapshot reducer', () => {
             role: 'assistant',
             status: 'complete',
             createdAt: '2026-06-05T00:00:02.000Z',
-            parts: [{ type: 'text', text: 'older answer' }],
+            parts: [
+              { type: 'text', text: 'older answer' },
+              {
+                type: 'media',
+                itemId: 'generated-image',
+                media: {
+                  url: 'file:///tmp/generated-image.png',
+                  alt: 'Generated image',
+                  mimeType: 'image/png',
+                  prompt: 'Draw a route map',
+                  title: 'Generated image',
+                },
+              },
+            ],
           },
         ],
       },
@@ -700,6 +713,20 @@ describe('snapshot reducer', () => {
       {
         type: 'attachment',
         attachment: { kind: 'file', name: 'report.txt', path: '/tmp/report.txt', mimeType: 'text/plain' },
+      },
+    ]);
+    expect(snapshot.messages[1]?.parts).toStrictEqual([
+      { type: 'text', text: 'older answer' },
+      {
+        type: 'media',
+        itemId: 'generated-image',
+        media: {
+          url: 'file:///tmp/generated-image.png',
+          alt: 'Generated image',
+          mimeType: 'image/png',
+          prompt: 'Draw a route map',
+          title: 'Generated image',
+        },
       },
     ]);
 
@@ -836,6 +863,14 @@ describe('snapshot reducer', () => {
             status: 'complete',
             createdAt: '2026-06-05T00:00:02.000Z',
             parts: [{ type: 'attachment', attachment: { kind: 'image', name: 42 } }],
+          },
+          {
+            id: 'bad-media-message',
+            agentId: 'agent-dina',
+            role: 'assistant',
+            status: 'complete',
+            createdAt: '2026-06-05T00:00:02.000Z',
+            parts: [{ type: 'media', media: { url: 42 } }],
           },
         ],
       },
