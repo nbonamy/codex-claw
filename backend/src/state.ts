@@ -19,6 +19,17 @@ export function backendProviderTokensFilePath(): string {
   return path.join(backendHomeDir(), 'provider-tokens.json');
 }
 
+/** Isolated Codex app-server state; never share the user's ~/.codex threads. */
+export function backendCodexHomeDir(): string {
+  return path.join(backendHomeDir(), 'codex-home');
+}
+
+export async function ensureBackendCodexHome(): Promise<string> {
+  const home = backendCodexHomeDir();
+  await mkdir(home, { recursive: true, mode: 0o700 });
+  return home;
+}
+
 export function backendSocketPath(): string {
   return path.join(backendHomeDir(), 'clawd.sock');
 }

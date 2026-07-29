@@ -15,7 +15,7 @@ const agent: Agent = {
 };
 
 describe('codex-config', () => {
-  it('keeps only global feature overrides on the app-server command line', () => {
+  it('enables the required event feature without creating a partial MCP server config', () => {
     expect(buildCodexClawMcpConfigOverrides()).toStrictEqual([
       'features.apply_patch_streaming_events=true',
     ]);
@@ -30,6 +30,13 @@ describe('codex-config', () => {
       },
       developerInstructions: expect.stringContaining('Your Codex Claw agent ID is agent-dina.'),
     });
+  });
+
+  it('directs GUI automation to Claw MCP rather than the built-in Codex Computer Use skill', () => {
+    const config = buildCodexClawThreadConfig(agent, 'http://127.0.0.1:8767/mcp');
+
+    expect(config.developerInstructions).toContain('computer-use-status');
+    expect(config.developerInstructions).toContain('Do not load or use the built-in computer-use skill, node_repl, or sky.* methods');
   });
 
   it('preserves existing query params when scoping an MCP URL to an agent', () => {

@@ -1,8 +1,8 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { backendHomeDir, backendProviderTokensFilePath, backendStateFilePath, loadBackendSnapshot, saveBackendSnapshot } from '../state';
+import { backendCodexHomeDir, backendHomeDir, backendProviderTokensFilePath, backendStateFilePath, ensureBackendCodexHome, loadBackendSnapshot, saveBackendSnapshot } from '../state';
 import { persistedStateFromSnapshot } from '../state-persistence';
 
 describe('backend state loading', () => {
@@ -28,8 +28,15 @@ describe('backend state loading', () => {
 
   it('uses CODEX_CLAW_HOME as the only backend home override', () => {
     expect(backendHomeDir()).toBe(homeDir);
+    expect(backendCodexHomeDir()).toBe(path.join(homeDir, 'codex-home'));
     expect(backendStateFilePath()).toBe(path.join(homeDir, 'state.json'));
     expect(backendProviderTokensFilePath()).toBe(path.join(homeDir, 'provider-tokens.json'));
+  });
+
+  it('creates an isolated Codex home under the Claw backend home', async () => {
+    await expect(ensureBackendCodexHome()).resolves.toBe(path.join(homeDir, 'codex-home'));
+    const directory = await stat(path.join(homeDir, 'codex-home'));
+    expect(directory.isDirectory()).toBe(true);
   });
 
   it('creates a default snapshot when no state file exists', async () => {

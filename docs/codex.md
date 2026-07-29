@@ -78,10 +78,11 @@ Connection flow:
 7. Stream notifications and server requests into the session manager.
 8. Cleanly interrupt, stop, or shut down when the app exits.
 
-For the first chat milestone, Codex Claw inherits the user's normal Codex
-environment by default so existing authentication works. Set
-`CODEX_CLAW_CODEX_HOME` to point the spawned app-server at an isolated Codex
-home when testing or when we later build a dedicated auth/onboarding flow.
+Codex Claw always gives the SDK an isolated Codex home at
+`~/.codex-claw/codex-home` (or `$CODEX_CLAW_HOME/codex-home`). It never uses
+the user's `~/.codex`, so Claw threads, config, and auth state cannot pollute
+the normal Codex CLI/Desktop home. The isolated home may require its own sign
+in on first launch; do not copy normal Codex thread or auth files into it.
 
 The General settings Advanced section can store a Codex executable path. Empty
 uses SDK discovery across the inherited and login-shell `PATH`, common user and
@@ -288,8 +289,7 @@ Each `thread/start` still receives agent-specific developer instructions, such
 as the Claw agent ID/name/folder and guidance to use the MCP server without
 passing its own caller ID to each tool.
 
-This keeps normal Codex config and normal Codex data untouched, including when
-`CODEX_CLAW_CODEX_HOME` is used for an isolated Codex home.
+This keeps normal Codex config and normal Codex data untouched.
 
 ## Notifications And Server Requests
 

@@ -13,6 +13,9 @@ class FakeTransport implements RpcTransport {
   skillVersion = 1;
   modelVersion = 1;
   completeTurnsImmediately = false;
+  readonly fullHistoryTurnsByThreadId = new Map<string, Record<string, unknown>[]>();
+  readonly summaryTurnsByThreadId = new Map<string, Record<string, unknown>[]>();
+  readonly staleActiveThreadIds = new Set<string>();
   private readonly listeners = new Set<(message: unknown) => void>();
   private readonly errorListeners = new Set<(error: Error) => void>();
 
@@ -85,7 +88,19 @@ class FakeTransport implements RpcTransport {
       case 'thread/resume': {
         const threadId = String((params as { threadId: string }).threadId);
         const cwd = String((params as { cwd?: string }).cwd ?? `/workspace/${threadId.at(-1)}`);
-        return resumeResponse(thread(threadId, cwd));
+        return resumeResponse(
+          thread(threadId, cwd),
+          this.summaryTurnsByThreadId.get(threadId)
+            ?? (this.staleActiveThreadIds.has(threadId) ? [turn(`turn-${threadId}`, 'inProgress')] : []),
+        );
+      }
+      case 'thread/turns/list': {
+        const threadId = String((params as { threadId: string }).threadId);
+        return {
+          data: this.fullHistoryTurnsByThreadId.get(threadId) ?? [],
+          nextCursor: null,
+          backwardsCursor: null,
+        };
       }
       case 'thread/goal/get': return { goal: null };
       case 'thread/goal/set': {
@@ -106,7 +121,14 @@ class FakeTransport implements RpcTransport {
         return { thread: thread(threadId, `/workspace/${threadId.at(-1)}`) };
       }
       case 'thread/settings/update': return {};
-      case 'turn/interrupt': return {};
+      case 'turn/interrupt': {
+        const input = params as { threadId: string; turnId: string };
+        this.emit({
+          method: 'turn/completed',
+          params: { threadId: input.threadId, turn: turn(input.turnId, 'interrupted') },
+        });
+        return {};
+      }
       default: return {};
     }
   }
@@ -371,6 +393,75 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
   });
 
+  it('interrupts an orphaned active turn before hydrating a cold conversation', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    transport.staleActiveThreadIds.add('thread-a');
+    adapter.onEvent((event) => events.push(event));
+
+    await adapter.hydrateAgent(agentA);
+
+    expect(lastRequest(transport, 'turn/interrupt')).toMatchObject({
+      params: { threadId: 'thread-a', turnId: 'turn-thread-a' },
+    });
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-a',
+      type: 'agent.statusChanged',
+      payload: { type: 'idle' },
+    }));
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-a',
+      type: 'turn.completed',
+      turnId: 'turn-thread-a',
+      payload: { status: 'interrupted' },
+    }));
+    expect(events.find((event) => event.type === 'thread.historyLoaded')).toMatchObject({
+      payload: { messages: expect.not.arrayContaining([expect.objectContaining({ status: 'streaming' })]) },
+    });
+  });
+
+  it('replaces summary-only restart history with every persisted turn item', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    const turnId = 'turn-thread-a';
+    transport.summaryTurnsByThreadId.set('thread-a', [
+      turn(turnId, 'completed', [
+        agentMessage('agent-final', 'Done — your Mac is now in Dark Mode.'),
+      ]),
+    ]);
+    transport.fullHistoryTurnsByThreadId.set('thread-a', [
+      turn(turnId, 'completed', [
+        agentMessage('agent-start', 'I’ll switch macOS to Dark appearance now.'),
+        {
+          type: 'commandExecution', id: 'command-settings', command: 'computer-use click',
+          cwd: '/workspace/a', processId: null, source: 'unifiedExec', status: 'completed',
+          commandActions: [], aggregatedOutput: 'clicked', exitCode: 0, durationMs: 20,
+        },
+        agentMessage('agent-final', 'Done — your Mac is now in Dark Mode.'),
+      ]),
+    ]);
+    adapter.onEvent((event) => events.push(event));
+
+    await adapter.hydrateAgent(agentA);
+
+    const history = events.filter((event) => event.type === 'thread.historyLoaded').at(-1);
+    expect(history).toMatchObject({
+      payload: {
+        replace: true,
+        messages: [
+          {
+            role: 'assistant',
+            parts: [
+              { type: 'text', text: 'I’ll switch macOS to Dark appearance now.' },
+              { type: 'tool', id: 'command-settings', kind: 'command' },
+              { type: 'text', text: 'Done — your Mac is now in Dark Mode.' },
+            ],
+          },
+        ],
+      },
+    });
+  });
+
   it('suppresses server-owned action echoes while keeping hydrate and explicit resume ownership exact', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
@@ -476,11 +567,19 @@ function thread(id: string, cwd: string): Record<string, unknown> {
   };
 }
 
-function turn(id: string, status: string): Record<string, unknown> {
-  return { id, status, items: [], startedAt: 1_700_000_000, completedAt: null, error: null };
+function turn(
+  id: string,
+  status: string,
+  items: Record<string, unknown>[] = [],
+): Record<string, unknown> {
+  return { id, status, items, itemsView: 'full', startedAt: 1_700_000_000, completedAt: null, error: null };
 }
 
-function resumeResponse(value: Record<string, unknown>): Record<string, unknown> {
+function agentMessage(id: string, text: string): Record<string, unknown> {
+  return { type: 'agentMessage', id, text, phase: null, memoryCitation: null };
+}
+
+function resumeResponse(value: Record<string, unknown>, turns: Record<string, unknown>[] = []): Record<string, unknown> {
   return {
     thread: value,
     model: 'gpt-5',
@@ -493,7 +592,7 @@ function resumeResponse(value: Record<string, unknown>): Record<string, unknown>
     },
     activePermissionProfile: { id: ':workspace', extends: null },
     reasoningEffort: 'medium',
-    initialTurnsPage: { data: [], nextCursor: null, backwardsCursor: null },
+    initialTurnsPage: { data: turns, nextCursor: null, backwardsCursor: null },
   };
 }
 

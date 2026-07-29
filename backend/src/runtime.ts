@@ -13,7 +13,7 @@ import { LoopScheduler } from './loops/scheduler';
 import { ClawMcpService } from './mcp/service';
 import { runtimeGitHubOAuthClientId } from './runtime-config';
 import { ClawBackendServer } from './server';
-import { backendProviderTokensFilePath, loadBackendSnapshot, saveBackendSnapshot } from './state';
+import { backendProviderTokensFilePath, ensureBackendCodexHome, loadBackendSnapshot, saveBackendSnapshot } from './state';
 import { FileWorkIntegrationTokenStore } from './work-integrations/file-token-store';
 import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
 import { WorkIntegrationManager } from './work-integrations/manager';
@@ -34,7 +34,16 @@ export type ClawdRuntime = {
 
 export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<ClawdRuntime> {
   const snapshot = await loadBackendSnapshot();
-  const mcpService = new ClawMcpService({ snapshot });
+  await ensureBackendCodexHome();
+  const mcpService = new ClawMcpService({
+    snapshot,
+    computerUse: {
+      execute: (input) => options.requestClient(backendMethods.clientComputerUseExecute, input),
+      requestAccessibility: () => options.requestClient(backendMethods.clientComputerUseRequestAccessibility),
+      status: () => options.requestClient(backendMethods.clientComputerUseStatusGet),
+      stop: () => options.requestClient(backendMethods.clientComputerUseStop),
+    },
+  });
   const mcpServerUrl = await mcpService.start();
   const backendDrivers = createDefaultBackendDrivers({
     clawMcpServerUrl: mcpServerUrl,
@@ -100,6 +109,10 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     remoteClients: new RemoteClawdClientManager({
       requestHandlers: {
         [backendMethods.clientExternalOpen]: (params) => options.requestClient(backendMethods.clientExternalOpen, params),
+        [backendMethods.clientComputerUseExecute]: (params) => options.requestClient(backendMethods.clientComputerUseExecute, params),
+        [backendMethods.clientComputerUseStop]: (params) => options.requestClient(backendMethods.clientComputerUseStop, params),
+        [backendMethods.clientComputerUseRequestAccessibility]: (params) => options.requestClient(backendMethods.clientComputerUseRequestAccessibility, params),
+        [backendMethods.clientComputerUseStatusGet]: (params) => options.requestClient(backendMethods.clientComputerUseStatusGet, params),
         [backendMethods.clientSystemPermissionsGet]: (params) => options.requestClient(backendMethods.clientSystemPermissionsGet, params),
         [backendMethods.clientSystemPermissionsAccessibilityOpen]: (params) => options.requestClient(backendMethods.clientSystemPermissionsAccessibilityOpen, params),
       },

@@ -5,17 +5,20 @@ import type { AddressInfo } from 'node:net';
 import { logMain, warnMain } from '../log';
 import type { ClawMcpAgentCoordinator } from './agent-coordinator';
 import { createCodexClawMcpServer } from './tools';
+import type { ComputerUseClient } from './computer-use-tools';
 
 const maxBodyBytes = 1024 * 1024;
 
 export type ClawMcpHttpServerOptions = {
   coordinator: ClawMcpAgentCoordinator;
+  computerUse?: ComputerUseClient;
   host?: string;
   port?: number;
 };
 
 export class ClawMcpHttpServer {
   private readonly coordinator: ClawMcpAgentCoordinator;
+  private readonly computerUse: ComputerUseClient | undefined;
   private readonly host: string;
   private readonly port: number;
   private server: http.Server | null = null;
@@ -23,6 +26,7 @@ export class ClawMcpHttpServer {
 
   constructor(options: ClawMcpHttpServerOptions) {
     this.coordinator = options.coordinator;
+    this.computerUse = options.computerUse;
     this.host = options.host ?? '127.0.0.1';
     this.port = options.port ?? 0;
   }
@@ -127,7 +131,7 @@ export class ClawMcpHttpServer {
     }
 
     this.coordinator.connectAgent(agentId);
-    const mcpServer = createCodexClawMcpServer(this.coordinator, agentId);
+    const mcpServer = createCodexClawMcpServer(this.coordinator, agentId, this.computerUse);
     const transport = new StreamableHTTPServerTransport({
       enableJsonResponse: true,
       sessionIdGenerator: undefined,

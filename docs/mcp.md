@@ -20,12 +20,14 @@ Backend responsibilities:
 - enforce team visibility;
 - notify the right agent when inbox work arrives;
 - translate status updates into app-owned `agent.updated` events.
+- route Computer Use requests to the connected desktop client; `clawd` never spawns the native helper itself.
 
 Electron main responsibilities:
 
 - fan backend events out to renderer windows;
 - perform native desktop effects requested by app-owned backend events;
 - keep preload IPC independent from MCP SDK and provider protocol types.
+- package the product-specific Computer Use helper and execute it only in response to explicit `client/computerUse/*` requests.
 
 Renderer responsibilities:
 
@@ -90,6 +92,31 @@ The scoped `mcp_servers.codex_claw.default_tools_approval_mode = "approve"`
 override authorizes only Claw's own collaboration tools; it does not authorize
 all Codex shell/file operations and does not mutate the user's global MCP
 config.
+
+## Computer Use
+
+Computer Use is a local macOS capability exposed through the same Claw MCP
+server. The shared native helper lives in `~/src/computer-use/macos`; Codex
+Claw packages its own signed `Codex Claw Computer Use.app` copy.
+
+When Claw launches Codex app-server, it disables that child process's
+`node_repl` MCP server. This removes Codex Desktop Sky Computer Use (`sky.*`)
+from the Claw session without changing the user's global Codex configuration.
+
+```text
+agent -> codex_claw MCP -> clawd -> client/computerUse RPC -> Electron main -> native helper -> macOS Accessibility
+```
+
+Tools are `computer-use-status`, `computer-use-request-accessibility`,
+`computer-use-list-apps`, `computer-use-find-apps`,
+`computer-use-launch-app`, `computer-use-focus-app`,
+`computer-use-get-app-state`, `computer-use-click`,
+`computer-use-type-text`, `computer-use-set-value`, and
+`computer-use-scroll`.
+
+The helper reports its own Accessibility trust. Agents must check status or
+request permission before inspection/actions and refresh app state before
+acting on an indexed element. Normal MCP approval applies to each call.
 
 For Claude, `clawd` passes the same request-scoped agent URL through the Claude
 CLI instead of mutating global Claude Code config:

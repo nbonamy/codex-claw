@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createClientRequestHandlers } from '../client-request-handlers';
 
+const computerUseOptions = () => ({
+  appPath: '/Applications/Codex Claw.app/Contents/Resources/app.asar',
+  isPackaged: true,
+  platform: 'darwin' as const,
+  resourcesPath: '/Applications/Codex Claw.app/Contents/Resources',
+});
+
 vi.mock('electron', () => ({
   safeStorage: {
     decryptString: vi.fn(),
@@ -19,6 +26,7 @@ describe('createClientRequestHandlers', () => {
       openExternal,
       getSystemPermissionsStatus: vi.fn(),
       openAccessibilitySettings: vi.fn(),
+      computerUseOptions,
     });
 
     await expect(handlers['client/external/open']?.({ url: 'https://example.com' })).resolves.toBe(true);
@@ -38,6 +46,7 @@ describe('createClientRequestHandlers', () => {
       openExternal: vi.fn(),
       getSystemPermissionsStatus,
       openAccessibilitySettings: vi.fn(),
+      computerUseOptions,
     });
 
     expect(await handlers['client/system/permissions/get']?.(undefined)).toStrictEqual(status);
@@ -57,6 +66,7 @@ describe('createClientRequestHandlers', () => {
       openExternal: vi.fn(),
       getSystemPermissionsStatus: vi.fn(),
       openAccessibilitySettings,
+      computerUseOptions,
     });
 
     await expect(handlers['client/system/permissions/accessibility/open']?.(undefined)).resolves.toStrictEqual(status);

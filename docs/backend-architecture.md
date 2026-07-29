@@ -244,7 +244,7 @@ Root `package.json` should be private and orchestration-only:
   "workspaces": ["shared", "backend", "electron"],
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "dev:electron": "npm run dev -w @codex-claw/electron",
+    "dev:electron": "npm run start -w @codex-claw/electron",
     "dev:backend": "npm run dev -w @codex-claw/backend",
     "dev:backend:run": "npm run dev:run -w @codex-claw/backend",
     "build": "npm run build -ws",
@@ -564,7 +564,7 @@ Target commands:
 {
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "dev:electron": "npm run dev -w @codex-claw/electron",
+    "dev:electron": "npm run start -w @codex-claw/electron",
     "dev:backend": "npm run dev -w @codex-claw/backend",
     "dev:backend:run": "npm run dev:run -w @codex-claw/backend"
   }
@@ -573,7 +573,9 @@ Target commands:
 
 The exact script names can change, but the shape should stay:
 
-- `npm run dev` remains the normal entrypoint for app development.
+- `npm run dev` remains the normal entrypoint for app development. Running it
+  from either the repository root or the `electron` workspace delegates to the
+  same root supervisor and therefore the same backend and Codex home.
 - `dev:electron` runs the `electron` workspace's Electron Forge/Vite flow.
 - `dev:backend` watches `backend/src` and `shared/src`, then writes a bundled
   file such as `backend/dist/clawd-dev.mjs`.
@@ -583,6 +585,9 @@ The exact script names can change, but the shape should stay:
   `CODEX_CLAW_BACKEND_ARGS=../backend/dist/clawd-dev.mjs,--stdio`.
 - `clawd` reads and writes state under `~/.codex-claw` by default. The only
   supported state-home override is `CODEX_CLAW_HOME`.
+- Every local `clawd` launch derives Codex app-server `CODEX_HOME` as
+  `$CODEX_CLAW_HOME/codex-home` (default
+  `~/.codex-claw/codex-home`) and ignores an inherited normal Codex home.
 
 Hot reload semantics:
 

@@ -104,6 +104,22 @@ describe('runtime config', () => {
     expect(devScript).not.toContain("CODEX_CLAW_ASSETS_PATH: path.join(rootDir, 'assets')");
   });
 
+  it('routes root and Electron workspace dev commands through the same supervisor', () => {
+    const rootPackage = JSON.parse(
+      readFileSync(path.resolve(__dirname, '../../../../package.json'), 'utf8'),
+    ) as { scripts: Record<string, string> };
+    const electronPackage = JSON.parse(
+      readFileSync(path.resolve(__dirname, '../../../package.json'), 'utf8'),
+    ) as { scripts: Record<string, string> };
+    const devScript = readFileSync(path.resolve(__dirname, '../../../../scripts/dev.mjs'), 'utf8');
+
+    expect(rootPackage.scripts.dev).toBe('node scripts/dev.mjs');
+    expect(electronPackage.scripts.dev).toBe('node ../scripts/dev.mjs');
+    expect(rootPackage.scripts['dev:electron']).toBe('npm run start -w @codex-claw/electron');
+    expect(devScript).toContain("await run('npm', ['run', 'build:computer-use'])");
+    expect(devScript).toContain("start('npm', ['run', 'dev:electron']");
+  });
+
   it('resolves the packaged clawd runtime from resources when no env command is configured', async () => {
     const { runtimeClawdCommand } = await import('../runtime-config');
 

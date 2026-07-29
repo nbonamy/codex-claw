@@ -1,6 +1,7 @@
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
-import { shell } from 'electron';
+import { app, shell } from 'electron';
 import type { SystemPermissionsStatus } from '@codex-claw/shared/contracts';
+import { executeComputerUseCommand, getComputerUseStatus, isComputerUseCommand, requestComputerUseAccessibility, stopComputerUseHelper, type ComputerUseOptions } from './computer-use-tools';
 import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-permissions';
 
 export type ClientRequestHandler = (params: unknown) => unknown | Promise<unknown>;
@@ -9,6 +10,7 @@ export type ClientRequestHandlersOptions = {
   openExternal: (url: string) => Promise<unknown>;
   getSystemPermissionsStatus: () => SystemPermissionsStatus;
   openAccessibilitySettings: () => Promise<SystemPermissionsStatus>;
+  computerUseOptions: () => ComputerUseOptions;
 };
 
 export function createRuntimeClientRequestHandlers(): Record<string, ClientRequestHandler> {
@@ -16,6 +18,12 @@ export function createRuntimeClientRequestHandlers(): Record<string, ClientReque
     openExternal: (url) => shell.openExternal(url),
     getSystemPermissionsStatus,
     openAccessibilitySettings,
+    computerUseOptions: () => ({
+      appPath: app.getAppPath(),
+      isPackaged: app.isPackaged,
+      platform: process.platform,
+      resourcesPath: process.resourcesPath,
+    }),
   });
 }
 
@@ -29,6 +37,23 @@ export function createClientRequestHandlers(options: ClientRequestHandlersOption
     },
     [backendMethods.clientSystemPermissionsGet]: () => options.getSystemPermissionsStatus(),
     [backendMethods.clientSystemPermissionsAccessibilityOpen]: () => options.openAccessibilitySettings(),
+    [backendMethods.clientComputerUseStatusGet]: () => getComputerUseStatus(options.computerUseOptions()),
+    [backendMethods.clientComputerUseRequestAccessibility]: () => requestComputerUseAccessibility(options.computerUseOptions()),
+    [backendMethods.clientComputerUseStop]: () => {
+      stopComputerUseHelper();
+      return { stopped: true };
+    },
+    [backendMethods.clientComputerUseExecute]: async (params) => {
+      const input = requireRecord(params);
+      if (!isComputerUseCommand(input.command)) {
+        throw new Error('Invalid Computer Use command.');
+      }
+      return executeComputerUseCommand({
+        arguments: requireRecord(input.arguments),
+        command: input.command,
+        options: options.computerUseOptions(),
+      });
+    },
   };
 }
 

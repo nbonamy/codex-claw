@@ -277,18 +277,46 @@ export class CodexSurfaceAgentAdapter {
     threadId: string,
     emitHistory: boolean,
   ): Promise<AgentConversation> {
+    const existing = this.sessionsByAgentId.get(agent.id);
+    if (existing && existing.handle.id === threadId) {
+      existing.agent = agent;
+      const snapshot = existing.handle.getSnapshot();
+      if (emitHistory) this.publishInitial(existing, snapshot, true);
+      else this.rememberPending(existing, snapshot);
+      return existing;
+    }
+
     await this.start();
     const session = this.bindRuntime(agent, threadId, false, true);
     try {
       let snapshot = await session.handle.load({ cwd: expandHome(agent.folder), extensionContext: agent });
+      const interruptedTurnId = snapshot.activeTurnId;
+      if (interruptedTurnId) {
+        // A newly created Claw backend has no ownership of an old in-progress
+        // turn. Leaving it active here permanently disables the composer after
+        // an app restart, so ask app-server to end that orphaned turn before
+        // exposing the hydrated conversation.
+        snapshot = await session.handle.interrupt();
+      }
       const requestedPreset = codexApprovalPresetFromDefaults(agent.backendDefaults);
       const effectivePreset = effectiveApprovalPreset(requestedPreset, snapshot.approvalPresets);
       if (effectivePreset && snapshot.approvalPreset !== effectivePreset) {
         snapshot = await session.handle.updateSettings({ approvalPreset: effectivePreset });
       }
       session.suppressEvents = false;
-      if (emitHistory) this.publishInitial(session, snapshot, true);
-      else this.rememberPending(session, snapshot);
+      snapshot = session.handle.getSnapshot();
+      if (emitHistory) {
+        this.publishInitial(session, snapshot, true);
+        if (interruptedTurnId) {
+          this.emitThread(session, {
+            type: 'turn.completed',
+            turnId: interruptedTurnId,
+            payload: { status: 'interrupted' },
+          });
+        }
+      } else {
+        this.rememberPending(session, snapshot);
+      }
       return session;
     } catch (error) {
       this.forgetAgentSession(agent.id);
@@ -327,7 +355,7 @@ export class CodexSurfaceAgentAdapter {
     emitHistory: boolean,
   ): void {
     this.emitThread(session, { type: 'thread.started', payload: { cwd: conversationCwd(snapshot) } });
-    if (emitHistory) this.emitHistory(session, snapshot.messages);
+    if (emitHistory) this.emitHistory(session, snapshot.messages, undefined, snapshot.activeTurnId === null);
     this.emitSettings(session, snapshot.approvalPreset, snapshot.planMode);
     if (snapshot.goal) this.emitThread(session, { type: 'thread.goalUpdated', payload: { goal: snapshot.goal } });
     if (snapshot.contextUsage) {
@@ -572,10 +600,11 @@ export class CodexSurfaceAgentAdapter {
     session: AgentConversation,
     messages: readonly SurfaceMessage[],
     occurredAt?: string,
+    completeStreaming = false,
   ): void {
     this.emitThread(session, {
       type: 'thread.historyLoaded',
-      payload: { messages: surfaceMessages(messages, session.agent.id), replace: true },
+      payload: { messages: surfaceMessages(messages, session.agent.id, completeStreaming), replace: true },
       ...(occurredAt ? { occurredAt } : {}),
     });
   }
@@ -715,13 +744,17 @@ function resultTurnId(
     ?? snapshot.turnIds.at(-1);
 }
 
-function surfaceMessages(messages: readonly SurfaceMessage[], agentId: string): RendererMessage[] {
+function surfaceMessages(
+  messages: readonly SurfaceMessage[],
+  agentId: string,
+  completeStreaming = false,
+): RendererMessage[] {
   return messages.map((message) => ({
     id: message.id,
     agentId,
     ...(message.kind ? { kind: message.kind } : {}),
     role: message.role,
-    status: message.status,
+    status: completeStreaming && message.status === 'streaming' ? 'complete' : message.status,
     ...(message.turnId ? { turnId: message.turnId } : {}),
     parts: message.parts.map(rendererPart),
     createdAt: message.createdAt ?? new Date(0).toISOString(),

@@ -83,6 +83,56 @@ describe('ClawMcpService', () => {
     }));
   });
 
+  it('routes Computer Use MCP calls through the desktop client port', async () => {
+    const status = vi.fn().mockResolvedValue({ available: true, accessibilityTrusted: true, platform: 'darwin' });
+    const execute = vi.fn().mockResolvedValue({ ok: true, result: { apps: [] } });
+    const stop = vi.fn().mockResolvedValue({ stopped: true });
+    service = new ClawMcpService({
+      snapshot: createInitialSnapshot(),
+      computerUse: {
+        execute,
+        requestAccessibility: vi.fn(),
+        status,
+        stop,
+      },
+    });
+    const url = await service.start();
+
+    const toolsResponse = await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 1, method: 'tools/list', params: {},
+    });
+    expect(toolsResponse.result.tools.map((tool: { name: string }) => tool.name)).toEqual(expect.arrayContaining([
+      'computer-use-status',
+      'computer-use-get-app-state',
+      'computer-use-click',
+      'computer-use-stop',
+    ]));
+
+    const statusResponse = await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'computer-use-status', arguments: {} },
+    });
+    expect(statusResponse.result.isError).toBe(false);
+    expect(status).toHaveBeenCalledOnce();
+
+    const stateResponse = await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0',
+      id: 3,
+      method: 'tools/call',
+      params: { name: 'computer-use-get-app-state', arguments: { app: 'TextEdit', maxNodes: 200 } },
+    });
+    expect(execute).toHaveBeenCalledWith({
+      command: 'get_app_state',
+      arguments: { app: 'TextEdit', maxNodes: 200 },
+    });
+    expect(stateResponse.result.content[0].text).toBe('{"apps":[]}');
+
+    const stopResponse = await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'computer-use-stop', arguments: {} },
+    });
+    expect(stopResponse.result.structuredContent).toStrictEqual({ stopped: true });
+    expect(stop).toHaveBeenCalledOnce();
+  });
+
   it('completes existing-team loop executions only after every created assignment is done and deletes the created agents', async () => {
     const snapshot = createLoopSnapshot({
       teamTarget: { mode: 'existing', teamId: 'team-codex-claw' },

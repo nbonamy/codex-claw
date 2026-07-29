@@ -57,7 +57,11 @@ const config: ForgeConfig = {
     icon: 'assets/icon',
     appBundleId: 'com.nabocorp.codex-claw',
     executableName: 'codex-claw',
-    extraResource: [appleSpeechHelperPath, 'resources/clawd'],
+    extraResource: [
+      appleSpeechHelperPath,
+      'resources/clawd',
+      '.computer-use/Codex Claw Computer Use.app',
+    ],
     extendInfo: 'build/Info.plist',
     ...osxPackagerConfig,
     afterCopyExtraResources: [

@@ -6,8 +6,13 @@ import type { ClawMcpAgentCoordinator } from './agent-coordinator';
 import { McpToolError } from './agent-coordinator';
 import { CHECK_INBOX_PROMPT } from './agent-prompts';
 import { errorToolResult, structuredToolResult } from './tool-result';
+import { registerComputerUseTools, type ComputerUseClient } from './computer-use-tools';
 
-export function createCodexClawMcpServer(coordinator: ClawMcpAgentCoordinator, callerAgentId: string): McpServer {
+export function createCodexClawMcpServer(
+  coordinator: ClawMcpAgentCoordinator,
+  callerAgentId: string,
+  computerUse?: ComputerUseClient,
+): McpServer {
   const server = new McpServer({
     name: 'codex-claw-mcp',
     version: '1.0.0',
@@ -140,6 +145,10 @@ export function createCodexClawMcpServer(coordinator: ClawMcpAgentCoordinator, c
     hasMarkdown: Boolean(markdown),
     titleLength: title?.length ?? 0,
   }, () => coordinator.displayMarkdown(callerAgentId, { path, markdown, title })));
+
+  if (computerUse) {
+    registerComputerUseTools(server, computerUse);
+  }
 
   return server;
 }

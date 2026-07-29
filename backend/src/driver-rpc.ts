@@ -7,9 +7,11 @@ import { listAgentFolderFiles, previewAgentFolderFile } from './agent-files';
 import { ClaudeBackendDriver } from './claude/claude-driver';
 import { CodexBackendDriver } from './codex/codex-driver';
 import { CodexSurfaceAgentAdapter } from './codex/codex-surface-adapter';
+import { resolveCodexCommand } from './codex/codex-command';
 import { createCodexSurface } from 'codex-app-sdk/node';
 import { createSourceWorktree, listSourceWorktrees, suggestedSourceWorktreePath } from './git-worktrees';
 import { buildCodexClawMcpConfigOverrides, buildCodexClawThreadConfig } from './mcp/codex-config';
+import { backendCodexHomeDir } from './state';
 import { listSourceFolders } from './source-folders';
 import { detectSourceFolder, scanSourceRepositories } from './source-repositories';
 
@@ -19,11 +21,24 @@ export type BackendDriverRegistryOptions = {
 };
 
 export function createDefaultBackendDrivers(options: BackendDriverRegistryOptions = {}): Map<AgentBackend, AgentBackendDriver> {
-  const codexSurface = createCodexSurface({
+  const codexSurface = createCodexSurface(codexClawSurfaceOptions(options));
+  const codexSessionManager = new CodexSurfaceAgentAdapter(codexSurface);
+
+  return new Map<AgentBackend, AgentBackendDriver>([
+    ['codex', new CodexBackendDriver(codexSessionManager)],
+    ['claude', new ClaudeBackendDriver(undefined, undefined, {
+      clawMcpServerUrl: options.clawMcpServerUrl ?? null,
+    })],
+  ]);
+}
+
+export function codexClawSurfaceOptions(options: BackendDriverRegistryOptions = {}): Parameters<typeof createCodexSurface>[0] {
+  return {
     autoSelectFirstConversation: false,
     clientInfo: { name: 'codex_claw', title: 'Codex Claw', version: '0.2.0' },
+    codexHome: backendCodexHomeDir(),
     transport: {
-      command: options.generalSettings?.codexBinaryPath,
+      command: resolveCodexCommand(options.generalSettings?.codexBinaryPath),
       configOverrides: buildCodexClawMcpConfigOverrides(),
     },
     extensions: [{
@@ -33,15 +48,7 @@ export function createDefaultBackendDrivers(options: BackendDriverRegistryOption
           : {}
       ),
     }],
-  });
-  const codexSessionManager = new CodexSurfaceAgentAdapter(codexSurface);
-
-  return new Map<AgentBackend, AgentBackendDriver>([
-    ['codex', new CodexBackendDriver(codexSessionManager)],
-    ['claude', new ClaudeBackendDriver(undefined, undefined, {
-      clawMcpServerUrl: options.clawMcpServerUrl ?? null,
-    })],
-  ]);
+  };
 }
 
 function isAgent(value: unknown): value is Agent {

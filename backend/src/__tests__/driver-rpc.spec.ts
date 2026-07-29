@@ -4,9 +4,21 @@ import os from 'node:os';
 import path from 'node:path';
 import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/shared/backend-driver';
 import type { Agent } from '@codex-claw/shared/contracts';
-import { BackendDriverRpc } from '../driver-rpc';
+import { BackendDriverRpc, codexClawSurfaceOptions } from '../driver-rpc';
 
 describe('BackendDriverRpc', () => {
+  it('puts Codex app-server state below the Claw home instead of ~/.codex', () => {
+    vi.stubEnv('CODEX_CLAW_HOME', '/tmp/codex-claw-isolated-home');
+    vi.stubEnv('CODEX_HOME', '/tmp/normal-codex-home');
+    try {
+      expect(codexClawSurfaceOptions()).toMatchObject({
+        codexHome: '/tmp/codex-claw-isolated-home/codex-home',
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('routes model requests to the agent backend driver', async () => {
     const agent = createAgent();
     const listModels = vi.fn().mockResolvedValue([{ id: 'gpt-test', name: 'GPT Test' }]);
