@@ -38,6 +38,7 @@ describe('Electron backend boundary', () => {
       'backend-client.ts',
       'backend-process-client.ts',
       'backend-socket-client.ts',
+      'browser-pane.ts',
       'client-request-handlers.ts',
       'computer-use-tools.ts',
       'daemon-launch-agent.ts',

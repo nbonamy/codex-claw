@@ -304,6 +304,7 @@ Event `type` values are the app-owned `MainToRendererEvent['type']` union from
   `sidePanel.gitDiffRequested`, `git.statusUpdated`,
   `context.compactionStarted`,
   `account.rateLimitsUpdated`, `skills.changed`;
+- native browser feedback: `browser.annotationCreated` (ephemeral element or area metadata that the renderer queues for a batched agent prompt);
 - work backlog: `workBacklog.assignmentUpdated`;
 - failures: `error`.
 

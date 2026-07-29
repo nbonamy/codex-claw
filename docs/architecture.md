@@ -716,6 +716,21 @@ best-effort prefill. After the device flow starts, the renderer polls the
 work-provider completion endpoint on the provider interval
 instead of requiring a manual "finish connection" step.
 
+## In-app Browser
+
+The in-app browser is a desktop preview surface, separate from
+`client/external/open`. Electron main hosts untrusted HTTP(S) pages in a
+sandboxed `WebContentsView` with a persistent, per-agent browser partition.
+The renderer may request navigation, sizing, and annotation capture,
+but never receives the guest `WebContents`, Node access, cookies, or arbitrary
+page scripting capability. The page captures element clicks or dragged areas
+inside the guest view; Electron returns only structured annotation metadata to
+the renderer. The renderer queues the user's written comments as a transient
+batch, then turns the complete batch into one ordinary agent prompt, leaving
+durable conversation state and agent execution in
+`clawd`. Browser page state is deliberately ephemeral and is not added to the
+persisted application snapshot.
+
 Dragging a work item onto an agent records provider-neutral assignment metadata
 in `workBacklog.assignments`, keyed by provider and provider-generated item id,
 then sends a deterministic prompt through the existing prompt path. Assignment

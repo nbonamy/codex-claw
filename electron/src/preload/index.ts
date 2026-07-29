@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AddSshConnectionInput, AppCommand, ApprovalPreset, BackendConversationRef, BenchLocation, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AppCommand, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
 import { exposeCodexNativeRendererApi, TypedIpcRenderer } from 'codex-app-sdk/electron/preload';
 
@@ -80,6 +80,16 @@ const api: CodexClawApi = {
   deleteMessage: (agentId: string, messageId: string) => ipc.invoke(ipcChannels.deleteMessage, agentId, messageId),
   editMessage: (agentId: string, messageId: string, prompt: string) => ipc.invoke(ipcChannels.editMessage, agentId, messageId, prompt),
   retryMessage: (agentId: string, messageId: string) => ipc.invoke(ipcChannels.retryMessage, agentId, messageId),
+  browserOpen: (agentId: string, url: string) => ipc.invoke(ipcChannels.browserOpen, agentId, url),
+  browserNavigate: (url: string) => ipc.invoke(ipcChannels.browserNavigate, url),
+  browserGoBack: () => ipc.invoke(ipcChannels.browserGoBack),
+  browserGoForward: () => ipc.invoke(ipcChannels.browserGoForward),
+  browserReload: () => ipc.invoke(ipcChannels.browserReload),
+  browserSetBounds: (bounds: BrowserBounds) => ipc.invoke(ipcChannels.browserSetBounds, bounds),
+  browserSetVisible: (visible: boolean) => ipc.invoke(ipcChannels.browserSetVisible, visible),
+  browserSetAnnotationMode: (enabled: boolean) => ipc.invoke(ipcChannels.browserSetAnnotationMode, enabled),
+  browserClearAnnotations: () => ipc.invoke(ipcChannels.browserClearAnnotations),
+  browserClose: () => ipc.invoke(ipcChannels.browserClose),
   respondToClientRequest: (response: ClientRequestResponse) => ipc.invoke(ipcChannels.respondToClientRequest, response),
   onEvent: (listener: (event: MainToRendererEvent) => void) => {
     return ipc.on(ipcChannels.event, listener);

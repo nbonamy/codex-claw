@@ -133,6 +133,26 @@ describe('ClawMcpService', () => {
     expect(stop).toHaveBeenCalledOnce();
   });
 
+  it('routes in-app browser inspection and debugging tools through the desktop client port', async () => {
+    const execute = vi.fn().mockResolvedValue({ url: 'https://example.com', title: 'Example', element: { tag: 'button' } });
+    service = new ClawMcpService({
+      snapshot: createInitialSnapshot(),
+      browser: { execute },
+    });
+    const url = await service.start();
+    const toolsResponse = await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 1, method: 'tools/list', params: {},
+    });
+    expect(toolsResponse.result.tools.map((tool: { name: string }) => tool.name)).toEqual(expect.arrayContaining([
+      'browser-get-dom', 'browser-screenshot', 'browser-click', 'browser-type', 'browser-scroll', 'browser-console-logs',
+    ]));
+    const response = await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'browser-get-dom', arguments: { selector: '#save' } },
+    });
+    expect(response.result.structuredContent).toStrictEqual({ url: 'https://example.com', title: 'Example', element: { tag: 'button' } });
+    expect(execute).toHaveBeenCalledWith({ agentId: 'agent-dina', command: 'dom', arguments: { selector: '#save' } });
+  });
+
   it('completes existing-team loop executions only after every created assignment is done and deletes the created agents', async () => {
     const snapshot = createLoopSnapshot({
       teamTarget: { mode: 'existing', teamId: 'team-codex-claw' },

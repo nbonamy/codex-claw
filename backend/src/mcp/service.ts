@@ -29,6 +29,7 @@ import { ClawMcpAgentCoordinator, McpToolError, type DisplayMarkdownInput, type 
 import { agentMessagesPrompt } from './agent-prompts';
 import { ClawMcpHttpServer } from './http-server';
 import type { ComputerUseClient } from './computer-use-tools';
+import type { InAppBrowserClient } from './browser-tools';
 
 const maxMarkdownBytes = 2 * 1024 * 1024;
 
@@ -37,6 +38,7 @@ export type ClawMcpServiceOptions = {
   now?: () => Date;
   onEvent?: (event: BackendEvent) => void;
   computerUse?: ComputerUseClient;
+  browser?: InAppBrowserClient;
 };
 
 export class ClawMcpService {
@@ -69,7 +71,7 @@ export class ClawMcpService {
       onCreateSourceWorktree: (input) => this.createSourceWorktree(input),
       onCreateAgent: (agent, input) => this.createAgentFromMcp(agent, input),
     });
-    this.server = new ClawMcpHttpServer({ coordinator: this.coordinator, computerUse: options.computerUse });
+    this.server = new ClawMcpHttpServer({ coordinator: this.coordinator, computerUse: options.computerUse, browser: options.browser });
   }
 
   setDriverRpc(driverRpc: BackendDriverRpc): void {

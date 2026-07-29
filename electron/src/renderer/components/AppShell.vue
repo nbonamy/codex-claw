@@ -144,12 +144,14 @@
           :agent="currentAgent"
           :git-status="currentAgentGitStatus"
           :backend-runtime="currentBackendRuntime"
+          :browser-open="browserVisible"
           :is-loading="isLoading"
           :sidebar-collapsed="agentSidebarCollapsed"
           @expand-sidebar="agentSidebarCollapsed = false"
+          @toggle-browser="toggleBrowser"
           @open-git-diff="openAgentGitDiffPreview"
         />
-        <div class="app-shell__body">
+        <div ref="browserBody" class="app-shell__body">
           <AgentEmptyState
             v-if="isAgentEmpty"
             :bench="activeBench"
@@ -195,6 +197,22 @@
             @steer-prompt="$emit('steerPrompt', $event)"
             @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
             @update:plan-mode="$emit('update:planMode', $event)"
+          />
+          <BrowserPanel
+            v-if="browserMounted && currentAgent"
+            v-show="browserVisible"
+            class="app-shell__browser-pane"
+            :style="{ flexBasis: `${browserPaneWidth}px` }"
+            :agent-id="currentAgent.id"
+            :visible="browserVisible"
+            @close="closeBrowser"
+            @send-prompt="forwardPrompt"
+          />
+          <div
+            v-if="browserVisible && browserMounted"
+            class="app-shell__browser-resizer"
+            aria-label="Resize browser side pane"
+            @pointerdown="startBrowserResize"
           />
           <SidePanel
             v-if="sidePanel"
@@ -277,6 +295,7 @@ import SidePanel from './SidePanel.vue';
 import TeamDialog from './TeamDialog.vue';
 import TeamRail from './TeamRail.vue';
 import BenchAgentAssignmentDialog from './BenchAgentAssignmentDialog.vue';
+import BrowserPanel from './BrowserPanel.vue';
 import SettingsView from './SettingsView.vue';
 import type { SettingsTab } from './settings-tabs';
 import { confirmCloseTeam } from './team-close-confirmation';
@@ -491,6 +510,10 @@ const agentSidebarMinWidth = 80;
 const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
 const activeSurface = ref<AppSurface>('agent');
+const browserVisible = ref(false);
+const browserMounted = ref(false);
+const browserPaneWidth = ref(420);
+const browserBody = ref<HTMLElement | null>(null);
 const settingsActiveTab = ref<SettingsTab>('general');
 const agentDialogVisible = ref(false);
 const agentDialogMode = ref<'create' | 'edit'>('create');
@@ -651,6 +674,32 @@ onBeforeUnmount(() => {
 
 function setAgentSidebarWidth(width: number): void {
   agentSidebarWidth.value = Math.min(Math.max(width, agentSidebarMinWidth), agentSidebarMaxWidth);
+}
+
+function toggleBrowser(): void {
+  browserMounted.value = true;
+  browserVisible.value = !browserVisible.value;
+}
+
+function closeBrowser(): void {
+  browserVisible.value = false;
+  browserMounted.value = false;
+}
+
+function startBrowserResize(event: PointerEvent): void {
+  event.preventDefault();
+  const body = browserBody.value;
+  if (!body) return;
+  const updateWidth = (moveEvent: PointerEvent) => {
+    const availableWidth = Math.max(240, body.getBoundingClientRect().width - 240);
+    browserPaneWidth.value = Math.min(Math.max(body.getBoundingClientRect().right - moveEvent.clientX, 240), availableWidth);
+  };
+  const stop = () => {
+    window.removeEventListener('pointermove', updateWidth);
+    window.removeEventListener('pointerup', stop);
+  };
+  window.addEventListener('pointermove', updateWidth);
+  window.addEventListener('pointerup', stop, { once: true });
 }
 
 function openNewAgent(teamId?: string): void {
@@ -1413,6 +1462,8 @@ watch(() => [
 
 watch(() => currentAgent.value?.id ?? null, () => {
   closeSidePanel();
+  browserVisible.value = false;
+  browserMounted.value = false;
 });
 
 watch(() => props.sidePanelRequest, (request) => {
@@ -1535,4 +1586,21 @@ function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
   overflow: hidden;
   display: flex;
 }
+
+.app-shell__browser-pane {
+  flex: 0 0 420px;
+  order: 2;
+  min-width: 0;
+  border-left: 1px solid var(--color-border);
+}
+
+.app-shell__browser-resizer {
+  flex: 0 0 5px;
+  order: 1;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 1;
+}
+
+.app-shell__browser-resizer:hover { background: var(--color-primary); }
 </style>

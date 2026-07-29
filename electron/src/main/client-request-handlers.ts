@@ -11,9 +11,10 @@ export type ClientRequestHandlersOptions = {
   getSystemPermissionsStatus: () => SystemPermissionsStatus;
   openAccessibilitySettings: () => Promise<SystemPermissionsStatus>;
   computerUseOptions: () => ComputerUseOptions;
+  browserExecute?: (agentId: string, command: string, arguments_: Record<string, unknown>) => Promise<unknown>;
 };
 
-export function createRuntimeClientRequestHandlers(): Record<string, ClientRequestHandler> {
+export function createRuntimeClientRequestHandlers(overrides: Pick<ClientRequestHandlersOptions, 'browserExecute'> = {}): Record<string, ClientRequestHandler> {
   return createClientRequestHandlers({
     openExternal: (url) => shell.openExternal(url),
     getSystemPermissionsStatus,
@@ -24,6 +25,7 @@ export function createRuntimeClientRequestHandlers(): Record<string, ClientReque
       platform: process.platform,
       resourcesPath: process.resourcesPath,
     }),
+    ...overrides,
   });
 }
 
@@ -34,6 +36,11 @@ export function createClientRequestHandlers(options: ClientRequestHandlersOption
       const url = requireString(record.url, 'url');
       await options.openExternal(url);
       return true;
+    },
+    [backendMethods.clientBrowserExecute]: async (params) => {
+      if (!options.browserExecute) throw new Error('In-app browser tools are unavailable.');
+      const input = requireRecord(params);
+      return options.browserExecute(requireString(input.agentId, 'agentId'), requireString(input.command, 'command'), requireRecord(input.arguments));
     },
     [backendMethods.clientSystemPermissionsGet]: () => options.getSystemPermissionsStatus(),
     [backendMethods.clientSystemPermissionsAccessibilityOpen]: () => options.openAccessibilitySettings(),

@@ -7,11 +7,13 @@ import { McpToolError } from './agent-coordinator';
 import { CHECK_INBOX_PROMPT } from './agent-prompts';
 import { errorToolResult, structuredToolResult } from './tool-result';
 import { registerComputerUseTools, type ComputerUseClient } from './computer-use-tools';
+import { registerInAppBrowserTools, type InAppBrowserClient } from './browser-tools';
 
 export function createCodexClawMcpServer(
   coordinator: ClawMcpAgentCoordinator,
   callerAgentId: string,
   computerUse?: ComputerUseClient,
+  browser?: InAppBrowserClient,
 ): McpServer {
   const server = new McpServer({
     name: 'codex-claw-mcp',
@@ -149,6 +151,7 @@ export function createCodexClawMcpServer(
   if (computerUse) {
     registerComputerUseTools(server, computerUse);
   }
+  if (browser) registerInAppBrowserTools(server, callerAgentId, browser);
 
   return server;
 }

@@ -43,6 +43,9 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
       status: () => options.requestClient(backendMethods.clientComputerUseStatusGet),
       stop: () => options.requestClient(backendMethods.clientComputerUseStop),
     },
+    browser: {
+      execute: (input) => options.requestClient(backendMethods.clientBrowserExecute, input),
+    },
   });
   const mcpServerUrl = await mcpService.start();
   const backendDrivers = createDefaultBackendDrivers({

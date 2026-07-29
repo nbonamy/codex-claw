@@ -6,12 +6,14 @@ import { logMain, warnMain } from '../log';
 import type { ClawMcpAgentCoordinator } from './agent-coordinator';
 import { createCodexClawMcpServer } from './tools';
 import type { ComputerUseClient } from './computer-use-tools';
+import type { InAppBrowserClient } from './browser-tools';
 
 const maxBodyBytes = 1024 * 1024;
 
 export type ClawMcpHttpServerOptions = {
   coordinator: ClawMcpAgentCoordinator;
   computerUse?: ComputerUseClient;
+  browser?: InAppBrowserClient;
   host?: string;
   port?: number;
 };
@@ -19,6 +21,7 @@ export type ClawMcpHttpServerOptions = {
 export class ClawMcpHttpServer {
   private readonly coordinator: ClawMcpAgentCoordinator;
   private readonly computerUse: ComputerUseClient | undefined;
+  private readonly browser: InAppBrowserClient | undefined;
   private readonly host: string;
   private readonly port: number;
   private server: http.Server | null = null;
@@ -27,6 +30,7 @@ export class ClawMcpHttpServer {
   constructor(options: ClawMcpHttpServerOptions) {
     this.coordinator = options.coordinator;
     this.computerUse = options.computerUse;
+    this.browser = options.browser;
     this.host = options.host ?? '127.0.0.1';
     this.port = options.port ?? 0;
   }
@@ -131,7 +135,7 @@ export class ClawMcpHttpServer {
     }
 
     this.coordinator.connectAgent(agentId);
-    const mcpServer = createCodexClawMcpServer(this.coordinator, agentId, this.computerUse);
+    const mcpServer = createCodexClawMcpServer(this.coordinator, agentId, this.computerUse, this.browser);
     const transport = new StreamableHTTPServerTransport({
       enableJsonResponse: true,
       sessionIdGenerator: undefined,

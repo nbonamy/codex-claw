@@ -9,9 +9,10 @@ import { getClawdDaemonStatus, setClawdDaemonEnabled } from './daemon-launch-age
 import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
 import { sendRendererEvent } from './ipc-events';
+import { BrowserPane } from './browser-pane';
 
 type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
 type StartupMaintenance = () => Promise<void>;
@@ -24,17 +25,23 @@ export class AppController {
   private nativeIpcUnregister: (() => void) | null = null;
   private seq = 0;
 
+  private readonly browserPane = new BrowserPane({
+    onAnnotation: (annotation) => this.emitBrowserAnnotation(annotation),
+  });
+
   private readonly powerSaveBlocker = new AgentActivityPowerSaveBlocker();
   private readonly backendClient: ClawBackendClientPort | null;
 
   constructor(
     initialSnapshot: AppSnapshot | null = null,
-    backendClient: ClawBackendClientPort | null = createRuntimeClawBackendClient(),
+    backendClient: ClawBackendClientPort | null | undefined = undefined,
     private readonly appLifecycle: AppLifecycle = app,
     private readonly startupMaintenance: StartupMaintenance = async () => undefined,
   ) {
     this.snapshot = initialSnapshot;
-    this.backendClient = backendClient;
+    this.backendClient = backendClient ?? createRuntimeClawBackendClient({
+      browserExecute: (agentId, command, arguments_) => this.browserPane.execute(agentId, command, arguments_),
+    });
   }
 
   async initialize(): Promise<void> {
@@ -335,6 +342,17 @@ export class AppController {
       return this.retryMessage(agentId, messageId);
     });
 
+    ipc.handle(ipcChannels.browserOpen, (_event, agentId: string, url: string) => this.browserOpen(agentId, url));
+    ipc.handle(ipcChannels.browserNavigate, (_event, url: string) => this.browserPane.navigate(url));
+    ipc.handle(ipcChannels.browserGoBack, () => this.browserPane.goBack());
+    ipc.handle(ipcChannels.browserGoForward, () => this.browserPane.goForward());
+    ipc.handle(ipcChannels.browserReload, () => this.browserPane.reload());
+    ipc.handle(ipcChannels.browserSetBounds, (_event, bounds: BrowserBounds) => this.browserPane.setBounds(bounds));
+    ipc.handle(ipcChannels.browserSetVisible, (_event, visible: boolean) => this.browserPane.setVisible(visible));
+    ipc.handle(ipcChannels.browserSetAnnotationMode, (_event, enabled: boolean) => this.browserPane.setAnnotationMode(enabled));
+    ipc.handle(ipcChannels.browserClearAnnotations, () => this.browserPane.clearAnnotations());
+    ipc.handle(ipcChannels.browserClose, () => this.browserPane.close());
+
     ipc.handle(ipcChannels.respondToClientRequest, async (_event, response: ClientRequestResponse) => {
       return this.respondToClientRequest(response);
     });
@@ -345,6 +363,7 @@ export class AppController {
   }
 
   async shutdown(): Promise<void> {
+    await this.browserPane.close();
     this.powerSaveBlocker.stop();
     this.nativeIpcUnregister?.();
     this.nativeIpcUnregister = null;
@@ -643,6 +662,24 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentPromptSend, { agentId, prompt, options }));
   }
 
+  private async browserOpen(agentId: string, url: string): Promise<BrowserState> {
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) {
+      throw new Error('Browser window is not available.');
+    }
+    return this.browserPane.open(this.mainWindow, agentId, url);
+  }
+
+  private emitBrowserAnnotation(annotation: BrowserAnnotation): void {
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
+    this.seq += 1;
+    sendRendererEvent(this.mainWindow.webContents, {
+      seq: this.seq,
+      type: 'browser.annotationCreated',
+      payload: annotation,
+      occurredAt: new Date().toISOString(),
+    });
+  }
+
   private async restartAgent(agentId: string): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentRestart, { agentId }));
   }
@@ -846,7 +883,7 @@ export class AppController {
 }
 
 export function startMainApp(): void {
-  const controller = new AppController(null, createRuntimeClawBackendClient(), app, ensureCurrentClawdDaemonForStartup);
+  const controller = new AppController(null, undefined, app, ensureCurrentClawdDaemonForStartup);
   controller.registerIpcHandlers();
 
   void app.whenReady().then(async () => {

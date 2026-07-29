@@ -95,6 +95,15 @@ config.
 
 ## Computer Use
 
+## In-app Browser
+
+When an agent has an open Codex Claw browser pane, the same MCP server exposes
+agent-scoped browser tools for CSS-selected DOM inspection, PNG screenshots,
+clicking, typing, scrolling, and recent console logs. `clawd` routes those
+requests through `client/browser/execute`; Electron main performs the operation
+against its sandboxed `WebContentsView`. The renderer never receives page DOM,
+cookies, screenshots, or arbitrary page-script access.
+
 Computer Use is a local macOS capability exposed through the same Claw MCP
 server. The shared native helper lives in `~/src/computer-use/macos`; Codex
 Claw packages its own signed `Codex Claw Computer Use.app` copy.

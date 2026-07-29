@@ -583,6 +583,30 @@ export type SidePanelGitDiffRequest = {
 
 export type SidePanelRequest = SidePanelMarkdownRequest | SidePanelGitDiffRequest;
 
+export type BrowserBounds = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type BrowserAnnotation = {
+  id: string;
+  url: string;
+  kind: 'element' | 'area';
+  selector?: string;
+  label?: string;
+  comment?: string;
+  rect: { x: number; y: number; width: number; height: number };
+};
+
+export type BrowserState = {
+  url: string;
+  title: string;
+  canGoBack: boolean;
+  canGoForward: boolean;
+};
+
 export type PromptSkillInput = {
   name: string;
   path: string;
@@ -844,6 +868,7 @@ export type MainToRendererEvent = {
     | 'backendApproval.resolved'
     | 'clientRequest.resolved'
     | 'toolInput.requested'
+    | 'browser.annotationCreated'
     | 'error';
   payload: unknown;
   occurredAt: string;
@@ -1048,6 +1073,16 @@ export type CodexClawApi = {
   deleteMessage(agentId: string, messageId: string): Promise<AppSnapshot>;
   editMessage(agentId: string, messageId: string, prompt: string): Promise<AppSnapshot>;
   retryMessage(agentId: string, messageId: string): Promise<AppSnapshot>;
+  browserOpen(agentId: string, url: string): Promise<BrowserState>;
+  browserNavigate(url: string): Promise<BrowserState>;
+  browserGoBack(): Promise<BrowserState>;
+  browserGoForward(): Promise<BrowserState>;
+  browserReload(): Promise<BrowserState>;
+  browserSetBounds(bounds: BrowserBounds): Promise<void>;
+  browserSetVisible(visible: boolean): Promise<void>;
+  browserSetAnnotationMode(enabled: boolean): Promise<void>;
+  browserClearAnnotations(): Promise<void>;
+  browserClose(): Promise<void>;
   respondToClientRequest(response: ClientRequestResponse): Promise<AppSnapshot>;
   onEvent(listener: (event: MainToRendererEvent) => void): () => void;
   onAppCommand(listener: (command: AppCommand) => void): () => void;

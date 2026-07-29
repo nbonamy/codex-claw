@@ -69,6 +69,50 @@ describe('AppShell', () => {
     expect(wrapper.emitted('sendPrompt')).toStrictEqual([['hello']]);
   });
 
+  it('keeps the conversation visible while the browser opens as a right-side pane', async () => {
+    const snapshot = createInitialSnapshot();
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    });
+    const browserOpen = vi.fn().mockResolvedValue({ url: '', title: '', canGoBack: false, canGoForward: false });
+    const browserSetVisible = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(window, 'codexClaw', {
+      configurable: true,
+      value: {
+        browserOpen,
+        browserSetBounds: vi.fn().mockResolvedValue(undefined),
+        browserSetVisible,
+        browserClose: vi.fn().mockResolvedValue(undefined),
+        onEvent: vi.fn(() => vi.fn()),
+      },
+    });
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: snapshot.messages,
+        isLoading: false,
+        isSending: false,
+      },
+      global: { plugins: [ElementPlus, i18n] },
+    });
+
+    await wrapper.get('[aria-label="Toggle browser side pane"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Chat with Dina');
+    expect(wrapper.find('.app-shell__browser-pane').exists()).toBe(true);
+
+    await wrapper.get('[aria-label="Toggle browser side pane"]').trigger('click');
+    await nextTick();
+    await wrapper.get('[aria-label="Toggle browser side pane"]').trigger('click');
+    await flushPromises();
+
+    expect(browserSetVisible).toHaveBeenCalledWith(false);
+    expect(browserOpen).toHaveBeenCalledTimes(1);
+  });
+
   it('opens the active agent git diff from header diff stats', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agentGitStatuses['agent-dina'] = {

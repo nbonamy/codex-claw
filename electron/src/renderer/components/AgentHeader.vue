@@ -82,6 +82,16 @@
           />
         </button>
       </span>
+      <button
+        class="agent-header__browser"
+        type="button"
+        aria-label="Toggle browser side pane"
+        :title="browserOpen ? 'Close in-app browser' : 'Open in-app browser'"
+        :aria-pressed="browserOpen"
+        @click="emit('toggle-browser')"
+      >
+        <IconLayoutSidebarRight aria-hidden="true" />
+      </button>
     </div>
   </header>
 </template>
@@ -90,6 +100,7 @@
 import { computed } from 'vue';
 import type { Agent, AgentGitStatus, BackendRuntimeStatus } from '@codex-claw/shared/contracts';
 import { PanelLeftOpenIcon } from '../shared/icons/app-icons';
+import { IconLayoutSidebarRight } from '@tabler/icons-vue';
 import { CodexAnimatedDiffStat } from 'codex-app-sdk/vue';
 import AgentAvatar from './AgentAvatar.vue';
 
@@ -97,12 +108,14 @@ const props = defineProps<{
   agent: Agent | null;
   gitStatus?: AgentGitStatus | null;
   backendRuntime: BackendRuntimeStatus;
+  browserOpen?: boolean;
   isLoading: boolean;
   sidebarCollapsed: boolean;
 }>();
 
 const emit = defineEmits<{
   'expand-sidebar': [];
+  'toggle-browser': [];
   'open-git-diff': [];
 }>();
 
@@ -173,8 +186,8 @@ const hasHeaderGitStatus = computed(() => {
 
 <style scoped>
 .agent-header {
-  --agent-header-height: 64px;
-  --agent-header-avatar-size: 38px;
+  --agent-header-height: 48px;
+  --agent-header-avatar-size: 30px;
   --agent-status-dot-size: 10px;
   flex: 0 0 var(--agent-header-height);
   min-height: var(--agent-header-height);
@@ -266,11 +279,37 @@ const hasHeaderGitStatus = computed(() => {
 
 .agent-header__activity {
   flex: 0 0 auto;
-  display: grid;
-  gap: var(--space-1);
-  min-width: 152px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-width: 0;
   color: var(--color-text-muted);
   text-align: right;
+}
+
+.agent-header__browser {
+  -webkit-app-region: no-drag;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.agent-header__browser:hover,
+.agent-header__browser[aria-pressed='true'] {
+  background: var(--color-surface-high);
+  color: var(--color-text);
+}
+
+.agent-header__browser :deep(svg) {
+  width: var(--icon-md);
+  height: var(--icon-md);
 }
 
 .agent-header--sidebar-collapsed .agent-header__activity {
