@@ -1,7 +1,12 @@
 <template>
   <section class="codex-login" aria-label="Sign in to Codex Claw">
     <div class="codex-login__content">
-      <div class="codex-login__mark" aria-hidden="true">C</div>
+      <div class="codex-login__mark">
+        <img
+          :src="appIconUrl"
+          alt="Codex Claw"
+        >
+      </div>
       <h1>{{ t('auth.title') }}</h1>
       <p>{{ t('auth.description') }}</p>
       <el-button
@@ -19,6 +24,8 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
+
+const appIconUrl = new URL('../../../assets/icon.png', import.meta.url).href;
 
 defineProps<{
   loading?: boolean;
@@ -51,15 +58,16 @@ const { t } = useI18n();
 }
 
 .codex-login__mark {
-  display: grid;
-  place-items: center;
   width: 64px;
   height: 64px;
-  border-radius: var(--radius-2xl);
-  color: var(--color-on-primary);
-  background: var(--color-primary);
-  font-size: var(--font-size-24);
-  font-weight: var(--font-weight-semibold);
+  overflow: hidden;
+}
+
+.codex-login__mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .codex-login h1 {

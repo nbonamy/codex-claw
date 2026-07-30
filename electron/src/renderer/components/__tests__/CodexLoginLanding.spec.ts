@@ -18,6 +18,7 @@ describe('CodexLoginLanding', () => {
 
     expect(wrapper.get('h1').text()).toBe('Welcome to Codex Claw');
     expect(wrapper.text()).toContain('Sign in with ChatGPT to get started.');
+    expect(wrapper.get('.codex-login__mark img').attributes('alt')).toBe('Codex Claw');
     await wrapper.get('button').trigger('click');
     expect(wrapper.emitted('login')).toStrictEqual([[]]);
   });

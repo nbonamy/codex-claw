@@ -76,19 +76,17 @@ const emit = defineEmits<{
 }>();
 const popoverVisible = ref(false);
 const menuItems = computed<AppMenuItem[]>(() => [
-  ...(props.account ? [{
-    id: 'logout',
-    type: 'action' as const,
-    label: 'Log out',
-    icon: QuitIcon,
-    danger: true,
-  }] : []),
-  { id: 'settings-separator', type: 'separator' },
   {
     id: 'open-settings',
     type: 'action',
     label: 'Settings',
     icon: SettingsIcon,
+  },
+  {
+    id: 'logout',
+    type: 'action',
+    label: 'Log out',
+    icon: QuitIcon,
   },
   {
     id: 'quit',

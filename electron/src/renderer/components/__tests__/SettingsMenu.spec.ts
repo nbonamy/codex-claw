@@ -42,14 +42,20 @@ describe('SettingsMenu', () => {
     expect(rows[1]?.text()).toContain('Jun 10');
   });
 
-  it('emits menu actions', async () => {
+  it('always exposes logout in the lower-left menu and emits menu actions', async () => {
     const wrapper = mountMenu();
 
+    await openMenu(wrapper);
+    const actions = wrapper.findAll('.app-menu__item');
+    expect(actions.map((button) => button.text())).toStrictEqual(['Settings', 'Log out', 'Quit']);
+    expect(actions[1]?.classes()).not.toContain('app-menu__item--danger');
+    await actions[1]?.trigger('click');
     await openMenu(wrapper);
     await wrapper.findAll('button').find((button) => button.text() === 'Settings')?.trigger('click');
     await openMenu(wrapper);
     await wrapper.findAll('button').find((button) => button.text() === 'Quit')?.trigger('click');
 
+    expect(wrapper.emitted('logout')).toStrictEqual([[]]);
     expect(wrapper.emitted('open-settings')).toStrictEqual([[]]);
     expect(wrapper.emitted('quit')).toStrictEqual([[]]);
   });
