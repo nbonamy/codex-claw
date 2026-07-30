@@ -3,7 +3,7 @@ import ElementPlus from 'element-plus';
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it } from 'vitest';
 import SettingsMenu from '../SettingsMenu.vue';
-import type { AccountRateLimits } from '@codex-claw/shared/contracts';
+import type { AccountRateLimits, CodexAccount } from '@codex-claw/shared/contracts';
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -54,6 +54,20 @@ describe('SettingsMenu', () => {
     expect(wrapper.emitted('quit')).toStrictEqual([[]]);
   });
 
+  it('shows the ChatGPT account and emits logout', async () => {
+    const wrapper = mountMenu(undefined, {
+      account: { type: 'chatgpt', email: 'nico@example.com', planType: 'pro' },
+    });
+
+    await openMenu(wrapper);
+    expect(wrapper.text()).toContain('nico@example.com');
+    expect(wrapper.text()).toContain('pro');
+    expect(wrapper.get('[aria-label="Account menu"]').element).toBeInstanceOf(HTMLElement);
+    await wrapper.findAll('button').find((button) => button.text() === 'Log out')?.trigger('click');
+
+    expect(wrapper.emitted('logout')).toStrictEqual([[]]);
+  });
+
   it('marks the trigger active when settings is selected', () => {
     const wrapper = mountMenu(undefined, { active: true });
 
@@ -74,7 +88,7 @@ describe('SettingsMenu', () => {
   });
 });
 
-function mountMenu(rateLimits?: AccountRateLimits, props: { active?: boolean } = {}) {
+function mountMenu(rateLimits?: AccountRateLimits, props: { active?: boolean; account?: CodexAccount } = {}) {
   return mount(SettingsMenu, {
     attachTo: document.body,
     props: {
@@ -104,6 +118,6 @@ function mountMenu(rateLimits?: AccountRateLimits, props: { active?: boolean } =
 }
 
 async function openMenu(wrapper: ReturnType<typeof mountMenu>): Promise<void> {
-  await wrapper.get('[aria-label="Settings menu"]').trigger('click');
+  await wrapper.get('[aria-label$="menu"]').trigger('click');
   await nextTick();
 }

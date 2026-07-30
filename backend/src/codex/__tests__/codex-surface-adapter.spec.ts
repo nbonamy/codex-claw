@@ -80,6 +80,16 @@ class FakeTransport implements RpcTransport {
         };
       }
       case 'configRequirements/read': return { requirements: null };
+      case 'account/read': return {
+        account: { type: 'chatgpt', email: 'nico@example.com', planType: 'pro' },
+        requiresOpenaiAuth: true,
+      };
+      case 'account/login/start': return {
+        type: 'chatgpt',
+        loginId: 'login-1',
+        authUrl: 'https://auth.openai.com/login',
+      };
+      case 'account/logout': return {};
       case 'account/rateLimits/read': return {};
       case 'thread/list': return {
         data: [thread('thread-a', '/workspace/a'), thread('thread-b', '/workspace/b')],
@@ -135,6 +145,25 @@ class FakeTransport implements RpcTransport {
 }
 
 describe('CodexSurfaceAgentAdapter', () => {
+  it('uses the SDK account lifecycle for isolated-home authentication', async () => {
+    const { adapter, transport } = createAdapter();
+
+    await expect(adapter.getAuthentication()).resolves.toStrictEqual({
+      account: { type: 'chatgpt', email: 'nico@example.com', planType: 'pro' },
+      requiresOpenaiAuth: true,
+      login: { status: 'idle', error: null },
+    });
+    await expect(adapter.startChatGptLogin()).resolves.toStrictEqual({
+      loginId: 'login-1',
+      authUrl: 'https://auth.openai.com/login',
+    });
+    await expect(adapter.logout()).resolves.toMatchObject({
+      account: { type: 'chatgpt', email: 'nico@example.com', planType: 'pro' },
+    });
+
+    expect(lastRequest(transport, 'account/login/start')).toBeDefined();
+    expect(lastRequest(transport, 'account/logout')).toBeDefined();
+  });
   it('routes simultaneous semantic conversation events without transcript replacement or cross-routing', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];

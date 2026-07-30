@@ -11,14 +11,22 @@
         class="settings-menu__trigger"
         :class="{ 'settings-menu__trigger--active': active }"
         type="button"
-        aria-label="Settings menu"
+        :aria-label="account ? 'Account menu' : 'Settings menu'"
         :aria-pressed="active"
       >
-        <SettingsIcon aria-hidden="true" />
+        <UserCircleIcon v-if="account" aria-hidden="true" />
+        <SettingsIcon v-else aria-hidden="true" />
       </button>
     </template>
 
     <div class="settings-menu" aria-label="Settings menu">
+      <div v-if="account" class="settings-menu__account">
+        <UserCircleIcon aria-hidden="true" />
+        <div>
+          <strong>{{ accountLabel }}</strong>
+          <span>{{ accountDescription }}</span>
+        </div>
+      </div>
 
       <div class="settings-menu__rate-limits" aria-label="Rate limits">
         <div class="settings-menu__rate-limits-header">
@@ -48,24 +56,33 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { AccountRateLimitWindow, AccountRateLimits } from '@codex-claw/shared/contracts';
+import type { AccountRateLimitWindow, AccountRateLimits, CodexAccount } from '@codex-claw/shared/contracts';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
-import { BrandSpeedTest, QuitIcon, SettingsIcon } from '../shared/icons/app-icons';
+import { BrandSpeedTest, QuitIcon, SettingsIcon, UserCircleIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
   active?: boolean;
   rateLimits?: AccountRateLimits;
+  account?: CodexAccount | null;
 }>(), {
   active: false,
 });
 
 const emit = defineEmits<{
   'open-settings': [];
+  logout: [];
   quit: [];
 }>();
 const popoverVisible = ref(false);
-const menuItems: AppMenuItem[] = [
+const menuItems = computed<AppMenuItem[]>(() => [
+  ...(props.account ? [{
+    id: 'logout',
+    type: 'action' as const,
+    label: 'Log out',
+    icon: QuitIcon,
+    danger: true,
+  }] : []),
   { id: 'settings-separator', type: 'separator' },
   {
     id: 'open-settings',
@@ -80,7 +97,13 @@ const menuItems: AppMenuItem[] = [
     icon: QuitIcon,
     danger: true,
   },
-];
+]);
+const accountLabel = computed(() => props.account?.type === 'chatgpt'
+  ? props.account.email ?? 'ChatGPT account'
+  : props.account?.type === 'apiKey' ? 'OpenAI API key' : 'Codex account');
+const accountDescription = computed(() => props.account?.type === 'chatgpt'
+  ? props.account.planType
+  : props.account?.type === 'apiKey' ? 'Usage-based billing' : '');
 
 type RateLimitRow = {
   label: string;
@@ -157,6 +180,8 @@ function selectMenuItem(itemId: string): void {
 
   if (itemId === 'open-settings') {
     emit('open-settings');
+  } else if (itemId === 'logout') {
+    emit('logout');
   } else if (itemId === 'quit') {
     emit('quit');
   }
@@ -186,6 +211,38 @@ function selectMenuItem(itemId: string): void {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+}
+
+.settings-menu__account {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.settings-menu__account > svg {
+  flex: 0 0 auto;
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+}
+
+.settings-menu__account > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-menu__account strong,
+.settings-menu__account span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-menu__account span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
 }
 
 .settings-menu__rate-limits {

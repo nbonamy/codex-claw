@@ -71,6 +71,12 @@ export class BackendDriverRpc {
         const record = requireRecord(params);
         return listAgentFolderFiles(requireString(record.folder, 'folder'));
       }
+      case backendMethods.driverCodexAuthenticationGet:
+        return this.requireCodexDriver().getAuthentication();
+      case backendMethods.driverCodexChatGptLoginStart:
+        return this.requireCodexDriver().startChatGptLogin();
+      case backendMethods.driverCodexLogout:
+        return this.requireCodexDriver().logout();
       case backendMethods.driverFilePreview: {
         const record = requireRecord(params);
         return previewAgentFolderFile(
@@ -243,6 +249,14 @@ export class BackendDriverRpc {
       default:
         return undefined;
     }
+  }
+
+  private requireCodexDriver(): CodexBackendDriver {
+    const driver = this.requireDriver('codex');
+    if (!(driver instanceof CodexBackendDriver)) {
+      throw new Error('Codex driver is not configured.');
+    }
+    return driver;
   }
 
   async close(): Promise<void> {

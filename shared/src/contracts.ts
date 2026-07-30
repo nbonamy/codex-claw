@@ -455,6 +455,25 @@ export type AppGeneralSettings = {
   codexBinaryPath: string;
 };
 
+export type CodexAccount =
+  | { type: 'apiKey' }
+  | { type: 'chatgpt'; email: string | null; planType: string }
+  | { type: 'amazonBedrock'; credentialSource: 'codexManaged' | 'awsManaged' };
+
+export type CodexAuthentication = {
+  account: CodexAccount | null;
+  requiresOpenaiAuth: boolean;
+  login: {
+    status: 'idle' | 'starting' | 'pending' | 'completed' | 'cancelled' | 'error';
+    error: string | null;
+  };
+};
+
+export type CodexChatGptLogin = {
+  loginId: string;
+  authUrl: string;
+};
+
 export type ClientState = {
   sourceFolderPath: string;
   shouldPreventDisplaySleep: boolean;
@@ -1058,6 +1077,9 @@ export type CodexClawApi = {
   closeAgent(agentId: string): Promise<AppSnapshot>;
   selectAgent(agentId: string): Promise<AppSnapshot>;
   updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>;
+  getCodexAuthentication(): Promise<CodexAuthentication>;
+  startCodexChatGptLogin(): Promise<CodexChatGptLogin>;
+  logoutCodex(): Promise<CodexAuthentication>;
   getDaemonStatus(): Promise<ClawdDaemonStatus>;
   setDaemonEnabled(enabled: boolean): Promise<ClawdDaemonStatus>;
   getSystemPermissions(): Promise<SystemPermissionsStatus>;

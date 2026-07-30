@@ -67,7 +67,9 @@
 
       <SettingsMenu
         :active="settingsActive"
+        :account="account"
         :rate-limits="rateLimits"
+        @logout="emit('logout')"
         @open-settings="emit('open-settings')"
         @quit="emit('quit')"
       />
@@ -89,7 +91,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { AccountRateLimits, ReorderTeamsInput, Team } from '@codex-claw/shared/contracts';
+import type { AccountRateLimits, CodexAccount, ReorderTeamsInput, Team } from '@codex-claw/shared/contracts';
 import { defaultTeamColor } from '@codex-claw/shared/team-colors';
 import { teamInitials } from '@codex-claw/shared/team-manager';
 import { InfinityIcon, PlusIcon } from '../shared/icons/app-icons';
@@ -105,6 +107,7 @@ const props = defineProps<{
   cockpitActive?: boolean;
   loopsActive?: boolean;
   rateLimits?: AccountRateLimits;
+  account?: CodexAccount | null;
   settingsActive?: boolean;
 }>();
 
@@ -114,6 +117,7 @@ const emit = defineEmits<{
   'edit-team': [teamId: string];
   'new-team': [];
   'open-settings': [];
+  logout: [];
   quit: [];
   'reorder-teams': [input: ReorderTeamsInput];
   'select-cockpit': [];

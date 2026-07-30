@@ -16,6 +16,7 @@ import type {
   RendererToolPart,
   RendererToolPartUpdate,
   SendPromptOptions,
+  CodexAuthentication,
 } from '@codex-claw/shared/contracts';
 import type { BackendEvent } from '@codex-claw/shared/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
@@ -61,6 +62,18 @@ export class CodexSurfaceAgentAdapter {
 
   async start(): Promise<void> {
     await this.surface.connect();
+  }
+
+  async getAuthentication(): Promise<CodexAuthentication> {
+    return authenticationFromSurface((await this.surface.refreshAccount()).authentication);
+  }
+
+  async startChatGptLogin() {
+    return this.surface.startChatGptLogin();
+  }
+
+  async logout(): Promise<CodexAuthentication> {
+    return authenticationFromSurface((await this.surface.logout()).authentication);
   }
 
   getRuntimeStatus(): BackendRuntimeStatus {
@@ -713,6 +726,19 @@ export class CodexSurfaceAgentAdapter {
       if (owner === session) this.clientRequestOwners.delete(id);
     }
   }
+}
+
+function authenticationFromSurface(
+  authentication: CodexSurfaceSnapshot['authentication'],
+): CodexAuthentication {
+  return {
+    account: authentication.account ? { ...authentication.account } : null,
+    requiresOpenaiAuth: authentication.requiresOpenaiAuth === true,
+    login: {
+      status: authentication.login.status,
+      error: authentication.login.error,
+    },
+  };
 }
 
 function backendApproval(approval: CodexSurfaceApproval): BackendApprovalRequest {

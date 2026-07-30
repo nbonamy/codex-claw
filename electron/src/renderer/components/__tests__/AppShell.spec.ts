@@ -23,6 +23,25 @@ afterEach(() => {
 });
 
 describe('AppShell', () => {
+  it('gates the workspace and shortcuts when the isolated Codex home is signed out', async () => {
+    window.codexClaw = {
+      getCodexAuthentication: vi.fn().mockResolvedValue({
+        account: null,
+        requiresOpenaiAuth: true,
+        login: { status: 'idle', error: null },
+      }),
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const wrapper = mountShell();
+    await flushPromises();
+
+    expect(wrapper.get('.app-shell').classes()).toContain('app-shell--auth-gated');
+    expect(wrapper.get('[aria-label="Sign in to Codex Claw"]').text()).toContain('Continue with ChatGPT');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', metaKey: true, cancelable: true }));
+    expect(wrapper.emitted('duplicate-agent')).toBeUndefined();
+
+    wrapper.unmount();
+  });
+
   it('composes the phase zero shell around the active agent', () => {
     const snapshot = createInitialSnapshot();
     const activeAgent = snapshot.agents[0];
@@ -1650,8 +1669,8 @@ describe('AppShell', () => {
     await wrapper.findAll('button').find((button) => button.text() === 'Settings')?.trigger('click');
     expect(wrapper.find('.settings-view').exists()).toBe(true);
     expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
-    expect(wrapper.get('[aria-label="Settings menu"]').attributes('aria-pressed')).toBe('true');
-    expect(wrapper.get('[aria-label="Settings menu"]').classes()).toContain('settings-menu__trigger--active');
+    expect(wrapper.get('[aria-label="Account menu"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('[aria-label="Account menu"]').classes()).toContain('settings-menu__trigger--active');
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.get('[aria-label="Codex Claw"]').classes()).not.toContain('team-rail__team--active');
     expect(wrapper.text()).toContain('Accessibility');

@@ -84,6 +84,15 @@ the user's `~/.codex`, so Claw threads, config, and auth state cannot pollute
 the normal Codex CLI/Desktop home. The isolated home may require its own sign
 in on first launch; do not copy normal Codex thread or auth files into it.
 
+Codex Claw reads and mutates that isolated authentication state through the
+SDK account surface. When `account/read` reports that OpenAI authentication is
+required and no account is loaded, the renderer gates the workspace behind a
+signed-out landing screen. `account/login/start` opens the ChatGPT browser
+flow, and the renderer refreshes account state until the SDK observes
+`account/login/completed`. Once signed in, the lower-left account menu shows
+the active account and exposes `account/logout`. Raw Codex account protocol
+types and authentication files never cross into the renderer.
+
 The General settings Advanced section can store a Codex executable path. Empty
 uses SDK discovery across the inherited and login-shell `PATH`, common user and
 Homebrew bins, nvm installs, and Windows executable extensions. A non-empty

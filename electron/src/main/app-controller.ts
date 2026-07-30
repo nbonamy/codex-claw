@@ -9,7 +9,7 @@ import { getClawdDaemonStatus, setClawdDaemonEnabled } from './daemon-launch-age
 import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
 import { sendRendererEvent } from './ipc-events';
 import { BrowserPane } from './browser-pane';
@@ -37,6 +37,7 @@ export class AppController {
     backendClient: ClawBackendClientPort | null | undefined = undefined,
     private readonly appLifecycle: AppLifecycle = app,
     private readonly startupMaintenance: StartupMaintenance = async () => undefined,
+    private readonly openExternal: (url: string) => Promise<unknown> = (url) => shell.openExternal(url),
   ) {
     this.snapshot = initialSnapshot;
     this.backendClient = backendClient ?? createRuntimeClawBackendClient({
@@ -287,6 +288,9 @@ export class AppController {
     ipc.handle(ipcChannels.updateSettings, async (_event, input: UpdateSettingsInput) => {
       return this.updateSettings(input);
     });
+    ipc.handle(ipcChannels.getCodexAuthentication, () => this.getCodexAuthentication());
+    ipc.handle(ipcChannels.startCodexChatGptLogin, () => this.startCodexChatGptLogin());
+    ipc.handle(ipcChannels.logoutCodex, () => this.logoutCodex());
 
     ipc.handle(ipcChannels.getDaemonStatus, () => this.getDaemonStatus());
 
@@ -566,6 +570,22 @@ export class AppController {
       this.restartApp();
     }
     return snapshot;
+  }
+
+  private getCodexAuthentication(): Promise<CodexAuthentication> {
+    return this.requireBackendClient().request(backendMethods.codexAuthenticationGet);
+  }
+
+  private async startCodexChatGptLogin(): Promise<CodexChatGptLogin> {
+    const login = await this.requireBackendClient().request<CodexChatGptLogin>(
+      backendMethods.codexChatGptLoginStart,
+    );
+    await this.openExternal(login.authUrl);
+    return login;
+  }
+
+  private logoutCodex(): Promise<CodexAuthentication> {
+    return this.requireBackendClient().request(backendMethods.codexLogout);
   }
 
   private async getDaemonStatus(): Promise<ClawdDaemonStatus> {

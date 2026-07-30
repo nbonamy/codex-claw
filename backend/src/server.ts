@@ -864,6 +864,21 @@ export class ClawBackendServer {
       case backendMethods.settingsUpdate:
         updateSettingsInSnapshot(this.snapshot, requireSettingsUpdateInput(message.params));
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      case backendMethods.codexAuthenticationGet:
+        return createClawRpcResult(
+          message.id,
+          await this.requireDriverRpc().handle(backendMethods.driverCodexAuthenticationGet, undefined),
+        );
+      case backendMethods.codexChatGptLoginStart:
+        return createClawRpcResult(
+          message.id,
+          await this.requireDriverRpc().handle(backendMethods.driverCodexChatGptLoginStart, undefined),
+        );
+      case backendMethods.codexLogout:
+        return createClawRpcResult(
+          message.id,
+          await this.requireDriverRpc().handle(backendMethods.driverCodexLogout, undefined),
+        );
       case backendMethods.sourceRepositoriesList: {
         return this.respondInLocation(
           message.id,

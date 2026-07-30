@@ -12,6 +12,8 @@ import type {
   ConversationSummary,
   RendererMessage,
   SendPromptOptions,
+  CodexAuthentication,
+  CodexChatGptLogin,
 } from '@codex-claw/shared/contracts';
 import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
@@ -33,6 +35,18 @@ export class CodexBackendDriver implements AgentBackendDriver {
 
   getRuntimeStatus(): BackendRuntimeStatus {
     return this.sessionManager.getRuntimeStatus();
+  }
+
+  getAuthentication(): Promise<CodexAuthentication> {
+    return this.sessionManager.getAuthentication();
+  }
+
+  startChatGptLogin(): Promise<CodexChatGptLogin> {
+    return this.sessionManager.startChatGptLogin();
+  }
+
+  logout(): Promise<CodexAuthentication> {
+    return this.sessionManager.logout();
   }
 
   getCapabilities(agent: Agent): BackendCapabilities {

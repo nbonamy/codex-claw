@@ -1,9 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController } from '../app-controller';
 import { applyMainEventToSnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
+import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { ipcChannels } from '@codex-claw/shared/ipc';
+
+function callPrivate<Result>(controller: AppController, method: string): Promise<Result> {
+  return (controller as unknown as Record<string, () => Promise<Result>>)[method]!();
+}
 
 describe('AppController', () => {
   it('relaunches the app when restart is requested', () => {
@@ -681,6 +686,41 @@ describe('AppController', () => {
     await expect(updateSettings(controller, input)).resolves.toBe(backendSnapshot);
 
     expect(request).toHaveBeenCalledWith('settings/update', { input });
+  });
+
+  it('routes isolated Codex authentication and opens the ChatGPT login URL', async () => {
+    const authentication: CodexAuthentication = {
+      account: null,
+      requiresOpenaiAuth: true,
+      login: { status: 'idle', error: null },
+    };
+    const login: CodexChatGptLogin = {
+      loginId: 'login-1',
+      authUrl: 'https://auth.openai.com/login',
+    };
+    const request = vi.fn(async (method: string) => (
+      method === backendMethods.codexChatGptLoginStart ? login : authentication
+    ));
+    const openExternal = vi.fn().mockResolvedValue(undefined);
+    const controller = new AppController(
+      createInitialSnapshot(),
+      createBackendClient({ request }),
+      fakeAppLifecycle(),
+      async () => undefined,
+      openExternal,
+    );
+
+    await expect(callPrivate<CodexAuthentication>(controller, 'getCodexAuthentication'))
+      .resolves.toStrictEqual(authentication);
+    await expect(callPrivate<CodexChatGptLogin>(controller, 'startCodexChatGptLogin'))
+      .resolves.toStrictEqual(login);
+    await expect(callPrivate<CodexAuthentication>(controller, 'logoutCodex'))
+      .resolves.toStrictEqual(authentication);
+
+    expect(request).toHaveBeenCalledWith(backendMethods.codexAuthenticationGet, undefined);
+    expect(request).toHaveBeenCalledWith(backendMethods.codexChatGptLoginStart, undefined);
+    expect(request).toHaveBeenCalledWith(backendMethods.codexLogout, undefined);
+    expect(openExternal).toHaveBeenCalledWith(login.authUrl);
   });
 
   it('restarts the app when the Codex executable setting changes', async () => {

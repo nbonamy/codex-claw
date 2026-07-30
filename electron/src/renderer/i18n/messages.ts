@@ -1,5 +1,11 @@
 export const messages = {
   en: {
+    auth: {
+      title: 'Welcome to Codex Claw',
+      description: 'Sign in with ChatGPT to get started.',
+      continue: 'Continue with ChatGPT',
+      waiting: 'Waiting for sign in…',
+    },
     chat: {
       actions: {
         cancel: 'Cancel',

@@ -1,7 +1,14 @@
 <template>
   <main
     class="app-shell"
+    :class="{ 'app-shell--auth-gated': showLoginLanding }"
   >
+    <CodexLoginLanding
+      v-if="showLoginLanding"
+      :loading="authenticationLoading || authentication?.login.status === 'pending'"
+      :error="authenticationError ?? authentication?.login.error"
+      @login="startChatGptLogin"
+    />
     <TeamRail
       :teams="snapshot.teams"
       :active-team-id="cockpitVisible || loopsVisible || settingsVisible ? null : activeTeam?.id ?? null"
@@ -9,12 +16,14 @@
       :loops-active="loopsVisible"
       :settings-active="settingsVisible"
       :rate-limits="snapshot.accountRateLimits"
+      :account="authentication?.account ?? null"
       class="app-shell__team-rail"
       @close-team="$emit('close-team', $event)"
       @disconnect-team="$emit('disconnect-team', $event)"
       @edit-team="openEditTeam"
       @new-team="openNewTeam"
       @open-settings="openSettings"
+      @logout="logoutCodex"
       @quit="quit"
       @reorder-teams="$emit('reorder-teams', $event)"
       @select-cockpit="openCockpit"
@@ -279,7 +288,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, MoveAgentToTeamInput, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelMarkdownRequest, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, TurnGitDiff, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, MoveAgentToTeamInput, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelMarkdownRequest, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, TurnGitDiff, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultTeamColor } from '@codex-claw/shared/team-colors';
@@ -297,6 +306,7 @@ import TeamRail from './TeamRail.vue';
 import BenchAgentAssignmentDialog from './BenchAgentAssignmentDialog.vue';
 import BrowserPanel from './BrowserPanel.vue';
 import SettingsView from './SettingsView.vue';
+import CodexLoginLanding from './CodexLoginLanding.vue';
 import type { SettingsTab } from './settings-tabs';
 import { confirmCloseTeam } from './team-close-confirmation';
 import {
@@ -514,6 +524,10 @@ const browserVisible = ref(false);
 const browserMounted = ref(false);
 const browserPaneWidth = ref(420);
 const browserBody = ref<HTMLElement | null>(null);
+const authentication = ref<CodexAuthentication | null>(null);
+const authenticationLoading = ref(true);
+const authenticationError = ref<string | null>(null);
+let authenticationPoll: ReturnType<typeof setInterval> | null = null;
 const settingsActiveTab = ref<SettingsTab>('general');
 const agentDialogVisible = ref(false);
 const agentDialogMode = ref<'create' | 'edit'>('create');
@@ -624,6 +638,10 @@ const settingsVisible = computed(() => activeSurface.value === 'settings');
 const isAgentWorkspaceVisible = computed(() => activeSurface.value === 'agent');
 const isModalDialogVisible = computed(() => agentDialogVisible.value || benchAssignmentDialogVisible.value || teamDialogVisible.value);
 const showAgentSidebar = computed(() => isAgentWorkspaceVisible.value && !agentSidebarCollapsed.value && !isAgentEmpty.value);
+const showLoginLanding = computed(() => (
+  authenticationLoading.value ||
+  (authentication.value?.account === null && authentication.value.requiresOpenaiAuth)
+));
 const editingAgent = computed(() => (
   editingAgentId.value ? props.snapshot.agents.find((agent) => agent.id === editingAgentId.value) ?? null : null
 ));
@@ -662,6 +680,7 @@ onMounted(() => {
     window.addEventListener('keydown', handleShellShortcut);
   }
   unsubscribeAppCommand = window.codexClaw?.onAppCommand?.(handleAppCommand) ?? null;
+  void loadAuthentication();
 });
 
 onBeforeUnmount(() => {
@@ -670,7 +689,75 @@ onBeforeUnmount(() => {
   }
   unsubscribeAppCommand?.();
   unsubscribeAppCommand = null;
+  stopAuthenticationPolling();
 });
+
+async function loadAuthentication(): Promise<void> {
+  authenticationLoading.value = true;
+  authenticationError.value = null;
+  try {
+    if (!window.codexClaw) {
+      authentication.value = {
+        account: { type: 'apiKey' },
+        requiresOpenaiAuth: false,
+        login: { status: 'idle', error: null },
+      };
+      return;
+    }
+    authentication.value = await window.codexClaw.getCodexAuthentication();
+  } catch (error) {
+    authenticationError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    authenticationLoading.value = false;
+  }
+}
+
+async function startChatGptLogin(): Promise<void> {
+  authenticationLoading.value = true;
+  authenticationError.value = null;
+  try {
+    const api = window.codexClaw;
+    if (!api) throw new Error('Codex Claw API is unavailable.');
+    await api.startCodexChatGptLogin();
+    authentication.value = {
+      account: null,
+      requiresOpenaiAuth: true,
+      login: { status: 'pending', error: null },
+    };
+    startAuthenticationPolling();
+  } catch (error) {
+    authenticationError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    authenticationLoading.value = false;
+  }
+}
+
+async function logoutCodex(): Promise<void> {
+  authenticationError.value = null;
+  const api = window.codexClaw;
+  if (!api) throw new Error('Codex Claw API is unavailable.');
+  authentication.value = await api.logoutCodex();
+}
+
+function startAuthenticationPolling(): void {
+  stopAuthenticationPolling();
+  const api = window.codexClaw;
+  if (!api) return;
+  authenticationPoll = setInterval(() => {
+    void api.getCodexAuthentication().then((next) => {
+      authentication.value = next;
+      if (next.account || next.login.status === 'error') stopAuthenticationPolling();
+    }).catch((error) => {
+      authenticationError.value = error instanceof Error ? error.message : String(error);
+      stopAuthenticationPolling();
+    });
+  }, 1000);
+}
+
+function stopAuthenticationPolling(): void {
+  if (authenticationPoll) clearInterval(authenticationPoll);
+  authenticationPoll = null;
+}
 
 function setAgentSidebarWidth(width: number): void {
   agentSidebarWidth.value = Math.min(Math.max(width, agentSidebarMinWidth), agentSidebarMaxWidth);
@@ -1043,6 +1130,9 @@ async function openAgentGitDiffPreview(): Promise<void> {
 }
 
 function handleShellShortcut(event: KeyboardEvent): void {
+  if (showLoginLanding.value) {
+    return;
+  }
   if (isModalDialogVisible.value || !isAgentWorkspaceVisible.value) {
     return;
   }
@@ -1532,6 +1622,10 @@ function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
   overflow: hidden;
   color: var(--color-text);
   background: var(--color-shell-main);
+}
+
+.app-shell--auth-gated > :not(.codex-login) {
+  visibility: hidden;
 }
 
 .app-shell__team-rail {
