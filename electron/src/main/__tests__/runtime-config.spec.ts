@@ -116,6 +116,10 @@ describe('runtime config', () => {
     expect(rootPackage.scripts.dev).toBe('node scripts/dev.mjs');
     expect(electronPackage.scripts.dev).toBe('node ../scripts/dev.mjs');
     expect(rootPackage.scripts['dev:electron']).toBe('npm run start -w @codex-claw/electron');
+    expect(rootPackage.scripts.build).toBe('node scripts/build.mjs');
+    expect(electronPackage.scripts['build:computer-use']).toBe(
+      "../../computer-use/macos/scripts/build-app.sh --app-name 'Codex Claw Computer Use' --bundle-identifier com.nabocorp.codex-claw.computer-use --icon assets/icon.icns --output .computer-use",
+    );
     expect(devScript).toContain("await run('npm', ['run', 'build:computer-use'])");
     expect(devScript).toContain("start('npm', ['run', 'dev:electron']");
   });

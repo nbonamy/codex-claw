@@ -28,14 +28,14 @@ export function signDarwinBinaries(
   const binaries = resolveDarwinBinaryPaths(buildPath, existsSync);
   for (const binary of binaries) {
     if (!existsSync(binary.path)) {
-      logger.warn(`${binary.label} not found for signing: ${binary.path}`);
-      continue;
+      throw new Error(`${binary.label} not found for signing: ${binary.path}`);
     }
 
     run('codesign', [
-      '--deep',
       '--force',
       '--verbose',
+      '--options',
+      'runtime',
       '--sign',
       identify,
       binary.path,
@@ -65,13 +65,22 @@ function resolveDarwinBinaryPaths(
     path.join(normalizedBuildPath, 'Contents', 'Resources'),
   ].filter((candidate): candidate is string => Boolean(candidate));
 
-  const helperPaths = resourcePaths.flatMap((resourcePath) => [
-    path.join(resourcePath, 'apple-speechanalyzer-cli'),
-    path.join(resourcePath, 'assets', 'apple-speechanalyzer-cli'),
+  const binaryPaths = resourcePaths.flatMap((resourcePath) => [
+    {
+      label: 'Apple speech helper',
+      path: path.join(resourcePath, 'apple-speechanalyzer-cli'),
+    },
+    {
+      label: 'Apple speech helper',
+      path: path.join(resourcePath, 'assets', 'apple-speechanalyzer-cli'),
+    },
   ]);
+  const computerUseAppPaths = resourcePaths.map((resourcePath) => ({
+    label: 'Computer Use helper app',
+    path: path.join(resourcePath, 'Codex Claw Computer Use.app'),
+  }));
 
-  return [{
-    label: 'Apple speech helper',
-    path: helperPaths.find((helperPath) => existsSync(helperPath)) ?? helperPaths[0],
-  }];
+  const appleSpeechHelper = binaryPaths.find((binary) => existsSync(binary.path)) ?? binaryPaths[0];
+  const computerUseHelper = computerUseAppPaths.find((binary) => existsSync(binary.path)) ?? computerUseAppPaths[0];
+  return [appleSpeechHelper, computerUseHelper];
 }

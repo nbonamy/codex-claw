@@ -77,6 +77,11 @@ CODEX_CLAW_SKIP_SIGNING=1 npm run build
 CODEX_CLAW_SKIP_SIGNING=1 npm run package
 ```
 
+`npm run build` is the release build entrypoint: it builds the backend and
+native Computer Use helper, packages the Electron app, then verifies the final
+signed and notarized macOS bundle. It fails before building when any required
+macOS signing or notarization credential is missing.
+
 ## Architecture
 
 Codex Claw keeps Codex protocol details in Electron main:

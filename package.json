@@ -14,7 +14,7 @@
     "dev:backend": "npm run dev -w @codex-claw/backend",
     "dev:backend:run": "npm run dev:run -w @codex-claw/backend",
     "dev:backend:serve": "npm run serve -w @codex-claw/backend",
-    "build": "npm run build:backend && npm run build -w @codex-claw/electron",
+    "build": "node scripts/build.mjs",
     "build:backend": "npm run build -w @codex-claw/shared && npm run build -w @codex-claw/backend && node scripts/package-backend.mjs",
     "typecheck": "npm run typecheck --workspaces",
     "lint": "npm run lint --workspaces",
