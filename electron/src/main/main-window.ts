@@ -1,4 +1,5 @@
-import { app, BrowserWindow, globalShortcut, shell, type BrowserWindowConstructorOptions } from 'electron';
+import { app, BrowserWindow, globalShortcut, screen, shell, type BrowserWindowConstructorOptions, type Rectangle } from 'electron';
+import { closeSync, fstatSync, mkdirSync, openSync, readSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import {
   appCommandFromInput,
@@ -12,7 +13,15 @@ import { sendAppCommand } from './ipc-events';
 
 export function createMainWindow(): BrowserWindow {
   const releaseMode = isReleaseMode();
-  const window = new BrowserWindow(createMainWindowOptions(releaseMode));
+  const savedBounds = readWindowBounds(windowStatePath());
+  const restoredBounds = savedBounds && isWindowBoundsVisible(savedBounds, screen.getAllDisplays().map((display) => display.workArea))
+    ? savedBounds
+    : undefined;
+  const window = new BrowserWindow(createMainWindowOptions(releaseMode, restoredBounds));
+
+  window.on('close', () => {
+    writeWindowBounds(windowStatePath(), window.getNormalBounds());
+  });
 
   window.once('ready-to-show', () => {
     window.show();
@@ -40,10 +49,11 @@ export function createMainWindow(): BrowserWindow {
   return window;
 }
 
-export function createMainWindowOptions(releaseMode: boolean): BrowserWindowConstructorOptions {
+export function createMainWindowOptions(releaseMode: boolean, bounds?: Rectangle): BrowserWindowConstructorOptions {
   return {
-    width: 1440,
-    height: 960,
+    width: bounds?.width ?? 1440,
+    height: bounds?.height ?? 960,
+    ...(bounds ? { x: bounds.x, y: bounds.y } : {}),
     minWidth: 1024,
     minHeight: 720,
     titleBarStyle: 'hidden',
@@ -57,6 +67,60 @@ export function createMainWindowOptions(releaseMode: boolean): BrowserWindowCons
       sandbox: false,
     },
   };
+}
+
+export function isWindowBoundsVisible(bounds: Rectangle, workAreas: Rectangle[]): boolean {
+  return workAreas.some((workArea) => {
+    const intersectionWidth = Math.min(bounds.x + bounds.width, workArea.x + workArea.width) - Math.max(bounds.x, workArea.x);
+    const intersectionHeight = Math.min(bounds.y + bounds.height, workArea.y + workArea.height) - Math.max(bounds.y, workArea.y);
+    return intersectionWidth > 0 && intersectionHeight > 0;
+  });
+}
+
+export function parseWindowBounds(value: string): Rectangle | null {
+  try {
+    const parsed = JSON.parse(value) as Partial<Rectangle>;
+    const values = [parsed.x, parsed.y, parsed.width, parsed.height];
+    if (!values.every((entry) => typeof entry === 'number' && Number.isFinite(entry))) {
+      return null;
+    }
+    if ((parsed.width ?? 0) < 1024 || (parsed.height ?? 0) < 720) {
+      return null;
+    }
+    return parsed as Rectangle;
+  } catch {
+    return null;
+  }
+}
+
+function windowStatePath(): string {
+  return path.join(app.getPath('userData'), 'window-state.json');
+}
+
+function readWindowBounds(filePath: string): Rectangle | null {
+  try {
+    const file = openSync(filePath, 'r');
+    try {
+      const buffer = Buffer.alloc(fstatSync(file).size);
+      readSync(file, buffer);
+      return parseWindowBounds(buffer.toString('utf8'));
+    } finally {
+      closeSync(file);
+    }
+  } catch {
+    return null;
+  }
+}
+
+function writeWindowBounds(filePath: string, bounds: Rectangle): void {
+  try {
+    mkdirSync(path.dirname(filePath), { recursive: true });
+    writeFileSync(filePath, `${JSON.stringify(bounds)}\n`, { mode: 0o600 });
+  } catch (error) {
+    warnMain('window', 'failed to save window bounds', {
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 export function handleExternalWindowOpen(url: string, openExternal: (url: string) => Promise<unknown> | void): { action: 'deny' } {
