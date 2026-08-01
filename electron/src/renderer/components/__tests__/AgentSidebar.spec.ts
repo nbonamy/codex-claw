@@ -130,6 +130,27 @@ describe('AgentSidebar', () => {
     expect(wrapper.find('[aria-label="Working"]').exists()).toBe(true);
   });
 
+  it('renders compact agent rows with only mini avatars, names, and status icons', () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        compact: true,
+        teamName: 'Codex Claw',
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.classes()).toContain('agent-sidebar--compact');
+    expect(wrapper.findAllComponents({ name: 'AgentAvatar' }).map((avatar) => avatar.props('size'))).toStrictEqual(['sm', 'sm']);
+    expect(wrapper.findAll('.agent-sidebar__meta strong').map((name) => name.text())).toStrictEqual(['Dina', 'Jesse']);
+    expect(wrapper.findAll('.agent-sidebar__status')).toHaveLength(2);
+    expect(wrapper.find('.agent-sidebar__status-text').exists()).toBe(false);
+    expect(wrapper.find('.agent-sidebar__folder').exists()).toBe(false);
+  });
+
   it('emits agent selection from agent rows', async () => {
     const wrapper = mount(AgentSidebar, {
       props: {

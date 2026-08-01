@@ -33,6 +33,7 @@ describe('app menu', () => {
       'Restart Agent',
     ]);
     expect(menuLabels(submenu(menu, 'View'))).toStrictEqual([
+      'Compact Agent List',
       'Review',
       'Browser',
       'Next Team',
@@ -70,6 +71,7 @@ describe('app menu', () => {
       ['Edit', 'Edit Agent'],
       ['Edit', 'Duplicate Agent'],
       ['Edit', 'Restart Agent'],
+      ['View', 'Compact Agent List'],
       ['View', 'Review'],
       ['View', 'Browser'],
       ['View', 'Next Team'],
@@ -85,11 +87,12 @@ describe('app menu', () => {
     expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(6, { type: 'edit-active-agent' });
     expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(7, { type: 'duplicate-active-agent' });
     expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(8, { type: 'restart-active-agent' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(9, { type: 'open-review' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(10, { type: 'open-browser' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(11, { type: 'cycle-teams' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(12, { type: 'cycle-agents', direction: 1 });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(13, { type: 'cycle-agents', direction: -1 });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(9, { type: 'set-agent-list-compact', compact: true });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(10, { type: 'open-review' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(11, { type: 'open-browser' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(12, { type: 'cycle-teams' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(13, { type: 'cycle-agents', direction: 1 });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(14, { type: 'cycle-agents', direction: -1 });
   });
 
   it('uses the expected file menu accelerators', () => {
@@ -102,6 +105,7 @@ describe('app menu', () => {
     expect(menuItem(menu, 'File', 'Quit')?.accelerator).toBe('CommandOrControl+Q');
     expect(menuItem(menu, 'Edit', 'Duplicate Agent')?.accelerator).toBe('CommandOrControl+D');
     expect(menuItem(menu, 'Edit', 'Restart Agent')?.accelerator).toBe('CommandOrControl+R');
+    expect(menuItem(menu, 'View', 'Compact Agent List')).toMatchObject({ type: 'checkbox', checked: false });
     expect(menuItem(menu, 'View', 'Review')?.accelerator).toBe('CommandOrControl+G');
     expect(menuItem(menu, 'View', 'Browser')?.accelerator).toBe('CommandOrControl+B');
   });
@@ -112,6 +116,7 @@ describe('app menu', () => {
     const releaseMenu = buildAppMenuTemplate(callbacks(), { debugMode: false }, 'darwin');
 
     expect(menuLabels(submenu(debugMenu, 'View'))).toStrictEqual([
+      'Compact Agent List',
       'Review',
       'Browser',
       'Next Team',
@@ -165,5 +170,5 @@ function clickItem(template: MenuItemConstructorOptions[], menuLabel: string, it
     throw new Error(`${itemLabel} menu item not found`);
   }
 
-  item.click(undefined as never, undefined as never, undefined as never);
+  item.click({ checked: true } as never, undefined as never, undefined as never);
 }

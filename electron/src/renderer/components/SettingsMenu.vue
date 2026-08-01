@@ -44,6 +44,12 @@
         </div>
       </div>
 
+      <div
+        class="settings-menu__usage-divider"
+        role="separator"
+        aria-label="Usage actions divider"
+      />
+
       <AppMenu
         class="app-menu--embedded settings-menu__actions"
         ariaLabel="Settings actions"
@@ -285,6 +291,11 @@ function selectMenuItem(itemId: string): void {
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.settings-menu__usage-divider {
+  height: 1px;
+  background: var(--color-border);
 }
 
 .settings-menu__actions {

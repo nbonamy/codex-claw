@@ -2091,6 +2091,10 @@ describe('AppShell', () => {
     const wrapper = mountShell({ snapshot, quit, openAgentGitDiff });
 
     expect(onAppCommand).toHaveBeenCalledOnce();
+    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('compact')).toBe(false);
+    listener({ type: 'set-agent-list-compact', compact: true });
+    await nextTick();
+    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('compact')).toBe(true);
     listener({ type: 'new-team' });
     await nextTick();
     expect(wrapper.text()).toContain('Create Team');

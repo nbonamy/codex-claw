@@ -78,6 +78,7 @@ implemented:
 
 - team rail on the far left;
 - agent list with avatar, name, folder, and status;
+- View-menu compact agent-list mode with mini avatars, names, and status icons;
 - active agent header;
 - central conversation and composer;
 - right-side tabbed workspace for the in-app Browser and GitHub Review, with

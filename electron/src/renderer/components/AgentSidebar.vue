@@ -1,6 +1,7 @@
 <template>
   <aside
     class="agent-sidebar"
+    :class="{ 'agent-sidebar--compact': compact }"
     :style="sidebarStyle"
     aria-label="Agents"
   >
@@ -40,12 +41,14 @@
           class="agent-sidebar__avatar"
           :avatar="agent.avatar"
           :name="agent.name"
-          size="lg"
+          :size="compact ? 'sm' : 'lg'"
         />
         <span class="agent-sidebar__meta">
           <strong>{{ agent.name }}</strong>
-          <span class="agent-sidebar__status-text">{{ agentStatusText(agent) }}</span>
-          <span class="agent-sidebar__folder">{{ folderBasename(agent.folder) }}</span>
+          <template v-if="!compact">
+            <span class="agent-sidebar__status-text">{{ agentStatusText(agent) }}</span>
+            <span class="agent-sidebar__folder">{{ folderBasename(agent.folder) }}</span>
+          </template>
         </span>
         <span
           class="agent-sidebar__status"
@@ -119,6 +122,7 @@ const props = defineProps<{
   agents: Agent[];
   activeAgentId: string | null;
   bench?: BenchTemplate[];
+  compact?: boolean;
   teams?: Team[];
   teamId?: string | null;
   teamName: string;
@@ -478,6 +482,35 @@ function onResizePointerEnd(event: PointerEvent): void {
 
 .agent-sidebar__status[data-status='error'] {
   background: var(--color-error);
+}
+
+.agent-sidebar--compact {
+  --agent-sidebar-avatar-size: var(--space-10);
+  --agent-sidebar-row-min-height: var(--space-20);
+  --agent-sidebar-status-column-width: var(--space-4);
+  --agent-status-dot-size: var(--space-4);
+}
+
+.agent-sidebar--compact .agent-sidebar__agent {
+  gap: var(--space-6);
+  padding: var(--space-3) var(--space-6);
+}
+
+.agent-sidebar--compact .agent-sidebar__meta {
+  display: block;
+}
+
+.agent-sidebar--compact .agent-sidebar__meta strong {
+  display: block;
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-16);
+}
+
+.agent-sidebar--compact :deep(.agent-avatar--emoji) {
+  overflow: visible;
+  border-color: transparent;
+  font-size: var(--font-size-18);
 }
 
 .agent-sidebar__footer {

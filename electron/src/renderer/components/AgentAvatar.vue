@@ -1,7 +1,7 @@
 <template>
   <span
     class="agent-avatar"
-    :class="`agent-avatar--${size}`"
+    :class="[`agent-avatar--${size}`, { 'agent-avatar--emoji': isEmojiAvatar }]"
     :aria-label="label"
   >
     <img
@@ -34,6 +34,7 @@ const props = withDefaults(defineProps<{
 });
 
 const isImageAvatar = computed(() => props.avatar?.startsWith('data:image/') ?? false);
+const isEmojiAvatar = computed(() => !isImageAvatar.value && /\p{Extended_Pictographic}/u.test(props.avatar ?? ''));
 const displayText = computed(() => props.avatar || initials(props.name));
 const label = computed(() => `${props.name} avatar`);
 

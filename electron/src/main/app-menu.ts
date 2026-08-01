@@ -109,6 +109,13 @@ function buildViewMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions): Me
     label: 'View',
     submenu: [
       {
+        label: 'Compact Agent List',
+        type: 'checkbox',
+        checked: false,
+        click: (item) => callbacks.sendAppCommand({ type: 'set-agent-list-compact', compact: item.checked }),
+      },
+      { type: 'separator' },
+      {
         label: 'Review',
         accelerator: 'CommandOrControl+G',
         click: () => callbacks.sendAppCommand({ type: 'open-review' }),

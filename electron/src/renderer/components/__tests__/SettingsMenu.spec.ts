@@ -40,6 +40,7 @@ describe('SettingsMenu', () => {
     expect(rows[1]?.text()).toContain('Weekly');
     expect(rows[1]?.text()).toContain('50%');
     expect(rows[1]?.text()).toContain('Jun 10');
+    expect(wrapper.get('[aria-label="Usage actions divider"]').attributes('role')).toBe('separator');
   });
 
   it('always exposes logout in the lower-left menu and emits menu actions', async () => {

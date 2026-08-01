@@ -39,6 +39,7 @@
         :teams="snapshot.teams"
         :team-id="activeTeam?.id ?? null"
         :team-name="activeTeamName"
+        :compact="agentListCompact"
         :width="agentSidebarWidth"
         :min-width="agentSidebarMinWidth"
         :max-width="agentSidebarMaxWidth"
@@ -523,6 +524,7 @@ type AppSurface = 'agent' | 'cockpit' | 'loops' | 'settings';
 type BenchLoadStatus = 'notLoaded' | 'loading' | 'loaded' | 'error';
 
 const agentSidebarCollapsed = ref(false);
+const agentListCompact = ref(false);
 const agentSidebarMinWidth = 80;
 const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
@@ -1263,6 +1265,11 @@ function handleShellShortcut(event: KeyboardEvent): void {
 }
 
 function handleAppCommand(command: AppCommand): void {
+  if (command.type === 'set-agent-list-compact') {
+    agentListCompact.value = command.compact;
+    return;
+  }
+
   if (isModalDialogVisible.value) {
     return;
   }

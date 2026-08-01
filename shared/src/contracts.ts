@@ -906,7 +906,8 @@ export type AppCommand =
   | { type: 'open-browser' }
   | { type: 'open-review' }
   | { type: 'quit' }
-  | { type: 'restart-active-agent' };
+  | { type: 'restart-active-agent' }
+  | { type: 'set-agent-list-compact'; compact: boolean };
 
 export type CreateAgentInput = {
   name: string;
