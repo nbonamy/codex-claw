@@ -65,7 +65,6 @@ function mountDialog(overrides: Partial<{
     props: {
       visible: true,
       title: 'Assign to Bench Agent',
-      subtitle: 'Choose a Bench agent and target team.',
       confirmLabel: 'Assign',
       benchTemplates: overrides.benchTemplates ?? benchTemplates(),
       initialNewTeamName: overrides.initialNewTeamName ?? '',

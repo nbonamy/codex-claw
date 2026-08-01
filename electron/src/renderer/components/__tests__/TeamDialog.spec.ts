@@ -10,11 +10,14 @@ describe('TeamDialog', () => {
     const wrapper = mountDialog();
 
     expect(wrapper.get('.claw-dialog__title').text()).toBe('Create Team');
-    expect(wrapper.get('.claw-dialog__subtitle').text()).toBe('Add a team to Codex Claw');
+    expect(wrapper.find('.claw-dialog__subtitle').exists()).toBe(false);
     expect(wrapper.findAll('.team-dialog__field')).toHaveLength(3);
     expect(wrapper.text()).toContain('Name');
     expect(wrapper.text()).toContain('Connection');
     expect(wrapper.text()).toContain('Color');
+    expect(wrapper.text()).not.toContain("Choose where this team's agents run.");
+    expect(wrapper.text()).not.toContain('Give this team a name for the sidebar.');
+    expect(wrapper.findAll('.team-dialog__group')).toHaveLength(2);
     expect(wrapper.get('.team-dialog__text-input').attributes('placeholder')).toBe('Enter team name');
     expect(wrapper.findAll('.team-dialog__color')).toHaveLength(teamColors.length);
     expect(wrapper.find('.team-dialog__preview').exists()).toBe(false);

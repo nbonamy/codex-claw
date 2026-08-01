@@ -11,7 +11,6 @@
     <template #header>
       <div class="claw-form-dialog__header agent-dialog__header">
         <h2 class="claw-dialog__title">{{ title }}</h2>
-        <p class="claw-dialog__subtitle">{{ subtitle }}</p>
       </div>
     </template>
 
@@ -45,158 +44,138 @@
 
       <section
         v-else
-        class="claw-form-dialog__field agent-dialog__field"
+        class="agent-dialog__workspace-group"
       >
-        <div class="agent-dialog__section-heading">
-          <label
-            class="claw-form-dialog__label agent-dialog__label"
-            for="agent-dialog-repository"
+        <div class="agent-dialog__workspace-rows">
+          <div class="agent-dialog__workspace-row">
+            <div class="agent-dialog__row-copy">
+              <label
+                class="agent-dialog__row-label"
+                for="agent-dialog-repository"
+              >Repository</label>
+            </div>
+            <div class="agent-dialog__row-control">
+              <el-select
+                id="agent-dialog-repository"
+                v-model="repositoryControlValue"
+                class="agent-dialog__workspace-select"
+                @update:model-value="selectRepositoryControl"
+              >
+                <el-option
+                  class="agent-dialog__source-custom-option"
+                  :label="customFolderOptionLabel"
+                  :value="customFolderOptionValue"
+                />
+                <el-option
+                  v-for="repository in sourceRepositories"
+                  :key="repository.path"
+                  :label="repository.name"
+                  :value="repository.path"
+                />
+              </el-select>
+            </div>
+          </div>
+
+          <div
+            v-if="showSourceWorktreeControl"
+            class="agent-dialog__workspace-row"
           >
-            Repository
-          </label>
-          <p class="claw-form-dialog__help agent-dialog__help">{{ repositoryHelp }}</p>
-        </div>
-        <div class="claw-form-dialog__control agent-dialog__input-shell agent-dialog__input-shell--select">
-          <el-select
-            id="agent-dialog-repository"
-            v-model="repositoryControlValue"
-            class="agent-dialog__source-select"
-            :teleported="false"
-            @update:model-value="selectRepositoryControl"
+            <div class="agent-dialog__row-copy">
+              <label
+                class="agent-dialog__row-label"
+                for="agent-dialog-worktree"
+              >Work in...</label>
+            </div>
+            <div class="agent-dialog__row-control">
+              <el-select
+                id="agent-dialog-worktree"
+                v-model="selectedSourceWorktreePath"
+                class="agent-dialog__workspace-select"
+                @update:model-value="selectWorktreeControl"
+              >
+                <el-option
+                  v-for="worktree in selectedSourceWorktrees"
+                  :key="worktree.path"
+                  :label="worktree.name"
+                  :value="worktree.path"
+                />
+                <el-option
+                  class="agent-dialog__source-custom-option"
+                  label="New Worktree..."
+                  :value="newWorktreeOptionValue"
+                />
+              </el-select>
+            </div>
+          </div>
+
+          <div
+            v-if="showTeamSelector"
+            class="agent-dialog__workspace-row"
           >
-            <el-option
-              class="agent-dialog__source-custom-option"
-              :label="customFolderOptionLabel"
-              :value="customFolderOptionValue"
-            />
-            <el-option
-              v-if="sourceRepositories.length > 0"
-              class="agent-dialog__source-option-divider"
-              disabled
-              label=""
-              :value="sourceDividerOptionValue"
-            />
-            <el-option
-              v-for="repository in sourceRepositories"
-              :key="repository.path"
-              :label="repository.name"
-              :value="repository.path"
-            />
-          </el-select>
+            <div class="agent-dialog__row-copy">
+              <label
+                class="agent-dialog__row-label"
+                for="agent-dialog-team"
+              >Team</label>
+            </div>
+            <div class="agent-dialog__row-control agent-dialog__row-control--stacked">
+              <el-select
+                id="agent-dialog-team"
+                v-model="teamSelection"
+                class="agent-dialog__workspace-select"
+              >
+                <el-option
+                  v-for="team in teams"
+                  :key="team.id"
+                  :label="team.name"
+                  :value="team.id"
+                />
+                <el-option
+                  label="New team"
+                  :value="newTeamOptionId"
+                />
+              </el-select>
+              <input
+                v-if="teamSelection === newTeamOptionId"
+                id="agent-dialog-new-team"
+                v-model="newTeamName"
+                class="claw-form-dialog__text-input agent-dialog__new-team-input"
+                type="text"
+                aria-label="New team name"
+                placeholder="Enter team name"
+              />
+            </div>
+          </div>
         </div>
       </section>
 
-      <section
-        v-if="showSourceWorktreeControl"
-        class="claw-form-dialog__field agent-dialog__field"
-      >
-        <div class="agent-dialog__compact-heading">
-          <label
-            class="agent-dialog__compact-label"
-            for="agent-dialog-worktree"
-          >
-            Checkout
-          </label>
-        </div>
-        <div class="claw-form-dialog__control agent-dialog__input-shell agent-dialog__input-shell--select agent-dialog__source-worktree-row">
-          <el-select
-            id="agent-dialog-worktree"
-            v-model="selectedSourceWorktreePath"
-            class="agent-dialog__source-select"
-            :teleported="false"
-            @update:model-value="selectWorktreeControl"
-          >
-            <el-option
-              v-for="worktree in selectedSourceWorktrees"
-              :key="worktree.path"
-              :label="worktree.name"
-              :value="worktree.path"
-            />
-            <el-option
-              v-if="selectedSourceWorktrees.length > 0"
-              class="agent-dialog__source-option-divider"
-              disabled
-              label=""
-              :value="worktreeDividerOptionValue"
-            />
-            <el-option
-              class="agent-dialog__source-custom-option"
-              label="New Worktree..."
-              :value="newWorktreeOptionValue"
-            />
-          </el-select>
-        </div>
-      </section>
-
-      <section
-        v-if="showTeamSelector"
-        class="claw-form-dialog__field agent-dialog__field"
-      >
-        <div class="agent-dialog__compact-heading">
-          <label
-            class="agent-dialog__compact-label"
-            for="agent-dialog-team"
-          >
-            Team
-          </label>
-        </div>
-        <div class="claw-form-dialog__control agent-dialog__input-shell agent-dialog__input-shell--select">
-          <el-select
-            id="agent-dialog-team"
-            v-model="teamSelection"
-            class="agent-dialog__team-select"
-            :teleported="false"
-          >
-            <el-option
-              v-for="team in teams"
-              :key="team.id"
-              :label="team.name"
-              :value="team.id"
-            />
-            <el-option
-              label="New team"
-              :value="newTeamOptionId"
-            />
-          </el-select>
-        </div>
-        <div
-          v-if="teamSelection === newTeamOptionId"
-          class="claw-form-dialog__control claw-form-dialog__input-control agent-dialog__new-team-control"
-        >
-          <input
-            id="agent-dialog-new-team"
-            v-model="newTeamName"
-            class="claw-form-dialog__text-input agent-dialog__text-input"
-            type="text"
-            aria-label="New team name"
-            placeholder="Enter team name"
-          />
-        </div>
-      </section>
-
-      <section class="agent-dialog__identity-field">
-        <div class="agent-dialog__compact-heading">
-          <label
-            class="agent-dialog__compact-label"
-            for="agent-dialog-name"
-          >Agent name</label>
-        </div>
-        <div class="agent-dialog__identity-row">
-          <AgentAvatarPicker
-            v-model="avatar"
-            :name="name || folderName || 'Agent'"
-            class="agent-dialog__identity-avatar"
-          />
-          <div class="claw-form-dialog__control agent-dialog__identity-control">
-            <input
-              id="agent-dialog-name"
-              v-model="name"
-              class="claw-form-dialog__text-input agent-dialog__text-input"
-              type="text"
-              aria-label="Agent name"
-              placeholder="Name this agent"
-              :disabled="!canEdit"
-            />
+      <section class="agent-dialog__identity-group">
+        <div class="agent-dialog__identity-rows">
+          <div class="agent-dialog__workspace-row agent-dialog__identity-row">
+            <div class="agent-dialog__row-copy">
+              <label
+                class="agent-dialog__row-label"
+                for="agent-dialog-name"
+              >Name</label>
+            </div>
+            <div class="agent-dialog__row-control agent-dialog__identity-control">
+              <AgentAvatarPicker
+                v-model="avatar"
+                :name="name || folderName || 'Agent'"
+                class="agent-dialog__identity-avatar"
+              />
+              <div class="agent-dialog__identity-input">
+                <input
+                  id="agent-dialog-name"
+                  v-model="name"
+                  class="claw-form-dialog__text-input agent-dialog__text-input"
+                  type="text"
+                  aria-label="Agent name"
+                  placeholder="Name this agent"
+                  :disabled="!canEdit"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -313,9 +292,7 @@ const choosingFolder = ref(false);
 const submitting = ref(false);
 const newTeamOptionId = '__new_team__';
 const customFolderOptionValue = '__custom_folder__';
-const sourceDividerOptionValue = '__source_divider__';
 const newWorktreeOptionValue = '__new_worktree__';
-const worktreeDividerOptionValue = '__worktree_divider__';
 const selectedSourceRepositoryPath = ref('');
 const selectedSourceWorktreePath = ref('');
 const repositoryControlValue = ref(customFolderOptionValue);
@@ -332,7 +309,6 @@ const isEditing = computed(() => props.mode === 'edit');
 const canEdit = computed(() => !isEditing.value || props.agent?.status.type === 'idle');
 const folderName = computed(() => folder.value.split(/[\\/]/).filter(Boolean).at(-1) ?? '');
 const title = computed(() => isEditing.value ? 'Edit agent' : 'New agent');
-const subtitle = computed(() => isEditing.value ? 'Update this agent' : 'Choose a repository to get started');
 const submitLabel = computed(() => isEditing.value ? 'Save' : 'Create agent');
 const folderLabel = computed(() => folder.value ? shortenFolder(folder.value) : 'Select folder');
 const teams = computed(() => props.teams);
@@ -366,17 +342,6 @@ const selectedSourceWorktrees = computed(() => {
   return [...worktrees, created];
 });
 const showSourceWorktreeControl = computed(() => !isEditing.value && selectedSourceRepository.value !== null);
-const repositoryHelp = computed(() => (
-  loadingRemoteSourceRepositories.value
-    ? 'Loading repositories from the SSH connection.'
-    : props.sourceFolderPath && sourceRepositories.value.length > 0
-    ? `Pick from ${props.sourceFolderPath}.`
-    : selectedRemoteConnectionId.value && sourceRepositories.value.length > 0
-      ? 'Pick from the selected SSH connection.'
-      : selectedRemoteConnectionId.value
-        ? 'No repositories found on the selected SSH connection.'
-    : 'Pick a custom project folder.'
-));
 const customFolderOptionLabel = computed(() => folder.value && !selectedSourceRepository.value ? 'Custom folder' : 'Choose folder...');
 const teamCanSave = computed(() => (
   !showTeamSelector.value ||
@@ -729,7 +694,7 @@ function syncRepositoryControlValue(): void {
 }
 
 .agent-dialog__form {
-  gap: var(--space-6);
+  gap: var(--space-10);
   padding: var(--space-12) var(--space-4) 0;
 }
 
@@ -738,45 +703,115 @@ function syncRepositoryControlValue(): void {
   gap: var(--space-1);
 }
 
-.agent-dialog__compact-heading {
-  display: flex;
-  align-items: center;
-}
-
-.agent-dialog__compact-label {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-12);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-18);
-}
-
 .agent-dialog__repository-value--empty {
   color: var(--color-text-muted);
 }
 
-.agent-dialog__identity-field {
-  display: grid;
-  gap: var(--space-1);
-  padding-top: var(--space-2);
+.agent-dialog__workspace-group,
+.agent-dialog__identity-group {
+  display: block;
 }
 
-.agent-dialog__identity-row {
-  display: flex;
+.agent-dialog__workspace-rows,
+.agent-dialog__identity-rows {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-lowest);
+}
+
+.agent-dialog__row-label {
+  color: var(--color-text);
+  font-size: var(--font-size-14);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-20);
+}
+
+.agent-dialog__workspace-row {
+  display: grid;
+  grid-template-columns: minmax(104px, 0.72fr) minmax(200px, 1.28fr);
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-8);
+  min-height: calc(var(--space-20) + var(--space-8));
+  padding: 0 var(--space-8);
+}
+
+.agent-dialog__workspace-row + .agent-dialog__workspace-row {
+  border-top: 1px solid var(--color-border);
+}
+
+.agent-dialog__row-copy {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.agent-dialog__row-control {
+  min-width: 0;
+}
+
+.agent-dialog__row-control--stacked {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.agent-dialog__workspace-select {
+  width: 100%;
+}
+
+.agent-dialog__workspace-select :deep(.el-select__wrapper) {
+  min-height: var(--space-20);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  background: transparent;
+  box-shadow: none;
+}
+
+.agent-dialog__workspace-select :deep(.el-select__wrapper:hover),
+.agent-dialog__workspace-select :deep(.el-select__wrapper.is-focused) {
+  background: var(--color-surface-low);
+  box-shadow: none;
+}
+
+.agent-dialog__workspace-select :deep(.el-select__selected-item),
+.agent-dialog__workspace-select :deep(.el-select__placeholder) {
+  color: var(--color-text);
+  font-size: var(--font-size-15);
+}
+
+.agent-dialog__new-team-input {
+  min-height: var(--space-16);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-lowest);
 }
 
 .agent-dialog__identity-control {
   display: flex;
-  flex: 1 1 auto;
   min-width: 0;
   align-items: center;
-  padding: 0;
+  gap: var(--space-3);
 }
 
-.agent-dialog__identity-control:focus-within {
-  /* border-color: var(--color-primary); */
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 18%, transparent);
+.agent-dialog__identity-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--space-16);
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-md);
+  background: transparent;
+}
+
+.agent-dialog__identity-input:focus-within {
+  background: var(--color-surface-low);
+}
+
+.agent-dialog__text-input {
+  height: var(--space-16);
+  padding: 0 var(--space-4);
+  line-height: var(--line-height-20);
 }
 
 .agent-dialog__identity-avatar :deep(.agent-avatar-picker) {
@@ -785,26 +820,18 @@ function syncRepositoryControlValue(): void {
 }
 
 .agent-dialog__identity-avatar :deep(.agent-avatar-picker__trigger) {
-  width: var(--space-20);
-  height: var(--space-20);
-  border-radius: 0;
-  background: transparent;
+  width: var(--space-16);
+  height: var(--space-16);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-low);
 }
 
 .agent-dialog__identity-avatar :deep(.agent-avatar-picker__trigger .agent-avatar-picker__preview) {
-  --agent-avatar-size: var(--space-20);
+  --agent-avatar-size: var(--space-16);
 }
 
 .agent-dialog__identity-avatar :deep(.agent-avatar-picker__hint) {
   display: none;
-}
-
-.agent-dialog__input-shell--select {
-  display: block;
-}
-
-.agent-dialog__new-team-control {
-  margin-top: var(--space-8);
 }
 
 .agent-dialog__repository-value {
@@ -830,19 +857,6 @@ function syncRepositoryControlValue(): void {
   flex: 0 0 auto;
   width: var(--icon-md);
   height: var(--icon-md);
-}
-
-.agent-dialog__source-worktree-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-6);
-}
-
-.agent-dialog__source-option-divider {
-  height: 1px;
-  margin: var(--space-4) 0;
-  padding: 0;
-  border-top: 1px solid var(--color-border);
 }
 
 .agent-dialog__source-custom-option {

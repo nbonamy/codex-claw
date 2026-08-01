@@ -11,7 +11,6 @@
     <template #header>
       <div class="claw-form-dialog__header bench-agent-assignment-dialog__header">
         <h2 class="claw-dialog__title">{{ title }}</h2>
-        <p class="claw-dialog__subtitle">{{ subtitle }}</p>
       </div>
     </template>
 
@@ -150,7 +149,6 @@ const props = withDefaults(defineProps<{
   confirmLabel?: string;
   initialNewTeamName?: string;
   initialTeamId?: string | null;
-  subtitle?: string;
   teams: Team[];
   title?: string;
   visible: boolean;
@@ -160,7 +158,6 @@ const props = withDefaults(defineProps<{
   confirmLabel: 'Continue',
   initialNewTeamName: '',
   initialTeamId: null,
-  subtitle: 'Choose a Bench agent and target team.',
   title: 'Assign to Bench Agent',
 });
 

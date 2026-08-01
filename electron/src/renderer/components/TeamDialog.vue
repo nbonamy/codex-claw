@@ -11,7 +11,6 @@
     <template #header>
       <div class="claw-form-dialog__header team-dialog__header">
         <h2 class="claw-dialog__title">{{ dialogTitle }}</h2>
-        <p class="claw-dialog__subtitle">{{ dialogSubtitle }}</p>
       </div>
     </template>
 
@@ -19,132 +18,111 @@
       class="claw-form-dialog team-dialog__form"
       @submit.prevent="submit"
     >
-
-      <section class="claw-form-dialog__field team-dialog__field">
-        <div class="claw-form-dialog__field-heading team-dialog__field-heading">
+      <div class="team-dialog__group">
+        <section class="team-dialog__row team-dialog__field">
           <label
-            class="claw-form-dialog__label team-dialog__label"
+            class="team-dialog__row-label"
             for="team-dialog-connection"
-          >
-            Connection
-          </label>
-          <span class="claw-form-dialog__heading-separator team-dialog__heading-separator">•</span>
-          <p class="claw-form-dialog__help team-dialog__help">Choose where this team's agents run.</p>
-        </div>
-        <div class="claw-form-dialog__control team-dialog__input-shell team-dialog__input-shell--select">
-          <el-select
-            id="team-dialog-connection"
-            v-model="connectionSelection"
-            class="team-dialog__connection-select"
-            :disabled="connectionLocked"
-            :teleported="false"
-          >
-            <el-option
-              label="Local"
-              :value="localConnectionValue"
-            />
-            <el-option
-              v-for="connection in readyRemoteConnections"
-              :key="connection.id"
-              :label="connection.name"
-              :value="connection.id"
-            />
-          </el-select>
-        </div>
-      </section>
+          >Connection</label>
+          <div class="team-dialog__row-control">
+            <el-select
+              id="team-dialog-connection"
+              v-model="connectionSelection"
+              class="team-dialog__select"
+              :disabled="connectionLocked"
+            >
+              <el-option
+                label="Local"
+                :value="localConnectionValue"
+              />
+              <el-option
+                v-for="connection in readyRemoteConnections"
+                :key="connection.id"
+                :label="connection.name"
+                :value="connection.id"
+              />
+            </el-select>
+          </div>
+        </section>
 
-      <section
-        v-if="showRemoteTeamSelection"
-        class="claw-form-dialog__field team-dialog__field"
-      >
-        <div class="claw-form-dialog__field-heading team-dialog__field-heading">
-          <label
-            class="claw-form-dialog__label team-dialog__label"
-            for="team-dialog-remote-team"
-          >
-            Remote Team
-          </label>
-          <span class="claw-form-dialog__heading-separator team-dialog__heading-separator">•</span>
-          <p class="claw-form-dialog__help team-dialog__help">Create a new team or connect to one already on that backend.</p>
-        </div>
-        <div class="claw-form-dialog__control team-dialog__input-shell team-dialog__input-shell--select">
-          <el-select
-            id="team-dialog-remote-team"
-            v-model="remoteTeamSelection"
-            class="team-dialog__connection-select"
-            :loading="remoteTeamsLoading"
-            :teleported="false"
-          >
-            <el-option
-              label="Create new remote team"
-              :value="newRemoteTeamValue"
-            />
-            <el-option
-              v-for="teamOption in remoteTeamOptions"
-              :key="teamOption.id"
-              :label="teamOption.name"
-              :value="teamOption.id"
-            />
-          </el-select>
-        </div>
-      </section>
-
-      <section
-        v-if="showTeamNameInput"
-        class="claw-form-dialog__field team-dialog__field"
-      >
-        <div class="claw-form-dialog__field-heading team-dialog__field-heading">
-          <label
-            class="claw-form-dialog__label team-dialog__label"
-            for="team-dialog-name"
-          >
-            Name
-          </label>
-          <span class="claw-form-dialog__heading-separator team-dialog__heading-separator">•</span>
-          <p class="claw-form-dialog__help team-dialog__help">Give this team a name for the sidebar.</p>
-        </div>
-        <div class="claw-form-dialog__control claw-form-dialog__input-control team-dialog__input-shell">
-          <input
-            id="team-dialog-name"
-            v-model="name"
-            class="claw-form-dialog__text-input team-dialog__text-input"
-            type="text"
-            placeholder="Enter team name"
-            autofocus
-          />
-        </div>
-      </section>
-
-      <section class="claw-form-dialog__field team-dialog__field">
-        <div class="claw-form-dialog__field-heading team-dialog__field-heading">
-          <span class="claw-form-dialog__label team-dialog__label">Color</span>
-          <span class="claw-form-dialog__heading-separator team-dialog__heading-separator">•</span>
-          <p class="claw-form-dialog__help team-dialog__help">Choose the team rail color.</p>
-        </div>
-        <div
-          class="claw-form-dialog__control team-dialog__colors"
-          role="radiogroup"
-          aria-label="Team color"
+        <section
+          v-if="showRemoteTeamSelection"
+          class="team-dialog__row team-dialog__field"
         >
-          <button
-            v-for="color in teamColors"
-            :key="color"
-            class="team-dialog__color"
-            :class="{ 'team-dialog__color--selected': color === selectedColor }"
-            :style="{ '--team-color': color }"
-            type="button"
-            role="radio"
-            :aria-label="`Use color ${color}`"
-            :aria-checked="color === selectedColor"
-            @click="selectedColor = color"
-          >
-            <CheckIcon
-              v-if="color === selectedColor"
-              aria-hidden="true"
+          <label
+            class="team-dialog__row-label"
+            for="team-dialog-remote-team"
+          >Remote team</label>
+          <div class="team-dialog__row-control">
+            <el-select
+              id="team-dialog-remote-team"
+              v-model="remoteTeamSelection"
+              class="team-dialog__select"
+              :loading="remoteTeamsLoading"
+            >
+              <el-option
+                label="Create new remote team"
+                :value="newRemoteTeamValue"
+              />
+              <el-option
+                v-for="teamOption in remoteTeamOptions"
+                :key="teamOption.id"
+                :label="teamOption.name"
+                :value="teamOption.id"
+              />
+            </el-select>
+          </div>
+        </section>
+      </div>
+
+      <div class="team-dialog__group">
+        <section
+          v-if="showTeamNameInput"
+          class="team-dialog__row team-dialog__field"
+        >
+          <label
+            class="team-dialog__row-label"
+            for="team-dialog-name"
+          >Name</label>
+          <div class="team-dialog__row-control team-dialog__name-control">
+            <input
+              id="team-dialog-name"
+              v-model="name"
+              class="claw-form-dialog__text-input team-dialog__text-input"
+              type="text"
+              placeholder="Enter team name"
+              autofocus
             />
-          </button>
-        </div>
-      </section>
+          </div>
+        </section>
+
+        <section class="team-dialog__row team-dialog__field team-dialog__color-row">
+          <span class="team-dialog__row-label">Color</span>
+          <div
+            class="team-dialog__row-control team-dialog__colors"
+            role="radiogroup"
+            aria-label="Team color"
+          >
+            <button
+              v-for="color in teamColors"
+              :key="color"
+              class="team-dialog__color"
+              :class="{ 'team-dialog__color--selected': color === selectedColor }"
+              :style="{ '--team-color': color }"
+              type="button"
+              role="radio"
+              :aria-label="`Use color ${color}`"
+              :aria-checked="color === selectedColor"
+              @click="selectedColor = color"
+            >
+              <CheckIcon
+                v-if="color === selectedColor"
+                aria-hidden="true"
+              />
+            </button>
+          </div>
+        </section>
+      </div>
 
       <el-alert
         v-if="errorMessage"
@@ -219,7 +197,6 @@ const selectedRemoteConnectionId = computed(() => (
 ));
 const connectionLocked = computed(() => props.mode === 'edit' && (props.team?.agentIds.length ?? 0) > 0);
 const dialogTitle = computed(() => props.mode === 'edit' ? 'Edit Team' : 'Create Team');
-const dialogSubtitle = computed(() => props.mode === 'edit' ? 'Update team identity' : 'Add a team to Codex Claw');
 const submitLabel = computed(() => props.mode === 'edit' ? 'Save' : 'Create Team');
 
 watch(() => props.visible, (visible) => {
@@ -335,16 +312,98 @@ function shouldLoadRemoteTeamOptions(connectionId: string): boolean {
 </script>
 
 <style scoped>
-.team-dialog__input-shell--select {
-  display: block;
+.team-dialog__form {
+  gap: var(--space-10);
+  padding: var(--space-12) var(--space-4) 0;
+}
+
+.team-dialog__group {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-lowest);
+}
+
+.team-dialog__row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-8);
+  min-height: calc(var(--space-20) + var(--space-8));
+  padding: 0 var(--space-8);
+}
+
+.team-dialog__row + .team-dialog__row {
+  border-top: 1px solid var(--color-border);
+}
+
+.team-dialog__row-label {
+  color: var(--color-text);
+  font-size: var(--font-size-14);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-20);
+}
+
+.team-dialog__row-control {
+  min-width: 0;
+}
+
+.team-dialog__select {
+  width: 100%;
+}
+
+.team-dialog__select :deep(.el-select__wrapper) {
+  min-height: var(--space-20);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  background: transparent;
+  box-shadow: none;
+}
+
+.team-dialog__select :deep(.el-select__wrapper:hover),
+.team-dialog__select :deep(.el-select__wrapper.is-focused) {
+  background: var(--color-surface-low);
+  box-shadow: none;
+}
+
+.team-dialog__select :deep(.el-select__selected-item),
+.team-dialog__select :deep(.el-select__placeholder) {
+  color: var(--color-text);
+  font-size: var(--font-size-15);
+}
+
+.team-dialog__name-control {
+  min-height: var(--space-16);
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-md);
+}
+
+.team-dialog__name-control:focus-within {
+  background: var(--color-surface-low);
+}
+
+.team-dialog__text-input {
+  height: var(--space-16);
+  padding: 0 var(--space-4);
+  line-height: var(--line-height-20);
+}
+
+.team-dialog__color-row {
+  align-items: start;
+  padding-top: var(--space-8);
+  padding-bottom: var(--space-8);
+}
+
+.team-dialog__color-row .team-dialog__row-label {
+  padding-top: var(--space-3);
 }
 
 .team-dialog__colors {
   display: grid;
-  grid-template-columns: repeat(6, 32px);
-  justify-content: center;
-  gap: var(--space-8);
-  padding: var(--space-16);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  justify-items: center;
+  gap: var(--space-4);
 }
 
 .team-dialog__color {

@@ -11,7 +11,6 @@
     <template #header>
       <div class="claw-form-dialog__header">
         <h2 class="claw-dialog__title">New Worktree</h2>
-        <p class="claw-dialog__subtitle">Create a worktree for {{ repo?.name ?? 'repository' }}</p>
       </div>
     </template>
 

@@ -269,7 +269,6 @@
     <BenchAgentAssignmentDialog
       :visible="benchAssignmentDialogVisible"
       title="Assign to Bench Agent"
-      subtitle="Choose a Bench agent and target team."
       confirm-label="Assign"
       :bench-templates="snapshot.bench"
       :bench-templates-by-team-id="benchByTeamId"

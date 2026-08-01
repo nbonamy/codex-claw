@@ -59,6 +59,7 @@
   --color-shell-main: var(--color-surface-lowest);
   --color-shell-sidebar: var(--color-surface-low);
   --color-shell-rail: var(--color-surface-low);
+  --color-dialog-body: #FDFDFD;
   --color-overlay: rgba(255, 255, 255, 0.78);
   --color-shine: rgba(255, 255, 255, 0.95);
 
@@ -189,6 +190,7 @@ html.dark {
   --color-background: var(--color-surface);
   --color-border: var(--color-outline-variant);
   --color-border-strong: var(--color-outline);
+  --color-dialog-body: var(--color-surface-lowest);
   --color-overlay: rgba(13, 15, 18, 0.78);
   --color-shine: rgba(255, 255, 255, 0.72);
 

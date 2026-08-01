@@ -90,7 +90,8 @@ implemented:
 - Bench entry point in the agent creation flow;
 - repository-first agent creation that keeps Codex implicit, puts custom folder
   selection first, progressively reveals checkout controls, and hides backend
-  and resolved-path implementation details;
+  and resolved-path implementation details; identity and workspace settings
+  use grouped surfaces with compact row controls;
 - full-space Settings surface launched from the rail, with its own category
   sidebar and screen-level panels instead of dialog chrome.
 
@@ -163,6 +164,9 @@ Rules:
 - Use icons for familiar tool buttons.
 - Use text buttons for clear commands.
 - Do not create nested cards or card-heavy shells.
+- Keep form-dialog chrome shared: title-only compact headers, full-width header
+  and footer dividers, and the semantic dialog-body surface belong to
+  `.claw-dialog`, not individual product dialogs.
 - Avoid decorative layouts that slow down real coding workflows.
 - Keep empty, loading, error, offline, and permission states explicit.
 - Ensure text fits in compact desktop windows.

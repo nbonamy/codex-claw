@@ -23,16 +23,22 @@ describe('AgentDialog', () => {
 
     expect(wrapper.get('.agent-dialog__header').text()).toContain('New agent');
     expect(wrapper.get('.claw-dialog__title').text()).toBe('New agent');
-    expect(wrapper.get('.claw-dialog__subtitle').text()).toBe('Choose a repository to get started');
-    expect(wrapper.findAll('.agent-dialog__field')).toHaveLength(1);
+    expect(wrapper.find('.claw-dialog__subtitle').exists()).toBe(false);
+    expect(wrapper.get('.agent-dialog__identity-group').text()).toContain('Name');
+    expect(wrapper.get('.agent-dialog__workspace-group').text()).toContain('Repository');
+    expect(wrapper.html().indexOf('agent-dialog__workspace-group')).toBeLessThan(wrapper.html().indexOf('agent-dialog__identity-group'));
+    expect(wrapper.text()).not.toContain('Workspace');
+    expect(wrapper.text()).not.toContain('Identity');
     expect(wrapper.text()).not.toContain('Workspace folder');
+    expect(wrapper.text()).not.toContain('Pick from ~/src.');
     expect(wrapper.text()).toContain('Repository');
-    expect(wrapper.text()).toContain('Agent name');
+    expect(wrapper.text()).not.toContain('Checkout');
+    expect(wrapper.get('[aria-label="Agent name"]').attributes('aria-label')).toBe('Agent name');
     expect(wrapper.text()).not.toContain('Resolved path');
     expect(wrapper.text()).not.toContain('Backend');
     expect(wrapper.text()).not.toContain('Claude Code');
     expect(wrapper.get('.agent-dialog__text-input').attributes('placeholder')).toBe('Name this agent');
-    expect(wrapper.get('.agent-dialog__source-custom-option').text()).toBe('Choose folder...');
+    expect(wrapper.findAllComponents({ name: 'ElOption' })[0]?.props('label')).toBe('Choose folder...');
     expect(saveButton(wrapper).attributes()).toHaveProperty('disabled');
   });
 
@@ -263,7 +269,7 @@ describe('AgentDialog', () => {
       sourceRepositories: repositories,
     });
 
-    expect(wrapper.text()).toContain('Checkout');
+    expect(wrapper.text()).toContain('Work in...');
     expect(wrapper.findAllComponents({ name: 'ElOption' })[0]?.props('label')).toBe('Choose folder...');
     expect(wrapper.text()).not.toContain('Resolved path');
     await emitSelect(wrapper, 'agent-dialog-repository', '/Users/nbonamy/src/codex-claw');
@@ -417,7 +423,7 @@ describe('AgentDialog', () => {
       }],
     });
 
-    expect(wrapper.text()).toContain('New Worktree...');
+    expect(wrapper.findAllComponents({ name: 'ElOption' }).some((option) => option.props('label') === 'New Worktree...')).toBe(true);
     await emitSelect(wrapper, 'agent-dialog-repository', '/Users/nbonamy/src/codex-claw');
     await nextTick();
     await emitSelect(wrapper, 'agent-dialog-worktree', '__new_worktree__');
