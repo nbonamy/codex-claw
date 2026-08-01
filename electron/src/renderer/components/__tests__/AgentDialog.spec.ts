@@ -303,6 +303,42 @@ describe('AgentDialog', () => {
     });
   });
 
+  it('keeps the selected repository when streaming snapshots replace team state', async () => {
+    const teams: Team[] = [{
+      id: 'team-codex-claw',
+      name: 'Codex Claw',
+      agentIds: ['agent-streaming'],
+    }];
+    const repositories: SourceRepository[] = [
+      {
+        name: 'codex-claw',
+        path: '/Users/nbonamy/src/codex-claw',
+        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/codex-claw' }],
+      },
+      {
+        name: 'mediastation',
+        path: '/Users/nbonamy/src/mediastation',
+        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/mediastation' }],
+      },
+    ];
+    const wrapper = mountDialog({ sourceRepositories: repositories, teams });
+
+    await emitSelect(wrapper, 'agent-dialog-repository', '/Users/nbonamy/src/mediastation');
+    await nextTick();
+    expect(wrapper.getComponent({ name: 'ElSelect' }).props('modelValue')).toBe('/Users/nbonamy/src/mediastation');
+
+    await (wrapper as unknown as { setProps: (props: { teams: Team[] }) => Promise<void> }).setProps({
+      teams: [{
+        ...teams[0]!,
+        agentIds: ['agent-streaming'],
+      }],
+    });
+    await nextTick();
+
+    expect(wrapper.getComponent({ name: 'ElSelect' }).props('modelValue')).toBe('/Users/nbonamy/src/mediastation');
+    expect(wrapper.get<HTMLInputElement>('[aria-label="Agent name"]').element.value).toBe('mediastation');
+  });
+
   it('creates agents using the target team SSH connection for repositories and worktrees', async () => {
     const createAgent = vi.fn().mockResolvedValue(undefined);
     const listSourceRepositories = vi.fn().mockResolvedValue([{

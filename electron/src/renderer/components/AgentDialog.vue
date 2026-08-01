@@ -361,7 +361,14 @@ const canSave = computed(() => (
   teamCanSave.value
 ));
 
-watch(() => [props.visible, props.mode, props.agent?.id, props.initialNewTeamName, props.initialTeamId, props.teams.length] as const, () => {
+watch([
+  () => props.visible,
+  () => props.mode,
+  () => props.agent?.id,
+  () => props.initialNewTeamName,
+  () => props.initialTeamId,
+  () => props.teams.length,
+], () => {
   if (props.visible) {
     resetForm();
   }
