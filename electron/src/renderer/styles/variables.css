@@ -240,6 +240,7 @@ html.dark {
   --el-fill-color-light: var(--color-surface-low);
   --el-fill-color-lighter: var(--color-surface-lowest);
   --el-fill-color-blank: var(--color-surface-lowest);
+  
   /* Shadows */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.34);
   --shadow-md: 0 3px 10px rgba(0, 0, 0, 0.38);
