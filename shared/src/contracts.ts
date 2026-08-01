@@ -1083,6 +1083,7 @@ export type CodexClawApi = {
   selectAgent(agentId: string): Promise<AppSnapshot>;
   updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>;
   getCodexAuthentication(): Promise<CodexAuthentication>;
+  cancelCodexChatGptLogin(): Promise<CodexAuthentication>;
   startCodexChatGptLogin(): Promise<CodexChatGptLogin>;
   logoutCodex(): Promise<CodexAuthentication>;
   getDaemonStatus(): Promise<ClawdDaemonStatus>;

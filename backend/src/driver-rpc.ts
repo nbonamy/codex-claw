@@ -73,6 +73,8 @@ export class BackendDriverRpc {
       }
       case backendMethods.driverCodexAuthenticationGet:
         return this.requireCodexDriver().getAuthentication();
+      case backendMethods.driverCodexChatGptLoginCancel:
+        return this.requireCodexDriver().cancelChatGptLogin();
       case backendMethods.driverCodexChatGptLoginStart:
         return this.requireCodexDriver().startChatGptLogin();
       case backendMethods.driverCodexLogout:

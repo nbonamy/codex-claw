@@ -17,6 +17,17 @@
       >
         {{ loading ? t('auth.waiting') : t('auth.continue') }}
       </el-button>
+      <button
+        class="codex-login__cancel"
+        :class="{ 'codex-login__cancel--hidden': !cancellable }"
+        type="button"
+        :aria-hidden="!cancellable"
+        :disabled="!cancellable || cancelling"
+        :tabindex="cancellable ? 0 : -1"
+        @click="emit('cancel')"
+      >
+        {{ t('auth.cancel') }}
+      </button>
       <p v-if="error" class="codex-login__error" role="alert">{{ error }}</p>
     </div>
   </section>
@@ -29,10 +40,12 @@ const appIconUrl = new URL('../../../assets/icon.png', import.meta.url).href;
 
 defineProps<{
   loading?: boolean;
+  cancellable?: boolean;
+  cancelling?: boolean;
   error?: string | null;
 }>();
 
-const emit = defineEmits<{ login: [] }>();
+const emit = defineEmits<{ cancel: []; login: [] }>();
 const { t } = useI18n();
 </script>
 
@@ -46,6 +59,7 @@ const { t } = useI18n();
   padding: var(--space-20);
   background: var(--color-shell-main);
   color: var(--color-text);
+  -webkit-app-region: drag;
 }
 
 .codex-login__content {
@@ -53,13 +67,13 @@ const { t } = useI18n();
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-6);
   text-align: center;
+  transform: translateY(calc(-1 * var(--space-12)));
 }
 
 .codex-login__mark {
-  width: 64px;
-  height: 64px;
+  width: 128px;
+  height: 128px;
   overflow: hidden;
 }
 
@@ -71,17 +85,50 @@ const { t } = useI18n();
 }
 
 .codex-login h1 {
-  margin: var(--space-4) 0 0;
-  font-size: var(--font-size-24);
+  margin: var(--space-16) 0 0;
+  font-size: var(--font-size-28);
+  line-height: var(--line-height-32);
 }
 
 .codex-login p {
-  margin: 0;
+  margin: var(--space-4) 0 0;
   color: var(--color-text-muted);
   line-height: var(--line-height-20);
 }
 
+.codex-login .el-button {
+  margin-top: var(--space-16);
+  -webkit-app-region: no-drag;
+}
+
+.codex-login__cancel {
+  margin-top: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: var(--font-size-12);
+  line-height: var(--line-height-16);
+  -webkit-app-region: no-drag;
+}
+
+.codex-login__cancel:hover:not(:disabled) {
+  color: var(--color-text);
+}
+
+.codex-login__cancel:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.codex-login__cancel--hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .codex-login__error {
+  margin-top: var(--space-6) !important;
   color: var(--color-error) !important;
 }
 </style>

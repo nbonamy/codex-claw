@@ -6,7 +6,10 @@
     <CodexLoginLanding
       v-if="showLoginLanding"
       :loading="authenticationLoading || authentication?.login.status === 'pending'"
+      :cancellable="authentication?.login.status === 'pending'"
+      :cancelling="authenticationCancelling"
       :error="authenticationError ?? authentication?.login.error"
+      @cancel="cancelChatGptLogin"
       @login="startChatGptLogin"
     />
     <TeamRail
@@ -538,6 +541,7 @@ const workspaceBody = ref<HTMLElement | null>(null);
 const gitReviewPanel = ref<SidePanelGitDiffState | null>(null);
 const authentication = ref<CodexAuthentication | null>(null);
 const authenticationLoading = ref(true);
+const authenticationCancelling = ref(false);
 const authenticationError = ref<string | null>(null);
 let authenticationPoll: ReturnType<typeof setInterval> | null = null;
 const settingsActiveTab = ref<SettingsTab>('general');
@@ -754,6 +758,21 @@ async function startChatGptLogin(): Promise<void> {
     authenticationError.value = error instanceof Error ? error.message : String(error);
   } finally {
     authenticationLoading.value = false;
+  }
+}
+
+async function cancelChatGptLogin(): Promise<void> {
+  authenticationCancelling.value = true;
+  authenticationError.value = null;
+  stopAuthenticationPolling();
+  try {
+    const api = window.codexClaw;
+    if (!api) throw new Error('Codex Claw API is unavailable.');
+    authentication.value = await api.cancelCodexChatGptLogin();
+  } catch (error) {
+    authenticationError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    authenticationCancelling.value = false;
   }
 }
 

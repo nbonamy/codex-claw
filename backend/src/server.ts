@@ -869,6 +869,11 @@ export class ClawBackendServer {
           message.id,
           await this.requireDriverRpc().handle(backendMethods.driverCodexAuthenticationGet, undefined),
         );
+      case backendMethods.codexChatGptLoginCancel:
+        return createClawRpcResult(
+          message.id,
+          await this.requireDriverRpc().handle(backendMethods.driverCodexChatGptLoginCancel, undefined),
+        );
       case backendMethods.codexChatGptLoginStart:
         return createClawRpcResult(
           message.id,

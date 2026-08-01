@@ -5,6 +5,7 @@ export const messages = {
       description: 'Sign in with ChatGPT to get started.',
       continue: 'Continue with ChatGPT',
       waiting: 'Waiting for sign in…',
+      cancel: 'Cancel sign-in',
     },
     chat: {
       actions: {

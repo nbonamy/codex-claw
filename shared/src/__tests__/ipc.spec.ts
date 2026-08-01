@@ -65,6 +65,7 @@ describe('ipc channels', () => {
       selectAgent: 'agent:select',
       updateSettings: 'settings:update',
       getCodexAuthentication: 'codex:authentication:get',
+      cancelCodexChatGptLogin: 'codex:authentication:chatgpt:cancel',
       startCodexChatGptLogin: 'codex:authentication:chatgpt:start',
       logoutCodex: 'codex:authentication:logout',
       getDaemonStatus: 'daemon:status:get',

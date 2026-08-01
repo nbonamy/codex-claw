@@ -66,6 +66,7 @@ const api: CodexClawApi = {
   selectAgent: (agentId: string) => ipc.invoke(ipcChannels.selectAgent, agentId),
   updateSettings: (input: UpdateSettingsInput) => ipc.invoke(ipcChannels.updateSettings, input),
   getCodexAuthentication: () => ipc.invoke(ipcChannels.getCodexAuthentication),
+  cancelCodexChatGptLogin: () => ipc.invoke(ipcChannels.cancelCodexChatGptLogin),
   startCodexChatGptLogin: () => ipc.invoke(ipcChannels.startCodexChatGptLogin),
   logoutCodex: () => ipc.invoke(ipcChannels.logoutCodex),
   getDaemonStatus: () => ipc.invoke(ipcChannels.getDaemonStatus),

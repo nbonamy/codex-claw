@@ -714,11 +714,14 @@ describe('AppController', () => {
       .resolves.toStrictEqual(authentication);
     await expect(callPrivate<CodexChatGptLogin>(controller, 'startCodexChatGptLogin'))
       .resolves.toStrictEqual(login);
+    await expect(callPrivate<CodexAuthentication>(controller, 'cancelCodexChatGptLogin'))
+      .resolves.toStrictEqual(authentication);
     await expect(callPrivate<CodexAuthentication>(controller, 'logoutCodex'))
       .resolves.toStrictEqual(authentication);
 
     expect(request).toHaveBeenCalledWith(backendMethods.codexAuthenticationGet, undefined);
     expect(request).toHaveBeenCalledWith(backendMethods.codexChatGptLoginStart, undefined);
+    expect(request).toHaveBeenCalledWith(backendMethods.codexChatGptLoginCancel, undefined);
     expect(request).toHaveBeenCalledWith(backendMethods.codexLogout, undefined);
     expect(openExternal).toHaveBeenCalledWith(login.authUrl);
   });

@@ -89,6 +89,7 @@ class FakeTransport implements RpcTransport {
         loginId: 'login-1',
         authUrl: 'https://auth.openai.com/login',
       };
+      case 'account/login/cancel': return { status: 'canceled' };
       case 'account/logout': return {};
       case 'account/rateLimits/read': return {};
       case 'thread/list': return {
@@ -157,11 +158,16 @@ describe('CodexSurfaceAgentAdapter', () => {
       loginId: 'login-1',
       authUrl: 'https://auth.openai.com/login',
     });
+    await expect(adapter.cancelChatGptLogin()).resolves.toMatchObject({
+      account: { type: 'chatgpt', email: 'nico@example.com', planType: 'pro' },
+      login: { status: 'cancelled', error: null },
+    });
     await expect(adapter.logout()).resolves.toMatchObject({
       account: { type: 'chatgpt', email: 'nico@example.com', planType: 'pro' },
     });
 
     expect(lastRequest(transport, 'account/login/start')).toBeDefined();
+    expect(lastRequest(transport, 'account/login/cancel')).toBeDefined();
     expect(lastRequest(transport, 'account/logout')).toBeDefined();
   });
   it('routes simultaneous semantic conversation events without transcript replacement or cross-routing', async () => {

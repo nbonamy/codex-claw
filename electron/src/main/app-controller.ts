@@ -289,6 +289,7 @@ export class AppController {
       return this.updateSettings(input);
     });
     ipc.handle(ipcChannels.getCodexAuthentication, () => this.getCodexAuthentication());
+    ipc.handle(ipcChannels.cancelCodexChatGptLogin, () => this.cancelCodexChatGptLogin());
     ipc.handle(ipcChannels.startCodexChatGptLogin, () => this.startCodexChatGptLogin());
     ipc.handle(ipcChannels.logoutCodex, () => this.logoutCodex());
 
@@ -574,6 +575,10 @@ export class AppController {
 
   private getCodexAuthentication(): Promise<CodexAuthentication> {
     return this.requireBackendClient().request(backendMethods.codexAuthenticationGet);
+  }
+
+  private cancelCodexChatGptLogin(): Promise<CodexAuthentication> {
+    return this.requireBackendClient().request(backendMethods.codexChatGptLoginCancel);
   }
 
   private async startCodexChatGptLogin(): Promise<CodexChatGptLogin> {

@@ -42,6 +42,34 @@ describe('AppShell', () => {
     wrapper.unmount();
   });
 
+  it('cancels a pending ChatGPT sign-in from the landing screen', async () => {
+    const cancelCodexChatGptLogin = vi.fn().mockResolvedValue({
+      account: null,
+      requiresOpenaiAuth: true,
+      login: { status: 'cancelled', error: null },
+    });
+    window.codexClaw = {
+      getCodexAuthentication: vi.fn().mockResolvedValue({
+        account: null,
+        requiresOpenaiAuth: true,
+        login: { status: 'pending', error: null },
+      }),
+      cancelCodexChatGptLogin,
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const wrapper = mountShell();
+    await flushPromises();
+
+    const cancel = wrapper.get('.codex-login__cancel');
+    expect(cancel.classes()).not.toContain('codex-login__cancel--hidden');
+    await cancel.trigger('click');
+    await flushPromises();
+
+    expect(cancelCodexChatGptLogin).toHaveBeenCalledOnce();
+    expect(wrapper.get('.codex-login__cancel').classes()).toContain('codex-login__cancel--hidden');
+
+    wrapper.unmount();
+  });
+
   it('composes the phase zero shell around the active agent', () => {
     const snapshot = createInitialSnapshot();
     const activeAgent = snapshot.agents[0];
