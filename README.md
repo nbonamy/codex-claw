@@ -4,9 +4,9 @@
 
 # Codex Claw
 
-Release builds consume the pinned Computer Use artifact from
-nbonamy/computer-use and verify its checksum before packaging. Development
-continues to build the helper from the sibling computer-use checkout.
+Builds consume the pinned Computer Use artifact from nbonamy/computer-use and
+verify its checksum. To opt into building the helper from a sibling
+`computer-use` checkout, set `COMPUTER_USE_LOCAL=1` in `.env`.
 
 Meet your native Codex coding crew. Codex Claw is a desktop app that lets you
 run a team of Codex agents, each with its own folder, identity, thread, tools,

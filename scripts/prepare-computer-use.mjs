@@ -2,8 +2,10 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import dotenv from 'dotenv';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+dotenv.config({ path: path.join(rootDir, '.env'), quiet: true });
 const configPath = path.join(rootDir, 'computer-use-release.json');
 const electronDir = path.join(rootDir, 'electron');
 const iconPath = path.join(electronDir, 'assets', 'icon.icns');
@@ -70,10 +72,10 @@ function releaseBuild() {
   }
 }
 
-if (process.argv.includes('--local')) {
+if (process.argv.includes('--local') || process.env.COMPUTER_USE_LOCAL === '1') {
   localBuild();
 } else if (process.argv.includes('--release')) {
   releaseBuild();
 } else {
-  throw new Error('Use --local for development or --release for a published artifact.');
+  releaseBuild();
 }

@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "build:computer-use": "node scripts/prepare-computer-use.mjs --release",
+    "build:computer-use": "node scripts/prepare-computer-use.mjs",
     "build:computer-use:local": "node scripts/prepare-computer-use.mjs --local",
     "dev:electron": "npm run start -w @codex-claw/electron",
     "dev:backend": "npm run dev -w @codex-claw/backend",

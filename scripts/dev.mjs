@@ -14,7 +14,7 @@ if (process.argv.includes('--help')) {
   process.exit(0);
 }
 
-await run('npm', ['run', 'build:computer-use:local']);
+await run('npm', ['run', 'build:computer-use']);
 await run('npm', ['run', 'build', '-w', '@codex-claw/backend']);
 
 const backendWatch = start('npm', ['run', 'dev:backend'], {

@@ -118,7 +118,7 @@ describe('runtime config', () => {
     expect(rootPackage.scripts['dev:electron']).toBe('npm run start -w @codex-claw/electron');
     expect(rootPackage.scripts.build).toBe('node scripts/build.mjs');
     expect(electronPackage.scripts['build:computer-use']).toBe(
-      'node ../scripts/prepare-computer-use.mjs --release',
+      'node ../scripts/prepare-computer-use.mjs',
     );
     expect(electronPackage.scripts['build:computer-use:local']).toBe(
       'node ../scripts/prepare-computer-use.mjs --local',
@@ -126,7 +126,7 @@ describe('runtime config', () => {
     expect(electronPackage.scripts.package).toBe('npm run build:computer-use && electron-forge package');
     expect(electronPackage.scripts.make).toBe('npm run build:computer-use && electron-forge make');
     expect(electronPackage.scripts.build).toContain('npm run build:computer-use &&');
-    expect(devScript).toContain("await run('npm', ['run', 'build:computer-use:local'])");
+    expect(devScript).toContain("await run('npm', ['run', 'build:computer-use'])");
     expect(devScript).toContain("start('npm', ['run', 'dev:electron']");
   });
 
@@ -143,6 +143,7 @@ describe('runtime config', () => {
     expect(releaseConfig.version).toMatch(/^0\.\d+\.\d+$/);
     expect(releaseConfig.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(prepareScript).toContain('Computer Use release checksum mismatch');
+    expect(prepareScript).toContain("process.env.COMPUTER_USE_LOCAL === '1'");
     expect(prepareScript).toContain('process.argv.includes(\'--local\')');
     expect(prepareScript).toContain('process.argv.includes(\'--release\')');
   });

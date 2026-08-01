@@ -6,7 +6,7 @@
   "description": "Native Codex team desktop app.",
   "main": ".vite/build/main.js",
   "scripts": {
-    "build:computer-use": "node ../scripts/prepare-computer-use.mjs --release",
+    "build:computer-use": "node ../scripts/prepare-computer-use.mjs",
     "build:computer-use:local": "node ../scripts/prepare-computer-use.mjs --local",
     "dev": "node ../scripts/dev.mjs",
     "start": "electron-forge start",
