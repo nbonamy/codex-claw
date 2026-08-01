@@ -40,6 +40,7 @@ describe('AgentHeader', () => {
     expect(wrapper.text()).toContain('~/src/id8');
     expect(wrapper.text()).toContain('Ready to get going');
     expect(wrapper.find('[aria-label="Show agent sidebar"]').exists()).toBe(false);
+    expect(wrapper.classes()).toContain('agent-header--with-sidebar-edge');
   });
 
   it('renders repo diff stats without file count or branch details', () => {
@@ -212,6 +213,7 @@ describe('AgentHeader', () => {
     expect(wrapper.text()).toContain('-4');
     expect(wrapper.get('.agent-header__avatar').classes()).toContain('agent-avatar--sm');
     expect(wrapper.classes()).not.toContain('agent-header--sidebar-collapsed');
+    expect(wrapper.classes()).not.toContain('agent-header--with-sidebar-edge');
 
     await wrapper.get('[aria-label="Show agent sidebar"]').trigger('click');
 

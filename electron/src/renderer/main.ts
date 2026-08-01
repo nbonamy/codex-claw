@@ -7,6 +7,9 @@ import './styles/theme.css';
 import './styles/base.css';
 import App from './App.vue';
 import { i18n } from './i18n';
+import { applyRendererPlatform } from './renderer-platform';
+
+applyRendererPlatform(document.documentElement, navigator.platform, navigator.userAgent);
 
 createApp(App)
   .use(ElementPlus)

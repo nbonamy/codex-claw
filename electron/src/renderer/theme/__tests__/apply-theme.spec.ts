@@ -7,6 +7,7 @@ afterEach(() => {
   document.documentElement.removeAttribute('data-effective-appearance');
   document.documentElement.removeAttribute('data-codex-theme');
   document.documentElement.removeAttribute('data-theme');
+  document.documentElement.removeAttribute('data-platform');
   document.documentElement.classList.remove('dark');
   document.documentElement.removeAttribute('style');
 });
@@ -53,6 +54,26 @@ describe('applyAppTheme', () => {
     expect(root.style.getPropertyValue('--color-shell-rail')).toBe('color-mix(in srgb, var(--color-shell-sidebar) 97%, white)');
     expect(root.style.getPropertyValue('--chat-font-size')).toBe('16px');
     expect(root.style.getPropertyValue('--code-font-size')).toBe('12px');
+  });
+
+  it('preserves native macOS translucency when applying a theme', () => {
+    document.documentElement.dataset.platform = 'macos';
+
+    applyAppTheme({
+      id: 'codex-claw-light',
+      mode: 'light',
+      uiFontSize: 14,
+      chatFontSize: 15,
+      codeFontSize: 13,
+    });
+
+    const root = document.documentElement;
+    expect(root.style.getPropertyValue('--color-shell-sidebar')).toBe(
+      'color-mix(in srgb, var(--color-shell-main) var(--shell-glass-opacity), transparent)',
+    );
+    expect(root.style.getPropertyValue('--color-shell-rail')).toBe(
+      'color-mix(in srgb, var(--color-shell-main) var(--shell-glass-opacity), transparent)',
+    );
   });
 
   it('applies the explicitly selected theme even when mode is system', () => {

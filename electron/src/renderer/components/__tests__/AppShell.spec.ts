@@ -856,10 +856,12 @@ describe('AppShell', () => {
       },
     });
 
+    expect(wrapper.get('.team-rail').classes()).toContain('team-rail--agent-sidebar-expanded');
     await wrapper.get('[aria-label="Hide agent sidebar"]').trigger('click');
 
     expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
     expect(wrapper.find('.team-rail').exists()).toBe(true);
+    expect(wrapper.get('.team-rail').classes()).not.toContain('team-rail--agent-sidebar-expanded');
     expect(wrapper.get('[aria-label="Show agent sidebar"]').attributes('aria-label')).toBe('Show agent sidebar');
   });
 

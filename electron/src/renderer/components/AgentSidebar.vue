@@ -313,7 +313,6 @@ function onResizePointerEnd(event: PointerEvent): void {
   display: flex;
   flex-direction: column;
   background: var(--color-shell-sidebar);
-  border-right: 1px solid var(--color-border);
   user-select: none;
 }
 
@@ -325,10 +324,10 @@ function onResizePointerEnd(event: PointerEvent): void {
   gap: var(--space-6);
   min-width: 0;
   padding-left: var(--space-16);
-  padding-right: var(--space-2);
+  padding-right: var(--space-8);
   color: var(--color-text);
-  background: var(--color-shell-main);
-  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  border-bottom: 1px solid var(--color-shell-appbar-divider);
   -webkit-app-region: drag;
 }
 
@@ -371,7 +370,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: var(--space-6);
+  padding: var(--space-6) var(--space-8) var(--space-6) var(--space-6);
 }
 
 .agent-sidebar__agent {
@@ -509,7 +508,7 @@ function onResizePointerEnd(event: PointerEvent): void {
 .agent-sidebar__footer {
   display: grid;
   gap: var(--space-4);
-  padding: var(--space-6);
+  padding: var(--space-6) var(--space-8) var(--space-6) var(--space-6);
   padding-top: 0;
 }
 
@@ -537,7 +536,7 @@ function onResizePointerEnd(event: PointerEvent): void {
 
 .agent-sidebar__resize-handle:hover::after,
 .agent-sidebar__resize-handle:focus-visible::after {
-  background: var(--color-primary);
+  background: var(--color-resize-handle-hover);
 }
 
 @container (max-width: 140px) {

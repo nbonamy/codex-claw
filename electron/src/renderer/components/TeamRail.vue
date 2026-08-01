@@ -2,77 +2,80 @@
   <aside
     ref="railRoot"
     class="team-rail"
+    :class="{ 'team-rail--agent-sidebar-expanded': agentSidebarExpanded }"
     aria-label="Teams"
   >
-    <div class="team-rail__spacer" />
-    
-    <button
-      class="team-rail__cockpit"
-      :class="{ 'team-rail__cockpit--active': cockpitActive }"
-      type="button"
-      aria-label="Cockpit"
-      :aria-pressed="cockpitActive"
-      @click="emit('select-cockpit')"
-    >
-      <CockpitIcon :teams="teams" />
-    </button>
+    <div class="team-rail__header" />
 
-    <button
-      v-for="team in teams"
-      :key="team.id"
-      class="team-rail__team"
-      :class="[
-        { 'team-rail__team--active': isTeamActive(team.id) },
-        teamReorder.dropTargetClass(team.id),
-      ]"
-      type="button"
-      v-bind="teamReorder.dragItemAttributes(team.id)"
-      :style="{ backgroundColor: team.color ?? defaultTeamColor }"
-      :aria-label="team.name"
-      :aria-pressed="isTeamActive(team.id)"
-      @click="emit('select-team', team.id)"
-      @contextmenu.prevent="openTeamMenu(team.id, $event)"
-      @dragstart="teamReorder.onDragStart(team.id, $event)"
-      @dragover="teamReorder.onDragOver(team.id, $event)"
-      @dragleave="teamReorder.onDragLeave(team.id, $event)"
-      @drop="teamReorder.onDrop(team.id, $event)"
-      @dragend="teamReorder.onDragEnd"
-    >
-      {{ team.avatar ?? teamInitials(team.name) }}
-    </button>
-
-    <button
-      class="team-rail__new"
-      type="button"
-      aria-label="Create team"
-      @click="emit('new-team')"
-    >
-      <PlusIcon aria-hidden="true" />
-    </button>
-
-    <div class="team-rail__bottom">
+    <div class="team-rail__body">
       <button
-        class="team-rail__loops"
-        :class="{ 'team-rail__loops--active': loopsActive }"
+        class="team-rail__cockpit"
+        :class="{ 'team-rail__cockpit--active': cockpitActive }"
         type="button"
-        aria-label="Loops"
-        :aria-pressed="loopsActive"
-        @click="emit('select-loops')"
+        aria-label="Cockpit"
+        :aria-pressed="cockpitActive"
+        @click="emit('select-cockpit')"
       >
-        <InfinityIcon
-          class="team-rail__loops-icon"
-          aria-hidden="true"
-        />
+        <CockpitIcon :teams="teams" />
       </button>
 
-      <SettingsMenu
-        :active="settingsActive"
-        :account="account"
-        :rate-limits="rateLimits"
-        @logout="emit('logout')"
-        @open-settings="emit('open-settings')"
-        @quit="emit('quit')"
-      />
+      <button
+        v-for="team in teams"
+        :key="team.id"
+        class="team-rail__team"
+        :class="[
+          { 'team-rail__team--active': isTeamActive(team.id) },
+          teamReorder.dropTargetClass(team.id),
+        ]"
+        type="button"
+        v-bind="teamReorder.dragItemAttributes(team.id)"
+        :style="{ backgroundColor: team.color ?? defaultTeamColor }"
+        :aria-label="team.name"
+        :aria-pressed="isTeamActive(team.id)"
+        @click="emit('select-team', team.id)"
+        @contextmenu.prevent="openTeamMenu(team.id, $event)"
+        @dragstart="teamReorder.onDragStart(team.id, $event)"
+        @dragover="teamReorder.onDragOver(team.id, $event)"
+        @dragleave="teamReorder.onDragLeave(team.id, $event)"
+        @drop="teamReorder.onDrop(team.id, $event)"
+        @dragend="teamReorder.onDragEnd"
+      >
+        {{ team.avatar ?? teamInitials(team.name) }}
+      </button>
+
+      <button
+        class="team-rail__new"
+        type="button"
+        aria-label="Create team"
+        @click="emit('new-team')"
+      >
+        <PlusIcon aria-hidden="true" />
+      </button>
+
+      <div class="team-rail__bottom">
+        <button
+          class="team-rail__loops"
+          :class="{ 'team-rail__loops--active': loopsActive }"
+          type="button"
+          aria-label="Loops"
+          :aria-pressed="loopsActive"
+          @click="emit('select-loops')"
+        >
+          <InfinityIcon
+            class="team-rail__loops-icon"
+            aria-hidden="true"
+          />
+        </button>
+
+        <SettingsMenu
+          :active="settingsActive"
+          :account="account"
+          :rate-limits="rateLimits"
+          @logout="emit('logout')"
+          @open-settings="emit('open-settings')"
+          @quit="emit('quit')"
+        />
+      </div>
     </div>
 
     <TeamContextMenu
@@ -109,6 +112,7 @@ const props = defineProps<{
   rateLimits?: AccountRateLimits;
   account?: CodexAccount | null;
   settingsActive?: boolean;
+  agentSidebarExpanded?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -229,25 +233,48 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   --team-rail-icon-color: var(--color-text-muted);
   --team-rail-icon-hover-color: var(--color-text);
   --team-rail-icon-active-color: var(--color-primary);
+  position: relative;
   flex: 0 0 var(--team-rail-width);
   width: var(--team-rail-width);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: transparent;
+  user-select: none;
+}
+
+.team-rail--agent-sidebar-expanded::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: var(--workbench-appbar-height);
+  right: -1px;
+  bottom: 0;
+  width: 1px;
+  background: var(--color-shell-rail-divider);
+  pointer-events: none;
+}
+
+.team-rail__header {
+  flex: 0 0 var(--workbench-appbar-height);
+  width: 100%;
+  background: var(--color-shell-collapsed-header);
+  border-bottom: 1px solid var(--color-shell-appbar-divider);
+}
+
+.team-rail--agent-sidebar-expanded .team-rail__header {
+  background: var(--color-shell-rail);
+}
+
+.team-rail__body {
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-6);
   padding: var(--space-6) var(--space-4);
   background: var(--color-shell-rail);
-  user-select: none;
-}
-
-.team-rail__spacer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: var(--workbench-appbar-height);
-  width: var(--team-rail-width);
-  background: var(--color-shell-main);
-  border-bottom: 1px solid var(--color-border);
 }
 
 .team-rail__team {

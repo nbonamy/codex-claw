@@ -54,11 +54,18 @@
   --color-text: var(--color-on-surface);
   --color-text-muted: var(--color-on-surface-variant);
   --color-background: var(--color-surface);
+  --color-window-background: var(--color-background);
   --color-border: var(--color-outline-variant);
   --color-border-strong: var(--color-outline);
   --color-shell-main: var(--color-surface-lowest);
+  --color-shell-window: var(--color-shell-main);
+  --shell-glass-opacity: 65%;
   --color-shell-sidebar: var(--color-surface-low);
   --color-shell-rail: var(--color-surface-low);
+  --color-shell-collapsed-header: #FFFFFF;
+  --color-shell-appbar-divider: color-mix(in srgb, var(--color-outline) 14%, transparent);
+  --color-shell-rail-divider: color-mix(in srgb, var(--color-outline) 22%, transparent);
+  --color-resize-handle-hover: color-mix(in srgb, var(--color-outline) 55%, transparent);
   --color-dialog-body: #FDFDFD;
   --color-overlay: rgba(255, 255, 255, 0.78);
   --color-shine: rgba(255, 255, 255, 0.95);
@@ -147,7 +154,18 @@
   --shadow-md: 0 3px 8px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
   --shadow-menu: 0 4px 6px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.05);
+  --shadow-content-edge:
+    0 0 0 0.5px color-mix(in srgb, var(--color-text) 12%, transparent),
+    0 3px 7.5px #0000000A,
+    0 0 20px #0000000D;
 
+}
+
+html[data-platform='macos'] {
+  --color-window-background: transparent;
+  --color-shell-window: transparent;
+  --color-shell-sidebar: color-mix(in srgb, var(--color-shell-main) var(--shell-glass-opacity), transparent);
+  --color-shell-rail: color-mix(in srgb, var(--color-shell-main) var(--shell-glass-opacity), transparent);
 }
 
 html.dark {
@@ -158,7 +176,7 @@ html.dark {
   --color-primary: #7DA6FF;
   --color-on-primary: #081B3F;
   --color-primary-container: #17356E;
-
+  --color-shell-collapsed-header: var(--color-shell-main);
   /* Semantic */
   --color-error: #FF8A78;
   --color-on-error: #3D0B05;

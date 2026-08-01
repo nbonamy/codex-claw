@@ -12,7 +12,7 @@ body,
 
 body {
   overflow: hidden;
-  background: var(--color-background);
+  background: var(--color-window-background);
   font-family: var(--font-family-base);
   font-size: var(--app-ui-font-size, var(--font-size-15));
   line-height: var(--line-height-20);

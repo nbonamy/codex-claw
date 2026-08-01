@@ -51,6 +51,24 @@ describe('TeamRail', () => {
     expect(wrapper.find('[aria-label="Create team"]').exists()).toBe(true);
     expect(wrapper.get('[aria-label="Loops"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.get('[aria-label="Settings menu"]').attributes('aria-pressed')).toBe('false');
+    expect(wrapper.find('.team-rail__header').exists()).toBe(true);
+    expect(wrapper.get('.team-rail__body').find('[aria-label="Cockpit"]').exists()).toBe(true);
+  });
+
+  it('marks when the adjacent agent sidebar is expanded', () => {
+    const expanded = mountRail({
+      teams,
+      activeTeamId: 'team-claw',
+      agentSidebarExpanded: true,
+    });
+    const collapsed = mountRail({
+      teams,
+      activeTeamId: 'team-claw',
+      agentSidebarExpanded: false,
+    });
+
+    expect(expanded.classes()).toContain('team-rail--agent-sidebar-expanded');
+    expect(collapsed.classes()).not.toContain('team-rail--agent-sidebar-expanded');
   });
 
   it('falls back to team initials when no avatar is set', () => {
@@ -409,6 +427,7 @@ function mountRail(props: {
   loopsActive?: boolean;
   rateLimits?: AccountRateLimits;
   settingsActive?: boolean;
+  agentSidebarExpanded?: boolean;
 }) {
   const wrapper = mount(TeamRail, {
     attachTo: document.body,

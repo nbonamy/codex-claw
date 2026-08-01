@@ -18,9 +18,19 @@ describe('main window options', () => {
     expect(createMainWindowOptions(false, bounds)).toMatchObject(bounds);
   });
 
-  it('centers macOS traffic lights in the workbench titlebar', () => {
-    expect(createMainWindowOptions(false, undefined, 'darwin').trafficLightPosition).toStrictEqual({ x: 8, y: 17 });
-    expect(createMainWindowOptions(false, undefined, 'win32').trafficLightPosition).toBeUndefined();
+  it('uses native macOS vibrancy and shadow behind the translucent shell', () => {
+    expect(createMainWindowOptions(false, undefined, 'darwin')).toMatchObject({
+      backgroundColor: '#00000000',
+      hasShadow: true,
+      titleBarStyle: 'hiddenInset',
+      trafficLightPosition: { x: 8, y: 17 },
+      vibrancy: 'menu',
+    });
+    expect(createMainWindowOptions(false, undefined, 'win32')).toMatchObject({
+      backgroundColor: '#061c2a',
+      titleBarStyle: 'hidden',
+    });
+    expect(createMainWindowOptions(false, undefined, 'win32').vibrancy).toBeUndefined();
   });
 
   it('accepts persisted bounds with maximized state', () => {

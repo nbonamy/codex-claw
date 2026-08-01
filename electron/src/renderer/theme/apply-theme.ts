@@ -31,16 +31,15 @@ export function applyAppTheme(settings: AppThemeSettings): void {
     '--color-shell-main',
     theme.appearance === 'dark' ? 'var(--color-surface-low)' : 'var(--color-surface-lowest)',
   );
-  root.style.setProperty(
-    '--color-shell-sidebar',
-    theme.appearance === 'dark' ? 'var(--color-surface-lowest)' : 'var(--color-surface-low)',
-  );
-  root.style.setProperty(
-    '--color-shell-rail',
-    theme.appearance === 'dark'
+  const nativeMacOSSidebar = root.dataset.platform === 'macos';
+  root.style.setProperty('--color-shell-sidebar', nativeMacOSSidebar
+    ? 'color-mix(in srgb, var(--color-shell-main) var(--shell-glass-opacity), transparent)'
+    : theme.appearance === 'dark' ? 'var(--color-surface-lowest)' : 'var(--color-surface-low)');
+  root.style.setProperty('--color-shell-rail', nativeMacOSSidebar
+    ? 'color-mix(in srgb, var(--color-shell-main) var(--shell-glass-opacity), transparent)'
+    : theme.appearance === 'dark'
       ? 'color-mix(in srgb, var(--color-shell-sidebar) 97%, white)'
-      : 'color-mix(in srgb, var(--color-shell-sidebar) 97%, black)',
-  );
+      : 'color-mix(in srgb, var(--color-shell-sidebar) 97%, black)');
   root.style.setProperty('--app-ui-font-size', `${settings.uiFontSize}px`);
   root.style.setProperty('--chat-font-size', `${settings.chatFontSize}px`);
   root.style.setProperty('--code-font-size', `${settings.codeFontSize}px`);

@@ -1,5 +1,8 @@
 <template>
-  <header class="agent-header">
+  <header
+    class="agent-header"
+    :class="{ 'agent-header--with-sidebar-edge': !sidebarCollapsed }"
+  >
     <button
       v-if="sidebarCollapsed"
       class="agent-header__expand"
@@ -192,8 +195,14 @@ const hasHeaderGitStatus = computed(() => {
   min-width: 0;
   padding: 0 var(--space-4) 0 var(--space-12);
   background: var(--color-shell-main);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-shell-appbar-divider);
   -webkit-app-region: drag;
+}
+
+.agent-header--with-sidebar-edge {
+  position: relative;
+  z-index: 1;
+  box-shadow: var(--shadow-content-edge);
 }
 
 .agent-header__identity {

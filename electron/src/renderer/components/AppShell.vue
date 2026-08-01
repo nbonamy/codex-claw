@@ -15,6 +15,7 @@
       :cockpit-active="cockpitVisible"
       :loops-active="loopsVisible"
       :settings-active="settingsVisible"
+      :agent-sidebar-expanded="showAgentSidebar"
       :rate-limits="snapshot.accountRateLimits"
       :account="authentication?.account ?? null"
       class="app-shell__team-rail"
@@ -1751,15 +1752,11 @@ function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
   min-height: 0;
   overflow: hidden;
   color: var(--color-text);
-  background: var(--color-shell-main);
+  background: var(--color-shell-window);
 }
 
 .app-shell--auth-gated > :not(.codex-login) {
   visibility: hidden;
-}
-
-.app-shell__team-rail {
-  padding-top: calc(var(--workbench-appbar-height) + var(--space-6));
 }
 
 .app-shell > .agent-sidebar-enter-active,
@@ -1771,8 +1768,7 @@ function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
     min-width 180ms ease,
     max-width 180ms ease,
     opacity 140ms ease,
-    transform 180ms ease,
-    border-color 180ms ease;
+    transform 180ms ease;
 }
 
 .app-shell > .agent-sidebar-enter-from,
@@ -1783,7 +1779,6 @@ function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
   max-width: 0;
   opacity: 0;
   transform: translateX(-8px);
-  border-right-color: transparent;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1799,16 +1794,19 @@ function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
   background: var(--color-shell-main);
 }
 
 .app-shell__body {
+  position: relative;
+  z-index: 1;
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
   overflow: hidden;
   display: flex;
+  box-shadow: var(--shadow-content-edge);
 }
 
 .app-shell__right-workspace {

@@ -184,6 +184,9 @@ Rules:
 - On macOS, keep the native traffic lights vertically centered in that appbar
   and reserve enough team-rail width and top padding that they never overlap
   sidebar or rail controls.
+- Compose the macOS rail and agent sidebar over Electron's native menu vibrancy
+  using translucent semantic shell tokens; keep main content opaque and retain
+  the native window shadow instead of simulating glass or shadow in CSS.
 
 ## Rendering Surfaces
 

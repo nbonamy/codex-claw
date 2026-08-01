@@ -81,16 +81,27 @@ export function createMainWindowOptions(
   bounds?: Rectangle,
   platform = process.platform,
 ): BrowserWindowConstructorOptions {
+  const macOSWindowOptions: BrowserWindowConstructorOptions = platform === 'darwin'
+    ? {
+        backgroundColor: '#00000000',
+        hasShadow: true,
+        titleBarStyle: 'hiddenInset',
+        trafficLightPosition: { x: 8, y: 17 },
+        vibrancy: 'menu',
+      }
+    : {
+        backgroundColor: '#061c2a',
+        titleBarStyle: 'hidden',
+      };
+
   return {
     width: bounds?.width ?? 1440,
     height: bounds?.height ?? 960,
     ...(bounds ? { x: bounds.x, y: bounds.y } : {}),
     minWidth: 1024,
     minHeight: 720,
-    titleBarStyle: 'hidden',
-    ...(platform === 'darwin' ? { trafficLightPosition: { x: 8, y: 17 } } : {}),
+    ...macOSWindowOptions,
     show: false,
-    backgroundColor: '#061c2a',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
