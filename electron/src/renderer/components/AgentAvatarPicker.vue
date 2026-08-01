@@ -32,7 +32,7 @@
           class="agent-avatar-picker__preset"
           type="button"
           aria-label="Use initials"
-          :aria-pressed="!modelValue"
+          :aria-pressed="!customAvatarActive && !modelValue"
           @click="selectAvatar(undefined)"
         >
         </button>
@@ -42,10 +42,33 @@
           class="agent-avatar-picker__preset"
           type="button"
           :aria-label="`Use ${preset} avatar`"
-          :aria-pressed="modelValue === preset"
+          :aria-pressed="!customAvatarActive && modelValue === preset"
           @click="selectAvatar(preset)"
         >
           {{ preset }}
+        </button>
+        <input
+          v-model="customAvatar"
+          class="agent-avatar-picker__custom"
+          :class="{ 'agent-avatar-picker__custom--active': customAvatarActive }"
+          type="text"
+          aria-label="Custom avatar character"
+          :aria-invalid="customAvatarInvalid"
+          placeholder="…"
+          title="Enter one character, or press Control-Command-Space on macOS"
+          @focus="customAvatarActive = true"
+          @input="customAvatarInvalid = false"
+          @keydown.enter.prevent="applyCustomAvatar"
+        />
+        <button
+          class="agent-avatar-picker__custom-apply"
+          type="button"
+          aria-label="Use custom avatar"
+          :disabled="!customAvatar.trim()"
+          @mousedown.prevent
+          @click="applyCustomAvatar"
+        >
+          <CheckIcon aria-hidden="true" />
         </button>
       </div>
 
@@ -58,7 +81,7 @@
         @click="openImagePicker"
       >
         <PhotoIcon aria-hidden="true" />
-        <span>Choose Image...</span>
+        <span>Pick image…</span>
       </button>
       <input
         ref="fileInput"
@@ -79,16 +102,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { PhotoIcon } from '../shared/icons/app-icons';
+import { ref, watch } from 'vue';
+import { CheckIcon, PhotoIcon } from '../shared/icons/app-icons';
 import AgentAvatar from './AgentAvatar.vue';
 import AgentAvatarCropDialog from './AgentAvatarCropDialog.vue';
 
 const avatarPresets = [
-  '✺', '◎', '▮', '▻', '👾', '🤖', '🧠', '💻', '🖥️', '⌨️',
-  '👨‍💻', '👩‍💻', '🦾', '🚀', '⚡', '🔧', '🛠️', '⚙️', '🔥', '💡',
-  '🎯', '📡', '🦊', '🐙', '🦄', '🐺', '🦅', '🦉', '🐝', '🦋',
-  '👹', '🌟', '👾', '🎮', '💎', '🌈', '🔮', '🎨', '⭐',
+  '🤖', '🧠', '💻', '🖥️', '👾', '👨‍💻', '👩‍💻', '🦾', '🚀',
+  '⚡', '🔧', '🛠️', '⚙️', '🔥', '💡', '🎯', '📡', '🦞', '🐙',
+  '🦊', '🦄', '🐺', '🦅', '🦉', '🐝', '🦋', '🎾', '🎵', '👹',
+  '🌟', '🎮', '💎', '🌈', '🔮', '🎨', '⭐', '🎧',
 ];
 
 const props = withDefaults(defineProps<{
@@ -105,6 +128,15 @@ const emit = defineEmits<{
 const fileInput = ref<HTMLInputElement | null>(null);
 const pendingImage = ref<string | null>(null);
 const popoverOpen = ref(false);
+const customAvatar = ref('');
+const customAvatarInvalid = ref(false);
+const customAvatarActive = ref(false);
+
+watch(() => props.modelValue, (value) => {
+  const customValue = customAvatarValue(value);
+  customAvatar.value = customValue;
+  customAvatarActive.value = Boolean(customValue);
+}, { immediate: true });
 
 function openImagePicker(): void {
   fileInput.value?.click();
@@ -113,7 +145,33 @@ function openImagePicker(): void {
 function selectAvatar(nextAvatar: string | undefined): void {
   emit('update:modelValue', nextAvatar);
   pendingImage.value = null;
+  customAvatarActive.value = false;
   popoverOpen.value = false;
+}
+
+function applyCustomAvatar(): void {
+  const segments = avatarSegments(customAvatar.value);
+  if (segments.length !== 1) {
+    customAvatarInvalid.value = true;
+    return;
+  }
+
+  const [segment] = segments;
+  customAvatar.value = '';
+  customAvatarInvalid.value = false;
+  selectAvatar(segment?.segment);
+}
+
+function customAvatarValue(value: string | undefined): string {
+  if (!value || value.startsWith('data:image/') || avatarPresets.includes(value)) {
+    return '';
+  }
+  const segments = avatarSegments(value);
+  return segments.length === 1 ? segments[0]?.segment ?? '' : '';
+}
+
+function avatarSegments(value: string): Intl.SegmentData[] {
+  return [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(value.trim())];
 }
 
 function onImageFileSelected(event: Event): void {
@@ -225,6 +283,66 @@ function applyCroppedAvatar(nextAvatar: string): void {
 .agent-avatar-picker__divider {
   height: 1px;
   background: var(--color-border);
+}
+
+.agent-avatar-picker__custom {
+  width: var(--space-16);
+  height: var(--space-16);
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-size-20);
+  text-align: center;
+  outline: none;
+}
+
+.agent-avatar-picker__custom:focus {
+  border-color: var(--color-primary);
+}
+
+.agent-avatar-picker__custom--active {
+  border-color: var(--color-primary);
+  background: var(--color-surface-base);
+}
+
+.agent-avatar-picker__custom::placeholder {
+  color: color-mix(in srgb, var(--color-text-muted) 45%, transparent);
+  opacity: 1;
+}
+
+.agent-avatar-picker__custom[aria-invalid="true"] {
+  border-color: var(--color-error);
+}
+
+.agent-avatar-picker__custom-apply {
+  width: var(--space-16);
+  height: var(--space-16);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.agent-avatar-picker__custom-apply:hover:not(:disabled) {
+  color: var(--color-primary);
+}
+
+.agent-avatar-picker__custom-apply:disabled {
+  color: var(--color-text-muted);
+  cursor: default;
+  opacity: 0.35;
+}
+
+.agent-avatar-picker__custom-apply svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  stroke-width: 2.5;
 }
 
 .agent-avatar-picker__choose-image {

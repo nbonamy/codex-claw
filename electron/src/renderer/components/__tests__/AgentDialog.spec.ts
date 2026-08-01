@@ -93,23 +93,39 @@ describe('AgentDialog', () => {
   });
 
   it('prefills edit mode and updates an idle agent', async () => {
+    const chooseAgentFolder = vi.fn().mockResolvedValue('/Users/nbonamy/src/codex-claw-next');
     const updateAgent = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountDialog({
       agent: idleAgent,
+      chooseAgentFolder,
       mode: 'edit',
+      sourceRepositories: [{
+        name: 'codex-claw',
+        path: '/Users/nbonamy/src/codex-claw',
+        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/codex-claw' }],
+      }],
       updateAgent,
     });
 
     expect(wrapper.get('.agent-dialog__header').text()).toContain('Edit agent');
+    expect(wrapper.html().indexOf('agent-dialog__identity-group')).toBeLessThan(wrapper.html().indexOf('agent-dialog__workspace-group'));
+    expect(wrapper.getComponent({ name: 'ElSelect' }).props('modelValue')).toBe('/Users/nbonamy/src/codex-claw');
+    expect(wrapper.text()).toContain('Work in...');
     expect((wrapper.get('.agent-dialog__text-input').element as HTMLInputElement).value).toBe('Dina');
+    await wrapper.get('.agent-avatar-picker__trigger').trigger('click');
+    expect(wrapper.get('.agent-avatar-picker__popover').isVisible()).toBe(true);
+    await wrapper.findAll('.agent-avatar-picker__preset').find((button) => button.text() === '🤖')?.trigger('click');
+    await emitSelect(wrapper, 'agent-dialog-repository', '__custom_folder__');
+    await flushPromises();
     await wrapper.get('.agent-dialog__text-input').setValue('Dina Prime');
     await saveButton(wrapper).trigger('click');
 
+    expect(chooseAgentFolder).toHaveBeenCalledOnce();
     expect(updateAgent).toHaveBeenCalledWith({
       id: 'agent-dina',
       name: 'Dina Prime',
-      avatar: 'DI',
-      folder: '/Users/nbonamy/src/codex-claw',
+      avatar: '🤖',
+      folder: '/Users/nbonamy/src/codex-claw-next',
       backend: 'codex',
     });
   });

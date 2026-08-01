@@ -14,12 +14,47 @@ describe('AgentAvatarPicker', () => {
     await wrapper.get('.agent-avatar-picker__trigger').trigger('click');
 
     expect(wrapper.find('.agent-avatar-picker__popover').exists()).toBe(true);
-    expect(wrapper.findAll('.agent-avatar-picker__preset').map((button) => button.text())).toContain('🤖');
+    const presets = wrapper.findAll('.agent-avatar-picker__preset').map((button) => button.text());
+    expect(presets).toEqual(expect.arrayContaining(['🤖', '🦞', '🎵', '🎾']));
+    expect(presets).not.toEqual(expect.arrayContaining(['✺', '◎', '▮', '▻', '⌨️']));
 
     await wrapper.findAll('.agent-avatar-picker__preset').find((button) => button.text() === '🤖')?.trigger('click');
 
     expect(wrapper.emitted('update:modelValue')).toStrictEqual([['🤖']]);
     expect(wrapper.find('.agent-avatar-picker__popover').exists()).toBe(false);
+  });
+
+  it('accepts one custom grapheme and rejects multiple characters', async () => {
+    const wrapper = mountPicker({ modelValue: '🤖' });
+    await wrapper.get('.agent-avatar-picker__trigger').trigger('click');
+    const custom = wrapper.get<HTMLInputElement>('.agent-avatar-picker__custom');
+    expect(custom.attributes('placeholder')).toBe('…');
+    expect(wrapper.get<HTMLButtonElement>('[aria-label="Use custom avatar"]').element.disabled).toBe(true);
+
+    await custom.trigger('focus');
+    expect(custom.classes()).toContain('agent-avatar-picker__custom--active');
+    expect(wrapper.findAll('.agent-avatar-picker__preset').find((button) => button.text() === '🤖')?.attributes('aria-pressed')).toBe('false');
+
+    await custom.setValue('🎾🎵');
+    expect(wrapper.get<HTMLButtonElement>('[aria-label="Use custom avatar"]').element.disabled).toBe(false);
+    await wrapper.get('[aria-label="Use custom avatar"]').trigger('click');
+    expect(custom.attributes('aria-invalid')).toBe('true');
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+
+    await custom.setValue('👨‍💻');
+    await wrapper.get('[aria-label="Use custom avatar"]').trigger('click');
+    expect(wrapper.emitted('update:modelValue')).toStrictEqual([['👨‍💻']]);
+    expect(wrapper.find('.agent-avatar-picker__popover').exists()).toBe(false);
+  });
+
+  it('prefills and selects a saved custom character', async () => {
+    const wrapper = mountPicker({ modelValue: '🫠' });
+    await wrapper.get('.agent-avatar-picker__trigger').trigger('click');
+
+    const custom = wrapper.get<HTMLInputElement>('.agent-avatar-picker__custom');
+    expect(custom.element.value).toBe('🫠');
+    expect(custom.classes()).toContain('agent-avatar-picker__custom--active');
+    expect(wrapper.find('[aria-label="Use custom avatar"]').exists()).toBe(true);
   });
 
   it('emits undefined when initials are selected', async () => {

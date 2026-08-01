@@ -20,30 +20,36 @@
     >
       <section
         v-if="isEditing"
-        class="claw-form-dialog__field agent-dialog__field"
+        class="agent-dialog__identity-group"
       >
-        <div class="agent-dialog__section-heading">
-          <span class="claw-form-dialog__label agent-dialog__label">Workspace folder</span>
-          <p class="claw-form-dialog__help agent-dialog__help">Select the repository or project directory.</p>
+        <div class="agent-dialog__identity-rows">
+          <div class="agent-dialog__workspace-row agent-dialog__identity-row">
+            <div class="agent-dialog__row-copy">
+              <label class="agent-dialog__row-label" for="agent-dialog-name">Name</label>
+            </div>
+            <div class="agent-dialog__row-control agent-dialog__identity-control">
+              <AgentAvatarPicker
+                v-model="avatar"
+                :name="name || folderName || 'Agent'"
+                class="agent-dialog__identity-avatar"
+              />
+              <div class="agent-dialog__identity-input">
+                <input
+                  id="agent-dialog-name"
+                  v-model="name"
+                  class="claw-form-dialog__text-input agent-dialog__text-input"
+                  type="text"
+                  aria-label="Agent name"
+                  placeholder="Name this agent"
+                  :disabled="!canEdit"
+                />
+              </div>
+            </div>
+          </div>
         </div>
-        <button
-          class="claw-form-dialog__control claw-form-dialog__button-control agent-dialog__folder-control"
-          type="button"
-          :disabled="!canEdit || choosingFolder"
-          @click="chooseFolder"
-        >
-          <span
-            class="agent-dialog__repository-value"
-            :class="{ 'agent-dialog__repository-value--empty': !folder }"
-          >
-            <span>{{ folderLabel }}</span>
-            <ChevronDown aria-hidden="true" />
-          </span>
-        </button>
       </section>
 
       <section
-        v-else
         class="agent-dialog__workspace-group"
       >
         <div class="agent-dialog__workspace-rows">
@@ -59,6 +65,7 @@
                 id="agent-dialog-repository"
                 v-model="repositoryControlValue"
                 class="agent-dialog__workspace-select"
+                :disabled="!canEdit || choosingFolder"
                 @update:model-value="selectRepositoryControl"
               >
                 <el-option
@@ -91,6 +98,7 @@
                 id="agent-dialog-worktree"
                 v-model="selectedSourceWorktreePath"
                 class="agent-dialog__workspace-select"
+                :disabled="!canEdit"
                 @update:model-value="selectWorktreeControl"
               >
                 <el-option
@@ -149,7 +157,7 @@
         </div>
       </section>
 
-      <section class="agent-dialog__identity-group">
+      <section v-if="!isEditing" class="agent-dialog__identity-group">
         <div class="agent-dialog__identity-rows">
           <div class="agent-dialog__workspace-row agent-dialog__identity-row">
             <div class="agent-dialog__row-copy">
@@ -235,7 +243,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { Agent, AgentBackend, CreateAgentInput, CreateSourceWorktreeInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '@codex-claw/shared/contracts';
-import { ChevronDown } from '../shared/icons/app-icons';
 import AgentAvatarPicker from './AgentAvatarPicker.vue';
 import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
 import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
@@ -310,7 +317,6 @@ const canEdit = computed(() => !isEditing.value || props.agent?.status.type === 
 const folderName = computed(() => folder.value.split(/[\\/]/).filter(Boolean).at(-1) ?? '');
 const title = computed(() => isEditing.value ? 'Edit agent' : 'New agent');
 const submitLabel = computed(() => isEditing.value ? 'Save' : 'Create agent');
-const folderLabel = computed(() => folder.value ? shortenFolder(folder.value) : 'Select folder');
 const teams = computed(() => props.teams);
 const showTeamSelector = computed(() => props.showTeamField && !isEditing.value);
 const selectedTeam = computed(() => teams.value.find((team) => team.id === teamSelection.value) ?? null);
@@ -341,7 +347,7 @@ const selectedSourceWorktrees = computed(() => {
   }
   return [...worktrees, created];
 });
-const showSourceWorktreeControl = computed(() => !isEditing.value && selectedSourceRepository.value !== null);
+const showSourceWorktreeControl = computed(() => selectedSourceRepository.value !== null);
 const customFolderOptionLabel = computed(() => folder.value && !selectedSourceRepository.value ? 'Custom folder' : 'Choose folder...');
 const teamCanSave = computed(() => (
   !showTeamSelector.value ||
@@ -527,7 +533,9 @@ function selectWorktreeControl(value: string): void {
 function selectSourceWorktree(worktreePath: string): void {
   selectedSourceWorktreePath.value = worktreePath;
   folder.value = worktreePath;
-  name.value = worktreePath.split(/[\\/]/).filter(Boolean).at(-1) ?? '';
+  if (!isEditing.value) {
+    name.value = worktreePath.split(/[\\/]/).filter(Boolean).at(-1) ?? '';
+  }
 }
 
 function openNewSourceWorktreeDialog(): void {
@@ -633,6 +641,7 @@ function resetForm(): void {
     folder.value = props.agent.folder;
     avatar.value = props.agent.avatar;
     backend.value = props.agent.backend;
+    resetEditSourceSelection();
     return;
   }
 
@@ -674,17 +683,23 @@ function initialTeamSelection(): string {
   return teams.value[0]?.id ?? newTeamOptionId;
 }
 
-function shortenFolder(value: string): string {
-  const parts = value.split(/[\\/]/).filter(Boolean);
-  if (parts.length <= 2) {
-    return value;
-  }
-
-  return `…/${parts.slice(-2).join('/')}`;
-}
-
 function syncRepositoryControlValue(): void {
   repositoryControlValue.value = selectedSourceRepositoryPath.value || customFolderOptionValue;
+}
+
+function resetEditSourceSelection(): void {
+  createdSourceWorktree.value = null;
+  listedSourceWorktrees.value = [];
+  listedSourceWorktreesRepoPath.value = '';
+  const repository = sourceRepositories.value.find((candidate) => (
+    candidate.path === folder.value || candidate.worktrees.some((worktree) => worktree.path === folder.value)
+  ));
+  selectedSourceRepositoryPath.value = repository?.path ?? '';
+  selectedSourceWorktreePath.value = repository?.worktrees.find((worktree) => worktree.path === folder.value)?.path ?? '';
+  syncRepositoryControlValue();
+  if (repository) {
+    void loadSelectedSourceWorktrees(repository.path);
+  }
 }
 </script>
 
@@ -698,15 +713,6 @@ function syncRepositoryControlValue(): void {
   padding: var(--space-12) var(--space-4) 0;
 }
 
-.agent-dialog__section-heading {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.agent-dialog__repository-value--empty {
-  color: var(--color-text-muted);
-}
-
 .agent-dialog__workspace-group,
 .agent-dialog__identity-group {
   display: block;
@@ -714,10 +720,17 @@ function syncRepositoryControlValue(): void {
 
 .agent-dialog__workspace-rows,
 .agent-dialog__identity-rows {
-  overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   background: var(--color-surface-lowest);
+}
+
+.agent-dialog__workspace-rows {
+  overflow: hidden;
+}
+
+.agent-dialog__identity-rows {
+  overflow: visible;
 }
 
 .agent-dialog__row-label {
@@ -832,31 +845,6 @@ function syncRepositoryControlValue(): void {
 
 .agent-dialog__identity-avatar :deep(.agent-avatar-picker__hint) {
   display: none;
-}
-
-.agent-dialog__repository-value {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-6);
-  width: 100%;
-  color: var(--color-text);
-  font-size: var(--font-size-14);
-  line-height: var(--line-height-20);
-}
-
-.agent-dialog__repository-value span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agent-dialog__repository-value svg {
-  flex: 0 0 auto;
-  width: var(--icon-md);
-  height: var(--icon-md);
 }
 
 .agent-dialog__source-custom-option {
