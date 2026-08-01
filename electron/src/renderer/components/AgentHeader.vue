@@ -193,7 +193,7 @@ const hasHeaderGitStatus = computed(() => {
   align-items: center;
   gap: var(--space-8);
   min-width: 0;
-  padding: 0 var(--space-4) 0 var(--space-12);
+  padding: 0 var(--space-4) 0 var(--space-8);
   background: var(--color-shell-main);
   border-bottom: 1px solid var(--color-shell-appbar-divider);
   -webkit-app-region: drag;
@@ -358,6 +358,10 @@ const hasHeaderGitStatus = computed(() => {
 .agent-header__git-diff:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+.agent-header:has(.agent-header__expand) {
+  padding-left: var(--space-16);
 }
 
 .agent-header__expand {

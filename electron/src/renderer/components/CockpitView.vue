@@ -524,7 +524,7 @@ function summaryLabel(status: AgentStatus['type'], count: number): string {
 .cockpit-view h1 {
   margin: 0;
   color: var(--color-text);
-  font-size: var(--font-size-12);
+  font-size: var(--font-size-14);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-16);
   text-transform: uppercase;
