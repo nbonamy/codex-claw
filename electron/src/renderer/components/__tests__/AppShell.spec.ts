@@ -110,7 +110,10 @@ describe('AppShell', () => {
       },
     });
 
-    await wrapper.get('textarea').setValue('hello');
+    const editor = wrapper.get('[role="textbox"][contenteditable]');
+    editor.element.textContent = 'hello';
+    await editor.trigger('input');
+    await nextTick();
     await wrapper.get('form').trigger('submit');
 
     expect(wrapper.emitted('sendPrompt')).toStrictEqual([['hello']]);

@@ -11,6 +11,7 @@ import { i18n } from '../../i18n';
 import { registerClawToolTitlePresenter } from '../../tool-title-presenter';
 
 const conversationPaneSource = readFileSync(resolve(process.cwd(), 'src/renderer/components/ConversationPane.vue'), 'utf8');
+const rendererViteConfig = readFileSync(resolve(process.cwd(), 'vite.renderer.config.ts'), 'utf8');
 
 const agent: Agent = {
   id: 'agent-dina',
@@ -48,14 +49,19 @@ describe('ConversationPane', () => {
     expect(conversationPaneSource).toMatch(/\.conversation-pane\s*\{[\s\S]*background:\s*var\(--color-shell-main\);/);
   });
 
+  it('refreshes the linked SDK prebundle without exposing CommonJS dependencies as ESM', () => {
+    expect(rendererViteConfig).toMatch(/optimizeDeps:\s*\{[\s\S]*force:\s*true/);
+    expect(rendererViteConfig).not.toMatch(/exclude:\s*\[[^\]]*codex-app-sdk/);
+  });
+
   it('adapts app-owned messages and prompt submission to the SDK pane', async () => {
     const wrapper = mountPane({ agent, messages, isSending: false });
 
     expect(wrapper.text()).toContain('Find the failing test.');
     expect(wrapper.text()).toContain('Looking now.');
-    expect(wrapper.get('textarea').attributes('placeholder')).toBe('Ask for follow-up changes');
+    expect(wrapper.get('[role="textbox"][contenteditable]').attributes('data-placeholder')).toBe('Ask for follow-up changes');
 
-    await wrapper.get('textarea').setValue('  hello codex  ');
+    await setComposerValue(wrapper, '  hello codex  ');
     await wrapper.get('form').trigger('submit');
 
     expect(wrapper.emitted('sendPrompt')).toStrictEqual([['hello codex']]);
@@ -284,7 +290,7 @@ describe('ConversationPane', () => {
     });
 
     expect(wrapper.find('[aria-label="Loading conversation"]').exists()).toBe(true);
-    expect(wrapper.find('textarea').exists()).toBe(false);
+    expect(wrapper.find('[role="textbox"][contenteditable]').exists()).toBe(false);
     const sdkProps = wrapper.getComponent(CodexConversationPane as unknown as Component).props() as Record<string, unknown>;
     expect(sdkProps.conversationKey).toBe('codex:thread-persisted');
   });
@@ -311,7 +317,7 @@ describe('ConversationPane', () => {
 
   it('resets the draft when the active conversation changes', async () => {
     const wrapper = mountPane({ agent, messages, isSending: false });
-    await wrapper.get('textarea').setValue('draft for Dina');
+    await setComposerValue(wrapper, 'draft for Dina');
 
     await wrapper.setProps({
       agent: {
@@ -322,7 +328,7 @@ describe('ConversationPane', () => {
     });
     await nextTick();
 
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('');
+    expect(wrapper.get('[role="textbox"][contenteditable]').text()).toBe('');
     const sdkProps = wrapper.getComponent(CodexConversationPane as unknown as Component).props() as Record<string, unknown>;
     expect(sdkProps.conversationKey).toBe('agent:agent-jesse');
   });
@@ -338,8 +344,8 @@ describe('ConversationPane', () => {
       isSending: true,
     });
 
-    expect(wrapper.get('textarea').attributes('placeholder')).toBe('Claude is working...');
-    await wrapper.get('textarea').setValue('queue this next');
+    expect(wrapper.get('[role="textbox"][contenteditable]').attributes('data-placeholder')).toBe('Claude is working...');
+    await setComposerValue(wrapper, 'queue this next');
     await wrapper.get('form').trigger('submit');
     expect(wrapper.emitted('sendPrompt')).toStrictEqual([['queue this next']]);
   });
@@ -363,4 +369,11 @@ function mountPane(props: {
       plugins: [ElementPlus, i18n],
     },
   });
+}
+
+async function setComposerValue(wrapper: ReturnType<typeof mountPane>, value: string): Promise<void> {
+  const editor = wrapper.get('[role="textbox"][contenteditable]');
+  editor.element.textContent = value;
+  await editor.trigger('input');
+  await nextTick();
 }
