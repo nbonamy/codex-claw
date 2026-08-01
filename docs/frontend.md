@@ -128,6 +128,10 @@ Token categories should include:
 - diff added, removed, changed, and gutter colors;
 - code and syntax colors.
 
+Claw's UI typography follows Codex's system-font treatment: use the native
+system sans stack and a restrained weight scale. Reserve stronger weights for
+real hierarchy instead of making routine labels and navigation feel bold.
+
 Theme rules:
 
 - Components consume semantic tokens only.

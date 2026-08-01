@@ -67,8 +67,8 @@
     TYPOGRAPHY
   ======================================== */
 
-  --font-family-ui: ui-sans-serif, -apple-system, sans-serif;
-  --font-family-base: ui-sans-serif, -apple-system, sans-serif;
+  --font-family-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-family-base: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-family-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
 
   --font-size-8: 8px;
@@ -87,9 +87,9 @@
   --font-weight-xlight: 200;
   --font-weight-light: 300;
   --font-weight-regular: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
-  --font-weight-bold: 700;
+  --font-weight-medium: 450;
+  --font-weight-semibold: 500;
+  --font-weight-bold: 600;
 
   --line-height-16: 16px;
   --line-height-18: 18px;

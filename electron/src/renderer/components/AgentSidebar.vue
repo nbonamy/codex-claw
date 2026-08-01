@@ -448,7 +448,7 @@ function onResizePointerEnd(event: PointerEvent): void {
 
 .agent-sidebar__meta strong {
   font-size: var(--font-size-14);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-regular);
   line-height: var(--line-height-18);
 }
 
@@ -503,8 +503,7 @@ function onResizePointerEnd(event: PointerEvent): void {
 .agent-sidebar--compact .agent-sidebar__meta strong {
   display: block;
   font-size: var(--font-size-14);
-  font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-16);
+  line-height: var(--line-height-18);
 }
 
 .agent-sidebar--compact :deep(.agent-avatar--emoji) {
