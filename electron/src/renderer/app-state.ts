@@ -1873,6 +1873,7 @@ function syncSidePanelFromMainEvent(event: MainToRendererEvent): void {
   sidePanelRequest.value = {
     kind: 'gitDiff',
     diff: event.payload.diff,
+    ...(event.payload.scope === 'workingTree' || event.payload.scope === 'turn' ? { scope: event.payload.scope } : {}),
     ...(typeof event.payload.title === 'string' ? { title: event.payload.title } : {}),
     ...(typeof event.payload.subtitle === 'string' ? { subtitle: event.payload.subtitle } : {}),
     ...(event.payload.state === 'error' ? { state: 'error' } : {}),

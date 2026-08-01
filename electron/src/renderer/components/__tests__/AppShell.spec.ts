@@ -4,7 +4,7 @@ import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { Agent, AppCommand, AppSnapshot, BackendConversationRef, BenchLocation, BenchTemplate, CodexClawApi, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { Agent, AppCommand, AppSnapshot, BackendConversationRef, BenchLocation, BenchTemplate, CodexClawApi, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, RendererMessage, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
 import { i18n } from '../../i18n';
 
@@ -88,7 +88,7 @@ describe('AppShell', () => {
     expect(wrapper.emitted('sendPrompt')).toStrictEqual([['hello']]);
   });
 
-  it('keeps the conversation visible while the browser opens as a right-side pane', async () => {
+  it('opens the empty workspace launcher before preserving a selected Browser tab', async () => {
     const snapshot = createInitialSnapshot();
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
@@ -117,19 +117,32 @@ describe('AppShell', () => {
       global: { plugins: [ElementPlus, i18n] },
     });
 
-    await wrapper.get('[aria-label="Toggle browser side pane"]').trigger('click');
+    await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
     await flushPromises();
 
     expect(wrapper.text()).toContain('Chat with Dina');
-    expect(wrapper.find('.app-shell__browser-pane').exists()).toBe(true);
+    expect(wrapper.find('.app-shell__right-workspace').exists()).toBe(true);
+    expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('Review');
+    expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('Browser');
+    expect(browserOpen).not.toHaveBeenCalled();
 
-    await wrapper.get('[aria-label="Toggle browser side pane"]').trigger('click');
+    await wrapper.findAll('.right-workspace-panel__launcher button').find((button) => button.text().includes('Browser'))?.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[role="tab"]').text()).toBe('Browser');
+
+    await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
     await nextTick();
-    await wrapper.get('[aria-label="Toggle browser side pane"]').trigger('click');
+    await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
     await flushPromises();
 
     expect(browserSetVisible).toHaveBeenCalledWith(false);
     expect(browserOpen).toHaveBeenCalledTimes(1);
+
+    await wrapper.get('[aria-label="Close Browser tab"]').trigger('click');
+    await nextTick();
+
+    expect(wrapper.get('[aria-label="Open a workspace tab"]').isVisible()).toBe(true);
   });
 
   it('opens the active agent git diff from header diff stats', async () => {
@@ -164,6 +177,57 @@ describe('AppShell', () => {
     await wrapper.get('[aria-label="Open repository diff"]').trigger('click');
 
     expect(openAgentGitDiff).toHaveBeenCalledWith('agent-dina');
+    expect(wrapper.get('[aria-label="Right workspace"]').text()).toContain('Review');
+    expect(wrapper.get('.git-diff-preview-panel').attributes('aria-busy')).toBe('true');
+
+    const setShellProps = wrapper.setProps.bind(wrapper) as unknown as (props: {
+      sidePanelRequest: SidePanelRequest;
+    }) => Promise<void>;
+    await setShellProps({
+      sidePanelRequest: {
+        kind: 'gitDiff',
+        scope: 'workingTree',
+        title: 'Git Diff',
+        subtitle: '/Users/nbonamy/src/id8',
+        diff: [
+          'diff --git a/src/main.ts b/src/main.ts',
+          '--- a/src/main.ts',
+          '+++ b/src/main.ts',
+          '@@ -1 +1 @@',
+          '-const oldValue = 1;',
+          '+const newValue = 2;',
+        ].join('\n'),
+      },
+    });
+    await nextTick();
+
+    expect(wrapper.text()).toContain('src/main.ts');
+    expect(wrapper.text()).toContain('newValue');
+  });
+
+  it('does not auto-open repository review for a turn-scoped diff event', () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [],
+        isLoading: false,
+        isSending: false,
+        sidePanelRequest: {
+          kind: 'gitDiff',
+          scope: 'turn',
+          title: 'Git Diff',
+          subtitle: 'Current turn',
+          diff: 'diff --git a/src/main.ts b/src/main.ts\n',
+        },
+      },
+      global: {
+        plugins: [ElementPlus, i18n],
+      },
+    });
+
+    expect(wrapper.get('[aria-label="Right workspace"]').isVisible()).toBe(false);
   });
 
   it('opens markdown links in the side panel through the agent file bridge', async () => {
@@ -1370,7 +1434,7 @@ describe('AppShell', () => {
 
     await wrapper.get('.agent-sidebar__new').trigger('click');
 
-    expect(wrapper.text()).toContain('Create Agent');
+    expect(wrapper.text()).toContain('New agent');
     expect(wrapper.find('#agent-dialog-team').exists()).toBe(false);
     await chooseCustomAgentFolder(wrapper);
     await wrapper.get('.agent-dialog__text-input').setValue('Jules');
@@ -1427,7 +1491,7 @@ describe('AppShell', () => {
     await wrapper.get('[aria-label="Cockpit"]').trigger('click');
     await wrapper.findAll('.cockpit-view__add-card .new-agent-button__primary')[1].trigger('click');
 
-    expect(wrapper.text()).toContain('Create Agent');
+    expect(wrapper.text()).toContain('New agent');
     await chooseCustomAgentFolder(wrapper);
     await wrapper.get('.agent-dialog__text-input').setValue('Abby');
     await wrapper.find('.claw-dialog__footer .el-button--primary').trigger('click');
@@ -1478,8 +1542,9 @@ describe('AppShell', () => {
     const agentDialog = wrapper.findComponent({ name: 'AgentDialog' });
     expect(agentDialog.find('#agent-dialog-team').exists()).toBe(true);
 
-    await chooseCustomAgentFolder(wrapper, 2);
-    await agentDialog.findAllComponents({ name: 'ElSelect' })[0]?.vm.$emit('update:modelValue', '__new_team__');
+    await chooseCustomAgentFolder(wrapper);
+    const teamSelect = agentDialog.findAllComponents({ name: 'ElSelect' }).at(-1);
+    await teamSelect?.vm.$emit('update:modelValue', '__new_team__');
     await nextTick();
     expect(agentDialog.get<HTMLInputElement>('[aria-label="New team name"]').element.value).toBe('GitHub #12');
     await wrapper.find('.claw-dialog__footer .el-button--primary').trigger('click');
@@ -1778,7 +1843,7 @@ describe('AppShell', () => {
     });
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Edit Agent')?.trigger('click');
 
-    expect(wrapper.text()).toContain('Edit Agent');
+    expect(wrapper.text()).toContain('Edit agent');
     await wrapper.get('.agent-dialog__text-input').setValue('Dina Prime');
     await wrapper.findAll('button').find((button) => button.text() === 'Save')?.trigger('click');
 
@@ -1950,6 +2015,17 @@ describe('AppShell', () => {
   });
 
   it('emits keyboard shortcut actions for active teams and agents', async () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    });
+    window.codexClaw = {
+      browserOpen: vi.fn().mockResolvedValue({ url: '', title: '', canGoBack: false, canGoForward: false }),
+      browserSetBounds: vi.fn().mockResolvedValue(undefined),
+      browserSetVisible: vi.fn().mockResolvedValue(undefined),
+      browserClose: vi.fn().mockResolvedValue(undefined),
+      onEvent: vi.fn(() => vi.fn()),
+    } as Partial<CodexClawApi> as CodexClawApi;
     const snapshot = createInitialSnapshot();
     snapshot.teams.push({
       id: 'team-skwad',
@@ -1958,9 +2034,17 @@ describe('AppShell', () => {
       color: '#46A857',
       agentIds: [],
     });
-    const wrapper = mountShell({ snapshot });
+    const openAgentGitDiff = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, openAgentGitDiff });
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', metaKey: true, cancelable: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'r', metaKey: true, cancelable: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', metaKey: true, cancelable: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', metaKey: true, cancelable: true }));
+    await flushPromises();
+    expect(openAgentGitDiff).toHaveBeenCalledWith('agent-dina');
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['Review', 'Browser']);
+
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', metaKey: true, cancelable: true }));
     window.dispatchEvent(new KeyboardEvent('keydown', { key: '`', code: 'Backquote', metaKey: true, cancelable: true }));
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', ctrlKey: true, cancelable: true }));
@@ -1968,12 +2052,17 @@ describe('AppShell', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', ctrlKey: true, shiftKey: true, cancelable: true }));
 
     expect(wrapper.emitted('duplicate-agent')).toStrictEqual([['agent-dina']]);
+    expect(wrapper.emitted('restart-agent')).toStrictEqual([['agent-dina']]);
     expect(wrapper.emitted('close-agent')).toStrictEqual([['agent-dina']]);
     expect(wrapper.emitted('select-team')).toStrictEqual([['team-skwad']]);
     expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-jesse'], ['agent-dina']]);
   });
 
   it('handles active app commands from the main-process menu channel', async () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    });
     let listener: (command: AppCommand) => void = () => undefined;
     const unsubscribe = vi.fn();
     const onAppCommand = vi.fn((nextListener: (command: AppCommand) => void) => {
@@ -1982,6 +2071,11 @@ describe('AppShell', () => {
     });
     window.codexClaw = {
       onAppCommand,
+      browserOpen: vi.fn().mockResolvedValue({ url: '', title: '', canGoBack: false, canGoForward: false }),
+      browserSetBounds: vi.fn().mockResolvedValue(undefined),
+      browserSetVisible: vi.fn().mockResolvedValue(undefined),
+      browserClose: vi.fn().mockResolvedValue(undefined),
+      onEvent: vi.fn(() => vi.fn()),
     } as Partial<CodexClawApi> as CodexClawApi;
     const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
     const snapshot = createInitialSnapshot();
@@ -1993,7 +2087,8 @@ describe('AppShell', () => {
       agentIds: [],
     });
     const quit = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, quit });
+    const openAgentGitDiff = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, quit, openAgentGitDiff });
 
     expect(onAppCommand).toHaveBeenCalledOnce();
     listener({ type: 'new-team' });
@@ -2013,6 +2108,8 @@ describe('AppShell', () => {
     listener({ type: 'cycle-agents', direction: 1 });
     listener({ type: 'duplicate-active-agent' });
     listener({ type: 'restart-active-agent' });
+    listener({ type: 'open-review' });
+    listener({ type: 'open-browser' });
     listener({ type: 'edit-active-agent' });
     await nextTick();
     await flushPromises();
@@ -2033,7 +2130,9 @@ describe('AppShell', () => {
     expect(quit).toHaveBeenCalledOnce();
     expect(wrapper.emitted('duplicate-agent')).toStrictEqual([['agent-dina']]);
     expect(wrapper.emitted('restart-agent')).toStrictEqual([['agent-dina']]);
-    expect(wrapper.text()).toContain('Edit Agent');
+    expect(openAgentGitDiff).toHaveBeenCalledWith('agent-dina');
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['Review', 'Browser']);
+    expect(wrapper.text()).toContain('Edit agent');
 
     wrapper.unmount();
     expect(unsubscribe).toHaveBeenCalledOnce();
@@ -2134,6 +2233,7 @@ function mountShell(overrides: Partial<{
   listAgentConversations: (agentId: string) => Promise<ConversationSummary[]>;
   resumeAgentConversation: (agentId: string, ref: BackendConversationRef) => Promise<void>;
   readConversationMessages: (ref: BackendConversationRef, agentId: string) => Promise<RendererMessage[]>;
+  openAgentGitDiff: (agentId: string) => Promise<void>;
   configureWorkBacklog: (input: WorkBacklogConfigurationInput) => Promise<void>;
   loadWorkRepositories: (provider: WorkProviderKind) => Promise<void>;
   loadWorkItems: (provider: WorkProviderKind, repositoryId: string) => Promise<void>;
@@ -2171,6 +2271,7 @@ function mountShell(overrides: Partial<{
       listAgentConversations: overrides.listAgentConversations ?? vi.fn().mockResolvedValue([]),
       resumeAgentConversation: overrides.resumeAgentConversation ?? vi.fn().mockResolvedValue(undefined),
       readConversationMessages: overrides.readConversationMessages ?? vi.fn().mockResolvedValue([]),
+      openAgentGitDiff: overrides.openAgentGitDiff ?? vi.fn().mockResolvedValue(undefined),
       configureWorkBacklog: overrides.configureWorkBacklog ?? vi.fn().mockResolvedValue(undefined),
       loadWorkRepositories: overrides.loadWorkRepositories ?? vi.fn().mockResolvedValue(undefined),
       loadWorkItems: overrides.loadWorkItems ?? vi.fn().mockResolvedValue(undefined),
@@ -2203,7 +2304,7 @@ function mountShell(overrides: Partial<{
   });
 }
 
-async function chooseCustomAgentFolder(wrapper: ReturnType<typeof mountShell>, repositorySelectIndex = 1) {
+async function chooseCustomAgentFolder(wrapper: ReturnType<typeof mountShell>, repositorySelectIndex = 0) {
   wrapper.findComponent({ name: 'AgentDialog' }).findAllComponents({ name: 'ElSelect' })[repositorySelectIndex]?.vm.$emit('update:modelValue', '__custom_folder__');
   await flushPromises();
 }

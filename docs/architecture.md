@@ -365,8 +365,11 @@ Renderer layers:
 - app shell inspired by Skwad: team rail, agent list, agent header, status, and
   conversation area;
 - native workspace panes inspired by `docs/codex.png`: the active conversation
-  should be able to sit beside document, plan, read-only source, git diff, or
-  file viewer tabs rather than forcing every artifact into the chat column;
+  sits beside a tabbed right workspace, initially hosting Browser and GitHub
+  Review, while focused document, plan, and read-only source previews can take
+  over that area without forcing every artifact into the chat column. Opening
+  the workspace before a tab exists shows a Claw-owned launcher for the
+  currently supported surfaces;
 - Bench surface for saved agent templates, starting as a New Agent menu section
   and eventually supporting faster deployment into any team;
 - chat state store that reduces `MainToRendererEvent` into message/tool/diff
@@ -382,8 +385,9 @@ Renderer layers:
 - side-panel previews are read-only app artifacts. Markdown and source file
   links request backend-owned agent resources by agent id; Electron must not
   resolve or pass local workspace roots for file previews. Source highlighting
-  uses Shiki, while git diff previews parse unified diff data and render with
-  Claw-owned Vue components;
+  uses Shiki. GitHub Review is a right-workspace tab: clicking the active
+  agent's git statistics requests the complete tracked working-tree diff from
+  `clawd`, then parses and renders every file with Claw-owned Vue components;
 - theme provider that applies semantic CSS custom properties to the document.
 
 ## IPC And Backend Protocol
@@ -718,7 +722,8 @@ instead of requiring a manual "finish connection" step.
 
 ## In-app Browser
 
-The in-app browser is a desktop preview surface, separate from
+The in-app browser is a desktop preview surface hosted in the renderer's
+tabbed right workspace alongside GitHub Review, and remains separate from
 `client/external/open`. Electron main hosts untrusted HTTP(S) pages in a
 sandboxed `WebContentsView` with a persistent, per-agent browser partition.
 The renderer may request navigation, sizing, and annotation capture,
@@ -729,7 +734,9 @@ the renderer. The renderer queues the user's written comments as a transient
 batch, then turns the complete batch into one ordinary agent prompt, leaving
 durable conversation state and agent execution in
 `clawd`. Browser page state is deliberately ephemeral and is not added to the
-persisted application snapshot.
+persisted application snapshot. Switching right-workspace tabs hides the
+native browser view without discarding its current page; closing the Browser
+tab destroys that view.
 
 Dragging a work item onto an agent records provider-neutral assignment metadata
 in `workBacklog.assignments`, keyed by provider and provider-generated item id,

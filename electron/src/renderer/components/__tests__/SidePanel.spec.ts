@@ -140,7 +140,7 @@ describe('SidePanel', () => {
 
     expect(wrapper.find('.git-diff-preview-panel').exists()).toBe(true);
     expect(wrapper.text()).toContain('src/main.ts');
-    expect(wrapper.text()).toContain('modified');
+    expect(wrapper.get('.git-diff-preview-panel__file-meta').text()).toBe('+1-1');
     expect(wrapper.text()).toContain('oldValue');
     expect(wrapper.text()).toContain('newValue');
   });

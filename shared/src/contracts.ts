@@ -593,6 +593,7 @@ export type SidePanelMarkdownRequest = {
 
 export type SidePanelGitDiffRequest = {
   kind: 'gitDiff';
+  scope?: 'workingTree' | 'turn';
   title?: string;
   subtitle?: string;
   diff: string;
@@ -902,6 +903,8 @@ export type AppCommand =
   | { type: 'edit-active-agent' }
   | { type: 'new-agent' }
   | { type: 'new-team' }
+  | { type: 'open-browser' }
+  | { type: 'open-review' }
   | { type: 'quit' }
   | { type: 'restart-active-agent' };
 

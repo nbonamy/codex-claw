@@ -1409,6 +1409,7 @@ describe('AppController', () => {
       type: 'sidePanel.gitDiffRequested',
       payload: {
         kind: 'gitDiff',
+        scope: 'turn',
         title: 'Git Diff',
         subtitle: 'Current turn',
         diff: 'diff --git a/a.ts b/a.ts\n',
@@ -1422,6 +1423,7 @@ describe('AppController', () => {
       type: 'sidePanel.gitDiffRequested',
       payload: {
         kind: 'gitDiff',
+        scope: 'turn',
         title: 'Git Diff',
         subtitle: 'Current turn',
         diff: 'diff --git a/a.ts b/a.ts\n',

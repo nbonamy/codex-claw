@@ -33,6 +33,8 @@ describe('app menu', () => {
       'Restart Agent',
     ]);
     expect(menuLabels(submenu(menu, 'View'))).toStrictEqual([
+      'Review',
+      'Browser',
       'Next Team',
       'Next Agent',
       'Previous Agent',
@@ -68,6 +70,8 @@ describe('app menu', () => {
       ['Edit', 'Edit Agent'],
       ['Edit', 'Duplicate Agent'],
       ['Edit', 'Restart Agent'],
+      ['View', 'Review'],
+      ['View', 'Browser'],
       ['View', 'Next Team'],
       ['View', 'Next Agent'],
       ['View', 'Previous Agent'],
@@ -81,9 +85,11 @@ describe('app menu', () => {
     expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(6, { type: 'edit-active-agent' });
     expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(7, { type: 'duplicate-active-agent' });
     expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(8, { type: 'restart-active-agent' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(9, { type: 'cycle-teams' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(10, { type: 'cycle-agents', direction: 1 });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(11, { type: 'cycle-agents', direction: -1 });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(9, { type: 'open-review' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(10, { type: 'open-browser' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(11, { type: 'cycle-teams' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(12, { type: 'cycle-agents', direction: 1 });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(13, { type: 'cycle-agents', direction: -1 });
   });
 
   it('uses the expected file menu accelerators', () => {
@@ -94,6 +100,10 @@ describe('app menu', () => {
     expect(menuItem(menu, 'File', 'Close Agent')?.accelerator).toBe('CommandOrControl+W');
     expect(menuItem(menu, 'File', 'Close Team')?.accelerator).toBe('CommandOrControl+Shift+W');
     expect(menuItem(menu, 'File', 'Quit')?.accelerator).toBe('CommandOrControl+Q');
+    expect(menuItem(menu, 'Edit', 'Duplicate Agent')?.accelerator).toBe('CommandOrControl+D');
+    expect(menuItem(menu, 'Edit', 'Restart Agent')?.accelerator).toBe('CommandOrControl+R');
+    expect(menuItem(menu, 'View', 'Review')?.accelerator).toBe('CommandOrControl+G');
+    expect(menuItem(menu, 'View', 'Browser')?.accelerator).toBe('CommandOrControl+B');
   });
 
   it('adds reload and developer tools only in debug mode', () => {
@@ -102,6 +112,8 @@ describe('app menu', () => {
     const releaseMenu = buildAppMenuTemplate(callbacks(), { debugMode: false }, 'darwin');
 
     expect(menuLabels(submenu(debugMenu, 'View'))).toStrictEqual([
+      'Review',
+      'Browser',
       'Next Team',
       'Next Agent',
       'Previous Agent',

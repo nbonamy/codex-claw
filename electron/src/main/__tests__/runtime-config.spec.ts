@@ -120,6 +120,9 @@ describe('runtime config', () => {
     expect(electronPackage.scripts['build:computer-use']).toBe(
       "../../computer-use/macos/scripts/build-app.sh --app-name 'Codex Claw Computer Use' --bundle-identifier com.nabocorp.codex-claw.computer-use --icon assets/icon.icns --output .computer-use",
     );
+    expect(electronPackage.scripts.package).toBe('npm run build:computer-use && electron-forge package');
+    expect(electronPackage.scripts.make).toBe('npm run build:computer-use && electron-forge make');
+    expect(electronPackage.scripts.build).toContain('npm run build:computer-use &&');
     expect(devScript).toContain("await run('npm', ['run', 'build:computer-use'])");
     expect(devScript).toContain("start('npm', ['run', 'dev:electron']");
   });

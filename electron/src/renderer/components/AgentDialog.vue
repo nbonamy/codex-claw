@@ -3,7 +3,7 @@
     class="claw-dialog agent-dialog"
     :model-value="visible"
     :teleported="false"
-    width="620px"
+    width="560px"
     :show-close="false"
     destroy-on-close
     @update:model-value="onVisibilityChanged"
@@ -19,29 +19,112 @@
       class="claw-form-dialog agent-dialog__form"
       @submit.prevent="submit"
     >
-      <section class="claw-form-dialog__field agent-dialog__field">
-        <div class="claw-form-dialog__field-heading agent-dialog__field-heading">
-          <span class="claw-form-dialog__label agent-dialog__label">Identity</span>
-          <span class="claw-form-dialog__heading-separator agent-dialog__heading-separator">•</span>
-          <p class="claw-form-dialog__help agent-dialog__help">Set the avatar and sidebar name.</p>
+      <section
+        v-if="isEditing"
+        class="claw-form-dialog__field agent-dialog__field"
+      >
+        <div class="agent-dialog__section-heading">
+          <span class="claw-form-dialog__label agent-dialog__label">Workspace folder</span>
+          <p class="claw-form-dialog__help agent-dialog__help">Select the repository or project directory.</p>
         </div>
-        <div style="display:flex; align-items: center; gap: var(--space-4);">
-            <AgentAvatarPicker
-              v-model="avatar"
-              :name="name || folderName || 'Agent'"
-              class="agent-dialog__identity-avatar"
+        <button
+          class="claw-form-dialog__control claw-form-dialog__button-control agent-dialog__folder-control"
+          type="button"
+          :disabled="!canEdit || choosingFolder"
+          @click="chooseFolder"
+        >
+          <span
+            class="agent-dialog__repository-value"
+            :class="{ 'agent-dialog__repository-value--empty': !folder }"
+          >
+            <span>{{ folderLabel }}</span>
+            <ChevronDown aria-hidden="true" />
+          </span>
+        </button>
+      </section>
+
+      <section
+        v-else
+        class="claw-form-dialog__field agent-dialog__field"
+      >
+        <div class="agent-dialog__section-heading">
+          <label
+            class="claw-form-dialog__label agent-dialog__label"
+            for="agent-dialog-repository"
+          >
+            Repository
+          </label>
+          <p class="claw-form-dialog__help agent-dialog__help">{{ repositoryHelp }}</p>
+        </div>
+        <div class="claw-form-dialog__control agent-dialog__input-shell agent-dialog__input-shell--select">
+          <el-select
+            id="agent-dialog-repository"
+            v-model="repositoryControlValue"
+            class="agent-dialog__source-select"
+            :teleported="false"
+            @update:model-value="selectRepositoryControl"
+          >
+            <el-option
+              class="agent-dialog__source-custom-option"
+              :label="customFolderOptionLabel"
+              :value="customFolderOptionValue"
             />
-          <div class="claw-form-dialog__control agent-dialog__identity-control">
-            <input
-              id="agent-dialog-name"
-              v-model="name"
-              class="claw-form-dialog__text-input agent-dialog__text-input"
-              type="text"
-              aria-label="Agent name"
-              placeholder="Enter agent name"
-              :disabled="!canEdit"
+            <el-option
+              v-if="sourceRepositories.length > 0"
+              class="agent-dialog__source-option-divider"
+              disabled
+              label=""
+              :value="sourceDividerOptionValue"
             />
-          </div>
+            <el-option
+              v-for="repository in sourceRepositories"
+              :key="repository.path"
+              :label="repository.name"
+              :value="repository.path"
+            />
+          </el-select>
+        </div>
+      </section>
+
+      <section
+        v-if="showSourceWorktreeControl"
+        class="claw-form-dialog__field agent-dialog__field"
+      >
+        <div class="agent-dialog__compact-heading">
+          <label
+            class="agent-dialog__compact-label"
+            for="agent-dialog-worktree"
+          >
+            Checkout
+          </label>
+        </div>
+        <div class="claw-form-dialog__control agent-dialog__input-shell agent-dialog__input-shell--select agent-dialog__source-worktree-row">
+          <el-select
+            id="agent-dialog-worktree"
+            v-model="selectedSourceWorktreePath"
+            class="agent-dialog__source-select"
+            :teleported="false"
+            @update:model-value="selectWorktreeControl"
+          >
+            <el-option
+              v-for="worktree in selectedSourceWorktrees"
+              :key="worktree.path"
+              :label="worktree.name"
+              :value="worktree.path"
+            />
+            <el-option
+              v-if="selectedSourceWorktrees.length > 0"
+              class="agent-dialog__source-option-divider"
+              disabled
+              label=""
+              :value="worktreeDividerOptionValue"
+            />
+            <el-option
+              class="agent-dialog__source-custom-option"
+              label="New Worktree..."
+              :value="newWorktreeOptionValue"
+            />
+          </el-select>
         </div>
       </section>
 
@@ -49,15 +132,13 @@
         v-if="showTeamSelector"
         class="claw-form-dialog__field agent-dialog__field"
       >
-        <div class="claw-form-dialog__field-heading agent-dialog__field-heading">
+        <div class="agent-dialog__compact-heading">
           <label
-            class="claw-form-dialog__label agent-dialog__label"
+            class="agent-dialog__compact-label"
             for="agent-dialog-team"
           >
             Team
           </label>
-          <span class="claw-form-dialog__heading-separator agent-dialog__heading-separator">•</span>
-          <p class="claw-form-dialog__help agent-dialog__help">Choose where this agent will live.</p>
         </div>
         <div class="claw-form-dialog__control agent-dialog__input-shell agent-dialog__input-shell--select">
           <el-select
@@ -93,199 +174,30 @@
         </div>
       </section>
 
-      <section class="claw-form-dialog__field agent-dialog__field">
-        <div class="claw-form-dialog__field-heading agent-dialog__field-heading">
+      <section class="agent-dialog__identity-field">
+        <div class="agent-dialog__compact-heading">
           <label
-            class="claw-form-dialog__label agent-dialog__label"
-            for="agent-dialog-backend"
-          >
-            Backend
-          </label>
-          <span class="claw-form-dialog__heading-separator agent-dialog__heading-separator">•</span>
-          <p class="claw-form-dialog__help agent-dialog__help">Choose the coding backend this agent will use.</p>
+            class="agent-dialog__compact-label"
+            for="agent-dialog-name"
+          >Agent name</label>
         </div>
-        <div class="claw-form-dialog__control agent-dialog__input-shell agent-dialog__input-shell--select">
-          <el-select
-            id="agent-dialog-backend"
-            v-model="backend"
-            class="agent-dialog__backend-select"
-            :disabled="!canEdit"
-            :teleported="false"
-            popper-class="agent-dialog__backend-popper"
-          >
-            <template #prefix>
-              <component
-                :is="selectedBackendOption.icon"
-                class="agent-dialog__backend-selected-icon"
-                :class="selectedBackendOption.iconClass"
-                aria-hidden="true"
-              />
-            </template>
-
-            <el-option
-              v-for="option in backendOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            >
-              <span class="agent-dialog__backend-option">
-                <span
-                  class="agent-dialog__backend-icon-frame"
-                  :class="option.iconClass"
-                >
-                  <component
-                    :is="option.icon"
-                    class="agent-dialog__backend-option-icon"
-                    aria-hidden="true"
-                  />
-                </span>
-                <span class="agent-dialog__backend-copy">
-                  <span class="agent-dialog__backend-name">{{ option.label }}</span>
-                  <!-- <span class="agent-dialog__backend-provider">{{ option.provider }}</span> -->
-                </span>
-              </span>
-            </el-option>
-          </el-select>
-        </div>
-      </section>
-
-      <section
-        v-if="isEditing"
-        class="claw-form-dialog__field agent-dialog__field"
-      >
-        <div class="claw-form-dialog__field-heading agent-dialog__field-heading">
-          <span class="claw-form-dialog__label agent-dialog__label">Workspace folder</span>
-          <span class="claw-form-dialog__heading-separator agent-dialog__heading-separator">•</span>
-          <p class="claw-form-dialog__help agent-dialog__help">Select the repository or project directory.</p>
-        </div>
-        <button
-          class="claw-form-dialog__control claw-form-dialog__button-control agent-dialog__folder-control"
-          type="button"
-          :disabled="!canEdit || choosingFolder"
-          @click="chooseFolder"
-        >
-          <span
-            class="agent-dialog__repository-value"
-            :class="{ 'agent-dialog__repository-value--empty': !folder }"
-          >
-            <span>{{ folderLabel }}</span>
-            <ChevronDown aria-hidden="true" />
-          </span>
-        </button>
-      </section>
-
-      <section
-        v-else
-        class="claw-form-dialog__field agent-dialog__field"
-      >
-        <div class="claw-form-dialog__field-heading agent-dialog__field-heading">
-          <label
-            class="claw-form-dialog__label agent-dialog__label"
-            for="agent-dialog-repository"
-          >
-            Repository
-          </label>
-          <span class="claw-form-dialog__heading-separator agent-dialog__heading-separator">•</span>
-          <p class="claw-form-dialog__help agent-dialog__help">{{ repositoryHelp }}</p>
-        </div>
-        <div class="claw-form-dialog__control agent-dialog__input-shell agent-dialog__input-shell--select">
-          <el-select
-            id="agent-dialog-repository"
-            v-model="repositoryControlValue"
-            class="agent-dialog__source-select"
-            :teleported="false"
-            @update:model-value="selectRepositoryControl"
-          >
-            <el-option
-              v-for="repository in sourceRepositories"
-              :key="repository.path"
-              :label="repository.name"
-              :value="repository.path"
-            />
-            <el-option
-              v-if="sourceRepositories.length > 0"
-              class="agent-dialog__source-option-divider"
-              disabled
-              label=""
-              :value="sourceDividerOptionValue"
-            />
-            <el-option
-              class="agent-dialog__source-custom-option"
-              :label="customFolderOptionLabel"
-              :value="customFolderOptionValue"
-            />
-          </el-select>
-        </div>
-      </section>
-
-      <section
-        v-if="showSourceWorktreeControl"
-        class="claw-form-dialog__field agent-dialog__field"
-      >
-        <div class="claw-form-dialog__field-heading agent-dialog__field-heading">
-          <label
-            class="claw-form-dialog__label agent-dialog__label"
-            for="agent-dialog-worktree"
-          >
-            Worktree
-          </label>
-          <span class="claw-form-dialog__heading-separator agent-dialog__heading-separator">•</span>
-          <p class="claw-form-dialog__help agent-dialog__help">Choose the checkout for this agent.</p>
-        </div>
-        <div class="claw-form-dialog__control agent-dialog__input-shell agent-dialog__input-shell--select agent-dialog__source-worktree-row">
-          <el-select
-            id="agent-dialog-worktree"
-            v-model="selectedSourceWorktreePath"
-            class="agent-dialog__source-select"
-            :teleported="false"
-            @update:model-value="selectWorktreeControl"
-          >
-            <el-option
-              v-for="worktree in selectedSourceWorktrees"
-              :key="worktree.path"
-              :label="worktree.name"
-              :value="worktree.path"
-            />
-            <el-option
-              v-if="selectedSourceWorktrees.length > 0"
-              class="agent-dialog__source-option-divider"
-              disabled
-              label=""
-              :value="worktreeDividerOptionValue"
-            />
-            <el-option
-              class="agent-dialog__source-custom-option"
-              label="New Worktree..."
-              :value="newWorktreeOptionValue"
-            />
-          </el-select>
-        </div>
-      </section>
-
-      <section
-        v-if="!isEditing"
-        class="claw-form-dialog__field agent-dialog__field"
-      >
-        <div class="claw-form-dialog__field-heading agent-dialog__field-heading">
-          <label
-            class="claw-form-dialog__label agent-dialog__label"
-            for="agent-dialog-resolved-path"
-          >
-            Resolved path
-          </label>
-          <span class="claw-form-dialog__heading-separator agent-dialog__heading-separator">•</span>
-          <p class="claw-form-dialog__help agent-dialog__help">This is the folder the agent will use.</p>
-        </div>
-        <div class="claw-form-dialog__control claw-form-dialog__input-control agent-dialog__resolved-path-control">
-          <input
-            id="agent-dialog-resolved-path"
-            class="claw-form-dialog__text-input agent-dialog__text-input agent-dialog__resolved-path-input"
-            type="text"
-            aria-label="Resolved path"
-            readonly
-            :value="folder"
-            placeholder="No folder selected"
+        <div class="agent-dialog__identity-row">
+          <AgentAvatarPicker
+            v-model="avatar"
+            :name="name || folderName || 'Agent'"
+            class="agent-dialog__identity-avatar"
           />
+          <div class="claw-form-dialog__control agent-dialog__identity-control">
+            <input
+              id="agent-dialog-name"
+              v-model="name"
+              class="claw-form-dialog__text-input agent-dialog__text-input"
+              type="text"
+              aria-label="Agent name"
+              placeholder="Name this agent"
+              :disabled="!canEdit"
+            />
+          </div>
         </div>
       </section>
 
@@ -343,9 +255,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { Component } from 'vue';
 import type { Agent, AgentBackend, CreateAgentInput, CreateSourceWorktreeInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '@codex-claw/shared/contracts';
-import { ClaudeCodeBackendIcon, CodexBackendIcon } from '../shared/icons/backend-icons';
 import { ChevronDown } from '../shared/icons/app-icons';
 import AgentAvatarPicker from './AgentAvatarPicker.vue';
 import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
@@ -418,41 +328,13 @@ const remoteSourceRepositoriesConnectionId = ref('');
 const loadingRemoteSourceRepositories = ref(false);
 const remoteFolderDialogVisible = ref(false);
 
-type BackendOption = {
-  icon: Component;
-  iconClass: string;
-  label: string;
-  provider: string;
-  value: AgentBackend;
-};
-
-const backendOptions: BackendOption[] = [
-  {
-    icon: CodexBackendIcon,
-    iconClass: 'agent-dialog__backend-icon--codex',
-    label: 'Codex',
-    provider: 'OpenAI',
-    value: 'codex',
-  },
-  {
-    icon: ClaudeCodeBackendIcon,
-    iconClass: 'agent-dialog__backend-icon--claude',
-    label: 'Claude Code',
-    provider: 'Anthropic',
-    value: 'claude',
-  },
-];
-
 const isEditing = computed(() => props.mode === 'edit');
 const canEdit = computed(() => !isEditing.value || props.agent?.status.type === 'idle');
 const folderName = computed(() => folder.value.split(/[\\/]/).filter(Boolean).at(-1) ?? '');
-const title = computed(() => isEditing.value ? 'Edit Agent' : 'Create Agent');
-const subtitle = computed(() => isEditing.value ? 'Update agent settings' : 'Add a teammate to your Codex Claw team');
-const submitLabel = computed(() => isEditing.value ? 'Save' : 'Add Agent');
+const title = computed(() => isEditing.value ? 'Edit agent' : 'New agent');
+const subtitle = computed(() => isEditing.value ? 'Update this agent' : 'Choose a repository to get started');
+const submitLabel = computed(() => isEditing.value ? 'Save' : 'Create agent');
 const folderLabel = computed(() => folder.value ? shortenFolder(folder.value) : 'Select folder');
-const selectedBackendOption = computed(() => (
-  backendOptions.find((option) => option.value === backend.value) ?? backendOptions[0]
-));
 const teams = computed(() => props.teams);
 const showTeamSelector = computed(() => props.showTeamField && !isEditing.value);
 const selectedTeam = computed(() => teams.value.find((team) => team.id === teamSelection.value) ?? null);
@@ -842,15 +724,54 @@ function syncRepositoryControlValue(): void {
 </script>
 
 <style scoped>
+.agent-dialog__header {
+  margin-left: calc(-1 * var(--space-4));
+}
+
+.agent-dialog__form {
+  gap: var(--space-6);
+  padding: var(--space-12) var(--space-4) 0;
+}
+
+.agent-dialog__section-heading {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.agent-dialog__compact-heading {
+  display: flex;
+  align-items: center;
+}
+
+.agent-dialog__compact-label {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-18);
+}
+
 .agent-dialog__repository-value--empty {
   color: var(--color-text-muted);
 }
 
-.agent-dialog__identity-control {
+.agent-dialog__identity-field {
+  display: grid;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+}
+
+.agent-dialog__identity-row {
   display: flex;
   align-items: center;
-  gap: var(--space-6);
-  padding: var(--space-4) var(--space-6);
+  gap: var(--space-4);
+}
+
+.agent-dialog__identity-control {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  padding: 0;
 }
 
 .agent-dialog__identity-control:focus-within {
@@ -886,76 +807,6 @@ function syncRepositoryControlValue(): void {
   margin-top: var(--space-8);
 }
 
-.agent-dialog__backend-selected-icon {
-  width: var(--icon-md);
-  height: var(--icon-md);
-}
-
-.agent-dialog__backend-option {
-  display: flex;
-  align-items: center;
-  gap: var(--space-6);
-  min-width: 0;
-}
-
-.agent-dialog__backend-icon-frame {
-  width: var(--space-12);
-  height: var(--space-12);
-}
-
-.agent-dialog__backend-option-icon {
-  width: var(--icon-md);
-  height: var(--icon-md);
-}
-
-.agent-dialog__backend-icon--codex {
-  color: var(--color-text);
-}
-
-.agent-dialog__backend-icon--claude {
-  color: #d97757;
-}
-
-.agent-dialog__backend-copy {
-  min-width: 0;
-  display: grid;
-  gap: 1px;
-}
-
-.agent-dialog__backend-name,
-.agent-dialog__backend-provider {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agent-dialog__backend-provider {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-12);
-  font-weight: var(--font-weight-regular);
-  line-height: var(--line-height-16);
-}
-
-.agent-dialog :deep(.agent-dialog__backend-popper .el-select-dropdown__item) {
-  height: auto;
-  padding: var(--space-4) var(--space-6);
-  line-height: var(--line-height-20);
-}
-
-.agent-dialog :deep(.agent-dialog__backend-popper),
-.agent-dialog :deep(.agent-dialog__backend-popper .el-select-dropdown) {
-  background: var(--color-surface-lowest);
-}
-
-.agent-dialog :deep(.agent-dialog__backend-popper .el-popper__arrow::before) {
-  background: var(--color-surface-lowest);
-}
-
-.agent-dialog :deep(.agent-dialog__backend-popper .el-select-dropdown__item.is-selected .agent-dialog__backend-icon-frame) {
-  border-color: var(--color-primary);
-  background: var(--color-surface);
-}
-
 .agent-dialog__repository-value {
   min-width: 0;
   display: flex;
@@ -985,14 +836,6 @@ function syncRepositoryControlValue(): void {
   display: flex;
   align-items: center;
   gap: var(--space-6);
-}
-
-.agent-dialog__new-worktree-button {
-  flex: 0 0 auto;
-}
-
-.agent-dialog__resolved-path-input {
-  color: var(--color-text-muted);
 }
 
 .agent-dialog__source-option-divider {

@@ -16,13 +16,13 @@ const agent: Agent = {
   updatedAt: '2026-06-05T00:00:00.000Z',
 };
 
-function mountHeader(backendRuntime: BackendRuntimeStatus, isLoading = false, gitStatus: AgentGitStatus | null = null, browserOpen = false) {
+function mountHeader(backendRuntime: BackendRuntimeStatus, isLoading = false, gitStatus: AgentGitStatus | null = null, workspaceOpen = false) {
   return mount(AgentHeader, {
     props: {
       agent,
       gitStatus,
       backendRuntime,
-      browserOpen,
+      workspaceOpen,
       isLoading,
       sidebarCollapsed: false,
     },
@@ -83,14 +83,16 @@ describe('AgentHeader', () => {
     expect(wrapper.emitted('open-git-diff')).toStrictEqual([[]]);
   });
 
-  it('renders an icon-only browser action in the header', async () => {
+  it('renders an icon-only right-workspace action in the header', async () => {
     const wrapper = mountHeader({ backend: 'codex', status: 'running' }, false, null, true);
+    const workspaceAction = wrapper.get('[aria-label="Toggle right workspace"]');
 
-    expect(wrapper.get('[aria-label="Toggle browser side pane"]').text()).toBe('');
-    expect(wrapper.get('[aria-label="Toggle browser side pane"]').attributes('aria-pressed')).toBe('true');
-    await wrapper.get('[aria-label="Toggle browser side pane"]').trigger('click');
+    expect(workspaceAction.text()).toBe('');
+    expect(workspaceAction.attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('.agent-header__activity').element.lastElementChild).toBe(workspaceAction.element);
+    await workspaceAction.trigger('click');
 
-    expect(wrapper.emitted('toggle-browser')).toStrictEqual([[]]);
+    expect(wrapper.emitted('toggle-workspace')).toStrictEqual([[]]);
   });
 
   it('renders loading, running, and error fallback labels without an agent', () => {

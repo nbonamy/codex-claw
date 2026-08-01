@@ -59,6 +59,14 @@ export function appCommandFromInput(input: AppShortcutInput): AppCommand | null 
         return { type: 'duplicate-active-agent' };
       }
 
+      if (key === 'g') {
+        return { type: 'open-review' };
+      }
+
+      if (key === 'b') {
+        return { type: 'open-browser' };
+      }
+
       if (key === 'r') {
         return { type: 'restart-active-agent' };
       }

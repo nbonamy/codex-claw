@@ -2701,6 +2701,7 @@ describe('useAppState', () => {
       type: 'sidePanel.gitDiffRequested',
       payload: {
         kind: 'gitDiff',
+        scope: 'workingTree',
         title: 'Current diff',
         subtitle: 'Working tree',
         diff: 'diff --git a/a.ts b/a.ts\n',
@@ -2710,6 +2711,7 @@ describe('useAppState', () => {
 
     expect(state.sidePanelRequest.value).toStrictEqual({
       kind: 'gitDiff',
+      scope: 'workingTree',
       title: 'Current diff',
       subtitle: 'Working tree',
       diff: 'diff --git a/a.ts b/a.ts\n',

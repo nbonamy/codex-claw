@@ -26,17 +26,29 @@ describe('appCommandFromInput', () => {
     })).toStrictEqual({ type: 'cycle-teams' });
   });
 
-  it('maps command r to active agent restart', () => {
+  it('maps command g and b to workspace tabs while preserving agent shortcuts', () => {
     expect(appCommandFromInput({
       type: 'keyDown',
       meta: true,
-      key: 'r',
-    })).toStrictEqual({ type: 'restart-active-agent' });
+      key: 'g',
+    })).toStrictEqual({ type: 'open-review' });
 
     expect(appCommandFromInput({
       type: 'keyDown',
       meta: true,
-      key: 'R',
+      key: 'G',
+    })).toStrictEqual({ type: 'open-review' });
+
+    expect(appCommandFromInput({
+      type: 'keyDown',
+      meta: true,
+      key: 'b',
+    })).toStrictEqual({ type: 'open-browser' });
+
+    expect(appCommandFromInput({
+      type: 'keyDown',
+      meta: true,
+      key: 'r',
     })).toStrictEqual({ type: 'restart-active-agent' });
   });
 

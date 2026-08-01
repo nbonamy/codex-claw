@@ -37,13 +37,27 @@
           :aria-expanded="isFileExpanded(file.key)"
           @click="toggleFile(file.key)"
         >
-          <ChevronRightIcon
-            class="git-diff-preview-panel__file-chevron"
-            :class="{ 'git-diff-preview-panel__file-chevron--expanded': isFileExpanded(file.key) }"
+          <span
+            class="git-diff-preview-panel__file-icon"
+            :class="`git-diff-preview-panel__file-icon--${file.iconKind}`"
             aria-hidden="true"
-          />
-          <strong>{{ file.title }}</strong>
-          <span>{{ file.status }}</span>
+          >
+            <component :is="fileIcon(file.iconKind)" />
+          </span>
+          <span
+            class="git-diff-preview-panel__file-title"
+            :title="file.fullPath"
+          >
+            <span
+              v-if="file.directory"
+              class="git-diff-preview-panel__file-directory"
+            >{{ file.directory }}</span>
+            <strong>{{ file.name }}</strong>
+          </span>
+          <span class="git-diff-preview-panel__file-meta">
+            <span class="git-diff-preview-panel__file-added">+{{ file.addedLines }}</span>
+            <span class="git-diff-preview-panel__file-removed">-{{ file.removedLines }}</span>
+          </span>
         </button>
 
         <div
@@ -55,8 +69,11 @@
             :key="chunk.key"
             class="git-diff-preview-panel__chunk"
           >
-            <div class="git-diff-preview-panel__hunk">
-              @@ -{{ chunk.fromStart }},{{ chunk.fromLines }} +{{ chunk.toStart }},{{ chunk.toLines }} @@<span v-if="chunk.context"> {{ chunk.context }}</span>
+            <div
+              v-if="chunk.unmodifiedLinesBefore > 0"
+              class="git-diff-preview-panel__hunk"
+            >
+              {{ chunk.unmodifiedLinesBefore }} unmodified {{ chunk.unmodifiedLinesBefore === 1 ? 'line' : 'lines' }}
             </div>
             <div
               v-for="(line, index) in chunk.lines"
@@ -90,8 +107,8 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import { IconBrandJavascript, IconBrandTypescript, IconBrandVue, IconFileCode } from '@tabler/icons-vue';
 import parseGitDiff, { type AnyChunk, type AnyFileChange, type Chunk } from 'parse-git-diff';
-import { ChevronRightIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
   diff: string;
@@ -128,16 +145,22 @@ type DiffChunkView = {
   fromLines: number;
   toStart: number;
   toLines: number;
-  context: string;
+  unmodifiedLinesBefore: number;
   lines: DiffLineView[];
 };
 
 type DiffFileView = {
   key: string;
-  title: string;
-  status: string;
+  directory: string;
+  fullPath: string;
+  name: string;
+  iconKind: DiffFileIconKind;
+  addedLines: number;
+  removedLines: number;
   chunks: DiffChunkView[];
 };
+
+type DiffFileIconKind = 'javascript' | 'typescript' | 'vue' | 'code';
 
 const parsed = computed(() => {
   if (!props.diff.trim()) {
@@ -198,39 +221,88 @@ function mapFile(file: AnyFileChange): DiffFileView {
   const title = file.type === 'RenamedFile'
     ? `${file.pathBefore} -> ${file.pathAfter}`
     : file.path;
+  const visiblePath = file.type === 'RenamedFile' ? file.pathAfter : file.path;
+  const { directory, name } = splitFilePath(visiblePath);
+  const chunks = file.chunks.reduce<DiffChunkView[]>((mappedChunks, chunk, index) => {
+    const mappedChunk = mapChunk(chunk, `${title}:${index}`, mappedChunks.at(-1));
+    if (mappedChunk) mappedChunks.push(mappedChunk);
+    return mappedChunks;
+  }, []);
   return {
     key: `${file.type}:${title}`,
-    title,
-    status: fileStatusLabel(file),
-    chunks: file.chunks.map((chunk, index) => mapChunk(chunk, `${title}:${index}`)).filter((chunk): chunk is DiffChunkView => Boolean(chunk)),
+    directory: compactDirectory(directory),
+    fullPath: visiblePath,
+    name,
+    iconKind: fileIconKind(name),
+    addedLines: countLines(chunks, 'added'),
+    removedLines: countLines(chunks, 'deleted'),
+    chunks,
   };
 }
 
-function fileStatusLabel(file: AnyFileChange): string {
-  switch (file.type) {
-    case 'AddedFile':
-      return 'added';
-    case 'DeletedFile':
-      return 'deleted';
-    case 'RenamedFile':
-      return 'renamed';
-    case 'ChangedFile':
-      return 'modified';
+function compactDirectory(directory: string): string {
+  const segments = directory.split('/').filter(Boolean);
+  if (segments.length <= 4) {
+    return directory;
   }
+
+  return `…/${segments.slice(-4).join('/')}/`;
 }
 
-function mapChunk(chunk: AnyChunk, key: string): DiffChunkView | null {
+function countLines(chunks: DiffChunkView[], kind: DiffLineKind): number {
+  return chunks.reduce((total, chunk) => total + chunk.lines.filter((line) => line.kind === kind).length, 0);
+}
+
+function splitFilePath(path: string): { directory: string; name: string } {
+  const separatorIndex = path.lastIndexOf('/');
+  if (separatorIndex === -1) {
+    return { directory: '', name: path };
+  }
+
+  return {
+    directory: path.slice(0, separatorIndex + 1),
+    name: path.slice(separatorIndex + 1),
+  };
+}
+
+function fileIconKind(fileName: string): DiffFileIconKind {
+  const extension = fileName.split('.').pop()?.toLowerCase();
+  if (extension === 'ts' || extension === 'tsx') return 'typescript';
+  if (extension === 'js' || extension === 'jsx' || extension === 'mjs' || extension === 'cjs') return 'javascript';
+  if (extension === 'vue') return 'vue';
+  return 'code';
+}
+
+function fileIcon(kind: DiffFileIconKind) {
+  if (kind === 'typescript') return IconBrandTypescript;
+  if (kind === 'javascript') return IconBrandJavascript;
+  if (kind === 'vue') return IconBrandVue;
+  return IconFileCode;
+}
+
+function mapChunk(chunk: AnyChunk, key: string, previousChunk?: DiffChunkView): DiffChunkView | null {
   if (chunk.type !== 'Chunk') {
     return null;
   }
 
+  const fromStart = chunk.fromFileRange.start;
+  const fromLines = chunk.fromFileRange.lines;
+  const toStart = chunk.toFileRange.start;
+  const toLines = chunk.toFileRange.lines;
+  const unmodifiedLinesBefore = previousChunk
+    ? Math.max(0, Math.min(
+      fromStart - (previousChunk.fromStart + previousChunk.fromLines),
+      toStart - (previousChunk.toStart + previousChunk.toLines),
+    ))
+    : Math.max(0, Math.min(fromStart, toStart) - 1);
+
   return {
     key,
-    fromStart: chunk.fromFileRange.start,
-    fromLines: chunk.fromFileRange.lines,
-    toStart: chunk.toFileRange.start,
-    toLines: chunk.toFileRange.lines,
-    context: chunk.context ?? '',
+    fromStart,
+    fromLines,
+    toStart,
+    toLines,
+    unmodifiedLinesBefore,
     lines: chunk.changes.map(mapLine),
   };
 }
@@ -304,22 +376,22 @@ function mapLine(line: Chunk['changes'][number]): DiffLineView {
   top: 0;
   z-index: 1;
   width: 100%;
-  display: grid;
-  grid-template-columns: var(--icon-md) minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-8);
+  gap: var(--space-6);
+  min-height: 36px;
+  padding: var(--space-2) var(--space-8);
   border: 0;
   border-bottom: 1px solid var(--color-border);
   color: inherit;
-  background: var(--color-surface-low);
+  background: var(--color-surface-lowest);
   font-family: var(--font-family-base);
   text-align: left;
   cursor: pointer;
 }
 
 .git-diff-preview-panel__file-header:hover {
-  background: var(--color-surface-base);
+  background: var(--color-surface-low);
 }
 
 .git-diff-preview-panel__file-header:focus-visible {
@@ -327,36 +399,71 @@ function mapLine(line: Chunk['changes'][number]): DiffLineView {
   outline-offset: -2px;
 }
 
-.git-diff-preview-panel__file-chevron {
+.git-diff-preview-panel__file-icon {
+  flex: 0 0 var(--space-12);
+  width: var(--space-12);
+  height: var(--space-12);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  background: var(--color-surface-low);
+}
+
+.git-diff-preview-panel__file-icon svg {
   width: var(--icon-md);
   height: var(--icon-md);
-  color: var(--color-text-muted);
-  transition: transform 120ms ease;
+  stroke-width: 1.8;
 }
 
-.git-diff-preview-panel__file-chevron--expanded {
-  transform: rotate(90deg);
+.git-diff-preview-panel__file-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  font-size: var(--font-size-14);
 }
 
-.git-diff-preview-panel__file-header strong {
+.git-diff-preview-panel__file-directory {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-regular);
+}
+
+.git-diff-preview-panel__file-title strong {
+  flex: 0 0 auto;
+  color: var(--color-text);
   font-weight: var(--font-weight-semibold);
 }
 
-.git-diff-preview-panel__file-header span {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-12);
-  text-transform: uppercase;
+.git-diff-preview-panel__file-meta {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-family-mono);
+}
+
+.git-diff-preview-panel__file-header .git-diff-preview-panel__file-added {
+  color: var(--color-success);
+  font-size: var(--font-size-13);
+}
+
+.git-diff-preview-panel__file-header .git-diff-preview-panel__file-removed {
+  color: var(--color-error);
+  font-size: var(--font-size-13);
 }
 
 .git-diff-preview-panel__hunk {
-  padding: var(--space-2) var(--space-8);
-  color: var(--color-secondary);
-  background: color-mix(in srgb, var(--color-secondary) 10%, var(--color-surface-low));
-  white-space: pre;
+  padding: var(--space-1) var(--space-8);
+  color: var(--color-text-muted);
+  background: var(--color-surface-low);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-14);
+  line-height: var(--line-height-20);
 }
 
 .git-diff-preview-panel__line {

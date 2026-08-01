@@ -1516,6 +1516,7 @@ describe('ClawBackendServer', () => {
       type: 'sidePanel.gitDiffRequested',
       payload: {
         kind: 'gitDiff',
+        scope: 'turn',
         title: 'Git Diff',
         subtitle: 'Current turn',
         diff,
@@ -2803,6 +2804,7 @@ describe('ClawBackendServer', () => {
       type: 'sidePanel.gitDiffRequested',
       payload: {
         kind: 'gitDiff',
+        scope: 'workingTree',
         title: 'Git Diff',
         subtitle: '/Users/nbonamy/src/codex-claw',
         diff: 'diff --git a/a.ts b/a.ts\n',

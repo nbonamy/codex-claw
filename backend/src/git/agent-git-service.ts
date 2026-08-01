@@ -5,16 +5,20 @@ import type { AgentGitStatus } from '@codex-claw/shared/contracts';
 const execFileAsync = promisify(execFile);
 
 export type AgentGitServiceClock = () => Date;
+export type AgentGitRunner = (cwd: string, args: string[]) => Promise<{ stdout: string }>;
 
 export class AgentGitService {
-  constructor(private readonly now: AgentGitServiceClock = () => new Date()) {}
+  constructor(
+    private readonly now: AgentGitServiceClock = () => new Date(),
+    private readonly runGit: AgentGitRunner = git,
+  ) {}
 
   async status(folder: string): Promise<AgentGitStatus> {
     const updatedAt = this.now().toISOString();
     try {
       const [statusResult, diffResult] = await Promise.all([
-        git(folder, ['status', '--porcelain=v1', '--branch']),
-        git(folder, ['diff', '--numstat']),
+        this.runGit(folder, ['status', '--porcelain=v1', '--branch']),
+        workingTreeDiff(this.runGit, folder, ['--numstat']),
       ]);
       const branch = parseBranchStatus(statusResult.stdout);
       const diff = parseNumstat(diffResult.stdout);
@@ -49,8 +53,20 @@ export class AgentGitService {
   }
 
   async diff(folder: string): Promise<string> {
-    const result = await git(folder, ['diff', '--no-ext-diff', '--']);
+    const result = await workingTreeDiff(this.runGit, folder, ['--no-ext-diff']);
     return result.stdout;
+  }
+}
+
+async function workingTreeDiff(runGit: AgentGitRunner, folder: string, args: string[]): Promise<{ stdout: string }> {
+  try {
+    return await runGit(folder, ['diff', 'HEAD', ...args, '--']);
+  } catch {
+    const [staged, unstaged] = await Promise.all([
+      runGit(folder, ['diff', '--cached', ...args, '--']),
+      runGit(folder, ['diff', ...args, '--']),
+    ]);
+    return { stdout: [staged.stdout, unstaged.stdout].filter(Boolean).join('\n') };
   }
 }
 

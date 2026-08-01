@@ -7,10 +7,10 @@ describe('GitDiffPreviewPanel', () => {
     const wrapper = mount(GitDiffPreviewPanel, {
       props: {
         diff: [
-          'diff --git a/src/a.ts b/src/a.ts',
-          '--- a/src/a.ts',
-          '+++ b/src/a.ts',
-          '@@ -1,3 +1,4 @@ function demo',
+          'diff --git a/android/music/src/main/res/values/a.ts b/android/music/src/main/res/values/a.ts',
+          '--- a/android/music/src/main/res/values/a.ts',
+          '+++ b/android/music/src/main/res/values/a.ts',
+          '@@ -8,3 +8,4 @@ function demo',
           ' const shared = true;',
           '-const oldValue = 1;',
           '+const newValue = 2;',
@@ -27,11 +27,16 @@ describe('GitDiffPreviewPanel', () => {
 
     const files = wrapper.findAll('.git-diff-preview-panel__file');
     expect(files).toHaveLength(2);
-    expect(wrapper.text()).toContain('src/a.ts');
+    expect(wrapper.text()).toContain('…/src/main/res/values/a.ts');
     expect(wrapper.text()).toContain('src/b.ts');
-    expect(wrapper.text()).toContain('modified');
-    expect(wrapper.text()).toContain('added');
-    expect(wrapper.text()).toContain('@@ -1,3 +1,4 @@function demo');
+    expect(files[0]?.get('.git-diff-preview-panel__file-directory').text()).toBe('…/src/main/res/values/');
+    expect(files[0]?.get('.git-diff-preview-panel__file-title strong').text()).toBe('a.ts');
+    expect(files[0]?.get('.git-diff-preview-panel__file-title').attributes('title')).toBe('android/music/src/main/res/values/a.ts');
+    expect(files[0]?.find('.git-diff-preview-panel__file-icon--typescript').exists()).toBe(true);
+    expect(files[0]?.find('.git-diff-preview-panel__file-meta').text()).toBe('+2-1');
+    expect(files[1]?.find('.git-diff-preview-panel__file-meta').text()).toBe('+1-0');
+    expect(wrapper.text()).toContain('7 unmodified lines');
+    expect(wrapper.text()).not.toContain('@@');
     expect(wrapper.findAll('.git-diff-preview-panel__line--added')).toHaveLength(3);
     expect(wrapper.findAll('.git-diff-preview-panel__line--deleted')).toHaveLength(1);
     expect(wrapper.findAll('.git-diff-preview-panel__line--context')).toHaveLength(1);

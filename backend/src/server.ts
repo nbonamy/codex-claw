@@ -1793,6 +1793,7 @@ export class ClawBackendServer {
           type: 'sidePanel.gitDiffRequested',
           payload: {
             kind: 'gitDiff',
+            scope: 'workingTree',
             title,
             subtitle,
             diff: '',
@@ -1808,6 +1809,7 @@ export class ClawBackendServer {
         type: 'sidePanel.gitDiffRequested',
         payload: {
           kind: 'gitDiff',
+          scope: 'workingTree',
           title,
           subtitle,
           diff,
@@ -1819,6 +1821,7 @@ export class ClawBackendServer {
         type: 'sidePanel.gitDiffRequested',
         payload: {
           kind: 'gitDiff',
+          scope: 'workingTree',
           title,
           subtitle,
           diff: '',
@@ -2054,6 +2057,7 @@ export class ClawBackendServer {
       type: 'sidePanel.gitDiffRequested',
       payload: {
         kind: 'gitDiff',
+        scope: 'turn',
         title: 'Git Diff',
         subtitle: 'Current turn',
         diff: event.payload.diff,

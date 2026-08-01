@@ -20,7 +20,13 @@ describe('SettingsAppearancePanel', () => {
     expect(wrapper.text()).not.toContain('UI font size');
     expect(wrapper.text()).toContain('Color');
     expect(wrapper.text()).toContain('Typography');
+    expect(wrapper.text()).toContain('Diff preview');
     expect(wrapper.text()).toContain('Select the color palette used across the app');
+    expect(wrapper.text()).toContain('src/theme.ts');
+    expect(wrapper.text()).toContain('28 unmodified lines');
+    expect(wrapper.text()).toContain("accent: 'claw'");
+    expect(wrapper.findAll('.git-diff-preview-panel__line--added')).toHaveLength(1);
+    expect(wrapper.findAll('.git-diff-preview-panel__line--deleted')).toHaveLength(1);
     await wrapper.findComponent({ name: 'ElSegmented' }).vm.$emit('update:modelValue', 'dark');
     await wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'github-dark');
     await wrapper.findAllComponents({ name: 'ElInputNumber' })[0].vm.$emit('update:modelValue', 17);

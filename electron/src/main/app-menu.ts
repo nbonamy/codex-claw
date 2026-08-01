@@ -109,6 +109,17 @@ function buildViewMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions): Me
     label: 'View',
     submenu: [
       {
+        label: 'Review',
+        accelerator: 'CommandOrControl+G',
+        click: () => callbacks.sendAppCommand({ type: 'open-review' }),
+      },
+      {
+        label: 'Browser',
+        accelerator: 'CommandOrControl+B',
+        click: () => callbacks.sendAppCommand({ type: 'open-browser' }),
+      },
+      { type: 'separator' },
+      {
         label: 'Next Team',
         accelerator: cycleTeamsAccelerator,
         click: () => callbacks.sendAppCommand({ type: 'cycle-teams' }),

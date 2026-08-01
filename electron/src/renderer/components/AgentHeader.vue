@@ -83,12 +83,12 @@
         </button>
       </span>
       <button
-        class="agent-header__browser"
+        class="agent-header__workspace"
         type="button"
-        aria-label="Toggle browser side pane"
-        :title="browserOpen ? 'Close in-app browser' : 'Open in-app browser'"
-        :aria-pressed="browserOpen"
-        @click="emit('toggle-browser')"
+        aria-label="Toggle right workspace"
+        :title="workspaceOpen ? 'Close right workspace' : 'Open right workspace'"
+        :aria-pressed="workspaceOpen"
+        @click="emit('toggle-workspace')"
       >
         <IconLayoutSidebarRight aria-hidden="true" />
       </button>
@@ -108,14 +108,14 @@ const props = defineProps<{
   agent: Agent | null;
   gitStatus?: AgentGitStatus | null;
   backendRuntime: BackendRuntimeStatus;
-  browserOpen?: boolean;
+  workspaceOpen?: boolean;
   isLoading: boolean;
   sidebarCollapsed: boolean;
 }>();
 
 const emit = defineEmits<{
   'expand-sidebar': [];
-  'toggle-browser': [];
+  'toggle-workspace': [];
   'open-git-diff': [];
 }>();
 
@@ -195,7 +195,7 @@ const hasHeaderGitStatus = computed(() => {
   align-items: center;
   gap: var(--space-8);
   min-width: 0;
-  padding: 0 var(--space-12);
+  padding: 0 var(--space-4) 0 var(--space-12);
   background: var(--color-shell-main);
   border-bottom: 1px solid var(--color-border);
   -webkit-app-region: drag;
@@ -287,7 +287,7 @@ const hasHeaderGitStatus = computed(() => {
   text-align: right;
 }
 
-.agent-header__browser {
+.agent-header__workspace {
   -webkit-app-region: no-drag;
   border: 0;
   border-radius: var(--radius-md);
@@ -301,13 +301,13 @@ const hasHeaderGitStatus = computed(() => {
   padding: 0;
 }
 
-.agent-header__browser:hover,
-.agent-header__browser[aria-pressed='true'] {
+.agent-header__workspace:hover,
+.agent-header__workspace[aria-pressed='true'] {
   background: var(--color-surface-high);
   color: var(--color-text);
 }
 
-.agent-header__browser :deep(svg) {
+.agent-header__workspace :deep(svg) {
   width: var(--icon-md);
   height: var(--icon-md);
 }

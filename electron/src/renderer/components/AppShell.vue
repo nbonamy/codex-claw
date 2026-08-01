@@ -153,14 +153,14 @@
           :agent="currentAgent"
           :git-status="currentAgentGitStatus"
           :backend-runtime="currentBackendRuntime"
-          :browser-open="browserVisible"
+          :workspace-open="rightWorkspaceVisible"
           :is-loading="isLoading"
           :sidebar-collapsed="agentSidebarCollapsed"
           @expand-sidebar="agentSidebarCollapsed = false"
-          @toggle-browser="toggleBrowser"
+          @toggle-workspace="toggleRightWorkspace"
           @open-git-diff="openAgentGitDiffPreview"
         />
-        <div ref="browserBody" class="app-shell__body">
+        <div ref="workspaceBody" class="app-shell__body">
           <AgentEmptyState
             v-if="isAgentEmpty"
             :bench="activeBench"
@@ -207,21 +207,28 @@
             @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
             @update:plan-mode="$emit('update:planMode', $event)"
           />
-          <BrowserPanel
-            v-if="browserMounted && currentAgent"
-            v-show="browserVisible"
-            class="app-shell__browser-pane"
-            :style="{ flexBasis: `${browserPaneWidth}px` }"
-            :agent-id="currentAgent.id"
-            :visible="browserVisible"
-            @close="closeBrowser"
+          <RightWorkspacePanel
+            v-if="currentAgent"
+            v-show="rightWorkspaceVisible"
+            class="app-shell__right-workspace"
+            :style="{ flexBasis: `${rightWorkspaceWidth}px` }"
+            :active-tab="effectiveRightWorkspaceTab"
+            :agent="currentAgent"
+            :git-panel="effectiveGitReviewPanel"
+            :git-status="currentAgentGitStatus"
+            :tabs="rightWorkspaceTabs"
+            :visible="rightWorkspaceVisible"
+            @close-tab="closeRightWorkspaceTab"
+            @open-tab="openRightWorkspaceTabFromMenu"
+            @refresh-git-diff="openAgentGitDiffPreview"
+            @select-tab="selectRightWorkspaceTab"
             @send-prompt="forwardPrompt"
           />
           <div
-            v-if="browserVisible && browserMounted"
-            class="app-shell__browser-resizer"
-            aria-label="Resize browser side pane"
-            @pointerdown="startBrowserResize"
+            v-if="rightWorkspaceVisible"
+            class="app-shell__right-workspace-resizer"
+            aria-label="Resize right workspace"
+            @pointerdown="startRightWorkspaceResize"
           />
           <SidePanel
             v-if="sidePanel"
@@ -304,7 +311,7 @@ import SidePanel from './SidePanel.vue';
 import TeamDialog from './TeamDialog.vue';
 import TeamRail from './TeamRail.vue';
 import BenchAgentAssignmentDialog from './BenchAgentAssignmentDialog.vue';
-import BrowserPanel from './BrowserPanel.vue';
+import RightWorkspacePanel from './RightWorkspacePanel.vue';
 import SettingsView from './SettingsView.vue';
 import CodexLoginLanding from './CodexLoginLanding.vue';
 import type { SettingsTab } from './settings-tabs';
@@ -313,7 +320,8 @@ import {
   languageForFilePath,
   type CodexQueuedPromptData as QueuedChatPrompt,
 } from 'codex-app-sdk/vue';
-import type { PlanReviewComment, SidePanelState } from './side-panel';
+import type { PlanReviewComment, SidePanelGitDiffState, SidePanelState } from './side-panel';
+import type { RightWorkspaceTab } from './right-workspace';
 
 const props = withDefaults(defineProps<{
   snapshot: AppSnapshot;
@@ -520,10 +528,12 @@ const agentSidebarMinWidth = 80;
 const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
 const activeSurface = ref<AppSurface>('agent');
-const browserVisible = ref(false);
-const browserMounted = ref(false);
-const browserPaneWidth = ref(420);
-const browserBody = ref<HTMLElement | null>(null);
+const rightWorkspaceTabs = ref<RightWorkspaceTab[]>([]);
+const activeRightWorkspaceTab = ref<RightWorkspaceTab | null>(null);
+const rightWorkspaceOpen = ref(false);
+const rightWorkspaceWidth = ref(420);
+const workspaceBody = ref<HTMLElement | null>(null);
+const gitReviewPanel = ref<SidePanelGitDiffState | null>(null);
 const authentication = ref<CodexAuthentication | null>(null);
 const authenticationLoading = ref(true);
 const authenticationError = ref<string | null>(null);
@@ -588,6 +598,19 @@ const currentTurnGitDiff = computed<TurnGitDiff | null>(() => {
 
   return null;
 });
+const rightWorkspaceVisible = computed(() => (
+  rightWorkspaceOpen.value &&
+  sidePanel.value === null
+));
+const effectiveRightWorkspaceTab = computed<RightWorkspaceTab | null>(() => activeRightWorkspaceTab.value);
+const effectiveGitReviewPanel = computed<SidePanelGitDiffState>(() => gitReviewPanel.value ?? ({
+  kind: 'gitDiff',
+  title: 'Review',
+  subtitle: currentAgent.value?.folder,
+  diff: '',
+  state: 'loading',
+  error: null,
+}));
 const savedCockpitBacklogConfiguration = computed<CockpitBacklogConfiguration>(() => {
   const configuration = props.snapshot.workBacklog.providerConfigurations.github ?? {};
   return normalizedCockpitBacklogConfiguration({
@@ -763,23 +786,66 @@ function setAgentSidebarWidth(width: number): void {
   agentSidebarWidth.value = Math.min(Math.max(width, agentSidebarMinWidth), agentSidebarMaxWidth);
 }
 
-function toggleBrowser(): void {
-  browserMounted.value = true;
-  browserVisible.value = !browserVisible.value;
+function toggleRightWorkspace(): void {
+  if (rightWorkspaceVisible.value) {
+    rightWorkspaceOpen.value = false;
+    return;
+  }
+
+  closeSidePanel();
+  rightWorkspaceOpen.value = true;
 }
 
-function closeBrowser(): void {
-  browserVisible.value = false;
-  browserMounted.value = false;
+function openRightWorkspaceTab(tab: RightWorkspaceTab): void {
+  closeSidePanel();
+  if (!rightWorkspaceTabs.value.includes(tab)) {
+    rightWorkspaceTabs.value = [...rightWorkspaceTabs.value, tab];
+  }
+  activeRightWorkspaceTab.value = tab;
+  rightWorkspaceOpen.value = true;
 }
 
-function startBrowserResize(event: PointerEvent): void {
+function openRightWorkspaceTabFromMenu(tab: RightWorkspaceTab): void {
+  if (tab === 'review') {
+    void openAgentGitDiffPreview();
+    return;
+  }
+  openRightWorkspaceTab(tab);
+}
+
+function selectRightWorkspaceTab(tab: RightWorkspaceTab): void {
+  if (rightWorkspaceTabs.value.includes(tab)) {
+    closeSidePanel();
+    activeRightWorkspaceTab.value = tab;
+  }
+}
+
+function closeRightWorkspaceTab(tab: RightWorkspaceTab): void {
+  const tabIndex = rightWorkspaceTabs.value.indexOf(tab);
+  if (tabIndex === -1) {
+    return;
+  }
+
+  const nextTabs = rightWorkspaceTabs.value.filter((candidate) => candidate !== tab);
+  rightWorkspaceTabs.value = nextTabs;
+  if (tab === 'review') {
+    gitReviewPanel.value = null;
+  }
+  if (activeRightWorkspaceTab.value === tab) {
+    activeRightWorkspaceTab.value = nextTabs[Math.min(tabIndex, nextTabs.length - 1)] ?? null;
+  }
+  if (nextTabs.length === 0) {
+    activeRightWorkspaceTab.value = null;
+  }
+}
+
+function startRightWorkspaceResize(event: PointerEvent): void {
   event.preventDefault();
-  const body = browserBody.value;
+  const body = workspaceBody.value;
   if (!body) return;
   const updateWidth = (moveEvent: PointerEvent) => {
     const availableWidth = Math.max(240, body.getBoundingClientRect().width - 240);
-    browserPaneWidth.value = Math.min(Math.max(body.getBoundingClientRect().right - moveEvent.clientX, 240), availableWidth);
+    rightWorkspaceWidth.value = Math.min(Math.max(body.getBoundingClientRect().right - moveEvent.clientX, 240), availableWidth);
   };
   const stop = () => {
     window.removeEventListener('pointermove', updateWidth);
@@ -1126,7 +1192,27 @@ async function openAgentGitDiffPreview(): Promise<void> {
     return;
   }
 
-  await props.openAgentGitDiff(agent.id);
+  gitReviewPanel.value = {
+    kind: 'gitDiff',
+    title: 'Review',
+    subtitle: agent.folder,
+    diff: '',
+    state: 'loading',
+    error: null,
+  };
+  openRightWorkspaceTab('review');
+  try {
+    await props.openAgentGitDiff(agent.id);
+  } catch (error) {
+    gitReviewPanel.value = {
+      kind: 'gitDiff',
+      title: 'Review',
+      subtitle: agent.folder,
+      diff: '',
+      state: 'error',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 function handleShellShortcut(event: KeyboardEvent): void {
@@ -1137,8 +1223,26 @@ function handleShellShortcut(event: KeyboardEvent): void {
     return;
   }
 
+  if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'g' && currentAgent.value) {
+    event.preventDefault();
+    void openAgentGitDiffPreview();
+    return;
+  }
+
+  if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'b' && currentAgent.value) {
+    event.preventDefault();
+    openRightWorkspaceTab('browser');
+    return;
+  }
+
   if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'd') {
     duplicateActiveAgent(event);
+    return;
+  }
+
+  if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'r') {
+    event.preventDefault();
+    restartActiveAgent();
     return;
   }
 
@@ -1174,6 +1278,20 @@ function handleAppCommand(command: AppCommand): void {
       return;
     }
     cycleTeams();
+    return;
+  }
+
+  if (command.type === 'open-review') {
+    if (isAgentWorkspaceVisible.value && currentAgent.value) {
+      void openAgentGitDiffPreview();
+    }
+    return;
+  }
+
+  if (command.type === 'open-browser') {
+    if (isAgentWorkspaceVisible.value && currentAgent.value) {
+      openRightWorkspaceTab('browser');
+    }
     return;
   }
 
@@ -1552,8 +1670,10 @@ watch(() => [
 
 watch(() => currentAgent.value?.id ?? null, () => {
   closeSidePanel();
-  browserVisible.value = false;
-  browserMounted.value = false;
+  rightWorkspaceTabs.value = [];
+  activeRightWorkspaceTab.value = null;
+  rightWorkspaceOpen.value = false;
+  gitReviewPanel.value = null;
 });
 
 watch(() => props.sidePanelRequest, (request) => {
@@ -1570,8 +1690,7 @@ function openSidePanelRequest(request: SidePanelRequest): void {
     return;
   }
 
-  // Temporarily keep turn diff side-panel requests from auto-opening.
-  // openGitDiffRequest(request);
+  openGitDiffRequest(request);
 }
 
 function openMarkdownRequest(request: SidePanelMarkdownRequest): void {
@@ -1589,15 +1708,20 @@ function openMarkdownRequest(request: SidePanelMarkdownRequest): void {
 }
 
 function openGitDiffRequest(request: Extract<SidePanelRequest, { kind: 'gitDiff' }>): void {
+  if (request.scope === 'turn') {
+    return;
+  }
+
   sidePanelRequestId += 1;
-  sidePanel.value = {
+  gitReviewPanel.value = {
     kind: 'gitDiff',
-    title: request.title ?? 'Git Diff',
+    title: request.title ?? 'Review',
     ...(request.subtitle ? { subtitle: request.subtitle } : {}),
     diff: request.diff,
     state: request.state ?? 'idle',
     error: request.error ?? null,
   };
+  openRightWorkspaceTab('review');
 }
 
 function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
@@ -1681,14 +1805,11 @@ function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
   display: flex;
 }
 
-.app-shell__browser-pane {
+.app-shell__right-workspace {
   flex: 0 0 420px;
-  order: 2;
-  min-width: 0;
-  border-left: 1px solid var(--color-border);
 }
 
-.app-shell__browser-resizer {
+.app-shell__right-workspace-resizer {
   flex: 0 0 5px;
   order: 1;
   cursor: col-resize;
@@ -1696,5 +1817,5 @@ function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
   z-index: 1;
 }
 
-.app-shell__browser-resizer:hover { background: var(--color-primary); }
+.app-shell__right-workspace-resizer:hover { background: var(--color-primary); }
 </style>

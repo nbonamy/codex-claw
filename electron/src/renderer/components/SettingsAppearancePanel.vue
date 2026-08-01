@@ -90,6 +90,16 @@
         </template>
       </SettingsRow>
     </SettingsSection>
+
+    <SettingsSection
+      title="Diff preview"
+      title-id="settings-appearance-diff-preview-title"
+    >
+      <GitDiffPreviewPanel
+        class="settings-appearance-panel__diff-preview"
+        :diff="diffPreview"
+      />
+    </SettingsSection>
   </SettingsPanelFrame>
 </template>
 
@@ -99,6 +109,7 @@ import type { AppThemeSettings, UpdateSettingsInput } from '@codex-claw/shared/c
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsRow from './SettingsRow.vue';
 import SettingsSection from './SettingsSection.vue';
+import GitDiffPreviewPanel from './GitDiffPreviewPanel.vue';
 import { appThemes, themeIdForAppearance } from '../theme/themes';
 
 const props = defineProps<{
@@ -119,6 +130,17 @@ const modeOptions = [
   { label: 'Dark', value: 'dark' },
   { label: 'System', value: 'system' },
 ];
+const diffPreview = [
+  'diff --git a/src/theme.ts b/src/theme.ts',
+  '--- a/src/theme.ts',
+  '+++ b/src/theme.ts',
+  '@@ -29,5 +29,5 @@',
+  ' export const appearance = {',
+  "-  accent: 'blue',",
+  "+  accent: 'claw',",
+  "   mode: 'system',",
+  ' };',
+].join('\n');
 
 function updateTheme(theme: Partial<AppThemeSettings>): void {
   void props.updateSettings?.({ theme });
@@ -161,5 +183,9 @@ function updateNumericTheme(key: 'chatFontSize' | 'codeFontSize' | 'uiFontSize',
 <style scoped>
 .settings-appearance-panel__theme-select {
   width: 220px;
+}
+
+.settings-appearance-panel__diff-preview {
+  max-height: 280px;
 }
 </style>

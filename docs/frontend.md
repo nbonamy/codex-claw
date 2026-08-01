@@ -80,9 +80,17 @@ implemented:
 - agent list with avatar, name, folder, and status;
 - active agent header;
 - central conversation and composer;
-- right-side artifact pane for documents, plans, read-only source previews,
-  git diffs, and future SWE surfaces;
-- Bench entry point in the agent creation flow.
+- right-side tabbed workspace for the in-app Browser and GitHub Review, with
+  full working-tree diffs opened from the agent header's git statistics;
+- empty right-workspace launcher for opening Review or Browser before any tab
+  exists and after the last tab closes; Review uses `Command+G` and Browser
+  uses `Command+B`, while existing `Command+D` duplicate-agent and `Command+R`
+  restart-agent shortcuts remain unchanged;
+- focused artifact panes for documents, plans, and read-only source previews;
+- Bench entry point in the agent creation flow;
+- repository-first agent creation that keeps Codex implicit, puts custom folder
+  selection first, progressively reveals checkout controls, and hides backend
+  and resolved-path implementation details;
 - full-space Settings surface launched from the rail, with its own category
   sidebar and screen-level panels instead of dialog chrome.
 
@@ -122,6 +130,8 @@ Theme rules:
 
 - Components consume semantic tokens only.
 - Theme switching should update CSS variables at the document root.
+- Appearance settings should end with a representative Git diff preview so
+  palette and code-font changes can be evaluated in context.
 - Theme application should bridge the active Claw palette into the SDK's
   optional `--codex-*` token contract rather than restyling SDK internals.
 - Element Plus theme overrides should be derived from the same app tokens.

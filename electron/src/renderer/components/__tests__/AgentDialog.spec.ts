@@ -18,26 +18,21 @@ const idleAgent: Agent = {
 };
 
 describe('AgentDialog', () => {
-  it('renders the Skwad-style create layout and disables save until name and folder are set', () => {
+  it('leads with repository selection and keeps Codex implementation details hidden', () => {
     const wrapper = mountDialog();
 
-    expect(wrapper.get('.agent-dialog__header').text()).toContain('Create Agent');
-    expect(wrapper.get('.claw-dialog__title').text()).toBe('Create Agent');
-    expect(wrapper.get('.claw-dialog__subtitle').text()).toBe('Add a teammate to your Codex Claw team');
-    expect(wrapper.text()).toContain('Add a teammate to your Codex Claw team');
-    expect(wrapper.findAll('.agent-dialog__field')).toHaveLength(4);
-    expect(wrapper.text()).toContain('Identity');
-    expect(wrapper.text()).not.toContain('Coding Agent');
-    expect(wrapper.text()).not.toContain('Persona');
+    expect(wrapper.get('.agent-dialog__header').text()).toContain('New agent');
+    expect(wrapper.get('.claw-dialog__title').text()).toBe('New agent');
+    expect(wrapper.get('.claw-dialog__subtitle').text()).toBe('Choose a repository to get started');
+    expect(wrapper.findAll('.agent-dialog__field')).toHaveLength(1);
     expect(wrapper.text()).not.toContain('Workspace folder');
     expect(wrapper.text()).toContain('Repository');
-    expect(wrapper.text()).toContain('Resolved path');
-    expect(wrapper.text()).toContain('Backend');
-    expect(wrapper.text()).toContain('Claude Code');
-    expect(wrapper.get('.agent-dialog__text-input').attributes('placeholder')).toBe('Enter agent name');
-    expect(wrapper.get<HTMLInputElement>('.agent-dialog__resolved-path-input').element.value).toBe('');
-    expect(wrapper.findComponent({ name: 'CodexBackendIcon' }).exists()).toBe(true);
-    expect(wrapper.findComponent({ name: 'ClaudeCodeBackendIcon' }).exists()).toBe(true);
+    expect(wrapper.text()).toContain('Agent name');
+    expect(wrapper.text()).not.toContain('Resolved path');
+    expect(wrapper.text()).not.toContain('Backend');
+    expect(wrapper.text()).not.toContain('Claude Code');
+    expect(wrapper.get('.agent-dialog__text-input').attributes('placeholder')).toBe('Name this agent');
+    expect(wrapper.get('.agent-dialog__source-custom-option').text()).toBe('Choose folder...');
     expect(saveButton(wrapper).attributes()).toHaveProperty('disabled');
   });
 
@@ -87,7 +82,7 @@ describe('AgentDialog', () => {
     await wrapper.get('.agent-dialog__text-input').setValue('Waiting');
     await chooseCustomFolder(wrapper);
 
-    expect(wrapper.get<HTMLInputElement>('.agent-dialog__resolved-path-input').element.value).toBe('');
+    expect(wrapper.get<HTMLInputElement>('[aria-label="Agent name"]').element.value).toBe('Waiting');
     expect(saveButton(wrapper).attributes()).toHaveProperty('disabled');
   });
 
@@ -99,7 +94,7 @@ describe('AgentDialog', () => {
       updateAgent,
     });
 
-    expect(wrapper.get('.agent-dialog__header').text()).toContain('Edit Agent');
+    expect(wrapper.get('.agent-dialog__header').text()).toContain('Edit agent');
     expect((wrapper.get('.agent-dialog__text-input').element as HTMLInputElement).value).toBe('Dina');
     await wrapper.get('.agent-dialog__text-input').setValue('Dina Prime');
     await saveButton(wrapper).trigger('click');
@@ -113,21 +108,28 @@ describe('AgentDialog', () => {
     });
   });
 
-  it('creates Claude agents when Claude is selected', async () => {
-    const createAgent = vi.fn().mockResolvedValue(undefined);
+  it('preserves the backend of an existing agent without exposing backend selection', async () => {
+    const updateAgent = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountDialog({
-      chooseAgentFolder: vi.fn().mockResolvedValue('/Users/nbonamy/src/claude-project'),
-      createAgent,
+      agent: {
+        ...idleAgent,
+        backend: 'claude',
+        backendDefaults: { kind: 'claude' },
+      },
+      mode: 'edit',
+      updateAgent,
     });
 
-    await chooseCustomFolder(wrapper);
-    await wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'claude');
+    expect(wrapper.text()).not.toContain('Backend');
+    expect(wrapper.text()).not.toContain('Claude Code');
+    await wrapper.get('.agent-dialog__text-input').setValue('Legacy Claude');
     await saveButton(wrapper).trigger('click');
 
-    expect(createAgent).toHaveBeenCalledWith({
-      name: 'claude-project',
-      avatar: '🤖',
-      folder: '/Users/nbonamy/src/claude-project',
+    expect(updateAgent).toHaveBeenCalledWith({
+      id: 'agent-dina',
+      name: 'Legacy Claude',
+      avatar: 'DI',
+      folder: '/Users/nbonamy/src/codex-claw',
       backend: 'claude',
     });
   });
@@ -148,9 +150,8 @@ describe('AgentDialog', () => {
       }],
     });
 
-    expect(wrapper.findAll('.agent-dialog__field')).toHaveLength(5);
-    await chooseCustomFolder(wrapper, 2);
-    await wrapper.findAllComponents({ name: 'ElSelect' })[0]?.vm.$emit('update:modelValue', '__new_team__');
+    await chooseCustomFolder(wrapper);
+    await emitSelect(wrapper, 'agent-dialog-team', '__new_team__');
     await nextTick();
 
     const newTeamInput = wrapper.get<HTMLInputElement>('[aria-label="New team name"]');
@@ -190,7 +191,7 @@ describe('AgentDialog', () => {
       ],
     });
 
-    await chooseCustomFolder(wrapper, 2);
+    await chooseCustomFolder(wrapper);
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
@@ -262,13 +263,13 @@ describe('AgentDialog', () => {
       sourceRepositories: repositories,
     });
 
-    expect(wrapper.text()).toContain('Worktree');
-    expect(wrapper.get<HTMLInputElement>('.agent-dialog__resolved-path-input').element.value).toBe('/Users/nbonamy/src/codex-claw');
-    await wrapper.findAllComponents({ name: 'ElSelect' })[1]?.vm.$emit('update:modelValue', '/Users/nbonamy/src/codex-claw');
+    expect(wrapper.text()).toContain('Checkout');
+    expect(wrapper.findAllComponents({ name: 'ElOption' })[0]?.props('label')).toBe('Choose folder...');
+    expect(wrapper.text()).not.toContain('Resolved path');
+    await emitSelect(wrapper, 'agent-dialog-repository', '/Users/nbonamy/src/codex-claw');
     await nextTick();
-    await wrapper.findAllComponents({ name: 'ElSelect' })[2]?.vm.$emit('update:modelValue', '/Users/nbonamy/src/codex-claw-source-folder');
+    await emitSelect(wrapper, 'agent-dialog-worktree', '/Users/nbonamy/src/codex-claw-source-folder');
     await nextTick();
-    expect(wrapper.get<HTMLInputElement>('.agent-dialog__resolved-path-input').element.value).toBe('/Users/nbonamy/src/codex-claw-source-folder');
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
@@ -304,7 +305,7 @@ describe('AgentDialog', () => {
     expect(wrapper.text()).not.toContain('Connection');
     expect(listSourceRepositories).toHaveBeenCalledWith('connection-devbox');
     expect(listSourceWorktrees).toHaveBeenCalledWith('/home/nicolas/src/codex-claw', 'connection-devbox');
-    await wrapper.findAllComponents({ name: 'ElSelect' })[2]?.vm.$emit('update:modelValue', '/home/nicolas/src/codex-claw-ssh-agent');
+    await emitSelect(wrapper, 'agent-dialog-worktree', '/home/nicolas/src/codex-claw-ssh-agent');
     await nextTick();
     await saveButton(wrapper).trigger('click');
 
@@ -388,8 +389,7 @@ describe('AgentDialog', () => {
     await flushPromises();
 
     expect(listSourceWorktrees).toHaveBeenCalledWith('/Users/nbonamy/src/codex-claw');
-    expect(wrapper.get<HTMLInputElement>('.agent-dialog__resolved-path-input').element.value).toBe('/Users/nbonamy/src/codex-claw');
-    await wrapper.findAllComponents({ name: 'ElSelect' })[2]?.vm.$emit('update:modelValue', '/Users/nbonamy/src/codex-claw-backend-split');
+    await emitSelect(wrapper, 'agent-dialog-worktree', '/Users/nbonamy/src/codex-claw-backend-split');
     await nextTick();
     await saveButton(wrapper).trigger('click');
 
@@ -418,9 +418,9 @@ describe('AgentDialog', () => {
     });
 
     expect(wrapper.text()).toContain('New Worktree...');
-    await wrapper.findAllComponents({ name: 'ElSelect' })[1]?.vm.$emit('update:modelValue', '/Users/nbonamy/src/codex-claw');
+    await emitSelect(wrapper, 'agent-dialog-repository', '/Users/nbonamy/src/codex-claw');
     await nextTick();
-    await wrapper.findAllComponents({ name: 'ElSelect' })[2]?.vm.$emit('update:modelValue', '__new_worktree__');
+    await emitSelect(wrapper, 'agent-dialog-worktree', '__new_worktree__');
     await nextTick();
     await wrapper.get('.new-source-worktree-dialog__branch-input').setValue('feature/source-folder');
     await wrapper.find('.new-source-worktree-dialog .el-button--primary').trigger('click');
@@ -502,7 +502,7 @@ function mountDialog(overrides: Partial<{
 }
 
 function saveButton(wrapper: ReturnType<typeof mountDialog>) {
-  const button = wrapper.findAll('button').find((candidate) => ['Add Agent', 'Save'].includes(candidate.text()));
+  const button = wrapper.findAll('button').find((candidate) => ['Create agent', 'Save'].includes(candidate.text()));
   if (!button) {
     throw new Error('Save button not found');
   }
@@ -510,7 +510,22 @@ function saveButton(wrapper: ReturnType<typeof mountDialog>) {
   return button;
 }
 
-async function chooseCustomFolder(wrapper: ReturnType<typeof mountDialog>, repositorySelectIndex = 1) {
-  wrapper.findAllComponents({ name: 'ElSelect' })[repositorySelectIndex]?.vm.$emit('update:modelValue', '__custom_folder__');
+async function emitSelect(wrapper: ReturnType<typeof mountDialog>, id: string, value: string) {
+  const selects = wrapper.findAllComponents({ name: 'ElSelect' });
+  const select = id === 'agent-dialog-repository'
+    ? selects[0]
+    : id === 'agent-dialog-worktree'
+      ? selects[1]
+      : id === 'agent-dialog-team'
+        ? selects.at(-1)
+        : undefined;
+  if (!select) {
+    throw new Error(`Select not found: ${id}`);
+  }
+  await select.vm.$emit('update:modelValue', value);
+}
+
+async function chooseCustomFolder(wrapper: ReturnType<typeof mountDialog>) {
+  await emitSelect(wrapper, 'agent-dialog-repository', '__custom_folder__');
   await flushPromises();
 }

@@ -162,7 +162,9 @@ Current implementation checkpoint:
   conversation refs before calling provider drivers.
 - `clawd` owns manual git diff preview requests. Electron forwards
   `agent/git/diff/open`, and the backend resolves the agent, calls the provider
-  git-diff capability, and emits the side-panel event.
+  git-diff capability, and emits an app-owned working-tree review event. Turn
+  diffs use the same event family with an explicit turn scope so the renderer
+  does not confuse automatic turn updates with a user-opened repository review.
 - `clawd` owns persisted-session hydration on agent selection and git-status
   refreshes after agent create/update/select and provider turn/diff/completion
   events. Electron receives the resulting snapshot/events instead of calling
