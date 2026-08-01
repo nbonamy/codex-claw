@@ -214,8 +214,8 @@ then backend events fanned back to renderer windows. It may still own native
 desktop effects such as windows, dialogs, open-external, app quit, native
 system permission prompts/settings, packaged resources, and helper processes
 that truly require Electron APIs. The main-window adapter persists normal
-window bounds locally and restores them only when they still intersect a
-connected display.
+window bounds and maximized state locally as they change, and restores them
+only when the bounds still intersect a connected display.
 
 Modules:
 

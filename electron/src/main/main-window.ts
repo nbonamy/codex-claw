@@ -11,19 +11,46 @@ import { installAppMenu } from './app-menu';
 import { warnMain } from './log';
 import { sendAppCommand } from './ipc-events';
 
+type MainWindowState = {
+  bounds: Rectangle;
+  isMaximized: boolean;
+};
+
 export function createMainWindow(): BrowserWindow {
   const releaseMode = isReleaseMode();
-  const savedBounds = readWindowBounds(windowStatePath());
-  const restoredBounds = savedBounds && isWindowBoundsVisible(savedBounds, screen.getAllDisplays().map((display) => display.workArea))
-    ? savedBounds
+  const savedState = readWindowState(windowStatePath());
+  const restoredState = savedState && isWindowBoundsVisible(savedState.bounds, screen.getAllDisplays().map((display) => display.workArea))
+    ? savedState
     : undefined;
-  const window = new BrowserWindow(createMainWindowOptions(releaseMode, restoredBounds));
+  const window = new BrowserWindow(createMainWindowOptions(releaseMode, restoredState?.bounds));
+  let saveTimer: ReturnType<typeof setTimeout> | null = null;
+  const saveState = (): void => {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    writeWindowState(windowStatePath(), {
+      bounds: window.getNormalBounds(),
+      isMaximized: window.isMaximized(),
+    });
+  };
+  const scheduleSave = (): void => {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+    }
+    saveTimer = setTimeout(saveState, 250);
+  };
 
-  window.on('close', () => {
-    writeWindowBounds(windowStatePath(), window.getNormalBounds());
-  });
+  window.on('move', scheduleSave);
+  window.on('resize', scheduleSave);
+  window.on('maximize', scheduleSave);
+  window.on('unmaximize', scheduleSave);
+  window.on('close', saveState);
 
   window.once('ready-to-show', () => {
+    if (restoredState?.isMaximized) {
+      window.maximize();
+    }
     window.show();
   });
 
@@ -77,17 +104,24 @@ export function isWindowBoundsVisible(bounds: Rectangle, workAreas: Rectangle[])
   });
 }
 
-export function parseWindowBounds(value: string): Rectangle | null {
+export function parseWindowState(value: string): MainWindowState | null {
   try {
-    const parsed = JSON.parse(value) as Partial<Rectangle>;
-    const values = [parsed.x, parsed.y, parsed.width, parsed.height];
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    const bounds = ('bounds' in parsed ? parsed.bounds : parsed) as Partial<Rectangle> | undefined;
+    if (!bounds) {
+      return null;
+    }
+    const values = [bounds.x, bounds.y, bounds.width, bounds.height];
     if (!values.every((entry) => typeof entry === 'number' && Number.isFinite(entry))) {
       return null;
     }
-    if ((parsed.width ?? 0) < 1024 || (parsed.height ?? 0) < 720) {
+    if ((bounds.width ?? 0) < 1024 || (bounds.height ?? 0) < 720) {
       return null;
     }
-    return parsed as Rectangle;
+    return {
+      bounds: bounds as Rectangle,
+      isMaximized: parsed.isMaximized === true,
+    };
   } catch {
     return null;
   }
@@ -97,13 +131,13 @@ function windowStatePath(): string {
   return path.join(app.getPath('userData'), 'window-state.json');
 }
 
-function readWindowBounds(filePath: string): Rectangle | null {
+function readWindowState(filePath: string): MainWindowState | null {
   try {
     const file = openSync(filePath, 'r');
     try {
       const buffer = Buffer.alloc(fstatSync(file).size);
       readSync(file, buffer);
-      return parseWindowBounds(buffer.toString('utf8'));
+      return parseWindowState(buffer.toString('utf8'));
     } finally {
       closeSync(file);
     }
@@ -112,10 +146,10 @@ function readWindowBounds(filePath: string): Rectangle | null {
   }
 }
 
-function writeWindowBounds(filePath: string, bounds: Rectangle): void {
+function writeWindowState(filePath: string, state: MainWindowState): void {
   try {
     mkdirSync(path.dirname(filePath), { recursive: true });
-    writeFileSync(filePath, `${JSON.stringify(bounds)}\n`, { mode: 0o600 });
+    writeFileSync(filePath, `${JSON.stringify(state)}\n`, { mode: 0o600 });
   } catch (error) {
     warnMain('window', 'failed to save window bounds', {
       detail: error instanceof Error ? error.message : String(error),

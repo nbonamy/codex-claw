@@ -3,7 +3,7 @@ import {
   createMainWindowOptions,
   handleExternalWindowOpen,
   isWindowBoundsVisible,
-  parseWindowBounds,
+  parseWindowState,
 } from '../main-window';
 
 describe('main window options', () => {
@@ -18,16 +18,24 @@ describe('main window options', () => {
     expect(createMainWindowOptions(false, bounds)).toMatchObject(bounds);
   });
 
-  it('accepts valid persisted bounds and rejects malformed or undersized values', () => {
-    expect(parseWindowBounds('{"x":120,"y":80,"width":1280,"height":800}')).toStrictEqual({
-      x: 120,
-      y: 80,
-      width: 1280,
-      height: 800,
+  it('accepts persisted bounds with maximized state', () => {
+    expect(parseWindowState('{"bounds":{"x":120,"y":80,"width":1280,"height":800},"isMaximized":true}')).toStrictEqual({
+      bounds: { x: 120, y: 80, width: 1280, height: 800 },
+      isMaximized: true,
     });
-    expect(parseWindowBounds('{"x":120,"y":80,"width":800,"height":600}')).toBeNull();
-    expect(parseWindowBounds('{"x":"nope"}')).toBeNull();
-    expect(parseWindowBounds('not json')).toBeNull();
+  });
+
+  it('migrates bounds saved before maximized state was introduced', () => {
+    expect(parseWindowState('{"x":120,"y":80,"width":1280,"height":800}')).toStrictEqual({
+      bounds: { x: 120, y: 80, width: 1280, height: 800 },
+      isMaximized: false,
+    });
+  });
+
+  it('rejects malformed or undersized persisted window state', () => {
+    expect(parseWindowState('{"bounds":{"x":120,"y":80,"width":800,"height":600}}')).toBeNull();
+    expect(parseWindowState('{"bounds":{"x":"nope"}}')).toBeNull();
+    expect(parseWindowState('not json')).toBeNull();
   });
 
   it('only restores bounds that intersect a connected display', () => {
