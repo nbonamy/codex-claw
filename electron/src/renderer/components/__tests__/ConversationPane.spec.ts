@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { CodexConversationPane } from 'codex-app-sdk/vue';
@@ -6,6 +8,8 @@ import { describe, expect, it } from 'vitest';
 import type { Agent, BackendApprovalRequest, BackendCapabilities, RendererMessage } from '@codex-claw/shared/contracts';
 import ConversationPane from '../ConversationPane.vue';
 import { i18n } from '../../i18n';
+
+const conversationPaneSource = readFileSync(resolve(process.cwd(), 'src/renderer/components/ConversationPane.vue'), 'utf8');
 
 const agent: Agent = {
   id: 'agent-dina',
@@ -39,6 +43,10 @@ const messages: RendererMessage[] = [
 ];
 
 describe('ConversationPane', () => {
+  it('uses the message surface for the empty conversation background', () => {
+    expect(conversationPaneSource).toMatch(/\.conversation-pane\s*\{[\s\S]*background:\s*var\(--color-shell-main\);/);
+  });
+
   it('adapts app-owned messages and prompt submission to the SDK pane', async () => {
     const wrapper = mountPane({ agent, messages, isSending: false });
 

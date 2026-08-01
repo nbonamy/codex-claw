@@ -50,7 +50,7 @@ function selectTab(tab: string): void {
 .settings-sidebar {
   border-right: 1px solid var(--color-border);
   background: var(--color-shell-sidebar);
-  padding-top: var(--space-16);
+  padding-top: var(--space-24);
 }
 
 .settings-sidebar :deep(.el-menu) {

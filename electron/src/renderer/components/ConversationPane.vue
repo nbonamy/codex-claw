@@ -204,5 +204,6 @@ function submitPrompt(prompt: string, options?: SendCodexMessageOptions): void {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+  background: var(--color-shell-main);
 }
 </style>

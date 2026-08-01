@@ -1,5 +1,9 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { applyAppTheme, subscribeToSystemAppearance } from '../apply-theme';
+
+const baseCss = readFileSync(resolve(process.cwd(), 'src/renderer/styles/base.css'), 'utf8');
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -54,6 +58,10 @@ describe('applyAppTheme', () => {
     expect(root.style.getPropertyValue('--color-shell-rail')).toBe('color-mix(in srgb, var(--color-shell-sidebar) 97%, white)');
     expect(root.style.getPropertyValue('--chat-font-size')).toBe('16px');
     expect(root.style.getPropertyValue('--code-font-size')).toBe('12px');
+  });
+
+  it('keeps the SDK dark theme host visible', () => {
+    expect(baseCss).toMatch(/html\[data-codex-theme\]\s*\{\s*display:\s*block;/);
   });
 
   it('preserves native macOS translucency when applying a theme', () => {
