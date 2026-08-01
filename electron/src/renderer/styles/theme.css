@@ -18,6 +18,7 @@
   --el-fill-color-light: var(--color-surface-low);
   --el-fill-color-lighter: var(--color-surface-lowest);
   --el-fill-color-blank: var(--color-surface-lowest);
+  --el-overlay-color-lighter: var(--color-dialog-overlay);
 
   --el-border-radius-base: var(--radius-md);
 
