@@ -44,6 +44,7 @@ function releaseBuild() {
   fs.mkdirSync(cacheDir, { recursive: true });
   if (!fs.existsSync(archivePath)) {
     const url = 'https://github.com/' + repository + '/releases/download/v' + version + '/' + archiveName;
+    console.log('Downloading Computer Use ' + version + ' release artifact...');
     run('curl', ['--fail', '--location', '--retry', '3', '--output', archivePath, url]);
   }
 
