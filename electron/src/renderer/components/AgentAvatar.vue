@@ -73,7 +73,7 @@ function initials(name: string): string {
 }
 
 .agent-avatar--sm {
-  --agent-avatar-size: var(--space-10);
+  --agent-avatar-size: var(--space-12);
   --agent-avatar-font-size: var(--font-size-11);
 }
 
@@ -85,6 +85,14 @@ function initials(name: string): string {
 .agent-avatar--xl {
   --agent-avatar-size: var(--space-24);
   --agent-avatar-font-size: var(--font-size-20);
+}
+
+.agent-avatar--emoji {
+  overflow: visible;
+  border: 0;
+  font-size: calc(var(--agent-avatar-size) - 1px);
+  position: relative;
+  top: -1px;
 }
 
 .agent-avatar__image {

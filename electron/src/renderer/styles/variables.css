@@ -124,14 +124,14 @@
   --space-24: 48px;
   --space-32: 64px;
 
-  --workbench-appbar-height: 32px;
+  --workbench-appbar-height: 48px;
   --workbench-layout-header-offset: 0px;
   --workbench-layout-footer-offset: 0px;
   --idea-pane-header-height: 56px;
   --ideas-chat-width: 40%;
   --ideas-explorer-width: 44px;
   --team-rail-scale: 1.1;
-  --team-rail-width: calc(var(--space-24) * var(--team-rail-scale));
+  --team-rail-width: calc((var(--space-24) + var(--space-32)) / 2);
 
   --icon-sm: 14px;
   --icon-md: 16px;

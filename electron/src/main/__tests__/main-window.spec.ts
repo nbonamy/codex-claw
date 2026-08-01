@@ -18,6 +18,11 @@ describe('main window options', () => {
     expect(createMainWindowOptions(false, bounds)).toMatchObject(bounds);
   });
 
+  it('centers macOS traffic lights in the workbench titlebar', () => {
+    expect(createMainWindowOptions(false, undefined, 'darwin').trafficLightPosition).toStrictEqual({ x: 8, y: 17 });
+    expect(createMainWindowOptions(false, undefined, 'win32').trafficLightPosition).toBeUndefined();
+  });
+
   it('accepts persisted bounds with maximized state', () => {
     expect(parseWindowState('{"bounds":{"x":120,"y":80,"width":1280,"height":800},"isMaximized":true}')).toStrictEqual({
       bounds: { x: 120, y: 80, width: 1280, height: 800 },

@@ -180,10 +180,22 @@ describe('AgentHeader', () => {
     expect(wrapper.get('[aria-label="Show agent sidebar"]').attributes('aria-label')).toBe('Show agent sidebar');
   });
 
-  it('emits sidebar expand requests from the compact app header icon', async () => {
+  it('keeps the full header presentation and emits expand requests when the sidebar is collapsed', async () => {
     const wrapper = mount(AgentHeader, {
       props: {
         agent,
+        gitStatus: {
+          folder: '/Users/nbonamy/src/id8',
+          branch: 'main',
+          ahead: 0,
+          behind: 0,
+          changedFiles: 1,
+          addedLines: 12,
+          removedLines: 4,
+          hasUntracked: false,
+          state: 'dirty',
+          updatedAt: '2026-06-05T00:00:00.000Z',
+        },
         backendRuntime: { backend: 'codex', status: 'running' },
         isLoading: false,
         sidebarCollapsed: true,
@@ -196,7 +208,10 @@ describe('AgentHeader', () => {
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('Idle');
     expect(wrapper.text()).toContain('~/src/id8');
-    expect(wrapper.text()).not.toContain('files');
+    expect(wrapper.text()).toContain('+12');
+    expect(wrapper.text()).toContain('-4');
+    expect(wrapper.get('.agent-header__avatar').classes()).toContain('agent-avatar--sm');
+    expect(wrapper.classes()).not.toContain('agent-header--sidebar-collapsed');
 
     await wrapper.get('[aria-label="Show agent sidebar"]').trigger('click');
 

@@ -76,7 +76,11 @@ export function createMainWindow(agentListCompact = false): BrowserWindow {
   return window;
 }
 
-export function createMainWindowOptions(releaseMode: boolean, bounds?: Rectangle): BrowserWindowConstructorOptions {
+export function createMainWindowOptions(
+  releaseMode: boolean,
+  bounds?: Rectangle,
+  platform = process.platform,
+): BrowserWindowConstructorOptions {
   return {
     width: bounds?.width ?? 1440,
     height: bounds?.height ?? 960,
@@ -84,6 +88,7 @@ export function createMainWindowOptions(releaseMode: boolean, bounds?: Rectangle
     minWidth: 1024,
     minHeight: 720,
     titleBarStyle: 'hidden',
+    ...(platform === 'darwin' ? { trafficLightPosition: { x: 8, y: 17 } } : {}),
     show: false,
     backgroundColor: '#061c2a',
     webPreferences: {

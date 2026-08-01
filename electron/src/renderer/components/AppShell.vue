@@ -1759,7 +1759,7 @@ function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
 }
 
 .app-shell__team-rail {
-  padding-top: var(--space-20);
+  padding-top: calc(var(--workbench-appbar-height) + var(--space-6));
 }
 
 .app-shell > .agent-sidebar-enter-active,

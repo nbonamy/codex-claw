@@ -1,8 +1,5 @@
 <template>
-  <header
-    class="agent-header"
-    :class="{ 'agent-header--sidebar-collapsed': sidebarCollapsed }"
-  >
+  <header class="agent-header">
     <button
       v-if="sidebarCollapsed"
       class="agent-header__expand"
@@ -21,7 +18,7 @@
         class="agent-header__avatar"
         :avatar="agent.avatar"
         :name="agent.name"
-        :size="sidebarCollapsed ? 'sm' : 'lg'"
+        size="sm"
       />
       <div class="agent-header__agent-line">
         <strong>{{ agent.name }}</strong>
@@ -175,7 +172,7 @@ const agentStatusDetail = computed(() => {
 const activityTitle = computed(() => agentStateLabel.value);
 const hasHeaderGitStatus = computed(() => {
   const gitStatus = props.gitStatus;
-  if (props.sidebarCollapsed || !gitStatus || gitStatus.state === 'unknown') {
+  if (!gitStatus || gitStatus.state === 'unknown') {
     return false;
   }
 
@@ -186,11 +183,9 @@ const hasHeaderGitStatus = computed(() => {
 
 <style scoped>
 .agent-header {
-  --agent-header-height: 48px;
-  --agent-header-avatar-size: 30px;
   --agent-status-dot-size: 10px;
-  flex: 0 0 var(--agent-header-height);
-  min-height: var(--agent-header-height);
+  flex: 0 0 var(--workbench-appbar-height);
+  min-height: var(--workbench-appbar-height);
   display: flex;
   align-items: center;
   gap: var(--space-8);
@@ -199,16 +194,6 @@ const hasHeaderGitStatus = computed(() => {
   background: var(--color-shell-main);
   border-bottom: 1px solid var(--color-border);
   -webkit-app-region: drag;
-}
-
-.agent-header--sidebar-collapsed {
-  flex-basis: var(--workbench-appbar-height);
-  min-height: var(--workbench-appbar-height);
-  max-height: var(--workbench-appbar-height);
-  align-items: center;
-  gap: var(--space-6);
-  padding-left: var(--space-16);
-  border-bottom-color: var(--color-outline-subtle);
 }
 
 .agent-header__identity {
@@ -228,7 +213,7 @@ const hasHeaderGitStatus = computed(() => {
 
 .agent-header__identity strong {
   color: var(--color-text);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-bold);
 }
 
 .agent-header__identity .agent-header__agent-line {
@@ -312,10 +297,6 @@ const hasHeaderGitStatus = computed(() => {
   height: var(--icon-md);
 }
 
-.agent-header--sidebar-collapsed .agent-header__activity {
-  min-width: auto;
-}
-
 .agent-header__activity-line {
   display: inline-flex;
   align-items: center;
@@ -384,12 +365,5 @@ const hasHeaderGitStatus = computed(() => {
   height: var(--icon-md);
   color: var(--color-text-muted);
 }
-
-.agent-header--sidebar-collapsed .agent-header__identity,
-.agent-header--sidebar-collapsed .agent-header__activity {
-  font-size: var(--font-size-13);
-}
-
-
 
 </style>

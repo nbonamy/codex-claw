@@ -335,7 +335,7 @@ function onResizePointerEnd(event: PointerEvent): void {
 .agent-sidebar__header strong {
   min-width: 0;
   overflow: hidden;
-  font-size: var(--font-size-12);
+  font-size: var(--font-size-14);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-16);
   text-overflow: ellipsis;
@@ -504,12 +504,6 @@ function onResizePointerEnd(event: PointerEvent): void {
   display: block;
   font-size: var(--font-size-14);
   line-height: var(--line-height-18);
-}
-
-.agent-sidebar--compact :deep(.agent-avatar--emoji) {
-  overflow: visible;
-  border-color: transparent;
-  font-size: var(--font-size-18);
 }
 
 .agent-sidebar__footer {

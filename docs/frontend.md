@@ -177,6 +177,13 @@ Rules:
 - Ensure text fits in compact desktop windows.
 - Preserve keyboard/composer behavior as the chat renderer grows.
 - Keep status language short and useful.
+- Render emoji avatars borderless and scale the glyph to the shared avatar box;
+  image and initials avatars keep the standard circular treatment.
+- Keep rail, sidebar, and main-content titlebars on the shared workbench appbar
+  height so adjacent shell regions align exactly.
+- On macOS, keep the native traffic lights vertically centered in that appbar
+  and reserve enough team-rail width and top padding that they never overlap
+  sidebar or rail controls.
 
 ## Rendering Surfaces
 

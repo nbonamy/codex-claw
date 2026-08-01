@@ -509,6 +509,7 @@ function summaryLabel(status: AgentStatus['type'], count: number): string {
   justify-content: space-between;
   gap: var(--space-12);
   padding: 0 var(--space-16);
+  font-size: var(--font-size-14);
   border-bottom: 1px solid var(--color-border);
   -webkit-app-region: drag;
 }
