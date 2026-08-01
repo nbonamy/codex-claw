@@ -7,9 +7,11 @@ describe('settings contracts', () => {
     expect(normalizeGeneralSettings({
       codexBinaryPath: ' /opt/homebrew/bin/codex ',
       preventSleepWhenAgentsRun: false,
+      agentListCompact: true,
     })).toStrictEqual({
       codexBinaryPath: '/opt/homebrew/bin/codex',
       preventSleepWhenAgentsRun: false,
+      agentListCompact: true,
     });
 
     expect(normalizeGeneralSettings({})).toStrictEqual(defaultGeneralSettings);
@@ -65,6 +67,7 @@ describe('settings contracts', () => {
     expect(snapshot.general).toStrictEqual({
       codexBinaryPath: '',
       preventSleepWhenAgentsRun: false,
+      agentListCompact: false,
     });
     expect(snapshot.teams).toHaveLength(1);
   });

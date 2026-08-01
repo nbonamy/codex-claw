@@ -363,7 +363,7 @@ export class AppController {
   }
 
   createWindow(): void {
-    this.mainWindow = createMainWindow();
+    this.mainWindow = createMainWindow(this.snapshot?.general.agentListCompact ?? false);
   }
 
   async shutdown(): Promise<void> {

@@ -453,6 +453,7 @@ export type AppThemeSettings = {
 export type AppGeneralSettings = {
   preventSleepWhenAgentsRun: boolean;
   codexBinaryPath: string;
+  agentListCompact: boolean;
 };
 
 export type CodexAccount =

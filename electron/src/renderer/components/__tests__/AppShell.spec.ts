@@ -2079,6 +2079,7 @@ describe('AppShell', () => {
     } as Partial<CodexClawApi> as CodexClawApi;
     const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
     const snapshot = createInitialSnapshot();
+    snapshot.general.agentListCompact = true;
     snapshot.teams.push({
       id: 'team-skwad',
       name: 'Skwad',
@@ -2088,13 +2089,14 @@ describe('AppShell', () => {
     });
     const quit = vi.fn().mockResolvedValue(undefined);
     const openAgentGitDiff = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, quit, openAgentGitDiff });
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, quit, openAgentGitDiff, updateSettings });
 
     expect(onAppCommand).toHaveBeenCalledOnce();
-    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('compact')).toBe(false);
-    listener({ type: 'set-agent-list-compact', compact: true });
-    await nextTick();
     expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('compact')).toBe(true);
+    listener({ type: 'set-agent-list-compact', compact: false });
+    await nextTick();
+    expect(updateSettings).toHaveBeenCalledWith({ general: { agentListCompact: false } });
     listener({ type: 'new-team' });
     await nextTick();
     expect(wrapper.text()).toContain('Create Team');

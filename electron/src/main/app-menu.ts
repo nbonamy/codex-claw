@@ -5,6 +5,7 @@ import { sendAppCommand } from './ipc-events';
 
 export type AppMenuOptions = {
   debugMode: boolean;
+  agentListCompact?: boolean;
 };
 
 export type AppMenuCallbacks = {
@@ -111,7 +112,7 @@ function buildViewMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions): Me
       {
         label: 'Compact Agent List',
         type: 'checkbox',
-        checked: false,
+        checked: options.agentListCompact ?? false,
         click: (item) => callbacks.sendAppCommand({ type: 'set-agent-list-compact', compact: item.checked }),
       },
       { type: 'separator' },

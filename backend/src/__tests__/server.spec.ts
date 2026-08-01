@@ -4343,6 +4343,7 @@ function createTestSnapshot(): AppSnapshot {
     general: {
       preventSleepWhenAgentsRun: true,
       codexBinaryPath: '',
+      agentListCompact: false,
     },
     sourceFolder: {
       path: '',

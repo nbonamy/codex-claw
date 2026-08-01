@@ -502,7 +502,7 @@ function onResizePointerEnd(event: PointerEvent): void {
 
 .agent-sidebar--compact .agent-sidebar__meta strong {
   display: block;
-  font-size: var(--font-size-13);
+  font-size: var(--font-size-14);
   font-weight: var(--font-weight-medium);
   line-height: var(--line-height-16);
 }

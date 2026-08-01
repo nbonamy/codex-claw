@@ -16,7 +16,7 @@ type MainWindowState = {
   isMaximized: boolean;
 };
 
-export function createMainWindow(): BrowserWindow {
+export function createMainWindow(agentListCompact = false): BrowserWindow {
   const releaseMode = isReleaseMode();
   const savedState = readWindowState(windowStatePath());
   const restoredState = savedState && isWindowBoundsVisible(savedState.bounds, screen.getAllDisplays().map((display) => display.workArea))
@@ -55,7 +55,7 @@ export function createMainWindow(): BrowserWindow {
   });
 
   window.webContents.setWindowOpenHandler(({ url }) => handleExternalWindowOpen(url, (targetUrl) => shell.openExternal(targetUrl)));
-  installAppMenu(window, { debugMode: !releaseMode });
+  installAppMenu(window, { debugMode: !releaseMode, agentListCompact });
   installFocusedAppShortcuts(window);
   window.webContents.on('before-input-event', (event, input) => {
     const command = appCommandFromInput(input);

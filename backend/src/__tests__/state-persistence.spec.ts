@@ -791,6 +791,7 @@ describe('AppStatePersistence', () => {
     snapshot.general = {
       preventSleepWhenAgentsRun: false,
       codexBinaryPath: '/opt/homebrew/bin/codex',
+      agentListCompact: true,
     };
 
     const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));

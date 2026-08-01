@@ -524,7 +524,7 @@ type AppSurface = 'agent' | 'cockpit' | 'loops' | 'settings';
 type BenchLoadStatus = 'notLoaded' | 'loading' | 'loaded' | 'error';
 
 const agentSidebarCollapsed = ref(false);
-const agentListCompact = ref(false);
+const agentListCompact = computed(() => props.snapshot.general.agentListCompact);
 const agentSidebarMinWidth = 80;
 const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
@@ -1266,7 +1266,7 @@ function handleShellShortcut(event: KeyboardEvent): void {
 
 function handleAppCommand(command: AppCommand): void {
   if (command.type === 'set-agent-list-compact') {
-    agentListCompact.value = command.compact;
+    void updateSettings({ general: { agentListCompact: command.compact } });
     return;
   }
 

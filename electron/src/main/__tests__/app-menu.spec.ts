@@ -110,6 +110,12 @@ describe('app menu', () => {
     expect(menuItem(menu, 'View', 'Browser')?.accelerator).toBe('CommandOrControl+B');
   });
 
+  it('reflects the persisted compact agent-list setting', () => {
+    const menu = buildAppMenuTemplate(callbacks(), { debugMode: false, agentListCompact: true }, 'darwin');
+
+    expect(menuItem(menu, 'View', 'Compact Agent List')).toMatchObject({ type: 'checkbox', checked: true });
+  });
+
   it('adds reload and developer tools only in debug mode', () => {
     const debugCallbacks = callbacks();
     const debugMenu = buildAppMenuTemplate(debugCallbacks, { debugMode: true }, 'darwin');
