@@ -6,7 +6,8 @@
   "description": "Native Codex team desktop app.",
   "main": ".vite/build/main.js",
   "scripts": {
-    "build:computer-use": "../../computer-use/macos/scripts/build-app.sh --app-name 'Codex Claw Computer Use' --bundle-identifier com.nabocorp.codex-claw.computer-use --icon assets/icon.icns --output .computer-use",
+    "build:computer-use": "node ../scripts/prepare-computer-use.mjs --release",
+    "build:computer-use:local": "node ../scripts/prepare-computer-use.mjs --local",
     "dev": "node ../scripts/dev.mjs",
     "start": "electron-forge start",
     "package": "npm run build:computer-use && electron-forge package",

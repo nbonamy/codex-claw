@@ -118,13 +118,33 @@ describe('runtime config', () => {
     expect(rootPackage.scripts['dev:electron']).toBe('npm run start -w @codex-claw/electron');
     expect(rootPackage.scripts.build).toBe('node scripts/build.mjs');
     expect(electronPackage.scripts['build:computer-use']).toBe(
-      "../../computer-use/macos/scripts/build-app.sh --app-name 'Codex Claw Computer Use' --bundle-identifier com.nabocorp.codex-claw.computer-use --icon assets/icon.icns --output .computer-use",
+      'node ../scripts/prepare-computer-use.mjs --release',
+    );
+    expect(electronPackage.scripts['build:computer-use:local']).toBe(
+      'node ../scripts/prepare-computer-use.mjs --local',
     );
     expect(electronPackage.scripts.package).toBe('npm run build:computer-use && electron-forge package');
     expect(electronPackage.scripts.make).toBe('npm run build:computer-use && electron-forge make');
     expect(electronPackage.scripts.build).toContain('npm run build:computer-use &&');
-    expect(devScript).toContain("await run('npm', ['run', 'build:computer-use'])");
+    expect(devScript).toContain("await run('npm', ['run', 'build:computer-use:local'])");
     expect(devScript).toContain("start('npm', ['run', 'dev:electron']");
+  });
+
+  it('pins release Computer Use artifacts and keeps a local development path', () => {
+    const releaseConfig = JSON.parse(
+      readFileSync(path.resolve(__dirname, '../../../../computer-use-release.json'), 'utf8'),
+    ) as { repository: string; version: string; sha256: string };
+    const prepareScript = readFileSync(
+      path.resolve(__dirname, '../../../../scripts/prepare-computer-use.mjs'),
+      'utf8',
+    );
+
+    expect(releaseConfig.repository).toBe('nbonamy/computer-use');
+    expect(releaseConfig.version).toMatch(/^0\.\d+\.\d+$/);
+    expect(releaseConfig.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(prepareScript).toContain('Computer Use release checksum mismatch');
+    expect(prepareScript).toContain('process.argv.includes(\'--local\')');
+    expect(prepareScript).toContain('process.argv.includes(\'--release\')');
   });
 
   it('resolves the packaged clawd runtime from resources when no env command is configured', async () => {

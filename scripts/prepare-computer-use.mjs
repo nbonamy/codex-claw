@@ -1,0 +1,78 @@
+import { execFileSync, spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const configPath = path.join(rootDir, 'computer-use-release.json');
+const electronDir = path.join(rootDir, 'electron');
+const iconPath = path.join(electronDir, 'assets', 'icon.icns');
+const outputDir = path.join(electronDir, '.computer-use');
+const sourceBuildScript = path.resolve(rootDir, '..', 'computer-use', 'macos', 'scripts', 'build-app.sh');
+
+function run(command, args) {
+  const result = spawnSync(command, args, { cwd: rootDir, stdio: 'inherit' });
+  if (result.error) throw result.error;
+  if (result.status !== 0) process.exit(result.status ?? 1);
+}
+
+function localBuild() {
+  run('bash', [
+    sourceBuildScript,
+    '--app-name', 'Codex Claw Computer Use',
+    '--bundle-identifier', 'com.nabocorp.codex-claw.computer-use',
+    '--icon', iconPath,
+    '--output', outputDir,
+  ]);
+}
+
+function releaseBuild() {
+  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  const version = process.env.COMPUTER_USE_VERSION || config.version;
+  const sha256 = (process.env.COMPUTER_USE_SHA256 || config.sha256).toLowerCase();
+  const repository = process.env.COMPUTER_USE_REPOSITORY || config.repository;
+  if (!/^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$/.test(version)) {
+    throw new Error('Invalid Computer Use release version.');
+  }
+  if (!/^[0-9a-f]{64}$/.test(sha256)) {
+    throw new Error('Computer Use release checksum must be a SHA-256 digest.');
+  }
+
+  const archiveName = 'computer-use-pilot-macos-arm64-' + version + '.tar.gz';
+  const cacheDir = path.join(electronDir, '.computer-use-artifacts', version);
+  const archivePath = path.join(cacheDir, archiveName);
+  fs.mkdirSync(cacheDir, { recursive: true });
+  if (!fs.existsSync(archivePath)) {
+    const url = 'https://github.com/' + repository + '/releases/download/v' + version + '/' + archiveName;
+    run('curl', ['--fail', '--location', '--retry', '3', '--output', archivePath, url]);
+  }
+
+  const actualSha256 = execFileSync('shasum', ['-a', '256', archivePath], { encoding: 'utf8' }).trim().split(/\s+/)[0];
+  if (actualSha256 !== sha256) {
+    throw new Error('Computer Use release checksum mismatch for ' + archiveName + '.');
+  }
+  const extractDir = fs.mkdtempSync(path.join(cacheDir, 'extract-'));
+  try {
+    run('tar', ['-xzf', archivePath, '-C', extractDir]);
+    const extractedRoot = path.join(extractDir, 'computer-use-pilot-macos-arm64-' + version);
+    run('bash', [
+      path.join(extractedRoot, 'scripts', 'package-app.sh'),
+      '--app-name', 'Codex Claw Computer Use',
+      '--bundle-identifier', 'com.nabocorp.codex-claw.computer-use',
+      '--icon', iconPath,
+      '--binary', path.join(extractedRoot, 'bin', 'computer-use-pilot'),
+      '--resource-dir', path.join(extractedRoot, 'Resources'),
+      '--output', outputDir,
+    ]);
+  } finally {
+    fs.rmSync(extractDir, { recursive: true, force: true });
+  }
+}
+
+if (process.argv.includes('--local')) {
+  localBuild();
+} else if (process.argv.includes('--release')) {
+  releaseBuild();
+} else {
+  throw new Error('Use --local for development or --release for a published artifact.');
+}

@@ -4,6 +4,10 @@
 
 # Codex Claw
 
+Release builds consume the pinned Computer Use artifact from
+nbonamy/computer-use and verify its checksum before packaging. Development
+continues to build the helper from the sibling computer-use checkout.
+
 Meet your native Codex coding crew. Codex Claw is a desktop app that lets you
 run a team of Codex agents, each with its own folder, identity, thread, tools,
 and inbox, while rendering the work as a real app instead of a terminal stream.
