@@ -52,8 +52,10 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import {
   CodexConversationPane,
+  provideCodexChatTranslate,
   toCodexChatMessages,
   type CodexCapabilities,
   type CodexConversationLink,
@@ -79,6 +81,9 @@ import type {
   TurnGitDiff,
 } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
+
+const { t } = useI18n();
+provideCodexChatTranslate((key, params) => t(key, params ?? {}));
 
 const props = withDefaults(defineProps<{
   messages: RendererMessage[];

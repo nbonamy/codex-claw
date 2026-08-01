@@ -122,6 +122,36 @@ export const messages = {
               failed: 'Failed broadcasting message',
               running: 'Broadcasting message',
             },
+            browserClick: {
+              completed: 'Clicked page',
+              failed: 'Failed clicking page',
+              running: 'Clicking page',
+            },
+            browserConsoleLogs: {
+              completed: 'Read browser console',
+              failed: 'Failed reading browser console',
+              running: 'Reading browser console',
+            },
+            browserGetDom: {
+              completed: 'Inspected page',
+              failed: 'Failed inspecting page',
+              running: 'Inspecting page',
+            },
+            browserScreenshot: {
+              completed: 'Captured page screenshot',
+              failed: 'Failed capturing page screenshot',
+              running: 'Capturing page screenshot',
+            },
+            browserScroll: {
+              completed: 'Scrolled page',
+              failed: 'Failed scrolling page',
+              running: 'Scrolling page',
+            },
+            browserType: {
+              completed: 'Entered text on page',
+              failed: 'Failed entering text on page',
+              running: 'Entering text on page',
+            },
             checkMessages: {
               completed: 'Checked messages',
               failed: 'Failed checking messages',
@@ -132,10 +162,90 @@ export const messages = {
               failed: 'Failed displaying {target}',
               running: 'Displaying {target}',
             },
+            computerUseClick: {
+              completed: 'Clicked app control',
+              failed: 'Failed clicking app control',
+              running: 'Clicking app control',
+            },
+            computerUseFindApps: {
+              completed: 'Found apps',
+              failed: 'Failed finding apps',
+              running: 'Finding apps',
+            },
+            computerUseFocusApp: {
+              completed: 'Focused {target}',
+              failed: 'Failed focusing {target}',
+              running: 'Focusing {target}',
+            },
+            computerUseGetAppState: {
+              completed: 'Inspected {target}',
+              failed: 'Failed inspecting {target}',
+              running: 'Inspecting {target}',
+            },
+            computerUseLaunchApp: {
+              completed: 'Launched {target}',
+              failed: 'Failed launching {target}',
+              running: 'Launching {target}',
+            },
+            computerUseListApps: {
+              completed: 'Listed open apps',
+              failed: 'Failed listing open apps',
+              running: 'Listing open apps',
+            },
+            computerUseRequestAccessibility: {
+              completed: 'Requested accessibility access',
+              failed: 'Failed requesting accessibility access',
+              running: 'Requesting accessibility access',
+            },
+            computerUseScroll: {
+              completed: 'Scrolled app',
+              failed: 'Failed scrolling app',
+              running: 'Scrolling app',
+            },
+            computerUseSetValue: {
+              completed: 'Updated app control',
+              failed: 'Failed updating app control',
+              running: 'Updating app control',
+            },
+            computerUseStatus: {
+              completed: 'Checked Computer Use status',
+              failed: 'Failed checking Computer Use status',
+              running: 'Checking Computer Use status',
+            },
+            computerUseStop: {
+              completed: 'Stopped Computer Use',
+              failed: 'Failed stopping Computer Use',
+              running: 'Stopping Computer Use',
+            },
+            computerUseTypeText: {
+              completed: 'Entered text in app',
+              failed: 'Failed entering text in app',
+              running: 'Entering text in app',
+            },
+            createAgent: {
+              completed: 'Created agent {target}',
+              failed: 'Failed creating agent {target}',
+              running: 'Creating agent {target}',
+            },
+            createWorktree: {
+              completed: 'Created worktree {target}',
+              failed: 'Failed creating worktree {target}',
+              running: 'Creating worktree {target}',
+            },
             listAgents: {
               completed: 'Listed agents',
               failed: 'Failed listing agents',
               running: 'Listing agents',
+            },
+            listRepos: {
+              completed: 'Listed repositories',
+              failed: 'Failed listing repositories',
+              running: 'Listing repositories',
+            },
+            listWorktrees: {
+              completed: 'Listed worktrees for {target}',
+              failed: 'Failed listing worktrees for {target}',
+              running: 'Listing worktrees for {target}',
             },
             markWorkItemCompleted: {
               completed: 'Marked work item complete',
