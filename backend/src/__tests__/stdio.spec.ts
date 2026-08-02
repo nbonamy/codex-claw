@@ -172,4 +172,52 @@ describe('stdio JSON-RPC transport', () => {
     expect(output.readableLength).toBeGreaterThan(0);
     peer.stop();
   });
+
+  it('coalesces queued snapshot notifications while preserving ordinary events', () => {
+    const input = new PassThrough();
+    const output = new PassThrough({ highWaterMark: 1 });
+    const writes: string[] = [];
+    output.on('data', (chunk) => writes.push(chunk.toString()));
+    const peer = new StdioRpcPeer({
+      input,
+      output,
+      onMessage: () => undefined,
+    });
+    peer.start();
+
+    peer.notify('backend/event/notify', { type: 'snapshot.updated', snapshot: 'first' });
+    peer.notify('backend/event/notify', { type: 'snapshot.updated', snapshot: 'second' });
+    peer.notify('backend/event/notify', { type: 'backend.event', value: 'keep' });
+    output.emit('drain');
+
+    const outputText = writes.join('');
+    expect(outputText).toContain('second');
+    expect(outputText.match(/"snapshot":"first"/g)).toHaveLength(1);
+    expect(outputText).toContain('keep');
+    peer.stop();
+  });
+
+  it('bounds queued notifications instead of allowing an unbounded writable buffer', () => {
+    const input = new PassThrough();
+    const output = new PassThrough({ highWaterMark: 1 });
+    const onOutputOverflow = vi.fn();
+    const peer = new StdioRpcPeer({
+      input,
+      output,
+      maxBufferedOutputBytes: 1,
+      onOutputOverflow,
+      onMessage: () => undefined,
+    });
+    peer.start();
+
+    peer.notify('backend/event/notify', { type: 'ordinary', value: 'first' });
+    peer.notify('backend/event/notify', { type: 'ordinary', value: 'second' });
+
+    expect(onOutputOverflow).toHaveBeenCalledWith(expect.objectContaining({
+      bufferedBytes: 0,
+      frameBytes: expect.any(Number),
+    }));
+    expect(output.destroyed).toBe(false);
+    peer.stop();
+  });
 });

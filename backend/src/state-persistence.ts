@@ -35,7 +35,10 @@ type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'upda
 };
 
 export class AppStatePersistence {
-  private saveChain: Promise<void> = Promise.resolve();
+  private pendingSerialized: string | null = null;
+  private pendingWaiters: Array<{ resolve(): void; reject(error: unknown): void }> = [];
+  private writeInFlight = false;
+  private lastSerialized: string | null = null;
 
   constructor(private readonly filePath: string) {}
 
@@ -54,9 +57,43 @@ export class AppStatePersistence {
   save(snapshot: AppSnapshot): Promise<void> {
     const persisted = persistedStateFromSnapshot(snapshot);
     const serialized = `${JSON.stringify(persisted, null, 2)}\n`;
-    const operation = this.saveChain.then(() => this.writeAtomically(serialized));
-    this.saveChain = operation.catch(() => undefined);
+    if (!this.writeInFlight && this.pendingSerialized === null && serialized === this.lastSerialized) {
+      return Promise.resolve();
+    }
+
+    this.pendingSerialized = serialized;
+    const operation = new Promise<void>((resolve, reject) => {
+      this.pendingWaiters.push({ resolve, reject });
+    });
+    void this.flushPendingSaves();
     return operation;
+  }
+
+  private async flushPendingSaves(): Promise<void> {
+    if (this.writeInFlight) {
+      return;
+    }
+
+    this.writeInFlight = true;
+    try {
+      while (this.pendingSerialized !== null) {
+        const serialized = this.pendingSerialized;
+        this.pendingSerialized = null;
+        const waiters = this.pendingWaiters.splice(0);
+        try {
+          await this.writeAtomically(serialized);
+          this.lastSerialized = serialized;
+          for (const waiter of waiters) waiter.resolve();
+        } catch (error) {
+          for (const waiter of waiters) waiter.reject(error);
+        }
+      }
+    } finally {
+      this.writeInFlight = false;
+      if (this.pendingSerialized !== null) {
+        void this.flushPendingSaves();
+      }
+    }
   }
 
   private async writeAtomically(serialized: string): Promise<void> {

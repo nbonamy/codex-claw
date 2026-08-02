@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { applyMainEventToSnapshot, createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/shared/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
@@ -50,6 +50,17 @@ const daemonStatusError = ref<string | null>(null);
 const hydratingAgentHistoryIds = ref(new Set<string>());
 const catalogLoadsByAgentId = new Map<string, Promise<void>>();
 type CatalogStatus = 'notLoaded' | 'loading' | 'loaded' | 'error';
+type CatalogCacheEntry<T> = {
+  value: T[];
+  status: CatalogStatus;
+  error: string | null;
+  promise: Promise<void> | null;
+  source: unknown;
+};
+
+const modelCatalogCache = new Map<AgentBackend, CatalogCacheEntry<BackendModelOption>>();
+const skillCatalogCache = new Map<string, CatalogCacheEntry<BackendSkillSummary>>();
+const fileCatalogCache = new Map<string, CatalogCacheEntry<AgentFileSearchItem>>();
 type AgentComposerConfiguration = {
   models: BackendModelOption[];
   modelStatus: CatalogStatus;
@@ -67,6 +78,7 @@ type AgentComposerConfiguration = {
 };
 const composerConfigurationByAgentId = new Map<string, AgentComposerConfiguration>();
 let agentSelectionRequestId = 0;
+let catalogSessionSource: unknown = null;
 let unsubscribeMainEvents: (() => void) | null = null;
 let bufferedMainEvents: MainToRendererEvent[] | null = null;
 let lastBackendEventSeq = 0;
@@ -167,6 +179,8 @@ export function useAppState() {
       return;
     }
 
+    resetCatalogStateIfSourceChanged(window.codexClaw);
+
     isLoading.value = true;
     bufferedMainEvents = [];
     subscribeToMainEvents();
@@ -175,7 +189,11 @@ export function useAppState() {
       await synchronizeRendererSnapshot(false);
       if (snapshot.value.activeAgentId) restoreComposerConfiguration(snapshot.value.activeAgentId);
       pruneRemoteBenchCache();
-      await hydrateActiveAgentHistory();
+      // The SDK publishes a complete initial page immediately and continues
+      // older history in the background. Do not hold the entire shell on that
+      // continuation or on catalog warm-up.
+      void hydrateActiveAgentHistory().catch(() => undefined);
+      void loadAllAgentCatalogs().catch(() => undefined);
       await Promise.all([
         loadActiveAgentCatalogs(),
         loadConnectedWorkBacklogs(),
@@ -1833,7 +1851,10 @@ function handleMainEvent(event: MainToRendererEvent, adoptSnapshot = true): void
   syncAnsweredClientRequestsFromMainEvent(event);
   syncComposerModeFromMainEvent(event);
   syncSidePanelFromMainEvent(event);
-  if (event.type === 'skills.changed') void loadBackendSkillsForActiveAgent();
+  if (event.type === 'skills.changed') {
+    skillCatalogCache.clear();
+    void loadAllAgentCatalogs().catch(() => undefined);
+  }
 }
 
 function isBackendMainEvent(event: MainToRendererEvent): boolean {
@@ -1901,9 +1922,9 @@ async function loadActiveAgentCatalogs(agentId = snapshot.value.activeAgentId): 
   }
 
   const load = Promise.all([
-    loadBackendModelsForActiveAgent(agentId, true),
-    loadBackendSkillsForActiveAgent(agentId, true),
-    loadAgentFilesForActiveAgent(agentId, true),
+    loadBackendModelsForActiveAgent(agentId),
+    loadBackendSkillsForActiveAgent(agentId),
+    loadAgentFilesForActiveAgent(agentId),
   ]).then(() => undefined).finally(() => {
     if (catalogLoadsByAgentId.get(agentId) === load) {
       catalogLoadsByAgentId.delete(agentId);
@@ -1911,6 +1932,88 @@ async function loadActiveAgentCatalogs(agentId = snapshot.value.activeAgentId): 
   });
   catalogLoadsByAgentId.set(agentId, load);
   await load;
+}
+
+async function loadAllAgentCatalogs(): Promise<void> {
+  const agentIds = snapshot.value.agents.map((agent) => agent.id);
+  await Promise.all(agentIds.map((agentId) => loadActiveAgentCatalogs(agentId)));
+  const activeAgentId = snapshot.value.activeAgentId;
+  if (activeAgentId) restoreComposerConfiguration(activeAgentId);
+}
+
+function catalogCacheEntry<T>(cache: Map<string, CatalogCacheEntry<T>>, key: string): CatalogCacheEntry<T>;
+function catalogCacheEntry<T>(cache: Map<AgentBackend, CatalogCacheEntry<T>>, key: AgentBackend): CatalogCacheEntry<T>;
+function catalogCacheEntry<T>(cache: Map<string | AgentBackend, CatalogCacheEntry<T>>, key: string | AgentBackend): CatalogCacheEntry<T> {
+  const existing = cache.get(key);
+  if (existing) return existing;
+  const created: CatalogCacheEntry<T> = {
+    value: [],
+    status: 'notLoaded',
+    error: null,
+    promise: null,
+    source: null,
+  };
+  cache.set(key, created);
+  return created;
+}
+
+function catalogKey(agent: Agent): string {
+  return `${agent.backend}:${agent.folder}`;
+}
+
+function resetCatalogCacheIfSourceChanged<T>(cache: CatalogCacheEntry<T>, source: unknown): void {
+  if (cache.source === null || cache.source === source) {
+    cache.source = source;
+    return;
+  }
+  cache.value = [];
+  cache.status = 'notLoaded';
+  cache.error = null;
+  cache.promise = null;
+  cache.source = source;
+}
+
+function resetCatalogStateIfSourceChanged(source: unknown): void {
+  if (catalogSessionSource === null || catalogSessionSource === source) {
+    catalogSessionSource = source;
+    return;
+  }
+  catalogSessionSource = source;
+  modelCatalogCache.clear();
+  skillCatalogCache.clear();
+  fileCatalogCache.clear();
+  composerConfigurationByAgentId.clear();
+  backendModels.value = [];
+  backendSkills.value = [];
+  agentFiles.value = [];
+  modelCatalogStatus.value = 'notLoaded';
+  skillCatalogStatus.value = 'notLoaded';
+  fileCatalogStatus.value = 'notLoaded';
+  modelCatalogError.value = null;
+  skillCatalogError.value = null;
+  fileCatalogError.value = null;
+}
+
+function syncModelCatalogToConfiguration(agentId: string, cache: CatalogCacheEntry<BackendModelOption>): void {
+  const configuration = composerConfiguration(agentId);
+  configuration.models = [...cache.value];
+  configuration.modelStatus = cache.status;
+  configuration.modelError = cache.error;
+  if (cache.status === 'loaded') selectDefaultModelForConfiguration(configuration);
+}
+
+function syncSkillCatalogToConfiguration(agentId: string, cache: CatalogCacheEntry<BackendSkillSummary>): void {
+  const configuration = composerConfiguration(agentId);
+  configuration.skills = [...cache.value];
+  configuration.skillStatus = cache.status;
+  configuration.skillError = cache.error;
+}
+
+function syncFileCatalogToConfiguration(agentId: string, cache: CatalogCacheEntry<AgentFileSearchItem>): void {
+  const configuration = composerConfiguration(agentId);
+  configuration.files = [...cache.value];
+  configuration.fileStatus = cache.status;
+  configuration.fileError = cache.error;
 }
 
 async function loadConnectedWorkBacklogs(): Promise<void> {
@@ -1966,98 +2069,136 @@ async function loadWorkItemsForRepository(provider: WorkProviderKind, repository
   };
 }
 
-async function loadBackendModelsForActiveAgent(agentId = snapshot.value.activeAgentId, allowConcurrent = false): Promise<void> {
-  if (agentId && agentId === snapshot.value.activeAgentId) rememberActiveComposerConfiguration();
-  const configuration = agentId ? composerConfiguration(agentId) : null;
-  if (!agentId || !window.codexClaw?.listBackendModels) {
-    if (configuration) {
-      configuration.models = [];
-      configuration.modelStatus = 'notLoaded';
-      if (agentId && agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
+async function loadBackendModelsForActiveAgent(agentId = snapshot.value.activeAgentId, _allowConcurrent = false): Promise<void> {
+  if (agentId === snapshot.value.activeAgentId) rememberActiveComposerConfiguration();
+  const source = window.codexClaw;
+  const agent = agentId ? snapshot.value.agents.find((candidate) => candidate.id === agentId) : null;
+  const initialConfiguration = agentId ? composerConfiguration(agentId) : null;
+  if (!agent || !source?.listBackendModels) {
+    if (initialConfiguration) {
+      initialConfiguration.models = [];
+      initialConfiguration.modelStatus = 'notLoaded';
+      if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId!);
     }
     return;
   }
+  const configuration = composerConfiguration(agent.id);
+  if (!_allowConcurrent && (configuration.modelStatus === 'loading' || (agent.id === snapshot.value.activeAgentId && modelCatalogStatus.value === 'loading'))) return;
 
-  if (!allowConcurrent && configuration?.modelStatus === 'loading') return;
-
-  configuration!.modelStatus = 'loading';
-  configuration!.modelError = null;
-  if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
-
-  try {
-    const models = await window.codexClaw.listBackendModels(agentId);
-    configuration!.models = models;
-    configuration!.modelStatus = 'loaded';
-    selectDefaultModelForConfiguration(configuration!);
-    if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
-  } catch (error) {
-    configuration!.models = [];
-    configuration!.modelStatus = 'error';
-    configuration!.modelError = error instanceof Error ? error.message : String(error);
-    if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
+  const cache = catalogCacheEntry(modelCatalogCache, agent.backend);
+  resetCatalogCacheIfSourceChanged(cache, source.listBackendModels);
+  if (!cache.promise && cache.status === 'notLoaded') {
+    cache.status = 'loading';
+    cache.error = null;
+    cache.promise = source.listBackendModels(agent.id)
+      .then((models) => {
+        cache.value = models.map((model) => ({ ...model }));
+        cache.status = 'loaded';
+      })
+      .catch((error) => {
+        cache.value = [];
+        cache.status = 'error';
+        cache.error = error instanceof Error ? error.message : String(error);
+      })
+      .finally(() => {
+        cache.promise = null;
+      });
   }
+
+  syncModelCatalogToConfiguration(agent.id, cache);
+  if (agent.id === snapshot.value.activeAgentId) restoreComposerConfiguration(agent.id);
+  await cache.promise;
+  if (source !== window.codexClaw) return;
+  syncModelCatalogToConfiguration(agent.id, cache);
+  if (agent.id === snapshot.value.activeAgentId) restoreComposerConfiguration(agent.id);
 }
 
-async function loadBackendSkillsForActiveAgent(agentId = snapshot.value.activeAgentId, allowConcurrent = false): Promise<void> {
-  if (agentId && agentId === snapshot.value.activeAgentId) rememberActiveComposerConfiguration();
-  const configuration = agentId ? composerConfiguration(agentId) : null;
-  if (!agentId || !window.codexClaw?.listBackendSkills) {
-    if (configuration) {
-      configuration.skills = [];
-      configuration.skillStatus = 'notLoaded';
-      if (agentId && agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
+async function loadBackendSkillsForActiveAgent(agentId = snapshot.value.activeAgentId, _allowConcurrent = false): Promise<void> {
+  if (agentId === snapshot.value.activeAgentId) rememberActiveComposerConfiguration();
+  const source = window.codexClaw;
+  const agent = agentId ? snapshot.value.agents.find((candidate) => candidate.id === agentId) : null;
+  const initialConfiguration = agentId ? composerConfiguration(agentId) : null;
+  if (!agent || !source?.listBackendSkills) {
+    if (initialConfiguration) {
+      initialConfiguration.skills = [];
+      initialConfiguration.skillStatus = 'notLoaded';
+      if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId!);
     }
     return;
   }
+  const configuration = composerConfiguration(agent.id);
+  if (!_allowConcurrent && configuration.skillStatus === 'loading') return;
 
-  if (!allowConcurrent && configuration?.skillStatus === 'loading') return;
-
-  configuration!.skillStatus = 'loading';
-  configuration!.skillError = null;
-  if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
-
-  try {
-    const skills = await window.codexClaw.listBackendSkills(agentId);
-    configuration!.skills = skills;
-    configuration!.skillStatus = 'loaded';
-    if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
-  } catch (error) {
-    configuration!.skills = [];
-    configuration!.skillStatus = 'error';
-    configuration!.skillError = error instanceof Error ? error.message : String(error);
-    if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
+  const cache = catalogCacheEntry(skillCatalogCache, catalogKey(agent));
+  resetCatalogCacheIfSourceChanged(cache, source.listBackendSkills);
+  if (!cache.promise && cache.status === 'notLoaded') {
+    cache.status = 'loading';
+    cache.error = null;
+    cache.promise = source.listBackendSkills(agent.id)
+      .then((skills) => {
+        cache.value = skills.map((skill) => ({ ...skill }));
+        cache.status = 'loaded';
+      })
+      .catch((error) => {
+        cache.value = [];
+        cache.status = 'error';
+        cache.error = error instanceof Error ? error.message : String(error);
+      })
+      .finally(() => {
+        cache.promise = null;
+      });
   }
+
+  syncSkillCatalogToConfiguration(agent.id, cache);
+  if (agent.id === snapshot.value.activeAgentId) restoreComposerConfiguration(agent.id);
+  await cache.promise;
+  if (source !== window.codexClaw) return;
+  syncSkillCatalogToConfiguration(agent.id, cache);
+  if (agent.id === snapshot.value.activeAgentId) restoreComposerConfiguration(agent.id);
 }
 
-async function loadAgentFilesForActiveAgent(agentId = snapshot.value.activeAgentId, allowConcurrent = false): Promise<void> {
-  if (agentId && agentId === snapshot.value.activeAgentId) rememberActiveComposerConfiguration();
-  const configuration = agentId ? composerConfiguration(agentId) : null;
-  if (!agentId || !window.codexClaw?.listAgentFiles) {
-    if (configuration) {
-      configuration.files = [];
-      configuration.fileStatus = 'notLoaded';
-      if (agentId && agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
+async function loadAgentFilesForActiveAgent(agentId = snapshot.value.activeAgentId, _allowConcurrent = false): Promise<void> {
+  if (agentId === snapshot.value.activeAgentId) rememberActiveComposerConfiguration();
+  const source = window.codexClaw;
+  const agent = agentId ? snapshot.value.agents.find((candidate) => candidate.id === agentId) : null;
+  const initialConfiguration = agentId ? composerConfiguration(agentId) : null;
+  if (!agent || !source?.listAgentFiles) {
+    if (initialConfiguration) {
+      initialConfiguration.files = [];
+      initialConfiguration.fileStatus = 'notLoaded';
+      if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId!);
     }
     return;
   }
+  const configuration = composerConfiguration(agent.id);
+  if (!_allowConcurrent && configuration.fileStatus === 'loading') return;
 
-  if (!allowConcurrent && configuration?.fileStatus === 'loading') return;
-
-  configuration!.fileStatus = 'loading';
-  configuration!.fileError = null;
-  if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
-
-  try {
-    const files = await window.codexClaw.listAgentFiles(agentId);
-    configuration!.files = files;
-    configuration!.fileStatus = 'loaded';
-    if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
-  } catch (error) {
-    configuration!.files = [];
-    configuration!.fileStatus = 'error';
-    configuration!.fileError = error instanceof Error ? error.message : String(error);
-    if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
+  const cache = catalogCacheEntry(fileCatalogCache, agent.folder);
+  resetCatalogCacheIfSourceChanged(cache, source.listAgentFiles);
+  if (!cache.promise && cache.status === 'notLoaded') {
+    cache.status = 'loading';
+    cache.error = null;
+    cache.promise = source.listAgentFiles(agent.id)
+      .then((files) => {
+        cache.value = files.map((file) => ({ ...file }));
+        cache.status = 'loaded';
+      })
+      .catch((error) => {
+        cache.value = [];
+        cache.status = 'error';
+        cache.error = error instanceof Error ? error.message : String(error);
+      })
+      .finally(() => {
+        cache.promise = null;
+      });
   }
+
+  syncFileCatalogToConfiguration(agent.id, cache);
+  if (agent.id === snapshot.value.activeAgentId) restoreComposerConfiguration(agent.id);
+  await cache.promise;
+  if (source !== window.codexClaw) return;
+  syncFileCatalogToConfiguration(agent.id, cache);
+  if (agent.id === snapshot.value.activeAgentId) restoreComposerConfiguration(agent.id);
 }
 
 function syncComposerModeFromMainEvent(event: MainToRendererEvent): void {

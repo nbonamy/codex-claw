@@ -89,11 +89,11 @@ implemented:
   attachments, and the current selection/caret, so switching agents restores
   the editor exactly; queued prompts remain backend-owned snapshot state and
   the renderer never removes them before `clawd` confirms dequeue;
-- per-agent in-memory model, reasoning, Fast mode, plan-mode, skill, and file-catalog
-  configuration, restored synchronously on selection before background catalog
-  refresh completes; model and reasoning selections are seeded from the
-  backend thread settings during hydration so reopening Claw does not reset a
-  resumed thread to catalog defaults;
+- per-agent in-memory model, reasoning, Fast mode, and plan-mode selections,
+  restored synchronously on selection; model catalogs are loaded once per
+  backend at startup, while skills and files are cached by working folder and
+  reused across agents; explicit catalog-change events are the only automatic
+  refresh path;
 - a non-blocking connection strip while Electron reconnects to `clawd`; the
   existing conversation remains visible because agents continue in the
   background daemon;

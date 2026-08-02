@@ -1423,6 +1423,43 @@ describe('ClawBackendServer', () => {
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
   });
 
+  it('defers high-frequency turn metadata persistence until completion', async () => {
+    const snapshot = createTestSnapshot();
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+    });
+
+    server.emitEvent({
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-dina',
+      type: 'thread.tokenUsageUpdated',
+      payload: { contextUsage: { totalTokens: 100 } },
+    });
+    server.emitEvent({
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-dina',
+      type: 'turn.planUpdated',
+      payload: { explanation: 'working', plan: [] },
+    });
+    expect(saveSnapshot).not.toHaveBeenCalled();
+
+    server.emitEvent({
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-dina',
+      type: 'turn.completed',
+      payload: { status: 'completed' },
+    });
+    await Promise.resolve();
+    expect(saveSnapshot).toHaveBeenCalledOnce();
+  });
+
   it('keeps execution plans passive and previews only proposed plans', () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];

@@ -280,7 +280,8 @@ tool parts and should not create a tool group in the renderer.
 
 This is preferred over relying on Codex to infer the skill from text alone.
 `skills/changed` is an invalidation notification; `clawd` emits app-owned
-`skills.changed`, and the renderer refreshes the active agent's catalog.
+`skills.changed`, and the renderer invalidates the folder-keyed skill caches
+before warming the known agents again.
 
 ## MCP Enablement
 

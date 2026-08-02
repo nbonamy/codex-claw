@@ -2766,8 +2766,9 @@ function shouldPersistSnapshotForEvent(event: BackendEvent): boolean {
     event.type === 'workBacklog.assignmentUpdated' ||
     event.type === 'thread.started' ||
     event.type === 'thread.settingsUpdated' ||
-    event.type === 'thread.tokenUsageUpdated' ||
-    event.type === 'turn.planUpdated' ||
+    // Token usage and plan updates are high-frequency during a turn. The
+    // completed event persists their latest state in one durable write.
+    event.type === 'turn.completed' ||
     event.type === 'turn.proposedPlanCompleted';
 }
 

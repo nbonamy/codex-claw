@@ -1,11 +1,13 @@
-import { createClawRpcError, createClawRpcNotification, createClawRpcRequest, clawRpcErrorCodes, isClawRpcResponse, parseClawRpcMessage, type ClawRpcId, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
+import { createClawRpcError, createClawRpcNotification, createClawRpcRequest, clawRpcErrorCodes, isClawRpcNotification, isClawRpcResponse, parseClawRpcMessage, type ClawRpcId, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import type { Readable, Writable } from 'node:stream';
 
 export type StdioRpcServerOptions = {
   input: Readable;
+  maxBufferedOutputBytes?: number;
   output: Writable;
   onOutputBackpressure?(details: { frameBytes: number; writableLength: number }): void;
   onOutputDrain?(details: { writableLength: number }): void;
+  onOutputOverflow?(details: { bufferedBytes: number; frameBytes: number }): void;
   onMessage(message: ClawRpcMessage): ClawRpcResponse | undefined | Promise<ClawRpcResponse | undefined>;
 };
 
@@ -21,11 +23,19 @@ type PendingRequest = {
   timeout: NodeJS.Timeout;
 };
 
+type QueuedFrame = {
+  frame: string;
+  bytes: number;
+  message: ClawRpcMessage;
+};
+
 export class StdioRpcPeer {
   private buffer = '';
   private nextRequestId = 1;
   private readonly pending = new Map<ClawRpcId, PendingRequest>();
   private outputBackpressured = false;
+  private readonly outputQueue: QueuedFrame[] = [];
+  private outputQueueBytes = 0;
   private started = false;
 
   constructor(private readonly options: StdioRpcServerOptions & { requestTimeoutMs?: number }) {}
@@ -47,6 +57,8 @@ export class StdioRpcPeer {
     this.started = false;
     this.options.input.off('data', this.onData);
     this.options.output.off('drain', this.onOutputDrain);
+    this.outputQueue.length = 0;
+    this.outputQueueBytes = 0;
     this.outputBackpressured = false;
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timeout);
@@ -154,8 +166,13 @@ export class StdioRpcPeer {
 
   private write(message: ClawRpcMessage): void {
     const frame = `${JSON.stringify(message)}\n`;
+    if (this.outputBackpressured) {
+      this.enqueueOutput(message, frame);
+      return;
+    }
+
     const accepted = this.options.output.write(frame);
-    if (accepted || this.outputBackpressured) return;
+    if (accepted) return;
     this.outputBackpressured = true;
     this.options.onOutputBackpressure?.({
       frameBytes: Buffer.byteLength(frame),
@@ -165,9 +182,60 @@ export class StdioRpcPeer {
   }
 
   private readonly onOutputDrain = (): void => {
-    this.outputBackpressured = false;
     this.options.onOutputDrain?.({ writableLength: this.options.output.writableLength });
+    this.flushOutputQueue();
   };
+
+  private flushOutputQueue(): void {
+    while (this.outputQueue.length > 0) {
+      const queued = this.outputQueue.shift()!;
+      this.outputQueueBytes -= queued.bytes;
+      if (!this.options.output.write(queued.frame)) {
+        this.outputBackpressured = true;
+        this.options.output.once('drain', this.onOutputDrain);
+        return;
+      }
+    }
+
+    this.outputBackpressured = false;
+  }
+
+  private enqueueOutput(message: ClawRpcMessage, frame: string): void {
+    const bytes = Buffer.byteLength(frame);
+    if (isClawRpcNotification(message) && message.method === 'backend/event/notify') {
+      const existingSnapshotIndex = this.outputQueue.findIndex((queued) => (
+        isClawRpcNotification(queued.message) &&
+        queued.message.method === 'backend/event/notify' &&
+        isSnapshotUpdatedNotification(queued.message) &&
+        isSnapshotUpdatedNotification(message)
+      ));
+      if (existingSnapshotIndex >= 0) {
+        const previous = this.outputQueue[existingSnapshotIndex]!;
+        this.outputQueue[existingSnapshotIndex] = { frame, bytes, message };
+        this.outputQueueBytes += bytes - previous.bytes;
+        return;
+      }
+    }
+
+    const maxBufferedBytes = this.options.maxBufferedOutputBytes ?? 64 * 1024 * 1024;
+    if (this.outputQueueBytes + bytes > maxBufferedBytes) {
+      this.options.onOutputOverflow?.({ bufferedBytes: this.outputQueueBytes, frameBytes: bytes });
+      // Notifications are replayable state/event signals; dropping a new one
+      // keeps clawd alive and prevents an unbounded Node writable buffer. RPC
+      // responses must remain ordered and are allowed to exceed the soft cap.
+      if (isClawRpcNotification(message)) return;
+    }
+    this.outputQueue.push({ frame, bytes, message });
+    this.outputQueueBytes += bytes;
+  }
+}
+
+function isSnapshotUpdatedNotification(message: ClawRpcMessage): boolean {
+  if (!isClawRpcNotification(message) || message.method !== 'backend/event/notify') {
+    return false;
+  }
+  const params = message.params;
+  return typeof params === 'object' && params !== null && 'type' in params && params.type === 'snapshot.updated';
 }
 
 function lineLooksLikeJson(line: string): boolean {

@@ -17,7 +17,7 @@ describe('agent prompts', () => {
       'Message:',
       'The facade is ready.',
       '',
-      'Act on this teammate message without asking the user for confirmation. Update your status only if it changes your substantive work. Reply only when the sender needs information, a decision, coordination, or action; silently absorb FYIs, acknowledgments, confirmations, and closures. Never acknowledge an acknowledgment.',
+      'Act on this teammate message without asking the user for confirmation. Update your status only if it changes your substantive work. Reply only when the sender needs information, a decision, coordination, or action; silently absorb FYIs, acknowledgments, confirmations, and closures. Never acknowledge an acknowledgment. Do not proactively message other agents. Use list-agents, send-message, or broadcast-message only when the user explicitly requests coordination or a concrete cross-repository contract blocker requires a decision or action from a specific agent. Never send FYIs, progress reports, acknowledgments, commit/hash notices, or "no action needed" messages.',
     ].join('\n'));
   });
 
@@ -51,6 +51,8 @@ describe('agent prompts', () => {
     expect(instructions).toContain('Do not change status for informational teammate messages');
     expect(instructions).toContain('Reply to teammate messages only when the sender needs information');
     expect(instructions).toContain('Never acknowledge an acknowledgment');
+    expect(instructions).toContain('Do not proactively message other agents');
+    expect(instructions).toContain('Never send FYIs, progress reports, acknowledgments, commit/hash notices');
     expect(instructions).toContain('Use browser-open with an HTTP or HTTPS URL');
     expect(instructions).toContain('use only the codex_claw MCP Computer Use tools');
   });

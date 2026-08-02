@@ -1172,7 +1172,7 @@ describe('useAppState', () => {
     })).toContain('[Body truncated]');
   });
 
-  it('keeps first startup loading until persisted history is complete', async () => {
+  it('shows the shell before persisted history hydration completes', async () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-persisted' };
     const hydratedSnapshot = {
@@ -1208,11 +1208,12 @@ describe('useAppState', () => {
 
     expect(onEvent).toHaveBeenCalledOnce();
     expect(selectAgent).not.toHaveBeenCalled();
-    expect(state.isLoading.value).toBe(true);
+    expect(state.isLoading.value).toBe(false);
     expect(state.isHydratingActiveAgentHistory.value).toBe(true);
     expect(state.visibleMessages.value).toStrictEqual([]);
 
     hydration.resolve(hydratedSnapshot);
+    await vi.waitFor(() => expect(state.visibleMessages.value).toStrictEqual(hydratedSnapshot.messages));
     await loading;
 
     expect(state.isLoading.value).toBe(false);
@@ -2070,27 +2071,17 @@ describe('useAppState', () => {
     expect(state.selectedReasoningEffort.value).toBe('high');
   });
 
-  it('restores each agent composer configuration immediately while catalogs refresh', async () => {
+  it('shares the warmed catalogs across agent switches while preserving composer settings', async () => {
     const base = createInitialSnapshot();
-    const jesseModels = deferred<Array<{
-      id: string;
-      model: string;
-      displayName: string;
-      description: string;
-      hidden: boolean;
-      isDefault: boolean;
-    }>>();
-    const modelsFor = (agentId: string) => [{
-      id: `${agentId}-model`,
-      model: `${agentId}-model`,
-      displayName: `${agentId} model`,
+    const models = [{
+      id: 'shared-model',
+      model: 'shared-model',
+      displayName: 'Shared model',
       description: '',
       hidden: false,
       isDefault: true,
     }];
-    const listBackendModels = vi.fn((agentId: string) => (
-      agentId === 'agent-jesse' ? jesseModels.promise : Promise.resolve(modelsFor(agentId))
-    ));
+    const listBackendModels = vi.fn().mockResolvedValue(models);
     vi.stubGlobal('window', {
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(base),
@@ -2102,18 +2093,17 @@ describe('useAppState', () => {
 
     const state = useAppState();
     await state.loadSnapshot();
-    expect(state.selectedModelId.value).toBe('agent-dina-model');
+    expect(state.selectedModelId.value).toBe('shared-model');
     state.setPlanMode(true);
 
     await state.selectAgent('agent-jesse');
-    expect(state.selectedModelId.value).toBeNull();
+    expect(state.selectedModelId.value).toBe('shared-model');
     expect(state.planMode.value).toBe(false);
-    jesseModels.resolve(modelsFor('agent-jesse'));
-    await vi.waitFor(() => expect(state.selectedModelId.value).toBe('agent-jesse-model'));
 
     await state.selectAgent('agent-dina');
-    expect(state.selectedModelId.value).toBe('agent-dina-model');
+    expect(state.selectedModelId.value).toBe('shared-model');
     expect(state.planMode.value).toBe(true);
+    expect(listBackendModels).toHaveBeenCalledOnce();
     state.setPlanMode(false);
   });
 

@@ -689,6 +689,13 @@ Move to SQLite only when `clawd` needs queryable app state beyond what provider
 backends already persist. Conversation history should not be duplicated in
 Codex Claw unless we need an app-specific cache for performance.
 
+Runtime catalog data is not persisted in `state.json`. The renderer warms model
+catalogs once per backend at startup and caches skills and file listings by
+working folder, so switching agents does not repeat backend RPCs. A catalog
+change event or explicit refresh may invalidate the relevant cache. Snapshot
+writes are coalesced so bursts of backend metadata events write only the latest
+durable projection.
+
 ## Work Backlog Integrations
 
 Work backlog providers are app-owned integrations, not agent backend features.
