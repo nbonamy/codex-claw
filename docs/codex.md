@@ -146,11 +146,13 @@ the shared SDK does not define or normalize a second sandbox-policy model.
 `thread/resume` returns a full-item page of the five newest turns in app-server
 protocol v2. `clawd` translates that page into app-owned `RendererMessage`s and
 emits it immediately; the SDK continues from the returned cursor and emits one
-lifecycle replacement when exhaustive history is ready. Existing active
-sessions remain memory-authoritative and are not re-resumed on selection. The
-renderer asks through the typed bridge to re-select the active persisted agent
-after subscribing to events, so relaunch restores visible history without the
-renderer importing Codex protocol types.
+lifecycle history update when exhaustive history is ready. Since app-server
+history may omit tool calls already observed live, Claw only adds unknown turns
+from lifecycle hydration and never rewrites a turn already present in memory.
+Existing active sessions remain memory-authoritative and are not re-resumed on
+selection. The renderer asks through the typed bridge to re-select the active
+persisted agent after subscribing to events, so relaunch restores visible
+history without the renderer importing Codex protocol types.
 
 The sidebar conversation history uses `thread/list` with the active agent
 folder as an exact `cwd` filter, `archived: false`, and newest-first

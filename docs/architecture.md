@@ -760,17 +760,19 @@ Agent selection is optimistic only when the renderer already has hydrated
 messages for that agent. First startup and the first visit to an uncached
 conversation keep the history loader visible until the full-item five-turn
 bootstrap page arrives, then reveal that recent transcript immediately. The SDK
-continues older full-history pagination from the bootstrap cursor and replaces
-the transcript once when exhaustive hydration finishes. Git status and
-agent-specific catalogs still reconcile in the background. Selection requests
-carry a monotonic renderer token so a stale response from a rapid earlier
-switch cannot replace the current agent.
+continues older full-history pagination from the bootstrap cursor. Because
+app-server history can omit tool items that were observed live, lifecycle
+hydration may add previously unknown turns but never rewrites a turn already in
+Claw memory. Git status and agent-specific catalogs still reconcile in the
+background. Selection requests carry a monotonic renderer token so a stale
+response from a rapid earlier switch cannot replace the current agent.
 Live Codex transcripts remain cached in `clawd` for five minutes after
 hydration or conversation activity. Re-selecting an agent within that window
 reuses the in-memory transcript; stale idle revalidation publishes a fresh
-five-turn bootstrap and then the exhaustive lifecycle replacement. Conversations
-with an active turn stay memory-authoritative and reconcile through their live
-app-server events instead of being replaced by a resume bootstrap.
+five-turn bootstrap and then merges previously unknown turns from exhaustive
+lifecycle hydration. Conversations with an active turn stay memory-authoritative
+and reconcile through their live app-server events instead of being replaced by
+a resume bootstrap.
 
 Dragging a work item onto an agent records provider-neutral assignment metadata
 in `workBacklog.assignments`, keyed by provider and provider-generated item id,

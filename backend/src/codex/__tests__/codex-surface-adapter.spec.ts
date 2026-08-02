@@ -631,7 +631,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
   });
 
-  it('publishes the initial five full turns before replacing them with background history', async () => {
+  it('publishes the initial five full turns before merging unknown background history', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     transport.turnsListDelayMs = 25;
@@ -659,6 +659,9 @@ describe('CodexSurfaceAgentAdapter', () => {
     await vi.waitFor(() => {
       const historyEvents = events.filter((event) => event.type === 'thread.historyLoaded');
       expect(historyEvents).toHaveLength(2);
+      expect(historyEvents[1]).toMatchObject({
+        payload: { preserveKnownTurns: true, replace: false },
+      });
       expect((historyEvents[1]?.payload as { messages: unknown[] }).messages).toHaveLength(6);
     });
   });
@@ -721,7 +724,9 @@ describe('CodexSurfaceAgentAdapter', () => {
       expect(transport.sent.filter((message) => (
         'method' in message && message.method === 'thread/resume'
       ))).toHaveLength(2);
-      expect(events.filter((event) => event.type === 'thread.historyLoaded')).toHaveLength(1);
+      expect(events.filter((event) => event.type === 'thread.historyLoaded')).toStrictEqual([
+        expect.objectContaining({ payload: expect.objectContaining({ preserveKnownTurns: true, replace: false }) }),
+      ]);
     } finally {
       vi.useRealTimers();
     }

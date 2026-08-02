@@ -310,7 +310,7 @@ export class CodexSurfaceAgentAdapter {
         const snapshot = existing.handle.getSnapshot();
         // Publish load's full initial page now. SDK lifecycle hydration will
         // emit the exhaustive replacement after continuing from its cursor.
-        this.publishInitial(existing, snapshot, true);
+        this.publishInitial(existing, snapshot, true, true);
         existing.suppressEvents = wasSuppressingEvents;
       } finally {
         existing.suppressEvents = wasSuppressingEvents;
@@ -461,9 +461,12 @@ export class CodexSurfaceAgentAdapter {
     session: AgentConversation,
     snapshot: CodexConversationSnapshot,
     emitHistory: boolean,
+    preserveKnownTurns = false,
   ): void {
     this.emitThread(session, { type: 'thread.started', payload: { cwd: conversationCwd(snapshot) } });
-    if (emitHistory) this.emitHistory(session, snapshot.messages, undefined, snapshot.activeTurnId === null);
+    if (emitHistory) {
+      this.emitHistory(session, snapshot.messages, undefined, snapshot.activeTurnId === null, preserveKnownTurns);
+    }
     this.emitSettings(
       session,
       snapshot.approvalPreset,
@@ -525,7 +528,7 @@ export class CodexSurfaceAgentAdapter {
         return;
       case 'conversation.historyReplaced':
         if (event.origin === 'action') return;
-        this.emitHistory(session, event.payload.messages, event.occurredAt);
+        this.emitHistory(session, event.payload.messages, event.occurredAt, false, true);
         return;
       case 'conversation.activityChanged':
         this.emitStatus(session, statusFromSnapshot(session.handle.getSnapshot()), event.occurredAt);
@@ -733,10 +736,15 @@ export class CodexSurfaceAgentAdapter {
     messages: readonly SurfaceMessage[],
     occurredAt?: string,
     completeStreaming = false,
+    preserveKnownTurns = false,
   ): void {
     this.emitThread(session, {
       type: 'thread.historyLoaded',
-      payload: { messages: surfaceMessages(messages, session.agent.id, completeStreaming), replace: true },
+      payload: {
+        messages: surfaceMessages(messages, session.agent.id, completeStreaming),
+        replace: !preserveKnownTurns,
+        ...(preserveKnownTurns ? { preserveKnownTurns: true } : {}),
+      },
       ...(occurredAt ? { occurredAt } : {}),
     });
   }

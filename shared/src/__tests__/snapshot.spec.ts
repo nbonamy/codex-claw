@@ -833,6 +833,84 @@ describe('snapshot reducer', () => {
     expect(snapshot.messages.map((message) => message.id)).toStrictEqual(['user-turn-1']);
   });
 
+  it('adds unknown hydrated turns without replacing known tool calls or steering', () => {
+    const snapshot = createInitialSnapshot();
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-live',
+      type: 'item.completed',
+      payload: toolPartPayload(commandToolPart({
+        id: 'cmd-live',
+        title: 'npm test',
+        status: 'completed',
+        body: 'tests passed',
+        cwd: '/workspace',
+        commandActions: [],
+        exitCode: 0,
+        durationMs: 20,
+      })),
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-live',
+      type: 'message.steer',
+      payload: { prompt: 'Keep going with the focused test.' },
+      occurredAt: '2026-06-05T00:00:04.000Z',
+    });
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 3,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.historyLoaded',
+      payload: {
+        replace: false,
+        preserveKnownTurns: true,
+        messages: [
+          {
+            id: 'assistant-turn-old',
+            agentId: 'agent-dina',
+            role: 'assistant',
+            status: 'complete',
+            turnId: 'turn-old',
+            createdAt: '2026-06-05T00:00:01.000Z',
+            parts: [{ type: 'text', text: 'Older history.' }],
+          },
+          {
+            id: 'assistant-turn-live',
+            agentId: 'agent-dina',
+            role: 'assistant',
+            status: 'complete',
+            turnId: 'turn-live',
+            createdAt: '2026-06-05T00:00:03.000Z',
+            parts: [{ type: 'text', text: 'Incomplete app-server history.' }],
+          },
+        ],
+      },
+      occurredAt: '2026-06-05T00:00:05.000Z',
+    });
+
+    expect(snapshot.messages.map((message) => message.id)).toStrictEqual([
+      'assistant-turn-old',
+      'assistant-turn-live',
+      'steer-turn-live-20260605t000004000z',
+      'assistant-turn-live-segment-20260605t000004000z',
+    ]);
+    expect(snapshot.messages[1]).toMatchObject({
+      id: 'assistant-turn-live',
+      parts: [expect.objectContaining({ type: 'tool', id: 'cmd-live', body: 'tests passed' })],
+    });
+    expect(snapshot.messages[2]).toMatchObject({
+      kind: 'steer',
+      parts: [{ type: 'text', text: 'Keep going with the focused test.' }],
+    });
+  });
+
   it('ignores malformed resumed history payloads', () => {
     const snapshot = createInitialSnapshot();
     appendUserPrompt(snapshot, 'agent-dina', 'keep me', '2026-06-05T00:00:03.000Z');
