@@ -6,7 +6,7 @@ import { createClawdRuntime, type ClawdRuntime } from './runtime';
 import { backendSocketPath } from './state';
 import { LocalSocketRpcServer } from './socket-server';
 import { StdioRpcPeer } from './stdio';
-import { flushBackendLogs, logMain, warnMain } from './log';
+import { debugMain, flushBackendLogs, logMain, warnMain } from './log';
 import backendPackage from '../package.json';
 
 export const CLAWD_VERSION = backendPackage.version;
@@ -106,8 +106,8 @@ async function runStdio(): Promise<void> {
   const stdio = new StdioRpcPeer({
     input: process.stdin,
     output: process.stdout,
-    onOutputBackpressure: (details) => warnMain('stdio', 'output backpressure', details),
-    onOutputDrain: (details) => logMain('stdio', 'output drained', details),
+    onOutputBackpressure: (details) => debugMain('stdio', 'output buffered', details),
+    onOutputDrain: (details) => debugMain('stdio', 'output drained', details),
     onMessage: (message) => runtime.server.handleMessage(message),
   });
   runtime = await createClawdRuntime({
