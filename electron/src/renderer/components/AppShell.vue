@@ -2080,6 +2080,7 @@ function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
 }
 
 .app-shell__right-workspace-resizer {
+  position: relative;
   flex: 0 0 5px;
   order: 1;
   cursor: col-resize;
@@ -2087,5 +2088,15 @@ function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
   z-index: 1;
 }
 
-.app-shell__right-workspace-resizer:hover { background: var(--color-primary); }
+.app-shell__right-workspace-resizer::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 2px;
+  width: 1px;
+  background: transparent;
+}
+
+.app-shell__right-workspace-resizer:hover::after {
+  background: var(--color-resize-handle-hover);
+}
 </style>
