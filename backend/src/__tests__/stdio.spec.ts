@@ -155,28 +155,21 @@ describe('stdio JSON-RPC transport', () => {
     peer.stop();
   });
 
-  it('terminates the transport instead of buffering output without a bound', () => {
+  it('keeps the transport alive while Node buffers complete frames', () => {
     const input = new PassThrough();
     const output = new PassThrough({ highWaterMark: 1 });
-    output.on('error', () => undefined);
-    const onOutputOverflow = vi.fn();
     const peer = new StdioRpcPeer({
       input,
       output,
-      maxBufferedOutputBytes: 1,
       onMessage: () => undefined,
-      onOutputOverflow,
     });
     peer.start();
 
     peer.notify('backend/event', { value: 'first' });
     peer.notify('backend/event', { value: 'second' });
 
-    expect(onOutputOverflow).toHaveBeenCalledWith(expect.objectContaining({
-      bufferedBytes: 0,
-      frameBytes: expect.any(Number),
-    }));
-    expect(output.destroyed).toBe(true);
+    expect(output.destroyed).toBe(false);
+    expect(output.readableLength).toBeGreaterThan(0);
     peer.stop();
   });
 });

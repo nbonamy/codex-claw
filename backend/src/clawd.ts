@@ -108,7 +108,6 @@ async function runStdio(): Promise<void> {
     output: process.stdout,
     onOutputBackpressure: (details) => warnMain('stdio', 'output backpressure', details),
     onOutputDrain: (details) => logMain('stdio', 'output drained', details),
-    onOutputOverflow: (details) => warnMain('stdio', 'output buffer limit exceeded', details),
     onMessage: (message) => runtime.server.handleMessage(message),
   });
   runtime = await createClawdRuntime({

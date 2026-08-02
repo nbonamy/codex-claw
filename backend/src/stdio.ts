@@ -3,11 +3,9 @@ import type { Readable, Writable } from 'node:stream';
 
 export type StdioRpcServerOptions = {
   input: Readable;
-  maxBufferedOutputBytes?: number;
   output: Writable;
   onOutputBackpressure?(details: { frameBytes: number; writableLength: number }): void;
   onOutputDrain?(details: { writableLength: number }): void;
-  onOutputOverflow?(details: { bufferedBytes: number; frameBytes: number }): void;
   onMessage(message: ClawRpcMessage): ClawRpcResponse | undefined | Promise<ClawRpcResponse | undefined>;
 };
 
@@ -28,8 +26,6 @@ export class StdioRpcPeer {
   private nextRequestId = 1;
   private readonly pending = new Map<ClawRpcId, PendingRequest>();
   private outputBackpressured = false;
-  private readonly outputQueue: string[] = [];
-  private outputQueueBytes = 0;
   private started = false;
 
   constructor(private readonly options: StdioRpcServerOptions & { requestTimeoutMs?: number }) {}
@@ -51,8 +47,6 @@ export class StdioRpcPeer {
     this.started = false;
     this.options.input.off('data', this.onData);
     this.options.output.off('drain', this.onOutputDrain);
-    this.outputQueue.length = 0;
-    this.outputQueueBytes = 0;
     this.outputBackpressured = false;
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timeout);
@@ -160,12 +154,8 @@ export class StdioRpcPeer {
 
   private write(message: ClawRpcMessage): void {
     const frame = `${JSON.stringify(message)}\n`;
-    if (this.outputBackpressured) {
-      this.enqueueOutput(frame);
-      return;
-    }
     const accepted = this.options.output.write(frame);
-    if (accepted) return;
+    if (accepted || this.outputBackpressured) return;
     this.outputBackpressured = true;
     this.options.onOutputBackpressure?.({
       frameBytes: Buffer.byteLength(frame),
@@ -175,29 +165,9 @@ export class StdioRpcPeer {
   }
 
   private readonly onOutputDrain = (): void => {
-    this.options.onOutputDrain?.({ writableLength: this.options.output.writableLength });
-    while (this.outputQueue.length > 0) {
-      const frame = this.outputQueue.shift()!;
-      this.outputQueueBytes -= Buffer.byteLength(frame);
-      if (!this.options.output.write(frame)) {
-        this.options.output.once('drain', this.onOutputDrain);
-        return;
-      }
-    }
     this.outputBackpressured = false;
+    this.options.onOutputDrain?.({ writableLength: this.options.output.writableLength });
   };
-
-  private enqueueOutput(frame: string): void {
-    const frameBytes = Buffer.byteLength(frame);
-    const maxBufferedBytes = this.options.maxBufferedOutputBytes ?? 8 * 1024 * 1024;
-    if (this.outputQueueBytes + frameBytes > maxBufferedBytes) {
-      this.options.onOutputOverflow?.({ bufferedBytes: this.outputQueueBytes, frameBytes });
-      this.options.output.destroy(new Error('clawd RPC output buffer exceeded its safety limit.'));
-      return;
-    }
-    this.outputQueue.push(frame);
-    this.outputQueueBytes += frameBytes;
-  }
 }
 
 function lineLooksLikeJson(line: string): boolean {
