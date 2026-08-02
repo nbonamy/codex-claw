@@ -1049,6 +1049,25 @@ describe('snapshot reducer', () => {
     });
   });
 
+  it('removes an agent status text when collaboration explicitly clears it', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.statusText = 'Reviewing MCP shape';
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'agent.updated',
+      payload: {
+        id: 'agent-dina',
+        statusText: null,
+        updatedAt: '2026-06-05T00:00:02.000Z',
+      },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(snapshot.agents[0]!.statusText).toBeUndefined();
+  });
+
   it('applies work backlog assignment updates from MCP tools', () => {
     const snapshot = createInitialSnapshot();
 

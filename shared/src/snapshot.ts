@@ -308,7 +308,11 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   if (event.type === 'agent.updated') {
     const agent = findAgent(snapshot, event.agentId);
     if (agent && isRecord(event.payload)) {
+      const statusText = event.payload.statusText;
       Object.assign(agent, event.payload);
+      if (statusText === null) {
+        delete agent.statusText;
+      }
     }
     return;
   }

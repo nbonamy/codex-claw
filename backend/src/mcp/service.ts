@@ -61,7 +61,9 @@ export class ClawMcpService {
       onAgentUpdated: (agent) => this.emit({
         agentId: agent.id,
         type: 'agent.updated',
-        payload: agent,
+        // JSON-RPC omits undefined properties. Preserve an explicit clear so
+        // renderer snapshots can remove a previously displayed status text.
+        payload: { ...agent, statusText: agent.statusText ?? null },
       }),
       onInboxMessage: (agentId) => {
         void this.deliverUnreadAgentMessages(agentId);

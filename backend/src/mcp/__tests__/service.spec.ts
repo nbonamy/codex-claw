@@ -14,6 +14,25 @@ describe('ClawMcpService', () => {
     service = null;
   });
 
+  it('serializes an explicit null when set-status clears the current text', async () => {
+    const snapshot = createInitialSnapshot();
+    const events: unknown[] = [];
+    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    const url = await service.start();
+
+    const response = await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 1, method: 'tools/call',
+      params: { name: 'set-status', arguments: { status: '' } },
+    });
+
+    expect(response.result.isError).toBe(false);
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-dina',
+      type: 'agent.updated',
+      payload: expect.objectContaining({ statusText: null }),
+    }));
+  });
+
   it('serves Claw collaboration tools from clawd and injects teammate messages through backend drivers', async () => {
     const snapshot = createInitialSnapshot();
     const events: unknown[] = [];
