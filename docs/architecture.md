@@ -755,6 +755,12 @@ already-hydrated messages are displayed immediately, while the backend's
 session hydration, Git status refresh, and agent-specific catalogs reconcile in
 the background. Selection requests carry a monotonic renderer token so a stale
 response from a rapid earlier switch cannot replace the current agent.
+Live Codex transcripts remain cached in `clawd` for five minutes after
+hydration or conversation activity. Re-selecting an agent within that window
+reuses the in-memory transcript; stale revalidation suppresses intermediate
+history events and publishes the refreshed transcript atomically. Conversations
+with an active turn still revalidate on selection so external interruption is
+reconciled promptly.
 
 Dragging a work item onto an agent records provider-neutral assignment metadata
 in `workBacklog.assignments`, keyed by provider and provider-generated item id,

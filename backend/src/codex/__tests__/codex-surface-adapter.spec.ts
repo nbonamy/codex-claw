@@ -467,6 +467,7 @@ describe('CodexSurfaceAgentAdapter', () => {
       type: 'agent.statusChanged',
       payload: { type: 'working' },
     }));
+    expect(events.filter((event) => event.type === 'thread.historyLoaded')).toHaveLength(1);
 
     transport.summaryTurnsByThreadId.set('thread-a', [turn('turn-thread-a', 'inProgress')]);
     events.length = 0;
@@ -481,6 +482,7 @@ describe('CodexSurfaceAgentAdapter', () => {
       type: 'agent.statusChanged',
       payload: { type: 'working' },
     }));
+    expect(events.filter((event) => event.type === 'thread.historyLoaded')).toHaveLength(1);
 
     transport.summaryTurnsByThreadId.set('thread-a', [turn('turn-thread-a', 'interrupted')]);
     events.length = 0;
@@ -498,6 +500,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     expect(events.find((event) => event.type === 'thread.historyLoaded')).toMatchObject({
       payload: { messages: expect.not.arrayContaining([expect.objectContaining({ status: 'streaming' })]) },
     });
+    expect(events.filter((event) => event.type === 'thread.historyLoaded')).toHaveLength(1);
   });
 
   it('replaces summary-only restart history with every persisted turn item', async () => {
@@ -556,6 +559,9 @@ describe('CodexSurfaceAgentAdapter', () => {
     expect(events.filter((event) => event.type === 'thread.historyLoaded')).toHaveLength(1);
     events.length = 0;
 
+    await adapter.hydrateAgent(agentA);
+    expect(events.filter((event) => event.type === 'thread.historyLoaded')).toHaveLength(0);
+
     await adapter.setThreadGoal(agentA, 'Ship it');
     await adapter.clearThreadGoal(agentA);
     expect(events.some((event) => event.type === 'thread.goalUpdated' || event.type === 'thread.goalCleared')).toBe(false);
@@ -572,6 +578,29 @@ describe('CodexSurfaceAgentAdapter', () => {
     events.length = 0;
     await adapter.rollbackToTurn(agentA, 'turn-thread-a');
     expect(events.some((event) => event.type === 'thread.historyLoaded')).toBe(false);
+  });
+
+  it('revalidates an idle cached transcript after its freshness ttl', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-08-01T00:00:00.000Z'));
+      const { adapter, transport } = createAdapter();
+      const events: BackendEvent[] = [];
+      adapter.onEvent((event) => events.push(event));
+
+      await adapter.hydrateAgent(agentA);
+      events.length = 0;
+      vi.setSystemTime(new Date('2026-08-01T00:05:00.001Z'));
+
+      await adapter.hydrateAgent(agentA);
+
+      expect(transport.sent.filter((message) => (
+        'method' in message && message.method === 'thread/resume'
+      ))).toHaveLength(2);
+      expect(events.filter((event) => event.type === 'thread.historyLoaded')).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('maps notification-only compaction completion once and dedupes action-start echoes', async () => {

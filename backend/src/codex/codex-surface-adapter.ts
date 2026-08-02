@@ -38,6 +38,8 @@ import type {
 
 type AdapterListener = (event: BackendEvent) => void;
 
+const AGENT_HISTORY_CACHE_TTL_MS = 5 * 60 * 1_000;
+
 type AgentConversation = {
   agent: Agent;
   completedCompactionItemIds: Set<string>;
@@ -50,6 +52,7 @@ type AgentConversation = {
 export class CodexSurfaceAgentAdapter {
   private readonly listeners = new Set<AdapterListener>();
   private readonly sessionsByAgentId = new Map<string, AgentConversation>();
+  private readonly historyHydratedAtByAgentId = new Map<string, number>();
   private readonly agentIdsByThreadId = new Map<string, string>();
   private readonly approvalOwners = new Map<string, AgentConversation>();
   private readonly clientRequestOwners = new Map<string, AgentConversation>();
@@ -185,6 +188,7 @@ export class CodexSurfaceAgentAdapter {
     if (!session) return;
     session.unsubscribe();
     this.sessionsByAgentId.delete(agentId);
+    this.historyHydratedAtByAgentId.delete(agentId);
     if (this.agentIdsByThreadId.get(session.handle.id) === agentId) {
       this.agentIdsByThreadId.delete(session.handle.id);
     }
@@ -231,11 +235,24 @@ export class CodexSurfaceAgentAdapter {
     const existing = this.sessionsByAgentId.get(agent.id);
     if (existing?.handle.id === threadId) {
       existing.agent = agent;
-      const snapshot = await existing.handle.load({ cwd: expandHome(agent.folder), extensionContext: agent });
-      this.publishInitial(existing, snapshot, true);
+      const hydratedAt = this.historyHydratedAtByAgentId.get(agent.id) ?? 0;
+      const conversationIsIdle = existing.handle.getSnapshot().activeTurnId === null;
+      if (conversationIsIdle && Date.now() - hydratedAt < AGENT_HISTORY_CACHE_TTL_MS) return threadId;
+
+      const wasSuppressingEvents = existing.suppressEvents;
+      existing.suppressEvents = true;
+      try {
+        const snapshot = await existing.handle.load({ cwd: expandHome(agent.folder), extensionContext: agent });
+        this.historyHydratedAtByAgentId.set(agent.id, Date.now());
+        existing.suppressEvents = wasSuppressingEvents;
+        this.publishInitial(existing, snapshot, true);
+      } finally {
+        existing.suppressEvents = wasSuppressingEvents;
+      }
       return threadId;
     }
     await this.bindAndLoad(agent, threadId, true);
+    this.historyHydratedAtByAgentId.set(agent.id, Date.now());
     return threadId;
   }
 
@@ -268,6 +285,7 @@ export class CodexSurfaceAgentAdapter {
     this.unsubscribeSurface();
     for (const session of this.sessionsByAgentId.values()) session.unsubscribe();
     this.sessionsByAgentId.clear();
+    this.historyHydratedAtByAgentId.clear();
     this.agentIdsByThreadId.clear();
     this.approvalOwners.clear();
     this.clientRequestOwners.clear();
@@ -427,6 +445,7 @@ export class CodexSurfaceAgentAdapter {
 
   private handleConversationEvent(session: AgentConversation, event: CodexConversationEvent): void {
     if (session.suppressEvents) return;
+    this.historyHydratedAtByAgentId.set(session.agent.id, Date.now());
     const metadata = { occurredAt: event.occurredAt };
     switch (event.type) {
       case 'conversation.summaryUpserted':
