@@ -32,6 +32,7 @@ export interface WorkProviderDriver {
   configured(): boolean;
   startAuthorization(): Promise<WorkProviderDeviceAuthorization>;
   pollAuthorization(deviceCode: string): Promise<WorkProviderDeviceTokenResult>;
+  refreshToken?(token: WorkProviderToken): Promise<WorkProviderToken>;
   currentAccountLabel(token: WorkProviderToken): Promise<string>;
   listRepositories(token: WorkProviderToken): Promise<WorkRepository[]>;
   listItems(token: WorkProviderToken, repositoryId: string): Promise<WorkItem[]>;

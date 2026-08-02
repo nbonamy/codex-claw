@@ -5,6 +5,9 @@ export type WorkProviderToken = {
   accessToken: string;
   tokenType: string;
   scope?: string;
+  expiresAt?: string;
+  refreshToken?: string;
+  refreshTokenExpiresAt?: string;
   accountLabel?: string;
   connectedAt: string;
 };

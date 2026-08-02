@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { WorkProviderToken } from '@codex-claw/shared/work-integration-tokens';
 import { GitHubWorkProviderDriver } from '../github-driver';
 
 afterEach(() => {
@@ -40,6 +41,62 @@ describe('GitHubWorkProviderDriver', () => {
     const driver = new GitHubWorkProviderDriver(() => 'client-id');
 
     await expect(driver.startAuthorization()).rejects.toThrow('Device Flow must be explicitly enabled for this App');
+  });
+
+  it('captures and rotates expiring GitHub App user tokens from device flow', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-08-01T00:00:00.000Z'));
+      const fetch = vi.fn()
+        .mockResolvedValueOnce(jsonResponse({
+          access_token: 'ghu_access_1',
+          expires_in: 28_800,
+          refresh_token: 'ghr_refresh_1',
+          refresh_token_expires_in: 15_897_600,
+          token_type: 'bearer',
+          scope: '',
+        }))
+        .mockResolvedValueOnce(jsonResponse({
+          access_token: 'ghu_access_2',
+          expires_in: 28_800,
+          refresh_token: 'ghr_refresh_2',
+          refresh_token_expires_in: 15_897_600,
+          token_type: 'bearer',
+          scope: '',
+        }));
+      vi.stubGlobal('fetch', fetch);
+      const driver = new GitHubWorkProviderDriver('client-id');
+
+      const authorization = await driver.pollAuthorization('device-code');
+      expect(authorization).toStrictEqual({
+        status: 'success',
+        token: {
+          accessToken: 'ghu_access_1',
+          expiresAt: '2026-08-01T08:00:00.000Z',
+          refreshToken: 'ghr_refresh_1',
+          refreshTokenExpiresAt: '2027-02-01T00:00:00.000Z',
+          scope: '',
+          tokenType: 'bearer',
+        },
+      });
+      if (authorization.status !== 'success') throw new Error('Expected successful device authorization.');
+      const token: WorkProviderToken = {
+        provider: 'github',
+        ...authorization.token,
+        connectedAt: '2026-08-01T00:00:00.000Z',
+      };
+
+      await expect(driver.refreshToken(token)).resolves.toMatchObject({
+        accessToken: 'ghu_access_2',
+        refreshToken: 'ghr_refresh_2',
+      });
+      const refreshBody = fetch.mock.calls[1]?.[1]?.body;
+      expect(refreshBody).toBeInstanceOf(URLSearchParams);
+      expect((refreshBody as URLSearchParams).get('grant_type')).toBe('refresh_token');
+      expect((refreshBody as URLSearchParams).get('refresh_token')).toBe('ghr_refresh_1');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('reads client ID from a dynamic provider', async () => {

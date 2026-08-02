@@ -79,6 +79,9 @@ function isPersistedToken(value: unknown): value is WorkProviderToken {
     typeof value.tokenType === 'string' &&
     typeof value.connectedAt === 'string' &&
     (value.scope === undefined || typeof value.scope === 'string') &&
+    (value.expiresAt === undefined || typeof value.expiresAt === 'string') &&
+    (value.refreshToken === undefined || typeof value.refreshToken === 'string') &&
+    (value.refreshTokenExpiresAt === undefined || typeof value.refreshTokenExpiresAt === 'string') &&
     (value.accountLabel === undefined || typeof value.accountLabel === 'string');
 }
 

@@ -17,6 +17,7 @@ type PendingAuthorization = WorkProviderDeviceAuthorization & {
 export class WorkIntegrationManager {
   private readonly drivers = new Map<WorkProviderKind, WorkProviderDriver>();
   private readonly pendingAuthorizations = new Map<WorkProviderKind, PendingAuthorization>();
+  private readonly tokenRefreshes = new Map<WorkProviderKind, Promise<WorkProviderToken>>();
 
   constructor(private readonly options: WorkIntegrationManagerOptions) {
     for (const driver of options.drivers) {
@@ -274,7 +275,42 @@ export class WorkIntegrationManager {
       throw new Error(`${providerLabel(provider)} is not connected.`);
     }
 
-    return token;
+    if (!tokenNeedsRefresh(token)) return token;
+
+    const existingRefresh = this.tokenRefreshes.get(provider);
+    if (existingRefresh) return existingRefresh;
+
+    const driver = this.driver(provider);
+    if (!driver.refreshToken || !token.refreshToken || refreshTokenExpired(token)) {
+      await this.markReconnectRequired(provider);
+      throw new Error(`${providerLabel(provider)} needs to be reconnected.`);
+    }
+
+    const refresh = driver.refreshToken(token)
+      .then(async (refreshedToken) => {
+        await this.options.tokenStore.set(refreshedToken);
+        return refreshedToken;
+      })
+      .catch(async (error: unknown) => {
+        await this.markReconnectRequired(provider);
+        throw error;
+      })
+      .finally(() => {
+        if (this.tokenRefreshes.get(provider) === refresh) {
+          this.tokenRefreshes.delete(provider);
+        }
+      });
+    this.tokenRefreshes.set(provider, refresh);
+    return refresh;
+  }
+
+  private async markReconnectRequired(provider: WorkProviderKind): Promise<void> {
+    this.setConnection({
+      provider,
+      status: 'disconnected',
+      detail: `${providerLabel(provider)} authorization expired. Reconnect to continue.`,
+    });
+    await this.options.saveSnapshot();
   }
 
   private driver(provider: WorkProviderKind): WorkProviderDriver {
@@ -305,6 +341,20 @@ export class WorkIntegrationManager {
     snapshot.workBacklog.connections[index] = connection;
     return true;
   }
+}
+
+const TOKEN_REFRESH_SKEW_MS = 60_000;
+
+function tokenNeedsRefresh(token: WorkProviderToken): boolean {
+  if (!token.expiresAt) return false;
+  const expiresAt = Date.parse(token.expiresAt);
+  return Number.isFinite(expiresAt) && expiresAt <= Date.now() + TOKEN_REFRESH_SKEW_MS;
+}
+
+function refreshTokenExpired(token: WorkProviderToken): boolean {
+  if (!token.refreshTokenExpiresAt) return false;
+  const expiresAt = Date.parse(token.refreshTokenExpiresAt);
+  return Number.isFinite(expiresAt) && expiresAt <= Date.now();
 }
 
 function normalizedOptionalString(value: string | null | undefined): string | null {

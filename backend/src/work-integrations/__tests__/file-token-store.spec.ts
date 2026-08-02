@@ -24,18 +24,25 @@ describe('FileWorkIntegrationTokenStore', () => {
       accessToken: 'gho_secret',
       tokenType: 'bearer',
       scope: 'repo read:user',
+      expiresAt: '2026-06-11T20:00:00.000Z',
+      refreshToken: 'ghr_secret',
+      refreshTokenExpiresAt: '2026-12-12T12:00:00.000Z',
       accountLabel: 'nbonamy',
       connectedAt: '2026-06-11T12:00:00.000Z',
     });
 
     const rawFile = await readFile(filePath, 'utf8');
     expect(rawFile).toContain('"accessToken": "gho_secret"');
+    expect(rawFile).toContain('"refreshToken": "ghr_secret"');
     expect(rawFile).not.toContain('encryptedAccessToken');
     await expect(store.get('github')).resolves.toStrictEqual({
       provider: 'github',
       accessToken: 'gho_secret',
       tokenType: 'bearer',
       scope: 'repo read:user',
+      expiresAt: '2026-06-11T20:00:00.000Z',
+      refreshToken: 'ghr_secret',
+      refreshTokenExpiresAt: '2026-12-12T12:00:00.000Z',
       accountLabel: 'nbonamy',
       connectedAt: '2026-06-11T12:00:00.000Z',
     });

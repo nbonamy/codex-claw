@@ -117,8 +117,47 @@ export class GitHubWorkProviderDriver implements WorkProviderDriver {
         accessToken: response.access_token,
         tokenType: typeof response.token_type === 'string' ? response.token_type : 'bearer',
         ...(typeof response.scope === 'string' ? { scope: response.scope } : {}),
+        ...(typeof response.expires_in === 'number' ? { expiresAt: expiresAt(response.expires_in) } : {}),
+        ...(typeof response.refresh_token === 'string' ? { refreshToken: response.refresh_token } : {}),
+        ...(typeof response.refresh_token_expires_in === 'number'
+          ? { refreshTokenExpiresAt: expiresAt(response.refresh_token_expires_in) }
+          : {}),
       },
     };
+  }
+
+  async refreshToken(token: WorkProviderToken): Promise<WorkProviderToken> {
+    if (!this.configured() || !token.refreshToken) {
+      throw new Error('GitHub needs to be reconnected.');
+    }
+
+    const response = await githubOAuthRequest(`${GITHUB_OAUTH_BASE_URL}/oauth/access_token`, {
+      client_id: this.clientId(),
+      grant_type: 'refresh_token',
+      refresh_token: token.refreshToken,
+    });
+    if (isRecord(response) && typeof response.error === 'string') {
+      throw new Error(githubOAuthErrorMessage(response));
+    }
+    if (!isRecord(response) || typeof response.access_token !== 'string') {
+      throw new Error('GitHub returned an invalid refreshed access token response.');
+    }
+
+    const refreshedToken: WorkProviderToken = {
+      ...token,
+      accessToken: response.access_token,
+      tokenType: typeof response.token_type === 'string' ? response.token_type : token.tokenType,
+      ...(typeof response.scope === 'string' ? { scope: response.scope } : {}),
+      refreshToken: typeof response.refresh_token === 'string' ? response.refresh_token : token.refreshToken,
+    };
+    if (typeof response.expires_in === 'number') refreshedToken.expiresAt = expiresAt(response.expires_in);
+    else delete refreshedToken.expiresAt;
+    if (typeof response.refresh_token_expires_in === 'number') {
+      refreshedToken.refreshTokenExpiresAt = expiresAt(response.refresh_token_expires_in);
+    } else {
+      delete refreshedToken.refreshTokenExpiresAt;
+    }
+    return refreshedToken;
   }
 
   async currentAccountLabel(token: WorkProviderToken): Promise<string> {
@@ -157,6 +196,10 @@ export class GitHubWorkProviderDriver implements WorkProviderDriver {
     const value = typeof this.clientIdProvider === 'function' ? this.clientIdProvider() : this.clientIdProvider;
     return typeof value === 'string' ? value.trim() : '';
   }
+}
+
+function expiresAt(expiresInSeconds: number): string {
+  return new Date(Date.now() + expiresInSeconds * 1_000).toISOString();
 }
 
 async function githubOAuthRequest(url: string, input: Record<string, string>): Promise<unknown> {

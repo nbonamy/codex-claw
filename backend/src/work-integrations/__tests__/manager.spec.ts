@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
 import type { AppSnapshot, WorkItem, WorkRepository } from '@codex-claw/shared/contracts';
+import type { WorkProviderToken } from '@codex-claw/shared/work-integration-tokens';
 import { WorkIntegrationManager } from '../manager';
 import { MemoryWorkIntegrationTokenStore } from '../memory-token-store';
 import type { WorkProviderDeviceAuthorization, WorkProviderDeviceTokenResult, WorkProviderDriver } from '../types';
@@ -111,6 +112,65 @@ describe('WorkIntegrationManager', () => {
       status: 'connected',
       accountLabel: 'nbonamy',
       connectedAt: '2026-06-14T10:00:00.000Z',
+    }]);
+    expect(saveSnapshot).toHaveBeenCalledOnce();
+  });
+
+  it('rotates one expired token for concurrent provider requests', async () => {
+    const snapshot = createInitialSnapshot();
+    const tokenStore = new MemoryWorkIntegrationTokenStore();
+    await tokenStore.set({
+      provider: 'github',
+      accessToken: 'ghu_expired',
+      tokenType: 'bearer',
+      expiresAt: '2026-07-31T00:00:00.000Z',
+      refreshToken: 'ghr_refresh_1',
+      refreshTokenExpiresAt: '2027-01-01T00:00:00.000Z',
+      accountLabel: 'nbonamy',
+      connectedAt: '2026-07-30T00:00:00.000Z',
+    });
+    const refreshedToken: WorkProviderToken = {
+      provider: 'github',
+      accessToken: 'ghu_fresh',
+      tokenType: 'bearer',
+      expiresAt: '2026-08-02T00:00:00.000Z',
+      refreshToken: 'ghr_refresh_2',
+      refreshTokenExpiresAt: '2027-02-01T00:00:00.000Z',
+      accountLabel: 'nbonamy',
+      connectedAt: '2026-07-30T00:00:00.000Z',
+    };
+    const driver = fakeDriver({ refreshedToken });
+    const manager = createManager({ driver, snapshot, tokenStore });
+
+    await Promise.all([
+      manager.listRepositories('github'),
+      manager.listItems('github', 'nbonamy/codex-claw'),
+    ]);
+
+    expect(driver.refreshToken).toHaveBeenCalledOnce();
+    expect(driver.listRepositories).toHaveBeenCalledWith(refreshedToken);
+    expect(driver.listItems).toHaveBeenCalledWith(refreshedToken, 'nbonamy/codex-claw');
+    await expect(tokenStore.get('github')).resolves.toStrictEqual(refreshedToken);
+  });
+
+  it('requires reconnection when an expired legacy token has no refresh token', async () => {
+    const snapshot = createInitialSnapshot();
+    const tokenStore = new MemoryWorkIntegrationTokenStore();
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    await tokenStore.set({
+      provider: 'github',
+      accessToken: 'ghu_expired',
+      tokenType: 'bearer',
+      expiresAt: '2026-07-31T00:00:00.000Z',
+      connectedAt: '2026-07-30T00:00:00.000Z',
+    });
+    const manager = createManager({ snapshot, saveSnapshot, tokenStore });
+
+    await expect(manager.listRepositories('github')).rejects.toThrow('GitHub needs to be reconnected.');
+    expect(snapshot.workBacklog.connections).toStrictEqual([{
+      provider: 'github',
+      status: 'disconnected',
+      detail: 'GitHub authorization expired. Reconnect to continue.',
     }]);
     expect(saveSnapshot).toHaveBeenCalledOnce();
   });
@@ -301,6 +361,7 @@ function fakeDriver(input: Partial<{
   configured: boolean;
   items: WorkItem[];
   pollResult: WorkProviderDeviceTokenResult;
+  refreshedToken: WorkProviderToken;
   repositories: WorkRepository[];
 }> = {}): WorkProviderDriver {
   return {
@@ -321,6 +382,7 @@ function fakeDriver(input: Partial<{
         tokenType: 'bearer',
       },
     }),
+    ...(input.refreshedToken ? { refreshToken: vi.fn().mockResolvedValue(input.refreshedToken) } : {}),
     currentAccountLabel: vi.fn().mockResolvedValue('nbonamy'),
     listRepositories: vi.fn().mockResolvedValue(input.repositories ?? []),
     listItems: vi.fn().mockResolvedValue(input.items ?? []),

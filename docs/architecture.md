@@ -721,6 +721,11 @@ takes focus. Electron owns that browser-open action through
 best-effort prefill. After the device flow starts, the renderer polls the
 work-provider completion endpoint on the provider interval
 instead of requiring a manual "finish connection" step.
+Device flow produces a GitHub App user access token, not a permanent
+device-bound credential. When GitHub returns expiring-token metadata, `clawd`
+stores the rotating refresh token beside the access token and refreshes it
+before provider requests. Concurrent requests share one refresh operation
+because GitHub invalidates the old access and refresh tokens after rotation.
 
 ## In-app Browser
 
