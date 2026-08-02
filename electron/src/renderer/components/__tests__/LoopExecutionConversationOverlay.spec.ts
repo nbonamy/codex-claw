@@ -44,4 +44,32 @@ describe('LoopExecutionConversationOverlay', () => {
 
     expect(wrapper.emitted('close')).toHaveLength(1);
   });
+
+  it('uses Claw presentation for internal MCP tools in execution transcripts', () => {
+    const wrapper = mount(LoopExecutionConversationOverlay, {
+      props: {
+        agentName: 'Dina',
+        messages: [{
+          id: 'message-tool',
+          agentId: 'agent-dina',
+          role: 'assistant',
+          status: 'complete',
+          createdAt: '2026-06-09T10:00:45.000Z',
+          parts: [{
+            type: 'tool',
+            id: 'browser-screenshot',
+            kind: 'mcp',
+            title: 'codex_claw.browser-screenshot',
+            status: 'completed',
+            metadata: { server: 'codex_claw', tool: 'browser-screenshot' },
+          }],
+        }],
+        ticket: 'github:nbonamy/codex-claw#12',
+      },
+      global: { plugins: [i18n] },
+    });
+
+    expect(wrapper.text()).toContain('Captured page screenshot');
+    expect(wrapper.find('.tabler-icon-browser').exists()).toBe(true);
+  });
 });

@@ -11,7 +11,6 @@ import { describe, expect, it } from 'vitest';
 import type { Agent, BackendApprovalRequest, BackendCapabilities, RendererMessage, ThreadPlan } from '@codex-claw/shared/contracts';
 import ConversationPane from '../ConversationPane.vue';
 import { i18n } from '../../i18n';
-import { registerClawToolTitlePresenter } from '../../tool-title-presenter';
 
 const conversationPaneSource = readFileSync(resolve(process.cwd(), 'src/renderer/components/ConversationPane.vue'), 'utf8');
 const rendererViteConfig = readFileSync(resolve(process.cwd(), 'vite.renderer.config.ts'), 'utf8');
@@ -127,34 +126,31 @@ describe('ConversationPane', () => {
   });
 
   it('renders Claw tool activity with translated user-facing titles', () => {
-    const unregister = registerClawToolTitlePresenter();
-    try {
-      const wrapper = mountPane({
-        agent,
-        messages: [{
-          id: 'message-tool',
-          agentId: agent.id,
-          role: 'assistant',
-          status: 'complete',
-          createdAt: '2026-06-05T00:00:01.000Z',
-          parts: [{
-            type: 'tool',
-            id: 'call-set-status',
-            kind: 'mcp',
-            title: 'codex_claw.set-status',
-            status: 'completed',
-            input: { status: 'Reviewing changes' },
-          }],
+    const wrapper = mountPane({
+      agent,
+      messages: [{
+        id: 'message-tool',
+        agentId: agent.id,
+        role: 'assistant',
+        status: 'complete',
+        createdAt: '2026-06-05T00:00:01.000Z',
+        parts: [{
+          type: 'tool',
+          id: 'call-set-status',
+          kind: 'mcp',
+          title: 'codex_claw.set-status',
+          status: 'completed',
+          input: { status: 'Reviewing changes' },
+          metadata: { server: 'codex_claw', tool: 'set-status' },
         }],
-        isSending: false,
-      });
+      }],
+      isSending: false,
+    });
 
-      expect(wrapper.text()).toContain('Updated status');
-      expect(wrapper.text()).not.toContain('chat.tool.mcp.codexClaw');
-      expect(wrapper.text()).not.toContain('codex_claw.set-status');
-    } finally {
-      unregister();
-    }
+    expect(wrapper.text()).toContain('Updated status');
+    expect(wrapper.text()).not.toContain('chat.tool.mcp.codexClaw');
+    expect(wrapper.text()).not.toContain('codex_claw.set-status');
+    expect(wrapper.find('.tabler-icon-users').exists()).toBe(true);
   });
 
   it('forwards SDK attachment descriptors without leaking SDK-selected model options', async () => {

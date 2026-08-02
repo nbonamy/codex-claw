@@ -61,7 +61,12 @@
 <script setup lang="ts">
 import type { RendererMessage } from '@codex-claw/shared/contracts';
 import { CodexMessageList } from 'codex-app-sdk/vue';
+import { useI18n } from 'vue-i18n';
 import { X } from '../shared/icons/app-icons';
+import { provideClawToolPresentation } from '../tool-presentation';
+
+const { t } = useI18n();
+provideClawToolPresentation((key, params) => t(key, params ?? {}));
 
 const props = defineProps<{
   agentName: string;

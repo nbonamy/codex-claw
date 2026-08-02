@@ -95,9 +95,11 @@ import type {
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import ConversationPlanPanel from './ConversationPlanPanel.vue';
 import { presentCollaborationMessage } from '../shared/collaboration-message';
+import { provideClawToolPresentation } from '../tool-presentation';
 
 const { t } = useI18n();
 provideCodexChatTranslate((key, params) => t(key, params ?? {}));
+provideClawToolPresentation((key, params) => t(key, params ?? {}));
 
 const props = withDefaults(defineProps<{
   messages: RendererMessage[];

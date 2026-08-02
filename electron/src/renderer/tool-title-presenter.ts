@@ -1,5 +1,4 @@
 import {
-  registerCodexToolTitlePresenter,
   type CodexToolTitlePresenterContext,
 } from 'codex-app-sdk/vue';
 
@@ -39,16 +38,12 @@ const TOOL_KEYS: Record<string, string> = {
   'set-status': 'setStatus',
 };
 
-export function registerClawToolTitlePresenter(): () => void {
-  return registerCodexToolTitlePresenter(presentClawToolTitle);
-}
-
 export function presentClawToolTitle({
   descriptor,
   toolCall,
   translate,
 }: CodexToolTitlePresenterContext): string | undefined {
-  const identity = clawToolIdentity(toolCall.function, descriptor?.params?.tool);
+  const identity = clawToolIdentity(toolCall.function, descriptor?.params?.tool, toolCall.kind, toolCall.metadata);
   if (!identity) return undefined;
 
   const key = TOOL_KEYS[identity.tool];
@@ -65,7 +60,15 @@ export function presentClawToolTitle({
   });
 }
 
-function clawToolIdentity(functionName: string, descriptorTool: unknown): { tool: string } | undefined {
+function clawToolIdentity(
+  functionName: string,
+  descriptorTool: unknown,
+  kind?: string,
+  metadata?: Readonly<Record<string, unknown>>,
+): { tool: string } | undefined {
+  const metadataTool = clawMcpToolName(kind, metadata);
+  if (metadataTool) return { tool: metadataTool };
+
   const rawName = typeof descriptorTool === 'string' ? descriptorTool : functionName;
   const toolName = rawName.startsWith('mcp__codex_claw__')
     ? rawName.slice('mcp__codex_claw__'.length)
@@ -73,6 +76,17 @@ function clawToolIdentity(functionName: string, descriptorTool: unknown): { tool
   if (!toolName) return undefined;
 
   return { tool: toolName.replaceAll('_', '-') };
+}
+
+export function clawMcpToolName(
+  kind?: string,
+  metadata?: Readonly<Record<string, unknown>>,
+): string | undefined {
+  if (kind !== 'mcp' || metadata?.server !== 'codex_claw' || typeof metadata.tool !== 'string') {
+    return undefined;
+  }
+  const tool = metadata.tool.trim().replaceAll('_', '-');
+  return tool || undefined;
 }
 
 function toolPhase(descriptorPhase: string | undefined, state: string): ToolPhase {
