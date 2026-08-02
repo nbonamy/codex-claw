@@ -818,6 +818,11 @@ Implemented product surfaces:
   queued prompts, ask-user prompts, approvals, context usage, rate limits,
   file mentions, skills, plan/goal controls, and voice transcription controls.
 - Settings can connect work backlog integrations, starting with GitHub OAuth.
+- Settings > Connections separates SSH links to remote `clawd` instances from
+  official Codex device pairing. Pairing stays behind app-owned contracts:
+  `clawd` calls the state-neutral `codex-app-sdk` remote-control facade, converts
+  app-server timestamps and client records, and Electron exposes only explicit
+  typed IPC methods to the renderer.
 - Cockpit can show connected repository issues and assign them to agents by
   drag and drop.
 - Claw's backend-owned local MCP server supports agent registration, status, listing,

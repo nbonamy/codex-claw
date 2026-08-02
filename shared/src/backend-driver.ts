@@ -13,7 +13,10 @@ import type {
   BackendSkillSummary,
   ClientRequestResponse,
   ConversationSummary,
+  DevicePairingSession,
+  DevicePairingStatus,
   MainToRendererEvent,
+  PairedDevice,
   RendererMessage,
   SendPromptOptions,
   ThreadGoal,
@@ -71,6 +74,13 @@ export type AgentBackendDriver = {
   rollbackToTurn?(agent: Agent, turnId: string): Promise<BackendRollbackResult>;
   listModels?(agent: Agent): Promise<BackendModelOption[]>;
   listSkills?(agent: Agent): Promise<BackendSkillSummary[]>;
+  getDevicePairingStatus?(): Promise<DevicePairingStatus>;
+  enableDevicePairing?(): Promise<DevicePairingStatus>;
+  disableDevicePairing?(): Promise<DevicePairingStatus>;
+  startDevicePairing?(): Promise<DevicePairingSession>;
+  checkDevicePairing?(session: DevicePairingSession): Promise<boolean>;
+  listPairedDevices?(environmentId: string): Promise<PairedDevice[]>;
+  revokePairedDevice?(environmentId: string, clientId: string): Promise<void>;
   onEvent(listener: (event: BackendEvent) => void): () => void;
   close(): Promise<void>;
 };

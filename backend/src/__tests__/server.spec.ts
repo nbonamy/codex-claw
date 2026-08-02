@@ -83,6 +83,33 @@ describe('ClawBackendServer', () => {
     });
   });
 
+  it('routes device pairing requests through the Codex driver RPC boundary', async () => {
+    const status = { status: 'connected', environmentId: 'environment-1' };
+    const handle = vi.fn().mockResolvedValue(status);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      driverRpc: {
+        handle,
+        onEvent: vi.fn(() => () => undefined),
+        close: vi.fn().mockResolvedValue(undefined),
+      } as unknown as BackendDriverRpc,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0', id: 'pairing-status', method: 'devicePairing/status/get',
+    })).resolves.toStrictEqual({ jsonrpc: '2.0', id: 'pairing-status', result: status });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0', id: 'pairing-revoke', method: 'devicePairing/client/revoke',
+      params: { environmentId: 'environment-1', clientId: 'client-1' },
+    })).resolves.toStrictEqual({ jsonrpc: '2.0', id: 'pairing-revoke', result: status });
+
+    expect(handle).toHaveBeenCalledWith('devicePairing/status/get', undefined);
+    expect(handle).toHaveBeenCalledWith('devicePairing/client/revoke', {
+      environmentId: 'environment-1', clientId: 'client-1',
+    });
+  });
+
   it('routes SSH connection discovery and persistence through clawd', async () => {
     const snapshot = createTestSnapshot();
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);

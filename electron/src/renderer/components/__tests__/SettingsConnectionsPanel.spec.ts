@@ -2,10 +2,20 @@ import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus, { ElMessageBox } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SourceFolderListInput } from '@codex-claw/shared/contracts';
+import { codexPairingUrl } from '../../device-pairing';
 import SettingsConnectionsPanel from '../SettingsConnectionsPanel.vue';
+
+describe('codexPairingUrl', () => {
+  it('wraps the opaque code in the ChatGPT Codex pairing deep link', () => {
+    expect(codexPairingUrl('opaque code/+')).toBe(
+      'https://chatgpt.com/codex/pair?pairing_code=opaque+code%2F%2B',
+    );
+  });
+});
 
 describe('SettingsConnectionsPanel', () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     document.body.innerHTML = '';
   });
@@ -122,7 +132,7 @@ describe('SettingsConnectionsPanel', () => {
       },
     });
 
-    await wrapper.findAll('button').find((button) => button.text() === 'Add')?.trigger('click');
+    await wrapper.findAll('button').find((button) => button.text() === 'Add remote')?.trigger('click');
     await flushPromises();
 
     expect(listSshHosts).toHaveBeenCalledOnce();
@@ -141,6 +151,64 @@ describe('SettingsConnectionsPanel', () => {
       user: 'nicolas',
       port: 2222,
     });
+  });
+
+  it('pairs and revokes Codex mobile devices', async () => {
+    vi.useFakeTimers();
+    const session = {
+      pairingCode: 'opaque-pairing-payload',
+      manualPairingCode: 'ABCD-EFGH',
+      environmentId: 'environment-1',
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    const getDevicePairingStatus = vi.fn().mockResolvedValue({
+      status: 'connected',
+      serverName: 'Claw',
+      installationId: 'installation-1',
+      environmentId: 'environment-1',
+      allowRemoteControl: true,
+    });
+    const startDevicePairing = vi.fn().mockResolvedValue(session);
+    const checkDevicePairing = vi.fn().mockResolvedValue(true);
+    const listPairedDevices = vi.fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{
+        clientId: 'client-1',
+        displayName: 'Nicolas’s iPhone',
+        platform: 'iOS',
+        appVersion: '1.0.0',
+      }]);
+    const revokePairedDevice = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
+
+    const wrapper = mount(SettingsConnectionsPanel, {
+      props: {
+        getDevicePairingStatus,
+        startDevicePairing,
+        checkDevicePairing,
+        listPairedDevices,
+        revokePairedDevice,
+      },
+      global: { plugins: [ElementPlus] },
+    });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Device pairing');
+    expect(wrapper.text()).toContain('No paired devices');
+    await wrapper.findAll('button').find((button) => button.text() === 'Pair device')?.trigger('click');
+    await flushPromises();
+    expect(wrapper.text()).toContain('ABCD-EFGH');
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    await flushPromises();
+    expect(checkDevicePairing).toHaveBeenCalledWith(session);
+    expect(wrapper.text()).toContain('Paired successfully');
+    expect(wrapper.text()).toContain('Nicolas’s iPhone');
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Revoke')?.trigger('click');
+    await flushPromises();
+    expect(revokePairedDevice).toHaveBeenCalledWith('environment-1', 'client-1');
+    vi.useRealTimers();
   });
 });
 

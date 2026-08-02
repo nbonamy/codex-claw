@@ -103,7 +103,9 @@ implemented:
   and resolved-path implementation details; identity and workspace settings
   use grouped surfaces with compact row controls;
 - full-space Settings surface launched from the rail, with its own category
-  sidebar and screen-level panels instead of dialog chrome.
+  sidebar and screen-level panels instead of dialog chrome; Connections keeps
+  remote Claw hosts separate from official Codex device pairing, including
+  pairing progress and paired-device revocation.
 
 Avoid layout jumps during streaming, loading, plan updates, approval prompts,
 and artifact pane changes.

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AddSshConnectionInput, AppCommand, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AppCommand, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
 import { exposeCodexNativeRendererApi, TypedIpcRenderer } from 'codex-app-sdk/electron/preload';
 
@@ -12,6 +12,13 @@ const api: CodexClawApi = {
   checkRemoteConnection: (connectionId: string) => ipc.invoke(ipcChannels.checkRemoteConnection, connectionId),
   updateRemoteConnection: (connectionId: string, input: UpdateRemoteConnectionInput) => ipc.invoke(ipcChannels.updateRemoteConnection, connectionId, input),
   removeRemoteConnection: (connectionId: string) => ipc.invoke(ipcChannels.removeRemoteConnection, connectionId),
+  getDevicePairingStatus: () => ipc.invoke(ipcChannels.getDevicePairingStatus),
+  enableDevicePairing: () => ipc.invoke(ipcChannels.enableDevicePairing),
+  disableDevicePairing: () => ipc.invoke(ipcChannels.disableDevicePairing),
+  startDevicePairing: () => ipc.invoke(ipcChannels.startDevicePairing),
+  checkDevicePairing: (session: DevicePairingSession) => ipc.invoke(ipcChannels.checkDevicePairing, session),
+  listPairedDevices: (environmentId: string) => ipc.invoke(ipcChannels.listPairedDevices, environmentId),
+  revokePairedDevice: (environmentId: string, clientId: string) => ipc.invoke(ipcChannels.revokePairedDevice, environmentId, clientId),
   connectWorkProvider: (provider: WorkProviderKind) => ipc.invoke(ipcChannels.connectWorkProvider, provider),
   openWorkProviderAuthorization: (provider: WorkProviderKind) => ipc.invoke(ipcChannels.openWorkProviderAuthorization, provider),
   completeWorkProviderConnection: (provider: WorkProviderKind) => ipc.invoke(ipcChannels.completeWorkProviderConnection, provider),

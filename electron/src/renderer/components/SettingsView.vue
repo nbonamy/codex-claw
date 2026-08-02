@@ -48,6 +48,13 @@
           :check-remote-connection="checkRemoteConnection"
           :update-remote-connection="updateRemoteConnection"
           :remove-remote-connection="removeRemoteConnection"
+          :get-device-pairing-status="getDevicePairingStatus"
+          :enable-device-pairing="enableDevicePairing"
+          :disable-device-pairing="disableDevicePairing"
+          :start-device-pairing="startDevicePairing"
+          :check-device-pairing="checkDevicePairing"
+          :list-paired-devices="listPairedDevices"
+          :revoke-paired-device="revokePairedDevice"
         />
         <SettingsAppearancePanel
           v-else
@@ -60,7 +67,7 @@
 </template>
 
 <script setup lang="ts">
-import type { AddSshConnectionInput, AppGeneralSettings, AppThemeSettings, ClawdDaemonStatus, RemoteConnection, SourceFolderListing, SourceFolderListInput, SourceFolderState, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AppGeneralSettings, AppThemeSettings, ClawdDaemonStatus, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SourceFolderListing, SourceFolderListInput, SourceFolderState, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { defaultGeneralSettings, defaultSourceFolderState } from '@codex-claw/shared/settings';
 import SettingsAppearancePanel from './SettingsAppearancePanel.vue';
 import SettingsConnectionsPanel from './SettingsConnectionsPanel.vue';
@@ -91,6 +98,13 @@ withDefaults(defineProps<{
   checkRemoteConnection?: (connectionId: string) => Promise<void>;
   updateRemoteConnection?: (connectionId: string, input: UpdateRemoteConnectionInput) => Promise<void>;
   removeRemoteConnection?: (connectionId: string) => Promise<void>;
+  getDevicePairingStatus?: () => Promise<DevicePairingStatus>;
+  enableDevicePairing?: () => Promise<DevicePairingStatus>;
+  disableDevicePairing?: () => Promise<DevicePairingStatus>;
+  startDevicePairing?: () => Promise<DevicePairingSession>;
+  checkDevicePairing?: (session: DevicePairingSession) => Promise<boolean>;
+  listPairedDevices?: (environmentId: string) => Promise<PairedDevice[]>;
+  revokePairedDevice?: (environmentId: string, clientId: string) => Promise<void>;
   completeWorkProviderConnection?: (provider: WorkProviderKind) => Promise<void>;
   connectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   disconnectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
@@ -113,6 +127,13 @@ withDefaults(defineProps<{
   checkRemoteConnection: async () => undefined,
   updateRemoteConnection: async () => undefined,
   removeRemoteConnection: async () => undefined,
+  getDevicePairingStatus: async () => ({ status: 'disabled' as const }),
+  enableDevicePairing: async () => ({ status: 'disabled' as const }),
+  disableDevicePairing: async () => ({ status: 'disabled' as const }),
+  startDevicePairing: async () => ({ pairingCode: '', environmentId: '', expiresAt: '' }),
+  checkDevicePairing: async () => false,
+  listPairedDevices: async () => [],
+  revokePairedDevice: async () => undefined,
   generalSettings: () => ({ ...defaultGeneralSettings }),
   sourceFolder: () => ({ ...defaultSourceFolderState }),
   daemonStatus: null,

@@ -11,10 +11,13 @@ import type {
   ClientRequest,
   ClientRequestResponse,
   ConversationSummary,
+  DevicePairingSession,
+  DevicePairingStatus,
   RendererMessage,
   RendererMessagePart,
   RendererToolPart,
   RendererToolPartUpdate,
+  PairedDevice,
   SendPromptOptions,
   CodexAuthentication,
 } from '@codex-claw/shared/contracts';
@@ -81,6 +84,70 @@ export class CodexSurfaceAgentAdapter {
 
   async logout(): Promise<CodexAuthentication> {
     return authenticationFromSurface((await this.surface.logout()).authentication);
+  }
+
+  async getDevicePairingStatus(): Promise<DevicePairingStatus> {
+    const status = await this.surface.readRemoteControlStatus();
+    const requirements = await this.surface.readConfigRequirements();
+    return {
+      ...status,
+      allowRemoteControl: requirements?.allowRemoteControl ?? null,
+    };
+  }
+
+  async enableDevicePairing(): Promise<DevicePairingStatus> {
+    const status = await this.surface.enableRemoteControl();
+    const requirements = await this.surface.readConfigRequirements();
+    return {
+      ...status,
+      allowRemoteControl: requirements?.allowRemoteControl ?? null,
+    };
+  }
+
+  async disableDevicePairing(): Promise<DevicePairingStatus> {
+    const status = await this.surface.disableRemoteControl();
+    const requirements = await this.surface.readConfigRequirements();
+    return {
+      ...status,
+      allowRemoteControl: requirements?.allowRemoteControl ?? null,
+    };
+  }
+
+  async startDevicePairing(): Promise<DevicePairingSession> {
+    const pairing = await this.surface.startRemoteControlPairing({ manualCode: true });
+    return {
+      pairingCode: pairing.pairingCode,
+      manualPairingCode: pairing.manualPairingCode,
+      environmentId: pairing.environmentId,
+      expiresAt: epochTimestampToIso(pairing.expiresAt),
+    };
+  }
+
+  async checkDevicePairing(session: DevicePairingSession): Promise<boolean> {
+    const result = await this.surface.readRemoteControlPairingStatus(
+      session.pairingCode
+        ? { pairingCode: session.pairingCode }
+        : { manualPairingCode: session.manualPairingCode ?? null },
+    );
+    return result.claimed;
+  }
+
+  async listPairedDevices(environmentId: string): Promise<PairedDevice[]> {
+    const clients = await this.surface.listRemoteControlClients({ environmentId, limit: 100 });
+    return clients.data.map((client) => ({
+      clientId: client.clientId,
+      displayName: client.displayName,
+      deviceType: client.deviceType,
+      platform: client.platform,
+      osVersion: client.osVersion,
+      deviceModel: client.deviceModel,
+      appVersion: client.appVersion,
+      lastSeenAt: client.lastSeenAt === null ? null : epochTimestampToIso(client.lastSeenAt),
+    }));
+  }
+
+  async revokePairedDevice(environmentId: string, clientId: string): Promise<void> {
+    await this.surface.revokeRemoteControlClient({ environmentId, clientId });
   }
 
   getRuntimeStatus(): BackendRuntimeStatus {
@@ -756,6 +823,14 @@ export class CodexSurfaceAgentAdapter {
       if (owner === session) this.clientRequestOwners.delete(id);
     }
   }
+}
+
+function epochTimestampToIso(value: bigint): string {
+  const numericValue = Number(value);
+  const milliseconds = Math.abs(numericValue) < 100_000_000_000 ? numericValue * 1_000 : numericValue;
+  const date = new Date(milliseconds);
+  if (Number.isNaN(date.getTime())) throw new Error('Codex returned an invalid remote-control timestamp.');
+  return date.toISOString();
 }
 
 function authenticationFromSurface(

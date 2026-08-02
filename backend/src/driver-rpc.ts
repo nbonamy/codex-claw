@@ -1,7 +1,7 @@
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/shared/backend-driver';
 import { unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
-import type { Agent, AgentBackend, AppGeneralSettings, CreateSourceWorktreeInput, SendPromptOptions } from '@codex-claw/shared/contracts';
+import type { Agent, AgentBackend, AppGeneralSettings, CreateSourceWorktreeInput, DevicePairingSession, SendPromptOptions } from '@codex-claw/shared/contracts';
 import { stat } from 'node:fs/promises';
 import { listAgentFolderFiles, previewAgentFolderFile } from './agent-files';
 import { ClaudeBackendDriver } from './claude/claude-driver';
@@ -79,6 +79,30 @@ export class BackendDriverRpc {
         return this.requireCodexDriver().startChatGptLogin();
       case backendMethods.driverCodexLogout:
         return this.requireCodexDriver().logout();
+      case backendMethods.devicePairingStatusGet:
+        return this.requireCodexDriver().getDevicePairingStatus();
+      case backendMethods.devicePairingEnable:
+        return this.requireCodexDriver().enableDevicePairing();
+      case backendMethods.devicePairingDisable:
+        return this.requireCodexDriver().disableDevicePairing();
+      case backendMethods.devicePairingStart:
+        return this.requireCodexDriver().startDevicePairing();
+      case backendMethods.devicePairingStatus: {
+        const record = requireRecord(params);
+        return this.requireCodexDriver().checkDevicePairing(record.session as DevicePairingSession);
+      }
+      case backendMethods.devicePairingClientsList: {
+        const record = requireRecord(params);
+        return this.requireCodexDriver().listPairedDevices(requireString(record.environmentId, 'environmentId'));
+      }
+      case backendMethods.devicePairingClientRevoke: {
+        const record = requireRecord(params);
+        await this.requireCodexDriver().revokePairedDevice(
+          requireString(record.environmentId, 'environmentId'),
+          requireString(record.clientId, 'clientId'),
+        );
+        return null;
+      }
       case backendMethods.driverFilePreview: {
         const record = requireRecord(params);
         return previewAgentFolderFile(

@@ -14,6 +14,9 @@ import type {
   SendPromptOptions,
   CodexAuthentication,
   CodexChatGptLogin,
+  DevicePairingSession,
+  DevicePairingStatus,
+  PairedDevice,
 } from '@codex-claw/shared/contracts';
 import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
@@ -71,6 +74,34 @@ export class CodexBackendDriver implements AgentBackendDriver {
 
   async listSkills(agent: Agent): Promise<BackendSkillSummary[]> {
     return this.sessionManager.listSkills(agent);
+  }
+
+  getDevicePairingStatus(): Promise<DevicePairingStatus> {
+    return this.sessionManager.getDevicePairingStatus();
+  }
+
+  enableDevicePairing(): Promise<DevicePairingStatus> {
+    return this.sessionManager.enableDevicePairing();
+  }
+
+  disableDevicePairing(): Promise<DevicePairingStatus> {
+    return this.sessionManager.disableDevicePairing();
+  }
+
+  startDevicePairing(): Promise<DevicePairingSession> {
+    return this.sessionManager.startDevicePairing();
+  }
+
+  checkDevicePairing(session: DevicePairingSession): Promise<boolean> {
+    return this.sessionManager.checkDevicePairing(session);
+  }
+
+  listPairedDevices(environmentId: string): Promise<PairedDevice[]> {
+    return this.sessionManager.listPairedDevices(environmentId);
+  }
+
+  revokePairedDevice(environmentId: string, clientId: string): Promise<void> {
+    return this.sessionManager.revokePairedDevice(environmentId, clientId);
   }
 
   tryHandlePromptCommand(agent: Agent, prompt: string): Promise<BackendSendResult> | null {

@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/shared/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
@@ -704,6 +704,38 @@ export function useAppState() {
     snapshot.value = await window.codexClaw.removeRemoteConnection(connectionId);
   }
 
+  async function getDevicePairingStatus(): Promise<DevicePairingStatus> {
+    if (!window.codexClaw?.getDevicePairingStatus) return { status: 'disabled' };
+    return window.codexClaw.getDevicePairingStatus();
+  }
+
+  async function enableDevicePairing(): Promise<DevicePairingStatus> {
+    if (!window.codexClaw?.enableDevicePairing) return { status: 'disabled' };
+    return window.codexClaw.enableDevicePairing();
+  }
+
+  async function disableDevicePairing(): Promise<DevicePairingStatus> {
+    if (!window.codexClaw?.disableDevicePairing) return { status: 'disabled' };
+    return window.codexClaw.disableDevicePairing();
+  }
+
+  async function startDevicePairing(): Promise<DevicePairingSession> {
+    if (!window.codexClaw?.startDevicePairing) throw new Error('Device pairing is not available.');
+    return window.codexClaw.startDevicePairing();
+  }
+
+  async function checkDevicePairing(session: DevicePairingSession): Promise<boolean> {
+    return window.codexClaw?.checkDevicePairing?.(plainDevicePairingSession(session)) ?? false;
+  }
+
+  async function listPairedDevices(environmentId: string): Promise<PairedDevice[]> {
+    return window.codexClaw?.listPairedDevices?.(environmentId) ?? [];
+  }
+
+  async function revokePairedDevice(environmentId: string, clientId: string): Promise<void> {
+    await window.codexClaw?.revokePairedDevice?.(environmentId, clientId);
+  }
+
   async function loadDaemonStatus(): Promise<void> {
     if (!window.codexClaw?.getDaemonStatus) {
       return;
@@ -1305,6 +1337,13 @@ export function useAppState() {
     checkRemoteConnection,
     updateRemoteConnection,
     removeRemoteConnection,
+    getDevicePairingStatus,
+    enableDevicePairing,
+    disableDevicePairing,
+    startDevicePairing,
+    checkDevicePairing,
+    listPairedDevices,
+    revokePairedDevice,
     setDaemonEnabled,
     connectWorkProvider,
     completeWorkProviderConnection,
@@ -1360,6 +1399,10 @@ function plainConversationRef(ref: BackendConversationRef): BackendConversationR
   return ref.backend === 'codex'
     ? { backend: 'codex', threadId: ref.threadId }
     : { backend: 'claude', folder: ref.folder, sessionId: ref.sessionId };
+}
+
+function plainDevicePairingSession(session: DevicePairingSession): DevicePairingSession {
+  return JSON.parse(JSON.stringify(session)) as DevicePairingSession;
 }
 
 function cloneWorkItemForIpc(item: WorkItem): WorkItem {

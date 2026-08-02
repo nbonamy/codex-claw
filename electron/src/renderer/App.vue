@@ -55,6 +55,13 @@
     :check-remote-connection="checkRemoteConnection"
     :update-remote-connection="updateRemoteConnection"
     :remove-remote-connection="removeRemoteConnection"
+    :get-device-pairing-status="getDevicePairingStatus"
+    :enable-device-pairing="enableDevicePairing"
+    :disable-device-pairing="disableDevicePairing"
+    :start-device-pairing="startDevicePairing"
+    :check-device-pairing="checkDevicePairing"
+    :list-paired-devices="listPairedDevices"
+    :revoke-paired-device="revokePairedDevice"
     :set-daemon-enabled="setDaemonEnabled"
     :connect-work-provider="connectWorkProvider"
     :open-work-provider-authorization="openWorkProviderAuthorization"
@@ -186,6 +193,13 @@ const {
   checkRemoteConnection,
   updateRemoteConnection,
   removeRemoteConnection,
+  getDevicePairingStatus,
+  enableDevicePairing,
+  disableDevicePairing,
+  startDevicePairing,
+  checkDevicePairing,
+  listPairedDevices,
+  revokePairedDevice,
   setDaemonEnabled,
   connectWorkProvider,
   openWorkProviderAuthorization,

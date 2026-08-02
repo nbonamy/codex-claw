@@ -9,7 +9,7 @@ import { getClawdDaemonStatus, setClawdDaemonEnabled } from './daemon-launch-age
 import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
 import { sendAppCommand, sendRendererEvent } from './ipc-events';
 import { BrowserPane, browserPaneKey } from './browser-pane';
@@ -85,6 +85,14 @@ export class AppController {
     ipc.handle(ipcChannels.removeRemoteConnection, async (_event, connectionId: string) => {
       return this.removeRemoteConnection(connectionId);
     });
+
+    ipc.handle(ipcChannels.getDevicePairingStatus, () => this.getDevicePairingStatus());
+    ipc.handle(ipcChannels.enableDevicePairing, () => this.enableDevicePairing());
+    ipc.handle(ipcChannels.disableDevicePairing, () => this.disableDevicePairing());
+    ipc.handle(ipcChannels.startDevicePairing, () => this.startDevicePairing());
+    ipc.handle(ipcChannels.checkDevicePairing, (_event, session: DevicePairingSession) => this.checkDevicePairing(session));
+    ipc.handle(ipcChannels.listPairedDevices, (_event, environmentId: string) => this.listPairedDevices(environmentId));
+    ipc.handle(ipcChannels.revokePairedDevice, (_event, environmentId: string, clientId: string) => this.revokePairedDevice(environmentId, clientId));
 
     ipc.handle(ipcChannels.connectWorkProvider, async (_event, provider: WorkProviderKind) => {
       return this.connectWorkProvider(provider);
@@ -430,6 +438,34 @@ export class AppController {
 
   private async removeRemoteConnection(connectionId: string): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.connectionsDelete, { connectionId }));
+  }
+
+  private getDevicePairingStatus(): Promise<DevicePairingStatus> {
+    return this.requireBackendClient().request(backendMethods.devicePairingStatusGet);
+  }
+
+  private enableDevicePairing(): Promise<DevicePairingStatus> {
+    return this.requireBackendClient().request(backendMethods.devicePairingEnable);
+  }
+
+  private disableDevicePairing(): Promise<DevicePairingStatus> {
+    return this.requireBackendClient().request(backendMethods.devicePairingDisable);
+  }
+
+  private startDevicePairing(): Promise<DevicePairingSession> {
+    return this.requireBackendClient().request(backendMethods.devicePairingStart);
+  }
+
+  private checkDevicePairing(session: DevicePairingSession): Promise<boolean> {
+    return this.requireBackendClient().request(backendMethods.devicePairingStatus, { session });
+  }
+
+  private listPairedDevices(environmentId: string): Promise<PairedDevice[]> {
+    return this.requireBackendClient().request(backendMethods.devicePairingClientsList, { environmentId });
+  }
+
+  private async revokePairedDevice(environmentId: string, clientId: string): Promise<void> {
+    await this.requireBackendClient().request(backendMethods.devicePairingClientRevoke, { environmentId, clientId });
   }
 
   private async openWorkProviderAuthorization(provider: WorkProviderKind): Promise<AppSnapshot> {

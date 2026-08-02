@@ -521,6 +521,33 @@ export type RemoteConnectionsState = {
   connections: RemoteConnection[];
 };
 
+export type DevicePairingStatus = {
+  status: 'disabled' | 'connecting' | 'connected' | 'errored';
+  serverName?: string;
+  installationId?: string;
+  environmentId?: string | null;
+  allowRemoteControl?: boolean | null;
+  detail?: string;
+};
+
+export type DevicePairingSession = {
+  pairingCode: string;
+  manualPairingCode?: string | null;
+  environmentId: string;
+  expiresAt: string;
+};
+
+export type PairedDevice = {
+  clientId: string;
+  displayName?: string | null;
+  deviceType?: string | null;
+  platform?: string | null;
+  osVersion?: string | null;
+  deviceModel?: string | null;
+  appVersion?: string | null;
+  lastSeenAt?: string | null;
+};
+
 export type AddSshConnectionInput = SshHostCandidate & {
   name?: string;
 };
@@ -1033,6 +1060,13 @@ export type CodexClawApi = {
   checkRemoteConnection(connectionId: string): Promise<AppSnapshot>;
   updateRemoteConnection(connectionId: string, input: UpdateRemoteConnectionInput): Promise<AppSnapshot>;
   removeRemoteConnection(connectionId: string): Promise<AppSnapshot>;
+  getDevicePairingStatus(): Promise<DevicePairingStatus>;
+  enableDevicePairing(): Promise<DevicePairingStatus>;
+  disableDevicePairing(): Promise<DevicePairingStatus>;
+  startDevicePairing(): Promise<DevicePairingSession>;
+  checkDevicePairing(session: DevicePairingSession): Promise<boolean>;
+  listPairedDevices(environmentId: string): Promise<PairedDevice[]>;
+  revokePairedDevice(environmentId: string, clientId: string): Promise<void>;
   connectWorkProvider(provider: WorkProviderKind): Promise<WorkProviderConnectResult>;
   openWorkProviderAuthorization(provider: WorkProviderKind): Promise<AppSnapshot>;
   completeWorkProviderConnection(provider: WorkProviderKind): Promise<AppSnapshot>;

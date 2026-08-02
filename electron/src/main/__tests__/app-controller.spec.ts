@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController } from '../app-controller';
 import { applyMainEventToSnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { ipcChannels } from '@codex-claw/shared/ipc';
@@ -847,6 +847,44 @@ describe('AppController', () => {
       path: '/home/nicolas',
     });
     expect(request).toHaveBeenCalledWith('connections/delete', { connectionId: 'connection-devbox' });
+  });
+
+  it('routes device pairing actions through clawd', async () => {
+    const status: DevicePairingStatus = {
+      status: 'connected', serverName: 'Claw', installationId: 'installation-1', environmentId: 'environment-1',
+    };
+    const session: DevicePairingSession = {
+      pairingCode: 'opaque-payload', manualPairingCode: 'ABCD-EFGH', environmentId: 'environment-1',
+      expiresAt: '2030-03-17T17:46:40.000Z',
+    };
+    const devices: PairedDevice[] = [{ clientId: 'client-1', displayName: 'Nicolas’s iPhone' }];
+    const request = vi.fn((method: string) => {
+      if (method === backendMethods.devicePairingStart) return Promise.resolve(session);
+      if (method === backendMethods.devicePairingStatus) return Promise.resolve(true);
+      if (method === backendMethods.devicePairingClientsList) return Promise.resolve(devices);
+      if (method === backendMethods.devicePairingClientRevoke) return Promise.resolve(null);
+      return Promise.resolve(status);
+    });
+    const controller = new AppController(createInitialSnapshot(), createBackendClient({ request }));
+    await controller.initialize();
+
+    await expect(getDevicePairingStatus(controller)).resolves.toBe(status);
+    await expect(enableDevicePairing(controller)).resolves.toBe(status);
+    await expect(disableDevicePairing(controller)).resolves.toBe(status);
+    await expect(startDevicePairing(controller)).resolves.toBe(session);
+    await expect(checkDevicePairing(controller, session)).resolves.toBe(true);
+    await expect(listPairedDevices(controller, 'environment-1')).resolves.toBe(devices);
+    await expect(revokePairedDevice(controller, 'environment-1', 'client-1')).resolves.toBeUndefined();
+
+    expect(request).toHaveBeenCalledWith(backendMethods.devicePairingStatusGet, undefined);
+    expect(request).toHaveBeenCalledWith(backendMethods.devicePairingEnable, undefined);
+    expect(request).toHaveBeenCalledWith(backendMethods.devicePairingDisable, undefined);
+    expect(request).toHaveBeenCalledWith(backendMethods.devicePairingStart, undefined);
+    expect(request).toHaveBeenCalledWith(backendMethods.devicePairingStatus, { session });
+    expect(request).toHaveBeenCalledWith(backendMethods.devicePairingClientsList, { environmentId: 'environment-1' });
+    expect(request).toHaveBeenCalledWith(backendMethods.devicePairingClientRevoke, {
+      environmentId: 'environment-1', clientId: 'client-1',
+    });
   });
 
   it('routes loop mutations and runs through clawd', async () => {
@@ -2036,6 +2074,35 @@ async function removeRemoteConnection(controller: AppController, connectionId: s
   return (controller as unknown as {
     removeRemoteConnection(connectionId: string): Promise<AppSnapshot>;
   }).removeRemoteConnection(connectionId);
+}
+
+function getDevicePairingStatus(controller: AppController): Promise<DevicePairingStatus> {
+  return (controller as unknown as { getDevicePairingStatus(): Promise<DevicePairingStatus> }).getDevicePairingStatus();
+}
+
+function enableDevicePairing(controller: AppController): Promise<DevicePairingStatus> {
+  return (controller as unknown as { enableDevicePairing(): Promise<DevicePairingStatus> }).enableDevicePairing();
+}
+
+function disableDevicePairing(controller: AppController): Promise<DevicePairingStatus> {
+  return (controller as unknown as { disableDevicePairing(): Promise<DevicePairingStatus> }).disableDevicePairing();
+}
+
+function startDevicePairing(controller: AppController): Promise<DevicePairingSession> {
+  return (controller as unknown as { startDevicePairing(): Promise<DevicePairingSession> }).startDevicePairing();
+}
+
+function checkDevicePairing(controller: AppController, session: DevicePairingSession): Promise<boolean> {
+  return (controller as unknown as { checkDevicePairing(value: DevicePairingSession): Promise<boolean> }).checkDevicePairing(session);
+}
+
+function listPairedDevices(controller: AppController, environmentId: string): Promise<PairedDevice[]> {
+  return (controller as unknown as { listPairedDevices(id: string): Promise<PairedDevice[]> }).listPairedDevices(environmentId);
+}
+
+function revokePairedDevice(controller: AppController, environmentId: string, clientId: string): Promise<void> {
+  return (controller as unknown as { revokePairedDevice(environment: string, client: string): Promise<void> })
+    .revokePairedDevice(environmentId, clientId);
 }
 
 async function configureWorkBacklog(controller: AppController, input: WorkBacklogConfigurationInput, location?: LoopLocation): Promise<AppSnapshot> {

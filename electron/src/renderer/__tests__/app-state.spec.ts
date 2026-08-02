@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/shared/contracts';
 import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
 import { workItemAssignmentPrompt } from '@codex-claw/shared/work-item-prompts';
 import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';
@@ -451,6 +451,33 @@ describe('useAppState', () => {
     expect(state.snapshot.value.theme.id).toBe('github-dark');
     expect(quit).toHaveBeenCalledOnce();
     expect(restartApp).toHaveBeenCalledOnce();
+  });
+
+  it('JSON-normalizes reactive device pairing sessions before Electron IPC', async () => {
+    const checkDevicePairing = vi.fn((session: DevicePairingSession) => {
+      structuredClone(session);
+      return Promise.resolve(true);
+    });
+    vi.stubGlobal('window', {
+      codexClaw: {
+        checkDevicePairing,
+      } satisfies Partial<CodexClawApi>,
+    });
+    const session = reactive<DevicePairingSession>({
+      pairingCode: 'opaque-payload',
+      manualPairingCode: 'ABCD-EFGH',
+      environmentId: 'environment-1',
+      expiresAt: '2030-03-17T17:46:40.000Z',
+    });
+
+    const state = useAppState();
+    await expect(state.checkDevicePairing(session)).resolves.toBe(true);
+    expect(checkDevicePairing).toHaveBeenCalledWith({
+      pairingCode: 'opaque-payload',
+      manualPairingCode: 'ABCD-EFGH',
+      environmentId: 'environment-1',
+      expiresAt: '2030-03-17T17:46:40.000Z',
+    });
   });
 
   it('loads source repositories and creates worktrees through clawd', async () => {

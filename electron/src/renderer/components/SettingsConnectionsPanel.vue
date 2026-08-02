@@ -9,7 +9,7 @@
         type="primary"
         @click="openAddDialog"
       >
-        Add
+        Add remote
       </el-button>
     </template>
 
@@ -78,6 +78,16 @@
         </div>
       </article>
     </SettingsSection>
+
+    <SettingsDevicePairingSection
+      :get-status="getDevicePairingStatus"
+      :enable="enableDevicePairing"
+      :disable="disableDevicePairing"
+      :start="startDevicePairing"
+      :check="checkDevicePairing"
+      :list-devices="listPairedDevices"
+      :revoke-device="revokePairedDevice"
+    />
 
     <el-dialog
       v-model="settingsDialogVisible"
@@ -190,12 +200,13 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, ref } from 'vue';
-import type { AddSshConnectionInput, RemoteConnection, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateRemoteConnectionInput } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateRemoteConnectionInput } from '@codex-claw/shared/contracts';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import { DotsVerticalIcon, RefreshIcon, SettingsIcon, Trash2Icon } from '../shared/icons/app-icons';
 import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
+import SettingsDevicePairingSection from './SettingsDevicePairingSection.vue';
 import SettingsSection from './SettingsSection.vue';
 
 const props = withDefaults(defineProps<{
@@ -207,6 +218,13 @@ const props = withDefaults(defineProps<{
   teams?: Team[];
   updateRemoteConnection?: (connectionId: string, input: UpdateRemoteConnectionInput) => Promise<void>;
   removeRemoteConnection?: (connectionId: string) => Promise<void>;
+  getDevicePairingStatus?: () => Promise<DevicePairingStatus>;
+  enableDevicePairing?: () => Promise<DevicePairingStatus>;
+  disableDevicePairing?: () => Promise<DevicePairingStatus>;
+  startDevicePairing?: () => Promise<DevicePairingSession>;
+  checkDevicePairing?: (session: DevicePairingSession) => Promise<boolean>;
+  listPairedDevices?: (environmentId: string) => Promise<PairedDevice[]>;
+  revokePairedDevice?: (environmentId: string, clientId: string) => Promise<void>;
 }>(), {
   addSshConnection: async () => undefined,
   checkRemoteConnection: async () => undefined,
@@ -216,6 +234,13 @@ const props = withDefaults(defineProps<{
   teams: () => [],
   updateRemoteConnection: async () => undefined,
   removeRemoteConnection: async () => undefined,
+  getDevicePairingStatus: async () => ({ status: 'disabled' as const }),
+  enableDevicePairing: async () => ({ status: 'disabled' as const }),
+  disableDevicePairing: async () => ({ status: 'disabled' as const }),
+  startDevicePairing: async () => ({ pairingCode: '', environmentId: '', expiresAt: '' }),
+  checkDevicePairing: async () => false,
+  listPairedDevices: async () => [],
+  revokePairedDevice: async () => undefined,
 });
 
 const addDialogVisible = ref(false);

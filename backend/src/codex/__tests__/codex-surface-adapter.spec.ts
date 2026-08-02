@@ -80,6 +80,26 @@ class FakeTransport implements RpcTransport {
         };
       }
       case 'configRequirements/read': return { requirements: null };
+      case 'remoteControl/status/read':
+      case 'remoteControl/enable': return {
+        status: 'connected', serverName: 'Claw', installationId: 'installation-1', environmentId: 'environment-1',
+      };
+      case 'remoteControl/disable': return {
+        status: 'disabled', serverName: 'Claw', installationId: 'installation-1', environmentId: null,
+      };
+      case 'remoteControl/pairing/start': return {
+        pairingCode: 'opaque-pairing-payload', manualPairingCode: 'ABCD-EFGH',
+        environmentId: 'environment-1', expiresAt: 1_900_000_000_000n,
+      };
+      case 'remoteControl/pairing/status': return { claimed: true };
+      case 'remoteControl/client/list': return {
+        data: [{
+          clientId: 'client-1', displayName: 'Nicolas’s iPhone', deviceType: 'phone', platform: 'iOS',
+          osVersion: '26', deviceModel: 'iPhone', appVersion: '1.0.0', lastSeenAt: 1_800_000_000_000n,
+        }],
+        nextCursor: null,
+      };
+      case 'remoteControl/client/revoke': return {};
       case 'account/read': return {
         account: { type: 'chatgpt', email: 'nico@example.com', planType: 'pro' },
         requiresOpenaiAuth: true,
@@ -146,6 +166,49 @@ class FakeTransport implements RpcTransport {
 }
 
 describe('CodexSurfaceAgentAdapter', () => {
+  it('maps official remote-control pairing data into Claw contracts', async () => {
+    const { adapter, transport } = createAdapter();
+
+    await expect(adapter.getDevicePairingStatus()).resolves.toStrictEqual({
+      status: 'connected',
+      serverName: 'Claw',
+      installationId: 'installation-1',
+      environmentId: 'environment-1',
+      allowRemoteControl: null,
+    });
+    await expect(adapter.startDevicePairing()).resolves.toStrictEqual({
+      pairingCode: 'opaque-pairing-payload',
+      manualPairingCode: 'ABCD-EFGH',
+      environmentId: 'environment-1',
+      expiresAt: '2030-03-17T17:46:40.000Z',
+    });
+    await expect(adapter.checkDevicePairing({
+      pairingCode: 'opaque-pairing-payload',
+      manualPairingCode: 'ABCD-EFGH',
+      environmentId: 'environment-1',
+      expiresAt: '2030-03-17T17:46:40.000Z',
+    })).resolves.toBe(true);
+    await expect(adapter.listPairedDevices('environment-1')).resolves.toStrictEqual([{
+      clientId: 'client-1',
+      displayName: 'Nicolas’s iPhone',
+      deviceType: 'phone',
+      platform: 'iOS',
+      osVersion: '26',
+      deviceModel: 'iPhone',
+      appVersion: '1.0.0',
+      lastSeenAt: '2027-01-15T08:00:00.000Z',
+    }]);
+    await expect(adapter.revokePairedDevice('environment-1', 'client-1')).resolves.toBeUndefined();
+
+    expect(lastRequest(transport, 'remoteControl/pairing/start')).toMatchObject({ params: { manualCode: true } });
+    const pairingStatusRequest = lastRequest(transport, 'remoteControl/pairing/status');
+    expect(pairingStatusRequest && 'params' in pairingStatusRequest ? pairingStatusRequest.params : undefined)
+      .toStrictEqual({ pairingCode: 'opaque-pairing-payload' });
+    expect(lastRequest(transport, 'remoteControl/client/revoke')).toMatchObject({
+      params: { environmentId: 'environment-1', clientId: 'client-1' },
+    });
+  });
+
   it('uses the SDK account lifecycle for isolated-home authentication', async () => {
     const { adapter, transport } = createAdapter();
 

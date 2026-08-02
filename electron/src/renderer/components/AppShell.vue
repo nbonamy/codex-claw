@@ -84,6 +84,13 @@
         :check-remote-connection="checkRemoteConnection"
         :update-remote-connection="updateRemoteConnection"
         :remove-remote-connection="removeRemoteConnection"
+        :get-device-pairing-status="getDevicePairingStatus"
+        :enable-device-pairing="enableDevicePairing"
+        :disable-device-pairing="disableDevicePairing"
+        :start-device-pairing="startDevicePairing"
+        :check-device-pairing="checkDevicePairing"
+        :list-paired-devices="listPairedDevices"
+        :revoke-paired-device="revokePairedDevice"
         :daemon-status="daemonStatus"
         :daemon-status-error="daemonStatusError"
         :choose-codex-binary="chooseCodexBinary"
@@ -303,7 +310,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type LoopLocation, type MoveAgentToTeamInput, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
+import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type PairedDevice, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultTeamColor } from '@codex-claw/shared/team-colors';
@@ -387,6 +394,13 @@ const props = withDefaults(defineProps<{
   checkRemoteConnection?: (connectionId: string) => Promise<void>;
   updateRemoteConnection?: (connectionId: string, input: UpdateRemoteConnectionInput) => Promise<void>;
   removeRemoteConnection?: (connectionId: string) => Promise<void>;
+  getDevicePairingStatus?: () => Promise<DevicePairingStatus>;
+  enableDevicePairing?: () => Promise<DevicePairingStatus>;
+  disableDevicePairing?: () => Promise<DevicePairingStatus>;
+  startDevicePairing?: () => Promise<DevicePairingSession>;
+  checkDevicePairing?: (session: DevicePairingSession) => Promise<boolean>;
+  listPairedDevices?: (environmentId: string) => Promise<PairedDevice[]>;
+  revokePairedDevice?: (environmentId: string, clientId: string) => Promise<void>;
   setDaemonEnabled?: (enabled: boolean) => Promise<void>;
   restartApp?: () => Promise<void>;
   getLoopSnapshot?: (location?: LoopLocation) => Promise<AppSnapshot>;
@@ -460,6 +474,13 @@ const props = withDefaults(defineProps<{
   checkRemoteConnection: async () => undefined,
   updateRemoteConnection: async () => undefined,
   removeRemoteConnection: async () => undefined,
+  getDevicePairingStatus: async () => ({ status: 'disabled' as const }),
+  enableDevicePairing: async () => ({ status: 'disabled' as const }),
+  disableDevicePairing: async () => ({ status: 'disabled' as const }),
+  startDevicePairing: async () => ({ pairingCode: '', environmentId: '', expiresAt: '' }),
+  checkDevicePairing: async () => false,
+  listPairedDevices: async () => [],
+  revokePairedDevice: async () => undefined,
   setDaemonEnabled: async () => undefined,
   restartApp: async () => undefined,
   getLoopSnapshot: async () => createEmptySnapshot(),

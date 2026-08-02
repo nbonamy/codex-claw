@@ -125,6 +125,14 @@ export class ClawBackendServer {
         return createClawRpcResult(message.id, await this.systemPermissions.getStatus());
       case backendMethods.systemPermissionsAccessibilityOpen:
         return createClawRpcResult(message.id, await this.systemPermissions.openAccessibilitySettings());
+      case backendMethods.devicePairingStatusGet:
+      case backendMethods.devicePairingEnable:
+      case backendMethods.devicePairingDisable:
+      case backendMethods.devicePairingStart:
+      case backendMethods.devicePairingStatus:
+      case backendMethods.devicePairingClientsList:
+      case backendMethods.devicePairingClientRevoke:
+        return createClawRpcResult(message.id, await this.requireDriverRpc().handle(message.method, message.params));
       case backendMethods.connectionsSshHostsList:
         return createClawRpcResult(message.id, await this.sshConnections.listHostCandidates());
       case backendMethods.connectionsSshCreate: {
