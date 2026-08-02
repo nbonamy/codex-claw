@@ -1322,32 +1322,12 @@ function handleFileActivity(activity: AgentFileActivity): void {
   const workspace = rightWorkspaceFor(agent.id);
   const tab = rightWorkspaceFileTab(filePath);
 
-  if (activity.action === 'read') return;
-  if (activity.status === 'failed') {
-    const panel = workspace.filePanels[tab];
-    if (panel?.state === 'loading') {
-      workspace.filePanels = {
-        ...workspace.filePanels,
-        [tab]: filePreviewPanel(filePath, panel.content, panel.content ? 'idle' : 'error', panel.content ? null : 'File update failed.'),
-      };
-    }
-    return;
-  }
-  if (activity.status === 'running') {
-    if (!workspace.filePanels[tab]) {
-      workspace.filePanels = {
-        ...workspace.filePanels,
-        [tab]: filePreviewPanel(filePath, '', 'loading', null),
-      };
-    }
-    openRightWorkspaceTab(tab, agent.id);
-    return;
-  }
+  if (activity.action === 'read' || activity.status !== 'completed' || !workspace.filePanels[tab]) return;
 
-  void openFilePreviewForAgent(agent.id, filePath);
+  void openFilePreviewForAgent(agent.id, filePath, false);
 }
 
-async function openFilePreviewForAgent(agentId: string, filePath: string): Promise<void> {
+async function openFilePreviewForAgent(agentId: string, filePath: string, reveal = true): Promise<void> {
   const agent = props.snapshot.agents.find((candidate) => candidate.id === agentId);
   const trimmedPath = normalizePreviewFilePath(filePath, agent?.folder);
   if (!agent || !trimmedPath) return;
@@ -1362,7 +1342,7 @@ async function openFilePreviewForAgent(agentId: string, filePath: string): Promi
     ...workspace.filePanels,
     [tab]: filePreviewPanel(trimmedPath, existingContent, 'loading', null),
   };
-  openRightWorkspaceTab(tab, agent.id);
+  if (reveal) openRightWorkspaceTab(tab, agent.id);
 
   try {
     const result = await props.previewAgentFile(agent.id, trimmedPath);

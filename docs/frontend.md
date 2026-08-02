@@ -107,10 +107,10 @@ implemented:
   Review, with full working-tree diffs opened from the agent header's git
   statistics; every agent preserves its own open/active tabs, open state, and
   width, and inactive workspaces stay mounted so background browser tooling can
-  continue without stealing the user's selected agent. Live edits and creates
-  reveal and refresh the file in the owning agent's workspace without adding a
-  second activity treatment to the normal tab selection styling; clicking an
-  SDK tool-call file target opens its canonical path in the same workspace;
+  continue without stealing the user's selected agent. Live edits refresh files
+  that the user already has open but never reveal or select a workspace tab;
+  clicking an SDK tool-call file target is the only action that opens its
+  canonical path in the owning workspace;
 - empty right-workspace launcher for opening Review or Browser before any tab
   exists; manually closing the last tab collapses the workspace. Review uses
   `Command+G` and Browser uses `Command+B`, while existing `Command+D`

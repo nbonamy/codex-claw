@@ -443,10 +443,16 @@ describe('AppShell', () => {
 
   it('opens source file links as read-only source previews', async () => {
     const snapshot = createInitialSnapshot();
-    const previewAgentFile = vi.fn().mockResolvedValue({
-      path: 'src/main.ts',
-      content: 'const answer: number = 42;\n',
-    });
+    snapshot.agents[0].folder = '/workspace/dina';
+    const previewAgentFile = vi.fn()
+      .mockResolvedValueOnce({
+        path: 'src/main.ts',
+        content: 'const answer: number = 42;\n',
+      })
+      .mockResolvedValueOnce({
+        path: 'src/main.ts',
+        content: 'const answer: number = 43;\n',
+      });
     const wrapper = mount(AppShell, {
       props: {
         snapshot,
@@ -480,9 +486,22 @@ describe('AppShell', () => {
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['Review', 'main.ts']);
     expect(wrapper.html()).toContain('shiki');
     expect(wrapper.text()).toContain('answer');
+
+    await wrapper.setProps({
+      fileActivity: {
+        agentId: 'agent-dina', turnId: 'turn-edit', messageId: 'message-edit', itemId: 'item-edit',
+        path: '/workspace/dina/src/main.ts', action: 'edit', status: 'completed',
+        occurredAt: '2026-08-02T00:00:00.000Z',
+      },
+    } as Record<string, unknown>);
+    await flushPromises();
+
+    expect(previewAgentFile).toHaveBeenCalledTimes(2);
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['Review', 'main.ts']);
+    expect(wrapper.text()).toContain('43');
   });
 
-  it('routes live file activity into the owning agent workspace', async () => {
+  it('does not open agent workspaces from background file activity', async () => {
     const snapshot = createInitialSnapshot();
     const [dina, jesse] = snapshot.agents;
     if (!dina || !jesse) throw new Error('Expected seeded agents.');
@@ -525,13 +544,12 @@ describe('AppShell', () => {
     } as Record<string, unknown>);
     await flushPromises();
 
-    expect(previewAgentFile).toHaveBeenCalledWith(jesse.id, 'src/main.ts');
+    expect(previewAgentFile).not.toHaveBeenCalled();
 
     await wrapper.setProps({ activeAgent: jesse } as Record<string, unknown>);
     await nextTick();
 
-    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain('main.ts');
-    expect(wrapper.text()).toContain('updated');
+    expect(wrapper.findAll('[role="tab"]')).toHaveLength(0);
 
     await wrapper.setProps({
       fileActivity: {
@@ -541,7 +559,7 @@ describe('AppShell', () => {
       },
     } as Record<string, unknown>);
 
-    expect(previewAgentFile).toHaveBeenCalledTimes(1);
+    expect(previewAgentFile).not.toHaveBeenCalled();
   });
 
   it('strips editor-style line suffixes before reading file previews', async () => {
