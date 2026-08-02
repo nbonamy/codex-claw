@@ -171,6 +171,15 @@ client may normalize it to a path relative to the active agent folder before
 requesting a preview; it must not forward an arbitrary absolute local path as
 read authority.
 
+The Codex SDK defines the composable provider-runtime foundation for `clawd`.
+Its `CodexAppBackend` owns one shared `CodexSurface` and accepts named app
+modules; Claw's Codex agent adapter has a host-owned lifecycle so it can sit at
+that app-module boundary once the SDK artifact containing the host is consumed.
+Generic Codex concerns remain in the SDK, while teams, agents, collaboration,
+loops, work integrations, and the provider-neutral `AgentBackendDriver` seam
+remain in Claw. The SDK backend is embedded in `clawd`; it is not another
+process and does not replace Claw's existing Claude driver boundary.
+
 Snapshot mutation is also backend-owned. `clawd` applies backend events to the
 authoritative snapshot and is the only process that persists it. Electron
 fetches fresh snapshots from `clawd` for `getSnapshot`; Electron and renderer
@@ -393,6 +402,13 @@ Renderer layers:
   `clawd`, then parses and renders every file with Claw-owned Vue components;
 - theme provider that applies semantic CSS custom properties to the document.
 
+Streaming preserves structural identity outside the row that changed. The
+active transcript passed to the SDK stays referentially stable when a
+background agent streams, Claw does not eagerly remap the full transcript into
+SDK messages, and the SDK projects each keyed row locally. Off-screen message
+rows use browser rendering containment so a long transcript does not make
+composer typing compete with layout and paint work for the full history.
+
 ## IPC And Backend Protocol
 
 Renderer IPC and the backend protocol should be app-domain messages, not
@@ -403,6 +419,14 @@ protocol.
 
 Every emitted backend event gets a monotonically increasing sequence number so
 the renderer can detect gaps after reloads.
+
+The desktop adapter owns the `codex-claw://` deep-link scheme and converts
+accepted URLs into typed `AppCommand` values; raw URLs never cross preload.
+`codex-claw://new?prompt=...` submits to the active agent, while
+`codex-claw://agents/<agent-id>?prompt=...` selects a specific agent and submits
+to it. Prompt values must be URL encoded. Submission is the default because the
+scheme is an automation interface. Add `submit=false` to prefill and focus the
+composer without submitting. A link with no prompt only selects the agent.
 
 ```ts
 type MainToRendererEvent = {
@@ -773,13 +797,16 @@ hydration may add previously unknown turns but never rewrites a turn already in
 Claw memory. Git status and agent-specific catalogs still reconcile in the
 background. Selection requests carry a monotonic renderer token so a stale
 response from a rapid earlier switch cannot replace the current agent.
-Live Codex transcripts remain cached in `clawd` for five minutes after
-hydration or conversation activity. Re-selecting an agent within that window
-reuses the in-memory transcript; stale idle revalidation publishes a fresh
-five-turn bootstrap and then merges previously unknown turns from exhaustive
-lifecycle hydration. Conversations with an active turn stay memory-authoritative
-and reconcile through their live app-server events instead of being replaced by
-a resume bootstrap.
+Live agent transcripts remain cached in `clawd` for five minutes after the
+latest selection or backend activity. The SDK supplies the optional generic TTL
+cache, activity clock, and sweep lifecycle; Claw supplies the agent policy. Claw
+only evicts an inactive, idle transcript with no queued prompt or pending
+approval. Eviction drops the in-memory messages and live SDK session handle but
+does not serialize or persist a second transcript copy. Drafts, attachments,
+queues, side-panel state, and browser state are separate and remain untouched.
+Selecting an evicted agent follows the normal provider history hydration path.
+Conversations with an active turn stay memory-authoritative and reconcile
+through their live backend events.
 
 Dragging a work item onto an agent records provider-neutral assignment metadata
 in `workBacklog.assignments`, keyed by provider and provider-generated item id,

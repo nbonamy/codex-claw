@@ -25,6 +25,7 @@ import { SshConnectionService } from './connections/ssh-connections';
 import type { LoopRunner } from './loops/runner';
 import type { WorkIntegrationManager } from './work-integrations/manager';
 import { warnMain } from './log';
+import { AgentTranscriptRetention, type AgentTranscriptRetentionOptions } from './agent-transcript-retention';
 
 export type ClawBackendServerOptions = {
   version: string;
@@ -39,6 +40,7 @@ export type ClawBackendServerOptions = {
   systemPermissions?: SystemPermissionsPort;
   sshConnections?: SshConnectionService;
   remoteClients?: RemoteClawdClientManager;
+  transcriptRetention?: Omit<AgentTranscriptRetentionOptions, 'snapshot' | 'onEvicted'>;
 };
 
 export type SystemPermissionsPort = {
@@ -81,6 +83,7 @@ export class ClawBackendServer {
   private readonly clientRequestOwners = new Map<string, { backend: AgentBackend; remoteConnectionId?: string }>();
   private readonly remoteSnapshots = new Map<string, AppSnapshot>();
   private readonly queuedPromptRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly transcriptRetention: AgentTranscriptRetention;
   private unsubscribeDriverEvents?: () => void;
   private lastEventSeq = 0;
 
@@ -97,6 +100,11 @@ export class ClawBackendServer {
     this.systemPermissions = options.systemPermissions ?? createUnsupportedSystemPermissionsPort();
     this.sshConnections = options.sshConnections ?? new SshConnectionService();
     this.remoteClients = options.remoteClients ?? new RemoteClawdClientManager();
+    this.transcriptRetention = new AgentTranscriptRetention({
+      snapshot: this.snapshot,
+      onEvicted: (agentId) => this.releaseEvictedAgentTranscript(agentId),
+      ...options.transcriptRetention,
+    });
     this.unsubscribeDriverEvents = this.driverRpc?.onEvent((event) => this.handleBackendEvent(event));
   }
 
@@ -254,6 +262,7 @@ export class ClawBackendServer {
       }
       case backendMethods.agentSelect: {
         const agentId = requireAgentId(message.params);
+        this.transcriptRetention.touch(agentId);
         const route = await this.locationForAgentId(agentId);
         if (!route) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
@@ -331,6 +340,7 @@ export class ClawBackendServer {
           if (!agent) {
             throw new Error(`Agent not found: ${agentId}`);
           }
+          this.transcriptRetention.delete(agentId);
           return this.persistAndEmitSnapshot();
         });
       }
@@ -544,6 +554,7 @@ export class ClawBackendServer {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
         const prompt = requireString(params.prompt, 'prompt');
+        this.transcriptRetention.touch(agentId);
         return this.routeAgentSnapshotRequest(
           message.id,
           agentId,
@@ -1199,6 +1210,7 @@ export class ClawBackendServer {
     for (const timer of this.queuedPromptRetryTimers.values()) clearTimeout(timer);
     this.queuedPromptRetryTimers.clear();
     this.unsubscribeDriverEvents?.();
+    await this.transcriptRetention.close();
     await this.driverRpc?.close();
     await this.remoteClients.close();
   }
@@ -2099,7 +2111,11 @@ export class ClawBackendServer {
     }
   }
 
-  private applyAndEmitBackendEvent(event: BackendEvent): void {
+  private applyAndEmitBackendEvent(
+    event: BackendEvent,
+    options: { trackTranscriptActivity?: boolean } = {},
+  ): void {
+    if (options.trackTranscriptActivity !== false) this.touchTranscriptForEvent(event);
     const fullEvent = this.nextMainEvent(event);
     applyMainEventToSnapshot(this.snapshot, fullEvent);
     this.recordClientRequestOwner(fullEvent);
@@ -2109,6 +2125,7 @@ export class ClawBackendServer {
   }
 
   private handleBackendEvent(event: BackendEvent, options: { persist?: boolean } = {}): void {
+    this.touchTranscriptForEvent(event);
     const fullEvent = this.nextMainEvent(event);
     applyMainEventToSnapshot(this.snapshot, fullEvent);
     this.recordClientRequestOwner(fullEvent);
@@ -2135,6 +2152,27 @@ export class ClawBackendServer {
     if (event.agentId && shouldRefreshGitStatusForEvent(event)) {
       void this.refreshAgentGitStatus(event.agentId);
     }
+  }
+
+  private touchTranscriptForEvent(event: BackendEvent): void {
+    if (!event.agentId) return;
+    const occurredAt = event.occurredAt ? Date.parse(event.occurredAt) : Number.NaN;
+    this.transcriptRetention.touch(event.agentId, Number.isFinite(occurredAt) ? occurredAt : undefined);
+  }
+
+  private async releaseEvictedAgentTranscript(agentId: string): Promise<void> {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) return;
+
+    await this.driverRpc?.handle(backendMethods.driverSessionForget, {
+      backend: agent.backend,
+      agentId,
+    });
+    this.applyAndEmitBackendEvent({
+      agentId,
+      type: 'thread.historyLoaded',
+      payload: { messages: [], replace: true },
+    }, { trackTranscriptActivity: false });
   }
 
   private nextMainEvent(event: BackendEvent): MainToRendererEvent {
