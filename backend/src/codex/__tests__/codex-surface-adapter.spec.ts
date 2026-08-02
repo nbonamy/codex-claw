@@ -185,6 +185,17 @@ class FakeTransport implements RpcTransport {
 }
 
 describe('CodexSurfaceAgentAdapter', () => {
+  it('delegates runtime ownership to the embedding backend host', async () => {
+    const surface = new CodexSurface();
+    const closeSurface = vi.fn().mockResolvedValue(undefined);
+    const adapter = new CodexSurfaceAgentAdapter(surface, closeSurface);
+
+    await adapter.close();
+    await adapter.close();
+
+    expect(closeSurface).toHaveBeenCalledOnce();
+  });
+
   it('maps official remote-control pairing data into Claw contracts', async () => {
     const { adapter, transport } = createAdapter();
 

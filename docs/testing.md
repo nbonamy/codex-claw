@@ -199,3 +199,19 @@ boot.
 
 For protocol or persistence changes, run focused tests for the touched module
 and the full coverage gate.
+
+## Conversation Performance Benchmark
+
+Run `npm run benchmark:conversation` from the Claw repository to exercise the
+two performance ownership boundaries without launching Electron:
+
+- Claw hydrates five long agent transcripts and reduces 2,000 interleaved
+  app-owned streaming events into the renderer replica.
+- The SDK uses an isolated temporary Codex home, cold-loads five 200-turn
+  conversations through a fake app-server transport, subscribes to every
+  conversation, and routes 500 interleaved app-server deltas.
+
+The command reports latency and throughput for both layers. Compare runs on the
+same machine and power state; it is a diagnostic benchmark, not a wall-clock CI
+threshold. Functional tests continue to assert event isolation and stable
+active-transcript identity so correctness does not depend on benchmark timing.

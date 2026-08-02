@@ -64,7 +64,10 @@ export class CodexSurfaceAgentAdapter {
   private readonly unsubscribeSurface: () => void;
   private closed = false;
 
-  constructor(private readonly surface: CodexSurface) {
+  constructor(
+    private readonly surface: CodexSurface,
+    private readonly closeSurface: () => Promise<void> = () => surface.close(),
+  ) {
     this.unsubscribeSurface = surface.onEvent((event) => this.handleSurfaceEvent(event));
   }
 
@@ -357,7 +360,7 @@ export class CodexSurfaceAgentAdapter {
     this.agentIdsByThreadId.clear();
     this.approvalOwners.clear();
     this.clientRequestOwners.clear();
-    await this.surface.close();
+    await this.closeSurface();
   }
 
   private async ensureSession(agent: Agent): Promise<AgentConversation> {

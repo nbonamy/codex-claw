@@ -88,6 +88,8 @@ const workProviderAuthorizationPollTimers = new Map<WorkProviderKind, ReturnType
 const WORK_PROVIDER_AUTHORIZATION_POLL_MS = 5_000;
 
 export function useAppState() {
+  let visibleMessageAgentId: string | null = null;
+  let visibleMessageCache: RendererMessage[] = [];
   const selectedModel = computed(() => selectedModelFromCatalog());
 
   const activeAgent = computed(() => {
@@ -98,8 +100,20 @@ export function useAppState() {
   const activeBackendCommands = computed<BackendCommandSummary[]>(() => defaultBackendCommands(activeAgent.value?.backend ?? 'codex'));
 
   const visibleMessages = computed(() => {
-    const agentId = activeAgent.value?.id;
-    return agentId ? snapshot.value.messages.filter((message) => message.agentId === agentId) : [];
+    const agentId = activeAgent.value?.id ?? null;
+    const next = agentId
+      ? snapshot.value.messages.filter((message) => message.agentId === agentId)
+      : [];
+    if (
+      agentId === visibleMessageAgentId &&
+      next.length === visibleMessageCache.length &&
+      next.every((message, index) => message === visibleMessageCache[index])
+    ) {
+      return visibleMessageCache;
+    }
+    visibleMessageAgentId = agentId;
+    visibleMessageCache = next;
+    return visibleMessageCache;
   });
 
   const isHydratingActiveAgentHistory = computed(() => {

@@ -2161,6 +2161,43 @@ describe('useAppState', () => {
     expect(state.visibleMessages.value.at(-1)?.parts).toStrictEqual([{ type: 'text', text: 'streamed' }]);
   });
 
+  it('keeps the active transcript reference stable when another agent streams', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents.push({
+      id: 'agent-jesse', teamId: remoteSnapshot.teams[0]!.id, name: 'Jesse',
+      folder: '/tmp/jesse', backend: 'codex', status: { type: 'working' },
+      createdAt: '2026-06-05T00:00:00.000Z', updatedAt: '2026-06-05T00:00:00.000Z',
+    });
+    remoteSnapshot.teams[0]!.agentIds.push('agent-jesse');
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn((nextListener) => {
+          listeners.push(nextListener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    const activeTranscript = state.visibleMessages.value;
+
+    listeners[0]!({
+      seq: 1,
+      agentId: 'agent-jesse',
+      threadId: 'thread-jesse',
+      turnId: 'turn-jesse',
+      type: 'message.delta',
+      payload: { delta: 'background stream' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(state.visibleMessages.value).toBe(activeTranscript);
+    expect(state.snapshot.value.messages.some((message) => message.agentId === 'agent-jesse')).toBe(true);
+  });
+
   it('responds to client requests through preload and tracks answered request ids', async () => {
     const updatedSnapshot = createInitialSnapshot();
     updatedSnapshot.agents[0].status = { type: 'working' };
