@@ -309,19 +309,31 @@ When a recipient receives a direct or broadcast message:
   drains all pending unread messages into one direct delivery prompt.
 
 The direct delivery prompt is intentionally not a generic "check your inbox"
-instruction. For one message it starts like:
+instruction. Messages use a versioned, JSON-encoded envelope with stable marker
+lines, followed by separately delimited delivery guidance:
 
 ```text
-You received a message from Dina (agent-dina).
+<<<CODEX_CLAW_AGENT_MESSAGES_V1>>>
+{
+  "version": 1,
+  "messages": [
+    {
+      "senderName": "Dina",
+      "senderId": "agent-dina",
+      "sentAt": "2026-08-02T12:00:00.000Z",
+      "content": "Please review this."
+    }
+  ]
+}
+<<<END_CODEX_CLAW_AGENT_MESSAGES_V1>>>
 ```
 
+The renderer reads only the delimited envelope, so delivery-instruction wording
+can change without breaking the sender label or message-body projection. It
+also recognizes the earlier prose envelope for hydrated historical messages.
 This keeps agent-to-agent messaging inside the same turn pipeline as normal
-user prompts, while avoiding the old extra `check-messages` indirection. There
-is no separate renderer-side command path. Delivery instructions tell the
-recipient to reply only when the sender needs information, a decision,
-coordination, or action. FYIs, acknowledgments, confirmations, and closure
-messages are absorbed silently, and informational delivery does not cause agent
-status churn.
+user prompts while avoiding the old extra `check-messages` indirection. There
+is no separate renderer-side command path.
 
 ## Approval Flow
 

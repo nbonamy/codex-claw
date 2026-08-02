@@ -1,6 +1,7 @@
 <template>
   <div class="conversation-pane">
     <CodexConversationPane
+      ref="surface"
       :composer-state="composerState"
       :attachments="attachments"
       class="conversation-pane__surface"
@@ -65,14 +66,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   CodexConversationPane,
   provideCodexChatTranslate,
-  toCodexChatMessage,
   type CodexCapabilities,
-  type CodexChatMessage,
   type CodexComposerState,
   type CodexConversationLink,
   type CodexNativeAttachment,
@@ -99,10 +98,11 @@ import type {
 } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import ConversationPlanPanel from './ConversationPlanPanel.vue';
-import { presentCollaborationMessage } from '../shared/collaboration-message';
+import { presentRendererCollaborationMessage } from '../shared/collaboration-message';
 import { provideClawToolPresentation } from '../tool-presentation';
 
 const { t } = useI18n();
+const surface = ref<{ focusComposer(): void } | null>(null);
 provideCodexChatTranslate((key, params) => t(key, params ?? {}));
 provideClawToolPresentation((key, params) => t(key, params ?? {}));
 
@@ -167,7 +167,7 @@ const emit = defineEmits<{
 }>();
 
 const presentedMessages = computed(() => props.messages.map((message) => (
-  presentCollaborationMessage(toCodexChatMessage(message))
+  presentRendererCollaborationMessage(message)
 )));
 const presentedChatMessages = computed(() => presentedMessages.value.map(({ message }) => message));
 const collaborationMessageLabels = computed(() => new Map(
@@ -254,7 +254,7 @@ function promptAttachments(options?: SendCodexMessageOptions): PromptAttachment[
   return options?.attachments?.map<PromptAttachment>((attachment) => ({ ...attachment }));
 }
 
-function collaborationMessageLabel(messageId: CodexChatMessage['id']): string | null {
+function collaborationMessageLabel(messageId: string | undefined): string | null {
   return messageId ? collaborationMessageLabels.value.get(messageId) ?? null : null;
 }
 
@@ -267,6 +267,12 @@ function updateComposerAttachments(attachments: readonly CodexNativeAttachment[]
   if (!props.agent) return;
   emit('update:composerAttachments', { agentId: props.agent.id, attachments });
 }
+
+function focusComposer(): void {
+  surface.value?.focusComposer?.();
+}
+
+defineExpose({ focusComposer });
 </script>
 
 <style scoped>

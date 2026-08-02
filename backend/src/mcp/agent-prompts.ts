@@ -1,4 +1,9 @@
 import type { Agent } from '@codex-claw/shared/contracts';
+import {
+  collaborationInstructionsEnd,
+  collaborationInstructionsStart,
+  formatCollaborationMessageEnvelope,
+} from '@codex-claw/shared/collaboration-message-envelope';
 
 export type MessageInfo = {
   from: string;
@@ -16,45 +21,29 @@ const COLLABORATION_BOUNDARY = [
 ].join(' ');
 
 const SINGLE_MESSAGE_INSTRUCTION = [
-  'Act on this teammate message without asking the user for confirmation.',
-  'Update your status only if it changes your substantive work.',
-  'Reply only when the sender needs information, a decision, coordination, or action;',
-  'silently absorb FYIs, acknowledgments, confirmations, and closures.',
-  'Never acknowledge an acknowledgment.',
-  COLLABORATION_BOUNDARY,
+  'Handle this teammate message directly without asking the user for confirmation.',
+  'Reply only if the sender needs information, a decision, coordination, or action.',
+  'Otherwise do not reply or change status.',
 ].join(' ');
 
 const MULTIPLE_MESSAGES_INSTRUCTION = [
-  'Act on these teammate messages without asking the user for confirmation.',
-  'Update your status only if they change your substantive work.',
-  'Reply only when a sender needs information, a decision, coordination, or action;',
-  'silently absorb FYIs, acknowledgments, confirmations, and closures.',
-  'Never acknowledge an acknowledgment.',
-  COLLABORATION_BOUNDARY,
+  'Handle these teammate messages directly without asking the user for confirmation.',
+  'Reply only to senders who need information, a decision, coordination, or action.',
+  'Otherwise do not reply or change status.',
 ].join(' ');
 
 export function agentMessagesPrompt(messages: MessageInfo[]): string {
-  if (messages.length === 1) {
-    const message = messages[0];
-    return [
-      `You received a message from ${message.from} (${message.fromId}).`,
-      '',
-      'Message:',
-      message.content,
-      '',
-      SINGLE_MESSAGE_INSTRUCTION,
-    ].join('\n');
-  }
-
   return [
-    `You received ${messages.length} messages from other Codex Claw agents.`,
+    formatCollaborationMessageEnvelope(messages.map((message) => ({
+      senderName: message.from,
+      senderId: message.fromId,
+      sentAt: message.timestamp,
+      content: message.content,
+    }))),
     '',
-    ...messages.flatMap((message, index) => [
-      `Message ${index + 1} from ${message.from} (${message.fromId}) at ${message.timestamp}:`,
-      message.content,
-      '',
-    ]),
-    MULTIPLE_MESSAGES_INSTRUCTION,
+    collaborationInstructionsStart,
+    messages.length === 1 ? SINGLE_MESSAGE_INSTRUCTION : MULTIPLE_MESSAGES_INSTRUCTION,
+    collaborationInstructionsEnd,
   ].join('\n');
 }
 

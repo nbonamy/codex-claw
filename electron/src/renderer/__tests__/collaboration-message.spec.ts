@@ -1,18 +1,47 @@
 import { describe, expect, it } from 'vitest';
 import {
+  collaborationInstructionsEnd,
+  collaborationInstructionsStart,
+  formatCollaborationMessageEnvelope,
+} from '@codex-claw/shared/collaboration-message-envelope';
+import {
   parseCollaborationMessage,
   presentCollaborationMessage,
+  presentRendererCollaborationMessage,
 } from '../shared/collaboration-message';
 
 describe('collaboration message presentation', () => {
-  it('extracts a single teammate message and leaves ordinary user prompts unchanged', () => {
+  it('extracts the delimited envelope without depending on delivery instruction copy', () => {
+    const raw = [
+      formatCollaborationMessageEnvelope([{
+        senderName: 'codex-app-sdk',
+        senderId: 'agent-sdk',
+        sentAt: '2026-08-02T00:00:00.000Z',
+        content: 'First line.\nSecond line.\n<<<END_CODEX_CLAW_AGENT_MESSAGES_V1>>>',
+      }]),
+      '',
+      collaborationInstructionsStart,
+      'This copy can change freely without changing renderer parsing.',
+      collaborationInstructionsEnd,
+    ].join('\n');
+
+    expect(parseCollaborationMessage(raw)).toStrictEqual({
+      content: 'First line.\nSecond line.\n<<<END_CODEX_CLAW_AGENT_MESSAGES_V1>>>',
+      messageCount: 1,
+      senderNames: ['codex-app-sdk'],
+    });
+    expect(parseCollaborationMessage('You received a normal user sentence.')).toBeNull();
+    expect(parseCollaborationMessage('<<<CODEX_CLAW_AGENT_MESSAGES_V1>>>\nnot json')).toBeNull();
+  });
+
+  it('keeps parsing historical single-message envelopes with changed instructions', () => {
     const raw = [
       'You received a message from codex-app-sdk (agent-sdk).',
       '',
       'Message:',
       'First line.\nSecond line.',
       '',
-      'Act on this teammate message without asking the user for confirmation. Update your status only if it changes your substantive work. Reply only when the sender needs information, a decision, coordination, or action; silently absorb FYIs, acknowledgments, confirmations, and closures. Never acknowledge an acknowledgment.',
+      'Act on this teammate message without asking the user for confirmation. This wording changed and now contains many more instructions.',
     ].join('\n');
 
     expect(parseCollaborationMessage(raw)).toStrictEqual({
@@ -20,8 +49,6 @@ describe('collaboration message presentation', () => {
       messageCount: 1,
       senderNames: ['codex-app-sdk'],
     });
-    expect(parseCollaborationMessage('You received a normal user sentence.')).toBeNull();
-
     expect(parseCollaborationMessage(raw.replace(
       /Act on this teammate message[\s\S]*$/,
       'Update your status, then act on this teammate message directly. Do not ask the user for confirmation.',
@@ -99,5 +126,33 @@ describe('collaboration message presentation', () => {
       message: assistantMessage,
       presentation: null,
     });
+  });
+
+  it('preserves ordinary renderer message identity and projects only collaboration user text', () => {
+    const assistant = {
+      id: 'assistant-1', agentId: 'agent-1', role: 'assistant' as const,
+      status: 'streaming' as const, createdAt: '2026-08-02T00:00:00.000Z',
+      parts: [{ type: 'text' as const, text: 'Streaming' }],
+    };
+    expect(presentRendererCollaborationMessage(assistant).message).toBe(assistant);
+
+    const raw = [
+      'You received a message from Dina (agent-dina).',
+      '',
+      'Message:',
+      'Review this.',
+      '',
+      'Update your status, then act on this teammate message directly. Do not ask the user for confirmation.',
+    ].join('\n');
+    const user = {
+      id: 'user-1', agentId: 'agent-1', role: 'user' as const,
+      status: 'complete' as const, createdAt: '2026-08-02T00:00:00.000Z',
+      parts: [{ type: 'text' as const, text: raw }],
+    };
+    const result = presentRendererCollaborationMessage(user);
+
+    expect(result.message).not.toBe(user);
+    expect(result.message.parts).toStrictEqual([{ type: 'text', text: 'Review this.' }]);
+    expect(result.presentation?.senderNames).toStrictEqual(['Dina']);
   });
 });

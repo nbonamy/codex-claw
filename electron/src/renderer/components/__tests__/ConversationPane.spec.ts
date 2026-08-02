@@ -266,31 +266,10 @@ describe('ConversationPane', () => {
     }];
     const wrapper = mountPane({ agent, messages: attachmentMessages, isSending: false });
     const sdkProps = wrapper.getComponent(CodexConversationPane as unknown as Component).props() as {
-      messages: Array<{ content: string; parts: unknown[] }>;
+      messages: RendererMessage[];
     };
 
-    expect(sdkProps.messages).toStrictEqual([expect.objectContaining({
-      content: 'Review both',
-      parts: [
-        { type: 'text', content: 'Review both' },
-        {
-          type: 'attachment',
-          attachment: {
-            kind: 'image',
-            name: 'screenshot.png',
-            path: '/tmp/screenshot.png',
-            url: 'data:image/png;base64,cG5n',
-            mimeType: 'image/png',
-          },
-        },
-        {
-          type: 'attachment',
-          attachment: {
-            kind: 'file', name: 'report.txt', path: '/tmp/report.txt', mimeType: 'text/plain',
-          },
-        },
-      ],
-    })]);
+    expect(sdkProps.messages).toStrictEqual(attachmentMessages);
     expect(wrapper.get('.chat-attachment-block__preview').attributes('src'))
       .toBe('data:image/png;base64,cG5n');
     expect(wrapper.get('a.chat-attachment-block--chip').attributes('href')).toBe('/tmp/report.txt');

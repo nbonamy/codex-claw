@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '@codex-claw/shared/contracts';
+import { parseCollaborationMessageEnvelope } from '@codex-claw/shared/collaboration-message-envelope';
 import { agentMessagesPrompt, codexClawDeveloperInstructions } from '../agent-prompts';
 
 describe('agent prompts', () => {
@@ -11,14 +12,18 @@ describe('agent prompts', () => {
       content: 'The facade is ready.',
     }]);
 
-    expect(prompt).toBe([
-      'You received a message from SDK (agent-sdk).',
-      '',
-      'Message:',
-      'The facade is ready.',
-      '',
-      'Act on this teammate message without asking the user for confirmation. Update your status only if it changes your substantive work. Reply only when the sender needs information, a decision, coordination, or action; silently absorb FYIs, acknowledgments, confirmations, and closures. Never acknowledge an acknowledgment. Do not proactively message other agents. Use list-agents, send-message, or broadcast-message only when the user explicitly requests coordination or a concrete cross-repository contract blocker requires a decision or action from a specific agent. Never send FYIs, progress reports, acknowledgments, commit/hash notices, or "no action needed" messages.',
-    ].join('\n'));
+    expect(parseCollaborationMessageEnvelope(prompt)).toStrictEqual({
+      version: 1,
+      messages: [{
+        senderName: 'SDK',
+        senderId: 'agent-sdk',
+        sentAt: '2026-08-02T12:00:00.000Z',
+        content: 'The facade is ready.',
+      }],
+    });
+    expect(prompt).toContain('<<<CODEX_CLAW_DELIVERY_INSTRUCTIONS>>>');
+    expect(prompt).toContain('Reply only if the sender needs information, a decision, coordination, or action.');
+    expect(prompt).not.toContain('Do not proactively message other agents.');
   });
 
   it('numbers and attributes batches of teammate messages', () => {
@@ -34,11 +39,21 @@ describe('agent prompts', () => {
       content: 'Second',
     }]);
 
-    expect(prompt).toContain('You received 2 messages from other Codex Claw agents.');
-    expect(prompt).toContain('Message 1 from SDK (agent-sdk) at 2026-08-02T12:00:00.000Z:\nFirst');
-    expect(prompt).toContain('Message 2 from Computer Use (agent-computer-use) at 2026-08-02T12:01:00.000Z:\nSecond');
-    expect(prompt).toContain('silently absorb FYIs, acknowledgments, confirmations, and closures');
-    expect(prompt).toContain('Never acknowledge an acknowledgment');
+    expect(parseCollaborationMessageEnvelope(prompt)?.messages).toStrictEqual([
+      {
+        senderName: 'SDK',
+        senderId: 'agent-sdk',
+        sentAt: '2026-08-02T12:00:00.000Z',
+        content: 'First',
+      },
+      {
+        senderName: 'Computer Use',
+        senderId: 'agent-computer-use',
+        sentAt: '2026-08-02T12:01:00.000Z',
+        content: 'Second',
+      },
+    ]);
+    expect(prompt).toContain('Reply only to senders who need information, a decision, coordination, or action.');
   });
 
   it('embeds the active agent identity and collaboration constraints', () => {

@@ -1,19 +1,12 @@
 import type { CodexChatMessage } from 'codex-app-sdk/vue';
+import type { RendererMessage } from '@codex-claw/shared/contracts';
+import { parseCollaborationMessageEnvelope } from '@codex-claw/shared/collaboration-message-envelope';
 
 export type CollaborationMessagePresentation = {
   content: string;
   messageCount: number;
   senderNames: string[];
 };
-
-const actionInstructions = [
-  'Act on this teammate message without asking the user for confirmation. Update your status only if it changes your substantive work. Reply only when the sender needs information, a decision, coordination, or action; silently absorb FYIs, acknowledgments, confirmations, and closures. Never acknowledge an acknowledgment.',
-  'Update your status, then act on this teammate message directly. Do not ask the user for confirmation.',
-];
-const actionsInstructions = [
-  'Act on these teammate messages without asking the user for confirmation. Update your status only if they change your substantive work. Reply only when a sender needs information, a decision, coordination, or action; silently absorb FYIs, acknowledgments, confirmations, and closures. Never acknowledge an acknowledgment.',
-  'Update your status, then act on these teammate messages directly. Do not ask the user for confirmation.',
-];
 
 export function presentCollaborationMessage(message: CodexChatMessage): {
   message: CodexChatMessage;
@@ -37,15 +30,44 @@ export function presentCollaborationMessage(message: CodexChatMessage): {
   };
 }
 
-export function parseCollaborationMessage(content: string): CollaborationMessagePresentation | null {
-  return parseSingleMessage(content) ?? parseMultipleMessages(content);
+export function presentRendererCollaborationMessage(message: RendererMessage): {
+  message: RendererMessage;
+  presentation: CollaborationMessagePresentation | null;
+} {
+  if (message.role !== 'user') return { message, presentation: null };
+  const content = message.parts
+    .filter((part): part is Extract<RendererMessage['parts'][number], { type: 'text' }> => part.type === 'text')
+    .map((part) => part.text)
+    .join('\n\n');
+  const presentation = parseCollaborationMessage(content);
+  if (!presentation) return { message, presentation: null };
+
+  return {
+    message: {
+      ...message,
+      parts: [
+        { type: 'text', text: presentation.content },
+        ...message.parts.filter((part) => part.type !== 'text'),
+      ],
+    },
+    presentation,
+  };
 }
 
-function parseSingleMessage(content: string): CollaborationMessagePresentation | null {
-  const suffix = matchingSuffix(content, actionInstructions, '\n\n');
-  if (!suffix) return null;
+export function parseCollaborationMessage(content: string): CollaborationMessagePresentation | null {
+  const envelope = parseCollaborationMessageEnvelope(content);
+  if (envelope) {
+    return presentationFromMessages(envelope.messages.map((message) => ({
+      senderName: message.senderName.trim(),
+      content: message.content.trim(),
+    })));
+  }
+  return parseLegacySingleMessage(content) ?? parseLegacyMultipleMessages(content);
+}
 
-  const body = content.slice(0, -suffix.length);
+function parseLegacySingleMessage(content: string): CollaborationMessagePresentation | null {
+  const body = legacyEnvelopeBody(content);
+  if (!body) return null;
   const match = /^You received a message from (.+) \(([^)\n]+)\)\.\r?\n\r?\nMessage:\r?\n([\s\S]*)$/.exec(body);
   if (!match) return null;
 
@@ -60,11 +82,9 @@ function parseSingleMessage(content: string): CollaborationMessagePresentation |
   };
 }
 
-function parseMultipleMessages(content: string): CollaborationMessagePresentation | null {
-  const suffix = matchingSuffix(content, actionsInstructions, '\n');
-  if (!suffix) return null;
-
-  const body = content.slice(0, -suffix.length);
+function parseLegacyMultipleMessages(content: string): CollaborationMessagePresentation | null {
+  const body = legacyEnvelopeBody(content);
+  if (!body) return null;
   const heading = /^You received (\d+) messages from other Codex Claw agents\.\r?\n\r?\n/.exec(body);
   if (!heading) return null;
 
@@ -79,6 +99,12 @@ function parseMultipleMessages(content: string): CollaborationMessagePresentatio
   if (parsed.length !== expectedCount || parsed.some((entry) => entry === null)) return null;
 
   const messages = parsed.filter((entry): entry is { senderName: string; content: string } => entry !== null);
+  return presentationFromMessages(messages);
+}
+
+function presentationFromMessages(
+  messages: Array<{ senderName: string; content: string }>,
+): CollaborationMessagePresentation {
   const senderNames = [...new Set(messages.map((entry) => entry.senderName))];
   return {
     content: senderNames.length === 1
@@ -89,6 +115,7 @@ function parseMultipleMessages(content: string): CollaborationMessagePresentatio
   };
 }
 
-function matchingSuffix(content: string, instructions: readonly string[], prefix: string): string | null {
-  return instructions.map((instruction) => `${prefix}${instruction}`).find((suffix) => content.endsWith(suffix)) ?? null;
+function legacyEnvelopeBody(content: string): string | null {
+  const instructions = /\r?\n\r?\n(?=(?:Act on (?:this|these) teammate messages?\b|Update your status\b))/.exec(content);
+  return instructions ? content.slice(0, instructions.index) : null;
 }
