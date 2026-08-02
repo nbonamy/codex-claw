@@ -67,6 +67,7 @@ export function sendAgentPrompt(
     })
     .catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
+      updateAgentStatus(agentId, { type: 'idle' }, emit, snapshot);
       updateBackendRuntimeStatus({
         backend: backendDriver.backend,
         status: 'error',

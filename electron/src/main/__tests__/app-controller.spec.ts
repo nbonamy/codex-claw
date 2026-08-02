@@ -1263,6 +1263,20 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('agent/prompt/steer', { agentId: 'agent-dina', prompt: ' try smaller ' });
   });
 
+  it('routes queued prompt mutations through clawd', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.sourceFolder.initialized = true;
+    const request = vi.fn().mockResolvedValue(snapshot);
+    const controller = new AppController(snapshot, createBackendClient({ request }));
+    await controller.initialize();
+
+    await expect(steerQueuedPrompt(controller, 'agent-dina', 'prompt-1')).resolves.toBe(snapshot);
+    await expect(deleteQueuedPrompt(controller, 'agent-dina', 'prompt-2')).resolves.toBe(snapshot);
+
+    expect(request).toHaveBeenNthCalledWith(1, 'agent/queuedPrompt/steer', { agentId: 'agent-dina', promptId: 'prompt-1' });
+    expect(request).toHaveBeenNthCalledWith(2, 'agent/queuedPrompt/delete', { agentId: 'agent-dina', promptId: 'prompt-2' });
+  });
+
   it('routes interruption through clawd', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].status = { type: 'working' };
@@ -1978,6 +1992,18 @@ async function steerPrompt(controller: AppController, agentId: string, prompt: s
   return (controller as unknown as {
     steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot>;
   }).steerPrompt(agentId, prompt);
+}
+
+async function steerQueuedPrompt(controller: AppController, agentId: string, promptId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    steerQueuedPrompt(agentId: string, promptId: string): Promise<AppSnapshot>;
+  }).steerQueuedPrompt(agentId, promptId);
+}
+
+async function deleteQueuedPrompt(controller: AppController, agentId: string, promptId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    deleteQueuedPrompt(agentId: string, promptId: string): Promise<AppSnapshot>;
+  }).deleteQueuedPrompt(agentId, promptId);
 }
 
 async function interruptAgent(controller: AppController, agentId: string): Promise<AppSnapshot> {

@@ -828,6 +828,14 @@ export type RendererMessage = {
   createdAt: string;
 };
 
+export type AgentQueuedPrompt = {
+  id: string;
+  agentId: string;
+  text: string;
+  createdAt: string;
+  options?: SendPromptOptions;
+};
+
 export type AgentGitStatus = {
   folder: string;
   branch?: string;
@@ -859,6 +867,7 @@ export type AppSnapshot = {
   activeTeamId: string | null;
   activeAgentId: string | null;
   messages: RendererMessage[];
+  queuedPrompts?: AgentQueuedPrompt[];
   agentGitStatuses: Record<string, AgentGitStatus>;
   turnGitDiffs: Record<string, TurnGitDiff>;
   backendRuntimes: BackendRuntimeStatus[];
@@ -906,6 +915,7 @@ export type MainToRendererEvent = {
     | 'agent.promptQueued'
     | 'agent.promptDequeued'
     | 'context.compactionStarted'
+    | 'context.compactionCompleted'
     | 'account.rateLimitsUpdated'
     | 'workBacklog.assignmentUpdated'
     | 'skills.changed'
@@ -1137,6 +1147,8 @@ export type CodexClawApi = {
   setAgentApprovalPreset(agentId: string, preset: ApprovalPreset): Promise<AppSnapshot>;
   sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot>;
   steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot>;
+  deleteQueuedPrompt(agentId: string, promptId: string): Promise<AppSnapshot>;
+  steerQueuedPrompt(agentId: string, promptId: string): Promise<AppSnapshot>;
   interruptAgent(agentId: string): Promise<AppSnapshot>;
   deleteMessage(agentId: string, messageId: string): Promise<AppSnapshot>;
   editMessage(agentId: string, messageId: string, prompt: string): Promise<AppSnapshot>;

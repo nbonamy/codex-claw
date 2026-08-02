@@ -23,7 +23,7 @@ describe('main window options', () => {
       backgroundColor: '#00000000',
       hasShadow: true,
       titleBarStyle: 'hiddenInset',
-      trafficLightPosition: { x: 8, y: 17 },
+      trafficLightPosition: { x: 16, y: 16 },
       vibrancy: 'menu',
     });
     expect(createMainWindowOptions(false, undefined, 'win32')).toMatchObject({

@@ -85,8 +85,13 @@ export class ClawMcpService {
   }
 
   handleBackendEvent(event: MainToRendererEvent): void {
-    if (event.type === 'turn.completed' && event.agentId) {
-      void this.deliverUnreadAgentMessages(event.agentId);
+    const payload = event.payload && typeof event.payload === 'object' && !Array.isArray(event.payload)
+      ? event.payload as Record<string, unknown>
+      : null;
+    if (event.type === 'agent.promptDequeued' && payload && Array.isArray(payload.ids)) {
+      const ids = payload.ids.filter((id): id is string => typeof id === 'string');
+      for (const id of ids) this.queuedMessageIds.delete(id);
+      this.coordinator.markMessagesRead(ids);
     }
   }
 

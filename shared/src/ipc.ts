@@ -82,6 +82,8 @@ export const ipcChannels = {
   setAgentApprovalPreset: 'agent:approval-preset:set',
   sendPrompt: 'agent:send-prompt',
   steerPrompt: 'agent:steer-prompt',
+  deleteQueuedPrompt: 'agent:delete-queued-prompt',
+  steerQueuedPrompt: 'agent:steer-queued-prompt',
   interruptAgent: 'agent:interrupt',
   deleteMessage: 'message:delete',
   editMessage: 'message:edit',

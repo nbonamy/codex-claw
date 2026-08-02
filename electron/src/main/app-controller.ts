@@ -348,6 +348,14 @@ export class AppController {
       return this.steerPrompt(agentId, prompt);
     });
 
+    ipc.handle(ipcChannels.deleteQueuedPrompt, (_event, agentId: string, promptId: string) => {
+      return this.deleteQueuedPrompt(agentId, promptId);
+    });
+
+    ipc.handle(ipcChannels.steerQueuedPrompt, (_event, agentId: string, promptId: string) => {
+      return this.steerQueuedPrompt(agentId, promptId);
+    });
+
     ipc.handle(ipcChannels.interruptAgent, (_event, agentId: string) => {
       return this.interruptAgent(agentId);
     });
@@ -871,6 +879,14 @@ export class AppController {
 
   private async steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentPromptSteer, { agentId, prompt }));
+  }
+
+  private async deleteQueuedPrompt(agentId: string, promptId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentQueuedPromptDelete, { agentId, promptId }));
+  }
+
+  private async steerQueuedPrompt(agentId: string, promptId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentQueuedPromptSteer, { agentId, promptId }));
   }
 
   private async interruptAgent(agentId: string): Promise<AppSnapshot> {

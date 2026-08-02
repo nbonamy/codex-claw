@@ -686,6 +686,7 @@ describe('CodexSurfaceAgentAdapter', () => {
         payload: { itemId: 'compact-notification-only' },
       }),
     ]);
+    expect(events.filter((event) => event.type === 'context.compactionCompleted')).toHaveLength(1);
 
     await adapter.sendPrompt(agentA, 'Create a turn');
     transport.emit({
@@ -702,6 +703,7 @@ describe('CodexSurfaceAgentAdapter', () => {
       },
     });
     expect(events.filter((event) => event.type === 'context.compactionStarted')).toHaveLength(1);
+    expect(events.filter((event) => event.type === 'context.compactionCompleted')).toHaveLength(1);
   });
 });
 

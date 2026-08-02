@@ -5,22 +5,16 @@ import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilit
 import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
 import { approvalPresetFromDefaults } from '@codex-claw/shared/approval-presets';
 import {
-  createQueuedChatPrompt,
   promptSkillInputsFromText,
-  type CodexQueuedPromptData as QueuedChatPrompt,
 } from 'codex-app-sdk/vue';
 import { workItemAssignmentPrompt } from '@codex-claw/shared/work-item-prompts';
 import { isAppSnapshot } from '@codex-claw/shared/snapshot-guards';
 import { useConfetti } from './shared/confetti/use-confetti';
 
-type QueuedAgentPrompt = QueuedChatPrompt & {
-  options?: SendPromptOptions;
-};
-
 const snapshot = ref<AppSnapshot>(createEmptySnapshot());
 const isLoading = ref(false);
 const sendingAgentIds = ref(new Set<string>());
-const queuedPromptsByAgentId = ref<Record<string, QueuedAgentPrompt[]>>({});
+const composerDraftsByAgentId = ref<Record<string, string>>({});
 const answeredClientRequestIds = ref(new Set<string>());
 const backendApprovalsByAgentId = ref<Record<string, BackendApprovalRequest[]>>({});
 const backendModels = ref<BackendModelOption[]>([]);
@@ -78,7 +72,19 @@ export function useAppState() {
 
   const activeQueuedPrompts = computed(() => {
     const agentId = activeAgent.value?.id;
-    return agentId ? queuedPromptsByAgentId.value[agentId] ?? [] : [];
+    return agentId ? (snapshot.value.queuedPrompts ?? []).filter((prompt) => prompt.agentId === agentId) : [];
+  });
+
+  const activeComposerDraft = computed({
+    get: () => {
+      const agentId = activeAgent.value?.id;
+      return agentId ? composerDraftsByAgentId.value[agentId] ?? '' : '';
+    },
+    set: (draft: string) => {
+      const agentId = activeAgent.value?.id;
+      if (!agentId) return;
+      composerDraftsByAgentId.value = { ...composerDraftsByAgentId.value, [agentId]: draft };
+    },
   });
 
   const activeBackendApprovals = computed(() => {
@@ -165,11 +171,6 @@ export function useAppState() {
       return;
     }
 
-    if (isAgentSending(agentId)) {
-      enqueuePrompt(agentId, trimmed, resolvedPromptOptions(agentId, trimmed, submissionOptions));
-      return;
-    }
-
     await sendPromptForAgent(agentId, trimmed, submissionOptions);
   }
 
@@ -190,7 +191,7 @@ export function useAppState() {
     }
 
     if (!window.codexClaw.steerPrompt) {
-      enqueuePrompt(agentId, trimmed);
+      await sendPromptForAgent(agentId, trimmed);
       return;
     }
 
@@ -258,37 +259,16 @@ export function useAppState() {
 
   async function steerQueuedPrompt(promptId: string): Promise<void> {
     const agentId = activeAgent.value?.id;
-    if (!agentId) {
+    if (!agentId || !window.codexClaw?.steerQueuedPrompt) {
       return;
     }
-
-    const queuedPrompt = removeQueuedPromptForAgent(agentId, promptId);
-    if (!queuedPrompt) {
-      return;
-    }
-
-    if (!isAgentSending(agentId)) {
-      await sendPreparedPromptForAgent(agentId, queuedPrompt.text, queuedPrompt.options);
-      return;
-    }
-
-    if ((queuedPrompt.options?.attachments?.length ?? 0) > 0) {
-      prependQueuedPrompt(agentId, queuedPrompt);
-      return;
-    }
-
-    try {
-      await steerPrompt(queuedPrompt.text);
-    } catch (error) {
-      prependQueuedPrompt(agentId, queuedPrompt);
-      throw error;
-    }
+    snapshot.value = await window.codexClaw.steerQueuedPrompt(agentId, promptId);
   }
 
-  function removeQueuedPrompt(promptId: string): void {
+  async function removeQueuedPrompt(promptId: string): Promise<void> {
     const agentId = activeAgent.value?.id;
-    if (agentId) {
-      removeQueuedPromptForAgent(agentId, promptId);
+    if (agentId && window.codexClaw?.deleteQueuedPrompt) {
+      snapshot.value = await window.codexClaw.deleteQueuedPrompt(agentId, promptId);
     }
   }
 
@@ -329,11 +309,6 @@ export function useAppState() {
     const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
     const trimmed = prompt.trim();
     if (!agent || !trimmed || !window.codexClaw) {
-      return;
-    }
-
-    if (isAgentSending(agent.id)) {
-      enqueuePrompt(agent.id, trimmed, selectedPromptOptions(agent.id, trimmed));
       return;
     }
 
@@ -1273,6 +1248,7 @@ export function useAppState() {
     activeApprovalPreset,
     visibleMessages,
     activeQueuedPrompts,
+    activeComposerDraft,
     isLoading,
     isHydratingActiveAgentHistory,
     isSending,
@@ -1615,42 +1591,12 @@ function subscribeToMainEvents(): void {
     adoptSnapshotFromMainEvent(event);
     syncBackendApprovalsFromMainEvent(event);
     syncAnsweredClientRequestsFromMainEvent(event);
-    syncQueuedPromptsFromMainEvent(event);
     syncComposerModeFromMainEvent(event);
     syncSidePanelFromMainEvent(event);
-    if (event.type === 'turn.completed' && event.agentId) {
-      void drainQueuedPrompts(event.agentId);
-    }
     if (event.type === 'skills.changed') {
       void loadBackendSkillsForActiveAgent();
     }
   });
-}
-
-function syncQueuedPromptsFromMainEvent(event: MainToRendererEvent): void {
-  if (!event.agentId || !isRecord(event.payload)) return;
-
-  if (event.type === 'agent.promptQueued') {
-    const id = event.payload.id;
-    const text = event.payload.text;
-    if (typeof id !== 'string' || typeof text !== 'string') return;
-    const existing = queuedPromptsByAgentId.value[event.agentId] ?? [];
-    if (existing.some((prompt) => prompt.id === id)) return;
-    queuedPromptsByAgentId.value = {
-      ...queuedPromptsByAgentId.value,
-      [event.agentId]: [...existing, { id, text }],
-    };
-    return;
-  }
-
-  if (event.type === 'agent.promptDequeued' && Array.isArray(event.payload.ids)) {
-    const ids = new Set(event.payload.ids.filter((id): id is string => typeof id === 'string'));
-    queuedPromptsByAgentId.value = {
-      ...queuedPromptsByAgentId.value,
-      [event.agentId]: (queuedPromptsByAgentId.value[event.agentId] ?? [])
-        .filter((prompt) => !ids.has(prompt.id)),
-    };
-  }
 }
 
 function syncBackendApprovalsFromMainEvent(event: MainToRendererEvent): void {
@@ -2052,91 +1998,6 @@ function isAgentSending(agentId: string): boolean {
     agent?.status.type === 'starting' ||
     agent?.status.type === 'working' ||
     agent?.status.type === 'awaitingInput';
-}
-
-function enqueuePrompt(agentId: string, prompt: string, options?: SendPromptOptions): void {
-  appendQueuedPrompt(agentId, {
-    ...createQueuedChatPrompt(prompt),
-    ...(options ? { options: clonePromptOptions(options) } : {}),
-  });
-}
-
-function appendQueuedPrompt(agentId: string, prompt: QueuedAgentPrompt): void {
-  queuedPromptsByAgentId.value = {
-    ...queuedPromptsByAgentId.value,
-    [agentId]: [
-      ...(queuedPromptsByAgentId.value[agentId] ?? []),
-      prompt,
-    ],
-  };
-}
-
-function prependQueuedPrompt(agentId: string, prompt: QueuedAgentPrompt): void {
-  queuedPromptsByAgentId.value = {
-    ...queuedPromptsByAgentId.value,
-    [agentId]: [
-      prompt,
-      ...(queuedPromptsByAgentId.value[agentId] ?? []),
-    ],
-  };
-}
-
-function removeQueuedPromptForAgent(agentId: string, promptId: string): QueuedAgentPrompt | null {
-  const prompts = queuedPromptsByAgentId.value[agentId] ?? [];
-  const prompt = prompts.find((candidate) => candidate.id === promptId) ?? null;
-  if (!prompt) {
-    return null;
-  }
-
-  queuedPromptsByAgentId.value = {
-    ...queuedPromptsByAgentId.value,
-    [agentId]: prompts.filter((candidate) => candidate.id !== promptId),
-  };
-  return prompt;
-}
-
-async function drainQueuedPrompts(agentId: string): Promise<void> {
-  if (!window.codexClaw || isAgentSending(agentId)) {
-    return;
-  }
-
-  const nextPrompt = queuedPromptsByAgentId.value[agentId]?.[0];
-  if (!nextPrompt) {
-    return;
-  }
-
-  markAgentSending(agentId, true);
-
-  try {
-    snapshot.value = nextPrompt.options
-      ? await window.codexClaw.sendPrompt(agentId, nextPrompt.text, nextPrompt.options)
-      : await window.codexClaw.sendPrompt(agentId, nextPrompt.text);
-    removeQueuedPromptForAgent(agentId, nextPrompt.id);
-  } catch {
-    // Keep the prompt visible and retryable when the backend does not accept it.
-  } finally {
-    markAgentSending(agentId, false);
-  }
-}
-
-function clonePromptOptions(options: SendPromptOptions): SendPromptOptions {
-  return {
-    ...options,
-    ...(options.attachments ? { attachments: options.attachments.map((attachment) => ({ ...attachment })) } : {}),
-    ...(options.skills ? { skills: options.skills.map((skill) => ({ ...skill })) } : {}),
-    ...(options.backendOptions?.kind === 'codex'
-      ? {
-        backendOptions: {
-          ...options.backendOptions,
-          ...(options.backendOptions.skills
-            ? { skills: options.backendOptions.skills.map((skill) => ({ ...skill })) }
-            : {}),
-        },
-      }
-      : options.backendOptions
-        ? { backendOptions: { ...options.backendOptions } }
-        : {}),
-  };
 }
 
 function markClientRequestAnswered(requestId: string): void {

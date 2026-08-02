@@ -202,6 +202,7 @@
             :selected-model-id="selectedModelId"
             :selected-reasoning-effort="selectedReasoningEffort"
             :queued-prompts="queuedPrompts"
+            :composer-draft="composerDraft"
             @client-response="$emit('client-response', $event)"
             @delete-message="$emit('delete-message', $event)"
             @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
@@ -218,6 +219,7 @@
             @steer-prompt="$emit('steerPrompt', $event)"
             @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
             @update:plan-mode="$emit('update:planMode', $event)"
+            @update:composer-draft="$emit('update:composerDraft', $event)"
           />
           <RightWorkspacePanel
             v-for="agent in snapshot.agents"
@@ -360,6 +362,7 @@ const props = withDefaults(defineProps<{
   selectedReasoningEffort?: ReasoningEffort | null;
   planMode?: boolean;
   queuedPrompts?: QueuedChatPrompt[];
+  composerDraft?: string;
   sidePanelRequest?: SidePanelRequest | null;
   workProviderAuthorization?: WorkProviderAuthorization | null;
   workRepositoriesByProvider?: Partial<Record<WorkProviderKind, WorkRepository[]>>;
@@ -437,6 +440,7 @@ const props = withDefaults(defineProps<{
   selectedReasoningEffort: null,
   approvalPreset: null,
   queuedPrompts: () => [],
+  composerDraft: '',
   sidePanelRequest: null,
   workProviderAuthorization: null,
   workRepositoriesByProvider: () => ({}),
@@ -534,6 +538,7 @@ const emit = defineEmits<{
   'select-team': [teamId: string];
   'steer-queued-prompt': [promptId: string];
   'update:planMode': [enabled: boolean];
+  'update:composerDraft': [draft: string];
   sendPrompt: [prompt: string, options?: SendPromptOptions];
   steerPrompt: [prompt: string];
 }>();

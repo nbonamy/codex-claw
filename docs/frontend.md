@@ -84,6 +84,9 @@ implemented:
 - optimistic agent switching that reveals the cached conversation immediately;
   backend session hydration, Git status, and agent catalogs refresh
   asynchronously and stale responses cannot replace a newer selection;
+- per-agent in-memory composer drafts, so switching agents preserves unsent
+  input; queued prompts remain backend-owned snapshot state and the renderer
+  never removes them before `clawd` confirms dequeue;
 - passive structured execution plans floating at the conversation's upper right
   while a turn is running; completed Plan-mode proposals continue to use the
   explicit review panel;

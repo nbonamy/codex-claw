@@ -210,6 +210,8 @@ Effects:
   available;
 - otherwise exposes it in the recipient's visible prompt queue and sends it as
   the next prompt after the active turn completes;
+- `clawd` owns that same queue for user and teammate prompts; renderer actions
+  request steer/delete mutations and only reflect confirmed snapshot changes;
 - returns the resolved recipient ID and display name so tool activity uses a
   human-friendly label even when the caller addressed an agent by UUID.
 

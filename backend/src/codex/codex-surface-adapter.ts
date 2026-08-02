@@ -641,9 +641,14 @@ export class CodexSurfaceAgentAdapter {
       case 'context.compactionCompleted':
         if (event.payload.itemId && session.completedCompactionItemIds.has(event.payload.itemId)) return;
         if (event.payload.itemId) session.completedCompactionItemIds.add(event.payload.itemId);
-        if (session.compactionStartedTurnIds.delete(event.turnId)) return;
+        if (!session.compactionStartedTurnIds.delete(event.turnId)) {
+          this.emitThread(session, {
+            type: 'context.compactionStarted', turnId: event.turnId,
+            payload: { itemId: event.payload.itemId }, ...metadata,
+          });
+        }
         this.emitThread(session, {
-          type: 'context.compactionStarted', turnId: event.turnId,
+          type: 'context.compactionCompleted', turnId: event.turnId,
           payload: { itemId: event.payload.itemId }, ...metadata,
         });
         return;

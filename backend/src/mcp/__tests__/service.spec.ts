@@ -119,7 +119,7 @@ describe('ClawMcpService', () => {
     expect(events.some((event) => event.type === 'agent.promptQueued')).toBe(false);
   });
 
-  it('shows busy teammate messages in the recipient queue and sends them when the turn completes', async () => {
+  it('shows busy teammate messages in the backend-owned queue until it reports dequeue', async () => {
     const snapshot = createInitialSnapshot();
     const recipient = snapshot.agents.find((agent) => agent.id === 'agent-jesse')!;
     recipient.status = { type: 'starting' };
@@ -144,22 +144,25 @@ describe('ClawMcpService', () => {
     })));
     expect(sendPrompt).not.toHaveBeenCalled();
 
-    recipient.status = { type: 'idle' };
+    const queuedEvent = events.find((event) => event.type === 'agent.promptQueued');
+    const queuedMessageId = queuedEvent?.payload?.id as string;
     service.handleBackendEvent({
       seq: 1,
       agentId: 'agent-jesse',
-      threadId: 'thread-old',
-      turnId: 'turn-old',
-      type: 'turn.completed',
-      payload: { status: 'completed' },
+      type: 'agent.promptDequeued',
+      payload: { ids: [queuedMessageId] },
       occurredAt: '2026-08-02T00:00:00.000Z',
     });
+    expect(sendPrompt).not.toHaveBeenCalled();
 
+    recipient.status = { type: 'idle' };
+    await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 2, method: 'tools/call',
+      params: { name: 'send-message', arguments: { to: 'agent-jesse', content: 'Only this remains.' } },
+    });
     await vi.waitFor(() => expect(sendPrompt).toHaveBeenCalledOnce());
-    await vi.waitFor(() => expect(events).toContainEqual(expect.objectContaining({
-      agentId: 'agent-jesse',
-      type: 'agent.promptDequeued',
-    })));
+    expect(sendPrompt.mock.calls[0]?.[1]).toContain('Only this remains.');
+    expect(sendPrompt.mock.calls[0]?.[1]).not.toContain('Run this next.');
   });
 
   it('routes Computer Use MCP calls through the desktop client port', async () => {

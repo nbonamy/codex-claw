@@ -1,7 +1,7 @@
 <template>
   <div class="conversation-pane">
     <CodexConversationPane
-      v-model="composerDraft"
+      :model-value="composerDraft"
       class="conversation-pane__surface"
       :answered-client-request-ids="answeredClientRequestIds"
       :approvals="approvals"
@@ -45,6 +45,7 @@
       @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
       @submit="submitPrompt"
       @update:model-id="$emit('select-model', $event)"
+      @update:model-value="$emit('update:composerDraft', $event)"
       @update:plan-mode="$emit('update:planMode', $event)"
       @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
     />
@@ -53,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   CodexConversationPane,
@@ -109,6 +110,7 @@ const props = withDefaults(defineProps<{
   approvalPreset?: ApprovalPreset | null;
   queuedPrompts?: QueuedChatPrompt[];
   planMode?: boolean;
+  composerDraft?: string;
 }>(), {
   queuedPrompts: () => [],
   agentFiles: () => [],
@@ -136,11 +138,11 @@ const emit = defineEmits<{
   'select-approval-preset': [preset: ApprovalPreset];
   'steer-queued-prompt': [promptId: string];
   'update:planMode': [enabled: boolean];
+  'update:composerDraft': [draft: string];
   sendPrompt: [prompt: string, options?: SendPromptOptions];
   steerPrompt: [prompt: string];
 }>();
 
-const composerDraft = ref('');
 const chatMessages = computed(() => toCodexChatMessages(props.messages));
 const conversationKey = computed(() => {
   const session = props.agent?.backendSession;
@@ -177,10 +179,6 @@ const heroHeadline = computed(() => (props.agent ? `Chat with ${props.agent.name
 const heroSubhead = computed(() => {
   if (!props.agent) return 'Choose an agent from the left to start a native backend session.';
   return props.agent.folder;
-});
-
-watch(conversationKey, () => {
-  composerDraft.value = '';
 });
 
 function openLink(link: CodexConversationLink): void {

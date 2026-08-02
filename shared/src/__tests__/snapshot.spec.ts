@@ -1362,6 +1362,94 @@ describe('snapshot reducer', () => {
     ]);
   });
 
+  it('marks only the matching compaction complete when completion arrives before turn completion', () => {
+    const snapshot = createInitialSnapshot();
+    for (const [seq, turnId] of [[1, 'turn-1'], [2, 'turn-2']] as const) {
+      applyMainEventToSnapshot(snapshot, {
+        seq,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        turnId,
+        type: 'context.compactionStarted',
+        payload: { itemId: `compact-${turnId}` },
+        occurredAt: `2026-06-05T00:00:0${seq}.000Z`,
+      });
+    }
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 3,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-2',
+      type: 'context.compactionCompleted',
+      payload: { itemId: 'compact-turn-2' },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+
+    expect(snapshot.messages.filter((message) => message.kind === 'compaction').map((message) => ({
+      turnId: message.turnId,
+      status: message.status,
+    }))).toStrictEqual([
+      { turnId: 'turn-1', status: 'streaming' },
+      { turnId: 'turn-2', status: 'complete' },
+    ]);
+  });
+
+  it('keeps queued prompts in the authoritative snapshot until confirmed dequeue', () => {
+    const snapshot = createInitialSnapshot();
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'agent.promptQueued',
+      payload: { id: 'prompt-1', text: 'run next', options: { planMode: true } },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      type: 'agent.promptQueued',
+      payload: { id: 'prompt-1', text: 'run next' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(snapshot.queuedPrompts).toStrictEqual([{
+      id: 'prompt-1',
+      agentId: 'agent-dina',
+      text: 'run next',
+      createdAt: '2026-06-05T00:00:01.000Z',
+      options: { planMode: true },
+    }]);
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 3,
+      agentId: 'agent-dina',
+      type: 'agent.promptDequeued',
+      payload: { ids: ['prompt-1'] },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+    expect(snapshot.queuedPrompts).toStrictEqual([]);
+  });
+
+  it('keeps queued prompts in snapshot state and scopes dequeue to the owning agent', () => {
+    const snapshot = createInitialSnapshot();
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1, agentId: 'agent-dina', type: 'agent.promptQueued',
+      payload: { id: 'shared-id', text: 'Dina next' }, occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2, agentId: 'agent-jesse', type: 'agent.promptQueued',
+      payload: { id: 'shared-id', text: 'Jesse next' }, occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 3, agentId: 'agent-dina', type: 'agent.promptDequeued',
+      payload: { ids: ['shared-id'] }, occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+
+    expect(snapshot.queuedPrompts).toStrictEqual([{
+      id: 'shared-id', agentId: 'agent-jesse', text: 'Jesse next', createdAt: '2026-06-05T00:00:02.000Z',
+    }]);
+  });
+
   it('removes empty assistant placeholders when turns complete without visible output', () => {
     const snapshot = createInitialSnapshot();
 

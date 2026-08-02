@@ -16,6 +16,7 @@ import type {
   RendererMessagePart,
   RendererToolPart,
   RendererToolPartUpdate,
+  SendPromptOptions,
   ThreadGoal,
   TurnGitDiff,
   ThreadPlan,
@@ -45,6 +46,7 @@ export function createEmptySnapshot(): AppSnapshot {
     activeTeamId: seedTeamId,
     activeAgentId: null,
     messages: [],
+    queuedPrompts: [],
     agentGitStatuses: {},
     turnGitDiffs: {},
     backendRuntimes: [{
@@ -80,6 +82,7 @@ export function createInitialSnapshot(): AppSnapshot {
     activeTeamId: seedTeamId,
     activeAgentId: agents[0]?.id ?? null,
     messages: [],
+    queuedPrompts: [],
     agentGitStatuses: {},
     turnGitDiffs: {},
     backendRuntimes: [{
@@ -151,7 +154,6 @@ export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentIn
   if (!agent) {
     return null;
   }
-
   if (agent.status.type !== 'idle') {
     throw new Error('Agent must be idle before editing.');
   }
@@ -444,8 +446,43 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     return;
   }
 
+  if (event.type === 'agent.promptQueued' && event.agentId) {
+    const payload = event.payload as { id?: unknown; text?: unknown; options?: unknown };
+    if (typeof payload.id === 'string' && typeof payload.text === 'string') {
+      const queuedPrompts = snapshot.queuedPrompts ?? [];
+      if (!queuedPrompts.some((prompt) => prompt.agentId === event.agentId && prompt.id === payload.id)) {
+        snapshot.queuedPrompts = [...queuedPrompts, {
+          id: payload.id,
+          agentId: event.agentId,
+          text: payload.text,
+          createdAt: event.occurredAt,
+          ...(payload.options ? { options: payload.options as SendPromptOptions } : {}),
+        }];
+      }
+    }
+    return;
+  }
+
+  if (event.type === 'agent.promptDequeued') {
+    const payload = event.payload as { ids?: unknown };
+    if (Array.isArray(payload.ids)) {
+      const ids = new Set(payload.ids.filter((id): id is string => typeof id === 'string'));
+      snapshot.queuedPrompts = (snapshot.queuedPrompts ?? []).filter((prompt) => (
+        prompt.agentId !== event.agentId || !ids.has(prompt.id)
+      ));
+    }
+    return;
+  }
+
   if (event.type === 'context.compactionStarted' && event.turnId) {
     appendCompactionMarker(snapshot, event.agentId, event.turnId, event.occurredAt);
+    return;
+  }
+
+  if (event.type === 'context.compactionCompleted' && event.turnId) {
+    for (const message of findCompactionMessages(snapshot, event.agentId, event.turnId)) {
+      message.status = 'complete';
+    }
     return;
   }
 

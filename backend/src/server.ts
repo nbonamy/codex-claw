@@ -17,6 +17,7 @@ import { teamColors } from '@codex-claw/shared/team-colors';
 import { sanitizeWorkItemAssignmentSource, workItemAssignmentKey, type WorkItemAssignmentSource } from '@codex-claw/shared/work-assignments';
 import { approvalBackendDefaultsWithPreset, isApprovalPreset } from '@codex-claw/shared/approval-presets';
 import { formatConversationTitle } from '@codex-claw/shared/conversation-title';
+import { createEntityId } from '@codex-claw/shared/ids';
 import { BackendDriverRpc } from './driver-rpc';
 import { RemoteClawdClientManager } from './connections/remote-clawd-client';
 import { SshConnectionService } from './connections/ssh-connections';
@@ -574,6 +575,39 @@ export class ClawBackendServer {
             payload: { prompt },
           });
           await this.persistSnapshotOnly();
+          return this.snapshot;
+        });
+      }
+      case backendMethods.agentQueuedPromptDelete: {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const promptId = requireString(params.promptId, 'promptId');
+        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentQueuedPromptDelete, { agentId, promptId }, async () => {
+          this.applyAndEmitBackendEvent({ agentId, type: 'agent.promptDequeued', payload: { ids: [promptId] } });
+          return this.snapshot;
+        });
+      }
+      case backendMethods.agentQueuedPromptSteer: {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const promptId = requireString(params.promptId, 'promptId');
+        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentQueuedPromptSteer, { agentId, promptId }, async (agent) => {
+          const queuedPrompt = (this.snapshot.queuedPrompts ?? []).find((prompt) => prompt.agentId === agentId && prompt.id === promptId);
+          if (!queuedPrompt) return this.snapshot;
+          if ((queuedPrompt.options?.attachments?.length ?? 0) > 0) return this.snapshot;
+          if (agent.status.type === 'idle') {
+            return this.startAgentPrompt(agent, queuedPrompt.text, queuedPrompt.options, queuedPrompt.id);
+          }
+          const result = await this.handleAgentDriverRequest(agent, backendMethods.driverPromptSteer, { agent, prompt: queuedPrompt.text }) as BackendSendResult;
+          agent.backendSession = result.backendSession;
+          this.applyAndEmitBackendEvent({ agentId, type: 'agent.promptDequeued', payload: { ids: [promptId] } });
+          this.applyAndEmitBackendEvent({
+            agentId,
+            ...(result.backendSession.kind === 'codex' ? { threadId: result.backendSession.threadId } : {}),
+            turnId: result.turnId,
+            type: 'message.steer',
+            payload: { prompt: queuedPrompt.text },
+          });
           return this.snapshot;
         });
       }
@@ -1641,6 +1675,25 @@ export class ClawBackendServer {
       return this.snapshot;
     }
 
+    if (agent.status.type === 'starting' || agent.status.type === 'working' || agent.status.type === 'awaitingInput') {
+      this.applyAndEmitBackendEvent({
+        agentId,
+        type: 'agent.promptQueued',
+        payload: {
+          id: createEntityId('prompt'),
+          text: prompt.trim(),
+          ...(options ? { options } : {}),
+        },
+      });
+      return this.snapshot;
+    }
+
+    return this.startAgentPrompt(agent, prompt, options);
+  }
+
+  private startAgentPrompt(agent: Agent, prompt: string, options?: SendPromptOptions, queuedPromptId?: string): AppSnapshot {
+    const agentId = agent.id;
+
     return sendAgentPrompt(this.snapshot, this.backendDriverForAgent(agent), agentId, prompt, options, (event) => {
       this.applyAndEmitBackendEvent(event);
     }, {
@@ -1648,7 +1701,24 @@ export class ClawBackendServer {
         await this.setNewConversationTitle(agentId, wasNewSession);
         await this.persistSnapshotOnly();
       },
+      onPromptStarted: () => {
+        if (queuedPromptId) {
+          this.applyAndEmitBackendEvent({
+            agentId,
+            type: 'agent.promptDequeued',
+            payload: { ids: [queuedPromptId] },
+          });
+        }
+      },
     });
+  }
+
+  private drainQueuedPrompt(agentId: string): void {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent || agent.status.type !== 'idle') return;
+    const queuedPrompt = (this.snapshot.queuedPrompts ?? []).find((prompt) => prompt.agentId === agentId);
+    if (!queuedPrompt) return;
+    this.startAgentPrompt(agent, queuedPrompt.text, queuedPrompt.options, queuedPrompt.id);
   }
 
   private backendDriverForAgent(agent: Agent): AgentBackendDriver {
@@ -1968,6 +2038,7 @@ export class ClawBackendServer {
     this.recordClientRequestOwner(fullEvent);
     this.emitBackendEvent(fullEvent, shouldAttachSnapshotToBackendEvent(event));
     this.emitDerivedSidePanelEvents(fullEvent);
+    this.onBackendEventApplied?.(fullEvent);
   }
 
   private handleBackendEvent(event: BackendEvent, options: { persist?: boolean } = {}): void {
@@ -1977,6 +2048,9 @@ export class ClawBackendServer {
     this.emitBackendEvent(fullEvent, shouldAttachSnapshotToBackendEvent(event));
     this.emitDerivedSidePanelEvents(fullEvent);
     this.onBackendEventApplied?.(fullEvent);
+    if (event.type === 'turn.completed' && event.agentId) {
+      this.drainQueuedPrompt(event.agentId);
+    }
     if (options.persist !== false && shouldPersistSnapshotForEvent(event)) {
       void this.saveSnapshot?.(this.snapshot);
     }

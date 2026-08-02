@@ -141,6 +141,7 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
     sourceFolder: normalizeSourceFolderState(value.sourceFolder),
     theme: normalizeThemeSettings(value.theme),
     messages: [],
+    queuedPrompts: [],
     backendRuntimes: seed.backendRuntimes.map((runtime) => ({ ...runtime })),
   };
 

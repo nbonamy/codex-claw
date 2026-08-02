@@ -3546,6 +3546,50 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
+  it('owns queued prompt draining and dequeues only after backend acceptance', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina', teamId: 'team-test', name: 'Dina', folder: '/workspace/dina', backend: 'codex',
+      backendSession: { kind: 'codex', threadId: 'thread-dina' }, status: { type: 'working' },
+      createdAt: '2026-06-13T00:00:00.000Z', updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    let acceptPrompt!: (value: { backendSession: { kind: 'codex'; threadId: string }; turnId: string }) => void;
+    const sendPrompt = vi.fn().mockReturnValue(new Promise((resolve) => { acceptPrompt = resolve; }));
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt,
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-dina' } }),
+      respondToRequest: async () => undefined,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version', pid: 123, snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await server.handleMessage({
+      jsonrpc: '2.0', id: 'queue', method: 'agent/prompt/send',
+      params: { agentId: 'agent-dina', prompt: 'run next' },
+    });
+    expect(snapshot.queuedPrompts).toEqual([expect.objectContaining({ agentId: 'agent-dina', text: 'run next' })]);
+    expect(sendPrompt).not.toHaveBeenCalled();
+
+    server.emitEvent({
+      agentId: 'agent-dina', threadId: 'thread-dina', turnId: 'turn-old',
+      type: 'turn.completed', payload: { status: 'completed' },
+    });
+    expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'run next', undefined);
+    expect(snapshot.queuedPrompts).toHaveLength(1);
+
+    acceptPrompt({ backendSession: { kind: 'codex', threadId: 'thread-dina' }, turnId: 'turn-next' });
+    await vi.waitFor(() => expect(snapshot.queuedPrompts).toStrictEqual([]));
+    await server.close();
+  });
+
   it('owns message retry and edit rollback orchestration', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];

@@ -118,8 +118,10 @@ reducers locally.
 | `agent/conversations/list` | `{ agentId }` | `ConversationSummary[]` | Lists provider history through the active agent backend. |
 | `agent/conversation/resume` | `{ agentId, ref: BackendConversationRef }` | `AppSnapshot` | Validates backend match and idle status, then replaces visible history. |
 | `agent/conversation/messages/get` | `{ agentId, ref }` | `RendererMessage[]` | Reads historical messages through the owning backend. |
-| `agent/prompt/send` | `{ agentId, prompt, options? }` | `AppSnapshot` | Starts or continues a backend turn. |
+| `agent/prompt/send` | `{ agentId, prompt, options? }` | `AppSnapshot` | Starts a backend turn when idle, or appends to the backend-owned per-agent queue while busy. |
 | `agent/prompt/steer` | `{ agentId, prompt }` | `AppSnapshot` | Sends active-turn steering and emits `message.steer`. |
+| `agent/queuedPrompt/steer` | `{ agentId, promptId }` | `AppSnapshot` | Atomically steers a queued prompt and dequeues it only after acceptance. |
+| `agent/queuedPrompt/delete` | `{ agentId, promptId }` | `AppSnapshot` | Deletes a prompt from the backend-owned queue. |
 | `agent/interrupt` | `{ agentId }` | `AppSnapshot` | Interrupts the active backend turn if supported. |
 | `agent/turn/rollback` | `{ agentId, turnId }` | `AppSnapshot` | Resolves the owning backend location, rolls back provider history, and replaces visible history. |
 | `agent/message/delete` | `{ agentId, messageId }` | `AppSnapshot` | Resolves the owning backend location, maps message to turn, rolls back, and persists. |

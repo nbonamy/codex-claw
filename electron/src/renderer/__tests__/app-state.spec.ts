@@ -1463,20 +1463,16 @@ describe('useAppState', () => {
     expect(retryMessage).not.toHaveBeenCalled();
   });
 
-  it('queues busy prompts and drains them after the active turn completes', async () => {
+  it('renders backend-owned queues and never drains them from the renderer', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0].status = { type: 'working' };
-    const drainedSnapshot = createInitialSnapshot();
-    drainedSnapshot.messages.push({
-      id: 'message-drained',
-      agentId: 'agent-dina',
-      role: 'user',
-      status: 'complete',
-      createdAt: '2026-06-05T00:00:01.000Z',
-      parts: [{ type: 'text', text: 'run this after the turn' }],
-    });
-    const sendPrompt = vi.fn().mockResolvedValue(drainedSnapshot);
+    const queuedSnapshot = createInitialSnapshot();
+    queuedSnapshot.agents[0].status = { type: 'working' };
+    queuedSnapshot.queuedPrompts = [{
+      id: 'prompt-1', agentId: 'agent-dina', text: 'run this after the turn', createdAt: '2026-06-05T00:00:01.000Z',
+    }];
+    const sendPrompt = vi.fn().mockResolvedValue(queuedSnapshot);
 
     vi.stubGlobal('window', {
       codexClaw: {
@@ -1493,13 +1489,14 @@ describe('useAppState', () => {
     await state.loadSnapshot();
     await state.sendPrompt('run this after the turn');
 
-    expect(sendPrompt).not.toHaveBeenCalled();
+    expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'run this after the turn');
     expect(state.activeQueuedPrompts.value).toStrictEqual([
       expect.objectContaining({
         text: 'run this after the turn',
       }),
     ]);
 
+    const drainedSnapshot = createInitialSnapshot();
     listeners[0]?.({
       seq: 1,
       agentId: 'agent-dina',
@@ -1508,14 +1505,10 @@ describe('useAppState', () => {
       type: 'turn.completed',
       payload: { status: 'completed' },
       occurredAt: '2026-06-05T00:00:02.000Z',
-      snapshot: createInitialSnapshot(),
-    });
-
-    await vi.waitFor(() => {
-      expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'run this after the turn');
+      snapshot: drainedSnapshot,
     });
     expect(state.activeQueuedPrompts.value).toStrictEqual([]);
-    expect(state.visibleMessages.value.at(-1)?.id).toBe('message-drained');
+    expect(sendPrompt).toHaveBeenCalledTimes(1);
   });
 
   it('shows and removes backend-owned teammate prompts in the target agent queue', async () => {
@@ -1538,9 +1531,13 @@ describe('useAppState', () => {
       type: 'agent.promptQueued',
       payload: { id: 'inbox-1', text: 'Review the other agent change.' },
       occurredAt: '2026-08-02T00:00:00.000Z',
+      snapshot: {
+        ...createInitialSnapshot(),
+        queuedPrompts: [{ id: 'inbox-1', agentId: 'agent-dina', text: 'Review the other agent change.', createdAt: '2026-08-02T00:00:00.000Z' }],
+      },
     });
     expect(state.activeQueuedPrompts.value).toEqual([
-      { id: 'inbox-1', text: 'Review the other agent change.' },
+      expect.objectContaining({ id: 'inbox-1', text: 'Review the other agent change.' }),
     ]);
 
     listeners[0]?.({
@@ -1549,16 +1546,15 @@ describe('useAppState', () => {
       type: 'agent.promptDequeued',
       payload: { ids: ['inbox-1'] },
       occurredAt: '2026-08-02T00:00:01.000Z',
+      snapshot: createInitialSnapshot(),
     });
     expect(state.activeQueuedPrompts.value).toStrictEqual([]);
   });
 
-  it('preserves attachment descriptors in a busy conversation queue until normal drain', async () => {
+  it('passes attachment descriptors to the backend queue owner', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0].status = { type: 'working' };
-    const sendPrompt = vi.fn().mockResolvedValue(createInitialSnapshot());
-    const steerPrompt = vi.fn().mockResolvedValue(remoteSnapshot);
     const attachments = [
       {
         type: 'image' as const,
@@ -1571,11 +1567,14 @@ describe('useAppState', () => {
       { type: 'file' as const, path: '/tmp/report.txt', name: 'report.txt', mimeType: 'text/plain' },
     ];
 
+    const queuedSnapshot = createInitialSnapshot();
+    queuedSnapshot.agents[0].status = { type: 'working' };
+    queuedSnapshot.queuedPrompts = [{ id: 'prompt-files', agentId: 'agent-dina', text: 'review these files', createdAt: '2026-06-05T00:00:01.000Z', options: { attachments } }];
+    const sendPrompt = vi.fn().mockResolvedValue(queuedSnapshot);
     vi.stubGlobal('window', {
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         sendPrompt,
-        steerPrompt,
         onEvent: vi.fn((nextListener) => {
           listeners.push(nextListener);
           return () => undefined;
@@ -1594,32 +1593,13 @@ describe('useAppState', () => {
       }),
     ]);
 
-    const queuedPromptId = state.activeQueuedPrompts.value[0]?.id;
-    await state.steerQueuedPrompt(queuedPromptId as string);
-    expect(steerPrompt).not.toHaveBeenCalled();
-    expect(state.activeQueuedPrompts.value).toHaveLength(1);
-
-    listeners[0]?.({
-      seq: 1,
-      agentId: 'agent-dina',
-      threadId: 'thread-1',
-      turnId: 'turn-1',
-      type: 'turn.completed',
-      payload: { status: 'completed' },
-      occurredAt: '2026-06-05T00:00:02.000Z',
-      snapshot: createInitialSnapshot(),
-    });
-
-    await vi.waitFor(() => {
-      expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'review these files', { attachments });
-    });
-    expect(state.activeQueuedPrompts.value).toStrictEqual([]);
+    expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'review these files', { attachments });
   });
 
-  it('keeps a queued prompt visible until the backend accepts the drained send', async () => {
+  it('keeps the previous authoritative queue visible while a backend mutation is pending', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
-    remoteSnapshot.agents[0].status = { type: 'working' };
+    remoteSnapshot.queuedPrompts = [{ id: 'prompt-1', agentId: 'agent-dina', text: 'do not disappear', createdAt: '2026-06-05T00:00:01.000Z' }];
     const pendingSend = deferred<AppSnapshot>();
     const sendPrompt = vi.fn().mockReturnValue(pendingSend.promise);
 
@@ -1636,32 +1616,22 @@ describe('useAppState', () => {
 
     const state = useAppState();
     await state.loadSnapshot();
-    await state.sendPrompt('do not disappear');
-
-    listeners[0]?.({
-      seq: 1,
-      agentId: 'agent-dina',
-      threadId: 'thread-1',
-      turnId: 'turn-1',
-      type: 'turn.completed',
-      payload: { status: 'completed' },
-      occurredAt: '2026-06-05T00:00:02.000Z',
-      snapshot: createInitialSnapshot(),
-    });
-
-    await vi.waitFor(() => expect(sendPrompt).toHaveBeenCalledOnce());
+    const mutation = state.sendPrompt('another prompt');
     expect(state.activeQueuedPrompts.value).toEqual([
       expect.objectContaining({ text: 'do not disappear' }),
     ]);
 
-    pendingSend.resolve(createInitialSnapshot());
-    await vi.waitFor(() => expect(state.activeQueuedPrompts.value).toStrictEqual([]));
+    pendingSend.resolve(remoteSnapshot);
+    await mutation;
+    expect(state.activeQueuedPrompts.value).toEqual([
+      expect.objectContaining({ text: 'do not disappear' }),
+    ]);
   });
 
-  it('preserves a queued prompt when the backend rejects its drained send', async () => {
+  it('preserves the authoritative queue when a backend mutation rejects', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
-    remoteSnapshot.agents[0].status = { type: 'working' };
+    remoteSnapshot.queuedPrompts = [{ id: 'prompt-1', agentId: 'agent-dina', text: 'retry me later', createdAt: '2026-06-05T00:00:01.000Z' }];
     const sendPrompt = vi.fn().mockRejectedValue(new Error('backend unavailable'));
 
     vi.stubGlobal('window', {
@@ -1677,35 +1647,25 @@ describe('useAppState', () => {
 
     const state = useAppState();
     await state.loadSnapshot();
-    await state.sendPrompt('retry me later');
-
-    listeners[0]?.({
-      seq: 1,
-      agentId: 'agent-dina',
-      threadId: 'thread-1',
-      turnId: 'turn-1',
-      type: 'turn.completed',
-      payload: { status: 'completed' },
-      occurredAt: '2026-06-05T00:00:02.000Z',
-      snapshot: createInitialSnapshot(),
-    });
-
-    await vi.waitFor(() => expect(sendPrompt).toHaveBeenCalledOnce());
+    await expect(state.sendPrompt('another prompt')).rejects.toThrow('backend unavailable');
     expect(state.activeQueuedPrompts.value).toEqual([
       expect.objectContaining({ text: 'retry me later' }),
     ]);
-    state.removeQueuedPrompt(state.activeQueuedPrompts.value[0]!.id);
   });
 
   it('steers busy drafts and queued prompts through preload', async () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0].status = { type: 'working' };
+    remoteSnapshot.queuedPrompts = [{ id: 'queued-1', agentId: 'agent-dina', text: 'queued but steerable', createdAt: '2026-06-05T00:00:01.000Z' }];
     const steerPrompt = vi.fn().mockResolvedValue(remoteSnapshot);
+    const steerQueuedPrompt = vi.fn().mockResolvedValue({ ...remoteSnapshot, queuedPrompts: [] });
 
     vi.stubGlobal('window', {
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         steerPrompt,
+        steerQueuedPrompt,
+        sendPrompt: vi.fn().mockResolvedValue(remoteSnapshot),
         onEvent: vi.fn(),
       } satisfies Partial<CodexClawApi>,
     });
@@ -1716,13 +1676,12 @@ describe('useAppState', () => {
 
     expect(steerPrompt).toHaveBeenCalledWith('agent-dina', 'use the smaller patch');
 
-    await state.sendPrompt('queued but steerable');
     const queuedPromptId = state.activeQueuedPrompts.value[0]?.id;
     expect(queuedPromptId).toBeTruthy();
 
     await state.steerQueuedPrompt(queuedPromptId as string);
 
-    expect(steerPrompt).toHaveBeenCalledWith('agent-dina', 'queued but steerable');
+    expect(steerQueuedPrompt).toHaveBeenCalledWith('agent-dina', 'queued-1');
     expect(state.activeQueuedPrompts.value).toStrictEqual([]);
   });
 
@@ -1749,24 +1708,27 @@ describe('useAppState', () => {
     expect(state.snapshot.value.agents[0].status).toStrictEqual({ type: 'working' });
   });
 
-  it('removes queued prompts locally', async () => {
+  it('deletes queued prompts through the backend owner', async () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0].status = { type: 'working' };
+    remoteSnapshot.queuedPrompts = [{ id: 'queued-1', agentId: 'agent-dina', text: 'delete this queued prompt', createdAt: '2026-06-05T00:00:01.000Z' }];
+    const deleteQueuedPrompt = vi.fn().mockResolvedValue({ ...remoteSnapshot, queuedPrompts: [] });
 
     vi.stubGlobal('window', {
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        deleteQueuedPrompt,
         onEvent: vi.fn(),
       } satisfies Partial<CodexClawApi>,
     });
 
     const state = useAppState();
     await state.loadSnapshot();
-    await state.sendPrompt('delete this queued prompt');
     const queuedPromptId = state.activeQueuedPrompts.value[0]?.id;
 
-    state.removeQueuedPrompt(queuedPromptId as string);
+    await state.removeQueuedPrompt(queuedPromptId as string);
 
+    expect(deleteQueuedPrompt).toHaveBeenCalledWith('agent-dina', 'queued-1');
     expect(state.activeQueuedPrompts.value).toStrictEqual([]);
   });
 
@@ -1819,6 +1781,54 @@ describe('useAppState', () => {
     dinaSend.resolve(dinaQueuedSnapshot);
     await firstSend;
     expect(state.activeAgent.value?.id).toBe('agent-jesse');
+  });
+
+  it('keeps composer drafts isolated in memory for each agent', async () => {
+    const base = createInitialSnapshot();
+    const selectAgent = vi.fn((agentId: string) => Promise.resolve({ ...base, activeAgentId: agentId }));
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(base),
+        selectAgent,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    state.activeComposerDraft.value = 'draft for Dina';
+
+    await state.selectAgent('agent-jesse');
+    expect(state.activeComposerDraft.value).toBe('');
+    state.activeComposerDraft.value = 'draft for Jesse';
+
+    await state.selectAgent('agent-dina');
+    expect(state.activeComposerDraft.value).toBe('draft for Dina');
+    await state.selectAgent('agent-jesse');
+    expect(state.activeComposerDraft.value).toBe('draft for Jesse');
+  });
+
+  it('keeps each agent queue in the authoritative snapshot while switching agents', async () => {
+    const base = createInitialSnapshot();
+    base.queuedPrompts = [
+      { id: 'dina-queue', agentId: 'agent-dina', text: 'Dina next', createdAt: '2026-06-05T00:00:01.000Z' },
+      { id: 'jesse-queue', agentId: 'agent-jesse', text: 'Jesse next', createdAt: '2026-06-05T00:00:02.000Z' },
+    ];
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(base),
+        selectAgent: vi.fn((agentId: string) => Promise.resolve({ ...base, activeAgentId: agentId })),
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    expect(state.activeQueuedPrompts.value.map((prompt) => prompt.text)).toStrictEqual(['Dina next']);
+    await state.selectAgent('agent-jesse');
+    expect(state.activeQueuedPrompts.value.map((prompt) => prompt.text)).toStrictEqual(['Jesse next']);
+    await state.selectAgent('agent-dina');
+    expect(state.activeQueuedPrompts.value.map((prompt) => prompt.text)).toStrictEqual(['Dina next']);
   });
 
   it('applies streamed main-process events to the visible conversation', async () => {
