@@ -66,7 +66,7 @@ describe('useAppState', () => {
     expect(state.activeAgent.value?.id).toBe('agent-dina');
   });
 
-  it('tracks answered client requests even when preload is unavailable', async () => {
+  it('does not mark client requests answered when preload is unavailable', async () => {
     vi.stubGlobal('window', {});
     const state = useAppState();
 
@@ -77,13 +77,15 @@ describe('useAppState', () => {
       },
     });
 
-    expect(state.answeredClientRequestIds.value.has('request-local')).toBe(true);
+    expect(state.answeredClientRequestIds.value.has('request-local')).toBe(false);
   });
 
   it('stores detailed approvals by agent and maps every resolution through the existing client-response bridge', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
-    const respondToClientRequest = vi.fn().mockResolvedValue(remoteSnapshot);
+    const respondToClientRequest = vi.fn().mockImplementation(async () => {
+      return { ...remoteSnapshot, backendApprovals: {} };
+    });
     vi.stubGlobal('window', {
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
@@ -319,6 +321,50 @@ describe('useAppState', () => {
     expect(state.activeBackendApprovals.value).toStrictEqual([approval]);
   });
 
+  it('does not replay a buffered delta already represented by the snapshot cursor', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.messages = [{
+      id: 'assistant-turn-1',
+      agentId: 'agent-dina',
+      role: 'assistant',
+      status: 'streaming',
+      turnId: 'turn-1',
+      createdAt: '2026-06-05T00:00:01.000Z',
+      parts: [{ type: 'text', text: 'streamed once' }],
+    }];
+    let listener: ((event: MainToRendererEvent) => void) | null = null;
+    vi.stubGlobal('window', {
+      codexClaw: {
+        onEvent: vi.fn((nextListener) => {
+          listener = nextListener;
+          return () => undefined;
+        }),
+        getSnapshotState: vi.fn().mockImplementation(async () => {
+          listener?.({
+            seq: 1,
+            source: 'backend',
+            agentId: 'agent-dina',
+            threadId: 'thread-dina',
+            turnId: 'turn-1',
+            type: 'message.delta',
+            payload: { delta: 'streamed once' },
+            occurredAt: '2026-06-05T00:00:01.000Z',
+          });
+          return {
+            snapshot: remoteSnapshot,
+            lastBackendEventSeq: 1,
+            connection: { status: 'connected' as const },
+          };
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    expect(state.visibleMessages.value[0]?.parts).toStrictEqual([{ type: 'text', text: 'streamed once' }]);
+  });
+
   it('adopts snapshots from explicit main event snapshot fields', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
@@ -418,6 +464,39 @@ describe('useAppState', () => {
       payload: structuredClone(initialSnapshot),
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
+
+    expect(state.activeAgent.value?.id).toBe('agent-jesse');
+  });
+
+  it('preserves the optimistic agent selection while repairing an event sequence gap', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const backendSnapshot = createInitialSnapshot();
+    const getSnapshotState = vi.fn()
+      .mockResolvedValueOnce({ snapshot: structuredClone(backendSnapshot), lastBackendEventSeq: 1, connection: { status: 'connected' } })
+      .mockResolvedValueOnce({ snapshot: structuredClone(backendSnapshot), lastBackendEventSeq: 3, connection: { status: 'connected' } });
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshotState,
+        selectAgent: vi.fn().mockResolvedValue({ ...structuredClone(backendSnapshot), activeAgentId: 'agent-jesse' }),
+        onEvent: vi.fn((nextListener) => {
+          listeners.push(nextListener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await state.selectAgent('agent-jesse');
+    listeners[0]?.({
+      seq: 3,
+      source: 'backend',
+      agentId: 'agent-dina',
+      type: 'agent.statusChanged',
+      payload: { type: 'working' },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+    await vi.waitFor(() => expect(getSnapshotState).toHaveBeenCalledTimes(2));
 
     expect(state.activeAgent.value?.id).toBe('agent-jesse');
   });
@@ -1976,6 +2055,53 @@ describe('useAppState', () => {
     expect(state.activeComposerState.value).toStrictEqual({
       text: 'draft for Jesse', selectionStart: 15, selectionEnd: 15,
     });
+  });
+
+  it('restores each agent composer configuration immediately while catalogs refresh', async () => {
+    const base = createInitialSnapshot();
+    const jesseModels = deferred<Array<{
+      id: string;
+      model: string;
+      displayName: string;
+      description: string;
+      hidden: boolean;
+      isDefault: boolean;
+    }>>();
+    const modelsFor = (agentId: string) => [{
+      id: `${agentId}-model`,
+      model: `${agentId}-model`,
+      displayName: `${agentId} model`,
+      description: '',
+      hidden: false,
+      isDefault: true,
+    }];
+    const listBackendModels = vi.fn((agentId: string) => (
+      agentId === 'agent-jesse' ? jesseModels.promise : Promise.resolve(modelsFor(agentId))
+    ));
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(base),
+        listBackendModels,
+        selectAgent: vi.fn((agentId: string) => Promise.resolve({ ...base, activeAgentId: agentId })),
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    expect(state.selectedModelId.value).toBe('agent-dina-model');
+    state.setPlanMode(true);
+
+    await state.selectAgent('agent-jesse');
+    expect(state.selectedModelId.value).toBeNull();
+    expect(state.planMode.value).toBe(false);
+    jesseModels.resolve(modelsFor('agent-jesse'));
+    await vi.waitFor(() => expect(state.selectedModelId.value).toBe('agent-jesse-model'));
+
+    await state.selectAgent('agent-dina');
+    expect(state.selectedModelId.value).toBe('agent-dina-model');
+    expect(state.planMode.value).toBe(true);
+    state.setPlanMode(false);
   });
 
   it('keeps each agent queue in the authoritative snapshot while switching agents', async () => {

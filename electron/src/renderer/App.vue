@@ -6,6 +6,7 @@
     :is-loading="isLoading"
     :is-conversation-loading="isHydratingActiveAgentHistory"
     :is-sending="isSending"
+    :connection-state="connectionState"
     :answered-client-request-ids="answeredClientRequestIds"
     :agent-files="agentFiles"
     :backend-models="backendModels"
@@ -139,6 +140,7 @@ const {
   isLoading,
   isHydratingActiveAgentHistory,
   isSending,
+  connectionState,
   answeredClientRequestIds,
   agentFiles,
   backendModels,

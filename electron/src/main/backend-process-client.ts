@@ -46,6 +46,7 @@ export class ClawBackendProcessClient {
   private nextRequestId = 1;
   private readonly pending = new Map<ClawRpcId, PendingRequest>();
   private readonly eventListeners = new Set<(event: ClawBackendEvent) => void>();
+  private readonly connectionStateListeners = new Set<(state: 'connected' | 'disconnected', error?: Error) => void>();
 
   constructor(options: ClawBackendProcessClientOptions) {
     this.command = options.command;
@@ -72,16 +73,11 @@ export class ClawBackendProcessClient {
     child.stderr.on('data', (chunk) => {
       warnMain('clawd', '', { detail: chunk.toString().trim() });
     });
-    child.once('exit', (code, signal) => {
-      this.process = null;
-      this.rejectPending(new Error(`clawd exited before responding (code=${code ?? 'null'}, signal=${signal ?? 'null'}).`));
-    });
-    child.once('error', (error) => {
-      this.process = null;
-      this.rejectPending(error);
-    });
+    child.once('exit', (code, signal) => this.handleDisconnect(child, new Error(`clawd exited before responding (code=${code ?? 'null'}, signal=${signal ?? 'null'}).`)));
+    child.once('error', (error) => this.handleDisconnect(child, error));
 
     this.startWatcher();
+    this.emitConnectionState('connected');
   }
 
   async health(): Promise<ClawBackendHealth> {
@@ -120,6 +116,11 @@ export class ClawBackendProcessClient {
     return () => {
       this.eventListeners.delete(listener);
     };
+  }
+
+  onConnectionState(listener: (state: 'connected' | 'disconnected', error?: Error) => void): () => void {
+    this.connectionStateListeners.add(listener);
+    return () => this.connectionStateListeners.delete(listener);
   }
 
   async close(): Promise<void> {
@@ -303,6 +304,17 @@ export class ClawBackendProcessClient {
       pending.reject(error);
     }
     this.pending.clear();
+  }
+
+  private handleDisconnect(child: ChildProcessWithoutNullStreams, error: Error): void {
+    if (this.process !== child) return;
+    this.process = null;
+    this.rejectPending(error);
+    this.emitConnectionState('disconnected', error);
+  }
+
+  private emitConnectionState(state: 'connected' | 'disconnected', error?: Error): void {
+    for (const listener of this.connectionStateListeners) listener(state, error);
   }
 
   private writeResponse(response: ClawRpcResponse): void {

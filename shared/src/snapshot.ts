@@ -4,6 +4,7 @@ import type {
   AgentContextUsage,
   ApprovalPreset,
   BackendDefaults,
+  BackendApprovalRequest,
   AgentGitStatus,
   AgentStatus,
   AccountRateLimits,
@@ -47,6 +48,7 @@ export function createEmptySnapshot(): AppSnapshot {
     activeAgentId: null,
     messages: [],
     queuedPrompts: [],
+    backendApprovals: {},
     agentGitStatuses: {},
     turnGitDiffs: {},
     backendRuntimes: [{
@@ -83,6 +85,7 @@ export function createInitialSnapshot(): AppSnapshot {
     activeAgentId: agents[0]?.id ?? null,
     messages: [],
     queuedPrompts: [],
+    backendApprovals: {},
     agentGitStatuses: {},
     turnGitDiffs: {},
     backendRuntimes: [{
@@ -457,7 +460,7 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   }
 
   if (event.type === 'agent.promptQueued' && event.agentId) {
-    const payload = event.payload as { id?: unknown; text?: unknown; options?: unknown };
+    const payload = event.payload as { id?: unknown; text?: unknown; options?: unknown; submitted?: unknown };
     if (typeof payload.id === 'string' && typeof payload.text === 'string') {
       const queuedPrompts = snapshot.queuedPrompts ?? [];
       if (!queuedPrompts.some((prompt) => prompt.agentId === event.agentId && prompt.id === payload.id)) {
@@ -467,8 +470,28 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
           text: payload.text,
           createdAt: event.occurredAt,
           ...(payload.options ? { options: payload.options as SendPromptOptions } : {}),
+          ...(payload.submitted === true ? { submitted: true } : {}),
         }];
       }
+    }
+    return;
+  }
+
+  if (event.type === 'agent.promptRetryScheduled' && event.agentId) {
+    const payload = event.payload as { id?: unknown; attempts?: unknown; lastError?: unknown; retryAt?: unknown };
+    const queuedPrompt = (snapshot.queuedPrompts ?? []).find((prompt) => (
+      prompt.agentId === event.agentId && prompt.id === payload.id
+    ));
+    if (
+      queuedPrompt &&
+      typeof payload.attempts === 'number' &&
+      typeof payload.lastError === 'string'
+    ) {
+      queuedPrompt.attempts = payload.attempts;
+      queuedPrompt.lastError = payload.lastError;
+      queuedPrompt.submitted = true;
+      if (typeof payload.retryAt === 'string') queuedPrompt.retryAt = payload.retryAt;
+      else delete queuedPrompt.retryAt;
     }
     return;
   }
@@ -480,6 +503,30 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
       snapshot.queuedPrompts = (snapshot.queuedPrompts ?? []).filter((prompt) => (
         prompt.agentId !== event.agentId || !ids.has(prompt.id)
       ));
+    }
+    return;
+  }
+
+  if (event.type === 'backendApproval.requested' && event.agentId) {
+    const approval = backendApprovalRequest(event.payload);
+    if (approval) {
+      const approvals = snapshot.backendApprovals[event.agentId] ?? [];
+      snapshot.backendApprovals[event.agentId] = [
+        ...approvals.filter((candidate) => candidate.id !== approval.id),
+        approval,
+      ];
+      setAgentStatus(snapshot, event.agentId, { type: 'awaitingInput', detail: approval.title });
+    }
+    return;
+  }
+
+  if (event.type === 'backendApproval.resolved') {
+    const approval = backendApprovalRequest(event.payload);
+    if (approval) {
+      const agentIds = event.agentId ? [event.agentId] : Object.keys(snapshot.backendApprovals);
+      for (const agentId of agentIds) {
+        snapshot.backendApprovals[agentId] = (snapshot.backendApprovals[agentId] ?? []).filter((candidate) => candidate.id !== approval.id);
+      }
     }
     return;
   }
@@ -1045,6 +1092,21 @@ function accountRateLimits(value: unknown): AccountRateLimits | null {
     planType: nullableString(rateLimits.planType),
     rateLimitReachedType: nullableString(rateLimits.rateLimitReachedType),
   };
+}
+
+function backendApprovalRequest(value: unknown): BackendApprovalRequest | null {
+  const candidate = isRecord(value) && isRecord(value.approval) ? value.approval : value;
+  if (
+    !isRecord(candidate) ||
+    typeof candidate.id !== 'string' ||
+    (candidate.kind !== 'command' && candidate.kind !== 'file-change' && candidate.kind !== 'permissions') ||
+    typeof candidate.conversationId !== 'string' ||
+    typeof candidate.itemId !== 'string' ||
+    typeof candidate.title !== 'string'
+  ) {
+    return null;
+  }
+  return candidate as BackendApprovalRequest;
 }
 
 function accountRateLimitWindow(value: unknown): AccountRateLimits['primary'] {

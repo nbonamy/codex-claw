@@ -39,6 +39,7 @@ describe('Electron backend boundary', () => {
       'backend-process-client.ts',
       'backend-socket-client.ts',
       'browser-pane.ts',
+      'chatgpt-app.ts',
       'client-request-handlers.ts',
       'computer-use-tools.ts',
       'daemon-launch-agent.ts',

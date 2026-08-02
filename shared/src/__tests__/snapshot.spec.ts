@@ -1450,6 +1450,71 @@ describe('snapshot reducer', () => {
     }]);
   });
 
+  it('records queue retry failures without removing or reordering the prompt', () => {
+    const snapshot = createInitialSnapshot();
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'agent.promptQueued',
+      payload: { id: 'prompt-1', text: 'retry me' },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      type: 'agent.promptRetryScheduled',
+      payload: {
+        id: 'prompt-1',
+        attempts: 2,
+        lastError: 'transport disconnected',
+        retryAt: '2026-06-05T00:00:03.000Z',
+      },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(snapshot.queuedPrompts).toStrictEqual([{
+      id: 'prompt-1',
+      agentId: 'agent-dina',
+      text: 'retry me',
+      createdAt: '2026-06-05T00:00:01.000Z',
+      attempts: 2,
+      lastError: 'transport disconnected',
+      retryAt: '2026-06-05T00:00:03.000Z',
+      submitted: true,
+    }]);
+  });
+
+  it('keeps backend approvals in canonical snapshot state until resolution', () => {
+    const snapshot = createInitialSnapshot();
+    const approval = {
+      id: 'approval-1',
+      kind: 'command' as const,
+      conversationId: 'thread-dina',
+      itemId: 'command-1',
+      title: 'Run tests',
+      command: 'npm test',
+    };
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'backendApproval.requested',
+      payload: { approval },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(snapshot.backendApprovals['agent-dina']).toStrictEqual([approval]);
+    expect(snapshot.agents[0]?.status).toStrictEqual({ type: 'awaitingInput', detail: 'Run tests' });
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      type: 'backendApproval.resolved',
+      payload: { approval, decision: 'allow' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+    expect(snapshot.backendApprovals['agent-dina']).toStrictEqual([]);
+  });
+
   it('adds a submitted user message once when the authoritative snapshot already contains it', () => {
     const snapshot = createInitialSnapshot();
     const message = appendUserPrompt(snapshot, 'agent-dina', 'run next', '2026-06-05T00:00:03.000Z');

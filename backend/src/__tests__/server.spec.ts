@@ -3596,6 +3596,64 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
+  it('retries failed queue drains without losing the item or duplicating its user message', async () => {
+    vi.useFakeTimers();
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina', teamId: 'team-test', name: 'Dina', folder: '/workspace/dina', backend: 'codex',
+      backendSession: { kind: 'codex', threadId: 'thread-dina' }, status: { type: 'working' },
+      createdAt: '2026-06-13T00:00:00.000Z', updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const sendPrompt = vi.fn()
+      .mockRejectedValueOnce(new Error('transport disconnected'))
+      .mockResolvedValueOnce({ backendSession: { kind: 'codex', threadId: 'thread-dina' }, turnId: 'turn-retry' });
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt,
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-dina' } }),
+      respondToRequest: async () => undefined,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version', pid: 123, snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await server.handleMessage({
+      jsonrpc: '2.0', id: 'queue', method: 'agent/prompt/send',
+      params: { agentId: 'agent-dina', prompt: 'retry safely' },
+    });
+    server.emitEvent({
+      agentId: 'agent-dina', threadId: 'thread-dina', turnId: 'turn-old',
+      type: 'turn.completed', payload: { status: 'completed' },
+    });
+    await flushMicrotasks();
+    await flushMicrotasks();
+    await flushMicrotasks();
+
+    expect(snapshot.queuedPrompts).toHaveLength(1);
+    expect(snapshot.queuedPrompts?.[0]).toMatchObject({
+      text: 'retry safely',
+      attempts: 1,
+      lastError: 'transport disconnected',
+    });
+    expect(snapshot.messages.filter((message) => message.role === 'user')).toHaveLength(1);
+    expect(snapshot.agents[0]?.status).toStrictEqual({ type: 'error', message: 'transport disconnected' });
+    expect((server as unknown as { queuedPromptRetryTimers: Map<string, unknown> }).queuedPromptRetryTimers.size).toBe(1);
+
+    await vi.runOnlyPendingTimersAsync();
+    await flushMicrotasks();
+    expect(sendPrompt).toHaveBeenCalledTimes(2);
+    expect(snapshot.messages.filter((message) => message.role === 'user')).toHaveLength(1);
+    expect(snapshot.queuedPrompts).toStrictEqual([]);
+    await server.close();
+    vi.useRealTimers();
+  });
+
   it('owns message retry and edit rollback orchestration', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
@@ -4494,6 +4552,7 @@ function createTestSnapshot(): AppSnapshot {
     activeTeamId: 'team-test',
     activeAgentId: null,
     messages: [],
+    backendApprovals: {},
     agentGitStatuses: {},
     turnGitDiffs: {},
     backendRuntimes: [],

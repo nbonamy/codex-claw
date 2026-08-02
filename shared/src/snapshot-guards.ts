@@ -7,6 +7,7 @@ export function isAppSnapshot(value: unknown): value is AppSnapshot {
     Array.isArray(value.bench) &&
     Array.isArray(value.loops) &&
     Array.isArray(value.messages) &&
+    isRecord(value.backendApprovals) &&
     Array.isArray(value.backendRuntimes) &&
     isRecord(value.workBacklog) &&
     isRecord(value.remoteConnections) &&

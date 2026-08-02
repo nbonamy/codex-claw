@@ -73,6 +73,12 @@ State-mutating public methods generally return `AppSnapshot`. The returned
 snapshot is authoritative. Between snapshots, clients replay only sequenced
 clawd-authored app events through the shared deterministic reducer.
 
+Electron and the renderer both synchronize with a subscribe-buffer-snapshot
+barrier: subscribe first, buffer notifications while reading `snapshot/get`,
+discard buffered events at or below `lastEventSeq`, then apply only contiguous
+events above it. A gap triggers a fresh snapshot barrier. Duplicate deltas are
+therefore never replayed after reconnect or renderer reload.
+
 ## Client To `clawd`: Core
 
 | Method | Params | Result | Notes |
@@ -301,7 +307,10 @@ Event `type` values are the app-owned `MainToRendererEvent['type']` union from
   `turn.proposedPlanCompleted`, `turn.completed`;
 - message and item streaming: `message.userSubmitted`, `message.delta`, `message.steer`,
   `item.started`, `item.updated`, `item.completed`;
-- approvals and requests: `approval.requested`, `toolInput.requested`;
+- approvals and requests: `backendApproval.requested`,
+  `backendApproval.resolved`, `approval.requested`, `toolInput.requested`;
+- backend-owned prompt queue: `agent.promptQueued`, `agent.promptDequeued`,
+  `agent.promptRetryScheduled`;
 - artifacts and account state: `diff.updated`, `sidePanel.markdownRequested`,
   `sidePanel.gitDiffRequested`, `git.statusUpdated`,
   `context.compactionStarted`,
@@ -312,6 +321,11 @@ Event `type` values are the app-owned `MainToRendererEvent['type']` union from
 
 Clients must ignore unknown event types and refresh via `snapshot/get` if they
 detect sequence gaps.
+
+The desktop reconnects the same selected socket or bundled-process transport
+with bounded exponential backoff. It does not silently fall back to a fresh
+bundled daemon after an established daemon connection drops, because doing so
+would fork the authoritative runtime state.
 
 ## `clawd` To Client Requests
 

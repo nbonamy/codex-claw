@@ -6,6 +6,7 @@ describe('ipc channels', () => {
   it('keeps renderer bridge channels explicit', () => {
     expect(ipcChannels).toStrictEqual({
       getSnapshot: 'app:get-snapshot',
+      getSnapshotState: 'app:get-snapshot-state',
       listSshHosts: 'connections:ssh-hosts:list',
       addSshConnection: 'connections:ssh:add',
       checkRemoteConnection: 'connections:remote:check',
@@ -79,6 +80,7 @@ describe('ipc channels', () => {
       setDaemonEnabled: 'daemon:enabled:set',
       getSystemPermissions: 'system-permissions:get',
       openAccessibilitySettings: 'system-permissions:accessibility:open',
+      launchChatGptApp: 'chatgpt:app:launch',
       quit: 'app:quit',
       restartApp: 'app:restart',
       setAgentGoal: 'agent:goal:set',
@@ -117,5 +119,9 @@ describe('ipc channels', () => {
       .toEqualTypeOf<MainToRendererEvent>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.appCommand]>()
       .toEqualTypeOf<AppCommand>();
+    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.launchChatGptApp]['args']>()
+      .toEqualTypeOf<[]>();
+    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.launchChatGptApp]['result']>()
+      .toEqualTypeOf<void>();
   });
 });

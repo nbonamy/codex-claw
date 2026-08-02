@@ -65,6 +65,19 @@
       />
     </Transition>
     <section class="app-shell__content">
+      <div
+        v-if="connectionState.status !== 'connected'"
+        class="app-shell__connection-status"
+        :class="`app-shell__connection-status--${connectionState.status}`"
+        role="status"
+        aria-live="polite"
+      >
+        <span class="app-shell__connection-status-dot" aria-hidden="true" />
+        <span>{{ connectionStatusLabel }}</span>
+        <span v-if="connectionState.detail" class="app-shell__connection-status-detail">
+          {{ connectionState.detail }}
+        </span>
+      </div>
       <SettingsView
         v-if="settingsVisible"
         :active-tab="settingsActiveTab"
@@ -312,7 +325,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type PairedDevice, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
+import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type PairedDevice, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultTeamColor } from '@codex-claw/shared/team-colors';
@@ -349,6 +362,7 @@ const props = withDefaults(defineProps<{
   isLoading: boolean;
   isConversationLoading?: boolean;
   isSending: boolean;
+  connectionState?: BackendConnectionState;
   goal?: ThreadGoal | null;
   approvals?: BackendApprovalRequest[];
   approvalPreset?: ApprovalPreset | null;
@@ -435,6 +449,7 @@ const props = withDefaults(defineProps<{
   backendSkills: () => [],
   backendCapabilities: () => defaultBackendCapabilities('codex'),
   isConversationLoading: false,
+  connectionState: () => ({ status: 'connected' }),
   modelCatalogStatus: 'notLoaded',
   skillCatalogStatus: 'notLoaded',
   selectedModelId: null,
@@ -570,6 +585,11 @@ type AgentRightWorkspaceState = {
 
 const agentSidebarCollapsed = ref(false);
 const agentListCompact = computed(() => props.snapshot.general.agentListCompact);
+const connectionStatusLabel = computed(() => {
+  if (props.connectionState.status === 'connecting') return 'Connecting to clawd…';
+  if (props.connectionState.status === 'reconnecting') return 'Reconnecting to clawd… Agents keep working in the background.';
+  return 'Clawd is unavailable. Reconnection will continue automatically.';
+});
 const agentSidebarMinWidth = 80;
 const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
@@ -581,7 +601,7 @@ const authenticationLoading = ref(true);
 const authenticationCancelling = ref(false);
 const authenticationError = ref<string | null>(null);
 let authenticationPoll: ReturnType<typeof setInterval> | null = null;
-const settingsActiveTab = ref<SettingsTab>('general');
+const settingsActiveTab = ref<SettingsTab>('chatgpt');
 const agentDialogVisible = ref(false);
 const agentDialogMode = ref<'create' | 'edit'>('create');
 const editingAgentId = ref<string | null>(null);
@@ -1908,6 +1928,40 @@ function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
   flex-direction: column;
   overflow: visible;
   background: var(--color-shell-main);
+}
+
+.app-shell__connection-status {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 5px 14px;
+  border-bottom: 1px solid var(--color-outline-subtle);
+  background: var(--color-surface-low);
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.app-shell__connection-status-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--color-warning);
+}
+
+.app-shell__connection-status--error .app-shell__connection-status-dot {
+  background: var(--color-error);
+}
+
+.app-shell__connection-status-detail {
+  min-width: 0;
+  overflow: hidden;
+  opacity: 0.78;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app-shell__body {

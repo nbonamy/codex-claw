@@ -251,6 +251,29 @@ describe('ClawBackendProcessClient', () => {
     await expect(requestPromise).rejects.toThrow('clawd exited before responding');
   });
 
+  it('reports unexpected exits and starts a fresh process on reconnect', async () => {
+    const firstChild = createFakeChildProcess();
+    const secondChild = createFakeChildProcess();
+    const spawnProcess = vi.fn()
+      .mockReturnValueOnce(firstChild)
+      .mockReturnValueOnce(secondChild);
+    const client = new ClawBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+      spawnProcess,
+    });
+    const connectionListener = vi.fn();
+    client.onConnectionState(connectionListener);
+
+    await client.start();
+    firstChild.emit('exit', 7, null);
+    await client.start();
+
+    expect(connectionListener).toHaveBeenNthCalledWith(1, 'connected', undefined);
+    expect(connectionListener).toHaveBeenNthCalledWith(2, 'disconnected', expect.any(Error));
+    expect(connectionListener).toHaveBeenNthCalledWith(3, 'connected', undefined);
+    expect(spawnProcess).toHaveBeenCalledTimes(2);
+  });
+
   it('restarts the backend when the watched bundle changes', async () => {
     vi.useFakeTimers();
     const firstChild = createFakeChildProcess();

@@ -7,6 +7,7 @@ const ipc = new TypedIpcRenderer<CodexClawIpcRequests, CodexClawIpcEvents>(ipcRe
 
 const api: CodexClawApi = {
   getSnapshot: () => ipc.invoke(ipcChannels.getSnapshot),
+  getSnapshotState: () => ipc.invoke(ipcChannels.getSnapshotState),
   listSshHosts: () => ipc.invoke(ipcChannels.listSshHosts),
   addSshConnection: (input: AddSshConnectionInput) => ipc.invoke(ipcChannels.addSshConnection, input),
   checkRemoteConnection: (connectionId: string) => ipc.invoke(ipcChannels.checkRemoteConnection, connectionId),
@@ -80,6 +81,7 @@ const api: CodexClawApi = {
   setDaemonEnabled: (enabled: boolean) => ipc.invoke(ipcChannels.setDaemonEnabled, enabled),
   getSystemPermissions: () => ipc.invoke(ipcChannels.getSystemPermissions),
   openAccessibilitySettings: () => ipc.invoke(ipcChannels.openAccessibilitySettings),
+  launchChatGptApp: () => ipc.invoke(ipcChannels.launchChatGptApp),
   quit: () => ipc.invoke(ipcChannels.quit),
   restartApp: () => ipc.invoke(ipcChannels.restartApp),
   setAgentGoal: (agentId: string, objective: string) => ipc.invoke(ipcChannels.setAgentGoal, agentId, objective),

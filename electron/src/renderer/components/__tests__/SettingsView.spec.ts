@@ -10,7 +10,7 @@ describe('SettingsView', () => {
     document.body.innerHTML = '';
   });
 
-  it('opens on general by default and emits tab selections', async () => {
+  it('opens on ChatGPT by default, lists it before General, and emits tab selections', async () => {
     const wrapper = mount(SettingsView, {
       props: {
         settings: defaultThemeSettings,
@@ -21,7 +21,12 @@ describe('SettingsView', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('Accessibility');
+    expect(wrapper.text()).toContain('Manage Codex settings in ChatGPT');
+    expect(wrapper.findAll('.el-menu-item').map((item) => item.text()).slice(0, 2)).toStrictEqual([
+      'ChatGPT',
+      'General',
+    ]);
+    expect(wrapper.text()).not.toContain('Accessibility');
     expect(wrapper.text()).not.toContain('Theme');
 
     await wrapper.findAll('.el-menu-item').find((item) => item.text() === 'Appearance')?.trigger('click');

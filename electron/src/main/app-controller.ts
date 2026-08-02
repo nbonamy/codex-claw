@@ -10,10 +10,11 @@ import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards';
 import { applyMainEventToSnapshot } from '@codex-claw/shared/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
 import { sendAppCommand, sendRendererEvent } from './ipc-events';
 import { BrowserPane, browserPaneKey } from './browser-pane';
+import { launchChatGptApp } from './chatgpt-app';
 
 type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
 type StartupMaintenance = () => Promise<void>;
@@ -30,8 +31,16 @@ export class AppController {
   private snapshot: AppSnapshot | null = null;
   private clientState: ClientState = createEmptyClientState();
   private backendClientEventUnsubscribe: (() => void) | null = null;
+  private backendClientConnectionUnsubscribe: (() => void) | null = null;
   private nativeIpcUnregister: (() => void) | null = null;
-  private seq = 0;
+  private lastBackendEventSeq = 0;
+  private clientEventSeq = 0;
+  private backendEventBuffer: ClawBackendEvent[] | null = null;
+  private backendSynchronization: Promise<void> | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectAttempt = 0;
+  private shuttingDown = false;
+  private connectionState: BackendConnectionState = { status: 'connecting' };
   private readonly pendingBrowserOpens = new Map<string, PendingBrowserOpen>();
 
   private readonly browserPane = new BrowserPane({
@@ -66,6 +75,7 @@ export class AppController {
     this.nativeIpcUnregister = registerCodexNativeIpc({ clipboard, dialog, ipcMain, shell });
     const ipc = new TypedIpcMain<CodexClawIpcRequests>(ipcMain);
     ipc.handle(ipcChannels.getSnapshot, () => this.getSnapshot());
+    ipc.handle(ipcChannels.getSnapshotState, () => this.getSnapshotState());
 
     ipc.handle(ipcChannels.listSshHosts, () => {
       return this.listSshHosts();
@@ -321,6 +331,8 @@ export class AppController {
 
     ipc.handle(ipcChannels.openAccessibilitySettings, () => this.openAccessibilitySettings());
 
+    ipc.handle(ipcChannels.launchChatGptApp, () => launchChatGptApp());
+
     ipc.handle(ipcChannels.quit, () => {
       this.appLifecycle.quit();
     });
@@ -392,6 +404,9 @@ export class AppController {
   }
 
   async shutdown(): Promise<void> {
+    this.shuttingDown = true;
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
     this.rejectAllPendingBrowserOpens(new Error('Application is shutting down.'));
     await this.browserPane.closeAll();
     this.powerSaveBlocker.stop();
@@ -399,6 +414,8 @@ export class AppController {
     this.nativeIpcUnregister = null;
     this.backendClientEventUnsubscribe?.();
     this.backendClientEventUnsubscribe = null;
+    this.backendClientConnectionUnsubscribe?.();
+    this.backendClientConnectionUnsubscribe = null;
     await this.backendClient?.close();
   }
 
@@ -412,9 +429,15 @@ export class AppController {
       const health = await this.backendClient.health();
       this.backendClientEventUnsubscribe?.();
       this.backendClientEventUnsubscribe = this.backendClient.onEvent((event) => this.emitBackendEvent(event));
-      await this.refreshSnapshotFromBackend();
+      this.backendClientConnectionUnsubscribe?.();
+      this.backendClientConnectionUnsubscribe = this.backendClient.onConnectionState?.((state, error) => {
+        if (state === 'disconnected') this.handleBackendDisconnect(error);
+      }) ?? null;
+      await this.synchronizeBackendState();
+      this.setConnectionState({ status: 'connected' });
       logMain('clawd', 'connected to backend', { version: health.version, pid: health.pid });
     } catch (error) {
+      this.handleBackendDisconnect(error instanceof Error ? error : new Error(String(error)));
       warnMain('clawd', 'failed to connect to backend process', {
         detail: error instanceof Error ? error.message : String(error),
       });
@@ -724,13 +747,18 @@ export class AppController {
   }
 
   private async getSnapshot(): Promise<AppSnapshot> {
-    if (this.backendClient) {
-      await this.refreshSnapshotFromBackend();
-    }
     if (!this.snapshot) {
       throw new Error('clawd snapshot is not available.');
     }
     return this.snapshot;
+  }
+
+  private async getSnapshotState(): Promise<RendererSnapshotState> {
+    return {
+      snapshot: await this.getSnapshot(),
+      lastBackendEventSeq: this.lastBackendEventSeq,
+      connection: { ...this.connectionState },
+    };
   }
 
   private async sendPrompt(
@@ -806,14 +834,7 @@ export class AppController {
   }
 
   private emitBrowserAnnotation(annotation: BrowserAnnotation): void {
-    if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
-    this.seq += 1;
-    sendRendererEvent(this.mainWindow.webContents, {
-      seq: this.seq,
-      type: 'browser.annotationCreated',
-      payload: annotation,
-      occurredAt: new Date().toISOString(),
-    });
+    this.emitClientEvent('browser.annotationCreated', annotation);
   }
 
   private async restartAgent(agentId: string): Promise<AppSnapshot> {
@@ -978,14 +999,51 @@ export class AppController {
     return this.requireBackendClient().request(backendMethods.systemPermissionsAccessibilityOpen);
   }
 
-  private async refreshSnapshotFromBackend(): Promise<void> {
-    const backendState = await this.requireBackendClient().request<unknown>(backendMethods.snapshotGet);
-    if (isClawSnapshotGetResult(backendState)) {
+  private synchronizeBackendState(): Promise<void> {
+    if (this.backendSynchronization) return this.backendSynchronization;
+    this.backendSynchronization = this.performBackendSynchronization()
+      .catch((error) => {
+        this.backendEventBuffer = null;
+        throw error;
+      })
+      .finally(() => {
+        this.backendSynchronization = null;
+      });
+    return this.backendSynchronization;
+  }
+
+  private async performBackendSynchronization(): Promise<void> {
+    this.backendEventBuffer ??= [];
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const backendState = await this.requireBackendClient().request<unknown>(backendMethods.snapshotGet);
+      if (!isClawSnapshotGetResult(backendState)) throw new Error('clawd returned an invalid snapshot.');
+
       this.snapshot = backendState.snapshot;
       this.clientState = backendState.clientState;
-      this.seq = Math.max(this.seq, backendState.lastEventSeq);
-      this.syncPowerSaveBlocker();
+      this.lastBackendEventSeq = backendState.lastEventSeq;
+      const buffered = this.backendEventBuffer;
+      this.backendEventBuffer = [];
+      let gap = false;
+      for (const event of buffered) {
+        if (event.seq <= this.lastBackendEventSeq) continue;
+        if (event.seq !== this.lastBackendEventSeq + 1) {
+          gap = true;
+          break;
+        }
+        this.applyBackendEvent(event, true);
+      }
+      if (!gap) {
+        this.backendEventBuffer = null;
+        this.syncPowerSaveBlocker();
+        return;
+      }
+      warnMain('clawd', 'backend event gap detected while synchronizing', {
+        attempt: attempt + 1,
+        lastEventSeq: this.lastBackendEventSeq,
+      });
     }
+    this.backendEventBuffer = null;
+    throw new Error('Unable to obtain a consistent clawd snapshot after repeated event gaps.');
   }
 
   private async refreshClientStateFromBackend(): Promise<void> {
@@ -1005,6 +1063,22 @@ export class AppController {
   }
 
   private emitBackendEvent(event: ClawBackendEvent): void {
+    if (this.backendEventBuffer) {
+      this.backendEventBuffer.push(event);
+      return;
+    }
+    if (event.seq <= this.lastBackendEventSeq) return;
+    if (event.seq !== this.lastBackendEventSeq + 1) {
+      this.backendEventBuffer = [event];
+      void this.synchronizeBackendState()
+        .then(() => this.emitSnapshotToRenderer())
+        .catch((error) => this.handleBackendDisconnect(error instanceof Error ? error : new Error(String(error))));
+      return;
+    }
+    this.applyBackendEvent(event, true);
+  }
+
+  private applyBackendEvent(event: ClawBackendEvent, notifyRenderer: boolean): void {
     const rendererEvent = eventForRenderer(event);
     if (isAppSnapshot(event.snapshot)) {
       this.snapshot = event.snapshot;
@@ -1015,11 +1089,66 @@ export class AppController {
       this.clientState = event.clientState;
     }
 
-    this.seq = Math.max(this.seq, rendererEvent.seq);
+    this.lastBackendEventSeq = event.seq;
     this.syncPowerSaveBlocker();
-    if (this.mainWindow) {
+    if (notifyRenderer && this.mainWindow && !this.mainWindow.isDestroyed()) {
       sendRendererEvent(this.mainWindow.webContents, rendererEvent);
     }
+  }
+
+  private handleBackendDisconnect(error?: Error): void {
+    if (this.shuttingDown) return;
+    this.setConnectionState({ status: 'reconnecting', ...(error?.message ? { detail: error.message } : {}) });
+    this.scheduleBackendReconnect();
+  }
+
+  private scheduleBackendReconnect(): void {
+    if (this.reconnectTimer || this.shuttingDown) return;
+    const delay = Math.min(10_000, 250 * (2 ** this.reconnectAttempt));
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      void this.reconnectBackend();
+    }, delay);
+    this.reconnectTimer.unref?.();
+  }
+
+  private async reconnectBackend(): Promise<void> {
+    if (this.shuttingDown || !this.backendClient) return;
+    try {
+      await this.backendClient.start();
+      const health = await this.backendClient.health();
+      await this.synchronizeBackendState();
+      this.reconnectAttempt = 0;
+      this.setConnectionState({ status: 'connected' });
+      this.emitSnapshotToRenderer();
+      logMain('clawd', 'reconnected to backend', { version: health.version, pid: health.pid });
+    } catch (error) {
+      this.reconnectAttempt += 1;
+      this.setConnectionState({ status: 'reconnecting', detail: error instanceof Error ? error.message : String(error) });
+      this.scheduleBackendReconnect();
+    }
+  }
+
+  private setConnectionState(state: BackendConnectionState): void {
+    this.connectionState = state;
+    this.emitClientEvent('client.connectionChanged', state);
+  }
+
+  private emitSnapshotToRenderer(): void {
+    if (this.snapshot) this.emitClientEvent('snapshot.updated', this.snapshot, this.snapshot);
+  }
+
+  private emitClientEvent(type: MainToRendererEvent['type'], payload: unknown, snapshot?: AppSnapshot): void {
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
+    this.clientEventSeq += 1;
+    sendRendererEvent(this.mainWindow.webContents, {
+      seq: this.clientEventSeq,
+      source: 'client',
+      type,
+      payload,
+      occurredAt: new Date().toISOString(),
+      ...(snapshot ? { snapshot } : {}),
+    });
   }
 
   private syncPowerSaveBlocker(): void {
@@ -1034,8 +1163,15 @@ export function startMainApp(): void {
   controller.registerIpcHandlers();
 
   void app.whenReady().then(async () => {
-    await controller.initialize();
-    controller.createWindow();
+    try {
+      await controller.initialize();
+    } catch (error) {
+      warnMain('startup', 'initialization failed; opening the recovery UI', {
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      controller.createWindow();
+    }
   });
 
   app.on('before-quit', (event) => {
@@ -1085,5 +1221,5 @@ function benchLocationForRemoteConnectionId(remoteConnectionId: string | undefin
 }
 
 function eventForRenderer(event: ClawBackendEvent): MainToRendererEvent {
-  return event;
+  return { ...event, source: 'backend' };
 }

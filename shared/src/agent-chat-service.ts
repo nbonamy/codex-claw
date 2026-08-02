@@ -10,7 +10,9 @@ export type AgentChatEventEmitter = (
 ) => void;
 
 export type SendAgentPromptHooks = {
+  appendUserMessage?: boolean;
   onBackendSessionUpdated?: (result: BackendSendResult, wasNewSession: boolean) => void | Promise<void>;
+  onPromptFailed?: (error: Error) => void | Promise<void>;
   onPromptStarted?: (result: BackendSendResult) => void | Promise<void>;
 };
 
@@ -30,7 +32,7 @@ export function sendAgentPrompt(
   }
 
   const promptResult = backendDriver.tryHandlePromptCommand?.(agent, trimmedPrompt) ?? null;
-  if (!promptResult) {
+  if (!promptResult && hooks?.appendUserMessage !== false) {
     const message = appendUserPrompt(snapshot, agentId, trimmedPrompt, undefined, options?.attachments);
     emit({
       agentId,
@@ -72,7 +74,8 @@ export function sendAgentPrompt(
       void Promise.resolve(hooks?.onPromptStarted?.(result)).catch(() => undefined);
     })
     .catch((error) => {
-      const message = error instanceof Error ? error.message : String(error);
+      const normalizedError = error instanceof Error ? error : new Error(String(error));
+      const message = normalizedError.message;
       updateAgentStatus(agentId, { type: 'idle' }, emit, snapshot);
       updateBackendRuntimeStatus({
         backend: backendDriver.backend,
@@ -84,6 +87,7 @@ export function sendAgentPrompt(
         type: 'error',
         payload: { message },
       });
+      void Promise.resolve(hooks?.onPromptFailed?.(normalizedError)).catch(() => undefined);
     });
 
   return snapshot;

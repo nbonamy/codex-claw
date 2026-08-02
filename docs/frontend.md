@@ -89,9 +89,18 @@ implemented:
   selection/caret, so switching agents restores the editor exactly; queued
   prompts remain backend-owned snapshot state and the renderer never removes
   them before `clawd` confirms dequeue;
+- per-agent in-memory model, reasoning, plan-mode, skill, and file-catalog
+  configuration, restored synchronously on selection before background catalog
+  refresh completes;
+- a non-blocking connection strip while Electron reconnects to `clawd`; the
+  existing conversation remains visible because agents continue in the
+  background daemon;
 - passive structured execution plans floating at the conversation's upper right
   while a turn is running; completed Plan-mode proposals continue to use the
   explicit review panel;
+- Claw-owned MCP activity keeps its phase-aware titles and uses host-provided
+  semantic icons for browser, Computer Use, collaboration, workspace, Markdown,
+  and work-item tools while unrelated MCP servers retain SDK fallbacks;
 - agent-owned right-side tabbed workspaces for the in-app Browser and GitHub
   Review, with full working-tree diffs opened from the agent header's git
   statistics; every agent preserves its own open/active tabs, open state, and
@@ -108,7 +117,9 @@ implemented:
   and resolved-path implementation details; identity and workspace settings
   use grouped surfaces with compact row controls;
 - full-space Settings surface launched from the rail, with its own category
-  sidebar and screen-level panels instead of dialog chrome; Connections keeps
+  sidebar and screen-level panels instead of dialog chrome; its first page
+  launches `/Applications/ChatGPT.app` with Claw's isolated `CODEX_HOME` for
+  plugin, sandbox-policy, and advanced Codex configuration; Connections keeps
   remote Claw hosts separate from official Codex device pairing, including
   pairing progress and paired-device revocation.
 

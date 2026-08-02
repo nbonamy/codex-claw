@@ -140,7 +140,9 @@ describe('ClawMcpService', () => {
     await vi.waitFor(() => expect(events).toContainEqual(expect.objectContaining({
       agentId: 'agent-jesse',
       type: 'agent.promptQueued',
-      payload: expect.objectContaining({ text: 'Run this next.' }),
+      payload: expect.objectContaining({
+        text: expect.stringContaining('Message:\nRun this next.'),
+      }),
     })));
     expect(sendPrompt).not.toHaveBeenCalled();
 
@@ -163,6 +165,27 @@ describe('ClawMcpService', () => {
     await vi.waitFor(() => expect(sendPrompt).toHaveBeenCalledOnce());
     expect(sendPrompt.mock.calls[0]?.[1]).toContain('Only this remains.');
     expect(sendPrompt.mock.calls[0]?.[1]).not.toContain('Run this next.');
+  });
+
+  it('marks collaboration messages already submitted when an idle delivery fails', async () => {
+    const snapshot = createInitialSnapshot();
+    const events: any[] = [];
+    const sendPrompt = vi.fn().mockRejectedValue(new Error('transport disconnected'));
+    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    service.setDriverRpc(new BackendDriverRpc(new Map([['codex', createDriver({ sendPrompt })]])));
+    const url = await service.start();
+
+    await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 1, method: 'tools/call',
+      params: { name: 'send-message', arguments: { to: 'agent-jesse', content: 'Retry this safely.' } },
+    });
+
+    await vi.waitFor(() => expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-jesse',
+      type: 'agent.promptQueued',
+      payload: expect.objectContaining({ submitted: true }),
+    })));
+    expect(snapshot.messages.filter((message) => message.agentId === 'agent-jesse' && message.role === 'user')).toHaveLength(1);
   });
 
   it('routes Computer Use MCP calls through the desktop client port', async () => {

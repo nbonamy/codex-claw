@@ -7,6 +7,10 @@
       :default-active="activeTab"
       @select="selectTab"
     >
+      <el-menu-item index="chatgpt">
+        <BrandOpenaiIcon aria-hidden="true" />
+        <span>ChatGPT</span>
+      </el-menu-item>
       <el-menu-item index="general">
         <SettingsIcon aria-hidden="true" />
         <span>General</span>
@@ -29,7 +33,7 @@
 
 <script setup lang="ts">
 import type { SettingsTab } from './settings-tabs';
-import { AffiliateIcon, PaletteIcon, SettingsIcon, TerminalIcon } from '../shared/icons/app-icons';
+import { AffiliateIcon, BrandOpenaiIcon, PaletteIcon, SettingsIcon, TerminalIcon } from '../shared/icons/app-icons';
 
 defineProps<{
   activeTab: SettingsTab;
@@ -40,7 +44,7 @@ const emit = defineEmits<{
 }>();
 
 function selectTab(tab: string): void {
-  if (tab === 'general' || tab === 'appearance' || tab === 'integrations' || tab === 'connections') {
+  if (tab === 'chatgpt' || tab === 'general' || tab === 'appearance' || tab === 'integrations' || tab === 'connections') {
     emit('select', tab);
   }
 }

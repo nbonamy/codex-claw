@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { applyMainEventToSnapshot, createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/shared/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
@@ -14,10 +14,10 @@ import { useConfetti } from './shared/confetti/use-confetti';
 
 const snapshot = ref<AppSnapshot>(createEmptySnapshot());
 const isLoading = ref(false);
+const connectionState = ref<BackendConnectionState>({ status: 'connecting' });
 const sendingAgentIds = ref(new Set<string>());
 const composerStatesByAgentId = ref<Record<string, CodexComposerState>>({});
 const answeredClientRequestIds = ref(new Set<string>());
-const backendApprovalsByAgentId = ref<Record<string, BackendApprovalRequest[]>>({});
 const backendModels = ref<BackendModelOption[]>([]);
 const modelCatalogStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
 const modelCatalogError = ref<string | null>(null);
@@ -46,9 +46,28 @@ const daemonStatus = ref<ClawdDaemonStatus | null>(null);
 const daemonStatusError = ref<string | null>(null);
 const hydratingAgentHistoryIds = ref(new Set<string>());
 const catalogLoadsByAgentId = new Map<string, Promise<void>>();
+type CatalogStatus = 'notLoaded' | 'loading' | 'loaded' | 'error';
+type AgentComposerConfiguration = {
+  models: BackendModelOption[];
+  modelStatus: CatalogStatus;
+  modelError: string | null;
+  skills: BackendSkillSummary[];
+  skillStatus: CatalogStatus;
+  skillError: string | null;
+  files: AgentFileSearchItem[];
+  fileStatus: CatalogStatus;
+  fileError: string | null;
+  selectedModelId: string | null;
+  selectedReasoningEffort: ReasoningEffort | null;
+  planMode: boolean;
+};
+const composerConfigurationByAgentId = new Map<string, AgentComposerConfiguration>();
 let agentSelectionRequestId = 0;
 let unsubscribeMainEvents: (() => void) | null = null;
 let bufferedMainEvents: MainToRendererEvent[] | null = null;
+let lastBackendEventSeq = 0;
+let rendererSynchronization: Promise<void> | null = null;
+let synchronizeRendererSnapshotRequest: (() => Promise<void>) | null = null;
 const workProviderAuthorizationPollTimers = new Map<WorkProviderKind, ReturnType<typeof globalThis.setTimeout>>();
 const WORK_PROVIDER_AUTHORIZATION_POLL_MS = 5_000;
 
@@ -94,7 +113,7 @@ export function useAppState() {
 
   const activeBackendApprovals = computed(() => {
     const agentId = activeAgent.value?.id;
-    return agentId ? backendApprovalsByAgentId.value[agentId] ?? [] : [];
+    return agentId ? snapshot.value.backendApprovals[agentId] ?? [] : [];
   });
 
   const activeGoal = computed(() => activeAgent.value?.goal ?? null);
@@ -136,11 +155,8 @@ export function useAppState() {
     subscribeToMainEvents();
 
     try {
-      snapshot.value = await window.codexClaw.getSnapshot();
-      backendApprovalsByAgentId.value = {};
-      const startupEvents = bufferedMainEvents;
-      bufferedMainEvents = null;
-      for (const event of startupEvents) handleMainEvent(event, false);
+      await synchronizeRendererSnapshot(false);
+      if (snapshot.value.activeAgentId) restoreComposerConfiguration(snapshot.value.activeAgentId);
       pruneRemoteBenchCache();
       await Promise.all([
         loadActiveAgentCatalogs(),
@@ -148,12 +164,71 @@ export function useAppState() {
         loadSourceRepositories(),
         loadDaemonStatus(),
       ]);
+    } catch (error) {
+      connectionState.value = {
+        status: 'error',
+        detail: error instanceof Error ? error.message : String(error),
+      };
     } finally {
       bufferedMainEvents = null;
       isLoading.value = false;
     }
 
     void hydrateActiveAgentHistory().catch(() => undefined);
+  }
+
+  async function synchronizeRendererSnapshot(preserveActiveSelection: boolean): Promise<void> {
+    if (rendererSynchronization) return rendererSynchronization;
+    rendererSynchronization = performRendererSynchronization(preserveActiveSelection).finally(() => {
+      rendererSynchronization = null;
+    });
+    return rendererSynchronization;
+  }
+  synchronizeRendererSnapshotRequest = () => synchronizeRendererSnapshot(true);
+
+  async function performRendererSynchronization(preserveActiveSelection: boolean): Promise<void> {
+    bufferedMainEvents ??= [];
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const state = await readRendererSnapshotState();
+      const activeAgentId = preserveActiveSelection ? snapshot.value.activeAgentId : null;
+      if (activeAgentId && state.snapshot.agents.some((agent) => agent.id === activeAgentId)) {
+        selectAgentInSnapshot(state.snapshot, activeAgentId);
+      }
+      snapshot.value = state.snapshot;
+      connectionState.value = state.connection;
+      lastBackendEventSeq = state.lastBackendEventSeq;
+      const buffered = bufferedMainEvents;
+      bufferedMainEvents = [];
+      let gap = false;
+      for (const event of buffered) {
+        if (!isBackendMainEvent(event)) {
+          handleMainEvent(event);
+          continue;
+        }
+        if (event.seq <= lastBackendEventSeq) continue;
+        if (event.seq !== lastBackendEventSeq + 1) {
+          gap = true;
+          break;
+        }
+        lastBackendEventSeq = event.seq;
+        handleMainEvent(event);
+      }
+      if (!gap) {
+        bufferedMainEvents = null;
+        return;
+      }
+    }
+    bufferedMainEvents = null;
+    throw new Error('Unable to synchronize the conversation after repeated backend event gaps.');
+  }
+
+  async function readRendererSnapshotState(): Promise<RendererSnapshotState> {
+    if (window.codexClaw?.getSnapshotState) return window.codexClaw.getSnapshotState();
+    return {
+      snapshot: await window.codexClaw!.getSnapshot(),
+      lastBackendEventSeq: 0,
+      connection: { status: 'connected' },
+    };
   }
 
   async function sendPrompt(prompt: string, submissionOptions?: SendPromptOptions): Promise<void> {
@@ -331,7 +406,9 @@ export function useAppState() {
     }
 
     const requestId = ++agentSelectionRequestId;
+    rememberActiveComposerConfiguration();
     snapshot.value = selectAgentInSnapshot(snapshot.value, agentId);
+    restoreComposerConfiguration(agentId);
     void loadActiveAgentCatalogs(agentId);
     void refreshAgentSelection(agentId, requestId);
   }
@@ -428,7 +505,7 @@ export function useAppState() {
     }
 
     const previousAgentIds = new Set(snapshot.value.agents.map((agent) => agent.id));
-    snapshot.value = await window.codexClaw.createAgent(input);
+    adoptNavigationSnapshot(await window.codexClaw.createAgent(input));
     await loadActiveAgentCatalogs();
     return snapshot.value.agents.find((agent) => !previousAgentIds.has(agent.id)) ?? activeAgent.value;
   }
@@ -439,7 +516,7 @@ export function useAppState() {
     }
 
     const previousTeamIds = new Set(snapshot.value.teams.map((team) => team.id));
-    snapshot.value = await window.codexClaw.createTeam(input);
+    adoptNavigationSnapshot(await window.codexClaw.createTeam(input));
     await loadActiveAgentCatalogs();
     return snapshot.value.teams.find((team) => !previousTeamIds.has(team.id)) ?? null;
   }
@@ -469,7 +546,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.closeTeam(teamId);
+    adoptNavigationSnapshot(await window.codexClaw.closeTeam(teamId));
     await loadActiveAgentCatalogs();
   }
 
@@ -478,7 +555,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.disconnectTeam(teamId);
+    adoptNavigationSnapshot(await window.codexClaw.disconnectTeam(teamId));
     await loadActiveAgentCatalogs();
   }
 
@@ -1046,7 +1123,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.duplicateAgent(agentId);
+    adoptNavigationSnapshot(await window.codexClaw.duplicateAgent(agentId));
     await loadActiveAgentCatalogs();
   }
 
@@ -1059,7 +1136,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.moveAgentToTeam(input);
+    adoptNavigationSnapshot(await window.codexClaw.moveAgentToTeam(input));
   }
 
   async function reorderAgents(input: ReorderAgentsInput): Promise<void> {
@@ -1140,18 +1217,17 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.closeAgent(agentId);
+    adoptNavigationSnapshot(await window.codexClaw.closeAgent(agentId));
     await loadActiveAgentCatalogs();
   }
 
   async function respondToClientRequest(response: ClientRequestResponse): Promise<void> {
-    markClientRequestAnswered(response.id);
-
     if (!window.codexClaw) {
       return;
     }
 
     adoptBackgroundSnapshot(await window.codexClaw.respondToClientRequest(response));
+    markClientRequestAnswered(response.id);
   }
 
   async function resolveBackendApproval(
@@ -1161,7 +1237,7 @@ export function useAppState() {
   ): Promise<void> {
     const agentId = activeAgent.value?.id;
     const approval = agentId
-      ? backendApprovalsByAgentId.value[agentId]?.find((candidate) => candidate.id === approvalId)
+      ? snapshot.value.backendApprovals[agentId]?.find((candidate) => candidate.id === approvalId)
       : undefined;
     if (
       !agentId ||
@@ -1183,7 +1259,6 @@ export function useAppState() {
             : 'allow',
       },
     });
-    removeBackendApproval(agentId, approvalId);
   }
 
   function selectModel(modelId: string): void {
@@ -1194,6 +1269,7 @@ export function useAppState() {
 
     selectedModelId.value = model.id;
     selectedReasoningEffort.value = defaultReasoningEffort(model);
+    rememberActiveComposerConfiguration();
   }
 
   function selectReasoningEffort(reasoningEffort: ReasoningEffort): void {
@@ -1203,10 +1279,12 @@ export function useAppState() {
     }
 
     selectedReasoningEffort.value = reasoningEffort;
+    rememberActiveComposerConfiguration();
   }
 
   function setPlanMode(enabled: boolean): void {
     planMode.value = enabled;
+    rememberActiveComposerConfiguration();
   }
 
   async function setApprovalPreset(preset: ApprovalPreset): Promise<void> {
@@ -1260,6 +1338,7 @@ export function useAppState() {
     activeQueuedPrompts,
     activeComposerState,
     isLoading,
+    connectionState,
     isHydratingActiveAgentHistory,
     isSending,
     answeredClientRequestIds,
@@ -1439,14 +1518,82 @@ function messageActionCapabilities(agentId: string) {
   return backendCapabilitiesForAgent(agent ?? null);
 }
 
-function selectDefaultModelIfNeeded(): void {
-  if (selectedModelFromCatalog()) {
-    return;
-  }
+function composerConfiguration(agentId: string): AgentComposerConfiguration {
+  const existing = composerConfigurationByAgentId.get(agentId);
+  if (existing) return existing;
+  const configuration: AgentComposerConfiguration = {
+    models: [],
+    modelStatus: 'notLoaded',
+    modelError: null,
+    skills: [],
+    skillStatus: 'notLoaded',
+    skillError: null,
+    files: [],
+    fileStatus: 'notLoaded',
+    fileError: null,
+    selectedModelId: null,
+    selectedReasoningEffort: null,
+    planMode: false,
+  };
+  composerConfigurationByAgentId.set(agentId, configuration);
+  return configuration;
+}
 
-  const defaultModel = backendModels.value.find((model) => model.isDefault) ?? backendModels.value[0] ?? null;
-  selectedModelId.value = defaultModel?.id ?? null;
-  selectedReasoningEffort.value = defaultModel ? defaultReasoningEffort(defaultModel) : null;
+function rememberActiveComposerConfiguration(): void {
+  const agentId = snapshot.value.activeAgentId;
+  if (!agentId) return;
+  Object.assign(composerConfiguration(agentId), {
+    models: [...backendModels.value],
+    modelStatus: modelCatalogStatus.value,
+    modelError: modelCatalogError.value,
+    skills: [...backendSkills.value],
+    skillStatus: skillCatalogStatus.value,
+    skillError: skillCatalogError.value,
+    files: [...agentFiles.value],
+    fileStatus: fileCatalogStatus.value,
+    fileError: fileCatalogError.value,
+    selectedModelId: selectedModelId.value,
+    selectedReasoningEffort: selectedReasoningEffort.value,
+    planMode: planMode.value,
+  });
+}
+
+function restoreComposerConfiguration(agentId: string): void {
+  const configuration = composerConfiguration(agentId);
+  backendModels.value = [...configuration.models];
+  modelCatalogStatus.value = configuration.modelStatus;
+  modelCatalogError.value = configuration.modelError;
+  backendSkills.value = [...configuration.skills];
+  skillCatalogStatus.value = configuration.skillStatus;
+  skillCatalogError.value = configuration.skillError;
+  agentFiles.value = [...configuration.files];
+  fileCatalogStatus.value = configuration.fileStatus;
+  fileCatalogError.value = configuration.fileError;
+  selectedModelId.value = configuration.selectedModelId;
+  selectedReasoningEffort.value = configuration.selectedReasoningEffort;
+  planMode.value = configuration.planMode;
+}
+
+function clearActiveComposerConfiguration(): void {
+  backendModels.value = [];
+  modelCatalogStatus.value = 'notLoaded';
+  modelCatalogError.value = null;
+  backendSkills.value = [];
+  skillCatalogStatus.value = 'notLoaded';
+  skillCatalogError.value = null;
+  agentFiles.value = [];
+  fileCatalogStatus.value = 'notLoaded';
+  fileCatalogError.value = null;
+  selectedModelId.value = null;
+  selectedReasoningEffort.value = null;
+  planMode.value = false;
+}
+
+function selectDefaultModelForConfiguration(configuration: AgentComposerConfiguration): void {
+  if (configuration.models.some((model) => model.id === configuration.selectedModelId)) return;
+  const defaultModel = configuration.models.find((model) => model.isDefault) ?? configuration.models[0] ?? null;
+  configuration.selectedModelId = defaultModel?.id ?? null;
+  configuration.selectedReasoningEffort = defaultModel ? defaultReasoningEffort(defaultModel) : null;
 }
 
 function selectedModelFromCatalog(): BackendModelOption | null {
@@ -1607,124 +1754,55 @@ function subscribeToMainEvents(): void {
       bufferedMainEvents.push(event);
       return;
     }
+    if (isBackendMainEvent(event)) {
+      if (event.seq <= lastBackendEventSeq) return;
+      if (event.seq !== lastBackendEventSeq + 1) {
+        bufferedMainEvents = [event];
+        void synchronizeRendererSnapshotRequest?.().catch((error) => {
+          connectionState.value = { status: 'error', detail: error instanceof Error ? error.message : String(error) };
+        });
+        return;
+      }
+      lastBackendEventSeq = event.seq;
+    }
     handleMainEvent(event);
   });
 }
 
 function handleMainEvent(event: MainToRendererEvent, adoptSnapshot = true): void {
+  if (event.type === 'client.connectionChanged' && isBackendConnectionState(event.payload)) {
+    connectionState.value = event.payload;
+  }
   if (adoptSnapshot) adoptSnapshotFromMainEvent(event);
-  syncBackendApprovalsFromMainEvent(event);
   syncAnsweredClientRequestsFromMainEvent(event);
   syncComposerModeFromMainEvent(event);
   syncSidePanelFromMainEvent(event);
   if (event.type === 'skills.changed') void loadBackendSkillsForActiveAgent();
 }
 
-function syncBackendApprovalsFromMainEvent(event: MainToRendererEvent): void {
-  if (event.type === 'backendApproval.requested') {
-    const approval = backendApprovalRequest(event.payload);
-    if (!event.agentId || !approval) return;
-    const approvals = backendApprovalsByAgentId.value[event.agentId] ?? [];
-    backendApprovalsByAgentId.value = {
-      ...backendApprovalsByAgentId.value,
-      [event.agentId]: [
-        ...approvals.filter((candidate) => candidate.id !== approval.id),
-        approval,
-      ],
-    };
-    return;
-  }
+function isBackendMainEvent(event: MainToRendererEvent): boolean {
+  return event.source === 'backend' || (
+    event.source === undefined &&
+    event.type !== 'browser.annotationCreated' &&
+    event.type !== 'client.connectionChanged'
+  );
+}
 
-  if (event.type !== 'backendApproval.resolved') return;
-  const approval = backendApprovalRequest(event.payload);
-  if (!approval) return;
-  removeBackendApproval(event.agentId, approval.id);
-  markClientRequestAnswered(approval.id);
+function isBackendConnectionState(value: unknown): value is BackendConnectionState {
+  return isRecord(value) &&
+    (value.status === 'connecting' || value.status === 'connected' || value.status === 'reconnecting' || value.status === 'error') &&
+    (value.detail === undefined || typeof value.detail === 'string');
 }
 
 function syncAnsweredClientRequestsFromMainEvent(event: MainToRendererEvent): void {
-  if (event.type !== 'clientRequest.resolved' || !isRecord(event.payload)) return;
-  const id = event.payload.id;
-  if (typeof id === 'string' && id) markClientRequestAnswered(id);
-}
-
-function removeBackendApproval(agentId: string | undefined, approvalId: string): void {
-  const next = { ...backendApprovalsByAgentId.value };
-  const agentIds = agentId ? [agentId] : Object.keys(next);
-  for (const candidateAgentId of agentIds) {
-    const approvals = next[candidateAgentId];
-    if (!approvals) continue;
-    const remaining = approvals.filter((approval) => approval.id !== approvalId);
-    if (remaining.length > 0) next[candidateAgentId] = remaining;
-    else delete next[candidateAgentId];
-  }
-  backendApprovalsByAgentId.value = next;
-}
-
-function backendApprovalRequest(payload: unknown): BackendApprovalRequest | null {
-  if (!isRecord(payload) || !isRecord(payload.approval)) return null;
-  const approval = payload.approval;
   if (
-    typeof approval.id !== 'string' ||
-    (approval.kind !== 'command' && approval.kind !== 'file-change' && approval.kind !== 'permissions') ||
-    typeof approval.conversationId !== 'string' ||
-    typeof approval.itemId !== 'string' ||
-    typeof approval.title !== 'string' ||
-    !optionalString(approval.turnId) ||
-    !optionalString(approval.description) ||
-    !optionalString(approval.command) ||
-    !optionalString(approval.cwd) ||
-    (approval.canDeny !== undefined && typeof approval.canDeny !== 'boolean') ||
-    !backendApprovalScopes(approval.allowedScopes) ||
-    !backendRequestedPermissions(approval.requestedPermissions)
-  ) {
-    return null;
-  }
-
-  return {
-    id: approval.id,
-    kind: approval.kind,
-    conversationId: approval.conversationId,
-    itemId: approval.itemId,
-    title: approval.title,
-    ...(approval.turnId === undefined ? {} : { turnId: approval.turnId }),
-    ...(approval.description === undefined ? {} : { description: approval.description }),
-    ...(approval.command === undefined ? {} : { command: approval.command }),
-    ...(approval.cwd === undefined ? {} : { cwd: approval.cwd }),
-    ...(approval.requestedPermissions === undefined
-      ? {}
-      : { requestedPermissions: approval.requestedPermissions.map((permission) => ({ ...permission })) }),
-    ...(approval.allowedScopes === undefined ? {} : { allowedScopes: [...approval.allowedScopes] }),
-    ...(approval.canDeny === undefined ? {} : { canDeny: approval.canDeny }),
-  };
-}
-
-function optionalString(value: unknown): value is string | undefined {
-  return value === undefined || typeof value === 'string';
-}
-
-function backendApprovalScopes(value: unknown): value is BackendApprovalScope[] | undefined {
-  return value === undefined || (
-    Array.isArray(value) && value.every((scope) => scope === 'once' || scope === 'session')
-  );
-}
-
-function backendRequestedPermissions(
-  value: unknown,
-): value is BackendApprovalRequest['requestedPermissions'] {
-  return value === undefined || (
-    Array.isArray(value) && value.every((permission) => {
-      if (!isRecord(permission) || typeof permission.kind !== 'string') return false;
-      if (permission.kind === 'filesystem') {
-        return (permission.access === 'read' || permission.access === 'write' || permission.access === 'deny')
-          && typeof permission.path === 'string';
-      }
-      return permission.kind === 'network'
-        && typeof permission.enabled === 'boolean'
-        && optionalString(permission.host)
-        && optionalString(permission.protocol);
-    })
-  );
+    (event.type !== 'clientRequest.resolved' && event.type !== 'backendApproval.resolved') ||
+    !isRecord(event.payload)
+  ) return;
+  const id = event.type === 'backendApproval.resolved' && isRecord(event.payload.approval)
+    ? event.payload.approval.id
+    : event.payload.id;
+  if (typeof id === 'string' && id) markClientRequestAnswered(id);
 }
 
 function adoptSnapshotFromMainEvent(event: MainToRendererEvent): void {
@@ -1745,6 +1823,17 @@ function adoptBackgroundSnapshot(nextSnapshot: AppSnapshot): void {
     selectAgentInSnapshot(nextSnapshot, activeAgentId);
   }
   snapshot.value = nextSnapshot;
+}
+
+function adoptNavigationSnapshot(nextSnapshot: AppSnapshot): void {
+  const previousAgentId = snapshot.value.activeAgentId;
+  rememberActiveComposerConfiguration();
+  snapshot.value = nextSnapshot;
+  if (nextSnapshot.activeAgentId && nextSnapshot.activeAgentId !== previousAgentId) {
+    restoreComposerConfiguration(nextSnapshot.activeAgentId);
+  } else if (!nextSnapshot.activeAgentId) {
+    clearActiveComposerConfiguration();
+  }
 }
 
 async function loadActiveAgentCatalogs(agentId = snapshot.value.activeAgentId): Promise<void> {
@@ -1822,105 +1911,106 @@ async function loadWorkItemsForRepository(provider: WorkProviderKind, repository
 }
 
 async function loadBackendModelsForActiveAgent(agentId = snapshot.value.activeAgentId, allowConcurrent = false): Promise<void> {
+  if (agentId && agentId === snapshot.value.activeAgentId) rememberActiveComposerConfiguration();
+  const configuration = agentId ? composerConfiguration(agentId) : null;
   if (!agentId || !window.codexClaw?.listBackendModels) {
-    if (agentId === snapshot.value.activeAgentId) {
-      backendModels.value = [];
-      modelCatalogStatus.value = 'notLoaded';
+    if (configuration) {
+      configuration.models = [];
+      configuration.modelStatus = 'notLoaded';
+      if (agentId && agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
     }
     return;
   }
 
-  if (!allowConcurrent && modelCatalogStatus.value === 'loading') return;
+  if (!allowConcurrent && configuration?.modelStatus === 'loading') return;
 
-  if (agentId === snapshot.value.activeAgentId) {
-    modelCatalogStatus.value = 'loading';
-    modelCatalogError.value = null;
-  }
+  configuration!.modelStatus = 'loading';
+  configuration!.modelError = null;
+  if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
 
   try {
     const models = await window.codexClaw.listBackendModels(agentId);
-    if (agentId !== snapshot.value.activeAgentId) return;
-    backendModels.value = models;
-    modelCatalogStatus.value = 'loaded';
-    selectDefaultModelIfNeeded();
+    configuration!.models = models;
+    configuration!.modelStatus = 'loaded';
+    selectDefaultModelForConfiguration(configuration!);
+    if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
   } catch (error) {
-    if (agentId !== snapshot.value.activeAgentId) return;
-    backendModels.value = [];
-    modelCatalogStatus.value = 'error';
-    modelCatalogError.value = error instanceof Error ? error.message : String(error);
+    configuration!.models = [];
+    configuration!.modelStatus = 'error';
+    configuration!.modelError = error instanceof Error ? error.message : String(error);
+    if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
   }
 }
 
 async function loadBackendSkillsForActiveAgent(agentId = snapshot.value.activeAgentId, allowConcurrent = false): Promise<void> {
+  if (agentId && agentId === snapshot.value.activeAgentId) rememberActiveComposerConfiguration();
+  const configuration = agentId ? composerConfiguration(agentId) : null;
   if (!agentId || !window.codexClaw?.listBackendSkills) {
-    if (!agentId) {
-      backendSkills.value = [];
-      skillCatalogStatus.value = 'notLoaded';
+    if (configuration) {
+      configuration.skills = [];
+      configuration.skillStatus = 'notLoaded';
+      if (agentId && agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
     }
     return;
   }
 
-  if (!allowConcurrent && skillCatalogStatus.value === 'loading') return;
+  if (!allowConcurrent && configuration?.skillStatus === 'loading') return;
 
-  if (agentId === snapshot.value.activeAgentId) {
-    skillCatalogStatus.value = 'loading';
-    skillCatalogError.value = null;
-  }
+  configuration!.skillStatus = 'loading';
+  configuration!.skillError = null;
+  if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
 
   try {
     const skills = await window.codexClaw.listBackendSkills(agentId);
-    if (agentId !== snapshot.value.activeAgentId) return;
-    backendSkills.value = skills;
-    skillCatalogStatus.value = 'loaded';
+    configuration!.skills = skills;
+    configuration!.skillStatus = 'loaded';
+    if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
   } catch (error) {
-    if (agentId !== snapshot.value.activeAgentId) return;
-    backendSkills.value = [];
-    skillCatalogStatus.value = 'error';
-    skillCatalogError.value = error instanceof Error ? error.message : String(error);
+    configuration!.skills = [];
+    configuration!.skillStatus = 'error';
+    configuration!.skillError = error instanceof Error ? error.message : String(error);
+    if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
   }
 }
 
 async function loadAgentFilesForActiveAgent(agentId = snapshot.value.activeAgentId, allowConcurrent = false): Promise<void> {
+  if (agentId && agentId === snapshot.value.activeAgentId) rememberActiveComposerConfiguration();
+  const configuration = agentId ? composerConfiguration(agentId) : null;
   if (!agentId || !window.codexClaw?.listAgentFiles) {
-    if (agentId === snapshot.value.activeAgentId) {
-      agentFiles.value = [];
-      fileCatalogStatus.value = 'notLoaded';
+    if (configuration) {
+      configuration.files = [];
+      configuration.fileStatus = 'notLoaded';
+      if (agentId && agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
     }
     return;
   }
 
-  if (!allowConcurrent && fileCatalogStatus.value === 'loading') return;
+  if (!allowConcurrent && configuration?.fileStatus === 'loading') return;
 
-  if (agentId === snapshot.value.activeAgentId) {
-    fileCatalogStatus.value = 'loading';
-    fileCatalogError.value = null;
-  }
+  configuration!.fileStatus = 'loading';
+  configuration!.fileError = null;
+  if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
 
   try {
     const files = await window.codexClaw.listAgentFiles(agentId);
-    if (agentId !== snapshot.value.activeAgentId) return;
-    agentFiles.value = files;
-    fileCatalogStatus.value = 'loaded';
+    configuration!.files = files;
+    configuration!.fileStatus = 'loaded';
+    if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
   } catch (error) {
-    if (agentId !== snapshot.value.activeAgentId) return;
-    agentFiles.value = [];
-    fileCatalogStatus.value = 'error';
-    fileCatalogError.value = error instanceof Error ? error.message : String(error);
+    configuration!.files = [];
+    configuration!.fileStatus = 'error';
+    configuration!.fileError = error instanceof Error ? error.message : String(error);
+    if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
   }
 }
 
 function syncComposerModeFromMainEvent(event: MainToRendererEvent): void {
-  if (event.agentId && event.agentId !== snapshot.value.activeAgentId) {
-    return;
-  }
-
   if (event.type === 'thread.modeUpdated' && isRecord(event.payload)) {
     const mode = event.payload.mode;
-    if (mode === 'plan') {
-      planMode.value = true;
-    } else if (mode === 'default') {
-      planMode.value = false;
-    }
+    const agentId = event.agentId ?? snapshot.value.activeAgentId;
+    if (!agentId || (mode !== 'plan' && mode !== 'default')) return;
+    composerConfiguration(agentId).planMode = mode === 'plan';
+    if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
     return;
   }
 

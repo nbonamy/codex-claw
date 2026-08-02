@@ -94,6 +94,31 @@ describe('ClawBackendSocketClient', () => {
       result: true,
     });
   });
+
+  it('reports disconnects and can reconnect using a fresh socket', async () => {
+    const firstSocket = createFakeSocket();
+    const secondSocket = createFakeSocket();
+    const connectSocket = vi.fn()
+      .mockReturnValueOnce(firstSocket)
+      .mockReturnValueOnce(secondSocket);
+    const client = new ClawBackendSocketClient({ socketPath: '/tmp/clawd.sock', connectSocket });
+    const connectionListener = vi.fn();
+    client.onConnectionState(connectionListener);
+
+    const firstStart = client.start();
+    firstSocket.emit('connect');
+    await firstStart;
+    firstSocket.emit('close');
+
+    expect(connectionListener).toHaveBeenNthCalledWith(1, 'connected', undefined);
+    expect(connectionListener).toHaveBeenNthCalledWith(2, 'disconnected', expect.any(Error));
+
+    const secondStart = client.start();
+    secondSocket.emit('connect');
+    await secondStart;
+    expect(connectionListener).toHaveBeenNthCalledWith(3, 'connected', undefined);
+    expect(connectSocket).toHaveBeenCalledTimes(2);
+  });
 });
 
 async function flushMicrotasks(): Promise<void> {

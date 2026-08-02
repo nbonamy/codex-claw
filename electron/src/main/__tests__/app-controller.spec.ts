@@ -193,6 +193,61 @@ describe('AppController', () => {
     expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'working' });
   });
 
+  it('reconnects the selected backend transport and refreshes its snapshot after disconnect', async () => {
+    vi.useFakeTimers();
+    const initialSnapshot = createInitialSnapshot();
+    const reconnectedSnapshot = createInitialSnapshot();
+    reconnectedSnapshot.agents[0]!.status = { type: 'working' };
+    const clientState: ClientState = { sourceFolderPath: '', shouldPreventDisplaySleep: false };
+    let connectionListener: (state: 'connected' | 'disconnected', error?: Error) => void = () => undefined;
+    let snapshotReads = 0;
+    const backendClient: NonNullable<ConstructorParameters<typeof AppController>[1]> = {
+      start: vi.fn().mockResolvedValue(undefined),
+      health: vi.fn().mockResolvedValue({ ok: true, name: 'clawd', version: '0.1.0', pid: 123 }),
+      request: vi.fn(async (method: string) => {
+        if (method === 'snapshot/get') {
+          snapshotReads += 1;
+          return {
+            snapshot: snapshotReads === 1 ? initialSnapshot : reconnectedSnapshot,
+            lastEventSeq: 0,
+            clientState,
+          };
+        }
+        return {};
+      }) as NonNullable<ConstructorParameters<typeof AppController>[1]>['request'],
+      onEvent: vi.fn(() => () => undefined),
+      onConnectionState: vi.fn((listener) => {
+        connectionListener = listener;
+        return () => undefined;
+      }),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const controller = new AppController(initialSnapshot, backendClient);
+    const send = vi.fn();
+    setMainWindowSend(controller, send);
+    await controller.initialize();
+    send.mockClear();
+
+    connectionListener('disconnected', new Error('socket closed'));
+    expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
+      type: 'client.connectionChanged',
+      payload: expect.objectContaining({ status: 'reconnecting', detail: 'socket closed' }),
+    }));
+
+    await vi.advanceTimersByTimeAsync(250);
+    expect(backendClient.start).toHaveBeenCalledTimes(2);
+    expect(currentSnapshot(controller)).toBe(reconnectedSnapshot);
+    expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
+      type: 'client.connectionChanged',
+      payload: { status: 'connected' },
+    }));
+    expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
+      type: 'snapshot.updated',
+      snapshot: reconnectedSnapshot,
+    }));
+    await controller.shutdown();
+  });
+
   it('caches authoritative snapshots from backend events emitted by the clawd process client', async () => {
     const snapshot = createInitialSnapshot();
     const backendSnapshot = createInitialSnapshot();
@@ -209,7 +264,7 @@ describe('AppController', () => {
     setMainWindowSend(controller, send);
     await controller.initialize();
     emitBackendEvent({
-      seq: 42,
+      seq: 1,
       backend: 'codex',
       agentId: 'agent-dina',
       type: 'agent.statusChanged',
@@ -225,7 +280,7 @@ describe('AppController', () => {
 
     expect(currentSnapshot(controller)).toBe(backendSnapshot);
     expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
-      seq: 42,
+      seq: 1,
       backend: 'codex',
       agentId: 'agent-dina',
       type: 'agent.statusChanged',
@@ -253,7 +308,7 @@ describe('AppController', () => {
     (controller as unknown as {
       emitBackendEvent(event: ClawBackendEvent): void;
     }).emitBackendEvent({
-      seq: 43,
+      seq: 1,
       type: 'snapshot.updated',
       payload: payloadSnapshot,
       occurredAt: '2026-06-13T00:00:00.000Z',
@@ -262,7 +317,7 @@ describe('AppController', () => {
     expect(currentSnapshot(controller)).toBe(snapshot);
     expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'working' });
     expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
-      seq: 43,
+      seq: 1,
       type: 'snapshot.updated',
       payload: payloadSnapshot,
     }));
@@ -278,7 +333,7 @@ describe('AppController', () => {
     (controller as unknown as {
       emitBackendEvent(event: ClawBackendEvent): void;
     }).emitBackendEvent({
-      seq: 44,
+      seq: 1,
       type: 'snapshot.updated',
       payload: {},
       occurredAt: '2026-06-13T00:00:00.000Z',
@@ -290,7 +345,7 @@ describe('AppController', () => {
 
     expect(currentSnapshot(controller)).toBe(snapshot);
     expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
-      seq: 44,
+      seq: 1,
       type: 'snapshot.updated',
     }));
   });
@@ -1462,9 +1517,7 @@ describe('AppController', () => {
     const controller = new AppController(snapshot, createBackendClient());
     await controller.initialize();
     const send = vi.fn();
-    (controller as unknown as {
-      mainWindow: { webContents: { send: ReturnType<typeof vi.fn> } };
-    }).mainWindow = { webContents: { send } };
+    setMainWindowSend(controller, send);
     const diff = [
       'diff --git a/src/main.ts b/src/main.ts',
       '--- a/src/main.ts',
@@ -1501,9 +1554,7 @@ describe('AppController', () => {
     const controller = new AppController(snapshot, createBackendClient());
     await controller.initialize();
     const send = vi.fn();
-    (controller as unknown as {
-      mainWindow: { webContents: { send: ReturnType<typeof vi.fn> } };
-    }).mainWindow = { webContents: { send } };
+    setMainWindowSend(controller, send);
 
     emitBackendEvent(controller, {
       agentId: 'agent-dina',

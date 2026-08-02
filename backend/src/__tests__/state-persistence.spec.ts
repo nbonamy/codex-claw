@@ -23,6 +23,23 @@ describe('AppStatePersistence', () => {
     await expect(persistence.load()).resolves.toStrictEqual(createEmptySnapshot());
   });
 
+  it('serializes overlapping saves and snapshots each write at invocation time', async () => {
+    const filePath = await tempStatePath();
+    const persistence = new AppStatePersistence(filePath);
+    const first = createInitialSnapshot();
+    first.general.agentListCompact = false;
+    const second = createInitialSnapshot();
+    second.general.agentListCompact = true;
+
+    const firstSave = persistence.save(first);
+    first.general.agentListCompact = true;
+    const secondSave = persistence.save(second);
+    await Promise.all([firstSave, secondSave]);
+
+    const written = JSON.parse(await readFile(filePath, 'utf8')) as { general: { agentListCompact: boolean } };
+    expect(written.general.agentListCompact).toBe(true);
+  });
+
   it('keeps persisted empty agents empty while defaulting missing teams', () => {
     const restored = snapshotFromPersistedState({
       teams: [],

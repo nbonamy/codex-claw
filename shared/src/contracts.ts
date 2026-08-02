@@ -834,6 +834,10 @@ export type AgentQueuedPrompt = {
   text: string;
   createdAt: string;
   options?: SendPromptOptions;
+  attempts?: number;
+  lastError?: string;
+  retryAt?: string;
+  submitted?: boolean;
 };
 
 export type AgentGitStatus = {
@@ -868,6 +872,7 @@ export type AppSnapshot = {
   activeAgentId: string | null;
   messages: RendererMessage[];
   queuedPrompts?: AgentQueuedPrompt[];
+  backendApprovals: Record<string, BackendApprovalRequest[]>;
   agentGitStatuses: Record<string, AgentGitStatus>;
   turnGitDiffs: Record<string, TurnGitDiff>;
   backendRuntimes: BackendRuntimeStatus[];
@@ -886,8 +891,20 @@ export type BackendRuntimeStatus = {
   capabilities?: Partial<BackendCapabilities>;
 };
 
+export type BackendConnectionState = {
+  status: 'connecting' | 'connected' | 'reconnecting' | 'error';
+  detail?: string;
+};
+
+export type RendererSnapshotState = {
+  snapshot: AppSnapshot;
+  lastBackendEventSeq: number;
+  connection: BackendConnectionState;
+};
+
 export type MainToRendererEvent = {
   seq: number;
+  source?: 'backend' | 'client';
   agentId?: string;
   backend?: AgentBackend;
   backendSessionId?: string;
@@ -896,6 +913,7 @@ export type MainToRendererEvent = {
   turnId?: string;
   type:
     | 'backend.statusChanged'
+    | 'client.connectionChanged'
     | 'agent.updated'
     | 'snapshot.updated'
     | 'agent.statusChanged'
@@ -914,6 +932,7 @@ export type MainToRendererEvent = {
     | 'message.userSubmitted'
     | 'message.steer'
     | 'agent.promptQueued'
+    | 'agent.promptRetryScheduled'
     | 'agent.promptDequeued'
     | 'context.compactionStarted'
     | 'context.compactionCompleted'
@@ -1068,6 +1087,7 @@ export type ClientRequestResponse = {
 
 export type CodexClawApi = {
   getSnapshot(): Promise<AppSnapshot>;
+  getSnapshotState(): Promise<RendererSnapshotState>;
   listSshHosts(): Promise<SshHostCandidate[]>;
   addSshConnection(input: AddSshConnectionInput): Promise<AppSnapshot>;
   checkRemoteConnection(connectionId: string): Promise<AppSnapshot>;
@@ -1141,6 +1161,7 @@ export type CodexClawApi = {
   setDaemonEnabled(enabled: boolean): Promise<ClawdDaemonStatus>;
   getSystemPermissions(): Promise<SystemPermissionsStatus>;
   openAccessibilitySettings(): Promise<SystemPermissionsStatus>;
+  launchChatGptApp(): Promise<void>;
   quit(): Promise<void>;
   restartApp(): Promise<void>;
   setAgentGoal(agentId: string, objective: string): Promise<AppSnapshot>;

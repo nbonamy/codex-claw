@@ -26,6 +26,7 @@ export class ClawBackendSocketClient {
   private nextRequestId = 1;
   private readonly pending = new Map<ClawRpcId, PendingRequest>();
   private readonly eventListeners = new Set<(event: ClawBackendEvent) => void>();
+  private readonly connectionStateListeners = new Set<(state: 'connected' | 'disconnected', error?: Error) => void>();
 
   constructor(private readonly options: ClawBackendSocketClientOptions) {
     this.connectSocket = options.connectSocket ?? net.createConnection;
@@ -41,19 +42,15 @@ export class ClawBackendSocketClient {
     const socket = this.connectSocket(this.options.socketPath);
     this.socket = socket;
     socket.on('data', (chunk) => this.handleData(chunk));
-    socket.once('close', () => {
-      this.socket = null;
-      this.rejectPending(new Error('clawd socket closed.'));
-    });
-    socket.once('error', (error) => {
-      this.socket = null;
-      this.rejectPending(error);
-    });
+    socket.once('close', () => this.handleDisconnect(socket, new Error('clawd socket closed.')));
+    socket.once('error', (error) => this.handleDisconnect(socket, error));
 
     await new Promise<void>((resolve, reject) => {
       socket.once('connect', resolve);
       socket.once('error', reject);
     });
+    this.buffer = '';
+    this.emitConnectionState('connected');
   }
 
   async health(): Promise<ClawBackendHealth> {
@@ -92,6 +89,11 @@ export class ClawBackendSocketClient {
     return () => {
       this.eventListeners.delete(listener);
     };
+  }
+
+  onConnectionState(listener: (state: 'connected' | 'disconnected', error?: Error) => void): () => void {
+    this.connectionStateListeners.add(listener);
+    return () => this.connectionStateListeners.delete(listener);
   }
 
   async close(): Promise<void> {
@@ -215,6 +217,17 @@ export class ClawBackendSocketClient {
       pending.reject(error);
     }
     this.pending.clear();
+  }
+
+  private handleDisconnect(socket: Socket, error: Error): void {
+    if (this.socket !== socket) return;
+    this.socket = null;
+    this.rejectPending(error);
+    this.emitConnectionState('disconnected', error);
+  }
+
+  private emitConnectionState(state: 'connected' | 'disconnected', error?: Error): void {
+    for (const listener of this.connectionStateListeners) listener(state, error);
   }
 
   private writeResponse(response: ClawRpcResponse): void {

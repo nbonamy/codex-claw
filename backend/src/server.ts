@@ -24,6 +24,7 @@ import { RemoteClawdClientManager } from './connections/remote-clawd-client';
 import { SshConnectionService } from './connections/ssh-connections';
 import type { LoopRunner } from './loops/runner';
 import type { WorkIntegrationManager } from './work-integrations/manager';
+import { warnMain } from './log';
 
 export type ClawBackendServerOptions = {
   version: string;
@@ -79,6 +80,7 @@ export class ClawBackendServer {
   private readonly remoteClients: RemoteClawdClientManager;
   private readonly clientRequestOwners = new Map<string, { backend: AgentBackend; remoteConnectionId?: string }>();
   private readonly remoteSnapshots = new Map<string, AppSnapshot>();
+  private readonly queuedPromptRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private unsubscribeDriverEvents?: () => void;
   private lastEventSeq = 0;
 
@@ -584,6 +586,7 @@ export class ClawBackendServer {
         const agentId = requireString(params.agentId, 'agentId');
         const promptId = requireString(params.promptId, 'promptId');
         return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentQueuedPromptDelete, { agentId, promptId }, async () => {
+          this.clearQueuedPromptRetry(promptId);
           this.applyAndEmitBackendEvent({ agentId, type: 'agent.promptDequeued', payload: { ids: [promptId] } });
           return this.snapshot;
         });
@@ -596,11 +599,12 @@ export class ClawBackendServer {
           const queuedPrompt = (this.snapshot.queuedPrompts ?? []).find((prompt) => prompt.agentId === agentId && prompt.id === promptId);
           if (!queuedPrompt) return this.snapshot;
           if ((queuedPrompt.options?.attachments?.length ?? 0) > 0) return this.snapshot;
-          if (agent.status.type === 'idle') {
+          if (canDrainQueuedPrompt(agent.status.type)) {
             return this.startAgentPrompt(agent, queuedPrompt.text, queuedPrompt.options, queuedPrompt.id);
           }
           const result = await this.handleAgentDriverRequest(agent, backendMethods.driverPromptSteer, { agent, prompt: queuedPrompt.text }) as BackendSendResult;
           agent.backendSession = result.backendSession;
+          this.clearQueuedPromptRetry(promptId);
           this.applyAndEmitBackendEvent({ agentId, type: 'agent.promptDequeued', payload: { ids: [promptId] } });
           this.applyAndEmitBackendEvent({
             agentId,
@@ -1182,6 +1186,8 @@ export class ClawBackendServer {
   }
 
   async close(): Promise<void> {
+    for (const timer of this.queuedPromptRetryTimers.values()) clearTimeout(timer);
+    this.queuedPromptRetryTimers.clear();
     this.unsubscribeDriverEvents?.();
     await this.driverRpc?.close();
     await this.remoteClients.close();
@@ -1698,10 +1704,15 @@ export class ClawBackendServer {
 
   private startAgentPrompt(agent: Agent, prompt: string, options?: SendPromptOptions, queuedPromptId?: string): AppSnapshot {
     const agentId = agent.id;
+    if (queuedPromptId) this.clearQueuedPromptRetry(queuedPromptId);
+    const queuedPrompt = queuedPromptId
+      ? (this.snapshot.queuedPrompts ?? []).find((candidate) => candidate.id === queuedPromptId)
+      : undefined;
 
     return sendAgentPrompt(this.snapshot, this.backendDriverForAgent(agent), agentId, prompt, options, (event) => {
       this.applyAndEmitBackendEvent(event);
     }, {
+      appendUserMessage: !queuedPrompt || (!queuedPrompt.submitted && (queuedPrompt.attempts ?? 0) === 0),
       onBackendSessionUpdated: async (_result, wasNewSession) => {
         await this.setNewConversationTitle(agentId, wasNewSession);
         await this.persistSnapshotOnly();
@@ -1715,15 +1726,59 @@ export class ClawBackendServer {
           });
         }
       },
+      onPromptFailed: (error) => {
+        if (queuedPromptId) this.scheduleQueuedPromptRetry(agentId, queuedPromptId, error);
+      },
     });
   }
 
   private drainQueuedPrompt(agentId: string): void {
     const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent || agent.status.type !== 'idle') return;
+    if (!agent || !canDrainQueuedPrompt(agent.status.type)) return;
     const queuedPrompt = (this.snapshot.queuedPrompts ?? []).find((prompt) => prompt.agentId === agentId);
     if (!queuedPrompt) return;
+    if (queuedPrompt.retryAt) {
+      const retryDelay = Date.parse(queuedPrompt.retryAt) - Date.now();
+      if (retryDelay > 0) {
+        this.installQueuedPromptRetry(agentId, queuedPrompt.id, retryDelay);
+        return;
+      }
+    }
     this.startAgentPrompt(agent, queuedPrompt.text, queuedPrompt.options, queuedPrompt.id);
+  }
+
+  private scheduleQueuedPromptRetry(agentId: string, promptId: string, error: Error): void {
+    const queuedPrompt = (this.snapshot.queuedPrompts ?? []).find((prompt) => prompt.agentId === agentId && prompt.id === promptId);
+    if (!queuedPrompt) return;
+    const attempts = (queuedPrompt.attempts ?? 0) + 1;
+    const retryDelay = Math.min(30_000, 1_000 * (2 ** Math.min(attempts - 1, 5)));
+    const retryAt = new Date(Date.now() + retryDelay).toISOString();
+    this.applyAndEmitBackendEvent({
+      agentId,
+      type: 'agent.promptRetryScheduled',
+      payload: { id: promptId, attempts, lastError: error.message, retryAt },
+    });
+    this.installQueuedPromptRetry(agentId, promptId, retryDelay);
+  }
+
+  private installQueuedPromptRetry(agentId: string, promptId: string, delay: number): void {
+    if (this.queuedPromptRetryTimers.has(promptId)) return;
+    const timer = setTimeout(() => {
+      this.queuedPromptRetryTimers.delete(promptId);
+      const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+      const head = (this.snapshot.queuedPrompts ?? []).find((prompt) => prompt.agentId === agentId);
+      if (agent && canDrainQueuedPrompt(agent.status.type) && head?.id === promptId) {
+        this.startAgentPrompt(agent, head.text, head.options, head.id);
+      }
+    }, Math.max(0, delay));
+    timer.unref?.();
+    this.queuedPromptRetryTimers.set(promptId, timer);
+  }
+
+  private clearQueuedPromptRetry(promptId: string): void {
+    const timer = this.queuedPromptRetryTimers.get(promptId);
+    if (timer) clearTimeout(timer);
+    this.queuedPromptRetryTimers.delete(promptId);
   }
 
   private backendDriverForAgent(agent: Agent): AgentBackendDriver {
@@ -2056,8 +2111,19 @@ export class ClawBackendServer {
     if (event.type === 'turn.completed' && event.agentId) {
       this.drainQueuedPrompt(event.agentId);
     }
+    if (event.type === 'agent.promptQueued' && event.agentId) {
+      this.drainQueuedPrompt(event.agentId);
+    }
     if (options.persist !== false && shouldPersistSnapshotForEvent(event)) {
-      void this.saveSnapshot?.(this.snapshot);
+      const persistence = this.saveSnapshot?.(this.snapshot);
+      if (persistence) {
+        void persistence.catch((error) => {
+          warnMain('state', 'failed to persist backend event snapshot', {
+            eventType: event.type,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        });
+      }
     }
     if (event.agentId && shouldRefreshGitStatusForEvent(event)) {
       void this.refreshAgentGitStatus(event.agentId);
@@ -2176,6 +2242,10 @@ export class ClawBackendServer {
       });
     }
   }
+}
+
+function canDrainQueuedPrompt(status: Agent['status']['type']): boolean {
+  return status !== 'starting' && status !== 'working' && status !== 'awaitingInput';
 }
 
 function requireBacklogConfiguration(params: unknown): WorkBacklogConfigurationInput {

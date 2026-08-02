@@ -864,6 +864,16 @@ shared reducer, and never written back to disk by Electron. Renderer code keeps
 UI-only state and the volatile product replica; neither Electron nor renderer
 owns durable product state.
 
+State and provider-token writes are serialized and use a same-directory
+temporary file followed by atomic rename. A newer mutation cannot be
+overwritten by an older slow write, and a partial write cannot replace the last
+valid file.
+
+Active turns, pending approvals, and queued prompts live in the running
+`clawd` snapshot. Queue delivery removes an item only after backend acceptance;
+transport failures retain the FIFO head, record the failure, and retry with
+bounded exponential backoff without appending duplicate user messages.
+
 Local migration path:
 
 1. `clawd` creates `~/.codex-claw` on startup and treats it as the backend

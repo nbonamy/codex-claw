@@ -1,1 +1,1 @@
-export type SettingsTab = 'appearance' | 'connections' | 'general' | 'integrations';
+export type SettingsTab = 'appearance' | 'chatgpt' | 'connections' | 'general' | 'integrations';

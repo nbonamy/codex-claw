@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { WorkIntegrationTokenStore, WorkProviderToken } from '@codex-claw/shared/work-integration-tokens';
@@ -8,6 +8,8 @@ type PersistedTokenFile = {
 };
 
 export class FileWorkIntegrationTokenStore implements WorkIntegrationTokenStore {
+  private operationChain: Promise<void> = Promise.resolve();
+
   constructor(private readonly filePath: string) {}
 
   canStoreTokens(): boolean {
@@ -15,28 +17,30 @@ export class FileWorkIntegrationTokenStore implements WorkIntegrationTokenStore 
   }
 
   async get(provider: WorkProviderKind): Promise<WorkProviderToken | null> {
+    await this.operationChain;
     const file = await this.readTokenFile();
     const token = file.tokens?.[provider];
     return token ? { ...token } : null;
   }
 
-  async set(token: WorkProviderToken): Promise<void> {
-    const file = await this.readTokenFile();
-    file.tokens = {
-      ...file.tokens,
-      [token.provider]: { ...token },
-    };
-    await this.writeTokenFile(file);
+  set(token: WorkProviderToken): Promise<void> {
+    return this.runExclusive(async () => {
+      const file = await this.readTokenFile();
+      file.tokens = {
+        ...file.tokens,
+        [token.provider]: { ...token },
+      };
+      await this.writeTokenFile(file);
+    });
   }
 
-  async delete(provider: WorkProviderKind): Promise<void> {
-    const file = await this.readTokenFile();
-    if (!file.tokens?.[provider]) {
-      return;
-    }
-
-    delete file.tokens[provider];
-    await this.writeTokenFile(file);
+  delete(provider: WorkProviderKind): Promise<void> {
+    return this.runExclusive(async () => {
+      const file = await this.readTokenFile();
+      if (!file.tokens?.[provider]) return;
+      delete file.tokens[provider];
+      await this.writeTokenFile(file);
+    });
   }
 
   private async readTokenFile(): Promise<PersistedTokenFile> {
@@ -54,8 +58,22 @@ export class FileWorkIntegrationTokenStore implements WorkIntegrationTokenStore 
   }
 
   private async writeTokenFile(file: PersistedTokenFile): Promise<void> {
-    await mkdir(path.dirname(this.filePath), { recursive: true });
-    await writeFile(this.filePath, `${JSON.stringify(file, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+    await mkdir(path.dirname(this.filePath), { recursive: true, mode: 0o700 });
+    const temporaryPath = `${this.filePath}.${process.pid}.tmp`;
+    try {
+      await writeFile(temporaryPath, `${JSON.stringify(file, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+      await rename(temporaryPath, this.filePath);
+    } finally {
+      await unlink(temporaryPath).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT') throw error;
+      });
+    }
+  }
+
+  private runExclusive(operation: () => Promise<void>): Promise<void> {
+    const result = this.operationChain.then(operation);
+    this.operationChain = result.catch(() => undefined);
+    return result;
   }
 }
 

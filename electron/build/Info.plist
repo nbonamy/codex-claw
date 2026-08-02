@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Codex Claw connects to development services and repositories on your local network.</string>
   <key>NSMicrophoneUsageDescription</key>
   <string>Codex Claw uses the microphone to transcribe your voice into composer text.</string>
   <key>ITSAppUsesNonExemptEncryption</key>

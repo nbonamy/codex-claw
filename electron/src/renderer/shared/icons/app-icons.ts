@@ -4,6 +4,7 @@ export {
   IconAffiliate as AffiliateIcon,
   IconBolt as BoltIcon,
   IconBookmark as SaveToBenchIcon,
+  IconBrandOpenai as BrandOpenaiIcon,
   IconBrandSpeedtest as BrandSpeedTest,
   IconCheck as CheckIcon,
   IconCheck as Check,

@@ -62,4 +62,27 @@ describe('FileWorkIntegrationTokenStore', () => {
 
     await expect(store.get('github')).resolves.toBeNull();
   });
+
+  it('serializes overlapping token updates so the latest operation wins cleanly', async () => {
+    const store = new FileWorkIntegrationTokenStore(path.join(tmpDir, 'provider-tokens.json'));
+
+    const first = store.set({
+      provider: 'github',
+      accessToken: 'gho_first',
+      tokenType: 'bearer',
+      connectedAt: '2026-06-11T12:00:00.000Z',
+    });
+    const second = store.set({
+      provider: 'github',
+      accessToken: 'gho_second',
+      tokenType: 'bearer',
+      connectedAt: '2026-06-11T12:01:00.000Z',
+    });
+    await Promise.all([first, second]);
+
+    await expect(store.get('github')).resolves.toMatchObject({
+      accessToken: 'gho_second',
+      connectedAt: '2026-06-11T12:01:00.000Z',
+    });
+  });
 });

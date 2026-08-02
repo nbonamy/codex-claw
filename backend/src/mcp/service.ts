@@ -27,7 +27,7 @@ import { createSourceWorktree, listSourceWorktrees } from '../git-worktrees';
 import { scanSourceRepositories } from '../source-repositories';
 import type { BackendDriverRpc } from '../driver-rpc';
 import { ClawMcpAgentCoordinator, McpToolError, type DisplayMarkdownInput, type DisplayMarkdownResponse, type MarkWorkItemCompletedResponse } from './agent-coordinator';
-import { agentMessagesPrompt } from './agent-prompts';
+import { agentMessagesPrompt, type MessageInfo } from './agent-prompts';
 import { ClawMcpHttpServer } from './http-server';
 import type { ComputerUseClient } from './computer-use-tools';
 import type { InAppBrowserClient } from './browser-tools';
@@ -150,6 +150,7 @@ export class ClawMcpService {
       (event) => this.emit(event),
       {
         onBackendSessionUpdated: () => this.emitSnapshotUpdated(agent.id),
+        onPromptFailed: () => this.emitQueuedMessages(agentId, messages, true),
         onPromptStarted: () => {
           this.coordinator.markMessagesRead(messages.map((message) => message.id));
           this.emitDequeuedMessages(agentId, messages.map((message) => message.id));
@@ -159,14 +160,14 @@ export class ClawMcpService {
     this.emitSnapshotUpdated(agent.id);
   }
 
-  private emitQueuedMessages(agentId: string, messages: Array<{ id: string; content: string }>): void {
+  private emitQueuedMessages(agentId: string, messages: Array<MessageInfo & { id: string }>, submitted = false): void {
     for (const message of messages) {
       if (this.queuedMessageIds.has(message.id)) continue;
       this.queuedMessageIds.add(message.id);
       this.emit({
         agentId,
         type: 'agent.promptQueued',
-        payload: { id: message.id, text: message.content },
+        payload: { id: message.id, text: agentMessagesPrompt([message]), ...(submitted ? { submitted: true } : {}) },
       });
     }
   }

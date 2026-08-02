@@ -2,6 +2,7 @@ import type { AppCommand, CodexClawApi, MainToRendererEvent } from './contracts'
 
 export const ipcChannels = {
   getSnapshot: 'app:get-snapshot',
+  getSnapshotState: 'app:get-snapshot-state',
   listSshHosts: 'connections:ssh-hosts:list',
   addSshConnection: 'connections:ssh:add',
   checkRemoteConnection: 'connections:remote:check',
@@ -75,6 +76,7 @@ export const ipcChannels = {
   setDaemonEnabled: 'daemon:enabled:set',
   getSystemPermissions: 'system-permissions:get',
   openAccessibilitySettings: 'system-permissions:accessibility:open',
+  launchChatGptApp: 'chatgpt:app:launch',
   quit: 'app:quit',
   restartApp: 'app:restart',
   setAgentGoal: 'agent:goal:set',

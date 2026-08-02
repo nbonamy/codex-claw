@@ -23,6 +23,25 @@ afterEach(() => {
 });
 
 describe('AppShell', () => {
+  it('keeps the workspace visible while reporting automatic clawd reconnection', () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0] ?? null,
+        messages: [],
+        isLoading: false,
+        isSending: false,
+        connectionState: { status: 'reconnecting', detail: 'socket closed' },
+      },
+      global: { plugins: [ElementPlus, i18n] },
+    });
+
+    expect(wrapper.get('.app-shell__connection-status').text()).toContain('Agents keep working in the background.');
+    expect(wrapper.get('.app-shell__connection-status').text()).toContain('socket closed');
+    expect(wrapper.find('.app-shell__content').exists()).toBe(true);
+  });
+
   it('gates the workspace and shortcuts when the isolated Codex home is signed out', async () => {
     window.codexClaw = {
       getCodexAuthentication: vi.fn().mockResolvedValue({
@@ -1855,7 +1874,7 @@ describe('AppShell', () => {
     });
   });
 
-  it('opens settings on general, remembers the last settings pane, updates appearance, and quits', async () => {
+  it('opens settings on ChatGPT, remembers the last settings pane, updates appearance, and quits', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.accountRateLimits = {
       limitId: 'codex',
@@ -1883,7 +1902,8 @@ describe('AppShell', () => {
     expect(wrapper.get('[aria-label="Account menu"]').classes()).toContain('settings-menu__trigger--active');
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.get('[aria-label="Codex Claw"]').classes()).not.toContain('team-rail__team--active');
-    expect(wrapper.text()).toContain('Accessibility');
+    expect(wrapper.text()).toContain('Manage Codex settings in ChatGPT');
+    expect(wrapper.text()).not.toContain('Accessibility');
     expect(wrapper.text()).not.toContain('Theme');
 
     await wrapper.findAll('.el-menu-item').find((item) => item.text() === 'Appearance')?.trigger('click');

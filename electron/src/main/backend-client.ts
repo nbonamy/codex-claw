@@ -8,6 +8,7 @@ import { runtimeClawdBackendMode, runtimeClawdCommand, runtimeClawdSocketPath, r
 export type ClawBackendClientPort = {
   close(): Promise<void>;
   health(): Promise<ClawBackendHealth>;
+  onConnectionState?(listener: (state: 'connected' | 'disconnected', error?: Error) => void): () => void;
   onEvent(listener: (event: ClawBackendEvent) => void): () => void;
   request<Result>(method: string, params?: unknown): Promise<Result>;
   start(): Promise<void>;
@@ -50,6 +51,12 @@ class AutoClawBackendClient implements ClawBackendClientPort {
   ) {}
 
   async start(): Promise<void> {
+    if (this.active) {
+      await this.active.start();
+      await this.active.health();
+      return;
+    }
+
     try {
       await this.socketClient.start();
       await this.socketClient.health();
@@ -74,6 +81,10 @@ class AutoClawBackendClient implements ClawBackendClientPort {
 
   onEvent(listener: (event: ClawBackendEvent) => void): () => void {
     return this.requireActive().onEvent(listener);
+  }
+
+  onConnectionState(listener: (state: 'connected' | 'disconnected', error?: Error) => void): () => void {
+    return this.requireActive().onConnectionState?.(listener) ?? (() => undefined);
   }
 
   async close(): Promise<void> {

@@ -13,8 +13,12 @@
 
     <main class="settings-view__content">
       <div class="settings-view__panel">
+        <SettingsChatGptPanel
+          v-if="activeTab === 'chatgpt'"
+          :launch-chat-gpt-app="launchChatGptApp"
+        />
         <SettingsGeneralPanel
-          v-if="activeTab === 'general'"
+          v-else-if="activeTab === 'general'"
           :choose-codex-binary="chooseCodexBinary"
           :choose-source-folder="chooseSourceFolder"
           :daemon-status="daemonStatus"
@@ -70,6 +74,7 @@
 import type { AddSshConnectionInput, AppGeneralSettings, AppThemeSettings, ClawdDaemonStatus, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SourceFolderListing, SourceFolderListInput, SourceFolderState, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { defaultGeneralSettings, defaultSourceFolderState } from '@codex-claw/shared/settings';
 import SettingsAppearancePanel from './SettingsAppearancePanel.vue';
+import SettingsChatGptPanel from './SettingsChatGptPanel.vue';
 import SettingsConnectionsPanel from './SettingsConnectionsPanel.vue';
 import SettingsGeneralPanel from './SettingsGeneralPanel.vue';
 import SettingsIntegrationsPanel from './SettingsIntegrationsPanel.vue';
@@ -85,6 +90,7 @@ withDefaults(defineProps<{
   daemonStatusError?: string | null;
   chooseCodexBinary?: () => Promise<string | null>;
   chooseSourceFolder?: () => Promise<string | null>;
+  launchChatGptApp?: () => Promise<void>;
   workBacklogConnections?: WorkIntegrationConnection[];
   workBacklogError?: string | null;
   workBacklogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
@@ -113,7 +119,7 @@ withDefaults(defineProps<{
   restartApp?: () => Promise<void>;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
 }>(), {
-  activeTab: 'general',
+  activeTab: 'chatgpt',
   workBacklogConnections: () => [],
   workBacklogError: null,
   workBacklogStatus: 'notLoaded',

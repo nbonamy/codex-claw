@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Loop, LoopAction, LoopExecutionCreatedAgent, LoopExecutionLogEntry, LoopExecutionStatus, LoopSourceConfiguration, LoopTeamTarget, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, Team, ThreadGoal, ThreadPlan, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/shared/contracts';
 import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '@codex-claw/shared/codex-approval-presets';
@@ -35,6 +35,8 @@ type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'upda
 };
 
 export class AppStatePersistence {
+  private saveChain: Promise<void> = Promise.resolve();
+
   constructor(private readonly filePath: string) {}
 
   async load(): Promise<AppSnapshot> {
@@ -49,10 +51,25 @@ export class AppStatePersistence {
     }
   }
 
-  async save(snapshot: AppSnapshot): Promise<void> {
+  save(snapshot: AppSnapshot): Promise<void> {
     const persisted = persistedStateFromSnapshot(snapshot);
-    await mkdir(path.dirname(this.filePath), { recursive: true });
-    await writeFile(this.filePath, `${JSON.stringify(persisted, null, 2)}\n`, 'utf8');
+    const serialized = `${JSON.stringify(persisted, null, 2)}\n`;
+    const operation = this.saveChain.then(() => this.writeAtomically(serialized));
+    this.saveChain = operation.catch(() => undefined);
+    return operation;
+  }
+
+  private async writeAtomically(serialized: string): Promise<void> {
+    await mkdir(path.dirname(this.filePath), { recursive: true, mode: 0o700 });
+    const temporaryPath = `${this.filePath}.${process.pid}.tmp`;
+    try {
+      await writeFile(temporaryPath, serialized, { encoding: 'utf8', mode: 0o600 });
+      await rename(temporaryPath, this.filePath);
+    } finally {
+      await unlink(temporaryPath).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT') throw error;
+      });
+    }
   }
 }
 
