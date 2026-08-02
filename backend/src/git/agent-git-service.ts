@@ -53,9 +53,36 @@ export class AgentGitService {
   }
 
   async diff(folder: string): Promise<string> {
-    const result = await workingTreeDiff(this.runGit, folder, ['--no-ext-diff']);
-    return result.stdout;
+    const [tracked, untrackedFiles] = await Promise.all([
+      workingTreeDiff(this.runGit, folder, ['--no-ext-diff']),
+      this.runGit(folder, ['ls-files', '--others', '--exclude-standard', '-z', '--']),
+    ]);
+    const diffs = [tracked.stdout];
+
+    for (const file of untrackedFiles.stdout.split('\0').filter(Boolean)) {
+      const result = await this.runGit(folder, [
+        'diff',
+        '--no-index',
+        '--no-ext-diff',
+        '--',
+        process.platform === 'win32' ? 'NUL' : '/dev/null',
+        file,
+      ]);
+      diffs.push(result.stdout);
+    }
+
+    return joinDiffOutputs(diffs);
   }
+}
+
+function joinDiffOutputs(diffs: string[]): string {
+  let output = '';
+  for (const diff of diffs) {
+    if (!diff) continue;
+    if (output && !output.endsWith('\n')) output += '\n';
+    output += diff;
+  }
+  return output;
 }
 
 async function workingTreeDiff(runGit: AgentGitRunner, folder: string, args: string[]): Promise<{ stdout: string }> {
@@ -71,12 +98,29 @@ async function workingTreeDiff(runGit: AgentGitRunner, folder: string, args: str
 }
 
 async function git(cwd: string, args: string[]): Promise<{ stdout: string }> {
-  const result = await execFileAsync('git', args, {
-    cwd,
-    encoding: 'utf8',
-    maxBuffer: 10 * 1024 * 1024,
-  });
-  return { stdout: result.stdout };
+  try {
+    const result = await execFileAsync('git', args, {
+      cwd,
+      encoding: 'utf8',
+      maxBuffer: 10 * 1024 * 1024,
+    });
+    return { stdout: result.stdout };
+  } catch (error) {
+    // `git diff --no-index` uses exit code 1 to report that files differ.
+    if (args.includes('--no-index') && isExpectedDiffExit(error)) {
+      return { stdout: error.stdout };
+    }
+    throw error;
+  }
+}
+
+function isExpectedDiffExit(error: unknown): error is { code: 1; stdout: string } {
+  return typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && error.code === 1
+    && 'stdout' in error
+    && typeof error.stdout === 'string';
 }
 
 export function parseBranchStatus(output: string): Pick<AgentGitStatus, 'ahead' | 'behind' | 'branch' | 'upstream'> {

@@ -43,6 +43,9 @@ describe('agent git service parsers', () => {
       if (args.includes('--numstat')) {
         return { stdout: '5\t2\tsrc/a.ts\n3\t1\tsrc/b.ts\n' };
       }
+      if (args[0] === 'ls-files') {
+        return { stdout: '' };
+      }
       return { stdout: 'diff --git a/src/a.ts b/src/a.ts\n' };
     });
     const service = new AgentGitService(() => new Date('2026-08-01T00:00:00.000Z'), runGit);
@@ -67,6 +70,9 @@ describe('agent git service parsers', () => {
       if (args.includes('--cached')) {
         return { stdout: 'staged diff' };
       }
+      if (args[0] === 'ls-files') {
+        return { stdout: '' };
+      }
       return { stdout: 'unstaged diff' };
     });
     const service = new AgentGitService(() => new Date(), runGit);
@@ -74,5 +80,40 @@ describe('agent git service parsers', () => {
     await expect(service.diff('/new-repo')).resolves.toBe('staged diff\nunstaged diff');
     expect(runGit).toHaveBeenCalledWith('/new-repo', ['diff', '--cached', '--no-ext-diff', '--']);
     expect(runGit).toHaveBeenCalledWith('/new-repo', ['diff', '--no-ext-diff', '--']);
+  });
+
+  it('appends diffs for untracked files', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'ls-files') {
+        return { stdout: 'new file.ts\0-leading-dash.md\0' };
+      }
+      if (args.includes('--no-index')) {
+        const file = args.at(-1);
+        return { stdout: `diff --git a/${file} b/${file}\n` };
+      }
+      return { stdout: 'tracked diff\n' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
+
+    await expect(service.diff('/repo')).resolves.toBe([
+      'tracked diff\n',
+      'diff --git a/new file.ts b/new file.ts\n',
+      'diff --git a/-leading-dash.md b/-leading-dash.md\n',
+    ].join(''));
+    expect(runGit).toHaveBeenCalledWith('/repo', [
+      'ls-files',
+      '--others',
+      '--exclude-standard',
+      '-z',
+      '--',
+    ]);
+    expect(runGit).toHaveBeenCalledWith('/repo', [
+      'diff',
+      '--no-index',
+      '--no-ext-diff',
+      '--',
+      process.platform === 'win32' ? 'NUL' : '/dev/null',
+      '-leading-dash.md',
+    ]);
   });
 });

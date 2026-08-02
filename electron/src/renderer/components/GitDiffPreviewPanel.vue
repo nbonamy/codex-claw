@@ -359,7 +359,7 @@ function mapLine(line: Chunk['changes'][number]): DiffLineView {
 
 .git-diff-preview-panel__files {
   display: grid;
-  min-width: max-content;
+  min-width: 0;
 }
 
 .git-diff-preview-panel--wrap .git-diff-preview-panel__files {
@@ -367,6 +367,7 @@ function mapLine(line: Chunk['changes'][number]): DiffLineView {
 }
 
 .git-diff-preview-panel__file {
+  min-width: 0;
   overflow: hidden;
   border-bottom: 1px solid var(--color-border);
 }
@@ -421,6 +422,8 @@ function mapLine(line: Chunk['changes'][number]): DiffLineView {
   min-width: 0;
   display: flex;
   align-items: baseline;
+  overflow: hidden;
+  white-space: nowrap;
   font-size: var(--font-size-14);
 }
 
@@ -434,7 +437,11 @@ function mapLine(line: Chunk['changes'][number]): DiffLineView {
 }
 
 .git-diff-preview-panel__file-title strong {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--color-text);
   font-weight: var(--font-weight-semibold);
 }
