@@ -33,6 +33,7 @@ import type {
   CodexSurfaceEvent,
   CodexSurfaceReviewTarget,
   CodexSurfaceSnapshot,
+  CodexSurfaceSkill,
   SendCodexMessageOptions,
   SurfaceMessage,
   SurfaceMessagePart,
@@ -516,7 +517,12 @@ export class CodexSurfaceAgentAdapter {
       return;
     }
     if (event.type === 'catalog.skillsChanged' && event.payload.status === 'loaded') {
-      this.emit({ backend: 'codex', type: 'skills.changed', payload: {}, occurredAt: event.occurredAt });
+      this.emit({
+        backend: 'codex',
+        type: 'skills.changed',
+        payload: skillsChangedPayload(event.payload.cwd, event.payload.skills, event.payload.status),
+        occurredAt: event.occurredAt,
+      });
     }
   }
 
@@ -562,7 +568,11 @@ export class CodexSurfaceAgentAdapter {
         return;
       case 'conversation.skillsChanged':
         if (event.payload.status === 'loaded') {
-          this.emitThread(session, { type: 'skills.changed', payload: {}, ...metadata });
+          this.emitThread(session, {
+            type: 'skills.changed',
+            payload: skillsChangedPayload(event.payload.cwd, event.payload.skills, event.payload.status),
+            ...metadata,
+          });
         }
         return;
       case 'conversation.permissionsChanged':
@@ -957,6 +967,18 @@ function rendererPart(part: SurfaceMessagePart): RendererMessagePart {
   if (part.type === 'tool') return rendererToolPart(part);
   if (part.type === 'attachment') return { type: 'attachment', attachment: { ...part.attachment } };
   return { ...part };
+}
+
+function skillsChangedPayload(
+  cwd: string | null,
+  skills: readonly CodexSurfaceSkill[],
+  status: 'loaded',
+): { cwd: string | null; skills: BackendSkillSummary[]; status: 'loaded' } {
+  return {
+    cwd,
+    skills: skills.map((skill) => ({ id: skill.path, ...skill })),
+    status,
+  };
 }
 
 function rendererToolPart(part: SurfaceMessageToolPart): RendererToolPart {

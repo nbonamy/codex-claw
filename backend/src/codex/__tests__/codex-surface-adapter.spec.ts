@@ -397,6 +397,14 @@ describe('CodexSurfaceAgentAdapter', () => {
       expect(events).toContainEqual(expect.objectContaining({
         type: 'skills.changed', agentId: 'agent-b', threadId: 'thread-b',
       }));
+      expect(events).toContainEqual(expect.objectContaining({
+        type: 'skills.changed', agentId: 'agent-a', threadId: 'thread-a',
+        payload: {
+          cwd: '/workspace/a', status: 'loaded', skills: [expect.objectContaining({
+            id: '/workspace/a/skill-2/SKILL.md', name: 'skill-2-/workspace/a', enabled: true,
+          })],
+        },
+      }));
     });
     await expect(adapter.listSkills(agentA)).resolves.toMatchObject([{
       name: 'skill-2-/workspace/a', path: '/workspace/a/skill-2/SKILL.md',

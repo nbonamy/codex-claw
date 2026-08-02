@@ -3107,17 +3107,7 @@ describe('useAppState', () => {
   it('refreshes active agent skills after a skills changed event', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
-    const listBackendSkills = vi.fn()
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        {
-          name: 'skill-creator',
-          description: 'Create or update Codex skills.',
-          path: '/Users/nbonamy/.codex/skills/skill-creator/SKILL.md',
-          scope: 'user',
-          enabled: true,
-        },
-      ]);
+    const listBackendSkills = vi.fn().mockResolvedValue([]);
 
     vi.stubGlobal('window', {
       codexClaw: {
@@ -3136,13 +3126,43 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 1,
       type: 'skills.changed',
-      payload: {},
+      agentId: 'agent-dina',
+      payload: {
+        cwd: '/Users/nbonamy/src/codex-claw',
+        status: 'loaded',
+        skills: [{
+          name: 'skill-creator',
+          description: 'Create or update Codex skills.',
+          path: '/Users/nbonamy/.codex/skills/skill-creator/SKILL.md',
+          scope: 'user',
+          enabled: true,
+        }],
+      },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
     await vi.waitFor(() => {
-      expect(listBackendSkills).toHaveBeenCalledTimes(2);
       expect(state.backendSkills.value.map((skill) => skill.name)).toStrictEqual(['skill-creator']);
     });
+    expect(listBackendSkills).toHaveBeenCalledTimes(1);
+    const skillsReference = state.backendSkills.value;
+    listeners[0]?.({
+      seq: 2,
+      agentId: 'agent-dina',
+      type: 'skills.changed',
+      payload: {
+        cwd: '/Users/nbonamy/src/codex-claw',
+        status: 'loaded',
+        skills: [{
+          name: 'skill-creator',
+          description: 'Create or update Codex skills.',
+          path: '/Users/nbonamy/.codex/skills/skill-creator/SKILL.md',
+          scope: 'user',
+          enabled: true,
+        }],
+      },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+    expect(state.backendSkills.value).toBe(skillsReference);
   });
 
   it('captures side panel requests from main events', async () => {

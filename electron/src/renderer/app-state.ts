@@ -1604,13 +1604,13 @@ function rememberActiveComposerConfiguration(): void {
   const agentId = snapshot.value.activeAgentId;
   if (!agentId) return;
   Object.assign(composerConfiguration(agentId), {
-    models: [...backendModels.value],
+    models: backendModels.value,
     modelStatus: modelCatalogStatus.value,
     modelError: modelCatalogError.value,
-    skills: [...backendSkills.value],
+    skills: backendSkills.value,
     skillStatus: skillCatalogStatus.value,
     skillError: skillCatalogError.value,
-    files: [...agentFiles.value],
+    files: agentFiles.value,
     fileStatus: fileCatalogStatus.value,
     fileError: fileCatalogError.value,
     selectedModelId: selectedModelId.value,
@@ -1622,13 +1622,13 @@ function rememberActiveComposerConfiguration(): void {
 
 function restoreComposerConfiguration(agentId: string): void {
   const configuration = composerConfiguration(agentId);
-  backendModels.value = [...configuration.models];
+  backendModels.value = configuration.models;
   modelCatalogStatus.value = configuration.modelStatus;
   modelCatalogError.value = configuration.modelError;
-  backendSkills.value = [...configuration.skills];
+  backendSkills.value = configuration.skills;
   skillCatalogStatus.value = configuration.skillStatus;
   skillCatalogError.value = configuration.skillError;
-  agentFiles.value = [...configuration.files];
+  agentFiles.value = configuration.files;
   fileCatalogStatus.value = configuration.fileStatus;
   fileCatalogError.value = configuration.fileError;
   selectedModelId.value = configuration.selectedModelId;
@@ -1852,9 +1852,60 @@ function handleMainEvent(event: MainToRendererEvent, adoptSnapshot = true): void
   syncComposerModeFromMainEvent(event);
   syncSidePanelFromMainEvent(event);
   if (event.type === 'skills.changed') {
-    skillCatalogCache.clear();
-    void loadAllAgentCatalogs().catch(() => undefined);
+    applySkillsChangedEvent(event);
   }
+}
+
+function applySkillsChangedEvent(event: MainToRendererEvent): void {
+  if (!isRecord(event.payload) || !Array.isArray(event.payload.skills)) return;
+  const cwd = event.payload.cwd;
+  if (cwd !== null && typeof cwd !== 'string') return;
+  const skills = event.payload.skills
+    .filter(isBackendSkillSummary)
+    .map((skill) => ({ ...skill }));
+  const agents = snapshot.value.agents.filter((agent) => (
+    agent.backend === 'codex' &&
+    (event.agentId === agent.id || (
+      !event.agentId && (cwd === null || agent.folder === cwd)
+    ))
+  ));
+
+  for (const agent of agents) {
+    const cache = catalogCacheEntry(skillCatalogCache, catalogKey(agent));
+    if (cache.status === 'loaded' && sameBackendSkills(cache.value, skills)) continue;
+    cache.value = skills;
+    cache.status = 'loaded';
+    cache.error = null;
+    syncSkillCatalogToConfiguration(agent.id, cache);
+    if (agent.id === snapshot.value.activeAgentId) restoreComposerConfiguration(agent.id);
+  }
+}
+
+function isBackendSkillSummary(value: unknown): value is BackendSkillSummary {
+  return isRecord(value) &&
+    typeof value.name === 'string' &&
+    typeof value.path === 'string' &&
+    typeof value.enabled === 'boolean';
+}
+
+function sameBackendSkills(left: readonly BackendSkillSummary[], right: readonly BackendSkillSummary[]): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((skill, index) => {
+    const other = right[index];
+    return Boolean(other) &&
+      skill.id === other.id &&
+      skill.name === other.name &&
+      skill.description === other.description &&
+      skill.shortDescription === other.shortDescription &&
+      skill.displayName === other.displayName &&
+      skill.iconSmall === other.iconSmall &&
+      skill.iconLarge === other.iconLarge &&
+      skill.brandColor === other.brandColor &&
+      skill.defaultPrompt === other.defaultPrompt &&
+      skill.path === other.path &&
+      skill.scope === other.scope &&
+      skill.enabled === other.enabled;
+  });
 }
 
 function isBackendMainEvent(event: MainToRendererEvent): boolean {
@@ -1996,7 +2047,7 @@ function resetCatalogStateIfSourceChanged(source: unknown): void {
 
 function syncModelCatalogToConfiguration(agentId: string, cache: CatalogCacheEntry<BackendModelOption>): void {
   const configuration = composerConfiguration(agentId);
-  configuration.models = [...cache.value];
+  configuration.models = cache.value;
   configuration.modelStatus = cache.status;
   configuration.modelError = cache.error;
   if (cache.status === 'loaded') selectDefaultModelForConfiguration(configuration);
@@ -2004,14 +2055,14 @@ function syncModelCatalogToConfiguration(agentId: string, cache: CatalogCacheEnt
 
 function syncSkillCatalogToConfiguration(agentId: string, cache: CatalogCacheEntry<BackendSkillSummary>): void {
   const configuration = composerConfiguration(agentId);
-  configuration.skills = [...cache.value];
+  configuration.skills = cache.value;
   configuration.skillStatus = cache.status;
   configuration.skillError = cache.error;
 }
 
 function syncFileCatalogToConfiguration(agentId: string, cache: CatalogCacheEntry<AgentFileSearchItem>): void {
   const configuration = composerConfiguration(agentId);
-  configuration.files = [...cache.value];
+  configuration.files = cache.value;
   configuration.fileStatus = cache.status;
   configuration.fileError = cache.error;
 }
