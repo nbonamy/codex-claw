@@ -1809,6 +1809,74 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
+  it('keeps live in-memory messages when selecting an agent again', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.activeAgentId = null;
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      backendSession: { kind: 'codex', threadId: 'thread-live' },
+      status: { type: 'working' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    snapshot.messages = [{
+      id: 'assistant-live',
+      agentId: 'agent-dina',
+      role: 'assistant',
+      status: 'streaming',
+      parts: [{
+        type: 'tool',
+        id: 'tool-live',
+        kind: 'command',
+        title: 'Run npm test',
+        status: 'running',
+        input: { cmd: 'npm test' },
+      }],
+      createdAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const hydrateAgent = vi.fn().mockResolvedValue({ kind: 'codex', threadId: 'thread-stale' });
+    const getGitStatus = vi.fn().mockResolvedValue(null);
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      getGitStatus,
+      hydrateAgent,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'select-live',
+      method: 'agent/select',
+      params: { agentId: 'agent-dina' },
+    })).resolves.toMatchObject({
+      result: {
+        activeAgentId: 'agent-dina',
+        messages: [{ id: 'assistant-live', parts: [{ type: 'tool' }] }],
+      },
+    });
+
+    expect(hydrateAgent).not.toHaveBeenCalled();
+    expect(getGitStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    await server.close();
+  });
+
   it('hydrates the selected team active agent and refreshes git status', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams = [

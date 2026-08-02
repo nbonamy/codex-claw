@@ -1581,6 +1581,87 @@ describe('useAppState', () => {
     expect(state.activeQueuedPrompts.value).toStrictEqual([]);
   });
 
+  it('keeps a queued prompt visible until the backend accepts the drained send', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0].status = { type: 'working' };
+    const pendingSend = deferred<AppSnapshot>();
+    const sendPrompt = vi.fn().mockReturnValue(pendingSend.promise);
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        sendPrompt,
+        onEvent: vi.fn((nextListener) => {
+          listeners.push(nextListener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await state.sendPrompt('do not disappear');
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'turn.completed',
+      payload: { status: 'completed' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+      snapshot: createInitialSnapshot(),
+    });
+
+    await vi.waitFor(() => expect(sendPrompt).toHaveBeenCalledOnce());
+    expect(state.activeQueuedPrompts.value).toEqual([
+      expect.objectContaining({ text: 'do not disappear' }),
+    ]);
+
+    pendingSend.resolve(createInitialSnapshot());
+    await vi.waitFor(() => expect(state.activeQueuedPrompts.value).toStrictEqual([]));
+  });
+
+  it('preserves a queued prompt when the backend rejects its drained send', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0].status = { type: 'working' };
+    const sendPrompt = vi.fn().mockRejectedValue(new Error('backend unavailable'));
+
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        sendPrompt,
+        onEvent: vi.fn((nextListener) => {
+          listeners.push(nextListener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await state.sendPrompt('retry me later');
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'turn.completed',
+      payload: { status: 'completed' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+      snapshot: createInitialSnapshot(),
+    });
+
+    await vi.waitFor(() => expect(sendPrompt).toHaveBeenCalledOnce());
+    expect(state.activeQueuedPrompts.value).toEqual([
+      expect.objectContaining({ text: 'retry me later' }),
+    ]);
+    state.removeQueuedPrompt(state.activeQueuedPrompts.value[0]!.id);
+  });
+
   it('steers busy drafts and queued prompts through preload', async () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0].status = { type: 'working' };

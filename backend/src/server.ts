@@ -1863,7 +1863,10 @@ export class ClawBackendServer {
   }
 
   private async hydrateAndRefreshSelectedAgent(agentId: string): Promise<void> {
-    await this.hydrateAgentHistory(agentId);
+    const hasInMemoryMessages = this.snapshot.messages.some((message) => message.agentId === agentId);
+    if (!hasInMemoryMessages) {
+      await this.hydrateAgentHistory(agentId);
+    }
     await this.refreshAgentGitStatus(agentId);
   }
 

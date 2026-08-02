@@ -2078,13 +2078,15 @@ async function drainQueuedPrompts(agentId: string): Promise<void> {
     return;
   }
 
-  removeQueuedPromptForAgent(agentId, nextPrompt.id);
   markAgentSending(agentId, true);
 
   try {
     snapshot.value = nextPrompt.options
       ? await window.codexClaw.sendPrompt(agentId, nextPrompt.text, nextPrompt.options)
       : await window.codexClaw.sendPrompt(agentId, nextPrompt.text);
+    removeQueuedPromptForAgent(agentId, nextPrompt.id);
+  } catch {
+    // Keep the prompt visible and retryable when the backend does not accept it.
   } finally {
     markAgentSending(agentId, false);
   }
