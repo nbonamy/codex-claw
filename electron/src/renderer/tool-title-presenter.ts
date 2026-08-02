@@ -3,6 +3,7 @@ import {
 } from 'codex-app-sdk/vue';
 
 type ToolPhase = 'completed' | 'failed' | 'running';
+type AgentNameResolver = (identifier: string) => string | undefined;
 
 const TOOL_KEYS: Record<string, string> = {
   'broadcast-message': 'broadcastMessage',
@@ -42,7 +43,7 @@ export function presentClawToolTitle({
   descriptor,
   toolCall,
   translate,
-}: CodexToolTitlePresenterContext): string | undefined {
+}: CodexToolTitlePresenterContext, resolveAgentName?: AgentNameResolver): string | undefined {
   const identity = clawToolIdentity(toolCall.function, descriptor?.params?.tool, toolCall.kind, toolCall.metadata);
   if (!identity) return undefined;
 
@@ -56,7 +57,7 @@ export function presentClawToolTitle({
   }
 
   return translate(`chat.tool.mcp.codexClaw.${key}.${phase}`, {
-    target: toolTarget(identity.tool, args, toolCall.result, phase),
+    target: toolTarget(identity.tool, args, toolCall.result, phase, resolveAgentName),
   });
 }
 
@@ -95,9 +96,20 @@ function toolPhase(descriptorPhase: string | undefined, state: string): ToolPhas
   return 'running';
 }
 
-function toolTarget(tool: string, args: Record<string, unknown>, result: unknown, phase: ToolPhase): string {
+function toolTarget(
+  tool: string,
+  args: Record<string, unknown>,
+  result: unknown,
+  phase: ToolPhase,
+  resolveAgentName?: AgentNameResolver,
+): string {
+  const requestedRecipient = typeof args.to === 'string' ? args.to.trim() : '';
   const candidates = tool === 'send-message'
-    ? [phase === 'completed' ? resultString(result, 'recipientName') : undefined, args.to]
+    ? [
+        phase === 'completed' ? resultString(result, 'recipientName') : undefined,
+        requestedRecipient ? resolveAgentName?.(requestedRecipient) : undefined,
+        requestedRecipient,
+      ]
     : tool === 'browser-open'
       ? [args.url]
       : tool === 'display-markdown'

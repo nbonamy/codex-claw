@@ -198,6 +198,7 @@
             ref="conversationPane"
             :messages="messages"
             :agent="currentAgent"
+            :agents="snapshot.agents"
             :agent-files="agentFiles"
             :is-loading="isLoading || isConversationLoading"
             :is-sending="isSending"
@@ -249,6 +250,7 @@
             :agent="agent"
             :git-panel="effectiveGitReviewPanelFor(agent)"
             :git-status="snapshot.agentGitStatuses[agent.id] ?? null"
+            :file-panels="rightWorkspaceFor(agent.id).filePanels"
             :tabs="rightWorkspaceFor(agent.id).tabs"
             :visible="isRightWorkspaceVisible(agent.id)"
             :browser-id="rightWorkspaceFor(agent.id).browserId"
@@ -358,7 +360,13 @@ import {
   type CodexQueuedPromptData as QueuedChatPrompt,
 } from 'codex-app-sdk/vue';
 import type { PlanReviewComment, SidePanelGitDiffState, SidePanelState } from './side-panel';
-import type { RightWorkspaceTab } from './right-workspace';
+import {
+  isRightWorkspaceFileTab,
+  rightWorkspaceFileTab,
+  type RightWorkspaceFilePanel,
+  type RightWorkspaceFileTab,
+  type RightWorkspaceTab,
+} from './right-workspace';
 
 const props = withDefaults(defineProps<{
   snapshot: AppSnapshot;
@@ -589,6 +597,8 @@ type AgentRightWorkspaceState = {
   browserId: string;
   browserInitialUrl: string;
   browserOpenRequestId: number;
+  filePanels: Partial<Record<RightWorkspaceFileTab, RightWorkspaceFilePanel>>;
+  filePreviewRequestIds: Partial<Record<RightWorkspaceFileTab, number>>;
   gitReviewPanel: SidePanelGitDiffState | null;
   open: boolean;
   tabs: RightWorkspaceTab[];
@@ -629,6 +639,7 @@ const teamDialogMode = ref<'create' | 'edit'>('create');
 const editingTeamId = ref<string | null>(null);
 const sidePanel = ref<SidePanelState | null>(null);
 let sidePanelRequestId = 0;
+let filePreviewRequestId = 0;
 let unsubscribeAppCommand: (() => void) | null = null;
 const activeTeamAgents = computed(() => {
   const team = activeTeam.value;
@@ -882,6 +893,8 @@ function rightWorkspaceFor(agentId: string): AgentRightWorkspaceState {
     browserId: PRIMARY_BROWSER_ID,
     browserInitialUrl: '',
     browserOpenRequestId: 0,
+    filePanels: {},
+    filePreviewRequestIds: {},
     gitReviewPanel: null,
     open: false,
     tabs: [],
@@ -971,6 +984,12 @@ function closeRightWorkspaceTab(agentId: string, tab: RightWorkspaceTab): void {
   workspace.tabs = nextTabs;
   if (tab === 'review') {
     workspace.gitReviewPanel = null;
+  }
+  if (isRightWorkspaceFileTab(tab)) {
+    const { [tab]: _closedPanel, ...filePanels } = workspace.filePanels;
+    const { [tab]: _closedRequest, ...filePreviewRequestIds } = workspace.filePreviewRequestIds;
+    workspace.filePanels = filePanels;
+    workspace.filePreviewRequestIds = filePreviewRequestIds;
   }
   if (workspace.activeTab === tab) {
     workspace.activeTab = nextTabs[Math.min(tabIndex, nextTabs.length - 1)] ?? null;
@@ -1294,10 +1313,13 @@ async function openFilePreview(filePath: string): Promise<void> {
     return;
   }
 
-  const requestId = sidePanelRequestId + 1;
-  sidePanelRequestId = requestId;
+  const workspace = rightWorkspaceFor(agent.id);
+  const tab = rightWorkspaceFileTab(trimmedPath);
+  const requestId = filePreviewRequestId + 1;
+  filePreviewRequestId = requestId;
+  workspace.filePreviewRequestIds = { ...workspace.filePreviewRequestIds, [tab]: requestId };
   const initialKind = isMarkdownPath(trimmedPath) ? 'markdown' : 'source';
-  sidePanel.value = {
+  workspace.filePanels = { ...workspace.filePanels, [tab]: {
     kind: initialKind,
     title: fileBasename(trimmedPath),
     subtitle: trimmedPath,
@@ -1305,15 +1327,16 @@ async function openFilePreview(filePath: string): Promise<void> {
     ...(initialKind === 'source' ? { language: languageForFilePath(trimmedPath) ?? null } : {}),
     state: 'loading',
     error: null,
-  } as SidePanelState;
+  } as RightWorkspaceFilePanel };
+  openRightWorkspaceTab(tab, agent.id);
 
   try {
     const result = await props.previewAgentFile(agent.id, trimmedPath);
-    if (requestId !== sidePanelRequestId) {
+    if (workspace.filePreviewRequestIds[tab] !== requestId) {
       return;
     }
     const resultKind = isMarkdownPath(result.path) ? 'markdown' : 'source';
-    sidePanel.value = {
+    workspace.filePanels = { ...workspace.filePanels, [tab]: {
       kind: resultKind,
       title: fileBasename(result.path),
       subtitle: result.path,
@@ -1321,12 +1344,12 @@ async function openFilePreview(filePath: string): Promise<void> {
       ...(resultKind === 'source' ? { language: languageForFilePath(result.path) ?? null } : {}),
       state: 'idle',
       error: null,
-    } as SidePanelState;
+    } as RightWorkspaceFilePanel };
   } catch (error) {
-    if (requestId !== sidePanelRequestId) {
+    if (workspace.filePreviewRequestIds[tab] !== requestId) {
       return;
     }
-    sidePanel.value = {
+    workspace.filePanels = { ...workspace.filePanels, [tab]: {
       kind: initialKind,
       title: fileBasename(trimmedPath),
       subtitle: trimmedPath,
@@ -1334,7 +1357,7 @@ async function openFilePreview(filePath: string): Promise<void> {
       ...(initialKind === 'source' ? { language: languageForFilePath(trimmedPath) ?? null } : {}),
       state: 'error',
       error: error instanceof Error ? error.message : String(error),
-    } as SidePanelState;
+    } as RightWorkspaceFilePanel };
   }
 }
 

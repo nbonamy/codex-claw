@@ -40,6 +40,20 @@ describe('Claw tool presentation', () => {
     });
   });
 
+  it('resolves recipient ids before send-message completes', () => {
+    const running = context('send-message', { to: 'agent-sdk' });
+    running.toolCall = { ...running.toolCall, done: false, state: 'running' };
+
+    expect(presentClawTool(
+      running,
+      translate,
+      (identifier) => identifier === 'agent-sdk' ? 'codex-app-sdk' : undefined,
+    )).toStrictEqual({
+      icon: MessageIcon,
+      title: 'Sending message to codex-app-sdk',
+    });
+  });
+
   it('leaves unknown, non-MCP, and third-party tools to the SDK fallback', () => {
     expect(presentClawTool(context('future-tool', {}), translate)).toBeUndefined();
     expect(presentClawTool(context('browser-open', {}, 'github'), translate)).toBeUndefined();

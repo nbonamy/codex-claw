@@ -112,6 +112,7 @@ describe('AppShell', () => {
     expect(wrapper.text()).toContain('Ready to get going');
     expect(wrapper.text()).toContain('Chat with Dina');
     expect(wrapper.text()).not.toContain('Artifacts');
+    expect(wrapper.findComponent({ name: 'ConversationPane' }).props('agents')).toStrictEqual(snapshot.agents);
   });
 
   it('shows structured plan progress only while its turn is active', async () => {
@@ -392,7 +393,7 @@ describe('AppShell', () => {
     expect(wrapper.get('[aria-label="Right workspace"]').isVisible()).toBe(false);
   });
 
-  it('opens markdown links in the side panel through the agent file bridge', async () => {
+  it('opens markdown links in additive right-workspace tabs through the agent file bridge', async () => {
     const snapshot = createInitialSnapshot();
     let resolveReadAgentFile: (result: { content: string; path: string }) => void = () => undefined;
     const previewAgentFile = vi.fn().mockReturnValue(new Promise((resolve) => {
@@ -432,12 +433,12 @@ describe('AppShell', () => {
     });
     await flushPromises();
 
-    expect(wrapper.find('.side-panel').exists()).toBe(true);
-    expect(wrapper.text()).toContain('docs/architecture.md');
+    expect(wrapper.find('.side-panel').exists()).toBe(false);
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain('architecture.md');
     expect(wrapper.text()).toContain('This is the side panel.');
 
-    await wrapper.get('[aria-label="Close side panel"]').trigger('click');
-    expect(wrapper.find('.side-panel').exists()).toBe(false);
+    await wrapper.get('[aria-label="Close architecture.md tab"]').trigger('click');
+    expect(wrapper.find('.markdown-panel').exists()).toBe(false);
   });
 
   it('opens source file links as read-only source previews', async () => {
@@ -469,12 +470,14 @@ describe('AppShell', () => {
       },
     });
 
+    await wrapper.findAll('.right-workspace-panel__launcher button').find((button) => button.text().includes('Review'))?.trigger('click');
+    await flushPromises();
     await wrapper.get('a[href="src/main.ts"]').trigger('click');
     await flushPromises();
 
     expect(previewAgentFile).toHaveBeenCalledWith('agent-dina', 'src/main.ts');
     expect(wrapper.find('.source-preview-panel').exists()).toBe(true);
-    expect(wrapper.text()).toContain('src/main.ts');
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['Review', 'main.ts']);
     expect(wrapper.html()).toContain('shiki');
     expect(wrapper.text()).toContain('answer');
   });
@@ -625,7 +628,7 @@ describe('AppShell', () => {
     expect(wrapper.find('.side-panel').exists()).toBe(false);
   });
 
-  it('ignores stale markdown reads after the side panel changes', async () => {
+  it('ignores stale markdown reads after the file tab closes', async () => {
     const snapshot = createInitialSnapshot();
     let resolveReadAgentFile: (result: { content: string; path: string }) => void = () => undefined;
     const previewAgentFile = vi.fn().mockReturnValue(new Promise((resolve) => {
@@ -655,7 +658,7 @@ describe('AppShell', () => {
     });
 
     await wrapper.get('a[href="docs/architecture.md"]').trigger('click');
-    await wrapper.get('[aria-label="Close side panel"]').trigger('click');
+    await wrapper.get('[aria-label="Close architecture.md tab"]').trigger('click');
 
     resolveReadAgentFile({
       path: 'docs/architecture.md',
@@ -667,7 +670,7 @@ describe('AppShell', () => {
     expect(wrapper.text()).not.toContain('This result is stale.');
   });
 
-  it('ignores stale markdown read errors after switching agents', async () => {
+  it('keeps file read state scoped to the originating agent when switching agents', async () => {
     const snapshot = createInitialSnapshot();
     let rejectReadAgentFile: (error: Error) => void = () => undefined;
     const previewAgentFile = vi.fn().mockReturnValue(new Promise((_resolve, reject) => {
@@ -702,11 +705,13 @@ describe('AppShell', () => {
     rejectReadAgentFile(new Error('This error is stale.'));
     await flushPromises();
 
-    expect(wrapper.find('.side-panel').exists()).toBe(false);
-    expect(wrapper.text()).not.toContain('This error is stale.');
+    expect(wrapper.findAll('.right-workspace-panel').every((panel) => !panel.isVisible())).toBe(true);
+
+    await wrapper.setProps({ activeAgent: snapshot.agents[0] } as Record<string, unknown>);
+    expect(wrapper.findAll('.right-workspace-panel')[0]?.text()).toContain('This error is stale.');
   });
 
-  it('shows markdown side panel read errors', async () => {
+  it('shows markdown file-tab read errors', async () => {
     const snapshot = createInitialSnapshot();
     const previewAgentFile = vi.fn().mockRejectedValue(new Error('File is outside the agent folder.'));
     const wrapper = mount(AppShell, {
@@ -735,7 +740,8 @@ describe('AppShell', () => {
     await wrapper.get('a[href="../secret.md"]').trigger('click');
     await flushPromises();
 
-    expect(wrapper.find('.side-panel').exists()).toBe(true);
+    expect(wrapper.find('.side-panel').exists()).toBe(false);
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain('secret.md');
     expect(wrapper.text()).toContain('File is outside the agent folder.');
   });
 

@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import RightWorkspacePanel from '../RightWorkspacePanel.vue';
+import type { RightWorkspaceFilePanel, RightWorkspaceFileTab, RightWorkspaceTab } from '../right-workspace';
 
 class ResizeObserverStub {
   observe() {}
@@ -12,7 +13,11 @@ afterEach(() => {
   delete window.codexClaw;
 });
 
-function mountPanel(tabs: Array<'review' | 'browser'> = ['review', 'browser'], activeTab: 'review' | 'browser' | null = 'review') {
+function mountPanel(
+  tabs: RightWorkspaceTab[] = ['review', 'browser'],
+  activeTab: RightWorkspaceTab | null = 'review',
+  filePanels: Partial<Record<RightWorkspaceFileTab, RightWorkspaceFilePanel>> = {},
+) {
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
   window.codexClaw = {
     browserOpen: vi.fn().mockResolvedValue({ url: '', title: '', canGoBack: false, canGoForward: false }),
@@ -28,6 +33,7 @@ function mountPanel(tabs: Array<'review' | 'browser'> = ['review', 'browser'], a
         id: 'agent-1', teamId: 'team-1', name: 'Dina', avatar: 'D', folder: '/repo', backend: 'codex', status: { type: 'idle' }, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
       },
       gitPanel: { kind: 'gitDiff', title: 'Review', diff: '', state: 'idle' },
+      filePanels,
       tabs,
       visible: true,
     },
@@ -71,5 +77,27 @@ describe('RightWorkspacePanel', () => {
     await wrapper.findAll('.app-menu__item')[0]?.trigger('click');
 
     expect(wrapper.emitted('openTab')).toStrictEqual([['review']]);
+  });
+
+  it('renders file previews as independently closable workspace tabs', async () => {
+    const fileTab = 'file:src%2Fmain.ts' as const;
+    const wrapper = mountPanel(['browser', fileTab], fileTab, {
+      [fileTab]: {
+        kind: 'source',
+        title: 'main.ts',
+        subtitle: 'src/main.ts',
+        content: 'export const ready = true;\n',
+        language: 'typescript',
+        state: 'idle',
+        error: null,
+      },
+    });
+    await flushPromises();
+
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['Browser', 'main.ts']);
+    expect(wrapper.get('.source-preview-panel').text()).toContain('ready');
+
+    await wrapper.get('[aria-label="Close main.ts tab"]').trigger('click');
+    expect(wrapper.emitted('closeTab')).toStrictEqual([[fileTab]]);
   });
 });

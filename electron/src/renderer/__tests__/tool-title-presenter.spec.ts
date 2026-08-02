@@ -31,6 +31,13 @@ describe('Claw tool title presenter', () => {
     })).toBe('Sent message to Computer Use');
   });
 
+  it('uses the loaded agent name while sending by agent id', () => {
+    expect(presentClawToolTitle(
+      context('codex_claw.send-message', { to: 'agent-uuid' }, 'running'),
+      (identifier) => identifier === 'agent-uuid' ? 'Computer Use' : undefined,
+    )).toBe('Sending message to Computer Use');
+  });
+
   it('uses approval descriptors and leaves other MCP servers to their own presenters', () => {
     expect(presentClawToolTitle(context(
       'codex_claw.register-agent',

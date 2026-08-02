@@ -17,6 +17,7 @@ import { clawMcpToolName, presentClawToolTitle } from './tool-title-presenter';
 
 type Translate = CodexToolTitlePresenterContext['translate'];
 type ToolIcon = Exclude<CodexToolPresentation['icon'], null | undefined>;
+type AgentNameResolver = (identifier: string) => string | undefined;
 
 // The linked SDK and Claw resolve Vue through separate package roots during
 // typechecking, while Vite dedupes them at runtime. Keep that cast at this one
@@ -61,6 +62,7 @@ const WORKSPACE_TOOLS = new Set(['create-worktree', 'list-repos', 'list-worktree
 export function presentClawTool(
   context: CodexToolPresentationContext,
   translate: Translate,
+  resolveAgentName?: AgentNameResolver,
 ): CodexToolPresentation | undefined {
   const tool = clawMcpToolName(context.kind, context.metadata);
   const icon = tool ? clawToolIcon(tool) : undefined;
@@ -70,15 +72,15 @@ export function presentClawTool(
     descriptor: context.descriptor,
     toolCall: context.toolCall,
     translate,
-  });
+  }, resolveAgentName);
   return {
     icon,
     ...(title ? { title } : {}),
   };
 }
 
-export function provideClawToolPresentation(translate: Translate): void {
-  provideCodexToolPresentation((context) => presentClawTool(context, translate));
+export function provideClawToolPresentation(translate: Translate, resolveAgentName?: AgentNameResolver): void {
+  provideCodexToolPresentation((context) => presentClawTool(context, translate, resolveAgentName));
 }
 
 function clawToolIcon(tool: string): ToolIcon | undefined {

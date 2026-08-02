@@ -104,11 +104,11 @@ import { provideClawToolPresentation } from '../tool-presentation';
 const { t } = useI18n();
 const surface = ref<{ focusComposer(): void } | null>(null);
 provideCodexChatTranslate((key, params) => t(key, params ?? {}));
-provideClawToolPresentation((key, params) => t(key, params ?? {}));
 
 const props = withDefaults(defineProps<{
   messages: RendererMessage[];
   agent: Agent | null;
+  agents?: readonly Agent[];
   agentFiles?: AgentFileSearchItem[];
   approvals?: BackendApprovalRequest[];
   goal?: Agent['goal'] | null;
@@ -131,6 +131,7 @@ const props = withDefaults(defineProps<{
   composerState?: CodexComposerState;
   attachments?: readonly CodexNativeAttachment[];
 }>(), {
+  agents: () => [],
   queuedPrompts: () => [],
   agentFiles: () => [],
   approvals: () => [],
@@ -143,6 +144,10 @@ const props = withDefaults(defineProps<{
   composerState: () => ({ text: '', selectionStart: 0, selectionEnd: 0 }),
   attachments: () => [],
 });
+provideClawToolPresentation(
+  (key, params) => t(key, params ?? {}),
+  (identifier) => props.agents.find((agent) => agent.id === identifier)?.name,
+);
 
 const emit = defineEmits<{
   'clear-goal': [];

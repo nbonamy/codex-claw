@@ -16,7 +16,9 @@
             @click="emit('selectTab', tab)"
           >
             <GitHubIcon v-if="tab === 'review'" aria-hidden="true" />
-            <IconWorld v-else aria-hidden="true" />
+            <IconWorld v-else-if="tab === 'browser'" aria-hidden="true" />
+            <FileTextIcon v-else-if="filePanel(tab)?.kind === 'markdown'" aria-hidden="true" />
+            <CodeIcon v-else aria-hidden="true" />
             <span>{{ tabLabel(tab) }}</span>
           </button>
           <button
@@ -87,6 +89,27 @@
       @close="emit('closeTab', 'browser')"
       @send-prompt="emit('sendPrompt', $event)"
     />
+
+    <div
+      v-for="tab in fileTabs"
+      :key="tab"
+      v-show="activeTab === tab"
+      class="right-workspace-panel__file-preview"
+    >
+      <MarkdownPanel
+        v-if="markdownFilePanel(tab)"
+        :content="markdownFilePanel(tab)?.content ?? ''"
+        :error="markdownFilePanel(tab)?.error"
+        :state="markdownFilePanel(tab)?.state"
+      />
+      <SourcePreviewPanel
+        v-else-if="sourceFilePanel(tab)"
+        :content="sourceFilePanel(tab)?.content ?? ''"
+        :error="sourceFilePanel(tab)?.error"
+        :language="sourceFilePanel(tab)?.language"
+        :state="sourceFilePanel(tab)?.state"
+      />
+    </div>
   </aside>
 </template>
 
@@ -94,19 +117,27 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { IconWorld } from '@tabler/icons-vue';
 import type { Agent, AgentGitStatus } from '@codex-claw/shared/contracts';
-import { GitHubIcon, PlusIcon, X } from '../shared/icons/app-icons';
+import { CodeIcon, FileTextIcon, GitHubIcon, PlusIcon, X } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import BrowserPanel from './BrowserPanel.vue';
 import GitReviewPanel from './GitReviewPanel.vue';
-import type { SidePanelGitDiffState } from './side-panel';
-import type { RightWorkspaceTab } from './right-workspace';
+import MarkdownPanel from './MarkdownPanel.vue';
+import SourcePreviewPanel from './SourcePreviewPanel.vue';
+import type { SidePanelGitDiffState, SidePanelMarkdownState, SidePanelSourceState } from './side-panel';
+import {
+  isRightWorkspaceFileTab,
+  type RightWorkspaceFilePanel,
+  type RightWorkspaceFileTab,
+  type RightWorkspaceTab,
+} from './right-workspace';
 
 const props = defineProps<{
   activeTab: RightWorkspaceTab | null;
   agent: Agent;
   gitPanel: SidePanelGitDiffState;
   gitStatus?: AgentGitStatus | null;
+  filePanels?: Partial<Record<RightWorkspaceFileTab, RightWorkspaceFilePanel>>;
   tabs: RightWorkspaceTab[];
   visible?: boolean;
   browserId?: string;
@@ -124,6 +155,7 @@ const emit = defineEmits<{
 
 const addMenuRoot = ref<HTMLElement | null>(null);
 const addMenuOpen = ref(false);
+const fileTabs = computed(() => props.tabs.filter(isRightWorkspaceFileTab));
 const addMenuItems = computed<AppMenuItem[]>(() => [
   { id: 'review', type: 'action', label: 'GitHub Review', icon: GitHubIcon },
   { id: 'browser', type: 'action', label: 'Browser', icon: IconWorld },
@@ -133,7 +165,23 @@ onMounted(() => document.addEventListener('click', closeAddMenuOnOutsideClick));
 onBeforeUnmount(() => document.removeEventListener('click', closeAddMenuOnOutsideClick));
 
 function tabLabel(tab: RightWorkspaceTab): string {
-  return tab === 'review' ? 'Review' : 'Browser';
+  if (tab === 'review') return 'Review';
+  if (tab === 'browser') return 'Browser';
+  return filePanel(tab)?.title ?? 'File';
+}
+
+function filePanel(tab: RightWorkspaceTab): RightWorkspaceFilePanel | undefined {
+  return isRightWorkspaceFileTab(tab) ? props.filePanels?.[tab] : undefined;
+}
+
+function markdownFilePanel(tab: RightWorkspaceFileTab): SidePanelMarkdownState | null {
+  const panel = filePanel(tab);
+  return panel?.kind === 'markdown' ? panel : null;
+}
+
+function sourceFilePanel(tab: RightWorkspaceFileTab): SidePanelSourceState | null {
+  const panel = filePanel(tab);
+  return panel?.kind === 'source' ? panel : null;
 }
 
 function openTabFromMenu(tab: string): void {
@@ -318,5 +366,11 @@ function closeAddMenuOnOutsideClick(event: MouseEvent): void {
   font-family: var(--font-family-base);
   font-size: var(--font-size-12);
   line-height: var(--line-height-16);
+}
+
+.right-workspace-panel__file-preview {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
 }
 </style>
