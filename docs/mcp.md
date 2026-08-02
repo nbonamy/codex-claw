@@ -317,7 +317,11 @@ You received a message from Dina (agent-dina).
 
 This keeps agent-to-agent messaging inside the same turn pipeline as normal
 user prompts, while avoiding the old extra `check-messages` indirection. There
-is no separate renderer-side command path.
+is no separate renderer-side command path. Delivery instructions tell the
+recipient to reply only when the sender needs information, a decision,
+coordination, or action. FYIs, acknowledgments, confirmations, and closure
+messages are absorbed silently, and informational delivery does not cause agent
+status churn.
 
 ## Approval Flow
 

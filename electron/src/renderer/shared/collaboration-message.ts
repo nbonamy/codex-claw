@@ -6,8 +6,14 @@ export type CollaborationMessagePresentation = {
   senderNames: string[];
 };
 
-const actionInstruction = 'Update your status, then act on this teammate message directly. Do not ask the user for confirmation.';
-const actionsInstruction = 'Update your status, then act on these teammate messages directly. Do not ask the user for confirmation.';
+const actionInstructions = [
+  'Act on this teammate message without asking the user for confirmation. Update your status only if it changes your substantive work. Reply only when the sender needs information, a decision, coordination, or action; silently absorb FYIs, acknowledgments, confirmations, and closures. Never acknowledge an acknowledgment.',
+  'Update your status, then act on this teammate message directly. Do not ask the user for confirmation.',
+];
+const actionsInstructions = [
+  'Act on these teammate messages without asking the user for confirmation. Update your status only if they change your substantive work. Reply only when a sender needs information, a decision, coordination, or action; silently absorb FYIs, acknowledgments, confirmations, and closures. Never acknowledge an acknowledgment.',
+  'Update your status, then act on these teammate messages directly. Do not ask the user for confirmation.',
+];
 
 export function presentCollaborationMessage(message: CodexChatMessage): {
   message: CodexChatMessage;
@@ -36,8 +42,8 @@ export function parseCollaborationMessage(content: string): CollaborationMessage
 }
 
 function parseSingleMessage(content: string): CollaborationMessagePresentation | null {
-  const suffix = `\n\n${actionInstruction}`;
-  if (!content.endsWith(suffix)) return null;
+  const suffix = matchingSuffix(content, actionInstructions, '\n\n');
+  if (!suffix) return null;
 
   const body = content.slice(0, -suffix.length);
   const match = /^You received a message from (.+) \(([^)\n]+)\)\.\r?\n\r?\nMessage:\r?\n([\s\S]*)$/.exec(body);
@@ -55,8 +61,8 @@ function parseSingleMessage(content: string): CollaborationMessagePresentation |
 }
 
 function parseMultipleMessages(content: string): CollaborationMessagePresentation | null {
-  const suffix = `\n${actionsInstruction}`;
-  if (!content.endsWith(suffix)) return null;
+  const suffix = matchingSuffix(content, actionsInstructions, '\n');
+  if (!suffix) return null;
 
   const body = content.slice(0, -suffix.length);
   const heading = /^You received (\d+) messages from other Codex Claw agents\.\r?\n\r?\n/.exec(body);
@@ -81,4 +87,8 @@ function parseMultipleMessages(content: string): CollaborationMessagePresentatio
     messageCount: messages.length,
     senderNames,
   };
+}
+
+function matchingSuffix(content: string, instructions: readonly string[], prefix: string): string | null {
+  return instructions.map((instruction) => `${prefix}${instruction}`).find((suffix) => content.endsWith(suffix)) ?? null;
 }

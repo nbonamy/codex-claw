@@ -12,7 +12,7 @@ describe('collaboration message presentation', () => {
       'Message:',
       'First line.\nSecond line.',
       '',
-      'Update your status, then act on this teammate message directly. Do not ask the user for confirmation.',
+      'Act on this teammate message without asking the user for confirmation. Update your status only if it changes your substantive work. Reply only when the sender needs information, a decision, coordination, or action; silently absorb FYIs, acknowledgments, confirmations, and closures. Never acknowledge an acknowledgment.',
     ].join('\n');
 
     expect(parseCollaborationMessage(raw)).toStrictEqual({
@@ -21,6 +21,15 @@ describe('collaboration message presentation', () => {
       senderNames: ['codex-app-sdk'],
     });
     expect(parseCollaborationMessage('You received a normal user sentence.')).toBeNull();
+
+    expect(parseCollaborationMessage(raw.replace(
+      /Act on this teammate message[\s\S]*$/,
+      'Update your status, then act on this teammate message directly. Do not ask the user for confirmation.',
+    ))).toStrictEqual({
+      content: 'First line.\nSecond line.',
+      messageCount: 1,
+      senderNames: ['codex-app-sdk'],
+    });
   });
 
   it('extracts batched messages while preserving sender attribution', () => {
@@ -33,7 +42,7 @@ describe('collaboration message presentation', () => {
       'Message 2 from computer-use (agent-computer) at 2026-08-02T00:00:01.000Z:',
       'Computer message.',
       '',
-      'Update your status, then act on these teammate messages directly. Do not ask the user for confirmation.',
+      'Act on these teammate messages without asking the user for confirmation. Update your status only if they change your substantive work. Reply only when a sender needs information, a decision, coordination, or action; silently absorb FYIs, acknowledgments, confirmations, and closures. Never acknowledge an acknowledgment.',
     ].join('\n');
 
     expect(parseCollaborationMessage(raw)).toStrictEqual({
@@ -48,6 +57,15 @@ describe('collaboration message presentation', () => {
       content: 'SDK message.\n\nSecond SDK message.',
       messageCount: 2,
       senderNames: ['codex-app-sdk'],
+    });
+
+    expect(parseCollaborationMessage(raw.replace(
+      /Act on these teammate messages[\s\S]*$/,
+      'Update your status, then act on these teammate messages directly. Do not ask the user for confirmation.',
+    ))).toStrictEqual({
+      content: 'codex-app-sdk:\nSDK message.\n\ncomputer-use:\nComputer message.',
+      messageCount: 2,
+      senderNames: ['codex-app-sdk', 'computer-use'],
     });
   });
 

@@ -17,7 +17,7 @@ describe('agent prompts', () => {
       'Message:',
       'The facade is ready.',
       '',
-      'Update your status, then act on this teammate message directly. Do not ask the user for confirmation.',
+      'Act on this teammate message without asking the user for confirmation. Update your status only if it changes your substantive work. Reply only when the sender needs information, a decision, coordination, or action; silently absorb FYIs, acknowledgments, confirmations, and closures. Never acknowledge an acknowledgment.',
     ].join('\n'));
   });
 
@@ -37,7 +37,8 @@ describe('agent prompts', () => {
     expect(prompt).toContain('You received 2 messages from other Codex Claw agents.');
     expect(prompt).toContain('Message 1 from SDK (agent-sdk) at 2026-08-02T12:00:00.000Z:\nFirst');
     expect(prompt).toContain('Message 2 from Computer Use (agent-computer-use) at 2026-08-02T12:01:00.000Z:\nSecond');
-    expect(prompt).toContain('act on these teammate messages directly');
+    expect(prompt).toContain('silently absorb FYIs, acknowledgments, confirmations, and closures');
+    expect(prompt).toContain('Never acknowledge an acknowledgment');
   });
 
   it('embeds the active agent identity and collaboration constraints', () => {
@@ -46,7 +47,10 @@ describe('agent prompts', () => {
     expect(instructions).toContain('Your Codex Claw agent ID is agent-dina.');
     expect(instructions).toContain('Your agent name is Dina');
     expect(instructions).toContain('your folder is /src/codex-claw');
-    expect(instructions).toContain('before starting work, changing direction, or finishing, call set-status');
+    expect(instructions).toContain('before starting substantive work, changing direction, or finishing substantive work');
+    expect(instructions).toContain('Do not change status for informational teammate messages');
+    expect(instructions).toContain('Reply to teammate messages only when the sender needs information');
+    expect(instructions).toContain('Never acknowledge an acknowledgment');
     expect(instructions).toContain('Use browser-open with an HTTP or HTTPS URL');
     expect(instructions).toContain('use only the codex_claw MCP Computer Use tools');
   });
