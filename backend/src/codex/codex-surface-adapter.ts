@@ -33,6 +33,7 @@ import type {
   CodexSurfaceEvent,
   CodexSurfaceReviewTarget,
   CodexSurfaceSnapshot,
+  SendCodexMessageOptions,
   SurfaceMessage,
   SurfaceMessagePart,
   SurfaceMessageToolPart,
@@ -180,18 +181,7 @@ export class CodexSurfaceAgentAdapter {
   async sendPrompt(agent: Agent, prompt: string, options: SendPromptOptions = {}) {
     const session = await this.ensureSession(agent);
     const beforeTurnIds = session.handle.getSnapshot().turnIds;
-    const backendOptions = options.backendOptions?.kind === 'codex' ? options.backendOptions : undefined;
-    const snapshot = await session.handle.sendMessage(prompt, {
-      ...(options.attachments?.length ? { attachments: options.attachments } : {}),
-      ...(options.model ? { model: options.model } : {}),
-      ...(typeof options.planMode === 'boolean' ? { planMode: options.planMode } : {}),
-      ...(options.reasoningEffort || backendOptions?.reasoningEffort
-        ? { reasoningEffort: options.reasoningEffort ?? backendOptions?.reasoningEffort ?? undefined }
-        : {}),
-      ...((options.skills?.length ?? 0) > 0 || (backendOptions?.skills?.length ?? 0) > 0
-        ? { skills: options.skills?.length ? options.skills : backendOptions?.skills }
-        : {}),
-    });
+    const snapshot = await session.handle.sendMessage(prompt, surfacePromptOptions(options));
     return { threadId: session.handle.id, turnId: resultTurnId(snapshot, beforeTurnIds) };
   }
 
@@ -235,10 +225,10 @@ export class CodexSurfaceAgentAdapter {
     return { threadId: session.handle.id, turnId: resultTurnId(snapshot, beforeTurnIds) };
   }
 
-  async steerPrompt(agent: Agent, prompt: string) {
+  async steerPrompt(agent: Agent, prompt: string, options?: SendPromptOptions) {
     const session = await this.ensureSession(agent);
     const beforeTurnIds = session.handle.getSnapshot().turnIds;
-    const snapshot = await session.handle.steerMessage(prompt);
+    const snapshot = await session.handle.steerMessage(prompt, surfacePromptOptions(options));
     return { threadId: session.handle.id, turnId: resultTurnId(snapshot, beforeTurnIds) };
   }
 
@@ -309,7 +299,11 @@ export class CodexSurfaceAgentAdapter {
       const wasSuppressingEvents = existing.suppressEvents;
       existing.suppressEvents = true;
       try {
-        const snapshot = await existing.handle.load({ cwd: expandHome(agent.folder), extensionContext: agent });
+        let snapshot = await existing.handle.load({ cwd: expandHome(agent.folder), extensionContext: agent });
+        if (snapshot.activeTurnId === null) {
+          await existing.handle.readHistory();
+          snapshot = existing.handle.getSnapshot();
+        }
         this.historyHydratedAtByAgentId.set(agent.id, Date.now());
         existing.suppressEvents = wasSuppressingEvents;
         this.publishInitial(existing, snapshot, true);
@@ -412,6 +406,9 @@ export class CodexSurfaceAgentAdapter {
       if (effectivePreset && snapshot.approvalPreset !== effectivePreset) {
         snapshot = await session.handle.updateSettings({ approvalPreset: effectivePreset });
       }
+      if (snapshot.activeTurnId === null) {
+        await session.handle.readHistory();
+      }
       session.suppressEvents = false;
       snapshot = session.handle.getSnapshot();
       if (emitHistory) {
@@ -465,7 +462,13 @@ export class CodexSurfaceAgentAdapter {
   ): void {
     this.emitThread(session, { type: 'thread.started', payload: { cwd: conversationCwd(snapshot) } });
     if (emitHistory) this.emitHistory(session, snapshot.messages, undefined, snapshot.activeTurnId === null);
-    this.emitSettings(session, snapshot.approvalPreset, snapshot.planMode);
+    this.emitSettings(
+      session,
+      snapshot.approvalPreset,
+      snapshot.selectedModelId,
+      snapshot.selectedReasoningEffort,
+      snapshot.planMode,
+    );
     if (snapshot.goal) this.emitThread(session, { type: 'thread.goalUpdated', payload: { goal: snapshot.goal } });
     if (snapshot.contextUsage) {
       this.emitThread(session, { type: 'thread.tokenUsageUpdated', payload: { contextUsage: snapshot.contextUsage } });
@@ -526,7 +529,14 @@ export class CodexSurfaceAgentAdapter {
         this.emitStatus(session, statusFromSnapshot(session.handle.getSnapshot()), event.occurredAt);
         return;
       case 'conversation.settingsChanged':
-        this.emitSettings(session, event.payload.approvalPreset, event.payload.planMode, event.occurredAt);
+        this.emitSettings(
+          session,
+          event.payload.approvalPreset,
+          event.payload.selectedModelId,
+          event.payload.selectedReasoningEffort,
+          event.payload.planMode,
+          event.occurredAt,
+        );
         return;
       case 'conversation.goalChanged':
         if (event.origin === 'action') return;
@@ -727,13 +737,21 @@ export class CodexSurfaceAgentAdapter {
   private emitSettings(
     session: AgentConversation,
     preset: ApprovalPreset | null,
+    selectedModelId: string | null,
+    selectedReasoningEffort: string | null,
     planMode: boolean,
     occurredAt?: string,
   ): void {
-    if (preset) {
+    if (preset || selectedModelId || selectedReasoningEffort) {
       this.emitThread(session, {
         type: 'thread.settingsUpdated',
-        payload: { threadSettings: threadSettingsForPreset(preset) },
+        payload: {
+          threadSettings: {
+            ...(preset ? threadSettingsForPreset(preset) : {}),
+            ...(selectedModelId ? { model: selectedModelId } : {}),
+            ...(selectedReasoningEffort ? { reasoningEffort: selectedReasoningEffort } : {}),
+          },
+        },
         ...(occurredAt ? { occurredAt } : {}),
       });
     }
@@ -878,6 +896,21 @@ function resultTurnId(
   const known = new Set(beforeTurnIds);
   return [...snapshot.turnIds].reverse().find((turnId) => !known.has(turnId))
     ?? snapshot.turnIds.at(-1);
+}
+
+function surfacePromptOptions(options: SendPromptOptions = {}): SendCodexMessageOptions {
+  const backendOptions = options.backendOptions?.kind === 'codex' ? options.backendOptions : undefined;
+  return {
+    ...(options.attachments?.length ? { attachments: options.attachments } : {}),
+    ...(options.model ? { model: options.model } : {}),
+    ...(typeof options.planMode === 'boolean' ? { planMode: options.planMode } : {}),
+    ...(options.reasoningEffort || backendOptions?.reasoningEffort
+      ? { reasoningEffort: options.reasoningEffort ?? backendOptions?.reasoningEffort ?? undefined }
+      : {}),
+    ...((options.skills?.length ?? 0) > 0 || (backendOptions?.skills?.length ?? 0) > 0
+      ? { skills: options.skills?.length ? options.skills : backendOptions?.skills }
+      : {}),
+  };
 }
 
 function surfaceMessages(

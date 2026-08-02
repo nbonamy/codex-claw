@@ -347,7 +347,10 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'message.steer',
-      payload: { prompt: 'read all the markdown files' },
+      payload: {
+        prompt: 'read all the markdown files',
+        attachments: [{ type: 'file', path: '/tmp/context.md', name: 'context.md' }],
+      },
       occurredAt: '2026-06-05T00:00:03.000Z',
     });
     applyMainEventToSnapshot(snapshot, {
@@ -380,7 +383,13 @@ describe('snapshot reducer', () => {
         status: 'complete',
         turnId: 'turn-1',
         createdAt: '2026-06-05T00:00:03.000Z',
-        parts: [{ type: 'text', text: 'read all the markdown files' }],
+        parts: [
+          { type: 'text', text: 'read all the markdown files' },
+          {
+            type: 'attachment',
+            attachment: { kind: 'file', path: '/tmp/context.md', name: 'context.md' },
+          },
+        ],
       },
       {
         id: 'assistant-turn-1-segment-20260605t000003000z',
@@ -479,6 +488,7 @@ describe('snapshot reducer', () => {
         threadSettings: {
           cwd: '/Users/nbonamy/src/codex-claw',
           model: 'gpt-5.5',
+          reasoningEffort: 'high',
           approvalPolicy: 'on-request',
           approvalsReviewer: 'auto_review',
           sandboxPolicy: {
@@ -492,10 +502,12 @@ describe('snapshot reducer', () => {
     expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-1' });
     expect(snapshot.agents[0].backendDefaults).toStrictEqual({
       kind: 'codex',
+      model: 'gpt-5.5',
       approvalPreset: 'approve-for-me',
       approvalPolicy: 'on-request',
       approvalsReviewer: 'auto_review',
       sandboxMode: 'workspace-write',
+      reasoningEffort: 'high',
     });
   });
 

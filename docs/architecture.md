@@ -756,11 +756,13 @@ working without changing the user's selection. Electron keys native browser
 views by both agent id and browser id; the current UI uses a stable `primary`
 id but the host is ready for multiple browser tabs per agent.
 
-Agent selection is optimistic in the renderer: the selected agent and any
-already-hydrated messages are displayed immediately, while the backend's
-session hydration, Git status refresh, and agent-specific catalogs reconcile in
-the background. Selection requests carry a monotonic renderer token so a stale
-response from a rapid earlier switch cannot replace the current agent.
+Agent selection is optimistic only when the renderer already has hydrated
+messages for that agent. First startup and the first visit to an uncached
+conversation keep the history loader visible until backend hydration finishes,
+then reveal the transcript atomically. Git status and agent-specific catalogs
+still reconcile in the background. Selection requests carry a monotonic
+renderer token so a stale response from a rapid earlier switch cannot replace
+the current agent.
 Live Codex transcripts remain cached in `clawd` for five minutes after
 hydration or conversation activity. Re-selecting an agent within that window
 reuses the in-memory transcript; stale revalidation suppresses intermediate

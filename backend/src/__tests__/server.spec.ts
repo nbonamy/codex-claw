@@ -1801,7 +1801,7 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
-  it('keeps live in-memory messages when selecting an agent again', async () => {
+  it('revalidates a selected agent while keeping its live in-memory messages', async () => {
     const snapshot = createTestSnapshot();
     snapshot.activeAgentId = null;
     snapshot.teams[0]!.agentIds = ['agent-dina'];
@@ -1864,7 +1864,7 @@ describe('ClawBackendServer', () => {
       },
     });
 
-    expect(hydrateAgent).not.toHaveBeenCalled();
+    expect(hydrateAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
     expect(getGitStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
     await server.close();
   });
@@ -3266,7 +3266,11 @@ describe('ClawBackendServer', () => {
       jsonrpc: '2.0',
       id: 'steer',
       method: 'agent/prompt/steer',
-      params: { agentId: 'agent-dina', prompt: ' try smaller ' },
+      params: {
+        agentId: 'agent-dina',
+        prompt: ' try smaller ',
+        options: { attachments: [{ type: 'file', path: '/tmp/notes.txt', name: 'notes.txt' }] },
+      },
     })).resolves.toMatchObject({
       result: {
         agents: [{ id: 'agent-dina', backendSession: { kind: 'codex', threadId: 'thread-steer' } }],
@@ -3283,11 +3287,22 @@ describe('ClawBackendServer', () => {
       },
     });
 
-    expect(steerPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'try smaller');
+    expect(steerPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'try smaller', {
+      attachments: [{ type: 'file', path: '/tmp/notes.txt', name: 'notes.txt' }],
+    });
     expect(interrupt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
     expect(snapshot.messages.some((message) => message.parts.some((part) => part.type === 'text' && part.text === 'try smaller'))).toBe(true);
+    expect(snapshot.messages.some((message) => message.parts.some((part) => (
+      part.type === 'attachment' && part.attachment.path === '/tmp/notes.txt'
+    )))).toBe(true);
     expect(events).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'message.steer', payload: { prompt: 'try smaller' } }),
+      expect.objectContaining({
+        type: 'message.steer',
+        payload: {
+          prompt: 'try smaller',
+          attachments: [{ type: 'file', path: '/tmp/notes.txt', name: 'notes.txt' }],
+        },
+      }),
     ]));
     expect(saveSnapshot).toHaveBeenCalledTimes(2);
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
@@ -3567,16 +3582,26 @@ describe('ClawBackendServer', () => {
 
     await server.handleMessage({
       jsonrpc: '2.0', id: 'queue', method: 'agent/prompt/send',
-      params: { agentId: 'agent-dina', prompt: 'run next' },
+      params: {
+        agentId: 'agent-dina',
+        prompt: 'run next',
+        options: { attachments: [{ type: 'file', path: '/tmp/queue.txt', name: 'queue.txt' }] },
+      },
     });
-    expect(snapshot.queuedPrompts).toEqual([expect.objectContaining({ agentId: 'agent-dina', text: 'run next' })]);
+    expect(snapshot.queuedPrompts).toEqual([expect.objectContaining({
+      agentId: 'agent-dina',
+      text: 'run next',
+      options: { attachments: [{ type: 'file', path: '/tmp/queue.txt', name: 'queue.txt' }] },
+    })]);
     expect(sendPrompt).not.toHaveBeenCalled();
 
     server.emitEvent({
       agentId: 'agent-dina', threadId: 'thread-dina', turnId: 'turn-old',
       type: 'turn.completed', payload: { status: 'completed' },
     });
-    expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'run next', undefined);
+    expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'run next', {
+      attachments: [{ type: 'file', path: '/tmp/queue.txt', name: 'queue.txt' }],
+    });
     expect(snapshot.queuedPrompts).toHaveLength(1);
     const submittedEvent = events.find((event) => event.type === 'message.userSubmitted');
     expect(submittedEvent).toEqual(expect.objectContaining({
@@ -3585,7 +3610,13 @@ describe('ClawBackendServer', () => {
         message: expect.objectContaining({
           agentId: 'agent-dina',
           role: 'user',
-          parts: [{ type: 'text', text: 'run next' }],
+          parts: [
+            { type: 'text', text: 'run next' },
+            {
+              type: 'attachment',
+              attachment: { kind: 'file', path: '/tmp/queue.txt', name: 'queue.txt' },
+            },
+          ],
         }),
       },
     }));

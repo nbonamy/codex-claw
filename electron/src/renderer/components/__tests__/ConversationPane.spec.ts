@@ -5,6 +5,7 @@ import ElementPlus from 'element-plus';
 import {
   CodexConversationPane,
   type CodexComposerState,
+  type CodexNativeAttachment,
 } from 'codex-app-sdk/vue';
 import { nextTick, type Component, type DefineComponent } from 'vue';
 import { describe, expect, it } from 'vitest';
@@ -186,6 +187,51 @@ describe('ConversationPane', () => {
             previewUrl: 'data:image/png;base64,cG5n',
           },
           { type: 'file', path: '/tmp/report.txt', name: 'report.txt', mimeType: 'text/plain' },
+        ],
+      },
+    ]]);
+  });
+
+  it('restores selected attachments and forwards attachment-aware steering for the owning agent', async () => {
+    const attachments: readonly CodexNativeAttachment[] = [
+      {
+        id: 'attachment-context', type: 'file', path: '/tmp/context.txt', name: 'context.txt',
+        mimeType: 'text/plain', size: 12,
+      },
+    ];
+    const wrapper = mountPane({ agent, messages, isSending: true, attachments });
+    const sdkPane = wrapper.getComponent(CodexConversationPane as unknown as Component);
+
+    expect((sdkPane.props() as Record<string, unknown>).attachments).toStrictEqual(attachments);
+    sdkPane.vm.$emit('attachmentsChange', [
+      {
+        id: 'attachment-screenshot', type: 'image', path: '/tmp/screenshot.png', name: 'screenshot.png',
+        mimeType: 'image/png', size: 24,
+      },
+    ]);
+    sdkPane.vm.$emit('steer', 'use this screenshot', {
+      attachments: [
+        { type: 'image', path: '/tmp/screenshot.png', detail: 'high', name: 'screenshot.png' },
+      ],
+    });
+    await nextTick();
+
+    expect(wrapper.emitted('update:composerAttachments')).toStrictEqual([[
+      {
+        agentId: 'agent-dina',
+        attachments: [
+          {
+            id: 'attachment-screenshot', type: 'image', path: '/tmp/screenshot.png', name: 'screenshot.png',
+            mimeType: 'image/png', size: 24,
+          },
+        ],
+      },
+    ]]);
+    expect(wrapper.emitted('steerPrompt')).toStrictEqual([[
+      'use this screenshot',
+      {
+        attachments: [
+          { type: 'image', path: '/tmp/screenshot.png', detail: 'high', name: 'screenshot.png' },
         ],
       },
     ]]);
@@ -435,6 +481,7 @@ function mountPane(props: {
   plan?: ThreadPlan | null;
   isLoading?: boolean;
   composerState?: CodexComposerState;
+  attachments?: readonly CodexNativeAttachment[];
 }) {
   type TestConversationPaneProps = typeof props & { isLoading: boolean };
   return mount(ConversationPane as unknown as DefineComponent<TestConversationPaneProps>, {

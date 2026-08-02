@@ -3,6 +3,7 @@ import net, { type Socket } from 'node:net';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawRpcResponse, parseClawRpcMessage, type ClawBackendEvent, type ClawBackendHealth, type ClawRpcId, type ClawRpcRequest, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { createRuntimeClientRequestHandlers } from './client-request-handlers';
 import { warnMain } from './log';
+import { backendRequestTimeoutMs } from './backend-request-timeout';
 
 export type ClawBackendSocketClientOptions = {
   connectSocket?: typeof net.createConnection;
@@ -71,7 +72,7 @@ export class ClawBackendSocketClient {
       const timeout = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`clawd socket request timed out: ${method}`));
-      }, this.requestTimeoutMs);
+      }, backendRequestTimeoutMs(method, this.requestTimeoutMs));
 
       this.pending.set(id, {
         resolve: (value) => resolve(value as Result),

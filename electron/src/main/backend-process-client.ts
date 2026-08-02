@@ -5,6 +5,7 @@ import { watch } from 'node:fs';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawRpcResponse, parseClawRpcMessage, type ClawBackendEvent, type ClawBackendHealth, type ClawRpcId, type ClawRpcRequest, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { createRuntimeClientRequestHandlers } from './client-request-handlers';
 import { warnMain } from './log';
+import { backendRequestTimeoutMs } from './backend-request-timeout';
 
 export type ClawBackendProcessCommand = {
   command: string;
@@ -98,7 +99,7 @@ export class ClawBackendProcessClient {
       const timeout = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`clawd request timed out: ${method}`));
-      }, this.requestTimeoutMs);
+      }, backendRequestTimeoutMs(method, this.requestTimeoutMs));
 
       this.pending.set(id, {
         resolve: (value) => resolve(value as Result),

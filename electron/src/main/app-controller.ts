@@ -355,8 +355,8 @@ export class AppController {
       return this.sendPrompt(agentId, prompt, options);
     });
 
-    ipc.handle(ipcChannels.steerPrompt, (_event, agentId: string, prompt: string) => {
-      return this.steerPrompt(agentId, prompt);
+    ipc.handle(ipcChannels.steerPrompt, (_event, agentId: string, prompt: string, options?: SendPromptOptions) => {
+      return this.steerPrompt(agentId, prompt, options);
     });
 
     ipc.handle(ipcChannels.deleteQueuedPrompt, (_event, agentId: string, promptId: string) => {
@@ -743,7 +743,7 @@ export class AppController {
   private async adoptBackendSnapshot(snapshot: AppSnapshot): Promise<AppSnapshot> {
     this.snapshot = snapshot;
     await this.refreshClientStateFromBackend();
-    return snapshot;
+    return this.snapshot;
   }
 
   private async getSnapshot(): Promise<AppSnapshot> {
@@ -898,8 +898,11 @@ export class AppController {
     await this.requireBackendClient().request(backendMethods.agentGitDiffOpen, { agentId });
   }
 
-  private async steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentPromptSteer, { agentId, prompt }));
+  private async steerPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(
+      backendMethods.agentPromptSteer,
+      options ? { agentId, prompt, options } : { agentId, prompt },
+    ));
   }
 
   private async deleteQueuedPrompt(agentId: string, promptId: string): Promise<AppSnapshot> {

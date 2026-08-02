@@ -227,7 +227,11 @@ export class BackendDriverRpc {
         if (!driver.steerPrompt) {
           throw unsupportedBackendFeature(agent, 'prompt steering');
         }
-        return driver.steerPrompt(agent, requireString(record.prompt, 'prompt'));
+        const prompt = requireString(record.prompt, 'prompt');
+        const options = record.options as SendPromptOptions | undefined;
+        return options
+          ? driver.steerPrompt(agent, prompt, options)
+          : driver.steerPrompt(agent, prompt);
       }
       case backendMethods.driverTurnRollback: {
         const { agent } = requireAgentParams(params);

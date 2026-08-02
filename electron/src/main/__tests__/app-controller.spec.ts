@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { ipcChannels } from '@codex-claw/shared/ipc';
@@ -11,6 +11,38 @@ function callPrivate<Result>(controller: AppController, method: string): Promise
 }
 
 describe('AppController', () => {
+  it('returns the latest event-applied snapshot after refreshing client state', async () => {
+    const staleSnapshot = createInitialSnapshot();
+    let resolveClientState!: (state: ClientState) => void;
+    const clientState = new Promise<ClientState>((resolve) => {
+      resolveClientState = resolve;
+    });
+    const request = vi.fn((method: string) => {
+      if (method === backendMethods.clientStateGet) return clientState;
+      return Promise.resolve({});
+    });
+    const backendClient = createBackendClient({
+      request: vi.fn(),
+      clientState: undefined,
+    });
+    backendClient.request = <Result,>(method: string) => request(method) as Promise<Result>;
+    const controller = new AppController(createInitialSnapshot(), backendClient);
+
+    const adoption = adoptBackendSnapshot(controller, staleSnapshot);
+    await vi.waitFor(() => expect(request).toHaveBeenCalledWith(backendMethods.clientStateGet));
+    emitBackendEvent(controller, {
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'agent.statusChanged',
+      payload: { type: 'working' },
+      occurredAt: '2026-08-02T14:00:00.000Z',
+    });
+    resolveClientState({ sourceFolderPath: '', shouldPreventDisplaySleep: true });
+
+    await expect(adoption).resolves.toBe(currentSnapshot(controller));
+    expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'working' });
+  });
+
   it('waits for the renderer browser pane to load a model-requested URL', async () => {
     const controller = new AppController(createInitialSnapshot(), null);
     const send = vi.fn();
@@ -1322,8 +1354,16 @@ describe('AppController', () => {
     await controller.initialize();
 
     await expect(steerPrompt(controller, 'agent-dina', ' try smaller ')).resolves.toBe(backendSnapshot);
+    await expect(steerPrompt(controller, 'agent-dina', ' inspect this ', {
+      attachments: [{ type: 'file', path: '/tmp/notes.txt', name: 'notes.txt' }],
+    })).resolves.toBe(backendSnapshot);
 
     expect(request).toHaveBeenCalledWith('agent/prompt/steer', { agentId: 'agent-dina', prompt: ' try smaller ' });
+    expect(request).toHaveBeenCalledWith('agent/prompt/steer', {
+      agentId: 'agent-dina',
+      prompt: ' inspect this ',
+      options: { attachments: [{ type: 'file', path: '/tmp/notes.txt', name: 'notes.txt' }] },
+    });
   });
 
   it('routes queued prompt mutations through clawd', async () => {
@@ -1689,6 +1729,12 @@ function emitBackendEvent(
   }).emitBackendEvent(fullEvent);
 }
 
+function adoptBackendSnapshot(controller: AppController, snapshot: AppSnapshot): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    adoptBackendSnapshot(snapshot: AppSnapshot): Promise<AppSnapshot>;
+  }).adoptBackendSnapshot(snapshot);
+}
+
 function setMainWindowSend(controller: AppController, send: ReturnType<typeof vi.fn>): void {
   (controller as unknown as {
     mainWindow: { isDestroyed(): boolean; webContents: { send: ReturnType<typeof vi.fn> } };
@@ -2043,10 +2089,15 @@ async function resumeAgentConversation(
   }).resumeAgentConversation(agentId, ref);
 }
 
-async function steerPrompt(controller: AppController, agentId: string, prompt: string): Promise<AppSnapshot> {
+async function steerPrompt(
+  controller: AppController,
+  agentId: string,
+  prompt: string,
+  options?: SendPromptOptions,
+): Promise<AppSnapshot> {
   return (controller as unknown as {
-    steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot>;
-  }).steerPrompt(agentId, prompt);
+    steerPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot>;
+  }).steerPrompt(agentId, prompt, options);
 }
 
 async function steerQueuedPrompt(controller: AppController, agentId: string, promptId: string): Promise<AppSnapshot> {

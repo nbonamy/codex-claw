@@ -1168,7 +1168,7 @@ export type CodexClawApi = {
   clearAgentGoal(agentId: string): Promise<AppSnapshot>;
   setAgentApprovalPreset(agentId: string, preset: ApprovalPreset): Promise<AppSnapshot>;
   sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot>;
-  steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot>;
+  steerPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot>;
   deleteQueuedPrompt(agentId: string, promptId: string): Promise<AppSnapshot>;
   steerQueuedPrompt(agentId: string, promptId: string): Promise<AppSnapshot>;
   interruptAgent(agentId: string): Promise<AppSnapshot>;

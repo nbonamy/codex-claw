@@ -200,6 +200,7 @@ export function appendSteerPrompt(
   turnId: string,
   prompt: string,
   createdAt = new Date().toISOString(),
+  attachments: readonly PromptAttachment[] = [],
 ): RendererMessage {
   const activeAssistantMessage = findAssistantMessage(snapshot, agentId, turnId);
   if (activeAssistantMessage?.parts.length === 0 && activeAssistantMessage.id.startsWith(`${assistantMessageId(turnId)}-segment-`)) {
@@ -208,7 +209,7 @@ export function appendSteerPrompt(
     activeAssistantMessage.status = 'complete';
   }
 
-  const message = createUserMessage(agentId, prompt, createdAt, `steer-${turnId}`, turnId);
+  const message = createUserMessage(agentId, prompt, createdAt, `steer-${turnId}`, turnId, attachments);
   snapshot.messages.push(message);
   ensureAssistantMessage(snapshot, agentId, turnId, assistantSegmentMessageId(turnId, createdAt), createdAt);
   pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
@@ -351,6 +352,20 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
       if (approvalPreset) {
         agent.backendDefaults = codexBackendDefaultsWithApprovalPreset(agent.backendDefaults, approvalPreset);
       }
+      if (isRecord(payload.threadSettings)) {
+        const defaults = agent.backendDefaults?.kind === 'codex'
+          ? agent.backendDefaults
+          : { kind: 'codex' as const };
+        agent.backendDefaults = {
+          ...defaults,
+          ...(typeof payload.threadSettings.model === 'string'
+            ? { model: payload.threadSettings.model }
+            : {}),
+          ...(typeof payload.threadSettings.reasoningEffort === 'string'
+            ? { reasoningEffort: payload.threadSettings.reasoningEffort }
+            : {}),
+        };
+      }
     }
     return;
   }
@@ -452,9 +467,16 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   }
 
   if (event.type === 'message.steer' && event.turnId) {
-    const payload = event.payload as { prompt?: unknown };
+    const payload = event.payload as { prompt?: unknown; attachments?: unknown };
     if (typeof payload.prompt === 'string' && payload.prompt.trim()) {
-      appendSteerPrompt(snapshot, event.agentId, event.turnId, payload.prompt, event.occurredAt);
+      appendSteerPrompt(
+        snapshot,
+        event.agentId,
+        event.turnId,
+        payload.prompt,
+        event.occurredAt,
+        promptAttachments(payload.attachments),
+      );
     }
     return;
   }
@@ -1773,6 +1795,25 @@ function promptAttachmentPart(attachment: PromptAttachment): RendererMessagePart
       ...(attachment.type === 'image' && attachment.previewUrl ? { url: attachment.previewUrl } : {}),
     },
   };
+}
+
+function promptAttachments(value: unknown): PromptAttachment[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((candidate) => {
+    if (!isRecord(candidate) || (candidate.type !== 'image' && candidate.type !== 'file') || typeof candidate.path !== 'string') {
+      return [];
+    }
+    return [{
+      type: candidate.type,
+      path: candidate.path,
+      ...(typeof candidate.name === 'string' ? { name: candidate.name } : {}),
+      ...(typeof candidate.mimeType === 'string' ? { mimeType: candidate.mimeType } : {}),
+      ...(candidate.type === 'image' && typeof candidate.detail === 'string' && (
+        candidate.detail === 'auto' || candidate.detail === 'low' || candidate.detail === 'high' || candidate.detail === 'original'
+      ) ? { detail: candidate.detail } : {}),
+      ...(candidate.type === 'image' && typeof candidate.previewUrl === 'string' ? { previewUrl: candidate.previewUrl } : {}),
+    } satisfies PromptAttachment];
+  });
 }
 
 function attachmentFileName(filePath: string): string {

@@ -7,6 +7,7 @@ import { approvalPresetFromDefaults } from '@codex-claw/shared/approval-presets'
 import {
   promptSkillInputsFromText,
   type CodexComposerState,
+  type CodexNativeAttachment,
 } from 'codex-app-sdk/vue';
 import { workItemAssignmentPrompt } from '@codex-claw/shared/work-item-prompts';
 import { isAppSnapshot } from '@codex-claw/shared/snapshot-guards';
@@ -17,6 +18,7 @@ const isLoading = ref(false);
 const connectionState = ref<BackendConnectionState>({ status: 'connecting' });
 const sendingAgentIds = ref(new Set<string>());
 const composerStatesByAgentId = ref<Record<string, CodexComposerState>>({});
+const composerAttachmentsByAgentId = ref<Record<string, CodexNativeAttachment[]>>({});
 const answeredClientRequestIds = ref(new Set<string>());
 const backendModels = ref<BackendModelOption[]>([]);
 const modelCatalogStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
@@ -103,11 +105,24 @@ export function useAppState() {
       : emptyComposerState();
   });
 
+  const activeComposerAttachments = computed<readonly CodexNativeAttachment[]>(() => {
+    const agentId = activeAgent.value?.id;
+    return agentId ? composerAttachmentsByAgentId.value[agentId] ?? [] : [];
+  });
+
   function updateComposerState(agentId: string, state: CodexComposerState): void {
     if (!snapshot.value.agents.some((agent) => agent.id === agentId)) return;
     composerStatesByAgentId.value = {
       ...composerStatesByAgentId.value,
       [agentId]: { ...state },
+    };
+  }
+
+  function updateComposerAttachments(agentId: string, attachments: readonly CodexNativeAttachment[]): void {
+    if (!snapshot.value.agents.some((agent) => agent.id === agentId)) return;
+    composerAttachmentsByAgentId.value = {
+      ...composerAttachmentsByAgentId.value,
+      [agentId]: attachments.map((attachment) => ({ ...attachment })),
     };
   }
 
@@ -158,6 +173,7 @@ export function useAppState() {
       await synchronizeRendererSnapshot(false);
       if (snapshot.value.activeAgentId) restoreComposerConfiguration(snapshot.value.activeAgentId);
       pruneRemoteBenchCache();
+      await hydrateActiveAgentHistory();
       await Promise.all([
         loadActiveAgentCatalogs(),
         loadConnectedWorkBacklogs(),
@@ -174,7 +190,6 @@ export function useAppState() {
       isLoading.value = false;
     }
 
-    void hydrateActiveAgentHistory().catch(() => undefined);
   }
 
   async function synchronizeRendererSnapshot(preserveActiveSelection: boolean): Promise<void> {
@@ -259,7 +274,7 @@ export function useAppState() {
     await sendPromptForAgent(agentId, trimmed, submissionOptions);
   }
 
-  async function steerPrompt(prompt: string): Promise<void> {
+  async function steerPrompt(prompt: string, submissionOptions?: SendPromptOptions): Promise<void> {
     const agentId = activeAgent.value?.id;
     if (!agentId || !window.codexClaw) {
       return;
@@ -271,16 +286,19 @@ export function useAppState() {
     }
 
     if (!isAgentSending(agentId)) {
-      await sendPromptForAgent(agentId, trimmed);
+      await sendPromptForAgent(agentId, trimmed, submissionOptions);
       return;
     }
 
     if (!window.codexClaw.steerPrompt) {
-      await sendPromptForAgent(agentId, trimmed);
+      await sendPromptForAgent(agentId, trimmed, submissionOptions);
       return;
     }
 
-    adoptBackgroundSnapshot(await window.codexClaw.steerPrompt(agentId, trimmed));
+    const options = resolvedPromptOptions(agentId, trimmed, submissionOptions);
+    adoptBackgroundSnapshot(options
+      ? await window.codexClaw.steerPrompt(agentId, trimmed, options)
+      : await window.codexClaw.steerPrompt(agentId, trimmed));
   }
 
   async function interruptActiveAgent(): Promise<void> {
@@ -406,11 +424,16 @@ export function useAppState() {
     }
 
     const requestId = ++agentSelectionRequestId;
+    const needsHistory = Boolean(
+      snapshot.value.agents.find((agent) => agent.id === agentId)?.backendSession
+      && !snapshot.value.messages.some((message) => message.agentId === agentId),
+    );
     rememberActiveComposerConfiguration();
     snapshot.value = selectAgentInSnapshot(snapshot.value, agentId);
     restoreComposerConfiguration(agentId);
+    if (needsHistory) markAgentHistoryHydrating(agentId, true);
     void loadActiveAgentCatalogs(agentId);
-    void refreshAgentSelection(agentId, requestId);
+    void refreshAgentSelection(agentId, requestId, needsHistory);
   }
 
   async function chooseAgentFolder(): Promise<string | null> {
@@ -1337,6 +1360,7 @@ export function useAppState() {
     visibleMessages,
     activeQueuedPrompts,
     activeComposerState,
+    activeComposerAttachments,
     isLoading,
     connectionState,
     isHydratingActiveAgentHistory,
@@ -1444,6 +1468,7 @@ export function useAppState() {
     setPlanMode,
     setApprovalPreset,
     updateComposerState,
+    updateComposerAttachments,
     selectAgent,
     selectTeam,
     clearActiveGoal,
@@ -1521,6 +1546,8 @@ function messageActionCapabilities(agentId: string) {
 function composerConfiguration(agentId: string): AgentComposerConfiguration {
   const existing = composerConfigurationByAgentId.get(agentId);
   if (existing) return existing;
+  const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
+  const defaults = agent?.backendDefaults?.kind === 'codex' ? agent.backendDefaults : undefined;
   const configuration: AgentComposerConfiguration = {
     models: [],
     modelStatus: 'notLoaded',
@@ -1531,8 +1558,8 @@ function composerConfiguration(agentId: string): AgentComposerConfiguration {
     files: [],
     fileStatus: 'notLoaded',
     fileError: null,
-    selectedModelId: null,
-    selectedReasoningEffort: null,
+    selectedModelId: defaults?.model ?? null,
+    selectedReasoningEffort: defaults?.reasoningEffort ?? null,
     planMode: false,
   };
   composerConfigurationByAgentId.set(agentId, configuration);
@@ -2005,6 +2032,21 @@ async function loadAgentFilesForActiveAgent(agentId = snapshot.value.activeAgent
 }
 
 function syncComposerModeFromMainEvent(event: MainToRendererEvent): void {
+  if (event.type === 'thread.settingsUpdated' && isRecord(event.payload)) {
+    const agentId = event.agentId ?? snapshot.value.activeAgentId;
+    const threadSettings = isRecord(event.payload.threadSettings) ? event.payload.threadSettings : null;
+    if (!agentId || !threadSettings) return;
+    const configuration = composerConfiguration(agentId);
+    if (typeof threadSettings.model === 'string') {
+      configuration.selectedModelId = threadSettings.model;
+    }
+    if (typeof threadSettings.reasoningEffort === 'string') {
+      configuration.selectedReasoningEffort = threadSettings.reasoningEffort;
+    }
+    if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
+    return;
+  }
+
   if (event.type === 'thread.modeUpdated' && isRecord(event.payload)) {
     const mode = event.payload.mode;
     const agentId = event.agentId ?? snapshot.value.activeAgentId;
@@ -2096,14 +2138,16 @@ async function selectSnapshotWithLoading(selectSnapshot: () => Promise<AppSnapsh
   }
 }
 
-async function refreshAgentSelection(agentId: string, requestId: number): Promise<void> {
+async function refreshAgentSelection(agentId: string, requestId: number, needsHistory = false): Promise<void> {
   try {
     const nextSnapshot = await window.codexClaw!.selectAgent(agentId);
     if (requestId === agentSelectionRequestId) {
-      snapshot.value = nextSnapshot;
+      adoptBackgroundSnapshot(nextSnapshot);
     }
   } catch {
     // The optimistic selection remains visible; the next snapshot/event will reconcile it.
+  } finally {
+    if (needsHistory) markAgentHistoryHydrating(agentId, false);
   }
 }
 

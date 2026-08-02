@@ -85,13 +85,15 @@ implemented:
   backend session hydration, Git status, and agent catalogs refresh
   asynchronously, while snapshots returned by background work preserve the
   current renderer selection and cannot switch the user back to another agent;
-- per-agent in-memory composer state, including unsent text and the current
-  selection/caret, so switching agents restores the editor exactly; queued
-  prompts remain backend-owned snapshot state and the renderer never removes
-  them before `clawd` confirms dequeue;
+- per-agent in-memory composer state, including unsent text, selected
+  attachments, and the current selection/caret, so switching agents restores
+  the editor exactly; queued prompts remain backend-owned snapshot state and
+  the renderer never removes them before `clawd` confirms dequeue;
 - per-agent in-memory model, reasoning, plan-mode, skill, and file-catalog
   configuration, restored synchronously on selection before background catalog
-  refresh completes;
+  refresh completes; model and reasoning selections are seeded from the
+  backend thread settings during hydration so reopening Claw does not reset a
+  resumed thread to catalog defaults;
 - a non-blocking connection strip while Electron reconnects to `clawd`; the
   existing conversation remains visible because agents continue in the
   background daemon;
@@ -107,8 +109,9 @@ implemented:
   width, and inactive workspaces stay mounted so background browser tooling can
   continue without stealing the user's selected agent;
 - empty right-workspace launcher for opening Review or Browser before any tab
-  exists and after the last tab closes; Review uses `Command+G` and Browser
-  uses `Command+B`, while existing `Command+D` duplicate-agent and `Command+R`
+  exists; manually closing the last tab collapses the workspace. Review uses
+  `Command+G` and Browser uses `Command+B`, while existing `Command+D`
+  duplicate-agent and `Command+R`
   restart-agent shortcuts remain unchanged;
 - focused artifact panes for documents, plans, and read-only source previews;
 - Bench entry point in the agent creation flow;

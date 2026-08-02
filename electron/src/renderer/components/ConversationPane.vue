@@ -2,6 +2,7 @@
   <div class="conversation-pane">
     <CodexConversationPane
       :composer-state="composerState"
+      :attachments="attachments"
       class="conversation-pane__surface"
       :answered-client-request-ids="answeredClientRequestIds"
       :approvals="approvals"
@@ -41,11 +42,12 @@
       @retry-message="$emit('retry-message', $event)"
       @resolve-approval="resolveApproval"
       @select-approval-preset="$emit('select-approval-preset', $event)"
-      @steer="$emit('steerPrompt', $event)"
+      @steer="steerPrompt"
       @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
       @submit="submitPrompt"
       @update:model-id="$emit('select-model', $event)"
       @update:composer-state="updateComposerState"
+      @attachments-change="updateComposerAttachments"
       @update:plan-mode="$emit('update:planMode', $event)"
       @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
     >
@@ -71,6 +73,7 @@ import {
   type CodexChatMessage,
   type CodexComposerState,
   type CodexConversationLink,
+  type CodexNativeAttachment,
   type CodexQueuedPromptData as QueuedChatPrompt,
   type SendCodexMessageOptions,
 } from 'codex-app-sdk/vue';
@@ -123,6 +126,7 @@ const props = withDefaults(defineProps<{
   queuedPrompts?: QueuedChatPrompt[];
   planMode?: boolean;
   composerState?: CodexComposerState;
+  attachments?: readonly CodexNativeAttachment[];
 }>(), {
   queuedPrompts: () => [],
   agentFiles: () => [],
@@ -134,6 +138,7 @@ const props = withDefaults(defineProps<{
   skillCatalogStatus: 'notLoaded',
   approvalPreset: null,
   composerState: () => ({ text: '', selectionStart: 0, selectionEnd: 0 }),
+  attachments: () => [],
 });
 
 const emit = defineEmits<{
@@ -152,8 +157,9 @@ const emit = defineEmits<{
   'steer-queued-prompt': [promptId: string];
   'update:planMode': [enabled: boolean];
   'update:composerState': [payload: { agentId: string; state: CodexComposerState }];
+  'update:composerAttachments': [payload: { agentId: string; attachments: readonly CodexNativeAttachment[] }];
   sendPrompt: [prompt: string, options?: SendPromptOptions];
-  steerPrompt: [prompt: string];
+  steerPrompt: [prompt: string, options?: SendPromptOptions];
 }>();
 
 const presentedMessages = computed(() => props.messages.map((message) => (
@@ -220,14 +226,25 @@ function resolveApproval(
 }
 
 function submitPrompt(prompt: string, options?: SendCodexMessageOptions): void {
-  const attachments = options?.attachments?.map<PromptAttachment>((attachment) => ({
-    ...attachment,
-  }));
+  const attachments = promptAttachments(options);
   if (attachments?.length) {
     emit('sendPrompt', prompt, { attachments });
   } else {
     emit('sendPrompt', prompt);
   }
+}
+
+function steerPrompt(prompt: string, options?: SendCodexMessageOptions): void {
+  const attachments = promptAttachments(options);
+  if (attachments?.length) {
+    emit('steerPrompt', prompt, { attachments });
+  } else {
+    emit('steerPrompt', prompt);
+  }
+}
+
+function promptAttachments(options?: SendCodexMessageOptions): PromptAttachment[] | undefined {
+  return options?.attachments?.map<PromptAttachment>((attachment) => ({ ...attachment }));
 }
 
 function collaborationMessageLabel(messageId: CodexChatMessage['id']): string | null {
@@ -237,6 +254,11 @@ function collaborationMessageLabel(messageId: CodexChatMessage['id']): string | 
 function updateComposerState(state: CodexComposerState): void {
   if (!props.agent) return;
   emit('update:composerState', { agentId: props.agent.id, state });
+}
+
+function updateComposerAttachments(attachments: readonly CodexNativeAttachment[]): void {
+  if (!props.agent) return;
+  emit('update:composerAttachments', { agentId: props.agent.id, attachments });
 }
 </script>
 

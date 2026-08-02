@@ -186,8 +186,8 @@ export class CodexBackendDriver implements AgentBackendDriver {
     };
   }
 
-  async steerPrompt(agent: Agent, prompt: string): Promise<BackendSendResult> {
-    const result = await this.sessionManager.steerPrompt(agent, prompt);
+  async steerPrompt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult> {
+    const result = await this.sessionManager.steerPrompt(agent, prompt, options);
     return {
       backendSession: codexBackendSession(result.threadId),
       turnId: result.turnId,

@@ -70,7 +70,7 @@ export type AgentBackendDriver = {
   listConversations?(agent: Agent): Promise<ConversationSummary[]>;
   resumeConversation?(agent: Agent, ref: BackendConversationRef): Promise<BackendConversationResumeResult>;
   readConversationMessages?(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]>;
-  steerPrompt?(agent: Agent, prompt: string): Promise<BackendSendResult>;
+  steerPrompt?(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>;
   rollbackToTurn?(agent: Agent, turnId: string): Promise<BackendRollbackResult>;
   listModels?(agent: Agent): Promise<BackendModelOption[]>;
   listSkills?(agent: Agent): Promise<BackendSkillSummary[]>;

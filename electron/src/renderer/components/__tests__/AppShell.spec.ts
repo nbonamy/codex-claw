@@ -222,7 +222,7 @@ describe('AppShell', () => {
     expect(wrapper.get('[role="tab"]').text()).toBe('Browser');
 
     await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
-    await nextTick();
+    await flushPromises();
     await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
     await flushPromises();
 
@@ -232,7 +232,7 @@ describe('AppShell', () => {
     await wrapper.get('[aria-label="Close Browser tab"]').trigger('click');
     await nextTick();
 
-    expect(wrapper.get('[aria-label="Open a workspace tab"]').isVisible()).toBe(true);
+    expect(wrapper.find('.app-shell__right-workspace').isVisible()).toBe(false);
   });
 
   it('keeps each agent workspace and browser mounted while switching agents', async () => {

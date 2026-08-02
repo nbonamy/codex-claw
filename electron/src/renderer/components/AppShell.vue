@@ -216,6 +216,7 @@
             :selected-reasoning-effort="selectedReasoningEffort"
             :queued-prompts="queuedPrompts"
             :composer-state="composerState"
+            :attachments="composerAttachments"
             @client-response="$emit('client-response', $event)"
             @delete-message="$emit('delete-message', $event)"
             @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
@@ -229,10 +230,11 @@
             @resolve-approval="forwardApprovalResolution"
             @clear-goal="$emit('clear-goal')"
             @send-prompt="forwardPrompt"
-            @steer-prompt="$emit('steerPrompt', $event)"
+            @steer-prompt="forwardSteerPrompt"
             @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
             @update:plan-mode="$emit('update:planMode', $event)"
             @update:composer-state="$emit('update:composerState', $event)"
+            @update:composer-attachments="$emit('update:composerAttachments', $event)"
           />
           <RightWorkspacePanel
             v-for="agent in snapshot.agents"
@@ -347,6 +349,7 @@ import CodexLoginLanding from './CodexLoginLanding.vue';
 import type { SettingsTab } from './settings-tabs';
 import { confirmCloseTeam } from './team-close-confirmation';
 import {
+  type CodexNativeAttachment,
   type CodexComposerState,
   languageForFilePath,
   type CodexQueuedPromptData as QueuedChatPrompt,
@@ -378,6 +381,7 @@ const props = withDefaults(defineProps<{
   planMode?: boolean;
   queuedPrompts?: QueuedChatPrompt[];
   composerState?: CodexComposerState;
+  composerAttachments?: readonly CodexNativeAttachment[];
   sidePanelRequest?: SidePanelRequest | null;
   workProviderAuthorization?: WorkProviderAuthorization | null;
   workRepositoriesByProvider?: Partial<Record<WorkProviderKind, WorkRepository[]>>;
@@ -457,6 +461,7 @@ const props = withDefaults(defineProps<{
   approvalPreset: null,
   queuedPrompts: () => [],
   composerState: () => ({ text: '', selectionStart: 0, selectionEnd: 0 }),
+  composerAttachments: () => [],
   sidePanelRequest: null,
   workProviderAuthorization: null,
   workRepositoriesByProvider: () => ({}),
@@ -555,8 +560,9 @@ const emit = defineEmits<{
   'steer-queued-prompt': [promptId: string];
   'update:planMode': [enabled: boolean];
   'update:composerState': [payload: { agentId: string; state: CodexComposerState }];
+  'update:composerAttachments': [payload: { agentId: string; attachments: readonly CodexNativeAttachment[] }];
   sendPrompt: [prompt: string, options?: SendPromptOptions];
-  steerPrompt: [prompt: string];
+  steerPrompt: [prompt: string, options?: SendPromptOptions];
 }>();
 
 type WorkItemAssignmentIntent = {
@@ -964,6 +970,7 @@ function closeRightWorkspaceTab(agentId: string, tab: RightWorkspaceTab): void {
   }
   if (nextTabs.length === 0) {
     workspace.activeTab = null;
+    workspace.open = false;
   }
 }
 
@@ -1249,6 +1256,14 @@ function forwardPrompt(prompt: string, options?: SendPromptOptions): void {
     emit('sendPrompt', prompt, options);
   } else {
     emit('sendPrompt', prompt);
+  }
+}
+
+function forwardSteerPrompt(prompt: string, options?: SendPromptOptions): void {
+  if (options) {
+    emit('steerPrompt', prompt, options);
+  } else {
+    emit('steerPrompt', prompt);
   }
 }
 

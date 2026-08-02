@@ -1172,7 +1172,7 @@ describe('useAppState', () => {
     })).toContain('[Body truncated]');
   });
 
-  it('lazy hydrates the active persisted thread after startup is interactive', async () => {
+  it('keeps first startup loading until persisted history is complete', async () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-persisted' };
     const hydratedSnapshot = {
@@ -1202,19 +1202,20 @@ describe('useAppState', () => {
     });
 
     const state = useAppState();
-    await state.loadSnapshot();
+    const loading = state.loadSnapshot();
+
+    await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalledWith('agent-dina'));
 
     expect(onEvent).toHaveBeenCalledOnce();
     expect(selectAgent).not.toHaveBeenCalled();
-    expect(hydrateAgentHistory).toHaveBeenCalledWith('agent-dina');
-    expect(state.isLoading.value).toBe(false);
+    expect(state.isLoading.value).toBe(true);
     expect(state.isHydratingActiveAgentHistory.value).toBe(true);
     expect(state.visibleMessages.value).toStrictEqual([]);
 
     hydration.resolve(hydratedSnapshot);
-    await hydration.promise;
-    await nextTick();
+    await loading;
 
+    expect(state.isLoading.value).toBe(false);
     expect(state.isHydratingActiveAgentHistory.value).toBe(false);
     expect(state.visibleMessages.value).toStrictEqual(hydratedSnapshot.messages);
   });
@@ -1250,48 +1251,6 @@ describe('useAppState', () => {
     await vi.waitFor(() => expect(state.activeAgent.value?.status).toStrictEqual({ type: 'idle' }));
     expect(state.visibleMessages.value[0]?.status).toBe('complete');
     expect(state.isSending.value).toBe(false);
-  });
-
-  it('keeps the newly selected agent active when prior-agent history hydration resolves late', async () => {
-    const initialSnapshot = createInitialSnapshot();
-    initialSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
-    const staleDinaHydration = structuredClone(initialSnapshot);
-    staleDinaHydration.messages.push({
-      id: 'message-dina-hydrated',
-      agentId: 'agent-dina',
-      role: 'assistant',
-      status: 'complete',
-      createdAt: '2026-06-05T00:00:01.000Z',
-      parts: [{ type: 'text', text: 'Dina finished in the background.' }],
-    });
-    const hydration = deferred<AppSnapshot>();
-    const hydrateAgentHistory = vi.fn().mockReturnValue(hydration.promise);
-    const selectAgent = vi.fn((agentId: string) => Promise.resolve(agentId === 'agent-jesse'
-      ? { ...structuredClone(initialSnapshot), activeAgentId: 'agent-jesse' }
-      : { ...structuredClone(staleDinaHydration), activeAgentId: 'agent-dina' }));
-    vi.stubGlobal('window', {
-      codexClaw: {
-        getSnapshot: vi.fn().mockResolvedValue(initialSnapshot),
-        hydrateAgentHistory,
-        selectAgent,
-        onEvent: vi.fn(),
-      } satisfies Partial<CodexClawApi>,
-    });
-
-    const state = useAppState();
-    await state.loadSnapshot();
-    await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalledWith('agent-dina'));
-    await state.selectAgent('agent-jesse');
-    expect(state.activeAgent.value?.id).toBe('agent-jesse');
-
-    hydration.resolve(staleDinaHydration);
-    await vi.waitFor(() => expect(state.snapshot.value.messages).toContainEqual(
-      expect.objectContaining({ id: 'message-dina-hydrated' }),
-    ));
-
-    expect(state.activeAgent.value?.id).toBe('agent-jesse');
-    await state.selectAgent('agent-dina');
-    expect(state.visibleMessages.value).toContainEqual(expect.objectContaining({ id: 'message-dina-hydrated' }));
   });
 
   it('does not hydrate startup history for agents without a persisted thread', async () => {
@@ -1907,9 +1866,13 @@ describe('useAppState', () => {
 
     const state = useAppState();
     await state.loadSnapshot();
-    await state.steerPrompt('use the smaller patch');
+    await state.steerPrompt('use the smaller patch', {
+      attachments: [{ type: 'file', path: '/tmp/notes.txt', name: 'notes.txt' }],
+    });
 
-    expect(steerPrompt).toHaveBeenCalledWith('agent-dina', 'use the smaller patch');
+    expect(steerPrompt).toHaveBeenCalledWith('agent-dina', 'use the smaller patch', {
+      attachments: [{ type: 'file', path: '/tmp/notes.txt', name: 'notes.txt' }],
+    });
 
     const queuedPromptId = state.activeQueuedPrompts.value[0]?.id;
     expect(queuedPromptId).toBeTruthy();
@@ -2018,7 +1981,7 @@ describe('useAppState', () => {
     expect(state.activeAgent.value?.id).toBe('agent-jesse');
   });
 
-  it('keeps composer text and selection isolated under the emitting agent', async () => {
+  it('keeps composer text, selection, and attachments isolated under the emitting agent', async () => {
     const base = createInitialSnapshot();
     const selectAgent = vi.fn((agentId: string) => Promise.resolve({ ...base, activeAgentId: agentId }));
     vi.stubGlobal('window', {
@@ -2034,14 +1997,27 @@ describe('useAppState', () => {
     state.updateComposerState('agent-dina', {
       text: 'draft for Dina', selectionStart: 3, selectionEnd: 8,
     });
+    state.updateComposerAttachments('agent-dina', [
+      {
+        id: 'attachment-dina', type: 'file', path: '/tmp/dina.txt', name: 'dina.txt',
+        mimeType: 'text/plain', size: 10,
+      },
+    ]);
 
     await state.selectAgent('agent-jesse');
     expect(state.activeComposerState.value).toStrictEqual({
       text: '', selectionStart: 0, selectionEnd: 0,
     });
+    expect(state.activeComposerAttachments.value).toStrictEqual([]);
     state.updateComposerState('agent-jesse', {
       text: 'draft for Jesse', selectionStart: 15, selectionEnd: 15,
     });
+    state.updateComposerAttachments('agent-jesse', [
+      {
+        id: 'attachment-jesse', type: 'image', path: '/tmp/jesse.png', name: 'jesse.png',
+        mimeType: 'image/png', size: 20,
+      },
+    ]);
     state.updateComposerState('agent-dina', {
       text: 'late Dina state', selectionStart: 4, selectionEnd: 4,
     });
@@ -2051,10 +2027,47 @@ describe('useAppState', () => {
     expect(state.activeComposerState.value).toStrictEqual({
       text: 'late Dina state', selectionStart: 4, selectionEnd: 4,
     });
+    expect(state.activeComposerAttachments.value).toStrictEqual([
+      {
+        id: 'attachment-dina', type: 'file', path: '/tmp/dina.txt', name: 'dina.txt',
+        mimeType: 'text/plain', size: 10,
+      },
+    ]);
     await state.selectAgent('agent-jesse');
     expect(state.activeComposerState.value).toStrictEqual({
       text: 'draft for Jesse', selectionStart: 15, selectionEnd: 15,
     });
+    expect(state.activeComposerAttachments.value).toStrictEqual([
+      {
+        id: 'attachment-jesse', type: 'image', path: '/tmp/jesse.png', name: 'jesse.png',
+        mimeType: 'image/png', size: 20,
+      },
+    ]);
+  });
+
+  it('restores persisted model and reasoning defaults when the renderer starts', async () => {
+    const base = createInitialSnapshot();
+    base.agents[0].id = 'agent-persisted-settings';
+    base.agents[0].backendDefaults = {
+      kind: 'codex',
+      model: 'gpt-5.4',
+      reasoningEffort: 'high',
+    };
+    base.teams[0].agentIds = ['agent-persisted-settings'];
+    base.teams[0].activeAgentId = 'agent-persisted-settings';
+    base.activeAgentId = 'agent-persisted-settings';
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(base),
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    expect(state.selectedModelId.value).toBe('gpt-5.4');
+    expect(state.selectedReasoningEffort.value).toBe('high');
   });
 
   it('restores each agent composer configuration immediately while catalogs refresh', async () => {
@@ -3291,7 +3304,7 @@ describe('useAppState', () => {
     });
   });
 
-  it('syncs composer mode and active goal from app-owned main events', async () => {
+  it('syncs composer settings, mode, and active goal from app-owned main events', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
 
@@ -3312,9 +3325,17 @@ describe('useAppState', () => {
       seq: 1,
       agentId: 'agent-dina',
       threadId: 'thread-1',
+      type: 'thread.settingsUpdated',
+      payload: { threadSettings: { model: 'gpt-5.4', reasoningEffort: 'high' } },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    listeners[0]?.({
+      seq: 2,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
       type: 'thread.modeUpdated',
       payload: { mode: 'plan' },
-      occurredAt: '2026-06-05T00:00:01.000Z',
+      occurredAt: '2026-06-05T00:00:02.000Z',
     });
     const goalSnapshot = createInitialSnapshot();
     goalSnapshot.agents[0].goal = {
@@ -3329,7 +3350,7 @@ describe('useAppState', () => {
     };
 
     listeners[0]?.({
-      seq: 2,
+      seq: 3,
       agentId: 'agent-dina',
       threadId: 'thread-1',
       type: 'thread.goalUpdated',
@@ -3345,28 +3366,30 @@ describe('useAppState', () => {
           updatedAt: 0,
         },
       },
-      occurredAt: '2026-06-05T00:00:02.000Z',
+      occurredAt: '2026-06-05T00:00:03.000Z',
       snapshot: goalSnapshot,
     });
 
+    expect(state.selectedModelId.value).toBe('gpt-5.4');
+    expect(state.selectedReasoningEffort.value).toBe('high');
     expect(state.planMode.value).toBe(true);
     expect(state.activeGoal.value?.objective).toBe('ship it');
 
     listeners[0]?.({
-      seq: 3,
+      seq: 4,
       agentId: 'agent-dina',
       threadId: 'thread-1',
       type: 'thread.modeUpdated',
       payload: { mode: 'default' },
-      occurredAt: '2026-06-05T00:00:03.000Z',
+      occurredAt: '2026-06-05T00:00:04.000Z',
     });
     listeners[0]?.({
-      seq: 4,
+      seq: 5,
       agentId: 'agent-dina',
       threadId: 'thread-1',
       type: 'thread.goalCleared',
       payload: {},
-      occurredAt: '2026-06-05T00:00:04.000Z',
+      occurredAt: '2026-06-05T00:00:05.000Z',
       snapshot: createInitialSnapshot(),
     });
 

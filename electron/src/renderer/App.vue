@@ -23,6 +23,7 @@
     :selected-reasoning-effort="selectedReasoningEffort"
     :queued-prompts="activeQueuedPrompts"
     :composer-state="activeComposerState"
+    :composer-attachments="activeComposerAttachments"
     :side-panel-request="sidePanelRequest"
     :work-provider-authorization="workProviderAuthorization"
     :work-repositories-by-provider="workRepositoriesByProvider"
@@ -117,6 +118,7 @@
     @steer-prompt="steerPrompt"
     @steer-queued-prompt="steerQueuedPrompt"
     @update:composer-state="updateComposerState($event.agentId, $event.state)"
+    @update:composer-attachments="updateComposerAttachments($event.agentId, $event.attachments)"
   />
   <ConfettiOverlay />
 </template>
@@ -137,6 +139,7 @@ const {
   visibleMessages,
   activeQueuedPrompts,
   activeComposerState,
+  activeComposerAttachments,
   isLoading,
   isHydratingActiveAgentHistory,
   isSending,
@@ -232,6 +235,7 @@ const {
   selectReasoningEffort,
   setApprovalPreset,
   updateComposerState,
+  updateComposerAttachments,
   setPlanMode,
   clearActiveGoal,
   selectAgent,

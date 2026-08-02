@@ -37,6 +37,7 @@ describe('Electron backend boundary', () => {
       'app-shortcuts.ts',
       'backend-client.ts',
       'backend-process-client.ts',
+      'backend-request-timeout.ts',
       'backend-socket-client.ts',
       'browser-pane.ts',
       'chatgpt-app.ts',

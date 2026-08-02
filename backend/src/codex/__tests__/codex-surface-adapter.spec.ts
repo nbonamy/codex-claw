@@ -13,6 +13,7 @@ class FakeTransport implements RpcTransport {
   skillVersion = 1;
   modelVersion = 1;
   completeTurnsImmediately = false;
+  turnsListDelayMs = 0;
   readonly fullHistoryTurnsByThreadId = new Map<string, Record<string, unknown>[]>();
   readonly summaryTurnsByThreadId = new Map<string, Record<string, unknown>[]>();
   readonly staleActiveThreadIds = new Set<string>();
@@ -23,7 +24,11 @@ class FakeTransport implements RpcTransport {
     this.sent.push(message);
     if (!('id' in message) || !('method' in message)) return;
     const params = 'params' in message ? message.params : undefined;
-    queueMicrotask(() => this.emit({ id: message.id, result: this.response(message.method, params) }));
+    queueMicrotask(() => {
+      void Promise.resolve(this.response(message.method, params)).then((result) => {
+        this.emit({ id: message.id, result });
+      });
+    });
   }
 
   onMessage(listener: (message: unknown) => void): () => void {
@@ -125,13 +130,20 @@ class FakeTransport implements RpcTransport {
             ?? (this.staleActiveThreadIds.has(threadId) ? [turn(`turn-${threadId}`, 'inProgress')] : []),
         );
       }
+      case 'thread/read': {
+        const threadId = String((params as { threadId: string }).threadId);
+        return { thread: thread(threadId, `/workspace/${threadId.at(-1)}`) };
+      }
       case 'thread/turns/list': {
         const threadId = String((params as { threadId: string }).threadId);
-        return {
+        const result = {
           data: this.fullHistoryTurnsByThreadId.get(threadId) ?? [],
           nextCursor: null,
           backwardsCursor: null,
         };
+        return this.turnsListDelayMs > 0
+          ? new Promise((resolve) => setTimeout(() => resolve(result), this.turnsListDelayMs))
+          : result;
       }
       case 'thread/goal/get': return { goal: null };
       case 'thread/goal/set': {
@@ -387,7 +399,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     }]);
   });
 
-  it('preserves image and file attachments through the driver into SDK turn input', async () => {
+  it('preserves image and file attachments through send and steer SDK turn input', async () => {
     const { adapter, transport } = createAdapter();
     const driver = new CodexBackendDriver(adapter);
     const attachments = [
@@ -403,6 +415,19 @@ describe('CodexSurfaceAgentAdapter', () => {
         threadId: 'thread-a',
         input: [
           { type: 'text', text: 'Inspect attachments' },
+          { type: 'localImage', path: '/tmp/screenshot.png', detail: 'high' },
+          { type: 'mention', path: '/tmp/README.md', name: 'README' },
+        ],
+      },
+    });
+
+    await driver.steerPrompt(agentA, 'Inspect these instead', prepared);
+
+    expect(lastRequest(transport, 'turn/steer')).toMatchObject({
+      params: {
+        threadId: 'thread-a',
+        input: [
+          { type: 'text', text: 'Inspect these instead' },
           { type: 'localImage', path: '/tmp/screenshot.png', detail: 'high' },
           { type: 'mention', path: '/tmp/README.md', name: 'README' },
         ],
@@ -569,6 +594,7 @@ describe('CodexSurfaceAgentAdapter', () => {
   it('replaces summary-only restart history with every persisted turn item', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
+    transport.turnsListDelayMs = 25;
     const turnId = 'turn-thread-a';
     transport.summaryTurnsByThreadId.set('thread-a', [
       turn(turnId, 'completed', [
@@ -590,7 +616,9 @@ describe('CodexSurfaceAgentAdapter', () => {
 
     await adapter.hydrateAgent(agentA);
 
-    const history = events.filter((event) => event.type === 'thread.historyLoaded').at(-1);
+    const historyEvents = events.filter((event) => event.type === 'thread.historyLoaded');
+    expect(historyEvents).toHaveLength(1);
+    const history = historyEvents[0];
     expect(history).toMatchObject({
       payload: {
         replace: true,
@@ -620,6 +648,12 @@ describe('CodexSurfaceAgentAdapter', () => {
 
     await adapter.hydrateAgent(agentA);
     expect(events.filter((event) => event.type === 'thread.historyLoaded')).toHaveLength(1);
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'thread.settingsUpdated',
+      payload: expect.objectContaining({
+        threadSettings: expect.objectContaining({ model: 'gpt-1', reasoningEffort: 'medium' }),
+      }),
+    }));
     events.length = 0;
 
     await adapter.hydrateAgent(agentA);
