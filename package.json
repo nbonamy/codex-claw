@@ -15,8 +15,9 @@
     "dev:backend": "npm run dev -w @codex-claw/backend",
     "dev:backend:run": "npm run dev:run -w @codex-claw/backend",
     "dev:backend:serve": "npm run serve -w @codex-claw/backend",
+    "build:sdk": "node scripts/build-sdk.mjs",
     "build": "node scripts/build.mjs",
-    "build:backend": "npm run build -w @codex-claw/shared && npm run build -w @codex-claw/backend && node scripts/package-backend.mjs",
+    "build:backend": "npm run build:sdk && npm run build -w @codex-claw/shared && npm run build -w @codex-claw/backend && node scripts/package-backend.mjs",
     "typecheck": "npm run typecheck --workspaces",
     "lint": "npm run lint --workspaces",
     "lint:css": "npm run lint:css -w @codex-claw/electron",
@@ -25,7 +26,7 @@
     "test:watch": "npm run test:watch -w @codex-claw/electron",
     "clawd:start": "node scripts/clawd-launch-agent.mjs start",
     "clawd:stop": "node scripts/clawd-launch-agent.mjs stop",
-    "package": "npm run build -w @codex-claw/backend && node scripts/package-backend.mjs && npm run package -w @codex-claw/electron",
-    "make": "npm run build -w @codex-claw/backend && node scripts/package-backend.mjs && npm run make -w @codex-claw/electron"
+    "package": "npm run build:sdk && npm run build -w @codex-claw/backend && node scripts/package-backend.mjs && npm run package -w @codex-claw/electron",
+    "make": "npm run build:sdk && npm run build -w @codex-claw/backend && node scripts/package-backend.mjs && npm run make -w @codex-claw/electron"
   }
 }

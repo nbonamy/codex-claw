@@ -112,11 +112,16 @@ describe('runtime config', () => {
       readFileSync(path.resolve(__dirname, '../../../package.json'), 'utf8'),
     ) as { scripts: Record<string, string> };
     const devScript = readFileSync(path.resolve(__dirname, '../../../../scripts/dev.mjs'), 'utf8');
+    const sdkBuildScript = readFileSync(path.resolve(__dirname, '../../../../scripts/build-sdk.mjs'), 'utf8');
 
     expect(rootPackage.scripts.dev).toBe('node scripts/dev.mjs');
     expect(electronPackage.scripts.dev).toBe('node ../scripts/dev.mjs');
     expect(rootPackage.scripts['dev:electron']).toBe('npm run start -w @codex-claw/electron');
+    expect(rootPackage.scripts['build:sdk']).toBe('node scripts/build-sdk.mjs');
     expect(rootPackage.scripts.build).toBe('node scripts/build.mjs');
+    expect(rootPackage.scripts['build:backend']).toMatch(/^npm run build:sdk &&/);
+    expect(rootPackage.scripts.package).toMatch(/^npm run build:sdk &&/);
+    expect(rootPackage.scripts.make).toMatch(/^npm run build:sdk &&/);
     expect(electronPackage.scripts['build:computer-use']).toBe(
       'node ../scripts/prepare-computer-use.mjs',
     );
@@ -128,6 +133,9 @@ describe('runtime config', () => {
     expect(electronPackage.scripts.build).toContain('npm run build:computer-use &&');
     expect(devScript).toContain("await run('npm', ['run', 'build:computer-use'])");
     expect(devScript).toContain("start('npm', ['run', 'dev:electron']");
+    expect(devScript).not.toContain("['run', 'build:sdk']");
+    expect(sdkBuildScript).toContain("specifier.startsWith('file:')");
+    expect(sdkBuildScript).toContain("spawnSync('npm', ['run', 'build']");
   });
 
   it('uses sibling SDK sources for dev while leaving package builds on dist', () => {

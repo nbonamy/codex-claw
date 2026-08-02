@@ -86,6 +86,11 @@ native Computer Use helper, packages the Electron app, then verifies the final
 signed and notarized macOS bundle. It fails before building when any required
 macOS signing or notarization credential is missing.
 
+While `codex-app-sdk` is linked through a local `file:` dependency, `build`,
+`build:backend`, `package`, and `make` rebuild the sibling SDK before consuming
+its `dist` output. This step automatically skips once the dependency is
+published through npm.
+
 ## Architecture
 
 Codex Claw keeps Codex protocol details in Electron main:

@@ -134,8 +134,10 @@ and artifact pane changes.
 `npm run dev` resolves `codex-app-sdk` entrypoints from the sibling
 `../codex-app-sdk/src` tree. Renderer SDK edits participate in Vite hot module
 replacement, while main, preload, and `clawd` SDK edits rebuild through their
-existing watchers. Package, make, and release builds continue to consume the
-SDK's published `dist` entrypoints.
+existing watchers. Package, make, backend, and release builds consume SDK
+`dist`; while the dependency uses a local `file:` reference, every root build
+entrypoint rebuilds the sibling SDK first. The build step becomes a no-op when
+Claw switches to a published npm dependency.
 
 ## Design Tokens And Themes
 
