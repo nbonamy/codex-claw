@@ -365,6 +365,9 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
           ...(typeof payload.threadSettings.reasoningEffort === 'string'
             ? { reasoningEffort: payload.threadSettings.reasoningEffort }
             : {}),
+          ...('serviceTier' in payload.threadSettings && (typeof payload.threadSettings.serviceTier === 'string' || payload.threadSettings.serviceTier === null)
+            ? { serviceTier: payload.threadSettings.serviceTier }
+            : {}),
         };
       }
     }

@@ -117,11 +117,15 @@ export class CodexBackendDriver implements AgentBackendDriver {
     const selectedSkills = options?.skills ?? [];
     const existingCodexOptions = options?.backendOptions?.kind === 'codex' ? options.backendOptions : undefined;
     const reasoningEffort = options?.reasoningEffort ?? existingCodexOptions?.reasoningEffort ?? null;
+    const serviceTier = options?.serviceTier !== undefined
+      ? options.serviceTier
+      : existingCodexOptions?.serviceTier;
     const skills = selectedSkills.length > 0 ? selectedSkills : existingCodexOptions?.skills ?? [];
-    const backendOptions = reasoningEffort || skills.length > 0
+    const backendOptions = reasoningEffort || serviceTier !== undefined || skills.length > 0
       ? {
         kind: 'codex' as const,
         ...(reasoningEffort ? { reasoningEffort } : {}),
+        ...(serviceTier !== undefined ? { serviceTier } : {}),
         ...(skills.length > 0 ? { skills } : {}),
       }
       : undefined;

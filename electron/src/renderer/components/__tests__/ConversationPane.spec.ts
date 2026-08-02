@@ -353,6 +353,27 @@ describe('ConversationPane', () => {
     expect(sdkProps.attachEnabled).toBe(false);
   });
 
+  it('passes fast-mode capability/state through and forwards tier changes', async () => {
+    const wrapper = mountPane({
+      agent,
+      messages,
+      isSending: false,
+      selectedServiceTier: 'fast',
+      backendCapabilities: {
+        ...defaultCapabilities(),
+        serviceTier: true,
+      },
+    });
+    const sdkPane = wrapper.getComponent(CodexConversationPane as unknown as Component);
+    const sdkProps = sdkPane.props() as Record<string, unknown>;
+    expect(sdkProps.selectedServiceTier).toBe('fast');
+    expect((sdkProps.capabilities as Record<string, unknown>).serviceTier).toBe(true);
+
+    sdkPane.vm.$emit('update:serviceTier', null);
+    await nextTick();
+    expect(wrapper.emitted('select-service-tier')).toStrictEqual([[null]]);
+  });
+
   it('passes detailed provider-neutral approvals into the SDK and forwards decisions', async () => {
     const approvals: BackendApprovalRequest[] = [{
       id: 'approval-native-1',
@@ -482,6 +503,7 @@ function mountPane(props: {
   isLoading?: boolean;
   composerState?: CodexComposerState;
   attachments?: readonly CodexNativeAttachment[];
+  selectedServiceTier?: string | null;
 }) {
   type TestConversationPaneProps = typeof props & { isLoading: boolean };
   return mount(ConversationPane as unknown as DefineComponent<TestConversationPaneProps>, {
@@ -493,6 +515,26 @@ function mountPane(props: {
       plugins: [ElementPlus, i18n],
     },
   });
+}
+
+function defaultCapabilities(): BackendCapabilities {
+  return {
+    attachments: true,
+    approvals: true,
+    editMessage: true,
+    goals: true,
+    history: true,
+    interrupt: true,
+    models: true,
+    planMode: 'native',
+    reasoningEffort: true,
+    retryMessage: true,
+    rollback: true,
+    skills: true,
+    steerPrompt: true,
+    thinkingBudget: false,
+    serviceTier: true,
+  };
 }
 
 async function setComposerValue(wrapper: ReturnType<typeof mountPane>, value: string): Promise<void> {

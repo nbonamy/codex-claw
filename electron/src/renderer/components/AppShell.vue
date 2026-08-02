@@ -214,6 +214,7 @@
             :plan-mode="planMode"
             :selected-model-id="selectedModelId"
             :selected-reasoning-effort="selectedReasoningEffort"
+            :selected-service-tier="selectedServiceTier"
             :queued-prompts="queuedPrompts"
             :composer-state="composerState"
             :attachments="composerAttachments"
@@ -226,6 +227,7 @@
             @retry-message="$emit('retry-message', $event)"
             @select-model="$emit('select-model', $event)"
             @select-reasoning-effort="$emit('select-reasoning-effort', $event)"
+            @select-service-tier="$emit('select-service-tier', $event)"
             @select-approval-preset="$emit('select-approval-preset', $event)"
             @resolve-approval="forwardApprovalResolution"
             @clear-goal="$emit('clear-goal')"
@@ -378,6 +380,7 @@ const props = withDefaults(defineProps<{
   skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
+  selectedServiceTier?: string | null;
   planMode?: boolean;
   queuedPrompts?: QueuedChatPrompt[];
   composerState?: CodexComposerState;
@@ -458,6 +461,7 @@ const props = withDefaults(defineProps<{
   skillCatalogStatus: 'notLoaded',
   selectedModelId: null,
   selectedReasoningEffort: null,
+  selectedServiceTier: null,
   approvalPreset: null,
   queuedPrompts: () => [],
   composerState: () => ({ text: '', selectionStart: 0, selectionEnd: 0 }),
@@ -555,6 +559,7 @@ const emit = defineEmits<{
   'select-agent': [agentId: string];
   'select-model': [modelId: string];
   'select-reasoning-effort': [reasoningEffort: ReasoningEffort];
+  'select-service-tier': [serviceTier: string | null];
   'select-approval-preset': [preset: ApprovalPreset];
   'select-team': [teamId: string];
   'steer-queued-prompt': [promptId: string];

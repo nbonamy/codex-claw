@@ -170,6 +170,7 @@ export class CodexSurfaceAgentAdapter {
     return models.map((model) => ({
       ...model,
       supportedReasoningEfforts: model.supportedReasoningEfforts?.map((effort) => ({ ...effort })),
+      serviceTiers: model.serviceTiers?.map((tier) => ({ ...tier })),
     }));
   }
 
@@ -472,6 +473,7 @@ export class CodexSurfaceAgentAdapter {
       snapshot.approvalPreset,
       snapshot.selectedModelId,
       snapshot.selectedReasoningEffort,
+      snapshot.selectedServiceTier,
       snapshot.planMode,
     );
     if (snapshot.goal) this.emitThread(session, { type: 'thread.goalUpdated', payload: { goal: snapshot.goal } });
@@ -539,6 +541,7 @@ export class CodexSurfaceAgentAdapter {
           event.payload.approvalPreset,
           event.payload.selectedModelId,
           event.payload.selectedReasoningEffort,
+          event.payload.selectedServiceTier,
           event.payload.planMode,
           event.occurredAt,
         );
@@ -754,10 +757,11 @@ export class CodexSurfaceAgentAdapter {
     preset: ApprovalPreset | null,
     selectedModelId: string | null,
     selectedReasoningEffort: string | null,
+    selectedServiceTier: string | null | undefined,
     planMode: boolean,
     occurredAt?: string,
   ): void {
-    if (preset || selectedModelId || selectedReasoningEffort) {
+    if (preset || selectedModelId || selectedReasoningEffort || selectedServiceTier !== undefined) {
       this.emitThread(session, {
         type: 'thread.settingsUpdated',
         payload: {
@@ -765,6 +769,7 @@ export class CodexSurfaceAgentAdapter {
             ...(preset ? threadSettingsForPreset(preset) : {}),
             ...(selectedModelId ? { model: selectedModelId } : {}),
             ...(selectedReasoningEffort ? { reasoningEffort: selectedReasoningEffort } : {}),
+            ...(selectedServiceTier === undefined ? {} : { serviceTier: selectedServiceTier }),
           },
         },
         ...(occurredAt ? { occurredAt } : {}),
@@ -921,6 +926,9 @@ function surfacePromptOptions(options: SendPromptOptions = {}): SendCodexMessage
     ...(typeof options.planMode === 'boolean' ? { planMode: options.planMode } : {}),
     ...(options.reasoningEffort || backendOptions?.reasoningEffort
       ? { reasoningEffort: options.reasoningEffort ?? backendOptions?.reasoningEffort ?? undefined }
+      : {}),
+    ...(options.serviceTier !== undefined || backendOptions?.serviceTier !== undefined
+      ? { serviceTier: options.serviceTier !== undefined ? options.serviceTier : backendOptions?.serviceTier }
       : {}),
     ...((options.skills?.length ?? 0) > 0 || (backendOptions?.skills?.length ?? 0) > 0
       ? { skills: options.skills?.length ? options.skills : backendOptions?.skills }

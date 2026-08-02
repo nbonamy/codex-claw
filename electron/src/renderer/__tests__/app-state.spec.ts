@@ -2776,6 +2776,8 @@ describe('useAppState', () => {
           { reasoningEffort: 'medium', description: 'Balanced' },
         ],
         defaultReasoningEffort: 'medium',
+        serviceTiers: [{ id: 'fast', name: 'Fast', description: 'Quick responses' }],
+        defaultServiceTier: 'fast',
         isDefault: false,
       },
       {
@@ -2819,6 +2821,7 @@ describe('useAppState', () => {
       model: 'gpt-5.1-codex-fast',
       planMode: false,
       reasoningEffort: 'low',
+      serviceTier: 'fast',
     });
   });
 
@@ -3326,7 +3329,7 @@ describe('useAppState', () => {
       agentId: 'agent-dina',
       threadId: 'thread-1',
       type: 'thread.settingsUpdated',
-      payload: { threadSettings: { model: 'gpt-5.4', reasoningEffort: 'high' } },
+      payload: { threadSettings: { model: 'gpt-5.4', reasoningEffort: 'high', serviceTier: 'fast' } },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
     listeners[0]?.({
@@ -3372,6 +3375,7 @@ describe('useAppState', () => {
 
     expect(state.selectedModelId.value).toBe('gpt-5.4');
     expect(state.selectedReasoningEffort.value).toBe('high');
+    expect(state.selectedServiceTier.value).toBe('fast');
     expect(state.planMode.value).toBe(true);
     expect(state.activeGoal.value?.objective).toBe('ship it');
 
@@ -3395,6 +3399,16 @@ describe('useAppState', () => {
 
     expect(state.planMode.value).toBe(false);
     expect(state.activeGoal.value).toBeNull();
+
+    listeners[0]?.({
+      seq: 6,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.settingsUpdated',
+      payload: { threadSettings: { serviceTier: null } },
+      occurredAt: '2026-06-05T00:00:06.000Z',
+    });
+    expect(state.selectedServiceTier.value).toBeNull();
   });
 
   it('handles model catalog loading guards, errors, and invalid selections', async () => {

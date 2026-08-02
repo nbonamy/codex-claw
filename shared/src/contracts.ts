@@ -74,6 +74,7 @@ export type BackendDefaults =
     approvalsReviewer?: CodexApprovalsReviewer;
     sandboxMode?: string;
     reasoningEffort?: string;
+    serviceTier?: string | null;
   }
   | {
     kind: 'claude';
@@ -427,6 +428,7 @@ export type BackendCapabilities = {
   models: boolean;
   skills: boolean;
   reasoningEffort: boolean;
+  serviceTier?: boolean;
   thinkingBudget: boolean;
   planMode: BackendPlanModeSupport;
   goals: boolean;
@@ -561,6 +563,12 @@ export type BackendReasoningEffortOption = {
   description: string;
 };
 
+export type BackendServiceTier = {
+  id: string;
+  name: string;
+  description: string;
+};
+
 export type BackendModelOption = {
   id: string;
   model: string;
@@ -569,6 +577,8 @@ export type BackendModelOption = {
   hidden?: boolean;
   supportedReasoningEfforts?: BackendReasoningEffortOption[];
   defaultReasoningEffort?: ReasoningEffort | null;
+  serviceTiers?: BackendServiceTier[];
+  defaultServiceTier?: string | null;
   isDefault?: boolean;
   capabilities?: Partial<BackendCapabilities>;
   providerMetadata?: Record<string, unknown>;
@@ -685,6 +695,7 @@ export type SendPromptOptions = {
   model?: string | null;
   planMode?: boolean;
   reasoningEffort?: ReasoningEffort | null;
+  serviceTier?: string | null;
   skills?: PromptSkillInput[];
   backendOptions?: BackendPromptOptions;
 };
@@ -693,6 +704,7 @@ export type BackendPromptOptions =
   | {
     kind: 'codex';
     reasoningEffort?: ReasoningEffort | null;
+    serviceTier?: string | null;
     skills?: PromptSkillInput[];
   }
   | {

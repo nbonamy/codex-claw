@@ -89,7 +89,7 @@ implemented:
   attachments, and the current selection/caret, so switching agents restores
   the editor exactly; queued prompts remain backend-owned snapshot state and
   the renderer never removes them before `clawd` confirms dequeue;
-- per-agent in-memory model, reasoning, plan-mode, skill, and file-catalog
+- per-agent in-memory model, reasoning, Fast mode, plan-mode, skill, and file-catalog
   configuration, restored synchronously on selection before background catalog
   refresh completes; model and reasoning selections are seeded from the
   backend thread settings during hydration so reopening Claw does not reset a

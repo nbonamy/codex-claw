@@ -21,6 +21,7 @@
     :plan-mode="planMode"
     :selected-model-id="selectedModelId"
     :selected-reasoning-effort="selectedReasoningEffort"
+    :selected-service-tier="selectedServiceTier"
     :queued-prompts="activeQueuedPrompts"
     :composer-state="activeComposerState"
     :composer-attachments="activeComposerAttachments"
@@ -103,6 +104,7 @@
     @select-team="selectTeam"
     @select-model="selectModel"
     @select-reasoning-effort="selectReasoningEffort"
+    @select-service-tier="selectServiceTier"
     @select-approval-preset="setApprovalPreset"
     @resolve-approval="resolveBackendApproval"
     @update:plan-mode="setPlanMode"
@@ -154,6 +156,7 @@ const {
   skillCatalogStatus,
   selectedModelId,
   selectedReasoningEffort,
+  selectedServiceTier,
   planMode,
   sidePanelRequest,
   workProviderAuthorization,
@@ -233,6 +236,7 @@ const {
   respondToClientRequest,
   selectModel,
   selectReasoningEffort,
+  selectServiceTier,
   setApprovalPreset,
   updateComposerState,
   updateComposerAttachments,

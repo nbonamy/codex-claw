@@ -1115,6 +1115,7 @@ function sanitizeBackendDefaults(value: unknown, expectedBackend: AgentBackend):
       ...(isCodexApprovalsReviewer(value.approvalsReviewer) ? { approvalsReviewer: value.approvalsReviewer } : {}),
       ...(typeof value.sandboxMode === 'string' ? { sandboxMode: value.sandboxMode } : {}),
       ...(typeof value.reasoningEffort === 'string' ? { reasoningEffort: value.reasoningEffort } : {}),
+      ...(typeof value.serviceTier === 'string' ? { serviceTier: value.serviceTier } : {}),
     } satisfies BackendDefaults;
     return defaults.kind === expectedBackend ? defaults : undefined;
   }

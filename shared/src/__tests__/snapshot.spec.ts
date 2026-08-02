@@ -489,6 +489,7 @@ describe('snapshot reducer', () => {
           cwd: '/Users/nbonamy/src/codex-claw',
           model: 'gpt-5.5',
           reasoningEffort: 'high',
+          serviceTier: 'fast',
           approvalPolicy: 'on-request',
           approvalsReviewer: 'auto_review',
           sandboxPolicy: {
@@ -508,6 +509,7 @@ describe('snapshot reducer', () => {
       approvalsReviewer: 'auto_review',
       sandboxMode: 'workspace-write',
       reasoningEffort: 'high',
+      serviceTier: 'fast',
     });
   });
 

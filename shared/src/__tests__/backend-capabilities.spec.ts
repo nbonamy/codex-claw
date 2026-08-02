@@ -12,6 +12,7 @@ describe('backend capabilities', () => {
       attachments: true,
       planMode: 'native',
       goals: true,
+      serviceTier: true,
       steerPrompt: true,
       approvals: true,
     });
@@ -23,6 +24,7 @@ describe('backend capabilities', () => {
       attachments: false,
       planMode: 'prompted',
       goals: false,
+      serviceTier: false,
       steerPrompt: false,
       approvals: false,
     });

@@ -92,6 +92,7 @@ describe('CodexBackendDriver', () => {
       model: 'gpt-5.1-codex',
       planMode: false,
       reasoningEffort: 'high',
+      serviceTier: 'fast',
       skills: [{
         name: 'frontend-design',
         path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',
@@ -102,6 +103,7 @@ describe('CodexBackendDriver', () => {
       backendOptions: {
         kind: 'codex',
         reasoningEffort: 'high',
+        serviceTier: 'fast',
         skills: [{
           name: 'frontend-design',
           path: '/Users/nbonamy/.codex/skills/frontend-design/SKILL.md',

@@ -30,6 +30,7 @@
       :queued-prompts="queuedPrompts"
       :selected-model-id="selectedModelId"
       :selected-reasoning-effort="selectedReasoningEffort"
+      :selected-service-tier="selectedServiceTier"
       :skill-catalog-status="skillCatalogStatus"
       :skills="backendSkills"
       @clear-goal="$emit('clear-goal')"
@@ -50,6 +51,7 @@
       @attachments-change="updateComposerAttachments"
       @update:plan-mode="$emit('update:planMode', $event)"
       @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
+      @update:service-tier="$emit('select-service-tier', $event)"
     >
       <template #message-header="{ message }">
         <span
@@ -122,6 +124,7 @@ const props = withDefaults(defineProps<{
   skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
+  selectedServiceTier?: string | null;
   approvalPreset?: ApprovalPreset | null;
   queuedPrompts?: QueuedChatPrompt[];
   planMode?: boolean;
@@ -153,6 +156,7 @@ const emit = defineEmits<{
   'retry-message': [index: number];
   'select-model': [modelId: string];
   'select-reasoning-effort': [reasoningEffort: ReasoningEffort];
+  'select-service-tier': [serviceTier: string | null];
   'select-approval-preset': [preset: ApprovalPreset];
   'steer-queued-prompt': [promptId: string];
   'update:planMode': [enabled: boolean];
@@ -186,6 +190,9 @@ const conversationCapabilities = computed<CodexCapabilities>(() => ({
   models: props.backendCapabilities.models,
   skills: props.backendCapabilities.skills,
   reasoningEffort: props.backendCapabilities.reasoningEffort,
+  ...(props.backendCapabilities.serviceTier === undefined
+    ? {}
+    : { serviceTier: props.backendCapabilities.serviceTier }),
   planMode: props.backendCapabilities.planMode !== 'unsupported',
   goals: props.backendCapabilities.goals,
   steerPrompt: props.backendCapabilities.steerPrompt,

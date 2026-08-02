@@ -186,12 +186,19 @@ Codex app-server v2 exposes the model picker catalog through `model/list`.
 Codex Claw should use that request instead of hardcoding model or reasoning
 level options. The response includes visible model entries, each model's
 `supportedReasoningEfforts` in the order Codex intends clients to display, and
-the model's `defaultReasoningEffort`.
+the model's `defaultReasoningEffort`. Models may also expose `serviceTiers` and
+`defaultServiceTier`; the SDK presents the fast/priority tier as the Fast mode
+toggle.
 
 The renderer consumes an app-owned picker shape only. `clawd` fetches and adapts
 the Codex catalog to `BackendModelOption[]`, the renderer stores the selected
 catalog model and reasoning effort, and each prompt request sends the model plus
-Codex-specific reasoning under `backendOptions`.
+Codex-specific reasoning and service tier under `backendOptions`.
+
+The selected service tier is part of the hydrated thread settings. `clawd`
+emits it through `thread.settingsUpdated`, including an explicit `null` when
+Fast mode is disabled, so switching agents or reloading the app does not retain
+a stale toggle.
 
 `turn/start` accepts `model` and `effort` overrides for the current turn and
 subsequent turns, so Codex Claw applies the current picker selection on every

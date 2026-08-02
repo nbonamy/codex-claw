@@ -54,7 +54,7 @@ class FakeTransport implements RpcTransport {
           displayName: `GPT-${this.modelVersion}`, description: 'Test', hidden: false,
           supportedReasoningEfforts: [{ reasoningEffort: 'medium', description: 'Balanced' }],
           defaultReasoningEffort: 'medium', isDefault: true, inputModalities: ['text'], supportsPersonality: true,
-          additionalSpeedTiers: [], serviceTiers: [], defaultServiceTier: null, upgrade: null,
+          additionalSpeedTiers: [], serviceTiers: [{ id: 'fast', name: 'Fast', description: 'Faster responses' }], defaultServiceTier: 'fast', upgrade: null,
           upgradeInfo: null, availabilityNux: null,
         }],
         nextCursor: null,
@@ -413,13 +413,14 @@ describe('CodexSurfaceAgentAdapter', () => {
       { type: 'image' as const, path: '/tmp/screenshot.png', detail: 'high' as const },
       { type: 'file' as const, path: '/tmp/README.md', name: 'README' },
     ];
-    const prepared = driver.preparePromptOptions(agentA, { attachments });
+    const prepared = driver.preparePromptOptions(agentA, { attachments, serviceTier: 'fast' });
 
     await driver.sendPrompt(agentA, 'Inspect attachments', prepared);
 
     expect(lastRequest(transport, 'turn/start')).toMatchObject({
       params: {
         threadId: 'thread-a',
+        serviceTier: 'fast',
         input: [
           { type: 'text', text: 'Inspect attachments' },
           { type: 'localImage', path: '/tmp/screenshot.png', detail: 'high' },
@@ -508,7 +509,11 @@ describe('CodexSurfaceAgentAdapter', () => {
     expect(driver.getCapabilities(agentA).approvalPresets).not.toContain('full-access');
     expect(driver.getCapabilities(agentB).approvalPresets).toContain('full-access');
 
-    await expect(adapter.listModels()).resolves.toMatchObject([{ id: 'gpt-1' }]);
+    await expect(adapter.listModels()).resolves.toMatchObject([{
+      id: 'gpt-1',
+      serviceTiers: [{ id: 'fast', name: 'Fast' }],
+      defaultServiceTier: 'fast',
+    }]);
     transport.modelVersion = 2;
     await expect(adapter.listModels()).resolves.toMatchObject([{ id: 'gpt-2' }]);
     expect(transport.sent.filter((message) => 'method' in message && message.method === 'model/list').length).toBe(3);
@@ -681,7 +686,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     expect(events).toContainEqual(expect.objectContaining({
       type: 'thread.settingsUpdated',
       payload: expect.objectContaining({
-        threadSettings: expect.objectContaining({ model: 'gpt-1', reasoningEffort: 'medium' }),
+        threadSettings: expect.objectContaining({ model: 'gpt-1', reasoningEffort: 'medium', serviceTier: 'fast' }),
       }),
     }));
     events.length = 0;
@@ -842,6 +847,7 @@ function resumeResponse(
     },
     activePermissionProfile: { id: ':workspace', extends: null },
     reasoningEffort: 'medium',
+    serviceTier: 'fast',
     initialTurnsPage: { data: turns, nextCursor, backwardsCursor: null },
   };
 }

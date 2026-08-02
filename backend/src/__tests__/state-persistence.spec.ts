@@ -88,6 +88,7 @@ describe('AppStatePersistence', () => {
         approvalPolicy: 'on-request',
         approvalsReviewer: 'auto_review',
         sandboxMode: 'workspace-write',
+        serviceTier: 'fast',
       },
       contextUsage: {
         totalTokens: 1200,
@@ -226,6 +227,7 @@ describe('AppStatePersistence', () => {
         approvalPolicy: 'on-request',
         approvalsReviewer: 'auto_review',
         sandboxMode: 'workspace-write',
+        serviceTier: 'fast',
       },
       contextUsage: {
         totalTokens: 1200,
@@ -312,6 +314,7 @@ describe('AppStatePersistence', () => {
         approvalPolicy: 'on-request',
         approvalsReviewer: 'auto_review',
         sandboxMode: 'workspace-write',
+        serviceTier: 'fast',
       },
       backendSession: { kind: 'codex', threadId: 'thread-dina' },
       contextUsage: {

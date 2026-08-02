@@ -31,6 +31,7 @@ const fileCatalogStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('not
 const fileCatalogError = ref<string | null>(null);
 const selectedModelId = ref<string | null>(null);
 const selectedReasoningEffort = ref<ReasoningEffort | null>(null);
+const selectedServiceTier = ref<string | null>(null);
 const planMode = ref(false);
 const sidePanelRequest = ref<SidePanelRequest | null>(null);
 const workProviderAuthorization = ref<WorkProviderAuthorization | null>(null);
@@ -61,6 +62,7 @@ type AgentComposerConfiguration = {
   fileError: string | null;
   selectedModelId: string | null;
   selectedReasoningEffort: ReasoningEffort | null;
+  selectedServiceTier: string | null;
   planMode: boolean;
 };
 const composerConfigurationByAgentId = new Map<string, AgentComposerConfiguration>();
@@ -1292,6 +1294,7 @@ export function useAppState() {
 
     selectedModelId.value = model.id;
     selectedReasoningEffort.value = defaultReasoningEffort(model);
+    selectedServiceTier.value = defaultServiceTier(model);
     rememberActiveComposerConfiguration();
   }
 
@@ -1302,6 +1305,16 @@ export function useAppState() {
     }
 
     selectedReasoningEffort.value = reasoningEffort;
+    rememberActiveComposerConfiguration();
+  }
+
+  function selectServiceTier(serviceTier: string | null): void {
+    const model = selectedModel.value;
+    if (!model || (serviceTier !== null && !model.serviceTiers?.some((tier) => tier.id === serviceTier))) {
+      return;
+    }
+
+    selectedServiceTier.value = serviceTier;
     rememberActiveComposerConfiguration();
   }
 
@@ -1379,6 +1392,7 @@ export function useAppState() {
     fileCatalogError,
     selectedModelId,
     selectedReasoningEffort,
+    selectedServiceTier,
     planMode,
     sidePanelRequest,
     workProviderAuthorization,
@@ -1465,6 +1479,7 @@ export function useAppState() {
     respondToClientRequest,
     selectModel,
     selectReasoningEffort,
+    selectServiceTier,
     setPlanMode,
     setApprovalPreset,
     updateComposerState,
@@ -1560,6 +1575,7 @@ function composerConfiguration(agentId: string): AgentComposerConfiguration {
     fileError: null,
     selectedModelId: defaults?.model ?? null,
     selectedReasoningEffort: defaults?.reasoningEffort ?? null,
+    selectedServiceTier: defaults?.serviceTier ?? null,
     planMode: false,
   };
   composerConfigurationByAgentId.set(agentId, configuration);
@@ -1581,6 +1597,7 @@ function rememberActiveComposerConfiguration(): void {
     fileError: fileCatalogError.value,
     selectedModelId: selectedModelId.value,
     selectedReasoningEffort: selectedReasoningEffort.value,
+    selectedServiceTier: selectedServiceTier.value,
     planMode: planMode.value,
   });
 }
@@ -1598,6 +1615,7 @@ function restoreComposerConfiguration(agentId: string): void {
   fileCatalogError.value = configuration.fileError;
   selectedModelId.value = configuration.selectedModelId;
   selectedReasoningEffort.value = configuration.selectedReasoningEffort;
+  selectedServiceTier.value = configuration.selectedServiceTier;
   planMode.value = configuration.planMode;
 }
 
@@ -1613,6 +1631,7 @@ function clearActiveComposerConfiguration(): void {
   fileCatalogError.value = null;
   selectedModelId.value = null;
   selectedReasoningEffort.value = null;
+  selectedServiceTier.value = null;
   planMode.value = false;
 }
 
@@ -1621,6 +1640,7 @@ function selectDefaultModelForConfiguration(configuration: AgentComposerConfigur
   const defaultModel = configuration.models.find((model) => model.isDefault) ?? configuration.models[0] ?? null;
   configuration.selectedModelId = defaultModel?.id ?? null;
   configuration.selectedReasoningEffort = defaultModel ? defaultReasoningEffort(defaultModel) : null;
+  configuration.selectedServiceTier = defaultModel ? defaultServiceTier(defaultModel) : null;
 }
 
 function selectedModelFromCatalog(): BackendModelOption | null {
@@ -1629,6 +1649,10 @@ function selectedModelFromCatalog(): BackendModelOption | null {
 
 function defaultReasoningEffort(model: BackendModelOption): ReasoningEffort | null {
   return model.defaultReasoningEffort || (model.supportedReasoningEfforts?.[0]?.reasoningEffort ?? null);
+}
+
+function defaultServiceTier(model: BackendModelOption): string | null {
+  return model.defaultServiceTier ?? null;
 }
 
 function selectedPromptOptions(agentId: string, prompt: string): SendPromptOptions | undefined {
@@ -1642,11 +1666,15 @@ function selectedPromptOptions(agentId: string, prompt: string): SendPromptOptio
   const reasoningEffort = capabilities.reasoningEffort && promptModel
     ? selectedReasoningEffort.value ?? defaultReasoningEffort(promptModel)
     : null;
+  const serviceTier = capabilities.serviceTier && promptModel?.serviceTiers?.length
+    ? selectedServiceTier.value
+    : undefined;
 
   if (
     !promptModel &&
     (capabilities.planMode === 'unsupported' || !isActiveAgent || !planMode.value) &&
     !reasoningEffort &&
+    serviceTier === undefined &&
     selectedSkills.length === 0
   ) {
     return undefined;
@@ -1657,6 +1685,7 @@ function selectedPromptOptions(agentId: string, prompt: string): SendPromptOptio
     ...(capabilities.planMode === 'native' && isActiveAgent ? { planMode: planMode.value } : {}),
     ...(capabilities.planMode === 'prompted' && isActiveAgent && planMode.value ? { planMode: true } : {}),
     ...(reasoningEffort ? { reasoningEffort } : {}),
+    ...(serviceTier !== undefined ? { serviceTier } : {}),
     ...(selectedSkills.length > 0 ? { skills: selectedSkills } : {}),
   };
 }
@@ -2042,6 +2071,9 @@ function syncComposerModeFromMainEvent(event: MainToRendererEvent): void {
     }
     if (typeof threadSettings.reasoningEffort === 'string') {
       configuration.selectedReasoningEffort = threadSettings.reasoningEffort;
+    }
+    if ('serviceTier' in threadSettings && (typeof threadSettings.serviceTier === 'string' || threadSettings.serviceTier === null)) {
+      configuration.selectedServiceTier = threadSettings.serviceTier;
     }
     if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
     return;
