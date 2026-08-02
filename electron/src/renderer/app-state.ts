@@ -6,6 +6,7 @@ import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
 import { approvalPresetFromDefaults } from '@codex-claw/shared/approval-presets';
 import {
   promptSkillInputsFromText,
+  type CodexComposerState,
 } from 'codex-app-sdk/vue';
 import { workItemAssignmentPrompt } from '@codex-claw/shared/work-item-prompts';
 import { isAppSnapshot } from '@codex-claw/shared/snapshot-guards';
@@ -14,7 +15,7 @@ import { useConfetti } from './shared/confetti/use-confetti';
 const snapshot = ref<AppSnapshot>(createEmptySnapshot());
 const isLoading = ref(false);
 const sendingAgentIds = ref(new Set<string>());
-const composerDraftsByAgentId = ref<Record<string, string>>({});
+const composerStatesByAgentId = ref<Record<string, CodexComposerState>>({});
 const answeredClientRequestIds = ref(new Set<string>());
 const backendApprovalsByAgentId = ref<Record<string, BackendApprovalRequest[]>>({});
 const backendModels = ref<BackendModelOption[]>([]);
@@ -76,17 +77,20 @@ export function useAppState() {
     return agentId ? (snapshot.value.queuedPrompts ?? []).filter((prompt) => prompt.agentId === agentId) : [];
   });
 
-  const activeComposerDraft = computed({
-    get: () => {
-      const agentId = activeAgent.value?.id;
-      return agentId ? composerDraftsByAgentId.value[agentId] ?? '' : '';
-    },
-    set: (draft: string) => {
-      const agentId = activeAgent.value?.id;
-      if (!agentId) return;
-      composerDraftsByAgentId.value = { ...composerDraftsByAgentId.value, [agentId]: draft };
-    },
+  const activeComposerState = computed<CodexComposerState>(() => {
+    const agentId = activeAgent.value?.id;
+    return agentId
+      ? composerStatesByAgentId.value[agentId] ?? emptyComposerState()
+      : emptyComposerState();
   });
+
+  function updateComposerState(agentId: string, state: CodexComposerState): void {
+    if (!snapshot.value.agents.some((agent) => agent.id === agentId)) return;
+    composerStatesByAgentId.value = {
+      ...composerStatesByAgentId.value,
+      [agentId]: { ...state },
+    };
+  }
 
   const activeBackendApprovals = computed(() => {
     const agentId = activeAgent.value?.id;
@@ -1254,7 +1258,7 @@ export function useAppState() {
     activeApprovalPreset,
     visibleMessages,
     activeQueuedPrompts,
-    activeComposerDraft,
+    activeComposerState,
     isLoading,
     isHydratingActiveAgentHistory,
     isSending,
@@ -1360,6 +1364,7 @@ export function useAppState() {
     selectReasoningEffort,
     setPlanMode,
     setApprovalPreset,
+    updateComposerState,
     selectAgent,
     selectTeam,
     clearActiveGoal,
@@ -1375,6 +1380,10 @@ export function useAppState() {
     quit,
     restartApp,
   };
+}
+
+function emptyComposerState(): CodexComposerState {
+  return { text: '', selectionStart: 0, selectionEnd: 0 };
 }
 
 function plainConversationRef(ref: BackendConversationRef): BackendConversationRef {

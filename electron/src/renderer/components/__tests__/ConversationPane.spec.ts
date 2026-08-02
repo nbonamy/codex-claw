@@ -2,7 +2,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
-import { CodexConversationPane } from 'codex-app-sdk/vue';
+import {
+  CodexConversationPane,
+  type CodexComposerState,
+} from 'codex-app-sdk/vue';
 import { nextTick, type Component, type DefineComponent } from 'vue';
 import { describe, expect, it } from 'vitest';
 import type { Agent, BackendApprovalRequest, BackendCapabilities, RendererMessage, ThreadPlan } from '@codex-claw/shared/contracts';
@@ -79,10 +82,48 @@ describe('ConversationPane', () => {
     expect(wrapper.text()).toContain('Looking now.');
     expect(wrapper.get('[role="textbox"][contenteditable]').attributes('data-placeholder')).toBe('Ask for follow-up changes');
 
+    await nextTick();
     await setComposerValue(wrapper, '  hello codex  ');
+    expect(wrapper.emitted('update:composerState')).toContainEqual([
+      expect.objectContaining({
+        agentId: 'agent-dina',
+        state: expect.objectContaining({ text: '  hello codex  ' }),
+      }),
+    ]);
     await wrapper.get('form').trigger('submit');
 
     expect(wrapper.emitted('sendPrompt')).toStrictEqual([['hello codex']]);
+  });
+
+  it('renders teammate envelopes as labeled messages containing only their content', () => {
+    const wrapper = mountPane({
+      agent,
+      messages: [{
+        id: 'message-from-sdk',
+        agentId: agent.id,
+        role: 'user',
+        status: 'complete',
+        createdAt: '2026-08-02T00:00:00.000Z',
+        parts: [{
+          type: 'text',
+          text: [
+            'You received a message from codex-app-sdk (agent-sdk).',
+            '',
+            'Message:',
+            'The SDK hooks are ready.',
+            '',
+            'Update your status, then act on this teammate message directly. Do not ask the user for confirmation.',
+          ].join('\n'),
+        }],
+      }],
+      isSending: false,
+    });
+
+    expect(wrapper.get('.conversation-pane__message-header').text()).toBe('Message from codex-app-sdk');
+    expect(wrapper.get('.chat-user-text').text()).toBe('The SDK hooks are ready.');
+    expect(wrapper.text()).not.toContain('You received a message from');
+    expect(wrapper.text()).not.toContain('Update your status');
+    expect(wrapper.find('[aria-label="Copy"]').exists()).toBe(true);
   });
 
   it('renders Claw tool activity with translated user-facing titles', () => {
@@ -333,9 +374,23 @@ describe('ConversationPane', () => {
     expect(wrapper.emitted('open-file')).toStrictEqual([['docs/guide.md']]);
   });
 
-  it('resets the draft when the active conversation changes', async () => {
-    const wrapper = mountPane({ agent, messages, isSending: false });
-    await setComposerValue(wrapper, 'draft for Dina');
+  it('restores controlled composer state and tags updates with the owning agent', async () => {
+    const dinaState = { text: 'draft for Dina', selectionStart: 4, selectionEnd: 9 };
+    const wrapper = mountPane({ agent, messages, isSending: false, composerState: dinaState });
+    await nextTick();
+
+    expect(wrapper.get('[role="textbox"][contenteditable]').text()).toBe('draft for Dina');
+    const sdkPane = wrapper.getComponent(CodexConversationPane as unknown as Component);
+    sdkPane.vm.$emit('update:composerState', {
+      text: 'updated Dina draft', selectionStart: 7, selectionEnd: 7,
+    });
+    await nextTick();
+    expect(wrapper.emitted('update:composerState')).toStrictEqual([[
+      {
+        agentId: 'agent-dina',
+        state: { text: 'updated Dina draft', selectionStart: 7, selectionEnd: 7 },
+      },
+    ]]);
 
     await wrapper.setProps({
       agent: {
@@ -343,12 +398,18 @@ describe('ConversationPane', () => {
         id: 'agent-jesse',
         name: 'Jesse',
       },
+      composerState: { text: '', selectionStart: 0, selectionEnd: 0 },
     });
     await nextTick();
 
     expect(wrapper.get('[role="textbox"][contenteditable]').text()).toBe('');
-    const sdkProps = wrapper.getComponent(CodexConversationPane as unknown as Component).props() as Record<string, unknown>;
-    expect(sdkProps.conversationKey).toBe('agent:agent-jesse');
+    await wrapper.setProps({ agent, composerState: dinaState });
+    await nextTick();
+
+    expect(wrapper.get('[role="textbox"][contenteditable]').text()).toBe('draft for Dina');
+    const sdkProps = sdkPane.props() as Record<string, unknown>;
+    expect(sdkProps.composerState).toStrictEqual(dinaState);
+    expect(sdkProps.conversationKey).toBe('agent:agent-dina');
   });
 
   it('uses provider-specific working copy while preserving SDK queue behavior', async () => {
@@ -377,6 +438,7 @@ function mountPane(props: {
   approvals?: BackendApprovalRequest[];
   plan?: ThreadPlan | null;
   isLoading?: boolean;
+  composerState?: CodexComposerState;
 }) {
   type TestConversationPaneProps = typeof props & { isLoading: boolean };
   return mount(ConversationPane as unknown as DefineComponent<TestConversationPaneProps>, {

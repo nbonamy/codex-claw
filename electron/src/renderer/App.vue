@@ -21,7 +21,7 @@
     :selected-model-id="selectedModelId"
     :selected-reasoning-effort="selectedReasoningEffort"
     :queued-prompts="activeQueuedPrompts"
-    :composer-draft="activeComposerDraft"
+    :composer-state="activeComposerState"
     :side-panel-request="sidePanelRequest"
     :work-provider-authorization="workProviderAuthorization"
     :work-repositories-by-provider="workRepositoriesByProvider"
@@ -115,7 +115,7 @@
     @send-prompt="sendPrompt"
     @steer-prompt="steerPrompt"
     @steer-queued-prompt="steerQueuedPrompt"
-    @update:composer-draft="activeComposerDraft = $event"
+    @update:composer-state="updateComposerState($event.agentId, $event.state)"
   />
   <ConfettiOverlay />
 </template>
@@ -135,7 +135,7 @@ const {
   activeApprovalPreset,
   visibleMessages,
   activeQueuedPrompts,
-  activeComposerDraft,
+  activeComposerState,
   isLoading,
   isHydratingActiveAgentHistory,
   isSending,
@@ -229,6 +229,7 @@ const {
   selectModel,
   selectReasoningEffort,
   setApprovalPreset,
+  updateComposerState,
   setPlanMode,
   clearActiveGoal,
   selectAgent,

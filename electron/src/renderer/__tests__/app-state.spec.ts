@@ -1939,7 +1939,7 @@ describe('useAppState', () => {
     expect(state.activeAgent.value?.id).toBe('agent-jesse');
   });
 
-  it('keeps composer drafts isolated in memory for each agent', async () => {
+  it('keeps composer text and selection isolated under the emitting agent', async () => {
     const base = createInitialSnapshot();
     const selectAgent = vi.fn((agentId: string) => Promise.resolve({ ...base, activeAgentId: agentId }));
     vi.stubGlobal('window', {
@@ -1952,16 +1952,30 @@ describe('useAppState', () => {
 
     const state = useAppState();
     await state.loadSnapshot();
-    state.activeComposerDraft.value = 'draft for Dina';
+    state.updateComposerState('agent-dina', {
+      text: 'draft for Dina', selectionStart: 3, selectionEnd: 8,
+    });
 
     await state.selectAgent('agent-jesse');
-    expect(state.activeComposerDraft.value).toBe('');
-    state.activeComposerDraft.value = 'draft for Jesse';
+    expect(state.activeComposerState.value).toStrictEqual({
+      text: '', selectionStart: 0, selectionEnd: 0,
+    });
+    state.updateComposerState('agent-jesse', {
+      text: 'draft for Jesse', selectionStart: 15, selectionEnd: 15,
+    });
+    state.updateComposerState('agent-dina', {
+      text: 'late Dina state', selectionStart: 4, selectionEnd: 4,
+    });
+    expect(state.activeComposerState.value.text).toBe('draft for Jesse');
 
     await state.selectAgent('agent-dina');
-    expect(state.activeComposerDraft.value).toBe('draft for Dina');
+    expect(state.activeComposerState.value).toStrictEqual({
+      text: 'late Dina state', selectionStart: 4, selectionEnd: 4,
+    });
     await state.selectAgent('agent-jesse');
-    expect(state.activeComposerDraft.value).toBe('draft for Jesse');
+    expect(state.activeComposerState.value).toStrictEqual({
+      text: 'draft for Jesse', selectionStart: 15, selectionEnd: 15,
+    });
   });
 
   it('keeps each agent queue in the authoritative snapshot while switching agents', async () => {

@@ -8,6 +8,10 @@ export const messages = {
       cancel: 'Cancel sign-in',
     },
     chat: {
+      collaboration: {
+        messageFrom: 'Message from {name}',
+        messagesFrom: 'Messages from {names}',
+      },
       actions: {
         cancel: 'Cancel',
         copied: 'Copied',

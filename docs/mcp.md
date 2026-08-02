@@ -301,6 +301,10 @@ When a recipient receives a direct or broadcast message:
   message body directly;
 - the delivery prompt is also appended to the recipient's visible conversation
   as a user message, just like a normal prompt from the renderer;
+- the renderer recognizes Claw's delivery envelope, labels the bubble with the
+  sender name, and shows only the teammate-authored body; the complete envelope
+  still reaches the backend agent and remains recoverable from hydrated thread
+  history;
 - if the recipient is busy, main waits until the current turn completes, then
   drains all pending unread messages into one direct delivery prompt.
 

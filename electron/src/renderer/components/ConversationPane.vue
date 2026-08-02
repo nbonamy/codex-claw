@@ -1,7 +1,7 @@
 <template>
   <div class="conversation-pane">
     <CodexConversationPane
-      :model-value="composerDraft"
+      :composer-state="composerState"
       class="conversation-pane__surface"
       :answered-client-request-ids="answeredClientRequestIds"
       :approvals="approvals"
@@ -21,7 +21,7 @@
       :files="agentFiles"
       :goal="goal ?? null"
       :history-loading="isHydratingHistory"
-      :messages="chatMessages"
+      :messages="presentedChatMessages"
       :model-catalog-status="modelCatalogStatus"
       :models="backendModels"
       :placeholder="composerPlaceholder"
@@ -45,10 +45,17 @@
       @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
       @submit="submitPrompt"
       @update:model-id="$emit('select-model', $event)"
-      @update:model-value="$emit('update:composerDraft', $event)"
+      @update:composer-state="updateComposerState"
       @update:plan-mode="$emit('update:planMode', $event)"
       @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
-    />
+    >
+      <template #message-header="{ message }">
+        <span
+          v-if="collaborationMessageLabel(message.id)"
+          class="conversation-pane__message-header"
+        >{{ collaborationMessageLabel(message.id) }}</span>
+      </template>
+    </CodexConversationPane>
     <ConversationPlanPanel v-if="plan" :plan="plan" />
   </div>
 </template>
@@ -59,8 +66,10 @@ import { useI18n } from 'vue-i18n';
 import {
   CodexConversationPane,
   provideCodexChatTranslate,
-  toCodexChatMessages,
+  toCodexChatMessage,
   type CodexCapabilities,
+  type CodexChatMessage,
+  type CodexComposerState,
   type CodexConversationLink,
   type CodexQueuedPromptData as QueuedChatPrompt,
   type SendCodexMessageOptions,
@@ -85,6 +94,7 @@ import type {
 } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import ConversationPlanPanel from './ConversationPlanPanel.vue';
+import { presentCollaborationMessage } from '../shared/collaboration-message';
 
 const { t } = useI18n();
 provideCodexChatTranslate((key, params) => t(key, params ?? {}));
@@ -110,7 +120,7 @@ const props = withDefaults(defineProps<{
   approvalPreset?: ApprovalPreset | null;
   queuedPrompts?: QueuedChatPrompt[];
   planMode?: boolean;
-  composerDraft?: string;
+  composerState?: CodexComposerState;
 }>(), {
   queuedPrompts: () => [],
   agentFiles: () => [],
@@ -121,6 +131,7 @@ const props = withDefaults(defineProps<{
   backendCapabilities: () => defaultBackendCapabilities('codex'),
   skillCatalogStatus: 'notLoaded',
   approvalPreset: null,
+  composerState: () => ({ text: '', selectionStart: 0, selectionEnd: 0 }),
 });
 
 const emit = defineEmits<{
@@ -138,12 +149,25 @@ const emit = defineEmits<{
   'select-approval-preset': [preset: ApprovalPreset];
   'steer-queued-prompt': [promptId: string];
   'update:planMode': [enabled: boolean];
-  'update:composerDraft': [draft: string];
+  'update:composerState': [payload: { agentId: string; state: CodexComposerState }];
   sendPrompt: [prompt: string, options?: SendPromptOptions];
   steerPrompt: [prompt: string];
 }>();
 
-const chatMessages = computed(() => toCodexChatMessages(props.messages));
+const presentedMessages = computed(() => props.messages.map((message) => (
+  presentCollaborationMessage(toCodexChatMessage(message))
+)));
+const presentedChatMessages = computed(() => presentedMessages.value.map(({ message }) => message));
+const collaborationMessageLabels = computed(() => new Map(
+  presentedMessages.value.flatMap(({ message, presentation }) => {
+    if (!message.id || !presentation) return [];
+    const names = presentation.senderNames.join(', ');
+    const label = presentation.messageCount === 1
+      ? t('chat.collaboration.messageFrom', { name: names })
+      : t('chat.collaboration.messagesFrom', { names });
+    return [[message.id, label] as const];
+  }),
+));
 const conversationKey = computed(() => {
   const session = props.agent?.backendSession;
   if (session?.kind === 'codex') return `codex:${session.threadId}`;
@@ -203,6 +227,15 @@ function submitPrompt(prompt: string, options?: SendCodexMessageOptions): void {
     emit('sendPrompt', prompt);
   }
 }
+
+function collaborationMessageLabel(messageId: CodexChatMessage['id']): string | null {
+  return messageId ? collaborationMessageLabels.value.get(messageId) ?? null : null;
+}
+
+function updateComposerState(state: CodexComposerState): void {
+  if (!props.agent) return;
+  emit('update:composerState', { agentId: props.agent.id, state });
+}
 </script>
 
 <style scoped>
@@ -220,5 +253,12 @@ function submitPrompt(prompt: string, options?: SendCodexMessageOptions): void {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+}
+
+.conversation-pane__message-header {
+  margin-bottom: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  font-weight: var(--font-weight-medium);
 }
 </style>
