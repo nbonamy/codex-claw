@@ -56,6 +56,14 @@ export const messages = {
         commentsCount: '{count} comment | {count} comments',
         updating: 'Updating plan...',
       },
+      planProgress: {
+        title: 'Plan',
+        status: {
+          pending: 'Pending',
+          inProgress: 'In progress',
+          completed: 'Completed',
+        },
+      },
       tool: {
         fallback: {
           completed: 'Ran {name}',
@@ -136,6 +144,11 @@ export const messages = {
               completed: 'Inspected page',
               failed: 'Failed inspecting page',
               running: 'Inspecting page',
+            },
+            browserOpen: {
+              completed: 'Opened {target}',
+              failed: 'Failed opening {target}',
+              running: 'Opening {target}',
             },
             browserScreenshot: {
               completed: 'Captured page screenshot',

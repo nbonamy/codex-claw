@@ -1,53 +1,55 @@
 <template>
-  <CodexConversationPane
-    v-model="composerDraft"
-    class="conversation-pane"
-    :answered-client-request-ids="answeredClientRequestIds"
-    :approvals="approvals"
-    :approval-preset="approvalPreset"
-    :attach-enabled="backendCapabilities.attachments"
-    :busy="isSending"
-    :can-delete-message="backendCapabilities.rollback"
-    :can-edit-message="backendCapabilities.editMessage"
-    :can-retry-message="backendCapabilities.retryMessage"
-    :capabilities="conversationCapabilities"
-    :commands="backendCommands"
-    :context-usage="agent?.contextUsage ?? null"
-    :conversation-key="conversationKey"
-    :disabled="!agent"
-    :empty-description="heroSubhead"
-    :empty-title="heroHeadline"
-    :files="agentFiles"
-    :goal="goal ?? null"
-    :history-loading="isHydratingHistory"
-    :messages="chatMessages"
-    :model-catalog-status="modelCatalogStatus"
-    :models="backendModels"
-    :placeholder="composerPlaceholder"
-    :plan-mode="planMode"
-    :queued-prompts="queuedPrompts"
-    :selected-model-id="selectedModelId"
-    :selected-reasoning-effort="selectedReasoningEffort"
-    :skill-catalog-status="skillCatalogStatus"
-    :skills="backendSkills"
-    :turn-git-diff="turnGitDiff ?? null"
-    @clear-goal="$emit('clear-goal')"
-    @client-response="$emit('client-response', $event)"
-    @delete-message="$emit('delete-message', $event)"
-    @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
-    @edit-message="$emit('edit-message', $event)"
-    @interrupt="$emit('interrupt-agent')"
-    @open-link="openLink"
-    @retry-message="$emit('retry-message', $event)"
-    @resolve-approval="resolveApproval"
-    @select-approval-preset="$emit('select-approval-preset', $event)"
-    @steer="$emit('steerPrompt', $event)"
-    @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
-    @submit="submitPrompt"
-    @update:model-id="$emit('select-model', $event)"
-    @update:plan-mode="$emit('update:planMode', $event)"
-    @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
-  />
+  <div class="conversation-pane">
+    <CodexConversationPane
+      v-model="composerDraft"
+      class="conversation-pane__surface"
+      :answered-client-request-ids="answeredClientRequestIds"
+      :approvals="approvals"
+      :approval-preset="approvalPreset"
+      :attach-enabled="backendCapabilities.attachments"
+      :busy="isSending"
+      :can-delete-message="backendCapabilities.rollback"
+      :can-edit-message="backendCapabilities.editMessage"
+      :can-retry-message="backendCapabilities.retryMessage"
+      :capabilities="conversationCapabilities"
+      :commands="backendCommands"
+      :context-usage="agent?.contextUsage ?? null"
+      :conversation-key="conversationKey"
+      :disabled="!agent"
+      :empty-description="heroSubhead"
+      :empty-title="heroHeadline"
+      :files="agentFiles"
+      :goal="goal ?? null"
+      :history-loading="isHydratingHistory"
+      :messages="chatMessages"
+      :model-catalog-status="modelCatalogStatus"
+      :models="backendModels"
+      :placeholder="composerPlaceholder"
+      :plan-mode="planMode"
+      :queued-prompts="queuedPrompts"
+      :selected-model-id="selectedModelId"
+      :selected-reasoning-effort="selectedReasoningEffort"
+      :skill-catalog-status="skillCatalogStatus"
+      :skills="backendSkills"
+      @clear-goal="$emit('clear-goal')"
+      @client-response="$emit('client-response', $event)"
+      @delete-message="$emit('delete-message', $event)"
+      @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
+      @edit-message="$emit('edit-message', $event)"
+      @interrupt="$emit('interrupt-agent')"
+      @open-link="openLink"
+      @retry-message="$emit('retry-message', $event)"
+      @resolve-approval="resolveApproval"
+      @select-approval-preset="$emit('select-approval-preset', $event)"
+      @steer="$emit('steerPrompt', $event)"
+      @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
+      @submit="submitPrompt"
+      @update:model-id="$emit('select-model', $event)"
+      @update:plan-mode="$emit('update:planMode', $event)"
+      @update:reasoning-effort="$emit('select-reasoning-effort', $event)"
+    />
+    <ConversationPlanPanel v-if="plan" :plan="plan" />
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -78,9 +80,10 @@ import type {
   ReasoningEffort,
   RendererMessage,
   SendPromptOptions,
-  TurnGitDiff,
+  ThreadPlan,
 } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
+import ConversationPlanPanel from './ConversationPlanPanel.vue';
 
 const { t } = useI18n();
 provideCodexChatTranslate((key, params) => t(key, params ?? {}));
@@ -91,7 +94,7 @@ const props = withDefaults(defineProps<{
   agentFiles?: AgentFileSearchItem[];
   approvals?: BackendApprovalRequest[];
   goal?: Agent['goal'] | null;
-  turnGitDiff?: TurnGitDiff | null;
+  plan?: ThreadPlan | null;
   isLoading: boolean;
   isSending: boolean;
   answeredClientRequestIds?: Set<string>;
@@ -206,9 +209,18 @@ function submitPrompt(prompt: string, options?: SendCodexMessageOptions): void {
 
 <style scoped>
 .conversation-pane {
+  position: relative;
+  display: flex;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
   background: var(--color-shell-main);
+}
+
+.conversation-pane__surface {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
 }
 </style>

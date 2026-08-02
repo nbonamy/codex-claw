@@ -455,6 +455,51 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
   });
 
+  it('reconciles a cached active session when app-server reports that its turn was interrupted', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
+
+    await adapter.hydrateAgent(agentA);
+    await adapter.sendPrompt(agentA, 'Start work');
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-a',
+      type: 'agent.statusChanged',
+      payload: { type: 'working' },
+    }));
+
+    transport.summaryTurnsByThreadId.set('thread-a', [turn('turn-thread-a', 'inProgress')]);
+    events.length = 0;
+    await adapter.hydrateAgent(agentA);
+
+    expect(transport.sent.filter((message) => (
+      'method' in message && message.method === 'thread/resume'
+    ))).toHaveLength(2);
+    expect(lastRequest(transport, 'turn/interrupt')).toBeUndefined();
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-a',
+      type: 'agent.statusChanged',
+      payload: { type: 'working' },
+    }));
+
+    transport.summaryTurnsByThreadId.set('thread-a', [turn('turn-thread-a', 'interrupted')]);
+    events.length = 0;
+    await adapter.hydrateAgent(agentA);
+
+    expect(transport.sent.filter((message) => (
+      'method' in message && message.method === 'thread/resume'
+    ))).toHaveLength(3);
+    expect(lastRequest(transport, 'turn/interrupt')).toBeUndefined();
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-a',
+      type: 'agent.statusChanged',
+      payload: { type: 'idle' },
+    }));
+    expect(events.find((event) => event.type === 'thread.historyLoaded')).toMatchObject({
+      payload: { messages: expect.not.arrayContaining([expect.objectContaining({ status: 'streaming' })]) },
+    });
+  });
+
   it('replaces summary-only restart history with every persisted turn item', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];

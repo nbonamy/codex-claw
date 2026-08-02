@@ -5,7 +5,7 @@ import ElementPlus from 'element-plus';
 import { CodexConversationPane } from 'codex-app-sdk/vue';
 import { nextTick, type Component, type DefineComponent } from 'vue';
 import { describe, expect, it } from 'vitest';
-import type { Agent, BackendApprovalRequest, BackendCapabilities, RendererMessage } from '@codex-claw/shared/contracts';
+import type { Agent, BackendApprovalRequest, BackendCapabilities, RendererMessage, ThreadPlan } from '@codex-claw/shared/contracts';
 import ConversationPane from '../ConversationPane.vue';
 import { i18n } from '../../i18n';
 import { registerClawToolTitlePresenter } from '../../tool-title-presenter';
@@ -49,8 +49,26 @@ describe('ConversationPane', () => {
     expect(conversationPaneSource).toMatch(/\.conversation-pane\s*\{[\s\S]*background:\s*var\(--color-shell-main\);/);
   });
 
-  it('refreshes the linked SDK prebundle without exposing CommonJS dependencies as ESM', () => {
-    expect(rendererViteConfig).toMatch(/optimizeDeps:\s*\{[\s\S]*force:\s*true/);
+  it('floats active plan progress without passing a sticky turn diff to the SDK composer', () => {
+    const plan: ThreadPlan = {
+      threadId: 'thread-plan',
+      turnId: 'turn-plan',
+      explanation: 'Current execution plan',
+      steps: [{ step: 'Implement the fix', status: 'inProgress' }],
+      markdown: 'Current execution plan\n- [ ] Implement the fix',
+      updatedAt: '2026-08-01T00:00:00.000Z',
+    };
+    const wrapper = mountPane({ agent, messages, isSending: true, plan });
+
+    expect(wrapper.get('.conversation-plan').text()).toContain('Implement the fix');
+    const sdkProps = wrapper.getComponent(CodexConversationPane as unknown as Component).props() as Record<string, unknown>;
+    expect(sdkProps.turnGitDiff).toBeUndefined();
+  });
+
+  it('keeps SDK sources hot-reloadable with a prebundled dist fallback', () => {
+    expect(rendererViteConfig).toContain('optimizeDeps: useSdkSources ? {');
+    expect(rendererViteConfig).toContain('exclude: Object.keys(sdkSourceAliases)');
+    expect(rendererViteConfig).toMatch(/:\s*\{[\s\S]*force:\s*true/);
     expect(rendererViteConfig).not.toMatch(/exclude:\s*\[[^\]]*codex-app-sdk/);
   });
 
@@ -357,6 +375,7 @@ function mountPane(props: {
   isSending: boolean;
   backendCapabilities?: BackendCapabilities;
   approvals?: BackendApprovalRequest[];
+  plan?: ThreadPlan | null;
   isLoading?: boolean;
 }) {
   type TestConversationPaneProps = typeof props & { isLoading: boolean };

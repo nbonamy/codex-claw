@@ -11,10 +11,11 @@ export type ClientRequestHandlersOptions = {
   getSystemPermissionsStatus: () => SystemPermissionsStatus;
   openAccessibilitySettings: () => Promise<SystemPermissionsStatus>;
   computerUseOptions: () => ComputerUseOptions;
-  browserExecute?: (agentId: string, command: string, arguments_: Record<string, unknown>) => Promise<unknown>;
+  browserOpen?: (agentId: string, browserId: string, url: string) => Promise<unknown>;
+  browserExecute?: (agentId: string, browserId: string, command: string, arguments_: Record<string, unknown>) => Promise<unknown>;
 };
 
-export function createRuntimeClientRequestHandlers(overrides: Pick<ClientRequestHandlersOptions, 'browserExecute'> = {}): Record<string, ClientRequestHandler> {
+export function createRuntimeClientRequestHandlers(overrides: Pick<ClientRequestHandlersOptions, 'browserExecute' | 'browserOpen'> = {}): Record<string, ClientRequestHandler> {
   return createClientRequestHandlers({
     openExternal: (url) => shell.openExternal(url),
     getSystemPermissionsStatus,
@@ -40,7 +41,12 @@ export function createClientRequestHandlers(options: ClientRequestHandlersOption
     [backendMethods.clientBrowserExecute]: async (params) => {
       if (!options.browserExecute) throw new Error('In-app browser tools are unavailable.');
       const input = requireRecord(params);
-      return options.browserExecute(requireString(input.agentId, 'agentId'), requireString(input.command, 'command'), requireRecord(input.arguments));
+      return options.browserExecute(requireString(input.agentId, 'agentId'), requireString(input.browserId, 'browserId'), requireString(input.command, 'command'), requireRecord(input.arguments));
+    },
+    [backendMethods.clientBrowserOpen]: async (params) => {
+      if (!options.browserOpen) throw new Error('In-app browser tools are unavailable.');
+      const input = requireRecord(params);
+      return options.browserOpen(requireString(input.agentId, 'agentId'), requireString(input.browserId, 'browserId'), requireString(input.url, 'url'));
     },
     [backendMethods.clientSystemPermissionsGet]: () => options.getSystemPermissionsStatus(),
     [backendMethods.clientSystemPermissionsAccessibilityOpen]: () => options.openAccessibilitySettings(),

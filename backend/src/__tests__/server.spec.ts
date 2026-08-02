@@ -1404,7 +1404,7 @@ describe('ClawBackendServer', () => {
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
   });
 
-  it('derives plan side-panel preview events in clawd', () => {
+  it('keeps execution plans passive and previews only proposed plans', () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     snapshot.agents = [{
@@ -1442,18 +1442,12 @@ describe('ClawBackendServer', () => {
     });
 
     expect(snapshot.agents[0]?.plan?.markdown).toBe('Current plan\n- [x] Inspect backend event\n- [ ] Preview markdown');
-    expect(events).toContainEqual(expect.objectContaining({
-      agentId: 'agent-dina',
-      threadId: 'thread-dina',
-      turnId: 'turn-plan',
-      type: 'sidePanel.markdownRequested',
-      payload: {
-        kind: 'markdown',
-        purpose: 'plan',
-        title: 'Plan',
-        content: 'Current plan\n- [x] Inspect backend event\n- [ ] Preview markdown',
-      },
-    }));
+    expect(events.some((event) => (
+      typeof event === 'object' &&
+      event !== null &&
+      'type' in event &&
+      event.type === 'sidePanel.markdownRequested'
+    ))).toBe(false);
 
     server.emitEvent({
       agentId: 'agent-dina',
@@ -1465,12 +1459,39 @@ describe('ClawBackendServer', () => {
       occurredAt: '2026-06-13T00:00:01.000Z',
     });
 
+    expect(events.some((event) => (
+      typeof event === 'object' &&
+      event !== null &&
+      'type' in event &&
+      event.type === 'sidePanel.markdownRequested'
+    ))).toBe(false);
+
+    server.emitEvent({
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-dina',
+      turnId: 'turn-proposed-plan',
+      type: 'turn.proposedPlanCompleted',
+      payload: { markdown: '# Proposed plan\n\n- Build it' },
+      occurredAt: '2026-06-13T00:00:02.000Z',
+    });
+
     expect(events.filter((event) => (
       typeof event === 'object' &&
       event !== null &&
       'type' in event &&
       event.type === 'sidePanel.markdownRequested'
-    ))).toHaveLength(2);
+    ))).toStrictEqual([expect.objectContaining({
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-proposed-plan',
+      payload: {
+        kind: 'markdown',
+        purpose: 'plan',
+        title: 'Plan',
+        content: '# Proposed plan\n\n- Build it',
+      },
+    })]);
   });
 
   it('derives current-turn git diff side-panel preview events in clawd', () => {

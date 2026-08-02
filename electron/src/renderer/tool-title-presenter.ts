@@ -10,6 +10,7 @@ const TOOL_KEYS: Record<string, string> = {
   'browser-click': 'browserClick',
   'browser-console-logs': 'browserConsoleLogs',
   'browser-get-dom': 'browserGetDom',
+  'browser-open': 'browserOpen',
   'browser-screenshot': 'browserScreenshot',
   'browser-scroll': 'browserScroll',
   'browser-type': 'browserType',
@@ -83,17 +84,19 @@ function toolPhase(descriptorPhase: string | undefined, state: string): ToolPhas
 function toolTarget(tool: string, args: Record<string, unknown>): string {
   const candidates = tool === 'send-message'
     ? [args.to]
-    : tool === 'display-markdown'
-      ? [args.title, args.path]
-      : tool === 'create-agent'
-        ? [args.name, args.repoPath]
-        : tool === 'create-worktree'
-          ? [args.branchName, args.destinationPath]
-          : tool === 'list-worktrees'
-            ? [args.repoPath]
-            : tool.startsWith('computer-use-')
-              ? [args.name, args.appName, args.bundleIdentifier, args.path]
-              : [];
+    : tool === 'browser-open'
+      ? [args.url]
+      : tool === 'display-markdown'
+        ? [args.title, args.path]
+        : tool === 'create-agent'
+          ? [args.name, args.repoPath]
+          : tool === 'create-worktree'
+            ? [args.branchName, args.destinationPath]
+            : tool === 'list-worktrees'
+              ? [args.repoPath]
+              : tool.startsWith('computer-use-')
+                ? [args.name, args.appName, args.bundleIdentifier, args.path]
+                : [];
 
   const target = candidates.find((candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0);
   return target?.trim() ?? '';

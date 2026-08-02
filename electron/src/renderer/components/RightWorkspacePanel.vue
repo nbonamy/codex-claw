@@ -80,6 +80,9 @@
       v-if="tabs.includes('browser')"
       v-show="activeTab === 'browser'"
       :agent-id="agent.id"
+      :browser-id="browserId"
+      :initial-url="browserInitialUrl"
+      :open-request-id="browserOpenRequestId"
       :visible="visible && activeTab === 'browser'"
       @close="emit('closeTab', 'browser')"
       @send-prompt="emit('sendPrompt', $event)"
@@ -106,6 +109,9 @@ const props = defineProps<{
   gitStatus?: AgentGitStatus | null;
   tabs: RightWorkspaceTab[];
   visible?: boolean;
+  browserId?: string;
+  browserInitialUrl?: string;
+  browserOpenRequestId?: number;
 }>();
 
 const emit = defineEmits<{

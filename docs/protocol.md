@@ -321,6 +321,8 @@ matches their platform capabilities.
 | Method | Params | Result | Owner |
 | --- | --- | --- | --- |
 | `client/external/open` | `{ url }` | `true` | Electron opens the URL with `shell.openExternal`. |
+| `client/browser/open` | `{ agentId, browserId, url }` | `BrowserState` | Electron asks the renderer to mount or navigate that agent/browser workspace without changing the selected agent, and resolves after its sandboxed page loads. |
+| `client/browser/execute` | `{ agentId, browserId, command, arguments }` | command-specific result | Electron operates on the addressed agent/browser `WebContentsView`, including while its workspace is hidden. |
 | `client/system/permissions/get` | none | `SystemPermissionsStatus` | Electron reads native permission status. |
 | `client/system/permissions/accessibility/open` | none | `SystemPermissionsStatus` | Electron opens native settings and returns status. |
 

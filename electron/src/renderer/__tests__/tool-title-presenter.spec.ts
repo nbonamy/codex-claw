@@ -10,6 +10,7 @@ describe('Claw tool title presenter', () => {
     ['codex_claw.send-message', { to: 'computer-use' }, 'completed', 'Sent message to computer-use'],
     ['codex_claw.list-agents', {}, 'completed', 'Listed agents'],
     ['codex_claw.browser-screenshot', {}, 'running', 'Capturing page screenshot'],
+    ['codex_claw.browser-open', { url: 'https://example.com' }, 'completed', 'Opened https://example.com'],
     ['mcp__codex_claw__computer_use_launch_app', { name: 'Codex Claw' }, 'completed', 'Launched Codex Claw'],
     ['codex_claw.create-worktree', { branchName: 'feature/tool-labels' }, 'error', 'Failed creating worktree feature/tool-labels'],
   ])('presents %s as user-facing activity text', (functionName, args, state, expected) => {

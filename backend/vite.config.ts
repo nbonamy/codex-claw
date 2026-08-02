@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite';
 import path from 'node:path';
+import { sdkSourceAliases } from '../vite.sdk-aliases';
 
 export default defineConfig(({ mode }) => {
   const rootDir = path.resolve(__dirname, '..');
@@ -7,6 +8,7 @@ export default defineConfig(({ mode }) => {
     ...loadEnv(mode, rootDir, ''),
     ...process.env,
   };
+  const useSdkSources = env.CODEX_APP_SDK_SOURCE === '1';
 
   return {
     define: {
@@ -15,6 +17,7 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@codex-claw/shared': path.resolve(__dirname, '../shared/src'),
+        ...(useSdkSources ? sdkSourceAliases : {}),
       },
     },
     ssr: {

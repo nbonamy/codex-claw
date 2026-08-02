@@ -611,8 +611,12 @@ export type BrowserBounds = {
   height: number;
 };
 
+export const PRIMARY_BROWSER_ID = 'primary';
+
 export type BrowserAnnotation = {
   id: string;
+  agentId: string;
+  browserId: string;
   url: string;
   kind: 'element' | 'area';
   selector?: string;
@@ -904,7 +908,7 @@ export type AppCommand =
   | { type: 'edit-active-agent' }
   | { type: 'new-agent' }
   | { type: 'new-team' }
-  | { type: 'open-browser' }
+  | { type: 'open-browser'; agentId?: string; browserId?: string; url?: string }
   | { type: 'open-review' }
   | { type: 'quit' }
   | { type: 'restart-active-agent' }
@@ -1101,16 +1105,16 @@ export type CodexClawApi = {
   deleteMessage(agentId: string, messageId: string): Promise<AppSnapshot>;
   editMessage(agentId: string, messageId: string, prompt: string): Promise<AppSnapshot>;
   retryMessage(agentId: string, messageId: string): Promise<AppSnapshot>;
-  browserOpen(agentId: string, url: string): Promise<BrowserState>;
-  browserNavigate(url: string): Promise<BrowserState>;
-  browserGoBack(): Promise<BrowserState>;
-  browserGoForward(): Promise<BrowserState>;
-  browserReload(): Promise<BrowserState>;
-  browserSetBounds(bounds: BrowserBounds): Promise<void>;
-  browserSetVisible(visible: boolean): Promise<void>;
-  browserSetAnnotationMode(enabled: boolean): Promise<void>;
-  browserClearAnnotations(): Promise<void>;
-  browserClose(): Promise<void>;
+  browserOpen(agentId: string, browserId: string, url: string): Promise<BrowserState>;
+  browserNavigate(agentId: string, browserId: string, url: string): Promise<BrowserState>;
+  browserGoBack(agentId: string, browserId: string): Promise<BrowserState>;
+  browserGoForward(agentId: string, browserId: string): Promise<BrowserState>;
+  browserReload(agentId: string, browserId: string): Promise<BrowserState>;
+  browserSetBounds(agentId: string, browserId: string, bounds: BrowserBounds): Promise<void>;
+  browserSetVisible(agentId: string, browserId: string, visible: boolean): Promise<void>;
+  browserSetAnnotationMode(agentId: string, browserId: string, enabled: boolean): Promise<void>;
+  browserClearAnnotations(agentId: string, browserId: string): Promise<void>;
+  browserClose(agentId: string, browserId: string): Promise<void>;
   respondToClientRequest(response: ClientRequestResponse): Promise<AppSnapshot>;
   onEvent(listener: (event: MainToRendererEvent) => void): () => void;
   onAppCommand(listener: (command: AppCommand) => void): () => void;

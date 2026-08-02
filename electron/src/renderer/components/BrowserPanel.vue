@@ -32,9 +32,20 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { IconArrowLeft, IconArrowRight, IconCirclePlus, IconDotsVertical, IconRefresh, IconX } from '@tabler/icons-vue';
-import type { BrowserAnnotation, BrowserBounds, BrowserState, MainToRendererEvent } from '@codex-claw/shared/contracts';
+import { PRIMARY_BROWSER_ID, type BrowserAnnotation, type BrowserBounds, type BrowserState, type MainToRendererEvent } from '@codex-claw/shared/contracts';
 
-const props = withDefaults(defineProps<{ agentId: string; initialUrl?: string; visible?: boolean }>(), { visible: true });
+const props = withDefaults(defineProps<{
+  agentId: string;
+  browserId?: string;
+  initialUrl?: string;
+  openRequestId?: number;
+  visible?: boolean;
+}>(), {
+  initialUrl: '',
+  browserId: PRIMARY_BROWSER_ID,
+  openRequestId: 0,
+  visible: true,
+});
 const emit = defineEmits<{ close: []; 'send-prompt': [prompt: string] }>();
 
 const viewport = ref<HTMLElement | null>(null);
@@ -61,7 +72,7 @@ onMounted(async () => {
   window.addEventListener('resize', syncBoundsAfterWindowResize);
   if (viewport.value) resizeObserver.observe(viewport.value);
   try {
-    state.value = await requireBrowserApi().browserOpen(props.agentId, address.value);
+    state.value = await requireBrowserApi().browserOpen(props.agentId, props.browserId, address.value);
     if (state.value.url) address.value = state.value.url;
   } catch (reason) {
     error.value = messageFor(reason);
@@ -76,32 +87,38 @@ onBeforeUnmount(() => {
   unsubscribe?.();
   resizeObserver?.disconnect();
   window.removeEventListener('resize', syncBoundsAfterWindowResize);
-  void window.codexClaw?.browserClose();
+  void window.codexClaw?.browserClose(props.agentId, props.browserId);
 });
 
 watch(() => props.visible, async (visible) => {
   if (!window.codexClaw) return;
-  await window.codexClaw.browserSetVisible(visible);
+  await window.codexClaw.browserSetVisible(props.agentId, props.browserId, visible);
   if (visible) {
     await nextTick();
     await syncBounds();
   }
 });
 
+watch(() => props.openRequestId, async (requestId, previousRequestId) => {
+  if (!requestId || requestId === previousRequestId || !props.initialUrl) return;
+  address.value = props.initialUrl;
+  await navigate();
+});
+
 async function navigate(): Promise<void> {
-  await runNavigation(() => requireBrowserApi().browserNavigate(address.value));
+  await runNavigation(() => requireBrowserApi().browserNavigate(props.agentId, props.browserId, address.value));
 }
 
 async function goBack(): Promise<void> {
-  await runNavigation(() => requireBrowserApi().browserGoBack());
+  await runNavigation(() => requireBrowserApi().browserGoBack(props.agentId, props.browserId));
 }
 
 async function goForward(): Promise<void> {
-  await runNavigation(() => requireBrowserApi().browserGoForward());
+  await runNavigation(() => requireBrowserApi().browserGoForward(props.agentId, props.browserId));
 }
 
 async function reload(): Promise<void> {
-  await runNavigation(() => requireBrowserApi().browserReload());
+  await runNavigation(() => requireBrowserApi().browserReload(props.agentId, props.browserId));
 }
 
 async function runNavigation(action: () => Promise<BrowserState>): Promise<void> {
@@ -122,10 +139,10 @@ async function toggleAnnotation(): Promise<void> {
   annotationMode.value = enabled;
   try {
     const api = requireBrowserApi();
-    await api.browserSetAnnotationMode(enabled);
+    await api.browserSetAnnotationMode(props.agentId, props.browserId, enabled);
     if (!enabled) {
       annotations.value = [];
-      await api.browserClearAnnotations();
+      await api.browserClearAnnotations(props.agentId, props.browserId);
     }
   } catch (reason) {
     annotationMode.value = false;
@@ -138,7 +155,7 @@ async function syncBounds(): Promise<void> {
   if (!element || loading.value || !props.visible) return;
   const rect = element.getBoundingClientRect();
   const bounds: BrowserBounds = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
-  await window.codexClaw?.browserSetBounds(bounds);
+  await window.codexClaw?.browserSetBounds(props.agentId, props.browserId, bounds);
 }
 
 function syncBoundsAfterWindowResize(): void {
@@ -146,10 +163,15 @@ function syncBoundsAfterWindowResize(): void {
 }
 
 function handleEvent(event: MainToRendererEvent): void {
-  if (event.type !== 'browser.annotationCreated' || !isBrowserAnnotation(event.payload)) return;
+  if (
+    event.type !== 'browser.annotationCreated' ||
+    !isBrowserAnnotation(event.payload) ||
+    event.payload.agentId !== props.agentId ||
+    event.payload.browserId !== props.browserId
+  ) return;
   annotations.value = [...annotations.value, event.payload];
   annotationMode.value = true;
-  void requireBrowserApi().browserSetAnnotationMode(true).catch((reason) => {
+  void requireBrowserApi().browserSetAnnotationMode(props.agentId, props.browserId, true).catch((reason) => {
     annotationMode.value = false;
     error.value = messageFor(reason);
   });
@@ -160,13 +182,13 @@ async function sendAnnotations(): Promise<void> {
   emit('send-prompt', annotationBatchPrompt(annotations.value));
   annotations.value = [];
   annotationMode.value = false;
-  await requireBrowserApi().browserSetAnnotationMode(false);
-  await requireBrowserApi().browserClearAnnotations();
+  await requireBrowserApi().browserSetAnnotationMode(props.agentId, props.browserId, false);
+  await requireBrowserApi().browserClearAnnotations(props.agentId, props.browserId);
 }
 
 async function close(): Promise<void> {
   menuOpen.value = false;
-  await window.codexClaw?.browserClose();
+  await window.codexClaw?.browserClose(props.agentId, props.browserId);
   emit('close');
 }
 
@@ -186,7 +208,16 @@ function annotationBatchPrompt(annotations: BrowserAnnotation[]): string {
 }
 
 function isBrowserAnnotation(value: unknown): value is BrowserAnnotation {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value) && typeof (value as BrowserAnnotation).id === 'string' && (value as BrowserAnnotation).kind && (value as BrowserAnnotation).rect);
+  return Boolean(
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    typeof (value as BrowserAnnotation).id === 'string' &&
+    typeof (value as BrowserAnnotation).agentId === 'string' &&
+    typeof (value as BrowserAnnotation).browserId === 'string' &&
+    (value as BrowserAnnotation).kind &&
+    (value as BrowserAnnotation).rect
+  );
 }
 
 function messageFor(reason: unknown): string {

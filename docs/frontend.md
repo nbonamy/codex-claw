@@ -81,8 +81,17 @@ implemented:
 - persisted View-menu compact agent-list mode with mini avatars, names, and status icons;
 - active agent header;
 - central conversation and composer;
-- right-side tabbed workspace for the in-app Browser and GitHub Review, with
-  full working-tree diffs opened from the agent header's git statistics;
+- optimistic agent switching that reveals the cached conversation immediately;
+  backend session hydration, Git status, and agent catalogs refresh
+  asynchronously and stale responses cannot replace a newer selection;
+- passive structured execution plans floating at the conversation's upper right
+  while a turn is running; completed Plan-mode proposals continue to use the
+  explicit review panel;
+- agent-owned right-side tabbed workspaces for the in-app Browser and GitHub
+  Review, with full working-tree diffs opened from the agent header's git
+  statistics; every agent preserves its own open/active tabs, open state, and
+  width, and inactive workspaces stay mounted so background browser tooling can
+  continue without stealing the user's selected agent;
 - empty right-workspace launcher for opening Review or Browser before any tab
   exists and after the last tab closes; Review uses `Command+G` and Browser
   uses `Command+B`, while existing `Command+D` duplicate-agent and `Command+R`
@@ -98,6 +107,14 @@ implemented:
 
 Avoid layout jumps during streaming, loading, plan updates, approval prompts,
 and artifact pane changes.
+
+## Local SDK Development
+
+`npm run dev` resolves `codex-app-sdk` entrypoints from the sibling
+`../codex-app-sdk/src` tree. Renderer SDK edits participate in Vite hot module
+replacement, while main, preload, and `clawd` SDK edits rebuild through their
+existing watchers. Package, make, and release builds continue to consume the
+SDK's published `dist` entrypoints.
 
 ## Design Tokens And Themes
 

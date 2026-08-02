@@ -44,6 +44,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
       stop: () => options.requestClient(backendMethods.clientComputerUseStop),
     },
     browser: {
+      open: (input) => options.requestClient(backendMethods.clientBrowserOpen, input),
       execute: (input) => options.requestClient(backendMethods.clientBrowserExecute, input),
     },
   });
@@ -112,6 +113,8 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     remoteClients: new RemoteClawdClientManager({
       requestHandlers: {
         [backendMethods.clientExternalOpen]: (params) => options.requestClient(backendMethods.clientExternalOpen, params),
+        [backendMethods.clientBrowserOpen]: (params) => options.requestClient(backendMethods.clientBrowserOpen, params),
+        [backendMethods.clientBrowserExecute]: (params) => options.requestClient(backendMethods.clientBrowserExecute, params),
         [backendMethods.clientComputerUseExecute]: (params) => options.requestClient(backendMethods.clientComputerUseExecute, params),
         [backendMethods.clientComputerUseStop]: (params) => options.requestClient(backendMethods.clientComputerUseStop, params),
         [backendMethods.clientComputerUseRequestAccessibility]: (params) => options.requestClient(backendMethods.clientComputerUseRequestAccessibility, params),

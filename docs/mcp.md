@@ -97,12 +97,20 @@ config.
 
 ## In-app Browser
 
-When an agent has an open Codex Claw browser pane, the same MCP server exposes
-agent-scoped browser tools for CSS-selected DOM inspection, PNG screenshots,
-clicking, typing, scrolling, and recent console logs. `clawd` routes those
-requests through `client/browser/execute`; Electron main performs the operation
-against its sandboxed `WebContentsView`. The renderer never receives page DOM,
-cookies, screenshots, or arbitrary page-script access.
+The same MCP server exposes an agent-scoped `browser-open` tool that accepts an
+HTTP or HTTPS URL, opens that agent's Browser workspace without changing the
+user's selected agent, and waits for its sandboxed page to load. The agent can
+then use `browser-get-dom`,
+`browser-screenshot`, `browser-click`, `browser-type`, `browser-scroll`, and
+`browser-console-logs`. `clawd` routes opening through `client/browser/open`
+and page operations through `client/browser/execute`; Electron main performs
+the operations against its sandboxed `WebContentsView`. Browser instances are
+addressed by agent id and browser id; today's UI uses one stable `primary`
+browser id per agent, while the contract and native host can support multiple
+browser tabs later. Inactive agent workspaces and their native views remain
+mounted but hidden, so browser MCP work can continue in the background. The
+renderer never receives page DOM, cookies, screenshots, or arbitrary
+page-script access.
 
 Computer Use is a local macOS capability exposed through the same Claw MCP
 server. The shared native helper lives in `~/src/computer-use/macos`; Codex

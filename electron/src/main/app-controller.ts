@@ -11,11 +11,18 @@ import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shar
 import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards';
 import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
-import { sendRendererEvent } from './ipc-events';
-import { BrowserPane } from './browser-pane';
+import { sendAppCommand, sendRendererEvent } from './ipc-events';
+import { BrowserPane, browserPaneKey } from './browser-pane';
 
 type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
 type StartupMaintenance = () => Promise<void>;
+type PendingBrowserOpen = {
+  agentId: string;
+  browserId: string;
+  resolve(state: BrowserState): void;
+  reject(error: Error): void;
+  timeout: ReturnType<typeof setTimeout>;
+};
 
 export class AppController {
   private mainWindow: BrowserWindow | null = null;
@@ -24,6 +31,7 @@ export class AppController {
   private backendClientEventUnsubscribe: (() => void) | null = null;
   private nativeIpcUnregister: (() => void) | null = null;
   private seq = 0;
+  private readonly pendingBrowserOpens = new Map<string, PendingBrowserOpen>();
 
   private readonly browserPane = new BrowserPane({
     onAnnotation: (annotation) => this.emitBrowserAnnotation(annotation),
@@ -41,7 +49,8 @@ export class AppController {
   ) {
     this.snapshot = initialSnapshot;
     this.backendClient = backendClient ?? createRuntimeClawBackendClient({
-      browserExecute: (agentId, command, arguments_) => this.browserPane.execute(agentId, command, arguments_),
+      browserOpen: (agentId, browserId, url) => this.requestBrowserOpen(agentId, browserId, url),
+      browserExecute: (agentId, browserId, command, arguments_) => this.browserPane.execute(agentId, browserId, command, arguments_),
     });
   }
 
@@ -347,16 +356,16 @@ export class AppController {
       return this.retryMessage(agentId, messageId);
     });
 
-    ipc.handle(ipcChannels.browserOpen, (_event, agentId: string, url: string) => this.browserOpen(agentId, url));
-    ipc.handle(ipcChannels.browserNavigate, (_event, url: string) => this.browserPane.navigate(url));
-    ipc.handle(ipcChannels.browserGoBack, () => this.browserPane.goBack());
-    ipc.handle(ipcChannels.browserGoForward, () => this.browserPane.goForward());
-    ipc.handle(ipcChannels.browserReload, () => this.browserPane.reload());
-    ipc.handle(ipcChannels.browserSetBounds, (_event, bounds: BrowserBounds) => this.browserPane.setBounds(bounds));
-    ipc.handle(ipcChannels.browserSetVisible, (_event, visible: boolean) => this.browserPane.setVisible(visible));
-    ipc.handle(ipcChannels.browserSetAnnotationMode, (_event, enabled: boolean) => this.browserPane.setAnnotationMode(enabled));
-    ipc.handle(ipcChannels.browserClearAnnotations, () => this.browserPane.clearAnnotations());
-    ipc.handle(ipcChannels.browserClose, () => this.browserPane.close());
+    ipc.handle(ipcChannels.browserOpen, (_event, agentId: string, browserId: string, url: string) => this.browserOpen(agentId, browserId, url));
+    ipc.handle(ipcChannels.browserNavigate, (_event, agentId: string, browserId: string, url: string) => this.browserNavigate(agentId, browserId, url));
+    ipc.handle(ipcChannels.browserGoBack, (_event, agentId: string, browserId: string) => this.browserPane.goBack(agentId, browserId));
+    ipc.handle(ipcChannels.browserGoForward, (_event, agentId: string, browserId: string) => this.browserPane.goForward(agentId, browserId));
+    ipc.handle(ipcChannels.browserReload, (_event, agentId: string, browserId: string) => this.browserPane.reload(agentId, browserId));
+    ipc.handle(ipcChannels.browserSetBounds, (_event, agentId: string, browserId: string, bounds: BrowserBounds) => this.browserPane.setBounds(agentId, browserId, bounds));
+    ipc.handle(ipcChannels.browserSetVisible, (_event, agentId: string, browserId: string, visible: boolean) => this.browserPane.setVisible(agentId, browserId, visible));
+    ipc.handle(ipcChannels.browserSetAnnotationMode, (_event, agentId: string, browserId: string, enabled: boolean) => this.browserPane.setAnnotationMode(agentId, browserId, enabled));
+    ipc.handle(ipcChannels.browserClearAnnotations, (_event, agentId: string, browserId: string) => this.browserPane.clearAnnotations(agentId, browserId));
+    ipc.handle(ipcChannels.browserClose, (_event, agentId: string, browserId: string) => this.browserPane.close(agentId, browserId));
 
     ipc.handle(ipcChannels.respondToClientRequest, async (_event, response: ClientRequestResponse) => {
       return this.respondToClientRequest(response);
@@ -368,7 +377,8 @@ export class AppController {
   }
 
   async shutdown(): Promise<void> {
-    await this.browserPane.close();
+    this.rejectAllPendingBrowserOpens(new Error('Application is shutting down.'));
+    await this.browserPane.closeAll();
     this.powerSaveBlocker.stop();
     this.nativeIpcUnregister?.();
     this.nativeIpcUnregister = null;
@@ -687,11 +697,68 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentPromptSend, { agentId, prompt, options }));
   }
 
-  private async browserOpen(agentId: string, url: string): Promise<BrowserState> {
+  private async browserOpen(agentId: string, browserId: string, url: string): Promise<BrowserState> {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) {
       throw new Error('Browser window is not available.');
     }
-    return this.browserPane.open(this.mainWindow, agentId, url);
+    try {
+      const state = await this.browserPane.open(this.mainWindow, agentId, browserId, url);
+      this.resolvePendingBrowserOpen(agentId, browserId, state);
+      return state;
+    } catch (error) {
+      this.rejectPendingBrowserOpen(agentId, browserId, error);
+      throw error;
+    }
+  }
+
+  private async browserNavigate(agentId: string, browserId: string, url: string): Promise<BrowserState> {
+    try {
+      const state = await this.browserPane.navigate(agentId, browserId, url);
+      this.resolvePendingBrowserOpen(agentId, browserId, state);
+      return state;
+    } catch (error) {
+      this.rejectPendingBrowserOpen(agentId, browserId, error);
+      throw error;
+    }
+  }
+
+  private requestBrowserOpen(agentId: string, browserId: string, url: string): Promise<BrowserState> {
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) {
+      return Promise.reject(new Error('Browser window is not available.'));
+    }
+
+    this.rejectPendingBrowserOpen(agentId, browserId, new Error('Browser open request was superseded.'));
+    return new Promise<BrowserState>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.rejectPendingBrowserOpen(agentId, browserId, new Error('Timed out opening the in-app browser.'));
+      }, 30_000);
+      this.pendingBrowserOpens.set(browserPaneKey(agentId, browserId), { agentId, browserId, resolve, reject, timeout });
+      sendAppCommand(this.mainWindow!.webContents, { type: 'open-browser', agentId, browserId, url });
+    });
+  }
+
+  private resolvePendingBrowserOpen(agentId: string, browserId: string, state: BrowserState): void {
+    const key = browserPaneKey(agentId, browserId);
+    const pending = this.pendingBrowserOpens.get(key);
+    if (!pending) return;
+    clearTimeout(pending.timeout);
+    this.pendingBrowserOpens.delete(key);
+    pending.resolve(state);
+  }
+
+  private rejectPendingBrowserOpen(agentId: string, browserId: string, reason: unknown): void {
+    const key = browserPaneKey(agentId, browserId);
+    const pending = this.pendingBrowserOpens.get(key);
+    if (!pending) return;
+    clearTimeout(pending.timeout);
+    this.pendingBrowserOpens.delete(key);
+    pending.reject(reason instanceof Error ? reason : new Error(String(reason)));
+  }
+
+  private rejectAllPendingBrowserOpens(reason: unknown): void {
+    for (const pending of [...this.pendingBrowserOpens.values()]) {
+      this.rejectPendingBrowserOpen(pending.agentId, pending.browserId, reason);
+    }
   }
 
   private emitBrowserAnnotation(annotation: BrowserAnnotation): void {

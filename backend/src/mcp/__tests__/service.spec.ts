@@ -134,23 +134,29 @@ describe('ClawMcpService', () => {
   });
 
   it('routes in-app browser inspection and debugging tools through the desktop client port', async () => {
+    const open = vi.fn().mockResolvedValue({ url: 'https://example.com/', title: 'Example', canGoBack: false, canGoForward: false });
     const execute = vi.fn().mockResolvedValue({ url: 'https://example.com', title: 'Example', element: { tag: 'button' } });
     service = new ClawMcpService({
       snapshot: createInitialSnapshot(),
-      browser: { execute },
+      browser: { open, execute },
     });
     const url = await service.start();
     const toolsResponse = await postJson(agentUrl(url, 'agent-dina'), {
       jsonrpc: '2.0', id: 1, method: 'tools/list', params: {},
     });
     expect(toolsResponse.result.tools.map((tool: { name: string }) => tool.name)).toEqual(expect.arrayContaining([
-      'browser-get-dom', 'browser-screenshot', 'browser-click', 'browser-type', 'browser-scroll', 'browser-console-logs',
+      'browser-open', 'browser-get-dom', 'browser-screenshot', 'browser-click', 'browser-type', 'browser-scroll', 'browser-console-logs',
     ]));
+    const openResponse = await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'browser-open', arguments: { url: 'https://example.com' } },
+    });
+    expect(openResponse.result.structuredContent).toStrictEqual({ url: 'https://example.com/', title: 'Example', canGoBack: false, canGoForward: false });
+    expect(open).toHaveBeenCalledWith({ agentId: 'agent-dina', browserId: 'primary', url: 'https://example.com' });
     const response = await postJson(agentUrl(url, 'agent-dina'), {
-      jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'browser-get-dom', arguments: { selector: '#save' } },
+      jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'browser-get-dom', arguments: { selector: '#save' } },
     });
     expect(response.result.structuredContent).toStrictEqual({ url: 'https://example.com', title: 'Example', element: { tag: 'button' } });
-    expect(execute).toHaveBeenCalledWith({ agentId: 'agent-dina', command: 'dom', arguments: { selector: '#save' } });
+    expect(execute).toHaveBeenCalledWith({ agentId: 'agent-dina', browserId: 'primary', command: 'dom', arguments: { selector: '#save' } });
   });
 
   it('completes existing-team loop executions only after every created assignment is done and deletes the created agents', async () => {

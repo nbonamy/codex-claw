@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController } from '../app-controller';
 import { applyMainEventToSnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { ipcChannels } from '@codex-claw/shared/ipc';
@@ -11,6 +11,46 @@ function callPrivate<Result>(controller: AppController, method: string): Promise
 }
 
 describe('AppController', () => {
+  it('waits for the renderer browser pane to load a model-requested URL', async () => {
+    const controller = new AppController(createInitialSnapshot(), null);
+    const send = vi.fn();
+    setMainWindowSend(controller, send);
+    const state = {
+      url: 'https://example.com/',
+      title: 'Example',
+      canGoBack: false,
+      canGoForward: false,
+    };
+
+    const opened = requestBrowserOpen(controller, 'agent-dina', 'primary', 'https://example.com');
+
+    expect(send).toHaveBeenCalledWith('app:command', {
+      type: 'open-browser',
+      agentId: 'agent-dina',
+      browserId: 'primary',
+      url: 'https://example.com',
+    });
+    resolvePendingBrowserOpen(controller, 'agent-dina', 'primary', state);
+    await expect(opened).resolves.toStrictEqual(state);
+  });
+
+  it('tracks concurrent browser opens independently by agent and browser id', async () => {
+    const controller = new AppController(createInitialSnapshot(), null);
+    const send = vi.fn();
+    setMainWindowSend(controller, send);
+    const firstState = { url: 'https://one.example/', title: 'One', canGoBack: false, canGoForward: false };
+    const secondState = { url: 'https://two.example/', title: 'Two', canGoBack: false, canGoForward: false };
+
+    const first = requestBrowserOpen(controller, 'agent-dina', 'primary', 'https://one.example');
+    const second = requestBrowserOpen(controller, 'agent-jesse', 'primary', 'https://two.example');
+    resolvePendingBrowserOpen(controller, 'agent-jesse', 'primary', secondState);
+    resolvePendingBrowserOpen(controller, 'agent-dina', 'primary', firstState);
+
+    await expect(first).resolves.toStrictEqual(firstState);
+    await expect(second).resolves.toStrictEqual(secondState);
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
   it('relaunches the app when restart is requested', () => {
     const appLifecycle = {
       quit: vi.fn(),
@@ -1545,12 +1585,25 @@ function emitBackendEvent(
 
 function setMainWindowSend(controller: AppController, send: ReturnType<typeof vi.fn>): void {
   (controller as unknown as {
-    mainWindow: { webContents: { send: ReturnType<typeof vi.fn> } };
+    mainWindow: { isDestroyed(): boolean; webContents: { send: ReturnType<typeof vi.fn> } };
   }).mainWindow = {
+    isDestroyed: () => false,
     webContents: {
       send,
     },
   };
+}
+
+function requestBrowserOpen(controller: AppController, agentId: string, browserId: string, url: string) {
+  return (controller as unknown as {
+    requestBrowserOpen(agentId: string, browserId: string, url: string): Promise<unknown>;
+  }).requestBrowserOpen(agentId, browserId, url);
+}
+
+function resolvePendingBrowserOpen(controller: AppController, agentId: string, browserId: string, state: BrowserState): void {
+  (controller as unknown as {
+    resolvePendingBrowserOpen(agentId: string, browserId: string, state: BrowserState): void;
+  }).resolvePendingBrowserOpen(agentId, browserId, state);
 }
 
 async function sendPrompt(controller: AppController, agentId: string, prompt: string): Promise<AppSnapshot> {

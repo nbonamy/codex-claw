@@ -1044,6 +1044,39 @@ describe('useAppState', () => {
     expect(state.visibleMessages.value).toStrictEqual(hydratedSnapshot.messages);
   });
 
+  it('reconciles persisted threads after renderer restart even when the daemon has cached messages', async () => {
+    const cachedSnapshot = createInitialSnapshot();
+    cachedSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-persisted' };
+    cachedSnapshot.agents[0].status = { type: 'working' };
+    cachedSnapshot.messages.push({
+      id: 'assistant-stale-turn',
+      agentId: 'agent-dina',
+      role: 'assistant',
+      status: 'streaming',
+      createdAt: '2026-06-05T00:00:00.000Z',
+      parts: [{ type: 'text', text: 'Partial response.' }],
+    });
+    const reconciledSnapshot = structuredClone(cachedSnapshot);
+    reconciledSnapshot.agents[0].status = { type: 'idle' };
+    reconciledSnapshot.messages[0]!.status = 'complete';
+    const hydrateAgentHistory = vi.fn().mockResolvedValue(reconciledSnapshot);
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(cachedSnapshot),
+        hydrateAgentHistory,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalledWith('agent-dina'));
+    await vi.waitFor(() => expect(state.activeAgent.value?.status).toStrictEqual({ type: 'idle' }));
+    expect(state.visibleMessages.value[0]?.status).toBe('complete');
+    expect(state.isSending.value).toBe(false);
+  });
+
   it('does not hydrate startup history for agents without a persisted thread', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const hydrateAgentHistory = vi.fn();
@@ -1164,7 +1197,33 @@ describe('useAppState', () => {
     expect(state.snapshot.value.activeTeamId).toBe('team-codex-claw');
   });
 
-  it('shows loading while agent and team selections hydrate conversation state', async () => {
+  it('ignores stale agent selection responses when switching quickly', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const jesseSelection = deferred<AppSnapshot>();
+    const dinaSelection = deferred<AppSnapshot>();
+    const selectAgent = vi.fn((agentId: string) => agentId === 'agent-jesse' ? jesseSelection.promise : dinaSelection.promise);
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        selectAgent,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    void state.selectAgent('agent-jesse');
+    void state.selectAgent('agent-dina');
+    expect(state.activeAgent.value?.id).toBe('agent-dina');
+
+    jesseSelection.resolve({ ...remoteSnapshot, activeAgentId: 'agent-jesse' });
+    dinaSelection.resolve({ ...remoteSnapshot, activeAgentId: 'agent-dina' });
+    await vi.waitFor(() => expect(state.activeAgent.value?.id).toBe('agent-dina'));
+    expect(selectAgent).toHaveBeenNthCalledWith(1, 'agent-jesse');
+    expect(selectAgent).toHaveBeenNthCalledWith(2, 'agent-dina');
+  });
+
+  it('updates agent selection immediately while keeping team selection loading', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const agentSelection = deferred<AppSnapshot>();
     const teamSelection = deferred<AppSnapshot>();
@@ -1183,7 +1242,8 @@ describe('useAppState', () => {
     await state.loadSnapshot();
 
     const agentPromise = state.selectAgent('agent-jesse');
-    expect(state.isLoading.value).toBe(true);
+    expect(state.isLoading.value).toBe(false);
+    expect(state.activeAgent.value?.id).toBe('agent-jesse');
     agentSelection.resolve({
       ...remoteSnapshot,
       activeAgentId: 'agent-jesse',

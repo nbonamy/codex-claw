@@ -5,24 +5,27 @@ type BrowserPaneOptions = {
   onAnnotation(annotation: BrowserAnnotation): void;
 };
 
+type HostedBrowserPane = {
+  agentId: string;
+  annotationRequest: Promise<void> | null;
+  browserId: string;
+  browserWindow: BrowserWindow;
+  consoleMessages: Array<{ level: string; message: string; timestamp: string }>;
+  view: WebContentsView;
+};
+
 /**
  * Hosts untrusted web content in a native child view. The renderer only gets a
  * narrow navigation and annotation API; it never receives the guest WebContents.
  */
 export class BrowserPane {
-  private view: WebContentsView | null = null;
-  private browserWindow: BrowserWindow | null = null;
-  private annotationRequest: Promise<void> | null = null;
-  private agentId: string | null = null;
-  private readonly consoleMessages: Array<{ level: string; message: string; timestamp: string }> = [];
+  private readonly panes = new Map<string, HostedBrowserPane>();
 
   constructor(private readonly options: BrowserPaneOptions) {}
 
-  async open(browserWindow: BrowserWindow, agentId: string, url: string): Promise<BrowserState> {
-    await this.close();
-    this.browserWindow = browserWindow;
-    this.agentId = agentId;
-    this.view = new WebContentsView({
+  async open(browserWindow: BrowserWindow, agentId: string, browserId: string, url: string): Promise<BrowserState> {
+    await this.close(agentId, browserId);
+    const view = new WebContentsView({
       webPreferences: {
         contextIsolation: true,
         nodeIntegration: false,
@@ -30,102 +33,120 @@ export class BrowserPane {
         partition: `persist:codex-claw-browser-${safePartitionName(agentId)}`,
       },
     });
-    browserWindow.contentView.addChildView(this.view);
-    this.view.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-    this.view.webContents.on('console-message', (_event, level, message) => {
-      this.consoleMessages.push({ level: String(level), message, timestamp: new Date().toISOString() });
-      if (this.consoleMessages.length > 100) this.consoleMessages.shift();
+    const pane: HostedBrowserPane = {
+      agentId,
+      annotationRequest: null,
+      browserId,
+      browserWindow,
+      consoleMessages: [],
+      view,
+    };
+    this.panes.set(browserPaneKey(agentId, browserId), pane);
+    browserWindow.contentView.addChildView(view);
+    view.setVisible(false);
+    view.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    view.webContents.on('console-message', (_event, level, message) => {
+      pane.consoleMessages.push({ level: String(level), message, timestamp: new Date().toISOString() });
+      if (pane.consoleMessages.length > 100) pane.consoleMessages.shift();
     });
-    if (url.trim()) return this.navigate(url);
-    await this.view.webContents.loadURL('about:blank');
-    return { ...this.state(), url: '', title: '' };
+    if (url.trim()) return this.navigate(agentId, browserId, url);
+    await view.webContents.loadURL('about:blank');
+    return { ...this.state(pane), url: '', title: '' };
   }
 
-  async navigate(url: string): Promise<BrowserState> {
+  async navigate(agentId: string, browserId: string, url: string): Promise<BrowserState> {
     const target = normalizeBrowserUrl(url);
-    const view = this.requireView();
-    await view.webContents.loadURL(target);
-    return this.state();
+    const pane = this.requirePane(agentId, browserId);
+    await pane.view.webContents.loadURL(target);
+    return this.state(pane);
   }
 
-  async goBack(): Promise<BrowserState> {
-    const webContents = this.requireView().webContents;
+  async goBack(agentId: string, browserId: string): Promise<BrowserState> {
+    const pane = this.requirePane(agentId, browserId);
+    const webContents = pane.view.webContents;
     if (webContents.canGoBack()) webContents.goBack();
-    return this.waitForNavigation(webContents);
+    return this.waitForNavigation(pane);
   }
 
-  async goForward(): Promise<BrowserState> {
-    const webContents = this.requireView().webContents;
+  async goForward(agentId: string, browserId: string): Promise<BrowserState> {
+    const pane = this.requirePane(agentId, browserId);
+    const webContents = pane.view.webContents;
     if (webContents.canGoForward()) webContents.goForward();
-    return this.waitForNavigation(webContents);
+    return this.waitForNavigation(pane);
   }
 
-  async reload(): Promise<BrowserState> {
-    const webContents = this.requireView().webContents;
+  async reload(agentId: string, browserId: string): Promise<BrowserState> {
+    const pane = this.requirePane(agentId, browserId);
+    const webContents = pane.view.webContents;
     webContents.reload();
-    return this.waitForNavigation(webContents);
+    return this.waitForNavigation(pane);
   }
 
-  setBounds(bounds: BrowserBounds): void {
-    const view = this.requireView();
-    view.setBounds({
+  setBounds(agentId: string, browserId: string, bounds: BrowserBounds): void {
+    const pane = this.requirePane(agentId, browserId);
+    pane.view.setBounds({
       x: Math.max(0, Math.round(bounds.x)),
       y: Math.max(0, Math.round(bounds.y)),
       width: Math.max(1, Math.round(bounds.width)),
       height: Math.max(1, Math.round(bounds.height)),
     });
-    view.setVisible(true);
+    pane.view.setVisible(true);
   }
 
-  setVisible(visible: boolean): void {
-    this.requireView().setVisible(visible);
+  setVisible(agentId: string, browserId: string, visible: boolean): void {
+    this.requirePane(agentId, browserId).view.setVisible(visible);
   }
 
-  async setAnnotationMode(enabled: boolean): Promise<void> {
+  async setAnnotationMode(agentId: string, browserId: string, enabled: boolean): Promise<void> {
+    const pane = this.requirePane(agentId, browserId);
     if (!enabled) {
-      await this.cancelAnnotationMode();
+      await this.cancelAnnotationMode(pane);
       return;
     }
-    if (this.annotationRequest) return;
+    if (pane.annotationRequest) return;
 
-    const webContents = this.requireView().webContents;
-    this.annotationRequest = webContents.executeJavaScript(annotationCaptureScript(), true)
+    const webContents = pane.view.webContents;
+    pane.annotationRequest = webContents.executeJavaScript(annotationCaptureScript(), true)
       .then((value: unknown) => {
         const annotation = parseAnnotation(value, webContents.getURL());
-        if (annotation) this.options.onAnnotation(annotation);
+        if (annotation) this.options.onAnnotation({ ...annotation, agentId, browserId });
       })
       .catch(() => undefined)
       .finally(() => {
-        this.annotationRequest = null;
+        pane.annotationRequest = null;
       });
   }
 
-  async clearAnnotations(): Promise<void> {
-    this.requireView();
+  async clearAnnotations(agentId: string, browserId: string): Promise<void> {
+    this.requirePane(agentId, browserId);
   }
 
-  async close(): Promise<void> {
-    await this.cancelAnnotationMode();
-    if (this.view && this.browserWindow && !this.browserWindow.isDestroyed()) {
-      this.browserWindow.contentView.removeChildView(this.view);
+  async close(agentId: string, browserId: string): Promise<void> {
+    const key = browserPaneKey(agentId, browserId);
+    const pane = this.panes.get(key);
+    if (!pane) return;
+    await this.cancelAnnotationMode(pane);
+    if (!pane.browserWindow.isDestroyed()) {
+      pane.browserWindow.contentView.removeChildView(pane.view);
     }
-    if (this.view && !this.view.webContents.isDestroyed()) {
-      this.view.webContents.close();
+    if (!pane.view.webContents.isDestroyed()) {
+      pane.view.webContents.close();
     }
-    this.view = null;
-    this.browserWindow = null;
-    this.agentId = null;
-    this.consoleMessages.length = 0;
+    this.panes.delete(key);
   }
 
-  async execute(agentId: string, command: string, arguments_: Record<string, unknown>): Promise<unknown> {
-    if (this.agentId !== agentId) throw new Error('The in-app browser is not open for this agent.');
-    const webContents = this.requireView().webContents;
+  async closeAll(): Promise<void> {
+    await Promise.all([...this.panes.values()].map((pane) => this.close(pane.agentId, pane.browserId)));
+  }
+
+  async execute(agentId: string, browserId: string, command: string, arguments_: Record<string, unknown>): Promise<unknown> {
+    const pane = this.requirePane(agentId, browserId);
+    const webContents = pane.view.webContents;
     if (command === 'screenshot') {
       const image = await webContents.capturePage();
       return { mimeType: 'image/png', data: image.toPNG().toString('base64') };
     }
-    if (command === 'console') return { messages: this.consoleMessages.slice(-(typeof arguments_.limit === 'number' ? arguments_.limit : 50)) };
+    if (command === 'console') return { messages: pane.consoleMessages.slice(-(typeof arguments_.limit === 'number' ? arguments_.limit : 50)) };
     const selector = typeof arguments_.selector === 'string' ? arguments_.selector : undefined;
     const payload = JSON.stringify({ command, selector, text: typeof arguments_.text === 'string' ? arguments_.text : '', clear: arguments_.clear !== false, deltaY: typeof arguments_.deltaY === 'number' ? arguments_.deltaY : 500 });
     return webContents.executeJavaScript(`(() => {
@@ -140,20 +161,21 @@ export class BrowserPane {
     })()`, true);
   }
 
-  private async cancelAnnotationMode(): Promise<void> {
-    if (!this.view || this.view.webContents.isDestroyed()) return;
-    await this.view.webContents.executeJavaScript('window.__codexClawCancelAnnotation?.()', true).catch(() => undefined);
+  private async cancelAnnotationMode(pane: HostedBrowserPane): Promise<void> {
+    if (pane.view.webContents.isDestroyed()) return;
+    await pane.view.webContents.executeJavaScript('window.__codexClawCancelAnnotation?.()', true).catch(() => undefined);
   }
 
-  private async waitForNavigation(webContents: Electron.WebContents): Promise<BrowserState> {
+  private async waitForNavigation(pane: HostedBrowserPane): Promise<BrowserState> {
+    const webContents = pane.view.webContents;
     if (webContents.isLoading()) {
       await new Promise<void>((resolve) => webContents.once('did-finish-load', () => resolve()));
     }
-    return this.state();
+    return this.state(pane);
   }
 
-  private state(): BrowserState {
-    const webContents = this.requireView().webContents;
+  private state(pane: HostedBrowserPane): BrowserState {
+    const webContents = pane.view.webContents;
     return {
       url: webContents.getURL(),
       title: webContents.getTitle(),
@@ -162,10 +184,15 @@ export class BrowserPane {
     };
   }
 
-  private requireView(): WebContentsView {
-    if (!this.view || this.view.webContents.isDestroyed()) throw new Error('Browser is not open.');
-    return this.view;
+  private requirePane(agentId: string, browserId: string): HostedBrowserPane {
+    const pane = this.panes.get(browserPaneKey(agentId, browserId));
+    if (!pane || pane.view.webContents.isDestroyed()) throw new Error('Browser is not open.');
+    return pane;
   }
+}
+
+export function browserPaneKey(agentId: string, browserId: string): string {
+  return JSON.stringify([agentId, browserId]);
 }
 
 export function normalizeBrowserUrl(value: string): string {
@@ -183,7 +210,7 @@ export function safePartitionName(agentId: string): string {
   return agentId.replace(/[^a-zA-Z\d_-]/g, '-').slice(0, 80) || 'default';
 }
 
-function parseAnnotation(value: unknown, url: string): BrowserAnnotation | null {
+function parseAnnotation(value: unknown, url: string): Omit<BrowserAnnotation, 'agentId' | 'browserId'> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
   const rect = record.rect;

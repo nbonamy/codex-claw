@@ -2020,11 +2020,7 @@ export class ClawBackendServer {
     if (
       !event.agentId ||
       !event.turnId ||
-      (
-        event.type !== 'turn.completed' &&
-        event.type !== 'turn.planUpdated' &&
-        event.type !== 'turn.proposedPlanCompleted'
-      )
+      event.type !== 'turn.proposedPlanCompleted'
     ) {
       return;
     }

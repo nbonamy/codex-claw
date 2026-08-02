@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue';
 import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
-import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
+import { createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/shared/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
 import { approvalPresetFromDefaults } from '@codex-claw/shared/approval-presets';
@@ -50,6 +50,8 @@ const sourceRepositoryError = ref<string | null>(null);
 const daemonStatus = ref<ClawdDaemonStatus | null>(null);
 const daemonStatusError = ref<string | null>(null);
 const hydratingAgentHistoryIds = ref(new Set<string>());
+const catalogLoadsByAgentId = new Map<string, Promise<void>>();
+let agentSelectionRequestId = 0;
 let unsubscribeMainEvents: (() => void) | null = null;
 const workProviderAuthorizationPollTimers = new Map<WorkProviderKind, ReturnType<typeof globalThis.setTimeout>>();
 const WORK_PROVIDER_AUTHORIZATION_POLL_MS = 5_000;
@@ -343,7 +345,10 @@ export function useAppState() {
       return;
     }
 
-    await selectSnapshotWithLoading(() => window.codexClaw!.selectAgent(agentId));
+    const requestId = ++agentSelectionRequestId;
+    snapshot.value = selectAgentInSnapshot(snapshot.value, agentId);
+    void loadActiveAgentCatalogs(agentId);
+    void refreshAgentSelection(agentId, requestId);
   }
 
   async function chooseAgentFolder(): Promise<string | null> {
@@ -1691,12 +1696,25 @@ function adoptSnapshotFromMainEvent(event: MainToRendererEvent): void {
   }
 }
 
-async function loadActiveAgentCatalogs(): Promise<void> {
-  await Promise.all([
-    loadBackendModelsForActiveAgent(),
-    loadBackendSkillsForActiveAgent(),
-    loadAgentFilesForActiveAgent(),
-  ]);
+async function loadActiveAgentCatalogs(agentId = snapshot.value.activeAgentId): Promise<void> {
+  if (!agentId) return;
+  const existing = catalogLoadsByAgentId.get(agentId);
+  if (existing) {
+    await existing;
+    return;
+  }
+
+  const load = Promise.all([
+    loadBackendModelsForActiveAgent(agentId, true),
+    loadBackendSkillsForActiveAgent(agentId, true),
+    loadAgentFilesForActiveAgent(agentId, true),
+  ]).then(() => undefined).finally(() => {
+    if (catalogLoadsByAgentId.get(agentId) === load) {
+      catalogLoadsByAgentId.delete(agentId);
+    }
+  });
+  catalogLoadsByAgentId.set(agentId, load);
+  await load;
 }
 
 async function loadConnectedWorkBacklogs(): Promise<void> {
@@ -1752,35 +1770,38 @@ async function loadWorkItemsForRepository(provider: WorkProviderKind, repository
   };
 }
 
-async function loadBackendModelsForActiveAgent(): Promise<void> {
-  const agentId = snapshot.value.activeAgentId;
+async function loadBackendModelsForActiveAgent(agentId = snapshot.value.activeAgentId, allowConcurrent = false): Promise<void> {
   if (!agentId || !window.codexClaw?.listBackendModels) {
-    backendModels.value = [];
-    modelCatalogStatus.value = 'notLoaded';
+    if (agentId === snapshot.value.activeAgentId) {
+      backendModels.value = [];
+      modelCatalogStatus.value = 'notLoaded';
+    }
     return;
   }
 
-  if (modelCatalogStatus.value === 'loading') {
-    return;
-  }
+  if (!allowConcurrent && modelCatalogStatus.value === 'loading') return;
 
-  modelCatalogStatus.value = 'loading';
-  modelCatalogError.value = null;
+  if (agentId === snapshot.value.activeAgentId) {
+    modelCatalogStatus.value = 'loading';
+    modelCatalogError.value = null;
+  }
 
   try {
-    backendModels.value = await window.codexClaw.listBackendModels(agentId);
+    const models = await window.codexClaw.listBackendModels(agentId);
+    if (agentId !== snapshot.value.activeAgentId) return;
+    backendModels.value = models;
     modelCatalogStatus.value = 'loaded';
     selectDefaultModelIfNeeded();
   } catch (error) {
+    if (agentId !== snapshot.value.activeAgentId) return;
     backendModels.value = [];
     modelCatalogStatus.value = 'error';
     modelCatalogError.value = error instanceof Error ? error.message : String(error);
   }
 }
 
-async function loadBackendSkillsForActiveAgent(): Promise<void> {
-  const agentId = snapshot.value.activeAgentId;
-  if (!agentId || !window.codexClaw?.listBackendSkills || skillCatalogStatus.value === 'loading') {
+async function loadBackendSkillsForActiveAgent(agentId = snapshot.value.activeAgentId, allowConcurrent = false): Promise<void> {
+  if (!agentId || !window.codexClaw?.listBackendSkills) {
     if (!agentId) {
       backendSkills.value = [];
       skillCatalogStatus.value = 'notLoaded';
@@ -1788,38 +1809,49 @@ async function loadBackendSkillsForActiveAgent(): Promise<void> {
     return;
   }
 
-  skillCatalogStatus.value = 'loading';
-  skillCatalogError.value = null;
+  if (!allowConcurrent && skillCatalogStatus.value === 'loading') return;
+
+  if (agentId === snapshot.value.activeAgentId) {
+    skillCatalogStatus.value = 'loading';
+    skillCatalogError.value = null;
+  }
 
   try {
-    backendSkills.value = await window.codexClaw.listBackendSkills(agentId);
+    const skills = await window.codexClaw.listBackendSkills(agentId);
+    if (agentId !== snapshot.value.activeAgentId) return;
+    backendSkills.value = skills;
     skillCatalogStatus.value = 'loaded';
   } catch (error) {
+    if (agentId !== snapshot.value.activeAgentId) return;
     backendSkills.value = [];
     skillCatalogStatus.value = 'error';
     skillCatalogError.value = error instanceof Error ? error.message : String(error);
   }
 }
 
-async function loadAgentFilesForActiveAgent(): Promise<void> {
-  const agentId = snapshot.value.activeAgentId;
+async function loadAgentFilesForActiveAgent(agentId = snapshot.value.activeAgentId, allowConcurrent = false): Promise<void> {
   if (!agentId || !window.codexClaw?.listAgentFiles) {
-    agentFiles.value = [];
-    fileCatalogStatus.value = 'notLoaded';
+    if (agentId === snapshot.value.activeAgentId) {
+      agentFiles.value = [];
+      fileCatalogStatus.value = 'notLoaded';
+    }
     return;
   }
 
-  if (fileCatalogStatus.value === 'loading') {
-    return;
-  }
+  if (!allowConcurrent && fileCatalogStatus.value === 'loading') return;
 
-  fileCatalogStatus.value = 'loading';
-  fileCatalogError.value = null;
+  if (agentId === snapshot.value.activeAgentId) {
+    fileCatalogStatus.value = 'loading';
+    fileCatalogError.value = null;
+  }
 
   try {
-    agentFiles.value = await window.codexClaw.listAgentFiles(agentId);
+    const files = await window.codexClaw.listAgentFiles(agentId);
+    if (agentId !== snapshot.value.activeAgentId) return;
+    agentFiles.value = files;
     fileCatalogStatus.value = 'loaded';
   } catch (error) {
+    if (agentId !== snapshot.value.activeAgentId) return;
     agentFiles.value = [];
     fileCatalogStatus.value = 'error';
     fileCatalogError.value = error instanceof Error ? error.message : String(error);
@@ -1891,7 +1923,7 @@ async function hydrateActiveAgentHistory(): Promise<void> {
     return;
   }
 
-  if (hydratingAgentHistoryIds.value.has(activeAgent.id) || snapshot.value.messages.some((message) => message.agentId === activeAgent.id)) {
+  if (hydratingAgentHistoryIds.value.has(activeAgent.id)) {
     return;
   }
 
@@ -1920,6 +1952,17 @@ async function selectSnapshotWithLoading(selectSnapshot: () => Promise<AppSnapsh
     await loadActiveAgentCatalogs();
   } finally {
     isLoading.value = false;
+  }
+}
+
+async function refreshAgentSelection(agentId: string, requestId: number): Promise<void> {
+  try {
+    const nextSnapshot = await window.codexClaw!.selectAgent(agentId);
+    if (requestId === agentSelectionRequestId) {
+      snapshot.value = nextSnapshot;
+    }
+  } catch {
+    // The optimistic selection remains visible; the next snapshot/event will reconcile it.
   }
 }
 

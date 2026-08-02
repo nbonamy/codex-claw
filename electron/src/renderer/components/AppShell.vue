@@ -189,7 +189,7 @@
             :skill-catalog-status="skillCatalogStatus"
             :goal="goal"
             :approvals="approvals"
-            :turn-git-diff="currentTurnGitDiff"
+            :plan="currentTurnPlan"
             :approval-preset="approvalPreset"
             :plan-mode="planMode"
             :selected-model-id="selectedModelId"
@@ -213,20 +213,24 @@
             @update:plan-mode="$emit('update:planMode', $event)"
           />
           <RightWorkspacePanel
-            v-if="currentAgent"
-            v-show="rightWorkspaceVisible"
+            v-for="agent in snapshot.agents"
+            :key="agent.id"
+            v-show="isRightWorkspaceVisible(agent.id)"
             class="app-shell__right-workspace"
-            :style="{ flexBasis: `${rightWorkspaceWidth}px` }"
-            :active-tab="effectiveRightWorkspaceTab"
-            :agent="currentAgent"
-            :git-panel="effectiveGitReviewPanel"
-            :git-status="currentAgentGitStatus"
-            :tabs="rightWorkspaceTabs"
-            :visible="rightWorkspaceVisible"
-            @close-tab="closeRightWorkspaceTab"
-            @open-tab="openRightWorkspaceTabFromMenu"
-            @refresh-git-diff="openAgentGitDiffPreview"
-            @select-tab="selectRightWorkspaceTab"
+            :style="{ flexBasis: `${rightWorkspaceFor(agent.id).width}px` }"
+            :active-tab="rightWorkspaceFor(agent.id).activeTab"
+            :agent="agent"
+            :git-panel="effectiveGitReviewPanelFor(agent)"
+            :git-status="snapshot.agentGitStatuses[agent.id] ?? null"
+            :tabs="rightWorkspaceFor(agent.id).tabs"
+            :visible="isRightWorkspaceVisible(agent.id)"
+            :browser-id="rightWorkspaceFor(agent.id).browserId"
+            :browser-initial-url="rightWorkspaceFor(agent.id).browserInitialUrl"
+            :browser-open-request-id="rightWorkspaceFor(agent.id).browserOpenRequestId"
+            @close-tab="closeRightWorkspaceTab(agent.id, $event)"
+            @open-tab="openRightWorkspaceTabFromMenu(agent.id, $event)"
+            @refresh-git-diff="openAgentGitDiffPreview(agent.id)"
+            @select-tab="selectRightWorkspaceTab(agent.id, $event)"
             @send-prompt="forwardPrompt"
           />
           <div
@@ -298,8 +302,8 @@
 
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendRuntimeStatus, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, MoveAgentToTeamInput, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelMarkdownRequest, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, TurnGitDiff, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type LoopLocation, type MoveAgentToTeamInput, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultTeamColor } from '@codex-claw/shared/team-colors';
@@ -526,6 +530,16 @@ type CockpitBacklogConfiguration = {
 
 type AppSurface = 'agent' | 'cockpit' | 'loops' | 'settings';
 type BenchLoadStatus = 'notLoaded' | 'loading' | 'loaded' | 'error';
+type AgentRightWorkspaceState = {
+  activeTab: RightWorkspaceTab | null;
+  browserId: string;
+  browserInitialUrl: string;
+  browserOpenRequestId: number;
+  gitReviewPanel: SidePanelGitDiffState | null;
+  open: boolean;
+  tabs: RightWorkspaceTab[];
+  width: number;
+};
 
 const agentSidebarCollapsed = ref(false);
 const agentListCompact = computed(() => props.snapshot.general.agentListCompact);
@@ -533,12 +547,8 @@ const agentSidebarMinWidth = 80;
 const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
 const activeSurface = ref<AppSurface>('agent');
-const rightWorkspaceTabs = ref<RightWorkspaceTab[]>([]);
-const activeRightWorkspaceTab = ref<RightWorkspaceTab | null>(null);
-const rightWorkspaceOpen = ref(false);
-const rightWorkspaceWidth = ref(420);
+const rightWorkspaces = reactive<Record<string, AgentRightWorkspaceState>>({});
 const workspaceBody = ref<HTMLElement | null>(null);
-const gitReviewPanel = ref<SidePanelGitDiffState | null>(null);
 const authentication = ref<CodexAuthentication | null>(null);
 const authenticationLoading = ref(true);
 const authenticationCancelling = ref(false);
@@ -593,30 +603,26 @@ const currentAgentGitStatus = computed<AgentGitStatus | null>(() => {
   const agentId = currentAgent.value?.id;
   return agentId ? props.snapshot.agentGitStatuses[agentId] ?? null : null;
 });
-const currentTurnGitDiff = computed<TurnGitDiff | null>(() => {
+const currentTurnPlan = computed<ThreadPlan | null>(() => {
+  const plan = currentAgent.value?.plan;
+  if (!props.isSending || !plan?.steps.length) {
+    return null;
+  }
+
+  let latestTurnId: string | undefined;
   for (let index = props.messages.length - 1; index >= 0; index -= 1) {
-    const turnId = props.messages[index]?.turnId;
-    const diff = turnId ? props.snapshot.turnGitDiffs[turnId] : null;
-    if (diff) {
-      return diff;
+    if (props.messages[index]?.turnId) {
+      latestTurnId = props.messages[index].turnId;
+      break;
     }
   }
 
-  return null;
+  return latestTurnId === plan.turnId ? plan : null;
 });
-const rightWorkspaceVisible = computed(() => (
-  rightWorkspaceOpen.value &&
-  sidePanel.value === null
-));
-const effectiveRightWorkspaceTab = computed<RightWorkspaceTab | null>(() => activeRightWorkspaceTab.value);
-const effectiveGitReviewPanel = computed<SidePanelGitDiffState>(() => gitReviewPanel.value ?? ({
-  kind: 'gitDiff',
-  title: 'Review',
-  subtitle: currentAgent.value?.folder,
-  diff: '',
-  state: 'loading',
-  error: null,
-}));
+const rightWorkspaceVisible = computed(() => {
+  const agentId = currentAgent.value?.id;
+  return Boolean(agentId && rightWorkspaceFor(agentId).open && sidePanel.value === null);
+});
 const savedCockpitBacklogConfiguration = computed<CockpitBacklogConfiguration>(() => {
   const configuration = props.snapshot.workBacklog.providerConfigurations.github ?? {};
   return normalizedCockpitBacklogConfiguration({
@@ -807,56 +813,110 @@ function setAgentSidebarWidth(width: number): void {
   agentSidebarWidth.value = Math.min(Math.max(width, agentSidebarMinWidth), agentSidebarMaxWidth);
 }
 
+function rightWorkspaceFor(agentId: string): AgentRightWorkspaceState {
+  const existing = rightWorkspaces[agentId];
+  if (existing) return existing;
+
+  const created: AgentRightWorkspaceState = {
+    activeTab: null,
+    browserId: PRIMARY_BROWSER_ID,
+    browserInitialUrl: '',
+    browserOpenRequestId: 0,
+    gitReviewPanel: null,
+    open: false,
+    tabs: [],
+    width: 420,
+  };
+  rightWorkspaces[agentId] = created;
+  return created;
+}
+
+function isRightWorkspaceVisible(agentId: string): boolean {
+  return currentAgent.value?.id === agentId && rightWorkspaceFor(agentId).open && sidePanel.value === null;
+}
+
+function effectiveGitReviewPanelFor(agent: Agent): SidePanelGitDiffState {
+  return rightWorkspaceFor(agent.id).gitReviewPanel ?? {
+    kind: 'gitDiff',
+    title: 'Review',
+    subtitle: agent.folder,
+    diff: '',
+    state: 'loading',
+    error: null,
+  };
+}
+
 function toggleRightWorkspace(): void {
+  const agentId = currentAgent.value?.id;
+  if (!agentId) return;
+  const workspace = rightWorkspaceFor(agentId);
   if (rightWorkspaceVisible.value) {
-    rightWorkspaceOpen.value = false;
+    workspace.open = false;
     return;
   }
 
   closeSidePanel();
-  rightWorkspaceOpen.value = true;
+  workspace.open = true;
 }
 
-function openRightWorkspaceTab(tab: RightWorkspaceTab): void {
-  closeSidePanel();
-  if (!rightWorkspaceTabs.value.includes(tab)) {
-    rightWorkspaceTabs.value = [...rightWorkspaceTabs.value, tab];
+function openRightWorkspaceTab(tab: RightWorkspaceTab, agentId = currentAgent.value?.id): void {
+  if (!agentId) return;
+  if (agentId === currentAgent.value?.id) closeSidePanel();
+  const workspace = rightWorkspaceFor(agentId);
+  if (!workspace.tabs.includes(tab)) {
+    workspace.tabs = [...workspace.tabs, tab];
   }
-  activeRightWorkspaceTab.value = tab;
-  rightWorkspaceOpen.value = true;
+  workspace.activeTab = tab;
+  workspace.open = true;
 }
 
-function openRightWorkspaceTabFromMenu(tab: RightWorkspaceTab): void {
+function openRequestedBrowser(agentId: string, command: Extract<AppCommand, { type: 'open-browser' }>): void {
+  const workspace = rightWorkspaceFor(agentId);
+  workspace.browserId = command.browserId ?? PRIMARY_BROWSER_ID;
+  workspace.browserInitialUrl = command.url ?? '';
+  workspace.browserOpenRequestId += 1;
+  openRightWorkspaceTab('browser', agentId);
+}
+
+function handleBrowserOpenCommand(command: Extract<AppCommand, { type: 'open-browser' }>): void {
+  const agentId = command.agentId ?? currentAgent.value?.id;
+  if (!agentId || !props.snapshot.agents.some((agent) => agent.id === agentId)) return;
+  openRequestedBrowser(agentId, command);
+}
+
+function openRightWorkspaceTabFromMenu(agentId: string, tab: RightWorkspaceTab): void {
   if (tab === 'review') {
-    void openAgentGitDiffPreview();
+    void openAgentGitDiffPreview(agentId);
     return;
   }
-  openRightWorkspaceTab(tab);
+  openRightWorkspaceTab(tab, agentId);
 }
 
-function selectRightWorkspaceTab(tab: RightWorkspaceTab): void {
-  if (rightWorkspaceTabs.value.includes(tab)) {
-    closeSidePanel();
-    activeRightWorkspaceTab.value = tab;
+function selectRightWorkspaceTab(agentId: string, tab: RightWorkspaceTab): void {
+  const workspace = rightWorkspaceFor(agentId);
+  if (workspace.tabs.includes(tab)) {
+    if (agentId === currentAgent.value?.id) closeSidePanel();
+    workspace.activeTab = tab;
   }
 }
 
-function closeRightWorkspaceTab(tab: RightWorkspaceTab): void {
-  const tabIndex = rightWorkspaceTabs.value.indexOf(tab);
+function closeRightWorkspaceTab(agentId: string, tab: RightWorkspaceTab): void {
+  const workspace = rightWorkspaceFor(agentId);
+  const tabIndex = workspace.tabs.indexOf(tab);
   if (tabIndex === -1) {
     return;
   }
 
-  const nextTabs = rightWorkspaceTabs.value.filter((candidate) => candidate !== tab);
-  rightWorkspaceTabs.value = nextTabs;
+  const nextTabs = workspace.tabs.filter((candidate) => candidate !== tab);
+  workspace.tabs = nextTabs;
   if (tab === 'review') {
-    gitReviewPanel.value = null;
+    workspace.gitReviewPanel = null;
   }
-  if (activeRightWorkspaceTab.value === tab) {
-    activeRightWorkspaceTab.value = nextTabs[Math.min(tabIndex, nextTabs.length - 1)] ?? null;
+  if (workspace.activeTab === tab) {
+    workspace.activeTab = nextTabs[Math.min(tabIndex, nextTabs.length - 1)] ?? null;
   }
   if (nextTabs.length === 0) {
-    activeRightWorkspaceTab.value = null;
+    workspace.activeTab = null;
   }
 }
 
@@ -864,9 +924,11 @@ function startRightWorkspaceResize(event: PointerEvent): void {
   event.preventDefault();
   const body = workspaceBody.value;
   if (!body) return;
+  const agentId = currentAgent.value?.id;
+  if (!agentId) return;
   const updateWidth = (moveEvent: PointerEvent) => {
     const availableWidth = Math.max(240, body.getBoundingClientRect().width - 240);
-    rightWorkspaceWidth.value = Math.min(Math.max(body.getBoundingClientRect().right - moveEvent.clientX, 240), availableWidth);
+    rightWorkspaceFor(agentId).width = Math.min(Math.max(body.getBoundingClientRect().right - moveEvent.clientX, 240), availableWidth);
   };
   const stop = () => {
     window.removeEventListener('pointermove', updateWidth);
@@ -1207,13 +1269,14 @@ async function openFilePreview(filePath: string): Promise<void> {
   }
 }
 
-async function openAgentGitDiffPreview(): Promise<void> {
-  const agent = currentAgent.value;
+async function openAgentGitDiffPreview(agentId = currentAgent.value?.id): Promise<void> {
+  const agent = props.snapshot.agents.find((candidate) => candidate.id === agentId);
   if (!agent) {
     return;
   }
 
-  gitReviewPanel.value = {
+  const workspace = rightWorkspaceFor(agent.id);
+  workspace.gitReviewPanel = {
     kind: 'gitDiff',
     title: 'Review',
     subtitle: agent.folder,
@@ -1221,11 +1284,11 @@ async function openAgentGitDiffPreview(): Promise<void> {
     state: 'loading',
     error: null,
   };
-  openRightWorkspaceTab('review');
+  openRightWorkspaceTab('review', agent.id);
   try {
     await props.openAgentGitDiff(agent.id);
   } catch (error) {
-    gitReviewPanel.value = {
+    workspace.gitReviewPanel = {
       kind: 'gitDiff',
       title: 'Review',
       subtitle: agent.folder,
@@ -1290,6 +1353,11 @@ function handleAppCommand(command: AppCommand): void {
     return;
   }
 
+  if (command.type === 'open-browser' && command.agentId && command.url) {
+    handleBrowserOpenCommand(command);
+    return;
+  }
+
   if (isModalDialogVisible.value) {
     return;
   }
@@ -1316,7 +1384,7 @@ function handleAppCommand(command: AppCommand): void {
 
   if (command.type === 'open-browser') {
     if (isAgentWorkspaceVisible.value && currentAgent.value) {
-      openRightWorkspaceTab('browser');
+      handleBrowserOpenCommand(command);
     }
     return;
   }
@@ -1696,10 +1764,6 @@ watch(() => [
 
 watch(() => currentAgent.value?.id ?? null, () => {
   closeSidePanel();
-  rightWorkspaceTabs.value = [];
-  activeRightWorkspaceTab.value = null;
-  rightWorkspaceOpen.value = false;
-  gitReviewPanel.value = null;
 });
 
 watch(() => props.sidePanelRequest, (request) => {
@@ -1738,8 +1802,10 @@ function openGitDiffRequest(request: Extract<SidePanelRequest, { kind: 'gitDiff'
     return;
   }
 
+  const agentId = currentAgent.value?.id;
+  if (!agentId) return;
   sidePanelRequestId += 1;
-  gitReviewPanel.value = {
+  rightWorkspaceFor(agentId).gitReviewPanel = {
     kind: 'gitDiff',
     title: request.title ?? 'Review',
     ...(request.subtitle ? { subtitle: request.subtitle } : {}),
@@ -1747,7 +1813,7 @@ function openGitDiffRequest(request: Extract<SidePanelRequest, { kind: 'gitDiff'
     state: request.state ?? 'idle',
     error: request.error ?? null,
   };
-  openRightWorkspaceTab('review');
+  openRightWorkspaceTab('review', agentId);
 }
 
 function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {

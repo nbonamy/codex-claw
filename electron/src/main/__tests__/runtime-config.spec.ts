@@ -130,6 +130,28 @@ describe('runtime config', () => {
     expect(devScript).toContain("start('npm', ['run', 'dev:electron']");
   });
 
+  it('uses sibling SDK sources for dev while leaving package builds on dist', () => {
+    const repositoryRoot = path.resolve(__dirname, '../../../..');
+    const devScript = readFileSync(path.join(repositoryRoot, 'scripts/dev.mjs'), 'utf8');
+    const aliasConfig = readFileSync(path.join(repositoryRoot, 'vite.sdk-aliases.ts'), 'utf8');
+    const viteConfigs = [
+      'backend/vite.config.ts',
+      'electron/vite.main.config.ts',
+      'electron/vite.preload.config.ts',
+      'electron/vite.renderer.config.ts',
+    ].map((filePath) => readFileSync(path.join(repositoryRoot, filePath), 'utf8'));
+
+    expect(devScript).toContain("process.env.CODEX_APP_SDK_SOURCE = '1'");
+    expect(aliasConfig).toContain("'codex-app-sdk/vue': path.join(sdkSourceRoot, 'vue/index.ts')");
+    expect(aliasConfig).toContain("'codex-app-sdk/styles.css': path.join(sdkSourceRoot, 'vue/styles.css')");
+    for (const viteConfig of viteConfigs) {
+      expect(viteConfig).toContain('useSdkSources');
+      expect(viteConfig).toContain('sdkSourceAliases');
+    }
+    expect(viteConfigs[3]).toContain('exclude: Object.keys(sdkSourceAliases)');
+    expect(viteConfigs[3]).toContain("dedupe: ['vue']");
+  });
+
   it('pins release Computer Use artifacts and keeps a local development path', () => {
     const releaseConfig = JSON.parse(
       readFileSync(path.resolve(__dirname, '../../../../computer-use-release.json'), 'utf8'),

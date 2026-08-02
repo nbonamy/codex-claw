@@ -740,6 +740,22 @@ persisted application snapshot. Switching right-workspace tabs hides the
 native browser view without discarding its current page; closing the Browser
 tab destroys that view.
 
+The app-owned MCP `browser-open` tool can request this same surface for its
+calling agent. `clawd` delegates through `client/browser/open`; Electron asks
+the renderer to mount or navigate the addressed agent/browser tab, then
+resolves the callback only after the renderer-created native view has loaded
+the requested URL. Each agent owns independent right-workspace state, and
+inactive workspaces remain mounted and hidden so their browser tools keep
+working without changing the user's selection. Electron keys native browser
+views by both agent id and browser id; the current UI uses a stable `primary`
+id but the host is ready for multiple browser tabs per agent.
+
+Agent selection is optimistic in the renderer: the selected agent and any
+already-hydrated messages are displayed immediately, while the backend's
+session hydration, Git status refresh, and agent-specific catalogs reconcile in
+the background. Selection requests carry a monotonic renderer token so a stale
+response from a rapid earlier switch cannot replace the current agent.
+
 Dragging a work item onto an agent records provider-neutral assignment metadata
 in `workBacklog.assignments`, keyed by provider and provider-generated item id,
 then sends a deterministic prompt through the existing prompt path. Assignment

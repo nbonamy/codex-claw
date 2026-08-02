@@ -8,6 +8,10 @@ const backendBundle = path.join(rootDir, 'backend/dist/clawd.mjs');
 const children = new Set();
 let shuttingDown = false;
 
+// Development resolves the linked sibling SDK directly from source so Vite
+// can hot-reload changes. Package and release builds keep using SDK dist.
+process.env.CODEX_APP_SDK_SOURCE = '1';
+
 if (process.argv.includes('--help')) {
   console.log('Usage: npm run dev');
   console.log('Builds clawd once, watches backend changes, then starts Electron with the backend process configured.');

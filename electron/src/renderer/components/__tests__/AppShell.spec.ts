@@ -95,6 +95,46 @@ describe('AppShell', () => {
     expect(wrapper.text()).not.toContain('Artifacts');
   });
 
+  it('shows structured plan progress only while its turn is active', async () => {
+    const snapshot = createInitialSnapshot();
+    const activeAgent = snapshot.agents[0];
+    const plan = {
+      threadId: 'thread-plan',
+      turnId: 'turn-plan',
+      explanation: 'Current execution plan',
+      steps: [{ step: 'Implement the fix', status: 'inProgress' as const }],
+      markdown: 'Current execution plan\n- [ ] Implement the fix',
+      updatedAt: '2026-08-01T00:00:00.000Z',
+    };
+    activeAgent.plan = plan;
+    const messages: RendererMessage[] = [{
+      id: 'assistant-plan',
+      agentId: activeAgent.id,
+      role: 'assistant',
+      status: 'streaming',
+      turnId: 'turn-plan',
+      parts: [],
+      createdAt: '2026-08-01T00:00:00.000Z',
+    }];
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent,
+        messages,
+        isLoading: false,
+        isSending: true,
+      },
+      global: { plugins: [ElementPlus, i18n] },
+    });
+
+    expect(wrapper.findComponent({ name: 'ConversationPane' }).props('plan')).toStrictEqual(plan);
+    expect(wrapper.findComponent({ name: 'ConversationPane' }).props()).not.toHaveProperty('turnGitDiff');
+
+    await wrapper.setProps({ isSending: false } as Record<string, unknown>);
+
+    expect(wrapper.findComponent({ name: 'ConversationPane' }).props('plan')).toBeNull();
+  });
+
   it('forwards prompts from the composer', async () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mount(AppShell, {
@@ -167,13 +207,85 @@ describe('AppShell', () => {
     await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
     await flushPromises();
 
-    expect(browserSetVisible).toHaveBeenCalledWith(false);
+    expect(browserSetVisible).toHaveBeenCalledWith('agent-dina', 'primary', false);
     expect(browserOpen).toHaveBeenCalledTimes(1);
 
     await wrapper.get('[aria-label="Close Browser tab"]').trigger('click');
     await nextTick();
 
     expect(wrapper.get('[aria-label="Open a workspace tab"]').isVisible()).toBe(true);
+  });
+
+  it('keeps each agent workspace and browser mounted while switching agents', async () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    });
+    const snapshot = createInitialSnapshot();
+    const browserOpen = vi.fn().mockResolvedValue({ url: '', title: '', canGoBack: false, canGoForward: false });
+    const browserClose = vi.fn().mockResolvedValue(undefined);
+    const browserSetVisible = vi.fn().mockResolvedValue(undefined);
+    window.codexClaw = {
+      browserOpen,
+      browserSetBounds: vi.fn().mockResolvedValue(undefined),
+      browserSetVisible,
+      browserClose,
+      onEvent: vi.fn(() => vi.fn()),
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const wrapper = mountShell({ snapshot });
+
+    await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
+    await wrapper.findAll('.right-workspace-panel__launcher button').find((button) => button.text().includes('Browser'))?.trigger('click');
+    await flushPromises();
+    expect(browserOpen).toHaveBeenCalledWith('agent-dina', 'primary', '');
+
+    await wrapper.setProps({ activeAgent: snapshot.agents.find((agent) => agent.id === 'agent-jesse') } as Record<string, unknown>);
+    await flushPromises();
+
+    expect(browserClose).not.toHaveBeenCalled();
+    expect(wrapper.findAllComponents({ name: 'BrowserPanel' })).toHaveLength(1);
+    await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
+    await wrapper.findAll('.right-workspace-panel__launcher button').find((button) => button.isVisible() && button.text().includes('Browser'))?.trigger('click');
+    await flushPromises();
+
+    expect(browserOpen).toHaveBeenCalledWith('agent-jesse', 'primary', '');
+    expect(wrapper.findAllComponents({ name: 'BrowserPanel' })).toHaveLength(2);
+    await wrapper.setProps({ activeAgent: snapshot.agents.find((agent) => agent.id === 'agent-dina') } as Record<string, unknown>);
+    await flushPromises();
+
+    const workspaces = wrapper.findAllComponents({ name: 'RightWorkspacePanel' });
+    expect(workspaces.find((panel) => panel.props('agent').id === 'agent-dina')?.props('tabs')).toStrictEqual(['browser']);
+    expect(workspaces.find((panel) => panel.props('agent').id === 'agent-jesse')?.props('tabs')).toStrictEqual(['browser']);
+    expect(browserClose).not.toHaveBeenCalled();
+    expect(browserSetVisible).toHaveBeenCalledWith('agent-dina', 'primary', true);
+  });
+
+  it('opens a background agent browser without changing the selected agent', async () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    });
+    let listener: (command: AppCommand) => void = () => undefined;
+    const browserOpen = vi.fn().mockResolvedValue({ url: 'https://example.com/', title: 'Example', canGoBack: false, canGoForward: false });
+    window.codexClaw = {
+      onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
+        listener = nextListener;
+        return () => undefined;
+      }),
+      browserOpen,
+      browserSetBounds: vi.fn().mockResolvedValue(undefined),
+      browserSetVisible: vi.fn().mockResolvedValue(undefined),
+      browserClose: vi.fn().mockResolvedValue(undefined),
+      onEvent: vi.fn(() => vi.fn()),
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const wrapper = mountShell();
+
+    listener({ type: 'open-browser', agentId: 'agent-jesse', browserId: 'primary', url: 'https://example.com' });
+    await flushPromises();
+
+    expect(browserOpen).toHaveBeenCalledWith('agent-jesse', 'primary', 'https://example.com');
+    expect(wrapper.emitted('select-agent')).toBeUndefined();
+    expect(wrapper.text()).toContain('Chat with Dina');
   });
 
   it('opens the active agent git diff from header diff stats', async () => {
@@ -2175,6 +2287,44 @@ describe('AppShell', () => {
 
     wrapper.unmount();
     expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it('opens a model-requested URL in the active agent browser workspace', async () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    });
+    let listener: (command: AppCommand) => void = () => undefined;
+    const browserOpen = vi.fn().mockResolvedValue({
+      url: 'https://example.com/',
+      title: 'Example',
+      canGoBack: false,
+      canGoForward: false,
+    });
+    window.codexClaw = {
+      onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
+        listener = nextListener;
+        return () => undefined;
+      }),
+      browserOpen,
+      browserSetBounds: vi.fn().mockResolvedValue(undefined),
+      browserSetVisible: vi.fn().mockResolvedValue(undefined),
+      browserClose: vi.fn().mockResolvedValue(undefined),
+      onEvent: vi.fn(() => vi.fn()),
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const snapshot = createInitialSnapshot();
+    const wrapper = mountShell({ snapshot });
+
+    listener({
+      type: 'open-browser',
+      agentId: 'agent-dina',
+      url: 'https://example.com',
+    });
+    await nextTick();
+    await flushPromises();
+
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['Browser']);
+    expect(browserOpen).toHaveBeenCalledWith('agent-dina', 'primary', 'https://example.com');
   });
 
   it('ignores active-agent shortcuts when no agent is selected', () => {

@@ -8,7 +8,7 @@ class ResizeObserverStub {
   disconnect = vi.fn();
 }
 
-function mountPanel() {
+function mountPanel(props: { initialUrl?: string; openRequestId?: number } = {}) {
   let listener: ((event: MainToRendererEvent) => void) | null = null;
   const browserOpen = vi.fn().mockResolvedValue({
     url: '',
@@ -18,7 +18,12 @@ function mountPanel() {
   });
   const api = {
     browserOpen,
-    browserNavigate: vi.fn(),
+    browserNavigate: vi.fn().mockResolvedValue({
+      url: 'https://example.com/',
+      title: 'Example',
+      canGoBack: false,
+      canGoForward: false,
+    }),
     browserGoBack: vi.fn(),
     browserGoForward: vi.fn(),
     browserReload: vi.fn(),
@@ -34,7 +39,7 @@ function mountPanel() {
   };
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
   Object.defineProperty(window, 'codexClaw', { configurable: true, value: api });
-  return { api, browserOpen, emitEvent: (event: MainToRendererEvent) => listener?.(event), wrapper: mount(BrowserPanel, { props: { agentId: 'agent-1', visible: true } }) };
+  return { api, browserOpen, emitEvent: (event: MainToRendererEvent) => listener?.(event), wrapper: mount(BrowserPanel, { props: { agentId: 'agent-1', visible: true, ...props } }) };
 }
 
 describe('BrowserPanel', () => {
@@ -42,14 +47,25 @@ describe('BrowserPanel', () => {
     const { api, browserOpen, wrapper } = mountPanel();
     await flushPromises();
 
-    expect(browserOpen).toHaveBeenCalledWith('agent-1', '');
+    expect(browserOpen).toHaveBeenCalledWith('agent-1', 'primary', '');
     expect((wrapper.get('[aria-label="Browser address"]').element as HTMLInputElement).value).toBe('');
     expect(api.browserSetBounds).toHaveBeenCalledTimes(1);
 
     await wrapper.get('.browser-panel__annotate').trigger('click');
 
-    expect(api.browserSetAnnotationMode).toHaveBeenCalledWith(true);
+    expect(api.browserSetAnnotationMode).toHaveBeenCalledWith('agent-1', 'primary', true);
     expect(wrapper.get('.browser-panel__annotation-title').text()).toContain('Annotating');
+  });
+
+  it('navigates an already-open pane when the model sends another browser request', async () => {
+    const { api, wrapper } = mountPanel();
+    await flushPromises();
+
+    await wrapper.setProps({ initialUrl: 'https://example.com', openRequestId: 1 } as Record<string, unknown>);
+    await flushPromises();
+
+    expect(api.browserNavigate).toHaveBeenCalledWith('agent-1', 'primary', 'https://example.com');
+    expect((wrapper.get('[aria-label="Browser address"]').element as HTMLInputElement).value).toBe('https://example.com/');
   });
 
   it('accumulates annotations and sends one scoped prompt when the batch is ready', async () => {
@@ -63,6 +79,8 @@ describe('BrowserPanel', () => {
       occurredAt: '2026-07-29T00:00:00.000Z',
       payload: {
         id: 'annotation-1',
+        agentId: 'agent-1',
+        browserId: 'primary',
         kind: 'element',
         url: 'http://localhost:3000/',
         selector: '#save',
@@ -77,6 +95,8 @@ describe('BrowserPanel', () => {
       occurredAt: '2026-07-29T00:00:01.000Z',
       payload: {
         id: 'annotation-2',
+        agentId: 'agent-1',
+        browserId: 'primary',
         kind: 'area',
         url: 'http://localhost:3000/',
         comment: 'Make this button blue.',
@@ -105,7 +125,7 @@ describe('BrowserPanel', () => {
       type: 'browser.annotationCreated',
       occurredAt: '2026-07-29T00:00:00.000Z',
       payload: {
-        id: 'annotation-1', kind: 'element', url: 'http://localhost:3000/', comment: 'Translate this.', rect: { x: 8, y: 16, width: 100, height: 40 },
+        id: 'annotation-1', agentId: 'agent-1', browserId: 'primary', kind: 'element', url: 'http://localhost:3000/', comment: 'Translate this.', rect: { x: 8, y: 16, width: 100, height: 40 },
       },
     });
     await wrapper.vm.$nextTick();
@@ -113,8 +133,24 @@ describe('BrowserPanel', () => {
     await wrapper.get('[aria-label="Exit annotation mode"]').trigger('click');
 
     expect(wrapper.find('[aria-label="Send 1 annotations"]').exists()).toBe(false);
-    expect(api.browserSetAnnotationMode).toHaveBeenLastCalledWith(false);
+    expect(api.browserSetAnnotationMode).toHaveBeenLastCalledWith('agent-1', 'primary', false);
     expect(api.browserClearAnnotations).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores annotations created in another agent browser', async () => {
+    const { emitEvent, wrapper } = mountPanel();
+    await flushPromises();
+    emitEvent({
+      seq: 1,
+      type: 'browser.annotationCreated',
+      occurredAt: '2026-07-29T00:00:00.000Z',
+      payload: {
+        id: 'annotation-other', agentId: 'agent-2', browserId: 'secondary', kind: 'element', url: 'https://example.com/', comment: 'Ignore this.', rect: { x: 8, y: 16, width: 100, height: 40 },
+      },
+    });
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[aria-label^="Send "]').exists()).toBe(false);
   });
 
   it('closes the native browser view before leaving the panel', async () => {
@@ -125,7 +161,7 @@ describe('BrowserPanel', () => {
     await wrapper.get('[role="menuitem"]').trigger('click');
     await flushPromises();
 
-    expect(api.browserClose).toHaveBeenCalled();
+    expect(api.browserClose).toHaveBeenCalledWith('agent-1', 'primary');
     expect(wrapper.emitted('close')).toStrictEqual([[]]);
   });
 });

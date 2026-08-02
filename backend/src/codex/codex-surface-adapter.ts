@@ -228,6 +228,13 @@ export class CodexSurfaceAgentAdapter {
   async hydrateAgent(agent: Agent): Promise<string | null> {
     const threadId = codexThreadId(agent);
     if (!threadId) return null;
+    const existing = this.sessionsByAgentId.get(agent.id);
+    if (existing?.handle.id === threadId) {
+      existing.agent = agent;
+      const snapshot = await existing.handle.load({ cwd: expandHome(agent.folder), extensionContext: agent });
+      this.publishInitial(existing, snapshot, true);
+      return threadId;
+    }
     await this.bindAndLoad(agent, threadId, true);
     return threadId;
   }

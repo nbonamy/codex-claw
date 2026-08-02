@@ -33,6 +33,30 @@ describe('createClientRequestHandlers', () => {
     expect(openExternal).toHaveBeenCalledWith('https://example.com');
   });
 
+  it('opens the agent-scoped in-app browser through the desktop port', async () => {
+    const browserState = {
+      url: 'https://example.com/',
+      title: 'Example',
+      canGoBack: false,
+      canGoForward: false,
+    };
+    const browserOpen = vi.fn().mockResolvedValue(browserState);
+    const handlers = createClientRequestHandlers({
+      openExternal: vi.fn(),
+      getSystemPermissionsStatus: vi.fn(),
+      openAccessibilitySettings: vi.fn(),
+      computerUseOptions,
+      browserOpen,
+    });
+
+    await expect(handlers['client/browser/open']?.({
+      agentId: 'agent-dina',
+      browserId: 'primary',
+      url: 'https://example.com',
+    })).resolves.toStrictEqual(browserState);
+    expect(browserOpen).toHaveBeenCalledWith('agent-dina', 'primary', 'https://example.com');
+  });
+
   it('checks system permissions through the desktop-native port', async () => {
     const status = {
       platform: 'darwin',
