@@ -1518,6 +1518,41 @@ describe('useAppState', () => {
     expect(state.visibleMessages.value.at(-1)?.id).toBe('message-drained');
   });
 
+  it('shows and removes backend-owned teammate prompts in the target agent queue', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(createInitialSnapshot()),
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'agent.promptQueued',
+      payload: { id: 'inbox-1', text: 'Review the other agent change.' },
+      occurredAt: '2026-08-02T00:00:00.000Z',
+    });
+    expect(state.activeQueuedPrompts.value).toEqual([
+      { id: 'inbox-1', text: 'Review the other agent change.' },
+    ]);
+
+    listeners[0]?.({
+      seq: 2,
+      agentId: 'agent-dina',
+      type: 'agent.promptDequeued',
+      payload: { ids: ['inbox-1'] },
+      occurredAt: '2026-08-02T00:00:01.000Z',
+    });
+    expect(state.activeQueuedPrompts.value).toStrictEqual([]);
+  });
+
   it('preserves attachment descriptors in a busy conversation queue until normal drain', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();

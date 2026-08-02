@@ -206,7 +206,12 @@ Effects:
 - rejects ambiguous recipient names and asks the agent to use the ID from
   `list-agents`;
 - stores an unread inbox message;
-- notifies main so the recipient can be prompted.
+- steers the message into the recipient's active Codex turn when steering is
+  available;
+- otherwise exposes it in the recipient's visible prompt queue and sends it as
+  the next prompt after the active turn completes;
+- returns the resolved recipient ID and display name so tool activity uses a
+  human-friendly label even when the caller addressed an agent by UUID.
 
 ### `check-messages`
 

@@ -54,6 +54,10 @@ describe('ClawMcpService', () => {
     });
 
     expect(sendMessageResponse.result.isError).toBe(false);
+    expect(sendMessageResponse.result.structuredContent).toMatchObject({
+      recipientId: 'agent-jesse',
+      recipientName: 'Jesse',
+    });
     expect(sendPrompt).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'agent-jesse' }),
       expect.stringContaining('Can you review this branch?'),
@@ -81,6 +85,81 @@ describe('ClawMcpService', () => {
         })],
       }),
     }));
+  });
+
+  it('steers teammate messages into a recipient with an active turn', async () => {
+    const snapshot = createInitialSnapshot();
+    const recipient = snapshot.agents.find((agent) => agent.id === 'agent-jesse')!;
+    recipient.status = { type: 'working' };
+    recipient.backendSession = { kind: 'codex', threadId: 'thread-jesse' };
+    const events: any[] = [];
+    const steerPrompt = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex', threadId: 'thread-jesse' },
+      turnId: 'turn-active',
+    });
+    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    service.setDriverRpc(new BackendDriverRpc(new Map([['codex', createDriver({ steerPrompt })]])));
+    const url = await service.start();
+
+    await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 1, method: 'tools/call',
+      params: { name: 'send-message', arguments: { to: 'agent-jesse', content: 'Check the failing test.' } },
+    });
+
+    await vi.waitFor(() => expect(steerPrompt).toHaveBeenCalledOnce());
+    expect(steerPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-jesse' }),
+      expect.stringContaining('Check the failing test.'),
+    );
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-jesse',
+      type: 'message.steer',
+      turnId: 'turn-active',
+    }));
+    expect(events.some((event) => event.type === 'agent.promptQueued')).toBe(false);
+  });
+
+  it('shows busy teammate messages in the recipient queue and sends them when the turn completes', async () => {
+    const snapshot = createInitialSnapshot();
+    const recipient = snapshot.agents.find((agent) => agent.id === 'agent-jesse')!;
+    recipient.status = { type: 'starting' };
+    const events: any[] = [];
+    const sendPrompt = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex', threadId: 'thread-next' },
+      turnId: 'turn-next',
+    });
+    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    service.setDriverRpc(new BackendDriverRpc(new Map([['codex', createDriver({ sendPrompt })]])));
+    const url = await service.start();
+
+    await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 1, method: 'tools/call',
+      params: { name: 'send-message', arguments: { to: 'agent-jesse', content: 'Run this next.' } },
+    });
+
+    await vi.waitFor(() => expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-jesse',
+      type: 'agent.promptQueued',
+      payload: expect.objectContaining({ text: 'Run this next.' }),
+    })));
+    expect(sendPrompt).not.toHaveBeenCalled();
+
+    recipient.status = { type: 'idle' };
+    service.handleBackendEvent({
+      seq: 1,
+      agentId: 'agent-jesse',
+      threadId: 'thread-old',
+      turnId: 'turn-old',
+      type: 'turn.completed',
+      payload: { status: 'completed' },
+      occurredAt: '2026-08-02T00:00:00.000Z',
+    });
+
+    await vi.waitFor(() => expect(sendPrompt).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-jesse',
+      type: 'agent.promptDequeued',
+    })));
   });
 
   it('routes Computer Use MCP calls through the desktop client port', async () => {

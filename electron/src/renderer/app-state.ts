@@ -1615,6 +1615,7 @@ function subscribeToMainEvents(): void {
     adoptSnapshotFromMainEvent(event);
     syncBackendApprovalsFromMainEvent(event);
     syncAnsweredClientRequestsFromMainEvent(event);
+    syncQueuedPromptsFromMainEvent(event);
     syncComposerModeFromMainEvent(event);
     syncSidePanelFromMainEvent(event);
     if (event.type === 'turn.completed' && event.agentId) {
@@ -1624,6 +1625,32 @@ function subscribeToMainEvents(): void {
       void loadBackendSkillsForActiveAgent();
     }
   });
+}
+
+function syncQueuedPromptsFromMainEvent(event: MainToRendererEvent): void {
+  if (!event.agentId || !isRecord(event.payload)) return;
+
+  if (event.type === 'agent.promptQueued') {
+    const id = event.payload.id;
+    const text = event.payload.text;
+    if (typeof id !== 'string' || typeof text !== 'string') return;
+    const existing = queuedPromptsByAgentId.value[event.agentId] ?? [];
+    if (existing.some((prompt) => prompt.id === id)) return;
+    queuedPromptsByAgentId.value = {
+      ...queuedPromptsByAgentId.value,
+      [event.agentId]: [...existing, { id, text }],
+    };
+    return;
+  }
+
+  if (event.type === 'agent.promptDequeued' && Array.isArray(event.payload.ids)) {
+    const ids = new Set(event.payload.ids.filter((id): id is string => typeof id === 'string'));
+    queuedPromptsByAgentId.value = {
+      ...queuedPromptsByAgentId.value,
+      [event.agentId]: (queuedPromptsByAgentId.value[event.agentId] ?? [])
+        .filter((prompt) => !ids.has(prompt.id)),
+    };
+  }
 }
 
 function syncBackendApprovalsFromMainEvent(event: MainToRendererEvent): void {

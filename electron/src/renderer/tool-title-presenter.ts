@@ -61,7 +61,7 @@ export function presentClawToolTitle({
   }
 
   return translate(`chat.tool.mcp.codexClaw.${key}.${phase}`, {
-    target: toolTarget(identity.tool, args),
+    target: toolTarget(identity.tool, args, toolCall.result, phase),
   });
 }
 
@@ -81,9 +81,9 @@ function toolPhase(descriptorPhase: string | undefined, state: string): ToolPhas
   return 'running';
 }
 
-function toolTarget(tool: string, args: Record<string, unknown>): string {
+function toolTarget(tool: string, args: Record<string, unknown>, result: unknown, phase: ToolPhase): string {
   const candidates = tool === 'send-message'
-    ? [args.to]
+    ? [phase === 'completed' ? resultString(result, 'recipientName') : undefined, args.to]
     : tool === 'browser-open'
       ? [args.url]
       : tool === 'display-markdown'
@@ -100,6 +100,12 @@ function toolTarget(tool: string, args: Record<string, unknown>): string {
 
   const target = candidates.find((candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0);
   return target?.trim() ?? '';
+}
+
+function resultString(result: unknown, key: string): string | undefined {
+  if (!isRecord(result)) return undefined;
+  const value = result[key];
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

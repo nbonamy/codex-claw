@@ -21,6 +21,16 @@ describe('Claw tool title presenter', () => {
     ))).toBe(expected);
   });
 
+  it('uses the resolved recipient name after sending by agent id', () => {
+    expect(presentClawToolTitle({
+      ...context('codex_claw.send-message', { to: 'agent-uuid' }, 'completed'),
+      toolCall: {
+        ...context('codex_claw.send-message', { to: 'agent-uuid' }, 'completed').toolCall,
+        result: { recipientId: 'agent-uuid', recipientName: 'Computer Use' },
+      },
+    })).toBe('Sent message to Computer Use');
+  });
+
   it('uses approval descriptors and leaves other MCP servers to their own presenters', () => {
     expect(presentClawToolTitle(context(
       'codex_claw.register-agent',

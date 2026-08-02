@@ -32,6 +32,8 @@ export type ListAgentsResponse = {
 export type SendMessageResponse = {
   success: boolean;
   message: string;
+  recipientId: string;
+  recipientName: string;
 };
 
 export type CheckMessagesResponse = {
@@ -169,6 +171,8 @@ export class ClawMcpAgentCoordinator {
     return {
       success: true,
       message: 'Message sent successfully. The recipient will process it when they are idle.',
+      recipientId: recipient.id,
+      recipientName: recipient.name,
     };
   }
 
@@ -324,6 +328,18 @@ export class ClawMcpAgentCoordinator {
     }
 
     return messages;
+  }
+
+  peekUnreadMessages(agentId: string): MessageInfo[] {
+    const agent = this.findAgent(agentId);
+    return agent ? this.unreadMessagesFor(agent.id).map((message) => this.toMessageInfo(message)) : [];
+  }
+
+  markMessagesRead(messageIds: string[]): void {
+    const ids = new Set(messageIds);
+    for (const message of this.messages) {
+      if (ids.has(message.id)) message.isRead = true;
+    }
   }
 
   debugAgents(): McpAgentInfo[] {

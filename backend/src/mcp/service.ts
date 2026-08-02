@@ -13,6 +13,7 @@ import type {
   CreateSourceWorktreeInput,
   LoopAction,
   LoopExecutionLogEntry,
+  MainToRendererEvent,
   SendPromptOptions,
   SourceRepository,
   SourceWorktree,
@@ -48,6 +49,7 @@ export class ClawMcpService {
   private readonly now: () => Date;
   private eventSink: ((event: BackendEvent) => void) | null = null;
   private driverRpc: BackendDriverRpc | null = null;
+  private readonly queuedMessageIds = new Set<string>();
 
   constructor(options: ClawMcpServiceOptions) {
     this.snapshot = options.snapshot;
@@ -62,7 +64,7 @@ export class ClawMcpService {
         payload: agent,
       }),
       onInboxMessage: (agentId) => {
-        void this.promptUnreadAgentMessages(agentId);
+        void this.deliverUnreadAgentMessages(agentId);
       },
       onDisplayMarkdown: (agent, input) => this.displayMarkdownForAgent(agent, input),
       onMarkWorkItemCompleted: (agent, workItemId, confirmCompletion) => this.markWorkItemCompletedForAgent(agent, workItemId, confirmCompletion),
@@ -82,6 +84,12 @@ export class ClawMcpService {
     this.eventSink = listener;
   }
 
+  handleBackendEvent(event: MainToRendererEvent): void {
+    if (event.type === 'turn.completed' && event.agentId) {
+      void this.deliverUnreadAgentMessages(event.agentId);
+    }
+  }
+
   start(): Promise<string> {
     return this.server.start();
   }
@@ -90,14 +98,41 @@ export class ClawMcpService {
     return this.server.stop();
   }
 
-  private async promptUnreadAgentMessages(agentId: string): Promise<void> {
+  private async deliverUnreadAgentMessages(agentId: string): Promise<void> {
     const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent || agent.status.type !== 'idle' || !this.driverRpc) {
+    if (!agent || !this.driverRpc) {
       return;
     }
 
-    const messages = this.coordinator.takeUnreadMessages(agentId);
+    const messages = this.coordinator.peekUnreadMessages(agentId);
     if (messages.length === 0) {
+      return;
+    }
+
+    if (agent.status.type === 'working' && defaultBackendCapabilities(agent.backend).steerPrompt) {
+      try {
+        const prompt = agentMessagesPrompt(messages);
+        const result = await this.driverRpc.handle(backendMethods.driverPromptSteer, { agent, prompt }) as BackendSendResult;
+        agent.backendSession = result.backendSession;
+        this.coordinator.markMessagesRead(messages.map((message) => message.id));
+        this.emitDequeuedMessages(agentId, messages.map((message) => message.id));
+        this.emit({
+          agentId,
+          ...(result.backendSession.kind === 'codex' ? { threadId: result.backendSession.threadId } : {}),
+          turnId: result.turnId,
+          type: 'message.steer',
+          payload: { prompt },
+        });
+        this.emitSnapshotUpdated(agent.id);
+        return;
+      } catch {
+        this.emitQueuedMessages(agentId, messages);
+        return;
+      }
+    }
+
+    if (agent.status.type !== 'idle') {
+      this.emitQueuedMessages(agentId, messages);
       return;
     }
 
@@ -110,9 +145,35 @@ export class ClawMcpService {
       (event) => this.emit(event),
       {
         onBackendSessionUpdated: () => this.emitSnapshotUpdated(agent.id),
+        onPromptStarted: () => {
+          this.coordinator.markMessagesRead(messages.map((message) => message.id));
+          this.emitDequeuedMessages(agentId, messages.map((message) => message.id));
+        },
       },
     );
     this.emitSnapshotUpdated(agent.id);
+  }
+
+  private emitQueuedMessages(agentId: string, messages: Array<{ id: string; content: string }>): void {
+    for (const message of messages) {
+      if (this.queuedMessageIds.has(message.id)) continue;
+      this.queuedMessageIds.add(message.id);
+      this.emit({
+        agentId,
+        type: 'agent.promptQueued',
+        payload: { id: message.id, text: message.content },
+      });
+    }
+  }
+
+  private emitDequeuedMessages(agentId: string, messageIds: string[]): void {
+    for (const id of messageIds) this.queuedMessageIds.delete(id);
+    if (messageIds.length === 0) return;
+    this.emit({
+      agentId,
+      type: 'agent.promptDequeued',
+      payload: { ids: messageIds },
+    });
   }
 
   private backendDriverForAgent(agent: Agent): AgentBackendDriver {

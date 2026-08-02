@@ -29,6 +29,7 @@ export type ClawBackendServerOptions = {
   snapshot?: AppSnapshot;
   driverRpc?: BackendDriverRpc;
   onEvent?: (event: ClawBackendEvent) => void;
+  onBackendEventApplied?: (event: MainToRendererEvent) => void;
   saveSnapshot?: (snapshot: AppSnapshot) => Promise<void>;
   workIntegrations?: WorkIntegrationManager;
   loopRunner?: Pick<LoopRunner, 'runAll' | 'runLoop'>;
@@ -67,6 +68,7 @@ export class ClawBackendServer {
   private readonly snapshot: AppSnapshot;
   private readonly driverRpc?: BackendDriverRpc;
   private readonly onEvent?: (event: ClawBackendEvent) => void;
+  private readonly onBackendEventApplied?: (event: MainToRendererEvent) => void;
   private readonly saveSnapshot?: (snapshot: AppSnapshot) => Promise<void>;
   private readonly workIntegrations?: WorkIntegrationManager;
   private readonly loopRunner?: Pick<LoopRunner, 'runAll' | 'runLoop'>;
@@ -84,6 +86,7 @@ export class ClawBackendServer {
     this.snapshot = options.snapshot ?? createEmptySnapshot();
     this.driverRpc = options.driverRpc;
     this.onEvent = options.onEvent;
+    this.onBackendEventApplied = options.onBackendEventApplied;
     this.saveSnapshot = options.saveSnapshot;
     this.workIntegrations = options.workIntegrations;
     this.loopRunner = options.loopRunner;
@@ -1973,6 +1976,7 @@ export class ClawBackendServer {
     this.recordClientRequestOwner(fullEvent);
     this.emitBackendEvent(fullEvent, shouldAttachSnapshotToBackendEvent(event));
     this.emitDerivedSidePanelEvents(fullEvent);
+    this.onBackendEventApplied?.(fullEvent);
     if (options.persist !== false && shouldPersistSnapshotForEvent(event)) {
       void this.saveSnapshot?.(this.snapshot);
     }

@@ -903,6 +903,8 @@ export type MainToRendererEvent = {
     | 'turn.proposedPlanCompleted'
     | 'turn.completed'
     | 'message.steer'
+    | 'agent.promptQueued'
+    | 'agent.promptDequeued'
     | 'context.compactionStarted'
     | 'account.rateLimitsUpdated'
     | 'workBacklog.assignmentUpdated'
