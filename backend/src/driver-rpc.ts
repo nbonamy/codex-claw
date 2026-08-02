@@ -35,7 +35,7 @@ export function createDefaultBackendDrivers(options: BackendDriverRegistryOption
 export function codexClawSurfaceOptions(options: BackendDriverRegistryOptions = {}): Parameters<typeof createCodexSurface>[0] {
   return {
     autoSelectFirstConversation: false,
-    clientInfo: { name: 'codex_claw', title: 'Codex Claw', version: '0.2.0' },
+    clientInfo: { name: 'codex_claw', title: 'Codex Claw', version: '0.3.0' },
     codexHome: backendCodexHomeDir(),
     transport: {
       command: resolveCodexCommand(options.generalSettings?.codexBinaryPath),

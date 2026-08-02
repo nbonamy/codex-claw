@@ -113,6 +113,7 @@ Claude Code driver.
 - [docs/frontend.md](docs/frontend.md) - renderer and theming principles
 - [docs/testing.md](docs/testing.md) - test strategy and coverage bar
 - [plans/codex-claw.md](plans/codex-claw.md) - product progression
+- [CHANGELOG.md](CHANGELOG.md) - release history
 
 ## License
 

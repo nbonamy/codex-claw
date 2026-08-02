@@ -12,6 +12,7 @@ describe('BackendDriverRpc', () => {
     vi.stubEnv('CODEX_HOME', '/tmp/normal-codex-home');
     try {
       expect(codexClawSurfaceOptions()).toMatchObject({
+        clientInfo: { name: 'codex_claw', title: 'Codex Claw', version: '0.3.0' },
         codexHome: '/tmp/codex-claw-isolated-home/codex-home',
       });
     } finally {
