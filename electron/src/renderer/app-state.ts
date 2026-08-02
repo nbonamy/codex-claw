@@ -201,7 +201,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.steerPrompt(agentId, trimmed);
+    adoptBackgroundSnapshot(await window.codexClaw.steerPrompt(agentId, trimmed));
   }
 
   async function interruptActiveAgent(): Promise<void> {
@@ -210,7 +210,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.interruptAgent(agentId);
+    adoptBackgroundSnapshot(await window.codexClaw.interruptAgent(agentId));
   }
 
   async function deleteMessage(index: number): Promise<void> {
@@ -223,7 +223,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.deleteMessage(action.agentId, action.messageId);
+    adoptBackgroundSnapshot(await window.codexClaw.deleteMessage(action.agentId, action.messageId));
   }
 
   async function editMessage(payload: { content: string; index: number }): Promise<void> {
@@ -239,7 +239,7 @@ export function useAppState() {
 
     markAgentSending(action.agentId, true);
     try {
-      snapshot.value = await window.codexClaw.editMessage(action.agentId, action.messageId, trimmed);
+      adoptBackgroundSnapshot(await window.codexClaw.editMessage(action.agentId, action.messageId, trimmed));
     } finally {
       markAgentSending(action.agentId, false);
     }
@@ -257,7 +257,7 @@ export function useAppState() {
 
     markAgentSending(action.agentId, true);
     try {
-      snapshot.value = await window.codexClaw.retryMessage(action.agentId, action.messageId);
+      adoptBackgroundSnapshot(await window.codexClaw.retryMessage(action.agentId, action.messageId));
     } finally {
       markAgentSending(action.agentId, false);
     }
@@ -268,13 +268,13 @@ export function useAppState() {
     if (!agentId || !window.codexClaw?.steerQueuedPrompt) {
       return;
     }
-    snapshot.value = await window.codexClaw.steerQueuedPrompt(agentId, promptId);
+    adoptBackgroundSnapshot(await window.codexClaw.steerQueuedPrompt(agentId, promptId));
   }
 
   async function removeQueuedPrompt(promptId: string): Promise<void> {
     const agentId = activeAgent.value?.id;
     if (agentId && window.codexClaw?.deleteQueuedPrompt) {
-      snapshot.value = await window.codexClaw.deleteQueuedPrompt(agentId, promptId);
+      adoptBackgroundSnapshot(await window.codexClaw.deleteQueuedPrompt(agentId, promptId));
     }
   }
 
@@ -303,9 +303,9 @@ export function useAppState() {
     markAgentSending(agentId, true);
 
     try {
-      snapshot.value = options
+      adoptBackgroundSnapshot(options
         ? await api.sendPrompt(agentId, prompt, options)
-        : await api.sendPrompt(agentId, prompt);
+        : await api.sendPrompt(agentId, prompt));
     } finally {
       markAgentSending(agentId, false);
     }
@@ -445,7 +445,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.updateTeam(input);
+    adoptBackgroundSnapshot(await window.codexClaw.updateTeam(input));
   }
 
   async function reorderTeams(input: ReorderTeamsInput): Promise<void> {
@@ -457,7 +457,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.reorderTeams(input);
+    adoptBackgroundSnapshot(await window.codexClaw.reorderTeams(input));
   }
 
   async function closeTeam(teamId: string): Promise<void> {
@@ -503,7 +503,7 @@ export function useAppState() {
       ? await window.codexClaw.createLoop(input, location)
       : await window.codexClaw.createLoop(input);
     if (!isRemoteLoopLocation(location)) {
-      snapshot.value = nextSnapshot;
+      adoptBackgroundSnapshot(nextSnapshot);
     }
     return nextSnapshot;
   }
@@ -520,7 +520,7 @@ export function useAppState() {
       ? await window.codexClaw.updateLoop(input, location)
       : await window.codexClaw.updateLoop(input);
     if (!isRemoteLoopLocation(location)) {
-      snapshot.value = nextSnapshot;
+      adoptBackgroundSnapshot(nextSnapshot);
     }
     return nextSnapshot;
   }
@@ -537,7 +537,7 @@ export function useAppState() {
       ? await window.codexClaw.runLoop(loopId, location)
       : await window.codexClaw.runLoop(loopId);
     if (!isRemoteLoopLocation(location)) {
-      snapshot.value = nextSnapshot;
+      adoptBackgroundSnapshot(nextSnapshot);
     }
     return nextSnapshot;
   }
@@ -554,7 +554,7 @@ export function useAppState() {
       ? await window.codexClaw.deleteLoop(loopId, location)
       : await window.codexClaw.deleteLoop(loopId);
     if (!isRemoteLoopLocation(location)) {
-      snapshot.value = nextSnapshot;
+      adoptBackgroundSnapshot(nextSnapshot);
     }
     return nextSnapshot;
   }
@@ -571,7 +571,7 @@ export function useAppState() {
       ? await window.codexClaw.clearLoopHistory(loopId, location)
       : await window.codexClaw.clearLoopHistory(loopId);
     if (!isRemoteLoopLocation(location)) {
-      snapshot.value = nextSnapshot;
+      adoptBackgroundSnapshot(nextSnapshot);
     }
     return nextSnapshot;
   }
@@ -591,7 +591,7 @@ export function useAppState() {
       ? await window.codexClaw.deleteLoopExecution(loopId, executionId, location)
       : await window.codexClaw.deleteLoopExecution(loopId, executionId);
     if (!isRemoteLoopLocation(location)) {
-      snapshot.value = nextSnapshot;
+      adoptBackgroundSnapshot(nextSnapshot);
     }
     return nextSnapshot;
   }
@@ -619,7 +619,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.resumeAgentConversation(agentId, plainConversationRef(ref));
+    adoptBackgroundSnapshot(await window.codexClaw.resumeAgentConversation(agentId, plainConversationRef(ref)));
     await loadActiveAgentCatalogs();
   }
 
@@ -628,7 +628,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.updateAgent(input);
+    adoptBackgroundSnapshot(await window.codexClaw.updateAgent(input));
     await loadActiveAgentCatalogs();
   }
 
@@ -638,7 +638,7 @@ export function useAppState() {
     }
 
     const previousSourceFolderPath = snapshot.value.sourceFolder.path;
-    snapshot.value = await window.codexClaw.updateSettings(input);
+    adoptBackgroundSnapshot(await window.codexClaw.updateSettings(input));
     if (input.sourceFolder && snapshot.value.sourceFolder.path !== previousSourceFolderPath) {
       await loadSourceRepositories();
     }
@@ -657,7 +657,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.addSshConnection(input);
+    adoptBackgroundSnapshot(await window.codexClaw.addSshConnection(input));
   }
 
   async function checkRemoteConnection(connectionId: string): Promise<void> {
@@ -665,7 +665,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.checkRemoteConnection(connectionId);
+    adoptBackgroundSnapshot(await window.codexClaw.checkRemoteConnection(connectionId));
   }
 
   async function updateRemoteConnection(connectionId: string, input: UpdateRemoteConnectionInput): Promise<void> {
@@ -673,7 +673,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.updateRemoteConnection(connectionId, input);
+    adoptBackgroundSnapshot(await window.codexClaw.updateRemoteConnection(connectionId, input));
     await loadSourceRepositories();
   }
 
@@ -682,7 +682,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.removeRemoteConnection(connectionId);
+    adoptBackgroundSnapshot(await window.codexClaw.removeRemoteConnection(connectionId));
   }
 
   async function getDevicePairingStatus(): Promise<DevicePairingStatus> {
@@ -766,7 +766,7 @@ export function useAppState() {
     workBacklogError.value = null;
     try {
       const result = await window.codexClaw.connectWorkProvider(provider);
-      snapshot.value = result.snapshot;
+      adoptBackgroundSnapshot(result.snapshot);
       workProviderAuthorization.value = result.authorization ?? null;
       if (result.authorization) {
         scheduleWorkProviderAuthorizationPoll(provider);
@@ -789,7 +789,7 @@ export function useAppState() {
     workBacklogStatus.value = 'loading';
     workBacklogError.value = null;
     try {
-      snapshot.value = await window.codexClaw.openWorkProviderAuthorization(provider);
+      adoptBackgroundSnapshot(await window.codexClaw.openWorkProviderAuthorization(provider));
       scheduleWorkProviderAuthorizationPoll(provider);
       workBacklogStatus.value = 'loaded';
     } catch (error) {
@@ -812,7 +812,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.disconnectWorkProvider(provider);
+    adoptBackgroundSnapshot(await window.codexClaw.disconnectWorkProvider(provider));
     clearWorkProviderAuthorizationPoll(provider);
     workProviderAuthorization.value = null;
     workRepositoriesByProvider.value = {
@@ -834,7 +834,7 @@ export function useAppState() {
     }
     workBacklogError.value = null;
     try {
-      snapshot.value = await window.codexClaw.completeWorkProviderConnection(provider);
+      adoptBackgroundSnapshot(await window.codexClaw.completeWorkProviderConnection(provider));
       const connection = workProviderConnection(provider);
       if (connection?.status === 'connected') {
         clearWorkProviderAuthorizationPoll(provider);
@@ -947,7 +947,7 @@ export function useAppState() {
       ? await window.codexClaw.configureWorkBacklog(input, location)
       : await window.codexClaw.configureWorkBacklog(input);
     if (!isRemoteLoopLocation(location)) {
-      snapshot.value = nextSnapshot;
+      adoptBackgroundSnapshot(nextSnapshot);
     }
   }
 
@@ -1025,7 +1025,7 @@ export function useAppState() {
     }
 
     const item = cloneWorkItemForIpc(payload.item);
-    snapshot.value = await window.codexClaw.assignWorkItemToAgent(payload.agentId, item);
+    adoptBackgroundSnapshot(await window.codexClaw.assignWorkItemToAgent(payload.agentId, item));
     await sendAgentPrompt(payload.agentId, workItemAssignmentPrompt(item));
   }
 
@@ -1034,7 +1034,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.removeWorkItemAssignment(cloneWorkItemForIpc(item));
+    adoptBackgroundSnapshot(await window.codexClaw.removeWorkItemAssignment(cloneWorkItemForIpc(item)));
   }
 
   async function duplicateAgent(agentId: string): Promise<void> {
@@ -1068,7 +1068,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.reorderAgents(input);
+    adoptBackgroundSnapshot(await window.codexClaw.reorderAgents(input));
   }
 
   async function saveAgentToBench(agentId: string): Promise<void> {
@@ -1083,7 +1083,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = nextSnapshot;
+    adoptBackgroundSnapshot(nextSnapshot);
   }
 
   async function deployBenchTemplate(input: string | DeployBenchTemplateInput): Promise<Agent | null> {
@@ -1120,7 +1120,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = nextSnapshot;
+    adoptBackgroundSnapshot(nextSnapshot);
   }
 
   async function restartAgent(agentId: string): Promise<void> {
@@ -1128,7 +1128,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.restartAgent(agentId);
+    adoptBackgroundSnapshot(await window.codexClaw.restartAgent(agentId));
   }
 
   async function closeAgent(agentId: string): Promise<void> {
@@ -1147,7 +1147,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.respondToClientRequest(response);
+    adoptBackgroundSnapshot(await window.codexClaw.respondToClientRequest(response));
   }
 
   async function resolveBackendApproval(
@@ -1217,7 +1217,7 @@ export function useAppState() {
       return;
     }
 
-    snapshot.value = await window.codexClaw.setAgentApprovalPreset(agent.id, preset);
+    adoptBackgroundSnapshot(await window.codexClaw.setAgentApprovalPreset(agent.id, preset));
   }
 
   async function benchForLocation(location: BenchLocation): Promise<BenchTemplate[]> {
@@ -1568,7 +1568,7 @@ async function handleGoalSlashCommand(agentId: string, command: GoalSlashCommand
   }
 
   if (command.action === 'set') {
-    snapshot.value = await window.codexClaw.setAgentGoal(agentId, command.objective);
+    adoptBackgroundSnapshot(await window.codexClaw.setAgentGoal(agentId, command.objective));
   }
 }
 
@@ -1584,7 +1584,7 @@ async function clearGoalForAgent(agentId: string): Promise<void> {
     return;
   }
 
-  snapshot.value = await window.codexClaw.clearAgentGoal(agentId);
+  adoptBackgroundSnapshot(await window.codexClaw.clearAgentGoal(agentId));
 }
 
 function subscribeToMainEvents(): void {
@@ -1720,10 +1720,22 @@ function backendRequestedPermissions(
 
 function adoptSnapshotFromMainEvent(event: MainToRendererEvent): void {
   if (isAppSnapshot(event.snapshot)) {
-    snapshot.value = event.snapshot;
+    adoptBackgroundSnapshot(event.snapshot);
+    return;
+  }
+  if (event.type === 'snapshot.updated' && isAppSnapshot(event.payload)) {
+    adoptBackgroundSnapshot(event.payload);
     return;
   }
   applyMainEventToSnapshot(snapshot.value, event);
+}
+
+function adoptBackgroundSnapshot(nextSnapshot: AppSnapshot): void {
+  const activeAgentId = snapshot.value.activeAgentId;
+  if (activeAgentId && nextSnapshot.agents.some((agent) => agent.id === activeAgentId)) {
+    selectAgentInSnapshot(nextSnapshot, activeAgentId);
+  }
+  snapshot.value = nextSnapshot;
 }
 
 async function loadActiveAgentCatalogs(agentId = snapshot.value.activeAgentId): Promise<void> {
@@ -1769,14 +1781,14 @@ async function loadWorkRepositoriesForProvider(provider: WorkProviderKind): Prom
     const configuredRepositoryId = snapshot.value.workBacklog.providerConfigurations[provider]?.repositoryId ?? null;
     const selectedRepositoryId = configuredRepositoryId ?? repositories[0]?.id ?? null;
     if (selectedRepositoryId && !configuredRepositoryId && window.codexClaw.configureWorkBacklog) {
-      snapshot.value = await window.codexClaw.configureWorkBacklog({
+      adoptBackgroundSnapshot(await window.codexClaw.configureWorkBacklog({
         provider,
         configuration: {
           repositoryId: selectedRepositoryId,
           assigneeLogin: null,
           tagName: null,
         },
-      });
+      }));
     }
     if (selectedRepositoryId) {
       await loadWorkItemsForRepository(provider, selectedRepositoryId);
@@ -1959,7 +1971,7 @@ async function hydrateActiveAgentHistory(): Promise<void> {
 
   markAgentHistoryHydrating(activeAgent.id, true);
   try {
-    snapshot.value = await window.codexClaw.hydrateAgentHistory(activeAgent.id);
+    adoptBackgroundSnapshot(await window.codexClaw.hydrateAgentHistory(activeAgent.id));
   } finally {
     markAgentHistoryHydrating(activeAgent.id, false);
   }

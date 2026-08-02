@@ -83,7 +83,8 @@ implemented:
 - central conversation and composer;
 - optimistic agent switching that reveals the cached conversation immediately;
   backend session hydration, Git status, and agent catalogs refresh
-  asynchronously and stale responses cannot replace a newer selection;
+  asynchronously, while snapshots returned by background work preserve the
+  current renderer selection and cannot switch the user back to another agent;
 - per-agent in-memory composer drafts, so switching agents preserves unsent
   input; queued prompts remain backend-owned snapshot state and the renderer
   never removes them before `clawd` confirms dequeue;

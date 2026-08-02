@@ -390,6 +390,38 @@ describe('useAppState', () => {
     expect(state.activeAgent.value?.id).toBe('agent-ellie');
   });
 
+  it('does not let a stale snapshot event steal the current agent selection', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const initialSnapshot = createInitialSnapshot();
+    const selectAgent = vi.fn().mockResolvedValue({
+      ...structuredClone(initialSnapshot),
+      activeAgentId: 'agent-jesse',
+    });
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(initialSnapshot),
+        selectAgent,
+        onEvent: vi.fn((nextListener) => {
+          listeners.push(nextListener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await state.selectAgent('agent-jesse');
+
+    listeners[0]?.({
+      seq: 1,
+      type: 'snapshot.updated',
+      payload: structuredClone(initialSnapshot),
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(state.activeAgent.value?.id).toBe('agent-jesse');
+  });
+
   it('sets the active approval preset through the preload bridge', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();
@@ -1141,6 +1173,48 @@ describe('useAppState', () => {
     expect(state.isSending.value).toBe(false);
   });
 
+  it('keeps the newly selected agent active when prior-agent history hydration resolves late', async () => {
+    const initialSnapshot = createInitialSnapshot();
+    initialSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
+    const staleDinaHydration = structuredClone(initialSnapshot);
+    staleDinaHydration.messages.push({
+      id: 'message-dina-hydrated',
+      agentId: 'agent-dina',
+      role: 'assistant',
+      status: 'complete',
+      createdAt: '2026-06-05T00:00:01.000Z',
+      parts: [{ type: 'text', text: 'Dina finished in the background.' }],
+    });
+    const hydration = deferred<AppSnapshot>();
+    const hydrateAgentHistory = vi.fn().mockReturnValue(hydration.promise);
+    const selectAgent = vi.fn((agentId: string) => Promise.resolve(agentId === 'agent-jesse'
+      ? { ...structuredClone(initialSnapshot), activeAgentId: 'agent-jesse' }
+      : { ...structuredClone(staleDinaHydration), activeAgentId: 'agent-dina' }));
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(initialSnapshot),
+        hydrateAgentHistory,
+        selectAgent,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalledWith('agent-dina'));
+    await state.selectAgent('agent-jesse');
+    expect(state.activeAgent.value?.id).toBe('agent-jesse');
+
+    hydration.resolve(staleDinaHydration);
+    await vi.waitFor(() => expect(state.snapshot.value.messages).toContainEqual(
+      expect.objectContaining({ id: 'message-dina-hydrated' }),
+    ));
+
+    expect(state.activeAgent.value?.id).toBe('agent-jesse');
+    await state.selectAgent('agent-dina');
+    expect(state.visibleMessages.value).toContainEqual(expect.objectContaining({ id: 'message-dina-hydrated' }));
+  });
+
   it('does not hydrate startup history for agents without a persisted thread', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const hydrateAgentHistory = vi.fn();
@@ -1818,7 +1892,7 @@ describe('useAppState', () => {
     const remoteSnapshot = createInitialSnapshot();
     const dinaQueuedSnapshot = {
       ...createInitialSnapshot(),
-      activeAgentId: 'agent-jesse',
+      activeAgentId: 'agent-dina',
     };
     const jesseQueuedSnapshot = {
       ...createInitialSnapshot(),
