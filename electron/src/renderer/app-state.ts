@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { applyMainEventToSnapshot, createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/shared/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
@@ -34,6 +34,7 @@ const selectedReasoningEffort = ref<ReasoningEffort | null>(null);
 const selectedServiceTier = ref<string | null>(null);
 const planMode = ref(false);
 const sidePanelRequest = ref<SidePanelRequest | null>(null);
+const fileActivity = ref<AgentFileActivity | null>(null);
 const workProviderAuthorization = ref<WorkProviderAuthorization | null>(null);
 const workRepositoriesByProvider = ref<Partial<Record<WorkProviderKind, WorkRepository[]>>>({});
 const workItemsByRepository = ref<Record<string, WorkItem[]>>({});
@@ -1427,6 +1428,7 @@ export function useAppState() {
     selectedServiceTier,
     planMode,
     sidePanelRequest,
+    fileActivity,
     workProviderAuthorization,
     workRepositoriesByProvider,
     workItemsByRepository,
@@ -1865,6 +1867,7 @@ function handleMainEvent(event: MainToRendererEvent, adoptSnapshot = true): void
   syncAnsweredClientRequestsFromMainEvent(event);
   syncComposerModeFromMainEvent(event);
   syncSidePanelFromMainEvent(event);
+  syncFileActivityFromMainEvent(event);
   if (event.type === 'skills.changed') {
     applySkillsChangedEvent(event);
   }
@@ -2331,6 +2334,29 @@ function syncSidePanelFromMainEvent(event: MainToRendererEvent): void {
     ...(typeof event.payload.subtitle === 'string' ? { subtitle: event.payload.subtitle } : {}),
     ...(event.payload.state === 'error' ? { state: 'error' } : {}),
     ...(typeof event.payload.error === 'string' ? { error: event.payload.error } : {}),
+  };
+}
+
+function syncFileActivityFromMainEvent(event: MainToRendererEvent): void {
+  if (event.type !== 'file.activity' || !event.agentId || !event.turnId || !isRecord(event.payload)) return;
+  const { action, itemId, messageId, path, status } = event.payload;
+  if (
+    (action !== 'read' && action !== 'edit' && action !== 'create') ||
+    (status !== 'running' && status !== 'completed' && status !== 'failed') ||
+    typeof itemId !== 'string' || !itemId ||
+    typeof messageId !== 'string' || !messageId ||
+    typeof path !== 'string' || !path.trim()
+  ) return;
+
+  fileActivity.value = {
+    agentId: event.agentId,
+    turnId: event.turnId,
+    messageId,
+    itemId,
+    path: path.trim(),
+    action,
+    status,
+    occurredAt: event.occurredAt,
   };
 }
 

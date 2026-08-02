@@ -26,6 +26,7 @@
     :composer-state="activeComposerState"
     :composer-attachments="activeComposerAttachments"
     :side-panel-request="sidePanelRequest"
+    :file-activity="fileActivity"
     :work-provider-authorization="workProviderAuthorization"
     :work-repositories-by-provider="workRepositoriesByProvider"
     :work-items-by-repository="workItemsByRepository"
@@ -159,6 +160,7 @@ const {
   selectedServiceTier,
   planMode,
   sidePanelRequest,
+  fileActivity,
   workProviderAuthorization,
   workRepositoriesByProvider,
   workItemsByRepository,

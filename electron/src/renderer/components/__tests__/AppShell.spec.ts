@@ -482,6 +482,68 @@ describe('AppShell', () => {
     expect(wrapper.text()).toContain('answer');
   });
 
+  it('routes live file activity into the owning agent workspace', async () => {
+    const snapshot = createInitialSnapshot();
+    const [dina, jesse] = snapshot.agents;
+    if (!dina || !jesse) throw new Error('Expected seeded agents.');
+    dina.folder = '/workspace/dina';
+    jesse.folder = '/workspace/jesse';
+    const previewAgentFile = vi.fn().mockResolvedValue({
+      path: 'src/main.ts',
+      content: 'export const updated = true;\n',
+    });
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: dina,
+        messages: [],
+        isLoading: false,
+        isSending: false,
+        previewAgentFile,
+        fileActivity: null,
+      },
+      global: { plugins: [ElementPlus, i18n] },
+    });
+
+    await wrapper.setProps({
+      fileActivity: {
+        agentId: jesse.id, turnId: 'turn-1', messageId: 'message-1', itemId: 'item-1',
+        path: '/workspace/jesse/src/main.ts', action: 'edit', status: 'running',
+        occurredAt: '2026-08-02T00:00:00.000Z',
+      },
+    } as Record<string, unknown>);
+
+    expect(previewAgentFile).not.toHaveBeenCalled();
+    expect(wrapper.find('[aria-label="Right workspace"]:not([style*="display: none"])').exists()).toBe(false);
+
+    await wrapper.setProps({
+      fileActivity: {
+        agentId: jesse.id, turnId: 'turn-1', messageId: 'message-1', itemId: 'item-1',
+        path: '/workspace/jesse/src/main.ts', action: 'edit', status: 'completed',
+        occurredAt: '2026-08-02T00:00:01.000Z',
+      },
+    } as Record<string, unknown>);
+    await flushPromises();
+
+    expect(previewAgentFile).toHaveBeenCalledWith(jesse.id, 'src/main.ts');
+
+    await wrapper.setProps({ activeAgent: jesse } as Record<string, unknown>);
+    await nextTick();
+
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain('main.ts');
+    expect(wrapper.text()).toContain('updated');
+
+    await wrapper.setProps({
+      fileActivity: {
+        agentId: jesse.id, turnId: 'turn-2', messageId: 'message-2', itemId: 'item-2',
+        path: '/workspace/jesse/src/main.ts', action: 'read', status: 'running',
+        occurredAt: '2026-08-02T00:00:02.000Z',
+      },
+    } as Record<string, unknown>);
+
+    expect(previewAgentFile).toHaveBeenCalledTimes(1);
+  });
+
   it('strips editor-style line suffixes before reading file previews', async () => {
     const snapshot = createInitialSnapshot();
     const previewAgentFile = vi.fn().mockResolvedValue({

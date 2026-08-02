@@ -362,6 +362,56 @@ describe('CodexSurfaceAgentAdapter', () => {
     ]);
   });
 
+  it('maps SDK file activity into the app-owned event stream', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
+    await adapter.hydrateAgent(agentA);
+    await adapter.sendPrompt(agentA, 'Inspect and update files');
+    events.length = 0;
+
+    transport.emit({
+      method: 'item/started',
+      params: {
+        threadId: 'thread-a', turnId: 'turn-thread-a', startedAtMs: 1,
+        item: {
+          type: 'commandExecution', id: 'read-file', command: 'cat README.md', cwd: '/workspace/a',
+          source: 'unifiedExec', status: 'inProgress', commandActions: [
+            { type: 'read', name: 'README.md', path: 'README.md' },
+          ],
+        },
+      },
+    });
+    transport.emit({
+      method: 'item/completed',
+      params: {
+        threadId: 'thread-a', turnId: 'turn-thread-a', completedAtMs: 2,
+        item: {
+          type: 'fileChange', id: 'create-file', status: 'completed', changes: [
+            { kind: 'add', path: 'src/new-file.ts' },
+          ],
+        },
+      },
+    });
+
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'file.activity', agentId: 'agent-a', threadId: 'thread-a', turnId: 'turn-thread-a',
+        payload: {
+          messageId: 'assistant-turn-thread-a', itemId: 'read-file',
+          path: '/workspace/a/README.md', action: 'read', status: 'running',
+        },
+      }),
+      expect.objectContaining({
+        type: 'file.activity', agentId: 'agent-a', threadId: 'thread-a', turnId: 'turn-thread-a',
+        payload: {
+          messageId: 'assistant-turn-thread-a', itemId: 'create-file',
+          path: '/workspace/a/src/new-file.ts', action: 'create', status: 'completed',
+        },
+      }),
+    ]));
+  });
+
   it('routes background approvals and cwd-scoped skill changes to their owning agents', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];

@@ -50,6 +50,7 @@ const messages: RendererMessage[] = [
 describe('ConversationPane', () => {
   it('uses the message surface for the empty conversation background', () => {
     expect(conversationPaneSource).toMatch(/\.conversation-pane\s*\{[\s\S]*background:\s*var\(--color-shell-main\);/);
+    expect(conversationPaneSource).toMatch(/:deep\(\.chat-tool-call__title-target\[href\]:hover\)[\s\S]*text-decoration:\s*underline;/);
   });
 
   it('floats active plan progress without passing a sticky turn diff to the SDK composer', () => {
@@ -413,7 +414,19 @@ describe('ConversationPane', () => {
     await wrapper.get('a[href="docs/guide.md#intro"]').trigger('click');
     await wrapper.get('a[href="https://example.com"]').trigger('click');
 
-    expect(wrapper.emitted('open-file')).toStrictEqual([['docs/guide.md']]);
+    wrapper.getComponent(CodexConversationPane as unknown as Component).vm.$emit('openLink', {
+      kind: 'file',
+      href: 'app-state.spec.ts',
+      path: 'app-state.spec.ts',
+      filepath: '/Users/nbonamy/src/codex-claw/electron/src/renderer/__tests__/app-state.spec.ts',
+      action: 'read',
+    });
+    await nextTick();
+
+    expect(wrapper.emitted('open-file')).toStrictEqual([
+      ['docs/guide.md'],
+      ['/Users/nbonamy/src/codex-claw/electron/src/renderer/__tests__/app-state.spec.ts'],
+    ]);
   });
 
   it('restores controlled composer state and tags updates with the owning agent', async () => {

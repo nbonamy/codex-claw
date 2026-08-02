@@ -332,7 +332,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type PairedDevice, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
+import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type PairedDevice, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultTeamColor } from '@codex-claw/shared/team-colors';
@@ -395,6 +395,7 @@ const props = withDefaults(defineProps<{
   composerState?: CodexComposerState;
   composerAttachments?: readonly CodexNativeAttachment[];
   sidePanelRequest?: SidePanelRequest | null;
+  fileActivity?: AgentFileActivity | null;
   workProviderAuthorization?: WorkProviderAuthorization | null;
   workRepositoriesByProvider?: Partial<Record<WorkProviderKind, WorkRepository[]>>;
   workItemsByRepository?: Record<string, WorkItem[]>;
@@ -476,6 +477,7 @@ const props = withDefaults(defineProps<{
   composerState: () => ({ text: '', selectionStart: 0, selectionEnd: 0 }),
   composerAttachments: () => [],
   sidePanelRequest: null,
+  fileActivity: null,
   workProviderAuthorization: null,
   workRepositoriesByProvider: () => ({}),
   workItemsByRepository: () => ({}),
@@ -1308,26 +1310,58 @@ function commentOnPlan(comments: PlanReviewComment[]): void {
 
 async function openFilePreview(filePath: string): Promise<void> {
   const agent = currentAgent.value;
-  const trimmedPath = normalizePreviewFilePath(filePath, agent?.folder);
-  if (!agent || !trimmedPath) {
+  if (!agent) return;
+  await openFilePreviewForAgent(agent.id, filePath);
+}
+
+function handleFileActivity(activity: AgentFileActivity): void {
+  const agent = props.snapshot.agents.find((candidate) => candidate.id === activity.agentId);
+  const filePath = normalizePreviewFilePath(activity.path, agent?.folder);
+  if (!agent || !filePath) return;
+
+  const workspace = rightWorkspaceFor(agent.id);
+  const tab = rightWorkspaceFileTab(filePath);
+
+  if (activity.action === 'read') return;
+  if (activity.status === 'failed') {
+    const panel = workspace.filePanels[tab];
+    if (panel?.state === 'loading') {
+      workspace.filePanels = {
+        ...workspace.filePanels,
+        [tab]: filePreviewPanel(filePath, panel.content, panel.content ? 'idle' : 'error', panel.content ? null : 'File update failed.'),
+      };
+    }
     return;
   }
+  if (activity.status === 'running') {
+    if (!workspace.filePanels[tab]) {
+      workspace.filePanels = {
+        ...workspace.filePanels,
+        [tab]: filePreviewPanel(filePath, '', 'loading', null),
+      };
+    }
+    openRightWorkspaceTab(tab, agent.id);
+    return;
+  }
+
+  void openFilePreviewForAgent(agent.id, filePath);
+}
+
+async function openFilePreviewForAgent(agentId: string, filePath: string): Promise<void> {
+  const agent = props.snapshot.agents.find((candidate) => candidate.id === agentId);
+  const trimmedPath = normalizePreviewFilePath(filePath, agent?.folder);
+  if (!agent || !trimmedPath) return;
 
   const workspace = rightWorkspaceFor(agent.id);
   const tab = rightWorkspaceFileTab(trimmedPath);
   const requestId = filePreviewRequestId + 1;
   filePreviewRequestId = requestId;
   workspace.filePreviewRequestIds = { ...workspace.filePreviewRequestIds, [tab]: requestId };
-  const initialKind = isMarkdownPath(trimmedPath) ? 'markdown' : 'source';
-  workspace.filePanels = { ...workspace.filePanels, [tab]: {
-    kind: initialKind,
-    title: fileBasename(trimmedPath),
-    subtitle: trimmedPath,
-    content: '',
-    ...(initialKind === 'source' ? { language: languageForFilePath(trimmedPath) ?? null } : {}),
-    state: 'loading',
-    error: null,
-  } as RightWorkspaceFilePanel };
+  const existingContent = workspace.filePanels[tab]?.content ?? '';
+  workspace.filePanels = {
+    ...workspace.filePanels,
+    [tab]: filePreviewPanel(trimmedPath, existingContent, 'loading', null),
+  };
   openRightWorkspaceTab(tab, agent.id);
 
   try {
@@ -1335,30 +1369,42 @@ async function openFilePreview(filePath: string): Promise<void> {
     if (workspace.filePreviewRequestIds[tab] !== requestId) {
       return;
     }
-    const resultKind = isMarkdownPath(result.path) ? 'markdown' : 'source';
-    workspace.filePanels = { ...workspace.filePanels, [tab]: {
-      kind: resultKind,
-      title: fileBasename(result.path),
-      subtitle: result.path,
-      content: result.content,
-      ...(resultKind === 'source' ? { language: languageForFilePath(result.path) ?? null } : {}),
-      state: 'idle',
-      error: null,
-    } as RightWorkspaceFilePanel };
+    workspace.filePanels = {
+      ...workspace.filePanels,
+      [tab]: filePreviewPanel(result.path, result.content, 'idle', null),
+    };
   } catch (error) {
     if (workspace.filePreviewRequestIds[tab] !== requestId) {
       return;
     }
-    workspace.filePanels = { ...workspace.filePanels, [tab]: {
-      kind: initialKind,
-      title: fileBasename(trimmedPath),
-      subtitle: trimmedPath,
-      content: '',
-      ...(initialKind === 'source' ? { language: languageForFilePath(trimmedPath) ?? null } : {}),
-      state: 'error',
-      error: error instanceof Error ? error.message : String(error),
-    } as RightWorkspaceFilePanel };
+    workspace.filePanels = {
+      ...workspace.filePanels,
+      [tab]: filePreviewPanel(
+        trimmedPath,
+        existingContent,
+        'error',
+        error instanceof Error ? error.message : String(error),
+      ),
+    };
   }
+}
+
+function filePreviewPanel(
+  filePath: string,
+  content: string,
+  state: 'idle' | 'loading' | 'error',
+  error: string | null,
+): RightWorkspaceFilePanel {
+  const kind = isMarkdownPath(filePath) ? 'markdown' : 'source';
+  return {
+    kind,
+    title: fileBasename(filePath),
+    subtitle: filePath,
+    content,
+    ...(kind === 'source' ? { language: languageForFilePath(filePath) ?? null } : {}),
+    state,
+    error,
+  } as RightWorkspaceFilePanel;
 }
 
 async function openAgentGitDiffPreview(agentId = currentAgent.value?.id): Promise<void> {
@@ -1890,6 +1936,10 @@ watch(() => props.sidePanelRequest, (request) => {
 
   openSidePanelRequest(request);
 }, { immediate: true });
+
+watch(() => props.fileActivity, (activity) => {
+  if (activity) handleFileActivity(activity);
+});
 
 function openSidePanelRequest(request: SidePanelRequest): void {
   if (request.kind === 'markdown') {

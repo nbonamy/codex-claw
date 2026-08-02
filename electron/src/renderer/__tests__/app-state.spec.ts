@@ -3202,6 +3202,63 @@ describe('useAppState', () => {
     expect(state.backendSkills.value).toBe(skillsReference);
   });
 
+  it('publishes validated file activity for inactive and active agents', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents.push({
+      id: 'agent-jesse', teamId: 'team-codex-claw', name: 'Jesse', avatar: 'J',
+      folder: '/Users/nbonamy/src/other', backend: 'codex', status: { type: 'working' },
+      createdAt: '2026-06-05T00:00:00.000Z', updatedAt: '2026-06-05T00:00:00.000Z',
+    });
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    await state.loadSnapshot();
+    state.fileActivity.value = null;
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-jesse',
+      threadId: 'thread-jesse',
+      turnId: 'turn-jesse',
+      type: 'file.activity',
+      payload: {
+        messageId: 'message-files', itemId: 'item-files',
+        path: '  /Users/nbonamy/src/other/src/main.ts  ', action: 'edit', status: 'running',
+      },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(state.fileActivity.value).toStrictEqual({
+      agentId: 'agent-jesse',
+      turnId: 'turn-jesse',
+      messageId: 'message-files',
+      itemId: 'item-files',
+      path: '/Users/nbonamy/src/other/src/main.ts',
+      action: 'edit',
+      status: 'running',
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    listeners[0]?.({
+      seq: 2,
+      agentId: 'agent-jesse',
+      threadId: 'thread-jesse',
+      turnId: 'turn-jesse',
+      type: 'file.activity',
+      payload: { messageId: '', itemId: 'item-files', path: '/tmp/bad.ts', action: 'edit', status: 'running' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+    expect(state.fileActivity.value).toMatchObject({ path: '/Users/nbonamy/src/other/src/main.ts' });
+  });
+
   it('captures side panel requests from main events', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();

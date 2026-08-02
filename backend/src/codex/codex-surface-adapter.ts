@@ -636,6 +636,13 @@ export class CodexSurfaceAgentAdapter {
           ...metadata,
         });
         return;
+      case 'file.activity':
+        this.emitThread(session, {
+          type: 'file.activity', turnId: event.turnId,
+          payload: { ...event.payload },
+          ...metadata,
+        });
+        return;
       case 'plan.delta':
         this.emitThread(session, {
           type: 'turn.proposedPlanDelta', turnId: event.turnId,

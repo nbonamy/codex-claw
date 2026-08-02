@@ -226,7 +226,7 @@ const heroSubhead = computed(() => {
 });
 
 function openLink(link: CodexConversationLink): void {
-  if (link.kind === 'file') emit('open-file', link.path);
+  if (link.kind === 'file') emit('open-file', link.filepath ?? link.path);
 }
 
 function resolveApproval(
@@ -302,5 +302,9 @@ defineExpose({ focusComposer });
   color: var(--color-text-muted);
   font-size: var(--font-size-12);
   font-weight: var(--font-weight-medium);
+}
+
+:deep(.chat-tool-call__title-target[href]:hover) {
+  text-decoration: underline;
 }
 </style>

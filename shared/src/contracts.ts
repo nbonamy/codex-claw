@@ -840,6 +840,17 @@ export type RendererMessage = {
   createdAt: string;
 };
 
+export type AgentFileActivity = {
+  agentId: string;
+  turnId: string;
+  messageId: string;
+  itemId: string;
+  path: string;
+  action: 'read' | 'edit' | 'create';
+  status: 'running' | 'completed' | 'failed';
+  occurredAt: string;
+};
+
 export type AgentQueuedPrompt = {
   id: string;
   agentId: string;
@@ -957,6 +968,7 @@ export type MainToRendererEvent = {
     | 'item.started'
     | 'item.updated'
     | 'item.completed'
+    | 'file.activity'
     | 'diff.updated'
     | 'git.statusUpdated'
     | 'approval.requested'
