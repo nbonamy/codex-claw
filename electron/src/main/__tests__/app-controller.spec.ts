@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController } from '../app-controller';
-import { applyMainEventToSnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
+import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
 import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
@@ -51,16 +51,24 @@ describe('AppController', () => {
     expect(send).toHaveBeenCalledTimes(2);
   });
 
-  it('relaunches the app when restart is requested', () => {
+  it('closes the backend before relaunching the app when restart is requested', async () => {
+    const order: string[] = [];
     const appLifecycle = {
       quit: vi.fn(),
-      relaunch: vi.fn(),
-      exit: vi.fn(),
+      relaunch: vi.fn(() => order.push('relaunch')),
+      exit: vi.fn(() => order.push('exit')),
     };
-    const controller = new AppController(createInitialSnapshot(), null, appLifecycle);
+    const backendClient = createBackendClient({
+      close: vi.fn(async () => {
+        order.push('close');
+      }),
+    });
+    const controller = new AppController(createInitialSnapshot(), backendClient, appLifecycle);
 
-    restartApp(controller);
+    await controller.initialize();
+    await restartApp(controller);
 
+    expect(order).toStrictEqual(['close', 'relaunch', 'exit']);
     expect(appLifecycle.relaunch).toHaveBeenCalledOnce();
     expect(appLifecycle.exit).toHaveBeenCalledWith(0);
     expect(appLifecycle.quit).not.toHaveBeenCalled();
@@ -141,8 +149,7 @@ describe('AppController', () => {
   it('subscribes to clawd events before hydrating its startup snapshot', async () => {
     const initialSnapshot = createInitialSnapshot();
     const backendSnapshot = createInitialSnapshot();
-    const eventSnapshot = createInitialSnapshot();
-    eventSnapshot.agents[0]!.status = { type: 'working' };
+    backendSnapshot.agents[0]!.status = { type: 'working' };
     const clientState: ClientState = {
       sourceFolderPath: '/Users/nbonamy/src',
       shouldPreventDisplaySleep: false,
@@ -160,7 +167,6 @@ describe('AppController', () => {
             type: 'agent.statusChanged',
             payload: { type: 'working' },
             occurredAt: '2026-06-13T00:00:00.000Z',
-            snapshot: eventSnapshot,
           });
           return Promise.resolve({ snapshot: backendSnapshot, lastEventSeq: 17, clientState } as Result);
         }
@@ -184,6 +190,7 @@ describe('AppController', () => {
       type: 'agent.statusChanged',
     }));
     expect(currentSnapshot(controller)).toBe(backendSnapshot);
+    expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'working' });
   });
 
   it('caches authoritative snapshots from backend events emitted by the clawd process client', async () => {
@@ -234,7 +241,7 @@ describe('AppController', () => {
     expect(unsubscribe).toHaveBeenCalledOnce();
   });
 
-  it('does not derive Electron snapshot cache updates from backend event payloads', async () => {
+  it('applies incremental backend events to the Electron snapshot cache', async () => {
     const snapshot = createInitialSnapshot();
     const payloadSnapshot = createInitialSnapshot();
     payloadSnapshot.agents[0]!.status = { type: 'working' };
@@ -253,6 +260,7 @@ describe('AppController', () => {
     });
 
     expect(currentSnapshot(controller)).toBe(snapshot);
+    expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'working' });
     expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
       seq: 43,
       type: 'snapshot.updated',
@@ -1625,14 +1633,9 @@ function emitBackendEvent(
     seq: event.seq ?? 1,
     occurredAt: event.occurredAt ?? new Date().toISOString(),
   };
-  const snapshot = currentSnapshot(controller);
-  applyMainEventToSnapshot(snapshot, fullEvent);
   (controller as unknown as {
     emitBackendEvent(event: ClawBackendEvent): void;
-  }).emitBackendEvent({
-    ...fullEvent,
-    snapshot,
-  });
+  }).emitBackendEvent(fullEvent);
 }
 
 function setMainWindowSend(controller: AppController, send: ReturnType<typeof vi.fn>): void {
@@ -1702,8 +1705,8 @@ function currentClientState(controller: AppController): ClientState {
   return (controller as unknown as { clientState: ClientState }).clientState;
 }
 
-function restartApp(controller: AppController): void {
-  return (controller as unknown as { restartApp(): void }).restartApp();
+function restartApp(controller: AppController): Promise<void> {
+  return (controller as unknown as { restartApp(): Promise<void> }).restartApp();
 }
 
 function fakeAppLifecycle() {
@@ -1729,6 +1732,7 @@ function createBackendClientWithEventEmitter(
 function createBackendClient(overrides: {
   request?: unknown;
   onEvent?: unknown;
+  close?: unknown;
   clientState?: ClientState;
 } = {}): NonNullable<ConstructorParameters<typeof AppController>[1]> {
   const request = (overrides.request ?? vi.fn().mockResolvedValue({})) as (method: string, params?: unknown) => Promise<unknown>;
@@ -1750,7 +1754,7 @@ function createBackendClient(overrides: {
       return request(method, params) as Promise<Result>;
     },
     onEvent,
-    close: vi.fn().mockResolvedValue(undefined),
+    close: (overrides.close ?? vi.fn().mockResolvedValue(undefined)) as () => Promise<void>,
   };
 }
 

@@ -30,6 +30,8 @@ type PendingRequest = {
   timeout: NodeJS.Timeout;
 };
 
+const BACKEND_SHUTDOWN_TIMEOUT_MS = 5_000;
+
 export class ClawBackendProcessClient {
   private readonly command: ClawBackendProcessCommand;
   private readonly requestHandlers: Record<string, (params: unknown) => unknown | Promise<unknown>>;
@@ -133,7 +135,7 @@ export class ClawBackendProcessClient {
     await new Promise<void>((resolve) => {
       child.once('exit', () => resolve());
       child.kill();
-      setTimeout(resolve, 1_000).unref();
+      setTimeout(resolve, BACKEND_SHUTDOWN_TIMEOUT_MS).unref();
     });
   }
 
@@ -188,7 +190,7 @@ export class ClawBackendProcessClient {
     await new Promise<void>((resolve) => {
       child.once('exit', () => resolve());
       child.kill();
-      setTimeout(resolve, 1_000).unref();
+      setTimeout(resolve, BACKEND_SHUTDOWN_TIMEOUT_MS).unref();
     });
 
     await this.start();

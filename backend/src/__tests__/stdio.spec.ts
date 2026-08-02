@@ -1,5 +1,5 @@
 import { PassThrough } from 'node:stream';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { startStdioRpcServer, StdioRpcPeer } from '../stdio';
 
 describe('stdio JSON-RPC transport', () => {
@@ -125,6 +125,33 @@ describe('stdio JSON-RPC transport', () => {
     })}\n`);
 
     await expect(resultPromise).rejects.toThrow('open failed');
+    peer.stop();
+  });
+
+  it('reports output backpressure once and reports when the stream drains', () => {
+    const input = new PassThrough();
+    const output = new PassThrough({ highWaterMark: 1 });
+    const onOutputBackpressure = vi.fn();
+    const onOutputDrain = vi.fn();
+    const peer = new StdioRpcPeer({
+      input,
+      output,
+      onMessage: () => undefined,
+      onOutputBackpressure,
+      onOutputDrain,
+    });
+    peer.start();
+
+    peer.notify('backend/event', { value: 'first' });
+    peer.notify('backend/event', { value: 'second' });
+
+    expect(onOutputBackpressure).toHaveBeenCalledOnce();
+    expect(onOutputBackpressure).toHaveBeenCalledWith(expect.objectContaining({
+      frameBytes: expect.any(Number),
+      writableLength: expect.any(Number),
+    }));
+    output.emit('drain');
+    expect(onOutputDrain).toHaveBeenCalledOnce();
     peer.stop();
   });
 });

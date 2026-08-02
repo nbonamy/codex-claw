@@ -2,12 +2,11 @@ import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { pathToFileURL } from 'node:url';
 import net from 'node:net';
 import type { Readable, Writable } from 'node:stream';
-import { createClawRpcNotification } from '@codex-claw/shared/backend-protocol/rpc';
 import { createClawdRuntime, type ClawdRuntime } from './runtime';
 import { backendSocketPath } from './state';
 import { LocalSocketRpcServer } from './socket-server';
 import { StdioRpcPeer } from './stdio';
-import { flushBackendLogs, logMain } from './log';
+import { flushBackendLogs, logMain, warnMain } from './log';
 import backendPackage from '../package.json';
 
 export const CLAWD_VERSION = backendPackage.version;
@@ -107,12 +106,14 @@ async function runStdio(): Promise<void> {
   const stdio = new StdioRpcPeer({
     input: process.stdin,
     output: process.stdout,
+    onOutputBackpressure: (details) => warnMain('stdio', 'output backpressure', details),
+    onOutputDrain: (details) => logMain('stdio', 'output drained', details),
     onMessage: (message) => runtime.server.handleMessage(message),
   });
   runtime = await createClawdRuntime({
     version: CLAWD_VERSION,
     requestClient: (method, params) => stdio.request(method, params),
-    emitEvent: (event) => process.stdout.write(`${JSON.stringify(createClawRpcNotification(backendMethods.backendEventNotify, event))}\n`),
+    emitEvent: (event) => stdio.notify(backendMethods.backendEventNotify, event),
   });
 
   let stopping = false;
@@ -133,6 +134,10 @@ async function runStdio(): Promise<void> {
   });
   process.stdin.once('end', () => {
     void stop().finally(() => process.exit(0));
+  });
+  process.stdout.once('error', (error) => {
+    warnMain('stdio', 'output closed', { message: error.message });
+    void stop().finally(() => process.exit(1));
   });
   stdio.start();
   process.stdin.resume();

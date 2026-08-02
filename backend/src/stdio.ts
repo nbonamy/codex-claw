@@ -4,6 +4,8 @@ import type { Readable, Writable } from 'node:stream';
 export type StdioRpcServerOptions = {
   input: Readable;
   output: Writable;
+  onOutputBackpressure?(details: { frameBytes: number; writableLength: number }): void;
+  onOutputDrain?(details: { writableLength: number }): void;
   onMessage(message: ClawRpcMessage): ClawRpcResponse | undefined | Promise<ClawRpcResponse | undefined>;
 };
 
@@ -23,6 +25,7 @@ export class StdioRpcPeer {
   private buffer = '';
   private nextRequestId = 1;
   private readonly pending = new Map<ClawRpcId, PendingRequest>();
+  private outputBackpressured = false;
   private started = false;
 
   constructor(private readonly options: StdioRpcServerOptions & { requestTimeoutMs?: number }) {}
@@ -43,6 +46,7 @@ export class StdioRpcPeer {
 
     this.started = false;
     this.options.input.off('data', this.onData);
+    this.options.output.off('drain', this.onOutputDrain);
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timeout);
       pending.reject(new Error('stdio RPC peer stopped.'));
@@ -148,8 +152,21 @@ export class StdioRpcPeer {
   }
 
   private write(message: ClawRpcMessage): void {
-    this.options.output.write(`${JSON.stringify(message)}\n`);
+    const frame = `${JSON.stringify(message)}\n`;
+    const accepted = this.options.output.write(frame);
+    if (accepted || this.outputBackpressured) return;
+    this.outputBackpressured = true;
+    this.options.onOutputBackpressure?.({
+      frameBytes: Buffer.byteLength(frame),
+      writableLength: this.options.output.writableLength,
+    });
+    this.options.output.once('drain', this.onOutputDrain);
   }
+
+  private readonly onOutputDrain = (): void => {
+    this.outputBackpressured = false;
+    this.options.onOutputDrain?.({ writableLength: this.options.output.writableLength });
+  };
 }
 
 function lineLooksLikeJson(line: string): boolean {

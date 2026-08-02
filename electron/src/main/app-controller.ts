@@ -9,6 +9,7 @@ import { getClawdDaemonStatus, setClawdDaemonEnabled } from './daemon-launch-age
 import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards';
+import { applyMainEventToSnapshot } from '@codex-claw/shared/snapshot';
 import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
 import { sendAppCommand, sendRendererEvent } from './ipc-events';
@@ -324,9 +325,7 @@ export class AppController {
       this.appLifecycle.quit();
     });
 
-    ipc.handle(ipcChannels.restartApp, () => {
-      this.restartApp();
-    });
+    ipc.handle(ipcChannels.restartApp, () => this.restartApp());
 
     ipc.handle(ipcChannels.setAgentGoal, (_event, agentId: string, objective: string) => {
       return this.setAgentGoal(agentId, objective);
@@ -622,7 +621,7 @@ export class AppController {
     const previousCodexBinaryPath = this.snapshot?.general.codexBinaryPath ?? '';
     const snapshot = await this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.settingsUpdate, { input }));
     if (previousCodexBinaryPath !== snapshot.general.codexBinaryPath) {
-      this.restartApp();
+      await this.restartApp();
     }
     return snapshot;
   }
@@ -655,7 +654,8 @@ export class AppController {
     return setClawdDaemonEnabled(enabled);
   }
 
-  private restartApp(): void {
+  private async restartApp(): Promise<void> {
+    await this.shutdown();
     this.appLifecycle.relaunch();
     this.appLifecycle.exit(0);
   }
@@ -1008,6 +1008,8 @@ export class AppController {
     const rendererEvent = eventForRenderer(event);
     if (isAppSnapshot(event.snapshot)) {
       this.snapshot = event.snapshot;
+    } else if (this.snapshot) {
+      applyMainEventToSnapshot(this.snapshot, rendererEvent);
     }
     if (isClientState(event.clientState)) {
       this.clientState = event.clientState;
@@ -1028,6 +1030,7 @@ export class AppController {
 
 export function startMainApp(): void {
   const controller = new AppController(null, undefined, app, ensureCurrentClawdDaemonForStartup);
+  let shutdownStarted = false;
   controller.registerIpcHandlers();
 
   void app.whenReady().then(async () => {
@@ -1035,8 +1038,17 @@ export function startMainApp(): void {
     controller.createWindow();
   });
 
-  app.on('before-quit', () => {
-    void controller.shutdown();
+  app.on('before-quit', (event) => {
+    if (shutdownStarted) return;
+    event.preventDefault();
+    shutdownStarted = true;
+    void controller.shutdown()
+      .catch((error) => {
+        warnMain('shutdown', 'failed to close app resources cleanly', {
+          detail: error instanceof Error ? error.message : String(error),
+        });
+      })
+      .finally(() => app.exit(0));
   });
 
   app.on('window-all-closed', () => {

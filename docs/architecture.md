@@ -172,11 +172,12 @@ requesting a preview; it must not forward an arbitrary absolute local path as
 read authority.
 
 Snapshot mutation is also backend-owned. `clawd` applies backend events to the
-authoritative snapshot; Electron fetches fresh snapshots from `clawd` for
-`getSnapshot` and may cache backend-provided snapshots only for desktop-native
-reactions. The renderer receives UI events, but state-affecting events include
-the backend snapshot, so renderer state adopts that snapshot instead of
-replaying product reducers. Electron-native affordances consume a backend
+authoritative snapshot and is the only process that persists it. Electron
+fetches fresh snapshots from `clawd` for `getSnapshot`; Electron and renderer
+then replay the same sequenced, app-owned events through the shared deterministic
+reducer to maintain volatile replicas. Incremental events do not carry the full
+snapshot: doing so makes streaming traffic grow with total conversation history
+and can saturate the clawd-to-Electron pipe. Electron-native affordances consume a backend
 derived `ClientState` for details such as source-folder dialog defaults and
 whether display sleep should be prevented; Electron runs the native APIs but
 does not derive those decisions from agent/product state.

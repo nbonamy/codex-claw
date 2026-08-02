@@ -1239,14 +1239,6 @@ describe('ClawBackendServer', () => {
       clientState: {
         shouldPreventDisplaySleep: true,
       },
-      snapshot: {
-        agents: [
-          expect.objectContaining({
-            id: 'agent-dina',
-            status: { type: 'working' },
-          }),
-        ],
-      },
     }]);
     await expect(server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'snapshot/get' })).resolves.toMatchObject({
       result: {

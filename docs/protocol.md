@@ -45,7 +45,7 @@ synced after this change.
 - Client to `clawd`: app-owned product requests such as `agent/prompt/send`,
   `source/worktrees/list`, and `workProvider/items/list`.
 - `clawd` to client notifications: currently `backend/event/notify`, carrying
-  app-owned events and optional backend-derived snapshots.
+  sequenced app-owned events and optional recovery snapshots.
 - `clawd` to client requests: narrow host callbacks for native affordances
   that the connected client must perform, currently Electron browser opening
   and macOS permission surfaces.
@@ -70,8 +70,8 @@ synced after this change.
   threadId?, turnId?, clientState?, snapshot? }`.
 
 State-mutating public methods generally return `AppSnapshot`. The returned
-snapshot is authoritative; clients should adopt it rather than replay product
-reducers locally.
+snapshot is authoritative. Between snapshots, clients replay only sequenced
+clawd-authored app events through the shared deterministic reducer.
 
 ## Client To `clawd`: Core
 
@@ -287,7 +287,7 @@ implementation messages, not the preferred app protocol for clients.
 
 | Method | Params | Notes |
 | --- | --- | --- |
-| `backend/event/notify` | `ClawBackendEvent` | App-owned event for renderer/UI state. May include `clientState` and, for state-affecting events, authoritative `snapshot`. |
+| `backend/event/notify` | `ClawBackendEvent` | Sequenced app-owned event for renderer/UI state. Includes small backend-derived `clientState`; `snapshot` is an optional compatibility or recovery checkpoint rather than accompanying each incremental event. |
 
 Event `type` values are the app-owned `MainToRendererEvent['type']` union from
 `shared/src/contracts.ts`. Current emitted examples include:
@@ -337,7 +337,8 @@ If a client request method is unknown, the client responds with JSON-RPC
 - `clawd` owns request IDs for requests it sends to Electron.
 - Electron owns request IDs for requests it sends to `clawd`.
 - Product state belongs to `clawd`. Electron and renderer may cache only
-  backend-provided snapshots.
+  backend snapshots and replay clawd-authored app events; neither client
+  persists or independently invents product mutations.
 - Filesystem reads, git commands, provider tokens, provider protocol calls,
   loops, scheduler execution, and transcription helper execution belong to
   `clawd`.

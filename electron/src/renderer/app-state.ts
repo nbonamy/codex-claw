@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue';
 import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
-import { createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/shared/snapshot';
+import { applyMainEventToSnapshot, createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/shared/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
 import { approvalPresetFromDefaults } from '@codex-claw/shared/approval-presets';
@@ -47,6 +47,7 @@ const hydratingAgentHistoryIds = ref(new Set<string>());
 const catalogLoadsByAgentId = new Map<string, Promise<void>>();
 let agentSelectionRequestId = 0;
 let unsubscribeMainEvents: (() => void) | null = null;
+let bufferedMainEvents: MainToRendererEvent[] | null = null;
 const workProviderAuthorizationPollTimers = new Map<WorkProviderKind, ReturnType<typeof globalThis.setTimeout>>();
 const WORK_PROVIDER_AUTHORIZATION_POLL_MS = 5_000;
 
@@ -127,12 +128,16 @@ export function useAppState() {
     }
 
     isLoading.value = true;
+    bufferedMainEvents = [];
+    subscribeToMainEvents();
 
     try {
       snapshot.value = await window.codexClaw.getSnapshot();
       backendApprovalsByAgentId.value = {};
+      const startupEvents = bufferedMainEvents;
+      bufferedMainEvents = null;
+      for (const event of startupEvents) handleMainEvent(event, false);
       pruneRemoteBenchCache();
-      subscribeToMainEvents();
       await Promise.all([
         loadActiveAgentCatalogs(),
         loadConnectedWorkBacklogs(),
@@ -140,6 +145,7 @@ export function useAppState() {
         loadDaemonStatus(),
       ]);
     } finally {
+      bufferedMainEvents = null;
       isLoading.value = false;
     }
 
@@ -1588,15 +1594,21 @@ function subscribeToMainEvents(): void {
 
   unsubscribeMainEvents?.();
   unsubscribeMainEvents = window.codexClaw.onEvent((event: MainToRendererEvent) => {
-    adoptSnapshotFromMainEvent(event);
-    syncBackendApprovalsFromMainEvent(event);
-    syncAnsweredClientRequestsFromMainEvent(event);
-    syncComposerModeFromMainEvent(event);
-    syncSidePanelFromMainEvent(event);
-    if (event.type === 'skills.changed') {
-      void loadBackendSkillsForActiveAgent();
+    if (bufferedMainEvents) {
+      bufferedMainEvents.push(event);
+      return;
     }
+    handleMainEvent(event);
   });
+}
+
+function handleMainEvent(event: MainToRendererEvent, adoptSnapshot = true): void {
+  if (adoptSnapshot) adoptSnapshotFromMainEvent(event);
+  syncBackendApprovalsFromMainEvent(event);
+  syncAnsweredClientRequestsFromMainEvent(event);
+  syncComposerModeFromMainEvent(event);
+  syncSidePanelFromMainEvent(event);
+  if (event.type === 'skills.changed') void loadBackendSkillsForActiveAgent();
 }
 
 function syncBackendApprovalsFromMainEvent(event: MainToRendererEvent): void {
@@ -1709,7 +1721,9 @@ function backendRequestedPermissions(
 function adoptSnapshotFromMainEvent(event: MainToRendererEvent): void {
   if (isAppSnapshot(event.snapshot)) {
     snapshot.value = event.snapshot;
+    return;
   }
+  applyMainEventToSnapshot(snapshot.value, event);
 }
 
 async function loadActiveAgentCatalogs(agentId = snapshot.value.activeAgentId): Promise<void> {

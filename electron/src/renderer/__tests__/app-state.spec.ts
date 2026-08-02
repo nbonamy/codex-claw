@@ -282,6 +282,43 @@ describe('useAppState', () => {
     expect(state.visibleMessages.value).toStrictEqual(remoteSnapshot.messages);
   });
 
+  it('subscribes before loading and preserves transient events received with the startup snapshot', async () => {
+    const snapshotLoad = deferred<ReturnType<typeof createInitialSnapshot>>();
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const onEvent = vi.fn((nextListener: (event: MainToRendererEvent) => void) => {
+      listeners.push(nextListener);
+      return () => undefined;
+    });
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockReturnValue(snapshotLoad.promise),
+        onEvent,
+      } satisfies Partial<CodexClawApi>,
+    });
+    const approval: BackendApprovalRequest = {
+      id: 'approval-during-load',
+      kind: 'command',
+      conversationId: 'thread-dina',
+      itemId: 'command-during-load',
+      title: 'Run tests',
+    };
+
+    const state = useAppState();
+    const load = state.loadSnapshot();
+    expect(onEvent).toHaveBeenCalledOnce();
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'backendApproval.requested',
+      payload: { approval },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    snapshotLoad.resolve(createInitialSnapshot());
+    await load;
+
+    expect(state.activeBackendApprovals.value).toStrictEqual([approval]);
+  });
+
   it('adopts snapshots from explicit main event snapshot fields', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
@@ -318,7 +355,7 @@ describe('useAppState', () => {
     expect(state.activeAgent.value?.name).toBe('Ellie');
   });
 
-  it('does not derive renderer snapshots from main event payloads', async () => {
+  it('applies snapshot update payloads when an event omits a full snapshot', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
     const payloadSnapshot = createInitialSnapshot();
@@ -349,8 +386,8 @@ describe('useAppState', () => {
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
 
-    expect(state.snapshot.value).toStrictEqual(remoteSnapshot);
-    expect(state.activeAgent.value?.id).toBe('agent-dina');
+    expect(state.snapshot.value).toStrictEqual(payloadSnapshot);
+    expect(state.activeAgent.value?.id).toBe('agent-ellie');
   });
 
   it('sets the active approval preset through the preload bridge', async () => {
@@ -1849,16 +1886,6 @@ describe('useAppState', () => {
     expect(listeners).toHaveLength(1);
     const emitMainEvent = listeners[0] as (event: MainToRendererEvent) => void;
 
-    const streamedSnapshot = createInitialSnapshot();
-    streamedSnapshot.messages.push({
-      id: 'message-streamed',
-      agentId: 'agent-dina',
-      role: 'assistant',
-      status: 'streaming',
-      createdAt: '2026-06-05T00:00:02.000Z',
-      parts: [{ type: 'text', text: 'streamed' }],
-    });
-
     emitMainEvent({
       seq: 1,
       agentId: 'agent-dina',
@@ -1867,7 +1894,6 @@ describe('useAppState', () => {
       type: 'message.delta',
       payload: { delta: 'streamed' },
       occurredAt: '2026-06-05T00:00:02.000Z',
-      snapshot: streamedSnapshot,
     });
 
     expect(state.visibleMessages.value.at(-1)?.parts).toStrictEqual([{ type: 'text', text: 'streamed' }]);

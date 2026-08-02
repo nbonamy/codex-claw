@@ -146,15 +146,14 @@ describe('Electron backend boundary', () => {
     }
   });
 
-  it('keeps renderer product snapshot reduction behind clawd', async () => {
+  it('keeps renderer snapshot replay limited to clawd-authored app events', async () => {
     const appStatePath = path.resolve(__dirname, '../../renderer/app-state.ts');
     const source = await readFile(appStatePath, 'utf8');
 
-    expect(source).not.toContain('applyMainEventToSnapshot');
+    expect(source).toContain('applyMainEventToSnapshot');
     expect(source).not.toContain('updateSettingsInSnapshot');
     expect(source).not.toContain('snapshot.value.activeAgentId =');
     expect(source).not.toContain('snapshot.value.activeTeamId =');
-    expect(source).not.toContain("event.type === 'snapshot.updated' && isAppSnapshot(event.payload)");
     expect(source).toContain('adoptSnapshotFromMainEvent');
   });
 
@@ -167,13 +166,13 @@ describe('Electron backend boundary', () => {
     expect(source).not.toContain('state.json');
     expect(source).not.toContain('persistSnapshot');
     expect(source).not.toContain('./snapshot-service');
-    expect(source).not.toContain('applyMainEventToSnapshot');
+    expect(source).toContain('applyMainEventToSnapshot');
     expect(source).not.toContain('createEmptySnapshot');
     expect(source).toContain('request<unknown>(backendMethods.snapshotGet)');
     await expect(readdir(path.join(mainDir, 'snapshot-service.ts'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
-  it('keeps Electron snapshot caching limited to backend-provided snapshots', async () => {
+  it('keeps Electron snapshot caching limited to backend snapshots and clawd-authored events', async () => {
     const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
     const source = await readFile(appControllerPath, 'utf8');
     const assignments = source.match(/\bthis\.snapshot\s*=/g) ?? [];
@@ -185,7 +184,7 @@ describe('Electron backend boundary', () => {
     expect(source).toContain('this.snapshot = event.snapshot;');
     expect(source).not.toContain('this.snapshot = result.snapshot;');
     expect(source).not.toContain('snapshotFromBackendEvent');
-    expect(source).not.toContain('applyMainEventToSnapshot');
+    expect(source).toContain('applyMainEventToSnapshot');
     expect(source).not.toContain('updateSettingsInSnapshot');
   });
 

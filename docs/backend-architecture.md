@@ -146,11 +146,10 @@ Current implementation checkpoint:
 - `clawd` now owns derived side-panel requests for plans and current-turn diffs.
   Electron fans out backend events but no longer synthesizes `sidePanel.*`
   events from plan or diff events.
-- `clawd` now owns snapshot event application for the desktop bridge. Backend
-  event notifications carry an authoritative snapshot for state-affecting
-  events, Electron caches that snapshot for desktop-native reactions, and the
-  renderer adopts the backend snapshot instead of reducing product events
-  itself.
+- `clawd` owns authoritative snapshot event application and durable persistence.
+  Backend notifications carry sequenced app-owned deltas rather than repeating
+  the full snapshot for every streaming update. Electron and renderer maintain
+  volatile replicas by replaying the same events through the shared reducer.
 - `clawd` owns agent file listing/preview authority. Client-facing
   `agent/files/list` and `agent/file/preview` take an `agentId`; Electron does not
   send workspace roots or request raw file reads. Provider-specific file preview
@@ -860,10 +859,10 @@ and future remote.
 `~/.codex-claw/provider-tokens.json`. Electron main
 owns only desktop-window state plus a
 volatile renderer-facing snapshot cache. That cache is hydrated through
-`snapshot/get`, replaced from backend-attached event snapshots, and never
-written back to disk by Electron. Renderer code keeps UI-only state and adopts
-backend-provided snapshots; it does not apply product reducers for backend
-events.
+`snapshot/get`, advanced only by sequenced clawd-authored app events through the
+shared reducer, and never written back to disk by Electron. Renderer code keeps
+UI-only state and the volatile product replica; neither Electron nor renderer
+owns durable product state.
 
 Local migration path:
 

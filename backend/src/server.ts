@@ -3,6 +3,7 @@ import path from 'node:path';
 import { sendAgentPrompt } from '@codex-claw/shared/agent-chat-service';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { applyMainEventToSnapshot, createAgentInSnapshot, createEmptySnapshot, selectAgent, updateAgentFolder, updateAgentFromInput } from '@codex-claw/shared/snapshot';
+import { isAppSnapshot } from '@codex-claw/shared/snapshot-guards';
 import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitStatus, AgentStatus, AppSnapshot, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, MainToRendererEvent, MoveAgentToTeamInput, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
@@ -1503,8 +1504,13 @@ export class ClawBackendServer {
   }
 
   private applyRemoteBackendEvent(connectionId: string, event: ClawBackendEvent): void {
-    if (event.snapshot) {
+    if (isAppSnapshot(event.snapshot)) {
       this.remoteSnapshots.set(connectionId, event.snapshot);
+    } else if (event.type === 'snapshot.updated' && isAppSnapshot(event.payload)) {
+      this.remoteSnapshots.set(connectionId, event.payload);
+    } else {
+      const remoteSnapshot = this.remoteSnapshots.get(connectionId);
+      if (remoteSnapshot) applyMainEventToSnapshot(remoteSnapshot, event);
     }
     if (event.type === 'snapshot.updated') {
       if (this.hasRemoteTeamPointerForConnection(connectionId)) {
@@ -1526,7 +1532,7 @@ export class ClawBackendServer {
     } = event;
     const fullEvent = this.nextMainEvent(backendEvent);
     this.recordClientRequestOwner(fullEvent, connectionId);
-    this.emitRemoteBackendEvent(fullEvent, shouldAttachSnapshotToBackendEvent(backendEvent));
+    this.emitRemoteBackendEvent(fullEvent);
     this.emitDerivedSidePanelEvents(fullEvent);
   }
 
@@ -1616,7 +1622,6 @@ export class ClawBackendServer {
       payload: snapshot,
       occurredAt: new Date().toISOString(),
       clientState: clientStateFromSnapshot(snapshot),
-      snapshot,
     };
     this.onEvent?.(event);
   }
@@ -2036,7 +2041,7 @@ export class ClawBackendServer {
     const fullEvent = this.nextMainEvent(event);
     applyMainEventToSnapshot(this.snapshot, fullEvent);
     this.recordClientRequestOwner(fullEvent);
-    this.emitBackendEvent(fullEvent, shouldAttachSnapshotToBackendEvent(event));
+    this.emitBackendEvent(fullEvent);
     this.emitDerivedSidePanelEvents(fullEvent);
     this.onBackendEventApplied?.(fullEvent);
   }
@@ -2045,7 +2050,7 @@ export class ClawBackendServer {
     const fullEvent = this.nextMainEvent(event);
     applyMainEventToSnapshot(this.snapshot, fullEvent);
     this.recordClientRequestOwner(fullEvent);
-    this.emitBackendEvent(fullEvent, shouldAttachSnapshotToBackendEvent(event));
+    this.emitBackendEvent(fullEvent);
     this.emitDerivedSidePanelEvents(fullEvent);
     this.onBackendEventApplied?.(fullEvent);
     if (event.type === 'turn.completed' && event.agentId) {
@@ -2073,31 +2078,19 @@ export class ClawBackendServer {
     return this.lastEventSeq;
   }
 
-  private emitBackendEvent(event: MainToRendererEvent, includeSnapshot: boolean): void {
-    this.onEvent?.(includeSnapshot
-      ? {
-        ...event,
-        clientState: clientStateFromSnapshot(this.snapshot),
-        snapshot: this.snapshot,
-      }
-      : {
-        ...event,
-        clientState: clientStateFromSnapshot(this.snapshot),
-      });
+  private emitBackendEvent(event: MainToRendererEvent): void {
+    this.onEvent?.({
+      ...event,
+      clientState: clientStateFromSnapshot(this.snapshot),
+    });
   }
 
-  private emitRemoteBackendEvent(event: MainToRendererEvent, includeSnapshot: boolean): void {
+  private emitRemoteBackendEvent(event: MainToRendererEvent): void {
     const snapshot = this.clientSnapshotFromKnownRemotes();
-    this.onEvent?.(includeSnapshot
-      ? {
-        ...event,
-        clientState: clientStateFromSnapshot(snapshot),
-        snapshot,
-      }
-      : {
-        ...event,
-        clientState: clientStateFromSnapshot(snapshot),
-      });
+    this.onEvent?.({
+      ...event,
+      clientState: clientStateFromSnapshot(snapshot),
+    });
   }
 
   private emitDerivedSidePanelEvents(event: MainToRendererEvent): void {
@@ -2699,11 +2692,6 @@ function shouldPersistSnapshotForEvent(event: BackendEvent): boolean {
     event.type === 'thread.tokenUsageUpdated' ||
     event.type === 'turn.planUpdated' ||
     event.type === 'turn.proposedPlanCompleted';
-}
-
-function shouldAttachSnapshotToBackendEvent(event: BackendEvent): boolean {
-  return event.type !== 'sidePanel.markdownRequested' &&
-    event.type !== 'sidePanel.gitDiffRequested';
 }
 
 function shouldRefreshGitStatusForEvent(event: BackendEvent): boolean {
