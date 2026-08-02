@@ -195,6 +195,7 @@
           />
           <ConversationPane
             v-else
+            ref="conversationPane"
             :messages="messages"
             :agent="currentAgent"
             :agent-files="agentFiles"
@@ -328,7 +329,7 @@
 
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type PairedDevice, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
@@ -607,6 +608,7 @@ const agentSidebarWidth = ref(260);
 const activeSurface = ref<AppSurface>('agent');
 const rightWorkspaces = reactive<Record<string, AgentRightWorkspaceState>>({});
 const workspaceBody = ref<HTMLElement | null>(null);
+const conversationPane = ref<{ focusComposer(): void } | null>(null);
 const authentication = ref<CodexAuthentication | null>(null);
 const authenticationLoading = ref(true);
 const authenticationCancelling = ref(false);
@@ -1422,6 +1424,31 @@ function handleAppCommand(command: AppCommand): void {
 
   if (command.type === 'open-browser' && command.agentId && command.url) {
     handleBrowserOpenCommand(command);
+    return;
+  }
+
+  if (command.type === 'open-agent-composer') {
+    const agent = command.agentId
+      ? props.snapshot.agents.find((candidate) => candidate.id === command.agentId)
+      : currentAgent.value;
+    if (!agent) return;
+    activeSurface.value = 'agent';
+    emit('select-agent', agent.id);
+    if (command.prompt !== undefined) {
+      if (command.submit !== false) {
+        emit('send-agent-prompt', { agentId: agent.id, prompt: command.prompt });
+        return;
+      }
+      emit('update:composerState', {
+        agentId: agent.id,
+        state: {
+          text: command.prompt,
+          selectionStart: command.prompt.length,
+          selectionEnd: command.prompt.length,
+        },
+      });
+    }
+    void nextTick(() => conversationPane.value?.focusComposer());
     return;
   }
 

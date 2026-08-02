@@ -1,5 +1,6 @@
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
+import path from 'node:path';
 import { registerCodexNativeIpc, TypedIpcMain } from 'codex-app-sdk/electron';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
 import { logMain, warnMain } from './log';
@@ -10,11 +11,12 @@ import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards';
 import { applyMainEventToSnapshot } from '@codex-claw/shared/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppSnapshot, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppCommand, AppSnapshot, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
 import { sendAppCommand, sendRendererEvent } from './ipc-events';
 import { BrowserPane, browserPaneKey } from './browser-pane';
 import { launchChatGptApp } from './chatgpt-app';
+import { appCommandFromDeepLink, codexClawDeepLinkScheme, deepLinksFromArgv } from './deep-links';
 
 type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
 type StartupMaintenance = () => Promise<void>;
@@ -41,6 +43,8 @@ export class AppController {
   private reconnectAttempt = 0;
   private shuttingDown = false;
   private connectionState: BackendConnectionState = { status: 'connecting' };
+  private rendererReady = false;
+  private readonly pendingDeepLinkCommands: AppCommand[] = [];
   private readonly pendingBrowserOpens = new Map<string, PendingBrowserOpen>();
 
   private readonly browserPane = new BrowserPane({
@@ -400,7 +404,31 @@ export class AppController {
   }
 
   createWindow(): void {
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      this.focusMainWindow();
+      return;
+    }
     this.mainWindow = createMainWindow(this.snapshot?.general.agentListCompact ?? false);
+    this.rendererReady = false;
+    this.mainWindow.webContents.on('did-start-loading', () => {
+      this.rendererReady = false;
+    });
+    this.mainWindow.webContents.on('did-finish-load', () => {
+      this.rendererReady = true;
+      this.flushPendingDeepLinkCommands();
+    });
+  }
+
+  openDeepLink(value: string): boolean {
+    const command = appCommandFromDeepLink(value);
+    if (!command) return false;
+    if (!this.mainWindow || this.mainWindow.isDestroyed() || !this.rendererReady) {
+      this.pendingDeepLinkCommands.push(command);
+    } else {
+      sendAppCommand(this.mainWindow.webContents, command);
+    }
+    this.focusMainWindow();
+    return true;
   }
 
   async shutdown(): Promise<void> {
@@ -1158,14 +1186,52 @@ export class AppController {
     this.powerSaveBlocker.sync(this.clientState.shouldPreventDisplaySleep);
   }
 
+  private flushPendingDeepLinkCommands(): void {
+    if (!this.mainWindow || this.mainWindow.isDestroyed() || !this.rendererReady) return;
+    for (const command of this.pendingDeepLinkCommands.splice(0)) {
+      sendAppCommand(this.mainWindow.webContents, command);
+    }
+  }
+
+  private focusMainWindow(): void {
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
+    if (this.mainWindow.isMinimized()) this.mainWindow.restore();
+    this.mainWindow.show();
+    this.mainWindow.focus();
+  }
+
 }
 
 export function startMainApp(): void {
   const controller = new AppController(null, undefined, app, ensureCurrentClawdDaemonForStartup);
   let shutdownStarted = false;
+  if (!app.requestSingleInstanceLock()) {
+    app.quit();
+    return;
+  }
+  const openDeepLinks = (values: readonly string[]): void => {
+    let accepted = false;
+    for (const value of values) accepted = controller.openDeepLink(value) || accepted;
+    if (accepted && app.isReady() && BrowserWindow.getAllWindows().length === 0) {
+      controller.createWindow();
+    }
+  };
+  app.on('open-url', (event, url) => {
+    event.preventDefault();
+    openDeepLinks([url]);
+  });
+  app.on('second-instance', (_event, argv) => {
+    openDeepLinks(deepLinksFromArgv(argv));
+  });
+  openDeepLinks(deepLinksFromArgv(process.argv));
   controller.registerIpcHandlers();
 
   void app.whenReady().then(async () => {
+    if (app.isPackaged) {
+      app.setAsDefaultProtocolClient(codexClawDeepLinkScheme);
+    } else if (process.argv[1]) {
+      app.setAsDefaultProtocolClient(codexClawDeepLinkScheme, process.execPath, [path.resolve(process.argv[1])]);
+    }
     try {
       await controller.initialize();
     } catch (error) {

@@ -2309,6 +2309,72 @@ describe('AppShell', () => {
     expect(unsubscribe).toHaveBeenCalledOnce();
   });
 
+  it('selects a deep-linked agent and submits its prompt by default', async () => {
+    let listener: (command: AppCommand) => void = () => undefined;
+    window.codexClaw = {
+      onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
+        listener = nextListener;
+        return () => undefined;
+      }),
+      onEvent: vi.fn(() => vi.fn()),
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const snapshot = createInitialSnapshot();
+    const wrapper = mountShell({ snapshot });
+
+    listener({
+      type: 'open-agent-composer',
+      agentId: 'agent-jesse',
+      prompt: 'Measure five active conversations',
+      submit: true,
+    });
+    await nextTick();
+
+    expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-jesse']]);
+    expect(wrapper.emitted('send-agent-prompt')).toStrictEqual([[
+      {
+        agentId: 'agent-jesse',
+        prompt: 'Measure five active conversations',
+      },
+    ]]);
+    expect(wrapper.emitted('update:composerState')).toBeUndefined();
+    expect(wrapper.emitted('sendPrompt')).toBeUndefined();
+  });
+
+  it('prefills a deep-linked agent composer when submission is disabled', async () => {
+    let listener: (command: AppCommand) => void = () => undefined;
+    window.codexClaw = {
+      onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
+        listener = nextListener;
+        return () => undefined;
+      }),
+      onEvent: vi.fn(() => vi.fn()),
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const snapshot = createInitialSnapshot();
+    const wrapper = mountShell({ snapshot });
+
+    listener({
+      type: 'open-agent-composer',
+      agentId: 'agent-jesse',
+      prompt: 'Measure five active conversations',
+      submit: false,
+    });
+    await nextTick();
+
+    expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-jesse']]);
+    expect(wrapper.emitted('update:composerState')).toStrictEqual([[
+      {
+        agentId: 'agent-jesse',
+        state: {
+          text: 'Measure five active conversations',
+          selectionStart: 33,
+          selectionEnd: 33,
+        },
+      },
+    ]]);
+    expect(wrapper.emitted('sendPrompt')).toBeUndefined();
+    expect(wrapper.emitted('send-agent-prompt')).toBeUndefined();
+  });
+
   it('opens a model-requested URL in the active agent browser workspace', async () => {
     vi.stubGlobal('ResizeObserver', class {
       observe() {}

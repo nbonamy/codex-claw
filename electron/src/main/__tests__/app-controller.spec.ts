@@ -11,6 +11,29 @@ function callPrivate<Result>(controller: AppController, method: string): Promise
 }
 
 describe('AppController', () => {
+  it('queues valid deep links until the renderer is ready, then focuses and dispatches them', () => {
+    const controller = new AppController(createInitialSnapshot(), null);
+    const send = vi.fn();
+    const show = vi.fn();
+    const focus = vi.fn();
+    setDeepLinkWindow(controller, { send, show, focus });
+
+    expect(controller.openDeepLink('codex-claw://new?prompt=Measure%20this')).toBe(true);
+    expect(controller.openDeepLink('https://example.com')).toBe(false);
+    expect(send).not.toHaveBeenCalled();
+    expect(show).toHaveBeenCalledOnce();
+    expect(focus).toHaveBeenCalledOnce();
+
+    (controller as unknown as { rendererReady: boolean }).rendererReady = true;
+    (controller as unknown as { flushPendingDeepLinkCommands(): void }).flushPendingDeepLinkCommands();
+
+    expect(send).toHaveBeenCalledWith('app:command', {
+      type: 'open-agent-composer',
+      prompt: 'Measure this',
+      submit: true,
+    });
+  });
+
   it('returns the latest event-applied snapshot after refreshing client state', async () => {
     const staleSnapshot = createInitialSnapshot();
     let resolveClientState!: (state: ClientState) => void;
@@ -1743,6 +1766,29 @@ function setMainWindowSend(controller: AppController, send: ReturnType<typeof vi
     webContents: {
       send,
     },
+  };
+}
+
+function setDeepLinkWindow(
+  controller: AppController,
+  callbacks: { send(...args: unknown[]): void; show(): void; focus(): void },
+): void {
+  (controller as unknown as {
+    mainWindow: {
+      isDestroyed(): boolean;
+      isMinimized(): boolean;
+      restore(): void;
+      show(): void;
+      focus(): void;
+      webContents: { send(...args: unknown[]): void };
+    };
+  }).mainWindow = {
+    isDestroyed: () => false,
+    isMinimized: () => false,
+    restore: vi.fn(),
+    show: callbacks.show,
+    focus: callbacks.focus,
+    webContents: { send: callbacks.send },
   };
 }
 

@@ -979,6 +979,7 @@ export type AppCommand =
   | { type: 'edit-active-agent' }
   | { type: 'new-agent' }
   | { type: 'new-team' }
+  | { type: 'open-agent-composer'; agentId?: string; prompt?: string; submit?: boolean }
   | { type: 'open-browser'; agentId?: string; browserId?: string; url?: string }
   | { type: 'open-review' }
   | { type: 'quit' }
