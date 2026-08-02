@@ -292,21 +292,26 @@ export class CodexSurfaceAgentAdapter {
     const existing = this.sessionsByAgentId.get(agent.id);
     if (existing?.handle.id === threadId) {
       existing.agent = agent;
+      const currentSnapshot = existing.handle.getSnapshot();
+      if (currentSnapshot.activeTurnId !== null) {
+        // This adapter already owns the live session and receives its events in
+        // the background. Keep that richer in-memory transcript authoritative
+        // instead of replacing it with load's five-turn bootstrap page.
+        return threadId;
+      }
       const hydratedAt = this.historyHydratedAtByAgentId.get(agent.id) ?? 0;
-      const conversationIsIdle = existing.handle.getSnapshot().activeTurnId === null;
-      if (conversationIsIdle && Date.now() - hydratedAt < AGENT_HISTORY_CACHE_TTL_MS) return threadId;
+      if (Date.now() - hydratedAt < AGENT_HISTORY_CACHE_TTL_MS) return threadId;
 
       const wasSuppressingEvents = existing.suppressEvents;
       existing.suppressEvents = true;
       try {
-        let snapshot = await existing.handle.load({ cwd: expandHome(agent.folder), extensionContext: agent });
-        if (snapshot.activeTurnId === null) {
-          await existing.handle.readHistory();
-          snapshot = existing.handle.getSnapshot();
-        }
+        await existing.handle.load({ cwd: expandHome(agent.folder), extensionContext: agent });
         this.historyHydratedAtByAgentId.set(agent.id, Date.now());
-        existing.suppressEvents = wasSuppressingEvents;
+        const snapshot = existing.handle.getSnapshot();
+        // Publish load's full initial page now. SDK lifecycle hydration will
+        // emit the exhaustive replacement after continuing from its cursor.
         this.publishInitial(existing, snapshot, true);
+        existing.suppressEvents = wasSuppressingEvents;
       } finally {
         existing.suppressEvents = wasSuppressingEvents;
       }
@@ -401,18 +406,17 @@ export class CodexSurfaceAgentAdapter {
         // exposing the hydrated conversation.
         snapshot = await session.handle.interrupt();
       }
+      snapshot = session.handle.getSnapshot();
+      if (emitHistory) this.publishInitial(session, snapshot, true);
+      else this.rememberPending(session, snapshot);
+      session.suppressEvents = false;
+
       const requestedPreset = codexApprovalPresetFromDefaults(agent.backendDefaults);
       const effectivePreset = effectiveApprovalPreset(requestedPreset, snapshot.approvalPresets);
       if (effectivePreset && snapshot.approvalPreset !== effectivePreset) {
-        snapshot = await session.handle.updateSettings({ approvalPreset: effectivePreset });
+        await session.handle.updateSettings({ approvalPreset: effectivePreset });
       }
-      if (snapshot.activeTurnId === null) {
-        await session.handle.readHistory();
-      }
-      session.suppressEvents = false;
-      snapshot = session.handle.getSnapshot();
       if (emitHistory) {
-        this.publishInitial(session, snapshot, true);
         if (interruptedTurnId) {
           this.emitThread(session, {
             type: 'turn.completed',
@@ -420,8 +424,6 @@ export class CodexSurfaceAgentAdapter {
             payload: { status: 'interrupted' },
           });
         }
-      } else {
-        this.rememberPending(session, snapshot);
       }
       return session;
     } catch (error) {
@@ -641,6 +643,11 @@ export class CodexSurfaceAgentAdapter {
         });
         return;
       case 'context.compactionStarted':
+        // Manual compaction emits an action-origin start against the last known
+        // turn before app-server reports the actual compaction item. The
+        // notification turn is authoritative; accepting both can render two
+        // markers and leave the speculative one running forever.
+        if (event.origin === 'action') return;
         if (session.compactionStartedTurnIds.has(event.turnId)) return;
         session.compactionStartedTurnIds.add(event.turnId);
         this.emitThread(session, {

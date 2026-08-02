@@ -143,12 +143,14 @@ configuration instead of sending a known-invalid `danger-full-access` request.
 The adapter returns the generated app-server `SandboxPolicy` shape directly;
 the shared SDK does not define or normalize a second sandbox-policy model.
 
-`thread/resume` returns the thread's `turns` in app-server protocol v2. `clawd`
-must translate those turns into app-owned `RendererMessage`s and emit a
-history hydration event before the next turn streams. The renderer asks through
-the typed bridge to re-select the active persisted agent after subscribing to
-events, so relaunch restores visible history without the renderer importing
-Codex protocol types.
+`thread/resume` returns a full-item page of the five newest turns in app-server
+protocol v2. `clawd` translates that page into app-owned `RendererMessage`s and
+emits it immediately; the SDK continues from the returned cursor and emits one
+lifecycle replacement when exhaustive history is ready. Existing active
+sessions remain memory-authoritative and are not re-resumed on selection. The
+renderer asks through the typed bridge to re-select the active persisted agent
+after subscribing to events, so relaunch restores visible history without the
+renderer importing Codex protocol types.
 
 The sidebar conversation history uses `thread/list` with the active agent
 folder as an exact `cwd` filter, `archived: false`, and newest-first

@@ -124,10 +124,13 @@ class FakeTransport implements RpcTransport {
       case 'thread/resume': {
         const threadId = String((params as { threadId: string }).threadId);
         const cwd = String((params as { cwd?: string }).cwd ?? `/workspace/${threadId.at(-1)}`);
+        const initialPage = this.fullHistoryTurnsByThreadId.get(threadId)
+          ?? this.summaryTurnsByThreadId.get(threadId)
+          ?? (this.staleActiveThreadIds.has(threadId) ? [turn(`turn-${threadId}`, 'inProgress')] : []);
         return resumeResponse(
           thread(threadId, cwd),
-          this.summaryTurnsByThreadId.get(threadId)
-            ?? (this.staleActiveThreadIds.has(threadId) ? [turn(`turn-${threadId}`, 'inProgress')] : []),
+          initialPage.slice(0, 5),
+          initialPage.length > 5 ? 'cursor-5' : null,
         );
       }
       case 'thread/read': {
@@ -136,9 +139,13 @@ class FakeTransport implements RpcTransport {
       }
       case 'thread/turns/list': {
         const threadId = String((params as { threadId: string }).threadId);
+        const cursor = (params as { cursor?: string | null }).cursor;
+        const offset = cursor?.startsWith('cursor-') ? Number(cursor.slice('cursor-'.length)) : 0;
+        const turns = this.fullHistoryTurnsByThreadId.get(threadId) ?? [];
+        const data = turns.slice(offset, offset + 5);
         const result = {
-          data: this.fullHistoryTurnsByThreadId.get(threadId) ?? [],
-          nextCursor: null,
+          data,
+          nextCursor: offset + data.length < turns.length ? `cursor-${offset + data.length}` : null,
           backwardsCursor: null,
         };
         return this.turnsListDelayMs > 0
@@ -543,7 +550,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
   });
 
-  it('reconciles a cached active session when app-server reports that its turn was interrupted', async () => {
+  it('keeps cached active history authoritative and reconciles through live completion events', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
@@ -557,50 +564,38 @@ describe('CodexSurfaceAgentAdapter', () => {
     }));
     expect(events.filter((event) => event.type === 'thread.historyLoaded')).toHaveLength(1);
 
-    transport.summaryTurnsByThreadId.set('thread-a', [turn('turn-thread-a', 'inProgress')]);
     events.length = 0;
     await adapter.hydrateAgent(agentA);
 
     expect(transport.sent.filter((message) => (
       'method' in message && message.method === 'thread/resume'
-    ))).toHaveLength(2);
+    ))).toHaveLength(1);
     expect(lastRequest(transport, 'turn/interrupt')).toBeUndefined();
-    expect(events).toContainEqual(expect.objectContaining({
-      agentId: 'agent-a',
-      type: 'agent.statusChanged',
-      payload: { type: 'working' },
-    }));
-    expect(events.filter((event) => event.type === 'thread.historyLoaded')).toHaveLength(1);
+    expect(events).toHaveLength(0);
 
-    transport.summaryTurnsByThreadId.set('thread-a', [turn('turn-thread-a', 'interrupted')]);
-    events.length = 0;
-    await adapter.hydrateAgent(agentA);
+    transport.emit({
+      method: 'turn/completed',
+      params: { threadId: 'thread-a', turn: turn('turn-thread-a', 'interrupted') },
+    });
 
-    expect(transport.sent.filter((message) => (
-      'method' in message && message.method === 'thread/resume'
-    ))).toHaveLength(3);
-    expect(lastRequest(transport, 'turn/interrupt')).toBeUndefined();
     expect(events).toContainEqual(expect.objectContaining({
       agentId: 'agent-a',
       type: 'agent.statusChanged',
       payload: { type: 'idle' },
     }));
-    expect(events.find((event) => event.type === 'thread.historyLoaded')).toMatchObject({
-      payload: { messages: expect.not.arrayContaining([expect.objectContaining({ status: 'streaming' })]) },
-    });
-    expect(events.filter((event) => event.type === 'thread.historyLoaded')).toHaveLength(1);
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-a',
+      type: 'turn.completed',
+      turnId: 'turn-thread-a',
+      payload: expect.objectContaining({ status: 'interrupted' }),
+    }));
+    expect(events.filter((event) => event.type === 'thread.historyLoaded')).toHaveLength(0);
   });
 
-  it('replaces summary-only restart history with every persisted turn item', async () => {
+  it('publishes full persisted turn items from the initial history page', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
-    transport.turnsListDelayMs = 25;
     const turnId = 'turn-thread-a';
-    transport.summaryTurnsByThreadId.set('thread-a', [
-      turn(turnId, 'completed', [
-        agentMessage('agent-final', 'Done — your Mac is now in Dark Mode.'),
-      ]),
-    ]);
     transport.fullHistoryTurnsByThreadId.set('thread-a', [
       turn(turnId, 'completed', [
         agentMessage('agent-start', 'I’ll switch macOS to Dark appearance now.'),
@@ -633,6 +628,38 @@ describe('CodexSurfaceAgentAdapter', () => {
           },
         ],
       },
+    });
+  });
+
+  it('publishes the initial five full turns before replacing them with background history', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    transport.turnsListDelayMs = 25;
+    transport.fullHistoryTurnsByThreadId.set('thread-a', Array.from({ length: 6 }, (_, index) => (
+      turn(`turn-${6 - index}`, 'completed', [
+        agentMessage(`message-${6 - index}`, `Message ${6 - index}`),
+      ])
+    )));
+    adapter.onEvent((event) => events.push(event));
+
+    await adapter.hydrateAgent(agentA);
+
+    const initialHistory = events.filter((event) => event.type === 'thread.historyLoaded');
+    expect(initialHistory).toHaveLength(1);
+    expect(initialHistory[0]).toMatchObject({
+      payload: {
+        replace: true,
+        messages: expect.arrayContaining([
+          expect.objectContaining({ parts: [{ type: 'text', text: 'Message 6', itemId: 'message-6' }] }),
+        ]),
+      },
+    });
+    expect((initialHistory[0]?.payload as { messages: unknown[] }).messages).toHaveLength(5);
+
+    await vi.waitFor(() => {
+      const historyEvents = events.filter((event) => event.type === 'thread.historyLoaded');
+      expect(historyEvents).toHaveLength(2);
+      expect((historyEvents[1]?.payload as { messages: unknown[] }).messages).toHaveLength(6);
     });
   });
 
@@ -700,7 +727,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     }
   });
 
-  it('maps notification-only compaction completion once and dedupes action-start echoes', async () => {
+  it('maps notification-only compaction completion once and ignores speculative action starts', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
@@ -729,15 +756,21 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
     events.length = 0;
     await adapter.compactThread(agentA);
+    expect(events.filter((event) => event.type === 'context.compactionStarted')).toHaveLength(0);
+
     transport.emit({
       method: 'item/completed',
       params: {
-        threadId: 'thread-a', turnId: 'turn-thread-a', completedAtMs: 3,
+        threadId: 'thread-a', turnId: 'turn-compaction', completedAtMs: 3,
         item: { type: 'contextCompaction', id: 'compact-action' },
       },
     });
-    expect(events.filter((event) => event.type === 'context.compactionStarted')).toHaveLength(1);
-    expect(events.filter((event) => event.type === 'context.compactionCompleted')).toHaveLength(1);
+    expect(events.filter((event) => (
+      event.type === 'context.compactionStarted' || event.type === 'context.compactionCompleted'
+    )).map((event) => ({ type: event.type, turnId: event.turnId }))).toStrictEqual([
+      { type: 'context.compactionStarted', turnId: 'turn-compaction' },
+      { type: 'context.compactionCompleted', turnId: 'turn-compaction' },
+    ]);
   });
 });
 
@@ -787,7 +820,11 @@ function agentMessage(id: string, text: string): Record<string, unknown> {
   return { type: 'agentMessage', id, text, phase: null, memoryCitation: null };
 }
 
-function resumeResponse(value: Record<string, unknown>, turns: Record<string, unknown>[] = []): Record<string, unknown> {
+function resumeResponse(
+  value: Record<string, unknown>,
+  turns: Record<string, unknown>[] = [],
+  nextCursor: string | null = null,
+): Record<string, unknown> {
   return {
     thread: value,
     model: 'gpt-5',
@@ -800,7 +837,7 @@ function resumeResponse(value: Record<string, unknown>, turns: Record<string, un
     },
     activePermissionProfile: { id: ':workspace', extends: null },
     reasoningEffort: 'medium',
-    initialTurnsPage: { data: turns, nextCursor: null, backwardsCursor: null },
+    initialTurnsPage: { data: turns, nextCursor, backwardsCursor: null },
   };
 }
 
