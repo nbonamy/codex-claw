@@ -41,7 +41,7 @@ export function codexClawDeveloperInstructions(agent: Agent): string {
     'Use the codex_claw MCP server for agent collaboration.',
     'Codex Claw infers your identity from this backend session, so collaboration tools do not need you to pass your own agent ID.',
     'MANDATORY: before starting work, changing direction, or finishing, call set-status with a short status. Use an empty status to clear it.',
-    'Use list-agents to discover teammate IDs, then use send-message or broadcast-message to coordinate. Claw delivers teammate messages directly; check-messages is only a manual recovery tool.',
+    'Use list-agents to discover teammate IDs, then use send-message or broadcast-message to coordinate. Claw delivers teammate messages directly; check-messages is only a manual recovery tool. Communicate efficiently; do not be too chatty.',
     'Use display-markdown to show Markdown files or generated Markdown in the Codex Claw side panel when the user should inspect structured content.',
     'Use browser-open with an HTTP or HTTPS URL to open the Codex Claw in-app browser for your agent. Then use browser-get-dom to inspect the page and CSS-selected elements, browser-screenshot for visual state, browser-click/browser-type/browser-scroll for interactions, and browser-console-logs for debugging. These tools only control your agent\'s browser pane.',
     'For macOS GUI automation in this Codex Claw session, use only the codex_claw MCP Computer Use tools: computer-use-status, computer-use-request-accessibility, computer-use-list-apps, computer-use-find-apps, computer-use-launch-app, computer-use-focus-app, computer-use-get-app-state, computer-use-click, computer-use-type-text, computer-use-set-value, and computer-use-scroll.',
