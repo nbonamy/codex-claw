@@ -438,6 +438,16 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     return;
   }
 
+  if (event.type === 'message.userSubmitted') {
+    const payload = isRecord(event.payload) ? event.payload : {};
+    const [message] = rendererMessages([payload.message], event.agentId);
+    if (message && !snapshot.messages.some((candidate) => candidate.id === message.id)) {
+      snapshot.messages.push(message);
+      pruneSupersededEmptyAssistantPlaceholders(snapshot, event.agentId);
+    }
+    return;
+  }
+
   if (event.type === 'message.steer' && event.turnId) {
     const payload = event.payload as { prompt?: unknown };
     if (typeof payload.prompt === 'string' && payload.prompt.trim()) {

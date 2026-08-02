@@ -911,6 +911,7 @@ export type MainToRendererEvent = {
     | 'turn.proposedPlanDelta'
     | 'turn.proposedPlanCompleted'
     | 'turn.completed'
+    | 'message.userSubmitted'
     | 'message.steer'
     | 'agent.promptQueued'
     | 'agent.promptDequeued'

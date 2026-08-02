@@ -1588,6 +1588,51 @@ describe('useAppState', () => {
     expect(state.activeQueuedPrompts.value).toStrictEqual([]);
   });
 
+  it('keeps a drained queued prompt visible as a submitted user message', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const initialSnapshot = createInitialSnapshot();
+    initialSnapshot.queuedPrompts = [{
+      id: 'queued-1', agentId: 'agent-dina', text: 'this is a test for queue', createdAt: '2026-08-02T00:00:00.000Z',
+    }];
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(initialSnapshot),
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    await state.loadSnapshot();
+    const message: RendererMessage = {
+      id: 'message-queued-1',
+      agentId: 'agent-dina',
+      role: 'user',
+      status: 'complete',
+      createdAt: '2026-08-02T00:00:01.000Z',
+      parts: [{ type: 'text', text: 'this is a test for queue' }],
+    };
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'message.userSubmitted',
+      payload: { message },
+      occurredAt: message.createdAt,
+    });
+    listeners[0]?.({
+      seq: 2,
+      agentId: 'agent-dina',
+      type: 'agent.promptDequeued',
+      payload: { ids: ['queued-1'] },
+      occurredAt: '2026-08-02T00:00:02.000Z',
+    });
+
+    expect(state.activeQueuedPrompts.value).toStrictEqual([]);
+    expect(state.visibleMessages.value.at(-1)).toStrictEqual(message);
+  });
+
   it('passes attachment descriptors to the backend queue owner', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();

@@ -1450,6 +1450,25 @@ describe('snapshot reducer', () => {
     }]);
   });
 
+  it('adds a submitted user message once when the authoritative snapshot already contains it', () => {
+    const snapshot = createInitialSnapshot();
+    const message = appendUserPrompt(snapshot, 'agent-dina', 'run next', '2026-06-05T00:00:03.000Z');
+    const event = {
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'message.userSubmitted' as const,
+      payload: { message },
+      occurredAt: message.createdAt,
+    };
+
+    applyMainEventToSnapshot(snapshot, event);
+    expect(snapshot.messages).toStrictEqual([message]);
+
+    const replica = createInitialSnapshot();
+    applyMainEventToSnapshot(replica, event);
+    expect(replica.messages).toStrictEqual([message]);
+  });
+
   it('removes empty assistant placeholders when turns complete without visible output', () => {
     const snapshot = createInitialSnapshot();
 

@@ -299,7 +299,7 @@ Event `type` values are the app-owned `MainToRendererEvent['type']` union from
   `thread.goalCleared`, `thread.tokenUsageUpdated`, `turn.started`,
   `turn.planUpdated`, `turn.proposedPlanDelta`,
   `turn.proposedPlanCompleted`, `turn.completed`;
-- message and item streaming: `message.delta`, `message.steer`,
+- message and item streaming: `message.userSubmitted`, `message.delta`, `message.steer`,
   `item.started`, `item.updated`, `item.completed`;
 - approvals and requests: `approval.requested`, `toolInput.requested`;
 - artifacts and account state: `diff.updated`, `sidePanel.markdownRequested`,

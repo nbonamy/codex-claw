@@ -31,7 +31,13 @@ export function sendAgentPrompt(
 
   const promptResult = backendDriver.tryHandlePromptCommand?.(agent, trimmedPrompt) ?? null;
   if (!promptResult) {
-    appendUserPrompt(snapshot, agentId, trimmedPrompt, undefined, options?.attachments);
+    const message = appendUserPrompt(snapshot, agentId, trimmedPrompt, undefined, options?.attachments);
+    emit({
+      agentId,
+      type: 'message.userSubmitted',
+      payload: { message },
+      occurredAt: message.createdAt,
+    });
   }
   const hadBackendSession = Boolean(agent.backendSession);
 

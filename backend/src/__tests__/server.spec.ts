@@ -3548,6 +3548,7 @@ describe('ClawBackendServer', () => {
     }];
     let acceptPrompt!: (value: { backendSession: { kind: 'codex'; threadId: string }; turnId: string }) => void;
     const sendPrompt = vi.fn().mockReturnValue(new Promise((resolve) => { acceptPrompt = resolve; }));
+    const events: Array<{ type: string; snapshot?: AppSnapshot; payload: unknown }> = [];
     const driver: AgentBackendDriver = {
       backend: 'codex',
       getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
@@ -3561,6 +3562,7 @@ describe('ClawBackendServer', () => {
     const server = new ClawBackendServer({
       version: 'test-version', pid: 123, snapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      onEvent: (event) => events.push(event),
     });
 
     await server.handleMessage({
@@ -3576,6 +3578,18 @@ describe('ClawBackendServer', () => {
     });
     expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'run next', undefined);
     expect(snapshot.queuedPrompts).toHaveLength(1);
+    const submittedEvent = events.find((event) => event.type === 'message.userSubmitted');
+    expect(submittedEvent).toEqual(expect.objectContaining({
+      type: 'message.userSubmitted',
+      payload: {
+        message: expect.objectContaining({
+          agentId: 'agent-dina',
+          role: 'user',
+          parts: [{ type: 'text', text: 'run next' }],
+        }),
+      },
+    }));
+    expect(submittedEvent).not.toHaveProperty('snapshot');
 
     acceptPrompt({ backendSession: { kind: 'codex', threadId: 'thread-dina' }, turnId: 'turn-next' });
     await vi.waitFor(() => expect(snapshot.queuedPrompts).toStrictEqual([]));
