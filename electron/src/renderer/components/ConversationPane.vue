@@ -319,10 +319,8 @@ defineExpose({ focusComposer });
 }
 
 .conversation-pane__message-header {
-  margin-bottom: var(--space-3);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-12);
-  font-weight: var(--font-weight-medium);
+  color: inherit;
+  font: inherit;
 }
 
 :deep(.chat-tool-call__title-target[href]:hover) {
