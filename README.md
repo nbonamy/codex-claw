@@ -1,119 +1,135 @@
 <p align="center">
-   <img src="electron/assets/icon.png" width="128" height="128" alt="Codex Claw App Icon" />
+  <img src="electron/assets/icon.png" width="112" height="112" alt="Codex Claw app icon" />
 </p>
 
-# Codex Claw
+<h1 align="center">Codex Claw</h1>
 
-Builds consume the pinned Computer Use artifact from nbonamy/computer-use and
-verify its checksum. To opt into building the helper from a sibling
-`computer-use` checkout, set `COMPUTER_USE_LOCAL=1` in `.env`.
+<p align="center">
+  <strong>Your Codex team, in one cockpit.</strong><br />
+  Run a team of coding agents with the full power of the OpenAI Codex harness.
+</p>
 
-Meet your native Codex coding crew. Codex Claw is a desktop app that lets you
-run a team of Codex agents, each with its own folder, identity, thread, tools,
-and inbox, while rendering the work as a real app instead of a terminal stream.
+<p align="center">
+  <a href="https://codex-claw.nabocorp.com/desktop/downloads/codex-claw-macos-arm64.dmg"><strong>Download for macOS</strong></a>
+  ·
+  <a href="https://codex-claw.nabocorp.com">Website</a>
+  ·
+  <a href="CHANGELOG.md">Changelog</a>
+</p>
 
-![Electron](https://img.shields.io/badge/Electron-42+-47848F)
-![Vue](https://img.shields.io/badge/Vue-3-42b883)
-![TypeScript](https://img.shields.io/badge/TypeScript-6+-3178c6)
-![License](https://img.shields.io/badge/License-Apache--2.0-green)
+<p align="center">
+  <img src="website/assets/claw-screenshot.png" alt="Codex Claw coordinating a team of coding agents" width="960" />
+</p>
 
-## Why Codex Claw
+Codex is remarkably good at doing the work. Codex Claw adds the team layer for
+directing it: launch multiple agents, keep each one in its own workspace and
+conversation, see what everyone is doing, and step in exactly when it matters.
 
-- **Feels like a team room:** teams, agents, avatars, folders, statuses, and
-  Bench templates stay visible and organized.
-- **Native Codex rendering:** messages, tool calls, command output, approvals,
-  questions, plans, file edits, diff stats, and Markdown render as app UI.
-- **Actually collaborative:** built-in MCP lets agents register, set status,
-  list teammates, send messages, broadcast, and check their inbox.
-- **Built for coding flow:** queue prompts, steer active turns, interrupt work,
-  mention files, trigger skills, dictate prompts, and keep context/rate-limit
-  state in sight.
+Codex Claw is free to use with the Codex subscription you already have.
 
-## Features
+## One cockpit for the whole team
 
-- **Team and agent management** - Create teams, add Codex agents, edit avatars,
-  move agents between teams, duplicate, restart, close, and persist everything.
-- **Bench templates** - Save good agents as reusable templates and deploy them
-  back into a team.
-- **Native chat surface** - Stream assistant text, ordered message parts,
-  syntax-highlighted code, links, tool groups, command logs, and file-change
-  summaries.
-- **Plan and goal modes** - Toggle Codex plan mode, start goal-oriented turns,
-  and process app-server mode updates.
-- **Agent-to-agent communication** - Local Claw MCP server with Skwad-shaped
-  collaboration tools.
-- **Composer superpowers** - Model/reasoning selector, queued prompts,
-  active-turn steering, slash commands, skill search, file mentions, attach
-  affordances, and macOS speech-to-text.
-- **Runtime awareness** - Context-window gauge, account rate limits, backend
-  status, agent status, thread history resume, and loading skeletons.
+- **Run a real team** — Organize agents into teams, give each one a repository,
+  identity, conversation, and durable workspace, then switch between them
+  without interrupting their work.
+- **See the work, not a terminal stream** — Follow messages, plans, reasoning,
+  tool calls, approvals, command output, file changes, and diffs in a native
+  conversation UI.
+- **Let agents collaborate** — Agents can discover teammates, share status,
+  send or steer messages, queue follow-up work, and coordinate through Claw's
+  built-in MCP tools.
+- **Browse without leaving** — Every agent can keep an in-app browser for
+  research, local previews, and browser-based tools—even while another agent is
+  selected.
+- **Use the computer when code is not enough** — Opt-in Computer Use lets agents
+  inspect and operate macOS applications while you keep the session visible.
+- **Review with context** — Open Git changes, source files, turn-specific diffs,
+  Markdown, execution plans, and Plan-mode proposals beside the conversation.
+- **Keep coding from your phone** — Pair Codex mobile with your Claw workspace
+  while agents continue running through the background `clawd` daemon.
+- **Automate the queue** — Assign GitHub work from the Cockpit or use Loops to
+  watch for matching issues, deploy the right agent, and keep work moving.
 
-## Requirements
+## Built around your workflow
 
-- A current macOS development environment.
-- Node.js compatible with the Electron Forge/Vite toolchain.
-- Access to a Codex app-server binary.
+Create agents from repositories or reusable Bench templates. Give each agent a
+prompt, then move freely between active conversations: drafts, attachments,
+queues, model settings, browser tabs, and sidebar state stay with the agent.
 
-Codex Claw can use an isolated Codex home through `CODEX_CLAW_CODEX_HOME` and
-resumes persisted agent sessions when possible.
+When a turn needs attention, steer it immediately. When it does not, queue the
+next instruction and let Claw submit it at the right time. Quit the desktop app
+without stopping the team; `clawd` keeps background work alive and restores the
+durable state when you return.
+
+## Get Codex Claw
+
+The current desktop release supports macOS on Apple silicon.
+
+1. [Download the latest DMG](https://codex-claw.nabocorp.com/desktop/downloads/codex-claw-macos-arm64.dmg).
+2. Move Codex Claw to Applications and launch it.
+3. Sign in with an OpenAI account that has access to Codex.
+4. Create a team, add an agent from a repository, and start coding.
+
+Plugin installation, sandbox policies, and advanced Codex configuration remain
+available through the ChatGPT desktop app. Codex Claw can launch ChatGPT with
+the same isolated Codex home from Settings.
 
 ## Development
+
+Requirements:
+
+- macOS with a current Node.js toolchain;
+- access to a Codex app-server binary;
+- a sibling `codex-app-sdk` checkout while the SDK dependency remains local.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Useful verification commands:
+Focused project gates:
 
 ```bash
 npm test
 npm run test:coverage
 npm run lint
-npm run build
+npm run typecheck
 ```
 
-macOS packaging signs and notarizes by default. For local packaging checks that
-do not need release signing:
+Builds consume the pinned Computer Use artifact and verify its checksum. Set
+`COMPUTER_USE_LOCAL=1` in `.env` to build the helper from a sibling
+`computer-use` checkout instead. While `codex-app-sdk` is linked through a local
+`file:` dependency, build and package entrypoints rebuild its `dist` first.
+
+macOS release packaging signs and notarizes by default. For local packaging
+checks that do not need signing:
 
 ```bash
-CODEX_CLAW_SKIP_SIGNING=1 npm run build
 CODEX_CLAW_SKIP_SIGNING=1 npm run package
 ```
 
-`npm run build` is the release build entrypoint: it builds the backend and
-native Computer Use helper, packages the Electron app, then verifies the final
-signed and notarized macOS bundle. It fails before building when any required
-macOS signing or notarization credential is missing.
-
-While `codex-app-sdk` is linked through a local `file:` dependency, `build`,
-`build:backend`, `package`, and `make` rebuild the sibling SDK before consuming
-its `dist` output. This step automatically skips once the dependency is
-published through npm.
-
 ## Architecture
 
-Codex Claw keeps Codex protocol details in Electron main:
+Codex Claw separates the desktop shell from the long-running agent backend:
 
 ```text
-Renderer UI -> typed preload IPC -> Electron main -> backend driver -> Codex app-server
+Vue renderer → typed preload IPC → Electron main → clawd → backend driver → Codex app-server
 ```
 
-The renderer consumes app-owned events and `RendererMessage` parts. Codex is
-the implemented backend today, with a narrow backend seam ready for a future
-Claude Code driver.
+Electron owns native desktop integration. `clawd` owns agent runtime state,
+persistence, collaboration, backend processes, git, approvals, and background
+work. The renderer consumes app-owned events rather than provider protocol
+types.
 
 ## Documentation
 
-- [AGENTS.md](AGENTS.md) - repo rules for agents working on Codex Claw
-- [docs/architecture.md](docs/architecture.md) - product and process
-  architecture
-- [docs/codex.md](docs/codex.md) - Codex app-server protocol notes
-- [docs/mcp.md](docs/mcp.md) - Claw MCP collaboration server
-- [docs/frontend.md](docs/frontend.md) - renderer and theming principles
-- [docs/testing.md](docs/testing.md) - test strategy and coverage bar
-- [plans/codex-claw.md](plans/codex-claw.md) - product progression
-- [CHANGELOG.md](CHANGELOG.md) - release history
+- [Architecture](docs/architecture.md)
+- [Backend protocol](docs/protocol.md)
+- [Codex integration](docs/codex.md)
+- [Agent collaboration and MCP](docs/mcp.md)
+- [Frontend conventions](docs/frontend.md)
+- [Testing](docs/testing.md)
+- [Contributor agent instructions](AGENTS.md)
 
 ## License
 
