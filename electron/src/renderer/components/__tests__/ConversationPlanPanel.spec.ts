@@ -24,12 +24,23 @@ describe('ConversationPlanPanel', () => {
       global: { plugins: [i18n] },
     });
 
-    expect(wrapper.get('aside').attributes('aria-label')).toBe('Plan');
-    expect(wrapper.get('.conversation-plan__explanation').text()).toBe('Ship the focused fix');
+    expect(wrapper.get('aside').attributes('aria-label')).toBe('Ship the focused fix');
+    expect(wrapper.get('h2').text()).toBe('Ship the focused fix');
     const steps = wrapper.findAll('.conversation-plan__step');
     expect(steps).toHaveLength(3);
     expect(steps[0].classes()).toContain('conversation-plan__step--completed');
     expect(steps[1].classes()).toContain('conversation-plan__step--inProgress');
     expect(steps[2].classes()).toContain('conversation-plan__step--pending');
+  });
+
+  it('emits close when the overlay dismiss button is pressed', async () => {
+    const wrapper = mount(ConversationPlanPanel, {
+      props: { plan },
+      global: { plugins: [i18n] },
+    });
+
+    await wrapper.get('[aria-label="Close execution plan"]').trigger('click');
+
+    expect(wrapper.emitted('close')).toStrictEqual([[]]);
   });
 });

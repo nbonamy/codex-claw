@@ -443,7 +443,7 @@ export class AppController {
     }
     this.mainWindow = createMainWindow(
       this.snapshot?.general.agentListCompact ?? false,
-      this.updateMenuOptions(),
+      { ...this.updateMenuOptions(), toggleDebugExecutionPlan: () => this.toggleDebugExecutionPlan() },
     );
     logMain('window', 'created main window');
     this.rendererReady = false;
@@ -1175,7 +1175,22 @@ export class AppController {
       debugMode: !app.isPackaged,
       agentListCompact: this.snapshot?.general.agentListCompact ?? false,
       ...this.updateMenuOptions(),
+      toggleDebugExecutionPlan: () => this.toggleDebugExecutionPlan(),
     });
+  }
+
+  private toggleDebugExecutionPlan(): void {
+    const agentId = this.snapshot?.activeAgentId;
+    if (!agentId || !this.backendClient || app.isPackaged) {
+      return;
+    }
+
+    void this.backendClient.request<AppSnapshot>(backendMethods.debugExecutionPlanToggle, { agentId })
+      .then((snapshot) => this.adoptBackendSnapshot(snapshot))
+      .catch((error) => warnMain('debug', 'failed to toggle execution plan', {
+        agentId,
+        detail: error instanceof Error ? error.message : String(error),
+      }));
   }
 
   private emitBackendEvent(event: ClawBackendEvent): void {

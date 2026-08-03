@@ -137,6 +137,40 @@ export class ClawBackendServer {
       case backendMethods.clientStateGet:
         await this.initializeSourceFolderIfNeeded();
         return createClawRpcResult(message.id, clientStateFromSnapshot(await this.clientSnapshot()));
+      case backendMethods.debugExecutionPlanToggle: {
+        const agentId = requireAgentId(message.params);
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+
+        const existingTurnId = agent.plan?.turnId;
+        if (existingTurnId) {
+          delete agent.plan;
+          this.snapshot.messages = this.snapshot.messages.filter((message) => (
+            message.agentId !== agentId || !message.parts.some((part) => part.type === 'tool' && part.id === `plan-${existingTurnId}`)
+          ));
+          return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        }
+
+        const turnId = `debug-plan-${Date.now()}`;
+        this.handleBackendEvent({
+          agentId,
+          backend: agent.backend,
+          threadId: agent.backendSession?.kind === 'codex' ? agent.backendSession.threadId : `debug-thread-${agentId}`,
+          turnId,
+          type: 'turn.planUpdated',
+          payload: {
+            explanation: 'Debug execution plan',
+            plan: [
+              { step: 'Inspect the current state', status: 'completed' },
+              { step: 'Exercise the execution-plan overlay', status: 'inProgress' },
+              { step: 'Remove the debug fixture', status: 'pending' },
+            ],
+          },
+        }, { persist: false });
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
       case backendMethods.systemPermissionsGet:
         return createClawRpcResult(message.id, await this.systemPermissions.getStatus());
       case backendMethods.systemPermissionsAccessibilityOpen:

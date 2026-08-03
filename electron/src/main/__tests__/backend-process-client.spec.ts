@@ -274,7 +274,7 @@ describe('ClawBackendProcessClient', () => {
     expect(spawnProcess).toHaveBeenCalledTimes(2);
   });
 
-  it('restarts the backend when the watched bundle changes', async () => {
+  it('restarts the backend when an explicit bundle watcher is configured', async () => {
     vi.useFakeTimers();
     const firstChild = createFakeChildProcess();
     const secondChild = createFakeChildProcess();

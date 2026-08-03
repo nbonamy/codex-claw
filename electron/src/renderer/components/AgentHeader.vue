@@ -83,6 +83,17 @@
         </button>
       </span>
       <button
+        v-if="executionPlanAvailable"
+        class="agent-header__execution-plan"
+        type="button"
+        aria-label="Toggle execution plan"
+        title="Toggle execution plan"
+        :aria-pressed="executionPlanOpen"
+        @click="emit('toggle-execution-plan')"
+      >
+        <ListIcon aria-hidden="true" />
+      </button>
+      <button
         class="agent-header__workspace"
         type="button"
         aria-label="Toggle right workspace"
@@ -104,7 +115,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Agent, AgentGitStatus, BackendRuntimeStatus, DesktopUpdateStatus } from '@codex-claw/shared/contracts';
-import { PanelLeftOpenIcon } from '../shared/icons/app-icons';
+import { ListIcon, PanelLeftOpenIcon } from '../shared/icons/app-icons';
 import { IconLayoutSidebarRight } from '@tabler/icons-vue';
 import { CodexAnimatedDiffStat } from 'codex-app-sdk/vue';
 import AgentAvatar from './AgentAvatar.vue';
@@ -118,11 +129,14 @@ const props = defineProps<{
   isLoading: boolean;
   sidebarCollapsed: boolean;
   updateStatus?: DesktopUpdateStatus;
+  executionPlanAvailable?: boolean;
+  executionPlanOpen?: boolean;
 }>();
 
 const emit = defineEmits<{
   'expand-sidebar': [];
   'toggle-workspace': [];
+  'toggle-execution-plan': [];
   'open-git-diff': [];
   'install-update': [];
 }>();
@@ -301,6 +315,31 @@ const hasHeaderGitStatus = computed(() => {
   width: 32px;
   height: 32px;
   padding: 0;
+}
+
+.agent-header__execution-plan {
+  -webkit-app-region: no-drag;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.agent-header__execution-plan:hover,
+.agent-header__execution-plan[aria-pressed='true'] {
+  background: var(--color-surface-high);
+  color: var(--color-text);
+}
+
+.agent-header__execution-plan :deep(svg) {
+  width: var(--icon-md);
+  height: var(--icon-md);
 }
 
 .agent-header__workspace:hover,

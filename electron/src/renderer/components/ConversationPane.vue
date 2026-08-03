@@ -61,7 +61,11 @@
         >{{ collaborationMessageLabel(message.id) }}</span>
       </template>
     </CodexConversationPane>
-    <ConversationPlanPanel v-if="plan" :plan="plan" />
+    <ConversationPlanPanel
+      v-if="plan && planVisible"
+      :plan="plan"
+      @close="emit('close-plan')"
+    />
   </div>
 </template>
 
@@ -114,6 +118,7 @@ const props = withDefaults(defineProps<{
   approvals?: BackendApprovalRequest[];
   goal?: Agent['goal'] | null;
   plan?: ThreadPlan | null;
+  planVisible?: boolean;
   isLoading: boolean;
   isSending: boolean;
   answeredClientRequestIds?: Set<string>;
@@ -144,6 +149,7 @@ const props = withDefaults(defineProps<{
   approvalPreset: null,
   composerState: () => ({ text: '', selectionStart: 0, selectionEnd: 0 }),
   attachments: () => [],
+  planVisible: true,
 });
 provideClawToolPresentation(
   (key, params) => t(key, params ?? {}),
@@ -152,6 +158,7 @@ provideClawToolPresentation(
 
 const emit = defineEmits<{
   'clear-goal': [];
+  'close-plan': [];
   'client-response': [response: ClientRequestResponse];
   'delete-message': [index: number];
   'delete-queued-prompt': [promptId: string];

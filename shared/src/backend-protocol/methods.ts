@@ -83,6 +83,7 @@ export const backendMethods = {
   driverSessionForget: 'driver/session/forget',
   driverSkillsList: 'driver/skills/list',
   driverTurnRollback: 'driver/turn/rollback',
+  debugExecutionPlanToggle: 'debug/executionPlan/toggle',
   devicePairingStatusGet: 'devicePairing/status/get',
   devicePairingEnable: 'devicePairing/enable',
   devicePairingDisable: 'devicePairing/disable',

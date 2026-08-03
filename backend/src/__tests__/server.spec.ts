@@ -5,6 +5,7 @@ import path from 'node:path';
 import type { AppSnapshot, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/shared/contracts';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/shared/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
+import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import { CodexBackendDriver } from '../codex/codex-driver';
@@ -26,6 +27,62 @@ describe('ClawBackendServer', () => {
         pid: 123,
       },
     });
+  });
+
+  it('toggles the persisted debug execution plan through the backend event pipeline', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+    });
+
+    const createResult = await server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'debug-plan-create',
+      method: backendMethods.debugExecutionPlanToggle,
+      params: { agentId: 'agent-dina' },
+    });
+    expect(createResult).toMatchObject({
+      result: {
+        agents: [{
+          id: 'agent-dina',
+          plan: {
+            explanation: 'Debug execution plan',
+            steps: [
+              { step: 'Inspect the current state', status: 'completed' },
+              { step: 'Exercise the execution-plan overlay', status: 'inProgress' },
+              { step: 'Remove the debug fixture', status: 'pending' },
+            ],
+          },
+        }],
+      },
+    });
+    expect(snapshot.messages.some((message) => message.parts.some((part) => part.type === 'tool' && part.id.startsWith('plan-debug-plan-')))).toBe(true);
+
+    const removeResult = await server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'debug-plan-remove',
+      method: backendMethods.debugExecutionPlanToggle,
+      params: { agentId: 'agent-dina' },
+    });
+    expect(removeResult).toMatchObject({ result: { agents: [{ id: 'agent-dina' }] } });
+    expect((removeResult as { result: AppSnapshot }).result.agents[0]?.plan).toBeUndefined();
+    expect(snapshot.messages.some((message) => message.parts.some((part) => part.type === 'tool' && part.id.startsWith('plan-debug-plan-')))).toBe(false);
+    expect(saveSnapshot).toHaveBeenCalledTimes(2);
   });
 
   it('routes system permission requests through the backend system port', async () => {

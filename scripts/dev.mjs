@@ -14,7 +14,7 @@ process.env.CODEX_APP_SDK_SOURCE = '1';
 
 if (process.argv.includes('--help')) {
   console.log('Usage: npm run dev');
-  console.log('Builds clawd once, watches backend changes, then starts Electron with the backend process configured.');
+  console.log('Builds clawd once, watches backend output, then starts Electron without restarting clawd on bundle changes.');
   process.exit(0);
 }
 
@@ -34,7 +34,7 @@ const electronDev = start('npm', ['run', 'dev:electron'], {
   env: {
     CODEX_CLAW_BACKEND_COMMAND: process.execPath,
     CODEX_CLAW_BACKEND_ARGS: `${backendBundle},--stdio`,
-    CODEX_CLAW_BACKEND_WATCH_FILE: backendBundle,
+    CODEX_CLAW_BACKEND_WATCH_FILE: '',
     CODEX_CLAW_ASSETS_PATH: path.join(rootDir, 'electron', 'assets'),
   },
 });

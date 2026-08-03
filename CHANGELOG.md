@@ -12,8 +12,9 @@ All notable Codex Claw changes are recorded here.
   review when a link has no usable turn context.
 - Added a Plugins settings page with opt-in Computer Use and Chrome controls,
   ChatGPT handoff, and a catalog of common integrations.
-- Chrome availability now mirrors ChatGPT's plugin configuration, refreshing
-  from the backend every five seconds without changing the toggle on click.
+- Markdown previews now open as tabs in the right sidebar.
+- Chrome availability stays in sync with ChatGPT.
+- Execution plans can be dismissed and reopened from the agent header.
 
 ## [0.3.1] - 2026-08-02
 

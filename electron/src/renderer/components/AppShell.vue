@@ -183,7 +183,10 @@
           :is-loading="isLoading"
           :sidebar-collapsed="agentSidebarCollapsed"
           :update-status="updateStatus"
+          :execution-plan-available="Boolean(currentTurnPlan)"
+          :execution-plan-open="executionPlanVisible"
           @expand-sidebar="agentSidebarCollapsed = false"
+          @toggle-execution-plan="toggleExecutionPlan"
           @toggle-workspace="toggleRightWorkspace"
           @open-git-diff="openAgentGitDiffPreview"
           @install-update="emit('install-update')"
@@ -215,6 +218,7 @@
             :goal="goal"
             :approvals="approvals"
             :plan="currentTurnPlan"
+            :plan-visible="executionPlanVisible"
             :approval-preset="approvalPreset"
             :plan-mode="planMode"
             :selected-model-id="selectedModelId"
@@ -224,6 +228,7 @@
             :composer-state="composerState"
             :attachments="composerAttachments"
             @client-response="$emit('client-response', $event)"
+            @close-plan="closeExecutionPlan"
             @delete-message="$emit('delete-message', $event)"
             @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
             @edit-message="$emit('edit-message', $event)"
@@ -369,6 +374,7 @@ import {
   isRightWorkspaceDiffTab,
   rightWorkspaceDiffTab,
   rightWorkspaceFileTab,
+  rightWorkspaceMarkdownTab,
   type RightWorkspaceDiffPanel,
   type RightWorkspaceDiffTab,
   type RightWorkspaceFilePanel,
@@ -632,6 +638,7 @@ const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
 const activeSurface = ref<AppSurface>('agent');
 const rightWorkspaces = reactive<Record<string, AgentRightWorkspaceState>>({});
+const executionPlanStates = reactive<Record<string, { open: boolean; turnId: string }>>({});
 const workspaceBody = ref<HTMLElement | null>(null);
 const conversationPane = ref<{ focusComposer(): void } | null>(null);
 const authentication = ref<CodexAuthentication | null>(null);
@@ -655,7 +662,26 @@ const editingTeamId = ref<string | null>(null);
 const sidePanel = ref<SidePanelState | null>(null);
 let sidePanelRequestId = 0;
 let filePreviewRequestId = 0;
+let markdownPreviewId = 0;
 let unsubscribeAppCommand: (() => void) | null = null;
+const activeTeam = computed<Team | null>(() => {
+  const selectedTeam = props.snapshot.activeTeamId
+    ? props.snapshot.teams.find((team) => team.id === props.snapshot.activeTeamId) ?? null
+    : null;
+  if (selectedTeam) {
+    return selectedTeam;
+  }
+
+  if (props.activeAgent?.teamId) {
+    return props.snapshot.teams.find((team) => team.id === props.activeAgent?.teamId) ?? props.snapshot.teams[0] ?? null;
+  }
+
+  if (props.activeAgent) {
+    return props.snapshot.teams.find((team) => team.agentIds.includes(props.activeAgent?.id ?? '')) ?? props.snapshot.teams[0] ?? null;
+  }
+
+  return props.snapshot.teams[0] ?? null;
+});
 const activeTeamAgents = computed(() => {
   const team = activeTeam.value;
   if (!team) {
@@ -691,7 +717,7 @@ const currentAgentGitStatus = computed<AgentGitStatus | null>(() => {
 });
 const currentTurnPlan = computed<ThreadPlan | null>(() => {
   const plan = currentAgent.value?.plan;
-  if (!props.isSending || !plan?.steps.length) {
+  if (!plan?.steps.length) {
     return null;
   }
 
@@ -703,8 +729,57 @@ const currentTurnPlan = computed<ThreadPlan | null>(() => {
     }
   }
 
-  return latestTurnId === plan.turnId ? plan : null;
+  return !latestTurnId || latestTurnId === plan.turnId ? plan : null;
 });
+const executionPlanVisible = computed(() => {
+  const agentId = currentAgent.value?.id;
+  const plan = currentTurnPlan.value;
+  if (!agentId || !plan) {
+    return false;
+  }
+
+  return executionPlanStates[agentId]?.turnId === plan.turnId
+    ? executionPlanStates[agentId].open
+    : true;
+});
+
+watch(() => ({
+  agentId: currentAgent.value?.id ?? null,
+  turnId: currentTurnPlan.value?.turnId ?? null,
+}), ({ agentId, turnId }) => {
+  if (!agentId || !turnId) {
+    return;
+  }
+
+  const existing = executionPlanStates[agentId];
+  if (!existing || existing.turnId !== turnId) {
+    executionPlanStates[agentId] = { open: true, turnId };
+  }
+}, { immediate: true });
+
+function toggleExecutionPlan(): void {
+  const agentId = currentAgent.value?.id;
+  const plan = currentTurnPlan.value;
+  if (!agentId || !plan) {
+    return;
+  }
+
+  const existing = executionPlanStates[agentId];
+  executionPlanStates[agentId] = {
+    turnId: plan.turnId,
+    open: existing?.turnId === plan.turnId ? !existing.open : false,
+  };
+}
+
+function closeExecutionPlan(): void {
+  const agentId = currentAgent.value?.id;
+  const plan = currentTurnPlan.value;
+  if (!agentId || !plan) {
+    return;
+  }
+
+  executionPlanStates[agentId] = { turnId: plan.turnId, open: false };
+}
 const rightWorkspaceVisible = computed(() => {
   const agentId = currentAgent.value?.id;
   return Boolean(agentId && rightWorkspaceFor(agentId).open && sidePanel.value === null);
@@ -1938,24 +2013,6 @@ function cycleAgents(direction: 1 | -1, event?: KeyboardEvent): void {
   selectAgentFromShell(nextAgent.id);
 }
 
-const activeTeam = computed<Team | null>(() => {
-  const selectedTeam = props.snapshot.activeTeamId
-    ? props.snapshot.teams.find((team) => team.id === props.snapshot.activeTeamId) ?? null
-    : null;
-  if (selectedTeam) {
-    return selectedTeam;
-  }
-
-  if (props.activeAgent?.teamId) {
-    return props.snapshot.teams.find((team) => team.id === props.activeAgent?.teamId) ?? props.snapshot.teams[0] ?? null;
-  }
-
-  if (props.activeAgent) {
-    return props.snapshot.teams.find((team) => team.agentIds.includes(props.activeAgent?.id ?? '')) ?? props.snapshot.teams[0] ?? null;
-  }
-
-  return props.snapshot.teams[0] ?? null;
-});
 const activeTeamName = computed(() => activeTeam.value?.name ?? 'Codex Claw');
 const activeBench = computed(() => benchForTeam(activeTeam.value));
 const benchByTeamId = computed<Record<string, BenchTemplate[]>>(() => {

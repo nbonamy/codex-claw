@@ -26,6 +26,7 @@ export {
   IconHandStop as HandStopIcon,
   IconInfoCircle as Info,
   IconInfinity as InfinityIcon,
+  IconList as ListIcon,
   IconListDetails as ListDetailsIcon,
   IconLogs as LogsIcon,
   IconLayoutSidebarLeftCollapse as PanelLeftCloseIcon,

@@ -47,6 +47,15 @@ const messages: RendererMessage[] = [
   },
 ];
 
+const executionPlan: ThreadPlan = {
+  threadId: 'thread-plan',
+  turnId: 'turn-plan',
+  explanation: 'Current execution plan',
+  steps: [{ step: 'Implement the fix', status: 'inProgress' }],
+  markdown: 'Current execution plan\n- [ ] Implement the fix',
+  updatedAt: '2026-08-01T00:00:00.000Z',
+};
+
 describe('ConversationPane', () => {
   it('uses the message surface for the empty conversation background', () => {
     expect(conversationPaneSource).toMatch(/\.conversation-pane\s*\{[\s\S]*background:\s*var\(--color-shell-main\);/);
@@ -54,19 +63,21 @@ describe('ConversationPane', () => {
   });
 
   it('floats active plan progress without passing a sticky turn diff to the SDK composer', () => {
-    const plan: ThreadPlan = {
-      threadId: 'thread-plan',
-      turnId: 'turn-plan',
-      explanation: 'Current execution plan',
-      steps: [{ step: 'Implement the fix', status: 'inProgress' }],
-      markdown: 'Current execution plan\n- [ ] Implement the fix',
-      updatedAt: '2026-08-01T00:00:00.000Z',
-    };
-    const wrapper = mountPane({ agent, messages, isSending: true, plan });
+    const wrapper = mountPane({ agent, messages, isSending: true, plan: executionPlan });
 
     expect(wrapper.get('.conversation-plan').text()).toContain('Implement the fix');
     const sdkProps = wrapper.getComponent(CodexConversationPane as unknown as Component).props() as Record<string, unknown>;
     expect(sdkProps.turnGitDiff).toBeUndefined();
+  });
+
+  it('forwards execution-plan dismissal and can hide the overlay', async () => {
+    const wrapper = mountPane({ agent, messages, isSending: true, plan: executionPlan, planVisible: true });
+
+    await wrapper.get('[aria-label="Close execution plan"]').trigger('click');
+
+    expect(wrapper.emitted('close-plan')).toStrictEqual([[]]);
+    await wrapper.setProps({ planVisible: false });
+    expect(wrapper.find('.conversation-plan').exists()).toBe(false);
   });
 
   it('keeps SDK sources hot-reloadable with a prebundled dist fallback', () => {
@@ -498,6 +509,7 @@ function mountPane(props: {
   backendCapabilities?: BackendCapabilities;
   approvals?: BackendApprovalRequest[];
   plan?: ThreadPlan | null;
+  planVisible?: boolean;
   isLoading?: boolean;
   composerState?: CodexComposerState;
   attachments?: readonly CodexNativeAttachment[];

@@ -96,6 +96,37 @@ describe('AgentHeader', () => {
     expect(wrapper.emitted('toggle-workspace')).toStrictEqual([[]]);
   });
 
+  it('shows the execution-plan toggle only when a plan is available', async () => {
+    const wrapper = mount(AgentHeader, {
+      props: {
+        agent,
+        backendRuntime: { backend: 'codex', status: 'running' },
+        isLoading: false,
+        sidebarCollapsed: false,
+        executionPlanAvailable: true,
+        executionPlanOpen: true,
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    const planAction = wrapper.get('[aria-label="Toggle execution plan"]');
+    expect(planAction.attributes('aria-pressed')).toBe('true');
+    await planAction.trigger('click');
+    expect(wrapper.emitted('toggle-execution-plan')).toStrictEqual([[]]);
+
+    const hiddenWrapper = mount(AgentHeader, {
+      props: {
+        agent,
+        backendRuntime: { backend: 'codex', status: 'running' },
+        isLoading: false,
+        sidebarCollapsed: false,
+        executionPlanAvailable: false,
+      },
+      global: { plugins: [ElementPlus] },
+    });
+    expect(hiddenWrapper.find('[aria-label="Toggle execution plan"]').exists()).toBe(false);
+  });
+
   it('places a downloaded update badge in the header and forwards install', async () => {
     const wrapper = mount(AgentHeader, {
       props: {

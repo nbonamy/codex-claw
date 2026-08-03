@@ -12,12 +12,13 @@ export type AppMenuOptions = {
 export type AppMenuCallbacks = {
   checkForUpdates?: () => void;
   installUpdate?: () => void;
+  toggleDebugExecutionPlan?: () => void;
   reload(): void;
   sendAppCommand(command: AppCommand): void;
   toggleDeveloperTools(): void;
 };
 
-type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate'>>;
+type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'toggleDebugExecutionPlan'>>;
 
 export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOptions): void {
   const { checkForUpdates, installUpdate, ...menuOptions } = options;
@@ -27,6 +28,7 @@ export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOpt
     reload: () => window.webContents.reload(),
     sendAppCommand: (command) => sendAppCommand(window.webContents, command),
     toggleDeveloperTools: () => window.webContents.toggleDevTools(),
+    toggleDebugExecutionPlan: options.toggleDebugExecutionPlan,
   }, menuOptions)));
 }
 
@@ -40,9 +42,23 @@ export function buildAppMenuTemplate(
     buildFileMenu(callbacks),
     buildEditMenu(callbacks),
     buildViewMenu(callbacks, options),
+    ...(options.debugMode ? [buildDebugMenu(callbacks)] : []),
     buildWindowMenu(callbacks, platform),
     { role: 'help' },
   ];
+}
+
+function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions {
+  return {
+    label: 'Debug',
+    submenu: [
+      {
+        label: 'Execution Plan',
+        enabled: Boolean(callbacks.toggleDebugExecutionPlan),
+        click: () => callbacks.toggleDebugExecutionPlan?.(),
+      },
+    ],
+  };
 }
 
 function buildCodexClawMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions): MenuItemConstructorOptions {

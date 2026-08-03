@@ -1,12 +1,18 @@
 <template>
-  <aside class="conversation-plan" aria-live="polite" :aria-label="t('chat.planProgress.title')">
+  <aside class="conversation-plan" aria-live="polite" :aria-label="planTitle">
     <header class="conversation-plan__header">
-      <ListDetailsIcon :size="16" stroke-width="1.8" aria-hidden="true" />
-      <h2>{{ t('chat.planProgress.title') }}</h2>
+      <ListIcon :size="16" stroke-width="1.8" aria-hidden="true" />
+      <h2>{{ planTitle }}</h2>
+      <button
+        class="conversation-plan__close"
+        type="button"
+        :aria-label="t('chat.planProgress.close')"
+        :title="t('chat.planProgress.close')"
+        @click="emit('close')"
+      >
+        <X :size="16" stroke-width="1.8" aria-hidden="true" />
+      </button>
     </header>
-    <p v-if="plan.explanation" class="conversation-plan__explanation">
-      {{ plan.explanation }}
-    </p>
     <ol class="conversation-plan__steps">
       <li
         v-for="(entry, index) in plan.steps"
@@ -38,15 +44,21 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { ThreadPlan } from '@codex-claw/shared/contracts';
-import { CheckIcon, Circle, ListDetailsIcon } from '../shared/icons/app-icons';
+import { CheckIcon, Circle, ListIcon, X } from '../shared/icons/app-icons';
 
-defineProps<{
+const props = defineProps<{
   plan: ThreadPlan;
 }>();
 
+const emit = defineEmits<{
+  close: [];
+}>();
+
 const { t } = useI18n();
+const planTitle = computed(() => props.plan.explanation?.trim() || t('chat.planProgress.title'));
 </script>
 
 <style scoped>
@@ -75,17 +87,35 @@ const { t } = useI18n();
 }
 
 .conversation-plan__header h2 {
+  flex: 1 1 auto;
   margin: 0;
   font-size: var(--font-size-13);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-16);
 }
 
-.conversation-plan__explanation {
-  margin: var(--space-6) 0 0;
+.conversation-plan__close {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
   color: var(--color-text-muted);
-  font-size: var(--font-size-12);
-  line-height: var(--line-height-16);
+  background: transparent;
+  cursor: pointer;
+}
+
+.conversation-plan__close:hover {
+  color: var(--color-text);
+  background: var(--color-surface-high);
+}
+
+.conversation-plan__close:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
 }
 
 .conversation-plan__steps {

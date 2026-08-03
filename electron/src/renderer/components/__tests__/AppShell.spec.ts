@@ -115,7 +115,7 @@ describe('AppShell', () => {
     expect(wrapper.findComponent({ name: 'ConversationPane' }).props('agents')).toStrictEqual(snapshot.agents);
   });
 
-  it('shows structured plan progress only while its turn is active', async () => {
+  it('retains structured plan progress after the turn stops', async () => {
     const snapshot = createInitialSnapshot();
     const activeAgent = snapshot.agents[0];
     const plan = {
@@ -152,7 +152,7 @@ describe('AppShell', () => {
 
     await wrapper.setProps({ isSending: false } as Record<string, unknown>);
 
-    expect(wrapper.findComponent({ name: 'ConversationPane' }).props('plan')).toBeNull();
+    expect(wrapper.findComponent({ name: 'ConversationPane' }).props('plan')).toStrictEqual(plan);
   });
 
   it('forwards prompts from the composer', async () => {
