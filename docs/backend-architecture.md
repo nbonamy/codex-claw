@@ -639,6 +639,13 @@ When launched by the macOS LaunchAgent, launchd captures stdout and stderr to
 `~/Library/Logs/Codex Claw/clawd.out.log` and `clawd.err.log`; those files are
 secondary process-capture logs, not the primary operational log.
 
+Electron main writes its own operational log through `electron-log` in the
+platform's Codex Claw log directory. It records startup, window, backend
+connection, request-timeout, event-sequence, and shutdown diagnostics. Main
+also receives renderer console messages from each window; messages are bounded,
+filtered for known browser noise, and redacted before they are written. The
+renderer remains free of filesystem access and does not own log persistence.
+
 On startup, packaged Electron resolves the current packaged `clawd --version`
 and compares it with the running daemon's `backend/health/get.version`. If an
 installed daemon is stale and idle, Electron refreshes the LaunchAgent before

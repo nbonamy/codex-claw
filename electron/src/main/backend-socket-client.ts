@@ -2,7 +2,7 @@ import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import net, { type Socket } from 'node:net';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawRpcResponse, parseClawRpcMessage, type ClawBackendEvent, type ClawBackendHealth, type ClawRpcId, type ClawRpcRequest, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { createRuntimeClientRequestHandlers } from './client-request-handlers';
-import { warnMain } from './log';
+import { logMain, warnMain } from './log';
 import { backendRequestTimeoutMs } from './backend-request-timeout';
 
 export type ClawBackendSocketClientOptions = {
@@ -42,6 +42,7 @@ export class ClawBackendSocketClient {
 
     const socket = this.connectSocket(this.options.socketPath);
     this.socket = socket;
+    logMain('clawd', 'connecting to backend socket');
     socket.on('data', (chunk) => this.handleData(chunk));
     socket.once('close', () => this.handleDisconnect(socket, new Error('clawd socket closed.')));
     socket.once('error', (error) => this.handleDisconnect(socket, error));
@@ -52,6 +53,7 @@ export class ClawBackendSocketClient {
     });
     this.buffer = '';
     this.emitConnectionState('connected');
+    logMain('clawd', 'backend socket connected');
   }
 
   async health(): Promise<ClawBackendHealth> {
@@ -71,6 +73,7 @@ export class ClawBackendSocketClient {
     const result = new Promise<Result>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pending.delete(id);
+        warnMain('clawd', 'socket request timed out', { method, id });
         reject(new Error(`clawd socket request timed out: ${method}`));
       }, backendRequestTimeoutMs(method, this.requestTimeoutMs));
 
@@ -147,6 +150,10 @@ export class ClawBackendSocketClient {
       }
       response = message;
     } catch (error) {
+      warnMain('clawd', 'failed to parse backend socket response', {
+        detail: error instanceof Error ? error.message : 'Invalid backend response.',
+        bytes: line.length,
+      });
       response = createClawRpcError(null, clawRpcErrorCodes.parseError, error instanceof Error ? error.message : 'Invalid backend response.');
     }
 
@@ -224,6 +231,7 @@ export class ClawBackendSocketClient {
     if (this.socket !== socket) return;
     this.socket = null;
     this.rejectPending(error);
+    warnMain('clawd', 'backend socket disconnected', { detail: error.message });
     this.emitConnectionState('disconnected', error);
   }
 

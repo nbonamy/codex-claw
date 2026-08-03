@@ -4,7 +4,7 @@ import { EventEmitter } from 'node:events';
 import { watch } from 'node:fs';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawRpcResponse, parseClawRpcMessage, type ClawBackendEvent, type ClawBackendHealth, type ClawRpcId, type ClawRpcRequest, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { createRuntimeClientRequestHandlers } from './client-request-handlers';
-import { warnMain } from './log';
+import { logMain, warnMain } from './log';
 import { backendRequestTimeoutMs } from './backend-request-timeout';
 
 export type ClawBackendProcessCommand = {
@@ -69,6 +69,8 @@ export class ClawBackendProcessClient {
       stdio: 'pipe',
     });
 
+    logMain('clawd', 'starting backend process', { command: this.command.command });
+
     this.process = child;
     child.stdout.on('data', (chunk) => this.handleStdout(chunk));
     child.stderr.on('data', (chunk) => {
@@ -79,6 +81,7 @@ export class ClawBackendProcessClient {
 
     this.startWatcher();
     this.emitConnectionState('connected');
+    logMain('clawd', 'backend process started', { pid: child.pid ?? null });
   }
 
   async health(): Promise<ClawBackendHealth> {
@@ -98,6 +101,7 @@ export class ClawBackendProcessClient {
     const result = new Promise<Result>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pending.delete(id);
+        warnMain('clawd', 'request timed out', { method, id });
         reject(new Error(`clawd request timed out: ${method}`));
       }, backendRequestTimeoutMs(method, this.requestTimeoutMs));
 
@@ -234,6 +238,7 @@ export class ClawBackendProcessClient {
       }
       response = message;
     } catch (error) {
+      warnMain('clawd', 'failed to parse backend response', { detail: error instanceof Error ? error.message : 'Invalid backend response.', bytes: line.length });
       response = createClawRpcError(null, clawRpcErrorCodes.parseError, error instanceof Error ? error.message : 'Invalid backend response.');
     }
 
@@ -311,6 +316,7 @@ export class ClawBackendProcessClient {
     if (this.process !== child) return;
     this.process = null;
     this.rejectPending(error);
+    warnMain('clawd', 'backend process disconnected', { detail: error.message });
     this.emitConnectionState('disconnected', error);
   }
 

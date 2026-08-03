@@ -3,7 +3,7 @@ import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
 import path from 'node:path';
 import { registerCodexNativeIpc, TypedIpcMain } from 'codex-app-sdk/electron';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
-import { logMain, warnMain } from './log';
+import { initializeMainLogging, installProcessErrorLogging, logMain, warnMain } from './log';
 import { createMainWindow } from './main-window';
 import { createRuntimeClawBackendClient, type ClawBackendClientPort } from './backend-client';
 import { getClawdDaemonStatus, setClawdDaemonEnabled } from './daemon-launch-agent';
@@ -75,10 +75,12 @@ export class AppController {
   }
 
   async initialize(): Promise<void> {
+    logMain('startup', 'initializing application');
     this.autoUpdateService?.start();
     await this.startupMaintenance();
     await this.initializeBackendClient();
     this.syncPowerSaveBlocker();
+    logMain('startup', 'application initialized');
   }
 
   setAutoUpdateService(service: DesktopAutoUpdateService): void {
@@ -443,6 +445,7 @@ export class AppController {
       this.snapshot?.general.agentListCompact ?? false,
       this.updateMenuOptions(),
     );
+    logMain('window', 'created main window');
     this.rendererReady = false;
     this.mainWindow.webContents.on('did-start-loading', () => {
       this.rendererReady = false;
@@ -466,6 +469,7 @@ export class AppController {
   }
 
   async shutdown(): Promise<void> {
+    logMain('shutdown', 'closing application');
     this.shuttingDown = true;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
@@ -480,6 +484,7 @@ export class AppController {
     this.backendClientConnectionUnsubscribe?.();
     this.backendClientConnectionUnsubscribe = null;
     await this.backendClient?.close();
+    logMain('shutdown', 'application resources closed');
   }
 
   private async initializeBackendClient(): Promise<void> {
@@ -1180,6 +1185,10 @@ export class AppController {
     }
     if (event.seq <= this.lastBackendEventSeq) return;
     if (event.seq !== this.lastBackendEventSeq + 1) {
+      warnMain('clawd', 'backend event sequence gap; synchronizing snapshot', {
+        expected: this.lastBackendEventSeq + 1,
+        received: event.seq,
+      });
       this.backendEventBuffer = [event];
       void this.synchronizeBackendState()
         .then(() => this.emitSnapshotToRenderer())
@@ -1209,6 +1218,10 @@ export class AppController {
 
   private handleBackendDisconnect(error?: Error): void {
     if (this.shuttingDown) return;
+    warnMain('clawd', 'backend connection lost', {
+      detail: error?.message ?? 'unknown error',
+      lastEventSeq: this.lastBackendEventSeq,
+    });
     this.setConnectionState({ status: 'reconnecting', ...(error?.message ? { detail: error.message } : {}) });
     this.scheduleBackendReconnect();
   }
@@ -1235,6 +1248,10 @@ export class AppController {
       logMain('clawd', 'reconnected to backend', { version: health.version, pid: health.pid });
     } catch (error) {
       this.reconnectAttempt += 1;
+      warnMain('clawd', 'backend reconnect failed', {
+        attempt: this.reconnectAttempt,
+        detail: error instanceof Error ? error.message : String(error),
+      });
       this.setConnectionState({ status: 'reconnecting', detail: error instanceof Error ? error.message : String(error) });
       this.scheduleBackendReconnect();
     }
@@ -1283,6 +1300,8 @@ export class AppController {
 }
 
 export function startMainApp(): void {
+  initializeMainLogging();
+  installProcessErrorLogging();
   const controller = new AppController(null, undefined, app, ensureCurrentClawdDaemonForStartup);
   const autoUpdateService = new DesktopAutoUpdateService({
     app,

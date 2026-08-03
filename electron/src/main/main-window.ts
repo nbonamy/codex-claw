@@ -8,7 +8,7 @@ import {
   unregisterCycleTeamsShortcut,
 } from './app-shortcuts';
 import { installAppMenu, type AppMenuCallbacks, type AppMenuOptions } from './app-menu';
-import { warnMain } from './log';
+import { logRendererConsole, warnMain } from './log';
 import { sendAppCommand } from './ipc-events';
 
 type MainWindowState = {
@@ -58,6 +58,9 @@ export function createMainWindow(
   });
 
   window.webContents.setWindowOpenHandler(({ url }) => handleExternalWindowOpen(url, (targetUrl) => shell.openExternal(targetUrl)));
+  window.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    logRendererConsole(level, message, { line, sourceId });
+  });
   installAppMenu(window, {
     debugMode: !releaseMode,
     agentListCompact,
