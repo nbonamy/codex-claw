@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#080b17" />
-    <meta name="description" content="Codex Claw is a macOS command center for teams of OpenAI Codex agents." />
+    <meta name="description" content="Codex Claw is a command center for teams of OpenAI Codex agents, with mobile pairing for coding on the road." />
     <title>Codex Claw — Your Codex team, in one cockpit</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -32,12 +32,12 @@
         <div class="hero-copy reveal">
           <p class="eyebrow"><span class="pulse"></span> OpenAI Codex, with a command center</p>
           <h1>Your Codex team,<br /><em>in one cockpit.</em></h1>
-          <p class="hero-lede">Codex Claw gives every agent the full power of the OpenAI Codex harness—then adds the place to steer a team, keep context, and ship together.</p>
+          <p class="hero-lede">Codex Claw gives every agent the full power of the OpenAI Codex harness—then adds the place to steer a team, keep context, and ship together. Pair your phone to keep coding on the road.</p>
           <div class="hero-actions">
             <a class="button button-primary" href="/desktop/downloads/codex-claw-macos-arm64.dmg" download>Download for macOS <span aria-hidden="true">→</span></a>
             <a class="text-link" href="#features">Explore the cockpit <span aria-hidden="true">↓</span></a>
           </div>
-          <div class="hero-meta"><span>macOS desktop app</span><span class="dot"></span><span>Built for serious coding</span></div>
+          <div class="hero-meta"><span>macOS desktop app</span><span class="dot"></span><span>Mobile pairing included</span></div>
         </div>
         <div class="hero-art reveal delay-1">
           <div class="hero-orbit hero-orbit-a"></div><div class="hero-orbit hero-orbit-b"></div>
@@ -58,32 +58,37 @@
       </section>
 
       <section id="features" class="features shell">
-        <div class="section-heading reveal"><div><div class="section-kicker">02 / The cockpit</div><h2>Everything in view.<br /><span>Nothing in the way.</span></h2></div><p>One calm surface for the messy, parallel reality of building software with agents.</p></div>
+        <div class="section-heading reveal"><div><div class="section-kicker">02 / The cockpit</div><h2>Everything in view.<br /><span>Nothing in the way.</span></h2></div><p>Assign work, automate the queue, and keep every agent moving from one calm surface.</p></div>
         <div class="feature-grid">
           <article class="feature-card feature-card-wide reveal">
             <div class="card-top"><span class="card-index">01</span><span class="card-icon">◎</span></div>
-            <h3>Run a real team</h3><p>Keep agents in their own conversations, with their own context and state. Let them hand off context and keep parallel work visible while you switch instantly without losing the thread.</p>
-            <div class="mini-team" aria-hidden="true"><span class="agent-chip active"><i></i>Atlas <b>working</b></span><span class="agent-chip"><i></i>Nova <b>queued</b></span><span class="agent-chip"><i></i>Sol <b>reviewing</b></span></div>
+            <h3>Run a real team</h3><p>Keep agents in their own conversations, with their own context and state. From the Cockpit, drag a GitHub issue onto the right agent and let the team take it from there.</p>
+            <div class="mini-team assignment-flow" aria-hidden="true"><span class="issue-chip"><i>GH</i><b>#142</b><span>Fix auth flow</span><small>DRAG</small></span><span class="assignment-arrow">→</span><span class="agent-chip active"><i></i>Atlas <b>working</b></span><span class="agent-chip"><i></i>Nova <b>queued</b></span></div>
           </article>
-          <article class="feature-card reveal delay-1">
-            <div class="card-top"><span class="card-index">02</span><span class="card-icon">⌁</span></div>
+          <article class="feature-card feature-card-loop reveal delay-1">
+            <div class="card-top"><span class="card-index">02</span><span class="card-icon">↻</span></div>
+            <h3>Loops that keep work moving</h3><p>Watch GitHub for matching issues, create the right agent or Bench template, send the assignment, and clean up when the work is done.</p>
+            <div class="loop-visual" aria-hidden="true"><span class="loop-node"><i>GH</i><b>GitHub issues</b><small>matching #bug</small></span><span class="loop-arrow">→</span><span class="loop-node loop-node-result"><i></i><b>Agent ready</b><small>assignment sent</small></span></div>
+          </article>
+          <article class="feature-card reveal delay-2">
+            <div class="card-top"><span class="card-index">03</span><span class="card-icon">⌁</span></div>
             <h3>Native Codex, fully visible</h3><p>Follow plans, tool calls, diffs, approvals, and reasoning in the same readable stream Codex understands.</p>
             <div class="terminal-lines" aria-hidden="true"><span><b>›</b> npm test</span><span class="ok">✓ 42 passed</span><span><b>›</b> Reviewing auth flow</span></div>
           </article>
-          <article class="feature-card reveal delay-2">
-            <div class="card-top"><span class="card-index">03</span><span class="card-icon">◌</span></div>
-            <h3>Browse without leaving</h3><p>Give agents an in-app browser for research, local previews, and the web surfaces your code touches.</p>
-            <div class="browser-pill" aria-hidden="true"><span>◉</span> localhost:3000 <b>↗</b></div>
+          <article class="feature-card feature-card-mobile feature-card-wide reveal">
+            <div class="card-top"><span class="card-index">04</span><span class="card-icon">⌁</span></div>
+            <div class="mobile-pairing-copy"><h3>Pair your phone. Keep coding.</h3><p>Connect the Codex mobile app to your Claw workspace and pick up wherever the day takes you. Your agents keep working while you stay in the loop from the road.</p></div>
+            <div class="pairing-visual" aria-hidden="true"><span class="pairing-device pairing-phone"><i></i><b>Codex mobile</b><small>PAIRED</small></span><span class="pairing-connector">↔</span><span class="pairing-device pairing-claw"><i></i><b>Claw cockpit</b><small>LIVE</small></span></div>
           </article>
           <article class="feature-card feature-card-accent reveal">
-            <div class="card-top"><span class="card-index">04</span><span class="card-icon">✦</span></div>
+            <div class="card-top"><span class="card-index">05</span><span class="card-icon">✦</span></div>
             <h3>Computer use, in context</h3><p>When a task leaves the terminal, Codex Claw keeps the computer-use session beside the conversation—visible, inspectable, and ready.</p>
             <a class="card-link" href="#workflow">See the workflow <span>→</span></a>
           </article>
           <article class="feature-card reveal delay-2">
-            <div class="card-top"><span class="card-index">05</span><span class="card-icon">⌗</span></div>
-            <h3>Artifacts that stay close</h3><p>Review files, git diffs, markdown, and browser tabs in a sidebar that remembers where you left off.</p>
-            <div class="artifact-tabs" aria-hidden="true"><span class="selected">Review</span><span>Browser</span><span>app.ts</span></div>
+            <div class="card-top"><span class="card-index">06</span><span class="card-icon">⌗</span></div>
+            <h3>Browse without leaving</h3><p>Give agents an in-app browser for research, local previews, and the web surfaces your code touches.</p>
+            <div class="browser-pill" aria-hidden="true"><span>◉</span> localhost:3000 <b>↗</b></div>
           </article>
         </div>
       </section>
@@ -96,7 +101,7 @@
             <div class="timeline-item"><span class="timeline-number">01</span><div><strong>Set the direction</strong><p>Give one agent the brief. Let the team split the work.</p></div></div>
             <div class="timeline-item"><span class="timeline-number">02</span><div><strong>Watch the edges</strong><p>Inspect tool calls, browser state, files, and approvals in one view.</p></div></div>
             <div class="timeline-item"><span class="timeline-number">03</span><div><strong>Make the call</strong><p>Steer a turn, queue the next move, or let the team finish.</p></div></div>
-            <div class="timeline-item"><span class="timeline-number">04</span><div><strong>Ship the result</strong><p>Review the diff, open the artifact, and move on to the next idea.</p></div></div>
+            <div class="timeline-item"><span class="timeline-number">04</span><div><strong>Ship the result</strong><p>Review the diff, merge the result, and move on to the next idea.</p></div></div>
           </div>
         </div>
       </section>
@@ -105,7 +110,7 @@
         <div class="section-kicker">04 / Simple by design</div>
         <div class="pricing-card">
           <div class="pricing-copy"><h2>Free to use.<br /><span>Powered by your Codex plan.</span></h2><p>Codex Claw is a free desktop cockpit for the Codex subscription you already have. No extra per-agent meter, no new workspace bill.</p><a class="button button-primary" href="/desktop/downloads/codex-claw-macos-arm64.dmg" download>Download for macOS <span aria-hidden="true">→</span></a></div>
-          <div class="pricing-details"><span class="pricing-badge">Included with Codex Claw</span><ul><li>Unlimited Codex Claw teams and conversations</li><li>In-app browser and computer use</li><li>Native Codex tools, plans, and diffs</li><li>Your existing OpenAI account and subscription</li></ul></div>
+          <div class="pricing-details"><span class="pricing-badge">Included with Codex Claw</span><ul><li>Unlimited Codex Claw teams and conversations</li><li>GitHub issue assignment and automatic Loops</li><li>In-app browser and computer use</li><li>Mobile pairing for coding on the road</li><li>Native Codex tools, plans, and diffs</li><li>Your existing OpenAI account and subscription</li></ul></div>
         </div>
       </section>
 
