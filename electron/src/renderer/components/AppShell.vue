@@ -2157,10 +2157,10 @@ function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
   position: absolute;
   inset: 0 auto 0 2px;
   width: 1px;
-  background: transparent;
+  background: var(--color-border);
 }
 
 .app-shell__right-workspace-resizer:hover::after {
-  background: var(--color-resize-handle-hover);
+  background: var(--color-border-strong);
 }
 </style>

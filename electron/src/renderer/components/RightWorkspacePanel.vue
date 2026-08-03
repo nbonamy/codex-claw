@@ -231,7 +231,6 @@ function closeAddMenuOnOutsideClick(event: MouseEvent): void {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border-left: 1px solid var(--color-border);
   background: var(--color-shell-main);
 }
 
