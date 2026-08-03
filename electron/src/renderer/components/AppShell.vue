@@ -253,6 +253,7 @@
             :git-panel="effectiveGitReviewPanelFor(agent)"
             :git-status="snapshot.agentGitStatuses[agent.id] ?? null"
             :file-panels="rightWorkspaceFor(agent.id).filePanels"
+            :diff-panels="rightWorkspaceFor(agent.id).diffPanels"
             :tabs="rightWorkspaceFor(agent.id).tabs"
             :visible="isRightWorkspaceVisible(agent.id)"
             :browser-id="rightWorkspaceFor(agent.id).browserId"
@@ -334,7 +335,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type PairedDevice, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
+import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type PairedDevice, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultTeamColor } from '@codex-claw/shared/team-colors';
@@ -364,7 +365,11 @@ import {
 import type { PlanReviewComment, SidePanelGitDiffState, SidePanelState } from './side-panel';
 import {
   isRightWorkspaceFileTab,
+  isRightWorkspaceDiffTab,
+  rightWorkspaceDiffTab,
   rightWorkspaceFileTab,
+  type RightWorkspaceDiffPanel,
+  type RightWorkspaceDiffTab,
   type RightWorkspaceFilePanel,
   type RightWorkspaceFileTab,
   type RightWorkspaceTab,
@@ -605,6 +610,7 @@ type AgentRightWorkspaceState = {
   browserOpenRequestId: number;
   filePanels: Partial<Record<RightWorkspaceFileTab, RightWorkspaceFilePanel>>;
   filePreviewRequestIds: Partial<Record<RightWorkspaceFileTab, number>>;
+  diffPanels: Partial<Record<RightWorkspaceDiffTab, RightWorkspaceDiffPanel>>;
   gitReviewPanel: SidePanelGitDiffState | null;
   open: boolean;
   tabs: RightWorkspaceTab[];
@@ -901,6 +907,7 @@ function rightWorkspaceFor(agentId: string): AgentRightWorkspaceState {
     browserOpenRequestId: 0,
     filePanels: {},
     filePreviewRequestIds: {},
+    diffPanels: {},
     gitReviewPanel: null,
     open: false,
     tabs: [],
@@ -996,6 +1003,10 @@ function closeRightWorkspaceTab(agentId: string, tab: RightWorkspaceTab): void {
     const { [tab]: _closedRequest, ...filePreviewRequestIds } = workspace.filePreviewRequestIds;
     workspace.filePanels = filePanels;
     workspace.filePreviewRequestIds = filePreviewRequestIds;
+  }
+  if (isRightWorkspaceDiffTab(tab)) {
+    const { [tab]: _closedPanel, ...diffPanels } = workspace.diffPanels;
+    workspace.diffPanels = diffPanels;
   }
   if (workspace.activeTab === tab) {
     workspace.activeTab = nextTabs[Math.min(tabIndex, nextTabs.length - 1)] ?? null;
@@ -1312,10 +1323,59 @@ function commentOnPlan(comments: PlanReviewComment[]): void {
   emit('sendPrompt', formatPlanCommentPrompt(comments));
 }
 
-async function openFilePreview(filePath: string): Promise<void> {
+async function openFilePreview(link: ConversationFileLink): Promise<void> {
   const agent = currentAgent.value;
   if (!agent) return;
+  const filePath = link.filepath ?? link.path;
+  if (link.action === 'edit') {
+    if (link.turnId && openTurnDiffPreviewForAgent(agent.id, link.turnId, filePath)) {
+      return;
+    }
+    await openAgentGitDiffPreview(agent.id);
+    return;
+  }
   await openFilePreviewForAgent(agent.id, filePath);
+}
+
+function openTurnDiffPreviewForAgent(agentId: string, turnId: string, filePath: string): boolean {
+  const agent = props.snapshot.agents.find((candidate) => candidate.id === agentId);
+  const relativePath = normalizePreviewFilePath(filePath, agent?.folder);
+  const turnDiff = props.snapshot.turnGitDiffs[turnId]?.diff;
+  if (!agent || !relativePath || !turnDiff) return false;
+
+  const diff = diffForPath(turnDiff, relativePath);
+  if (!diff) return false;
+
+  const workspace = rightWorkspaceFor(agentId);
+  const tab = rightWorkspaceDiffTab(turnId, relativePath);
+  workspace.diffPanels = {
+    ...workspace.diffPanels,
+    [tab]: {
+      kind: 'gitDiff',
+      title: fileBasename(relativePath),
+      subtitle: relativePath,
+      diff,
+      state: 'idle',
+      error: null,
+    },
+  };
+  openRightWorkspaceTab(tab, agentId);
+  return true;
+}
+
+function diffForPath(diff: string, filePath: string): string | null {
+  const targetPath = normalizePathSeparators(filePath).replace(/^\.\//u, '');
+  const sections = diff.split(/(?=^diff --git )/mu).filter((section) => section.startsWith('diff --git '));
+  return sections.find((section) => {
+    const header = section.split('\n', 1)[0] ?? '';
+    const separator = header.indexOf(' b/');
+    if (separator < 0) return false;
+    const beforePath = header.slice('diff --git a/'.length, separator);
+    const afterPath = header.slice(separator + ' b/'.length);
+    return [beforePath, afterPath].some((candidate) => (
+      normalizePathSeparators(candidate).replace(/^[ab]\//u, '') === targetPath
+    ));
+  }) ?? null;
 }
 
 function handleFileActivity(activity: AgentFileActivity): void {

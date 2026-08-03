@@ -17,6 +17,7 @@
           >
             <GitHubIcon v-if="tab === 'review'" aria-hidden="true" />
             <IconWorld v-else-if="tab === 'browser'" aria-hidden="true" />
+            <FileDiffIcon v-else-if="diffPanel(tab)" aria-hidden="true" />
             <FileTextIcon v-else-if="filePanel(tab)?.kind === 'markdown'" aria-hidden="true" />
             <CodeIcon v-else aria-hidden="true" />
             <span>{{ tabLabel(tab) }}</span>
@@ -110,6 +111,19 @@
         :state="sourceFilePanel(tab)?.state"
       />
     </div>
+
+    <div
+      v-for="tab in diffTabs"
+      :key="tab"
+      v-show="activeTab === tab"
+      class="right-workspace-panel__file-preview"
+    >
+      <GitDiffPreviewPanel
+        :diff="diffPanel(tab)?.diff ?? ''"
+        :error="diffPanel(tab)?.error"
+        :state="diffPanel(tab)?.state"
+      />
+    </div>
   </aside>
 </template>
 
@@ -117,16 +131,20 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { IconWorld } from '@tabler/icons-vue';
 import type { Agent, AgentGitStatus } from '@codex-claw/shared/contracts';
-import { CodeIcon, FileTextIcon, GitHubIcon, PlusIcon, X } from '../shared/icons/app-icons';
+import { CodeIcon, FileDiffIcon, FileTextIcon, GitHubIcon, PlusIcon, X } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import BrowserPanel from './BrowserPanel.vue';
+import GitDiffPreviewPanel from './GitDiffPreviewPanel.vue';
 import GitReviewPanel from './GitReviewPanel.vue';
 import MarkdownPanel from './MarkdownPanel.vue';
 import SourcePreviewPanel from './SourcePreviewPanel.vue';
 import type { SidePanelGitDiffState, SidePanelMarkdownState, SidePanelSourceState } from './side-panel';
 import {
+  isRightWorkspaceDiffTab,
   isRightWorkspaceFileTab,
+  type RightWorkspaceDiffPanel,
+  type RightWorkspaceDiffTab,
   type RightWorkspaceFilePanel,
   type RightWorkspaceFileTab,
   type RightWorkspaceTab,
@@ -137,6 +155,7 @@ const props = defineProps<{
   agent: Agent;
   gitPanel: SidePanelGitDiffState;
   gitStatus?: AgentGitStatus | null;
+  diffPanels?: Partial<Record<RightWorkspaceDiffTab, RightWorkspaceDiffPanel>>;
   filePanels?: Partial<Record<RightWorkspaceFileTab, RightWorkspaceFilePanel>>;
   tabs: RightWorkspaceTab[];
   visible?: boolean;
@@ -156,6 +175,7 @@ const emit = defineEmits<{
 const addMenuRoot = ref<HTMLElement | null>(null);
 const addMenuOpen = ref(false);
 const fileTabs = computed(() => props.tabs.filter(isRightWorkspaceFileTab));
+const diffTabs = computed(() => props.tabs.filter(isRightWorkspaceDiffTab));
 const addMenuItems = computed<AppMenuItem[]>(() => [
   { id: 'review', type: 'action', label: 'GitHub Review', icon: GitHubIcon },
   { id: 'browser', type: 'action', label: 'Browser', icon: IconWorld },
@@ -167,7 +187,12 @@ onBeforeUnmount(() => document.removeEventListener('click', closeAddMenuOnOutsid
 function tabLabel(tab: RightWorkspaceTab): string {
   if (tab === 'review') return 'Review';
   if (tab === 'browser') return 'Browser';
+  if (diffPanel(tab)) return diffPanel(tab)?.title ?? 'Diff';
   return filePanel(tab)?.title ?? 'File';
+}
+
+function diffPanel(tab: RightWorkspaceTab): RightWorkspaceDiffPanel | undefined {
+  return isRightWorkspaceDiffTab(tab) ? props.diffPanels?.[tab] : undefined;
 }
 
 function filePanel(tab: RightWorkspaceTab): RightWorkspaceFilePanel | undefined {

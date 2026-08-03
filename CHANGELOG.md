@@ -2,6 +2,15 @@
 
 All notable Codex Claw changes are recorded here.
 
+## [0.4.0] - WIP
+
+### New features
+
+- Turn-aware file links now open edit targets in their own diff tabs, while
+  read and create targets continue to open source tabs.
+- Agent workspaces retain per-turn diff tabs and fall back to the current Git
+  review when a link has no usable turn context.
+
 ## [0.3.1] - 2026-08-02
 
 ### New features

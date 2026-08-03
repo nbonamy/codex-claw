@@ -501,6 +501,75 @@ describe('AppShell', () => {
     expect(wrapper.text()).toContain('43');
   });
 
+  it('opens edit links in a turn-scoped diff tab', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].folder = '/workspace/dina';
+    snapshot.turnGitDiffs['turn-edit'] = {
+      turnId: 'turn-edit',
+      addedLines: 1,
+      removedLines: 0,
+      diff: [
+        'diff --git a/src/main.ts b/src/main.ts',
+        '--- a/src/main.ts',
+        '+++ b/src/main.ts',
+        '@@ -1,1 +1,2 @@',
+        ' const answer: number = 42;',
+        '+export const done = true;',
+      ].join('\n'),
+      updatedAt: '2026-08-02T00:00:00.000Z',
+    };
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [],
+        isLoading: false,
+        isSending: false,
+      },
+      global: { plugins: [ElementPlus, i18n] },
+    });
+
+    wrapper.findComponent({ name: 'ConversationPane' }).vm.$emit('open-file', {
+      kind: 'file',
+      href: '/workspace/dina/src/main.ts',
+      path: '/workspace/dina/src/main.ts',
+      action: 'edit',
+      turnId: 'turn-edit',
+    });
+    await nextTick();
+
+    expect(wrapper.find('.git-diff-preview-panel').exists()).toBe(true);
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['main.ts']);
+    expect(wrapper.text()).toContain('done = true');
+  });
+
+  it('falls back to the current git review for edit links without turn context', async () => {
+    const snapshot = createInitialSnapshot();
+    const openAgentGitDiff = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [],
+        isLoading: false,
+        isSending: false,
+        openAgentGitDiff,
+      },
+      global: { plugins: [ElementPlus, i18n] },
+    });
+
+    wrapper.findComponent({ name: 'ConversationPane' }).vm.$emit('open-file', {
+      kind: 'file',
+      href: 'src/main.ts',
+      path: 'src/main.ts',
+      action: 'edit',
+    });
+    await flushPromises();
+
+    expect(openAgentGitDiff).toHaveBeenCalledWith('agent-dina');
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain('Review');
+  });
+
   it('does not open agent workspaces from background file activity', async () => {
     const snapshot = createInitialSnapshot();
     const [dina, jesse] = snapshot.agents;
@@ -845,7 +914,11 @@ describe('AppShell', () => {
       },
     });
 
-    wrapper.findComponent({ name: 'ConversationPane' }).vm.$emit('open-file', '   ');
+    wrapper.findComponent({ name: 'ConversationPane' }).vm.$emit('open-file', {
+      kind: 'file',
+      href: '   ',
+      path: '   ',
+    });
     await flushPromises();
 
     expect(previewAgentFile).not.toHaveBeenCalled();

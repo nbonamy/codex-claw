@@ -851,6 +851,19 @@ export type AgentFileActivity = {
   occurredAt: string;
 };
 
+export type ConversationFileLink = {
+  kind: 'file';
+  href: string;
+  path: string;
+  filepath?: string;
+  action?: 'read' | 'edit' | 'create';
+  line?: number;
+  column?: number;
+  turnId?: string;
+  messageId?: string;
+  itemId?: string;
+};
+
 export type AgentQueuedPrompt = {
   id: string;
   agentId: string;

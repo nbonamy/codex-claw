@@ -90,6 +90,7 @@ import type {
   BackendModelOption,
   BackendSkillSummary,
   ClientRequestResponse,
+  ConversationFileLink,
   PromptAttachment,
   ReasoningEffort,
   RendererMessage,
@@ -156,7 +157,7 @@ const emit = defineEmits<{
   'delete-queued-prompt': [promptId: string];
   'edit-message': [payload: { content: string; index: number }];
   'interrupt-agent': [];
-  'open-file': [filePath: string];
+  'open-file': [link: ConversationFileLink];
   'resolve-approval': [approvalId: string, decision: BackendApprovalDecision, scope: BackendApprovalScope];
   'retry-message': [index: number];
   'select-model': [modelId: string];
@@ -226,7 +227,20 @@ const heroSubhead = computed(() => {
 });
 
 function openLink(link: CodexConversationLink): void {
-  if (link.kind === 'file') emit('open-file', link.filepath ?? link.path);
+  if (link.kind !== 'file') return;
+  const context = link as CodexConversationLink & Partial<Pick<ConversationFileLink, 'turnId' | 'messageId' | 'itemId'>>;
+  emit('open-file', {
+    kind: 'file',
+    href: link.href,
+    path: link.path,
+    ...(link.filepath ? { filepath: link.filepath } : {}),
+    ...(link.action ? { action: link.action } : {}),
+    ...(link.line === undefined ? {} : { line: link.line }),
+    ...(link.column === undefined ? {} : { column: link.column }),
+    ...(context.turnId ? { turnId: context.turnId } : {}),
+    ...(context.messageId ? { messageId: context.messageId } : {}),
+    ...(context.itemId ? { itemId: context.itemId } : {}),
+  });
 }
 
 function resolveApproval(

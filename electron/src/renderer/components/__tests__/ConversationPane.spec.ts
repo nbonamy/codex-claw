@@ -424,8 +424,14 @@ describe('ConversationPane', () => {
     await nextTick();
 
     expect(wrapper.emitted('open-file')).toStrictEqual([
-      ['docs/guide.md'],
-      ['/Users/nbonamy/src/codex-claw/electron/src/renderer/__tests__/app-state.spec.ts'],
+      [{ kind: 'file', href: 'docs/guide.md#intro', path: 'docs/guide.md' }],
+      [{
+        kind: 'file',
+        href: 'app-state.spec.ts',
+        path: 'app-state.spec.ts',
+        filepath: '/Users/nbonamy/src/codex-claw/electron/src/renderer/__tests__/app-state.spec.ts',
+        action: 'read',
+      }],
     ]);
   });
 

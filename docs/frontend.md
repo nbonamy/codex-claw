@@ -110,7 +110,9 @@ implemented:
   continue without stealing the user's selected agent. Live edits refresh files
   that the user already has open but never reveal or select a workspace tab;
   clicking an SDK tool-call file target is the only action that opens its
-  canonical path in the owning workspace;
+  canonical path in the owning workspace. Edit targets with turn context open
+  a turn-scoped diff tab; links without that context fall back to the current
+  Git review;
 - empty right-workspace launcher for opening Review or Browser before any tab
   exists; manually closing the last tab collapses the workspace. Review uses
   `Command+G` and Browser uses `Command+B`, while existing `Command+D`
