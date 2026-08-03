@@ -295,6 +295,13 @@ implementation messages, not the preferred app protocol for clients.
 | --- | --- | --- |
 | `backend/event/notify` | `ClawBackendEvent` | Sequenced app-owned event for renderer/UI state. Includes small backend-derived `clientState`; `snapshot` is an optional compatibility or recovery checkpoint rather than accompanying each incremental event. |
 
+Routine `snapshot.updated` notifications carry `AppSnapshotMetadata`, which
+explicitly excludes conversation messages. Transcripts move through
+`thread.historyLoaded` and the incremental message/item events instead. Agent
+selection, history hydration, prompt submission, and steering likewise return
+metadata-only acknowledgements so those hot paths never echo the full cached
+transcript back through stdio and Electron IPC.
+
 Event `type` values are the app-owned `MainToRendererEvent['type']` union from
 `shared/src/contracts.ts`. Current emitted examples include:
 

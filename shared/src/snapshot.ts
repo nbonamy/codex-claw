@@ -9,6 +9,7 @@ import type {
   AgentStatus,
   AccountRateLimits,
   AppSnapshot,
+  AppSnapshotMetadata,
   ClientRequest,
   CreateAgentInput,
   MainToRendererEvent,
@@ -260,11 +261,21 @@ export function selectAgent(snapshot: AppSnapshot, agentId: string): AppSnapshot
   return snapshot;
 }
 
+export function snapshotMetadata(snapshot: AppSnapshot): AppSnapshotMetadata {
+  const { messages: _messages, ...metadata } = snapshot;
+  return metadata;
+}
+
+export function applySnapshotMetadata(snapshot: AppSnapshot, metadata: AppSnapshotMetadata): void {
+  const { messages: _messages, ...safeMetadata } = metadata as AppSnapshotMetadata & { messages?: AppSnapshot['messages'] };
+  Object.assign(snapshot, safeMetadata);
+}
+
 export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRendererEvent): void {
   if (event.type === 'snapshot.updated') {
-    const nextSnapshot = event.payload as AppSnapshot;
+    const nextSnapshot = event.payload as AppSnapshotMetadata;
     if (isRecord(nextSnapshot) && Array.isArray(nextSnapshot.teams) && Array.isArray(nextSnapshot.agents)) {
-      Object.assign(snapshot, nextSnapshot);
+      applySnapshotMetadata(snapshot, nextSnapshot);
     }
     return;
   }
@@ -1726,11 +1737,12 @@ function pruneSupersededEmptyAssistantPlaceholders(snapshot: AppSnapshot, agentI
     return;
   }
 
-  snapshot.messages = snapshot.messages.filter((message, index) => (
-    message.agentId !== agentId ||
-    index === lastAgentMessageIndex ||
-    !isPlainEmptyAssistantPlaceholder(message)
-  ));
+  for (let index = lastAgentMessageIndex - 1; index >= 0; index -= 1) {
+    const message = snapshot.messages[index];
+    if (message?.agentId === agentId && isPlainEmptyAssistantPlaceholder(message)) {
+      snapshot.messages.splice(index, 1);
+    }
+  }
 }
 
 function isPlainEmptyAssistantPlaceholder(message: RendererMessage): boolean {

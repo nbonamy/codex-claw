@@ -19,6 +19,8 @@ All notable Codex Claw changes are recorded here.
 
 ### Improvements and fixes
 
+- Large conversations no longer retransmit and redraw their full transcript for
+  routine agent selection, prompt, status, or background-state updates.
 - Browser annotations now dismiss on outside click and immediately resume
   element selection while annotation mode remains active.
 - Plan reviews now support compact inline comments, batch refinement, clear

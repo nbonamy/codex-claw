@@ -1,12 +1,17 @@
-import type { AppSnapshot, ClientState } from './contracts';
+import type { AppSnapshot, AppSnapshotMetadata, ClientState } from './contracts';
 
 export function isAppSnapshot(value: unknown): value is AppSnapshot {
+  return isAppSnapshotMetadata(value) &&
+    'messages' in value &&
+    Array.isArray(value.messages);
+}
+
+export function isAppSnapshotMetadata(value: unknown): value is AppSnapshotMetadata {
   return isRecord(value) &&
     Array.isArray(value.teams) &&
     Array.isArray(value.agents) &&
     Array.isArray(value.bench) &&
     Array.isArray(value.loops) &&
-    Array.isArray(value.messages) &&
     isRecord(value.backendApprovals) &&
     Array.isArray(value.backendRuntimes) &&
     isRecord(value.workBacklog) &&

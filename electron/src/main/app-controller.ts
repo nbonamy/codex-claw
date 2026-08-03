@@ -10,8 +10,8 @@ import { getClawdDaemonStatus, setClawdDaemonEnabled } from './daemon-launch-age
 import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards';
-import { applyMainEventToSnapshot } from '@codex-claw/shared/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppCommand, AppPluginStatus, AppSnapshot, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import { applyMainEventToSnapshot, applySnapshotMetadata, snapshotMetadata } from '@codex-claw/shared/snapshot';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppCommand, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
 import { sendAppCommand, sendRendererEvent } from './ipc-events';
 import { installAppMenu, type AppMenuCallbacks } from './app-menu';
@@ -629,8 +629,8 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentDelete, { agentId }));
   }
 
-  private async selectAgent(agentId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentSelect, { agentId }));
+  private async selectAgent(agentId: string): Promise<AppSnapshotMetadata> {
+    return this.adoptBackendMetadata(await this.requireBackendClient().request<AppSnapshotMetadata>(backendMethods.agentSelect, { agentId }));
   }
 
   private async updateAgentFolder(agentId: string, folder: string): Promise<AppSnapshot> {
@@ -822,6 +822,13 @@ export class AppController {
     return this.snapshot;
   }
 
+  private async adoptBackendMetadata(metadata: AppSnapshotMetadata): Promise<AppSnapshotMetadata> {
+    if (!this.snapshot) throw new Error('clawd snapshot is not available.');
+    applySnapshotMetadata(this.snapshot, metadata);
+    this.syncPowerSaveBlocker();
+    return metadata;
+  }
+
   private async getSnapshot(): Promise<AppSnapshot> {
     if (!this.snapshot) {
       throw new Error('clawd snapshot is not available.');
@@ -841,8 +848,8 @@ export class AppController {
     agentId: string,
     prompt: string,
     options?: SendPromptOptions,
-  ): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentPromptSend, { agentId, prompt, options }));
+  ): Promise<AppSnapshotMetadata> {
+    return this.adoptBackendMetadata(await this.requireBackendClient().request<AppSnapshotMetadata>(backendMethods.agentPromptSend, { agentId, prompt, options }));
   }
 
   private async browserOpen(agentId: string, browserId: string, url: string): Promise<BrowserState> {
@@ -917,8 +924,8 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentRestart, { agentId }));
   }
 
-  private async hydrateAgentHistory(agentId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentHistoryHydrate, { agentId }));
+  private async hydrateAgentHistory(agentId: string): Promise<AppSnapshotMetadata> {
+    return this.adoptBackendMetadata(await this.requireBackendClient().request<AppSnapshotMetadata>(backendMethods.agentHistoryHydrate, { agentId }));
   }
 
   private async listAgentConversations(agentId: string): Promise<ConversationSummary[]> {
@@ -974,8 +981,8 @@ export class AppController {
     await this.requireBackendClient().request(backendMethods.agentGitDiffOpen, { agentId });
   }
 
-  private async steerPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(
+  private async steerPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshotMetadata> {
+    return this.adoptBackendMetadata(await this.requireBackendClient().request<AppSnapshotMetadata>(
       backendMethods.agentPromptSteer,
       options ? { agentId, prompt, options } : { agentId, prompt },
     ));
@@ -1317,7 +1324,7 @@ export class AppController {
   }
 
   private emitSnapshotToRenderer(): void {
-    if (this.snapshot) this.emitClientEvent('snapshot.updated', this.snapshot, this.snapshot);
+    if (this.snapshot) this.emitClientEvent('snapshot.updated', snapshotMetadata(this.snapshot));
   }
 
   private emitClientEvent(type: MainToRendererEvent['type'], payload: unknown, snapshot?: AppSnapshot): void {

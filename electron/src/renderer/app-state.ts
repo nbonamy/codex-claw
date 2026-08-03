@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppPluginStatus, AppSnapshot, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
-import { applyMainEventToSnapshot, createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/shared/snapshot';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import { applyMainEventToSnapshot, applySnapshotMetadata, createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/shared/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
 import { approvalPresetFromDefaults } from '@codex-claw/shared/approval-presets';
@@ -10,7 +10,7 @@ import {
   type CodexNativeAttachment,
 } from 'codex-app-sdk/vue';
 import { workItemAssignmentPrompt } from '@codex-claw/shared/work-item-prompts';
-import { isAppSnapshot } from '@codex-claw/shared/snapshot-guards';
+import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/shared/snapshot-guards';
 import { useConfetti } from './shared/confetti/use-confetti';
 
 const snapshot = ref<AppSnapshot>(createEmptySnapshot());
@@ -331,7 +331,7 @@ export function useAppState() {
     }
 
     const options = resolvedPromptOptions(agentId, trimmed, submissionOptions);
-    adoptBackgroundSnapshot(options
+    adoptBackgroundSnapshotMetadata(options
       ? await window.codexClaw.steerPrompt(agentId, trimmed, options)
       : await window.codexClaw.steerPrompt(agentId, trimmed));
   }
@@ -435,7 +435,7 @@ export function useAppState() {
     markAgentSending(agentId, true);
 
     try {
-      adoptBackgroundSnapshot(options
+      adoptBackgroundSnapshotMetadata(options
         ? await api.sendPrompt(agentId, prompt, options)
         : await api.sendPrompt(agentId, prompt));
     } finally {
@@ -1964,7 +1964,19 @@ function adoptSnapshotFromMainEvent(event: MainToRendererEvent): void {
     adoptBackgroundSnapshot(event.payload);
     return;
   }
+  if (event.type === 'snapshot.updated' && isAppSnapshotMetadata(event.payload)) {
+    adoptBackgroundSnapshotMetadata(event.payload);
+    return;
+  }
   applyMainEventToSnapshot(snapshot.value, event);
+}
+
+function adoptBackgroundSnapshotMetadata(metadata: AppSnapshotMetadata): void {
+  const activeAgentId = snapshot.value.activeAgentId;
+  applySnapshotMetadata(snapshot.value, metadata);
+  if (activeAgentId && snapshot.value.agents.some((agent) => agent.id === activeAgentId)) {
+    selectAgentInSnapshot(snapshot.value, activeAgentId);
+  }
 }
 
 function adoptBackgroundSnapshot(nextSnapshot: AppSnapshot): void {
@@ -2381,7 +2393,7 @@ async function hydrateActiveAgentHistory(): Promise<void> {
 
   markAgentHistoryHydrating(activeAgent.id, true);
   try {
-    adoptBackgroundSnapshot(await window.codexClaw.hydrateAgentHistory(activeAgent.id));
+    adoptBackgroundSnapshotMetadata(await window.codexClaw.hydrateAgentHistory(activeAgent.id));
   } finally {
     markAgentHistoryHydrating(activeAgent.id, false);
   }
@@ -2411,7 +2423,7 @@ async function refreshAgentSelection(agentId: string, requestId: number, needsHi
   try {
     const nextSnapshot = await window.codexClaw!.selectAgent(agentId);
     if (requestId === agentSelectionRequestId) {
-      adoptBackgroundSnapshot(nextSnapshot);
+      adoptBackgroundSnapshotMetadata(nextSnapshot);
     }
   } catch {
     // The optimistic selection remains visible; the next snapshot/event will reconcile it.

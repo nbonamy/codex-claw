@@ -935,6 +935,13 @@ export type AppSnapshot = {
   theme: AppThemeSettings;
 };
 
+/**
+ * Application state that can be synchronized without retransmitting cached
+ * conversation transcripts. Messages have their own incremental event stream
+ * and explicit history-hydration path.
+ */
+export type AppSnapshotMetadata = Omit<AppSnapshot, 'messages'>;
+
 export type BackendRuntimeStatus = {
   backend: AgentBackend;
   status: 'notConfigured' | 'starting' | 'running' | 'error';
@@ -1218,9 +1225,9 @@ export type CodexClawApi = {
   deployBenchTemplate(templateId: string, teamId?: string, location?: BenchLocation): Promise<AppSnapshot>;
   removeBenchTemplate(templateId: string, location?: BenchLocation): Promise<AppSnapshot>;
   restartAgent(agentId: string): Promise<AppSnapshot>;
-  hydrateAgentHistory(agentId: string): Promise<AppSnapshot>;
+  hydrateAgentHistory(agentId: string): Promise<AppSnapshotMetadata>;
   closeAgent(agentId: string): Promise<AppSnapshot>;
-  selectAgent(agentId: string): Promise<AppSnapshot>;
+  selectAgent(agentId: string): Promise<AppSnapshotMetadata>;
   updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>;
   getPluginStatus(): Promise<AppPluginStatus>;
   getCodexAuthentication(): Promise<CodexAuthentication>;
@@ -1239,8 +1246,8 @@ export type CodexClawApi = {
   setAgentGoal(agentId: string, objective: string): Promise<AppSnapshot>;
   clearAgentGoal(agentId: string): Promise<AppSnapshot>;
   setAgentApprovalPreset(agentId: string, preset: ApprovalPreset): Promise<AppSnapshot>;
-  sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot>;
-  steerPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot>;
+  sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshotMetadata>;
+  steerPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshotMetadata>;
   deleteQueuedPrompt(agentId: string, promptId: string): Promise<AppSnapshot>;
   steerQueuedPrompt(agentId: string, promptId: string): Promise<AppSnapshot>;
   interruptAgent(agentId: string): Promise<AppSnapshot>;

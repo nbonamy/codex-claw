@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController } from '../app-controller';
-import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
+import { createInitialSnapshot, snapshotMetadata } from '@codex-claw/shared/snapshot';
 import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
@@ -313,7 +313,7 @@ describe('AppController', () => {
     }));
     expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
       type: 'snapshot.updated',
-      snapshot: reconnectedSnapshot,
+      payload: expect.not.objectContaining({ messages: expect.anything() }),
     }));
     await controller.shutdown();
   });
@@ -1158,14 +1158,16 @@ describe('AppController', () => {
         },
       ],
     };
-    const request = vi.fn().mockResolvedValue(backendSnapshot);
+    const backendMetadata = snapshotMetadata(backendSnapshot);
+    const request = vi.fn().mockResolvedValue(backendMetadata);
     const controller = new AppController(snapshot, createBackendClient({ request }));
 
     await controller.initialize();
-    await expect(hydrateAgentHistory(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
+    await expect(hydrateAgentHistory(controller, 'agent-dina')).resolves.toBe(backendMetadata);
 
+    expect(request).toHaveBeenCalledOnce();
     expect(request).toHaveBeenCalledWith('agent/history/hydrate', { agentId: 'agent-dina' });
-    expect(currentSnapshot(controller)).toBe(backendSnapshot);
+    expect(currentSnapshot(controller)).toBe(snapshot);
   });
 
   it('caches token usage updates emitted by clawd', async () => {

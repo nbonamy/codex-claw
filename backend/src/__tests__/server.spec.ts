@@ -703,7 +703,7 @@ describe('ClawBackendServer', () => {
       remoteClients: remoteClients as never,
     });
 
-    await expect(server.handleMessage({
+    const response = await server.handleMessage({
       jsonrpc: '2.0',
       id: 'prompt',
       method: 'agent/prompt/send',
@@ -711,19 +711,17 @@ describe('ClawBackendServer', () => {
         agentId: 'agent-remote',
         prompt: 'hello',
       },
-    })).resolves.toMatchObject({
+    });
+    expect(response).toMatchObject({
       result: {
         activeAgentId: 'agent-remote',
         agents: [{
           id: 'agent-remote',
           teamId: 'team-pointer',
         }],
-        messages: [{
-          agentId: 'agent-remote',
-          parts: [{ type: 'text', text: 'hello' }],
-        }],
       },
     });
+    expect((response as { result: Record<string, unknown> }).result).not.toHaveProperty('messages');
 
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       1,
@@ -1594,12 +1592,15 @@ describe('ClawBackendServer', () => {
 
   it('persists backend-owned snapshot changes for stateful events', async () => {
     const snapshot = createTestSnapshot();
+    snapshot.messages.push(createTextMessage('message-large-transcript', 'agent-dina', 'large transcript'));
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const onEvent = vi.fn();
     const server = new ClawBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
       saveSnapshot,
+      onEvent,
     });
 
     server.emitEvent({
@@ -1620,6 +1621,10 @@ describe('ClawBackendServer', () => {
 
     expect(saveSnapshot).toHaveBeenCalledOnce();
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
+    expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'snapshot.updated',
+      payload: expect.not.objectContaining({ messages: expect.anything() }),
+    }));
   });
 
   it('defers high-frequency turn metadata persistence until completion', async () => {
@@ -2171,17 +2176,21 @@ describe('ClawBackendServer', () => {
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
     });
 
-    await expect(server.handleMessage({
+    const response = await server.handleMessage({
       jsonrpc: '2.0',
       id: 'select-live',
       method: 'agent/select',
       params: { agentId: 'agent-dina' },
-    })).resolves.toMatchObject({
+    });
+    expect(response).toMatchObject({
       result: {
         activeAgentId: 'agent-dina',
-        messages: [{ id: 'assistant-live', parts: [{ type: 'tool' }] }],
       },
     });
+    expect((response as { result: Record<string, unknown> }).result).not.toHaveProperty('messages');
+    expect(snapshot.messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'assistant-live', parts: [expect.objectContaining({ type: 'tool' })] }),
+    ]));
 
     expect(hydrateAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
     expect(getGitStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
@@ -3789,17 +3798,21 @@ describe('ClawBackendServer', () => {
         driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
       });
 
-      await expect(server.handleMessage({
+      const response = await server.handleMessage({
         jsonrpc: '2.0',
         id: 'send',
         method: 'agent/prompt/send',
         params: { agentId: 'agent-dina', prompt: ' hello codex ' },
-      })).resolves.toMatchObject({
+      });
+      expect(response).toMatchObject({
         result: {
           agents: [{ id: 'agent-dina', status: { type: 'starting' } }],
-          messages: [{ agentId: 'agent-dina', role: 'user', parts: [{ type: 'text', text: 'hello codex' }] }],
         },
       });
+      expect((response as { result: Record<string, unknown> }).result).not.toHaveProperty('messages');
+      expect(snapshot.messages).toEqual(expect.arrayContaining([
+        expect.objectContaining({ agentId: 'agent-dina', role: 'user', parts: [{ type: 'text', text: 'hello codex' }] }),
+      ]));
       await flushMicrotasks();
 
       expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'hello codex', undefined);

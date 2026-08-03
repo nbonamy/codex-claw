@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
-import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
+import { createEmptySnapshot, createInitialSnapshot, snapshotMetadata } from '@codex-claw/shared/snapshot';
 import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/shared/contracts';
 import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
 import { workItemAssignmentPrompt } from '@codex-claw/shared/work-item-prompts';
@@ -424,15 +424,18 @@ describe('useAppState', () => {
 
     const state = useAppState();
     await state.loadSnapshot();
+    const rendererSnapshot = state.snapshot.value;
+    const messages = state.snapshot.value.messages;
 
     listeners[0]?.({
       seq: 1,
       type: 'snapshot.updated',
-      payload: payloadSnapshot,
+      payload: snapshotMetadata(payloadSnapshot),
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
 
-    expect(state.snapshot.value).toStrictEqual(payloadSnapshot);
+    expect(state.snapshot.value).toBe(rendererSnapshot);
+    expect(state.snapshot.value.messages).toBe(messages);
     expect(state.activeAgent.value?.id).toBe('agent-ellie');
   });
 
@@ -1173,6 +1176,7 @@ describe('useAppState', () => {
   });
 
   it('shows the shell before persisted history hydration completes', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-persisted' };
     const hydratedSnapshot = {
@@ -1188,10 +1192,13 @@ describe('useAppState', () => {
         },
       ],
     };
-    const hydration = deferred<AppSnapshot>();
+    const hydration = deferred<ReturnType<typeof snapshotMetadata>>();
     const hydrateAgentHistory = vi.fn().mockReturnValue(hydration.promise);
     const selectAgent = vi.fn();
-    const onEvent = vi.fn();
+    const onEvent = vi.fn((listener) => {
+      listeners.push(listener);
+      return () => undefined;
+    });
     vi.stubGlobal('window', {
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
@@ -1212,7 +1219,15 @@ describe('useAppState', () => {
     expect(state.isHydratingActiveAgentHistory.value).toBe(true);
     expect(state.visibleMessages.value).toStrictEqual([]);
 
-    hydration.resolve(hydratedSnapshot);
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-persisted',
+      type: 'thread.historyLoaded',
+      payload: { messages: hydratedSnapshot.messages, replace: true },
+      occurredAt: '2026-06-05T00:00:00.000Z',
+    });
+    hydration.resolve(snapshotMetadata(hydratedSnapshot));
     await vi.waitFor(() => expect(state.visibleMessages.value).toStrictEqual(hydratedSnapshot.messages));
     await loading;
 
@@ -1222,6 +1237,7 @@ describe('useAppState', () => {
   });
 
   it('reconciles persisted threads after renderer restart even when the daemon has cached messages', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const cachedSnapshot = createInitialSnapshot();
     cachedSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-persisted' };
     cachedSnapshot.agents[0].status = { type: 'working' };
@@ -1236,12 +1252,25 @@ describe('useAppState', () => {
     const reconciledSnapshot = structuredClone(cachedSnapshot);
     reconciledSnapshot.agents[0].status = { type: 'idle' };
     reconciledSnapshot.messages[0]!.status = 'complete';
-    const hydrateAgentHistory = vi.fn().mockResolvedValue(reconciledSnapshot);
+    const hydrateAgentHistory = vi.fn().mockImplementation(async () => {
+      listeners[0]?.({
+        seq: 1,
+        agentId: 'agent-dina',
+        threadId: 'thread-persisted',
+        type: 'thread.historyLoaded',
+        payload: { messages: reconciledSnapshot.messages, replace: true },
+        occurredAt: '2026-06-05T00:00:01.000Z',
+      });
+      return snapshotMetadata(reconciledSnapshot);
+    });
     vi.stubGlobal('window', {
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(cachedSnapshot),
         hydrateAgentHistory,
-        onEvent: vi.fn(),
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
       } satisfies Partial<CodexClawApi>,
     });
 
@@ -1441,7 +1470,8 @@ describe('useAppState', () => {
     expect(state.activeAgent.value?.id).toBe('agent-dina');
   });
 
-  it('sends prompts through preload and replaces the snapshot with the main result', async () => {
+  it('sends prompts through preload and adopts the submitted-message event', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();
     updatedSnapshot.messages.push({
@@ -1453,12 +1483,24 @@ describe('useAppState', () => {
       parts: [{ type: 'text', text: 'hello' }],
     });
 
-    const sendPrompt = vi.fn().mockResolvedValue(updatedSnapshot);
+    const sendPrompt = vi.fn().mockImplementation(async () => {
+      listeners[0]?.({
+        seq: 1,
+        agentId: 'agent-dina',
+        type: 'message.userSubmitted',
+        payload: { message: updatedSnapshot.messages[0] },
+        occurredAt: '2026-06-05T00:00:01.000Z',
+      });
+      return snapshotMetadata(updatedSnapshot);
+    });
     vi.stubGlobal('window', {
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         sendPrompt,
-        onEvent: vi.fn(),
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
       } satisfies Partial<CodexClawApi>,
     });
 
@@ -1475,6 +1517,7 @@ describe('useAppState', () => {
   });
 
   it('can send prompts to a specific agent from overview surfaces', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();
     updatedSnapshot.messages.push({
@@ -1486,12 +1529,24 @@ describe('useAppState', () => {
       parts: [{ type: 'text', text: 'ship this' }],
     });
 
-    const sendPrompt = vi.fn().mockResolvedValue(updatedSnapshot);
+    const sendPrompt = vi.fn().mockImplementation(async () => {
+      listeners[0]?.({
+        seq: 1,
+        agentId: 'agent-jesse',
+        type: 'message.userSubmitted',
+        payload: { message: updatedSnapshot.messages[0] },
+        occurredAt: '2026-06-05T00:00:01.000Z',
+      });
+      return snapshotMetadata(updatedSnapshot);
+    });
     vi.stubGlobal('window', {
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         sendPrompt,
-        onEvent: vi.fn(),
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
       } satisfies Partial<CodexClawApi>,
     });
 

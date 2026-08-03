@@ -807,6 +807,10 @@ queues, side-panel state, and browser state are separate and remain untouched.
 Selecting an evicted agent follows the normal provider history hydration path.
 Conversations with an active turn stay memory-authoritative and reconcile
 through their live backend events.
+Global snapshot notifications and hot-path acknowledgements contain metadata
+only. They are merged into the existing renderer state without replacing the
+root snapshot or cached message array, so an unrelated agent, queue, loop, or
+status change cannot clone and invalidate a long active transcript.
 
 Dragging a work item onto an agent records provider-neutral assignment metadata
 in `workBacklog.assignments`, keyed by provider and provider-generated item id,

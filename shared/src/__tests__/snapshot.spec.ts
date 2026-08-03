@@ -5,6 +5,7 @@ import {
   createAgentInSnapshot,
   createInitialSnapshot,
   selectAgent,
+  snapshotMetadata,
   updateAgentFromInput,
   updateAgentFolder,
 } from '../snapshot';
@@ -277,6 +278,7 @@ describe('snapshot reducer', () => {
       status: 'streaming',
       parts: [],
     });
+    const messages = snapshot.messages;
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
@@ -286,6 +288,7 @@ describe('snapshot reducer', () => {
       payload: { delta: 'hello' },
       occurredAt: '2026-06-05T00:00:03.000Z',
     });
+    expect(snapshot.messages).toBe(messages);
     applyMainEventToSnapshot(snapshot, {
       seq: 3,
       agentId: 'agent-dina',
@@ -981,8 +984,9 @@ describe('snapshot reducer', () => {
     ]);
   });
 
-  it('replaces renderer state from a snapshot update event', () => {
+  it('updates metadata without replacing cached conversation transcripts', () => {
     const snapshot = createInitialSnapshot();
+    const messages = snapshot.messages;
     const nextSnapshot = createInitialSnapshot();
     nextSnapshot.loops = [{
       id: 'loop-bugs',
@@ -1008,11 +1012,21 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       type: 'snapshot.updated',
-      payload: nextSnapshot,
+      payload: snapshotMetadata(nextSnapshot),
       occurredAt: '2026-06-09T10:00:00.000Z',
     });
 
     expect(snapshot.loops).toStrictEqual(nextSnapshot.loops);
+    expect(snapshot.messages).toBe(messages);
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      type: 'snapshot.updated',
+      payload: nextSnapshot,
+      occurredAt: '2026-06-09T10:00:01.000Z',
+    });
+
+    expect(snapshot.messages).toBe(messages);
   });
 
   it('merges agent updates from main-process collaboration tools', () => {
