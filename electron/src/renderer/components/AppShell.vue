@@ -2002,6 +2002,28 @@ function openSidePanelRequest(request: SidePanelRequest): void {
 }
 
 function openMarkdownRequest(request: SidePanelMarkdownRequest): void {
+  if (request.purpose !== 'plan') {
+    const agent = currentAgent.value;
+    if (!agent) return;
+    const identifier = request.path ?? `inline-${++markdownPreviewId}`;
+    const tab = request.path ? rightWorkspaceFileTab(request.path) : rightWorkspaceMarkdownTab(identifier);
+    const subtitle = request.path;
+    const workspace = rightWorkspaceFor(agent.id);
+    workspace.filePanels = {
+      ...workspace.filePanels,
+      [tab]: {
+        kind: 'markdown',
+        title: request.title ?? (subtitle ? fileBasename(subtitle) : 'Markdown'),
+        ...(subtitle ? { subtitle } : {}),
+        content: request.content,
+        state: 'idle',
+        error: null,
+      },
+    };
+    openRightWorkspaceTab(tab, agent.id);
+    return;
+  }
+
   sidePanelRequestId += 1;
   const subtitle = request.path;
   sidePanel.value = {

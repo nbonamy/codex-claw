@@ -925,7 +925,7 @@ describe('AppShell', () => {
     expect(wrapper.find('.side-panel').exists()).toBe(false);
   });
 
-  it('opens markdown side panel requests from main events', async () => {
+  it('opens MCP markdown requests as right-workspace tabs', async () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mount(AppShell, {
       props: {
@@ -945,7 +945,8 @@ describe('AppShell', () => {
       },
     });
 
-    expect(wrapper.find('.side-panel').exists()).toBe(true);
+    expect(wrapper.find('.side-panel').exists()).toBe(false);
+    expect(wrapper.find('.right-workspace-panel').exists()).toBe(true);
     expect(wrapper.text()).toContain('Generated Plan');
     expect(wrapper.text()).toContain('Ship it.');
 
@@ -957,7 +958,7 @@ describe('AppShell', () => {
       },
     } as Record<string, unknown>);
 
-    expect(wrapper.text()).toContain('docs/mcp.md');
+    expect(wrapper.text()).toContain('mcp.md');
     expect(wrapper.text()).toContain('MCP');
   });
 
@@ -980,8 +981,8 @@ describe('AppShell', () => {
       },
     });
 
-    expect(wrapper.get('.side-panel h2').text()).toBe('Markdown');
-    expect(wrapper.find('.side-panel__copy p').exists()).toBe(false);
+    expect(wrapper.find('.side-panel').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Markdown');
     expect(wrapper.text()).toContain('Generated');
   });
 

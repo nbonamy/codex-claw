@@ -10,6 +10,10 @@ export function rightWorkspaceFileTab(filePath: string): RightWorkspaceFileTab {
   return `file:${encodeURIComponent(filePath)}`;
 }
 
+export function rightWorkspaceMarkdownTab(identifier: string): RightWorkspaceFileTab {
+  return `file:markdown:${encodeURIComponent(identifier)}`;
+}
+
 export function isRightWorkspaceFileTab(tab: RightWorkspaceTab): tab is RightWorkspaceFileTab {
   return tab.startsWith('file:');
 }

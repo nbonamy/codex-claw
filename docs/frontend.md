@@ -109,6 +109,8 @@ implemented:
   width, and inactive workspaces stay mounted so background browser tooling can
   continue without stealing the user's selected agent. Live edits refresh files
   that the user already has open but never reveal or select a workspace tab;
+  MCP Markdown previews open as Markdown tabs in this same workspace, while
+  plan-review Markdown keeps its explicit review controls;
   clicking an SDK tool-call file target is the only action that opens its
   canonical path in the owning workspace. Edit targets with turn context open
   a turn-scoped diff tab; links without that context fall back to the current
