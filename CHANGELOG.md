@@ -2,7 +2,7 @@
 
 All notable Codex Claw changes are recorded here.
 
-## [0.4.0] - WIP
+## [0.4.0] - 2026-08-03
 
 ### New features
 
