@@ -7,7 +7,7 @@ import {
   registerCycleTeamsShortcut,
   unregisterCycleTeamsShortcut,
 } from './app-shortcuts';
-import { installAppMenu } from './app-menu';
+import { installAppMenu, type AppMenuCallbacks, type AppMenuOptions } from './app-menu';
 import { warnMain } from './log';
 import { sendAppCommand } from './ipc-events';
 
@@ -16,7 +16,10 @@ type MainWindowState = {
   isMaximized: boolean;
 };
 
-export function createMainWindow(agentListCompact = false): BrowserWindow {
+export function createMainWindow(
+  agentListCompact = false,
+  appMenuOptions: Partial<Pick<AppMenuOptions, 'updateStatus'>> & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate'>> = {},
+): BrowserWindow {
   const releaseMode = isReleaseMode();
   const savedState = readWindowState(windowStatePath());
   const restoredState = savedState && isWindowBoundsVisible(savedState.bounds, screen.getAllDisplays().map((display) => display.workArea))
@@ -55,7 +58,11 @@ export function createMainWindow(agentListCompact = false): BrowserWindow {
   });
 
   window.webContents.setWindowOpenHandler(({ url }) => handleExternalWindowOpen(url, (targetUrl) => shell.openExternal(targetUrl)));
-  installAppMenu(window, { debugMode: !releaseMode, agentListCompact });
+  installAppMenu(window, {
+    debugMode: !releaseMode,
+    agentListCompact,
+    ...appMenuOptions,
+  });
   installFocusedAppShortcuts(window);
   window.webContents.on('before-input-event', (event, input) => {
     const command = appCommandFromInput(input);

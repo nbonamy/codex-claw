@@ -96,6 +96,25 @@ describe('AgentHeader', () => {
     expect(wrapper.emitted('toggle-workspace')).toStrictEqual([[]]);
   });
 
+  it('places a downloaded update badge in the header and forwards install', async () => {
+    const wrapper = mount(AgentHeader, {
+      props: {
+        agent,
+        backendRuntime: { backend: 'codex', status: 'running' },
+        isLoading: false,
+        sidebarCollapsed: false,
+        updateStatus: { state: 'downloaded', version: '0.4.0' },
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    const badge = wrapper.get('.update-available-badge');
+    expect(badge.text()).toBe('Update available');
+    await badge.trigger('click');
+
+    expect(wrapper.emitted('install-update')).toStrictEqual([[]]);
+  });
+
   it('renders loading, running, and error fallback labels without an agent', () => {
     const props = {
       agent: null,

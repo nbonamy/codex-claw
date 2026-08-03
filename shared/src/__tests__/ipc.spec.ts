@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import type { AppCommand, AppSnapshot, MainToRendererEvent, SendPromptOptions } from '../contracts';
+import type { AppCommand, AppSnapshot, DesktopUpdateStatus, MainToRendererEvent, SendPromptOptions } from '../contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '../ipc';
 
 describe('ipc channels', () => {
@@ -76,6 +76,8 @@ describe('ipc channels', () => {
       cancelCodexChatGptLogin: 'codex:authentication:chatgpt:cancel',
       startCodexChatGptLogin: 'codex:authentication:chatgpt:start',
       logoutCodex: 'codex:authentication:logout',
+      getUpdateStatus: 'app:update-status:get',
+      installUpdate: 'app:update:install',
       getDaemonStatus: 'daemon:status:get',
       setDaemonEnabled: 'daemon:enabled:set',
       getSystemPermissions: 'system-permissions:get',
@@ -107,6 +109,7 @@ describe('ipc channels', () => {
       respondToClientRequest: 'client-request:respond',
       event: 'app:event',
       appCommand: 'app:command',
+      updateStatusChanged: 'app:update-status-changed',
     });
   });
 
@@ -119,6 +122,8 @@ describe('ipc channels', () => {
       .toEqualTypeOf<MainToRendererEvent>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.appCommand]>()
       .toEqualTypeOf<AppCommand>();
+    expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.updateStatusChanged]>()
+      .toEqualTypeOf<DesktopUpdateStatus>();
     expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.launchChatGptApp]['args']>()
       .toEqualTypeOf<[]>();
     expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.launchChatGptApp]['result']>()

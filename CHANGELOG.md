@@ -1,8 +1,28 @@
 # Changelog
 
-All notable Codex Claw changes are recorded here. The history through `0.2.0`
-was reconstructed from the Git log because earlier releases did not maintain a
-changelog or release tags.
+All notable Codex Claw changes are recorded here.
+
+## [0.3.1] - 2026-08-02
+
+### New features
+
+- Added macOS update checks, a Codex Claw menu action, a downloaded-update
+  badge, and install-and-relaunch flow.
+- Added the signed desktop release publishing workflow and update feed.
+- Added live file activity in conversations and clickable file targets for
+  reads, edits, and creates.
+- Published the Codex Claw landing page with release downloads and product
+  documentation.
+
+### Improvements and fixes
+
+- Update checks now run at startup and once per hour in packaged builds.
+- Git review now includes untracked files and keeps the change statistics
+  visible alongside long filenames.
+- File activity no longer opens files unexpectedly; explicit file targets remain
+  available from the conversation.
+- Preserved conversation workspace context while navigating between agents.
+- Refined exploration labels and made right-sidebar resize affordances subtler.
 
 ## [0.3.0] - 2026-08-02
 

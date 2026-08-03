@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { MenuItemConstructorOptions } from 'electron';
-import { buildAppMenuTemplate, type AppMenuCallbacks } from '../app-menu';
+import { buildAppMenuTemplate, installAppMenu, type AppMenuCallbacks } from '../app-menu';
+
+const electronMenuMocks = vi.hoisted(() => ({
+  buildFromTemplate: vi.fn((template: MenuItemConstructorOptions[]) => template),
+  setApplicationMenu: vi.fn(),
+}));
+
+vi.mock('electron', () => ({ Menu: electronMenuMocks }));
 
 const callbacks = (): AppMenuCallbacks => ({
   reload: vi.fn(),
@@ -114,6 +121,57 @@ describe('app menu', () => {
     const menu = buildAppMenuTemplate(callbacks(), { debugMode: false, agentListCompact: true }, 'darwin');
 
     expect(menuItem(menu, 'View', 'Compact Agent List')).toMatchObject({ type: 'checkbox', checked: true });
+  });
+
+  it('offers update installation or checking in the Codex Claw menu', () => {
+    const checkForUpdates = vi.fn();
+    const installUpdate = vi.fn();
+    const menu = buildAppMenuTemplate({
+      ...callbacks(),
+      checkForUpdates,
+      installUpdate,
+    }, { debugMode: false, updateStatus: { state: 'downloaded', version: '0.4.0' } }, 'darwin');
+
+    clickItem(menu, 'Codex Claw', 'Install Update and Relaunch');
+    expect(installUpdate).toHaveBeenCalledOnce();
+
+    const checkingMenu = buildAppMenuTemplate({
+      ...callbacks(),
+      checkForUpdates,
+      installUpdate,
+    }, { debugMode: false, updateStatus: { state: 'checking' } }, 'darwin');
+    expect(menuItem(checkingMenu, 'Codex Claw', 'Checking for Updates...')).toMatchObject({ enabled: false });
+
+    const idleMenu = buildAppMenuTemplate({
+      ...callbacks(),
+      checkForUpdates,
+      installUpdate,
+    }, { debugMode: false, updateStatus: { state: 'idle' } }, 'darwin');
+    clickItem(idleMenu, 'Codex Claw', 'Check for Updates...');
+    expect(checkForUpdates).toHaveBeenCalledOnce();
+  });
+
+  it('passes update callbacks through the native menu installer', () => {
+    const checkForUpdates = vi.fn();
+    const installUpdate = vi.fn();
+    installAppMenu({
+      webContents: {
+        reload: vi.fn(),
+        toggleDevTools: vi.fn(),
+      },
+    } as never, {
+      debugMode: false,
+      updateStatus: { state: 'idle' },
+      checkForUpdates,
+      installUpdate,
+    });
+
+    const template = electronMenuMocks.buildFromTemplate.mock.calls.at(-1)?.[0];
+    if (!Array.isArray(template)) throw new Error('Menu template was not built');
+    clickItem(template, 'Codex Claw', 'Check for Updates...');
+
+    expect(checkForUpdates).toHaveBeenCalledOnce();
+    expect(electronMenuMocks.setApplicationMenu).toHaveBeenCalledOnce();
   });
 
   it('adds reload and developer tools only in debug mode', () => {

@@ -11,12 +11,15 @@ import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards';
 import { applyMainEventToSnapshot } from '@codex-claw/shared/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppCommand, AppSnapshot, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppCommand, AppSnapshot, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
 import { sendAppCommand, sendRendererEvent } from './ipc-events';
+import { installAppMenu } from './app-menu';
+import { DesktopAutoUpdateService } from './auto-update';
 import { BrowserPane, browserPaneKey } from './browser-pane';
 import { launchChatGptApp } from './chatgpt-app';
 import { appCommandFromDeepLink, codexClawDeepLinkScheme, deepLinksFromArgv } from './deep-links';
+import { ManualUpdateCheckController } from './manual-update-check';
 
 type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
 type StartupMaintenance = () => Promise<void>;
@@ -46,6 +49,9 @@ export class AppController {
   private rendererReady = false;
   private readonly pendingDeepLinkCommands: AppCommand[] = [];
   private readonly pendingBrowserOpens = new Map<string, PendingBrowserOpen>();
+  private autoUpdateService: DesktopAutoUpdateService | null = null;
+  private manualUpdateCheckController: ManualUpdateCheckController | null = null;
+  private desktopUpdateStatus: DesktopUpdateStatus = { state: 'idle' };
 
   private readonly browserPane = new BrowserPane({
     onAnnotation: (annotation) => this.emitBrowserAnnotation(annotation),
@@ -69,9 +75,31 @@ export class AppController {
   }
 
   async initialize(): Promise<void> {
+    this.autoUpdateService?.start();
     await this.startupMaintenance();
     await this.initializeBackendClient();
     this.syncPowerSaveBlocker();
+  }
+
+  setAutoUpdateService(service: DesktopAutoUpdateService): void {
+    this.autoUpdateService = service;
+    this.desktopUpdateStatus = service.getStatus();
+    this.manualUpdateCheckController = new ManualUpdateCheckController({
+      getWindow: () => this.mainWindow,
+      installUpdate: () => this.installUpdate(),
+      showMessageBox: (window, options) => window
+        ? dialog.showMessageBox(window, options)
+        : dialog.showMessageBox(options),
+    });
+  }
+
+  setDesktopUpdateStatus(status: DesktopUpdateStatus): void {
+    this.desktopUpdateStatus = status;
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      this.mainWindow.webContents.send(ipcChannels.updateStatusChanged, status);
+      this.refreshAppMenu();
+    }
+    this.manualUpdateCheckController?.handleStatus(status);
   }
 
   registerIpcHandlers(): void {
@@ -324,6 +352,8 @@ export class AppController {
     ipc.handle(ipcChannels.cancelCodexChatGptLogin, () => this.cancelCodexChatGptLogin());
     ipc.handle(ipcChannels.startCodexChatGptLogin, () => this.startCodexChatGptLogin());
     ipc.handle(ipcChannels.logoutCodex, () => this.logoutCodex());
+    ipc.handle(ipcChannels.getUpdateStatus, () => this.desktopUpdateStatus);
+    ipc.handle(ipcChannels.installUpdate, () => this.requestInstallUpdate());
 
     ipc.handle(ipcChannels.getDaemonStatus, () => this.getDaemonStatus());
 
@@ -408,7 +438,10 @@ export class AppController {
       this.focusMainWindow();
       return;
     }
-    this.mainWindow = createMainWindow(this.snapshot?.general.agentListCompact ?? false);
+    this.mainWindow = createMainWindow(
+      this.snapshot?.general.agentListCompact ?? false,
+      this.updateMenuOptions(),
+    );
     this.rendererReady = false;
     this.mainWindow.webContents.on('did-start-loading', () => {
       this.rendererReady = false;
@@ -438,6 +471,7 @@ export class AppController {
     this.rejectAllPendingBrowserOpens(new Error('Application is shutting down.'));
     await this.browserPane.closeAll();
     this.powerSaveBlocker.stop();
+    this.autoUpdateService?.stop();
     this.nativeIpcUnregister?.();
     this.nativeIpcUnregister = null;
     this.backendClientEventUnsubscribe?.();
@@ -1093,6 +1127,47 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.clientRequestRespond, { response }));
   }
 
+  private installUpdate(): void {
+    this.autoUpdateService?.install();
+  }
+
+  private requestInstallUpdate(): void {
+    if (!this.autoUpdateService) return;
+    if (this.manualUpdateCheckController) {
+      this.manualUpdateCheckController.begin(this.desktopUpdateStatus);
+      return;
+    }
+    this.installUpdate();
+  }
+
+  private runManualUpdateCheck(): void {
+    if (!this.autoUpdateService || !this.manualUpdateCheckController) return;
+    if (!this.manualUpdateCheckController.begin(this.autoUpdateService.getStatus())) return;
+    if (!this.autoUpdateService.check()) this.manualUpdateCheckController.cancel();
+    this.refreshAppMenu();
+  }
+
+  private updateMenuOptions(): {
+    updateStatus: DesktopUpdateStatus;
+    checkForUpdates: () => void;
+    installUpdate: () => void;
+  } {
+    return {
+      updateStatus: this.desktopUpdateStatus,
+      checkForUpdates: () => this.runManualUpdateCheck(),
+      installUpdate: () => this.requestInstallUpdate(),
+    };
+  }
+
+  private refreshAppMenu(): void {
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
+    installAppMenu(this.mainWindow, {
+      debugMode: !app.isPackaged,
+      agentListCompact: this.snapshot?.general.agentListCompact ?? false,
+      ...this.updateMenuOptions(),
+    });
+  }
+
   private emitBackendEvent(event: ClawBackendEvent): void {
     if (this.backendEventBuffer) {
       this.backendEventBuffer.push(event);
@@ -1204,6 +1279,12 @@ export class AppController {
 
 export function startMainApp(): void {
   const controller = new AppController(null, undefined, app, ensureCurrentClawdDaemonForStartup);
+  const autoUpdateService = new DesktopAutoUpdateService({
+    app,
+    updateBaseUrl: process.env.CODEX_CLAW_UPDATE_BASE_URL,
+    onStatusChanged: (status) => controller.setDesktopUpdateStatus(status),
+  });
+  controller.setAutoUpdateService(autoUpdateService);
   let shutdownStarted = false;
   if (!app.requestSingleInstanceLock()) {
     app.quit();

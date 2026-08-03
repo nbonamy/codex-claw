@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AddSshConnectionInput, AppCommand, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AppCommand, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DesktopUpdateStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
 import { exposeCodexNativeRendererApi, TypedIpcRenderer } from 'codex-app-sdk/electron/preload';
 
@@ -77,6 +77,8 @@ const api: CodexClawApi = {
   cancelCodexChatGptLogin: () => ipc.invoke(ipcChannels.cancelCodexChatGptLogin),
   startCodexChatGptLogin: () => ipc.invoke(ipcChannels.startCodexChatGptLogin),
   logoutCodex: () => ipc.invoke(ipcChannels.logoutCodex),
+  getUpdateStatus: () => ipc.invoke(ipcChannels.getUpdateStatus),
+  installUpdate: () => ipc.invoke(ipcChannels.installUpdate),
   getDaemonStatus: () => ipc.invoke(ipcChannels.getDaemonStatus),
   setDaemonEnabled: (enabled: boolean) => ipc.invoke(ipcChannels.setDaemonEnabled, enabled),
   getSystemPermissions: () => ipc.invoke(ipcChannels.getSystemPermissions),
@@ -111,6 +113,9 @@ const api: CodexClawApi = {
   },
   onAppCommand: (listener: (command: AppCommand) => void) => {
     return ipc.on(ipcChannels.appCommand, listener);
+  },
+  onUpdateStatusChanged: (listener: (status: DesktopUpdateStatus) => void) => {
+    return ipc.on(ipcChannels.updateStatusChanged, listener);
   },
 };
 

@@ -72,6 +72,8 @@ export const ipcChannels = {
   cancelCodexChatGptLogin: 'codex:authentication:chatgpt:cancel',
   startCodexChatGptLogin: 'codex:authentication:chatgpt:start',
   logoutCodex: 'codex:authentication:logout',
+  getUpdateStatus: 'app:update-status:get',
+  installUpdate: 'app:update:install',
   getDaemonStatus: 'daemon:status:get',
   setDaemonEnabled: 'daemon:enabled:set',
   getSystemPermissions: 'system-permissions:get',
@@ -103,11 +105,12 @@ export const ipcChannels = {
   respondToClientRequest: 'client-request:respond',
   event: 'app:event',
   appCommand: 'app:command',
+  updateStatusChanged: 'app:update-status-changed',
 } as const;
 
 export type IpcChannel = typeof ipcChannels[keyof typeof ipcChannels];
 
-type CodexClawIpcRequestApi = Omit<CodexClawApi, 'onAppCommand' | 'onEvent'>;
+type CodexClawIpcRequestApi = Omit<CodexClawApi, 'onAppCommand' | 'onEvent' | 'onUpdateStatusChanged'>;
 
 type IpcRequestFor<Method> = Method extends (...args: infer Arguments) => infer Result
   ? { args: Arguments; result: Awaited<Result> }
@@ -122,4 +125,5 @@ export type CodexClawIpcRequests = {
 export type CodexClawIpcEvents = {
   [ipcChannels.event]: MainToRendererEvent;
   [ipcChannels.appCommand]: AppCommand;
+  [ipcChannels.updateStatusChanged]: import('./contracts').DesktopUpdateStatus;
 };

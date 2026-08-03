@@ -31,6 +31,8 @@ const dmgOptions: MakerDMGConfig = {
   //   }
   // }
 }
+const updateBaseUrl = process.env.CODEX_CLAW_UPDATE_BASE_URL ?? 'https://codex-claw.nabocorp.com/desktop/releases';
+const updateManifestBaseUrl = `${updateBaseUrl.replace(/\/+$/, '')}/darwin/arm64`;
 
 if (isDarwin && !skipMacSigning) {
   osxPackagerConfig = {
@@ -78,7 +80,7 @@ const config: ForgeConfig = {
     ],
   },
   makers: [
-    new MakerZIP({}, ['darwin', 'win32', 'linux']),
+    new MakerZIP({ macUpdateManifestBaseUrl: updateManifestBaseUrl }, ['darwin', 'win32', 'linux']),
     new MakerDMG(dmgOptions, ['darwin']),
   ],
   plugins: [

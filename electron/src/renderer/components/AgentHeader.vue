@@ -92,17 +92,23 @@
       >
         <IconLayoutSidebarRight aria-hidden="true" />
       </button>
+      <UpdateAvailableBadge
+        v-if="updateStatus"
+        :status="updateStatus"
+        @install="emit('install-update')"
+      />
     </div>
   </header>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Agent, AgentGitStatus, BackendRuntimeStatus } from '@codex-claw/shared/contracts';
+import type { Agent, AgentGitStatus, BackendRuntimeStatus, DesktopUpdateStatus } from '@codex-claw/shared/contracts';
 import { PanelLeftOpenIcon } from '../shared/icons/app-icons';
 import { IconLayoutSidebarRight } from '@tabler/icons-vue';
 import { CodexAnimatedDiffStat } from 'codex-app-sdk/vue';
 import AgentAvatar from './AgentAvatar.vue';
+import UpdateAvailableBadge from './UpdateAvailableBadge.vue';
 
 const props = defineProps<{
   agent: Agent | null;
@@ -111,12 +117,14 @@ const props = defineProps<{
   workspaceOpen?: boolean;
   isLoading: boolean;
   sidebarCollapsed: boolean;
+  updateStatus?: DesktopUpdateStatus;
 }>();
 
 const emit = defineEmits<{
   'expand-sidebar': [];
   'toggle-workspace': [];
   'open-git-diff': [];
+  'install-update': [];
 }>();
 
 const statusLabel = computed(() => {

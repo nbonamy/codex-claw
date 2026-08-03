@@ -1,25 +1,33 @@
 import { Menu, type BrowserWindow, type MenuItemConstructorOptions } from 'electron';
-import type { AppCommand } from '@codex-claw/shared/contracts';
+import type { AppCommand, DesktopUpdateStatus } from '@codex-claw/shared/contracts';
 import { cycleTeamsAccelerator } from './app-shortcuts';
 import { sendAppCommand } from './ipc-events';
 
 export type AppMenuOptions = {
   debugMode: boolean;
   agentListCompact?: boolean;
+  updateStatus?: DesktopUpdateStatus;
 };
 
 export type AppMenuCallbacks = {
+  checkForUpdates?: () => void;
+  installUpdate?: () => void;
   reload(): void;
   sendAppCommand(command: AppCommand): void;
   toggleDeveloperTools(): void;
 };
 
-export function installAppMenu(window: BrowserWindow, options: AppMenuOptions): void {
+type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate'>>;
+
+export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOptions): void {
+  const { checkForUpdates, installUpdate, ...menuOptions } = options;
   Menu.setApplicationMenu(Menu.buildFromTemplate(buildAppMenuTemplate({
+    checkForUpdates,
+    installUpdate,
     reload: () => window.webContents.reload(),
     sendAppCommand: (command) => sendAppCommand(window.webContents, command),
     toggleDeveloperTools: () => window.webContents.toggleDevTools(),
-  }, options)));
+  }, menuOptions)));
 }
 
 export function buildAppMenuTemplate(
@@ -28,13 +36,55 @@ export function buildAppMenuTemplate(
   platform: NodeJS.Platform = process.platform,
 ): MenuItemConstructorOptions[] {
   return [
-    ...(platform === 'darwin' ? [{ role: 'appMenu' as const }] : []),
+    ...(platform === 'darwin' ? [buildCodexClawMenu(callbacks, options)] : []),
     buildFileMenu(callbacks),
     buildEditMenu(callbacks),
     buildViewMenu(callbacks, options),
     buildWindowMenu(callbacks, platform),
     { role: 'help' },
   ];
+}
+
+function buildCodexClawMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions): MenuItemConstructorOptions {
+  return {
+    label: 'Codex Claw',
+    submenu: [
+      { role: 'about' },
+      ...(options.updateStatus && callbacks.checkForUpdates && callbacks.installUpdate
+        ? [
+            createUpdateMenuItem(options.updateStatus, callbacks),
+            { type: 'separator' as const },
+          ]
+        : []),
+      { role: 'services' },
+      { type: 'separator' },
+      { role: 'hide' },
+      { role: 'hideOthers' },
+      { role: 'unhide' },
+      { type: 'separator' },
+      {
+        label: 'Quit Codex Claw',
+        accelerator: 'CommandOrControl+Q',
+        click: () => callbacks.sendAppCommand({ type: 'quit' }),
+      },
+    ],
+  };
+}
+
+function createUpdateMenuItem(status: DesktopUpdateStatus, callbacks: AppMenuCallbacks): MenuItemConstructorOptions {
+  if (status.state === 'downloaded') {
+    return {
+      label: 'Install Update and Relaunch',
+      click: callbacks.installUpdate,
+    };
+  }
+
+  const busy = status.state === 'checking' || status.state === 'downloading';
+  return {
+    enabled: status.state !== 'disabled' && !busy,
+    label: busy ? 'Checking for Updates...' : 'Check for Updates...',
+    click: callbacks.checkForUpdates,
+  };
 }
 
 function buildFileMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions {

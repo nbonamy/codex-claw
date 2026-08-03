@@ -1,6 +1,6 @@
 {
   "name": "@codex-claw/electron",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "productName": "Codex Claw",
   "description": "Native Codex team desktop app.",
@@ -12,6 +12,8 @@
     "start": "electron-forge start",
     "package": "npm run build:computer-use && electron-forge package",
     "make": "npm run build:computer-use && electron-forge make",
+    "check-publish:macos": "node ../scripts/publish-macos.mjs --check-only",
+    "publish:macos": "node ../scripts/publish-macos.mjs",
     "build": "npm run build:computer-use && vue-tsc --noEmit && tsc --noEmit && electron-forge package",
     "typecheck": "vue-tsc --noEmit && tsc --noEmit",
     "lint": "vue-tsc --noEmit && tsc --noEmit && npm run lint:css",
@@ -21,7 +23,7 @@
     "test:watch": "vitest watch"
   },
   "dependencies": {
-    "@codex-claw/shared": "0.3.0",
+    "@codex-claw/shared": "0.3.1",
     "@tabler/icons-vue": "^3.44.0",
     "codex-app-sdk": "file:../../codex-app-sdk",
     "electron-log": "^5.4.4",

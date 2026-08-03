@@ -717,6 +717,22 @@ Recommended build pipeline:
    A real release build should sign and notarize the app and any helper
    executable that ships inside resources.
 
+### Desktop auto-update
+
+Packaged macOS builds use Electron's native `autoUpdater` with the Forge ZIP
+maker's JSON feed. The updater checks immediately at startup and every hour,
+then exposes status through the typed preload bridge and an
+"Update available" badge. Manual checks and install/relaunch are also available
+from the Codex Claw menu. Development builds and unsupported platforms report updates
+as disabled.
+
+The feed is served at
+`https://codex-claw.nabocorp.com/desktop/releases/<platform>/<arch>/RELEASES.json`
+by default. Set `CODEX_CLAW_UPDATE_BASE_URL` for another HTTPS host. A release
+publish uses `npm run publish:macos` after a signed `npm run make`; the script
+uploads the ZIP, manifest, and DMG through SSH using
+`CODEX_CLAW_UPDATE_PUBLISH_HOST` and `CODEX_CLAW_UPDATE_REMOTE_ROOT`.
+
 Runtime execution in a packaged app:
 
 1. Electron main resolves the packaged backend runtime under

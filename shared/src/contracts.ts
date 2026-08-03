@@ -1110,6 +1110,20 @@ export type ClientRequestResponse = {
   };
 };
 
+export type DesktopUpdateState =
+  | 'disabled'
+  | 'idle'
+  | 'checking'
+  | 'downloading'
+  | 'downloaded'
+  | 'error';
+
+export type DesktopUpdateStatus = {
+  state: DesktopUpdateState;
+  error?: string;
+  version?: string;
+};
+
 export type CodexClawApi = {
   getSnapshot(): Promise<AppSnapshot>;
   getSnapshotState(): Promise<RendererSnapshotState>;
@@ -1182,6 +1196,8 @@ export type CodexClawApi = {
   cancelCodexChatGptLogin(): Promise<CodexAuthentication>;
   startCodexChatGptLogin(): Promise<CodexChatGptLogin>;
   logoutCodex(): Promise<CodexAuthentication>;
+  getUpdateStatus(): Promise<DesktopUpdateStatus>;
+  installUpdate(): Promise<void>;
   getDaemonStatus(): Promise<ClawdDaemonStatus>;
   setDaemonEnabled(enabled: boolean): Promise<ClawdDaemonStatus>;
   getSystemPermissions(): Promise<SystemPermissionsStatus>;
@@ -1213,4 +1229,5 @@ export type CodexClawApi = {
   respondToClientRequest(response: ClientRequestResponse): Promise<AppSnapshot>;
   onEvent(listener: (event: MainToRendererEvent) => void): () => void;
   onAppCommand(listener: (command: AppCommand) => void): () => void;
+  onUpdateStatusChanged(listener: (status: DesktopUpdateStatus) => void): () => void;
 };

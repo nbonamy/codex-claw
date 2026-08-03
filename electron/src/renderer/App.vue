@@ -25,6 +25,7 @@
     :queued-prompts="activeQueuedPrompts"
     :composer-state="activeComposerState"
     :composer-attachments="activeComposerAttachments"
+    :update-status="updateStatus"
     :side-panel-request="sidePanelRequest"
     :file-activity="fileActivity"
     :work-provider-authorization="workProviderAuthorization"
@@ -122,12 +123,14 @@
     @steer-queued-prompt="steerQueuedPrompt"
     @update:composer-state="updateComposerState($event.agentId, $event.state)"
     @update:composer-attachments="updateComposerAttachments($event.agentId, $event.attachments)"
+    @install-update="installUpdate"
   />
   <ConfettiOverlay />
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, watch } from 'vue';
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import type { DesktopUpdateStatus } from '@codex-claw/shared/contracts';
 import AppShell from './components/AppShell.vue';
 import { useAppState } from './app-state';
 import ConfettiOverlay from './shared/confetti/ConfettiOverlay.vue';
@@ -259,17 +262,34 @@ const {
   restartApp,
 } = useAppState();
 
+const updateStatus = ref<DesktopUpdateStatus>({ state: 'idle' });
 let unsubscribeSystemAppearance: (() => void) | null = null;
+let unsubscribeUpdateStatus: (() => void) | null = null;
+
+async function installUpdate(): Promise<void> {
+  await window.codexClaw?.installUpdate?.();
+}
 
 onMounted(() => {
   unsubscribeSystemAppearance = subscribeToSystemAppearance();
   void loadSnapshot();
   void loadBackendModels();
+  const updateStatusPromise = window.codexClaw?.getUpdateStatus?.();
+  if (updateStatusPromise) {
+    void updateStatusPromise.then((status) => {
+      updateStatus.value = status;
+    });
+  }
+  unsubscribeUpdateStatus = window.codexClaw?.onUpdateStatusChanged?.((status) => {
+    updateStatus.value = status;
+  }) ?? null;
 });
 
 onBeforeUnmount(() => {
   unsubscribeSystemAppearance?.();
   unsubscribeSystemAppearance = null;
+  unsubscribeUpdateStatus?.();
+  unsubscribeUpdateStatus = null;
 });
 
 watch(() => snapshot.value.theme, (theme) => {

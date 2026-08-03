@@ -181,9 +181,11 @@
           :workspace-open="rightWorkspaceVisible"
           :is-loading="isLoading"
           :sidebar-collapsed="agentSidebarCollapsed"
+          :update-status="updateStatus"
           @expand-sidebar="agentSidebarCollapsed = false"
           @toggle-workspace="toggleRightWorkspace"
           @open-git-diff="openAgentGitDiffPreview"
+          @install-update="emit('install-update')"
         />
         <div ref="workspaceBody" class="app-shell__body">
           <AgentEmptyState
@@ -332,7 +334,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type PairedDevice, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
+import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type PairedDevice, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultTeamColor } from '@codex-claw/shared/team-colors';
@@ -394,6 +396,7 @@ const props = withDefaults(defineProps<{
   queuedPrompts?: QueuedChatPrompt[];
   composerState?: CodexComposerState;
   composerAttachments?: readonly CodexNativeAttachment[];
+  updateStatus?: DesktopUpdateStatus;
   sidePanelRequest?: SidePanelRequest | null;
   fileActivity?: AgentFileActivity | null;
   workProviderAuthorization?: WorkProviderAuthorization | null;
@@ -577,6 +580,7 @@ const emit = defineEmits<{
   'update:planMode': [enabled: boolean];
   'update:composerState': [payload: { agentId: string; state: CodexComposerState }];
   'update:composerAttachments': [payload: { agentId: string; attachments: readonly CodexNativeAttachment[] }];
+  'install-update': [];
   sendPrompt: [prompt: string, options?: SendPromptOptions];
   steerPrompt: [prompt: string, options?: SendPromptOptions];
 }>();
