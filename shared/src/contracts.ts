@@ -1016,6 +1016,8 @@ export type AppCommand =
   | { type: 'cycle-agents'; direction: -1 | 1 }
   | { type: 'cycle-teams' }
   | { type: 'duplicate-active-agent' }
+  | { type: 'debug-approval-request' }
+  | { type: 'debug-open-markdown' }
   | { type: 'edit-active-agent' }
   | { type: 'new-agent' }
   | { type: 'new-team' }

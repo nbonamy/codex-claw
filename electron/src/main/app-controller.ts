@@ -14,7 +14,7 @@ import { applyMainEventToSnapshot } from '@codex-claw/shared/snapshot';
 import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppCommand, AppPluginStatus, AppSnapshot, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
 import { sendAppCommand, sendRendererEvent } from './ipc-events';
-import { installAppMenu } from './app-menu';
+import { installAppMenu, type AppMenuCallbacks } from './app-menu';
 import { DesktopAutoUpdateService } from './auto-update';
 import { BrowserPane, browserPaneKey } from './browser-pane';
 import { launchChatGptApp } from './chatgpt-app';
@@ -446,8 +446,7 @@ export class AppController {
       this.snapshot?.general.agentListCompact ?? false,
       {
         ...this.updateMenuOptions(),
-        toggleDebugExecutionPlan: () => this.toggleDebugExecutionPlan(),
-        injectDebugPlanReview: () => this.injectDebugPlanReview(),
+        ...this.debugMenuOptions(),
       },
     );
     logMain('window', 'created main window');
@@ -1180,14 +1179,21 @@ export class AppController {
       debugMode: !app.isPackaged,
       agentListCompact: this.snapshot?.general.agentListCompact ?? false,
       ...this.updateMenuOptions(),
+      ...this.debugMenuOptions(),
+    });
+  }
+
+  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview'> {
+    return {
+      sendDebugAgentMessage: () => this.sendDebugAgentMessage(),
       toggleDebugExecutionPlan: () => this.toggleDebugExecutionPlan(),
       injectDebugPlanReview: () => this.injectDebugPlanReview(),
-    });
+    };
   }
 
   private toggleDebugExecutionPlan(): void {
     const agentId = this.snapshot?.activeAgentId;
-    if (!agentId || !this.backendClient || app.isPackaged) {
+    if (!agentId || !this.backendClient || app?.isPackaged) {
       return;
     }
 
@@ -1199,9 +1205,22 @@ export class AppController {
       }));
   }
 
+  private sendDebugAgentMessage(): void {
+    const agentId = this.snapshot?.activeAgentId;
+    if (!agentId || !this.backendClient || app?.isPackaged) {
+      return;
+    }
+
+    void this.backendClient.request(backendMethods.debugAgentMessageSend, { agentId })
+      .catch((error) => warnMain('debug', 'failed to send agent message fixture', {
+        agentId,
+        detail: error instanceof Error ? error.message : String(error),
+      }));
+  }
+
   private injectDebugPlanReview(): void {
     const agentId = this.snapshot?.activeAgentId;
-    if (!agentId || !this.backendClient || app.isPackaged) {
+    if (!agentId || !this.backendClient || app?.isPackaged) {
       return;
     }
 

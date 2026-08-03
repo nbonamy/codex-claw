@@ -106,6 +106,24 @@ describe('ClawMcpService', () => {
     }));
   });
 
+  it('exposes the same message delivery path to backend-owned debug fixtures', async () => {
+    const snapshot = createInitialSnapshot();
+    const sendPrompt = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex', threadId: 'thread-jesse' },
+      turnId: 'turn-jesse',
+    });
+    service = new ClawMcpService({ snapshot });
+    service.setDriverRpc(new BackendDriverRpc(new Map([['codex', createDriver({ sendPrompt })]])));
+
+    service.sendMessage('agent-dina', 'agent-jesse', 'Debug menu delivery');
+
+    await vi.waitFor(() => expect(sendPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-jesse' }),
+      expect.stringContaining('Debug menu delivery'),
+      undefined,
+    ));
+  });
+
   it('steers teammate messages into a recipient with an active turn', async () => {
     const snapshot = createInitialSnapshot();
     const recipient = snapshot.agents.find((agent) => agent.id === 'agent-jesse')!;

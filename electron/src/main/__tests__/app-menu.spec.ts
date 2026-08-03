@@ -12,6 +12,7 @@ vi.mock('electron', () => ({ Menu: electronMenuMocks }));
 const callbacks = (): AppMenuCallbacks => ({
   reload: vi.fn(),
   sendAppCommand: vi.fn(),
+  sendDebugAgentMessage: vi.fn(),
   toggleDeveloperTools: vi.fn(),
   toggleDebugExecutionPlan: vi.fn(),
   injectDebugPlanReview: vi.fn(),
@@ -176,6 +177,25 @@ describe('app menu', () => {
     expect(electronMenuMocks.setApplicationMenu).toHaveBeenCalledOnce();
   });
 
+  it('passes the message fixture callback through the startup menu installer', () => {
+    const sendDebugAgentMessage = vi.fn();
+    installAppMenu({
+      webContents: {
+        reload: vi.fn(),
+        toggleDevTools: vi.fn(),
+      },
+    } as never, {
+      debugMode: true,
+      sendDebugAgentMessage,
+    });
+
+    const template = electronMenuMocks.buildFromTemplate.mock.calls.at(-1)?.[0];
+    if (!Array.isArray(template)) throw new Error('Menu template was not built');
+    expect(menuItem(template, 'Debug', 'Send Message')).toMatchObject({ enabled: true });
+    clickItem(template, 'Debug', 'Send Message');
+    expect(sendDebugAgentMessage).toHaveBeenCalledOnce();
+  });
+
   it('adds reload and developer tools only in debug mode', () => {
     const debugCallbacks = callbacks();
     const debugMenu = buildAppMenuTemplate(debugCallbacks, { debugMode: true }, 'darwin');
@@ -191,7 +211,14 @@ describe('app menu', () => {
       'Reload',
       'Toggle Developer Tools',
     ]);
-    expect(menuLabels(submenu(debugMenu, 'Debug'))).toStrictEqual(['Execution Plan', 'Plan Review']);
+    expect(menuLabels(submenu(debugMenu, 'Debug'))).toStrictEqual([
+      'Send Message',
+      'Open Codex Claw Website',
+      'Open Markdown',
+      'Approval Request',
+      'Execution Plan',
+      'Plan Review',
+    ]);
     expect(menuItem(debugMenu, 'View', 'Next Team')?.accelerator).toBe('Command+`');
     expect(menuItem(debugMenu, 'View', 'Next Agent')?.accelerator).toBe('Control+Tab');
     expect(menuItem(debugMenu, 'View', 'Previous Agent')?.accelerator).toBe('Control+Shift+Tab');
@@ -200,11 +227,22 @@ describe('app menu', () => {
 
     clickItem(debugMenu, 'View', 'Reload');
     clickItem(debugMenu, 'View', 'Toggle Developer Tools');
+    clickItem(debugMenu, 'Debug', 'Send Message');
+    clickItem(debugMenu, 'Debug', 'Open Codex Claw Website');
+    clickItem(debugMenu, 'Debug', 'Open Markdown');
+    clickItem(debugMenu, 'Debug', 'Approval Request');
     clickItem(debugMenu, 'Debug', 'Execution Plan');
     clickItem(debugMenu, 'Debug', 'Plan Review');
 
     expect(debugCallbacks.reload).toHaveBeenCalledOnce();
     expect(debugCallbacks.toggleDeveloperTools).toHaveBeenCalledOnce();
+    expect(debugCallbacks.sendDebugAgentMessage).toHaveBeenCalledOnce();
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(1, {
+      type: 'open-browser',
+      url: 'https://codex-claw.nabocorp.com',
+    });
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(2, { type: 'debug-open-markdown' });
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(3, { type: 'debug-approval-request' });
     expect(debugCallbacks.toggleDebugExecutionPlan).toHaveBeenCalledOnce();
     expect(debugCallbacks.injectDebugPlanReview).toHaveBeenCalledOnce();
     expect(JSON.stringify(releaseMenu)).not.toMatch(/reload|forceReload|developer tools|toggleDevTools/i);

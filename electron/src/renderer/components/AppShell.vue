@@ -216,7 +216,7 @@
             :model-catalog-status="modelCatalogStatus"
             :skill-catalog-status="skillCatalogStatus"
             :goal="goal"
-            :approvals="approvals"
+            :approvals="effectiveApprovals"
             :plan="currentTurnPlan"
             :plan-visible="executionPlanVisible"
             :approval-preset="approvalPreset"
@@ -634,6 +634,7 @@ const agentSidebarWidth = ref(260);
 const activeSurface = ref<AppSurface>('agent');
 const rightWorkspaces = reactive<Record<string, AgentRightWorkspaceState>>({});
 const executionPlanStates = reactive<Record<string, { open: boolean; turnId: string }>>({});
+const debugApproval = ref<{ agentId: string; request: BackendApprovalRequest } | null>(null);
 const workspaceBody = ref<HTMLElement | null>(null);
 const conversationPane = ref<{ focusComposer(): void } | null>(null);
 const authentication = ref<CodexAuthentication | null>(null);
@@ -696,6 +697,13 @@ const currentAgent = computed(() => {
   }
 
   return activeTeamAgents.value.find((agent) => agent.id === team.activeAgentId) ?? activeTeamAgents.value[0] ?? null;
+});
+const effectiveApprovals = computed(() => {
+  const fixture = debugApproval.value;
+  return [
+    ...(props.approvals ?? []),
+    ...(fixture && fixture.agentId === currentAgent.value?.id ? [fixture.request] : []),
+  ];
 });
 const currentBackendRuntime = computed<BackendRuntimeStatus>(() => {
   const backend = currentAgent.value?.backend ?? 'codex';
@@ -1348,6 +1356,10 @@ function forwardApprovalResolution(
   decision: BackendApprovalDecision,
   scope: BackendApprovalScope,
 ): void {
+  if (debugApproval.value?.request.id === approvalId) {
+    debugApproval.value = null;
+    return;
+  }
   emit('resolve-approval', approvalId, decision, scope);
 }
 
@@ -1619,6 +1631,53 @@ function handleAppCommand(command: AppCommand): void {
       });
     }
     void nextTick(() => conversationPane.value?.focusComposer());
+    return;
+  }
+
+  if (command.type === 'debug-open-markdown') {
+    activeSurface.value = 'agent';
+    openMarkdownRequest({
+      kind: 'markdown',
+      title: 'Debug Markdown',
+      content: [
+        '# Debug Markdown',
+        '',
+        'Opened from the Codex Claw Debug menu.',
+        '',
+        '## Rendering fixtures',
+        '',
+        '- [x] Workspace tab',
+        '- [ ] Markdown content',
+        '',
+        '> A deterministic document for checking Markdown presentation.',
+        '',
+        '```ts',
+        "const source = 'Debug menu';",
+        '```',
+      ].join('\n'),
+    });
+    return;
+  }
+
+  if (command.type === 'debug-approval-request') {
+    const agent = currentAgent.value;
+    if (!agent) return;
+    activeSurface.value = 'agent';
+    debugApproval.value = {
+      agentId: agent.id,
+      request: {
+        id: 'debug-approval-request',
+        kind: 'command',
+        conversationId: `debug-${agent.id}`,
+        itemId: 'debug-command-item',
+        title: 'Allow debug command',
+        description: 'A deterministic approval request from the Debug menu.',
+        command: 'npm test -- --run debug-fixture',
+        cwd: agent.folder,
+        allowedScopes: ['once', 'session'],
+        canDeny: true,
+      },
+    };
     return;
   }
 

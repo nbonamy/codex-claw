@@ -36,6 +36,7 @@ const mocks = vi.hoisted(() => ({
   mcpSetDriverRpc: vi.fn(),
   mcpSetEventSink: vi.fn(),
   mcpHandleBackendEvent: vi.fn(),
+  mcpSendMessage: vi.fn(),
   hydrateConnections: vi.fn(),
   schedulerStart: vi.fn(),
   schedulerStop: vi.fn(),
@@ -70,6 +71,7 @@ vi.mock('../mcp/service', () => ({
     setDriverRpc = mocks.mcpSetDriverRpc;
     setEventSink = mocks.mcpSetEventSink;
     handleBackendEvent = mocks.mcpHandleBackendEvent;
+    sendMessage = mocks.mcpSendMessage;
   },
 }));
 
@@ -158,6 +160,7 @@ type ServerOptions = {
   onEvent(event: unknown): void;
   onBackendEventApplied(event: unknown): void;
   saveSnapshot(snapshot: unknown): Promise<unknown>;
+  sendAgentMessage(fromAgentId: string, toAgentId: string, content: string): void;
   systemPermissions: {
     getStatus(): Promise<unknown>;
     openAccessibilitySettings(): Promise<unknown>;
@@ -254,6 +257,8 @@ describe('clawd runtime', () => {
     expect(mocks.mcpHandleBackendEvent).toHaveBeenCalledWith({ type: 'backend' });
     await server.saveSnapshot({ next: true });
     expect(mocks.saveBackendSnapshot).toHaveBeenCalledWith({ next: true });
+    server.sendAgentMessage('agent-dina', 'agent-jesse', 'hello');
+    expect(mocks.mcpSendMessage).toHaveBeenCalledWith('agent-dina', 'agent-jesse', 'hello');
     await server.systemPermissions.getStatus();
     await server.systemPermissions.openAccessibilitySettings();
     expect(requestClient).toHaveBeenCalledWith(backendMethods.clientSystemPermissionsGet);

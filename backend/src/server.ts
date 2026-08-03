@@ -42,6 +42,7 @@ export type ClawBackendServerOptions = {
   sshConnections?: SshConnectionService;
   remoteClients?: RemoteClawdClientManager;
   transcriptRetention?: Omit<AgentTranscriptRetentionOptions, 'snapshot' | 'onEvicted'>;
+  sendAgentMessage?: (fromAgentId: string, toAgentId: string, content: string) => void;
 };
 
 export type SystemPermissionsPort = {
@@ -81,6 +82,7 @@ export class ClawBackendServer {
   private readonly systemPermissions: SystemPermissionsPort;
   private readonly sshConnections: SshConnectionService;
   private readonly remoteClients: RemoteClawdClientManager;
+  private readonly sendAgentMessage?: (fromAgentId: string, toAgentId: string, content: string) => void;
   private readonly clientRequestOwners = new Map<string, { backend: AgentBackend; remoteConnectionId?: string }>();
   private readonly remoteSnapshots = new Map<string, AppSnapshot>();
   private readonly queuedPromptRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -101,6 +103,7 @@ export class ClawBackendServer {
     this.systemPermissions = options.systemPermissions ?? createUnsupportedSystemPermissionsPort();
     this.sshConnections = options.sshConnections ?? new SshConnectionService();
     this.remoteClients = options.remoteClients ?? new RemoteClawdClientManager();
+    this.sendAgentMessage = options.sendAgentMessage;
     this.transcriptRetention = new AgentTranscriptRetention({
       snapshot: this.snapshot,
       onEvicted: (agentId) => this.releaseEvictedAgentTranscript(agentId),
@@ -137,6 +140,29 @@ export class ClawBackendServer {
       case backendMethods.clientStateGet:
         await this.initializeSourceFolderIfNeeded();
         return createClawRpcResult(message.id, clientStateFromSnapshot(await this.clientSnapshot()));
+      case backendMethods.debugAgentMessageSend: {
+        const agentId = requireAgentId(message.params);
+        const recipient = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!recipient) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        if (!this.sendAgentMessage) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Agent messaging is not configured.');
+        }
+
+        const sender = this.snapshot.agents.find((candidate) => (
+          candidate.teamId === recipient.teamId && candidate.id !== recipient.id
+        )) ?? recipient;
+        this.sendAgentMessage(
+          sender.id,
+          recipient.id,
+          'Reply with a brief confirmation that the Debug menu message arrived.',
+        );
+        return createClawRpcResult(message.id, {
+          recipientId: recipient.id,
+          senderId: sender.id,
+        });
+      }
       case backendMethods.debugExecutionPlanToggle: {
         const agentId = requireAgentId(message.params);
         const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
@@ -145,7 +171,16 @@ export class ClawBackendServer {
         }
 
         const existingTurnId = agent.plan?.turnId;
-        if (existingTurnId) {
+        let latestTurnId: string | undefined;
+        for (let index = this.snapshot.messages.length - 1; index >= 0; index -= 1) {
+          const candidate = this.snapshot.messages[index];
+          if (candidate?.agentId === agentId && candidate.turnId) {
+            latestTurnId = candidate.turnId;
+            break;
+          }
+        }
+        const currentPlanExists = Boolean(existingTurnId && (!latestTurnId || latestTurnId === existingTurnId));
+        if (existingTurnId && currentPlanExists) {
           delete agent.plan;
           this.snapshot.messages = this.snapshot.messages.filter((message) => (
             message.agentId !== agentId || !message.parts.some((part) => part.type === 'tool' && part.id === `plan-${existingTurnId}`)

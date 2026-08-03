@@ -113,6 +113,10 @@ export class ClawMcpService {
     return this.server.stop();
   }
 
+  sendMessage(fromAgentId: string, toAgentId: string, content: string): void {
+    this.coordinator.sendMessage(fromAgentId, toAgentId, content);
+  }
+
   private async deliverUnreadAgentMessages(agentId: string): Promise<void> {
     const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
     if (!agent || !this.driverRpc) {

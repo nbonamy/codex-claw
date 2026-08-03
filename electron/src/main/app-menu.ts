@@ -12,6 +12,7 @@ export type AppMenuOptions = {
 export type AppMenuCallbacks = {
   checkForUpdates?: () => void;
   installUpdate?: () => void;
+  sendDebugAgentMessage?: () => void;
   toggleDebugExecutionPlan?: () => void;
   injectDebugPlanReview?: () => void;
   reload(): void;
@@ -19,7 +20,7 @@ export type AppMenuCallbacks = {
   toggleDeveloperTools(): void;
 };
 
-type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview'>>;
+type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview'>>;
 
 export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOptions): void {
   const { checkForUpdates, installUpdate, ...menuOptions } = options;
@@ -29,6 +30,7 @@ export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOpt
     reload: () => window.webContents.reload(),
     sendAppCommand: (command) => sendAppCommand(window.webContents, command),
     toggleDeveloperTools: () => window.webContents.toggleDevTools(),
+    sendDebugAgentMessage: options.sendDebugAgentMessage,
     toggleDebugExecutionPlan: options.toggleDebugExecutionPlan,
     injectDebugPlanReview: options.injectDebugPlanReview,
   }, menuOptions)));
@@ -54,6 +56,26 @@ function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions
   return {
     label: 'Debug',
     submenu: [
+      {
+        label: 'Send Message',
+        enabled: Boolean(callbacks.sendDebugAgentMessage),
+        click: () => callbacks.sendDebugAgentMessage?.(),
+      },
+      {
+        label: 'Open Codex Claw Website',
+        click: () => callbacks.sendAppCommand({
+          type: 'open-browser',
+          url: 'https://codex-claw.nabocorp.com',
+        }),
+      },
+      {
+        label: 'Open Markdown',
+        click: () => callbacks.sendAppCommand({ type: 'debug-open-markdown' }),
+      },
+      {
+        label: 'Approval Request',
+        click: () => callbacks.sendAppCommand({ type: 'debug-approval-request' }),
+      },
       {
         label: 'Execution Plan',
         enabled: Boolean(callbacks.toggleDebugExecutionPlan),

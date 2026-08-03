@@ -111,6 +111,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     onEvent: options.emitEvent,
     onBackendEventApplied: (event) => mcpService.handleBackendEvent(event),
     saveSnapshot: (nextSnapshot) => saveBackendSnapshot(nextSnapshot),
+    sendAgentMessage: (fromAgentId, toAgentId, content) => mcpService.sendMessage(fromAgentId, toAgentId, content),
     workIntegrations,
     loopRunner,
     remoteClients: new RemoteClawdClientManager({

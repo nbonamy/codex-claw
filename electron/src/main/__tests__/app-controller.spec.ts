@@ -11,6 +11,21 @@ function callPrivate<Result>(controller: AppController, method: string): Promise
 }
 
 describe('AppController', () => {
+  it('routes the Debug message fixture to the active agent through clawd', async () => {
+    const request = vi.fn().mockResolvedValue({ recipientId: 'agent-dina' });
+    const controller = new AppController(createInitialSnapshot(), createBackendClient({ request }));
+    const options = (controller as unknown as {
+      debugMenuOptions(): { sendDebugAgentMessage(): void };
+    }).debugMenuOptions();
+
+    options.sendDebugAgentMessage();
+
+    await vi.waitFor(() => expect(request).toHaveBeenCalledWith(
+      backendMethods.debugAgentMessageSend,
+      { agentId: 'agent-dina' },
+    ));
+  });
+
   it('queues valid deep links until the renderer is ready, then focuses and dispatches them', () => {
     const controller = new AppController(createInitialSnapshot(), null);
     const send = vi.fn();

@@ -18,7 +18,7 @@ type MainWindowState = {
 
 export function createMainWindow(
   agentListCompact = false,
-  appMenuOptions: Partial<Pick<AppMenuOptions, 'updateStatus'>> & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview'>> = {},
+  appMenuOptions: Partial<Pick<AppMenuOptions, 'updateStatus'>> & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview'>> = {},
 ): BrowserWindow {
   const releaseMode = isReleaseMode();
   const savedState = readWindowState(windowStatePath());

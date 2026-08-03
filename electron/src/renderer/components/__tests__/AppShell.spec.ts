@@ -2471,6 +2471,43 @@ describe('AppShell', () => {
     expect(unsubscribe).toHaveBeenCalledOnce();
   });
 
+  it('opens deterministic Markdown and approval fixtures from Debug commands', async () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    });
+    let listener: (command: AppCommand) => void = () => undefined;
+    window.codexClaw = {
+      onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
+        listener = nextListener;
+        return () => undefined;
+      }),
+      onEvent: vi.fn(() => vi.fn()),
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const wrapper = mountShell();
+
+    listener({ type: 'debug-open-markdown' });
+    await nextTick();
+
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['Debug Markdown']);
+    expect(wrapper.get('.markdown-panel').text()).toContain('Opened from the Codex Claw Debug menu.');
+
+    listener({ type: 'debug-approval-request' });
+    await nextTick();
+    const conversation = wrapper.getComponent({ name: 'ConversationPane' });
+    expect(conversation.props('approvals')).toStrictEqual([expect.objectContaining({
+      id: 'debug-approval-request',
+      title: 'Allow debug command',
+      command: 'npm test -- --run debug-fixture',
+    })]);
+
+    conversation.vm.$emit('resolve-approval', 'debug-approval-request', 'approve', 'once');
+    await nextTick();
+
+    expect(wrapper.getComponent({ name: 'ConversationPane' }).props('approvals')).toStrictEqual([]);
+    expect(wrapper.emitted('resolve-approval')).toBeUndefined();
+  });
+
   it('selects a deep-linked agent and submits its prompt by default', async () => {
     let listener: (command: AppCommand) => void = () => undefined;
     window.codexClaw = {

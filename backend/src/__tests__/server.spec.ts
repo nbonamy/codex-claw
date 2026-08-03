@@ -29,6 +29,55 @@ describe('ClawBackendServer', () => {
     });
   });
 
+  it('routes the debug message fixture through the MCP messaging port', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.agents = [
+      {
+        id: 'agent-target',
+        teamId: 'team-test',
+        name: 'Target',
+        folder: '/src/target',
+        backend: 'codex',
+        status: { type: 'idle' },
+        createdAt: '2026-06-13T00:00:00.000Z',
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      },
+      {
+        id: 'agent-sender',
+        teamId: 'team-test',
+        name: 'Sender',
+        folder: '/src/sender',
+        backend: 'codex',
+        status: { type: 'idle' },
+        createdAt: '2026-06-13T00:00:00.000Z',
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      },
+    ];
+    const sendAgentMessage = vi.fn();
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      sendAgentMessage,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'debug-message',
+      method: backendMethods.debugAgentMessageSend,
+      params: { agentId: 'agent-target' },
+    })).resolves.toMatchObject({
+      result: {
+        recipientId: 'agent-target',
+        senderId: 'agent-sender',
+      },
+    });
+    expect(sendAgentMessage).toHaveBeenCalledWith(
+      'agent-sender',
+      'agent-target',
+      'Reply with a brief confirmation that the Debug menu message arrived.',
+    );
+  });
+
   it('toggles the persisted debug execution plan through the backend event pipeline', async () => {
     const snapshot = createTestSnapshot();
     snapshot.agents = [{
@@ -83,6 +132,57 @@ describe('ClawBackendServer', () => {
     expect((removeResult as { result: AppSnapshot }).result.agents[0]?.plan).toBeUndefined();
     expect(snapshot.messages.some((message) => message.parts.some((part) => part.type === 'tool' && part.id.startsWith('plan-debug-plan-')))).toBe(false);
     expect(saveSnapshot).toHaveBeenCalledTimes(2);
+  });
+
+  it('replaces a stale execution plan on the first debug-menu request', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'idle' },
+      plan: {
+        threadId: 'thread-old',
+        turnId: 'turn-old',
+        explanation: 'Old plan',
+        steps: [{ step: 'Old step', status: 'pending' }],
+        markdown: 'Old plan',
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    snapshot.messages = [{
+      id: 'assistant-new',
+      agentId: 'agent-dina',
+      role: 'assistant',
+      status: 'complete',
+      turnId: 'turn-new',
+      parts: [{ type: 'text', text: 'Newer work' }],
+      createdAt: '2026-06-13T00:01:00.000Z',
+    }];
+    const server = new ClawBackendServer({ version: 'test-version', snapshot });
+
+    const result = await server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'debug-plan-replace-stale',
+      method: backendMethods.debugExecutionPlanToggle,
+      params: { agentId: 'agent-dina' },
+    });
+
+    expect(result).toMatchObject({
+      result: {
+        agents: [{
+          id: 'agent-dina',
+          plan: {
+            explanation: 'Debug execution plan',
+            turnId: expect.stringMatching(/^debug-plan-/u),
+          },
+        }],
+      },
+    });
   });
 
   it('injects a proposed plan and emits the normal plan-review side-panel request', async () => {

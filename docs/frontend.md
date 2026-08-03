@@ -150,6 +150,13 @@ existing watchers. Package, make, backend, and release builds consume SDK
 entrypoint rebuilds the sibling SDK first. The build step becomes a no-op when
 Claw switches to a published npm dependency.
 
+Development builds expose a native Debug menu with deterministic fixtures for
+sending a real MCP collaboration message to the current agent, opening the
+Codex Claw website in the agent browser, opening a sample Markdown tab, showing
+an approval request, and toggling execution-plan and Plan Review states. Keep
+these fixtures local and repeatable; resolving a debug approval must never
+reach the backend.
+
 ## Design Tokens And Themes
 
 Themes are a first-class architecture concern.
