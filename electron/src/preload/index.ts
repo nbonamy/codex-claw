@@ -106,6 +106,7 @@ const api: CodexClawApi = {
   browserSetBounds: (agentId: string, browserId: string, bounds: BrowserBounds) => ipc.invoke(ipcChannels.browserSetBounds, agentId, browserId, bounds),
   browserSetVisible: (agentId: string, browserId: string, visible: boolean) => ipc.invoke(ipcChannels.browserSetVisible, agentId, browserId, visible),
   browserSetAnnotationMode: (agentId: string, browserId: string, enabled: boolean) => ipc.invoke(ipcChannels.browserSetAnnotationMode, agentId, browserId, enabled),
+  browserResolveAnnotation: (token: string, comment: string | null) => ipc.invoke(ipcChannels.browserResolveAnnotation, token, comment),
   browserClearAnnotations: (agentId: string, browserId: string) => ipc.invoke(ipcChannels.browserClearAnnotations, agentId, browserId),
   browserClose: (agentId: string, browserId: string) => ipc.invoke(ipcChannels.browserClose, agentId, browserId),
   respondToClientRequest: (response: ClientRequestResponse) => ipc.invoke(ipcChannels.respondToClientRequest, response),

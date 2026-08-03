@@ -1253,6 +1253,7 @@ export type CodexClawApi = {
   browserSetBounds(agentId: string, browserId: string, bounds: BrowserBounds): Promise<void>;
   browserSetVisible(agentId: string, browserId: string, visible: boolean): Promise<void>;
   browserSetAnnotationMode(agentId: string, browserId: string, enabled: boolean): Promise<void>;
+  browserResolveAnnotation(token: string, comment: string | null): Promise<void>;
   browserClearAnnotations(agentId: string, browserId: string): Promise<void>;
   browserClose(agentId: string, browserId: string): Promise<void>;
   respondToClientRequest(response: ClientRequestResponse): Promise<AppSnapshot>;

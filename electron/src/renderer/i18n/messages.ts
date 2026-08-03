@@ -48,9 +48,13 @@ export const messages = {
       },
       planReview: {
         cancel: 'Cancel',
-        comment: 'Comment',
+        clear: 'Clear',
+        clearCommentsBody: 'All comments on this plan will be removed.',
+        clearCommentsConfirm: 'Clear comments',
+        clearCommentsTitle: 'Clear all comments?',
         confirm: 'Confirm',
         commentHelp: 'Select text in the plan to add an inline comment.',
+        commentAbout: 'about',
         commentLabel: 'Plan comment',
         commentPlaceholder: 'What should change?',
         deleteComment: 'Delete comment',
@@ -58,6 +62,8 @@ export const messages = {
         commentSave: 'Save comment',
         commentCancel: 'Cancel',
         commentsCount: '{count} comment | {count} comments',
+        keepComments: 'Keep comments',
+        sendComments: 'Send {count} comment | Send {count} comments',
         updating: 'Updating plan...',
       },
       planProgress: {

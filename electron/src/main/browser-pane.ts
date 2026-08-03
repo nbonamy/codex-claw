@@ -1,4 +1,5 @@
-import { WebContentsView, type BrowserWindow } from 'electron';
+import { BrowserWindow, WebContentsView } from 'electron';
+import path from 'node:path';
 import type { BrowserAnnotation, BrowserBounds, BrowserState } from '@codex-claw/shared/contracts';
 
 type BrowserPaneOptions = {
@@ -7,7 +8,12 @@ type BrowserPaneOptions = {
 
 type HostedBrowserPane = {
   agentId: string;
+  annotationEnabled: boolean;
+  annotationOverlay: BrowserWindow | null;
   annotationRequest: Promise<void> | null;
+  annotationResolve: ((comment: string | null) => void) | null;
+  annotationToken: string | null;
+  bounds: BrowserBounds;
   browserId: string;
   browserWindow: BrowserWindow;
   consoleMessages: Array<{ level: string; message: string; timestamp: string }>;
@@ -35,7 +41,12 @@ export class BrowserPane {
     });
     const pane: HostedBrowserPane = {
       agentId,
+      annotationEnabled: false,
+      annotationOverlay: null,
       annotationRequest: null,
+      annotationResolve: null,
+      annotationToken: null,
+      bounds: { x: 0, y: 0, width: 1, height: 1 },
       browserId,
       browserWindow,
       consoleMessages: [],
@@ -84,37 +95,73 @@ export class BrowserPane {
 
   setBounds(agentId: string, browserId: string, bounds: BrowserBounds): void {
     const pane = this.requirePane(agentId, browserId);
-    pane.view.setBounds({
+    pane.bounds = {
       x: Math.max(0, Math.round(bounds.x)),
       y: Math.max(0, Math.round(bounds.y)),
       width: Math.max(1, Math.round(bounds.width)),
       height: Math.max(1, Math.round(bounds.height)),
-    });
+    };
+    pane.view.setBounds(pane.bounds);
     pane.view.setVisible(true);
+    this.syncAnnotationOverlayBounds(pane);
   }
 
   setVisible(agentId: string, browserId: string, visible: boolean): void {
-    this.requirePane(agentId, browserId).view.setVisible(visible);
+    const pane = this.requirePane(agentId, browserId);
+    pane.view.setVisible(visible);
+    if (pane.annotationOverlay && !pane.annotationOverlay.isDestroyed()) {
+      if (visible) pane.annotationOverlay.show();
+      else pane.annotationOverlay.hide();
+    }
   }
 
   async setAnnotationMode(agentId: string, browserId: string, enabled: boolean): Promise<void> {
     const pane = this.requirePane(agentId, browserId);
+    pane.annotationEnabled = enabled;
     if (!enabled) {
       await this.cancelAnnotationMode(pane);
       return;
     }
-    if (pane.annotationRequest) return;
+
+    this.startAnnotationCapture(pane);
+  }
+
+  private startAnnotationCapture(pane: HostedBrowserPane): void {
+    if (!pane.annotationEnabled || pane.annotationRequest || pane.annotationOverlay) return;
 
     const webContents = pane.view.webContents;
-    pane.annotationRequest = webContents.executeJavaScript(annotationCaptureScript(), true)
-      .then((value: unknown) => {
+    if (webContents.isDestroyed()) return;
+    webContents.focus();
+    let resumeAfterPopup = false;
+    const request = webContents.executeJavaScript(annotationCaptureScript(), true)
+      .then(async (value: unknown) => {
         const annotation = parseAnnotation(value, webContents.getURL());
-        if (annotation) this.options.onAnnotation({ ...annotation, agentId, browserId });
+        if (!annotation) return;
+        resumeAfterPopup = true;
+        const comment = await this.openAnnotationOverlay(pane, annotation);
+        if (!comment) return;
+        this.options.onAnnotation({
+          ...annotation,
+          comment,
+          agentId: pane.agentId,
+          browserId: pane.browserId,
+        });
       })
-      .catch(() => undefined)
+      .catch(() => {
+        resumeAfterPopup = false;
+        this.finishAnnotationOverlay(pane, null);
+      })
       .finally(() => {
-        pane.annotationRequest = null;
+        if (pane.annotationRequest === request) pane.annotationRequest = null;
+        if (resumeAfterPopup && pane.annotationEnabled) this.startAnnotationCapture(pane);
       });
+    pane.annotationRequest = request;
+  }
+
+  resolveAnnotation(token: string, comment: string | null): void {
+    const pane = [...this.panes.values()].find((candidate) => candidate.annotationToken === token);
+    if (!pane) return;
+    this.finishAnnotationOverlay(pane, typeof comment === 'string' ? comment.trim() || null : null);
   }
 
   async clearAnnotations(agentId: string, browserId: string): Promise<void> {
@@ -162,8 +209,94 @@ export class BrowserPane {
   }
 
   private async cancelAnnotationMode(pane: HostedBrowserPane): Promise<void> {
+    pane.annotationEnabled = false;
+    this.finishAnnotationOverlay(pane, null);
     if (pane.view.webContents.isDestroyed()) return;
     await pane.view.webContents.executeJavaScript('window.__codexClawCancelAnnotation?.()', true).catch(() => undefined);
+  }
+
+  private async openAnnotationOverlay(
+    pane: HostedBrowserPane,
+    annotation: Omit<BrowserAnnotation, 'agentId' | 'browserId'>,
+  ): Promise<string | null> {
+    this.finishAnnotationOverlay(pane, null);
+    const token = crypto.randomUUID();
+    const overlay = new BrowserWindow({
+      parent: pane.browserWindow,
+      ...this.annotationOverlayBounds(pane),
+      frame: false,
+      transparent: true,
+      backgroundColor: '#00000000',
+      hasShadow: false,
+      resizable: false,
+      movable: false,
+      minimizable: false,
+      maximizable: false,
+      fullscreenable: false,
+      skipTaskbar: true,
+      show: false,
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: false,
+      },
+    });
+    pane.annotationOverlay = overlay;
+    pane.annotationToken = token;
+    const completion = new Promise<string | null>((resolve) => {
+      pane.annotationResolve = resolve;
+    });
+
+    overlay.once('ready-to-show', () => {
+      if (overlay.isDestroyed()) return;
+      overlay.show();
+      overlay.focus();
+    });
+    overlay.once('closed', () => {
+      if (pane.annotationOverlay === overlay) this.finishAnnotationOverlay(pane, null, false);
+    });
+
+    const query = {
+      surface: 'annotation-overlay',
+      token,
+      anchor: JSON.stringify(annotation.rect),
+      description: annotation.label ?? annotation.selector ?? 'Selected page area',
+    };
+    if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+      const target = new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+      for (const [key, value] of Object.entries(query)) target.searchParams.set(key, value);
+      await overlay.loadURL(target.toString());
+    } else {
+      await overlay.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`), { query });
+    }
+    return completion;
+  }
+
+  private finishAnnotationOverlay(pane: HostedBrowserPane, comment: string | null, closeWindow = true): void {
+    const resolve = pane.annotationResolve;
+    const overlay = pane.annotationOverlay;
+    pane.annotationResolve = null;
+    pane.annotationOverlay = null;
+    pane.annotationToken = null;
+    if (closeWindow && overlay && !overlay.isDestroyed()) overlay.close();
+    resolve?.(comment);
+  }
+
+  private syncAnnotationOverlayBounds(pane: HostedBrowserPane): void {
+    const overlay = pane.annotationOverlay;
+    if (!overlay || overlay.isDestroyed()) return;
+    overlay.setBounds(this.annotationOverlayBounds(pane));
+  }
+
+  private annotationOverlayBounds(pane: HostedBrowserPane): BrowserBounds {
+    const contentBounds = pane.browserWindow.getContentBounds();
+    return {
+      x: contentBounds.x + pane.bounds.x,
+      y: contentBounds.y + pane.bounds.y,
+      width: pane.bounds.width,
+      height: pane.bounds.height,
+    };
   }
 
   private async waitForNavigation(pane: HostedBrowserPane): Promise<BrowserState> {
@@ -239,7 +372,6 @@ function annotationCaptureScript(): string {
     document.documentElement.append(highlight);
     let start = null;
     let hovered = null;
-    let editor = null;
     const selectorFor = (element) => {
       if (element.id) return '#' + CSS.escape(element.id);
       const parts = [];
@@ -260,7 +392,6 @@ function annotationCaptureScript(): string {
       document.removeEventListener('mouseup', onUp, true);
       style.remove();
       highlight.remove();
-      editor?.remove();
       delete window.__codexClawCancelAnnotation;
     };
     const finish = (value) => { cleanup(); resolve(value); };
@@ -271,48 +402,23 @@ function annotationCaptureScript(): string {
     };
     const onMove = (event) => {
       const element = document.elementFromPoint(event.clientX, event.clientY);
-      if (!element || element.closest('[data-codex-claw-editor]')) return;
+      if (!element) return;
       hovered = element;
       showHighlight(element.getBoundingClientRect());
     };
     const onDown = (event) => { event.preventDefault(); event.stopPropagation(); start = { x: event.clientX, y: event.clientY }; };
-    const openEditor = (selection) => {
-      document.removeEventListener('mousemove', onMove, true);
-      document.removeEventListener('mousedown', onDown, true);
-      document.removeEventListener('mouseup', onUp, true);
-      showHighlight(selection.rect);
-      editor = document.createElement('form');
-      editor.dataset.codexClawEditor = 'true';
-      editor.style.cssText = 'position:fixed;z-index:2147483647;display:flex;align-items:center;gap:8px;width:min(320px,calc(100vw - 24px));padding:6px 6px 6px 12px;border:1px solid rgba(0,0,0,.12);border-radius:10px;background:#fff;box-shadow:0 8px 20px rgba(0,0,0,.16);font:14px -apple-system,BlinkMacSystemFont,sans-serif;';
-      editor.style.left = Math.max(12, Math.min(selection.rect.x, window.innerWidth - 332)) + 'px';
-      editor.style.top = Math.max(12, Math.min(selection.rect.y + selection.rect.height + 8, window.innerHeight - 48)) + 'px';
-      const input = document.createElement('input');
-      input.placeholder = 'enter comment'; input.autofocus = true;
-      input.style.cssText = 'min-width:0;flex:1;border:0;outline:0;background:transparent;color:#111;font:inherit;';
-      const submit = document.createElement('button');
-      submit.type = 'submit'; submit.textContent = '↑'; submit.setAttribute('aria-label', 'Send annotation');
-      submit.style.cssText = 'display:grid;place-items:center;width:24px;height:24px;border:0;border-radius:7px;background:#0a84ff;color:#fff;font-size:16px;line-height:1;cursor:pointer;';
-      editor.append(input, submit); document.documentElement.append(editor); input.focus();
-      editor.addEventListener('submit', (event) => {
-        event.preventDefault();
-        const comment = input.value.trim();
-        if (!comment) { input.focus(); return; }
-        editor.remove(); finish({ ...selection, comment });
-      });
-      input.addEventListener('keydown', (event) => { if (event.key === 'Escape') { editor.remove(); finish(null); } });
-    };
     const onUp = (event) => {
       event.preventDefault(); event.stopPropagation();
       const origin = start || { x: event.clientX, y: event.clientY };
       const dx = Math.abs(event.clientX - origin.x); const dy = Math.abs(event.clientY - origin.y);
       if (dx > 6 || dy > 6) {
-        openEditor({ kind: 'area', rect: { x: Math.min(origin.x, event.clientX), y: Math.min(origin.y, event.clientY), width: dx, height: dy } });
+        finish({ kind: 'area', rect: { x: Math.min(origin.x, event.clientX), y: Math.min(origin.y, event.clientY), width: dx, height: dy } });
         return;
       }
       const element = hovered || document.elementFromPoint(event.clientX, event.clientY);
       if (!element) return finish(null);
       const rect = element.getBoundingClientRect();
-      openEditor({ kind: 'element', selector: selectorFor(element), label: (element.getAttribute('aria-label') || element.innerText || element.textContent || element.tagName).trim().slice(0, 160), rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height } });
+      finish({ kind: 'element', selector: selectorFor(element), label: (element.getAttribute('aria-label') || element.innerText || element.textContent || element.tagName).trim().slice(0, 160), rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height } });
     };
     window.__codexClawCancelAnnotation = () => finish(null);
     document.addEventListener('mousemove', onMove, true);

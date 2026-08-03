@@ -15,9 +15,15 @@ All notable Codex Claw changes are recorded here.
 - Markdown previews now open as tabs in the right sidebar.
 - Chrome availability stays in sync with ChatGPT.
 - Execution plans can be dismissed and reopened from the agent header.
+- Browser and plan annotations now support voice recording and transcription.
 
 ### Improvements and fixes
 
+- Browser annotations now dismiss on outside click and immediately resume
+  element selection while annotation mode remains active.
+- Plan reviews now support compact inline comments, batch refinement, clear
+  confirmation, and a locked review state while a revised plan is generated;
+  they now open as agent workspace tabs instead of replacing the sidebar.
 - Fixed macOS voice transcription in development builds by resolving the
   bundled Apple Speech helper from the linked SDK assets.
 

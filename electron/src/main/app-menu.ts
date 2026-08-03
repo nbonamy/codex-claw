@@ -13,12 +13,13 @@ export type AppMenuCallbacks = {
   checkForUpdates?: () => void;
   installUpdate?: () => void;
   toggleDebugExecutionPlan?: () => void;
+  injectDebugPlanReview?: () => void;
   reload(): void;
   sendAppCommand(command: AppCommand): void;
   toggleDeveloperTools(): void;
 };
 
-type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'toggleDebugExecutionPlan'>>;
+type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview'>>;
 
 export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOptions): void {
   const { checkForUpdates, installUpdate, ...menuOptions } = options;
@@ -29,6 +30,7 @@ export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOpt
     sendAppCommand: (command) => sendAppCommand(window.webContents, command),
     toggleDeveloperTools: () => window.webContents.toggleDevTools(),
     toggleDebugExecutionPlan: options.toggleDebugExecutionPlan,
+    injectDebugPlanReview: options.injectDebugPlanReview,
   }, menuOptions)));
 }
 
@@ -56,6 +58,11 @@ function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions
         label: 'Execution Plan',
         enabled: Boolean(callbacks.toggleDebugExecutionPlan),
         click: () => callbacks.toggleDebugExecutionPlan?.(),
+      },
+      {
+        label: 'Plan Review',
+        enabled: Boolean(callbacks.injectDebugPlanReview),
+        click: () => callbacks.injectDebugPlanReview?.(),
       },
     ],
   };

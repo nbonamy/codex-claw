@@ -2,16 +2,11 @@
   <footer class="plan-review-footer">
     <div class="plan-review-footer__status">
       <p
-        v-if="showCommentHelp"
+        v-if="comments.length === 0"
         class="plan-review-footer__help"
       >
-        {{ t('chat.planReview.commentHelp') }}
-      </p>
-      <p
-        v-else-if="comments.length"
-        class="plan-review-footer__count"
-      >
-        {{ t('chat.planReview.commentsCount', comments.length) }}
+        <IconCirclePlus aria-hidden="true" />
+        <span>{{ t('chat.planReview.commentHelp') }}</span>
       </p>
     </div>
 
@@ -27,14 +22,15 @@
         :title="commentTitle(comment)"
       >
         <div class="plan-review-footer__comment-copy">
-          <blockquote>{{ oneLineText(comment.quote) }}</blockquote>
-          <p>{{ oneLineText(comment.body) }}</p>
+          <span>{{ t('chat.planReview.commentAbout') }}</span>
+          <strong>{{ oneLineText(comment.quote) }}</strong>
         </div>
         <div class="plan-review-footer__comment-actions">
           <button
             class="plan-review-footer__comment-button"
             type="button"
             :aria-label="t('chat.planReview.editComment')"
+            :disabled="disabled"
             @click="emit('editComment', comment)"
           >
             <PencilIcon aria-hidden="true" />
@@ -43,6 +39,7 @@
             class="plan-review-footer__comment-button"
             type="button"
             :aria-label="t('chat.planReview.deleteComment')"
+            :disabled="disabled"
             @click="emit('deleteComment', comment.id)"
           >
             <Trash2Icon aria-hidden="true" />
@@ -52,23 +49,35 @@
     </div>
 
     <div class="plan-review-footer__actions">
+      <AnnotationSendButton
+        v-if="comments.length"
+        :count="comments.length"
+        :disabled="disabled"
+        :label="t('chat.planReview.sendComments', comments.length)"
+        @click="emit('send')"
+      />
       <button
+        v-else
         class="plan-review-footer__button plan-review-footer__button--primary"
         type="button"
+        :disabled="disabled"
         @click="emit('confirm')"
       >
         {{ t('chat.planReview.confirm') }}
       </button>
       <button
+        v-if="comments.length"
         class="plan-review-footer__button"
         type="button"
-        @click="emit('comment')"
+        :disabled="disabled"
+        @click="emit('clear')"
       >
-        {{ t('chat.planReview.comment') }}
+        {{ t('chat.planReview.clear') }}
       </button>
       <button
         class="plan-review-footer__button"
         type="button"
+        :disabled="disabled"
         @click="emit('cancel')"
       >
         {{ t('chat.planReview.cancel') }}
@@ -79,19 +88,24 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
+import { IconCirclePlus } from '@tabler/icons-vue';
 import { PencilIcon, Trash2Icon } from '../shared/icons/app-icons';
+import AnnotationSendButton from './AnnotationSendButton.vue';
 import type { PlanReviewComment } from './side-panel';
 
-defineProps<{
+withDefaults(defineProps<{
   comments: PlanReviewComment[];
-  showCommentHelp?: boolean;
-}>();
+  disabled?: boolean;
+}>(), {
+  disabled: false,
+});
 
 const emit = defineEmits<{
   confirm: [];
-  comment: [];
+  clear: [];
   deleteComment: [commentId: string];
   editComment: [comment: PlanReviewComment];
+  send: [];
   cancel: [];
 }>();
 
@@ -119,15 +133,28 @@ function commentTitle(comment: PlanReviewComment): string {
 }
 
 .plan-review-footer__status {
-  min-height: var(--line-height-18);
+  min-height: 0;
 }
 
-.plan-review-footer__help,
-.plan-review-footer__count {
+.plan-review-footer__status:empty {
+  display: none;
+}
+
+.plan-review-footer__help {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
   margin: 0;
   color: var(--color-text-muted);
-  font-size: var(--font-size-12);
+  font-size: var(--font-size-13);
   line-height: var(--line-height-18);
+}
+
+.plan-review-footer__help svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 1.8;
 }
 
 .plan-review-footer__comments {
@@ -145,45 +172,32 @@ function commentTitle(comment: PlanReviewComment): string {
   align-items: center;
   column-gap: var(--space-3);
   padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--color-border);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, var(--color-border));
   border-radius: var(--radius-md);
-  background: var(--color-surface-low);
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-surface-lowest));
 }
 
 .plan-review-footer__comment-copy {
   min-width: 0;
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: var(--space-2);
   overflow: hidden;
-  white-space: nowrap;
-}
-
-.plan-review-footer__comment blockquote,
-.plan-review-footer__comment p {
-  margin: 0;
   font-size: var(--font-size-12);
   line-height: var(--line-height-18);
-}
-
-.plan-review-footer__comment blockquote {
-  flex: 0 1 38%;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--color-text-muted);
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.plan-review-footer__comment blockquote::after {
-  content: ":";
+.plan-review-footer__comment-copy span {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
 }
 
-.plan-review-footer__comment p {
-  flex: 1 1 auto;
+.plan-review-footer__comment-copy strong {
   min-width: 0;
   overflow: hidden;
   color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -212,12 +226,23 @@ function commentTitle(comment: PlanReviewComment): string {
   background: var(--color-surface);
 }
 
+.plan-review-footer__comment-button:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.plan-review-footer__comment-button:disabled:hover {
+  color: var(--color-text-muted);
+  background: transparent;
+}
+
 .plan-review-footer__comment-button svg {
   width: 14px;
   height: 14px;
 }
 
 .plan-review-footer__actions {
+  --annotation-send-button-height: var(--space-16);
   display: flex;
   justify-content: flex-end;
   gap: var(--space-3);
@@ -239,6 +264,15 @@ function commentTitle(comment: PlanReviewComment): string {
   background: var(--color-surface-low);
 }
 
+.plan-review-footer__button:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.plan-review-footer__button:disabled:hover {
+  background: var(--color-surface-lowest);
+}
+
 .plan-review-footer__button--primary {
   border-color: var(--color-primary);
   color: var(--color-on-primary);
@@ -247,5 +281,9 @@ function commentTitle(comment: PlanReviewComment): string {
 
 .plan-review-footer__button--primary:hover {
   background: var(--color-on-primary-container);
+}
+
+.plan-review-footer__button--primary:disabled:hover {
+  background: var(--color-primary);
 }
 </style>

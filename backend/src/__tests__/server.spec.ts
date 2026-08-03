@@ -85,6 +85,48 @@ describe('ClawBackendServer', () => {
     expect(saveSnapshot).toHaveBeenCalledTimes(2);
   });
 
+  it('injects a proposed plan and emits the normal plan-review side-panel request', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    const events: unknown[] = [];
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      onEvent: (event) => events.push(event),
+    });
+
+    const result = await server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'debug-plan-review',
+      method: backendMethods.debugPlanReviewInject,
+      params: { agentId: 'agent-dina' },
+    });
+
+    expect(result).toMatchObject({ result: { agents: [{ id: 'agent-dina', plan: { markdown: expect.stringContaining('# Debug plan review') } }] } });
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'sidePanel.markdownRequested',
+        payload: expect.objectContaining({
+          kind: 'markdown',
+          purpose: 'plan',
+          title: 'Debug plan review',
+          content: expect.stringMatching(/## Key Changes[\s\S]*## Commit Strategy/u),
+        }),
+      }),
+    ]));
+  });
+
   it('routes system permission requests through the backend system port', async () => {
     const status: SystemPermissionsStatus = {
       platform: 'darwin',
@@ -1601,8 +1643,8 @@ describe('ClawBackendServer', () => {
       payload: {
         kind: 'markdown',
         purpose: 'plan',
-        title: 'Plan',
-        content: '# Proposed plan\n\n- Build it',
+        title: 'Proposed plan',
+        content: '- Build it',
       },
     })]);
   });

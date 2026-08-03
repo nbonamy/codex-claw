@@ -101,6 +101,7 @@ export const ipcChannels = {
   browserSetBounds: 'browser:bounds:set',
   browserSetVisible: 'browser:visible:set',
   browserSetAnnotationMode: 'browser:annotation-mode:set',
+  browserResolveAnnotation: 'browser:annotation:resolve',
   browserClearAnnotations: 'browser:annotations:clear',
   browserClose: 'browser:close',
   respondToClientRequest: 'client-request:respond',

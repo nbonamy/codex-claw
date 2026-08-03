@@ -1008,6 +1008,7 @@ describe('AppShell', () => {
       },
     });
 
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain('Plan');
     await wrapper.get('button.plan-review-footer__button--primary').trigger('click');
 
     expect(wrapper.emitted('update:planMode')).toStrictEqual([[false]]);
@@ -1036,11 +1037,12 @@ describe('AppShell', () => {
       },
     });
 
-    await wrapper.findAll('.plan-review-footer__button')[2].trigger('click');
+    const cancel = wrapper.findAll('.plan-review-footer__button').find((button) => button.text() === 'Cancel');
+    await cancel?.trigger('click');
 
     expect(wrapper.emitted('update:planMode')).toStrictEqual([[false]]);
     expect(wrapper.emitted('sendPrompt')).toBeUndefined();
-    expect(wrapper.find('.side-panel').exists()).toBe(false);
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).not.toContain('Plan');
   });
 
   it('sends saved plan comments as a refinement prompt', async () => {
@@ -1065,7 +1067,7 @@ describe('AppShell', () => {
       },
     });
 
-    wrapper.findComponent({ name: 'SidePanel' }).vm.$emit('commentPlan', [
+    wrapper.findComponent({ name: 'PlanReviewPanel' }).vm.$emit('commentPlan', [
       {
         id: 'comment-1',
         quote: 'Build it',
@@ -1119,7 +1121,7 @@ describe('AppShell', () => {
       },
     });
 
-    expect(wrapper.get('.side-panel__plan-overlay').text()).toBe('Updating plan...');
+    expect(wrapper.get('.plan-review-panel__overlay').text()).toBe('Updating plan...');
   });
 
   it('forwards interrupts from the composer stop button', async () => {

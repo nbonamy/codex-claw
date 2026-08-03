@@ -428,6 +428,7 @@ export class AppController {
     ipc.handle(ipcChannels.browserSetBounds, (_event, agentId: string, browserId: string, bounds: BrowserBounds) => this.browserPane.setBounds(agentId, browserId, bounds));
     ipc.handle(ipcChannels.browserSetVisible, (_event, agentId: string, browserId: string, visible: boolean) => this.browserPane.setVisible(agentId, browserId, visible));
     ipc.handle(ipcChannels.browserSetAnnotationMode, (_event, agentId: string, browserId: string, enabled: boolean) => this.browserPane.setAnnotationMode(agentId, browserId, enabled));
+    ipc.handle(ipcChannels.browserResolveAnnotation, (_event, token: string, comment: string | null) => this.browserPane.resolveAnnotation(token, comment));
     ipc.handle(ipcChannels.browserClearAnnotations, (_event, agentId: string, browserId: string) => this.browserPane.clearAnnotations(agentId, browserId));
     ipc.handle(ipcChannels.browserClose, (_event, agentId: string, browserId: string) => this.browserPane.close(agentId, browserId));
 
@@ -443,7 +444,11 @@ export class AppController {
     }
     this.mainWindow = createMainWindow(
       this.snapshot?.general.agentListCompact ?? false,
-      { ...this.updateMenuOptions(), toggleDebugExecutionPlan: () => this.toggleDebugExecutionPlan() },
+      {
+        ...this.updateMenuOptions(),
+        toggleDebugExecutionPlan: () => this.toggleDebugExecutionPlan(),
+        injectDebugPlanReview: () => this.injectDebugPlanReview(),
+      },
     );
     logMain('window', 'created main window');
     this.rendererReady = false;
@@ -1176,6 +1181,7 @@ export class AppController {
       agentListCompact: this.snapshot?.general.agentListCompact ?? false,
       ...this.updateMenuOptions(),
       toggleDebugExecutionPlan: () => this.toggleDebugExecutionPlan(),
+      injectDebugPlanReview: () => this.injectDebugPlanReview(),
     });
   }
 
@@ -1188,6 +1194,20 @@ export class AppController {
     void this.backendClient.request<AppSnapshot>(backendMethods.debugExecutionPlanToggle, { agentId })
       .then((snapshot) => this.adoptBackendSnapshot(snapshot))
       .catch((error) => warnMain('debug', 'failed to toggle execution plan', {
+        agentId,
+        detail: error instanceof Error ? error.message : String(error),
+      }));
+  }
+
+  private injectDebugPlanReview(): void {
+    const agentId = this.snapshot?.activeAgentId;
+    if (!agentId || !this.backendClient || app.isPackaged) {
+      return;
+    }
+
+    void this.backendClient.request<AppSnapshot>(backendMethods.debugPlanReviewInject, { agentId })
+      .then((snapshot) => this.adoptBackendSnapshot(snapshot))
+      .catch((error) => warnMain('debug', 'failed to inject plan review fixture', {
         agentId,
         detail: error instanceof Error ? error.message : String(error),
       }));

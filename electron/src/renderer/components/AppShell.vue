@@ -258,6 +258,8 @@
             :agent="agent"
             :git-panel="effectiveGitReviewPanelFor(agent)"
             :git-status="snapshot.agentGitStatuses[agent.id] ?? null"
+            :plan-panel="rightWorkspaceFor(agent.id).planPanel"
+            :plan-updating="isPlanPreviewUpdatingFor(agent.id)"
             :file-panels="rightWorkspaceFor(agent.id).filePanels"
             :diff-panels="rightWorkspaceFor(agent.id).diffPanels"
             :tabs="rightWorkspaceFor(agent.id).tabs"
@@ -266,6 +268,9 @@
             :browser-initial-url="rightWorkspaceFor(agent.id).browserInitialUrl"
             :browser-open-request-id="rightWorkspaceFor(agent.id).browserOpenRequestId"
             @close-tab="closeRightWorkspaceTab(agent.id, $event)"
+            @cancel-plan="cancelPlanReview(agent.id)"
+            @comment-plan="commentOnPlan"
+            @confirm-plan="confirmPlan"
             @open-tab="openRightWorkspaceTabFromMenu(agent.id, $event)"
             @refresh-git-diff="openAgentGitDiffPreview(agent.id)"
             @select-tab="selectRightWorkspaceTab(agent.id, $event)"
@@ -276,16 +281,6 @@
             class="app-shell__right-workspace-resizer"
             aria-label="Resize right workspace"
             @pointerdown="startRightWorkspaceResize"
-          />
-          <SidePanel
-            v-if="sidePanel"
-            :panel="sidePanel"
-            :plan-updating="isPlanPreviewUpdating"
-            @cancel-plan="cancelPlanReview"
-            @close="closeSidePanel"
-            @comment-plan="commentOnPlan"
-            @confirm-plan="confirmPlan"
-            @refresh-git-diff="openAgentGitDiffPreview"
           />
         </div>
       </template>
@@ -353,7 +348,6 @@ import AgentSidebar from './AgentSidebar.vue';
 import CockpitView from './CockpitView.vue';
 import ConversationPane from './ConversationPane.vue';
 import LoopsView from './LoopsView.vue';
-import SidePanel from './SidePanel.vue';
 import TeamDialog from './TeamDialog.vue';
 import TeamRail from './TeamRail.vue';
 import BenchAgentAssignmentDialog from './BenchAgentAssignmentDialog.vue';
@@ -368,7 +362,7 @@ import {
   languageForFilePath,
   type CodexQueuedPromptData as QueuedChatPrompt,
 } from 'codex-app-sdk/vue';
-import type { PlanReviewComment, SidePanelGitDiffState, SidePanelState } from './side-panel';
+import type { PlanReviewComment, SidePanelGitDiffState, SidePanelMarkdownState } from './side-panel';
 import {
   isRightWorkspaceFileTab,
   isRightWorkspaceDiffTab,
@@ -621,6 +615,7 @@ type AgentRightWorkspaceState = {
   filePreviewRequestIds: Partial<Record<RightWorkspaceFileTab, number>>;
   diffPanels: Partial<Record<RightWorkspaceDiffTab, RightWorkspaceDiffPanel>>;
   gitReviewPanel: SidePanelGitDiffState | null;
+  planPanel: SidePanelMarkdownState | null;
   open: boolean;
   tabs: RightWorkspaceTab[];
   width: number;
@@ -659,8 +654,6 @@ const benchAssignmentDialogVisible = ref(false);
 const teamDialogVisible = ref(false);
 const teamDialogMode = ref<'create' | 'edit'>('create');
 const editingTeamId = ref<string | null>(null);
-const sidePanel = ref<SidePanelState | null>(null);
-let sidePanelRequestId = 0;
 let filePreviewRequestId = 0;
 let markdownPreviewId = 0;
 let unsubscribeAppCommand: (() => void) | null = null;
@@ -782,7 +775,7 @@ function closeExecutionPlan(): void {
 }
 const rightWorkspaceVisible = computed(() => {
   const agentId = currentAgent.value?.id;
-  return Boolean(agentId && rightWorkspaceFor(agentId).open && sidePanel.value === null);
+  return Boolean(agentId && rightWorkspaceFor(agentId).open);
 });
 const savedCockpitBacklogConfiguration = computed<CockpitBacklogConfiguration>(() => {
   const configuration = props.snapshot.workBacklog.providerConfigurations.github ?? {};
@@ -851,16 +844,9 @@ const agentDialogTargetTeam = computed(() => {
     : null;
 });
 const agentDialogRemoteConnectionId = computed(() => agentDialogTargetTeam.value?.remoteConnectionId ?? '');
-const isPlanPreviewUpdating = computed(() => {
-  if (sidePanel.value?.kind !== 'markdown' || sidePanel.value.purpose !== 'plan') {
-    return false;
-  }
-
-  const agentId = currentAgent.value?.id;
-  if (!agentId) {
-    return false;
-  }
-
+function isPlanPreviewUpdatingFor(agentId: string): boolean {
+  const panel = rightWorkspaceFor(agentId).planPanel;
+  if (!panel || panel.purpose !== 'plan') return false;
   return props.messages.some((message) => (
     message.agentId === agentId &&
     message.parts.some((part) => (
@@ -869,7 +855,7 @@ const isPlanPreviewUpdating = computed(() => {
       part.metadata?.planProgress === true
     ))
   ));
-});
+}
 
 onMounted(() => {
   if (typeof window.addEventListener === 'function') {
@@ -987,6 +973,7 @@ function rightWorkspaceFor(agentId: string): AgentRightWorkspaceState {
     filePreviewRequestIds: {},
     diffPanels: {},
     gitReviewPanel: null,
+    planPanel: null,
     open: false,
     tabs: [],
     width: 420,
@@ -996,7 +983,7 @@ function rightWorkspaceFor(agentId: string): AgentRightWorkspaceState {
 }
 
 function isRightWorkspaceVisible(agentId: string): boolean {
-  return currentAgent.value?.id === agentId && rightWorkspaceFor(agentId).open && sidePanel.value === null;
+  return currentAgent.value?.id === agentId && rightWorkspaceFor(agentId).open;
 }
 
 function effectiveGitReviewPanelFor(agent: Agent): SidePanelGitDiffState {
@@ -1019,13 +1006,11 @@ function toggleRightWorkspace(): void {
     return;
   }
 
-  closeSidePanel();
   workspace.open = true;
 }
 
 function openRightWorkspaceTab(tab: RightWorkspaceTab, agentId = currentAgent.value?.id): void {
   if (!agentId) return;
-  if (agentId === currentAgent.value?.id) closeSidePanel();
   const workspace = rightWorkspaceFor(agentId);
   if (!workspace.tabs.includes(tab)) {
     workspace.tabs = [...workspace.tabs, tab];
@@ -1059,7 +1044,6 @@ function openRightWorkspaceTabFromMenu(agentId: string, tab: RightWorkspaceTab):
 function selectRightWorkspaceTab(agentId: string, tab: RightWorkspaceTab): void {
   const workspace = rightWorkspaceFor(agentId);
   if (workspace.tabs.includes(tab)) {
-    if (agentId === currentAgent.value?.id) closeSidePanel();
     workspace.activeTab = tab;
   }
 }
@@ -1075,6 +1059,9 @@ function closeRightWorkspaceTab(agentId: string, tab: RightWorkspaceTab): void {
   workspace.tabs = nextTabs;
   if (tab === 'review') {
     workspace.gitReviewPanel = null;
+  }
+  if (tab === 'plan') {
+    workspace.planPanel = null;
   }
   if (isRightWorkspaceFileTab(tab)) {
     const { [tab]: _closedPanel, ...filePanels } = workspace.filePanels;
@@ -1268,17 +1255,14 @@ async function resolveSelectedTeam(teamId: string | null | undefined, newTeamNam
 }
 
 function openCockpit(): void {
-  closeSidePanel();
   activeSurface.value = 'cockpit';
 }
 
 function openLoops(): void {
-  closeSidePanel();
   activeSurface.value = 'loops';
 }
 
 function openSettings(): void {
-  closeSidePanel();
   activeSurface.value = 'settings';
 }
 
@@ -1354,11 +1338,6 @@ function removeBenchTemplateForTeam(templateId: string, team: Team | null | unde
   });
 }
 
-function closeSidePanel(): void {
-  sidePanelRequestId += 1;
-  sidePanel.value = null;
-}
-
 function confirmPlan(): void {
   emit('update:planMode', false);
   emit('sendPrompt', 'implement the plan');
@@ -1388,9 +1367,9 @@ function forwardSteerPrompt(prompt: string, options?: SendPromptOptions): void {
   }
 }
 
-function cancelPlanReview(): void {
+function cancelPlanReview(agentId: string): void {
   emit('update:planMode', false);
-  closeSidePanel();
+  closeRightWorkspaceTab(agentId, 'plan');
 }
 
 function commentOnPlan(comments: PlanReviewComment[]): void {
@@ -2033,10 +2012,6 @@ watch(() => [
   loadVisibleBenchCatalogs();
 }, { immediate: true });
 
-watch(() => currentAgent.value?.id ?? null, () => {
-  closeSidePanel();
-});
-
 watch(() => props.sidePanelRequest, (request) => {
   if (!request) {
     return;
@@ -2059,9 +2034,9 @@ function openSidePanelRequest(request: SidePanelRequest): void {
 }
 
 function openMarkdownRequest(request: SidePanelMarkdownRequest): void {
+  const agent = currentAgent.value;
+  if (!agent) return;
   if (request.purpose !== 'plan') {
-    const agent = currentAgent.value;
-    if (!agent) return;
     const identifier = request.path ?? `inline-${++markdownPreviewId}`;
     const tab = request.path ? rightWorkspaceFileTab(request.path) : rightWorkspaceMarkdownTab(identifier);
     const subtitle = request.path;
@@ -2081,17 +2056,17 @@ function openMarkdownRequest(request: SidePanelMarkdownRequest): void {
     return;
   }
 
-  sidePanelRequestId += 1;
   const subtitle = request.path;
-  sidePanel.value = {
+  rightWorkspaceFor(agent.id).planPanel = {
     kind: 'markdown',
-    ...(request.purpose ? { purpose: request.purpose } : {}),
+    purpose: 'plan',
     title: request.title ?? (subtitle ? fileBasename(subtitle) : 'Markdown'),
     ...(subtitle ? { subtitle } : {}),
     content: request.content,
     state: 'idle',
     error: null,
   };
+  openRightWorkspaceTab('plan', agent.id);
 }
 
 function openGitDiffRequest(request: Extract<SidePanelRequest, { kind: 'gitDiff' }>): void {
@@ -2101,7 +2076,6 @@ function openGitDiffRequest(request: Extract<SidePanelRequest, { kind: 'gitDiff'
 
   const agentId = currentAgent.value?.id;
   if (!agentId) return;
-  sidePanelRequestId += 1;
   rightWorkspaceFor(agentId).gitReviewPanel = {
     kind: 'gitDiff',
     title: request.title ?? 'Review',

@@ -17,6 +17,7 @@
           >
             <GitHubIcon v-if="tab === 'review'" aria-hidden="true" />
             <IconWorld v-else-if="tab === 'browser'" aria-hidden="true" />
+            <FileTextIcon v-else-if="tab === 'plan'" aria-hidden="true" />
             <FileDiffIcon v-else-if="diffPanel(tab)" aria-hidden="true" />
             <FileTextIcon v-else-if="filePanel(tab)?.kind === 'markdown'" aria-hidden="true" />
             <CodeIcon v-else aria-hidden="true" />
@@ -91,6 +92,16 @@
       @send-prompt="emit('sendPrompt', $event)"
     />
 
+    <PlanReviewPanel
+      v-if="tabs.includes('plan') && planPanel"
+      v-show="activeTab === 'plan'"
+      :panel="planPanel"
+      :plan-updating="planUpdating"
+      @cancel-plan="emit('cancelPlan')"
+      @comment-plan="emit('commentPlan', $event)"
+      @confirm-plan="emit('confirmPlan')"
+    />
+
     <div
       v-for="tab in fileTabs"
       :key="tab"
@@ -138,8 +149,9 @@ import BrowserPanel from './BrowserPanel.vue';
 import GitDiffPreviewPanel from './GitDiffPreviewPanel.vue';
 import GitReviewPanel from './GitReviewPanel.vue';
 import MarkdownPanel from './MarkdownPanel.vue';
+import PlanReviewPanel from './PlanReviewPanel.vue';
 import SourcePreviewPanel from './SourcePreviewPanel.vue';
-import type { SidePanelGitDiffState, SidePanelMarkdownState, SidePanelSourceState } from './side-panel';
+import type { PlanReviewComment, SidePanelGitDiffState, SidePanelMarkdownState, SidePanelSourceState } from './side-panel';
 import {
   isRightWorkspaceDiffTab,
   isRightWorkspaceFileTab,
@@ -155,6 +167,8 @@ const props = defineProps<{
   agent: Agent;
   gitPanel: SidePanelGitDiffState;
   gitStatus?: AgentGitStatus | null;
+  planPanel?: SidePanelMarkdownState | null;
+  planUpdating?: boolean;
   diffPanels?: Partial<Record<RightWorkspaceDiffTab, RightWorkspaceDiffPanel>>;
   filePanels?: Partial<Record<RightWorkspaceFileTab, RightWorkspaceFilePanel>>;
   tabs: RightWorkspaceTab[];
@@ -166,6 +180,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   closeTab: [tab: RightWorkspaceTab];
+  cancelPlan: [];
+  commentPlan: [comments: PlanReviewComment[]];
+  confirmPlan: [];
   openTab: [tab: RightWorkspaceTab];
   refreshGitDiff: [];
   selectTab: [tab: RightWorkspaceTab];
@@ -187,6 +204,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closeAddMenuOnOutsid
 function tabLabel(tab: RightWorkspaceTab): string {
   if (tab === 'review') return 'Review';
   if (tab === 'browser') return 'Browser';
+  if (tab === 'plan') return props.planPanel?.title ?? 'Plan';
   if (diffPanel(tab)) return diffPanel(tab)?.title ?? 'Diff';
   return filePanel(tab)?.title ?? 'File';
 }

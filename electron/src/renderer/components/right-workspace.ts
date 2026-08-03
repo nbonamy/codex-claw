@@ -2,7 +2,7 @@ import type { SidePanelGitDiffState, SidePanelMarkdownState, SidePanelSourceStat
 
 export type RightWorkspaceFileTab = `file:${string}`;
 export type RightWorkspaceDiffTab = `diff:${string}`;
-export type RightWorkspaceTab = 'review' | 'browser' | RightWorkspaceFileTab | RightWorkspaceDiffTab;
+export type RightWorkspaceTab = 'review' | 'browser' | 'plan' | RightWorkspaceFileTab | RightWorkspaceDiffTab;
 export type RightWorkspaceFilePanel = SidePanelMarkdownState | SidePanelSourceState;
 export type RightWorkspaceDiffPanel = SidePanelGitDiffState;
 

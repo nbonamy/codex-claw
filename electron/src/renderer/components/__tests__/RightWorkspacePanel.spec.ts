@@ -2,6 +2,8 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import RightWorkspacePanel from '../RightWorkspacePanel.vue';
 import type { RightWorkspaceFilePanel, RightWorkspaceFileTab, RightWorkspaceTab } from '../right-workspace';
+import type { SidePanelMarkdownState } from '../side-panel';
+import { i18n } from '../../i18n';
 
 class ResizeObserverStub {
   observe() {}
@@ -17,6 +19,7 @@ function mountPanel(
   tabs: RightWorkspaceTab[] = ['review', 'browser'],
   activeTab: RightWorkspaceTab | null = 'review',
   filePanels: Partial<Record<RightWorkspaceFileTab, RightWorkspaceFilePanel>> = {},
+  planPanel: SidePanelMarkdownState | null = null,
 ) {
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
   window.codexClaw = {
@@ -34,9 +37,11 @@ function mountPanel(
       },
       gitPanel: { kind: 'gitDiff', title: 'Review', diff: '', state: 'idle' },
       filePanels,
+      planPanel,
       tabs,
       visible: true,
     },
+    global: { plugins: [i18n] },
   });
 }
 
@@ -99,5 +104,25 @@ describe('RightWorkspacePanel', () => {
 
     await wrapper.get('[aria-label="Close main.ts tab"]').trigger('click');
     expect(wrapper.emitted('closeTab')).toStrictEqual([[fileTab]]);
+  });
+
+  it('renders Plan Review as a normal tab beside existing workspace tabs', async () => {
+    const wrapper = mountPanel(['browser', 'plan'], 'plan', {}, {
+      kind: 'markdown',
+      purpose: 'plan',
+      title: 'Implementation plan',
+      content: '# Plan\n\nKeep Browser available.',
+      state: 'idle',
+      error: null,
+    });
+
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['Browser', 'Implementation plan']);
+    expect(wrapper.get('.plan-review-panel').text()).toContain('Keep Browser available.');
+
+    await wrapper.findAll('[role="tab"]')[0]?.trigger('click');
+    await wrapper.get('[aria-label="Close Implementation plan tab"]').trigger('click');
+
+    expect(wrapper.emitted('selectTab')).toStrictEqual([['browser']]);
+    expect(wrapper.emitted('closeTab')).toStrictEqual([['plan']]);
   });
 });

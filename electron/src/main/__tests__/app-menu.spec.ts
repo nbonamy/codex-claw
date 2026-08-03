@@ -14,6 +14,7 @@ const callbacks = (): AppMenuCallbacks => ({
   sendAppCommand: vi.fn(),
   toggleDeveloperTools: vi.fn(),
   toggleDebugExecutionPlan: vi.fn(),
+  injectDebugPlanReview: vi.fn(),
 });
 
 describe('app menu', () => {
@@ -190,7 +191,7 @@ describe('app menu', () => {
       'Reload',
       'Toggle Developer Tools',
     ]);
-    expect(menuLabels(submenu(debugMenu, 'Debug'))).toStrictEqual(['Execution Plan']);
+    expect(menuLabels(submenu(debugMenu, 'Debug'))).toStrictEqual(['Execution Plan', 'Plan Review']);
     expect(menuItem(debugMenu, 'View', 'Next Team')?.accelerator).toBe('Command+`');
     expect(menuItem(debugMenu, 'View', 'Next Agent')?.accelerator).toBe('Control+Tab');
     expect(menuItem(debugMenu, 'View', 'Previous Agent')?.accelerator).toBe('Control+Shift+Tab');
@@ -200,10 +201,12 @@ describe('app menu', () => {
     clickItem(debugMenu, 'View', 'Reload');
     clickItem(debugMenu, 'View', 'Toggle Developer Tools');
     clickItem(debugMenu, 'Debug', 'Execution Plan');
+    clickItem(debugMenu, 'Debug', 'Plan Review');
 
     expect(debugCallbacks.reload).toHaveBeenCalledOnce();
     expect(debugCallbacks.toggleDeveloperTools).toHaveBeenCalledOnce();
     expect(debugCallbacks.toggleDebugExecutionPlan).toHaveBeenCalledOnce();
+    expect(debugCallbacks.injectDebugPlanReview).toHaveBeenCalledOnce();
     expect(JSON.stringify(releaseMenu)).not.toMatch(/reload|forceReload|developer tools|toggleDevTools/i);
   });
 });

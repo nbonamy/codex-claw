@@ -12,7 +12,12 @@
       <div v-else class="browser-panel__annotation-title"><strong>Annotating</strong><span>•</span><span>{{ displayHost }}</span></div>
       <div class="browser-panel__actions">
         <button class="browser-panel__annotate" type="button" :aria-label="annotationMode ? 'Exit annotation mode' : 'Annotate page'" :title="annotationMode ? 'Exit annotation mode' : 'Annotate page'" :aria-pressed="annotationMode" @click="toggleAnnotation"><IconX v-if="annotationMode" /><IconCirclePlus v-else /></button>
-        <button v-if="annotations.length" class="browser-panel__send" type="button" :aria-label="`Send ${annotations.length} annotations`" @click="sendAnnotations">Send <span>{{ annotations.length }}</span></button>
+        <AnnotationSendButton
+          v-if="annotations.length"
+          :count="annotations.length"
+          :label="`Send ${annotations.length} annotations`"
+          @click="sendAnnotations"
+        />
         <button type="button" aria-label="Browser menu" title="Browser menu" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen"><IconDotsVertical /></button>
         <div v-if="menuOpen" class="browser-panel__menu" role="menu">
           <button type="button" role="menuitem" @click="close">Close browser</button>
@@ -33,6 +38,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { IconArrowLeft, IconArrowRight, IconCirclePlus, IconDotsVertical, IconRefresh, IconX } from '@tabler/icons-vue';
 import { PRIMARY_BROWSER_ID, type BrowserAnnotation, type BrowserBounds, type BrowserState, type MainToRendererEvent } from '@codex-claw/shared/contracts';
+import AnnotationSendButton from './AnnotationSendButton.vue';
 
 const props = withDefaults(defineProps<{
   agentId: string;
@@ -247,7 +253,5 @@ function messageFor(reason: unknown): string {
 .browser-panel__viewport { position: relative; flex: 1; min-width: 0; min-height: 0; background: var(--color-surface-low); }
 .browser-panel__loading { display: grid; place-items: center; height: 100%; color: var(--color-text-muted); }
 .browser-panel__error { margin: 0; padding: var(--space-4) var(--space-8); color: var(--color-error); background: var(--color-error-container); }
-.browser-panel__send { display: inline-flex !important; align-items: center; justify-content: center; width: auto !important; min-width: 70px; padding: 0 var(--space-4) !important; border-radius: var(--radius-md) !important; background: var(--color-primary) !important; color: var(--color-on-primary) !important; font-size: var(--font-size-13); font-weight: var(--font-weight-medium); line-height: 1; white-space: nowrap; }
-.browser-panel__send span { display: inline-grid; place-items: center; width: 20px; height: 20px; margin-left: var(--space-2); border-radius: var(--radius-full); background: color-mix(in srgb, var(--color-on-primary) 18%, transparent); font-size: var(--font-size-11); }
 @media (max-width: 760px) { .browser-panel__toolbar { grid-template-columns: 1fr auto; } .browser-panel__address, .browser-panel__annotation-title { display: none; } }
 </style>

@@ -171,6 +171,53 @@ export class ClawBackendServer {
         }, { persist: false });
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
+      case backendMethods.debugPlanReviewInject: {
+        const agentId = requireAgentId(message.params);
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+
+        const turnId = `debug-plan-review-${Date.now()}`;
+        this.handleBackendEvent({
+          agentId,
+          backend: agent.backend,
+          threadId: agent.backendSession?.kind === 'codex' ? agent.backendSession.threadId : `debug-thread-${agentId}`,
+          turnId,
+          type: 'turn.proposedPlanCompleted',
+          payload: {
+            markdown: [
+              '# Debug plan review',
+              '',
+              '## Summary',
+              '',
+              'Exercise the full Plan-mode review workflow with a realistic proposal.',
+              '',
+              '## Key Changes',
+              '',
+              '- [ ] Inspect the current state and identify the relevant files.',
+              '- [ ] Review the proposed changes before implementation.',
+              '- [ ] Keep the implementation scoped to the requested behavior.',
+              '',
+              '## Implementation Notes',
+              '',
+              '- Preserve the existing conversation and side-panel state.',
+              '- Prefer the smallest change that keeps the host boundary explicit.',
+              '- Surface any assumptions before making a destructive change.',
+              '',
+              '## Tests',
+              '',
+              '- [ ] Run the focused tests.',
+              '- [ ] Check the affected UI state in the running app.',
+              '',
+              '## Commit Strategy',
+              '',
+              'Keep the change reviewable and separate from unrelated work.',
+            ].join('\n'),
+          },
+        }, { persist: false });
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
       case backendMethods.systemPermissionsGet:
         return createClawRpcResult(message.id, await this.systemPermissions.getStatus());
       case backendMethods.systemPermissionsAccessibilityOpen:
@@ -2260,6 +2307,7 @@ export class ClawBackendServer {
       return;
     }
 
+    const preview = planReviewPreview(agent.plan.markdown);
     this.applyAndEmitBackendEvent({
       agentId: event.agentId,
       backend: event.backend,
@@ -2269,8 +2317,8 @@ export class ClawBackendServer {
       payload: {
         kind: 'markdown',
         purpose: 'plan',
-        title: 'Plan',
-        content: agent.plan.markdown,
+        title: preview.title,
+        content: preview.content,
       },
     });
   }
@@ -2821,6 +2869,18 @@ function rendererMessageText(message: RendererMessage): string {
     .filter(Boolean)
     .join('\n\n')
     .trim();
+}
+
+function planReviewPreview(markdown: string): { title: string; content: string } {
+  const lines = markdown.trim().split('\n');
+  const headingIndex = lines.findIndex((line) => /^#\s+\S/u.test(line.trim()));
+  if (headingIndex < 0) {
+    return { title: 'Plan', content: markdown };
+  }
+
+  const title = lines[headingIndex]!.trim().replace(/^#\s+/u, '').trim() || 'Plan';
+  const content = [...lines.slice(0, headingIndex), ...lines.slice(headingIndex + 1)].join('\n').trim();
+  return { title, content };
 }
 
 function turnIdFromRendererMessageId(messageId: string): string | null {
