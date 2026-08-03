@@ -102,6 +102,9 @@ describe('runtime config', () => {
 
     expect(devScript).toContain("CODEX_CLAW_ASSETS_PATH: path.join(rootDir, 'electron', 'assets')");
     expect(devScript).not.toContain("CODEX_CLAW_ASSETS_PATH: path.join(rootDir, 'assets')");
+    expect(devScript).toContain(
+      "CODEX_APP_SDK_ASSETS_PATH: path.join(rootDir, 'node_modules', 'codex-app-sdk', 'assets')",
+    );
   });
 
   it('routes root and Electron workspace dev commands through the same supervisor', () => {

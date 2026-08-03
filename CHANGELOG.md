@@ -16,6 +16,11 @@ All notable Codex Claw changes are recorded here.
 - Chrome availability stays in sync with ChatGPT.
 - Execution plans can be dismissed and reopened from the agent header.
 
+### Improvements and fixes
+
+- Fixed macOS voice transcription in development builds by resolving the
+  bundled Apple Speech helper from the linked SDK assets.
+
 ## [0.3.1] - 2026-08-02
 
 ### New features
