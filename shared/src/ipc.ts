@@ -68,6 +68,7 @@ export const ipcChannels = {
   closeAgent: 'agent:close',
   selectAgent: 'agent:select',
   updateSettings: 'settings:update',
+  getPluginStatus: 'settings:plugin-status:get',
   getCodexAuthentication: 'codex:authentication:get',
   cancelCodexChatGptLogin: 'codex:authentication:chatgpt:cancel',
   startCodexChatGptLogin: 'codex:authentication:chatgpt:start',

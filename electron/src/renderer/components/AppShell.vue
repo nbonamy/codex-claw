@@ -113,6 +113,7 @@
         :complete-work-provider-connection="completeWorkProviderConnection"
         :disconnect-work-provider="disconnectWorkProvider"
         :update-settings="updateSettings"
+        :get-plugin-status="getPluginStatus"
         :set-daemon-enabled="setDaemonEnabled"
         :restart-app="restartApp"
         @select-tab="settingsActiveTab = $event"
@@ -432,6 +433,7 @@ const props = withDefaults(defineProps<{
   updateTeam?: (input: UpdateTeamInput) => Promise<void>;
   updateAgent?: (input: UpdateAgentInput) => Promise<void>;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
+  getPluginStatus?: () => Promise<import('@codex-claw/shared/contracts').AppPluginStatus>;
   listSshHosts?: () => Promise<SshHostCandidate[]>;
   addSshConnection?: (input: AddSshConnectionInput) => Promise<void>;
   checkRemoteConnection?: (connectionId: string) => Promise<void>;
@@ -517,6 +519,7 @@ const props = withDefaults(defineProps<{
   updateTeam: async () => undefined,
   updateAgent: async () => undefined,
   updateSettings: async () => undefined,
+  getPluginStatus: async () => ({ chromeEnabled: false }),
   listSshHosts: async () => [],
   addSshConnection: async () => undefined,
   checkRemoteConnection: async () => undefined,
@@ -1656,6 +1659,10 @@ function handleAppCommand(command: AppCommand): void {
 
 async function updateSettings(input: UpdateSettingsInput): Promise<void> {
   await props.updateSettings(input);
+}
+
+async function getPluginStatus(): Promise<import('@codex-claw/shared/contracts').AppPluginStatus> {
+  return props.getPluginStatus();
 }
 
 async function setDaemonEnabled(enabled: boolean): Promise<void> {

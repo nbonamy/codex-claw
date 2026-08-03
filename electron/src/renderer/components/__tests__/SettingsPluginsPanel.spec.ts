@@ -8,11 +8,12 @@ describe('SettingsPluginsPanel', () => {
     document.body.innerHTML = '';
   });
 
-  it('asks to launch ChatGPT before enabling Chrome and persists after launch', async () => {
+  it('asks to launch ChatGPT without changing Chrome settings', async () => {
     const launchChatGptApp = vi.fn().mockResolvedValue(undefined);
     const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const getPluginStatus = vi.fn().mockResolvedValue({ chromeEnabled: false });
     const wrapper = mount(SettingsPluginsPanel, {
-      props: { launchChatGptApp, updateSettings },
+      props: { launchChatGptApp, updateSettings, getPluginStatus },
       global: { plugins: [ElementPlus] },
       attachTo: document.body,
     });
@@ -29,7 +30,27 @@ describe('SettingsPluginsPanel', () => {
     await flushPromises();
 
     expect(launchChatGptApp).toHaveBeenCalledOnce();
-    expect(updateSettings).toHaveBeenCalledWith({ general: { plugins: { chromeEnabled: true } } });
+    expect(updateSettings).not.toHaveBeenCalled();
+    expect(getPluginStatus).toHaveBeenCalled();
+  });
+
+  it('opens the ChatGPT dialog when Chrome is already enabled and clicked off', async () => {
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mount(SettingsPluginsPanel, {
+      props: {
+        settings: { computerUseEnabled: false, chromeEnabled: true },
+        updateSettings,
+        getPluginStatus: vi.fn().mockResolvedValue({ chromeEnabled: true }),
+      },
+      global: { plugins: [ElementPlus] },
+      attachTo: document.body,
+    });
+
+    await wrapper.get('[aria-label="Enable Chrome"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Manage plugins in ChatGPT');
+    expect(updateSettings).not.toHaveBeenCalled();
   });
 
   it('disables a capability without opening the ChatGPT dialog', async () => {

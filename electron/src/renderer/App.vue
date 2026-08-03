@@ -56,6 +56,7 @@
     :update-team="updateTeam"
     :update-agent="updateAgent"
     :update-settings="updateSettings"
+    :get-plugin-status="getPluginStatus"
     :list-ssh-hosts="listSshHosts"
     :add-ssh-connection="addSshConnection"
     :check-remote-connection="checkRemoteConnection"
@@ -260,6 +261,7 @@ const {
   removeQueuedPrompt,
   quit,
   restartApp,
+  getPluginStatus,
 } = useAppState();
 
 const updateStatus = ref<DesktopUpdateStatus>({ state: 'idle' });

@@ -47,6 +47,7 @@
           :settings="generalSettings?.plugins"
           :launch-chat-gpt-app="launchChatGptApp"
           :update-settings="updateSettings"
+          :get-plugin-status="getPluginStatus"
         />
         <SettingsConnectionsPanel
           v-else-if="activeTab === 'connections'"
@@ -77,7 +78,7 @@
 </template>
 
 <script setup lang="ts">
-import type { AddSshConnectionInput, AppGeneralSettings, AppThemeSettings, ClawdDaemonStatus, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SourceFolderListing, SourceFolderListInput, SourceFolderState, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AppGeneralSettings, AppPluginStatus, AppThemeSettings, ClawdDaemonStatus, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SourceFolderListing, SourceFolderListInput, SourceFolderState, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { defaultGeneralSettings, defaultSourceFolderState } from '@codex-claw/shared/settings';
 import SettingsAppearancePanel from './SettingsAppearancePanel.vue';
 import SettingsChatGptPanel from './SettingsChatGptPanel.vue';
@@ -125,6 +126,7 @@ withDefaults(defineProps<{
   setDaemonEnabled?: (enabled: boolean) => Promise<void>;
   restartApp?: () => Promise<void>;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
+  getPluginStatus?: () => Promise<AppPluginStatus>;
 }>(), {
   activeTab: 'chatgpt',
   workBacklogConnections: () => [],

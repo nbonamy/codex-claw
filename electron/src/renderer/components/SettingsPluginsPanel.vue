@@ -30,7 +30,7 @@
       >
         <template #control>
           <el-switch
-            :model-value="pluginSettings.chromeEnabled"
+            :model-value="chromeEnabled"
             aria-label="Enable Chrome"
             @update:model-value="updatePlugin('chrome', $event)"
           />
@@ -112,8 +112,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import type { AppPluginSettings, UpdateSettingsInput } from '@codex-claw/shared/contracts';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import type { AppPluginSettings, AppPluginStatus, UpdateSettingsInput } from '@codex-claw/shared/contracts';
 import { defaultPluginSettings } from '@codex-claw/shared/settings';
 import { ChevronRightIcon, X } from '../shared/icons/app-icons';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
@@ -127,9 +127,11 @@ const props = withDefaults(defineProps<{
   settings?: AppPluginSettings;
   launchChatGptApp?: () => Promise<void>;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
+  getPluginStatus?: () => Promise<AppPluginStatus>;
 }>(), {
   settings: () => ({ ...defaultPluginSettings }),
   updateSettings: async () => undefined,
+  getPluginStatus: undefined,
 });
 
 const dialogVisible = ref(false);
@@ -137,7 +139,34 @@ const launching = ref(false);
 const dialogError = ref<string | null>(null);
 const settingsError = ref<string | null>(null);
 const pendingPlugin = ref<PendingPlugin>(null);
+const chromeEnabled = ref(false);
 const pluginSettings = computed(() => props.settings ?? defaultPluginSettings);
+let pluginStatusTimer: number | undefined;
+
+async function refreshPluginStatus(): Promise<void> {
+  if (!props.getPluginStatus) {
+    chromeEnabled.value = props.settings?.chromeEnabled === true;
+    return;
+  }
+  try {
+    chromeEnabled.value = (await props.getPluginStatus()).chromeEnabled === true;
+  } catch {
+    // Preserve the last known status through transient config/IPC failures.
+  }
+}
+
+watch(() => props.settings?.chromeEnabled, (value) => {
+  if (!props.getPluginStatus) chromeEnabled.value = value === true;
+});
+
+onMounted(() => {
+  void refreshPluginStatus();
+  pluginStatusTimer = window.setInterval(() => { void refreshPluginStatus(); }, 5_000);
+});
+
+onBeforeUnmount(() => {
+  if (pluginStatusTimer !== undefined) window.clearInterval(pluginStatusTimer);
+});
 
 function openChatGptDialog(plugin: PendingPlugin): void {
   pendingPlugin.value = plugin;
@@ -146,13 +175,14 @@ function openChatGptDialog(plugin: PendingPlugin): void {
 }
 
 function updatePlugin(plugin: Exclude<PendingPlugin, null>, enabled: boolean): void {
+  if (plugin === 'chrome') {
+    settingsError.value = null;
+    openChatGptDialog('chrome');
+    return;
+  }
   if (enabled) {
     settingsError.value = null;
-    if (plugin === 'chrome') {
-      openChatGptDialog(plugin);
-    } else {
-      void persistPlugin(plugin, true);
-    }
+    void persistPlugin(plugin, true);
     return;
   }
 
@@ -180,9 +210,6 @@ async function launchChatGpt(): Promise<void> {
       throw new Error('ChatGPT could not be launched from this window.');
     }
     await launchApp();
-    if (pendingPlugin.value) {
-      await persistPlugin(pendingPlugin.value, true);
-    }
     dialogVisible.value = false;
   } catch (error) {
     dialogError.value = error instanceof Error ? error.message : String(error);

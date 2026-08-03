@@ -457,6 +457,10 @@ export type AppPluginSettings = {
   chromeEnabled: boolean;
 };
 
+export type AppPluginStatus = {
+  chromeEnabled: boolean;
+};
+
 export type AppGeneralSettings = {
   preventSleepWhenAgentsRun: boolean;
   codexBinaryPath: string;
@@ -1216,6 +1220,7 @@ export type CodexClawApi = {
   closeAgent(agentId: string): Promise<AppSnapshot>;
   selectAgent(agentId: string): Promise<AppSnapshot>;
   updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>;
+  getPluginStatus(): Promise<AppPluginStatus>;
   getCodexAuthentication(): Promise<CodexAuthentication>;
   cancelCodexChatGptLogin(): Promise<CodexAuthentication>;
   startCodexChatGptLogin(): Promise<CodexChatGptLogin>;

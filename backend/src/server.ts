@@ -26,6 +26,7 @@ import type { LoopRunner } from './loops/runner';
 import type { WorkIntegrationManager } from './work-integrations/manager';
 import { warnMain } from './log';
 import { AgentTranscriptRetention, type AgentTranscriptRetentionOptions } from './agent-transcript-retention';
+import { loadPluginStatus } from './plugin-status';
 
 export type ClawBackendServerOptions = {
   version: string;
@@ -935,6 +936,8 @@ export class ClawBackendServer {
       case backendMethods.settingsUpdate:
         updateSettingsInSnapshot(this.snapshot, requireSettingsUpdateInput(message.params));
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      case backendMethods.settingsPluginStatusGet:
+        return createClawRpcResult(message.id, await loadPluginStatus());
       case backendMethods.codexAuthenticationGet:
         return createClawRpcResult(
           message.id,

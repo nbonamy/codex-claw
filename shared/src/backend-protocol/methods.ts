@@ -98,6 +98,7 @@ export const backendMethods = {
   loopRun: 'loop/run',
   loopUpdate: 'loop/update',
   settingsUpdate: 'settings/update',
+  settingsPluginStatusGet: 'settings/pluginStatus/get',
   snapshotBenchGet: 'snapshot/bench/get',
   snapshotGet: 'snapshot/get',
   snapshotLoopsGet: 'snapshot/loops/get',
