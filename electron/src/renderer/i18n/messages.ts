@@ -90,9 +90,9 @@ export const messages = {
             running: 'Deleting {target}',
           },
           explore: {
-            completed: 'Explored',
-            failed: 'Failed exploring',
-            running: 'Exploring',
+            completed: 'Explored {target}',
+            failed: 'Failed exploring {target}',
+            running: 'Exploring {target}',
           },
           list: {
             completed: 'Listed {target}',
