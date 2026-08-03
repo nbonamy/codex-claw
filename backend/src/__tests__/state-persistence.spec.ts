@@ -4,7 +4,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { AppStatePersistence, persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 import { appendUserPrompt, createEmptySnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import { defaultThemeSettings } from '@codex-claw/shared/settings';
+import { defaultPluginSettings, defaultThemeSettings } from '@codex-claw/shared/settings';
 import type { RemoteConnection } from '@codex-claw/shared/contracts';
 
 let tempDir: string | null = null;
@@ -815,6 +815,7 @@ describe('AppStatePersistence', () => {
       preventSleepWhenAgentsRun: false,
       codexBinaryPath: '/opt/homebrew/bin/codex',
       agentListCompact: true,
+      plugins: { ...defaultPluginSettings },
     };
 
     const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));

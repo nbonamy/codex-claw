@@ -452,10 +452,21 @@ export type AppThemeSettings = {
   codeFontSize: number;
 };
 
+export type AppPluginSettings = {
+  computerUseEnabled: boolean;
+  chromeEnabled: boolean;
+};
+
 export type AppGeneralSettings = {
   preventSleepWhenAgentsRun: boolean;
   codexBinaryPath: string;
   agentListCompact: boolean;
+  /** Optional for backwards compatibility with pre-plugin state files. */
+  plugins?: AppPluginSettings;
+};
+
+export type UpdateGeneralSettingsInput = Partial<Omit<AppGeneralSettings, 'plugins'>> & {
+  plugins?: Partial<AppPluginSettings>;
 };
 
 export type CodexAccount =
@@ -773,7 +784,7 @@ export type CreateSourceWorktreeInput = {
 };
 
 export type UpdateSettingsInput = {
-  general?: Partial<AppGeneralSettings>;
+  general?: UpdateGeneralSettingsInput;
   sourceFolder?: Partial<Pick<SourceFolderState, 'path' | 'recentRepoNames'>>;
   theme?: Partial<AppThemeSettings>;
   workProviders?: Partial<Record<WorkProviderKind, WorkProviderSettings>>;

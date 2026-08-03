@@ -1,9 +1,15 @@
-import type { AppGeneralSettings, AppSnapshot, AppThemeSettings, SourceFolderState, UpdateSettingsInput, WorkProviderSettings } from './contracts';
+import type { AppGeneralSettings, AppPluginSettings, AppSnapshot, AppThemeSettings, SourceFolderState, UpdateSettingsInput, WorkProviderSettings } from './contracts';
+
+export const defaultPluginSettings: AppPluginSettings = {
+  computerUseEnabled: false,
+  chromeEnabled: false,
+};
 
 export const defaultGeneralSettings: AppGeneralSettings = {
   preventSleepWhenAgentsRun: true,
   codexBinaryPath: '',
   agentListCompact: false,
+  plugins: { ...defaultPluginSettings },
 };
 
 export const defaultSourceFolderState: SourceFolderState = {
@@ -25,6 +31,10 @@ export function updateSettingsInSnapshot(snapshot: AppSnapshot, input: UpdateSet
     snapshot.general = normalizeGeneralSettings({
       ...snapshot.general,
       ...input.general,
+      plugins: {
+        ...snapshot.general.plugins,
+        ...input.general.plugins,
+      },
     });
   }
 
@@ -72,6 +82,18 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
     preventSleepWhenAgentsRun: value.preventSleepWhenAgentsRun !== false,
     codexBinaryPath: normalizeString(value.codexBinaryPath) ?? defaultGeneralSettings.codexBinaryPath,
     agentListCompact: value.agentListCompact === true,
+    plugins: normalizePluginSettings(value.plugins),
+  };
+}
+
+export function normalizePluginSettings(value: unknown): AppPluginSettings {
+  if (!isRecord(value)) {
+    return { ...defaultPluginSettings };
+  }
+
+  return {
+    computerUseEnabled: value.computerUseEnabled === true,
+    chromeEnabled: value.chromeEnabled === true,
   };
 }
 

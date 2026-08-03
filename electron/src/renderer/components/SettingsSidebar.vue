@@ -19,6 +19,10 @@
         <PaletteIcon aria-hidden="true" />
         <span>Appearance</span>
       </el-menu-item>
+      <el-menu-item index="plugins">
+        <AffiliateIcon aria-hidden="true" />
+        <span>Plugins</span>
+      </el-menu-item>
       <el-menu-item index="integrations">
         <AffiliateIcon aria-hidden="true" />
         <span>Integrations</span>
@@ -44,7 +48,7 @@ const emit = defineEmits<{
 }>();
 
 function selectTab(tab: string): void {
-  if (tab === 'chatgpt' || tab === 'general' || tab === 'appearance' || tab === 'integrations' || tab === 'connections') {
+  if (tab === 'chatgpt' || tab === 'general' || tab === 'appearance' || tab === 'integrations' || tab === 'plugins' || tab === 'connections') {
     emit('select', tab);
   }
 }

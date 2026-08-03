@@ -1,4 +1,5 @@
-import type { Agent } from '@codex-claw/shared/contracts';
+import type { Agent, AppPluginSettings } from '@codex-claw/shared/contracts';
+import { defaultPluginSettings } from '@codex-claw/shared/settings';
 import {
   collaborationInstructionsEnd,
   collaborationInstructionsStart,
@@ -47,8 +48,8 @@ export function agentMessagesPrompt(messages: MessageInfo[]): string {
   ].join('\n');
 }
 
-export function codexClawDeveloperInstructions(agent: Agent): string {
-  return [
+export function codexClawDeveloperInstructions(agent: Agent, settings: AppPluginSettings = defaultPluginSettings): string {
+  const instructions = [
     'You are part of a team of agents collaborating in Codex Claw.',
     `Your Codex Claw agent ID is ${agent.id}. Your agent name is ${agent.name} and your folder is ${agent.folder}.`,
     'Use the codex_claw MCP server for agent collaboration.',
@@ -57,7 +58,21 @@ export function codexClawDeveloperInstructions(agent: Agent): string {
     `Claw delivers teammate messages directly; check-messages is only a manual recovery tool. Reply to teammate messages only when the sender needs information, a decision, coordination, or action. Silently absorb FYIs, acknowledgments, confirmations, and closures. Never acknowledge an acknowledgment. ${COLLABORATION_BOUNDARY}`,
     'Use display-markdown to show Markdown files or generated Markdown in the Codex Claw side panel when the user should inspect structured content.',
     'Use browser-open with an HTTP or HTTPS URL to open the Codex Claw in-app browser for your agent. Then use browser-get-dom to inspect the page and CSS-selected elements, browser-screenshot for visual state, browser-click/browser-type/browser-scroll for interactions, and browser-console-logs for debugging. These tools only control your agent\'s browser pane.',
-    'For macOS GUI automation in this Codex Claw session, use only the codex_claw MCP Computer Use tools: computer-use-status, computer-use-request-accessibility, computer-use-list-apps, computer-use-find-apps, computer-use-launch-app, computer-use-focus-app, computer-use-get-app-state, computer-use-click, computer-use-type-text, computer-use-set-value, and computer-use-scroll.',
-    'Do not load or use the built-in computer-use skill, node_repl, or sky.* methods: those control Codex-provided Computer Use instead of the Computer Use helper bundled with Codex Claw. Start with computer-use-status; request permission if needed; refresh app state before acting on an indexed element.',
-  ].join(' ');
+  ];
+  if (settings.computerUseEnabled) {
+    instructions.push(
+      'For macOS GUI automation in this Codex Claw session, use only the codex_claw MCP Computer Use tools: computer-use-status, computer-use-request-accessibility, computer-use-list-apps, computer-use-find-apps, computer-use-launch-app, computer-use-focus-app, computer-use-get-app-state, computer-use-click, computer-use-type-text, computer-use-set-value, and computer-use-scroll.',
+      'Do not load or use the built-in computer-use skill or sky.* methods: those control Codex-provided Computer Use instead of the Computer Use helper bundled with Codex Claw. Start with computer-use-status; request permission if needed; refresh app state before acting on an indexed element.',
+    );
+  } else {
+    instructions.push('Computer Use is disabled for this Codex Claw session. Do not attempt macOS GUI automation or use computer-use tools.');
+  }
+  if (settings.chromeEnabled) {
+    instructions.push(
+      'When the user explicitly asks for Chrome, an external browser, existing Chrome tabs, or Chrome login state, use the bundled chrome:control-chrome skill. Do not substitute the Claw in-app browser tools for an explicit Chrome request. The Chrome skill owns its host bridge and browser safety checks; do not invoke its raw bridge manually.',
+    );
+  } else {
+    instructions.push('Chrome integration is disabled for this Codex Claw session. Do not attempt to use the Chrome plugin.');
+  }
+  return instructions.join(' ');
 }

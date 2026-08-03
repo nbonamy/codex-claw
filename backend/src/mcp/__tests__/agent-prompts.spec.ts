@@ -57,7 +57,10 @@ describe('agent prompts', () => {
   });
 
   it('embeds the active agent identity and collaboration constraints', () => {
-    const instructions = codexClawDeveloperInstructions(agent());
+    const instructions = codexClawDeveloperInstructions(agent(), {
+      computerUseEnabled: true,
+      chromeEnabled: true,
+    });
 
     expect(instructions).toContain('Your Codex Claw agent ID is agent-dina.');
     expect(instructions).toContain('Your agent name is Dina');
@@ -70,6 +73,16 @@ describe('agent prompts', () => {
     expect(instructions).toContain('Never send FYIs, progress reports, acknowledgments, commit/hash notices');
     expect(instructions).toContain('Use browser-open with an HTTP or HTTPS URL');
     expect(instructions).toContain('use only the codex_claw MCP Computer Use tools');
+    expect(instructions).toContain('chrome:control-chrome');
+  });
+
+  it('does not advertise disabled host plugins by default', () => {
+    const instructions = codexClawDeveloperInstructions(agent());
+
+    expect(instructions).toContain('Computer Use is disabled');
+    expect(instructions).toContain('Chrome integration is disabled');
+    expect(instructions).not.toContain('computer-use-status');
+    expect(instructions).not.toContain('chrome:control-chrome');
   });
 });
 

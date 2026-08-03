@@ -13,6 +13,7 @@ const maxBodyBytes = 1024 * 1024;
 export type ClawMcpHttpServerOptions = {
   coordinator: ClawMcpAgentCoordinator;
   computerUse?: ComputerUseClient;
+  computerUseEnabled?: () => boolean;
   browser?: InAppBrowserClient;
   host?: string;
   port?: number;
@@ -21,6 +22,7 @@ export type ClawMcpHttpServerOptions = {
 export class ClawMcpHttpServer {
   private readonly coordinator: ClawMcpAgentCoordinator;
   private readonly computerUse: ComputerUseClient | undefined;
+  private readonly computerUseEnabled: () => boolean;
   private readonly browser: InAppBrowserClient | undefined;
   private readonly host: string;
   private readonly port: number;
@@ -30,6 +32,7 @@ export class ClawMcpHttpServer {
   constructor(options: ClawMcpHttpServerOptions) {
     this.coordinator = options.coordinator;
     this.computerUse = options.computerUse;
+    this.computerUseEnabled = options.computerUseEnabled ?? (() => true);
     this.browser = options.browser;
     this.host = options.host ?? '127.0.0.1';
     this.port = options.port ?? 0;
@@ -135,7 +138,12 @@ export class ClawMcpHttpServer {
     }
 
     this.coordinator.connectAgent(agentId);
-    const mcpServer = createCodexClawMcpServer(this.coordinator, agentId, this.computerUse, this.browser);
+    const mcpServer = createCodexClawMcpServer(
+      this.coordinator,
+      agentId,
+      this.computerUseEnabled() ? this.computerUse : undefined,
+      this.browser,
+    );
     const transport = new StreamableHTTPServerTransport({
       enableJsonResponse: true,
       sessionIdGenerator: undefined,

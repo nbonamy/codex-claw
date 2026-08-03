@@ -1,6 +1,7 @@
 import path from 'node:path';
 import type {
   Agent,
+  AppPluginSettings,
   BackendCapabilities,
   BackendConversationRef,
   BackendModelOption,
@@ -61,6 +62,7 @@ type ClaudeHistoryLoader = (agent: Agent) => Promise<ClaudeTranscriptHistory | n
 type ClaudeBackendDriverOptions = {
   clawMcpServerUrl?: string | null;
   homeDir?: string;
+  pluginSettings?: () => AppPluginSettings;
 };
 
 export class ClaudeBackendDriver implements AgentBackendDriver {
@@ -114,6 +116,7 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
         options,
         existingSessionId,
         this.driverOptions.clawMcpServerUrl,
+        this.driverOptions.pluginSettings?.(),
       ), (message) => {
         if (activeTurn) {
           this.handleSdkMessage(activeTurn, message);
@@ -703,6 +706,7 @@ function claudeTurnParams(
   options: SendPromptOptions,
   existingSessionId: string | null,
   clawMcpServerUrl: string | null | undefined,
+  pluginSettings?: AppPluginSettings,
 ): ClaudeTurnParams {
   const claudeOptions = options.backendOptions?.kind === 'claude' ? options.backendOptions : undefined;
   const defaults = agent.backendDefaults?.kind === 'claude' ? agent.backendDefaults : undefined;
@@ -713,7 +717,7 @@ function claudeTurnParams(
     sessionId: existingSessionId ?? undefined,
     model: options.model ?? defaults?.model ?? null,
     permissionMode: claudeOptions?.permissionMode ?? defaults?.permissionMode ?? null,
-    appendSystemPrompt: codexClawDeveloperInstructions(agent),
+    appendSystemPrompt: codexClawDeveloperInstructions(agent, pluginSettings),
     mcpServerUrl,
     allowedTools: mcpServerUrl ? ['mcp__codex_claw__*'] : [],
   };

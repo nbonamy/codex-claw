@@ -220,10 +220,11 @@ describe('clawd runtime', () => {
     expect(mocks.loadBackendSnapshot).toHaveBeenCalledOnce();
     expect(mocks.ensureBackendCodexHome).toHaveBeenCalledOnce();
     expect(mocks.mcpStart).toHaveBeenCalledOnce();
-    expect(mocks.createDefaultBackendDrivers).toHaveBeenCalledWith({
+    expect(mocks.createDefaultBackendDrivers).toHaveBeenCalledWith(expect.objectContaining({
       clawMcpServerUrl: 'http://127.0.0.1:4242/mcp',
       generalSettings: mocks.snapshot.general,
-    });
+      pluginSettings: expect.any(Function),
+    }));
     expect(mocks.hydrateConnections).toHaveBeenCalledOnce();
     expect(mocks.schedulerStart).toHaveBeenCalledOnce();
     expect(mocks.mcpSetDriverRpc).toHaveBeenCalledOnce();

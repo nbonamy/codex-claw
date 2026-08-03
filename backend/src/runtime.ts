@@ -43,6 +43,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
       status: () => options.requestClient(backendMethods.clientComputerUseStatusGet),
       stop: () => options.requestClient(backendMethods.clientComputerUseStop),
     },
+    computerUseEnabled: () => snapshot.general.plugins?.computerUseEnabled === true,
     browser: {
       open: (input) => options.requestClient(backendMethods.clientBrowserOpen, input),
       execute: (input) => options.requestClient(backendMethods.clientBrowserExecute, input),
@@ -52,6 +53,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   const backendDrivers = createDefaultBackendDrivers({
     clawMcpServerUrl: mcpServerUrl,
     generalSettings: snapshot.general,
+    pluginSettings: () => snapshot.general.plugins ?? { computerUseEnabled: false, chromeEnabled: false },
   });
   const driverRpc = new BackendDriverRpc(backendDrivers);
   let server: ClawBackendServer;

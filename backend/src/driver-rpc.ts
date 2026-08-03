@@ -1,7 +1,7 @@
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/shared/backend-driver';
 import { unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
-import type { Agent, AgentBackend, AppGeneralSettings, CreateSourceWorktreeInput, DevicePairingSession, SendPromptOptions } from '@codex-claw/shared/contracts';
+import type { Agent, AgentBackend, AppGeneralSettings, AppPluginSettings, CreateSourceWorktreeInput, DevicePairingSession, SendPromptOptions } from '@codex-claw/shared/contracts';
 import { stat } from 'node:fs/promises';
 import { listAgentFolderFiles, previewAgentFolderFile } from './agent-files';
 import { ClaudeBackendDriver } from './claude/claude-driver';
@@ -18,6 +18,7 @@ import { detectSourceFolder, scanSourceRepositories } from './source-repositorie
 export type BackendDriverRegistryOptions = {
   clawMcpServerUrl?: string | null;
   generalSettings?: AppGeneralSettings;
+  pluginSettings?: () => AppPluginSettings;
 };
 
 export function createDefaultBackendDrivers(options: BackendDriverRegistryOptions = {}): Map<AgentBackend, AgentBackendDriver> {
@@ -28,6 +29,7 @@ export function createDefaultBackendDrivers(options: BackendDriverRegistryOption
     ['codex', new CodexBackendDriver(codexSessionManager)],
     ['claude', new ClaudeBackendDriver(undefined, undefined, {
       clawMcpServerUrl: options.clawMcpServerUrl ?? null,
+      pluginSettings: options.pluginSettings,
     })],
   ]);
 }
@@ -39,12 +41,16 @@ export function codexClawSurfaceOptions(options: BackendDriverRegistryOptions = 
     codexHome: backendCodexHomeDir(),
     transport: {
       command: resolveCodexCommand(options.generalSettings?.codexBinaryPath),
-      configOverrides: buildCodexClawMcpConfigOverrides(),
+      configOverrides: buildCodexClawMcpConfigOverrides(options.generalSettings?.plugins),
     },
     extensions: [{
-      configureConversation: ({ extensionContext }) => (
-        isAgent(extensionContext)
-          ? buildCodexClawThreadConfig(extensionContext, options.clawMcpServerUrl ?? null)
+        configureConversation: ({ extensionContext }) => (
+          isAgent(extensionContext)
+          ? buildCodexClawThreadConfig(
+            extensionContext,
+            options.clawMcpServerUrl ?? null,
+            options.pluginSettings?.() ?? options.generalSettings?.plugins,
+          )
           : {}
       ),
     }],

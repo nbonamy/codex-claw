@@ -116,9 +116,17 @@ Computer Use is a local macOS capability exposed through the same Claw MCP
 server. The shared native helper lives in `~/src/computer-use/macos`; Codex
 Claw packages its own signed `Codex Claw Computer Use.app` copy.
 
+Computer Use tools are omitted from an agent's MCP server unless the user
+enables Computer Use in Settings -> Plugins. Chrome is a separate bundled
+ChatGPT plugin: it is not reimplemented as a Claw MCP server. When enabled in
+ChatGPT using Claw's shared `CODEX_HOME`, the `chrome:control-chrome` skill is
+available to agents that have Chrome enabled in Claw settings.
+
 When Claw launches Codex app-server, it disables that child process's
-`node_repl` MCP server. This removes Codex Desktop Sky Computer Use (`sky.*`)
-from the Claw session without changing the user's global Codex configuration.
+`node_repl` MCP server unless Chrome is enabled in Settings -> Plugins. This
+keeps the raw host bridge out of the default Claw session while allowing the
+bundled Chrome skill to use it when explicitly enabled; it does not change the
+user's global MCP configuration.
 
 ```text
 agent -> codex_claw MCP -> clawd -> client/computerUse RPC -> Electron main -> native helper -> macOS Accessibility

@@ -7,72 +7,73 @@
       <SettingsIntegrationBanner />
     </template>
 
-    <article class="settings-integrations-panel__integration">
-      <div class="settings-integrations-panel__identity">
-        <span
-          class="settings-integrations-panel__icon"
-          aria-hidden="true"
-        >
-          <GitHubIcon />
-        </span>
-        <div>
-          <strong>GitHub</strong>
-          <span>{{ githubDescription }}</span>
-        </div>
-      </div>
-
-      <div class="settings-integrations-panel__actions">
-        <el-button
-          v-if="githubConnection.status !== 'connected'"
-          :loading="status === 'loading'"
-          size="small"
-          type="primary"
-          @click="connectGithub"
-        >
-          Connect
-        </el-button>
-        <template v-else>
-          <span class="settings-integrations-panel__connected">Connected</span>
-          <el-button
-            size="small"
-            @click="emit('disconnect', 'github')"
+    <SettingsSection>
+      <article class="settings-integrations-panel__integration">
+        <div class="settings-integrations-panel__identity">
+          <span
+            class="settings-integrations-panel__icon"
+            aria-hidden="true"
           >
-            Disconnect
+            <GitHubIcon size="var(--icon-xl)" />
+          </span>
+          <div>
+            <strong>GitHub</strong>
+            <span>{{ githubDescription }}</span>
+          </div>
+        </div>
+
+        <div class="settings-integrations-panel__actions">
+          <el-button
+            v-if="githubConnection.status !== 'connected'"
+            :loading="status === 'loading'"
+            size="small"
+            type="primary"
+            @click="connectGithub"
+          >
+            Connect
           </el-button>
-        </template>
-      </div>
-    </article>
+          <template v-else>
+            <span class="settings-integrations-panel__connected">Connected</span>
+            <el-button
+              size="small"
+              @click="emit('disconnect', 'github')"
+            >
+              Disconnect
+            </el-button>
+          </template>
+        </div>
+      </article>
 
-    <!-- <div
-      v-if="githubConnection.status !== 'connected'"
-      class="settings-integrations-panel__config"
-    >
-      <label for="github-client-id">Client ID</label>
-      <div class="settings-integrations-panel__config-row">
-        <el-input
-          id="github-client-id"
-          v-model="clientIdInput"
-          autocomplete="off"
-          placeholder="GitHub OAuth or App client ID"
-          size="small"
-          spellcheck="false"
-        />
-        <el-button
-          :disabled="!clientIdChanged"
-          :loading="savingClientId"
-          size="small"
-          @click="saveClientId"
-        >
-          Save
-        </el-button>
-      </div>
-    </div> -->
+      <!-- <div
+        v-if="githubConnection.status !== 'connected'"
+        class="settings-integrations-panel__config"
+      >
+        <label for="github-client-id">Client ID</label>
+        <div class="settings-integrations-panel__config-row">
+          <el-input
+            id="github-client-id"
+            v-model="clientIdInput"
+            autocomplete="off"
+            placeholder="GitHub OAuth or App client ID"
+            size="small"
+            spellcheck="false"
+          />
+          <el-button
+            :disabled="!clientIdChanged"
+            :loading="savingClientId"
+            size="small"
+            @click="saveClientId"
+          >
+            Save
+          </el-button>
+        </div>
+      </div> -->
 
-    <div
-      v-if="authorization?.provider === 'github' && githubConnection.status === 'connecting'"
-      class="settings-integrations-panel__authorization"
-    >
-      <ol class="settings-integrations-panel__authorization-steps">
+      <div
+        v-if="authorization?.provider === 'github' && githubConnection.status === 'connecting'"
+        class="settings-integrations-panel__authorization"
+      >
+        <ol class="settings-integrations-panel__authorization-steps">
         <li class="settings-integrations-panel__authorization-step">
           <div class="settings-integrations-panel__authorization-step-copy">
             <div class="settings-integrations-panel__authorization-step-text">
@@ -118,8 +119,9 @@
             Waiting...
           </span>
         </li>
-      </ol>
-    </div>
+        </ol>
+      </div>
+    </SettingsSection>
 
     <p
       v-if="configurationError || error"
@@ -136,6 +138,7 @@ import type { UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, 
 import { CheckIcon, CopyIcon, GitHubIcon } from '../shared/icons/app-icons';
 import SettingsIntegrationBanner from './SettingsIntegrationBanner.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
+import SettingsSection from './SettingsSection.vue';
 
 const props = withDefaults(defineProps<{
   authorization?: WorkProviderAuthorization | null;
@@ -251,14 +254,14 @@ async function copyAuthorizationCode(): Promise<void> {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-12);
-  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-10) var(--space-12);
 }
 
 .settings-integrations-panel__identity {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: var(--space-10);
+  gap: var(--space-8);
 }
 
 .settings-integrations-panel__identity strong,
@@ -280,11 +283,11 @@ async function copyAuthorizationCode(): Promise<void> {
 }
 
 .settings-integrations-panel__icon {
-  margin-left: var(--space-8);
   width: var(--space-16);
   height: var(--space-16);
   display: flex;
   align-items: center;
+  justify-content: center;
 }
 
 .settings-integrations-panel__actions {

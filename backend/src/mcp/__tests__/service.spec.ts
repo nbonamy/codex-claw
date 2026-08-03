@@ -160,7 +160,7 @@ describe('ClawMcpService', () => {
       agentId: 'agent-jesse',
       type: 'agent.promptQueued',
       payload: expect.objectContaining({
-        text: expect.stringContaining('Message:\nRun this next.'),
+        text: expect.stringContaining('Run this next.'),
       }),
     })));
     expect(sendPrompt).not.toHaveBeenCalled();
@@ -255,6 +255,28 @@ describe('ClawMcpService', () => {
     });
     expect(stopResponse.result.structuredContent).toStrictEqual({ stopped: true });
     expect(stop).toHaveBeenCalledOnce();
+  });
+
+  it('omits Computer Use tools when the capability is disabled', async () => {
+    service = new ClawMcpService({
+      snapshot: createInitialSnapshot(),
+      computerUse: {
+        execute: vi.fn(),
+        requestAccessibility: vi.fn(),
+        status: vi.fn(),
+        stop: vi.fn(),
+      },
+      computerUseEnabled: () => false,
+    });
+    const url = await service.start();
+
+    const toolsResponse = await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 1, method: 'tools/list', params: {},
+    });
+
+    expect(toolsResponse.result.tools.map((tool: { name: string }) => tool.name)).not.toEqual(
+      expect.arrayContaining(['computer-use-status', 'computer-use-click']),
+    );
   });
 
   it('routes in-app browser inspection and debugging tools through the desktop client port', async () => {

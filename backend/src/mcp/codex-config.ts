@@ -1,16 +1,19 @@
-import type { Agent } from '@codex-claw/shared/contracts';
+import type { Agent, AppPluginSettings } from '@codex-claw/shared/contracts';
+import { defaultPluginSettings } from '@codex-claw/shared/settings';
 import type { CodexThreadStartExtension } from 'codex-app-sdk/node';
 import { codexClawDeveloperInstructions } from './agent-prompts';
 
-export function buildCodexClawMcpConfigOverrides(): string[] {
+export function buildCodexClawMcpConfigOverrides(pluginSettings: AppPluginSettings = defaultPluginSettings): string[] {
   return [
     configOverride('features.apply_patch_streaming_events', true),
+    configOverride('mcp_servers.node_repl.enabled', pluginSettings.chromeEnabled),
   ];
 }
 
 export function buildCodexClawThreadConfig(
   agent: Agent,
   mcpServerUrl: string | null,
+  pluginSettings: AppPluginSettings = defaultPluginSettings,
 ): CodexThreadStartExtension {
   if (!mcpServerUrl) {
     return {};
@@ -20,8 +23,9 @@ export function buildCodexClawThreadConfig(
     config: {
       'mcp_servers.codex_claw.url': agentScopedMcpUrl(mcpServerUrl, agent.id),
       'mcp_servers.codex_claw.default_tools_approval_mode': 'approve',
+      'mcp_servers.node_repl.enabled': pluginSettings.chromeEnabled,
     },
-    developerInstructions: codexClawDeveloperInstructions(agent),
+    developerInstructions: codexClawDeveloperInstructions(agent, pluginSettings),
   };
 }
 

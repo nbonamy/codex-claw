@@ -1,9 +1,12 @@
 <template>
   <section
     class="settings-section"
-    :aria-labelledby="titleId"
+    :aria-labelledby="title ? titleId : undefined"
   >
-    <header class="settings-section__header">
+    <header
+      v-if="title"
+      class="settings-section__header"
+    >
       <h3 :id="titleId">{{ title }}</h3>
     </header>
     <div class="settings-section__group">
@@ -14,8 +17,8 @@
 
 <script setup lang="ts">
 defineProps<{
-  title: string;
-  titleId: string;
+  title?: string;
+  titleId?: string;
 }>();
 </script>
 

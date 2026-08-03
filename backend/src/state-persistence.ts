@@ -121,7 +121,10 @@ export function persistedStateFromSnapshot(snapshot: AppSnapshot): PersistedStat
     ...(snapshot.accountRateLimits ? { accountRateLimits: { ...snapshot.accountRateLimits } } : {}),
     workBacklog: cloneWorkBacklogState(snapshot.workBacklog),
     remoteConnections: cloneRemoteConnectionsState(snapshot.remoteConnections),
-    general: { ...snapshot.general },
+    general: {
+      ...snapshot.general,
+      plugins: snapshot.general.plugins ? { ...snapshot.general.plugins } : undefined,
+    },
     sourceFolder: {
       ...snapshot.sourceFolder,
       recentRepoNames: [...snapshot.sourceFolder.recentRepoNames],

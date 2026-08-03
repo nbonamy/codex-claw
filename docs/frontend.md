@@ -127,7 +127,9 @@ implemented:
 - full-space Settings surface launched from the rail, with its own category
   sidebar and screen-level panels instead of dialog chrome; its first page
   launches `/Applications/ChatGPT.app` with Claw's isolated `CODEX_HOME` for
-  plugin, sandbox-policy, and advanced Codex configuration; Connections keeps
+  plugin, sandbox-policy, and advanced Codex configuration; Plugins keeps
+  Computer Use and Chrome disabled by default, persists explicit capability
+  choices, and directs plugin activation through ChatGPT; Connections keeps
   remote Claw hosts separate from official Codex device pairing, including
   pairing progress and paired-device revocation.
 

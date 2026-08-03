@@ -39,6 +39,7 @@ export type ClawMcpServiceOptions = {
   now?: () => Date;
   onEvent?: (event: BackendEvent) => void;
   computerUse?: ComputerUseClient;
+  computerUseEnabled?: () => boolean;
   browser?: InAppBrowserClient;
 };
 
@@ -46,6 +47,7 @@ export class ClawMcpService {
   private readonly snapshot: AppSnapshot;
   private readonly coordinator: ClawMcpAgentCoordinator;
   private readonly server: ClawMcpHttpServer;
+  private readonly computerUseEnabled: () => boolean;
   private readonly now: () => Date;
   private eventSink: ((event: BackendEvent) => void) | null = null;
   private driverRpc: BackendDriverRpc | null = null;
@@ -54,6 +56,7 @@ export class ClawMcpService {
   constructor(options: ClawMcpServiceOptions) {
     this.snapshot = options.snapshot;
     this.now = options.now ?? (() => new Date());
+    this.computerUseEnabled = options.computerUseEnabled ?? (() => true);
     this.eventSink = options.onEvent ?? null;
     this.coordinator = new ClawMcpAgentCoordinator({
       getAgents: () => this.snapshot.agents,
@@ -75,7 +78,12 @@ export class ClawMcpService {
       onCreateSourceWorktree: (input) => this.createSourceWorktree(input),
       onCreateAgent: (agent, input) => this.createAgentFromMcp(agent, input),
     });
-    this.server = new ClawMcpHttpServer({ coordinator: this.coordinator, computerUse: options.computerUse, browser: options.browser });
+    this.server = new ClawMcpHttpServer({
+      coordinator: this.coordinator,
+      computerUse: options.computerUse,
+      computerUseEnabled: this.computerUseEnabled,
+      browser: options.browser,
+    });
   }
 
   setDriverRpc(driverRpc: BackendDriverRpc): void {

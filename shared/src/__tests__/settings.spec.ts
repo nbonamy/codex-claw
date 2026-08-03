@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptySnapshot } from '../snapshot';
-import { defaultGeneralSettings, defaultThemeSettings, normalizeGeneralSettings, normalizeThemeSettings, updateSettingsInSnapshot } from '../settings';
+import { defaultGeneralSettings, defaultPluginSettings, defaultThemeSettings, normalizeGeneralSettings, normalizeThemeSettings, updateSettingsInSnapshot } from '../settings';
 
 describe('settings contracts', () => {
   it('normalizes general settings', () => {
@@ -8,10 +8,12 @@ describe('settings contracts', () => {
       codexBinaryPath: ' /opt/homebrew/bin/codex ',
       preventSleepWhenAgentsRun: false,
       agentListCompact: true,
+      plugins: defaultPluginSettings,
     })).toStrictEqual({
       codexBinaryPath: '/opt/homebrew/bin/codex',
       preventSleepWhenAgentsRun: false,
       agentListCompact: true,
+      plugins: defaultPluginSettings,
     });
 
     expect(normalizeGeneralSettings({})).toStrictEqual(defaultGeneralSettings);
@@ -68,6 +70,7 @@ describe('settings contracts', () => {
       codexBinaryPath: '',
       preventSleepWhenAgentsRun: false,
       agentListCompact: false,
+      plugins: defaultPluginSettings,
     });
     expect(snapshot.teams).toHaveLength(1);
   });
@@ -108,6 +111,19 @@ describe('settings contracts', () => {
     });
 
     expect(snapshot.sourceFolder.recentRepoNames).toStrictEqual(['one', 'two', 'three', 'four', 'five']);
+  });
+
+  it('persists plugin access settings separately from the general controls', () => {
+    const snapshot = createEmptySnapshot();
+
+    updateSettingsInSnapshot(snapshot, {
+      general: { plugins: { computerUseEnabled: true, chromeEnabled: true } },
+    });
+
+    expect(snapshot.general.plugins).toStrictEqual({
+      computerUseEnabled: true,
+      chromeEnabled: true,
+    });
   });
 
   it('updates GitHub provider settings without replacing connection state', () => {

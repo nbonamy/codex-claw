@@ -10,6 +10,8 @@ All notable Codex Claw changes are recorded here.
   read and create targets continue to open source tabs.
 - Agent workspaces retain per-turn diff tabs and fall back to the current Git
   review when a link has no usable turn context.
+- Added a Plugins settings page with opt-in Computer Use and Chrome controls,
+  ChatGPT handoff, and a catalog of common integrations.
 
 ## [0.3.1] - 2026-08-02
 
@@ -24,6 +26,11 @@ All notable Codex Claw changes are recorded here.
   documentation.
 
 ### Improvements and fixes
+
+- Computer Use MCP tools are hidden until explicitly enabled, while plugin
+  settings persist across launches and apply to new and resumed conversations.
+- Refined Plugins and Integrations settings cards, banners, spacing, and
+  dialog presentation.
 
 - Update checks now run at startup and once per hour in packaged builds.
 - Git review now includes untracked files and keeps the change statistics

@@ -42,6 +42,12 @@
           @disconnect="disconnectWorkProvider"
           @open-authorization="openWorkProviderAuthorization"
         />
+        <SettingsPluginsPanel
+          v-else-if="activeTab === 'plugins'"
+          :settings="generalSettings?.plugins"
+          :launch-chat-gpt-app="launchChatGptApp"
+          :update-settings="updateSettings"
+        />
         <SettingsConnectionsPanel
           v-else-if="activeTab === 'connections'"
           :connections="remoteConnections"
@@ -78,6 +84,7 @@ import SettingsChatGptPanel from './SettingsChatGptPanel.vue';
 import SettingsConnectionsPanel from './SettingsConnectionsPanel.vue';
 import SettingsGeneralPanel from './SettingsGeneralPanel.vue';
 import SettingsIntegrationsPanel from './SettingsIntegrationsPanel.vue';
+import SettingsPluginsPanel from './SettingsPluginsPanel.vue';
 import SettingsSidebar from './SettingsSidebar.vue';
 import type { SettingsTab } from './settings-tabs';
 

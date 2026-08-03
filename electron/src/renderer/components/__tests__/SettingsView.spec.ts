@@ -75,6 +75,32 @@ describe('SettingsView', () => {
     expect(wrapper.text()).toContain('Accessibility');
   });
 
+  it('places plugin controls before integrations and forwards ChatGPT actions', async () => {
+    const launchChatGptApp = vi.fn().mockResolvedValue(undefined);
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mount(SettingsView, {
+      props: {
+        settings: defaultThemeSettings,
+        generalSettings: defaultGeneralSettings,
+        activeTab: 'plugins',
+        launchChatGptApp,
+        updateSettings,
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    expect(wrapper.text()).toContain('Computer Use');
+    expect(wrapper.text()).toContain('Chrome');
+    const labels = wrapper.findAll('.el-menu-item').map((item) => item.text());
+    expect(labels.indexOf('Plugins')).toBeLessThan(labels.indexOf('Integrations'));
+
+    await wrapper.get('[aria-label="Enable Chrome"]').trigger('click');
+    await flushPromises();
+    await wrapper.findComponent({ name: 'ElDialog' }).vm.$emit('update:modelValue', false);
+    expect(launchChatGptApp).not.toHaveBeenCalled();
+    expect(updateSettings).not.toHaveBeenCalled();
+  });
+
   it('renders the connections tab and forwards SSH actions', async () => {
     const listSshHosts = vi.fn().mockResolvedValue([]);
     const addSshConnection = vi.fn().mockResolvedValue(undefined);

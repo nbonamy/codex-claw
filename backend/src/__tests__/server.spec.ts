@@ -4720,6 +4720,10 @@ function createTestSnapshot(): AppSnapshot {
       preventSleepWhenAgentsRun: true,
       codexBinaryPath: '',
       agentListCompact: false,
+      plugins: {
+        computerUseEnabled: false,
+        chromeEnabled: false,
+      },
     },
     sourceFolder: {
       path: '',
