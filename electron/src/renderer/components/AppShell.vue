@@ -693,6 +693,9 @@ const currentTurnPlan = computed<ThreadPlan | null>(() => {
   if (!plan?.steps.length) {
     return null;
   }
+  if (props.isConversationLoading && props.messages.length === 0) {
+    return null;
+  }
 
   let latestTurnId: string | undefined;
   for (let index = props.messages.length - 1; index >= 0; index -= 1) {

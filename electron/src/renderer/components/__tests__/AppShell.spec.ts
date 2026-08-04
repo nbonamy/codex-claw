@@ -160,6 +160,51 @@ describe('AppShell', () => {
     expect(wrapper.findComponent({ name: 'ConversationPane' }).props('plan')).toStrictEqual(plan);
   });
 
+  it('does not flash a persisted plan while conversation history hydrates', async () => {
+    const snapshot = createInitialSnapshot();
+    const activeAgent = snapshot.agents[0];
+    if (!activeAgent) throw new Error('Expected seeded agent.');
+    activeAgent.backendSession = { kind: 'codex', threadId: 'thread-persisted' };
+    activeAgent.plan = {
+      threadId: 'thread-persisted',
+      turnId: 'turn-old-plan',
+      explanation: 'Old execution plan',
+      steps: [{ step: 'Old completed work', status: 'completed' }],
+      markdown: 'Old execution plan\n- [x] Old completed work',
+      updatedAt: '2026-08-01T00:00:00.000Z',
+    };
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent,
+        messages: [],
+        isLoading: false,
+        isConversationLoading: true,
+        isSending: false,
+      },
+      global: { plugins: [ElementPlus, i18n] },
+    });
+
+    expect(wrapper.findComponent({ name: 'ConversationPane' }).props('plan')).toBeNull();
+    expect(wrapper.find('.conversation-plan').exists()).toBe(false);
+
+    await wrapper.setProps({
+      isConversationLoading: false,
+      messages: [{
+        id: 'assistant-newer-turn',
+        agentId: activeAgent.id,
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'turn-newer',
+        parts: [{ type: 'text', text: 'Newer work completed.' }],
+        createdAt: '2026-08-02T00:00:00.000Z',
+      }],
+    } as Record<string, unknown>);
+
+    expect(wrapper.findComponent({ name: 'ConversationPane' }).props('plan')).toBeNull();
+    expect(wrapper.find('.conversation-plan').exists()).toBe(false);
+  });
+
   it('forwards prompts from the composer', async () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mount(AppShell, {

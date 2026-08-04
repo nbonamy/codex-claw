@@ -12,6 +12,8 @@ All notable Codex Claw changes are recorded here.
   agent's context.
 - Conversations now preserve submitted `/review` commands and open external
   links correctly, while Git status is analyzed when an agent is first shown.
+- Restored conversations no longer briefly show a stale execution plan while
+  their message history is loading.
 
 ## [0.4.0] - 2026-08-03
 
