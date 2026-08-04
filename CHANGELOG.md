@@ -4,6 +4,11 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+### Improvements and fixes
+
+- Dialog close buttons now sit closer to the top-right corner, and dialogs
+  without footers keep their rounded bottom corners.
+
 ## [0.5.0] - 2026-08-04
 
 ### New features
