@@ -151,6 +151,38 @@ describe('AgentSidebar', () => {
     expect(wrapper.find('.agent-sidebar__folder').exists()).toBe(false);
   });
 
+  it('replaces the first nine status dots with Command-number shortcuts', () => {
+    const manyAgents = Array.from({ length: 10 }, (_, index): Agent => ({
+      ...agents[0]!,
+      id: `agent-${index + 1}`,
+      name: `Agent ${index + 1}`,
+    }));
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: manyAgents,
+        activeAgentId: manyAgents[0]!.id,
+        quickSwitchShortcutsVisible: true,
+        teamName: 'Codex Claw',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    expect(wrapper.findAll('.agent-sidebar__quick-switch-shortcut').map((shortcut) => shortcut.text()))
+      .toStrictEqual(['⌘1', '⌘2', '⌘3', '⌘4', '⌘5', '⌘6', '⌘7', '⌘8', '⌘9']);
+    expect(wrapper.findAll('.agent-sidebar__status')).toHaveLength(1);
+
+    const hiddenWrapper = mount(AgentSidebar, {
+      props: {
+        agents: manyAgents,
+        activeAgentId: manyAgents[0]!.id,
+        teamName: 'Codex Claw',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+    expect(hiddenWrapper.find('.agent-sidebar__quick-switch-shortcut').exists()).toBe(false);
+    expect(hiddenWrapper.findAll('.agent-sidebar__status')).toHaveLength(10);
+  });
+
   it('emits agent selection from agent rows', async () => {
     const wrapper = mount(AgentSidebar, {
       props: {

@@ -123,7 +123,9 @@ implemented:
   exists; manually closing the last tab collapses the workspace. Review uses
   `Command+G` and Browser uses `Command+B`, while existing `Command+D`
   duplicate-agent and `Command+R` restart-agent shortcuts remain unchanged;
-  `Command+K` submits `/compact` for the active agent;
+  `Command+K` submits `/compact` for the active agent. Holding Command briefly
+  replaces the first nine agents' activity dots with `Command+1` through
+  `Command+9` hints; pressing the matching number switches agents;
 - focused artifact panes for documents, plans, and read-only source previews;
 - Bench entry point in the agent creation flow;
 - repository-first agent creation that keeps Codex implicit, puts custom folder

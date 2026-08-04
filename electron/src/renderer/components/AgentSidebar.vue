@@ -19,7 +19,7 @@
 
     <nav class="agent-sidebar__list">
       <button
-        v-for="agent in agents"
+        v-for="(agent, index) in agents"
         :key="agent.id"
         class="agent-sidebar__agent"
         :class="[
@@ -51,6 +51,12 @@
           </template>
         </span>
         <span
+          v-if="quickSwitchShortcutsVisible && index < 9"
+          class="agent-sidebar__quick-switch-shortcut"
+          :aria-label="`Switch to ${agent.name} with Command ${index + 1}`"
+        ><span aria-hidden="true">⌘</span>{{ index + 1 }}</span>
+        <span
+          v-else
           class="agent-sidebar__status"
           :data-status="agent.status.type"
           :aria-label="agentStatusLabel(agent.status.type)"
@@ -129,6 +135,7 @@ const props = defineProps<{
   width?: number;
   minWidth?: number;
   maxWidth?: number;
+  quickSwitchShortcutsVisible?: boolean;
   listConversations?: (agentId: string) => Promise<ConversationSummary[]>;
   resumeConversation?: (agentId: string, ref: BackendConversationRef) => Promise<void>;
 }>();
@@ -481,6 +488,24 @@ function onResizePointerEnd(event: PointerEvent): void {
 
 .agent-sidebar__status[data-status='error'] {
   background: var(--color-error);
+}
+
+.agent-sidebar__quick-switch-shortcut {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 28px;
+  height: var(--line-height-18);
+  margin-left: -16px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  color: var(--color-text-muted);
+  background: var(--color-surface-base);
+  font-size: var(--font-size-11);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-18);
+  white-space: nowrap;
 }
 
 .agent-sidebar--compact {

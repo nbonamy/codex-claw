@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import type { Agent, RendererMessage } from '@codex-claw/shared/contracts';
-import { AgentTranscriptRetention } from '../agent-transcript-retention';
+import {
+  AgentTranscriptRetention,
+  DEFAULT_AGENT_TRANSCRIPT_TTL_MS,
+} from '../agent-transcript-retention';
 
 describe('AgentTranscriptRetention', () => {
-  it('evicts after the latest activity', async () => {
+  it('evicts after the default 15-minute ttl from the latest activity', async () => {
     let now = 0;
     const snapshot = createEmptySnapshot();
     snapshot.agents = [agent('active'), agent('background')];
@@ -14,16 +17,15 @@ describe('AgentTranscriptRetention', () => {
     const retention = new AgentTranscriptRetention({
       snapshot,
       onEvicted,
-      ttlMs: 300,
       sweepIntervalMs: null,
       now: () => now,
     });
 
     retention.touch('background', 120);
     retention.touch('background', 110);
-    now = 419;
+    now = 120 + DEFAULT_AGENT_TRANSCRIPT_TTL_MS - 1;
     await expect(retention.sweep()).resolves.toStrictEqual([]);
-    now = 420;
+    now = 120 + DEFAULT_AGENT_TRANSCRIPT_TTL_MS;
     await expect(retention.sweep()).resolves.toStrictEqual(['background']);
 
     expect(snapshot.messages.every((message) => message.agentId === 'active')).toBe(true);

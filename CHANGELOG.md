@@ -10,6 +10,10 @@ All notable Codex Claw changes are recorded here.
   connection, pairing, and device controls in Settings.
 - Added keyboard shortcuts for opening Settings and compacting the active
   agent's context.
+- Holding Command now reveals numbered shortcuts for the first nine agents in
+  the active team, and Command+1 through Command+9 switches directly to them.
+- Inactive agent transcripts now remain warm for 15 minutes before they are
+  eligible for eviction.
 - Conversations now preserve submitted `/review` commands and open external
   links correctly, while Git status is analyzed when an agent is first shown.
 - Restored conversations no longer briefly show a stale execution plan while

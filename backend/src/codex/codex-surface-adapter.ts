@@ -43,7 +43,7 @@ import type {
 
 type AdapterListener = (event: BackendEvent) => void;
 
-const AGENT_HISTORY_CACHE_TTL_MS = 5 * 60 * 1_000;
+const AGENT_HISTORY_CACHE_TTL_MS = 15 * 60 * 1_000;
 
 type AgentConversation = {
   agent: Agent;

@@ -2526,6 +2526,46 @@ describe('AppShell', () => {
     expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-jesse'], ['agent-dina']]);
   });
 
+  it('reveals delayed Command-number hints and switches to the numbered agent', async () => {
+    vi.useFakeTimers();
+    const wrapper = mountShell();
+    try {
+      expect(wrapper.find('.agent-sidebar__quick-switch-shortcut').exists()).toBe(false);
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta', metaKey: true }));
+      await nextTick();
+      expect(wrapper.find('.agent-sidebar__quick-switch-shortcut').exists()).toBe(false);
+
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Meta' }));
+      vi.advanceTimersByTime(350);
+      await nextTick();
+      expect(wrapper.find('.agent-sidebar__quick-switch-shortcut').exists()).toBe(false);
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta', metaKey: true }));
+      vi.advanceTimersByTime(350);
+      await nextTick();
+      expect(wrapper.findAll('.agent-sidebar__quick-switch-shortcut').map((shortcut) => shortcut.text()))
+        .toStrictEqual(['⌘1', '⌘2']);
+
+      const switchEvent = new KeyboardEvent('keydown', {
+        key: '2',
+        metaKey: true,
+        cancelable: true,
+      });
+      window.dispatchEvent(switchEvent);
+      expect(switchEvent.defaultPrevented).toBe(true);
+      expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-jesse']]);
+
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Meta' }));
+      await nextTick();
+      expect(wrapper.find('.agent-sidebar__quick-switch-shortcut').exists()).toBe(false);
+      expect(wrapper.findAll('.agent-sidebar__status')).toHaveLength(2);
+    } finally {
+      wrapper.unmount();
+      vi.useRealTimers();
+    }
+  });
+
   it('handles active app commands from the main-process menu channel', async () => {
     vi.stubGlobal('ResizeObserver', class {
       observe() {}

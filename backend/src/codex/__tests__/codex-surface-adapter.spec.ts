@@ -817,7 +817,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     expect(events.some((event) => event.type === 'thread.historyLoaded')).toBe(false);
   });
 
-  it('revalidates an idle cached transcript after its freshness ttl', async () => {
+  it('revalidates an idle cached transcript after its 15-minute freshness ttl', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     try {
       vi.setSystemTime(new Date('2026-08-01T00:00:00.000Z'));
@@ -828,6 +828,14 @@ describe('CodexSurfaceAgentAdapter', () => {
       await adapter.hydrateAgent(agentA);
       events.length = 0;
       vi.setSystemTime(new Date('2026-08-01T00:05:00.001Z'));
+
+      await adapter.hydrateAgent(agentA);
+
+      expect(transport.sent.filter((message) => (
+        'method' in message && message.method === 'thread/resume'
+      ))).toHaveLength(1);
+
+      vi.setSystemTime(new Date('2026-08-01T00:15:00.001Z'));
 
       await adapter.hydrateAgent(agentA);
 

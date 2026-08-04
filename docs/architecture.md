@@ -803,7 +803,7 @@ hydration may add previously unknown turns but never rewrites a turn already in
 Claw memory. Git status and agent-specific catalogs still reconcile in the
 background. Selection requests carry a monotonic renderer token so a stale
 response from a rapid earlier switch cannot replace the current agent.
-Live agent transcripts remain cached in `clawd` for five minutes after the
+Live agent transcripts remain cached in `clawd` for fifteen minutes after the
 latest selection or backend activity. The SDK supplies the optional generic TTL
 cache, activity clock, and sweep lifecycle; Claw supplies the agent policy. Claw
 only evicts an inactive, idle transcript with no queued prompt or pending

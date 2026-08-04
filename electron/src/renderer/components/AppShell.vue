@@ -48,6 +48,7 @@
         :min-width="agentSidebarMinWidth"
         :max-width="agentSidebarMaxWidth"
         :list-conversations="listAgentConversations"
+        :quick-switch-shortcuts-visible="quickAgentShortcutsVisible"
         :resume-conversation="resumeAgentConversation"
         @collapse-sidebar="agentSidebarCollapsed = true"
         @close-agent="$emit('close-agent', $event)"
@@ -606,6 +607,7 @@ const agentSidebarWidth = ref(260);
 const activeSurface = ref<AppSurface>('agent');
 const rightWorkspaces = reactive<Record<string, AgentRightWorkspaceState>>({});
 const executionPlanStates = reactive<Record<string, { open: boolean; turnId: string }>>({});
+const quickAgentShortcutsVisible = ref(false);
 const debugApproval = ref<{ agentId: string; request: BackendApprovalRequest } | null>(null);
 const workspaceBody = ref<HTMLElement | null>(null);
 const conversationPane = ref<{ focusComposer(): void } | null>(null);
@@ -630,6 +632,9 @@ const editingTeamId = ref<string | null>(null);
 let filePreviewRequestId = 0;
 let markdownPreviewId = 0;
 let unsubscribeAppCommand: (() => void) | null = null;
+let quickAgentShortcutTimer: ReturnType<typeof setTimeout> | null = null;
+let commandKeyHeld = false;
+const quickAgentShortcutDelayMs = 350;
 const activeTeam = computed<Team | null>(() => {
   const selectedTeam = props.snapshot.activeTeamId
     ? props.snapshot.teams.find((team) => team.id === props.snapshot.activeTeamId) ?? null
@@ -949,6 +954,8 @@ function isPlanPreviewUpdatingFor(agentId: string): boolean {
 onMounted(() => {
   if (typeof window.addEventListener === 'function') {
     window.addEventListener('keydown', handleShellShortcut);
+    window.addEventListener('keyup', handleShellKeyup);
+    window.addEventListener('blur', resetQuickAgentShortcuts);
   }
   unsubscribeAppCommand = window.codexClaw?.onAppCommand?.(handleAppCommand) ?? null;
   void loadAuthentication();
@@ -957,7 +964,10 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (typeof window.removeEventListener === 'function') {
     window.removeEventListener('keydown', handleShellShortcut);
+    window.removeEventListener('keyup', handleShellKeyup);
+    window.removeEventListener('blur', resetQuickAgentShortcuts);
   }
+  resetQuickAgentShortcuts();
   unsubscribeAppCommand?.();
   unsubscribeAppCommand = null;
   stopAuthenticationPolling();
@@ -1682,6 +1692,20 @@ function handleShellShortcut(event: KeyboardEvent): void {
     return;
   }
 
+  if (event.key === 'Meta') {
+    startQuickAgentShortcutReveal(event);
+    return;
+  }
+
+  if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && /^[1-9]$/.test(event.key)) {
+    const agent = activeTeamAgents.value[Number(event.key) - 1];
+    if (agent) {
+      event.preventDefault();
+      selectAgentFromShell(agent.id);
+    }
+    return;
+  }
+
   if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'g' && currentAgent.value) {
     event.preventDefault();
     void openAgentGitDiffPreview();
@@ -1719,6 +1743,34 @@ function handleShellShortcut(event: KeyboardEvent): void {
 
   if (event.ctrlKey && !event.metaKey && !event.altKey && event.key === 'Tab') {
     cycleAgents(event.shiftKey ? -1 : 1, event);
+  }
+}
+
+function startQuickAgentShortcutReveal(event: KeyboardEvent): void {
+  commandKeyHeld = true;
+  if (event.repeat || quickAgentShortcutTimer || quickAgentShortcutsVisible.value) {
+    return;
+  }
+  quickAgentShortcutTimer = setTimeout(() => {
+    quickAgentShortcutTimer = null;
+    if (commandKeyHeld && !showLoginLanding.value && !isModalDialogVisible.value && isAgentWorkspaceVisible.value) {
+      quickAgentShortcutsVisible.value = true;
+    }
+  }, quickAgentShortcutDelayMs);
+}
+
+function handleShellKeyup(event: KeyboardEvent): void {
+  if (event.key === 'Meta' || !event.metaKey) {
+    resetQuickAgentShortcuts();
+  }
+}
+
+function resetQuickAgentShortcuts(): void {
+  commandKeyHeld = false;
+  quickAgentShortcutsVisible.value = false;
+  if (quickAgentShortcutTimer) {
+    clearTimeout(quickAgentShortcutTimer);
+    quickAgentShortcutTimer = null;
   }
 }
 
