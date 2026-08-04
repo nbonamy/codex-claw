@@ -33,6 +33,7 @@ type PendingBrowserOpen = {
 
 export class AppController {
   private mainWindow: BrowserWindow | null = null;
+  /** Main retains product metadata only; full transcripts are transient IPC values. */
   private snapshot: AppSnapshot | null = null;
   private clientState: ClientState = createEmptyClientState();
   private backendClientEventUnsubscribe: (() => void) | null = null;
@@ -41,7 +42,8 @@ export class AppController {
   private lastBackendEventSeq = 0;
   private clientEventSeq = 0;
   private backendEventBuffer: ClawBackendEvent[] | null = null;
-  private backendSynchronization: Promise<void> | null = null;
+  private backendSynchronization: Promise<AppSnapshot> | null = null;
+  private readonly transientSnapshots = new Set<AppSnapshot>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempt = 0;
   private shuttingDown = false;
@@ -67,7 +69,7 @@ export class AppController {
     private readonly startupMaintenance: StartupMaintenance = async () => undefined,
     private readonly openExternal: (url: string) => Promise<unknown> = (url) => shell.openExternal(url),
   ) {
-    this.snapshot = initialSnapshot;
+    this.snapshot = initialSnapshot ? metadataOnlySnapshot(initialSnapshot) : null;
     this.backendClient = backendClient ?? createRuntimeClawBackendClient({
       browserOpen: (agentId, browserId, url) => this.requestBrowserOpen(agentId, browserId, url),
       browserExecute: (agentId, browserId, command, arguments_) => this.browserPane.execute(agentId, browserId, command, arguments_),
@@ -817,9 +819,14 @@ export class AppController {
   }
 
   private async adoptBackendSnapshot(snapshot: AppSnapshot): Promise<AppSnapshot> {
-    this.snapshot = snapshot;
-    await this.refreshClientStateFromBackend();
-    return this.snapshot;
+    this.snapshot = metadataOnlySnapshot(snapshot);
+    this.transientSnapshots.add(snapshot);
+    try {
+      await this.refreshClientStateFromBackend();
+      return snapshot;
+    } finally {
+      this.transientSnapshots.delete(snapshot);
+    }
   }
 
   private async adoptBackendMetadata(metadata: AppSnapshotMetadata): Promise<AppSnapshotMetadata> {
@@ -830,10 +837,11 @@ export class AppController {
   }
 
   private async getSnapshot(): Promise<AppSnapshot> {
-    if (!this.snapshot) {
-      throw new Error('clawd snapshot is not available.');
+    if (this.backendClient && this.connectionState.status === 'connected') {
+      return this.synchronizeBackendState();
     }
-    return this.snapshot;
+    if (this.snapshot) return this.snapshot;
+    throw new Error('clawd snapshot is not available.');
   }
 
   private async getSnapshotState(): Promise<RendererSnapshotState> {
@@ -1085,7 +1093,7 @@ export class AppController {
     return this.requireBackendClient().request(backendMethods.systemPermissionsAccessibilityOpen);
   }
 
-  private synchronizeBackendState(): Promise<void> {
+  private synchronizeBackendState(): Promise<AppSnapshot> {
     if (this.backendSynchronization) return this.backendSynchronization;
     this.backendSynchronization = this.performBackendSynchronization()
       .catch((error) => {
@@ -1098,13 +1106,14 @@ export class AppController {
     return this.backendSynchronization;
   }
 
-  private async performBackendSynchronization(): Promise<void> {
+  private async performBackendSynchronization(): Promise<AppSnapshot> {
     this.backendEventBuffer ??= [];
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const backendState = await this.requireBackendClient().request<unknown>(backendMethods.snapshotGet);
       if (!isClawSnapshotGetResult(backendState)) throw new Error('clawd returned an invalid snapshot.');
 
-      this.snapshot = backendState.snapshot;
+      let synchronizedSnapshot = backendState.snapshot;
+      this.snapshot = metadataOnlySnapshot(synchronizedSnapshot);
       this.clientState = backendState.clientState;
       this.lastBackendEventSeq = backendState.lastEventSeq;
       const buffered = this.backendEventBuffer;
@@ -1116,12 +1125,15 @@ export class AppController {
           gap = true;
           break;
         }
+        const rendererEvent = eventForRenderer(event);
+        if (isAppSnapshot(event.snapshot)) synchronizedSnapshot = event.snapshot;
+        else applyMainEventToSnapshot(synchronizedSnapshot, rendererEvent);
         this.applyBackendEvent(event, true);
       }
       if (!gap) {
         this.backendEventBuffer = null;
         this.syncPowerSaveBlocker();
-        return;
+        return synchronizedSnapshot;
       }
       warnMain('clawd', 'backend event gap detected while synchronizing', {
         attempt: attempt + 1,
@@ -1252,7 +1264,7 @@ export class AppController {
       });
       this.backendEventBuffer = [event];
       void this.synchronizeBackendState()
-        .then(() => this.emitSnapshotToRenderer())
+        .then((snapshot) => this.emitSnapshotToRenderer(snapshot))
         .catch((error) => this.handleBackendDisconnect(error instanceof Error ? error : new Error(String(error))));
       return;
     }
@@ -1261,10 +1273,15 @@ export class AppController {
 
   private applyBackendEvent(event: ClawBackendEvent, notifyRenderer: boolean): void {
     const rendererEvent = eventForRenderer(event);
+    for (const snapshot of this.transientSnapshots) {
+      if (isAppSnapshot(event.snapshot)) overwriteAppSnapshot(snapshot, event.snapshot);
+      else applyMainEventToSnapshot(snapshot, rendererEvent);
+    }
     if (isAppSnapshot(event.snapshot)) {
-      this.snapshot = event.snapshot;
+      this.snapshot = metadataOnlySnapshot(event.snapshot);
     } else if (this.snapshot) {
       applyMainEventToSnapshot(this.snapshot, rendererEvent);
+      this.snapshot.messages = [];
     }
     if (isClientState(event.clientState)) {
       this.clientState = event.clientState;
@@ -1302,10 +1319,10 @@ export class AppController {
     try {
       await this.backendClient.start();
       const health = await this.backendClient.health();
-      await this.synchronizeBackendState();
+      const snapshot = await this.synchronizeBackendState();
       this.reconnectAttempt = 0;
       this.setConnectionState({ status: 'connected' });
-      this.emitSnapshotToRenderer();
+      this.emitSnapshotToRenderer(snapshot);
       logMain('clawd', 'reconnected to backend', { version: health.version, pid: health.pid });
     } catch (error) {
       this.reconnectAttempt += 1;
@@ -1323,8 +1340,12 @@ export class AppController {
     this.emitClientEvent('client.connectionChanged', state);
   }
 
-  private emitSnapshotToRenderer(): void {
-    if (this.snapshot) this.emitClientEvent('snapshot.updated', snapshotMetadata(this.snapshot));
+  private emitSnapshotToRenderer(snapshot?: AppSnapshot): void {
+    if (snapshot) {
+      this.emitClientEvent('snapshot.updated', snapshotMetadata(snapshot), snapshot);
+    } else if (this.snapshot) {
+      this.emitClientEvent('snapshot.updated', snapshotMetadata(this.snapshot));
+    }
   }
 
   private emitClientEvent(type: MainToRendererEvent['type'], payload: unknown, snapshot?: AppSnapshot): void {
@@ -1440,6 +1461,18 @@ function createEmptyClientState(): ClientState {
     sourceFolderPath: '',
     shouldPreventDisplaySleep: false,
   };
+}
+
+function metadataOnlySnapshot(snapshot: AppSnapshot): AppSnapshot {
+  return { ...snapshot, messages: [] };
+}
+
+function overwriteAppSnapshot(target: AppSnapshot, source: AppSnapshot): void {
+  const mutableTarget = target as unknown as Record<string, unknown>;
+  for (const key of Object.keys(mutableTarget)) {
+    if (!(key in source)) delete mutableTarget[key];
+  }
+  Object.assign(target, source);
 }
 
 function isRemoteLoopLocation(location: LoopLocation | undefined): location is Extract<LoopLocation, { kind: 'remote' }> {

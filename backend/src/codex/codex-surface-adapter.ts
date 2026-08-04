@@ -255,6 +255,7 @@ export class CodexSurfaceAgentAdapter {
       this.agentIdsByThreadId.delete(session.handle.id);
     }
     this.removePendingOwners(session);
+    this.surface.forgetConversation(session.handle.id);
   }
 
   async rollbackToTurn(agent: Agent, turnId: string) {
@@ -470,7 +471,10 @@ export class CodexSurfaceAgentAdapter {
   ): void {
     this.emitThread(session, { type: 'thread.started', payload: { cwd: conversationCwd(snapshot) } });
     if (emitHistory) {
-      this.emitHistory(session, snapshot.messages, undefined, snapshot.activeTurnId === null, preserveKnownTurns);
+      this.emitHistory(session, snapshot.messages, undefined, {
+        completeStreaming: snapshot.activeTurnId === null,
+        preserveKnownTurns,
+      });
     }
     this.emitSettings(
       session,
@@ -539,7 +543,10 @@ export class CodexSurfaceAgentAdapter {
         return;
       case 'conversation.historyReplaced':
         if (event.origin === 'action') return;
-        this.emitHistory(session, event.payload.messages, event.occurredAt, false, true);
+        this.emitHistory(session, event.payload.messages, event.occurredAt, { preserveKnownTurns: true });
+        return;
+      case 'conversation.historyPrepended':
+        this.emitHistory(session, event.payload.messages, event.occurredAt, { preserveKnownMessages: true });
         return;
       case 'conversation.activityChanged':
         this.emitStatus(session, statusFromSnapshot(session.handle.getSnapshot()), event.occurredAt);
@@ -612,9 +619,16 @@ export class CodexSurfaceAgentAdapter {
           ...metadata,
         });
         return;
-      case 'message.updated':
-        this.emitHistory(session, session.handle.getSnapshot().messages, event.occurredAt);
+      case 'message.updated': {
+        const [message] = surfaceMessages([event.payload.message], session.agent.id);
+        if (!message) return;
+        this.emitThread(session, {
+          type: 'message.updated', turnId: event.turnId,
+          payload: { message },
+          ...metadata,
+        });
         return;
+      }
       case 'tool.started':
         this.emitThread(session, {
           type: 'item.started', turnId: event.turnId,
@@ -758,15 +772,20 @@ export class CodexSurfaceAgentAdapter {
     session: AgentConversation,
     messages: readonly SurfaceMessage[],
     occurredAt?: string,
-    completeStreaming = false,
-    preserveKnownTurns = false,
+    options: {
+      completeStreaming?: boolean;
+      preserveKnownMessages?: boolean;
+      preserveKnownTurns?: boolean;
+    } = {},
   ): void {
+    const preserveHistory = options.preserveKnownMessages || options.preserveKnownTurns;
     this.emitThread(session, {
       type: 'thread.historyLoaded',
       payload: {
-        messages: surfaceMessages(messages, session.agent.id, completeStreaming),
-        replace: !preserveKnownTurns,
-        ...(preserveKnownTurns ? { preserveKnownTurns: true } : {}),
+        messages: surfaceMessages(messages, session.agent.id, options.completeStreaming),
+        replace: !preserveHistory,
+        ...(options.preserveKnownTurns ? { preserveKnownTurns: true } : {}),
+        ...(options.preserveKnownMessages ? { preserveKnownMessages: true } : {}),
       },
       ...(occurredAt ? { occurredAt } : {}),
     });

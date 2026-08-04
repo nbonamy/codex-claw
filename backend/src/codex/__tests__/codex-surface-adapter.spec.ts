@@ -542,12 +542,12 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
 
     await vi.waitFor(() => {
-      const history = [...events].reverse().find((event) => event.type === 'thread.historyLoaded');
-      expect(history).toMatchObject({
+      const update = [...events].reverse().find((event) => event.type === 'message.updated');
+      expect(update).toMatchObject({
         agentId: 'agent-a',
         threadId: 'thread-a',
         payload: {
-          messages: [expect.objectContaining({
+          message: expect.objectContaining({
             parts: [
               expect.objectContaining({
                 type: 'tool', id: 'image-live', status: 'completed',
@@ -564,7 +564,7 @@ describe('CodexSurfaceAgentAdapter', () => {
                 },
               },
             ],
-          })],
+          }),
         },
       });
     });
@@ -705,7 +705,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
   });
 
-  it('publishes the initial five full turns before merging unknown background history', async () => {
+  it('publishes the initial five full turns before prepending background history incrementally', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     transport.turnsListDelayMs = 25;
@@ -734,20 +734,28 @@ describe('CodexSurfaceAgentAdapter', () => {
       const historyEvents = events.filter((event) => event.type === 'thread.historyLoaded');
       expect(historyEvents).toHaveLength(2);
       expect(historyEvents[1]).toMatchObject({
-        payload: { preserveKnownTurns: true, replace: false },
+        payload: {
+          preserveKnownMessages: true,
+          replace: false,
+          messages: [
+            expect.objectContaining({ parts: [{ type: 'text', text: 'Message 1', itemId: 'message-1' }] }),
+          ],
+        },
       });
-      expect((historyEvents[1]?.payload as { messages: unknown[] }).messages).toHaveLength(6);
+      expect((historyEvents[1]?.payload as { messages: unknown[] }).messages).toHaveLength(1);
     });
   });
 
   it('suppresses server-owned action echoes while keeping hydrate and explicit resume ownership exact', async () => {
-    const { adapter, transport } = createAdapter();
+    const { adapter, surface, transport } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
 
     await adapter.resumeConversation(agentA, 'thread-a');
     expect(events.filter((event) => event.type === 'thread.historyLoaded')).toHaveLength(0);
+    const cachedHandle = surface.conversation('thread-a');
     adapter.forgetAgentSession(agentA.id);
+    expect(surface.conversation('thread-a')).not.toBe(cachedHandle);
     events.length = 0;
 
     await adapter.hydrateAgent(agentA);
@@ -857,13 +865,13 @@ const agentA = createAgent('agent-a', 'thread-a', '/workspace/a');
 const agentB = createAgent('agent-b', 'thread-b', '/workspace/b');
 const generatedPngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
-function createAdapter(): { adapter: CodexSurfaceAgentAdapter; transport: FakeTransport } {
+function createAdapter(): { adapter: CodexSurfaceAgentAdapter; surface: CodexSurface; transport: FakeTransport } {
   const transport = new FakeTransport();
   const surface = new CodexSurface({
     autoSelectFirstConversation: false,
     client: new CodexAppServerClient(transport),
   });
-  return { adapter: new CodexSurfaceAgentAdapter(surface), transport };
+  return { adapter: new CodexSurfaceAgentAdapter(surface), surface, transport };
 }
 
 function createAgent(id: string, threadId: string, folder: string): Agent {

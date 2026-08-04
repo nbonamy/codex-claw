@@ -9,7 +9,7 @@ import {
   updateAgentFromInput,
   updateAgentFolder,
 } from '../snapshot';
-import type { RendererToolPart, RendererToolPartUpdate } from '../contracts';
+import type { RendererMessage, RendererToolPart, RendererToolPartUpdate } from '../contracts';
 import { toolOutputText } from '../tool-output';
 
 describe('snapshot reducer', () => {
@@ -321,6 +321,79 @@ describe('snapshot reducer', () => {
 
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'idle' });
     expect(snapshot.messages.at(-1)?.status).toBe('complete');
+  });
+
+  it('updates one message without replacing the progressively hydrated transcript', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.messages.push(
+      {
+        id: 'history-older', agentId: 'agent-dina', role: 'assistant', status: 'complete',
+        createdAt: '2026-06-05T00:00:00.000Z', parts: [{ type: 'text', text: 'Older history' }],
+      },
+      {
+        id: 'assistant-turn-1', agentId: 'agent-dina', role: 'assistant', status: 'streaming',
+        turnId: 'turn-1', createdAt: '2026-06-05T00:00:01.000Z', parts: [{ type: 'text', text: 'Draft' }],
+      },
+    );
+    const transcript = snapshot.messages;
+    const olderMessage = snapshot.messages[0];
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'message.updated',
+      payload: {
+        message: {
+          id: 'assistant-turn-1', agentId: 'agent-dina', role: 'assistant', status: 'streaming',
+          turnId: 'turn-1', createdAt: '2026-06-05T00:00:01.000Z',
+          parts: [{ type: 'text', text: 'Rewritten response' }],
+        },
+      },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(snapshot.messages).toBe(transcript);
+    expect(snapshot.messages[0]).toBe(olderMessage);
+    expect(snapshot.messages).toHaveLength(2);
+    expect(snapshot.messages[1]).toMatchObject({
+      id: 'assistant-turn-1',
+      parts: [{ type: 'text', text: 'Rewritten response' }],
+    });
+  });
+
+  it('retains every message when progressive batches split one turn', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.messages.push({
+      id: 'current', agentId: 'agent-dina', role: 'assistant', status: 'complete',
+      turnId: 'turn-current', createdAt: '2026-06-05T00:00:05.000Z',
+      parts: [{ type: 'text', text: 'Current history' }],
+    });
+    const transcript = snapshot.messages;
+    const historyMessage = (id: string, createdAt: string): RendererMessage => ({
+      id, agentId: 'agent-dina', role: 'assistant', status: 'complete',
+      turnId: 'turn-split', createdAt, parts: [{ type: 'text', text: id }],
+    });
+
+    for (const [seq, messages] of [
+      [1, [historyMessage('split-3', '2026-06-05T00:00:03.000Z'), historyMessage('split-4', '2026-06-05T00:00:04.000Z')]],
+      [2, [historyMessage('split-1', '2026-06-05T00:00:01.000Z'), historyMessage('split-2', '2026-06-05T00:00:02.000Z')]],
+    ] as const) {
+      applyMainEventToSnapshot(snapshot, {
+        seq,
+        agentId: 'agent-dina',
+        threadId: 'thread-1',
+        type: 'thread.historyLoaded',
+        payload: { messages, preserveKnownMessages: true, replace: false },
+        occurredAt: '2026-06-05T00:00:06.000Z',
+      });
+    }
+
+    expect(snapshot.messages).toBe(transcript);
+    expect(snapshot.messages.map((message) => message.id)).toStrictEqual([
+      'split-1', 'split-2', 'split-3', 'split-4', 'current',
+    ]);
   });
 
   it('inserts steer prompts at the streaming point and resumes assistant output in a new segment', () => {
@@ -867,6 +940,7 @@ describe('snapshot reducer', () => {
       payload: { prompt: 'Keep going with the focused test.' },
       occurredAt: '2026-06-05T00:00:04.000Z',
     });
+    const messages = snapshot.messages;
 
     applyMainEventToSnapshot(snapshot, {
       seq: 3,
@@ -900,6 +974,7 @@ describe('snapshot reducer', () => {
       occurredAt: '2026-06-05T00:00:05.000Z',
     });
 
+    expect(snapshot.messages).toBe(messages);
     expect(snapshot.messages.map((message) => message.id)).toStrictEqual([
       'assistant-turn-old',
       'assistant-turn-live',

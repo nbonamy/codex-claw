@@ -1000,6 +1000,7 @@ export type MainToRendererEvent = {
     | 'sidePanel.markdownRequested'
     | 'sidePanel.gitDiffRequested'
     | 'message.delta'
+    | 'message.updated'
     | 'item.started'
     | 'item.updated'
     | 'item.completed'

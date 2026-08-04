@@ -354,7 +354,12 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     const messages = rendererMessages(payload.messages, event.agentId);
     const replace = isRecord(event.payload) && event.payload.replace === true;
     const preserveKnownTurns = isRecord(event.payload) && event.payload.preserveKnownTurns === true;
-    hydrateAgentMessages(snapshot, event.agentId, messages, { preserveKnownTurns, replace });
+    const preserveKnownMessages = isRecord(event.payload) && event.payload.preserveKnownMessages === true;
+    hydrateAgentMessages(snapshot, event.agentId, messages, {
+      preserveKnownMessages,
+      preserveKnownTurns,
+      replace,
+    });
     return;
   }
 
@@ -472,6 +477,19 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
       typeof payload.itemId === 'string' ? payload.itemId : undefined,
       event.occurredAt,
     );
+    return;
+  }
+
+  if (event.type === 'message.updated') {
+    const payload = isRecord(event.payload) ? event.payload : {};
+    const [message] = rendererMessages([payload.message], event.agentId);
+    if (!message) return;
+    const messageIndex = snapshot.messages.findIndex((candidate) => (
+      candidate.agentId === event.agentId && candidate.id === message.id
+    ));
+    if (messageIndex === -1) snapshot.messages.push(message);
+    else snapshot.messages.splice(messageIndex, 1, message);
+    pruneSupersededEmptyAssistantPlaceholders(snapshot, event.agentId);
     return;
   }
 
@@ -1315,8 +1333,12 @@ function hydrateAgentMessages(
   snapshot: AppSnapshot,
   agentId: string,
   messages: RendererMessage[],
-  options: { preserveKnownTurns?: boolean; replace?: boolean } = {},
+  options: { preserveKnownMessages?: boolean; preserveKnownTurns?: boolean; replace?: boolean } = {},
 ): void {
+  if (options.preserveKnownMessages) {
+    mergeUnknownAgentMessages(snapshot, agentId, messages);
+    return;
+  }
   if (options.preserveKnownTurns) {
     mergeUnknownAgentTurns(snapshot, agentId, messages);
     return;
@@ -1346,6 +1368,14 @@ function hydrateAgentMessages(
   pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
 }
 
+function mergeUnknownAgentMessages(snapshot: AppSnapshot, agentId: string, messages: RendererMessage[]): void {
+  const knownMessageIds = new Set(snapshot.messages
+    .filter((message) => message.agentId === agentId)
+    .map((message) => message.id));
+  const additions = messages.filter((message) => !knownMessageIds.has(message.id));
+  insertOlderAgentMessages(snapshot, agentId, additions);
+}
+
 function mergeUnknownAgentTurns(snapshot: AppSnapshot, agentId: string, messages: RendererMessage[]): void {
   const existing = snapshot.messages.filter((message) => message.agentId === agentId);
   const knownTurnIds = new Set(existing.flatMap((message) => message.turnId ? [message.turnId] : []));
@@ -1353,6 +1383,10 @@ function mergeUnknownAgentTurns(snapshot: AppSnapshot, agentId: string, messages
   const additions = messages.filter((message) => (
     message.turnId ? !knownTurnIds.has(message.turnId) : !knownMessageIds.has(message.id)
   ));
+  insertOlderAgentMessages(snapshot, agentId, additions);
+}
+
+function insertOlderAgentMessages(snapshot: AppSnapshot, agentId: string, additions: RendererMessage[]): void {
   if (additions.length === 0) return;
 
   const orderedAdditions = additions
@@ -1361,11 +1395,9 @@ function mergeUnknownAgentTurns(snapshot: AppSnapshot, agentId: string, messages
       left.message.createdAt.localeCompare(right.message.createdAt) || left.index - right.index
     ))
     .map(({ message }) => message);
-  const merged = [...orderedAdditions, ...existing];
   const firstAgentMessageIndex = snapshot.messages.findIndex((message) => message.agentId === agentId);
-  snapshot.messages = snapshot.messages.filter((message) => message.agentId !== agentId);
-  if (firstAgentMessageIndex === -1) snapshot.messages.push(...merged);
-  else snapshot.messages.splice(firstAgentMessageIndex, 0, ...merged);
+  if (firstAgentMessageIndex === -1) snapshot.messages.push(...orderedAdditions);
+  else snapshot.messages.splice(firstAgentMessageIndex, 0, ...orderedAdditions);
   pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
 }
 

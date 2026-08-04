@@ -182,11 +182,13 @@ process and does not replace Claw's existing Claude driver boundary.
 
 Snapshot mutation is also backend-owned. `clawd` applies backend events to the
 authoritative snapshot and is the only process that persists it. Electron
-fetches fresh snapshots from `clawd` for `getSnapshot`; Electron and renderer
-then replay the same sequenced, app-owned events through the shared deterministic
-reducer to maintain volatile replicas. Incremental events do not carry the full
-snapshot: doing so makes streaming traffic grow with total conversation history
-and can saturate the clawd-to-Electron pipe. Electron-native affordances consume a backend
+fetches fresh snapshots from `clawd` only while synchronizing or forwarding one
+to the renderer, then retains a metadata-only shell with no transcript bodies.
+The renderer replays the same sequenced, app-owned events through the shared
+deterministic reducer to maintain its volatile presentation replica. Incremental
+events do not carry the full snapshot: doing so makes streaming traffic grow
+with total conversation history and can saturate the clawd-to-Electron pipe.
+Electron-native affordances consume a backend
 derived `ClientState` for details such as source-folder dialog defaults and
 whether display sleep should be prevented; Electron runs the native APIs but
 does not derive those decisions from agent/product state.
@@ -802,7 +804,9 @@ latest selection or backend activity. The SDK supplies the optional generic TTL
 cache, activity clock, and sweep lifecycle; Claw supplies the agent policy. Claw
 only evicts an inactive, idle transcript with no queued prompt or pending
 approval. Eviction drops the in-memory messages and live SDK session handle but
-does not serialize or persist a second transcript copy. Drafts, attachments,
+also asks the SDK surface to forget its local conversation runtime; it never
+deletes or archives the app-server thread. It does not serialize or persist a
+second transcript copy. Drafts, attachments,
 queues, side-panel state, and browser state are separate and remain untouched.
 Selecting an evicted agent follows the normal provider history hydration path.
 Conversations with an active turn stay memory-authoritative and reconcile

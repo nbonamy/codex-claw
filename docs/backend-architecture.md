@@ -80,10 +80,12 @@ Current implementation checkpoint:
   fanout. `clawd` derives the minimal `ClientState` that tells Electron which
   source folder path to use as a dialog default and whether display sleep should
   be prevented.
-- `clawd` owns durable snapshot loading and saving. Electron keeps only a
-  volatile renderer-facing snapshot cache hydrated from `snapshot/get` and
-  backend events; it does not read or write `state.json`, keep a local snapshot
-  service shim, or validate agent folders before backend mutations.
+- `clawd` owns durable snapshot loading and saving. Electron retains only
+  transcript-free snapshot metadata for menus and native effects. Full snapshots
+  are short-lived values fetched from `snapshot/get` while synchronizing or
+  crossing IPC to the renderer; Electron does not keep transcript bodies, read
+  or write `state.json`, keep a local snapshot service shim, or validate agent
+  folders before backend mutations.
   Main-process product IPC handlers adopt snapshots returned by backend RPCs;
   they do not perform direct product-state updates. Desktop-native state is
   fetched from `client/state/get` or received on backend events instead of

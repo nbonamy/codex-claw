@@ -19,6 +19,8 @@ All notable Codex Claw changes are recorded here.
 
 ### Improvements and fixes
 
+- Long conversations now load progressively, keep only recent messages mounted
+  until you scroll upward, and use less memory across long sessions.
 - Large conversations no longer retransmit and redraw their full transcript for
   routine agent selection, prompt, status, or background-state updates.
 - Browser annotations now dismiss on outside click and immediately resume

@@ -23,7 +23,7 @@
       :files="agentFiles"
       :goal="goal ?? null"
       :history-loading="isHydratingHistory"
-      :messages="presentedChatMessages"
+      :messages="messages"
       :model-catalog-status="modelCatalogStatus"
       :models="backendModels"
       :placeholder="composerPlaceholder"
@@ -34,6 +34,7 @@
       :selected-service-tier="selectedServiceTier"
       :skill-catalog-status="skillCatalogStatus"
       :skills="backendSkills"
+      :transform-message="transformConversationMessage"
       @clear-goal="$emit('clear-goal')"
       @client-response="$emit('client-response', $event)"
       @delete-message="$emit('delete-message', $event)"
@@ -70,17 +71,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   CodexConversationPane,
   provideCodexChatTranslate,
+  type CodexChatMessage,
   type CodexCapabilities,
   type CodexComposerState,
   type CodexConversationLink,
   type CodexNativeAttachment,
   type CodexQueuedPromptData as QueuedChatPrompt,
   type SendCodexMessageOptions,
+  type SurfaceMessage,
 } from 'codex-app-sdk/vue';
 import type {
   Agent,
@@ -103,7 +106,11 @@ import type {
 } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import ConversationPlanPanel from './ConversationPlanPanel.vue';
-import { presentRendererCollaborationMessage } from '../shared/collaboration-message';
+import {
+  presentCollaborationMessage,
+  presentRendererCollaborationMessage,
+  type CollaborationMessagePresentation,
+} from '../shared/collaboration-message';
 import { provideClawToolPresentation } from '../tool-presentation';
 
 const { t } = useI18n();
@@ -179,25 +186,17 @@ const emit = defineEmits<{
   steerPrompt: [prompt: string, options?: SendPromptOptions];
 }>();
 
-const presentedMessages = computed(() => props.messages.map((message) => (
-  presentRendererCollaborationMessage(message)
-)));
-const presentedChatMessages = computed(() => presentedMessages.value.map(({ message }) => message));
-const collaborationMessageLabels = computed(() => new Map(
-  presentedMessages.value.flatMap(({ message, presentation }) => {
-    if (!message.id || !presentation) return [];
-    const names = presentation.senderNames.join(', ');
-    const label = presentation.messageCount === 1
-      ? t('chat.collaboration.messageFrom', { name: names })
-      : t('chat.collaboration.messagesFrom', { names });
-    return [[message.id, label] as const];
-  }),
-));
 const conversationKey = computed(() => {
   const session = props.agent?.backendSession;
   if (session?.kind === 'codex') return `codex:${session.threadId}`;
   if (session?.kind === 'claude') return `claude:${session.sessionId}`;
   return props.agent ? `agent:${props.agent.id}` : 'no-agent';
+});
+const collaborationMessagePresentations = new Map<string, CollaborationMessagePresentation>();
+let transformedMessageCache = new WeakMap<object, CodexChatMessage | SurfaceMessage>();
+watch(conversationKey, () => {
+  collaborationMessagePresentations.clear();
+  transformedMessageCache = new WeakMap<object, CodexChatMessage | SurfaceMessage>();
 });
 const conversationCapabilities = computed<CodexCapabilities>(() => ({
   models: props.backendCapabilities.models,
@@ -281,7 +280,30 @@ function promptAttachments(options?: SendCodexMessageOptions): PromptAttachment[
 }
 
 function collaborationMessageLabel(messageId: string | undefined): string | null {
-  return messageId ? collaborationMessageLabels.value.get(messageId) ?? null : null;
+  if (!messageId) return null;
+  const presentation = collaborationMessagePresentations.get(messageId);
+  if (!presentation) return null;
+  const names = presentation.senderNames.join(', ');
+  return presentation.messageCount === 1
+    ? t('chat.collaboration.messageFrom', { name: names })
+    : t('chat.collaboration.messagesFrom', { names });
+}
+
+function transformConversationMessage(
+  message: CodexChatMessage | SurfaceMessage,
+): CodexChatMessage | SurfaceMessage {
+  const cached = transformedMessageCache.get(message);
+  if (cached) return cached;
+
+  const result = 'content' in message
+    ? presentCollaborationMessage(message)
+    : presentRendererCollaborationMessage(message as RendererMessage);
+  if (message.id && result.presentation) {
+    collaborationMessagePresentations.set(message.id, result.presentation);
+  }
+  const transformed = result.message as CodexChatMessage | SurfaceMessage;
+  transformedMessageCache.set(message, transformed);
+  return transformed;
 }
 
 function updateComposerState(state: CodexComposerState): void {

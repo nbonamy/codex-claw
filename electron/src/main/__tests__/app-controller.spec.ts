@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController } from '../app-controller';
 import { createInitialSnapshot, snapshotMetadata } from '@codex-claw/shared/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { ipcChannels } from '@codex-claw/shared/ipc';
@@ -77,7 +77,9 @@ describe('AppController', () => {
     });
     resolveClientState({ sourceFolderPath: '', shouldPreventDisplaySleep: true });
 
-    await expect(adoption).resolves.toBe(currentSnapshot(controller));
+    await expect(adoption).resolves.toBe(staleSnapshot);
+    expect(currentSnapshot(controller)).not.toBe(staleSnapshot);
+    expect(currentSnapshot(controller).messages).toStrictEqual([]);
     expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'working' });
   });
 
@@ -180,7 +182,7 @@ describe('AppController', () => {
     expect(order).toStrictEqual(['maintenance', 'backend-start']);
   });
 
-  it('hydrates its renderer cache from clawd snapshot state', async () => {
+  it('hydrates its metadata cache from clawd snapshot state', async () => {
     const initialSnapshot = createInitialSnapshot();
     const backendSnapshot = {
       ...createInitialSnapshot(),
@@ -212,8 +214,41 @@ describe('AppController', () => {
     await controller.initialize();
 
     expect(request).toHaveBeenCalledWith('snapshot/get');
-    expect(currentSnapshot(controller)).toBe(backendSnapshot);
+    expect(currentSnapshot(controller)).not.toBe(backendSnapshot);
+    expect(currentSnapshot(controller).messages).toStrictEqual([]);
     expect(currentClientState(controller)).toStrictEqual(clientState);
+  });
+
+  it('forwards full snapshots to the renderer without retaining transcript bodies in main', async () => {
+    const backendSnapshot = createInitialSnapshot();
+    backendSnapshot.messages.push({
+      id: 'large-history-message',
+      agentId: 'agent-dina',
+      role: 'assistant',
+      status: 'complete',
+      createdAt: '2026-08-04T00:00:00.000Z',
+      parts: [{ type: 'text', text: 'A'.repeat(10_000) }],
+    });
+    const clientState: ClientState = { sourceFolderPath: '', shouldPreventDisplaySleep: false };
+    const backendClient = createBackendClient({
+      request: vi.fn(),
+    });
+    backendClient.request = vi.fn(async (method: string) => {
+      if (method === backendMethods.snapshotGet) {
+        return { snapshot: backendSnapshot, lastEventSeq: 0, clientState };
+      }
+      if (method === backendMethods.clientStateGet) return clientState;
+      return {};
+    }) as typeof backendClient.request;
+    const controller = new AppController(createInitialSnapshot(), backendClient);
+
+    await controller.initialize();
+    expect(currentSnapshot(controller).messages).toStrictEqual([]);
+
+    const rendererState = await callPrivate<RendererSnapshotState>(controller, 'getSnapshotState');
+
+    expect(rendererState.snapshot.messages).toStrictEqual(backendSnapshot.messages);
+    expect(currentSnapshot(controller).messages).toStrictEqual([]);
   });
 
   it('subscribes to clawd events before hydrating its startup snapshot', async () => {
@@ -259,7 +294,8 @@ describe('AppController', () => {
       agentId: 'agent-dina',
       type: 'agent.statusChanged',
     }));
-    expect(currentSnapshot(controller)).toBe(backendSnapshot);
+    expect(currentSnapshot(controller)).not.toBe(backendSnapshot);
+    expect(currentSnapshot(controller).messages).toStrictEqual([]);
     expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'working' });
   });
 
@@ -306,7 +342,8 @@ describe('AppController', () => {
 
     await vi.advanceTimersByTimeAsync(250);
     expect(backendClient.start).toHaveBeenCalledTimes(2);
-    expect(currentSnapshot(controller)).toBe(reconnectedSnapshot);
+    expect(currentSnapshot(controller)).not.toBe(reconnectedSnapshot);
+    expect(currentSnapshot(controller).messages).toStrictEqual([]);
     expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
       type: 'client.connectionChanged',
       payload: { status: 'connected' },
@@ -318,7 +355,7 @@ describe('AppController', () => {
     await controller.shutdown();
   });
 
-  it('caches authoritative snapshots from backend events emitted by the clawd process client', async () => {
+  it('caches authoritative snapshot metadata from backend events emitted by the clawd process client', async () => {
     const snapshot = createInitialSnapshot();
     const backendSnapshot = createInitialSnapshot();
     backendSnapshot.agents[0]!.status = { type: 'working' };
@@ -348,7 +385,8 @@ describe('AppController', () => {
     });
     await controller.shutdown();
 
-    expect(currentSnapshot(controller)).toBe(backendSnapshot);
+    expect(currentSnapshot(controller)).not.toBe(backendSnapshot);
+    expect(currentSnapshot(controller).messages).toStrictEqual([]);
     expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
       seq: 1,
       backend: 'codex',
@@ -366,7 +404,7 @@ describe('AppController', () => {
     expect(unsubscribe).toHaveBeenCalledOnce();
   });
 
-  it('applies incremental backend events to the Electron snapshot cache', async () => {
+  it('applies incremental backend events to the Electron metadata cache', async () => {
     const snapshot = createInitialSnapshot();
     const payloadSnapshot = createInitialSnapshot();
     payloadSnapshot.agents[0]!.status = { type: 'working' };
@@ -384,7 +422,8 @@ describe('AppController', () => {
       occurredAt: '2026-06-13T00:00:00.000Z',
     });
 
-    expect(currentSnapshot(controller)).toBe(snapshot);
+    expect(currentSnapshot(controller)).not.toBe(snapshot);
+    expect(currentSnapshot(controller).messages).toStrictEqual([]);
     expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'working' });
     expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
       seq: 1,
@@ -413,7 +452,8 @@ describe('AppController', () => {
       } as unknown as AppSnapshot,
     });
 
-    expect(currentSnapshot(controller)).toBe(snapshot);
+    expect(currentSnapshot(controller)).not.toBe(snapshot);
+    expect(currentSnapshot(controller).messages).toStrictEqual([]);
     expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
       seq: 1,
       type: 'snapshot.updated',
@@ -437,7 +477,8 @@ describe('AppController', () => {
     await expect(respondToClientRequest(controller, response)).resolves.toBe(backendSnapshot);
 
     expect(request).toHaveBeenCalledWith('client/request/respond', { response });
-    expect(currentSnapshot(controller)).toBe(backendSnapshot);
+    expect(currentSnapshot(controller)).not.toBe(backendSnapshot);
+    expect(currentSnapshot(controller).messages).toStrictEqual([]);
   });
 
   it('routes source repository discovery through clawd', async () => {
@@ -827,7 +868,7 @@ describe('AppController', () => {
     });
 
     await expect(deployBenchTemplate(controller, 'bench-remote-dina', 'team-codex-claw', remoteLocation)).resolves.toBe(deployedLocalSnapshot);
-    await expect(getSnapshot(controller)).resolves.toBe(deployedLocalSnapshot);
+    await expect(getSnapshot(controller)).resolves.toStrictEqual({ ...deployedLocalSnapshot, messages: [] });
 
     expect(request).toHaveBeenCalledWith('snapshot/bench/get', { location: remoteLocation });
     expect(request).toHaveBeenCalledWith('bench/agent/template/create', { agentId: 'agent-dina' });
@@ -1111,7 +1152,8 @@ describe('AppController', () => {
     expect(request).toHaveBeenNthCalledWith(1, 'snapshot/loops/get', { location });
     expect(request).toHaveBeenNthCalledWith(2, 'loop/create', { input: createInput, location });
     expect(request).toHaveBeenNthCalledWith(3, 'loop/run', { loopId: 'loop-bugs', location });
-    expect(currentSnapshot(controller)).toBe(snapshot);
+    expect(currentSnapshot(controller)).not.toBe(snapshot);
+    expect(currentSnapshot(controller).messages).toStrictEqual([]);
   });
 
   it('opens repo git diff previews through clawd', async () => {
@@ -1167,7 +1209,8 @@ describe('AppController', () => {
 
     expect(request).toHaveBeenCalledOnce();
     expect(request).toHaveBeenCalledWith('agent/history/hydrate', { agentId: 'agent-dina' });
-    expect(currentSnapshot(controller)).toBe(snapshot);
+    expect(currentSnapshot(controller)).not.toBe(snapshot);
+    expect(currentSnapshot(controller).messages).toStrictEqual([]);
   });
 
   it('caches token usage updates emitted by clawd', async () => {
@@ -1226,7 +1269,7 @@ describe('AppController', () => {
     });
     await flushMicrotasks();
 
-    expect(snapshot.accountRateLimits).toStrictEqual(rateLimits);
+    expect(currentSnapshot(controller).accountRateLimits).toStrictEqual(rateLimits);
   });
 
   it('caches plan updates emitted by clawd', async () => {
