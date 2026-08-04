@@ -96,11 +96,15 @@ function buildCodexClawMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions
     submenu: [
       { role: 'about' },
       ...(options.updateStatus && callbacks.checkForUpdates && callbacks.installUpdate
-        ? [
-            createUpdateMenuItem(options.updateStatus, callbacks),
-            { type: 'separator' as const },
-          ]
+        ? [createUpdateMenuItem(options.updateStatus, callbacks)]
         : []),
+      { type: 'separator' },
+      {
+        label: 'Settings...',
+        accelerator: 'CommandOrControl+,',
+        click: () => callbacks.sendAppCommand({ type: 'open-settings' }),
+      },
+      { type: 'separator' },
       { role: 'services' },
       { type: 'separator' },
       { role: 'hide' },
@@ -211,6 +215,15 @@ function buildViewMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions): Me
         click: (item) => callbacks.sendAppCommand({ type: 'set-agent-list-compact', compact: item.checked }),
       },
       { type: 'separator' },
+      {
+        label: 'Compact Context',
+        accelerator: 'CommandOrControl+K',
+        click: () => callbacks.sendAppCommand({
+          type: 'open-agent-composer',
+          prompt: '/compact',
+          submit: true,
+        }),
+      },
       {
         label: 'Review',
         accelerator: 'CommandOrControl+G',

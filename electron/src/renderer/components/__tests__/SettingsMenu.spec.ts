@@ -48,11 +48,15 @@ describe('SettingsMenu', () => {
 
     await openMenu(wrapper);
     const actions = wrapper.findAll('.app-menu__item');
-    expect(actions.map((button) => button.text())).toStrictEqual(['Settings', 'Log out', 'Quit']);
+    expect(actions.map((button) => button.get('.app-menu__label').text())).toStrictEqual(['Settings', 'Log out', 'Quit']);
+    expect(actions[0]?.get('.app-menu__value').text()).toBe('⌘,');
     expect(actions[1]?.classes()).not.toContain('app-menu__item--danger');
     await actions[1]?.trigger('click');
     await openMenu(wrapper);
-    await wrapper.findAll('button').find((button) => button.text() === 'Settings')?.trigger('click');
+    await wrapper.findAll('button').find((button) => {
+      const label = button.find('.app-menu__label');
+      return label.exists() && label.text() === 'Settings';
+    })?.trigger('click');
     await openMenu(wrapper);
     await wrapper.findAll('button').find((button) => button.text() === 'Quit')?.trigger('click');
 
@@ -88,7 +92,10 @@ describe('SettingsMenu', () => {
     await openMenu(wrapper);
     expect(wrapper.find('[data-test="settings-popover-content"]').exists()).toBe(true);
 
-    await wrapper.findAll('button').find((button) => button.text() === 'Settings')?.trigger('click');
+    await wrapper.findAll('button').find((button) => {
+      const label = button.find('.app-menu__label');
+      return label.exists() && label.text() === 'Settings';
+    })?.trigger('click');
     await nextTick();
 
     expect(wrapper.find('[data-test="settings-popover-content"]').exists()).toBe(false);

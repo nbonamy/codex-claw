@@ -59,6 +59,18 @@ export function appCommandFromInput(input: AppShortcutInput): AppCommand | null 
         return { type: 'duplicate-active-agent' };
       }
 
+      if (key === ',') {
+        return { type: 'open-settings' };
+      }
+
+      if (key === 'k') {
+        return {
+          type: 'open-agent-composer',
+          prompt: '/compact',
+          submit: true,
+        };
+      }
+
       if (key === 'g') {
         return { type: 'open-review' };
       }

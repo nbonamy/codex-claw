@@ -1612,6 +1612,11 @@ function handleAppCommand(command: AppCommand): void {
     return;
   }
 
+  if (command.type === 'open-settings') {
+    openSettings();
+    return;
+  }
+
   if (command.type === 'open-browser' && command.agentId && command.url) {
     handleBrowserOpenCommand(command);
     return;

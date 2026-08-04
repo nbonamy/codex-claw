@@ -2057,7 +2057,10 @@ describe('AppShell', () => {
     const wrapper = mountShell({ snapshot, updateSettings, quit });
 
     expect(wrapper.text()).toContain('59%');
-    await wrapper.findAll('button').find((button) => button.text() === 'Settings')?.trigger('click');
+    await wrapper.findAll('button').find((button) => {
+      const label = button.find('.app-menu__label');
+      return label.exists() && label.text() === 'Settings';
+    })?.trigger('click');
     expect(wrapper.find('.settings-view').exists()).toBe(true);
     expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
     expect(wrapper.get('[aria-label="Account menu"]').attributes('aria-pressed')).toBe('true');
@@ -2075,7 +2078,10 @@ describe('AppShell', () => {
     await wrapper.get('[aria-label="Cockpit"]').trigger('click');
     expect(wrapper.find('.settings-view').exists()).toBe(false);
 
-    await wrapper.findAll('button').find((button) => button.text() === 'Settings')?.trigger('click');
+    await wrapper.findAll('button').find((button) => {
+      const label = button.find('.app-menu__label');
+      return label.exists() && label.text() === 'Settings';
+    })?.trigger('click');
     expect(wrapper.text()).toContain('Theme');
     expect(wrapper.text()).toContain('Codex Claw Light');
 
@@ -2537,6 +2543,23 @@ describe('AppShell', () => {
     ]]);
     expect(wrapper.emitted('update:composerState')).toBeUndefined();
     expect(wrapper.emitted('sendPrompt')).toBeUndefined();
+  });
+
+  it('opens Settings from the native app command', async () => {
+    let listener: (command: AppCommand) => void = () => undefined;
+    window.codexClaw = {
+      onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
+        listener = nextListener;
+        return () => undefined;
+      }),
+      onEvent: vi.fn(() => vi.fn()),
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const wrapper = mountShell();
+
+    listener({ type: 'open-settings' });
+    await nextTick();
+
+    expect(wrapper.find('.settings-view').exists()).toBe(true);
   });
 
   it('prefills a deep-linked agent composer when submission is disabled', async () => {

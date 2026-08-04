@@ -120,8 +120,8 @@ implemented:
 - empty right-workspace launcher for opening Review or Browser before any tab
   exists; manually closing the last tab collapses the workspace. Review uses
   `Command+G` and Browser uses `Command+B`, while existing `Command+D`
-  duplicate-agent and `Command+R`
-  restart-agent shortcuts remain unchanged;
+  duplicate-agent and `Command+R` restart-agent shortcuts remain unchanged;
+  `Command+K` submits `/compact` for the active agent;
 - focused artifact panes for documents, plans, and read-only source previews;
 - Bench entry point in the agent creation flow;
 - repository-first agent creation that keeps Codex implicit, puts custom folder
@@ -135,7 +135,8 @@ implemented:
   Computer Use and Chrome disabled by default, persists explicit capability
   choices, and directs plugin activation through ChatGPT; Connections keeps
   remote Claw hosts separate from official Codex device pairing, including
-  pairing progress and paired-device revocation.
+  pairing progress and paired-device revocation. Settings is also available
+  from the native macOS app menu and lower-left account menu with `Command+,`.
 
 Avoid layout jumps during streaming, loading, plan updates, approval prompts,
 and artifact pane changes.

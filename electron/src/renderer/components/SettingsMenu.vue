@@ -87,6 +87,7 @@ const menuItems = computed<AppMenuItem[]>(() => [
     type: 'action',
     label: 'Settings',
     icon: SettingsIcon,
+    value: '⌘,',
   },
   {
     id: 'logout',

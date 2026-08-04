@@ -1041,6 +1041,7 @@ export type AppCommand =
   | { type: 'open-agent-composer'; agentId?: string; prompt?: string; submit?: boolean }
   | { type: 'open-browser'; agentId?: string; browserId?: string; url?: string }
   | { type: 'open-review' }
+  | { type: 'open-settings' }
   | { type: 'quit' }
   | { type: 'restart-active-agent' }
   | { type: 'set-agent-list-compact'; compact: boolean };

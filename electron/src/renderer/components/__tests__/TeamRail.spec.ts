@@ -259,7 +259,10 @@ describe('TeamRail', () => {
     expect(wrapper.text()).toContain('68%');
     expect(wrapper.text()).toContain('Weekly');
     expect(wrapper.text()).toContain('50%');
-    await wrapper.findAll('button').find((button) => button.text() === 'Settings')?.trigger('click');
+    await wrapper.findAll('button').find((button) => {
+      const label = button.find('.app-menu__label');
+      return label.exists() && label.text() === 'Settings';
+    })?.trigger('click');
     await wrapper.findAll('button').find((button) => button.text() === 'Quit')?.trigger('click');
 
     expect(wrapper.emitted('open-settings')).toStrictEqual([[]]);

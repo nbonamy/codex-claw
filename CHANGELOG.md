@@ -8,6 +8,8 @@ All notable Codex Claw changes are recorded here.
 
 - Mobile remote access can keep a plugged-in Mac awake, with streamlined
   connection, pairing, and device controls in Settings.
+- Added keyboard shortcuts for opening Settings and compacting the active
+  agent's context.
 
 ## [0.4.0] - 2026-08-03
 
