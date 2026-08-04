@@ -22,7 +22,10 @@
       :empty-title="heroHeadline"
       :files="agentFiles"
       :goal="goal ?? null"
+      render-strategy="lazy"
+      :has-older-history="historyHasOlder"
       :history-loading="isHydratingHistory"
+      :loading-older-history="historyLoadingOlder"
       :messages="messages"
       :model-catalog-status="modelCatalogStatus"
       :models="backendModels"
@@ -42,6 +45,7 @@
       @edit-message="$emit('edit-message', $event)"
       @interrupt="$emit('interrupt-agent')"
       @open-link="openLink"
+      @load-older-history="$emit('load-older-history')"
       @retry-message="$emit('retry-message', $event)"
       @resolve-approval="resolveApproval"
       @select-approval-preset="$emit('select-approval-preset', $event)"
@@ -143,6 +147,8 @@ const props = withDefaults(defineProps<{
   planMode?: boolean;
   composerState?: CodexComposerState;
   attachments?: readonly CodexNativeAttachment[];
+  historyHasOlder?: boolean;
+  historyLoadingOlder?: boolean;
 }>(), {
   agents: () => [],
   queuedPrompts: () => [],
@@ -171,6 +177,7 @@ const emit = defineEmits<{
   'delete-queued-prompt': [promptId: string];
   'edit-message': [payload: { content: string; index: number }];
   'interrupt-agent': [];
+  'load-older-history': [];
   'open-file': [link: ConversationFileLink];
   'resolve-approval': [approvalId: string, decision: BackendApprovalDecision, scope: BackendApprovalScope];
   'retry-message': [index: number];

@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, AgentHistoryLoadResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/shared/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
@@ -49,6 +49,8 @@ const sourceRepositoryError = ref<string | null>(null);
 const daemonStatus = ref<ClawdDaemonStatus | null>(null);
 const daemonStatusError = ref<string | null>(null);
 const hydratingAgentHistoryIds = ref(new Set<string>());
+const loadingOlderHistoryIds = ref(new Set<string>());
+const historyHasOlderByAgentId = ref<Record<string, boolean>>({});
 const catalogLoadsByAgentId = new Map<string, Promise<void>>();
 type CatalogStatus = 'notLoaded' | 'loading' | 'loaded' | 'error';
 type CatalogCacheEntry<T> = {
@@ -120,6 +122,16 @@ export function useAppState() {
   const isHydratingActiveAgentHistory = computed(() => {
     const agentId = activeAgent.value?.id;
     return Boolean(agentId && hydratingAgentHistoryIds.value.has(agentId));
+  });
+
+  const activeHistoryHasOlder = computed(() => {
+    const agent = activeAgent.value;
+    if (!agent || agent.backend !== 'codex') return false;
+    return historyHasOlderByAgentId.value[agent.id] ?? true;
+  });
+  const isLoadingOlderHistory = computed(() => {
+    const agentId = activeAgent.value?.id;
+    return Boolean(agentId && loadingOlderHistoryIds.value.has(agentId));
   });
 
   const activeQueuedPrompts = computed(() => {
@@ -204,9 +216,9 @@ export function useAppState() {
       await synchronizeRendererSnapshot(false);
       if (snapshot.value.activeAgentId) restoreComposerConfiguration(snapshot.value.activeAgentId);
       pruneRemoteBenchCache();
-      // The SDK publishes a complete initial page immediately and continues
-      // older history in the background. Do not hold the entire shell on that
-      // continuation or on catalog warm-up.
+      // The SDK publishes a bounded initial page immediately. Older pages stay
+      // behind the conversation's demand-paging cursor until the user reaches
+      // the top of the transcript.
       void hydrateActiveAgentHistory().catch(() => undefined);
       void loadAllAgentCatalogs().catch(() => undefined);
       await Promise.all([
@@ -1414,6 +1426,9 @@ export function useAppState() {
     isLoading,
     connectionState,
     isHydratingActiveAgentHistory,
+    activeHistoryHasOlder,
+    isLoadingOlderHistory,
+    loadOlderAgentHistory,
     isSending,
     answeredClientRequestIds,
     backendModels,
@@ -1873,9 +1888,20 @@ function handleMainEvent(event: MainToRendererEvent, adoptSnapshot = true): void
   syncComposerModeFromMainEvent(event);
   syncSidePanelFromMainEvent(event);
   syncFileActivityFromMainEvent(event);
+  syncHistoryPageStateFromMainEvent(event);
   if (event.type === 'skills.changed') {
     applySkillsChangedEvent(event);
   }
+}
+
+function syncHistoryPageStateFromMainEvent(event: MainToRendererEvent): void {
+  if (event.type !== 'thread.historyLoaded' || !event.agentId || !isRecord(event.payload)) return;
+  const hasOlder = event.payload.hasOlderMessages;
+  if (typeof hasOlder !== 'boolean') return;
+  historyHasOlderByAgentId.value = {
+    ...historyHasOlderByAgentId.value,
+    [event.agentId]: hasOlder,
+  };
 }
 
 function applySkillsChangedEvent(event: MainToRendererEvent): void {
@@ -2396,6 +2422,24 @@ async function hydrateActiveAgentHistory(): Promise<void> {
     adoptBackgroundSnapshotMetadata(await window.codexClaw.hydrateAgentHistory(activeAgent.id));
   } finally {
     markAgentHistoryHydrating(activeAgent.id, false);
+  }
+}
+
+async function loadOlderAgentHistory(agentId: string): Promise<void> {
+  if (!window.codexClaw?.loadOlderAgentHistory || loadingOlderHistoryIds.value.has(agentId)) return;
+  const next = new Set(loadingOlderHistoryIds.value);
+  next.add(agentId);
+  loadingOlderHistoryIds.value = next;
+  try {
+    const result = await window.codexClaw.loadOlderAgentHistory(agentId) as AgentHistoryLoadResult;
+    historyHasOlderByAgentId.value = {
+      ...historyHasOlderByAgentId.value,
+      [agentId]: result.hasOlder,
+    };
+  } finally {
+    const remaining = new Set(loadingOlderHistoryIds.value);
+    remaining.delete(agentId);
+    loadingOlderHistoryIds.value = remaining;
   }
 }
 

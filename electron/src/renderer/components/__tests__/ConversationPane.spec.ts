@@ -66,6 +66,7 @@ describe('ConversationPane', () => {
     const wrapper = mountPane({ agent, messages, isSending: true, plan: executionPlan });
 
     expect(wrapper.get('.conversation-plan').text()).toContain('Implement the fix');
+    expect(conversationPaneSource).toContain('render-strategy="lazy"');
     const sdkProps = wrapper.getComponent(CodexConversationPane as unknown as Component).props() as Record<string, unknown>;
     expect(sdkProps.turnGitDiff).toBeUndefined();
   });

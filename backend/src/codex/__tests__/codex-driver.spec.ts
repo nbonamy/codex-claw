@@ -221,6 +221,15 @@ describe('CodexBackendDriver', () => {
     expect(sessionManager.listConversations).toHaveBeenCalledWith(agent);
     expect(sessionManager.resumeConversation).toHaveBeenCalledWith(agent, 'thread-dina');
   });
+
+  it('loads one older history page through the session manager', async () => {
+    const loadOlderHistory = vi.fn().mockResolvedValue({ hasOlder: true });
+    const sessionManager = createSessionManager({ loadOlderHistory });
+    const driver = new CodexBackendDriver(sessionManager);
+
+    await expect(driver.loadOlderHistory(agent)).resolves.toStrictEqual({ hasOlder: true });
+    expect(loadOlderHistory).toHaveBeenCalledWith(agent);
+  });
 });
 
 function createSessionManager(overrides: Partial<CodexSurfaceAgentAdapter> = {}): CodexSurfaceAgentAdapter {
@@ -233,6 +242,7 @@ function createSessionManager(overrides: Partial<CodexSurfaceAgentAdapter> = {})
     listConversations: vi.fn().mockResolvedValue([]),
     resumeConversation: vi.fn().mockResolvedValue({ threadId: 'thread-dina', messages: [] }),
     readConversationMessages: vi.fn().mockResolvedValue([]),
+    loadOlderHistory: vi.fn().mockResolvedValue({ hasOlder: false }),
     setConversationTitle: vi.fn().mockResolvedValue(undefined),
     setApprovalPreset: vi.fn().mockResolvedValue({ threadId: 'thread-approval', approvalPreset: 'full-access' }),
     setThreadGoal: vi.fn().mockResolvedValue({

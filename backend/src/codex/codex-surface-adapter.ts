@@ -273,6 +273,16 @@ export class CodexSurfaceAgentAdapter {
     return surfaceMessages(history.messages, agentId);
   }
 
+  async loadOlderHistory(agent: Agent): Promise<{ hasOlder: boolean }> {
+    const session = await this.ensureSession(agent);
+    const loadOlderHistory = (session.handle as CodexConversation & {
+      loadOlderHistory?: () => Promise<{ hasOlder: boolean }>;
+    }).loadOlderHistory;
+    if (!loadOlderHistory) throw new Error('The Codex SDK does not support demand-paged conversation history.');
+    const page = await loadOlderHistory();
+    return { hasOlder: page.hasOlder };
+  }
+
   async listConversations(agent: Agent): Promise<ConversationSummary[]> {
     const conversations = await this.surface.listConversations({ cwd: expandHome(agent.folder), limit: 30 });
     return conversations.map((conversation) => ({
@@ -779,11 +789,15 @@ export class CodexSurfaceAgentAdapter {
     } = {},
   ): void {
     const preserveHistory = options.preserveKnownMessages || options.preserveKnownTurns;
+    const historyState = (session.handle.getSnapshot() as CodexConversationSnapshot & {
+      historyState?: { hasOlder?: boolean };
+    }).historyState;
     this.emitThread(session, {
       type: 'thread.historyLoaded',
       payload: {
         messages: surfaceMessages(messages, session.agent.id, options.completeStreaming),
         replace: !preserveHistory,
+        ...(typeof historyState?.hasOlder === 'boolean' ? { hasOlderMessages: historyState.hasOlder } : {}),
         ...(options.preserveKnownTurns ? { preserveKnownTurns: true } : {}),
         ...(options.preserveKnownMessages ? { preserveKnownMessages: true } : {}),
       },

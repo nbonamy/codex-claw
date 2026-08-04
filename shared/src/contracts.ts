@@ -942,6 +942,10 @@ export type AppSnapshot = {
  */
 export type AppSnapshotMetadata = Omit<AppSnapshot, 'messages'>;
 
+export type AgentHistoryLoadResult = {
+  hasOlder: boolean;
+};
+
 export type BackendRuntimeStatus = {
   backend: AgentBackend;
   status: 'notConfigured' | 'starting' | 'running' | 'error';
@@ -1227,6 +1231,7 @@ export type CodexClawApi = {
   removeBenchTemplate(templateId: string, location?: BenchLocation): Promise<AppSnapshot>;
   restartAgent(agentId: string): Promise<AppSnapshot>;
   hydrateAgentHistory(agentId: string): Promise<AppSnapshotMetadata>;
+  loadOlderAgentHistory(agentId: string): Promise<AgentHistoryLoadResult>;
   closeAgent(agentId: string): Promise<AppSnapshot>;
   selectAgent(agentId: string): Promise<AppSnapshotMetadata>;
   updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>;

@@ -5,6 +5,9 @@
     :messages="visibleMessages"
     :is-loading="isLoading"
     :is-conversation-loading="isHydratingActiveAgentHistory"
+    :history-has-older="activeHistoryHasOlder"
+    :history-loading-older="isLoadingOlderHistory"
+    :load-older-agent-history="loadOlderAgentHistory"
     :is-sending="isSending"
     :connection-state="connectionState"
     :answered-client-request-ids="answeredClientRequestIds"
@@ -149,6 +152,8 @@ const {
   activeComposerAttachments,
   isLoading,
   isHydratingActiveAgentHistory,
+  activeHistoryHasOlder,
+  isLoadingOlderHistory,
   isSending,
   connectionState,
   answeredClientRequestIds,
@@ -178,6 +183,7 @@ const {
   sourceRepositories,
   loadBackendModels,
   loadSnapshot,
+  loadOlderAgentHistory,
   chooseAgentFolder,
   chooseCodexBinary,
   chooseSourceFolder,

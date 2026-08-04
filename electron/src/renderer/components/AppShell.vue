@@ -207,6 +207,8 @@
             :agents="snapshot.agents"
             :agent-files="agentFiles"
             :is-loading="isLoading || isConversationLoading"
+            :history-has-older="historyHasOlder"
+            :history-loading-older="historyLoadingOlder"
             :is-sending="isSending"
             :answered-client-request-ids="answeredClientRequestIds"
             :backend-models="backendModels"
@@ -242,6 +244,7 @@
             @resolve-approval="forwardApprovalResolution"
             @clear-goal="$emit('clear-goal')"
             @send-prompt="forwardPrompt"
+            @load-older-history="loadOlderAgentHistory?.(currentAgent?.id ?? '')"
             @steer-prompt="forwardSteerPrompt"
             @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
             @update:plan-mode="$emit('update:planMode', $event)"
@@ -383,6 +386,8 @@ const props = withDefaults(defineProps<{
   messages: RendererMessage[];
   isLoading: boolean;
   isConversationLoading?: boolean;
+  historyHasOlder?: boolean;
+  historyLoadingOlder?: boolean;
   isSending: boolean;
   connectionState?: BackendConnectionState;
   goal?: ThreadGoal | null;
@@ -466,6 +471,7 @@ const props = withDefaults(defineProps<{
   loadBench?: (location?: BenchLocation) => Promise<BenchTemplate[] | void>;
   loadWorkRepositories?: (provider: WorkProviderKind, location?: LoopLocation) => Promise<WorkRepository[] | void>;
   loadWorkItems?: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation) => Promise<WorkItem[] | void>;
+  loadOlderAgentHistory?: (agentId: string) => Promise<void>;
   quit?: () => Promise<void>;
 }>(), {
   answeredClientRequestIds: () => new Set<string>(),
@@ -476,6 +482,8 @@ const props = withDefaults(defineProps<{
   backendSkills: () => [],
   backendCapabilities: () => defaultBackendCapabilities('codex'),
   isConversationLoading: false,
+  historyHasOlder: true,
+  historyLoadingOlder: false,
   connectionState: () => ({ status: 'connected' }),
   modelCatalogStatus: 'notLoaded',
   skillCatalogStatus: 'notLoaded',

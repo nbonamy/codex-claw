@@ -121,6 +121,7 @@ therefore never replayed after reconnect or renderer reload.
 | --- | --- | --- | --- |
 | `agent/restart` | `{ agentId }` | `AppSnapshot` | Clears app-visible conversation state and forgets backend session. |
 | `agent/history/hydrate` | `{ agentId }` | `AppSnapshot` | Lazily restores persisted session history without selecting the agent. |
+| `agent/history/load-older` | `{ agentId }` | `{ hasOlder }` | Loads one older provider history page; message batches arrive through `thread.historyLoaded`. |
 | `agent/conversations/list` | `{ agentId }` | `ConversationSummary[]` | Lists provider history through the active agent backend. |
 | `agent/conversation/resume` | `{ agentId, ref: BackendConversationRef }` | `AppSnapshot` | Validates backend match and idle status, then replaces visible history. |
 | `agent/conversation/messages/get` | `{ agentId, ref }` | `RendererMessage[]` | Reads historical messages through the owning backend. |
@@ -274,6 +275,7 @@ implementation messages, not the preferred app protocol for clients.
 | `driver/interrupt` | `{ agent }` | `BackendSendResult` |
 | `driver/clientRequest/respond` | `{ backend, response }` | `null` |
 | `driver/history/hydrate` | `{ agent }` | `BackendSession | null` |
+| `driver/history/load-older` | `{ agent }` | `{ hasOlder }` |
 | `driver/conversations/list` | `{ agent }` | `ConversationSummary[]` |
 | `driver/conversation/resume` | `{ agent, ref }` | `BackendConversationResumeResult` |
 | `driver/conversation/messages/get` | `{ ref, agentId }` | `RendererMessage[]` |

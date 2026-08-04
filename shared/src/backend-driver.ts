@@ -39,6 +39,10 @@ export type BackendConversationResumeResult = {
   messages: RendererMessage[];
 };
 
+export type BackendHistoryLoadResult = {
+  hasOlder: boolean;
+};
+
 export type BackendGoalResult = {
   backendSession: BackendSession;
   goal?: ThreadGoal;
@@ -67,6 +71,7 @@ export type AgentBackendDriver = {
   interrupt(agent: Agent): Promise<BackendSendResult>;
   respondToRequest(response: ClientRequestResponse): Promise<void>;
   hydrateAgent?(agent: Agent): Promise<BackendSession | null>;
+  loadOlderHistory?(agent: Agent): Promise<BackendHistoryLoadResult>;
   listConversations?(agent: Agent): Promise<ConversationSummary[]>;
   resumeConversation?(agent: Agent, ref: BackendConversationRef): Promise<BackendConversationResumeResult>;
   readConversationMessages?(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]>;

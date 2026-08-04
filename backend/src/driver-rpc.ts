@@ -21,6 +21,12 @@ export type BackendDriverRegistryOptions = {
   pluginSettings?: () => AppPluginSettings;
 };
 
+type CodexClawLoadingStrategy = 'eager' | 'lazy';
+
+type CodexClawSurfaceOptions = Parameters<typeof createCodexSurface>[0] & {
+  loadingStrategy?: CodexClawLoadingStrategy;
+};
+
 export function createDefaultBackendDrivers(options: BackendDriverRegistryOptions = {}): Map<AgentBackend, AgentBackendDriver> {
   const codexSurface = createCodexSurface(codexClawSurfaceOptions(options));
   const codexSessionManager = new CodexSurfaceAgentAdapter(codexSurface);
@@ -34,11 +40,12 @@ export function createDefaultBackendDrivers(options: BackendDriverRegistryOption
   ]);
 }
 
-export function codexClawSurfaceOptions(options: BackendDriverRegistryOptions = {}): Parameters<typeof createCodexSurface>[0] {
+export function codexClawSurfaceOptions(options: BackendDriverRegistryOptions = {}): CodexClawSurfaceOptions {
   return {
     autoSelectFirstConversation: false,
     clientInfo: { name: 'codex_claw', title: 'Codex Claw', version: '0.3.0' },
     codexHome: backendCodexHomeDir(),
+    loadingStrategy: 'lazy',
     transport: {
       command: resolveCodexCommand(options.generalSettings?.codexBinaryPath),
       configOverrides: buildCodexClawMcpConfigOverrides(options.generalSettings?.plugins),
@@ -201,6 +208,14 @@ export class BackendDriverRpc {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);
         return driver.hydrateAgent ? driver.hydrateAgent(agent) : null;
+      }
+      case backendMethods.driverHistoryLoadOlder: {
+        const { agent } = requireAgentParams(params);
+        const driver = this.requireDriver(agent.backend);
+        if (!driver.loadOlderHistory) {
+          throw unsupportedBackendFeature(agent, 'demand-paged conversation history');
+        }
+        return driver.loadOlderHistory(agent);
       }
       case backendMethods.driverConversationsList: {
         const { agent } = requireAgentParams(params);

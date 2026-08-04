@@ -223,6 +223,10 @@ export class CodexBackendDriver implements AgentBackendDriver {
     return threadId ? codexBackendSession(threadId) : null;
   }
 
+  async loadOlderHistory(agent: Agent) {
+    return this.sessionManager.loadOlderHistory(agent);
+  }
+
   async readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]> {
     if (ref.backend !== 'codex') {
       throw new Error('Codex cannot read non-Codex conversation history.');

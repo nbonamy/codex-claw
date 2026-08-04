@@ -65,6 +65,7 @@ export const ipcChannels = {
   removeBenchTemplate: 'bench:remove-template',
   restartAgent: 'agent:restart',
   hydrateAgentHistory: 'agent:history:hydrate',
+  loadOlderAgentHistory: 'agent:history:load-older',
   closeAgent: 'agent:close',
   selectAgent: 'agent:select',
   updateSettings: 'settings:update',

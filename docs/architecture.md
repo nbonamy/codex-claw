@@ -791,9 +791,13 @@ id but the host is ready for multiple browser tabs per agent.
 
 Agent selection is optimistic only when the renderer already has hydrated
 messages for that agent. First startup and the first visit to an uncached
-conversation keep the history loader visible until the full-item five-turn
-bootstrap page arrives, then reveal that recent transcript immediately. The SDK
-continues older full-history pagination from the bootstrap cursor. Because
+conversation keep the history loader visible until the full-item 50-turn
+bootstrap page arrives, then reveal that recent transcript immediately. The
+The default lazy loading strategy keeps the app-server cursor inside the SDK and
+requests older pages only when the user reaches the top. Claw also selects lazy
+rendering, so the DOM remains bounded while eager rendering remains available
+for hosts that need every supplied message mounted. Eager loading can be
+selected independently when a host needs the full history in memory. Because
 app-server history can omit tool items that were observed live, lifecycle
 hydration may add previously unknown turns but never rewrites a turn already in
 Claw memory. Git status and agent-specific catalogs still reconcile in the
