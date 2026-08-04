@@ -48,8 +48,20 @@ export function buildAppMenuTemplate(
     buildViewMenu(callbacks, options),
     ...(options.debugMode ? [buildDebugMenu(callbacks)] : []),
     buildWindowMenu(callbacks, platform),
-    { role: 'help' },
+    buildHelpMenu(callbacks),
   ];
+}
+
+function buildHelpMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions {
+  return {
+    label: 'Help',
+    submenu: [
+      {
+        label: 'What’s New',
+        click: () => callbacks.sendAppCommand({ type: 'open-whats-new' }),
+      },
+    ],
+  };
 }
 
 function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions {

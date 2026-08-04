@@ -65,7 +65,7 @@ import { computed, ref } from 'vue';
 import type { AccountRateLimitWindow, AccountRateLimits, CodexAccount } from '@codex-claw/shared/contracts';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
-import { BrandSpeedTest, QuitIcon, SettingsIcon, UserCircleIcon } from '../shared/icons/app-icons';
+import { BrandSpeedTest, QuitIcon, SettingsIcon, SparklesIcon, UserCircleIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
   active?: boolean;
@@ -77,6 +77,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   'open-settings': [];
+  'open-whats-new': [];
   logout: [];
   quit: [];
 }>();
@@ -88,6 +89,12 @@ const menuItems = computed<AppMenuItem[]>(() => [
     label: 'Settings',
     icon: SettingsIcon,
     value: '⌘,',
+  },
+  {
+    id: 'open-whats-new',
+    type: 'action',
+    label: 'What’s New',
+    icon: SparklesIcon,
   },
   {
     id: 'logout',
@@ -185,6 +192,8 @@ function selectMenuItem(itemId: string): void {
 
   if (itemId === 'open-settings') {
     emit('open-settings');
+  } else if (itemId === 'open-whats-new') {
+    emit('open-whats-new');
   } else if (itemId === 'logout') {
     emit('logout');
   } else if (itemId === 'quit') {

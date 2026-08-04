@@ -1042,6 +1042,7 @@ export type AppCommand =
   | { type: 'open-browser'; agentId?: string; browserId?: string; url?: string }
   | { type: 'open-review' }
   | { type: 'open-settings' }
+  | { type: 'open-whats-new' }
   | { type: 'quit' }
   | { type: 'restart-active-agent' }
   | { type: 'set-agent-list-compact'; compact: boolean };

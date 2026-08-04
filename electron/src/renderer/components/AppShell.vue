@@ -27,6 +27,7 @@
       @edit-team="openEditTeam"
       @new-team="openNewTeam"
       @open-settings="openSettings"
+      @open-whats-new="openWhatsNew"
       @logout="logoutCodex"
       @quit="quit"
       @reorder-teams="$emit('reorder-teams', $event)"
@@ -292,6 +293,10 @@
       :update-team="updateTeam"
       @close="teamDialogVisible = false"
     />
+    <WhatsNewDialog
+      :visible="whatsNewVisible"
+      @close="whatsNewVisible = false"
+    />
   </main>
 </template>
 
@@ -312,6 +317,7 @@ import ConversationPane from './ConversationPane.vue';
 import LoopsView from './LoopsView.vue';
 import TeamDialog from './TeamDialog.vue';
 import TeamRail from './TeamRail.vue';
+import WhatsNewDialog from './WhatsNewDialog.vue';
 import BenchAgentAssignmentDialog from './BenchAgentAssignmentDialog.vue';
 import RightWorkspacePanel from './RightWorkspacePanel.vue';
 import SettingsView from './SettingsView.vue';
@@ -628,6 +634,7 @@ const pendingCockpitBacklogConfiguration = ref<CockpitBacklogConfiguration | nul
 const benchAssignmentDialogVisible = ref(false);
 const teamDialogVisible = ref(false);
 const teamDialogMode = ref<'create' | 'edit'>('create');
+const whatsNewVisible = ref(false);
 const editingTeamId = ref<string | null>(null);
 let filePreviewRequestId = 0;
 let markdownPreviewId = 0;
@@ -919,7 +926,12 @@ const cockpitVisible = computed(() => activeSurface.value === 'cockpit');
 const loopsVisible = computed(() => activeSurface.value === 'loops');
 const settingsVisible = computed(() => activeSurface.value === 'settings');
 const isAgentWorkspaceVisible = computed(() => activeSurface.value === 'agent');
-const isModalDialogVisible = computed(() => agentDialogVisible.value || benchAssignmentDialogVisible.value || teamDialogVisible.value);
+const isModalDialogVisible = computed(() => (
+  agentDialogVisible.value
+  || benchAssignmentDialogVisible.value
+  || teamDialogVisible.value
+  || whatsNewVisible.value
+));
 const showAgentSidebar = computed(() => isAgentWorkspaceVisible.value && !agentSidebarCollapsed.value && !isAgentEmpty.value);
 const showLoginLanding = computed(() => (
   authenticationLoading.value ||
@@ -1365,6 +1377,10 @@ function openSettings(): void {
   activeSurface.value = 'settings';
 }
 
+function openWhatsNew(): void {
+  whatsNewVisible.value = true;
+}
+
 async function createLoop(input: CreateLoopInput, location?: LoopLocation): Promise<AppSnapshot | void> {
   return props.createLoop(input, location);
 }
@@ -1782,6 +1798,11 @@ function handleAppCommand(command: AppCommand): void {
 
   if (command.type === 'open-settings') {
     openSettings();
+    return;
+  }
+
+  if (command.type === 'open-whats-new') {
+    openWhatsNew();
     return;
   }
 

@@ -48,10 +48,12 @@ describe('SettingsMenu', () => {
 
     await openMenu(wrapper);
     const actions = wrapper.findAll('.app-menu__item');
-    expect(actions.map((button) => button.get('.app-menu__label').text())).toStrictEqual(['Settings', 'Log out', 'Quit']);
+    expect(actions.map((button) => button.get('.app-menu__label').text())).toStrictEqual(['Settings', 'What’s New', 'Log out', 'Quit']);
     expect(actions[0]?.get('.app-menu__value').text()).toBe('⌘,');
-    expect(actions[1]?.classes()).not.toContain('app-menu__item--danger');
-    await actions[1]?.trigger('click');
+    expect(actions[2]?.classes()).not.toContain('app-menu__item--danger');
+    await actions[2]?.trigger('click');
+    await openMenu(wrapper);
+    await wrapper.findAll('button').find((button) => button.text() === 'What’s New')?.trigger('click');
     await openMenu(wrapper);
     await wrapper.findAll('button').find((button) => {
       const label = button.find('.app-menu__label');
@@ -61,6 +63,7 @@ describe('SettingsMenu', () => {
     await wrapper.findAll('button').find((button) => button.text() === 'Quit')?.trigger('click');
 
     expect(wrapper.emitted('logout')).toStrictEqual([[]]);
+    expect(wrapper.emitted('open-whats-new')).toStrictEqual([[]]);
     expect(wrapper.emitted('open-settings')).toStrictEqual([[]]);
     expect(wrapper.emitted('quit')).toStrictEqual([[]]);
   });

@@ -4,6 +4,11 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+### New features
+
+- Added an in-app What’s New dialog, available from the native Help menu and
+  lower-left account menu, with release notes verified during release packaging.
+
 ### Improvements and fixes
 
 - Mobile remote access can keep a plugged-in Mac awake, with streamlined

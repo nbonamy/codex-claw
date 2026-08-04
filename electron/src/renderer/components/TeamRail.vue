@@ -73,6 +73,7 @@
           :rate-limits="rateLimits"
           @logout="emit('logout')"
           @open-settings="emit('open-settings')"
+          @open-whats-new="emit('open-whats-new')"
           @quit="emit('quit')"
         />
       </div>
@@ -121,6 +122,7 @@ const emit = defineEmits<{
   'edit-team': [teamId: string];
   'new-team': [];
   'open-settings': [];
+  'open-whats-new': [];
   logout: [];
   quit: [];
   'reorder-teams': [input: ReorderTeamsInput];

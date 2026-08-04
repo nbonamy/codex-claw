@@ -1,0 +1,141 @@
+import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.resolve(import.meta.dirname, '..');
+const RELEASE_NOTES_PATH = 'electron/src/renderer/generated/release-notes.json';
+const PACKAGE_PATHS = ['package.json', 'shared/package.json', 'backend/package.json', 'electron/package.json'];
+
+function readJson(filePath) {
+  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function extractReleaseSection(changelog, version) {
+  const headingPattern = new RegExp(`^## \\[${escapeRegExp(version)}\\] - (\\d{4}-\\d{2}-\\d{2})\\s*$`, 'm');
+  const match = headingPattern.exec(changelog);
+  if (!match) {
+    throw new Error(`CHANGELOG.md must contain a release heading for ${version}: ## [${version}] - YYYY-MM-DD`);
+  }
+
+  const bodyStart = match.index + match[0].length;
+  const nextHeadingOffset = changelog.slice(bodyStart).search(/^##\s/m);
+  const bodyEnd = nextHeadingOffset === -1 ? changelog.length : bodyStart + nextHeadingOffset;
+  const markdown = changelog.slice(bodyStart, bodyEnd).trim();
+  if (!markdown) {
+    throw new Error(`CHANGELOG.md release ${version} has no release notes.`);
+  }
+
+  return {
+    releasedAt: match[1],
+    markdown,
+  };
+}
+
+export function assertVersionConsistency({ rootPackage, workspaces, lockfile }) {
+  const version = rootPackage.version;
+  if (typeof version !== 'string' || !version.trim()) {
+    throw new Error('The root package.json must declare a version.');
+  }
+
+  for (const workspace of workspaces) {
+    if (workspace.manifest.version !== version) {
+      throw new Error(`${workspace.path} version ${workspace.manifest.version ?? '(missing)'} does not match root version ${version}.`);
+    }
+    const sharedVersion = workspace.manifest.dependencies?.['@codex-claw/shared'];
+    if (sharedVersion !== undefined && sharedVersion !== version) {
+      throw new Error(`${workspace.path} depends on @codex-claw/shared ${sharedVersion}, expected ${version}.`);
+    }
+  }
+
+  if (lockfile.version !== version || lockfile.packages?.['']?.version !== version) {
+    throw new Error(`package-lock.json root version does not match ${version}. Run npm install after bumping versions.`);
+  }
+  for (const workspace of workspaces) {
+    const lockManifest = lockfile.packages?.[workspace.path.replace('/package.json', '')];
+    if (lockManifest?.version !== version) {
+      throw new Error(`package-lock.json entry for ${workspace.path} does not match ${version}. Run npm install after bumping versions.`);
+    }
+    const sharedVersion = lockManifest?.dependencies?.['@codex-claw/shared'];
+    if (sharedVersion !== undefined && sharedVersion !== version) {
+      throw new Error(`package-lock.json entry for ${workspace.path} depends on @codex-claw/shared ${sharedVersion}, expected ${version}.`);
+    }
+  }
+
+  return version;
+}
+
+export function createReleaseNotes({ version, changelog }) {
+  const release = extractReleaseSection(changelog, version);
+  return {
+    schemaVersion: 1,
+    version,
+    releasedAt: release.releasedAt,
+    sourceSha256: createHash('sha256').update(release.markdown).digest('hex'),
+    markdown: release.markdown,
+  };
+}
+
+export function serializeReleaseNotes(releaseNotes) {
+  return `${JSON.stringify(releaseNotes, null, 2)}\n`;
+}
+
+export function expectedReleaseNotes(rootDir = ROOT) {
+  const manifests = PACKAGE_PATHS.map((relativePath) => ({
+    path: relativePath,
+    manifest: readJson(path.join(rootDir, relativePath)),
+  }));
+  const [root, ...workspaces] = manifests;
+  const version = assertVersionConsistency({
+    rootPackage: root.manifest,
+    workspaces,
+    lockfile: readJson(path.join(rootDir, 'package-lock.json')),
+  });
+  const changelog = fs.readFileSync(path.join(rootDir, 'CHANGELOG.md'), 'utf8');
+  return serializeReleaseNotes(createReleaseNotes({ version, changelog }));
+}
+
+export function generateReleaseNotes(rootDir = ROOT) {
+  const outputPath = path.join(rootDir, RELEASE_NOTES_PATH);
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, expectedReleaseNotes(rootDir));
+  return outputPath;
+}
+
+export function assertReleaseNotesCurrent(actual, expected) {
+  if (actual !== expected) {
+    throw new Error(`${RELEASE_NOTES_PATH} is stale. Run npm run release-notes:generate and review the result.`);
+  }
+}
+
+export function checkReleaseNotes(rootDir = ROOT) {
+  const outputPath = path.join(rootDir, RELEASE_NOTES_PATH);
+  if (!fs.existsSync(outputPath)) {
+    throw new Error(`Missing ${RELEASE_NOTES_PATH}. Run npm run release-notes:generate.`);
+  }
+  const expected = expectedReleaseNotes(rootDir);
+  const actual = fs.readFileSync(outputPath, 'utf8');
+  assertReleaseNotesCurrent(actual, expected);
+  return outputPath;
+}
+
+function isMainModule() {
+  return process.argv[1] ? fileURLToPath(import.meta.url) === path.resolve(process.argv[1]) : false;
+}
+
+if (isMainModule()) {
+  const mode = process.argv[2] ?? 'check';
+  if (mode === 'generate') {
+    const outputPath = generateReleaseNotes();
+    console.log(`Generated ${path.relative(ROOT, outputPath)}.`);
+  } else if (mode === 'check') {
+    const outputPath = checkReleaseNotes();
+    console.log(`Verified ${path.relative(ROOT, outputPath)} against package version and CHANGELOG.md.`);
+  } else {
+    throw new Error(`Unknown release-notes mode: ${mode}. Use generate or check.`);
+  }
+}

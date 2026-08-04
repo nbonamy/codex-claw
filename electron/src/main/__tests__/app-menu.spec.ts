@@ -51,6 +51,7 @@ describe('app menu', () => {
       'Next Agent',
       'Previous Agent',
     ]);
+    expect(menuLabels(submenu(menu, 'Help'))).toStrictEqual(['What’s New']);
     expect(JSON.stringify(menu)).not.toMatch(/editMenu|viewMenu|reload|forceReload|toggleDevTools/i);
   });
 
@@ -110,6 +111,8 @@ describe('app menu', () => {
     expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(13, { type: 'cycle-teams' });
     expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(14, { type: 'cycle-agents', direction: 1 });
     expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(15, { type: 'cycle-agents', direction: -1 });
+    clickItem(menu, 'Help', 'What’s New');
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(16, { type: 'open-whats-new' });
   });
 
   it('uses the expected file menu accelerators', () => {

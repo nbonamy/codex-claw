@@ -2602,6 +2602,12 @@ describe('AppShell', () => {
 
     expect(onAppCommand).toHaveBeenCalledOnce();
     expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('compact')).toBe(true);
+    listener({ type: 'open-whats-new' });
+    await nextTick();
+    expect(wrapper.getComponent({ name: 'WhatsNewDialog' }).props('visible')).toBe(true);
+    wrapper.getComponent({ name: 'WhatsNewDialog' }).vm.$emit('close');
+    await nextTick();
+    expect(wrapper.getComponent({ name: 'WhatsNewDialog' }).props('visible')).toBe(false);
     listener({ type: 'set-agent-list-compact', compact: false });
     await nextTick();
     expect(updateSettings).toHaveBeenCalledWith({ general: { agentListCompact: false } });

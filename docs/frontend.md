@@ -132,6 +132,9 @@ implemented:
   selection first, progressively reveals checkout controls, and hides backend
   and resolved-path implementation details; identity and workspace settings
   use grouped surfaces with compact row controls;
+- a theme-aware What’s New dialog that renders the release notes embedded in
+  the application and opens from both the native Help menu and lower-left
+  account menu;
 - full-space Settings surface launched from the rail, with its own category
   sidebar and screen-level panels instead of dialog chrome; its first page
   launches `/Applications/ChatGPT.app` with Claw's isolated `CODEX_HOME` for

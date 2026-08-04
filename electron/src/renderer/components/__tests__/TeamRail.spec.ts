@@ -263,9 +263,13 @@ describe('TeamRail', () => {
       const label = button.find('.app-menu__label');
       return label.exists() && label.text() === 'Settings';
     })?.trigger('click');
+    await wrapper.get('[aria-label$="menu"]').trigger('click');
+    await wrapper.findAll('button').find((button) => button.text() === 'What’s New')?.trigger('click');
+    await wrapper.get('[aria-label$="menu"]').trigger('click');
     await wrapper.findAll('button').find((button) => button.text() === 'Quit')?.trigger('click');
 
     expect(wrapper.emitted('open-settings')).toStrictEqual([[]]);
+    expect(wrapper.emitted('open-whats-new')).toStrictEqual([[]]);
     expect(wrapper.emitted('quit')).toStrictEqual([[]]);
   });
 
