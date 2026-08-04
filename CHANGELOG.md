@@ -4,6 +4,8 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.5.0] - 2026-08-04
+
 ### New features
 
 - Added an in-app What’s New dialog, available from the native Help menu and
@@ -11,6 +13,10 @@ All notable Codex Claw changes are recorded here.
 
 ### Improvements and fixes
 
+- Long conversations now load progressively, keep only recent messages mounted
+  until you scroll upward, and use less memory across long sessions.
+- Large conversations no longer retransmit and redraw their full transcript for
+  routine agent selection, prompt, status, or background-state updates.
 - Mobile remote access can keep a plugged-in Mac awake, with streamlined
   connection, pairing, and device controls in Settings.
 - Added keyboard shortcuts for opening Settings and compacting the active
@@ -41,10 +47,6 @@ All notable Codex Claw changes are recorded here.
 
 ### Improvements and fixes
 
-- Long conversations now load progressively, keep only recent messages mounted
-  until you scroll upward, and use less memory across long sessions.
-- Large conversations no longer retransmit and redraw their full transcript for
-  routine agent selection, prompt, status, or background-state updates.
 - Browser annotations now dismiss on outside click and immediately resume
   element selection while annotation mode remains active.
 - Plan reviews now support compact inline comments, batch refinement, clear
