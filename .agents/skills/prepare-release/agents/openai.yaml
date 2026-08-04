@@ -1,4 +1,4 @@
 interface:
   display_name: "Prepare Release"
-  short_description: "Audit and freeze a Codex Claw release"
+  short_description: "Audit Claw and SDK, then freeze a release"
   default_prompt: "Use $prepare-release to prepare the next Codex Claw release."
