@@ -136,6 +136,7 @@
   --workbench-appbar-height: 48px;
   --workbench-layout-header-offset: 0px;
   --workbench-layout-footer-offset: 0px;
+  --conversation-content-width: 780px;
   --idea-pane-header-height: 56px;
   --ideas-chat-width: 40%;
   --ideas-explorer-width: 44px;

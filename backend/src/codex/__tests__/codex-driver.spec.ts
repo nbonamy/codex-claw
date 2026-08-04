@@ -39,7 +39,7 @@ describe('CodexBackendDriver', () => {
     expect(sessionManager.compactThread).not.toHaveBeenCalled();
   });
 
-  it('routes review prompts to review targets', async () => {
+  it('routes review prompts through SDK slash handling', async () => {
     const sessionManager = createSessionManager();
     const driver = new CodexBackendDriver(sessionManager);
 
@@ -47,15 +47,10 @@ describe('CodexBackendDriver', () => {
       backendSession: { kind: 'codex', threadId: 'thread-review' },
       turnId: 'turn-review',
     });
-    expect(sessionManager.reviewThread).toHaveBeenCalledWith(agent, {
-      type: 'uncommittedChanges',
-    });
+    expect(sessionManager.sendPrompt).toHaveBeenCalledWith(agent, '/review');
 
     await driver.tryHandlePromptCommand(agent, '/review check regressions');
-    expect(sessionManager.reviewThread).toHaveBeenLastCalledWith(agent, {
-      type: 'custom',
-      instructions: 'check regressions',
-    });
+    expect(sessionManager.sendPrompt).toHaveBeenLastCalledWith(agent, '/review check regressions');
   });
 
   it('sets and clears goals through the session manager', async () => {
@@ -238,7 +233,7 @@ function createSessionManager(overrides: Partial<CodexSurfaceAgentAdapter> = {})
     clearThreadGoal: vi.fn().mockResolvedValue({ threadId: 'thread-goal', cleared: true }),
     reviewThread: vi.fn().mockResolvedValue({ threadId: 'thread-review', turnId: 'turn-review' }),
     getRuntimeStatus: vi.fn().mockReturnValue({ backend: 'codex', status: 'notConfigured' }),
-    sendPrompt: vi.fn(),
+    sendPrompt: vi.fn().mockResolvedValue({ threadId: 'thread-review', turnId: 'turn-review' }),
     listConversations: vi.fn().mockResolvedValue([]),
     resumeConversation: vi.fn().mockResolvedValue({ threadId: 'thread-dina', messages: [] }),
     readConversationMessages: vi.fn().mockResolvedValue([]),

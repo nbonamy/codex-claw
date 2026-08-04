@@ -1,5 +1,10 @@
-import { flushPromises, mount } from '@vue/test-utils';
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import ElementPlus, { ElMessageBox } from 'element-plus';
+import type {
+  CodexConversationPaneActions,
+  CodexConversationPaneController,
+  CodexConversationPaneState,
+} from 'codex-app-sdk/vue';
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
@@ -177,6 +182,91 @@ describe('AppShell', () => {
     await wrapper.get('form').trigger('submit');
 
     expect(wrapper.emitted('sendPrompt')).toStrictEqual([['hello']]);
+  });
+
+  it('owns the SDK conversation controller state and actions at the shell boundary', async () => {
+    const snapshot = createInitialSnapshot();
+    const activeAgent = snapshot.agents[0];
+    if (!activeAgent) throw new Error('Expected seeded agent.');
+    activeAgent.backendSession = { kind: 'codex', threadId: 'thread-dina' };
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent,
+        messages: snapshot.messages,
+        isLoading: false,
+        isSending: false,
+        selectedModelId: 'gpt-5',
+        selectedReasoningEffort: 'high',
+        selectedServiceTier: 'fast',
+        composerState: { text: 'saved draft', selectionStart: 5, selectionEnd: 5 },
+      },
+      global: { plugins: [ElementPlus, i18n] },
+    });
+
+    const state = conversationControllerState(wrapper);
+    expect(state.identity).toMatchObject({
+      conversationKey: 'codex:thread-dina',
+      messages: snapshot.messages,
+      busy: false,
+      disabled: false,
+    });
+    expect(state.composer).toMatchObject({
+      selectedModelId: 'gpt-5',
+      selectedReasoningEffort: 'high',
+      selectedServiceTier: 'fast',
+      state: { text: 'saved draft', selectionStart: 5, selectionEnd: 5 },
+    });
+
+    const updatedMessages: RendererMessage[] = [{
+      id: 'controller-reactive-message',
+      agentId: activeAgent.id,
+      role: 'assistant',
+      status: 'complete',
+      createdAt: '2026-08-04T00:00:00.000Z',
+      parts: [{ type: 'text', text: 'Updated through the stable controller.' }],
+    }];
+    await wrapper.setProps({ messages: updatedMessages } as Record<string, unknown>);
+    expect(conversationControllerState(wrapper).identity.messages).toStrictEqual(updatedMessages);
+    expect(wrapper.text()).toContain('Updated through the stable controller.');
+
+    const actions = conversationControllerActions(wrapper);
+    const openExternal = vi.spyOn(window, 'open').mockImplementation(() => null);
+    await actions.updateComposerState?.({ text: 'updated', selectionStart: 7, selectionEnd: 7 });
+    await actions.updateAttachments?.([{
+      id: 'attachment-1',
+      type: 'file',
+      path: '/tmp/context.txt',
+      name: 'context.txt',
+      mimeType: 'text/plain',
+      size: 12,
+    }]);
+    await actions.updateSettings?.({ modelId: 'gpt-5.1', serviceTier: null });
+    await actions.submit?.('review context', {
+      attachments: [{ type: 'file', path: '/tmp/context.txt', name: 'context.txt' }],
+      model: 'sdk-selection-does-not-cross-host-boundary',
+    });
+    await actions.openLink?.({ kind: 'external', href: 'https://example.com/docs' });
+
+    expect(wrapper.emitted('update:composerState')).toStrictEqual([[{
+      agentId: activeAgent.id,
+      state: { text: 'updated', selectionStart: 7, selectionEnd: 7 },
+    }]]);
+    expect(wrapper.emitted('update:composerAttachments')).toStrictEqual([[{
+      agentId: activeAgent.id,
+      attachments: [expect.objectContaining({ path: '/tmp/context.txt' })],
+    }]]);
+    expect(wrapper.emitted('select-model')).toStrictEqual([['gpt-5.1']]);
+    expect(wrapper.emitted('select-service-tier')).toStrictEqual([[null]]);
+    expect(wrapper.emitted('sendPrompt')).toStrictEqual([[
+      'review context',
+      { attachments: [{ type: 'file', path: '/tmp/context.txt', name: 'context.txt' }] },
+    ]]);
+    expect(openExternal).toHaveBeenCalledWith(
+      'https://example.com/docs',
+      '_blank',
+      'noopener,noreferrer',
+    );
   });
 
   it('opens the empty workspace launcher before preserving a selected Browser tab', async () => {
@@ -529,7 +619,7 @@ describe('AppShell', () => {
       global: { plugins: [ElementPlus, i18n] },
     });
 
-    wrapper.findComponent({ name: 'ConversationPane' }).vm.$emit('open-file', {
+    await conversationControllerActions(wrapper).openLink?.({
       kind: 'file',
       href: '/workspace/dina/src/main.ts',
       path: '/workspace/dina/src/main.ts',
@@ -558,7 +648,7 @@ describe('AppShell', () => {
       global: { plugins: [ElementPlus, i18n] },
     });
 
-    wrapper.findComponent({ name: 'ConversationPane' }).vm.$emit('open-file', {
+    await conversationControllerActions(wrapper).openLink?.({
       kind: 'file',
       href: 'src/main.ts',
       path: 'src/main.ts',
@@ -914,7 +1004,7 @@ describe('AppShell', () => {
       },
     });
 
-    wrapper.findComponent({ name: 'ConversationPane' }).vm.$emit('open-file', {
+    await conversationControllerActions(wrapper).openLink?.({
       kind: 'file',
       href: '   ',
       path: '   ',
@@ -2500,17 +2590,20 @@ describe('AppShell', () => {
 
     listener({ type: 'debug-approval-request' });
     await nextTick();
-    const conversation = wrapper.getComponent({ name: 'ConversationPane' });
-    expect(conversation.props('approvals')).toStrictEqual([expect.objectContaining({
+    expect(conversationControllerState(wrapper).thread?.approvals).toStrictEqual([expect.objectContaining({
       id: 'debug-approval-request',
       title: 'Allow debug command',
       command: 'npm test -- --run debug-fixture',
     })]);
 
-    conversation.vm.$emit('resolve-approval', 'debug-approval-request', 'approve', 'once');
+    await conversationControllerActions(wrapper).resolveApproval?.(
+      'debug-approval-request',
+      'approve',
+      'once',
+    );
     await nextTick();
 
-    expect(wrapper.getComponent({ name: 'ConversationPane' }).props('approvals')).toStrictEqual([]);
+    expect(conversationControllerState(wrapper).thread?.approvals).toStrictEqual([]);
     expect(wrapper.emitted('resolve-approval')).toBeUndefined();
   });
 
@@ -2799,6 +2892,24 @@ function mountShell(overrides: Partial<{
       },
     },
   });
+}
+
+function conversationController(wrapper: VueWrapper): CodexConversationPaneController {
+  return wrapper.getComponent({ name: 'ConversationPane' }).props('controller') as CodexConversationPaneController;
+}
+
+function conversationControllerState(wrapper: VueWrapper): CodexConversationPaneState {
+  return resolveConversationControllerValue(conversationController(wrapper).state);
+}
+
+function conversationControllerActions(wrapper: VueWrapper): CodexConversationPaneActions {
+  return resolveConversationControllerValue(conversationController(wrapper).actions);
+}
+
+function resolveConversationControllerValue<T>(source: T | { readonly value: T } | (() => T)): T {
+  if (typeof source === 'function') return (source as () => T)();
+  if (source && typeof source === 'object' && 'value' in source) return source.value;
+  return source as T;
 }
 
 async function chooseCustomAgentFolder(wrapper: ReturnType<typeof mountShell>, repositorySelectIndex = 0) {

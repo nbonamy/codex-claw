@@ -10,6 +10,8 @@ All notable Codex Claw changes are recorded here.
   connection, pairing, and device controls in Settings.
 - Added keyboard shortcuts for opening Settings and compacting the active
   agent's context.
+- Conversations now preserve submitted `/review` commands and open external
+  links correctly, while Git status is analyzed when an agent is first shown.
 
 ## [0.4.0] - 2026-08-03
 

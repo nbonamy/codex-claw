@@ -202,54 +202,12 @@
           <ConversationPane
             v-else
             ref="conversationPane"
-            :messages="messages"
+            :controller="conversationPaneController"
             :agent="currentAgent"
             :agents="snapshot.agents"
-            :agent-files="agentFiles"
-            :is-loading="isLoading || isConversationLoading"
-            :history-has-older="historyHasOlder"
-            :history-loading-older="historyLoadingOlder"
-            :is-sending="isSending"
-            :answered-client-request-ids="answeredClientRequestIds"
-            :backend-models="backendModels"
-            :backend-commands="backendCommands"
-            :backend-skills="backendSkills"
-            :backend-capabilities="backendCapabilities"
-            :model-catalog-status="modelCatalogStatus"
-            :skill-catalog-status="skillCatalogStatus"
-            :goal="goal"
-            :approvals="effectiveApprovals"
             :plan="currentTurnPlan"
             :plan-visible="executionPlanVisible"
-            :approval-preset="approvalPreset"
-            :plan-mode="planMode"
-            :selected-model-id="selectedModelId"
-            :selected-reasoning-effort="selectedReasoningEffort"
-            :selected-service-tier="selectedServiceTier"
-            :queued-prompts="queuedPrompts"
-            :composer-state="composerState"
-            :attachments="composerAttachments"
-            @client-response="$emit('client-response', $event)"
             @close-plan="closeExecutionPlan"
-            @delete-message="$emit('delete-message', $event)"
-            @delete-queued-prompt="$emit('delete-queued-prompt', $event)"
-            @edit-message="$emit('edit-message', $event)"
-            @interrupt-agent="$emit('interrupt-agent')"
-            @open-file="openFilePreview"
-            @retry-message="$emit('retry-message', $event)"
-            @select-model="$emit('select-model', $event)"
-            @select-reasoning-effort="$emit('select-reasoning-effort', $event)"
-            @select-service-tier="$emit('select-service-tier', $event)"
-            @select-approval-preset="$emit('select-approval-preset', $event)"
-            @resolve-approval="forwardApprovalResolution"
-            @clear-goal="$emit('clear-goal')"
-            @send-prompt="forwardPrompt"
-            @load-older-history="loadOlderAgentHistory?.(currentAgent?.id ?? '')"
-            @steer-prompt="forwardSteerPrompt"
-            @steer-queued-prompt="$emit('steer-queued-prompt', $event)"
-            @update:plan-mode="$emit('update:planMode', $event)"
-            @update:composer-state="$emit('update:composerState', $event)"
-            @update:composer-attachments="$emit('update:composerAttachments', $event)"
           />
           <RightWorkspacePanel
             v-for="agent in snapshot.agents"
@@ -339,7 +297,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type PairedDevice, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
+import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type PairedDevice, type PromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultTeamColor } from '@codex-claw/shared/team-colors';
@@ -360,10 +318,16 @@ import CodexLoginLanding from './CodexLoginLanding.vue';
 import type { SettingsTab } from './settings-tabs';
 import { confirmCloseTeam } from './team-close-confirmation';
 import {
+  createCodexConversationPaneController,
+  type CodexCapabilities,
+  type CodexConversationLink,
+  type CodexConversationPaneActions,
+  type CodexConversationPaneState,
   type CodexNativeAttachment,
   type CodexComposerState,
   languageForFilePath,
   type CodexQueuedPromptData as QueuedChatPrompt,
+  type SendCodexMessageOptions,
 } from 'codex-app-sdk/vue';
 import type { PlanReviewComment, SidePanelGitDiffState, SidePanelMarkdownState } from './side-panel';
 import {
@@ -750,6 +714,112 @@ const executionPlanVisible = computed(() => {
   return executionPlanStates[agentId]?.turnId === plan.turnId
     ? executionPlanStates[agentId].open
     : true;
+});
+
+const conversationKey = computed(() => {
+  const session = currentAgent.value?.backendSession;
+  if (session?.kind === 'codex') return `codex:${session.threadId}`;
+  if (session?.kind === 'claude') return `claude:${session.sessionId}`;
+  return currentAgent.value ? `agent:${currentAgent.value.id}` : 'no-agent';
+});
+const conversationCapabilities = computed<CodexCapabilities>(() => ({
+  models: props.backendCapabilities.models,
+  skills: props.backendCapabilities.skills,
+  reasoningEffort: props.backendCapabilities.reasoningEffort,
+  ...(props.backendCapabilities.serviceTier === undefined
+    ? {}
+    : { serviceTier: props.backendCapabilities.serviceTier }),
+  planMode: props.backendCapabilities.planMode !== 'unsupported',
+  goals: props.backendCapabilities.goals,
+  steerPrompt: props.backendCapabilities.steerPrompt,
+  interrupt: props.backendCapabilities.interrupt,
+  history: props.backendCapabilities.history,
+  rollback: props.backendCapabilities.rollback,
+  editMessage: props.backendCapabilities.editMessage,
+  retryMessage: props.backendCapabilities.retryMessage,
+  approvals: props.backendCapabilities.approvals,
+  approvalPresets: props.backendCapabilities.approvalPresets ?? [],
+}));
+const conversationPaneState: CodexConversationPaneState = {
+  identity: {
+    get conversationKey() { return conversationKey.value; },
+    get messages() { return props.messages; },
+    get busy() { return props.isSending; },
+    get disabled() { return !currentAgent.value; },
+  },
+  history: {
+    get hasOlder() { return props.historyHasOlder; },
+    get loading() {
+      return Boolean(currentAgent.value?.backendSession)
+        && props.messages.length === 0
+        && (props.isLoading || props.isConversationLoading);
+    },
+    get loadingOlder() { return props.historyLoadingOlder; },
+  },
+  thread: {
+    get approvals() { return effectiveApprovals.value; },
+    get answeredClientRequestIds() { return props.answeredClientRequestIds; },
+    get goal() { return props.goal ?? null; },
+    get queuedPrompts() { return props.queuedPrompts; },
+    get contextUsage() { return currentAgent.value?.contextUsage ?? null; },
+  },
+  composer: {
+    get state() { return props.composerState; },
+    get attachments() { return props.composerAttachments; },
+    get placeholder() {
+      if (!currentAgent.value) return 'Select an agent';
+      const backend = currentAgent.value.backend === 'claude' ? 'Claude' : 'Codex';
+      return props.isSending ? `${backend} is working...` : 'Ask for follow-up changes';
+    },
+    get approvalPreset() { return props.approvalPreset; },
+    get planMode() { return props.planMode; },
+    get selectedModelId() { return props.selectedModelId; },
+    get selectedReasoningEffort() { return props.selectedReasoningEffort; },
+    get selectedServiceTier() { return props.selectedServiceTier; },
+  },
+  catalogs: {
+    get files() { return props.agentFiles; },
+    get models() { return props.backendModels; },
+    get commands() { return props.backendCommands; },
+    get skills() { return props.backendSkills; },
+    get modelCatalogStatus() { return props.modelCatalogStatus; },
+    get skillCatalogStatus() { return props.skillCatalogStatus; },
+  },
+  get capabilities() { return conversationCapabilities.value; },
+  policy: {
+    get attachEnabled() { return props.backendCapabilities.attachments; },
+    get canDeleteMessage() { return props.backendCapabilities.rollback; },
+    get canEditMessage() { return props.backendCapabilities.editMessage; },
+    get canRetryMessage() { return props.backendCapabilities.retryMessage; },
+  },
+};
+const conversationPaneActions: CodexConversationPaneActions = {
+  clearGoal: () => emit('clear-goal'),
+  clientResponse: (response) => emit('client-response', response),
+  deleteMessage: (index) => emit('delete-message', index),
+  deleteQueuedPrompt: (promptId) => emit('delete-queued-prompt', promptId),
+  editMessage: (payload) => emit('edit-message', payload),
+  interrupt: () => emit('interrupt-agent'),
+  loadOlderHistory: () => props.loadOlderAgentHistory?.(currentAgent.value?.id ?? ''),
+  openLink: openConversationLink,
+  resolveApproval: forwardApprovalResolution,
+  retryMessage: (index) => emit('retry-message', index),
+  steer: forwardCodexSteerPrompt,
+  steerQueuedPrompt: (promptId) => emit('steer-queued-prompt', promptId),
+  submit: forwardCodexPrompt,
+  updateAttachments: updateConversationAttachments,
+  updateComposerState: updateConversationComposerState,
+  updateSettings: (settings) => {
+    if (settings.approvalPreset !== undefined) emit('select-approval-preset', settings.approvalPreset);
+    if (settings.modelId !== undefined) emit('select-model', settings.modelId);
+    if (settings.planMode !== undefined) emit('update:planMode', settings.planMode);
+    if (settings.reasoningEffort !== undefined) emit('select-reasoning-effort', settings.reasoningEffort);
+    if (settings.serviceTier !== undefined) emit('select-service-tier', settings.serviceTier);
+  },
+};
+const conversationPaneController = createCodexConversationPaneController({
+  state: conversationPaneState,
+  actions: conversationPaneActions,
 });
 
 watch(() => ({
@@ -1385,6 +1455,49 @@ function forwardSteerPrompt(prompt: string, options?: SendPromptOptions): void {
   } else {
     emit('steerPrompt', prompt);
   }
+}
+
+function forwardCodexPrompt(prompt: string, options?: SendCodexMessageOptions): void {
+  forwardPrompt(prompt, promptOptions(options));
+}
+
+function forwardCodexSteerPrompt(prompt: string, options?: SendCodexMessageOptions): void {
+  forwardSteerPrompt(prompt, promptOptions(options));
+}
+
+function promptOptions(options?: SendCodexMessageOptions): SendPromptOptions | undefined {
+  const attachments = options?.attachments?.map<PromptAttachment>((attachment) => ({ ...attachment }));
+  return attachments?.length ? { attachments } : undefined;
+}
+
+function openConversationLink(link: CodexConversationLink): void | Promise<void> {
+  if (link.kind === 'external') {
+    window.open(link.href, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  const context = link as CodexConversationLink & Partial<Pick<ConversationFileLink, 'turnId' | 'messageId' | 'itemId'>>;
+  return openFilePreview({
+    kind: 'file',
+    href: link.href,
+    path: link.path,
+    ...(link.filepath ? { filepath: link.filepath } : {}),
+    ...(link.action ? { action: link.action } : {}),
+    ...(link.line === undefined ? {} : { line: link.line }),
+    ...(link.column === undefined ? {} : { column: link.column }),
+    ...(context.turnId ? { turnId: context.turnId } : {}),
+    ...(context.messageId ? { messageId: context.messageId } : {}),
+    ...(context.itemId ? { itemId: context.itemId } : {}),
+  });
+}
+
+function updateConversationComposerState(state: CodexComposerState): void {
+  const agentId = currentAgent.value?.id;
+  if (agentId) emit('update:composerState', { agentId, state });
+}
+
+function updateConversationAttachments(attachments: readonly CodexNativeAttachment[]): void {
+  const agentId = currentAgent.value?.id;
+  if (agentId) emit('update:composerAttachments', { agentId, attachments });
 }
 
 function cancelPlanReview(agentId: string): void {

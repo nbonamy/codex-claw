@@ -82,9 +82,11 @@ implemented:
 - active agent header;
 - central conversation and composer;
 - optimistic agent switching that reveals the cached conversation immediately;
-  backend session hydration, Git status, and agent catalogs refresh
-  asynchronously, while snapshots returned by background work preserve the
-  current renderer selection and cannot switch the user back to another agent;
+  backend session hydration and agent catalogs refresh asynchronously, while
+  Git status is analyzed the first time an agent is shown and then refreshed
+  manually or after app-observed file activity; snapshots returned by background
+  work preserve the current renderer selection and cannot switch the user back
+  to another agent;
 - per-agent in-memory composer state, including unsent text, selected
   attachments, and the current selection/caret, so switching agents restores
   the editor exactly; queued prompts remain backend-owned snapshot state and

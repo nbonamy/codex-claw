@@ -324,8 +324,8 @@ export class CodexSurfaceAgentAdapter {
         await existing.handle.load({ cwd: expandHome(agent.folder), extensionContext: agent });
         this.historyHydratedAtByAgentId.set(agent.id, Date.now());
         const snapshot = existing.handle.getSnapshot();
-        // Publish load's full initial page now. SDK lifecycle hydration will
-        // emit the exhaustive replacement after continuing from its cursor.
+        // Publish load's full initial page now. Older messages remain behind
+        // the SDK's demand-paging cursor until the conversation requests them.
         this.publishInitial(existing, snapshot, true, true);
         existing.suppressEvents = wasSuppressingEvents;
       } finally {
@@ -628,7 +628,18 @@ export class CodexSurfaceAgentAdapter {
         });
         return;
       case 'message.appended':
-        if (event.payload.message.role === 'user') return;
+        if (event.payload.message.role === 'user') {
+          if (event.origin !== 'action' || event.payload.message.metadata?.reviewPrompt !== true) return;
+          const [message] = surfaceMessages([event.payload.message], session.agent.id);
+          if (!message) return;
+          this.emitThread(session, {
+            type: 'message.userSubmitted',
+            turnId: event.turnId,
+            payload: { message },
+            ...metadata,
+          });
+          return;
+        }
         this.emitAppendedMessage(session, event.payload.message, event.turnId, event.occurredAt);
         return;
       case 'message.delta':

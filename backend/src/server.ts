@@ -88,6 +88,8 @@ export class ClawBackendServer {
   private readonly clientRequestOwners = new Map<string, { backend: AgentBackend; remoteConnectionId?: string }>();
   private readonly remoteSnapshots = new Map<string, AppSnapshot>();
   private readonly queuedPromptRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly analyzedGitAgentIds = new Set<string>();
+  private readonly gitAnalysisPromises = new Map<string, Promise<void>>();
   private readonly transcriptRetention: AgentTranscriptRetention;
   private unsubscribeDriverEvents?: () => void;
   private lastEventSeq = 0;
@@ -135,6 +137,9 @@ export class ClawBackendServer {
         await this.initializeSourceFolderIfNeeded();
         await this.ensureRemoteControlStatus();
         const snapshot = await this.clientSnapshot();
+        if (snapshot.activeAgentId) {
+          void this.analyzeAgentGitStatusOnce(snapshot.activeAgentId);
+        }
         return createClawRpcResult(message.id, {
           snapshot,
           lastEventSeq: this.lastEventSeq,
@@ -2196,23 +2201,42 @@ export class ClawBackendServer {
 
   private async hydrateAndRefreshSelectedAgent(agentId: string): Promise<void> {
     await this.hydrateAgentHistory(agentId);
-    await this.refreshAgentGitStatus(agentId);
+    await this.analyzeAgentGitStatusOnce(agentId);
   }
 
-  private async refreshAgentGitStatus(agentId: string): Promise<void> {
+  private async analyzeAgentGitStatusOnce(agentId: string): Promise<void> {
+    if (this.analyzedGitAgentIds.has(agentId)) {
+      return;
+    }
+    const existing = this.gitAnalysisPromises.get(agentId);
+    if (existing) {
+      return existing;
+    }
+    const analysis = this.refreshAgentGitStatus(agentId).then((updated) => {
+      if (updated) {
+        this.analyzedGitAgentIds.add(agentId);
+      }
+    }).finally(() => {
+      this.gitAnalysisPromises.delete(agentId);
+    });
+    this.gitAnalysisPromises.set(agentId, analysis);
+    return analysis;
+  }
+
+  private async refreshAgentGitStatus(agentId: string): Promise<boolean> {
     const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
     if (!agent) {
-      return;
+      return false;
     }
 
     let status: AgentGitStatus | null = null;
     try {
       status = await this.handleAgentDriverRequest(agent, backendMethods.driverGitStatusGet, { agent }) as AgentGitStatus | null;
       if (!status) {
-        return;
+        return false;
       }
     } catch {
-      return;
+      return false;
     }
 
     this.applyAndEmitBackendEvent({
@@ -2220,6 +2244,8 @@ export class ClawBackendServer {
       type: 'git.statusUpdated',
       payload: status,
     });
+    this.analyzedGitAgentIds.add(agentId);
+    return true;
   }
 
   private addRecentSourceRepository(repoName?: string): void {

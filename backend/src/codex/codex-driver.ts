@@ -21,12 +21,11 @@ import type {
 import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
 import { AgentGitService } from '../git/agent-git-service';
-import type { CodexSurfaceReviewTarget } from 'codex-app-sdk/surface';
 import type { CodexSurfaceAgentAdapter } from './codex-surface-adapter';
 
 type CodexPromptCommand =
   | { type: 'compact' }
-  | { type: 'review'; target: CodexSurfaceReviewTarget };
+  | { type: 'review'; prompt: string };
 
 export class CodexBackendDriver implements AgentBackendDriver {
   readonly backend = 'codex' as const;
@@ -183,7 +182,7 @@ export class CodexBackendDriver implements AgentBackendDriver {
       };
     }
 
-    const result = await this.sessionManager.reviewThread(agent, command.target);
+    const result = await this.sessionManager.sendPrompt(agent, command.prompt);
     return {
       backendSession: codexBackendSession(result.threadId),
       turnId: result.turnId,
@@ -289,9 +288,7 @@ function codexPromptCommand(prompt: string): CodexPromptCommand | null {
   if (parsed.name === 'review') {
     return {
       type: 'review',
-      target: parsed.rest
-        ? { type: 'custom', instructions: parsed.rest }
-        : { type: 'uncommittedChanges' },
+      prompt,
     };
   }
 

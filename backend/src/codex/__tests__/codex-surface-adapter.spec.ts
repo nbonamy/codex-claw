@@ -166,6 +166,10 @@ class FakeTransport implements RpcTransport {
         return { turn: turn(`turn-${threadId}`, this.completeTurnsImmediately ? 'completed' : 'inProgress') };
       }
       case 'turn/steer': return { turnId: String((params as { expectedTurnId: string }).expectedTurnId) };
+      case 'review/start': {
+        const threadId = String((params as { threadId: string }).threadId);
+        return { reviewThreadId: threadId, turn: turn(`review-${threadId}`, 'inProgress') };
+      }
       case 'thread/rollback': {
         const threadId = String((params as { threadId: string }).threadId);
         return { thread: thread(threadId, `/workspace/${threadId.at(-1)}`) };
@@ -705,7 +709,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
   });
 
-  it('publishes the initial five full turns before prepending background history incrementally', async () => {
+  it('publishes the initial five full turns before prepending requested history incrementally', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     transport.turnsListDelayMs = 25;
@@ -730,20 +734,20 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
     expect((initialHistory[0]?.payload as { messages: unknown[] }).messages).toHaveLength(5);
 
-    await vi.waitFor(() => {
-      const historyEvents = events.filter((event) => event.type === 'thread.historyLoaded');
-      expect(historyEvents).toHaveLength(2);
-      expect(historyEvents[1]).toMatchObject({
-        payload: {
-          preserveKnownMessages: true,
-          replace: false,
-          messages: [
-            expect.objectContaining({ parts: [{ type: 'text', text: 'Message 1', itemId: 'message-1' }] }),
-          ],
-        },
-      });
-      expect((historyEvents[1]?.payload as { messages: unknown[] }).messages).toHaveLength(1);
+    await expect(adapter.loadOlderHistory(agentA)).resolves.toStrictEqual({ hasOlder: false });
+
+    const historyEvents = events.filter((event) => event.type === 'thread.historyLoaded');
+    expect(historyEvents).toHaveLength(2);
+    expect(historyEvents[1]).toMatchObject({
+      payload: {
+        preserveKnownMessages: true,
+        replace: false,
+        messages: [
+          expect.objectContaining({ parts: [{ type: 'text', text: 'Message 1', itemId: 'message-1' }] }),
+        ],
+      },
     });
+    expect((historyEvents[1]?.payload as { messages: unknown[] }).messages).toHaveLength(1);
   });
 
   it('suppresses server-owned action echoes while keeping hydrate and explicit resume ownership exact', async () => {
@@ -786,6 +790,30 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
     events.length = 0;
     await adapter.rollbackToTurn(agentA, 'turn-thread-a');
+    expect(events.some((event) => event.type === 'thread.historyLoaded')).toBe(false);
+  });
+
+  it('materializes an SDK-marked slash review prompt without replacing history', async () => {
+    const { adapter } = createAdapter();
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
+    await adapter.hydrateAgent(agentA);
+    events.length = 0;
+
+    await adapter.sendPrompt(agentA, '/review');
+
+    expect(events.filter((event) => event.type === 'message.userSubmitted')).toStrictEqual([
+      expect.objectContaining({
+        agentId: agentA.id,
+        threadId: 'thread-a',
+        payload: {
+          message: expect.objectContaining({
+            role: 'user',
+            parts: [{ type: 'text', text: '/review' }],
+          }),
+        },
+      }),
+    ]);
     expect(events.some((event) => event.type === 'thread.historyLoaded')).toBe(false);
   });
 

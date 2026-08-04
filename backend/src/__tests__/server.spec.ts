@@ -1956,6 +1956,8 @@ describe('ClawBackendServer', () => {
   it('owns agent selection hydration and git status refresh', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.teams[0]!.activeAgentId = 'agent-dina';
+    snapshot.activeAgentId = 'agent-dina';
     snapshot.agents = [{
       id: 'agent-dina',
       teamId: 'team-test',
@@ -2005,6 +2007,15 @@ describe('ClawBackendServer', () => {
 
     await expect(server.handleMessage({
       jsonrpc: '2.0',
+      id: 'initial-snapshot',
+      method: 'snapshot/get',
+    })).resolves.toMatchObject({
+      result: { snapshot: { activeAgentId: 'agent-dina' } },
+    });
+    await vi.waitFor(() => expect(getGitStatus).toHaveBeenCalledOnce());
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
       id: 'select',
       method: 'agent/select',
       params: { agentId: 'agent-dina' },
@@ -2019,7 +2030,7 @@ describe('ClawBackendServer', () => {
     });
 
     expect(hydrateAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
-    expect(getGitStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina', backendSession: { kind: 'codex', threadId: 'thread-hydrated' } }));
+    expect(getGitStatus).toHaveBeenCalledOnce();
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'snapshot.updated' }),
       expect.objectContaining({ type: 'git.statusUpdated', agentId: 'agent-dina' }),

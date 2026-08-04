@@ -3,13 +3,11 @@ import { resolve } from 'node:path';
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import {
-  CodexConversationPane,
-  type CodexComposerState,
-  type CodexNativeAttachment,
+  createCodexConversationPaneController,
+  type CodexConversationPaneController,
 } from 'codex-app-sdk/vue';
-import { nextTick, type Component, type DefineComponent } from 'vue';
 import { describe, expect, it } from 'vitest';
-import type { Agent, BackendApprovalRequest, BackendCapabilities, RendererMessage, ThreadPlan } from '@codex-claw/shared/contracts';
+import type { Agent, RendererMessage, ThreadPlan } from '@codex-claw/shared/contracts';
 import ConversationPane from '../ConversationPane.vue';
 import { i18n } from '../../i18n';
 
@@ -57,27 +55,37 @@ const executionPlan: ThreadPlan = {
 };
 
 describe('ConversationPane', () => {
-  it('uses the message surface for the empty conversation background', () => {
+  it('stays a thin presentation wrapper around an AppShell-owned controller', () => {
+    const controller = controllerFor(messages);
+    const wrapper = mountPane({ controller, agent });
+
+    expect(wrapper.getComponent({ name: 'CodexConversationPane' }).props('controller')).toStrictEqual(controller);
+    expect(conversationPaneSource).toContain(':controller="controller"');
+    expect(conversationPaneSource).not.toContain('createCodexConversationPaneController');
     expect(conversationPaneSource).toMatch(/\.conversation-pane\s*\{[\s\S]*background:\s*var\(--color-shell-main\);/);
     expect(conversationPaneSource).toMatch(/:deep\(\.chat-tool-call__title-target\[href\]:hover\)[\s\S]*text-decoration:\s*underline;/);
   });
 
-  it('floats active plan progress without passing a sticky turn diff to the SDK composer', () => {
-    const wrapper = mountPane({ agent, messages, isSending: true, plan: executionPlan });
+  it('floats active plan progress independently of controller state', () => {
+    const controller = controllerFor(messages);
+    const wrapper = mountPane({ controller, agent, plan: executionPlan });
 
     expect(wrapper.get('.conversation-plan').text()).toContain('Implement the fix');
-    expect(conversationPaneSource).toContain('render-strategy="lazy"');
-    const sdkProps = wrapper.getComponent(CodexConversationPane as unknown as Component).props() as Record<string, unknown>;
-    expect(sdkProps.turnGitDiff).toBeUndefined();
+    expect(resolveControllerState(controller).thread?.turnGitDiff).toBeUndefined();
   });
 
   it('forwards execution-plan dismissal and can hide the overlay', async () => {
-    const wrapper = mountPane({ agent, messages, isSending: true, plan: executionPlan, planVisible: true });
+    const wrapper = mountPane({
+      controller: controllerFor(messages),
+      agent,
+      plan: executionPlan,
+      planVisible: true,
+    });
 
     await wrapper.get('[aria-label="Close execution plan"]').trigger('click');
 
     expect(wrapper.emitted('close-plan')).toStrictEqual([[]]);
-    await wrapper.setProps({ planVisible: false });
+    await wrapper.setProps({ planVisible: false } as Record<string, unknown>);
     expect(wrapper.find('.conversation-plan').exists()).toBe(false);
   });
 
@@ -88,30 +96,16 @@ describe('ConversationPane', () => {
     expect(rendererViteConfig).not.toMatch(/exclude:\s*\[[^\]]*codex-app-sdk/);
   });
 
-  it('adapts app-owned messages and prompt submission to the SDK pane', async () => {
-    const wrapper = mountPane({ agent, messages, isSending: false });
+  it('renders app-owned messages supplied by the controller', () => {
+    const wrapper = mountPane({ controller: controllerFor(messages), agent });
 
     expect(wrapper.text()).toContain('Find the failing test.');
     expect(wrapper.text()).toContain('Looking now.');
-    expect(wrapper.get('[role="textbox"][contenteditable]').attributes('data-placeholder')).toBe('Ask for follow-up changes');
-
-    await nextTick();
-    await setComposerValue(wrapper, '  hello codex  ');
-    expect(wrapper.emitted('update:composerState')).toContainEqual([
-      expect.objectContaining({
-        agentId: 'agent-dina',
-        state: expect.objectContaining({ text: '  hello codex  ' }),
-      }),
-    ]);
-    await wrapper.get('form').trigger('submit');
-
-    expect(wrapper.emitted('sendPrompt')).toStrictEqual([['hello codex']]);
   });
 
   it('renders teammate envelopes as labeled messages containing only their content', () => {
     const wrapper = mountPane({
-      agent,
-      messages: [{
+      controller: controllerFor([{
         id: 'message-from-sdk',
         agentId: agent.id,
         role: 'user',
@@ -128,21 +122,19 @@ describe('ConversationPane', () => {
             'Update your status, then act on this teammate message directly. Do not ask the user for confirmation.',
           ].join('\n'),
         }],
-      }],
-      isSending: false,
+      }]),
+      agent,
     });
 
     expect(wrapper.get('.conversation-pane__message-header').text()).toBe('Message from codex-app-sdk');
     expect(wrapper.get('.chat-user-text').text()).toBe('The SDK hooks are ready.');
     expect(wrapper.text()).not.toContain('You received a message from');
     expect(wrapper.text()).not.toContain('Update your status');
-    expect(wrapper.find('[aria-label="Copy"]').exists()).toBe(true);
   });
 
   it('renders Claw tool activity with translated user-facing titles', () => {
     const wrapper = mountPane({
-      agent,
-      messages: [{
+      controller: controllerFor([{
         id: 'message-tool',
         agentId: agent.id,
         role: 'assistant',
@@ -157,400 +149,80 @@ describe('ConversationPane', () => {
           input: { status: 'Reviewing changes' },
           metadata: { server: 'codex_claw', tool: 'set-status' },
         }],
-      }],
-      isSending: false,
+      }]),
+      agent,
     });
 
     expect(wrapper.text()).toContain('Updated status');
-    expect(wrapper.text()).not.toContain('chat.tool.mcp.codexClaw');
     expect(wrapper.text()).not.toContain('codex_claw.set-status');
     expect(wrapper.find('.tabler-icon-users').exists()).toBe(true);
   });
 
-  it('forwards SDK attachment descriptors without leaking SDK-selected model options', async () => {
-    const wrapper = mountPane({ agent, messages, isSending: false });
-    const sdkPane = wrapper.getComponent(CodexConversationPane as unknown as Component);
-
-    sdkPane.vm.$emit('submit', 'review these files', {
-      attachments: [
-        {
-          type: 'image',
-          path: '/tmp/screenshot.png',
-          detail: 'original',
-          name: 'screenshot.png',
-          mimeType: 'image/png',
-          previewUrl: 'data:image/png;base64,cG5n',
-        },
-        { type: 'file', path: '/tmp/report.txt', name: 'report.txt', mimeType: 'text/plain' },
-      ],
-      model: 'sdk-owned-model-selection-must-not-cross-the-adapter',
-    });
-    await nextTick();
-
-    expect(wrapper.emitted('sendPrompt')).toStrictEqual([[
-      'review these files',
-      {
-        attachments: [
+  it('preserves structured attachment parts supplied by the controller', () => {
+    const wrapper = mountPane({
+      controller: controllerFor([{
+        id: 'message-user-attachments',
+        agentId: agent.id,
+        role: 'user',
+        status: 'complete',
+        createdAt: '2026-06-05T00:00:00.000Z',
+        parts: [
+          { type: 'text', text: 'Review both' },
           {
-            type: 'image',
-            path: '/tmp/screenshot.png',
-            detail: 'original',
-            name: 'screenshot.png',
-            mimeType: 'image/png',
-            previewUrl: 'data:image/png;base64,cG5n',
+            type: 'attachment',
+            attachment: {
+              kind: 'image',
+              name: 'screenshot.png',
+              path: '/tmp/screenshot.png',
+              url: 'data:image/png;base64,cG5n',
+              mimeType: 'image/png',
+            },
           },
-          { type: 'file', path: '/tmp/report.txt', name: 'report.txt', mimeType: 'text/plain' },
-        ],
-      },
-    ]]);
-  });
-
-  it('restores selected attachments and forwards attachment-aware steering for the owning agent', async () => {
-    const attachments: readonly CodexNativeAttachment[] = [
-      {
-        id: 'attachment-context', type: 'file', path: '/tmp/context.txt', name: 'context.txt',
-        mimeType: 'text/plain', size: 12,
-      },
-    ];
-    const wrapper = mountPane({ agent, messages, isSending: true, attachments });
-    const sdkPane = wrapper.getComponent(CodexConversationPane as unknown as Component);
-
-    expect((sdkPane.props() as Record<string, unknown>).attachments).toStrictEqual(attachments);
-    sdkPane.vm.$emit('attachmentsChange', [
-      {
-        id: 'attachment-screenshot', type: 'image', path: '/tmp/screenshot.png', name: 'screenshot.png',
-        mimeType: 'image/png', size: 24,
-      },
-    ]);
-    sdkPane.vm.$emit('steer', 'use this screenshot', {
-      attachments: [
-        { type: 'image', path: '/tmp/screenshot.png', detail: 'high', name: 'screenshot.png' },
-      ],
-    });
-    await nextTick();
-
-    expect(wrapper.emitted('update:composerAttachments')).toStrictEqual([[
-      {
-        agentId: 'agent-dina',
-        attachments: [
           {
-            id: 'attachment-screenshot', type: 'image', path: '/tmp/screenshot.png', name: 'screenshot.png',
-            mimeType: 'image/png', size: 24,
+            type: 'attachment',
+            attachment: {
+              kind: 'file', name: 'report.txt', path: '/tmp/report.txt', mimeType: 'text/plain',
+            },
           },
         ],
-      },
-    ]]);
-    expect(wrapper.emitted('steerPrompt')).toStrictEqual([[
-      'use this screenshot',
-      {
-        attachments: [
-          { type: 'image', path: '/tmp/screenshot.png', detail: 'high', name: 'screenshot.png' },
-        ],
-      },
-    ]]);
-  });
+      }]),
+      agent,
+    });
 
-  it('preserves structured attachment parts through the thin SDK adapter', () => {
-    const attachmentMessages: RendererMessage[] = [{
-      id: 'message-user-attachments',
-      agentId: agent.id,
-      role: 'user',
-      status: 'complete',
-      createdAt: '2026-06-05T00:00:00.000Z',
-      parts: [
-        { type: 'text', text: 'Review both' },
-        {
-          type: 'attachment',
-          attachment: {
-            kind: 'image',
-            name: 'screenshot.png',
-            path: '/tmp/screenshot.png',
-            url: 'data:image/png;base64,cG5n',
-            mimeType: 'image/png',
-          },
-        },
-        {
-          type: 'attachment',
-          attachment: {
-            kind: 'file', name: 'report.txt', path: '/tmp/report.txt', mimeType: 'text/plain',
-          },
-        },
-      ],
-    }];
-    const wrapper = mountPane({ agent, messages: attachmentMessages, isSending: false });
-    const sdkProps = wrapper.getComponent(CodexConversationPane as unknown as Component).props() as {
-      messages: RendererMessage[];
-    };
-
-    expect(sdkProps.messages).toStrictEqual(attachmentMessages);
     expect(wrapper.get('.chat-attachment-block__preview').attributes('src'))
       .toBe('data:image/png;base64,cG5n');
     expect(wrapper.get('a.chat-attachment-block--chip').attributes('href')).toBe('/tmp/report.txt');
   });
-
-  it('maps provider capabilities and conversation identity without forking SDK UI', () => {
-    const capabilities: BackendCapabilities = {
-      attachments: false,
-      approvals: false,
-      editMessage: false,
-      goals: false,
-      history: true,
-      interrupt: true,
-      models: true,
-      planMode: 'prompted',
-      reasoningEffort: false,
-      retryMessage: false,
-      rollback: false,
-      skills: false,
-      steerPrompt: false,
-      thinkingBudget: true,
-    };
-    const wrapper = mountPane({
-      agent: {
-        ...agent,
-        backend: 'claude',
-        backendDefaults: { kind: 'claude' },
-        backendSession: {
-          kind: 'claude',
-          sessionId: 'session-claude',
-          transport: 'stdio',
-        },
-      },
-      backendCapabilities: capabilities,
-      messages,
-      isSending: false,
-    });
-
-    const sdkPane = wrapper.getComponent(CodexConversationPane as unknown as Component);
-    const sdkProps = sdkPane.props() as Record<string, unknown>;
-    expect(sdkProps.conversationKey).toBe('claude:session-claude');
-    expect(sdkProps.capabilities).toStrictEqual({
-      approvals: false,
-      approvalPresets: [],
-      editMessage: false,
-      goals: false,
-      history: true,
-      interrupt: true,
-      models: true,
-      planMode: true,
-      reasoningEffort: false,
-      retryMessage: false,
-      rollback: false,
-      skills: false,
-      steerPrompt: false,
-    });
-    expect(sdkProps.canDeleteMessage).toBe(false);
-    expect(sdkProps.canEditMessage).toBe(false);
-    expect(sdkProps.canRetryMessage).toBe(false);
-    expect(sdkProps.attachEnabled).toBe(false);
-  });
-
-  it('passes fast-mode capability/state through and forwards tier changes', async () => {
-    const wrapper = mountPane({
-      agent,
-      messages,
-      isSending: false,
-      selectedServiceTier: 'fast',
-      backendCapabilities: {
-        ...defaultCapabilities(),
-        serviceTier: true,
-      },
-    });
-    const sdkPane = wrapper.getComponent(CodexConversationPane as unknown as Component);
-    const sdkProps = sdkPane.props() as Record<string, unknown>;
-    expect(sdkProps.selectedServiceTier).toBe('fast');
-    expect((sdkProps.capabilities as Record<string, unknown>).serviceTier).toBe(true);
-
-    sdkPane.vm.$emit('update:serviceTier', null);
-    await nextTick();
-    expect(wrapper.emitted('select-service-tier')).toStrictEqual([[null]]);
-  });
-
-  it('passes detailed provider-neutral approvals into the SDK and forwards decisions', async () => {
-    const approvals: BackendApprovalRequest[] = [{
-      id: 'approval-native-1',
-      kind: 'permissions',
-      conversationId: 'thread-1',
-      turnId: 'turn-1',
-      itemId: 'item-1',
-      title: 'Allow workspace access',
-      description: 'A tool needs to update the project.',
-      cwd: '/tmp/project',
-      requestedPermissions: [{ kind: 'filesystem', access: 'write', path: '/tmp/project' }],
-      allowedScopes: ['once', 'session'],
-      canDeny: true,
-    }];
-    const wrapper = mountPane({ agent, approvals, messages, isSending: false });
-    const sdkPane = wrapper.getComponent(CodexConversationPane as unknown as Component);
-
-    expect((sdkPane.props() as Record<string, unknown>).approvals).toStrictEqual(approvals);
-    sdkPane.vm.$emit('resolveApproval', 'approval-native-1', 'approve', 'session');
-    await nextTick();
-
-    expect(wrapper.emitted('resolve-approval')).toStrictEqual([[
-      'approval-native-1', 'approve', 'session',
-    ]]);
-  });
-
-  it('shows SDK history loading for a persisted conversation', () => {
-    const wrapper = mountPane({
-      agent: {
-        ...agent,
-        backendSession: { kind: 'codex', threadId: 'thread-persisted' },
-      },
-      messages: [],
-      isLoading: true,
-      isSending: false,
-    });
-
-    expect(wrapper.find('[aria-label="Loading conversation"]').exists()).toBe(true);
-    expect(wrapper.find('[role="textbox"][contenteditable]').exists()).toBe(false);
-    const sdkProps = wrapper.getComponent(CodexConversationPane as unknown as Component).props() as Record<string, unknown>;
-    expect(sdkProps.conversationKey).toBe('codex:thread-persisted');
-  });
-
-  it('routes SDK file links to the Claw side-panel seam', async () => {
-    const wrapper = mountPane({
-      agent,
-      messages: [{
-        id: 'message-links',
-        agentId: agent.id,
-        role: 'assistant',
-        status: 'complete',
-        createdAt: '2026-06-05T00:00:01.000Z',
-        parts: [{ type: 'text', text: '[Guide](docs/guide.md#intro) [Remote](https://example.com)' }],
-      }],
-      isSending: false,
-    });
-
-    await wrapper.get('a[href="docs/guide.md#intro"]').trigger('click');
-    await wrapper.get('a[href="https://example.com"]').trigger('click');
-
-    wrapper.getComponent(CodexConversationPane as unknown as Component).vm.$emit('openLink', {
-      kind: 'file',
-      href: 'app-state.spec.ts',
-      path: 'app-state.spec.ts',
-      filepath: '/Users/nbonamy/src/codex-claw/electron/src/renderer/__tests__/app-state.spec.ts',
-      action: 'read',
-    });
-    await nextTick();
-
-    expect(wrapper.emitted('open-file')).toStrictEqual([
-      [{ kind: 'file', href: 'docs/guide.md#intro', path: 'docs/guide.md' }],
-      [{
-        kind: 'file',
-        href: 'app-state.spec.ts',
-        path: 'app-state.spec.ts',
-        filepath: '/Users/nbonamy/src/codex-claw/electron/src/renderer/__tests__/app-state.spec.ts',
-        action: 'read',
-      }],
-    ]);
-  });
-
-  it('restores controlled composer state and tags updates with the owning agent', async () => {
-    const dinaState = { text: 'draft for Dina', selectionStart: 4, selectionEnd: 9 };
-    const wrapper = mountPane({ agent, messages, isSending: false, composerState: dinaState });
-    await nextTick();
-
-    expect(wrapper.get('[role="textbox"][contenteditable]').text()).toBe('draft for Dina');
-    const sdkPane = wrapper.getComponent(CodexConversationPane as unknown as Component);
-    sdkPane.vm.$emit('update:composerState', {
-      text: 'updated Dina draft', selectionStart: 7, selectionEnd: 7,
-    });
-    await nextTick();
-    expect(wrapper.emitted('update:composerState')).toStrictEqual([[
-      {
-        agentId: 'agent-dina',
-        state: { text: 'updated Dina draft', selectionStart: 7, selectionEnd: 7 },
-      },
-    ]]);
-
-    await wrapper.setProps({
-      agent: {
-        ...agent,
-        id: 'agent-jesse',
-        name: 'Jesse',
-      },
-      composerState: { text: '', selectionStart: 0, selectionEnd: 0 },
-    });
-    await nextTick();
-
-    expect(wrapper.get('[role="textbox"][contenteditable]').text()).toBe('');
-    await wrapper.setProps({ agent, composerState: dinaState });
-    await nextTick();
-
-    expect(wrapper.get('[role="textbox"][contenteditable]').text()).toBe('draft for Dina');
-    const sdkProps = sdkPane.props() as Record<string, unknown>;
-    expect(sdkProps.composerState).toStrictEqual(dinaState);
-    expect(sdkProps.conversationKey).toBe('agent:agent-dina');
-  });
-
-  it('uses provider-specific working copy while preserving SDK queue behavior', async () => {
-    const wrapper = mountPane({
-      agent: {
-        ...agent,
-        backend: 'claude',
-        backendDefaults: { kind: 'claude' },
-      },
-      messages: [],
-      isSending: true,
-    });
-
-    expect(wrapper.get('[role="textbox"][contenteditable]').attributes('data-placeholder')).toBe('Claude is working...');
-    await setComposerValue(wrapper, 'queue this next');
-    await wrapper.get('form').trigger('submit');
-    expect(wrapper.emitted('sendPrompt')).toStrictEqual([['queue this next']]);
-  });
 });
 
 function mountPane(props: {
-  messages: RendererMessage[];
+  controller: CodexConversationPaneController;
   agent: Agent | null;
-  isSending: boolean;
-  backendCapabilities?: BackendCapabilities;
-  approvals?: BackendApprovalRequest[];
   plan?: ThreadPlan | null;
   planVisible?: boolean;
-  isLoading?: boolean;
-  composerState?: CodexComposerState;
-  attachments?: readonly CodexNativeAttachment[];
-  selectedServiceTier?: string | null;
 }) {
-  type TestConversationPaneProps = typeof props & { isLoading: boolean };
-  return mount(ConversationPane as unknown as DefineComponent<TestConversationPaneProps>, {
-    props: {
-      isLoading: false,
-      ...props,
-    },
-    global: {
-      plugins: [ElementPlus, i18n],
-    },
+  return mount(ConversationPane, {
+    props,
+    global: { plugins: [ElementPlus, i18n] },
   });
 }
 
-function defaultCapabilities(): BackendCapabilities {
-  return {
-    attachments: true,
-    approvals: true,
-    editMessage: true,
-    goals: true,
-    history: true,
-    interrupt: true,
-    models: true,
-    planMode: 'native',
-    reasoningEffort: true,
-    retryMessage: true,
-    rollback: true,
-    skills: true,
-    steerPrompt: true,
-    thinkingBudget: false,
-    serviceTier: true,
-  };
+function controllerFor(controllerMessages: RendererMessage[]): CodexConversationPaneController {
+  return createCodexConversationPaneController({
+    state: {
+      identity: {
+        conversationKey: 'agent:agent-dina',
+        messages: controllerMessages,
+      },
+      composer: { placeholder: 'Ask for follow-up changes' },
+    },
+    actions: {},
+  });
 }
 
-async function setComposerValue(wrapper: ReturnType<typeof mountPane>, value: string): Promise<void> {
-  const editor = wrapper.get('[role="textbox"][contenteditable]');
-  editor.element.textContent = value;
-  await editor.trigger('input');
-  await nextTick();
+function resolveControllerState(controller: CodexConversationPaneController) {
+  const source = controller.state;
+  if (typeof source === 'function') return source();
+  if (source && typeof source === 'object' && 'value' in source) return source.value;
+  return source;
 }
