@@ -1,5 +1,5 @@
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
-import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, powerMonitor, shell } from 'electron';
 import path from 'node:path';
 import { registerCodexNativeIpc, TypedIpcMain } from 'codex-app-sdk/electron';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
@@ -60,6 +60,10 @@ export class AppController {
   });
 
   private readonly powerSaveBlocker = new AgentActivityPowerSaveBlocker();
+  private readonly handlePowerSourceChanged = (): void => {
+    this.syncPowerSaveBlocker();
+  };
+  private powerSourceListenersInstalled = false;
   private readonly backendClient: ClawBackendClientPort | null;
 
   constructor(
@@ -78,6 +82,11 @@ export class AppController {
 
   async initialize(): Promise<void> {
     logMain('startup', 'initializing application');
+    if (!this.powerSourceListenersInstalled && powerMonitor) {
+      powerMonitor.on('on-battery', this.handlePowerSourceChanged);
+      powerMonitor.on('on-ac', this.handlePowerSourceChanged);
+      this.powerSourceListenersInstalled = true;
+    }
     this.autoUpdateService?.start();
     await this.startupMaintenance();
     await this.initializeBackendClient();
@@ -486,6 +495,11 @@ export class AppController {
     this.rejectAllPendingBrowserOpens(new Error('Application is shutting down.'));
     await this.browserPane.closeAll();
     this.powerSaveBlocker.stop();
+    if (this.powerSourceListenersInstalled && powerMonitor) {
+      powerMonitor.removeListener('on-battery', this.handlePowerSourceChanged);
+      powerMonitor.removeListener('on-ac', this.handlePowerSourceChanged);
+      this.powerSourceListenersInstalled = false;
+    }
     this.autoUpdateService?.stop();
     this.nativeIpcUnregister?.();
     this.nativeIpcUnregister = null;
@@ -1370,7 +1384,8 @@ export class AppController {
   }
 
   private syncPowerSaveBlocker(): void {
-    this.powerSaveBlocker.sync(this.clientState.shouldPreventDisplaySleep);
+    const isOnBattery = powerMonitor?.isOnBatteryPower?.() ?? false;
+    this.powerSaveBlocker.sync(shouldBlockDisplaySleep(this.clientState, isOnBattery));
   }
 
   private flushPendingDeepLinkCommands(): void {
@@ -1469,6 +1484,11 @@ function createEmptyClientState(): ClientState {
     sourceFolderPath: '',
     shouldPreventDisplaySleep: false,
   };
+}
+
+export function shouldBlockDisplaySleep(clientState: ClientState, isOnBattery: boolean): boolean {
+  return clientState.shouldPreventDisplaySleep ||
+    (clientState.shouldPreventDisplaySleepForRemoteAccess === true && !isOnBattery);
 }
 
 function metadataOnlySnapshot(snapshot: AppSnapshot): AppSnapshot {

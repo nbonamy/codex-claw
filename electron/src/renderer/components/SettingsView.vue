@@ -52,6 +52,8 @@
         <SettingsConnectionsPanel
           v-else-if="activeTab === 'connections'"
           :connections="remoteConnections"
+          :settings="generalSettings"
+          :update-settings="updateSettings"
           :teams="teams"
           :list-source-folders="listSourceFolders"
           :list-ssh-hosts="listSshHosts"

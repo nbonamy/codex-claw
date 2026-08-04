@@ -80,6 +80,8 @@
     </SettingsSection>
 
     <SettingsDevicePairingSection
+      :settings="settings"
+      :update-settings="updateSettings"
       :get-status="getDevicePairingStatus"
       :enable="enableDevicePairing"
       :disable="disableDevicePairing"
@@ -200,7 +202,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, ref } from 'vue';
-import type { AddSshConnectionInput, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateRemoteConnectionInput } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput } from '@codex-claw/shared/contracts';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import { DotsVerticalIcon, RefreshIcon, SettingsIcon, Trash2Icon } from '../shared/icons/app-icons';
@@ -218,6 +220,8 @@ const props = withDefaults(defineProps<{
   teams?: Team[];
   updateRemoteConnection?: (connectionId: string, input: UpdateRemoteConnectionInput) => Promise<void>;
   removeRemoteConnection?: (connectionId: string) => Promise<void>;
+  settings?: { preventSleepWhenRemoteAccessEnabled: boolean };
+  updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
   getDevicePairingStatus?: () => Promise<DevicePairingStatus>;
   enableDevicePairing?: () => Promise<DevicePairingStatus>;
   disableDevicePairing?: () => Promise<DevicePairingStatus>;
@@ -241,6 +245,8 @@ const props = withDefaults(defineProps<{
   checkDevicePairing: async () => false,
   listPairedDevices: async () => [],
   revokePairedDevice: async () => undefined,
+  settings: () => ({ preventSleepWhenRemoteAccessEnabled: true }),
+  updateSettings: async () => undefined,
 });
 
 const addDialogVisible = ref(false);

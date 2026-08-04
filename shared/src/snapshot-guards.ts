@@ -24,7 +24,9 @@ export function isAppSnapshotMetadata(value: unknown): value is AppSnapshotMetad
 export function isClientState(value: unknown): value is ClientState {
   return isRecord(value) &&
     typeof value.sourceFolderPath === 'string' &&
-    typeof value.shouldPreventDisplaySleep === 'boolean';
+    typeof value.shouldPreventDisplaySleep === 'boolean' &&
+    (value.shouldPreventDisplaySleepForRemoteAccess === undefined ||
+      typeof value.shouldPreventDisplaySleepForRemoteAccess === 'boolean');
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

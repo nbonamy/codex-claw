@@ -12,6 +12,7 @@ describe('settings contracts', () => {
     })).toStrictEqual({
       codexBinaryPath: '/opt/homebrew/bin/codex',
       preventSleepWhenAgentsRun: false,
+      preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: true,
       plugins: defaultPluginSettings,
     });
@@ -69,6 +70,7 @@ describe('settings contracts', () => {
     expect(snapshot.general).toStrictEqual({
       codexBinaryPath: '',
       preventSleepWhenAgentsRun: false,
+      preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: false,
       plugins: defaultPluginSettings,
     });

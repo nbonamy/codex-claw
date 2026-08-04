@@ -463,6 +463,7 @@ export type AppPluginStatus = {
 
 export type AppGeneralSettings = {
   preventSleepWhenAgentsRun: boolean;
+  preventSleepWhenRemoteAccessEnabled: boolean;
   codexBinaryPath: string;
   agentListCompact: boolean;
   /** Optional for backwards compatibility with pre-plugin state files. */
@@ -494,7 +495,10 @@ export type CodexChatGptLogin = {
 
 export type ClientState = {
   sourceFolderPath: string;
+  /** Agent activity requires sleep prevention regardless of power source. */
   shouldPreventDisplaySleep: boolean;
+  /** Remote access requires sleep prevention only while connected to AC power. */
+  shouldPreventDisplaySleepForRemoteAccess?: boolean;
 };
 
 export type SshHostCandidate = {
@@ -999,6 +1003,7 @@ export type MainToRendererEvent = {
     | 'context.compactionStarted'
     | 'context.compactionCompleted'
     | 'account.rateLimitsUpdated'
+    | 'devicePairing.statusChanged'
     | 'workBacklog.assignmentUpdated'
     | 'skills.changed'
     | 'sidePanel.markdownRequested'

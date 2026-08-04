@@ -20,6 +20,44 @@ describe('SettingsConnectionsPanel', () => {
     document.body.innerHTML = '';
   });
 
+  it('updates the remote-access keep-awake setting', async () => {
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mount(SettingsConnectionsPanel, {
+      props: {
+        settings: { preventSleepWhenRemoteAccessEnabled: true },
+        updateSettings,
+        getDevicePairingStatus: async () => ({ status: 'connected' }),
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+    await flushPromises();
+
+    await switchWithLabel(wrapper, 'Keep this Mac awake').vm.$emit('update:modelValue', false);
+
+    expect(wrapper.text()).toContain('Keep this Mac awake');
+    expect(updateSettings).toHaveBeenCalledWith({
+      general: {
+        preventSleepWhenRemoteAccessEnabled: false,
+      },
+    });
+  });
+
+  it('hides the remote-access keep-awake setting while device connections are disabled', async () => {
+    const wrapper = mount(SettingsConnectionsPanel, {
+      props: {
+        getDevicePairingStatus: async () => ({ status: 'disabled' }),
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain('Keep this Mac awake');
+  });
+
   it('lists saved remote connections and exposes row actions', async () => {
     const checkRemoteConnection = vi.fn().mockResolvedValue(undefined);
     const updateRemoteConnection = vi.fn().mockResolvedValue(undefined);
@@ -195,22 +233,63 @@ describe('SettingsConnectionsPanel', () => {
 
     expect(wrapper.text()).toContain('Device pairing');
     expect(wrapper.text()).toContain('No paired devices');
-    await wrapper.findAll('button').find((button) => button.text() === 'Pair device')?.trigger('click');
+    await wrapper.findAll('button').find((button) => button.text() === 'Add device')?.trigger('click');
     await flushPromises();
     expect(wrapper.text()).toContain('ABCD-EFGH');
 
     await vi.advanceTimersByTimeAsync(2_000);
     await flushPromises();
     expect(checkDevicePairing).toHaveBeenCalledWith(session);
-    expect(wrapper.text()).toContain('Paired successfully');
+    expect(wrapper.text()).not.toContain('Paired successfully');
+    expect(wrapper.text()).not.toContain('ABCD-EFGH');
+    expect(wrapper.find('img[alt="Codex device pairing QR code"]').exists()).toBe(false);
     expect(wrapper.text()).toContain('Nicolas’s iPhone');
+    expect(wrapper.get('.settings-device-pairing__device-list').text()).toContain('Nicolas’s iPhone');
+    expect(wrapper.find('.settings-device-pairing__device-divider').exists()).toBe(true);
 
     await wrapper.findAll('button').find((button) => button.text() === 'Revoke')?.trigger('click');
     await flushPromises();
     expect(revokePairedDevice).toHaveBeenCalledWith('environment-1', 'client-1');
     vi.useRealTimers();
   });
+
+  it('toggles mobile connections through the device-pairing controls', async () => {
+    const enableDevicePairing = vi.fn().mockResolvedValue({ status: 'connecting' });
+    const disableDevicePairing = vi.fn().mockResolvedValue({ status: 'disabled' });
+    const wrapper = mount(SettingsConnectionsPanel, {
+      props: {
+        getDevicePairingStatus: async () => ({ status: 'disabled' }),
+        enableDevicePairing,
+        disableDevicePairing,
+      },
+      global: { plugins: [ElementPlus] },
+    });
+    await flushPromises();
+
+    await switchWithLabel(wrapper, 'Allow connections').vm.$emit('update:modelValue', true);
+    await flushPromises();
+    expect(enableDevicePairing).toHaveBeenCalledOnce();
+    const refreshingButton = wrapper.findAllComponents({ name: 'ElButton' })
+      .find((candidate) => candidate.text() === 'Refreshing');
+    expect(refreshingButton?.props('loading')).toBe(true);
+    expect(refreshingButton?.props('disabled')).toBe(true);
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Add device')).toBe(false);
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Refresh')).toBe(false);
+
+    await switchWithLabel(wrapper, 'Allow connections').vm.$emit('update:modelValue', false);
+    await flushPromises();
+    expect(disableDevicePairing).toHaveBeenCalledOnce();
+  });
 });
+
+function switchWithLabel(wrapper: ReturnType<typeof mount>, label: string) {
+  const control = wrapper.findAllComponents({ name: 'ElSwitch' })
+    .find((candidate) => (
+      candidate.attributes('aria-label') === label || candidate.props('ariaLabel') === label
+    ));
+  if (!control) throw new Error(`Missing ${label} switch`);
+  return control;
+}
 
 function bodyButton(label: string): HTMLButtonElement | undefined {
   return [...document.body.querySelectorAll('button')]

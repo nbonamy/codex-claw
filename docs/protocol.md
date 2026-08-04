@@ -58,7 +58,13 @@ synced after this change.
 
 - `AppSnapshot`: authoritative product snapshot owned by `clawd`.
 - `ClientState`: backend-derived client hints:
-  `{ sourceFolderPath, shouldPreventDisplaySleep }`.
+  `{ sourceFolderPath, shouldPreventDisplaySleep,
+  shouldPreventDisplaySleepForRemoteAccess? }`. The first sleep hint represents
+  active-agent work and applies on either power source. The remote-access hint
+  is true only when `general.preventSleepWhenRemoteAccessEnabled` is enabled
+  and Codex remote control is connected; Electron applies that reason only on
+  AC power. Keeping the reasons separate prevents the remote-access power policy
+  from changing the existing agent-activity behavior.
 - `ClawSnapshotGetResult`: `{ snapshot, lastEventSeq, clientState }`.
 - `LoopLocation`: optional loop/work-provider location selector:
   `{ kind: "local" }` or `{ kind: "remote", remoteConnectionId }`.

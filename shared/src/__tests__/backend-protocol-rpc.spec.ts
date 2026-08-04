@@ -11,6 +11,7 @@ describe('backend protocol guards', () => {
       clientState: {
         sourceFolderPath: '/Users/nbonamy/src',
         shouldPreventDisplaySleep: true,
+        shouldPreventDisplaySleepForRemoteAccess: false,
       },
     })).toBe(true);
   });
@@ -37,7 +38,13 @@ describe('backend protocol guards', () => {
     expect(isClientState({
       sourceFolderPath: '/Users/nbonamy/src',
       shouldPreventDisplaySleep: false,
+      shouldPreventDisplaySleepForRemoteAccess: true,
     })).toBe(true);
+    expect(isClientState({
+      sourceFolderPath: '/Users/nbonamy/src',
+      shouldPreventDisplaySleep: false,
+      shouldPreventDisplaySleepForRemoteAccess: 'yes',
+    })).toBe(false);
     expect(isClawSnapshotGetResult({
       snapshot: createInitialSnapshot(),
       lastEventSeq: 17,

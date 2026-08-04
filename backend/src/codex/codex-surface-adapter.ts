@@ -540,6 +540,15 @@ export class CodexSurfaceAgentAdapter {
         payload: skillsChangedPayload(event.payload.cwd, event.payload.skills, event.payload.status),
         occurredAt: event.occurredAt,
       });
+      return;
+    }
+    if (event.type === 'remoteControl.statusChanged') {
+      this.emit({
+        backend: 'codex',
+        type: 'devicePairing.statusChanged',
+        payload: event.payload.status,
+        occurredAt: event.occurredAt,
+      });
     }
   }
 

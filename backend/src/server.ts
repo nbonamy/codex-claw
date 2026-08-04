@@ -4,7 +4,7 @@ import { sendAgentPrompt } from '@codex-claw/shared/agent-chat-service';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput } from '@codex-claw/shared/snapshot';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/shared/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitStatus, AgentStatus, AgentHistoryLoadResult, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, MainToRendererEvent, MoveAgentToTeamInput, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitStatus, AgentHistoryLoadResult, AgentStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, MainToRendererEvent, MoveAgentToTeamInput, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
@@ -73,6 +73,8 @@ export class ClawBackendServer {
   private readonly version: string;
   private readonly pid: number;
   private readonly snapshot: AppSnapshot;
+  private remoteControlStatus: DevicePairingStatus = { status: 'disabled' };
+  private remoteControlStatusLoaded = false;
   private readonly driverRpc?: BackendDriverRpc;
   private readonly onEvent?: (event: ClawBackendEvent) => void;
   private readonly onBackendEventApplied?: (event: MainToRendererEvent) => void;
@@ -131,15 +133,17 @@ export class ClawBackendServer {
         });
       case backendMethods.snapshotGet:
         await this.initializeSourceFolderIfNeeded();
+        await this.ensureRemoteControlStatus();
         const snapshot = await this.clientSnapshot();
         return createClawRpcResult(message.id, {
           snapshot,
           lastEventSeq: this.lastEventSeq,
-          clientState: clientStateFromSnapshot(snapshot),
+          clientState: this.clientStateFromSnapshot(snapshot),
         });
       case backendMethods.clientStateGet:
         await this.initializeSourceFolderIfNeeded();
-        return createClawRpcResult(message.id, clientStateFromSnapshot(await this.clientSnapshot()));
+        await this.ensureRemoteControlStatus();
+        return createClawRpcResult(message.id, this.clientStateFromSnapshot(await this.clientSnapshot()));
       case backendMethods.debugAgentMessageSend: {
         const agentId = requireAgentId(message.params);
         const recipient = this.snapshot.agents.find((candidate) => candidate.id === agentId);
@@ -260,6 +264,11 @@ export class ClawBackendServer {
       case backendMethods.devicePairingStatusGet:
       case backendMethods.devicePairingEnable:
       case backendMethods.devicePairingDisable:
+        {
+          const status = await this.requireDriverRpc().handle(message.method, message.params) as DevicePairingStatus;
+          this.publishRemoteControlStatus(status);
+          return createClawRpcResult(message.id, status);
+        }
       case backendMethods.devicePairingStart:
       case backendMethods.devicePairingStatus:
       case backendMethods.devicePairingClientsList:
@@ -1817,7 +1826,7 @@ export class ClawBackendServer {
       type: 'snapshot.updated',
       payload: snapshotMetadata(snapshot),
       occurredAt: new Date().toISOString(),
-      clientState: clientStateFromSnapshot(snapshot),
+      clientState: this.clientStateFromSnapshot(snapshot),
     };
     this.onEvent?.(event);
   }
@@ -2294,6 +2303,13 @@ export class ClawBackendServer {
 
   private handleBackendEvent(event: BackendEvent, options: { persist?: boolean } = {}): void {
     this.touchTranscriptForEvent(event);
+    if (event.type === 'devicePairing.statusChanged') {
+      const status = devicePairingStatusFromUnknown(event.payload);
+      if (status) {
+        this.remoteControlStatus = status;
+        this.remoteControlStatusLoaded = true;
+      }
+    }
     const fullEvent = this.nextMainEvent(this.compactSnapshotEvent(event));
     applyMainEventToSnapshot(this.snapshot, fullEvent);
     this.recordClientRequestOwner(fullEvent);
@@ -2368,15 +2384,41 @@ export class ClawBackendServer {
   private emitBackendEvent(event: MainToRendererEvent): void {
     this.onEvent?.({
       ...event,
-      clientState: clientStateFromSnapshot(this.snapshot),
+      clientState: this.clientStateFromSnapshot(this.snapshot),
     });
+  }
+
+  private publishRemoteControlStatus(status: DevicePairingStatus): void {
+    this.remoteControlStatusLoaded = true;
+    this.handleBackendEvent({
+      type: 'devicePairing.statusChanged',
+      payload: status,
+    }, { persist: false });
+  }
+
+  private clientStateFromSnapshot(snapshot: AppSnapshot): ClientState {
+    return clientStateFromSnapshot(snapshot, this.remoteControlStatus);
+  }
+
+  private async ensureRemoteControlStatus(): Promise<void> {
+    if (this.remoteControlStatusLoaded || !this.driverRpc) return;
+    try {
+      const status = await this.driverRpc.handle(backendMethods.devicePairingStatusGet, undefined);
+      const parsed = devicePairingStatusFromUnknown(status);
+      if (parsed) this.remoteControlStatus = parsed;
+    } catch {
+      // Remote-control status is an optional capability. Keep the safe default
+      // when an older or unavailable driver cannot answer the status request.
+    } finally {
+      this.remoteControlStatusLoaded = true;
+    }
   }
 
   private emitRemoteBackendEvent(event: MainToRendererEvent): void {
     const snapshot = this.clientSnapshotFromKnownRemotes();
     this.onEvent?.({
       ...event,
-      clientState: clientStateFromSnapshot(snapshot),
+      clientState: this.clientStateFromSnapshot(snapshot),
     });
   }
 
@@ -3005,14 +3047,36 @@ function shouldRefreshGitStatusForEvent(event: BackendEvent): boolean {
     event.type === 'turn.completed';
 }
 
-function clientStateFromSnapshot(snapshot: AppSnapshot): ClientState {
+function clientStateFromSnapshot(snapshot: AppSnapshot, remoteControlStatus: DevicePairingStatus): ClientState {
   return {
     sourceFolderPath: snapshot.sourceFolder.path,
     shouldPreventDisplaySleep: snapshot.general.preventSleepWhenAgentsRun &&
       snapshot.agents.some((agent) => isActiveAgentStatus(agent.status)),
+    shouldPreventDisplaySleepForRemoteAccess: snapshot.general.preventSleepWhenRemoteAccessEnabled !== false &&
+      remoteControlStatus.status === 'connected',
   };
 }
 
 function isActiveAgentStatus(status: AgentStatus): boolean {
   return status.type === 'starting' || status.type === 'working' || status.type === 'awaitingInput';
+}
+
+function devicePairingStatusFromUnknown(value: unknown): DevicePairingStatus | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (
+    (record.status !== 'disabled' && record.status !== 'connecting' && record.status !== 'connected' && record.status !== 'errored') ||
+    (record.serverName !== undefined && typeof record.serverName !== 'string') ||
+    (record.installationId !== undefined && typeof record.installationId !== 'string') ||
+    (record.environmentId !== undefined && record.environmentId !== null && typeof record.environmentId !== 'string')
+  ) {
+    return null;
+  }
+  const status: DevicePairingStatus = {
+    status: record.status,
+  };
+  if (typeof record.serverName === 'string') status.serverName = record.serverName;
+  if (typeof record.installationId === 'string') status.installationId = record.installationId;
+  if (record.environmentId === null || typeof record.environmentId === 'string') status.environmentId = record.environmentId;
+  return status;
 }

@@ -813,6 +813,7 @@ describe('AppStatePersistence', () => {
     const snapshot = createInitialSnapshot();
     snapshot.general = {
       preventSleepWhenAgentsRun: false,
+      preventSleepWhenRemoteAccessEnabled: true,
       codexBinaryPath: '/opt/homebrew/bin/codex',
       agentListCompact: true,
       plugins: { ...defaultPluginSettings },

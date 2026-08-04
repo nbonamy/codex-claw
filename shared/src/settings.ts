@@ -7,6 +7,7 @@ export const defaultPluginSettings: AppPluginSettings = {
 
 export const defaultGeneralSettings: AppGeneralSettings = {
   preventSleepWhenAgentsRun: true,
+  preventSleepWhenRemoteAccessEnabled: true,
   codexBinaryPath: '',
   agentListCompact: false,
   plugins: { ...defaultPluginSettings },
@@ -80,6 +81,7 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
 
   return {
     preventSleepWhenAgentsRun: value.preventSleepWhenAgentsRun !== false,
+    preventSleepWhenRemoteAccessEnabled: value.preventSleepWhenRemoteAccessEnabled !== false,
     codexBinaryPath: normalizeString(value.codexBinaryPath) ?? defaultGeneralSettings.codexBinaryPath,
     agentListCompact: value.agentListCompact === true,
     plugins: normalizePluginSettings(value.plugins),

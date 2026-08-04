@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AppController } from '../app-controller';
+import { AppController, shouldBlockDisplaySleep } from '../app-controller';
 import { createInitialSnapshot, snapshotMetadata } from '@codex-claw/shared/snapshot';
 import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
@@ -11,6 +11,24 @@ function callPrivate<Result>(controller: AppController, method: string): Promise
 }
 
 describe('AppController', () => {
+  it('keeps agent and AC-only remote-access sleep prevention independent', () => {
+    expect(shouldBlockDisplaySleep({
+      sourceFolderPath: '',
+      shouldPreventDisplaySleep: true,
+      shouldPreventDisplaySleepForRemoteAccess: false,
+    }, true)).toBe(true);
+    expect(shouldBlockDisplaySleep({
+      sourceFolderPath: '',
+      shouldPreventDisplaySleep: false,
+      shouldPreventDisplaySleepForRemoteAccess: true,
+    }, false)).toBe(true);
+    expect(shouldBlockDisplaySleep({
+      sourceFolderPath: '',
+      shouldPreventDisplaySleep: false,
+      shouldPreventDisplaySleepForRemoteAccess: true,
+    }, true)).toBe(false);
+  });
+
   it('routes the Debug message fixture to the active agent through clawd', async () => {
     const request = vi.fn().mockResolvedValue({ recipientId: 'agent-dina' });
     const controller = new AppController(createInitialSnapshot(), createBackendClient({ request }));

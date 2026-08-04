@@ -2,6 +2,13 @@
 
 All notable Codex Claw changes are recorded here.
 
+## Unreleased
+
+### Improvements and fixes
+
+- Mobile remote access can keep a plugged-in Mac awake, with streamlined
+  connection, pairing, and device controls in Settings.
+
 ## [0.4.0] - 2026-08-03
 
 ### New features

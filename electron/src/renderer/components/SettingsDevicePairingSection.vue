@@ -4,41 +4,35 @@
     title-id="settings-connections-device-pairing-title"
   >
     <div class="settings-device-pairing">
-      <div class="settings-device-pairing__header">
-        <div>
-          <strong>Codex mobile devices</strong>
-          <span>{{ description }}</span>
-        </div>
-        <div class="settings-device-pairing__actions">
-          <el-button
-            v-if="status?.status === 'disabled'"
-            size="small"
-            type="primary"
-            :loading="action === 'enable'"
-            :disabled="status.allowRemoteControl === false"
-            @click="enablePairing"
-          >
-            Enable
-          </el-button>
-          <template v-else-if="status">
-            <el-button
-              size="small"
-              :loading="action === 'start'"
-              :disabled="status.status !== 'connected'"
-              @click="startPairing"
-            >
-              Pair device
-            </el-button>
-            <el-button
-              size="small"
-              :loading="action === 'disable'"
-              @click="disablePairing"
-            >
-              Disable
-            </el-button>
-          </template>
-        </div>
-      </div>
+      <SettingsRow
+        title="Allow connections"
+        :description="description"
+      >
+        <template #control>
+          <el-switch
+            :model-value="remoteControlEnabled"
+            :loading="action === 'enable' || action === 'disable'"
+            :disabled="status === null || status.allowRemoteControl === false || action === 'start'"
+            aria-label="Allow connections"
+            @update:model-value="updateRemoteControlEnabled"
+          />
+        </template>
+      </SettingsRow>
+
+      <SettingsRow
+        v-if="remoteControlEnabled"
+        as="label"
+        title="Keep this Mac awake"
+        description="Prevent sleep when this Mac is plugged in and remote access is enabled"
+      >
+        <template #control>
+          <el-switch
+            :model-value="settings.preventSleepWhenRemoteAccessEnabled"
+            aria-label="Keep this Mac awake"
+            @update:model-value="updateRemoteAccessKeepAwake"
+          />
+        </template>
+      </SettingsRow>
 
       <p
         v-if="error"
@@ -67,47 +61,73 @@
         <em>{{ sessionStatus }}</em>
       </div>
 
-      <div
-        v-if="status?.status === 'connected'"
-        class="settings-device-pairing__devices"
+      <template
+        v-if="remoteControlEnabled"
       >
-        <div class="settings-device-pairing__devices-heading">
-          <strong>Paired devices</strong>
-          <el-button
-            text
-            size="small"
-            :loading="loadingDevices"
-            @click="loadDevices"
+        <SettingsRow
+          title="Paired devices"
+          :description="pairedDevicesDescription"
+        >
+          <template #control>
+            <span class="settings-device-pairing__actions">
+              <el-button
+                v-if="status?.status === 'connecting'"
+                text
+                size="small"
+                loading
+                disabled
+              >
+                Refreshing
+              </el-button>
+              <template v-else-if="status?.status === 'connected'">
+                <el-button
+                  text
+                  size="small"
+                  :loading="action === 'start'"
+                  @click="startPairing"
+                >
+                  Add device
+                </el-button>
+                <el-button
+                  text
+                  size="small"
+                  :loading="loadingDevices"
+                  @click="loadDevices"
+                >
+                  Refresh
+                </el-button>
+              </template>
+            </span>
+          </template>
+        </SettingsRow>
+        <div
+          v-if="devices.length > 0"
+          class="settings-device-pairing__device-list"
+        >
+          <hr
+            class="settings-device-pairing__device-divider"
+            aria-hidden="true"
           >
-            Refresh
-          </el-button>
+          <SettingsRow
+            v-for="device in devices"
+            :key="device.clientId"
+            :title="device.displayName || device.deviceModel || 'Codex device'"
+            :description="deviceLabel(device)"
+          >
+            <template #control>
+              <el-button
+                text
+                type="danger"
+                size="small"
+                :loading="revokingDeviceId === device.clientId"
+                @click="confirmRevoke(device)"
+              >
+                Revoke
+              </el-button>
+            </template>
+          </SettingsRow>
         </div>
-        <span
-          v-if="!loadingDevices && devices.length === 0"
-          class="settings-device-pairing__empty"
-        >
-          No paired devices
-        </span>
-        <article
-          v-for="device in devices"
-          :key="device.clientId"
-          class="settings-device-pairing__device"
-        >
-          <div>
-            <strong>{{ device.displayName || device.deviceModel || 'Codex device' }}</strong>
-            <span>{{ deviceLabel(device) }}</span>
-          </div>
-          <el-button
-            text
-            type="danger"
-            size="small"
-            :loading="revokingDeviceId === device.clientId"
-            @click="confirmRevoke(device)"
-          >
-            Revoke
-          </el-button>
-        </article>
-      </div>
+      </template>
     </div>
   </SettingsSection>
 </template>
@@ -116,8 +136,9 @@
 import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { toString as qrCodeToString } from 'qrcode';
-import type { DevicePairingSession, DevicePairingStatus, PairedDevice } from '@codex-claw/shared/contracts';
+import type { DevicePairingSession, DevicePairingStatus, PairedDevice, UpdateSettingsInput } from '@codex-claw/shared/contracts';
 import { codexPairingUrl } from '../device-pairing';
+import SettingsRow from './SettingsRow.vue';
 import SettingsSection from './SettingsSection.vue';
 
 const props = withDefaults(defineProps<{
@@ -128,6 +149,8 @@ const props = withDefaults(defineProps<{
   check?: (session: DevicePairingSession) => Promise<boolean>;
   listDevices?: (environmentId: string) => Promise<PairedDevice[]>;
   revokeDevice?: (environmentId: string, clientId: string) => Promise<void>;
+  settings?: { preventSleepWhenRemoteAccessEnabled: boolean };
+  updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
 }>(), {
   getStatus: async () => ({ status: 'disabled' as const }),
   enable: async () => ({ status: 'disabled' as const }),
@@ -136,6 +159,8 @@ const props = withDefaults(defineProps<{
   check: async () => false,
   listDevices: async () => [],
   revokeDevice: async () => undefined,
+  settings: () => ({ preventSleepWhenRemoteAccessEnabled: true }),
+  updateSettings: async () => undefined,
 });
 
 const status = ref<DevicePairingStatus | null>(null);
@@ -146,7 +171,6 @@ const loadingDevices = ref(false);
 const error = ref<string | null>(null);
 const action = ref<'enable' | 'disable' | 'start' | null>(null);
 const revokingDeviceId = ref<string | null>(null);
-const claimed = ref(false);
 const qrDataUrl = ref<string | null>(null);
 let pairingPollTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 let statusPollTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
@@ -158,9 +182,17 @@ const description = computed(() => {
   if (status.value?.status === 'errored') return 'Codex remote control needs attention.';
   return 'Connect the official Codex mobile app to this Claw instance.';
 });
+const remoteControlEnabled = computed(() => (
+  status.value !== null && status.value.status !== 'disabled'
+));
+const pairedDevicesDescription = computed(() => {
+  if (status.value?.status === 'connecting') return 'Connecting before devices can be paired';
+  if (status.value?.status === 'errored') return 'Remote control needs attention';
+  if (!loadingDevices.value && devices.value.length === 0) return 'No paired devices';
+  return '';
+});
 
 const sessionStatus = computed(() => {
-  if (claimed.value) return 'Paired successfully';
   if (!session.value) return '';
   return new Date(session.value.expiresAt).getTime() <= Date.now()
     ? 'Code expired'
@@ -218,10 +250,21 @@ async function disablePairing(): Promise<void> {
   }
 }
 
+function updateRemoteControlEnabled(value: boolean | string | number): void {
+  void (value === true ? enablePairing() : disablePairing());
+}
+
+function updateRemoteAccessKeepAwake(value: boolean | string | number): void {
+  void props.updateSettings({
+    general: {
+      preventSleepWhenRemoteAccessEnabled: value === true,
+    },
+  });
+}
+
 async function startPairing(): Promise<void> {
   action.value = 'start';
   error.value = null;
-  claimed.value = false;
   stopPairingPoll();
   try {
     session.value = await props.start();
@@ -244,9 +287,10 @@ async function pollPairing(): Promise<void> {
   const activeSession = session.value;
   if (!activeSession || new Date(activeSession.expiresAt).getTime() <= Date.now()) return;
   try {
-    claimed.value = await props.check(activeSession);
-    if (claimed.value) {
+    if (await props.check(activeSession)) {
       await loadDevices();
+      session.value = null;
+      qrDataUrl.value = null;
       return;
     }
   } catch (cause) {
@@ -333,40 +377,6 @@ async function pairingCodeDataUrl(pairingCode: string): Promise<string> {
 .settings-device-pairing {
   display: flex;
   flex-direction: column;
-  gap: var(--space-12);
-  padding: var(--space-12);
-}
-
-.settings-device-pairing__header,
-.settings-device-pairing__devices-heading,
-.settings-device-pairing__device {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-12);
-}
-
-.settings-device-pairing__header > div:first-child,
-.settings-device-pairing__device > div {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.settings-device-pairing__header strong,
-.settings-device-pairing__devices-heading strong,
-.settings-device-pairing__device strong {
-  color: var(--color-text);
-  font-size: var(--font-size-14);
-  font-weight: 600;
-}
-
-.settings-device-pairing__header span,
-.settings-device-pairing__device span,
-.settings-device-pairing__code span,
-.settings-device-pairing__code em {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-12);
 }
 
 .settings-device-pairing__actions {
@@ -375,15 +385,25 @@ async function pairingCodeDataUrl(pairingCode: string): Promise<string> {
   align-items: center;
 }
 
+.settings-device-pairing__device-divider {
+  margin: 0 var(--space-12);
+  border: 0;
+  border-top: 1px solid var(--color-border);
+}
+
 .settings-device-pairing__code {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-6);
   padding: var(--space-20);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
   background: var(--color-surface-low);
+}
+
+.settings-device-pairing__code span,
+.settings-device-pairing__code em {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
 }
 
 .settings-device-pairing__code em {
@@ -403,17 +423,6 @@ async function pairingCodeDataUrl(pairingCode: string): Promise<string> {
   border-radius: var(--radius-sm);
 }
 
-.settings-device-pairing__devices {
-  display: flex;
-  flex-direction: column;
-}
-
-.settings-device-pairing__device {
-  padding: var(--space-10) 0;
-  border-top: 1px solid var(--color-border);
-}
-
-.settings-device-pairing__empty,
 .settings-device-pairing__loading {
   color: var(--color-text-muted);
   font-size: var(--font-size-13);

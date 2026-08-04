@@ -1280,6 +1280,7 @@ describe('ClawBackendServer', () => {
       recentRepoNames: [],
     };
     snapshot.general.preventSleepWhenAgentsRun = true;
+    snapshot.general.preventSleepWhenRemoteAccessEnabled = true;
     snapshot.agents = [{
       id: 'agent-dina',
       name: 'Dina',
@@ -1303,6 +1304,7 @@ describe('ClawBackendServer', () => {
       result: {
         sourceFolderPath: '/Users/nbonamy/src',
         shouldPreventDisplaySleep: true,
+        shouldPreventDisplaySleepForRemoteAccess: false,
       },
     });
 
@@ -1315,8 +1317,44 @@ describe('ClawBackendServer', () => {
       result: {
         sourceFolderPath: '/Users/nbonamy/src',
         shouldPreventDisplaySleep: false,
+        shouldPreventDisplaySleepForRemoteAccess: false,
       },
     });
+  });
+
+  it('hydrates remote-control status before deriving initial client state', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.general.preventSleepWhenAgentsRun = true;
+    snapshot.general.preventSleepWhenRemoteAccessEnabled = true;
+    const handle = vi.fn(async (method: string) => method === backendMethods.devicePairingStatusGet ? {
+      status: 'connected',
+      serverName: 'Codex remote control',
+      installationId: 'installation-1',
+      environmentId: 'environment-1',
+    } : undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      driverRpc: {
+        handle,
+        onEvent: vi.fn(() => () => undefined),
+        close: vi.fn().mockResolvedValue(undefined),
+      } as unknown as BackendDriverRpc,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'snapshot',
+      method: 'snapshot/get',
+    })).resolves.toMatchObject({
+      result: {
+        clientState: {
+          shouldPreventDisplaySleepForRemoteAccess: true,
+        },
+      },
+    });
+    expect(handle).toHaveBeenCalledWith(backendMethods.devicePairingStatusGet, undefined);
   });
 
   it('initializes source folder state from the backend when snapshots are requested', async () => {
@@ -1435,11 +1473,27 @@ describe('ClawBackendServer', () => {
       payload: { type: 'working' },
       clientState: {
         shouldPreventDisplaySleep: true,
+        shouldPreventDisplaySleepForRemoteAccess: false,
       },
     }]);
+    emitEvent({
+      backend: 'codex',
+      type: 'devicePairing.statusChanged',
+      payload: {
+        status: 'connected',
+        serverName: 'Codex remote control',
+        installationId: 'installation-1',
+        environmentId: 'environment-1',
+      },
+    });
+    expect(events).toContainEqual(expect.objectContaining({
+      seq: 2,
+      type: 'devicePairing.statusChanged',
+      clientState: expect.objectContaining({ shouldPreventDisplaySleepForRemoteAccess: true }),
+    }));
     await expect(server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'snapshot/get' })).resolves.toMatchObject({
       result: {
-        lastEventSeq: 1,
+        lastEventSeq: 2,
       },
     });
   });
@@ -4930,6 +4984,7 @@ function createTestSnapshot(): AppSnapshot {
     },
     general: {
       preventSleepWhenAgentsRun: true,
+      preventSleepWhenRemoteAccessEnabled: true,
       codexBinaryPath: '',
       agentListCompact: false,
       plugins: {
