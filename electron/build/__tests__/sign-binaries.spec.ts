@@ -1,5 +1,25 @@
 import { describe, expect, it, vi } from 'vitest';
-import { signDarwinBinaries } from '../sign-binaries';
+import {
+  shouldPreserveUpstreamCodexSignature,
+  signDarwinBinaries,
+} from '../sign-binaries';
+
+describe('shouldPreserveUpstreamCodexSignature', () => {
+  it('excludes only the bundled Codex executable from Electron re-signing', () => {
+    expect(shouldPreserveUpstreamCodexSignature(
+      '/build/Codex Claw.app/Contents/Resources/codex/codex',
+    )).toBe(true);
+    expect(shouldPreserveUpstreamCodexSignature(
+      'Contents/Resources/codex/codex',
+    )).toBe(true);
+    expect(shouldPreserveUpstreamCodexSignature(
+      '/build/Codex Claw.app/Contents/Resources/codex/codex-helper',
+    )).toBe(false);
+    expect(shouldPreserveUpstreamCodexSignature(
+      '/build/Codex Claw.app/Contents/MacOS/codex',
+    )).toBe(false);
+  });
+});
 
 describe('signDarwinBinaries', () => {
   it('skips signing when the signing identity is not configured', () => {

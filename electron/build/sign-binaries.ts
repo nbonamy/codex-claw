@@ -9,6 +9,14 @@ type SignDarwinBinariesDeps = {
   logger?: Pick<typeof console, 'log' | 'warn'>;
 };
 
+const bundledCodexPathSuffix = path.join('Contents', 'Resources', 'codex', 'codex');
+
+export function shouldPreserveUpstreamCodexSignature(filePath: string): boolean {
+  const normalizedPath = path.normalize(filePath);
+  return normalizedPath === bundledCodexPathSuffix
+    || normalizedPath.endsWith(`${path.sep}${bundledCodexPathSuffix}`);
+}
+
 export function signDarwinBinaries(
   buildPath: string,
   _arch: string,

@@ -234,6 +234,7 @@ describe('runtime config', () => {
     expect(prepareScript).toContain("execFileSync('lipo', ['-archs', filePath]");
     expect(prepareScript).toContain("execFileSync('codesign', ['--verify', '--strict', '--verbose=2'");
     expect(forgeConfig).toContain("'resources/codex'");
+    expect(forgeConfig).toContain('ignore: shouldPreserveUpstreamCodexSignature');
   });
 
   it('resolves the packaged clawd runtime from resources when no env command is configured', async () => {

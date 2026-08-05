@@ -5,7 +5,10 @@ import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import path from 'node:path';
-import { signDarwinBinaries } from './build/sign-binaries';
+import {
+  shouldPreserveUpstreamCodexSignature,
+  signDarwinBinaries,
+} from './build/sign-binaries';
 
 import dotenv from 'dotenv';
 dotenv.config();
@@ -38,6 +41,7 @@ if (isDarwin && !skipMacSigning) {
   osxPackagerConfig = {
     osxSign: {
       identity: process.env.IDENTIFY_DARWIN_CODE,
+      ignore: shouldPreserveUpstreamCodexSignature,
       // provisioningProfile: './build/Witsy_Darwin.provisionprofile',
       optionsForFile: () => { return {
         hardenedRuntime: true,

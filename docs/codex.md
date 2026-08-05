@@ -114,9 +114,9 @@ temporary home with `CODEX_RELEASE`, `CODEX_NON_INTERACTIVE`, and
 `CODEX_INSTALL_DIR`, then copies the resolved executable into
 `electron/resources/codex/codex`. The official installer verifies its release
 checksums, and Claw verifies the resulting version and Developer ID signature.
-Unsigned development packages retain the upstream OpenAI signature; signed
-release packaging recursively re-signs the executable with the Codex Claw
-Developer ID before notarization.
+Electron signing explicitly preserves the executable's upstream OpenAI
+signature and entitlements. The outer Codex Claw signature seals that nested
+code, and release notarization validates the complete app bundle.
 
 Electron passes the copied path to local `clawd` through
 `CODEX_CLAW_BUNDLED_CODEX_PATH`. The SSH installer uploads only `clawd.mjs`,
