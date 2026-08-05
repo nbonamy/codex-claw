@@ -103,6 +103,23 @@ describe('ConversationPane', () => {
     expect(wrapper.text()).toContain('Looking now.');
   });
 
+  it('falls back to SDK translations for SDK actions Claw has not overridden', () => {
+    const controller = createCodexConversationPaneController({
+      state: {
+        identity: {
+          conversationKey: 'agent:agent-dina',
+          messages,
+        },
+        policy: { canForkMessage: true },
+      },
+      actions: { forkMessage: () => undefined },
+    });
+
+    const wrapper = mountPane({ controller, agent });
+
+    expect(wrapper.find('[aria-label="Fork"]').exists()).toBe(true);
+  });
+
   it('renders teammate envelopes as labeled messages containing only their content', () => {
     const wrapper = mountPane({
       controller: controllerFor([{

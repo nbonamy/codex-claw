@@ -322,6 +322,10 @@ export class AppController {
       return this.duplicateAgent(agentId);
     });
 
+    ipc.handle(ipcChannels.forkAgent, async (_event, agentId: string, messageIndex?: number) => {
+      return this.forkAgent(agentId, messageIndex);
+    });
+
     ipc.handle(ipcChannels.moveAgentToTeam, async (_event, input: MoveAgentToTeamInput) => {
       return this.moveAgentToTeam(input);
     });
@@ -635,6 +639,13 @@ export class AppController {
 
   private async duplicateAgent(agentId: string): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentDuplicate, { agentId }));
+  }
+
+  private async forkAgent(agentId: string, messageIndex?: number): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentFork, {
+      agentId,
+      ...(messageIndex === undefined ? {} : { messageIndex }),
+    }));
   }
 
   private async moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot> {

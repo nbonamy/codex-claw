@@ -412,6 +412,7 @@ describe('AgentSidebar', () => {
     expect(wrapper.get('.agent-context-menu').findAll('[role="menuitem"]').map((item) => item.text())).toStrictEqual([
       'Edit Agent',
       'Duplicate Agent',
+      'Fork Agent',
       'Move to Other Team',
       'Save to Bench',
       'Restart Agent',
@@ -438,6 +439,23 @@ describe('AgentSidebar', () => {
       await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === label)?.trigger('click');
       expect(wrapper.emitted(eventName)).toStrictEqual([['agent-dina']]);
     }
+  });
+
+  it('emits fork for an idle Codex agent with a conversation', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: [{ ...agents[0], backendSession: { kind: 'codex', threadId: 'thread-dina' } }, agents[1]],
+        activeAgentId: 'agent-dina',
+        forkableAgentIds: ['agent-dina'],
+        teamName: 'Codex Claw',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    await wrapper.findAll('.agent-sidebar__agent')[0].trigger('contextmenu');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Fork Agent')?.trigger('click');
+
+    expect(wrapper.emitted('fork-agent')).toStrictEqual([['agent-dina']]);
   });
 
   it('emits move targets from the context menu submenu', async () => {

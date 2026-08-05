@@ -1464,6 +1464,7 @@ type BackendRuntimeCapabilities = NonNullable<AppSnapshot['backendRuntimes'][num
 
 function backendCapabilities(value: Record<string, unknown>): Partial<BackendRuntimeCapabilities> {
   return {
+    ...(typeof value.conversationFork === 'boolean' ? { conversationFork: value.conversationFork } : {}),
     ...(Array.isArray(value.approvalPresets) ? { approvalPresets: value.approvalPresets.filter(isApprovalPreset) } : {}),
   };
 }

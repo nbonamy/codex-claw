@@ -7,6 +7,7 @@ describe('backendRequestTimeoutMs', () => {
     expect(backendRequestTimeoutMs(backendMethods.agentHistoryHydrate, 5_000)).toBe(120_000);
     expect(backendRequestTimeoutMs(backendMethods.agentHistoryLoadOlder, 5_000)).toBe(120_000);
     expect(backendRequestTimeoutMs(backendMethods.agentSelect, 5_000)).toBe(120_000);
+    expect(backendRequestTimeoutMs(backendMethods.agentFork, 5_000)).toBe(120_000);
     expect(backendRequestTimeoutMs(backendMethods.snapshotGet, 5_000)).toBe(5_000);
   });
 });

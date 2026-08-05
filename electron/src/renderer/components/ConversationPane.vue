@@ -32,6 +32,7 @@ import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   CodexConversationPane,
+  defaultCodexChatTranslate,
   provideCodexChatTranslate,
   type CodexChatMessage,
   type CodexConversationPaneController,
@@ -50,9 +51,11 @@ import {
 } from '../shared/collaboration-message';
 import { provideClawToolPresentation } from '../tool-presentation';
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const surface = ref<{ focusComposer(): void } | null>(null);
-provideCodexChatTranslate((key, params) => t(key, params ?? {}));
+provideCodexChatTranslate((key, params) => te(key)
+  ? t(key, params ?? {})
+  : defaultCodexChatTranslate(key, params));
 
 const props = withDefaults(defineProps<{
   controller: CodexConversationPaneController;

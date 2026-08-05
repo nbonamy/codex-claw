@@ -52,7 +52,8 @@ describe('CockpitView', () => {
 
   it('opens agent actions from cockpit card right click', async () => {
     const snapshot = createInitialSnapshot();
-    const wrapper = mountCockpit(snapshot);
+    snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
+    const wrapper = mountCockpit(snapshot, { forkableAgentIds: ['agent-dina'] });
 
     await wrapper.get('.cockpit-view__agent-card').trigger('contextmenu', {
       clientX: 42,
@@ -68,6 +69,11 @@ describe('CockpitView', () => {
 
     expect(wrapper.emitted('duplicate-agent')).toStrictEqual([['agent-dina']]);
     expect(wrapper.find('.agent-context-menu').exists()).toBe(false);
+
+    await wrapper.get('.cockpit-view__agent-card').trigger('contextmenu');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Fork Agent')?.trigger('click');
+
+    expect(wrapper.emitted('fork-agent')).toStrictEqual([['agent-dina']]);
   });
 
   it('shows the add tile when the final row has space', () => {

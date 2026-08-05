@@ -7,9 +7,9 @@ import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/shared/snapsho
 import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitStatus, AgentHistoryLoadResult, AgentStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, MainToRendererEvent, MoveAgentToTeamInput, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
-import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
+import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
-import { assignWorkItemToAgentInSnapshot, closeAgentInSnapshot, deployBenchTemplateInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeBenchTemplateFromSnapshot, removeWorkItemAssignmentFromSnapshot, reorderAgentInTeam, restartAgentConversation, resumeAgentConversationInSnapshot, saveAgentToBench, saveBenchTemplateToSnapshot } from '@codex-claw/shared/agent-manager';
+import { assignWorkItemToAgentInSnapshot, attachForkedAgentInSnapshot, closeAgentInSnapshot, createForkedAgentDraft, deployBenchTemplateInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeBenchTemplateFromSnapshot, removeWorkItemAssignmentFromSnapshot, reorderAgentInTeam, restartAgentConversation, resumeAgentConversationInSnapshot, saveAgentToBench, saveBenchTemplateToSnapshot } from '@codex-claw/shared/agent-manager';
 import { clearLoopExecutionHistoryInSnapshot, createLoopInSnapshot, deleteLoopExecutionFromSnapshot, deleteLoopFromSnapshot, updateLoopInSnapshot } from '@codex-claw/shared/loop-manager';
 import { updateSettingsInSnapshot } from '@codex-claw/shared/settings';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
@@ -426,6 +426,51 @@ export class ClawBackendServer {
           const agent = duplicateAgentInSnapshot(this.snapshot, agentId);
           if (!agent) {
             throw new Error(`Agent not found: ${agentId}`);
+          }
+          return this.persistAndEmitSnapshot();
+        });
+      }
+      case backendMethods.agentFork: {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const rawMessageIndex = params.messageIndex;
+        if (rawMessageIndex !== undefined && (
+          typeof rawMessageIndex !== 'number' || !Number.isInteger(rawMessageIndex) || rawMessageIndex < 0
+        )) {
+          throw new Error('Invalid fork message index.');
+        }
+        const messageIndex = rawMessageIndex as number | undefined;
+        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentFork, {
+          agentId,
+          ...(messageIndex === undefined ? {} : { messageIndex }),
+        }, async (agent) => {
+          if (agent.status.type !== 'idle') {
+            throw new Error('Agent must be idle before forking.');
+          }
+          if (!agent.backendSession) {
+            throw new Error('Agent must have a conversation before forking.');
+          }
+          const targetAgent = createForkedAgentDraft(this.snapshot, agentId);
+          if (!targetAgent) {
+            throw new Error(`Agent not found: ${agentId}`);
+          }
+          const result = await this.handleAgentDriverRequest(agent, backendMethods.driverConversationFork, {
+            agent,
+            targetAgent,
+            ...(messageIndex === undefined ? {} : { messageIndex }),
+          }) as BackendConversationForkResult;
+          const forked = attachForkedAgentInSnapshot(
+            this.snapshot,
+            agentId,
+            targetAgent,
+            result.backendSession,
+            result.messages,
+          );
+          if (!forked) {
+            throw new Error(`Agent not found: ${agentId}`);
+          }
+          if (result.activeTurnId) {
+            forked.status = { type: 'working' };
           }
           return this.persistAndEmitSnapshot();
         });

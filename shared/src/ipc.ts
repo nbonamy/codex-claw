@@ -58,6 +58,7 @@ export const ipcChannels = {
   assignWorkItemToAgent: 'agent:work-item:assign',
   removeWorkItemAssignment: 'agent:work-item:unassign',
   duplicateAgent: 'agent:duplicate',
+  forkAgent: 'agent:fork',
   moveAgentToTeam: 'agent:move-to-team',
   reorderAgents: 'agent:reorder',
   saveAgentToBench: 'agent:save-to-bench',

@@ -15,6 +15,7 @@ describe('backend capabilities', () => {
       serviceTier: true,
       steerPrompt: true,
       approvals: true,
+      conversationFork: true,
     });
   });
 
@@ -27,6 +28,7 @@ describe('backend capabilities', () => {
       serviceTier: false,
       steerPrompt: false,
       approvals: false,
+      conversationFork: false,
     });
   });
 });

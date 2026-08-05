@@ -108,7 +108,8 @@ therefore never replayed after reconnect or renderer reload.
 | `agent/create` | `{ input: CreateAgentInput }` | `AppSnapshot` | Creates the agent in the owning team's backend location. For remote-team pointers, local `clawd` forwards creation to the remote `clawd` with the remote team id and does not persist a local proxy agent. |
 | `agent/update` | `{ input: UpdateAgentInput }` | `AppSnapshot` | Validates folder and refreshes git status. |
 | `agent/select` | `{ agentId }` | `AppSnapshot` | Selects, hydrates history, and refreshes git status. |
-| `agent/duplicate` | `{ agentId }` | `AppSnapshot` | Duplicates product agent state. |
+| `agent/duplicate` | `{ agentId }` | `AppSnapshot` | Duplicates product agent configuration directly below the source agent. |
+| `agent/fork` | `{ agentId, messageIndex? }` | `AppSnapshot` | Forks an idle agent's backend conversation, optionally at an absolute host message index, into a new selected agent directly below the source. |
 | `agent/team/move` | `{ input: MoveAgentToTeamInput }` | `AppSnapshot` | Moves a local agent between local teams. Cross-backend moves are rejected; create a new agent in the target remote team instead. |
 | `agent/reorder` | `{ input: ReorderAgentsInput }` | `AppSnapshot` | Reorders within a team. |
 | `agent/delete` | `{ agentId }` | `AppSnapshot` | Removes the active product agent. |
@@ -284,6 +285,7 @@ implementation messages, not the preferred app protocol for clients.
 | `driver/history/load-older` | `{ agent }` | `{ hasOlder }` |
 | `driver/conversations/list` | `{ agent }` | `ConversationSummary[]` |
 | `driver/conversation/resume` | `{ agent, ref }` | `BackendConversationResumeResult` |
+| `driver/conversation/fork` | `{ agent, messageIndex? }` | `BackendConversationResumeResult` |
 | `driver/conversation/messages/get` | `{ ref, agentId }` | `RendererMessage[]` |
 | `driver/prompt/steer` | `{ agent, prompt }` | `BackendSendResult` |
 | `driver/turn/rollback` | `{ agent, turnId }` | `BackendRollbackResult` |

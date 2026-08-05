@@ -21,6 +21,7 @@ describe('AgentContextMenu', () => {
     expect(wrapper.findAll('[role="menuitem"]').map((item) => item.text())).toStrictEqual([
       'Edit Agent',
       'Duplicate Agent',
+      'Fork Agent',
       'Move to Other Team',
       'Save to Bench',
       'Restart Agent',
@@ -35,6 +36,27 @@ describe('AgentContextMenu', () => {
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Save to Bench')?.trigger('click');
 
     expect(wrapper.emitted('action')).toStrictEqual([['save-agent-to-bench']]);
+  });
+
+  it('places fork directly after duplicate and disables it when unavailable', () => {
+    const wrapper = mountMenu({ forkDisabled: true });
+    const items = wrapper.findAll('[role="menuitem"]');
+
+    expect(items.map((item) => item.text()).slice(0, 4)).toStrictEqual([
+      'Edit Agent',
+      'Duplicate Agent',
+      'Fork Agent',
+      'Move to Other Team',
+    ]);
+    expect(items.find((item) => item.text() === 'Fork Agent')?.attributes()).toHaveProperty('disabled');
+  });
+
+  it('emits fork when available', async () => {
+    const wrapper = mountMenu();
+
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Fork Agent')?.trigger('click');
+
+    expect(wrapper.emitted('action')).toStrictEqual([['fork-agent']]);
   });
 
   it('disables move targets when no other teams are available', () => {
@@ -97,7 +119,7 @@ describe('AgentContextMenu', () => {
   });
 });
 
-function mountMenu(props: { moveTargets?: Team[] } = {}) {
+function mountMenu(props: { forkDisabled?: boolean; moveTargets?: Team[] } = {}) {
   const wrapper = mount(AgentContextMenu, {
     props: {
       x: 120,

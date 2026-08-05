@@ -97,6 +97,8 @@
     @disconnect-team="disconnectTeam"
     @close-agent="closeAgent"
     @duplicate-agent="duplicateAgent"
+    @fork-agent="forkAgent"
+    @fork-message="forkActiveAgentMessage"
     @move-agent-to-team="moveAgentToTeam"
     @reorder-agents="reorderAgents"
     @reorder-teams="reorderTeams"
@@ -203,6 +205,8 @@ const {
   disconnectTeam,
   updateAgent,
   duplicateAgent,
+  forkAgent,
+  forkActiveAgentMessage,
   moveAgentToTeam,
   reorderAgents,
   saveAgentToBench,

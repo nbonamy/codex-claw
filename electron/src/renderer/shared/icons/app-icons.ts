@@ -23,6 +23,7 @@ export {
   IconFileDiff as FileDiffIcon,
   IconFileText as FileTextIcon,
   IconFolder as FolderIcon,
+  IconGitFork as GitForkIcon,
   IconHandStop as HandStopIcon,
   IconInfoCircle as Info,
   IconInfinity as InfinityIcon,

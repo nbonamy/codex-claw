@@ -39,6 +39,7 @@
       <AgentSidebar
         v-if="showAgentSidebar"
         :agents="activeTeamAgents"
+        :forkable-agent-ids="forkableAgentIds"
         :active-agent-id="currentAgent?.id ?? null"
         :bench="activeBench"
         :teams="snapshot.teams"
@@ -55,6 +56,7 @@
         @close-agent="$emit('close-agent', $event)"
         @deploy-bench-template="deployBenchTemplateForActiveTeam"
         @duplicate-agent="$emit('duplicate-agent', $event)"
+        @fork-agent="$emit('fork-agent', $event)"
         @edit-agent="openEditAgent"
         @move-agent-to-team="$emit('move-agent-to-team', $event)"
         @new-agent="openNewAgent"
@@ -151,6 +153,7 @@
       <CockpitView
         v-else-if="cockpitVisible"
         :agents="snapshot.agents"
+        :forkable-agent-ids="forkableAgentIds"
         :bench-by-team-id="benchByTeamId"
         :teams="snapshot.teams"
         :work-backlog="cockpitWorkBacklog"
@@ -161,6 +164,7 @@
         @close-agent="$emit('close-agent', $event)"
         @deploy-bench-template="$emit('deploy-bench-template', $event)"
         @duplicate-agent="$emit('duplicate-agent', $event)"
+        @fork-agent="$emit('fork-agent', $event)"
         @edit-agent="openEditAgent"
         @move-agent-to-team="$emit('move-agent-to-team', $event)"
         @prompt-agent="$emit('send-agent-prompt', $event)"
@@ -544,6 +548,8 @@ const emit = defineEmits<{
   'delete-queued-prompt': [promptId: string];
   'deploy-bench-template': [input: string | DeployBenchTemplateInput];
   'duplicate-agent': [agentId: string];
+  'fork-agent': [agentId: string];
+  'fork-message': [index: number];
   'edit-message': [payload: { content: string; index: number }];
   'interrupt-agent': [];
   'move-agent-to-team': [input: MoveAgentToTeamInput];
@@ -670,6 +676,13 @@ const activeTeamAgents = computed(() => {
     .map((agentId) => props.snapshot.agents.find((agent) => agent.id === agentId))
     .filter((agent): agent is Agent => Boolean(agent));
 });
+const forkableAgentIds = computed(() => props.snapshot.agents
+  .filter((agent) => {
+    const defaults = defaultBackendCapabilities(agent.backend);
+    const runtime = props.snapshot.backendRuntimes.find((candidate) => candidate.backend === agent.backend);
+    return (runtime?.capabilities?.conversationFork ?? defaults.conversationFork) === true;
+  })
+  .map((agent) => agent.id));
 const currentAgent = computed(() => {
   const team = activeTeam.value;
   if (!team) {
@@ -805,6 +818,10 @@ const conversationPaneState: CodexConversationPaneState = {
     get attachEnabled() { return props.backendCapabilities.attachments; },
     get canDeleteMessage() { return props.backendCapabilities.rollback; },
     get canEditMessage() { return props.backendCapabilities.editMessage; },
+    get canForkMessage() {
+      const agent = currentAgent.value;
+      return Boolean(agent && forkableAgentIds.value.includes(agent.id));
+    },
     get canRetryMessage() { return props.backendCapabilities.retryMessage; },
   },
 };
@@ -814,6 +831,7 @@ const conversationPaneActions: CodexConversationPaneActions = {
   deleteMessage: (index) => emit('delete-message', index),
   deleteQueuedPrompt: (promptId) => emit('delete-queued-prompt', promptId),
   editMessage: (payload) => emit('edit-message', payload),
+  forkMessage: (index) => emit('fork-message', index),
   interrupt: () => emit('interrupt-agent'),
   loadOlderHistory: () => props.loadOlderAgentHistory?.(currentAgent.value?.id ?? ''),
   openLink: openConversationLink,

@@ -302,6 +302,24 @@ export class CodexSurfaceAgentAdapter {
     };
   }
 
+  async forkConversation(agent: Agent, targetAgent: Agent, messageIndex?: number) {
+    const source = await this.ensureSession(agent);
+    const result = await (messageIndex === undefined ? source.handle.fork(
+      { cwd: expandHome(agent.folder) },
+      { extensionContext: targetAgent },
+    ) : source.handle.forkMessage(
+      messageIndex,
+      { cwd: expandHome(agent.folder) },
+      { extensionContext: targetAgent },
+    ));
+    this.bindRuntime(targetAgent, result.conversationId, false);
+    return {
+      threadId: result.conversationId,
+      messages: surfaceMessages(result.snapshot.messages, targetAgent.id),
+      activeTurnId: result.snapshot.activeTurnId,
+    };
+  }
+
   async hydrateAgent(agent: Agent): Promise<string | null> {
     const threadId = codexThreadId(agent);
     if (!threadId) return null;

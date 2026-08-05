@@ -1201,6 +1201,26 @@ export function useAppState() {
     await loadActiveAgentCatalogs();
   }
 
+  async function forkAgent(agentId: string, messageIndex?: number): Promise<void> {
+    if (!window.codexClaw?.forkAgent) {
+      return;
+    }
+
+    const nextSnapshot = messageIndex === undefined
+      ? await window.codexClaw.forkAgent(agentId)
+      : await window.codexClaw.forkAgent(agentId, messageIndex);
+    adoptNavigationSnapshot(nextSnapshot);
+    await loadActiveAgentCatalogs();
+  }
+
+  async function forkActiveAgentMessage(messageIndex: number): Promise<void> {
+    const agentId = snapshot.value.activeAgentId;
+    if (!agentId) {
+      return;
+    }
+    await forkAgent(agentId, messageIndex);
+  }
+
   async function moveAgentToTeam(input: MoveAgentToTeamInput): Promise<void> {
     if (
       !window.codexClaw?.moveAgentToTeam ||
@@ -1522,6 +1542,8 @@ export function useAppState() {
     assignWorkItemToAgent,
     removeWorkItemAssignment,
     duplicateAgent,
+    forkAgent,
+    forkActiveAgentMessage,
     moveAgentToTeam,
     reorderAgents,
     saveAgentToBench,

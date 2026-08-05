@@ -79,6 +79,11 @@ implemented:
 - team rail on the far left;
 - agent list with avatar, name, folder, and status;
 - persisted View-menu compact agent-list mode with mini avatars, names, and status icons;
+- agent context actions for duplicating configuration or forking the active
+  backend conversation; both insert the new selected agent directly below the
+  source agent;
+- opted-in Fork actions on user and assistant messages, routed by absolute
+  host message index into the same new-agent workflow;
 - active agent header;
 - central conversation and composer;
 - optimistic agent switching that reveals the cached conversation immediately;

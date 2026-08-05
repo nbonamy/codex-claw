@@ -262,6 +262,7 @@ describe('AppShell', () => {
       selectedServiceTier: 'fast',
       state: { text: 'saved draft', selectionStart: 5, selectionEnd: 5 },
     });
+    expect(state.policy?.canForkMessage).toBe(true);
 
     const updatedMessages: RendererMessage[] = [{
       id: 'controller-reactive-message',
@@ -276,6 +277,8 @@ describe('AppShell', () => {
     expect(wrapper.text()).toContain('Updated through the stable controller.');
 
     const actions = conversationControllerActions(wrapper);
+    await actions.forkMessage?.(3);
+    expect(wrapper.emitted('fork-message')).toStrictEqual([[3]]);
     const openExternal = vi.spyOn(window, 'open').mockImplementation(() => null);
     await actions.updateComposerState?.({ text: 'updated', selectionStart: 7, selectionEnd: 7 });
     await actions.updateAttachments?.([{
@@ -1618,6 +1621,7 @@ describe('AppShell', () => {
 
   it('forwards cockpit agent context menu actions', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
     const wrapper = mountShell({ snapshot });
 
     await wrapper.get('[aria-label="Cockpit"]').trigger('click');
@@ -1628,6 +1632,11 @@ describe('AppShell', () => {
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Duplicate Agent')?.trigger('click');
 
     expect(wrapper.emitted('duplicate-agent')).toStrictEqual([['agent-dina']]);
+
+    await wrapper.get('.cockpit-view__agent-card').trigger('contextmenu');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Fork Agent')?.trigger('click');
+
+    expect(wrapper.emitted('fork-agent')).toStrictEqual([['agent-dina']]);
   });
 
   it('forwards cockpit prompts for the targeted agent', async () => {
@@ -2326,6 +2335,7 @@ describe('AppShell', () => {
 
   it('forwards agent context menu action intents', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
     const wrapper = mountShell({ snapshot });
 
     await wrapper.findAll('.agent-sidebar__agent')[0].trigger('contextmenu', {
@@ -2335,6 +2345,11 @@ describe('AppShell', () => {
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Duplicate Agent')?.trigger('click');
 
     expect(wrapper.emitted('duplicate-agent')).toStrictEqual([['agent-dina']]);
+
+    await wrapper.findAll('.agent-sidebar__agent')[0].trigger('contextmenu');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Fork Agent')?.trigger('click');
+
+    expect(wrapper.emitted('fork-agent')).toStrictEqual([['agent-dina']]);
 
     await wrapper.findAll('.agent-sidebar__agent')[0].trigger('contextmenu', {
       clientX: 120,

@@ -133,6 +133,10 @@ class FakeTransport implements RpcTransport {
           initialPage.length > 5 ? 'cursor-5' : null,
         );
       }
+      case 'thread/fork': {
+        const cwd = String((params as { cwd?: string }).cwd ?? '/workspace/a');
+        return { thread: thread('thread-forked', cwd) };
+      }
       case 'thread/read': {
         const threadId = String((params as { threadId: string }).threadId);
         return { thread: thread(threadId, `/workspace/${threadId.at(-1)}`) };
@@ -168,7 +172,15 @@ class FakeTransport implements RpcTransport {
       case 'turn/steer': return { turnId: String((params as { expectedTurnId: string }).expectedTurnId) };
       case 'review/start': {
         const threadId = String((params as { threadId: string }).threadId);
-        return { reviewThreadId: threadId, turn: turn(`review-${threadId}`, 'inProgress') };
+        return {
+          reviewThreadId: threadId,
+          turn: turn(`review-${threadId}`, 'inProgress', [{
+            type: 'userMessage',
+            id: 'review-prompt',
+            clientId: null,
+            content: [{ type: 'text', text: 'current changes', textElements: [] }],
+          }]),
+        };
       }
       case 'thread/rollback': {
         const threadId = String((params as { threadId: string }).threadId);
@@ -793,6 +805,44 @@ describe('CodexSurfaceAgentAdapter', () => {
     expect(events.some((event) => event.type === 'thread.historyLoaded')).toBe(false);
   });
 
+  it('forks through the SDK handle and maps the returned history', async () => {
+    const { adapter, transport } = createAdapter();
+    const targetAgent = createForkTarget();
+    transport.fullHistoryTurnsByThreadId.set('thread-forked', [
+      turn('turn-forked', 'completed', [agentMessage('message-forked', 'Forked answer')]),
+    ]);
+
+    await expect(adapter.forkConversation(agentA, targetAgent)).resolves.toMatchObject({
+      threadId: 'thread-forked',
+      messages: [expect.objectContaining({
+        agentId: 'agent-forked',
+        parts: [expect.objectContaining({ type: 'text', text: 'Forked answer' })],
+      })],
+    });
+    expect(lastRequest(transport, 'thread/fork')).toMatchObject({
+      params: { threadId: 'thread-a', cwd: '/workspace/a' },
+    });
+  });
+
+  it('forwards an absolute host message index to the SDK fork operation', async () => {
+    const { adapter, transport } = createAdapter();
+    const targetAgent = createForkTarget();
+    transport.fullHistoryTurnsByThreadId.set('thread-a', [
+      turn('turn-source', 'completed', [agentMessage('message-source', 'Source answer')]),
+    ]);
+    transport.fullHistoryTurnsByThreadId.set('thread-forked', [
+      turn('turn-source', 'completed', [agentMessage('message-source', 'Source answer')]),
+    ]);
+    await adapter.hydrateAgent(agentA);
+
+    await expect(adapter.forkConversation(agentA, targetAgent, 0)).resolves.toMatchObject({
+      threadId: 'thread-forked',
+    });
+    expect(lastRequest(transport, 'thread/fork')).toMatchObject({
+      params: { threadId: 'thread-a', lastTurnId: 'turn-source' },
+    });
+  });
+
   it('materializes an SDK-marked slash review prompt without replacing history', async () => {
     const { adapter } = createAdapter();
     const events: BackendEvent[] = [];
@@ -809,7 +859,10 @@ describe('CodexSurfaceAgentAdapter', () => {
         payload: {
           message: expect.objectContaining({
             role: 'user',
-            parts: [{ type: 'text', text: '/review' }],
+            parts: [{
+              type: 'text',
+              text: 'Review the current code changes (staged, unstaged, and untracked files) and provide prioritized findings.',
+            }],
           }),
         },
       }),
@@ -922,6 +975,12 @@ function createAgent(id: string, threadId: string, folder: string): Agent {
     createdAt: '2026-07-18T00:00:00.000Z',
     updatedAt: '2026-07-18T00:00:00.000Z',
   };
+}
+
+function createForkTarget(): Agent {
+  const target = createAgent('agent-forked', 'thread-forked', '/workspace/a');
+  delete target.backendSession;
+  return target;
 }
 
 function thread(id: string, cwd: string): Record<string, unknown> {

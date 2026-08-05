@@ -8,24 +8,61 @@ export function duplicateAgentInSnapshot(snapshot: AppSnapshot, agentId: string,
     return null;
   }
 
-  const duplicate: Agent = {
-    id: uniqueAgentId(snapshot, createId),
-    teamId: source.teamId ?? activeTeamId(snapshot),
-    name: `${source.name} (copy)`,
-    avatar: source.avatar,
-    folder: source.folder,
-    backend: source.backend,
-    backendDefaults: source.backendDefaults ? { ...source.backendDefaults } : undefined,
-    status: { type: 'idle' },
-    createdAt,
-    updatedAt: createdAt,
-  };
-
-  snapshot.agents.push(duplicate);
-  attachAgentToTeam(snapshot, duplicate);
+  const duplicate = copiedAgent(snapshot, source, 'copy', createdAt, createId);
+  insertAgentAfterSource(snapshot, source, duplicate);
   snapshot.activeTeamId = duplicate.teamId ?? snapshot.activeTeamId;
   snapshot.activeAgentId = duplicate.id;
   return duplicate;
+}
+
+export function forkAgentInSnapshot(
+  snapshot: AppSnapshot,
+  agentId: string,
+  backendSession: BackendSession,
+  messages: RendererMessage[],
+  createdAt = new Date().toISOString(),
+  createId: IdGenerator = () => createEntityId('agent'),
+): Agent | null {
+  const forked = createForkedAgentDraft(snapshot, agentId, createdAt, createId);
+  return forked
+    ? attachForkedAgentInSnapshot(snapshot, agentId, forked, backendSession, messages)
+    : null;
+}
+
+export function createForkedAgentDraft(
+  snapshot: AppSnapshot,
+  agentId: string,
+  createdAt = new Date().toISOString(),
+  createId: IdGenerator = () => createEntityId('agent'),
+): Agent | null {
+  const source = snapshot.agents.find((agent) => agent.id === agentId);
+  return source ? copiedAgent(snapshot, source, 'fork', createdAt, createId) : null;
+}
+
+export function attachForkedAgentInSnapshot(
+  snapshot: AppSnapshot,
+  sourceAgentId: string,
+  forked: Agent,
+  backendSession: BackendSession,
+  messages: RendererMessage[],
+): Agent | null {
+  const source = snapshot.agents.find((agent) => agent.id === sourceAgentId);
+  if (!source) {
+    return null;
+  }
+  if (backendSession.kind !== source.backend || forked.backend !== source.backend) {
+    throw new Error('Forked conversation backend does not match the source agent backend.');
+  }
+  if (snapshot.agents.some((agent) => agent.id === forked.id)) {
+    throw new Error(`Forked agent already exists: ${forked.id}`);
+  }
+
+  forked.backendSession = { ...backendSession };
+  insertAgentAfterSource(snapshot, source, forked);
+  snapshot.messages.push(...messages.map((message) => ({ ...message, agentId: forked.id })));
+  snapshot.activeTeamId = forked.teamId ?? snapshot.activeTeamId;
+  snapshot.activeAgentId = forked.id;
+  return forked;
 }
 
 export function saveAgentToBench(snapshot: AppSnapshot, agentId: string, createdAt = new Date().toISOString()): BenchTemplate | null {
@@ -348,7 +385,7 @@ function clearRuntimeState(agent: Agent): void {
   delete agent.statusText;
 }
 
-function attachAgentToTeam(snapshot: AppSnapshot, agent: Agent): void {
+function attachAgentToTeam(snapshot: AppSnapshot, agent: Agent, afterAgentId?: string): void {
   const team = snapshot.teams.find((candidate) => candidate.id === agent.teamId) ?? snapshot.teams[0];
   if (!team) {
     return;
@@ -356,9 +393,37 @@ function attachAgentToTeam(snapshot: AppSnapshot, agent: Agent): void {
 
   agent.teamId = team.id;
   if (!team.agentIds.includes(agent.id)) {
-    team.agentIds.push(agent.id);
+    const sourceIndex = afterAgentId ? team.agentIds.indexOf(afterAgentId) : -1;
+    team.agentIds.splice(sourceIndex >= 0 ? sourceIndex + 1 : team.agentIds.length, 0, agent.id);
   }
   team.activeAgentId = agent.id;
+}
+
+function copiedAgent(
+  snapshot: AppSnapshot,
+  source: Agent,
+  suffix: 'copy' | 'fork',
+  createdAt: string,
+  createId: IdGenerator,
+): Agent {
+  return {
+    id: uniqueAgentId(snapshot, createId),
+    teamId: source.teamId ?? activeTeamId(snapshot),
+    name: `${source.name} (${suffix})`,
+    avatar: source.avatar,
+    folder: source.folder,
+    backend: source.backend,
+    backendDefaults: source.backendDefaults ? { ...source.backendDefaults } : undefined,
+    status: { type: 'idle' },
+    createdAt,
+    updatedAt: createdAt,
+  };
+}
+
+function insertAgentAfterSource(snapshot: AppSnapshot, source: Agent, agent: Agent): void {
+  const sourceIndex = snapshot.agents.indexOf(source);
+  snapshot.agents.splice(sourceIndex + 1, 0, agent);
+  attachAgentToTeam(snapshot, agent, source.id);
 }
 
 function activeTeamId(snapshot: AppSnapshot): string | undefined {

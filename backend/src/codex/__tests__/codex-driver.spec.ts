@@ -183,7 +183,8 @@ describe('CodexBackendDriver', () => {
     expect(sessionManager.readConversationMessages).toHaveBeenCalledWith('thread-dina', 'agent-dina');
   });
 
-  it('lists and resumes conversations through the session manager', async () => {
+  it('lists, resumes, and forks conversations through the session manager', async () => {
+    const targetAgent = { ...agent, id: 'agent-forked', name: 'Dina (fork)', backendSession: undefined };
     const messages = [{
       id: 'user-thread-dina-user-1',
       agentId: 'agent-dina',
@@ -200,6 +201,10 @@ describe('CodexBackendDriver', () => {
       ref: { backend: 'codex' as const, threadId: 'thread-dina' },
     }];
     const sessionManager = createSessionManager({
+      forkConversation: vi.fn().mockResolvedValue({
+        threadId: 'thread-forked',
+        messages,
+      }),
       listConversations: vi.fn().mockResolvedValue(conversations),
       resumeConversation: vi.fn().mockResolvedValue({
         threadId: 'thread-dina',
@@ -215,6 +220,16 @@ describe('CodexBackendDriver', () => {
     });
     expect(sessionManager.listConversations).toHaveBeenCalledWith(agent);
     expect(sessionManager.resumeConversation).toHaveBeenCalledWith(agent, 'thread-dina');
+    await expect(driver.forkConversation(agent, targetAgent)).resolves.toStrictEqual({
+      backendSession: { kind: 'codex', threadId: 'thread-forked' },
+      messages,
+    });
+    await expect(driver.forkConversation(agent, targetAgent, 5)).resolves.toStrictEqual({
+      backendSession: { kind: 'codex', threadId: 'thread-forked' },
+      messages,
+    });
+    expect(sessionManager.forkConversation).toHaveBeenNthCalledWith(1, agent, targetAgent);
+    expect(sessionManager.forkConversation).toHaveBeenNthCalledWith(2, agent, targetAgent, 5);
   });
 
   it('loads one older history page through the session manager', async () => {
@@ -235,6 +250,7 @@ function createSessionManager(overrides: Partial<CodexSurfaceAgentAdapter> = {})
     getRuntimeStatus: vi.fn().mockReturnValue({ backend: 'codex', status: 'notConfigured' }),
     sendPrompt: vi.fn().mockResolvedValue({ threadId: 'thread-review', turnId: 'turn-review' }),
     listConversations: vi.fn().mockResolvedValue([]),
+    forkConversation: vi.fn().mockResolvedValue({ threadId: 'thread-forked', messages: [] }),
     resumeConversation: vi.fn().mockResolvedValue({ threadId: 'thread-dina', messages: [] }),
     readConversationMessages: vi.fn().mockResolvedValue([]),
     loadOlderHistory: vi.fn().mockResolvedValue({ hasOlder: false }),

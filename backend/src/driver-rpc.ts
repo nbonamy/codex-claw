@@ -233,6 +233,24 @@ export class BackendDriverRpc {
         }
         return driver.resumeConversation(agent, record.ref as never);
       }
+      case backendMethods.driverConversationFork: {
+        const { agent } = requireAgentParams(params);
+        const record = requireRecord(params);
+        const targetAgent = requireAgent(record.targetAgent, 'targetAgent');
+        const rawMessageIndex = record.messageIndex;
+        if (rawMessageIndex !== undefined && (
+          typeof rawMessageIndex !== 'number' || !Number.isInteger(rawMessageIndex) || rawMessageIndex < 0
+        )) {
+          throw new Error('Invalid fork message index.');
+        }
+        const driver = this.requireDriver(agent.backend);
+        if (!driver.forkConversation) {
+          throw unsupportedBackendFeature(agent, 'conversation fork');
+        }
+        return rawMessageIndex === undefined
+          ? driver.forkConversation(agent, targetAgent)
+          : driver.forkConversation(agent, targetAgent, rawMessageIndex as number);
+      }
       case backendMethods.driverConversationMessagesGet: {
         const record = requireRecord(params);
         const ref = requireRecord(record.ref);
@@ -347,10 +365,14 @@ export class BackendDriverRpc {
 
 function requireAgentParams(params: unknown): { agent: Agent } {
   const record = requireRecord(params);
-  const agent = requireRecord(record.agent) as Agent;
+  return { agent: requireAgent(record.agent, 'agent') };
+}
+
+function requireAgent(value: unknown, label: string): Agent {
+  const agent = requireRecord(value) as Agent;
   requireBackend(agent.backend);
-  requireString(agent.id, 'agent.id');
-  return { agent };
+  requireString(agent.id, `${label}.id`);
+  return agent;
 }
 
 function requireBackendAgentIdParams(params: unknown): { backend: AgentBackend; agentId: string } {

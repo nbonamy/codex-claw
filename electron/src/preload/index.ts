@@ -63,6 +63,7 @@ const api: CodexClawApi = {
   assignWorkItemToAgent: (agentId: string, item: WorkItem) => ipc.invoke(ipcChannels.assignWorkItemToAgent, agentId, item),
   removeWorkItemAssignment: (item: WorkItem) => ipc.invoke(ipcChannels.removeWorkItemAssignment, item),
   duplicateAgent: (agentId: string) => ipc.invoke(ipcChannels.duplicateAgent, agentId),
+  forkAgent: (agentId: string, messageIndex?: number) => ipc.invoke(ipcChannels.forkAgent, agentId, messageIndex),
   moveAgentToTeam: (input: MoveAgentToTeamInput) => ipc.invoke(ipcChannels.moveAgentToTeam, input),
   reorderAgents: (input: ReorderAgentsInput) => ipc.invoke(ipcChannels.reorderAgents, input),
   saveAgentToBench: (agentId: string) => ipc.invoke(ipcChannels.saveAgentToBench, agentId),

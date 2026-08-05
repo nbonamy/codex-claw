@@ -3504,6 +3504,87 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
+  it('forks a conversation into a selected agent directly below its source', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina', 'agent-jesse'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      backendSession: { kind: 'codex', threadId: 'thread-dina' },
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }, {
+      id: 'agent-jesse',
+      teamId: 'team-test',
+      name: 'Jesse',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const forkedMessages = [createTextMessage('forked-message', 'agent-dina', 'forked')];
+    const forkConversation = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex', threadId: 'thread-forked' },
+      messages: forkedMessages,
+      activeTurnId: 'turn-forked',
+    });
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      forkConversation,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'fork-agent',
+      method: 'agent/fork',
+      params: { agentId: 'agent-dina', messageIndex: 2 },
+    })).resolves.toMatchObject({
+      result: {
+        activeAgentId: expect.stringContaining('agent-'),
+        agents: [
+          { id: 'agent-dina' },
+          {
+            name: 'Dina (fork)',
+            backendSession: { kind: 'codex', threadId: 'thread-forked' },
+            status: { type: 'working' },
+          },
+          { id: 'agent-jesse' },
+        ],
+      },
+    });
+
+    const forkedAgentId = snapshot.agents[1]?.id;
+    expect(forkConversation).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-dina' }),
+      expect.objectContaining({ name: 'Dina (fork)' }),
+      2,
+    );
+    expect(snapshot.teams[0]?.agentIds).toStrictEqual(['agent-dina', forkedAgentId, 'agent-jesse']);
+    expect(snapshot.messages).toContainEqual(expect.objectContaining({ id: 'forked-message', agentId: forkedAgentId }));
+    expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
+    await server.close();
+  });
+
   it('owns goal and approval preset session mutations', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];

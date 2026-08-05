@@ -39,6 +39,10 @@ export type BackendConversationResumeResult = {
   messages: RendererMessage[];
 };
 
+export type BackendConversationForkResult = BackendConversationResumeResult & {
+  activeTurnId?: string;
+};
+
 export type BackendHistoryLoadResult = {
   hasOlder: boolean;
 };
@@ -74,6 +78,7 @@ export type AgentBackendDriver = {
   loadOlderHistory?(agent: Agent): Promise<BackendHistoryLoadResult>;
   listConversations?(agent: Agent): Promise<ConversationSummary[]>;
   resumeConversation?(agent: Agent, ref: BackendConversationRef): Promise<BackendConversationResumeResult>;
+  forkConversation?(agent: Agent, targetAgent: Agent, messageIndex?: number): Promise<BackendConversationForkResult>;
   readConversationMessages?(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]>;
   steerPrompt?(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>;
   rollbackToTurn?(agent: Agent, turnId: string): Promise<BackendRollbackResult>;

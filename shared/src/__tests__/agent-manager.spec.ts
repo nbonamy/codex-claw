@@ -6,6 +6,7 @@ import {
   deployBenchTemplateInSnapshot,
   deployBenchTemplateToSnapshot,
   duplicateAgentInSnapshot,
+  forkAgentInSnapshot,
   moveAgentToTeamInSnapshot,
   removeBenchTemplateFromSnapshot,
   removeWorkItemAssignmentFromSnapshot,
@@ -38,7 +39,8 @@ describe('agent-manager', () => {
       updatedAt: '2026-06-05T10:11:12.000Z',
     });
     expect(snapshot.activeAgentId).toBe(duplicate?.id);
-    expect(snapshot.teams[0].agentIds).toContain(duplicate?.id);
+    expect(snapshot.teams[0].agentIds.slice(0, 2)).toStrictEqual(['agent-dina', duplicate?.id]);
+    expect(snapshot.agents.slice(0, 2).map((agent) => agent.id)).toStrictEqual(['agent-dina', duplicate?.id]);
   });
 
   it('generates collision-safe ids for duplicated agents and bench templates', () => {
@@ -54,6 +56,30 @@ describe('agent-manager', () => {
     expect(secondDuplicate?.id).toBe('agent-duplicate-dina-2');
     expect(firstTemplate?.id).toBe('bench-dina-20260605t101112000z');
     expect(secondTemplate?.id).toBe('bench-dina-20260605t101112000z-2');
+  });
+
+  it('forks an agent conversation directly below its source and selects it', () => {
+    const snapshot = createInitialSnapshot();
+    const sourceMessage = appendUserPrompt(snapshot, 'agent-dina', 'fork this conversation');
+    const forked = forkAgentInSnapshot(
+      snapshot,
+      'agent-dina',
+      { kind: 'codex', threadId: 'thread-forked' },
+      [{ ...sourceMessage, id: 'message-forked' }],
+      '2026-06-05T10:11:12.000Z',
+      () => 'agent-forked-dina',
+    );
+
+    expect(forked).toMatchObject({
+      id: 'agent-forked-dina',
+      name: 'Dina (fork)',
+      backendSession: { kind: 'codex', threadId: 'thread-forked' },
+      status: { type: 'idle' },
+    });
+    expect(snapshot.teams[0].agentIds.slice(0, 2)).toStrictEqual(['agent-dina', 'agent-forked-dina']);
+    expect(snapshot.agents.slice(0, 2).map((agent) => agent.id)).toStrictEqual(['agent-dina', 'agent-forked-dina']);
+    expect(snapshot.messages.find((message) => message.id === 'message-forked')?.agentId).toBe('agent-forked-dina');
+    expect(snapshot.activeAgentId).toBe('agent-forked-dina');
   });
 
   it('duplicates legacy agents into the active team when they have no team id', () => {
@@ -303,7 +329,7 @@ describe('agent-manager', () => {
     const snapshot = createInitialSnapshot();
     const duplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z', () => 'agent-abby');
     expect(duplicate?.id).toBe('agent-abby');
-    expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-dina', 'agent-jesse', 'agent-abby']);
+    expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-dina', 'agent-abby', 'agent-jesse']);
 
     expect(reorderAgentInTeam(snapshot, 'team-codex-claw', 'agent-abby', 'agent-dina')).toStrictEqual(duplicate);
     expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-abby', 'agent-dina', 'agent-jesse']);

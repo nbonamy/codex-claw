@@ -190,6 +190,19 @@ returned `{ kind: "codex", threadId }` session on the agent, replaces that
 agent's visible messages with the resumed turns, and routes the next prompt to
 the selected thread. Resume is allowed only while the agent is idle.
 
+Fork Agent calls the SDK conversation handle's high-level `fork()` operation,
+which owns `thread/fork` and returns a new conversation id plus its snapshot.
+`clawd` translates that history into app-owned messages, creates a selected
+agent directly below the source with the new `{ kind: "codex", threadId }`
+session, and leaves raw fork protocol types outside product contracts. Forking
+requires an idle Codex agent with an existing conversation.
+
+The controlled conversation pane opts into SDK message-level Fork actions for
+user and assistant messages. It passes the absolute host message index through
+the app-owned `agent/fork` request; the Codex adapter calls the conversation
+handle's `forkMessage()` operation, and the result enters the same new-agent
+workflow without changing the source thread.
+
 ## Requests
 
 Important requests for the first product:
@@ -197,6 +210,7 @@ Important requests for the first product:
 - `thread/start`
 - `thread/name/set`
 - `thread/resume`
+- `thread/fork`
 - `thread/list`
 - `turn/start`
 - `turn/steer`

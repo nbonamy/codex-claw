@@ -19,7 +19,7 @@ import type {
   PairedDevice,
 } from '@codex-claw/shared/contracts';
 import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
-import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
+import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
 import { AgentGitService } from '../git/agent-git-service';
 import type { CodexSurfaceAgentAdapter } from './codex-surface-adapter';
 
@@ -246,6 +246,17 @@ export class CodexBackendDriver implements AgentBackendDriver {
     return {
       backendSession: codexBackendSession(result.threadId),
       messages: result.messages,
+    };
+  }
+
+  async forkConversation(agent: Agent, targetAgent: Agent, messageIndex?: number): Promise<BackendConversationForkResult> {
+    const result = messageIndex === undefined
+      ? await this.sessionManager.forkConversation(agent, targetAgent)
+      : await this.sessionManager.forkConversation(agent, targetAgent, messageIndex);
+    return {
+      backendSession: codexBackendSession(result.threadId),
+      messages: result.messages,
+      ...(result.activeTurnId ? { activeTurnId: result.activeTurnId } : {}),
     };
   }
 

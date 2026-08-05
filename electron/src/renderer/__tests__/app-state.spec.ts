@@ -2417,6 +2417,7 @@ describe('useAppState', () => {
     const createAgent = vi.fn().mockResolvedValue(createdSnapshot);
     const updateAgent = vi.fn().mockResolvedValue(updatedSnapshot);
     const duplicateAgent = vi.fn().mockResolvedValue(duplicatedSnapshot);
+    const forkAgent = vi.fn().mockResolvedValue(duplicatedSnapshot);
     const moveAgentToTeam = vi.fn().mockResolvedValue(movedSnapshot);
     const saveAgentToBench = vi.fn().mockResolvedValue(benchSnapshot);
     const restartAgent = vi.fn().mockResolvedValue(restartedSnapshot);
@@ -2437,6 +2438,7 @@ describe('useAppState', () => {
         createAgent,
         updateAgent,
         duplicateAgent,
+        forkAgent,
         moveAgentToTeam,
         reorderAgents,
         saveAgentToBench,
@@ -2458,7 +2460,9 @@ describe('useAppState', () => {
     await state.reorderAgents({ teamId: 'team-codex-claw', agentId: 'agent-jesse', beforeAgentId: 'agent-dina' });
     await state.createAgent({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules', backend: 'claude' });
     await state.updateAgent({ id: 'agent-jules', name: 'Jules Prime', avatar: '🤖', folder: '/Users/nbonamy/src/jules', backend: 'claude' });
+    await state.forkActiveAgentMessage(4);
     await state.duplicateAgent('agent-jules');
+    await state.forkAgent('agent-jules');
     await state.moveAgentToTeam({ agentId: 'agent-jules', teamId: 'team-skwad-core' });
     await state.saveAgentToBench('agent-jules');
     await state.restartAgent('agent-jules');
@@ -2476,6 +2480,8 @@ describe('useAppState', () => {
     expect(createAgent).toHaveBeenCalledWith({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules', backend: 'claude' });
     expect(updateAgent).toHaveBeenCalledWith({ id: 'agent-jules', name: 'Jules Prime', avatar: '🤖', folder: '/Users/nbonamy/src/jules', backend: 'claude' });
     expect(duplicateAgent).toHaveBeenCalledWith('agent-jules');
+    expect(forkAgent).toHaveBeenNthCalledWith(1, 'agent-jules', 4);
+    expect(forkAgent).toHaveBeenNthCalledWith(2, 'agent-jules');
     expect(moveAgentToTeam).toHaveBeenCalledWith({ agentId: 'agent-jules', teamId: 'team-skwad-core' });
     expect(saveAgentToBench).toHaveBeenCalledWith('agent-jules');
     expect(restartAgent).toHaveBeenCalledWith('agent-jules');

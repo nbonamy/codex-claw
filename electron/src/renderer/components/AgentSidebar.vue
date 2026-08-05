@@ -74,6 +74,7 @@
 
     <AgentContextMenu
       v-if="contextMenuAgentId"
+      :fork-disabled="!canForkContextMenuAgent"
       :move-targets="contextMenuMoveTargets"
       :x="contextMenuPosition.x"
       :y="contextMenuPosition.y"
@@ -128,6 +129,7 @@ const props = defineProps<{
   agents: Agent[];
   activeAgentId: string | null;
   bench?: BenchTemplate[];
+  forkableAgentIds?: string[];
   compact?: boolean;
   teams?: Team[];
   teamId?: string | null;
@@ -145,6 +147,7 @@ const emit = defineEmits<{
   'close-agent': [agentId: string];
   'deploy-bench-template': [templateId: string];
   'duplicate-agent': [agentId: string];
+  'fork-agent': [agentId: string];
   'edit-agent': [agentId: string];
   'move-agent-to-team': [payload: { agentId: string; teamId: string }];
   'new-agent': [];
@@ -167,6 +170,11 @@ const contextMenuAgentId = ref<string | null>(null);
 const contextMenuPosition = ref({ x: 0, y: 0 });
 const contextMenuAgent = computed(() => (
   contextMenuAgentId.value ? props.agents.find((agent) => agent.id === contextMenuAgentId.value) ?? null : null
+));
+const canForkContextMenuAgent = computed(() => (
+  contextMenuAgent.value?.status.type === 'idle' &&
+  Boolean(contextMenuAgent.value.backendSession) &&
+  (props.forkableAgentIds ?? []).includes(contextMenuAgent.value.id)
 ));
 const contextMenuMoveTargets = computed(() => {
   const agent = contextMenuAgent.value;
@@ -241,6 +249,9 @@ function emitContextAgentAction(action: AgentContextMenuAction): void {
       break;
     case 'duplicate-agent':
       emit('duplicate-agent', agentId);
+      break;
+    case 'fork-agent':
+      emit('fork-agent', agentId);
       break;
     case 'edit-agent':
       emit('edit-agent', agentId);

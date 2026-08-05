@@ -435,6 +435,7 @@ export type BackendCapabilities = {
   steerPrompt: boolean;
   interrupt: boolean;
   history: boolean;
+  conversationFork?: boolean;
   rollback: boolean;
   editMessage: boolean;
   retryMessage: boolean;
@@ -1231,6 +1232,7 @@ export type CodexClawApi = {
   assignWorkItemToAgent(agentId: string, item: WorkItem): Promise<AppSnapshot>;
   removeWorkItemAssignment(item: WorkItem): Promise<AppSnapshot>;
   duplicateAgent(agentId: string): Promise<AppSnapshot>;
+  forkAgent(agentId: string, messageIndex?: number): Promise<AppSnapshot>;
   moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot>;
   reorderAgents(input: ReorderAgentsInput): Promise<AppSnapshot>;
   saveAgentToBench(agentId: string): Promise<AppSnapshot>;

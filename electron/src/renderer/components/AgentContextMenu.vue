@@ -20,6 +20,7 @@ import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import {
   CopyIcon,
+  GitForkIcon,
   PencilIcon,
   RefreshIcon,
   SaveToBenchIcon,
@@ -31,11 +32,13 @@ export type AgentContextMenuAction =
   | 'close-agent'
   | 'duplicate-agent'
   | 'edit-agent'
+  | 'fork-agent'
   | 'restart-agent'
   | 'save-agent-to-bench';
 
 const props = defineProps<{
   moveTargets?: Team[];
+  forkDisabled?: boolean;
   x: number;
   y: number;
 }>();
@@ -64,6 +67,13 @@ const menuItems = computed<AppMenuItem[]>(() => [
     type: 'action',
     label: 'Duplicate Agent',
     icon: CopyIcon,
+  },
+  {
+    id: 'fork-agent',
+    type: 'action',
+    label: 'Fork Agent',
+    icon: GitForkIcon,
+    disabled: props.forkDisabled === true,
   },
   { id: 'group-primary', type: 'separator' },
   {
@@ -149,6 +159,7 @@ function isAgentContextMenuAction(itemId: string): itemId is AgentContextMenuAct
   return itemId === 'close-agent' ||
     itemId === 'duplicate-agent' ||
     itemId === 'edit-agent' ||
+    itemId === 'fork-agent' ||
     itemId === 'restart-agent' ||
     itemId === 'save-agent-to-bench';
 }

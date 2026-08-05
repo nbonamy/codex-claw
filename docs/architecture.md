@@ -348,6 +348,7 @@ type CodexClawApi = {
   listAgentConversations(agentId: string): Promise<ConversationSummary[]>
   resumeAgentConversation(agentId: string, ref: BackendConversationRef): Promise<AppSnapshot>
   duplicateAgent(agentId: string): Promise<AppSnapshot>
+  forkAgent(agentId: string, messageIndex?: number): Promise<AppSnapshot>
   moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot>
   saveAgentToBench(agentId: string): Promise<AppSnapshot>
   deployBenchTemplate(templateId: string, teamId?: string): Promise<AppSnapshot>

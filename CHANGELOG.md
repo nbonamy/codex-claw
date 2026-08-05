@@ -8,11 +8,15 @@ All notable Codex Claw changes are recorded here.
 
 - Codex Claw now bundles its local Codex app-server executable, while remote
   agents continue using the Codex installation on their remote host.
+- Agent menus can now fork an existing Codex conversation into a new agent.
+- User and assistant message actions can fork a Codex conversation from that
+  point into a new agent.
 
 ### Improvements and fixes
 
 - Execution plans now keep a stable Task list heading and show the model's
   plan-update title as a separate, full-width block below the header.
+- Duplicated and forked agents now appear directly below their source agent.
 
 ## [0.5.1] - 2026-08-04
 
