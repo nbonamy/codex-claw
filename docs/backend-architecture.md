@@ -591,6 +591,9 @@ The exact script names can change, but the shape should stay:
 - Every local `clawd` launch derives Codex app-server `CODEX_HOME` as
   `$CODEX_CLAW_HOME/codex-home` (default
   `~/.codex-claw/codex-home`) and ignores an inherited normal Codex home.
+- Electron supplies every local `clawd` launch with the pinned Codex executable
+  copied into desktop resources. SSH sync uploads only `clawd.mjs`, so a remote
+  `clawd` continues to discover and launch Codex installed on that host.
 
 Hot reload semantics:
 

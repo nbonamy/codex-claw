@@ -62,6 +62,7 @@ const config: ForgeConfig = {
     extraResource: [
       appleSpeechHelperPath,
       'resources/clawd',
+      'resources/codex',
       '.computer-use/Codex Claw Computer Use.app',
     ],
     extendInfo: 'build/Info.plist',

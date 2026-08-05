@@ -139,7 +139,7 @@
     >
       <SettingsRow
         title="Codex executable"
-        description="Leave empty to find codex from PATH. Changing this restarts Codex Claw."
+        description="Leave empty to use the bundled Codex. Changing this restarts Codex Claw."
         :error="codexBinaryError"
       >
         <template #control>
@@ -148,7 +148,7 @@
               v-model="codexBinaryDraft"
               aria-label="Codex executable path"
               clearable
-              placeholder="codex from PATH"
+              placeholder="Bundled Codex"
               size="small"
               @change="updateCodexBinaryPath"
               @clear="clearCodexBinaryPath"

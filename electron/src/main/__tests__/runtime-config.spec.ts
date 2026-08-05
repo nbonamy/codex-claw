@@ -97,11 +97,34 @@ describe('runtime config', () => {
     });
   });
 
+  it('forwards an explicitly configured bundled Codex path to local clawd', async () => {
+    const { runtimeClawdCommand } = await import('../runtime-config');
+
+    expect(runtimeClawdCommand({
+      env: {
+        CODEX_CLAW_BACKEND_COMMAND: 'clawd',
+        CODEX_CLAW_BUNDLED_CODEX_PATH: '/app/resources/codex/codex',
+      },
+    })).toStrictEqual({
+      command: 'clawd',
+      args: ['--stdio'],
+      env: {
+        CODEX_CLAW_ASSETS_PATH: path.resolve(process.cwd(), 'assets'),
+        CODEX_CLAW_BUNDLED_CODEX_PATH: '/app/resources/codex/codex',
+        CODEX_CLAW_HOME: path.join(homedir(), '.codex-claw'),
+        HOME: homedir(),
+      },
+    });
+  });
+
   it('starts dev clawd with the moved Electron assets path', () => {
     const devScript = readFileSync(path.resolve(__dirname, '../../../../scripts/dev.mjs'), 'utf8');
 
     expect(devScript).toContain("CODEX_CLAW_ASSETS_PATH: path.join(rootDir, 'electron', 'assets')");
     expect(devScript).not.toContain("CODEX_CLAW_ASSETS_PATH: path.join(rootDir, 'assets')");
+    expect(devScript).toContain(
+      "CODEX_CLAW_BUNDLED_CODEX_PATH: path.join(rootDir, 'electron', 'resources', 'codex', 'codex')",
+    );
     expect(devScript).toContain(
       "CODEX_APP_SDK_ASSETS_PATH: path.join(rootDir, 'node_modules', 'codex-app-sdk', 'assets')",
     );
@@ -118,7 +141,9 @@ describe('runtime config', () => {
     const sdkBuildScript = readFileSync(path.resolve(__dirname, '../../../../scripts/build-sdk.mjs'), 'utf8');
 
     expect(rootPackage.scripts.dev).toBe('node scripts/dev.mjs');
+    expect(rootPackage.scripts['build:codex']).toBe('node scripts/prepare-codex-app-server.mjs');
     expect(electronPackage.scripts.dev).toBe('node ../scripts/dev.mjs');
+    expect(electronPackage.scripts['build:codex']).toBe('node ../scripts/prepare-codex-app-server.mjs');
     expect(rootPackage.scripts['dev:electron']).toBe('npm run start -w @codex-claw/electron');
     expect(rootPackage.scripts['build:sdk']).toBe('node scripts/build-sdk.mjs');
     expect(rootPackage.scripts.build).toBe('node scripts/build.mjs');
@@ -131,9 +156,14 @@ describe('runtime config', () => {
     expect(electronPackage.scripts['build:computer-use:local']).toBe(
       'node ../scripts/prepare-computer-use.mjs --local',
     );
-    expect(electronPackage.scripts.package).toBe('npm run build:computer-use && electron-forge package');
-    expect(electronPackage.scripts.make).toBe('npm run build:computer-use && electron-forge make');
-    expect(electronPackage.scripts.build).toContain('npm run build:computer-use &&');
+    expect(electronPackage.scripts.package).toBe(
+      'npm run build:codex && npm run build:computer-use && electron-forge package',
+    );
+    expect(electronPackage.scripts.make).toBe(
+      'npm run release-notes:check && npm run build:codex && npm run build:computer-use && electron-forge make',
+    );
+    expect(electronPackage.scripts.build).toContain('npm run build:codex && npm run build:computer-use &&');
+    expect(devScript).toContain("await run('npm', ['run', 'build:codex'])");
     expect(devScript).toContain("await run('npm', ['run', 'build:computer-use'])");
     expect(devScript).toContain("start('npm', ['run', 'dev:electron']");
     expect(devScript).not.toContain("['run', 'build:sdk']");
@@ -181,6 +211,31 @@ describe('runtime config', () => {
     expect(prepareScript).toContain('process.argv.includes(\'--release\')');
   });
 
+  it('pins and verifies the bundled Codex app-server executable', () => {
+    const repositoryRoot = path.resolve(__dirname, '../../../..');
+    const releaseConfig = JSON.parse(
+      readFileSync(path.join(repositoryRoot, 'codex-app-server-release.json'), 'utf8'),
+    ) as { version: string; platform: string; arch: string };
+    const prepareScript = readFileSync(
+      path.join(repositoryRoot, 'scripts/prepare-codex-app-server.mjs'),
+      'utf8',
+    );
+    const forgeConfig = readFileSync(path.join(repositoryRoot, 'electron/forge.config.ts'), 'utf8');
+
+    expect(releaseConfig.version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(releaseConfig.platform).toBe('darwin');
+    expect(releaseConfig.arch).toBe('arm64');
+    expect(prepareScript).toContain('https://releases.openai.com/codex/install.sh');
+    expect(prepareScript).toContain("CODEX_INSTALL_DIR: installBinDir");
+    expect(prepareScript).toContain("CODEX_NON_INTERACTIVE: '1'");
+    expect(prepareScript).toContain('CODEX_RELEASE: config.version');
+    expect(prepareScript).toContain('HOME: installerUserHome');
+    expect(prepareScript).toContain("SHELL: '/bin/sh'");
+    expect(prepareScript).toContain("execFileSync('lipo', ['-archs', filePath]");
+    expect(prepareScript).toContain("execFileSync('codesign', ['--verify', '--strict', '--verbose=2'");
+    expect(forgeConfig).toContain("'resources/codex'");
+  });
+
   it('resolves the packaged clawd runtime from resources when no env command is configured', async () => {
     const { runtimeClawdCommand } = await import('../runtime-config');
 
@@ -193,6 +248,7 @@ describe('runtime config', () => {
         throw new Error('login shell unavailable');
       }),
       existsSync: (filePath) => filePath === '/app/resources/clawd/clawd.mjs' ||
+        filePath === '/app/resources/codex/codex' ||
         filePath === '/Users/nicolas/.nvm/versions/node/v22.19.0/bin/node',
       homedir: () => '/Users/nicolas',
       resourcesPath: '/app/resources',
@@ -204,6 +260,7 @@ describe('runtime config', () => {
       ],
       env: {
         CODEX_CLAW_ASSETS_PATH: '/app/resources',
+        CODEX_CLAW_BUNDLED_CODEX_PATH: '/app/resources/codex/codex',
         CODEX_CLAW_HOME: '/Users/nicolas/.codex-claw',
         HOME: '/Users/nicolas',
         PATH: '/usr/bin:/Users/nicolas/.nvm/versions/node/v22.19.0/bin',

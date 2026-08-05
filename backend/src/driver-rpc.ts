@@ -47,7 +47,9 @@ export function codexClawSurfaceOptions(options: BackendDriverRegistryOptions = 
     codexHome: backendCodexHomeDir(),
     loadingStrategy: 'lazy',
     transport: {
-      command: resolveCodexCommand(options.generalSettings?.codexBinaryPath),
+      command: resolveCodexCommand(options.generalSettings?.codexBinaryPath, {
+        bundledPath: process.env.CODEX_CLAW_BUNDLED_CODEX_PATH,
+      }),
       configOverrides: buildCodexClawMcpConfigOverrides(options.generalSettings?.plugins),
     },
     extensions: [{

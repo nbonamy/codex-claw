@@ -9,12 +9,16 @@ import { BackendDriverRpc, codexClawSurfaceOptions } from '../driver-rpc';
 describe('BackendDriverRpc', () => {
   it('puts Codex app-server state below the Claw home instead of ~/.codex', () => {
     vi.stubEnv('CODEX_CLAW_HOME', '/tmp/codex-claw-isolated-home');
+    vi.stubEnv('CODEX_CLAW_BUNDLED_CODEX_PATH', '/app/resources/codex/codex');
     vi.stubEnv('CODEX_HOME', '/tmp/normal-codex-home');
     try {
       expect(codexClawSurfaceOptions()).toMatchObject({
         clientInfo: { name: 'codex_claw', title: 'Codex Claw', version: '0.3.0' },
         codexHome: '/tmp/codex-claw-isolated-home/codex-home',
         loadingStrategy: 'lazy',
+        transport: {
+          command: '/app/resources/codex/codex',
+        },
       });
     } finally {
       vi.unstubAllEnvs();

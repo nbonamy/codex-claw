@@ -4,6 +4,11 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+### New features
+
+- Codex Claw now bundles its local Codex app-server executable, while remote
+  agents continue using the Codex installation on their remote host.
+
 ## [0.5.1] - 2026-08-04
 
 ### Improvements and fixes

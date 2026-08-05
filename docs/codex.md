@@ -9,7 +9,8 @@ to the renderer, and owns only desktop-native callbacks.
 
 `clawd` responsibilities:
 
-- choose an explicit Codex executable override when configured;
+- choose an explicit Codex executable override when configured, otherwise use
+  the Codex executable supplied by its local desktop host;
 - start or connect to `codex app-server`;
 - initialize the app-server session;
 - own JSON-RPC request IDs and response matching;
@@ -60,15 +61,15 @@ codex app-server --listen stdio://
 ```
 
 Stdio keeps the first product local and simple. Future transport options can
-include a Unix socket daemon, `codex app-server proxy`, or a bundled Codex
-binary.
+include a Unix socket daemon or `codex app-server proxy`.
 
 ## Lifecycle
 
 Connection flow:
 
-1. Let the SDK discover the Codex executable, unless the user configured an
-   explicit path.
+1. Use an explicit user-configured Codex executable when present. Otherwise,
+   local desktop `clawd` uses the pinned executable bundled by Codex Claw;
+   remote `clawd` lets the SDK discover Codex on that remote machine.
 2. Start app-server with the chosen environment.
 3. Send `initialize` with `clientInfo.name = "codex_claw"` and
    `capabilities.experimentalApi = true`.
@@ -93,12 +94,34 @@ flow, and the renderer refreshes account state until the SDK observes
 the active account and exposes `account/logout`. Raw Codex account protocol
 types and authentication files never cross into the renderer.
 
-The General settings Advanced section can store a Codex executable path. Empty
-uses SDK discovery across the inherited and login-shell `PATH`, common user and
-Homebrew bins, nvm installs, and Windows executable extensions. A non-empty
-value is passed as the executable for `codex app-server --listen stdio://` and
-always wins. Changing the path persists the setting and relaunches Codex Claw
-so the backend and app-server start from a clean lifecycle.
+The General settings Advanced section can store a Codex executable path. A
+non-empty value is passed as the executable for
+`codex app-server --listen stdio://` and always wins. Empty uses the pinned
+Codex executable bundled with local desktop builds. If no bundle is supplied,
+as with an SSH-installed remote `clawd`, SDK discovery searches the inherited
+and login-shell `PATH`, common user and Homebrew bins, nvm installs, and Windows
+executable extensions. Changing the path persists the setting and relaunches
+Codex Claw so the backend and app-server start from a clean lifecycle.
+
+## Bundled App Server
+
+`codex-app-server-release.json` pins the Codex CLI version, platform, and
+architecture used by desktop builds. `npm run dev` and every Electron
+build/package/make path run `scripts/prepare-codex-app-server.mjs`. If the
+repo-owned ignored resource is absent or reports a different version, the
+script runs <https://releases.openai.com/codex/install.sh> in an isolated
+temporary home with `CODEX_RELEASE`, `CODEX_NON_INTERACTIVE`, and
+`CODEX_INSTALL_DIR`, then copies the resolved executable into
+`electron/resources/codex/codex`. The official installer verifies its release
+checksums, and Claw verifies the resulting version and Developer ID signature.
+Unsigned development packages retain the upstream OpenAI signature; signed
+release packaging recursively re-signs the executable with the Codex Claw
+Developer ID before notarization.
+
+Electron passes the copied path to local `clawd` through
+`CODEX_CLAW_BUNDLED_CODEX_PATH`. The SSH installer uploads only `clawd.mjs`,
+not the desktop Codex executable or that environment variable, so remote agents
+continue to require a Codex installation on the remote host.
 
 ## Thread And Agent Mapping
 

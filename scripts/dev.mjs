@@ -18,6 +18,7 @@ if (process.argv.includes('--help')) {
   process.exit(0);
 }
 
+await run('npm', ['run', 'build:codex']);
 await run('npm', ['run', 'build:computer-use']);
 await run('npm', ['run', 'build', '-w', '@codex-claw/backend']);
 
@@ -36,6 +37,7 @@ const electronDev = start('npm', ['run', 'dev:electron'], {
     CODEX_CLAW_BACKEND_ARGS: `${backendBundle},--stdio`,
     CODEX_CLAW_BACKEND_WATCH_FILE: '',
     CODEX_CLAW_ASSETS_PATH: path.join(rootDir, 'electron', 'assets'),
+    CODEX_CLAW_BUNDLED_CODEX_PATH: path.join(rootDir, 'electron', 'resources', 'codex', 'codex'),
     CODEX_APP_SDK_ASSETS_PATH: path.join(rootDir, 'node_modules', 'codex-app-sdk', 'assets'),
   },
 });

@@ -896,8 +896,9 @@ Still intentionally incomplete:
 - Bench is a first-class concept from Skwad: a global set of saved agent
   templates that can be deployed into teams. It should not be hidden as merely
   a create-agent shortcut.
-- Codex bundling is undecided. The first implementation can launch an installed
-  `codex` CLI, and the architecture keeps room for a bundled binary later.
+- Local desktop builds bundle a pinned, checksum-verified Codex executable and
+  pass it to local `clawd`. SSH-installed remote `clawd` continues to discover
+  Codex on the remote host.
 - Current local access exists through `codex app-server`; a separate
   `codex-app-server` binary is not required for the first prototype.
 - Prefer an isolated Codex identity for Codex Claw, potentially including a
@@ -909,8 +910,6 @@ Still intentionally incomplete:
 
 ## Remaining Questions
 
-- What is the exact Codex binary resolver order once packaging starts:
-  bundled, configured path, managed install, then PATH?
 - Should a custom `CODEX_HOME` be mandatory from day one, or only for packaged
   builds?
 - Do we need a custom app-server session source in Codex itself, or is

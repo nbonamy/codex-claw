@@ -232,8 +232,10 @@ describe('SettingsGeneralPanel', () => {
     await flushPromises();
     expect(wrapper.text()).toContain('Advanced');
     expect(wrapper.text()).toContain('Codex executable');
+    expect(wrapper.text()).toContain('Leave empty to use the bundled Codex.');
 
     const codexInput = wrapper.find('input[aria-label="Codex executable path"]');
+    expect(codexInput.attributes('placeholder')).toBe('Bundled Codex');
     await codexInput.setValue('/usr/local/bin/codex');
     await codexInput.trigger('change');
     expect(updateSettings).toHaveBeenCalledWith({
