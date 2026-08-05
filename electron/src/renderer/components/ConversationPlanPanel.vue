@@ -1,8 +1,8 @@
 <template>
-  <aside class="conversation-plan" aria-live="polite" :aria-label="planTitle">
+  <aside class="conversation-plan" aria-live="polite" :aria-label="t('chat.planProgress.title')">
     <header class="conversation-plan__header">
       <ListIcon :size="16" stroke-width="1.8" aria-hidden="true" />
-      <h2>{{ planTitle }}</h2>
+      <h2>{{ t('chat.planProgress.title') }}</h2>
       <button
         class="conversation-plan__close"
         type="button"
@@ -13,6 +13,11 @@
         <X :size="16" stroke-width="1.8" aria-hidden="true" />
       </button>
     </header>
+    <p
+      v-if="planExplanation"
+      class="conversation-plan__explanation"
+      :title="planExplanation"
+    >{{ planExplanation }}</p>
     <ol class="conversation-plan__steps">
       <li
         v-for="(entry, index) in plan.steps"
@@ -58,7 +63,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const planTitle = computed(() => props.plan.explanation?.trim() || t('chat.planProgress.title'));
+const planExplanation = computed(() => props.plan.explanation?.trim() || '');
 </script>
 
 <style scoped>
@@ -82,16 +87,33 @@ const planTitle = computed(() => props.plan.explanation?.trim() || t('chat.planP
 
 .conversation-plan__header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-6);
+}
+
+.conversation-plan__header > svg {
+  margin-top: 1px;
 }
 
 .conversation-plan__header h2 {
   flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
   font-size: var(--font-size-13);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-16);
+}
+
+.conversation-plan__explanation {
+  display: -webkit-box;
+  margin: var(--space-6) 0 0;
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-18);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .conversation-plan__close {

@@ -82,7 +82,7 @@ describe('ConversationPane', () => {
       planVisible: true,
     });
 
-    await wrapper.get('[aria-label="Close execution plan"]').trigger('click');
+    await wrapper.get('[aria-label="Close task list"]').trigger('click');
 
     expect(wrapper.emitted('close-plan')).toStrictEqual([[]]);
     await wrapper.setProps({ planVisible: false } as Record<string, unknown>);

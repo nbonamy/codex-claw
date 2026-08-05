@@ -101,8 +101,10 @@ implemented:
   background daemon;
 - passive structured execution plans floating at the conversation's upper right
   while a turn is running and retained in the agent snapshot; the plan can be
-  dismissed and reopened from the header list control; completed Plan-mode
-  proposals continue to use the explicit review panel;
+  dismissed and reopened from the header list control; the floating card uses
+  a stable Task list heading and presents the backend explanation as a
+  separate, full-width title clamped to two lines below the header; completed
+  Plan-mode proposals continue to use the explicit review panel;
 - Claw-owned MCP activity keeps its phase-aware titles and uses host-provided
   semantic icons for browser, Computer Use, collaboration, workspace, Markdown,
   and work-item tools while unrelated MCP servers retain SDK fallbacks;

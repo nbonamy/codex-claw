@@ -24,8 +24,11 @@ describe('ConversationPlanPanel', () => {
       global: { plugins: [i18n] },
     });
 
-    expect(wrapper.get('aside').attributes('aria-label')).toBe('Ship the focused fix');
-    expect(wrapper.get('h2').text()).toBe('Ship the focused fix');
+    expect(wrapper.get('aside').attributes('aria-label')).toBe('Task list');
+    expect(wrapper.get('h2').text()).toBe('Task list');
+    const planTitle = wrapper.get('.conversation-plan > .conversation-plan__explanation');
+    expect(planTitle.text()).toBe('Ship the focused fix');
+    expect(planTitle.attributes('title')).toBe('Ship the focused fix');
     const steps = wrapper.findAll('.conversation-plan__step');
     expect(steps).toHaveLength(3);
     expect(steps[0].classes()).toContain('conversation-plan__step--completed');
@@ -39,8 +42,18 @@ describe('ConversationPlanPanel', () => {
       global: { plugins: [i18n] },
     });
 
-    await wrapper.get('[aria-label="Close execution plan"]').trigger('click');
+    await wrapper.get('[aria-label="Close task list"]').trigger('click');
 
     expect(wrapper.emitted('close')).toStrictEqual([[]]);
+  });
+
+  it('omits the status line when the backend provides no explanation', () => {
+    const wrapper = mount(ConversationPlanPanel, {
+      props: { plan: { ...plan, explanation: '  ' } },
+      global: { plugins: [i18n] },
+    });
+
+    expect(wrapper.get('h2').text()).toBe('Task list');
+    expect(wrapper.find('.conversation-plan__explanation').exists()).toBe(false);
   });
 });

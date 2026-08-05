@@ -67,8 +67,8 @@ export const messages = {
         updating: 'Updating plan...',
       },
       planProgress: {
-        close: 'Close execution plan',
-        title: 'Plan',
+        close: 'Close task list',
+        title: 'Task list',
         status: {
           pending: 'Pending',
           inProgress: 'In progress',
