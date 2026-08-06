@@ -18,6 +18,24 @@
           class="conversation-pane__message-header"
         >{{ collaborationMessageLabel(message.id) }}</span>
       </template>
+      <template #composer-attachment-actions="{ attachments, index, disabled }">
+        <el-tooltip
+          v-if="attachments.length === 1 && attachments[index]?.type === 'image'"
+          :content="t('chat.attachments.annotate')"
+          placement="top"
+          :show-after="300"
+        >
+          <button
+            class="conversation-pane__annotate-attachment"
+            type="button"
+            :aria-label="t('chat.attachments.annotate')"
+            :disabled="disabled"
+            @click="requestAttachmentAnnotation(attachments[index])"
+          >
+            <PlusCircleIcon aria-hidden="true" />
+          </button>
+        </el-tooltip>
+      </template>
     </CodexConversationPane>
     <ConversationPlanPanel
       v-if="plan && planVisible"
@@ -36,8 +54,10 @@ import {
   provideCodexChatTranslate,
   type CodexChatMessage,
   type CodexConversationPaneController,
+  type CodexNativeAttachment,
   type SurfaceMessage,
 } from 'codex-app-sdk/vue';
+import { PlusCircleIcon } from '../shared/icons/app-icons';
 import type {
   Agent,
   RendererMessage,
@@ -73,6 +93,7 @@ provideClawToolPresentation(
 );
 
 const emit = defineEmits<{
+  'annotate-attachment': [attachment: CodexNativeAttachment];
   'close-plan': [];
 }>();
 
@@ -96,6 +117,10 @@ function collaborationMessageLabel(messageId: string | undefined): string | null
   return presentation.messageCount === 1
     ? t('chat.collaboration.messageFrom', { name: names })
     : t('chat.collaboration.messagesFrom', { names });
+}
+
+function requestAttachmentAnnotation(attachment: CodexNativeAttachment | undefined): void {
+  if (attachment?.type === 'image') emit('annotate-attachment', attachment);
 }
 
 function transformConversationMessage(
@@ -149,6 +174,34 @@ defineExpose({ focusComposer });
 .conversation-pane__message-header {
   color: inherit;
   font: inherit;
+}
+
+.conversation-pane__annotate-attachment {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  place-items: center;
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.conversation-pane__annotate-attachment:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--color-surface-low);
+}
+
+.conversation-pane__annotate-attachment:disabled {
+  color: var(--color-text-muted);
+  cursor: default;
+}
+
+.conversation-pane__annotate-attachment svg {
+  width: 16px;
+  height: 16px;
 }
 
 :deep(.chat-tool-call__title-target[href]:hover) {

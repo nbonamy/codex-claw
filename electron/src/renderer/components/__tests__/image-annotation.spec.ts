@@ -5,6 +5,7 @@ import {
   annotationPixelLength,
   centeredImageCropDataUrl,
   centeredImageCropRect,
+  formatImageAnnotationPrompt,
   isDrawableAnnotation,
   measurementAnnotation,
   type ImageAnnotation,
@@ -16,6 +17,33 @@ afterEach(() => {
 });
 
 describe('image annotation geometry', () => {
+  it('formats every numbered image annotation after an existing composer prompt', () => {
+    expect(formatImageAnnotationPrompt([
+      {
+        id: 'first',
+        number: 1,
+        tool: 'arrow',
+        start: { x: 1, y: 2 },
+        end: { x: 3, y: 4 },
+        comment: 'Move this control.',
+      },
+      {
+        id: 'second',
+        number: 2,
+        tool: 'rectangle',
+        start: { x: 5, y: 6 },
+        end: { x: 7, y: 8 },
+        comment: '  Increase the spacing.  ',
+      },
+    ], 'Please update this screen.')).toBe([
+      'Please update this screen.',
+      '',
+      'Image annotations:',
+      '1. Move this control.',
+      '2. Increase the spacing.',
+    ].join('\n'));
+  });
+
   it('measures the gap between contrasting horizontal edges', () => {
     const imageData = solidImageData(11, 3, 255);
     paintColumn(imageData, 1, 0);

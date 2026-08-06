@@ -100,6 +100,16 @@ describe('ImageAnnotationDialog', () => {
     expect(ovalTool.element.parentElement?.dataset.content).toBe('Oval (O)');
   });
 
+  it('prevents closing while the annotated image is being prepared', async () => {
+    const wrapper = await mountDialog();
+    await wrapper.setProps({ submitting: true });
+
+    expect(wrapper.getComponent({ name: 'ElDialog' }).props('closeOnClickModal')).toBe(false);
+    expect(wrapper.getComponent({ name: 'ElDialog' }).props('closeOnPressEscape')).toBe(false);
+    expect(wrapper.get('.image-annotation-dialog__footer').findAll('button')[0]?.attributes('disabled'))
+      .toBeDefined();
+  });
+
   it('shows the pixel color under the cursor and copies it with Tab', async () => {
     const wrapper = await mountDialog();
     const canvas = annotationCanvas(wrapper);
@@ -473,7 +483,7 @@ async function mountDialog(width = 800, height = 400, initialPixelRatio: 1 | 2 =
         ElTooltip: ElTooltipStub,
         ElDialog: {
           name: 'ElDialog',
-          props: ['modelValue', 'closeOnPressEscape', 'width'],
+          props: ['modelValue', 'closeOnClickModal', 'closeOnPressEscape', 'width'],
           template: '<section v-if="modelValue"><slot name="header" /><slot /><slot name="footer" /></section>',
         },
       },

@@ -8,6 +8,9 @@ export const messages = {
       cancel: 'Cancel sign-in',
     },
     chat: {
+      attachments: {
+        annotate: 'Annotate',
+      },
       collaboration: {
         messageFrom: 'Message from {name}',
         messagesFrom: 'Messages from {names}',

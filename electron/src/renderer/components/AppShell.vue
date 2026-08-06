@@ -213,6 +213,7 @@
             :agents="snapshot.agents"
             :plan="currentTurnPlan"
             :plan-visible="executionPlanVisible"
+            @annotate-attachment="openAttachmentImageAnnotation"
             @close-plan="closeExecutionPlan"
           />
           <RightWorkspacePanel
@@ -302,20 +303,21 @@
       @close="whatsNewVisible = false"
     />
     <ImageAnnotationDialog
-      :visible="debugImageAnnotationVisible"
-      :image-src="debugAnnotationImageSource"
-      :fallback-image-src="debugAnnotationScreenshotUrl"
-      :initial-pixel-ratio="debugAnnotationPixelRatio"
-      file-name="codex-claw-annotated.png"
-      @close="debugImageAnnotationVisible = false"
-      @image-error="useDebugAnnotationFallback"
-      @send="finishDebugImageAnnotation"
+      :visible="imageAnnotationVisible"
+      :image-src="imageAnnotationImageSource"
+      :fallback-image-src="attachmentAnnotationTarget ? undefined : debugAnnotationScreenshotUrl"
+      :initial-pixel-ratio="imageAnnotationPixelRatio"
+      :file-name="imageAnnotationFileName"
+      :submitting="imageAnnotationSubmitting"
+      @close="closeImageAnnotation"
+      @image-error="handleImageAnnotationError"
+      @send="finishImageAnnotation"
     />
   </main>
 </template>
 
 <script setup lang="ts">
-import { ElMessageBox } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import debugAnnotationScreenshotUrl from '../../../../docs/codex.png?url';
 import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type PairedDevice, type PromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
@@ -330,7 +332,7 @@ import AgentSidebar from './AgentSidebar.vue';
 import CockpitView from './CockpitView.vue';
 import ConversationPane from './ConversationPane.vue';
 import ImageAnnotationDialog, { type ImageAnnotationSendPayload } from './ImageAnnotationDialog.vue';
-import { centeredImageCropDataUrl } from './image-annotation';
+import { centeredImageCropDataUrl, formatImageAnnotationPrompt } from './image-annotation';
 import LoopsView from './LoopsView.vue';
 import TeamDialog from './TeamDialog.vue';
 import TeamRail from './TeamRail.vue';
@@ -343,6 +345,7 @@ import type { SettingsTab } from './settings-tabs';
 import { confirmCloseTeam } from './team-close-confirmation';
 import {
   createCodexConversationPaneController,
+  getCodexNativeRendererApi,
   type CodexCapabilities,
   type CodexConversationLink,
   type CodexConversationPaneActions,
@@ -603,6 +606,11 @@ type CockpitBacklogConfiguration = {
   tagName: string | null;
 };
 
+type AttachmentAnnotationTarget = {
+  agentId: string;
+  attachment: CodexNativeAttachment;
+};
+
 type AppSurface = 'agent' | 'cockpit' | 'loops' | 'settings';
 type BenchLoadStatus = 'notLoaded' | 'loading' | 'loaded' | 'error';
 type AgentRightWorkspaceState = {
@@ -658,6 +666,8 @@ const whatsNewVisible = ref(false);
 const debugImageAnnotationVisible = ref(false);
 const debugAnnotationPixelRatio = ref<1 | 2>(1);
 const debugAnnotationImageSource = ref(debugAnnotationScreenshotUrl);
+const attachmentAnnotationTarget = ref<AttachmentAnnotationTarget | null>(null);
+const imageAnnotationSubmitting = ref(false);
 const editingTeamId = ref<string | null>(null);
 let filePreviewRequestId = 0;
 let markdownPreviewId = 0;
@@ -961,12 +971,27 @@ const cockpitVisible = computed(() => activeSurface.value === 'cockpit');
 const loopsVisible = computed(() => activeSurface.value === 'loops');
 const settingsVisible = computed(() => activeSurface.value === 'settings');
 const isAgentWorkspaceVisible = computed(() => activeSurface.value === 'agent');
+const imageAnnotationVisible = computed(() => (
+  debugImageAnnotationVisible.value || attachmentAnnotationTarget.value !== null
+));
+const imageAnnotationImageSource = computed(() => (
+  attachmentAnnotationTarget.value?.attachment.previewUrl ?? debugAnnotationImageSource.value
+));
+const imageAnnotationPixelRatio = computed<1 | 2>(() => (
+  attachmentAnnotationTarget.value ? 1 : debugAnnotationPixelRatio.value
+));
+const imageAnnotationFileName = computed(() => {
+  const name = attachmentAnnotationTarget.value?.attachment.name;
+  if (!name) return 'codex-claw-annotated.png';
+  const baseName = name.replace(/\.[^.]+$/, '') || 'image';
+  return `${baseName}-annotated.png`;
+});
 const isModalDialogVisible = computed(() => (
   agentDialogVisible.value
   || benchAssignmentDialogVisible.value
   || teamDialogVisible.value
   || whatsNewVisible.value
-  || debugImageAnnotationVisible.value
+  || imageAnnotationVisible.value
 ));
 const showAgentSidebar = computed(() => isAgentWorkspaceVisible.value && !agentSidebarCollapsed.value && !isAgentEmpty.value);
 const showLoginLanding = computed(() => (
@@ -1417,11 +1442,78 @@ function openWhatsNew(): void {
   whatsNewVisible.value = true;
 }
 
-function finishDebugImageAnnotation(_payload: ImageAnnotationSendPayload): void {
+function openAttachmentImageAnnotation(attachment: CodexNativeAttachment): void {
+  const agentId = currentAgent.value?.id;
+  if (!agentId || attachment.type !== 'image') return;
+  if (!attachment.previewUrl) {
+    ElMessage.error('This image cannot be opened for annotation.');
+    return;
+  }
   debugImageAnnotationVisible.value = false;
+  attachmentAnnotationTarget.value = { agentId, attachment };
+}
+
+function closeImageAnnotation(): void {
+  if (imageAnnotationSubmitting.value) return;
+  debugImageAnnotationVisible.value = false;
+  attachmentAnnotationTarget.value = null;
+}
+
+function handleImageAnnotationError(): void {
+  if (attachmentAnnotationTarget.value) {
+    ElMessage.error('This image cannot be opened for annotation.');
+    closeImageAnnotation();
+    return;
+  }
+  void useDebugAnnotationFallback();
+}
+
+async function finishImageAnnotation(payload: ImageAnnotationSendPayload): Promise<void> {
+  const target = attachmentAnnotationTarget.value;
+  if (!target) {
+    debugImageAnnotationVisible.value = false;
+    return;
+  }
+
+  const nativeApi = getCodexNativeRendererApi();
+  if (!nativeApi || currentAgent.value?.id !== target.agentId) {
+    ElMessage.error('The annotated image could not be prepared.');
+    return;
+  }
+
+  imageAnnotationSubmitting.value = true;
+  try {
+    const [annotatedAttachment] = await nativeApi.ingestAttachments([{
+      name: payload.fileName,
+      mimeType: 'image/png',
+      data: imageDataUrlArrayBuffer(payload.dataUrl),
+    }]);
+    if (!annotatedAttachment) throw new Error('Annotated image ingestion returned no attachment.');
+
+    const prompt = formatImageAnnotationPrompt(payload.annotations, props.composerState?.text);
+    const attachment: PromptAttachment = {
+      type: 'image',
+      path: annotatedAttachment.path,
+      name: annotatedAttachment.name,
+      mimeType: annotatedAttachment.mimeType,
+      ...(annotatedAttachment.previewUrl ? { previewUrl: annotatedAttachment.previewUrl } : {}),
+    };
+    forwardPrompt(prompt, { attachments: [attachment] });
+    emit('update:composerState', {
+      agentId: target.agentId,
+      state: { text: '', selectionStart: 0, selectionEnd: 0 },
+    });
+    emit('update:composerAttachments', { agentId: target.agentId, attachments: [] });
+    attachmentAnnotationTarget.value = null;
+  } catch {
+    ElMessage.error('The annotated image could not be prepared.');
+  } finally {
+    imageAnnotationSubmitting.value = false;
+  }
 }
 
 async function openDebugImageAnnotation(imageDataUrl?: string, pixelRatio: 1 | 2 = 1): Promise<void> {
+  attachmentAnnotationTarget.value = null;
   if (imageDataUrl) {
     debugAnnotationImageSource.value = imageDataUrl;
     debugAnnotationPixelRatio.value = pixelRatio;
@@ -1440,6 +1532,18 @@ async function useDebugAnnotationFallback(): Promise<void> {
   } catch {
     debugAnnotationImageSource.value = debugAnnotationScreenshotUrl;
   }
+}
+
+function imageDataUrlArrayBuffer(dataUrl: string): ArrayBuffer {
+  const separator = dataUrl.indexOf(',');
+  const header = separator >= 0 ? dataUrl.slice(0, separator) : '';
+  if (!header.startsWith('data:image/png;') || !header.endsWith(';base64')) {
+    throw new TypeError('Annotated image must be a base64 PNG data URL.');
+  }
+  const binary = atob(dataUrl.slice(separator + 1));
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes.buffer;
 }
 
 async function createLoop(input: CreateLoopInput, location?: LoopLocation): Promise<AppSnapshot | void> {

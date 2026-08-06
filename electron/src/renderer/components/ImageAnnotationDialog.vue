@@ -4,7 +4,8 @@
     :model-value="visible"
     :show-close="false"
     :teleported="false"
-    :close-on-press-escape="!activeComment"
+    :close-on-click-modal="!submitting && !sending"
+    :close-on-press-escape="!activeComment && !submitting && !sending"
     destroy-on-close
     style="height: 80vh; margin-top: 10vh"
     width="80vw"
@@ -192,10 +193,10 @@
 
     <template #footer>
       <div class="claw-dialog__footer image-annotation-dialog__footer">
-        <el-button @click="emit('close')">Cancel</el-button>
+        <el-button :disabled="submitting || sending" @click="emit('close')">Cancel</el-button>
         <AnnotationSendButton
           :count="annotations.length"
-          :disabled="annotations.length === 0 || sending"
+          :disabled="annotations.length === 0 || submitting || sending"
           :label="`Send annotated image with ${annotations.length} annotations`"
           @click="sendAnnotatedImage"
         />
@@ -246,12 +247,14 @@ const props = withDefaults(defineProps<{
   imageAlt?: string;
   imageSrc: string;
   initialPixelRatio?: 1 | 2;
+  submitting?: boolean;
   title?: string;
   visible: boolean;
 }>(), {
   fileName: 'annotated-image.png',
   imageAlt: 'Image to annotate',
   initialPixelRatio: 1,
+  submitting: false,
   title: 'Annotate',
 });
 

@@ -4,6 +4,8 @@ import type {
   CodexConversationPaneActions,
   CodexConversationPaneController,
   CodexConversationPaneState,
+  CodexNativeAttachment,
+  CodexNativeRendererApi,
 } from 'codex-app-sdk/vue';
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -30,6 +32,7 @@ function pointerEvent(type: string, clientX: number): PointerEvent {
 afterEach(() => {
   vi.restoreAllMocks();
   delete window.codexClaw;
+  delete (window as Window & { codexAppSdkNative?: CodexNativeRendererApi }).codexAppSdkNative;
 });
 
 describe('AppShell', () => {
@@ -320,6 +323,115 @@ describe('AppShell', () => {
       '_blank',
       'noopener,noreferrer',
     );
+  });
+
+  it('sends the rendered annotation image and every annotation comment instead of the original attachment', async () => {
+    const originalAttachment: CodexNativeAttachment = {
+      id: 'original-image',
+      type: 'image',
+      path: '/tmp/original.png',
+      name: 'original.png',
+      mimeType: 'image/png',
+      size: 128,
+      previewUrl: 'data:image/png;base64,b3JpZ2luYWw=',
+    };
+    const annotatedAttachment: CodexNativeAttachment = {
+      id: 'annotated-image',
+      type: 'image',
+      path: '/tmp/original-annotated.png',
+      name: 'original-annotated.png',
+      mimeType: 'image/png',
+      size: 256,
+      previewUrl: 'data:image/png;base64,YW5ub3RhdGVk',
+    };
+    const ingestAttachments = vi.fn().mockResolvedValue([annotatedAttachment]);
+    (window as Window & { codexAppSdkNative?: Partial<CodexNativeRendererApi> }).codexAppSdkNative = {
+      capabilities: {
+        attachments: true,
+        clipboard: true,
+        externalLinks: true,
+        transcription: false,
+      },
+      ingestAttachments,
+    };
+    const wrapper = mountShell({
+      composerState: {
+        text: 'Please update this screen.',
+        selectionStart: 26,
+        selectionEnd: 26,
+      },
+      composerAttachments: [originalAttachment],
+    });
+
+    await wrapper.get('[aria-label="Annotate"]').trigger('click');
+    const dialog = wrapper.getComponent({ name: 'ImageAnnotationDialog' });
+    expect(dialog.props('visible')).toBe(true);
+    expect(dialog.props('imageSrc')).toBe(originalAttachment.previewUrl);
+    expect(dialog.props('fileName')).toBe('original-annotated.png');
+
+    dialog.vm.$emit('send', {
+      annotations: [
+        {
+          id: 'annotation-1',
+          number: 1,
+          tool: 'arrow',
+          start: { x: 1, y: 2 },
+          end: { x: 3, y: 4 },
+          comment: 'Move the button.',
+        },
+        {
+          id: 'annotation-2',
+          number: 2,
+          tool: 'rectangle',
+          start: { x: 5, y: 6 },
+          end: { x: 7, y: 8 },
+          comment: 'Increase this margin.',
+        },
+      ],
+      dataUrl: 'data:image/png;base64,YW5ub3RhdGVk',
+      fileName: 'original-annotated.png',
+      height: 80,
+      pixelRatio: 1,
+      width: 120,
+    });
+    await flushPromises();
+
+    expect(ingestAttachments).toHaveBeenCalledOnce();
+    expect(ingestAttachments.mock.calls[0]?.[0]).toStrictEqual([{
+      name: 'original-annotated.png',
+      mimeType: 'image/png',
+      data: expect.any(ArrayBuffer),
+    }]);
+    expect(wrapper.emitted('sendPrompt')).toStrictEqual([[
+      [
+        'Please update this screen.',
+        '',
+        'Image annotations:',
+        '1. Move the button.',
+        '2. Increase this margin.',
+      ].join('\n'),
+      {
+        attachments: [{
+          type: 'image',
+          path: annotatedAttachment.path,
+          name: annotatedAttachment.name,
+          mimeType: annotatedAttachment.mimeType,
+          previewUrl: annotatedAttachment.previewUrl,
+        }],
+      },
+    ]]);
+    expect(wrapper.emitted('sendPrompt')?.[0]?.[1]).not.toStrictEqual(expect.objectContaining({
+      attachments: [expect.objectContaining({ path: originalAttachment.path })],
+    }));
+    expect(wrapper.emitted('update:composerState')).toContainEqual([{
+      agentId: 'agent-dina',
+      state: { text: '', selectionStart: 0, selectionEnd: 0 },
+    }]);
+    expect(wrapper.emitted('update:composerAttachments')).toContainEqual([{
+      agentId: 'agent-dina',
+      attachments: [],
+    }]);
+    expect(dialog.props('visible')).toBe(false);
   });
 
   it('opens the empty workspace launcher before preserving a selected Browser tab', async () => {
@@ -2936,6 +3048,8 @@ describe('AppShell', () => {
 
 function mountShell(overrides: Partial<{
   snapshot: AppSnapshot;
+  composerAttachments: readonly CodexNativeAttachment[];
+  composerState: { text: string; selectionStart: number; selectionEnd: number };
   chooseAgentFolder: () => Promise<string | null>;
   createAgent: (input: CreateAgentInput) => Promise<Agent | null | void>;
   createTeam: (input: CreateTeamInput) => Promise<Team | null | void>;
@@ -2974,6 +3088,8 @@ function mountShell(overrides: Partial<{
       messages: snapshot.messages,
       isLoading: false,
       isSending: false,
+      composerAttachments: overrides.composerAttachments ?? [],
+      composerState: overrides.composerState ?? { text: '', selectionStart: 0, selectionEnd: 0 },
       chooseAgentFolder: overrides.chooseAgentFolder ?? vi.fn().mockResolvedValue(null),
       listSourceFolders: overrides.listSourceFolders ?? vi.fn().mockResolvedValue({ path: '', parentPath: null, entries: [] }),
       listSourceRepositories: overrides.listSourceRepositories ?? vi.fn().mockResolvedValue([]),

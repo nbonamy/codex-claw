@@ -31,6 +31,17 @@ export type ImageAnnotationCounterPlacement = {
   center: ImageAnnotationPoint;
 };
 
+export function formatImageAnnotationPrompt(
+  annotations: readonly ImageAnnotation[],
+  existingPrompt = '',
+): string {
+  const annotationText = [
+    'Image annotations:',
+    ...annotations.map((annotation) => `${annotation.number}. ${annotation.comment.trim()}`),
+  ].join('\n');
+  return [existingPrompt.trim(), annotationText].filter(Boolean).join('\n\n');
+}
+
 export const defaultImageAnnotationPalette: ImageAnnotationPalette = {
   stroke: '#ff2d20',
   halo: '#ffffff',

@@ -5,6 +5,7 @@ import ElementPlus from 'element-plus';
 import {
   createCodexConversationPaneController,
   type CodexConversationPaneController,
+  type CodexNativeAttachment,
 } from 'codex-app-sdk/vue';
 import { describe, expect, it } from 'vitest';
 import type { Agent, RendererMessage, ThreadPlan } from '@codex-claw/shared/contracts';
@@ -210,6 +211,36 @@ describe('ConversationPane', () => {
       .toBe('data:image/png;base64,cG5n');
     expect(wrapper.get('a.chat-attachment-block--chip').attributes('href')).toBe('/tmp/report.txt');
   });
+
+  it('offers annotation only for a single composer image attachment', async () => {
+    const image: CodexNativeAttachment = {
+      id: 'image-1',
+      type: 'image',
+      path: '/tmp/screenshot.png',
+      name: 'screenshot.png',
+      mimeType: 'image/png',
+      size: 128,
+      previewUrl: 'data:image/png;base64,cG5n',
+    };
+    const wrapper = mountPane({ controller: controllerWithAttachments([image]), agent });
+
+    const annotate = wrapper.get('[aria-label="Annotate"]');
+    expect(annotate.find('.tabler-icon-circle-plus').exists()).toBe(true);
+    await annotate.trigger('click');
+    expect(wrapper.emitted('annotate-attachment')).toStrictEqual([[image]]);
+
+    const fileWrapper = mountPane({
+      controller: controllerWithAttachments([{ ...image, id: 'file-1', type: 'file', mimeType: 'text/plain' }]),
+      agent,
+    });
+    expect(fileWrapper.find('[aria-label="Annotate"]').exists()).toBe(false);
+
+    const multipleWrapper = mountPane({
+      controller: controllerWithAttachments([image, { ...image, id: 'image-2' }]),
+      agent,
+    });
+    expect(multipleWrapper.find('[aria-label="Annotate"]').exists()).toBe(false);
+  });
 });
 
 function mountPane(props: {
@@ -232,6 +263,21 @@ function controllerFor(controllerMessages: RendererMessage[]): CodexConversation
         messages: controllerMessages,
       },
       composer: { placeholder: 'Ask for follow-up changes' },
+    },
+    actions: {},
+  });
+}
+
+function controllerWithAttachments(
+  attachments: readonly CodexNativeAttachment[],
+): CodexConversationPaneController {
+  return createCodexConversationPaneController({
+    state: {
+      identity: {
+        conversationKey: 'agent:agent-dina',
+        messages,
+      },
+      composer: { attachments },
     },
     actions: {},
   });

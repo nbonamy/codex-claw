@@ -99,7 +99,10 @@ implemented:
   separate `@2x` toolbar toggle reports image dimensions
   and measured gaps in logical Retina pixels; clipboard images enable it
   automatically from a 2x native representation or macOS screenshot PNG
-  density metadata. Escape
+  density metadata. A single image in the conversation composer exposes the
+  Browser-style annotation action; sending from the dialog submits the rendered
+  annotated PNG instead of the original attachment, alongside the numbered
+  annotation comments and any existing composer text. Escape
   cancels the active mark before it can close the dialog. The development
   fixture is available from Debug → Image Annotation
   and uses a clipboard image when present, otherwise a centered crop of the
