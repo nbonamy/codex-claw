@@ -822,7 +822,7 @@ export type RendererMessagePart =
   | {
     type: 'tool';
     id: string;
-    kind: 'command' | 'mcp' | 'dynamic' | 'fileChange' | 'generic';
+    kind: string;
     title: string;
     status: 'running' | 'completed' | 'failed';
     statusText?: string;

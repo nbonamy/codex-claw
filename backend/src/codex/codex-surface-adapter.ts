@@ -1065,7 +1065,7 @@ function skillsChangedPayload(
 function rendererToolPart(part: SurfaceMessageToolPart): RendererToolPart {
   return {
     ...part,
-    kind: toolKind(part.kind),
+    kind: part.kind ?? 'generic',
   };
 }
 
@@ -1075,12 +1075,6 @@ function rendererToolUpdate(update: SurfaceMessageToolPartUpdate): RendererToolP
     ...rest,
     ...(fallbackToolPart ? { fallbackToolPart: rendererToolPart(fallbackToolPart) } : {}),
   };
-}
-
-function toolKind(kind: string | undefined): RendererToolPart['kind'] {
-  return kind === 'command' || kind === 'mcp' || kind === 'dynamic' || kind === 'fileChange'
-    ? kind
-    : 'generic';
 }
 
 function statusFromSnapshot(snapshot: CodexConversationSnapshot): AgentStatus {

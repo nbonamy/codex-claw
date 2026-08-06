@@ -1953,6 +1953,29 @@ describe('snapshot reducer', () => {
     ]);
   });
 
+  it('preserves arbitrary tool kinds in renderer state', () => {
+    const snapshot = createInitialSnapshot();
+    const toolPart: RendererToolPart = {
+      type: 'tool',
+      id: 'future-tool',
+      kind: 'futureSdkTool',
+      title: 'Future tool',
+      status: 'completed',
+    };
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-future',
+      type: 'item.completed',
+      payload: toolPartPayload(toolPart),
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([toolPart]);
+  });
+
   it('does not erase streamed command output when completion lacks aggregate output', () => {
     const snapshot = createInitialSnapshot();
 

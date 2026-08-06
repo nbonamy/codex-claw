@@ -721,6 +721,52 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
   });
 
+  it('preserves SDK tool kinds without a closed allowlist', async () => {
+    const { adapter, surface, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    transport.fullHistoryTurnsByThreadId.set('thread-a', [
+      turn('turn-search', 'completed', [{
+        type: 'webSearch', id: 'search-history', query: 'codex app server', action: null, results: null,
+      }]),
+    ]);
+    adapter.onEvent((event) => events.push(event));
+
+    await adapter.hydrateAgent(agentA);
+
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'thread.historyLoaded',
+      payload: expect.objectContaining({
+        messages: [expect.objectContaining({
+          parts: [expect.objectContaining({ id: 'search-history', kind: 'webSearch', type: 'tool' })],
+        })],
+      }),
+    }));
+
+    events.length = 0;
+    const emitSurfaceEvent = (surface as unknown as {
+      emitEvent(origin: 'notification', event: unknown): void;
+    }).emitEvent.bind(surface);
+    emitSurfaceEvent('notification', {
+      type: 'tool.completed',
+      conversationId: 'thread-a',
+      turnId: 'turn-future',
+      payload: {
+        messageId: 'message-future',
+        toolPart: {
+          type: 'tool', id: 'future-tool', kind: 'futureSdkTool', title: 'Future tool', status: 'completed',
+        },
+      },
+    });
+
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'item.completed',
+      payload: expect.objectContaining({
+        messageId: 'message-future',
+        toolPart: expect.objectContaining({ id: 'future-tool', kind: 'futureSdkTool' }),
+      }),
+    }));
+  });
+
   it('publishes the initial five full turns before prepending requested history incrementally', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
