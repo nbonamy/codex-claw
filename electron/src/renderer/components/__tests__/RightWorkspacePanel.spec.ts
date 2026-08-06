@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import RightWorkspacePanel from '../RightWorkspacePanel.vue';
-import type { RightWorkspaceFilePanel, RightWorkspaceFileTab, RightWorkspaceTab } from '../right-workspace';
+import type { RightWorkspaceFilePanel, RightWorkspaceFileTab, RightWorkspaceImagePanel, RightWorkspaceImageTab, RightWorkspaceTab } from '../right-workspace';
 import type { SidePanelMarkdownState } from '../side-panel';
 import { i18n } from '../../i18n';
 
@@ -20,6 +20,7 @@ function mountPanel(
   activeTab: RightWorkspaceTab | null = 'review',
   filePanels: Partial<Record<RightWorkspaceFileTab, RightWorkspaceFilePanel>> = {},
   planPanel: SidePanelMarkdownState | null = null,
+  imagePanels: Partial<Record<RightWorkspaceImageTab, RightWorkspaceImagePanel>> = {},
 ) {
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
   window.codexClaw = {
@@ -37,6 +38,7 @@ function mountPanel(
       },
       gitPanel: { kind: 'gitDiff', title: 'Review', diff: '', state: 'idle' },
       filePanels,
+      imagePanels,
       planPanel,
       tabs,
       visible: true,
@@ -124,5 +126,31 @@ describe('RightWorkspacePanel', () => {
 
     expect(wrapper.emitted('selectTab')).toStrictEqual([['browser']]);
     expect(wrapper.emitted('closeTab')).toStrictEqual([['plan']]);
+  });
+
+  it('renders conversation images as independently closable workspace tabs', async () => {
+    const imageTab = 'image:preview' as const;
+    const wrapper = mountPanel([imageTab], imageTab, {}, null, {
+      [imageTab]: {
+        kind: 'image',
+        title: 'diagram.png',
+        subtitle: '/repo/diagram.png',
+        path: '/repo/diagram.png',
+        src: 'data:image/png;base64,aW1hZ2U=',
+        alt: 'Architecture diagram',
+        mimeType: 'image/png',
+        state: 'idle',
+        error: null,
+      },
+    });
+
+    expect(wrapper.get('[role="tab"]').text()).toBe('diagram.png');
+    expect(wrapper.get('.image-preview-panel img').attributes()).toMatchObject({
+      alt: 'Architecture diagram',
+      src: 'data:image/png;base64,aW1hZ2U=',
+    });
+
+    await wrapper.get('[aria-label="Close diagram.png tab"]').trigger('click');
+    expect(wrapper.emitted('closeTab')).toStrictEqual([[imageTab]]);
   });
 });

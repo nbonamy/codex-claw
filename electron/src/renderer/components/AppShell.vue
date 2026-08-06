@@ -229,6 +229,7 @@
             :plan-panel="rightWorkspaceFor(agent.id).planPanel"
             :plan-updating="isPlanPreviewUpdatingFor(agent.id)"
             :file-panels="rightWorkspaceFor(agent.id).filePanels"
+            :image-panels="rightWorkspaceFor(agent.id).imagePanels"
             :diff-panels="rightWorkspaceFor(agent.id).diffPanels"
             :tabs="rightWorkspaceFor(agent.id).tabs"
             :visible="isRightWorkspaceVisible(agent.id)"
@@ -350,6 +351,8 @@ import {
   type CodexConversationLink,
   type CodexConversationPaneActions,
   type CodexConversationPaneState,
+  type CodexMessageImage,
+  type CodexMessageImageContext,
   type CodexNativeAttachment,
   type CodexComposerState,
   languageForFilePath,
@@ -357,17 +360,20 @@ import {
   type SendCodexMessageOptions,
 } from 'codex-app-sdk/vue';
 
-import type { PlanReviewComment, SidePanelGitDiffState, SidePanelMarkdownState } from './side-panel';
+import type { PlanReviewComment, SidePanelGitDiffState, SidePanelImageState, SidePanelMarkdownState } from './side-panel';
 import {
   isRightWorkspaceFileTab,
   isRightWorkspaceDiffTab,
+  isRightWorkspaceImageTab,
   rightWorkspaceDiffTab,
   rightWorkspaceFileTab,
+  rightWorkspaceImageTab,
   rightWorkspaceMarkdownTab,
   type RightWorkspaceDiffPanel,
   type RightWorkspaceDiffTab,
   type RightWorkspaceFilePanel,
   type RightWorkspaceFileTab,
+  type RightWorkspaceImageTab,
   type RightWorkspaceTab,
 } from './right-workspace';
 
@@ -622,6 +628,7 @@ type AgentRightWorkspaceState = {
   filePreviewRequestIds: Partial<Record<RightWorkspaceFileTab, number>>;
   diffPanels: Partial<Record<RightWorkspaceDiffTab, RightWorkspaceDiffPanel>>;
   gitReviewPanel: SidePanelGitDiffState | null;
+  imagePanels: Partial<Record<RightWorkspaceImageTab, SidePanelImageState>>;
   planPanel: SidePanelMarkdownState | null;
   open: boolean;
   tabs: RightWorkspaceTab[];
@@ -862,6 +869,7 @@ const conversationPaneActions: CodexConversationPaneActions = {
   interrupt: () => emit('interrupt-agent'),
   loadOlderHistory: () => props.loadOlderAgentHistory?.(currentAgent.value?.id ?? ''),
   openLink: openConversationLink,
+  openImage: openConversationImage,
   resolveApproval: forwardApprovalResolution,
   retryMessage: (index) => emit('retry-message', index),
   steer: forwardCodexSteerPrompt,
@@ -1145,6 +1153,7 @@ function rightWorkspaceFor(agentId: string): AgentRightWorkspaceState {
     filePreviewRequestIds: {},
     diffPanels: {},
     gitReviewPanel: null,
+    imagePanels: {},
     planPanel: null,
     open: false,
     tabs: [],
@@ -1244,6 +1253,10 @@ function closeRightWorkspaceTab(agentId: string, tab: RightWorkspaceTab): void {
   if (isRightWorkspaceDiffTab(tab)) {
     const { [tab]: _closedPanel, ...diffPanels } = workspace.diffPanels;
     workspace.diffPanels = diffPanels;
+  }
+  if (isRightWorkspaceImageTab(tab)) {
+    const { [tab]: _closedPanel, ...imagePanels } = workspace.imagePanels;
+    workspace.imagePanels = imagePanels;
   }
   if (workspace.activeTab === tab) {
     workspace.activeTab = nextTabs[Math.min(tabIndex, nextTabs.length - 1)] ?? null;
@@ -1682,6 +1695,40 @@ function openConversationLink(link: CodexConversationLink): void | Promise<void>
     ...(context.messageId ? { messageId: context.messageId } : {}),
     ...(context.itemId ? { itemId: context.itemId } : {}),
   });
+}
+
+function openConversationImage(image: CodexMessageImage, context?: CodexMessageImageContext): true {
+  const agent = currentAgent.value;
+  if (!agent) return true;
+
+  const durablePath = image.path?.trim() || undefined;
+  const messageIdentifier = context?.message.id ?? `message-${context?.index ?? 'unknown'}`;
+  const tab = rightWorkspaceImageTab([
+    messageIdentifier,
+    image.kind,
+    durablePath ?? image.src,
+  ].join('\0'));
+  const title = image.title?.trim()
+    || image.name?.trim()
+    || (durablePath ? fileBasename(durablePath) : '')
+    || image.alt.trim()
+    || 'Image';
+  const workspace = rightWorkspaceFor(agent.id);
+  workspace.imagePanels = {
+    ...workspace.imagePanels,
+    [tab]: {
+      kind: 'image',
+      title,
+      ...(durablePath ? { subtitle: durablePath, path: durablePath } : {}),
+      ...(image.mimeType ? { mimeType: image.mimeType } : {}),
+      alt: image.alt || title,
+      src: image.src,
+      state: 'idle',
+      error: null,
+    },
+  };
+  openRightWorkspaceTab(tab, agent.id);
+  return true;
 }
 
 function updateConversationComposerState(state: CodexComposerState): void {

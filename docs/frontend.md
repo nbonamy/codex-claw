@@ -138,7 +138,9 @@ implemented:
   and work-item tools while unrelated MCP servers retain SDK fallbacks;
 - agent-owned right-side tabbed workspaces for the in-app Browser and GitHub
   Review, with full working-tree diffs opened from the agent header's git
-  statistics; every agent preserves its own open/active tabs, open state, and
+  statistics; clicking a conversation image opens it in a Claw-owned image tab,
+  while the SDK lightbox remains the fallback for hosts without that action;
+  every agent preserves its own open/active tabs, open state, and
   width, and inactive workspaces stay mounted so background browser tooling can
   continue without stealing the user's selected agent. Live edits refresh files
   that the user already has open but never reveal or select a workspace tab;

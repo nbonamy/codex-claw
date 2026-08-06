@@ -17,12 +17,20 @@ export type SidePanelSourceState = SidePanelBaseState & {
   language?: string | null;
 };
 
+export type SidePanelImageState = SidePanelBaseState & {
+  kind: 'image';
+  alt: string;
+  mimeType?: string;
+  path?: string;
+  src: string;
+};
+
 export type SidePanelGitDiffState = SidePanelBaseState & {
   kind: 'gitDiff';
   diff: string;
 };
 
-export type SidePanelState = SidePanelMarkdownState | SidePanelSourceState | SidePanelGitDiffState;
+export type SidePanelState = SidePanelMarkdownState | SidePanelSourceState | SidePanelImageState | SidePanelGitDiffState;
 
 export type PlanReviewComment = {
   id: string;

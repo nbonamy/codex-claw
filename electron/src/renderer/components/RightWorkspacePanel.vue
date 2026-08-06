@@ -19,6 +19,7 @@
             <IconWorld v-else-if="tab === 'browser'" aria-hidden="true" />
             <FileTextIcon v-else-if="tab === 'plan'" aria-hidden="true" />
             <FileDiffIcon v-else-if="diffPanel(tab)" aria-hidden="true" />
+            <PhotoIcon v-else-if="imagePanel(tab)" aria-hidden="true" />
             <FileTextIcon v-else-if="filePanel(tab)?.kind === 'markdown'" aria-hidden="true" />
             <CodeIcon v-else aria-hidden="true" />
             <span>{{ tabLabel(tab) }}</span>
@@ -135,6 +136,15 @@
         :state="diffPanel(tab)?.state"
       />
     </div>
+
+    <div
+      v-for="tab in imageTabs"
+      :key="tab"
+      v-show="activeTab === tab"
+      class="right-workspace-panel__file-preview"
+    >
+      <ImagePreviewPanel :panel="imagePanel(tab)!" />
+    </div>
   </aside>
 </template>
 
@@ -142,12 +152,13 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { IconWorld } from '@tabler/icons-vue';
 import type { Agent, AgentGitStatus } from '@codex-claw/shared/contracts';
-import { CodeIcon, FileDiffIcon, FileTextIcon, GitHubIcon, PlusIcon, X } from '../shared/icons/app-icons';
+import { CodeIcon, FileDiffIcon, FileTextIcon, GitHubIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import BrowserPanel from './BrowserPanel.vue';
 import GitDiffPreviewPanel from './GitDiffPreviewPanel.vue';
 import GitReviewPanel from './GitReviewPanel.vue';
+import ImagePreviewPanel from './ImagePreviewPanel.vue';
 import MarkdownPanel from './MarkdownPanel.vue';
 import PlanReviewPanel from './PlanReviewPanel.vue';
 import SourcePreviewPanel from './SourcePreviewPanel.vue';
@@ -155,10 +166,13 @@ import type { PlanReviewComment, SidePanelGitDiffState, SidePanelMarkdownState, 
 import {
   isRightWorkspaceDiffTab,
   isRightWorkspaceFileTab,
+  isRightWorkspaceImageTab,
   type RightWorkspaceDiffPanel,
   type RightWorkspaceDiffTab,
   type RightWorkspaceFilePanel,
   type RightWorkspaceFileTab,
+  type RightWorkspaceImagePanel,
+  type RightWorkspaceImageTab,
   type RightWorkspaceTab,
 } from './right-workspace';
 
@@ -171,6 +185,7 @@ const props = defineProps<{
   planUpdating?: boolean;
   diffPanels?: Partial<Record<RightWorkspaceDiffTab, RightWorkspaceDiffPanel>>;
   filePanels?: Partial<Record<RightWorkspaceFileTab, RightWorkspaceFilePanel>>;
+  imagePanels?: Partial<Record<RightWorkspaceImageTab, RightWorkspaceImagePanel>>;
   tabs: RightWorkspaceTab[];
   visible?: boolean;
   browserId?: string;
@@ -193,6 +208,7 @@ const addMenuRoot = ref<HTMLElement | null>(null);
 const addMenuOpen = ref(false);
 const fileTabs = computed(() => props.tabs.filter(isRightWorkspaceFileTab));
 const diffTabs = computed(() => props.tabs.filter(isRightWorkspaceDiffTab));
+const imageTabs = computed(() => props.tabs.filter(isRightWorkspaceImageTab));
 const addMenuItems = computed<AppMenuItem[]>(() => [
   { id: 'review', type: 'action', label: 'GitHub Review', icon: GitHubIcon },
   { id: 'browser', type: 'action', label: 'Browser', icon: IconWorld },
@@ -206,6 +222,7 @@ function tabLabel(tab: RightWorkspaceTab): string {
   if (tab === 'browser') return 'Browser';
   if (tab === 'plan') return props.planPanel?.title ?? 'Plan';
   if (diffPanel(tab)) return diffPanel(tab)?.title ?? 'Diff';
+  if (imagePanel(tab)) return imagePanel(tab)?.title ?? 'Image';
   return filePanel(tab)?.title ?? 'File';
 }
 
@@ -215,6 +232,10 @@ function diffPanel(tab: RightWorkspaceTab): RightWorkspaceDiffPanel | undefined 
 
 function filePanel(tab: RightWorkspaceTab): RightWorkspaceFilePanel | undefined {
   return isRightWorkspaceFileTab(tab) ? props.filePanels?.[tab] : undefined;
+}
+
+function imagePanel(tab: RightWorkspaceTab): RightWorkspaceImagePanel | undefined {
+  return isRightWorkspaceImageTab(tab) ? props.imagePanels?.[tab] : undefined;
 }
 
 function markdownFilePanel(tab: RightWorkspaceFileTab): SidePanelMarkdownState | null {

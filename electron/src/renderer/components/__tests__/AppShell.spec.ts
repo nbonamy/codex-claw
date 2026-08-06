@@ -303,6 +303,17 @@ describe('AppShell', () => {
       model: 'sdk-selection-does-not-cross-host-boundary',
     });
     await actions.openLink?.({ kind: 'external', href: 'https://example.com/docs' });
+    const imageHandled = await actions.openImage?.({
+      alt: 'Architecture diagram',
+      kind: 'attachment',
+      mimeType: 'image/png',
+      name: 'diagram.png',
+      path: '/repo/diagram.png',
+      src: 'data:image/png;base64,aW1hZ2U=',
+    }, {
+      index: 2,
+      message: { id: 'message-with-image', role: 'assistant', content: '' },
+    });
 
     expect(wrapper.emitted('update:composerState')).toStrictEqual([[{
       agentId: activeAgent.id,
@@ -323,6 +334,27 @@ describe('AppShell', () => {
       '_blank',
       'noopener,noreferrer',
     );
+    expect(imageHandled).toBe(true);
+    const imageWorkspace = wrapper.getComponent({ name: 'RightWorkspacePanel' });
+    const imageTab = (imageWorkspace.props('tabs') as string[]).find((tab) => tab.startsWith('image:'));
+    expect(imageTab).toBeDefined();
+    expect(imageWorkspace.props('activeTab')).toBe(imageTab);
+    expect((imageWorkspace.props('imagePanels') as Record<string, unknown>)[imageTab!]).toStrictEqual({
+      kind: 'image',
+      title: 'diagram.png',
+      subtitle: '/repo/diagram.png',
+      path: '/repo/diagram.png',
+      mimeType: 'image/png',
+      alt: 'Architecture diagram',
+      src: 'data:image/png;base64,aW1hZ2U=',
+      state: 'idle',
+      error: null,
+    });
+
+    imageWorkspace.vm.$emit('closeTab', imageTab);
+    await nextTick();
+    expect(imageWorkspace.props('tabs')).not.toContain(imageTab);
+    expect(imageWorkspace.props('imagePanels')).toStrictEqual({});
   });
 
   it('sends the rendered annotation image and every annotation comment instead of the original attachment', async () => {
