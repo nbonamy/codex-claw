@@ -4,20 +4,39 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.6.0] - 2026-08-06
+
 ### New features
 
 - Codex Claw now bundles its local Codex app-server executable, while remote
   agents continue using the Codex installation on their remote host.
-- Agent menus can now fork an existing Codex conversation into a new agent.
-- User and assistant message actions can fork a Codex conversation from that
-  point into a new agent.
-- Image annotation.
+- Existing Codex conversations can now be forked into a new agent from the
+  agent menu or from a specific user or assistant message.
+- Image annotation now lets you mark up a composer image with arrows,
+  rectangles, numbered comments, zoom, color inspection, and Retina-aware
+  measurements, then send the annotated image and feedback together.
+- Appshots capture the frontmost macOS window directly into the active agent
+  with a configurable dual-Command, dual-Option, or dual-Shift hotkey and an
+  optional confirmation sound.
+- Computer Use can now capture a target application window or macOS display as
+  an image, with Screen Recording permission surfaced in Settings.
+- Clicking an image in a conversation now opens it in a dedicated per-agent
+  workspace tab.
 
 ### Improvements and fixes
 
 - Execution plans now keep a stable Task list heading and show the model's
   plan-update title as a separate, full-width block below the header.
 - Duplicated and forked agents now appear directly below their source agent.
+- Conversations now open with less initial history while older turns remain
+  available on demand.
+- Historical image attachments render previews again, and selected attachments
+  stay contained within the composer.
+- Web searches now use their own tool presentation, while new SDK tool kinds
+  keep their intended identity instead of falling back to a generic tool.
+- Message actions are disabled while an agent is busy, controlled composer
+  caret movement is preserved, and user-message presentation is more
+  consistent.
 
 ## [0.5.1] - 2026-08-04
 

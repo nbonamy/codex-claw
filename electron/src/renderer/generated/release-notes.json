@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "version": "0.5.1",
-  "releasedAt": "2026-08-04",
-  "sourceSha256": "d8e2ecbeccbdc435108dac564eba0ce7cc60d75bb742bc43d4eda6b6ecede902",
-  "markdown": "### Improvements and fixes\n\n- Dialog close buttons now sit closer to the top-right corner, and dialogs\n  without footers keep their rounded bottom corners."
+  "version": "0.6.0",
+  "releasedAt": "2026-08-06",
+  "sourceSha256": "580d081bc98bdb5cf87dbf152d07ca03e55c62cd2354c78c3e21eb3bda20bcac",
+  "markdown": "### New features\n\n- Codex Claw now bundles its local Codex app-server executable, while remote\n  agents continue using the Codex installation on their remote host.\n- Existing Codex conversations can now be forked into a new agent from the\n  agent menu or from a specific user or assistant message.\n- Image annotation now lets you mark up a composer image with arrows,\n  rectangles, numbered comments, zoom, color inspection, and Retina-aware\n  measurements, then send the annotated image and feedback together.\n- Appshots capture the frontmost macOS window directly into the active agent\n  with a configurable dual-Command, dual-Option, or dual-Shift hotkey and an\n  optional confirmation sound.\n- Computer Use can now capture a target application window or macOS display as\n  an image, with Screen Recording permission surfaced in Settings.\n- Clicking an image in a conversation now opens it in a dedicated per-agent\n  workspace tab.\n\n### Improvements and fixes\n\n- Execution plans now keep a stable Task list heading and show the model's\n  plan-update title as a separate, full-width block below the header.\n- Duplicated and forked agents now appear directly below their source agent.\n- Conversations now open with less initial history while older turns remain\n  available on demand.\n- Historical image attachments render previews again, and selected attachments\n  stay contained within the composer.\n- Web searches now use their own tool presentation, while new SDK tool kinds\n  keep their intended identity instead of falling back to a generic tool.\n- Message actions are disabled while an agent is busy, controlled composer\n  caret movement is preserved, and user-message presentation is more\n  consistent."
 }

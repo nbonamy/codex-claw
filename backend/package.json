@@ -1,6 +1,6 @@
 {
   "name": "@codex-claw/backend",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -15,7 +15,7 @@
     "test:watch": "vitest watch"
   },
   "dependencies": {
-    "@codex-claw/shared": "0.5.1",
+    "@codex-claw/shared": "0.6.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "codex-app-sdk": "file:../../codex-app-sdk",
     "pino": "^10.3.1",
