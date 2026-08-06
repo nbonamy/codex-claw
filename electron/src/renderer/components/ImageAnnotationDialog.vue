@@ -108,7 +108,11 @@
       @keydown="handleKeyDown"
     >
       <div class="image-annotation-dialog__content">
-        <div ref="workspace" class="image-annotation-dialog__workspace">
+        <div
+          ref="workspace"
+          class="image-annotation-dialog__workspace"
+          @wheel="handleWorkspaceWheel"
+        >
           <div
             ref="stage"
             class="image-annotation-dialog__stage"
@@ -444,6 +448,27 @@ function handleWindowResize(): void {
   if (!props.visible) return;
   fitSourceImage();
   void nextTick(frameSourceImage);
+}
+
+function handleWorkspaceWheel(event: WheelEvent): void {
+  if (!event.ctrlKey) return;
+  event.preventDefault();
+  const container = workspace.value;
+  const stageElement = stage.value;
+  if (!container || !stageElement) return;
+
+  const nextZoom = clamp(zoom.value * Math.exp(-event.deltaY * 0.01), 0.5, 3);
+  if (nextZoom === zoom.value) return;
+  const rect = stageElement.getBoundingClientRect();
+  const anchorX = rect.width > 0 ? clamp((event.clientX - rect.left) / rect.width, 0, 1) : 0.5;
+  const anchorY = rect.height > 0 ? clamp((event.clientY - rect.top) / rect.height, 0, 1) : 0.5;
+  zoom.value = nextZoom;
+
+  void nextTick(() => {
+    const nextRect = stageElement.getBoundingClientRect();
+    container.scrollLeft += nextRect.left + nextRect.width * anchorX - event.clientX;
+    container.scrollTop += nextRect.top + nextRect.height * anchorY - event.clientY;
+  });
 }
 
 function imageFailed(): void {
@@ -1108,14 +1133,6 @@ function clamp(value: number, minimum: number, maximum: number): number {
 .image-annotation-dialog__stage--oval .image-annotation-dialog__canvas,
 .image-annotation-dialog__stage--rectangle .image-annotation-dialog__canvas {
   cursor: crosshair;
-}
-
-.image-annotation-dialog__stage--measure-horizontal .image-annotation-dialog__canvas {
-  cursor: ew-resize;
-}
-
-.image-annotation-dialog__stage--measure-vertical .image-annotation-dialog__canvas {
-  cursor: ns-resize;
 }
 
 .image-annotation-dialog__comments {

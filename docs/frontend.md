@@ -94,8 +94,9 @@ implemented:
   images or changing the user-visible zoom, and edge drags scroll the
   drawing workspace, and a live header inspector shows cursor RGB values, image
   size, and zoom with Tab-to-copy color support. The dialog stays fixed at 80%
-  of viewport width and 80% of viewport height while zoom remains contained in
-  its scrolling canvas. A separate `@2x` toolbar toggle reports image dimensions
+  of viewport width and 80% of viewport height while Command shortcuts and
+  native trackpad pinch gestures control zoom inside its scrolling canvas. A
+  separate `@2x` toolbar toggle reports image dimensions
   and measured gaps in logical Retina pixels; clipboard images enable it
   automatically from a 2x native representation or macOS screenshot PNG
   density metadata. Escape

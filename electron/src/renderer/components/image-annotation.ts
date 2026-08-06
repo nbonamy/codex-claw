@@ -31,11 +31,6 @@ export type ImageAnnotationCounterPlacement = {
   center: ImageAnnotationPoint;
 };
 
-type ImageAnnotationLabelSize = {
-  height: number;
-  width: number;
-};
-
 export const defaultImageAnnotationPalette: ImageAnnotationPalette = {
   stroke: '#ff2d20',
   halo: '#ffffff',
@@ -177,19 +172,16 @@ export function annotationAnchor(annotation: ImageAnnotation): ImageAnnotationPo
   return annotation.end;
 }
 
-export function annotationCounterPlacement(
-  annotation: ImageAnnotation,
-  measurementLabelSize: ImageAnnotationLabelSize = { height: 0, width: 0 },
-): ImageAnnotationCounterPlacement {
+export function annotationCounterPlacement(annotation: ImageAnnotation): ImageAnnotationCounterPlacement {
   if (annotation.tool === 'measure-horizontal' || annotation.tool === 'measure-vertical') {
     const middle = midpoint(annotation.start, annotation.end);
     const counterOffset = 23;
     if (annotation.tool === 'measure-horizontal') {
-      const anchor = { x: middle.x, y: middle.y + measurementLabelSize.height / 2 };
+      const anchor = middle;
       return { anchor, center: { x: anchor.x, y: anchor.y + counterOffset } };
     }
-    const anchor = { x: middle.x + measurementLabelSize.width / 2, y: middle.y };
-    return { anchor, center: { x: anchor.x + counterOffset, y: anchor.y } };
+    const anchor = middle;
+    return { anchor, center: { x: anchor.x - counterOffset, y: anchor.y } };
   }
 
   if (annotation.tool === 'arrow') {
@@ -374,17 +366,21 @@ function drawMeasurement(
   const textWidth = context.measureText(label).width;
   const labelWidth = textWidth + 12;
   const labelHeight = 22;
-  const labelX = middle.x - labelWidth / 2;
-  const labelY = middle.y - labelHeight / 2;
+  const labelGap = 6;
+  const labelCenter = horizontal
+    ? { x: middle.x, y: middle.y - labelHeight / 2 - labelGap }
+    : { x: middle.x + labelWidth / 2 + labelGap, y: middle.y };
+  const labelX = labelCenter.x - labelWidth / 2;
+  const labelY = labelCenter.y - labelHeight / 2;
   roundedRect(context, labelX, labelY, labelWidth, labelHeight, 4);
   context.fillStyle = palette.labelFill;
   context.fill();
   context.fillStyle = palette.labelText;
   context.textAlign = 'center';
   context.textBaseline = 'middle';
-  context.fillText(label, middle.x, middle.y + 0.5);
+  context.fillText(label, labelCenter.x, labelCenter.y + 0.5);
   context.restore();
-  return annotationCounterPlacement(annotation, { height: labelHeight, width: labelWidth });
+  return annotationCounterPlacement(annotation);
 }
 
 function drawCounter(

@@ -69,6 +69,8 @@ describe('ImageAnnotationDialog', () => {
     expect(componentSource).toMatch(
       /\.image-annotation-dialog__comment-list \{[^}]*grid-auto-rows: max-content;[^}]*align-content: start;/,
     );
+    expect(componentSource).not.toContain('cursor: ew-resize');
+    expect(componentSource).not.toContain('cursor: ns-resize');
   });
 
   it('keeps the compact title and annotation tools together without instructional copy', async () => {
@@ -224,7 +226,12 @@ describe('ImageAnnotationDialog', () => {
 
     context.fillText.mockClear();
     dispatchPointer(canvas, 'pointermove', 200, 100);
-    expect(context.fillText).toHaveBeenCalledWith('798px', expect.any(Number), expect.any(Number));
+    expect(context.fillText).toHaveBeenCalledWith('798px', 495.5, 183.5);
+
+    await wrapper.get('.image-annotation-dialog__body').trigger('keydown', { key: 'v' });
+    context.fillText.mockClear();
+    dispatchPointer(canvas, 'pointermove', 200, 100);
+    expect(context.fillText).toHaveBeenCalledWith('398px', 429, 296);
   });
 
   it('reports logical dimensions and gaps in Retina mode', async () => {
@@ -286,6 +293,41 @@ describe('ImageAnnotationDialog', () => {
     expect(wrapper.findComponent({ name: 'ElDialog' }).attributes('style')).toBe(dialogStyle);
     await wrapper.get('.image-annotation-dialog__body').trigger('keydown', { key: '-', code: 'Minus', metaKey: true });
     expect(stage.element.style.width).toBe('512px');
+  });
+
+  it('uses native pinch wheel events for canvas zoom without consuming ordinary scrolling', async () => {
+    const wrapper = await mountDialog(320, 180);
+    const workspace = wrapper.get<HTMLElement>('.image-annotation-dialog__workspace').element;
+    const stage = wrapper.get<HTMLElement>('.image-annotation-dialog__stage').element;
+    const initialWidth = stage.style.width;
+    Object.defineProperties(workspace, {
+      scrollLeft: { configurable: true, value: 0, writable: true },
+      scrollTop: { configurable: true, value: 0, writable: true },
+    });
+    Object.defineProperty(stage, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({ left: 20, right: 532, top: 10, bottom: 302, width: 512, height: 292 }),
+    });
+
+    const scroll = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 20 });
+    workspace.dispatchEvent(scroll);
+    expect(scroll.defaultPrevented).toBe(false);
+    expect(stage.style.width).toBe(initialWidth);
+
+    const pinch = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 200,
+      clientY: 120,
+      ctrlKey: true,
+      deltaY: -20,
+    });
+    workspace.dispatchEvent(pinch);
+    await nextTick();
+
+    expect(pinch.defaultPrevented).toBe(true);
+    expect(Number.parseFloat(stage.style.width)).toBeGreaterThan(Number.parseFloat(initialWidth));
+    expect(wrapper.get('[aria-label="Image information"]').text()).not.toContain('100%');
   });
 
   it('fits oversized images inside the canvas viewport without changing zoom', async () => {

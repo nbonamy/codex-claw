@@ -42,9 +42,9 @@ describe('image annotation geometry', () => {
     expect(annotationPixelLength(annotation)).toBe(5);
     expect(annotationPixelLength(annotation, 2)).toBe(2.5);
     expect(annotationAnchor(annotation)).toStrictEqual({ x: 8, y: 1 });
-    expect(annotationCounterPlacement(annotation, { height: 22, width: 46 })).toStrictEqual({
-      anchor: { x: 5, y: 12 },
-      center: { x: 5, y: 35 },
+    expect(annotationCounterPlacement(annotation)).toStrictEqual({
+      anchor: { x: 5, y: 1 },
+      center: { x: 5, y: 24 },
     });
     expect(annotationAnchor({
       ...annotation,
@@ -66,9 +66,9 @@ describe('image annotation geometry', () => {
 
     expect(annotationPixelLength(annotation)).toBe(72);
     expect(annotationAnchor(annotation)).toStrictEqual(annotation.end);
-    expect(annotationCounterPlacement(annotation, { height: 22, width: 46 })).toStrictEqual({
-      anchor: { x: 35, y: 56.5 },
-      center: { x: 58, y: 56.5 },
+    expect(annotationCounterPlacement(annotation)).toStrictEqual({
+      anchor: { x: 12, y: 56.5 },
+      center: { x: -11, y: 56.5 },
     });
   });
 
