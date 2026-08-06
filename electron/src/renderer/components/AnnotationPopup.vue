@@ -1,13 +1,14 @@
 <template>
-  <form
-    ref="popup"
-    class="annotation-popup"
-    :aria-label="label"
-    :aria-description="description"
-    :style="positionStyle"
-    @keydown.esc.prevent="emit('cancel')"
-    @submit.prevent="submit"
-  >
+  <Teleport to="body" :disabled="strategy !== 'fixed'">
+    <form
+      ref="popup"
+      class="annotation-popup"
+      :aria-label="label"
+      :aria-description="description"
+      :style="positionStyle"
+      @keydown.esc.stop.prevent="emit('cancel')"
+      @submit.prevent="submit"
+    >
     <CodexComposerVoiceField
       v-if="voiceVisible && (voiceRecording || voiceTranscribing)"
       class="annotation-popup__voice-field"
@@ -43,7 +44,8 @@
     >
       ↑
     </button>
-  </form>
+    </form>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -69,6 +71,7 @@ const props = withDefaults(defineProps<{
   label?: string;
   placement?: 'above' | 'below';
   placeholder?: string;
+  strategy?: 'absolute' | 'fixed';
   submitLabel?: string;
   width?: number;
 }>(), {
@@ -77,6 +80,7 @@ const props = withDefaults(defineProps<{
   label: 'Annotation comment',
   placement: 'below',
   placeholder: 'enter comment',
+  strategy: 'absolute',
   submitLabel: 'Send annotation',
 });
 
@@ -116,14 +120,18 @@ const positionStyle = computed(() => {
   if (props.placement === 'above') {
     return {
       left: `${left}px`,
+      position: props.strategy,
       top: `${Math.max(12, Math.min(props.anchor.y - 8, window.innerHeight - 12))}px`,
       transform: 'translateY(-100%)',
+      ...(props.strategy === 'fixed' ? { zIndex: 3000 } : {}),
       ...(props.width ? { width: `${props.width}px` } : {}),
     };
   }
   return {
     left: `${left}px`,
+    position: props.strategy,
     top: `${Math.max(12, Math.min(props.anchor.y + props.anchor.height + 8, window.innerHeight - 48))}px`,
+    ...(props.strategy === 'fixed' ? { zIndex: 3000 } : {}),
     ...(props.width ? { width: `${props.width}px` } : {}),
   };
 });
@@ -194,7 +202,7 @@ async function submit(): Promise<void> {
 .annotation-popup {
   --chat-composer-compact-control-size: 24px;
   position: absolute;
-  z-index: 1;
+  z-index: 3;
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -207,7 +215,7 @@ async function submit(): Promise<void> {
   background: var(--color-surface-lowest);
   box-shadow: var(--shadow-lg);
   color: var(--color-text);
-  font-family: var(--font-family-sans);
+  font-family: var(--font-family-ui);
   font-size: var(--font-size-14);
 }
 

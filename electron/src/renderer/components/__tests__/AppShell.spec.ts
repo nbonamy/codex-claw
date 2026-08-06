@@ -13,6 +13,11 @@ import type { Agent, AppCommand, AppSnapshot, BackendConversationRef, BenchLocat
 import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
 import { i18n } from '../../i18n';
 
+vi.mock('../image-annotation', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../image-annotation')>(),
+  centeredImageCropDataUrl: vi.fn().mockResolvedValue('data:image/png;base64,centered-fallback'),
+}));
+
 function pointerEvent(type: string, clientX: number): PointerEvent {
   const event = new MouseEvent(type, {
     bubbles: true,
@@ -2687,6 +2692,26 @@ describe('AppShell', () => {
       onEvent: vi.fn(() => vi.fn()),
     } as Partial<CodexClawApi> as CodexClawApi;
     const wrapper = mountShell();
+
+    listener({
+      type: 'debug-image-annotation',
+      imageDataUrl: 'data:image/png;base64,debug-image',
+      pixelRatio: 2,
+    });
+    await flushPromises();
+
+    expect(wrapper.getComponent({ name: 'ImageAnnotationDialog' }).props('visible')).toBe(true);
+    expect(wrapper.getComponent({ name: 'ImageAnnotationDialog' }).props('imageSrc'))
+      .toBe('data:image/png;base64,debug-image');
+    expect(wrapper.getComponent({ name: 'ImageAnnotationDialog' }).props('initialPixelRatio')).toBe(2);
+    wrapper.getComponent({ name: 'ImageAnnotationDialog' }).vm.$emit('image-error');
+    await flushPromises();
+    expect(wrapper.getComponent({ name: 'ImageAnnotationDialog' }).props('imageSrc'))
+      .toBe('data:image/png;base64,centered-fallback');
+    expect(wrapper.getComponent({ name: 'ImageAnnotationDialog' }).props('initialPixelRatio')).toBe(1);
+    wrapper.getComponent({ name: 'ImageAnnotationDialog' }).vm.$emit('close');
+    await nextTick();
+    expect(wrapper.getComponent({ name: 'ImageAnnotationDialog' }).props('visible')).toBe(false);
 
     listener({ type: 'debug-open-markdown' });
     await nextTick();

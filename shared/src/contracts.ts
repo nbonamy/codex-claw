@@ -1035,6 +1035,7 @@ export type AppCommand =
   | { type: 'cycle-teams' }
   | { type: 'duplicate-active-agent' }
   | { type: 'debug-approval-request' }
+  | { type: 'debug-image-annotation'; imageDataUrl?: string; pixelRatio?: 1 | 2 }
   | { type: 'debug-open-markdown' }
   | { type: 'edit-active-agent' }
   | { type: 'new-agent' }

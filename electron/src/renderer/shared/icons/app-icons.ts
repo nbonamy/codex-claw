@@ -2,6 +2,10 @@ export { default as GitHubIcon } from './GitHubIcon.vue';
 
 export {
   IconAffiliate as AffiliateIcon,
+  IconArrowBackUp as ArrowBackUpIcon,
+  IconArrowUpRight as ArrowUpRightIcon,
+  IconArrowsHorizontal as ArrowsHorizontalIcon,
+  IconArrowsVertical as ArrowsVerticalIcon,
   IconBolt as BoltIcon,
   IconBookmark as SaveToBenchIcon,
   IconBrandOpenai as BrandOpenaiIcon,
@@ -44,6 +48,7 @@ export {
   IconCirclePlus as PlusCircleIcon,
   IconCircle as Circle,
   IconQuote as QuoteIcon,
+  IconRectangle as RectangleIcon,
   IconRefresh as RefreshIcon,
   IconRotateClockwise as RotateClockwiseIcon,
   IconSend as SendIcon,

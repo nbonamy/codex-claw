@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MenuItemConstructorOptions } from 'electron';
 import { buildAppMenuTemplate, installAppMenu, type AppMenuCallbacks } from '../app-menu';
 
@@ -6,8 +6,26 @@ const electronMenuMocks = vi.hoisted(() => ({
   buildFromTemplate: vi.fn((template: MenuItemConstructorOptions[]) => template),
   setApplicationMenu: vi.fn(),
 }));
+const electronClipboardMocks = vi.hoisted(() => {
+  const image = {
+    getScaleFactors: vi.fn((): number[] => [2]),
+    isEmpty: (): boolean => false,
+    toDataURL: vi.fn((): string => 'data:image/png;base64,clipboard-image'),
+  };
+  return {
+    availableFormats: vi.fn((): string[] => []),
+    image,
+    readBuffer: vi.fn((_format: string): Buffer => Buffer.alloc(0)),
+    readImage: vi.fn(() => image),
+  };
+});
 
-vi.mock('electron', () => ({ Menu: electronMenuMocks }));
+vi.mock('electron', () => ({ clipboard: electronClipboardMocks, Menu: electronMenuMocks }));
+
+beforeEach(() => {
+  electronClipboardMocks.availableFormats.mockReturnValue([]);
+  electronClipboardMocks.image.getScaleFactors.mockReturnValue([2]);
+});
 
 const callbacks = (): AppMenuCallbacks => ({
   reload: vi.fn(),
@@ -252,6 +270,7 @@ describe('app menu', () => {
       'Approval Request',
       'Execution Plan',
       'Plan Review',
+      'Image Annotation',
     ]);
     expect(menuItem(debugMenu, 'View', 'Next Team')?.accelerator).toBe('Command+`');
     expect(menuItem(debugMenu, 'View', 'Next Agent')?.accelerator).toBe('Control+Tab');
@@ -267,6 +286,7 @@ describe('app menu', () => {
     clickItem(debugMenu, 'Debug', 'Approval Request');
     clickItem(debugMenu, 'Debug', 'Execution Plan');
     clickItem(debugMenu, 'Debug', 'Plan Review');
+    clickItem(debugMenu, 'Debug', 'Image Annotation');
 
     expect(debugCallbacks.reload).toHaveBeenCalledOnce();
     expect(debugCallbacks.toggleDeveloperTools).toHaveBeenCalledOnce();
@@ -277,11 +297,61 @@ describe('app menu', () => {
     });
     expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(2, { type: 'debug-open-markdown' });
     expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(3, { type: 'debug-approval-request' });
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(4, {
+      type: 'debug-image-annotation',
+      imageDataUrl: 'data:image/png;base64,clipboard-image',
+      pixelRatio: 2,
+    });
+    expect(electronClipboardMocks.readImage).toHaveBeenCalledOnce();
+    expect(electronClipboardMocks.image.toDataURL).toHaveBeenCalledWith({ scaleFactor: 2 });
     expect(debugCallbacks.toggleDebugExecutionPlan).toHaveBeenCalledOnce();
     expect(debugCallbacks.injectDebugPlanReview).toHaveBeenCalledOnce();
     expect(JSON.stringify(releaseMenu)).not.toMatch(/reload|forceReload|developer tools|toggleDevTools/i);
   });
+
+  it('omits image data when the native clipboard has no image', () => {
+    electronClipboardMocks.readImage.mockReturnValueOnce({
+      getScaleFactors: vi.fn(() => [1]),
+      isEmpty: () => true,
+      toDataURL: vi.fn(() => ''),
+    });
+    const nextCallbacks = callbacks();
+    const menu = buildAppMenuTemplate(nextCallbacks, { debugMode: true }, 'darwin');
+
+    clickItem(menu, 'Debug', 'Image Annotation');
+
+    expect(nextCallbacks.sendAppCommand).toHaveBeenCalledWith({ type: 'debug-image-annotation' });
+  });
+
+  it('detects Retina screenshots from raw PNG density when Electron reports only a 1x image', () => {
+    const retinaPng = pngWithDensity(5_669, 5_669);
+    electronClipboardMocks.availableFormats.mockReturnValueOnce(['image/png']);
+    electronClipboardMocks.readBuffer.mockImplementationOnce(() => Buffer.alloc(0));
+    electronClipboardMocks.readBuffer.mockImplementationOnce(() => retinaPng);
+    electronClipboardMocks.image.getScaleFactors.mockReturnValueOnce([1]);
+    const nextCallbacks = callbacks();
+    const menu = buildAppMenuTemplate(nextCallbacks, { debugMode: true }, 'darwin');
+
+    clickItem(menu, 'Debug', 'Image Annotation');
+
+    expect(nextCallbacks.sendAppCommand).toHaveBeenCalledWith({
+      type: 'debug-image-annotation',
+      imageDataUrl: `data:image/png;base64,${retinaPng.toString('base64')}`,
+      pixelRatio: 2,
+    });
+  });
 });
+
+function pngWithDensity(xPixelsPerMeter: number, yPixelsPerMeter: number): Buffer {
+  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const chunk = Buffer.alloc(21);
+  chunk.writeUInt32BE(9, 0);
+  chunk.write('pHYs', 4, 'ascii');
+  chunk.writeUInt32BE(xPixelsPerMeter, 8);
+  chunk.writeUInt32BE(yPixelsPerMeter, 12);
+  chunk[16] = 1;
+  return Buffer.concat([signature, chunk]);
+}
 
 function submenu(template: MenuItemConstructorOptions[], label: string): MenuItemConstructorOptions[] {
   const item = template.find((entry) => entry.label === label);

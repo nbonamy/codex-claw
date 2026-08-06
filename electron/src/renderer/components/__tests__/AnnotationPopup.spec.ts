@@ -114,6 +114,23 @@ describe('AnnotationPopup', () => {
     expect(style).toContain('transform: translateY(-100%)');
   });
 
+  it('can escape host clipping with viewport positioning', () => {
+    const wrapper = mount(AnnotationPopup, {
+      attachTo: document.body,
+      props: {
+        anchor: { x: 640, y: 420, width: 0, height: 0 },
+        label: 'Fixed annotation',
+        strategy: 'fixed',
+      },
+    });
+
+    const popup = document.body.querySelector<HTMLFormElement>('[aria-label="Fixed annotation"]');
+    expect(popup?.style.position).toBe('fixed');
+    expect(popup?.style.left).toBe('640px');
+    expect(popup?.style.zIndex).toBe('3000');
+    wrapper.unmount();
+  });
+
   it('records voice with the SDK controls and inserts the transcript at the saved selection', async () => {
     const wrapper = mount(AnnotationPopup, {
       props: { anchor: { x: 0, y: 0, width: 0, height: 0 } },

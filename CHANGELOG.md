@@ -11,6 +11,7 @@ All notable Codex Claw changes are recorded here.
 - Agent menus can now fork an existing Codex conversation into a new agent.
 - User and assistant message actions can fork a Codex conversation from that
   point into a new agent.
+- Image annotation.
 
 ### Improvements and fixes
 

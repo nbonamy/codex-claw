@@ -301,12 +301,23 @@
       :visible="whatsNewVisible"
       @close="whatsNewVisible = false"
     />
+    <ImageAnnotationDialog
+      :visible="debugImageAnnotationVisible"
+      :image-src="debugAnnotationImageSource"
+      :fallback-image-src="debugAnnotationScreenshotUrl"
+      :initial-pixel-ratio="debugAnnotationPixelRatio"
+      file-name="codex-claw-annotated.png"
+      @close="debugImageAnnotationVisible = false"
+      @image-error="useDebugAnnotationFallback"
+      @send="finishDebugImageAnnotation"
+    />
   </main>
 </template>
 
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import debugAnnotationScreenshotUrl from '../../../../docs/codex.png?url';
 import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type PairedDevice, type PromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
@@ -318,6 +329,8 @@ import AgentHeader from './AgentHeader.vue';
 import AgentSidebar from './AgentSidebar.vue';
 import CockpitView from './CockpitView.vue';
 import ConversationPane from './ConversationPane.vue';
+import ImageAnnotationDialog, { type ImageAnnotationSendPayload } from './ImageAnnotationDialog.vue';
+import { centeredImageCropDataUrl } from './image-annotation';
 import LoopsView from './LoopsView.vue';
 import TeamDialog from './TeamDialog.vue';
 import TeamRail from './TeamRail.vue';
@@ -340,6 +353,7 @@ import {
   type CodexQueuedPromptData as QueuedChatPrompt,
   type SendCodexMessageOptions,
 } from 'codex-app-sdk/vue';
+
 import type { PlanReviewComment, SidePanelGitDiffState, SidePanelMarkdownState } from './side-panel';
 import {
   isRightWorkspaceFileTab,
@@ -641,6 +655,9 @@ const benchAssignmentDialogVisible = ref(false);
 const teamDialogVisible = ref(false);
 const teamDialogMode = ref<'create' | 'edit'>('create');
 const whatsNewVisible = ref(false);
+const debugImageAnnotationVisible = ref(false);
+const debugAnnotationPixelRatio = ref<1 | 2>(1);
+const debugAnnotationImageSource = ref(debugAnnotationScreenshotUrl);
 const editingTeamId = ref<string | null>(null);
 let filePreviewRequestId = 0;
 let markdownPreviewId = 0;
@@ -949,6 +966,7 @@ const isModalDialogVisible = computed(() => (
   || benchAssignmentDialogVisible.value
   || teamDialogVisible.value
   || whatsNewVisible.value
+  || debugImageAnnotationVisible.value
 ));
 const showAgentSidebar = computed(() => isAgentWorkspaceVisible.value && !agentSidebarCollapsed.value && !isAgentEmpty.value);
 const showLoginLanding = computed(() => (
@@ -1397,6 +1415,31 @@ function openSettings(): void {
 
 function openWhatsNew(): void {
   whatsNewVisible.value = true;
+}
+
+function finishDebugImageAnnotation(_payload: ImageAnnotationSendPayload): void {
+  debugImageAnnotationVisible.value = false;
+}
+
+async function openDebugImageAnnotation(imageDataUrl?: string, pixelRatio: 1 | 2 = 1): Promise<void> {
+  if (imageDataUrl) {
+    debugAnnotationImageSource.value = imageDataUrl;
+    debugAnnotationPixelRatio.value = pixelRatio;
+    debugImageAnnotationVisible.value = true;
+    return;
+  }
+
+  await useDebugAnnotationFallback();
+  debugImageAnnotationVisible.value = true;
+}
+
+async function useDebugAnnotationFallback(): Promise<void> {
+  debugAnnotationPixelRatio.value = 1;
+  try {
+    debugAnnotationImageSource.value = await centeredImageCropDataUrl(debugAnnotationScreenshotUrl);
+  } catch {
+    debugAnnotationImageSource.value = debugAnnotationScreenshotUrl;
+  }
 }
 
 async function createLoop(input: CreateLoopInput, location?: LoopLocation): Promise<AppSnapshot | void> {
@@ -1898,6 +1941,12 @@ function handleAppCommand(command: AppCommand): void {
         canDeny: true,
       },
     };
+    return;
+  }
+
+  if (command.type === 'debug-image-annotation') {
+    if (isModalDialogVisible.value) return;
+    void openDebugImageAnnotation(command.imageDataUrl, command.pixelRatio);
     return;
   }
 

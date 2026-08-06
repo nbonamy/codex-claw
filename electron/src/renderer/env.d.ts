@@ -4,3 +4,8 @@ declare module '*.vue' {
   const component: DefineComponent<object, object, unknown>;
   export default component;
 }
+
+declare module '*?url' {
+  const url: string;
+  export default url;
+}

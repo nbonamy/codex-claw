@@ -84,6 +84,25 @@ implemented:
   source agent;
 - opted-in Fork actions on user and assistant messages, routed by absolute
   host message index into the same new-agent workflow;
+- a standalone image-annotation dialog that centers the source image within a
+  larger virtual drawing canvas so marks can extend beyond the image, accumulates
+  numbered comments through the shared annotation popup portaled above canvas
+  and dialog clipping, and emits a rasterized PNG plus structured annotation
+  metadata. Its compact header keeps the title and tools left, places live
+  indicators on the right, and omits a redundant close icon. Initial framing
+  fits oversized source images to the canvas viewport without upscaling small
+  images or changing the user-visible zoom, and edge drags scroll the
+  drawing workspace, and a live header inspector shows cursor RGB values, image
+  size, and zoom with Tab-to-copy color support. The dialog stays fixed at 80%
+  of viewport width and 80% of viewport height while zoom remains contained in
+  its scrolling canvas. A separate `@2x` toolbar toggle reports image dimensions
+  and measured gaps in logical Retina pixels; clipboard images enable it
+  automatically from a 2x native representation or macOS screenshot PNG
+  density metadata. Escape
+  cancels the active mark before it can close the dialog. The development
+  fixture is available from Debug → Image Annotation
+  and uses a clipboard image when present, otherwise a centered crop of the
+  bundled shell screenshot;
 - active agent header;
 - central conversation and composer;
 - optimistic agent switching that reveals the cached conversation immediately;

@@ -1,6 +1,7 @@
-import { Menu, type BrowserWindow, type MenuItemConstructorOptions } from 'electron';
+import { clipboard, Menu, type BrowserWindow, type MenuItemConstructorOptions } from 'electron';
 import type { AppCommand, DesktopUpdateStatus } from '@codex-claw/shared/contracts';
 import { cycleTeamsAccelerator } from './app-shortcuts';
+import { detectPngRetinaPixelRatio, readClipboardPngBuffer } from './clipboard-image';
 import { sendAppCommand } from './ipc-events';
 
 export type AppMenuOptions = {
@@ -97,6 +98,27 @@ function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions
         label: 'Plan Review',
         enabled: Boolean(callbacks.injectDebugPlanReview),
         click: () => callbacks.injectDebugPlanReview?.(),
+      },
+      {
+        label: 'Image Annotation',
+        click: () => {
+          const image = clipboard.readImage();
+          if (image.isEmpty()) {
+            callbacks.sendAppCommand({ type: 'debug-image-annotation' });
+            return;
+          }
+
+          const pngBuffer = readClipboardPngBuffer(clipboard);
+          const pixelRatio = detectPngRetinaPixelRatio(pngBuffer ?? Buffer.alloc(0))
+            ?? (image.getScaleFactors().some((scaleFactor) => scaleFactor >= 2) ? 2 : 1);
+          callbacks.sendAppCommand({
+            type: 'debug-image-annotation',
+            imageDataUrl: pngBuffer
+              ? `data:image/png;base64,${pngBuffer.toString('base64')}`
+              : image.toDataURL({ scaleFactor: pixelRatio }),
+            ...(pixelRatio === 2 ? { pixelRatio } : {}),
+          });
+        },
       },
     ],
   };
