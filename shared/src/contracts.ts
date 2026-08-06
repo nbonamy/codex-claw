@@ -462,11 +462,20 @@ export type AppPluginStatus = {
   chromeEnabled: boolean;
 };
 
+export type AppshotHotkey = 'command' | 'option' | 'shift' | 'none';
+
+export type AppshotSettings = {
+  hotkey: AppshotHotkey;
+  destination: 'active-agent';
+  playSound: boolean;
+};
+
 export type AppGeneralSettings = {
   preventSleepWhenAgentsRun: boolean;
   preventSleepWhenRemoteAccessEnabled: boolean;
   codexBinaryPath: string;
   agentListCompact: boolean;
+  appshots: AppshotSettings;
   /** Optional for backwards compatibility with pre-plugin state files. */
   plugins?: AppPluginSettings;
 };
@@ -736,6 +745,10 @@ export type BackendPromptOptions =
 export type SystemPermissionsStatus = {
   platform: string;
   accessibility: {
+    required: boolean;
+    trusted: boolean;
+  };
+  screenRecording: {
     required: boolean;
     trusted: boolean;
   };
@@ -1029,6 +1042,14 @@ export type MainToRendererEvent = {
 };
 
 export type AppCommand =
+  | {
+    type: 'attach-appshot';
+    accessibilityText?: string;
+    appName?: string;
+    imageDataUrl: string;
+    windowTitle?: string;
+  }
+  | { type: 'appshot-failed'; message: string }
   | { type: 'close-active-agent' }
   | { type: 'close-active-team' }
   | { type: 'cycle-agents'; direction: -1 | 1 }
@@ -1256,6 +1277,7 @@ export type CodexClawApi = {
   setDaemonEnabled(enabled: boolean): Promise<ClawdDaemonStatus>;
   getSystemPermissions(): Promise<SystemPermissionsStatus>;
   openAccessibilitySettings(): Promise<SystemPermissionsStatus>;
+  openScreenRecordingSettings(): Promise<SystemPermissionsStatus>;
   launchChatGptApp(): Promise<void>;
   quit(): Promise<void>;
   restartApp(): Promise<void>;

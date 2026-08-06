@@ -211,6 +211,17 @@ describe('runtime config', () => {
     expect(prepareScript).toContain('process.argv.includes(\'--release\')');
   });
 
+  it('packages the externalized native automation dependency from the workspace root', () => {
+    const repositoryRoot = path.resolve(__dirname, '../../../..');
+    const forgeConfig = readFileSync(path.join(repositoryRoot, 'electron/forge.config.ts'), 'utf8');
+    const mainViteConfig = readFileSync(path.join(repositoryRoot, 'electron/vite.main.config.ts'), 'utf8');
+
+    expect(mainViteConfig).toContain("external: ['autolib']");
+    expect(forgeConfig).toContain("import { copyPackagedNativeDependencies }");
+    expect(forgeConfig).toContain('afterPrune: [');
+    expect(forgeConfig).toContain('copyPackagedNativeDependencies(buildPath)');
+  });
+
   it('pins and verifies the bundled Codex app-server executable', () => {
     const repositoryRoot = path.resolve(__dirname, '../../../..');
     const releaseConfig = JSON.parse(

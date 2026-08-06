@@ -229,6 +229,12 @@ that truly require Electron APIs. The main-window adapter persists normal
 window bounds and maximized state locally as they change, and restores them
 only when the bounds still intersect a connected display.
 
+Appshots are one such desktop effect. A passive native key monitor recognizes
+left-and-right modifier chords, while the bundled Computer Use helper captures
+the frontmost macOS window and reports its Screen Recording trust. Electron
+routes permission status through the app-owned backend protocol and delivers
+the resulting PNG to the active renderer composer as a normal SDK attachment.
+
 Modules:
 
 - `ClawBackendProcessClient`: starts the local `clawd` command, frames

@@ -172,7 +172,10 @@ implemented:
   Computer Use and Chrome disabled by default, persists explicit capability
   choices, and directs plugin activation through ChatGPT; Connections keeps
   remote Claw hosts separate from official Codex device pairing, including
-  pairing progress and paired-device revocation. Settings is also available
+  pairing progress and paired-device revocation. Appshots configures a
+  left-and-right modifier chord, active-agent destination, and capture sound;
+  General → System permissions reports both Accessibility and the Computer Use
+  helper's Screen Recording permission. Settings is also available
   from the native macOS app menu and lower-left account menu with `Command+,`.
 
 Avoid layout jumps during streaming, loading, plan updates, approval prompts,

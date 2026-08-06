@@ -291,10 +291,38 @@ describe('SettingsGeneralPanel', () => {
     expect(wrapper.text()).toContain('Granted');
   });
 
+  it('shows Screen Recording status and grants it through the helper', async () => {
+    const getSystemPermissions = vi.fn().mockResolvedValue(permissionStatus(
+      { required: true, trusted: true },
+      { required: true, trusted: false },
+    ));
+    const openScreenRecordingSettings = vi.fn().mockResolvedValue(permissionStatus(
+      { required: true, trusted: true },
+      { required: true, trusted: true },
+    ));
+    const wrapper = mountPanel({ getSystemPermissions, openScreenRecordingSettings });
+
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Screen Recording');
+    expect(wrapper.text()).toContain('Required for Appshots to capture the frontmost window.');
+
+    const grantButtons = wrapper.findAll('button').filter((button) => button.text() === 'Grant');
+    await grantButtons.at(-1)?.trigger('click');
+    await flushPromises();
+
+    expect(openScreenRecordingSettings).toHaveBeenCalledOnce();
+    expect(wrapper.text()).toContain('Granted');
+  });
+
   it('shows non-macOS permission status without an action', async () => {
     const getSystemPermissions = vi.fn().mockResolvedValue({
       platform: 'linux',
       accessibility: {
+        required: false,
+        trusted: true,
+      },
+      screenRecording: {
         required: false,
         trusted: true,
       },
@@ -321,10 +349,14 @@ function mountPanel(props: Record<string, unknown>) {
   });
 }
 
-function permissionStatus(accessibility: SystemPermissionsStatus['accessibility']): SystemPermissionsStatus {
+function permissionStatus(
+  accessibility: SystemPermissionsStatus['accessibility'],
+  screenRecording: SystemPermissionsStatus['screenRecording'] = { required: true, trusted: true },
+): SystemPermissionsStatus {
   return {
     platform: 'darwin',
     accessibility,
+    screenRecording,
   };
 }
 

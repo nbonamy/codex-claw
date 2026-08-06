@@ -15,6 +15,10 @@
         <SettingsIcon aria-hidden="true" />
         <span>General</span>
       </el-menu-item>
+      <el-menu-item index="appshots">
+        <PhotoIcon aria-hidden="true" />
+        <span>Appshots</span>
+      </el-menu-item>
       <el-menu-item index="appearance">
         <PaletteIcon aria-hidden="true" />
         <span>Appearance</span>
@@ -37,7 +41,7 @@
 
 <script setup lang="ts">
 import type { SettingsTab } from './settings-tabs';
-import { AffiliateIcon, BrandOpenaiIcon, PaletteIcon, SettingsIcon, TerminalIcon } from '../shared/icons/app-icons';
+import { AffiliateIcon, BrandOpenaiIcon, PaletteIcon, PhotoIcon, SettingsIcon, TerminalIcon } from '../shared/icons/app-icons';
 
 defineProps<{
   activeTab: SettingsTab;
@@ -48,7 +52,7 @@ const emit = defineEmits<{
 }>();
 
 function selectTab(tab: string): void {
-  if (tab === 'chatgpt' || tab === 'general' || tab === 'appearance' || tab === 'integrations' || tab === 'plugins' || tab === 'connections') {
+  if (tab === 'chatgpt' || tab === 'general' || tab === 'appshots' || tab === 'appearance' || tab === 'integrations' || tab === 'plugins' || tab === 'connections') {
     emit('select', tab);
   }
 }

@@ -48,6 +48,7 @@ export type ClawBackendServerOptions = {
 export type SystemPermissionsPort = {
   getStatus(): Promise<SystemPermissionsStatus>;
   openAccessibilitySettings(): Promise<SystemPermissionsStatus>;
+  openScreenRecordingSettings(): Promise<SystemPermissionsStatus>;
 };
 
 type AgentLocation =
@@ -266,6 +267,8 @@ export class ClawBackendServer {
         return createClawRpcResult(message.id, await this.systemPermissions.getStatus());
       case backendMethods.systemPermissionsAccessibilityOpen:
         return createClawRpcResult(message.id, await this.systemPermissions.openAccessibilitySettings());
+      case backendMethods.systemPermissionsScreenRecordingOpen:
+        return createClawRpcResult(message.id, await this.systemPermissions.openScreenRecordingSettings());
       case backendMethods.devicePairingStatusGet:
       case backendMethods.devicePairingEnable:
       case backendMethods.devicePairingDisable:
@@ -2984,6 +2987,9 @@ function createUnsupportedSystemPermissionsPort(): SystemPermissionsPort {
     async openAccessibilitySettings() {
       return unsupportedSystemPermissionsStatus();
     },
+    async openScreenRecordingSettings() {
+      return unsupportedSystemPermissionsStatus();
+    },
   };
 }
 
@@ -2991,6 +2997,10 @@ function unsupportedSystemPermissionsStatus(): SystemPermissionsStatus {
   return {
     platform: 'unsupported',
     accessibility: {
+      required: false,
+      trusted: true,
+    },
+    screenRecording: {
       required: false,
       trusted: true,
     },

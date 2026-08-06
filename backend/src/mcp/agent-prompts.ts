@@ -61,7 +61,7 @@ export function codexClawDeveloperInstructions(agent: Agent, settings: AppPlugin
   ];
   if (settings.computerUseEnabled) {
     instructions.push(
-      'For macOS GUI automation in this Codex Claw session, use only the codex_claw MCP Computer Use tools: computer-use-status, computer-use-request-accessibility, computer-use-list-apps, computer-use-find-apps, computer-use-launch-app, computer-use-focus-app, computer-use-get-app-state, computer-use-click, computer-use-type-text, computer-use-set-value, and computer-use-scroll.',
+      'For macOS GUI automation in this Codex Claw session, use only the codex_claw MCP Computer Use tools: computer-use-status, computer-use-request-accessibility, computer-use-request-screen-recording, computer-use-list-apps, computer-use-find-apps, computer-use-launch-app, computer-use-focus-app, computer-use-get-app-state, computer-use-screenshot, computer-use-click, computer-use-type-text, computer-use-set-value, and computer-use-scroll.',
       'Do not load or use the built-in computer-use skill or sky.* methods: those control Codex-provided Computer Use instead of the Computer Use helper bundled with Codex Claw. Start with computer-use-status; request permission if needed; refresh app state before acting on an indexed element.',
     );
   } else {

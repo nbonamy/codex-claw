@@ -15,6 +15,10 @@ describe('system permissions', () => {
         required: true,
         trusted: true,
       },
+      screenRecording: {
+        required: false,
+        trusted: true,
+      },
     });
     expect(isTrustedAccessibilityClient).toHaveBeenCalledWith(false);
   });
@@ -29,6 +33,10 @@ describe('system permissions', () => {
     })).toStrictEqual({
       platform: 'linux',
       accessibility: {
+        required: false,
+        trusted: true,
+      },
+      screenRecording: {
         required: false,
         trusted: true,
       },
@@ -54,6 +62,10 @@ describe('system permissions', () => {
         required: true,
         trusted: false,
       },
+      screenRecording: {
+        required: false,
+        trusted: true,
+      },
     });
     expect(isTrustedAccessibilityClient).toHaveBeenNthCalledWith(1, true);
     expect(isTrustedAccessibilityClient).toHaveBeenNthCalledWith(2, false);
@@ -75,6 +87,10 @@ describe('system permissions', () => {
       platform: 'darwin',
       accessibility: {
         required: true,
+        trusted: true,
+      },
+      screenRecording: {
+        required: false,
         trusted: true,
       },
     });

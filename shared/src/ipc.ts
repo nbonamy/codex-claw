@@ -81,6 +81,7 @@ export const ipcChannels = {
   setDaemonEnabled: 'daemon:enabled:set',
   getSystemPermissions: 'system-permissions:get',
   openAccessibilitySettings: 'system-permissions:accessibility:open',
+  openScreenRecordingSettings: 'system-permissions:screen-recording:open',
   launchChatGptApp: 'chatgpt:app:launch',
   quit: 'app:quit',
   restartApp: 'app:restart',

@@ -86,6 +86,7 @@ const api: CodexClawApi = {
   setDaemonEnabled: (enabled: boolean) => ipc.invoke(ipcChannels.setDaemonEnabled, enabled),
   getSystemPermissions: () => ipc.invoke(ipcChannels.getSystemPermissions),
   openAccessibilitySettings: () => ipc.invoke(ipcChannels.openAccessibilitySettings),
+  openScreenRecordingSettings: () => ipc.invoke(ipcChannels.openScreenRecordingSettings),
   launchChatGptApp: () => ipc.invoke(ipcChannels.launchChatGptApp),
   quit: () => ipc.invoke(ipcChannels.quit),
   restartApp: () => ipc.invoke(ipcChannels.restartApp),

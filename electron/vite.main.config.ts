@@ -16,5 +16,8 @@ export default defineConfig({
   build: {
     sourcemap: true,
     minify: false,
+    rollupOptions: {
+      external: ['autolib'],
+    },
   },
 });

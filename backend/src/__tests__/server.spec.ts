@@ -234,6 +234,10 @@ describe('ClawBackendServer', () => {
         required: true,
         trusted: false,
       },
+      screenRecording: {
+        required: true,
+        trusted: false,
+      },
     };
     const openedStatus: SystemPermissionsStatus = {
       platform: 'darwin',
@@ -241,10 +245,19 @@ describe('ClawBackendServer', () => {
         required: true,
         trusted: true,
       },
+      screenRecording: {
+        required: true,
+        trusted: false,
+      },
+    };
+    const screenRecordingStatus: SystemPermissionsStatus = {
+      ...openedStatus,
+      screenRecording: { required: true, trusted: true },
     };
     const systemPermissions = {
       getStatus: vi.fn().mockResolvedValue(status),
       openAccessibilitySettings: vi.fn().mockResolvedValue(openedStatus),
+      openScreenRecordingSettings: vi.fn().mockResolvedValue(screenRecordingStatus),
     };
     const server = new ClawBackendServer({
       version: 'test-version',
@@ -262,8 +275,14 @@ describe('ClawBackendServer', () => {
       id: 'open-permissions',
       result: openedStatus,
     });
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'open-screen-recording', method: 'system/permissions/screenRecording/open' })).resolves.toStrictEqual({
+      jsonrpc: '2.0',
+      id: 'open-screen-recording',
+      result: screenRecordingStatus,
+    });
     expect(systemPermissions.getStatus).toHaveBeenCalledOnce();
     expect(systemPermissions.openAccessibilitySettings).toHaveBeenCalledOnce();
+    expect(systemPermissions.openScreenRecordingSettings).toHaveBeenCalledOnce();
   });
 
   it('returns a non-desktop system permission status when no host port is configured', async () => {
@@ -275,6 +294,10 @@ describe('ClawBackendServer', () => {
       result: {
         platform: 'unsupported',
         accessibility: {
+          required: false,
+          trusted: true,
+        },
+        screenRecording: {
           required: false,
           trusted: true,
         },
@@ -5079,6 +5102,11 @@ function createTestSnapshot(): AppSnapshot {
       preventSleepWhenRemoteAccessEnabled: true,
       codexBinaryPath: '',
       agentListCompact: false,
+      appshots: {
+        hotkey: 'command',
+        destination: 'active-agent',
+        playSound: true,
+      },
       plugins: {
         computerUseEnabled: false,
         chromeEnabled: false,

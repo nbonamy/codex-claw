@@ -1,6 +1,27 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createClientRequestHandlers } from '../client-request-handlers';
 
+const computerUseMocks = vi.hoisted(() => ({
+  getStatus: vi.fn().mockResolvedValue({
+    accessibilityTrusted: true,
+    screenCaptureTrusted: false,
+    available: true,
+    platform: 'darwin',
+  }),
+  requestScreenCapture: vi.fn().mockResolvedValue({
+    accessibilityTrusted: true,
+    screenCaptureTrusted: true,
+    available: true,
+    platform: 'darwin',
+  }),
+}));
+
+vi.mock('../computer-use-tools', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../computer-use-tools')>(),
+  getComputerUseStatus: computerUseMocks.getStatus,
+  requestComputerUseScreenCapture: computerUseMocks.requestScreenCapture,
+}));
+
 const computerUseOptions = () => ({
   appPath: '/Applications/Codex Claw.app/Contents/Resources/app.asar',
   isPackaged: true,
@@ -64,6 +85,10 @@ describe('createClientRequestHandlers', () => {
         required: true,
         trusted: false,
       },
+      screenRecording: {
+        required: false,
+        trusted: true,
+      },
     };
     const getSystemPermissionsStatus = vi.fn().mockReturnValue(status);
     const handlers = createClientRequestHandlers({
@@ -73,7 +98,10 @@ describe('createClientRequestHandlers', () => {
       computerUseOptions,
     });
 
-    expect(await handlers['client/system/permissions/get']?.(undefined)).toStrictEqual(status);
+    expect(await handlers['client/system/permissions/get']?.(undefined)).toStrictEqual({
+      ...status,
+      screenRecording: { required: true, trusted: false },
+    });
     expect(getSystemPermissionsStatus).toHaveBeenCalledOnce();
   });
 
@@ -82,6 +110,10 @@ describe('createClientRequestHandlers', () => {
       platform: 'darwin',
       accessibility: {
         required: true,
+        trusted: true,
+      },
+      screenRecording: {
+        required: false,
         trusted: true,
       },
     };
@@ -93,7 +125,30 @@ describe('createClientRequestHandlers', () => {
       computerUseOptions,
     });
 
-    await expect(handlers['client/system/permissions/accessibility/open']?.(undefined)).resolves.toStrictEqual(status);
+    await expect(handlers['client/system/permissions/accessibility/open']?.(undefined)).resolves.toStrictEqual({
+      ...status,
+      screenRecording: { required: true, trusted: false },
+    });
     expect(openAccessibilitySettings).toHaveBeenCalledOnce();
+  });
+
+  it('requests Screen Recording through the Computer Use helper', async () => {
+    const status = {
+      platform: 'darwin',
+      accessibility: { required: true, trusted: true },
+      screenRecording: { required: false, trusted: true },
+    };
+    const handlers = createClientRequestHandlers({
+      openExternal: vi.fn(),
+      getSystemPermissionsStatus: vi.fn(() => status),
+      openAccessibilitySettings: vi.fn(),
+      computerUseOptions,
+    });
+
+    await expect(handlers['client/system/permissions/screenRecording/open']?.(undefined)).resolves.toStrictEqual({
+      ...status,
+      screenRecording: { required: true, trusted: true },
+    });
+    expect(computerUseMocks.requestScreenCapture).toHaveBeenCalledOnce();
   });
 });

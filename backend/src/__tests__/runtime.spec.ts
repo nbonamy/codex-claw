@@ -164,6 +164,7 @@ type ServerOptions = {
   systemPermissions: {
     getStatus(): Promise<unknown>;
     openAccessibilitySettings(): Promise<unknown>;
+    openScreenRecordingSettings(): Promise<unknown>;
   };
 };
 
@@ -261,8 +262,10 @@ describe('clawd runtime', () => {
     expect(mocks.mcpSendMessage).toHaveBeenCalledWith('agent-dina', 'agent-jesse', 'hello');
     await server.systemPermissions.getStatus();
     await server.systemPermissions.openAccessibilitySettings();
+    await server.systemPermissions.openScreenRecordingSettings();
     expect(requestClient).toHaveBeenCalledWith(backendMethods.clientSystemPermissionsGet);
     expect(requestClient).toHaveBeenCalledWith(backendMethods.clientSystemPermissionsAccessibilityOpen);
+    expect(requestClient).toHaveBeenCalledWith(backendMethods.clientSystemPermissionsScreenRecordingOpen);
 
     const workIntegrations = mocks.workIntegrationOptions[0] as WorkIntegrationOptions;
     expect(workIntegrations.getSnapshot()).toBe(mocks.snapshot);

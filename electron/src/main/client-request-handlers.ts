@@ -1,7 +1,7 @@
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { app, shell } from 'electron';
 import type { SystemPermissionsStatus } from '@codex-claw/shared/contracts';
-import { executeComputerUseCommand, getComputerUseStatus, isComputerUseCommand, requestComputerUseAccessibility, stopComputerUseHelper, type ComputerUseOptions } from './computer-use-tools';
+import { executeComputerUseCommand, getComputerUseStatus, isComputerUseCommand, requestComputerUseAccessibility, requestComputerUseScreenCapture, stopComputerUseHelper, type ComputerUseOptions } from './computer-use-tools';
 import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-permissions';
 
 export type ClientRequestHandler = (params: unknown) => unknown | Promise<unknown>;
@@ -48,8 +48,18 @@ export function createClientRequestHandlers(options: ClientRequestHandlersOption
       const input = requireRecord(params);
       return options.browserOpen(requireString(input.agentId, 'agentId'), requireString(input.browserId, 'browserId'), requireString(input.url, 'url'));
     },
-    [backendMethods.clientSystemPermissionsGet]: () => options.getSystemPermissionsStatus(),
-    [backendMethods.clientSystemPermissionsAccessibilityOpen]: () => options.openAccessibilitySettings(),
+    [backendMethods.clientSystemPermissionsGet]: async () => mergeComputerUsePermissions(
+      options.getSystemPermissionsStatus(),
+      await getComputerUseStatus(options.computerUseOptions()),
+    ),
+    [backendMethods.clientSystemPermissionsAccessibilityOpen]: async () => mergeComputerUsePermissions(
+      await options.openAccessibilitySettings(),
+      await getComputerUseStatus(options.computerUseOptions()),
+    ),
+    [backendMethods.clientSystemPermissionsScreenRecordingOpen]: async () => mergeComputerUsePermissions(
+      options.getSystemPermissionsStatus(),
+      await requestComputerUseScreenCapture(options.computerUseOptions()),
+    ),
     [backendMethods.clientComputerUseStatusGet]: () => getComputerUseStatus(options.computerUseOptions()),
     [backendMethods.clientComputerUseRequestAccessibility]: () => requestComputerUseAccessibility(options.computerUseOptions()),
     [backendMethods.clientComputerUseStop]: () => {
@@ -66,6 +76,19 @@ export function createClientRequestHandlers(options: ClientRequestHandlersOption
         command: input.command,
         options: options.computerUseOptions(),
       });
+    },
+  };
+}
+
+function mergeComputerUsePermissions(
+  permissions: SystemPermissionsStatus,
+  computerUse: Awaited<ReturnType<typeof getComputerUseStatus>>,
+): SystemPermissionsStatus {
+  return {
+    ...permissions,
+    screenRecording: {
+      required: computerUse.platform === 'darwin',
+      trusted: computerUse.platform !== 'darwin' || computerUse.screenCaptureTrusted,
     },
   };
 }

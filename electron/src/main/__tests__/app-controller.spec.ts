@@ -589,6 +589,10 @@ describe('AppController', () => {
         required: true,
         trusted: false,
       },
+      screenRecording: {
+        required: true,
+        trusted: false,
+      },
     };
     const openedStatus: SystemPermissionsStatus = {
       platform: 'darwin',
@@ -596,18 +600,28 @@ describe('AppController', () => {
         required: true,
         trusted: true,
       },
+      screenRecording: {
+        required: true,
+        trusted: false,
+      },
     };
     const request = vi.fn()
       .mockResolvedValueOnce(permissionStatus)
-      .mockResolvedValueOnce(openedStatus);
+      .mockResolvedValueOnce(openedStatus)
+      .mockResolvedValueOnce({ ...openedStatus, screenRecording: { required: true, trusted: true } });
     const controller = new AppController(snapshot, createBackendClient({ request }));
 
     await controller.initialize();
 
     await expect(getSystemPermissions(controller)).resolves.toStrictEqual(permissionStatus);
     await expect(openAccessibilitySettings(controller)).resolves.toStrictEqual(openedStatus);
+    await expect(openScreenRecordingSettings(controller)).resolves.toStrictEqual({
+      ...openedStatus,
+      screenRecording: { required: true, trusted: true },
+    });
     expect(request).toHaveBeenNthCalledWith(1, 'system/permissions/get', undefined);
     expect(request).toHaveBeenNthCalledWith(2, 'system/permissions/accessibility/open', undefined);
+    expect(request).toHaveBeenNthCalledWith(3, 'system/permissions/screenRecording/open', undefined);
   });
 
   it('routes work provider actions through clawd when the backend client is connected', async () => {
@@ -2021,6 +2035,12 @@ async function openAccessibilitySettings(controller: AppController): Promise<Sys
   return (controller as unknown as {
     openAccessibilitySettings(): Promise<SystemPermissionsStatus>;
   }).openAccessibilitySettings();
+}
+
+async function openScreenRecordingSettings(controller: AppController): Promise<SystemPermissionsStatus> {
+  return (controller as unknown as {
+    openScreenRecordingSettings(): Promise<SystemPermissionsStatus>;
+  }).openScreenRecordingSettings();
 }
 
 async function assignWorkItemToAgent(controller: AppController, agentId: string, item: WorkItem): Promise<AppSnapshot> {

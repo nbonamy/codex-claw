@@ -28,6 +28,7 @@ describe('SettingsView', () => {
     ]);
     expect(wrapper.text()).not.toContain('Accessibility');
     expect(wrapper.text()).not.toContain('Theme');
+    expect(wrapper.findAll('.el-menu-item').map((item) => item.text())).toContain('Appshots');
 
     await wrapper.findAll('.el-menu-item').find((item) => item.text() === 'Appearance')?.trigger('click');
 

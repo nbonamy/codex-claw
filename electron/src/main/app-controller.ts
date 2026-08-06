@@ -20,6 +20,8 @@ import { BrowserPane, browserPaneKey } from './browser-pane';
 import { launchChatGptApp } from './chatgpt-app';
 import { appCommandFromDeepLink, codexClawDeepLinkScheme, deepLinksFromArgv } from './deep-links';
 import { ManualUpdateCheckController } from './manual-update-check';
+import { AppshotsKeyMonitor } from './appshots-key-monitor';
+import { captureAppshot as captureFrontmostAppshot } from './appshots';
 
 type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
 type StartupMaintenance = () => Promise<void>;
@@ -54,6 +56,7 @@ export class AppController {
   private autoUpdateService: DesktopAutoUpdateService | null = null;
   private manualUpdateCheckController: ManualUpdateCheckController | null = null;
   private desktopUpdateStatus: DesktopUpdateStatus = { state: 'idle' };
+  private appshotCapturePending = false;
 
   private readonly browserPane = new BrowserPane({
     onAnnotation: (annotation) => this.emitBrowserAnnotation(annotation),
@@ -72,6 +75,7 @@ export class AppController {
     private readonly appLifecycle: AppLifecycle = app,
     private readonly startupMaintenance: StartupMaintenance = async () => undefined,
     private readonly openExternal: (url: string) => Promise<unknown> = (url) => shell.openExternal(url),
+    private readonly appshotsKeyMonitor: AppshotsKeyMonitor | null = null,
   ) {
     this.snapshot = initialSnapshot ? metadataOnlySnapshot(initialSnapshot) : null;
     this.backendClient = backendClient ?? createRuntimeClawBackendClient({
@@ -90,6 +94,7 @@ export class AppController {
     this.autoUpdateService?.start();
     await this.startupMaintenance();
     await this.initializeBackendClient();
+    this.syncAppshotsKeyMonitor();
     this.syncPowerSaveBlocker();
     logMain('startup', 'application initialized');
   }
@@ -387,6 +392,8 @@ export class AppController {
 
     ipc.handle(ipcChannels.openAccessibilitySettings, () => this.openAccessibilitySettings());
 
+    ipc.handle(ipcChannels.openScreenRecordingSettings, () => this.openScreenRecordingSettings());
+
     ipc.handle(ipcChannels.launchChatGptApp, () => launchChatGptApp());
 
     ipc.handle(ipcChannels.quit, () => {
@@ -505,6 +512,7 @@ export class AppController {
       this.powerSourceListenersInstalled = false;
     }
     this.autoUpdateService?.stop();
+    this.appshotsKeyMonitor?.stop();
     this.nativeIpcUnregister?.();
     this.nativeIpcUnregister = null;
     this.backendClientEventUnsubscribe?.();
@@ -746,6 +754,7 @@ export class AppController {
   private async updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot> {
     const previousCodexBinaryPath = this.snapshot?.general.codexBinaryPath ?? '';
     const snapshot = await this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.settingsUpdate, { input }));
+    if (input.general?.appshots) this.syncAppshotsKeyMonitor();
     if (previousCodexBinaryPath !== snapshot.general.codexBinaryPath) {
       await this.restartApp();
     }
@@ -1119,11 +1128,17 @@ export class AppController {
   }
 
   private async getSystemPermissions(): Promise<SystemPermissionsStatus> {
-    return this.requireBackendClient().request(backendMethods.systemPermissionsGet);
+    const permissions = await this.requireBackendClient().request<SystemPermissionsStatus>(backendMethods.systemPermissionsGet);
+    if (permissions.accessibility.trusted) this.syncAppshotsKeyMonitor();
+    return permissions;
   }
 
   private async openAccessibilitySettings(): Promise<SystemPermissionsStatus> {
     return this.requireBackendClient().request(backendMethods.systemPermissionsAccessibilityOpen);
+  }
+
+  private async openScreenRecordingSettings(): Promise<SystemPermissionsStatus> {
+    return this.requireBackendClient().request(backendMethods.systemPermissionsScreenRecordingOpen);
   }
 
   private synchronizeBackendState(): Promise<AppSnapshot> {
@@ -1413,12 +1428,61 @@ export class AppController {
     this.mainWindow.focus();
   }
 
+  private syncAppshotsKeyMonitor(): void {
+    if (!this.appshotsKeyMonitor) return;
+    const hotkey = this.snapshot?.general.appshots?.hotkey ?? 'command';
+    if (!this.appshotsKeyMonitor.start(hotkey, () => void this.captureAppshot())) {
+      warnMain('appshots', 'failed to start native hotkey monitor', { hotkey });
+    } else {
+      logMain('appshots', hotkey === 'none' ? 'hotkey disabled' : 'hotkey monitor started', { hotkey });
+    }
+  }
+
+  private async captureAppshot(): Promise<void> {
+    if (this.appshotCapturePending) return;
+    this.appshotCapturePending = true;
+    try {
+      const capture = await captureFrontmostAppshot();
+      logMain('appshots', 'captured frontmost window', {
+        appName: capture.appName,
+        windowTitle: capture.windowTitle,
+        accessibilityText: Boolean(capture.accessibilityText),
+      });
+      if (this.snapshot?.general.appshots?.playSound !== false) shell.beep();
+      this.sendOrQueueAppCommand({ type: 'attach-appshot', ...capture });
+    } catch (error) {
+      this.sendOrQueueAppCommand({
+        type: 'appshot-failed',
+        message: error instanceof Error ? error.message : 'The Appshot could not be captured.',
+      });
+    } finally {
+      this.appshotCapturePending = false;
+      this.focusMainWindow();
+    }
+  }
+
+  private sendOrQueueAppCommand(command: AppCommand): void {
+    if (!this.mainWindow || this.mainWindow.isDestroyed() || !this.rendererReady) {
+      this.pendingDeepLinkCommands.push(command);
+      if (app.isReady() && BrowserWindow.getAllWindows().length === 0) this.createWindow();
+      return;
+    }
+    sendAppCommand(this.mainWindow.webContents, command);
+  }
+
 }
 
 export function startMainApp(): void {
   initializeMainLogging();
   installProcessErrorLogging();
-  const controller = new AppController(null, undefined, app, ensureCurrentClawdDaemonForStartup);
+  const controller = new AppController(
+    null,
+    undefined,
+    app,
+    ensureCurrentClawdDaemonForStartup,
+    (url) => shell.openExternal(url),
+    new AppshotsKeyMonitor(),
+  );
   const autoUpdateService = new DesktopAutoUpdateService({
     app,
     updateBaseUrl: process.env.CODEX_CLAW_UPDATE_BASE_URL,

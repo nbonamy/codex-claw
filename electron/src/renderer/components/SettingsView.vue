@@ -29,6 +29,11 @@
           :restart-app="restartApp"
           :update-settings="updateSettings"
         />
+        <SettingsAppshotsPanel
+          v-else-if="activeTab === 'appshots'"
+          :settings="generalSettings.appshots"
+          :update-settings="updateSettings"
+        />
         <SettingsIntegrationsPanel
           v-else-if="activeTab === 'integrations'"
           :authorization="workProviderAuthorization"
@@ -83,6 +88,7 @@
 import type { AddSshConnectionInput, AppGeneralSettings, AppPluginStatus, AppThemeSettings, ClawdDaemonStatus, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SourceFolderListing, SourceFolderListInput, SourceFolderState, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { defaultGeneralSettings, defaultSourceFolderState } from '@codex-claw/shared/settings';
 import SettingsAppearancePanel from './SettingsAppearancePanel.vue';
+import SettingsAppshotsPanel from './SettingsAppshotsPanel.vue';
 import SettingsChatGptPanel from './SettingsChatGptPanel.vue';
 import SettingsConnectionsPanel from './SettingsConnectionsPanel.vue';
 import SettingsGeneralPanel from './SettingsGeneralPanel.vue';

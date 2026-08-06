@@ -2850,6 +2850,56 @@ describe('AppShell', () => {
     expect(wrapper.emitted('resolve-approval')).toBeUndefined();
   });
 
+  it('attaches an Appshot command to the active agent composer', async () => {
+    let listener: (command: AppCommand) => void = () => undefined;
+    window.codexClaw = {
+      onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
+        listener = nextListener;
+        return () => undefined;
+      }),
+      onEvent: vi.fn(() => vi.fn()),
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const attachment: CodexNativeAttachment = {
+      id: 'appshot-image',
+      type: 'image',
+      path: '/tmp/electron-appshot.png',
+      name: 'electron-appshot.png',
+      mimeType: 'image/png',
+      size: 3,
+      previewUrl: 'data:image/png;base64,YXBw',
+    };
+    const ingestAttachments = vi.fn().mockResolvedValue([attachment]);
+    (window as Window & { codexAppSdkNative?: Partial<CodexNativeRendererApi> }).codexAppSdkNative = {
+      capabilities: {
+        attachments: true,
+        clipboard: true,
+        externalLinks: true,
+        transcription: false,
+      },
+      ingestAttachments,
+    };
+    const wrapper = mountShell();
+
+    listener({
+      type: 'attach-appshot',
+      imageDataUrl: 'data:image/png;base64,YXBw',
+      appName: 'Electron',
+      windowTitle: 'Codex Claw',
+      accessibilityText: 'Visible and offscreen text',
+    });
+    await flushPromises();
+
+    expect(ingestAttachments).toHaveBeenCalledWith([{
+      name: expect.stringMatching(/^electron-appshot-\d+\.png$/u),
+      mimeType: 'image/png',
+      data: expect.any(ArrayBuffer),
+    }]);
+    expect(wrapper.emitted('update:composerAttachments')).toContainEqual([{
+      agentId: 'agent-dina',
+      attachments: [attachment],
+    }]);
+  });
+
   it('selects a deep-linked agent and submits its prompt by default', async () => {
     let listener: (command: AppCommand) => void = () => undefined;
     window.codexClaw = {

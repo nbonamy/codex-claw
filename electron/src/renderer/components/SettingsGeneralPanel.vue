@@ -113,7 +113,7 @@
               {{ accessibilityStatusLabel }}
             </span>
             <el-button
-              v-if="showGrantButton"
+              v-if="showAccessibilityGrantButton"
               :loading="openingAccessibilitySettings"
               size="small"
               @click="grantAccessibility"
@@ -122,6 +122,38 @@
             </el-button>
             <el-button
               v-else-if="permissions?.accessibility.required"
+              :loading="loadingPermissions"
+              size="small"
+              @click="loadPermissions"
+            >
+              Refresh
+            </el-button>
+          </span>
+        </template>
+      </SettingsRow>
+      <SettingsRow
+        title="Screen Recording"
+        :description="screenRecordingDescription"
+      >
+        <template #control>
+          <span class="settings-general-panel__actions">
+            <span
+              class="settings-general-panel__status"
+              :class="{ 'settings-general-panel__status--granted': screenRecordingGranted }"
+            >
+              <ShieldCheckIcon aria-hidden="true" />
+              {{ screenRecordingStatusLabel }}
+            </span>
+            <el-button
+              v-if="showScreenRecordingGrantButton"
+              :loading="openingScreenRecordingSettings"
+              size="small"
+              @click="grantScreenRecording"
+            >
+              Grant
+            </el-button>
+            <el-button
+              v-else-if="permissions?.screenRecording.required"
               :loading="loadingPermissions"
               size="small"
               @click="loadPermissions"
@@ -190,6 +222,10 @@ const defaultPermissionsStatus: SystemPermissionsStatus = {
     required: false,
     trusted: true,
   },
+  screenRecording: {
+    required: false,
+    trusted: true,
+  },
 };
 
 const props = defineProps<{
@@ -199,6 +235,7 @@ const props = defineProps<{
   daemonStatusError?: string | null;
   getSystemPermissions?: () => Promise<SystemPermissionsStatus>;
   openAccessibilitySettings?: () => Promise<SystemPermissionsStatus>;
+  openScreenRecordingSettings?: () => Promise<SystemPermissionsStatus>;
   restartApp?: () => Promise<void>;
   setDaemonEnabled?: (enabled: boolean) => Promise<void>;
   settings: AppGeneralSettings;
@@ -209,6 +246,7 @@ const props = defineProps<{
 const permissions = ref<SystemPermissionsStatus | null>(null);
 const loadingPermissions = ref(false);
 const openingAccessibilitySettings = ref(false);
+const openingScreenRecordingSettings = ref(false);
 const choosingSourceFolder = ref(false);
 const choosingCodexBinary = ref(false);
 const settingDaemon = ref(false);
@@ -248,7 +286,9 @@ const daemonDescription = computed(() => {
   return 'Start the Codex Claw agent to keep your loops running.';
 });
 const accessibilityGranted = computed(() => permissions.value?.accessibility.trusted ?? false);
-const showGrantButton = computed(() => permissions.value?.accessibility.required === true && !accessibilityGranted.value);
+const showAccessibilityGrantButton = computed(() => permissions.value?.accessibility.required === true && !accessibilityGranted.value);
+const screenRecordingGranted = computed(() => permissions.value?.screenRecording.trusted ?? false);
+const showScreenRecordingGrantButton = computed(() => permissions.value?.screenRecording.required === true && !screenRecordingGranted.value);
 const accessibilityStatusLabel = computed(() => {
   if (!permissions.value) {
     return 'Checking';
@@ -266,6 +306,24 @@ const accessibilityDescription = computed(() => {
   }
 
   return 'Required for Computer Use to inspect and click Codex Claw.';
+});
+const screenRecordingStatusLabel = computed(() => {
+  if (!permissions.value) {
+    return 'Checking';
+  }
+
+  if (!permissions.value.screenRecording.required) {
+    return 'Not needed';
+  }
+
+  return screenRecordingGranted.value ? 'Granted' : 'Required';
+});
+const screenRecordingDescription = computed(() => {
+  if (permissions.value?.screenRecording.required === false) {
+    return 'Appshots do not need this permission on this platform.';
+  }
+
+  return 'Required for Appshots to capture the frontmost window.';
 });
 
 onMounted(() => {
@@ -291,6 +349,15 @@ async function grantAccessibility(): Promise<void> {
     permissions.value = await (props.openAccessibilitySettings ?? openAccessibilitySettings)();
   } finally {
     openingAccessibilitySettings.value = false;
+  }
+}
+
+async function grantScreenRecording(): Promise<void> {
+  openingScreenRecordingSettings.value = true;
+  try {
+    permissions.value = await (props.openScreenRecordingSettings ?? openScreenRecordingSettings)();
+  } finally {
+    openingScreenRecordingSettings.value = false;
   }
 }
 
@@ -359,6 +426,10 @@ async function getSystemPermissions(): Promise<SystemPermissionsStatus> {
 
 async function openAccessibilitySettings(): Promise<SystemPermissionsStatus> {
   return window.codexClaw?.openAccessibilitySettings?.() ?? defaultPermissionsStatus;
+}
+
+async function openScreenRecordingSettings(): Promise<SystemPermissionsStatus> {
+  return window.codexClaw?.openScreenRecordingSettings?.() ?? defaultPermissionsStatus;
 }
 
 function updatePreventSleep(value: boolean | string | number): void {

@@ -29,12 +29,14 @@ describe('Computer Use MCP tools', () => {
     expect([...handlers.keys()]).toStrictEqual([
       'computer-use-status',
       'computer-use-request-accessibility',
+      'computer-use-request-screen-recording',
       'computer-use-stop',
       'computer-use-list-apps',
       'computer-use-find-apps',
       'computer-use-launch-app',
       'computer-use-focus-app',
       'computer-use-get-app-state',
+      'computer-use-screenshot',
       'computer-use-click',
       'computer-use-type-text',
       'computer-use-set-value',
@@ -59,6 +61,7 @@ describe('Computer Use MCP tools', () => {
 
   it.each([
     ['computer-use-list-apps', {}, 'list_apps'],
+    ['computer-use-request-screen-recording', {}, 'request_screen_capture'],
     ['computer-use-find-apps', { app: 'Claw' }, 'find_apps'],
     ['computer-use-launch-app', { path: '/Applications/Claw.app' }, 'launch_app'],
     ['computer-use-focus-app', { pid: 42 }, 'focus_app'],
@@ -73,6 +76,51 @@ describe('Computer Use MCP tools', () => {
     await handlers.get(tool)?.(arguments_);
 
     expect(computerUse.execute).toHaveBeenCalledWith({ command, arguments: arguments_ });
+  });
+
+  it('returns screenshots as MCP image content without repeating base64 in structured metadata', async () => {
+    vi.mocked(computerUse.execute).mockResolvedValue({
+      ok: true,
+      result: {
+        scope: 'screen',
+        screen: { id: 42, isMain: true },
+        image: {
+          dataBase64: 'cG5n',
+          width: 3024,
+          height: 1964,
+          mimeType: 'image/png',
+          scaleFactor: 2,
+        },
+      },
+    });
+
+    await expect(handlers.get('computer-use-screenshot')?.({ scope: 'screen', displayId: 42 })).resolves.toStrictEqual({
+      content: [{ type: 'image', data: 'cG5n', mimeType: 'image/png' }],
+      structuredContent: {
+        scope: 'screen',
+        screen: { id: 42, isMain: true },
+        image: {
+          width: 3024,
+          height: 1964,
+          mimeType: 'image/png',
+          scaleFactor: 2,
+        },
+      },
+      isError: false,
+    });
+    expect(computerUse.execute).toHaveBeenCalledWith({
+      command: 'screenshot',
+      arguments: { scope: 'screen', displayId: 42 },
+    });
+  });
+
+  it('returns malformed screenshot payloads as tool errors', async () => {
+    vi.mocked(computerUse.execute).mockResolvedValue({ ok: true, result: { scope: 'window' } });
+
+    await expect(handlers.get('computer-use-screenshot')?.({})).resolves.toStrictEqual({
+      content: [{ type: 'text', text: 'Computer Use returned an invalid screenshot.' }],
+      isError: true,
+    });
   });
 
   it('unwraps helper success envelopes for both structured content and readable text', async () => {

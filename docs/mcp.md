@@ -133,11 +133,18 @@ agent -> codex_claw MCP -> clawd -> client/computerUse RPC -> Electron main -> n
 ```
 
 Tools are `computer-use-status`, `computer-use-request-accessibility`,
+`computer-use-request-screen-recording`,
 `computer-use-list-apps`, `computer-use-find-apps`,
 `computer-use-launch-app`, `computer-use-focus-app`,
-`computer-use-get-app-state`, `computer-use-click`,
+`computer-use-get-app-state`, `computer-use-screenshot`, `computer-use-click`,
 `computer-use-type-text`, `computer-use-set-value`, and
 `computer-use-scroll`.
+
+`computer-use-screenshot` returns MCP image content rather than embedding PNG
+base64 in text. Its `window` scope targets the frontmost or explicitly selected
+application; its `screen` scope captures the main or explicitly selected
+display. Screenshot capture is gated by the helper's separately reported
+Screen Recording trust, surfaced in General -> System permissions.
 
 The helper reports its own Accessibility trust. Agents must check status or
 request permission before inspection/actions and refresh app state before

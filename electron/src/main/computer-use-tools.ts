@@ -11,6 +11,8 @@ const defaultIdleTtlMs = 10_000;
 export const computerUseCommands = [
   'status',
   'request_accessibility',
+  'request_screen_capture',
+  'screenshot',
   'list_apps',
   'find_apps',
   'launch_app',
@@ -26,6 +28,7 @@ export type ComputerUseCommand = (typeof computerUseCommands)[number];
 
 export type ComputerUseStatus = {
   accessibilityTrusted: boolean;
+  screenCaptureTrusted: boolean;
   available: boolean;
   error?: string;
   helperAppPath?: string;
@@ -76,6 +79,7 @@ export async function getComputerUseStatus(options: ComputerUseOptions): Promise
   const result = record(response.result);
   return {
     accessibilityTrusted: result?.accessibilityTrusted === true,
+    screenCaptureTrusted: result?.screenCaptureTrusted === true,
     available: true,
     helperAppPath: helperAppPathFromPilotPath(helperPath),
     helperPath,
@@ -87,6 +91,15 @@ export async function requestComputerUseAccessibility(options: ComputerUseOption
   await executeComputerUseCommand({
     command: 'request_accessibility',
     arguments: { openSettings: true, prompt: true },
+    options,
+  });
+  return getComputerUseStatus(options);
+}
+
+export async function requestComputerUseScreenCapture(options: ComputerUseOptions): Promise<ComputerUseStatus> {
+  await executeComputerUseCommand({
+    command: 'request_screen_capture',
+    arguments: {},
     options,
   });
   return getComputerUseStatus(options);
@@ -154,6 +167,7 @@ export function resolveComputerUseHelperAppPath(options: ComputerUseOptions): st
 function unavailableStatus(options: ComputerUseOptions, error: string, helperAppPath?: string, helperPath?: string): ComputerUseStatus {
   return {
     accessibilityTrusted: false,
+    screenCaptureTrusted: false,
     available: false,
     error,
     ...(helperAppPath ? { helperAppPath } : {}),
@@ -338,7 +352,7 @@ function parseResponse(line: string): ComputerUseResult {
 }
 
 function normalizeErrorCode(code: string | undefined): ComputerUseErrorCode {
-  if (code === 'accessibility_not_granted' || code === 'permission_denied') return 'permission_denied';
+  if (code === 'accessibility_not_granted' || code === 'screen_capture_not_granted' || code === 'permission_denied') return 'permission_denied';
   if (code === 'timeout') return 'timeout';
   if (code === 'tool_unavailable') return 'tool_unavailable';
   return 'client_error';

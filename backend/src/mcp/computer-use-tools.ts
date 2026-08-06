@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import * as z from 'zod/v4';
 import { errorToolResult, structuredToolResult } from './tool-result';
 
@@ -16,13 +17,15 @@ type ComputerUseCommand =
   | 'get_app_state'
   | 'launch_app'
   | 'list_apps'
+  | 'request_screen_capture'
   | 'scroll'
   | 'set_value'
+  | 'screenshot'
   | 'type_text';
 
 export function registerComputerUseTools(server: McpServer, computerUse: ComputerUseClient): void {
   server.registerTool('computer-use-status', {
-    description: 'Check whether the bundled local Computer Use helper is available and trusted by macOS Accessibility.',
+    description: 'Check whether the bundled local Computer Use helper is available and trusted by macOS Accessibility and Screen Recording.',
     inputSchema: {},
   }, () => computerUseResult(() => computerUse.status()));
 
@@ -30,6 +33,11 @@ export function registerComputerUseTools(server: McpServer, computerUse: Compute
     description: 'Request macOS Accessibility permission for the bundled Computer Use helper and open System Settings when needed.',
     inputSchema: {},
   }, () => computerUseResult(() => computerUse.requestAccessibility()));
+
+  server.registerTool('computer-use-request-screen-recording', {
+    description: 'Request macOS Screen Recording permission for the bundled Computer Use helper and open System Settings when needed.',
+    inputSchema: {},
+  }, () => execute(computerUse, 'request_screen_capture', {}));
 
   server.registerTool('computer-use-stop', {
     description: 'Optionally end the live local Computer Use session and hide its virtual cursor immediately. A later Computer Use action starts a new session automatically.',
@@ -74,6 +82,17 @@ export function registerComputerUseTools(server: McpServer, computerUse: Compute
       rootElementIndex: z.number().int().nonnegative().optional(),
     },
   }, (arguments_) => execute(computerUse, 'get_app_state', arguments_));
+
+  server.registerTool('computer-use-screenshot', {
+    description: 'Capture a target application window or an entire macOS display as a PNG image. Window capture defaults to the frontmost application; screen capture defaults to the main display.',
+    inputSchema: {
+      ...optionalAppSchema,
+      displayId: z.number().int().positive().optional(),
+      scope: z.enum(['window', 'screen']).optional(),
+    },
+  }, (arguments_) => computerUseScreenshotResult(
+    () => computerUse.execute({ command: 'screenshot', arguments: arguments_ }),
+  ));
 
   server.registerTool('computer-use-click', {
     description: 'Click a fresh Accessibility element by element_index, or click at x/y coordinates.',
@@ -139,10 +158,40 @@ async function computerUseResult(run: () => Promise<unknown>) {
   }
 }
 
+async function computerUseScreenshotResult(run: () => Promise<unknown>): Promise<CallToolResult> {
+  try {
+    const value = await run();
+    if (isFailure(value)) return errorToolResult(value.error);
+    const result = isSuccess(value) ? value.result : value;
+    const payload = record(result);
+    const image = record(payload?.image);
+    const data = typeof image?.dataBase64 === 'string' ? image.dataBase64 : null;
+    const mimeType = typeof image?.mimeType === 'string' ? image.mimeType : 'image/png';
+    if (!payload || !image || !data) return errorToolResult('Computer Use returned an invalid screenshot.');
+    const { dataBase64: _dataBase64, ...imageMetadata } = image;
+    return {
+      content: [{ type: 'image', data, mimeType }],
+      structuredContent: {
+        ...payload,
+        image: imageMetadata,
+      },
+      isError: false,
+    };
+  } catch (error) {
+    return errorToolResult(error instanceof Error ? error.message : String(error));
+  }
+}
+
 function isSuccess(value: unknown): value is { ok: true; result: unknown } {
   return typeof value === 'object' && value !== null && (value as { ok?: unknown }).ok === true && 'result' in value;
 }
 
 function isFailure(value: unknown): value is { error: string; ok: false } {
   return typeof value === 'object' && value !== null && (value as { ok?: unknown }).ok === false && typeof (value as { error?: unknown }).error === 'string';
+}
+
+function record(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
 }

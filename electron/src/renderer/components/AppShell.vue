@@ -1956,6 +1956,16 @@ function resetQuickAgentShortcuts(): void {
 }
 
 function handleAppCommand(command: AppCommand): void {
+  if (command.type === 'appshot-failed') {
+    ElMessage.error(command.message);
+    return;
+  }
+
+  if (command.type === 'attach-appshot') {
+    void attachAppshot(command);
+    return;
+  }
+
   if (command.type === 'set-agent-list-compact') {
     void updateSettings({ general: { agentListCompact: command.compact } });
     return;
@@ -2141,6 +2151,38 @@ function handleAppCommand(command: AppCommand): void {
     }
     restartActiveAgent();
   }
+}
+
+async function attachAppshot(command: Extract<AppCommand, { type: 'attach-appshot' }>): Promise<void> {
+  const agent = currentAgent.value;
+  const nativeApi = getCodexNativeRendererApi();
+  if (!agent || !nativeApi || !props.backendCapabilities.attachments) {
+    ElMessage.error('Select an agent that supports image attachments before taking an Appshot.');
+    return;
+  }
+
+  try {
+    const [attachment] = await nativeApi.ingestAttachments([{
+      name: appshotFileName(command.appName),
+      mimeType: 'image/png',
+      data: imageDataUrlArrayBuffer(command.imageDataUrl),
+    }]);
+    if (!attachment) throw new Error('Appshot ingestion returned no attachment.');
+    activeSurface.value = 'agent';
+    emit('update:composerAttachments', {
+      agentId: agent.id,
+      attachments: [...props.composerAttachments, attachment],
+    });
+    await nextTick();
+    conversationPane.value?.focusComposer();
+  } catch {
+    ElMessage.error('The Appshot could not be attached.');
+  }
+}
+
+function appshotFileName(appName?: string): string {
+  const source = appName?.trim().replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
+  return `${source ? `${source}-` : ''}appshot-${Date.now()}.png`;
 }
 
 async function updateSettings(input: UpdateSettingsInput): Promise<void> {

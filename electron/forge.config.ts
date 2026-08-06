@@ -2,6 +2,7 @@ import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerDMG, MakerDMGConfig } from '@electron-forge/maker-dmg';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
+import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import path from 'node:path';
@@ -9,6 +10,7 @@ import {
   shouldPreserveUpstreamCodexSignature,
   signDarwinBinaries,
 } from './build/sign-binaries';
+import { copyPackagedNativeDependencies } from './build/package-native-dependencies';
 
 import dotenv from 'dotenv';
 dotenv.config();
@@ -83,12 +85,23 @@ const config: ForgeConfig = {
         }
       },
     ],
+    afterPrune: [
+      (buildPath: string, _electronVersion: string, _platform: string, _arch: string, callback: (error?: Error) => void) => {
+        try {
+          copyPackagedNativeDependencies(buildPath);
+          callback();
+        } catch (error) {
+          callback(error instanceof Error ? error : new Error(String(error)));
+        }
+      },
+    ],
   },
   makers: [
     new MakerZIP({ macUpdateManifestBaseUrl: updateManifestBaseUrl }, ['darwin', 'win32', 'linux']),
     new MakerDMG(dmgOptions, ['darwin']),
   ],
   plugins: [
+    new AutoUnpackNativesPlugin({}),
     new VitePlugin({
       build: [
         {

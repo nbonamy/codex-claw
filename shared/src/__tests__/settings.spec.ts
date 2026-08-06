@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptySnapshot } from '../snapshot';
-import { defaultGeneralSettings, defaultPluginSettings, defaultThemeSettings, normalizeGeneralSettings, normalizeThemeSettings, updateSettingsInSnapshot } from '../settings';
+import { defaultAppshotSettings, defaultGeneralSettings, defaultPluginSettings, defaultThemeSettings, normalizeGeneralSettings, normalizeThemeSettings, updateSettingsInSnapshot } from '../settings';
 
 describe('settings contracts', () => {
   it('normalizes general settings', () => {
@@ -8,12 +8,14 @@ describe('settings contracts', () => {
       codexBinaryPath: ' /opt/homebrew/bin/codex ',
       preventSleepWhenAgentsRun: false,
       agentListCompact: true,
+      appshots: defaultAppshotSettings,
       plugins: defaultPluginSettings,
     })).toStrictEqual({
       codexBinaryPath: '/opt/homebrew/bin/codex',
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: true,
+      appshots: defaultAppshotSettings,
       plugins: defaultPluginSettings,
     });
 
@@ -72,6 +74,7 @@ describe('settings contracts', () => {
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: false,
+      appshots: defaultAppshotSettings,
       plugins: defaultPluginSettings,
     });
     expect(snapshot.teams).toHaveLength(1);

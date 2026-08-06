@@ -1,8 +1,14 @@
-import type { AppGeneralSettings, AppPluginSettings, AppSnapshot, AppThemeSettings, SourceFolderState, UpdateSettingsInput, WorkProviderSettings } from './contracts';
+import type { AppGeneralSettings, AppPluginSettings, AppshotSettings, AppSnapshot, AppThemeSettings, SourceFolderState, UpdateSettingsInput, WorkProviderSettings } from './contracts';
 
 export const defaultPluginSettings: AppPluginSettings = {
   computerUseEnabled: false,
   chromeEnabled: false,
+};
+
+export const defaultAppshotSettings: AppshotSettings = {
+  hotkey: 'command',
+  destination: 'active-agent',
+  playSound: true,
 };
 
 export const defaultGeneralSettings: AppGeneralSettings = {
@@ -10,6 +16,7 @@ export const defaultGeneralSettings: AppGeneralSettings = {
   preventSleepWhenRemoteAccessEnabled: true,
   codexBinaryPath: '',
   agentListCompact: false,
+  appshots: { ...defaultAppshotSettings },
   plugins: { ...defaultPluginSettings },
 };
 
@@ -84,7 +91,22 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
     preventSleepWhenRemoteAccessEnabled: value.preventSleepWhenRemoteAccessEnabled !== false,
     codexBinaryPath: normalizeString(value.codexBinaryPath) ?? defaultGeneralSettings.codexBinaryPath,
     agentListCompact: value.agentListCompact === true,
+    appshots: normalizeAppshotSettings(value.appshots),
     plugins: normalizePluginSettings(value.plugins),
+  };
+}
+
+export function normalizeAppshotSettings(value: unknown): AppshotSettings {
+  if (!isRecord(value)) {
+    return { ...defaultAppshotSettings };
+  }
+  const hotkey = value.hotkey;
+  return {
+    hotkey: hotkey === 'command' || hotkey === 'option' || hotkey === 'shift' || hotkey === 'none'
+      ? hotkey
+      : defaultAppshotSettings.hotkey,
+    destination: 'active-agent',
+    playSound: value.playSound !== false,
   };
 }
 

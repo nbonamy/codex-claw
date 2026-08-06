@@ -31,6 +31,10 @@ export function getSystemPermissionsStatus(
         required: false,
         trusted: true,
       },
+      screenRecording: {
+        required: false,
+        trusted: true,
+      },
     };
   }
 
@@ -39,6 +43,10 @@ export function getSystemPermissionsStatus(
     accessibility: {
       required: true,
       trusted: dependencies.isTrustedAccessibilityClient(false),
+    },
+    screenRecording: {
+      required: false,
+      trusted: true,
     },
   };
 }
