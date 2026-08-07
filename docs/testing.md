@@ -3,10 +3,10 @@
 Use focused tests while iterating, then run the relevant final gates before
 handing off or committing.
 
-Codex Claw is a desktop app. It does not have an HTTP API server, so do not
-copy id8's API harness or endpoint coverage workflow here. When this repo says
-"contract" or "workflow" test, it means Electron IPC, client state, renderer
-behavior, or a fake backend transport.
+Codex Claw has an Electron desktop host and an initial localhost-only Express
+web host. Do not copy id8's generic API harness here. When this repo says
+"contract" or "workflow" test, it means Electron IPC, the Claw WebSocket
+adapter, client state, renderer behavior, or a fake backend transport.
 As the backend seam grows, prefer fake backend drivers for app-controller
 routing tests and fake Codex transports for Codex-driver/session tests.
 
@@ -196,6 +196,15 @@ full relevant gate before handoff.
 
 For visual changes, run tests plus a local app/screenshot check when the app can
 boot.
+
+Web-only iteration uses the root lifecycle commands:
+
+```bash
+npm run typecheck:web
+npm run test:web
+npm run build:web
+npm run preview:web
+```
 
 For protocol or persistence changes, run focused tests for the touched module
 and the full coverage gate.

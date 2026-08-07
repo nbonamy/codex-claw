@@ -217,6 +217,16 @@ public deployment model. Authentication must replace the fixed identity and
 select an isolated backend/state home before the bind address is widened or
 multiple users are admitted.
 
+Run the web host from the repository root:
+
+- `npm run dev:web` builds the local SDK and backend, then builds and runs the
+  web host;
+- `npm run build:web` produces the backend plus web client/server artifacts;
+- `npm run start:web` starts already-built production artifacts;
+- `npm run preview:web` builds and then starts those production artifacts; and
+- `npm run typecheck:web`, `npm run lint:web`, `npm run test:web`, and
+  `npm run test:coverage:web` expose the web-only quality gates.
+
 Host capabilities are enforced at both UI and backend boundaries. Electron
 advertises native dialogs, app lifecycle, updates, Dock badges, Open In,
 Appshots, the embedded browser, and Computer Use. Web advertises none of those,
