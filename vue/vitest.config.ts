@@ -1,7 +1,9 @@
 import { defineConfig } from 'vitest/config';
+import vue from '@vitejs/plugin-vue';
 import path from 'node:path';
 
 export default defineConfig({
+  plugins: [vue()],
   resolve: {
     alias: {
       '@codex-claw/core': path.resolve(__dirname, '../core/src'),
@@ -9,16 +11,15 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    setupFiles: [path.resolve(__dirname, 'src/test/setup.ts')],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      include: [
-        'src/main/mcp/**/*.ts',
-        'src/main/snapshot-service.ts',
-        'src/main/**/*.ts',
-      ],
+      include: ['src/**/*.{ts,vue}'],
       exclude: [
-        'src/renderer/**/*.d.ts',
+        'src/bootstrap.ts',
+        'src/**/*.d.ts',
+        'src/**/__tests__/**',
         'src/test/**',
       ],
       thresholds: {

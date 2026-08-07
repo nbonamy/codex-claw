@@ -4,7 +4,9 @@ export type ClawClientPlatform = 'electron' | 'web';
 
 export type ClawHostCapabilities = {
   appLifecycle: boolean;
+  appshots: boolean;
   appUpdates: boolean;
+  computerUse: boolean;
   daemonManagement: boolean;
   dockBadge: boolean;
   embeddedBrowser: boolean;
@@ -21,7 +23,9 @@ export type ClawClient = {
 
 export const electronClawHostCapabilities: Readonly<ClawHostCapabilities> = Object.freeze({
   appLifecycle: true,
+  appshots: true,
   appUpdates: true,
+  computerUse: true,
   daemonManagement: true,
   dockBadge: true,
   embeddedBrowser: true,
@@ -32,7 +36,9 @@ export const electronClawHostCapabilities: Readonly<ClawHostCapabilities> = Obje
 
 export const webClawHostCapabilities: Readonly<ClawHostCapabilities> = Object.freeze({
   appLifecycle: false,
+  appshots: false,
   appUpdates: false,
+  computerUse: false,
   daemonManagement: false,
   dockBadge: false,
   embeddedBrowser: false,

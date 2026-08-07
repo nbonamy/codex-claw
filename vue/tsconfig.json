@@ -2,11 +2,8 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {},
   "include": [
-    "forge.config.ts",
-    "vite.*.config.ts",
-    "vitest.config.ts",
     "src/**/*.ts",
+    "src/**/*.vue",
     "../core/src/**/*.ts"
-  ],
-  "references": []
+  ]
 }

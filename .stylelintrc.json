@@ -17,8 +17,8 @@
       true,
       {
         "importFrom": [
-          "src/renderer/styles/variables.css",
-          "src/renderer/styles/theme.css"
+          "src/styles/variables.css",
+          "src/styles/theme.css"
         ]
       }
     ],

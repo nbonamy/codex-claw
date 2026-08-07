@@ -20,17 +20,19 @@ export default defineConfig({
   resolve: {
     alias: {
       '@codex-claw/core': path.resolve(__dirname, '../core/src'),
+      '@codex-claw/vue': path.resolve(__dirname, '../vue/src'),
       ...(useSdkSources ? sdkSourceAliases : {}),
     },
     dedupe: ['vue'],
   },
   server: {
     port: 5174,
-    ...(useSdkSources ? {
-      fs: {
-        allow: [path.resolve(__dirname, '..'), sdkSourceRoot],
-      },
-    } : {}),
+    fs: {
+      allow: [
+        path.resolve(__dirname, '..'),
+        ...(useSdkSources ? [sdkSourceRoot] : []),
+      ],
+    },
   },
   plugins: [vue()],
   build: {

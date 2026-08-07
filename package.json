@@ -5,6 +5,7 @@
   "workspaces": [
     "core",
     "backend",
+    "vue",
     "electron"
   ],
   "scripts": {
@@ -23,7 +24,7 @@
     "build:backend": "npm run build:sdk && npm run build -w @codex-claw/core && npm run build -w @codex-claw/backend && node scripts/package-backend.mjs",
     "typecheck": "npm run typecheck --workspaces",
     "lint": "npm run lint --workspaces",
-    "lint:css": "npm run lint:css -w @codex-claw/electron",
+    "lint:css": "npm run lint:css -w @codex-claw/vue",
     "test": "npm run test --workspaces",
     "test:coverage": "npm run test:coverage --workspaces",
     "benchmark:conversation": "npm run benchmark:conversation -w @codex-claw/core && npm --prefix ../codex-app-sdk run benchmark:conversation",

@@ -278,7 +278,7 @@ User-facing renderer strings should be compatible with Vue I18n from the start.
 
 Rules:
 
-- Put reusable renderer copy in `src/renderer/i18n/messages.ts`.
+- Put reusable renderer copy in `vue/src/i18n/messages.ts`.
 - Use `vue-i18n` in components for dynamic UI labels instead of assembling
   English strings inline.
 - Keep backend adapters responsible for app-owned semantic descriptors, not
