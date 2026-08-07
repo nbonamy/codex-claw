@@ -8,7 +8,8 @@ const sdkDependencies = [
   ['backend', '@codex-app-sdk/backend'],
   ['backend', '@codex-app-sdk/core'],
   ['electron', '@codex-app-sdk/electron'],
-  ['electron', '@codex-app-sdk/vue'],
+  ['vue', '@codex-app-sdk/vue'],
+  ['web', '@codex-app-sdk/web'],
 ].map(([directory, packageName]) => {
   const packagePath = path.join(rootDir, directory, 'package.json');
   const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));

@@ -2,7 +2,7 @@ import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { pathToFileURL } from 'node:url';
 import net from 'node:net';
 import type { Readable, Writable } from 'node:stream';
-import { createClawdRuntime, type ClawdRuntime } from './runtime';
+import { createClawdRuntime, type ClawdRuntime, type ClawdRuntimeOptions } from './runtime';
 import { backendSocketPath } from './state';
 import { LocalSocketRpcServer } from './socket-server';
 import { StdioRpcPeer } from './stdio';
@@ -113,6 +113,7 @@ async function runStdio(): Promise<void> {
   });
   runtime = await createClawdRuntime({
     version: CLAWD_VERSION,
+    features: runtimeFeatures(),
     requestClient: (method, params) => stdio.request(method, params),
     emitEvent: (event) => stdio.notify(backendMethods.backendEventNotify, event),
   });
@@ -148,6 +149,7 @@ async function serve(): Promise<void> {
   let socketServer: LocalSocketRpcServer | null = null;
   const runtime = await createClawdRuntime({
     version: CLAWD_VERSION,
+    features: runtimeFeatures(),
     requestClient: (method, params) => {
       if (!socketServer) {
         throw new Error(`No connected client can handle '${method}'.`);
@@ -181,6 +183,12 @@ async function serve(): Promise<void> {
   process.once('SIGINT', () => {
     void stop().finally(() => process.exit(0));
   });
+}
+
+function runtimeFeatures(): ClawdRuntimeOptions['features'] {
+  return process.env.CODEX_CLAW_HOST === 'web'
+    ? { computerUse: false, embeddedBrowser: false }
+    : undefined;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

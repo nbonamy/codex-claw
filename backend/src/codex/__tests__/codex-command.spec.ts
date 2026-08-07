@@ -20,6 +20,7 @@ describe('resolveCodexCommand', () => {
 
   it('falls back to the current ChatGPT-bundled Codex app-server on macOS', () => {
     expect(resolveCodexCommand('', {
+      bundledPath: ' ',
       platform: 'darwin',
       existsSync: (candidate) => candidate === '/Applications/ChatGPT.app/Contents/Resources/codex',
     })).toBe('/Applications/ChatGPT.app/Contents/Resources/codex');
@@ -27,10 +28,12 @@ describe('resolveCodexCommand', () => {
 
   it('leaves normal executable discovery enabled when no local bundle is provided', () => {
     expect(resolveCodexCommand(undefined, {
+      bundledPath: ' ',
       platform: 'darwin',
       existsSync: () => false,
     })).toBeUndefined();
     expect(resolveCodexCommand(undefined, {
+      bundledPath: ' ',
       platform: 'linux',
       existsSync: () => true,
     })).toBeUndefined();

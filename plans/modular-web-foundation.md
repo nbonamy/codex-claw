@@ -82,10 +82,18 @@ Commit checkpoint: `feat: add claw web foundation`
 ## Commit Checkpoints
 
 - [x] `chore: extract claw core package`
-- [ ] `chore: extract claw vue package`
-- [ ] `chore: recompose electron claw app`
-- [ ] `feat: add claw web foundation`
+- [x] `chore: extract claw vue package`
+- [x] `chore: recompose electron claw app`
+- [x] `feat: add claw web foundation`
 
 ## Learnings
 
-Append implementation learnings here after the phases are complete.
+- Keep product transport and provider surfaces separate. The SDK web package
+  supplies portable browser/Node WebSocket ports, while Claw still needs its
+  own allowlisted product protocol for teams, agents, files, loops, and
+  settings.
+- Capability flags are insufficient for security-sensitive features when they
+  only hide UI. The web host also configures `clawd` so Computer Use and the
+  embedded desktop browser are not registered as agent tools.
+- The SDK already owns transcription discovery and composer visibility. A
+  second Claw flag would duplicate state and eventually drift.

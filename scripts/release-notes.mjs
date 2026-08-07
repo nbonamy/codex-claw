@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const RELEASE_NOTES_PATH = 'vue/src/generated/release-notes.json';
-const PACKAGE_PATHS = ['package.json', 'core/package.json', 'backend/package.json', 'vue/package.json', 'electron/package.json'];
+const PACKAGE_PATHS = ['package.json', 'core/package.json', 'backend/package.json', 'vue/package.json', 'electron/package.json', 'web/package.json'];
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));

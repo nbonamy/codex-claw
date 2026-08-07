@@ -1,8 +1,8 @@
 # Codex Claw Architecture
 
-Status: updated for backend protocol extraction, 2026-06-13.
+Status: updated for modular desktop/web hosts, 2026-08-07.
 
-Codex Claw is an Electron app that merges the team/agent product model from
+Codex Claw is a modular app that merges the team/agent product model from
 Skwad with the native chat and artifact rendering already built in id8. The app
 implements Codex through Codex app-server and Claude through the local Claude
 Code CLI stream-json surface behind the `clawd` backend. It does not launch a
@@ -37,9 +37,9 @@ protocol/process communication and the renderer displays app-owned events.
 
 ## Tech Stack
 
-- Electron desktop app.
+- Electron desktop host and an initial localhost-only Express web host.
 - Electron Forge for packaging and desktop build orchestration.
-- TypeScript across main, preload, renderer, and shared contracts.
+- TypeScript across hosts, reusable Vue UI, backend, and core contracts.
 - Vue 3 with TypeScript for the renderer.
 - Element Plus for base UI components, matching id8.
 - Vitest for unit and integration-style tests.
@@ -193,18 +193,47 @@ derived `ClientState` for details such as source-folder dialog defaults and
 whether display sleep should be prevented; Electron runs the native APIs but
 does not derive those decisions from agent/product state.
 
-`shared` is intentionally runtime-thin: contracts, protocol types, and pure
+`@codex-claw/core` is intentionally runtime-thin: contracts, protocol types, and pure
 normalization helpers only. Node filesystem persistence such as `state.json`
 loading/saving belongs in `clawd`, so desktop, mobile, and web clients share the
 same backend contract without inheriting local file-read authority.
 
+The workspace layers are explicit:
+
+- `@codex-claw/core` owns platform-neutral contracts, reducers, and client
+  capability ports;
+- `@codex-claw/vue` owns the reusable Vue product shell and receives a typed
+  `ClawClient` at bootstrap;
+- `@codex-claw/electron` composes preload IPC and desktop-native capabilities;
+- `@codex-claw/web` composes the same Vue shell with an Express-owned WebSocket
+  adapter built on the SDK web socket ports; and
+- `@codex-claw/backend` remains the product authority and agent runtime.
+
+The initial web server binds to `127.0.0.1`, uses an explicit fixed
+`local-single-user` identity, and starts a dedicated stdio `clawd` child. The
+browser can invoke only an allowlisted set of product operations; desktop-only
+methods are rejected server-side. This is deliberately not an acceptable
+public deployment model. Authentication must replace the fixed identity and
+select an isolated backend/state home before the bind address is widened or
+multiple users are admitted.
+
+Host capabilities are enforced at both UI and backend boundaries. Electron
+advertises native dialogs, app lifecycle, updates, Dock badges, Open In,
+Appshots, the embedded browser, and Computer Use. Web advertises none of those,
+and its `clawd` runtime omits Computer Use and embedded-browser MCP tools even
+if a persisted desktop preference had enabled them. Voice transcription is an
+SDK-native capability: the SDK composer hides the microphone when a host does
+not provide transcription, so Claw does not maintain a duplicate flag.
+
 ```mermaid
 flowchart LR
-  Renderer["Renderer: Vue UI"]
+  Renderer["Reusable @codex-claw/vue UI"]
   Preload["Preload: typed bridge"]
   Main["Electron main: desktop adapter"]
   Client["ClawBackendClient"]
   Backend["clawd"]
+  Web["Express + Claw WebSocket adapter"]
+  Browser["Web browser"]
   Store["Backend app state directory"]
   Server["Codex app-server / Claude Code"]
   CodexHome["Backend state and provider homes"]
@@ -213,6 +242,8 @@ flowchart LR
   Preload <--> Main
   Main <--> Client
   Client <--> Backend
+  Browser <--> Web
+  Web <--> Backend
   Backend <--> Store
   Backend <--> Server
   Server <--> CodexHome

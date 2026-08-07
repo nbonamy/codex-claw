@@ -148,13 +148,13 @@ vi.mock('../log', () => ({ warnMain: mocks.warnMain }));
 import { createClawdRuntime } from '../runtime';
 
 type McpOptions = {
-  computerUse: {
+  computerUse?: {
     execute(input: unknown): Promise<unknown>;
     requestAccessibility(): Promise<unknown>;
     status(): Promise<unknown>;
     stop(): Promise<unknown>;
   };
-  browser: {
+  browser?: {
     open(input: unknown): Promise<unknown>;
     execute(input: unknown): Promise<unknown>;
   };
@@ -207,6 +207,7 @@ describe('clawd runtime', () => {
     mocks.schedulerOptions.length = 0;
     mocks.remoteOptions.length = 0;
     mocks.workIntegrationOptions.length = 0;
+    mocks.snapshot.general = {};
     mocks.drivers.clear();
     mocks.drivers.set('codex', driver);
     mocks.loadBackendSnapshot.mockResolvedValue(mocks.snapshot);
@@ -242,12 +243,12 @@ describe('clawd runtime', () => {
     expect(mocks.mcpSetEventSink).toHaveBeenCalledOnce();
 
     const mcp = mocks.mcpOptions[0] as McpOptions;
-    await mcp.computerUse.execute({ command: 'click' });
-    await mcp.computerUse.requestAccessibility();
-    await mcp.computerUse.status();
-    await mcp.computerUse.stop();
-    await mcp.browser.open({ url: 'https://example.com' });
-    await mcp.browser.execute({ command: 'dom' });
+    await mcp.computerUse!.execute({ command: 'click' });
+    await mcp.computerUse!.requestAccessibility();
+    await mcp.computerUse!.status();
+    await mcp.computerUse!.stop();
+    await mcp.browser!.open({ url: 'https://example.com' });
+    await mcp.browser!.execute({ command: 'dom' });
     expect(requestClient.mock.calls.map(([method]) => method)).toStrictEqual([
       backendMethods.clientComputerUseExecute,
       backendMethods.clientComputerUseRequestAccessibility,
@@ -298,6 +299,33 @@ describe('clawd runtime', () => {
     const scheduler = mocks.schedulerOptions[0] as SchedulerOptions;
     await scheduler.runLoops();
     expect(mocks.loopRunAll).toHaveBeenCalledOnce();
+  });
+
+  it('removes desktop-owned tools from a web-hosted runtime', async () => {
+    mocks.snapshot.general = {
+      plugins: { computerUseEnabled: true, chromeEnabled: true },
+    };
+
+    await createClawdRuntime({
+      emitEvent,
+      features: { computerUse: false, embeddedBrowser: false },
+      requestClient,
+      version: '1.2.3',
+    });
+
+    const mcp = mocks.mcpOptions[0] as McpOptions & { computerUseEnabled(): boolean };
+    expect(mcp.computerUse).toBeUndefined();
+    expect(mcp.browser).toBeUndefined();
+    expect(mcp.computerUseEnabled()).toBe(false);
+
+    const driverOptions = mocks.createDefaultBackendDrivers.mock.calls[0]?.[0] as {
+      pluginSettings(): { computerUseEnabled: boolean; chromeEnabled: boolean };
+    };
+    expect(driverOptions.pluginSettings()).toEqual({
+      computerUseEnabled: false,
+      chromeEnabled: true,
+    });
+    expect(requestClient).not.toHaveBeenCalled();
   });
 
   it('runs loop prompts, records new conversations, and emits snapshot updates', async () => {

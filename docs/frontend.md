@@ -70,6 +70,17 @@ Rules:
   menu component when an app builder needs another action.
 - Do not copy SDK leaf components, CSS, audio helpers, clipboard logic, or
   attachment plumbing into the renderer.
+- Mount the reusable shell through `mountClawVueApp` with a typed `ClawClient`.
+  Components consume injected app APIs and capability flags; they do not read
+  Electron globals or branch on user-agent strings.
+- Treat transcription as an SDK-native capability. A host that does not supply
+  transcription gets no microphone from the SDK composer; do not add a second
+  Claw transcription setting or feature flag.
+- Treat Computer Use, Appshots, native dialogs, the embedded browser, Open In,
+  Dock badges, desktop updates, daemon controls, system permissions, and app
+  lifecycle as host capabilities. Unsupported controls must be absent in web,
+  and security-sensitive capabilities such as Computer Use must also be absent
+  from the web backend tool surface.
 
 ## App Shell
 

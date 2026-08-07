@@ -1,6 +1,6 @@
 # Backend Architecture
 
-Status: exploration and implementation slicing, 2026-06-14.
+Status: desktop extraction plus initial web host, 2026-08-07.
 
 This document is the architecture record for extracting most of Codex Claw's
 Electron main process into a separate TypeScript backend process, tentatively
@@ -34,7 +34,17 @@ security tradeoff, not a mechanical build tweak.
 
 Current implementation checkpoint:
 
-- The repo is split into `shared`, `backend`, and `electron` workspaces.
+- The repo is split into `core`, `backend`, `vue`, `electron`, and `web`
+  workspaces. The web package follows the SDK web sample shape: one Express
+  server owns static hosting, HTTP upgrades, the Claw WebSocket adapter, and a
+  dedicated stdio `clawd` child.
+- The initial web identity is fixed and server-owned, the listener defaults to
+  localhost, and the browser protocol is an explicit allowlist over app-owned
+  backend methods. Multi-user hosting requires authenticated tenant lookup and
+  a per-user backend/state lease at this seam.
+- Web-launched `clawd` processes receive a host feature profile. Computer Use
+  and embedded-browser MCP tools are removed from that runtime rather than
+  being hidden only in the renderer.
 - `clawd --stdio` speaks app-owned JSON-RPC over newline-delimited stdio.
 - `clawd serve` speaks the same app-owned JSON-RPC over the local
   `~/.codex-claw/clawd.sock` Unix socket for a single-host always-on daemon.
@@ -219,7 +229,7 @@ codex-claw/
   package-lock.json
   tsconfig.base.json
   docs/
-  shared/
+  core/
     package.json
     src/
   backend/
@@ -234,6 +244,14 @@ codex-claw/
       renderer/
     assets/
     build/
+  vue/
+    package.json
+    src/
+  web/
+    package.json
+    src/
+      client/
+      server/
 ```
 
 Use npm workspaces because the repo already uses npm and lockfile v3. Do not
@@ -245,7 +263,7 @@ Root `package.json` should be private and orchestration-only:
 {
   "name": "codex-claw",
   "private": true,
-  "workspaces": ["shared", "backend", "electron"],
+  "workspaces": ["core", "backend", "vue", "electron", "web"],
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:electron": "npm run start -w @codex-claw/electron",
@@ -264,28 +282,37 @@ Workspace package names:
 
 - `@codex-claw/core`
 - `@codex-claw/backend`
+- `@codex-claw/vue`
 - `@codex-claw/electron`
+- `@codex-claw/web`
 
 Package ownership:
 
-- `shared` contains app contracts, backend protocol types/schemas,
+- `core` contains app contracts, backend protocol types/schemas,
   `RendererMessage`, IPC-facing DTOs, IDs, pure reducers, and pure helpers used
   by both backend and Electron. It must not import Electron, Vue, filesystem,
   child process, Codex app-server, Claude, or MCP implementation modules.
 - `backend` contains `clawd`, Codex/Claude drivers, MCP collaboration, loops,
   git/files/source discovery, persistence, work integrations, and backend
   protocol server/client implementations. It depends on `@codex-claw/core`.
-- `electron` contains Electron Forge config, main, preload, renderer, desktop
-  adapters, native dialogs, packaged resources, app icons, and release
-  packaging. It depends on `@codex-claw/core`; it should talk to the backend
-  through the app-owned backend protocol/client rather than importing backend
-  internals.
+- `vue` contains the reusable product shell, components, styles, i18n, and
+  renderer state adapter. It depends on `@codex-claw/core` and receives host
+  APIs at bootstrap.
+- `electron` contains Electron Forge config, main, preload, desktop adapters,
+  native dialogs, packaged resources, app icons, and release packaging. It
+  depends on `@codex-claw/core` and `@codex-claw/vue`; it should talk to the
+  backend through the app-owned backend protocol/client rather than importing
+  backend internals.
+- `web` contains the browser composition root and the Express-owned product
+  WebSocket bridge. It depends on core, Vue, and the SDK web transport ports,
+  and starts a built `clawd` artifact rather than importing backend internals.
 
 Dependency rules:
 
-- `shared` has no dependency on `backend` or `electron`.
-- `backend` may depend on `shared`, never on `electron`.
-- `electron` may depend on `shared`, but should not depend on `backend` at the
+- `core` has no dependency on `backend`, `vue`, `electron`, or `web`.
+- `backend` may depend on `core`, never on a host or UI package.
+- `vue` may depend on `core`, never on a host package.
+- `electron` and `web` may depend on `core` and `vue`, but should not depend on `backend` at the
   source-code level. In development it may spawn `backend`'s built `clawd`
   artifact, and in release it may package the backend executable or bundled
   script as a resource.
@@ -296,8 +323,9 @@ Dependency rules:
   stable, but the first reorg can keep build wiring simple if needed.
 
 This layout makes the process boundary visible in the filesystem. Root is the
-product monorepo; `electron` is one client/runtime; `backend` is the product
-backend; `shared` is the only compile-time contract bridge.
+product monorepo; `electron` and `web` are host runtimes; `vue` is the reusable
+UI; `backend` is the product backend; and `core` is the compile-time contract
+bridge.
 
 ## Source Facts
 

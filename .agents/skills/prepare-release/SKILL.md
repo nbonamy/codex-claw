@@ -82,6 +82,7 @@ Update all version-owned files together with `apply_patch`:
 - `backend/package.json`
 - `vue/package.json`
 - `electron/package.json`
+- `web/package.json`
 - the internal `@codex-claw/*` dependencies in workspace manifests
 
 Mechanically refresh the lockfile:
@@ -114,9 +115,11 @@ Only these paths may be modified:
 - `CHANGELOG.md`
 - `package.json`
 - `package-lock.json`
-- `shared/package.json`
+- `core/package.json`
 - `backend/package.json`
+- `vue/package.json`
 - `electron/package.json`
+- `web/package.json`
 - `vue/src/generated/release-notes.json`
 
 Abort if another path changed. Review the complete diff and confirm every
@@ -124,7 +127,7 @@ manifest and lockfile workspace version equals the target.
 
 ## 6. Commit and tag release preparation
 
-Stage only the seven allowed paths. Review `git diff --cached --check`,
+Stage only the allowed paths. Review `git diff --cached --check`,
 `git diff --cached --stat`, and the complete cached diff. Commit with exactly:
 
 ```text

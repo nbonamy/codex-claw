@@ -24,6 +24,10 @@ export type ClawdClientRequest = <Result>(method: string, params?: unknown) => P
 
 export type ClawdRuntimeOptions = {
   emitEvent(event: ClawBackendEvent): void;
+  features?: {
+    computerUse?: boolean;
+    embeddedBrowser?: boolean;
+  };
   requestClient: ClawdClientRequest;
   version: string;
 };
@@ -34,28 +38,33 @@ export type ClawdRuntime = {
 };
 
 export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<ClawdRuntime> {
+  const computerUseAvailable = options.features?.computerUse !== false;
+  const embeddedBrowserAvailable = options.features?.embeddedBrowser !== false;
   const snapshot = await loadBackendSnapshot();
   await initializeCodexResourceSharing(snapshot.general.shareCodexSkillsAndPlugins);
   await ensureBackendCodexHome();
   const mcpService = new ClawMcpService({
     snapshot,
-    computerUse: {
+    computerUse: computerUseAvailable ? {
       execute: (input) => options.requestClient(backendMethods.clientComputerUseExecute, input),
       requestAccessibility: () => options.requestClient(backendMethods.clientComputerUseRequestAccessibility),
       status: () => options.requestClient(backendMethods.clientComputerUseStatusGet),
       stop: () => options.requestClient(backendMethods.clientComputerUseStop),
-    },
-    computerUseEnabled: () => snapshot.general.plugins?.computerUseEnabled === true,
-    browser: {
+    } : undefined,
+    computerUseEnabled: () => computerUseAvailable && snapshot.general.plugins?.computerUseEnabled === true,
+    browser: embeddedBrowserAvailable ? {
       open: (input) => options.requestClient(backendMethods.clientBrowserOpen, input),
       execute: (input) => options.requestClient(backendMethods.clientBrowserExecute, input),
-    },
+    } : undefined,
   });
   const mcpServerUrl = await mcpService.start();
   const backendDrivers = createDefaultBackendDrivers({
     clawMcpServerUrl: mcpServerUrl,
     generalSettings: snapshot.general,
-    pluginSettings: () => snapshot.general.plugins ?? { computerUseEnabled: false, chromeEnabled: false },
+    pluginSettings: () => ({
+      ...(snapshot.general.plugins ?? { computerUseEnabled: false, chromeEnabled: false }),
+      computerUseEnabled: computerUseAvailable && snapshot.general.plugins?.computerUseEnabled === true,
+    }),
   });
   const driverRpc = new BackendDriverRpc(backendDrivers);
   let server: ClawBackendServer;

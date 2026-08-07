@@ -3,11 +3,11 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('workspace dependency boundaries', () => {
-  it('keeps backend and shared source free of Electron imports', async () => {
+  it('keeps backend and core source free of Electron imports', async () => {
     const repoRoot = path.resolve(__dirname, '../../..');
     const files = [
       ...(await sourceFiles(path.join(repoRoot, 'backend/src'))),
-      ...(await sourceFiles(path.join(repoRoot, 'shared/src'))),
+      ...(await sourceFiles(path.join(repoRoot, 'core/src'))),
     ];
     const offenders: string[] = [];
 
