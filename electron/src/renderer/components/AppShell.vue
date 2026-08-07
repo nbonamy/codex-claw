@@ -2023,6 +2023,11 @@ function resetQuickAgentShortcuts(): void {
 }
 
 function handleAppCommand(command: AppCommand): void {
+  // Native menu accelerators can consume the matching key event before the
+  // renderer observes Meta keyup. Treat the resolved command as the end of
+  // the transient Command-number reveal so the sidebar cannot stay latched.
+  resetQuickAgentShortcuts();
+
   if (command.type === 'appshot-failed') {
     ElMessage.error(command.message);
     return;

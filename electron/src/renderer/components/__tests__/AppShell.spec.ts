@@ -2697,6 +2697,14 @@ describe('AppShell', () => {
 
   it('reveals delayed Command-number hints and switches to the numbered agent', async () => {
     vi.useFakeTimers();
+    let listener: (command: AppCommand) => void = () => undefined;
+    window.codexClaw = {
+      onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
+        listener = nextListener;
+        return () => undefined;
+      }),
+      onEvent: vi.fn(() => vi.fn()),
+    } as Partial<CodexClawApi> as CodexClawApi;
     const wrapper = mountShell();
     try {
       expect(wrapper.find('.agent-sidebar__quick-switch-shortcut').exists()).toBe(false);
@@ -2716,6 +2724,17 @@ describe('AppShell', () => {
       expect(wrapper.findAll('.agent-sidebar__quick-switch-shortcut').map((shortcut) => shortcut.text()))
         .toStrictEqual(['⌘1', '⌘2']);
 
+      listener({ type: 'open-agent-composer', prompt: '/compact', submit: true });
+      await nextTick();
+      expect(wrapper.find('.agent-sidebar__quick-switch-shortcut').exists()).toBe(false);
+      expect(wrapper.emitted('send-agent-prompt')).toStrictEqual([[
+        { agentId: 'agent-dina', prompt: '/compact' },
+      ]]);
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta', metaKey: true }));
+      vi.advanceTimersByTime(350);
+      await nextTick();
+
       const switchEvent = new KeyboardEvent('keydown', {
         key: '2',
         metaKey: true,
@@ -2723,7 +2742,7 @@ describe('AppShell', () => {
       });
       window.dispatchEvent(switchEvent);
       expect(switchEvent.defaultPrevented).toBe(true);
-      expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-jesse']]);
+      expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-dina'], ['agent-jesse']]);
 
       window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Meta' }));
       await nextTick();
