@@ -1,0 +1,4 @@
+interface:
+  display_name: "Update Changelog"
+  short_description: "Audit release history and curate release notes"
+  default_prompt: "Use $update-changelog to audit Codex Claw and SDK changes and refresh Unreleased release notes."

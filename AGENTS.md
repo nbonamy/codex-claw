@@ -130,12 +130,20 @@ editing.
 Use `codex-claw-dod` before handing off, committing, pushing, or calling Codex
 Claw work done.
 
+Never update `CHANGELOG.md` during ordinary implementation, review, handoff,
+commit, or push work. Curate it only when Nicolas explicitly invokes
+`update-changelog` or `prepare-release`.
+
 - `codex-claw-dod`: Definition of Done checklist for scope, architecture,
   tests, coverage, security, UX, docs, worktree hygiene, and handoff.
 - `codex-claw-frontend-dev`: Vue, Element Plus, app shell, chat rendering,
   artifact panes, design tokens, themes, and frontend tests.
 - `codex-claw-testing-coverage`: Vitest, component isolation, IPC contracts,
   fake Codex transports, coverage triage, and verification gates.
+- `update-changelog`: release-time audit of Claw and SDK histories, curated
+  Unreleased notes, and an evidence-backed semantic-version recommendation.
+- `prepare-release`: invokes `update-changelog`, confirms the recommended
+  version, freezes release artifacts, and creates the local provenance tag.
 
 ## Plans
 

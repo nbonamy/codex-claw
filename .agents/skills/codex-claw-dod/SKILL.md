@@ -25,6 +25,10 @@ fixture, generated artifact, or dependency changed afterward.
 Do not call work done just because it compiles. Walk the checklist, verify each
 applicable gate, and explicitly call out anything skipped or not applicable.
 
+Do not edit `CHANGELOG.md` during ordinary implementation, review, handoff,
+commit, or push work. Changelog curation belongs exclusively to an explicit
+`update-changelog` or `prepare-release` workflow.
+
 ## Risk classification
 
 Classify the change before choosing commands:
@@ -83,10 +87,6 @@ Before handoff or commit, check every applicable item:
   or with screenshots when tooling exists.
 - [ ] **Docs:** `AGENTS.md`, `docs/*.md`, and plans are updated when behavior,
   architecture, or workflow expectations change.
-- [ ] **Changelog:** Meaningful user-facing features and fixes get a short,
-  user-oriented entry under the current release in `CHANGELOG.md`. Describe
-  the outcome users notice; omit internal plumbing such as logging,
-  refactors, tests, and dependency updates unless they change user behavior.
 - [ ] **Worktree hygiene:** `git status --short` is reviewed; unrelated user
   changes are not staged.
 - [ ] **Commit readiness:** The staged diff contains only intended files and
