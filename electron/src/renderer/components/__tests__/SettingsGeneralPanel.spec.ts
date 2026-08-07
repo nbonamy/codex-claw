@@ -1,8 +1,8 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus, { ElMessageBox } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ClawdDaemonStatus, SystemPermissionsStatus } from '@codex-claw/shared/contracts';
-import { defaultGeneralSettings } from '@codex-claw/shared/settings';
+import type { ClawdDaemonStatus, SystemPermissionsStatus } from '@codex-claw/core/contracts';
+import { defaultGeneralSettings } from '@codex-claw/core/settings';
 import SettingsGeneralPanel from '../SettingsGeneralPanel.vue';
 
 describe('SettingsGeneralPanel', () => {

@@ -1,4 +1,4 @@
-import type { AppThemeSettings } from '@codex-claw/shared/contracts';
+import type { AppThemeSettings } from '@codex-claw/core/contracts';
 import { effectiveTheme } from './themes';
 
 const mediaQuery = typeof window !== 'undefined'

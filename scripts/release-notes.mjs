@@ -46,9 +46,9 @@ export function assertVersionConsistency({ rootPackage, workspaces, lockfile }) 
     if (workspace.manifest.version !== version) {
       throw new Error(`${workspace.path} version ${workspace.manifest.version ?? '(missing)'} does not match root version ${version}.`);
     }
-    const sharedVersion = workspace.manifest.dependencies?.['@codex-claw/shared'];
+    const sharedVersion = workspace.manifest.dependencies?.['@codex-claw/core'];
     if (sharedVersion !== undefined && sharedVersion !== version) {
-      throw new Error(`${workspace.path} depends on @codex-claw/shared ${sharedVersion}, expected ${version}.`);
+      throw new Error(`${workspace.path} depends on @codex-claw/core ${sharedVersion}, expected ${version}.`);
     }
   }
 
@@ -60,9 +60,9 @@ export function assertVersionConsistency({ rootPackage, workspaces, lockfile }) 
     if (lockManifest?.version !== version) {
       throw new Error(`package-lock.json entry for ${workspace.path} does not match ${version}. Run npm install after bumping versions.`);
     }
-    const sharedVersion = lockManifest?.dependencies?.['@codex-claw/shared'];
+    const sharedVersion = lockManifest?.dependencies?.['@codex-claw/core'];
     if (sharedVersion !== undefined && sharedVersion !== version) {
-      throw new Error(`package-lock.json entry for ${workspace.path} depends on @codex-claw/shared ${sharedVersion}, expected ${version}.`);
+      throw new Error(`package-lock.json entry for ${workspace.path} depends on @codex-claw/core ${sharedVersion}, expected ${version}.`);
     }
   }
 

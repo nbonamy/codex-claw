@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
-import type { SourceRepository } from '@codex-claw/shared/contracts';
+import type { SourceRepository } from '@codex-claw/core/contracts';
 import NewSourceWorktreeDialog from '../NewSourceWorktreeDialog.vue';
 
 describe('NewSourceWorktreeDialog', () => {

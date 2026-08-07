@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus, { ElMessageBox } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import NewAgentButton from '../NewAgentButton.vue';
-import type { BenchTemplate } from '@codex-claw/shared/contracts';
+import type { BenchTemplate } from '@codex-claw/core/contracts';
 
 const bench: BenchTemplate[] = [
   {

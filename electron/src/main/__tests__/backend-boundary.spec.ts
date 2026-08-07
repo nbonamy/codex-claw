@@ -136,7 +136,7 @@ describe('Electron backend boundary', () => {
   });
 
   it('keeps the shared package free of Node filesystem runtime APIs', async () => {
-    const sources = (await readElectronMainRuntimeSources(path.resolve(__dirname, '../../../../shared/src')))
+    const sources = (await readElectronMainRuntimeSources(path.resolve(__dirname, '../../../../core/src')))
       .filter(({ filePath }) => !filePath.endsWith('runtime-discovery.ts'));
 
     for (const { filePath, source } of sources) {
@@ -256,7 +256,7 @@ describe('Electron backend boundary', () => {
   it('keeps folder picker IPC separate from backend mutations', async () => {
     const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
     const preloadPath = path.resolve(__dirname, '../../preload/index.ts');
-    const ipcPath = path.resolve(__dirname, '../../../../shared/src/ipc.ts');
+    const ipcPath = path.resolve(__dirname, '../../../../core/src/ipc.ts');
     const appController = await readFile(appControllerPath, 'utf8');
     const preload = await readFile(preloadPath, 'utf8');
     const ipc = await readFile(ipcPath, 'utf8');
@@ -280,7 +280,7 @@ describe('Electron backend boundary', () => {
   it('uses the SDK native bridge instead of app-owned transcription IPC', async () => {
     const appControllerPath = path.resolve(__dirname, '../app-controller.ts');
     const preloadPath = path.resolve(__dirname, '../../preload/index.ts');
-    const backendMethodsPath = path.resolve(__dirname, '../../../../shared/src/backend-protocol/methods.ts');
+    const backendMethodsPath = path.resolve(__dirname, '../../../../core/src/backend-protocol/methods.ts');
     const appController = await readFile(appControllerPath, 'utf8');
     const preload = await readFile(preloadPath, 'utf8');
     const backendMethods = await readFile(backendMethodsPath, 'utf8');

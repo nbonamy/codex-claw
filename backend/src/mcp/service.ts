@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { sendAgentPrompt } from '@codex-claw/shared/agent-chat-service';
-import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
-import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/shared/backend-driver';
-import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
+import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
+import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/core/backend-driver';
+import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import type {
   Agent,
   AppSnapshot,
@@ -18,11 +18,11 @@ import type {
   SourceRepository,
   SourceWorktree,
   WorkBacklogAssignment,
-} from '@codex-claw/shared/contracts';
-import { closeAgentInSnapshot, completeWorkItemAssignmentInSnapshot, markWorkItemCompletionInstructionsDeliveredInSnapshot } from '@codex-claw/shared/agent-manager';
-import { completeLoopExecutionInSnapshot } from '@codex-claw/shared/loop-manager';
-import { createAgentInSnapshot } from '@codex-claw/shared/snapshot';
-import { closeTeamInSnapshot } from '@codex-claw/shared/team-manager';
+} from '@codex-claw/core/contracts';
+import { closeAgentInSnapshot, completeWorkItemAssignmentInSnapshot, markWorkItemCompletionInstructionsDeliveredInSnapshot } from '@codex-claw/core/agent-manager';
+import { completeLoopExecutionInSnapshot } from '@codex-claw/core/loop-manager';
+import { createAgentInSnapshot } from '@codex-claw/core/snapshot';
+import { closeTeamInSnapshot } from '@codex-claw/core/team-manager';
 import { createSourceWorktree, listSourceWorktrees } from '../git-worktrees';
 import { scanSourceRepositories } from '../source-repositories';
 import type { BackendDriverRpc } from '../driver-rpc';

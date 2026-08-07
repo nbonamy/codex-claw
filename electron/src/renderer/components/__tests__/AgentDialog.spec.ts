@@ -3,7 +3,7 @@ import ElementPlus from 'element-plus';
 import { nextTick } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import AgentDialog from '../AgentDialog.vue';
-import type { Agent, CreateAgentInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '@codex-claw/shared/contracts';
+import type { Agent, CreateAgentInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '@codex-claw/core/contracts';
 
 const idleAgent: Agent = {
   id: 'agent-dina',

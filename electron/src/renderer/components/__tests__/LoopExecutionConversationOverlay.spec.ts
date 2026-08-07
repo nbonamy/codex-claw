@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import type { RendererMessage } from '@codex-claw/shared/contracts';
+import type { RendererMessage } from '@codex-claw/core/contracts';
 import { i18n } from '../../i18n';
 import LoopExecutionConversationOverlay from '../LoopExecutionConversationOverlay.vue';
 

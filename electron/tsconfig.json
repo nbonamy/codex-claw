@@ -7,7 +7,7 @@
     "vitest.config.ts",
     "src/**/*.ts",
     "src/**/*.vue",
-    "../shared/src/**/*.ts"
+    "../core/src/**/*.ts"
   ],
   "references": []
 }

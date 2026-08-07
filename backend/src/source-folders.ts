@@ -1,7 +1,7 @@
 import { readdir, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { SourceFolderEntry, SourceFolderListing } from '@codex-claw/shared/contracts';
+import type { SourceFolderEntry, SourceFolderListing } from '@codex-claw/core/contracts';
 
 export async function listSourceFolders(folderPath?: string): Promise<SourceFolderListing> {
   const resolvedPath = await resolveFolderPath(folderPath);

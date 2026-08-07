@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
 import AgentContextMenu from '../AgentContextMenu.vue';
-import type { Team } from '@codex-claw/shared/contracts';
+import type { Team } from '@codex-claw/core/contracts';
 
 let mountedWrappers: ReturnType<typeof mount>[] = [];
 

@@ -1,4 +1,4 @@
-import type { Agent, OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/shared/contracts';
+import type { Agent, OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
 import type { AppMenuItem } from './menu/app-menu';
 
 const openInMenuPrefix = 'open-in:';

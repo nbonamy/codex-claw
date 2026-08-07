@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import type { ThreadPlan } from '@codex-claw/shared/contracts';
+import type { ThreadPlan } from '@codex-claw/core/contracts';
 import ConversationPlanPanel from '../ConversationPlanPanel.vue';
 import { i18n } from '../../i18n';
 

@@ -62,7 +62,7 @@ import type {
   Agent,
   RendererMessage,
   ThreadPlan,
-} from '@codex-claw/shared/contracts';
+} from '@codex-claw/core/contracts';
 import ConversationPlanPanel from './ConversationPlanPanel.vue';
 import {
   presentCollaborationMessage,

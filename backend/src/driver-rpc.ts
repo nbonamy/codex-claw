@@ -1,7 +1,7 @@
-import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
-import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/shared/backend-driver';
-import { unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
-import type { Agent, AgentBackend, AppGeneralSettings, AppPluginSettings, CreateSourceWorktreeInput, DevicePairingSession, SendPromptOptions } from '@codex-claw/shared/contracts';
+import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/core/backend-driver';
+import { unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
+import type { Agent, AgentBackend, AppGeneralSettings, AppPluginSettings, CreateSourceWorktreeInput, DevicePairingSession, SendPromptOptions } from '@codex-claw/core/contracts';
 import { stat } from 'node:fs/promises';
 import { listAgentFolderFiles, previewAgentFolderFile } from './agent-files';
 import { ClaudeBackendDriver } from './claude/claude-driver';

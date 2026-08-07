@@ -3,7 +3,7 @@ import ElementPlus from 'element-plus';
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it } from 'vitest';
 import SettingsMenu from '../SettingsMenu.vue';
-import type { AccountRateLimits, CodexAccount } from '@codex-claw/shared/contracts';
+import type { AccountRateLimits, CodexAccount } from '@codex-claw/core/contracts';
 
 afterEach(() => {
   document.body.innerHTML = '';

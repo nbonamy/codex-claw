@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
-import { createEmptySnapshot, createInitialSnapshot, snapshotMetadata } from '@codex-claw/shared/snapshot';
-import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/shared/contracts';
-import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
-import { workItemAssignmentPrompt } from '@codex-claw/shared/work-item-prompts';
+import { createEmptySnapshot, createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
+import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
 import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';
 
 describe('useAppState', () => {

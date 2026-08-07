@@ -1,11 +1,11 @@
-import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
+import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { access, mkdir, unlink, writeFile } from 'node:fs/promises';
 import net, { type Socket } from 'node:net';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { execFile as execFileCallback } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { ClawdDaemonStatus } from '@codex-claw/shared/contracts';
+import type { ClawdDaemonStatus } from '@codex-claw/core/contracts';
 import { runtimeClawdCommand, runtimeClawdHome, runtimeClawdServeCommand, runtimeClawdSocketPath, type RuntimeClawdConfigDeps, type RuntimeClawdCommand } from './runtime-config';
 
 const execFile = promisify(execFileCallback);

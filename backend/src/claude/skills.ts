@@ -1,7 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import type { Agent, BackendSkillSummary } from '@codex-claw/shared/contracts';
+import type { Agent, BackendSkillSummary } from '@codex-claw/core/contracts';
 
 type ClaudeSkillScope = 'project' | 'user';
 

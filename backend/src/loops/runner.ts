@@ -1,12 +1,12 @@
-import type { Agent, AppSnapshot, Loop, LoopExecutionLogEntry, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
-import { assignWorkItemToAgentInSnapshot, deployBenchTemplateInSnapshot } from '@codex-claw/shared/agent-manager';
-import { recordLoopExecutionInSnapshot } from '@codex-claw/shared/loop-manager';
-import { createEntityId, type IdGenerator } from '@codex-claw/shared/ids';
-import { createAgentInSnapshot } from '@codex-claw/shared/snapshot';
-import { defaultTeamColor } from '@codex-claw/shared/team-colors';
-import { createTeamInSnapshot } from '@codex-claw/shared/team-manager';
-import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
-import { workItemAssignmentPrompt, workProviderLabel } from '@codex-claw/shared/work-item-prompts';
+import type { Agent, AppSnapshot, Loop, LoopExecutionLogEntry, WorkItem, WorkProviderKind } from '@codex-claw/core/contracts';
+import { assignWorkItemToAgentInSnapshot, deployBenchTemplateInSnapshot } from '@codex-claw/core/agent-manager';
+import { recordLoopExecutionInSnapshot } from '@codex-claw/core/loop-manager';
+import { createEntityId, type IdGenerator } from '@codex-claw/core/ids';
+import { createAgentInSnapshot } from '@codex-claw/core/snapshot';
+import { defaultTeamColor } from '@codex-claw/core/team-colors';
+import { createTeamInSnapshot } from '@codex-claw/core/team-manager';
+import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import { workItemAssignmentPrompt, workProviderLabel } from '@codex-claw/core/work-item-prompts';
 import path from 'node:path';
 import { logMain, warnMain } from '../log';
 

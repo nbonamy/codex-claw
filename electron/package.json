@@ -25,11 +25,11 @@
     "test:watch": "vitest watch"
   },
   "dependencies": {
-    "@codex-claw/shared": "0.6.1",
+    "@codex-claw/core": "0.6.1",
     "@tabler/icons-vue": "^3.44.0",
     "autolib": "github:nbonamy/witsy-autolib#v1.2.3",
-    "@codex-app-sdk/electron": "file:../../codex-app-sdk-modular-packages/packages/electron",
-    "@codex-app-sdk/vue": "file:../../codex-app-sdk-modular-packages/packages/vue",
+    "@codex-app-sdk/electron": "file:../../codex-app-sdk/packages/electron",
+    "@codex-app-sdk/vue": "file:../../codex-app-sdk/packages/vue",
     "electron-log": "^5.4.4",
     "electron-squirrel-startup": "^1.0.1",
     "element-plus": "^2.13.6",

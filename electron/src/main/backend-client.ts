@@ -1,4 +1,4 @@
-import type { ClawBackendEvent, ClawBackendHealth } from '@codex-claw/shared/backend-protocol/rpc';
+import type { ClawBackendEvent, ClawBackendHealth } from '@codex-claw/core/backend-protocol/rpc';
 import { createRuntimeClientRequestHandlers } from './client-request-handlers';
 import { ClawBackendProcessClient } from './backend-process-client';
 import { ClawBackendSocketClient } from './backend-socket-client';

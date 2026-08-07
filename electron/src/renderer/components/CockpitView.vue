@@ -160,9 +160,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { ComponentPublicInstance } from 'vue';
-import type { Agent, AgentStatus, BenchTemplate, DeployBenchTemplateInput, RemoveBenchTemplateInput, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/shared/contracts';
-import { defaultTeamColor } from '@codex-claw/shared/team-colors';
-import { assignedAgentsByWorkItemKey as collectAssignedAgentsByWorkItemKey } from '@codex-claw/shared/work-assignments';
+import type { Agent, AgentStatus, BenchTemplate, DeployBenchTemplateInput, RemoveBenchTemplateInput, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import { defaultTeamColor } from '@codex-claw/core/team-colors';
+import { assignedAgentsByWorkItemKey as collectAssignedAgentsByWorkItemKey } from '@codex-claw/core/work-assignments';
 import AgentContextMenu from './AgentContextMenu.vue';
 import type { AgentContextMenuAction } from './AgentContextMenu.vue';
 import CockpitAddAgentTile from './CockpitAddAgentTile.vue';

@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import AgentHeader from '../AgentHeader.vue';
-import type { Agent, AgentGitStatus, BackendRuntimeStatus } from '@codex-claw/shared/contracts';
+import type { Agent, AgentGitStatus, BackendRuntimeStatus } from '@codex-claw/core/contracts';
 
 const agent: Agent = {
   id: 'agent-dina',

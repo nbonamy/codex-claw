@@ -1,5 +1,5 @@
-import type { Agent, AppPluginSettings } from '@codex-claw/shared/contracts';
-import { defaultPluginSettings } from '@codex-claw/shared/settings';
+import type { Agent, AppPluginSettings } from '@codex-claw/core/contracts';
+import { defaultPluginSettings } from '@codex-claw/core/settings';
 import type { CodexThreadStartExtension } from '@codex-app-sdk/backend';
 import { codexClawDeveloperInstructions } from './agent-prompts';
 

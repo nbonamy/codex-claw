@@ -195,8 +195,8 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Agent, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/shared/contracts';
-import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
+import type { Agent, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import { CircleXIcon, DotsVerticalIcon, ExternalLinkIcon, GitHubIcon, PlusCircleIcon, RefreshIcon, SaveToBenchIcon } from '../shared/icons/app-icons';

@@ -2,9 +2,9 @@ import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { nextTick } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { WorkItem } from '@codex-claw/shared/contracts';
-import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import type { WorkItem } from '@codex-claw/core/contracts';
+import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import CockpitView from '../CockpitView.vue';
 
 describe('CockpitView', () => {

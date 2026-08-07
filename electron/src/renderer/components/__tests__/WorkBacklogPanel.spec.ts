@@ -4,8 +4,8 @@ import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Agent, WorkItem, WorkRepository } from '@codex-claw/shared/contracts';
-import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
+import type { Agent, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import WorkBacklogPanel from '../WorkBacklogPanel.vue';
 
 describe('WorkBacklogPanel', () => {

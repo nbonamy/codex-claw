@@ -19,7 +19,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@codex-claw/shared': path.resolve(__dirname, '../shared/src'),
+      '@codex-claw/core': path.resolve(__dirname, '../core/src'),
       ...(useSdkSources ? sdkSourceAliases : {}),
     },
     dedupe: ['vue'],

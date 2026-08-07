@@ -242,7 +242,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { Agent, AgentBackend, CreateAgentInput, CreateSourceWorktreeInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '@codex-claw/shared/contracts';
+import type { Agent, AgentBackend, CreateAgentInput, CreateSourceWorktreeInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '@codex-claw/core/contracts';
 import AgentAvatarPicker from './AgentAvatarPicker.vue';
 import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
 import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';

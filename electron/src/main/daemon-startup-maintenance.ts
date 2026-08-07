@@ -1,7 +1,7 @@
-import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
+import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { dialog } from 'electron';
-import { isClawSnapshotGetResult } from '@codex-claw/shared/backend-protocol/rpc';
-import type { AppSnapshot } from '@codex-claw/shared/contracts';
+import { isClawSnapshotGetResult } from '@codex-claw/core/backend-protocol/rpc';
+import type { AppSnapshot } from '@codex-claw/core/contracts';
 import { ClawBackendSocketClient } from './backend-socket-client';
 import { getClawdDaemonStatus, getResolvedClawdVersion, refreshClawdDaemon, type DaemonLaunchAgentDependencies } from './daemon-launch-agent';
 import { logMain, warnMain } from './log';

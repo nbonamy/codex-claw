@@ -151,8 +151,8 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { CreateTeamInput, RemoteConnection, Team, UpdateTeamInput } from '@codex-claw/shared/contracts';
-import { defaultTeamColor, teamColors } from '@codex-claw/shared/team-colors';
+import type { CreateTeamInput, RemoteConnection, Team, UpdateTeamInput } from '@codex-claw/core/contracts';
+import { defaultTeamColor, teamColors } from '@codex-claw/core/team-colors';
 import { CheckIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{

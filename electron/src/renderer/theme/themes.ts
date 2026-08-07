@@ -1,4 +1,4 @@
-import type { AppearanceMode, AppThemeSettings } from '@codex-claw/shared/contracts';
+import type { AppearanceMode, AppThemeSettings } from '@codex-claw/core/contracts';
 
 export type AppThemeDefinition = {
   id: string;

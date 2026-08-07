@@ -3,7 +3,7 @@ import {
   collaborationInstructionsEnd,
   collaborationInstructionsStart,
   formatCollaborationMessageEnvelope,
-} from '@codex-claw/shared/collaboration-message-envelope';
+} from '@codex-claw/core/collaboration-message-envelope';
 import {
   parseCollaborationMessage,
   presentCollaborationMessage,

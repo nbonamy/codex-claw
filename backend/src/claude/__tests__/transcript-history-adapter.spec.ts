@@ -3,7 +3,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 import { claudeTranscriptToRendererMessages, listClaudeTranscriptSummaries, loadClaudeTranscriptHistory } from '../transcript-history-adapter';
-import type { Agent } from '@codex-claw/shared/contracts';
+import type { Agent } from '@codex-claw/core/contracts';
 
 describe('claudeTranscriptToRendererMessages', () => {
   it('translates Claude JSONL transcript records into renderer messages', () => {

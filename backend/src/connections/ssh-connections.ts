@@ -3,8 +3,8 @@ import { constants as fsConstants } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import type { AddSshConnectionInput, RemoteConnection, SshHostCandidate } from '@codex-claw/shared/contracts';
-import { createEntityId } from '@codex-claw/shared/ids';
+import type { AddSshConnectionInput, RemoteConnection, SshHostCandidate } from '@codex-claw/core/contracts';
+import { createEntityId } from '@codex-claw/core/ids';
 import { backendProviderTokensFilePath } from '../state';
 
 type ExecResult = {

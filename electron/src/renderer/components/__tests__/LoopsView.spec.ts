@@ -1,8 +1,8 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus, { ElMessageBox } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AppSnapshot, BackendConversationRef, CreateLoopInput, Loop, LoopLocation, RemoteConnection, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/shared/contracts';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import type { AppSnapshot, BackendConversationRef, CreateLoopInput, Loop, LoopLocation, RemoteConnection, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import LoopsView from '../LoopsView.vue';
 
 afterEach(() => {

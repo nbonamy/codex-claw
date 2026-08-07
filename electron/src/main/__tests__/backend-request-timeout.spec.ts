@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
+import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { backendRequestTimeoutMs } from '../backend-request-timeout';
 
 describe('backendRequestTimeoutMs', () => {

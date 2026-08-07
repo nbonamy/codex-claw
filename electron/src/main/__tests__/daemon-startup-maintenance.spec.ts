@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ClawdDaemonStatus } from '@codex-claw/shared/contracts';
-import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
+import type { ClawdDaemonStatus } from '@codex-claw/core/contracts';
+import { createEmptySnapshot } from '@codex-claw/core/snapshot';
 import { ensureCurrentClawdDaemonForStartup } from '../daemon-startup-maintenance';
 
 describe('daemon startup maintenance', () => {

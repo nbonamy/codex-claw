@@ -134,7 +134,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/core/contracts';
 import { CheckIcon, CopyIcon, GitHubIcon } from '../shared/icons/app-icons';
 import SettingsIntegrationBanner from './SettingsIntegrationBanner.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';

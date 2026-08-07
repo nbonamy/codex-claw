@@ -1,6 +1,6 @@
 import { PassThrough } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
+import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ClawBackendProcessClient } from '../backend-process-client';
 
 describe('ClawBackendProcessClient', () => {

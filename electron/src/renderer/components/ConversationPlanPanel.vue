@@ -51,7 +51,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { ThreadPlan } from '@codex-claw/shared/contracts';
+import type { ThreadPlan } from '@codex-claw/core/contracts';
 import { CheckIcon, Circle, ListIcon, X } from '../shared/icons/app-icons';
 
 const props = defineProps<{

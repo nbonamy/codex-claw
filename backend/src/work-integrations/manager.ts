@@ -1,5 +1,5 @@
-import type { AppSnapshot, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkProviderAuthorization, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
-import type { WorkIntegrationTokenStore, WorkProviderToken } from '@codex-claw/shared/work-integration-tokens';
+import type { AppSnapshot, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkProviderAuthorization, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { WorkIntegrationTokenStore, WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
 import type { WorkProviderDeviceAuthorization, WorkProviderDriver } from './types';
 
 type WorkIntegrationManagerOptions = {

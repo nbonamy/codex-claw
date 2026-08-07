@@ -2,7 +2,7 @@ import type { Dirent } from 'node:fs';
 import { access, readFile, readdir, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, BackendSession, ConversationSummary, RendererMessage, RendererMessagePart, RendererToolPart } from '@codex-claw/shared/contracts';
+import type { Agent, BackendSession, ConversationSummary, RendererMessage, RendererMessagePart, RendererToolPart } from '@codex-claw/core/contracts';
 import { claudeMessageContentBlocks, parseClaudeSdkMessage, type ClaudeSdkContentBlock, type ClaudeSdkMessage } from './protocol';
 
 export type ClaudeTranscriptHistory = {

@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { Agent, WorkItem } from '@codex-claw/shared/contracts';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import type { Agent, WorkItem } from '@codex-claw/core/contracts';
 import CockpitAgentCard from '../CockpitAgentCard.vue';
 
 type CockpitAgentCardProps = {

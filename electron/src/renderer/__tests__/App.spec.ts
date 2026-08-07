@@ -3,8 +3,8 @@ import ElementPlus from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../App.vue';
 import AppShell from '../components/AppShell.vue';
-import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { CodexClawApi } from '@codex-claw/shared/contracts';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import type { CodexClawApi } from '@codex-claw/core/contracts';
 
 afterEach(() => {
   delete window.codexClaw;

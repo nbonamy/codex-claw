@@ -78,10 +78,10 @@ Move the reviewed Unreleased body under today's local-date heading:
 Update all version-owned files together with `apply_patch`:
 
 - `package.json`
-- `shared/package.json`
+- `core/package.json`
 - `backend/package.json`
 - `electron/package.json`
-- the `@codex-claw/shared` dependency in backend and Electron manifests
+- the `@codex-claw/core` dependency in backend and Electron manifests
 
 Mechanically refresh the lockfile:
 

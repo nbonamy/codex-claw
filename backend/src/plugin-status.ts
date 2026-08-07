@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AppPluginStatus } from '@codex-claw/shared/contracts';
+import type { AppPluginStatus } from '@codex-claw/core/contracts';
 import { backendCodexHomeDir } from './state';
 
 const chromePluginSection = '[plugins."chrome@openai-bundled"]';

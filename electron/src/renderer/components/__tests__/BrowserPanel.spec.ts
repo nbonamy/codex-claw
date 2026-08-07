@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import BrowserPanel from '../BrowserPanel.vue';
-import type { MainToRendererEvent } from '@codex-claw/shared/contracts';
+import type { MainToRendererEvent } from '@codex-claw/core/contracts';
 
 class ResizeObserverStub {
   observe = vi.fn();

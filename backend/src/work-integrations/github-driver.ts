@@ -1,5 +1,5 @@
-import type { WorkItem, WorkItemLabel, WorkRepository } from '@codex-claw/shared/contracts';
-import type { WorkProviderToken } from '@codex-claw/shared/work-integration-tokens';
+import type { WorkItem, WorkItemLabel, WorkRepository } from '@codex-claw/core/contracts';
+import type { WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
 import { runtimeGitHubOAuthClientId } from '../runtime-config';
 import type { WorkProviderDeviceAuthorization, WorkProviderDeviceTokenResult, WorkProviderDriver } from './types';
 

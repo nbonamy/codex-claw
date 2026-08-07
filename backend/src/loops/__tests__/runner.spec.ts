@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import { createLoopInSnapshot } from '@codex-claw/shared/loop-manager';
-import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
-import type { WorkItem } from '@codex-claw/shared/contracts';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createLoopInSnapshot } from '@codex-claw/core/loop-manager';
+import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import type { WorkItem } from '@codex-claw/core/contracts';
 import { LoopRunner, matchingLoopItems } from '../runner';
 
 const logMainMock = vi.hoisted(() => vi.fn());

@@ -1,6 +1,6 @@
-import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
+import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import net, { type Socket } from 'node:net';
-import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawRpcResponse, parseClawRpcMessage, type ClawBackendEvent, type ClawBackendHealth, type ClawRpcId, type ClawRpcRequest, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
+import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawRpcResponse, parseClawRpcMessage, type ClawBackendEvent, type ClawBackendHealth, type ClawRpcId, type ClawRpcRequest, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
 import { createRuntimeClientRequestHandlers } from './client-request-handlers';
 import { logMain, warnMain } from './log';
 import { backendRequestTimeoutMs } from './backend-request-timeout';

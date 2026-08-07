@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Agent, AgentStatus } from '@codex-claw/shared/contracts';
-import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
+import type { Agent, AgentStatus } from '@codex-claw/core/contracts';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import {
   ClawMcpAgentCoordinator,
   McpToolError,

@@ -133,7 +133,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { BenchTemplate, Team } from '@codex-claw/shared/contracts';
+import type { BenchTemplate, Team } from '@codex-claw/core/contracts';
 import { folderBasename } from '../shared/agent-display';
 import AgentAvatar from './AgentAvatar.vue';
 

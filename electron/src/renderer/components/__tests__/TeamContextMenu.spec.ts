@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import TeamContextMenu from '../TeamContextMenu.vue';
-import type { Team } from '@codex-claw/shared/contracts';
+import type { Team } from '@codex-claw/core/contracts';
 
 const team: Team = {
   id: 'team-codex-claw',

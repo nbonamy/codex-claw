@@ -262,7 +262,7 @@ Root `package.json` should be private and orchestration-only:
 
 Workspace package names:
 
-- `@codex-claw/shared`
+- `@codex-claw/core`
 - `@codex-claw/backend`
 - `@codex-claw/electron`
 
@@ -274,10 +274,10 @@ Package ownership:
   child process, Codex app-server, Claude, or MCP implementation modules.
 - `backend` contains `clawd`, Codex/Claude drivers, MCP collaboration, loops,
   git/files/source discovery, persistence, work integrations, and backend
-  protocol server/client implementations. It depends on `@codex-claw/shared`.
+  protocol server/client implementations. It depends on `@codex-claw/core`.
 - `electron` contains Electron Forge config, main, preload, renderer, desktop
   adapters, native dialogs, packaged resources, app icons, and release
-  packaging. It depends on `@codex-claw/shared`; it should talk to the backend
+  packaging. It depends on `@codex-claw/core`; it should talk to the backend
   through the app-owned backend protocol/client rather than importing backend
   internals.
 
@@ -290,7 +290,7 @@ Dependency rules:
   artifact, and in release it may package the backend executable or bundled
   script as a resource.
 - Cross-package imports should use package names such as
-  `@codex-claw/shared`, not deep relative paths across workspace boundaries.
+  `@codex-claw/core`, not deep relative paths across workspace boundaries.
 - TypeScript should use a root `tsconfig.base.json` plus package-level
   `tsconfig.json` files. Package references are useful once the first move is
   stable, but the first reorg can keep build wiring simple if needed.

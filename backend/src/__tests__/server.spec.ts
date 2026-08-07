@@ -2,16 +2,16 @@ import { describe, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { AppSnapshot, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/shared/contracts';
-import type { AgentBackendDriver, BackendEvent } from '@codex-claw/shared/backend-driver';
-import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
-import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
+import type { AppSnapshot, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/core/contracts';
+import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
+import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import { CodexBackendDriver } from '../codex/codex-driver';
 import type { CodexSurfaceAgentAdapter } from '../codex/codex-surface-adapter';
 import type { WorkIntegrationManager } from '../work-integrations/manager';
-import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
+import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 
 describe('ClawBackendServer', () => {
   it('responds to backend health requests', async () => {

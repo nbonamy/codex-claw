@@ -1,4 +1,4 @@
-import type { Agent, AgentStatus } from '@codex-claw/shared/contracts';
+import type { Agent, AgentStatus } from '@codex-claw/core/contracts';
 
 export function agentStatusLabel(status: AgentStatus['type']): string {
   switch (status) {

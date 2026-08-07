@@ -1,5 +1,5 @@
-import type { AppCommand, MainToRendererEvent } from '@codex-claw/shared/contracts';
-import { ipcChannels, type CodexClawIpcEvents } from '@codex-claw/shared/ipc';
+import type { AppCommand, MainToRendererEvent } from '@codex-claw/core/contracts';
+import { ipcChannels, type CodexClawIpcEvents } from '@codex-claw/core/ipc';
 import { sendIpcEvent, type IpcEventSender } from '@codex-app-sdk/electron';
 
 export function sendRendererEvent(sender: IpcEventSender, event: MainToRendererEvent): void {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { appThemes, effectiveTheme, themeById, themeIdForAppearance } from '../themes';
-import { defaultThemeSettings } from '@codex-claw/shared/settings';
+import { defaultThemeSettings } from '@codex-claw/core/settings';
 
 const requestedThemePairs = [
   ['absolutely-light', 'absolutely-dark'],

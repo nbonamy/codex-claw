@@ -8,7 +8,7 @@ import {
   type CodexNativeAttachment,
 } from '@codex-app-sdk/vue';
 import { describe, expect, it } from 'vitest';
-import type { Agent, RendererMessage, ThreadPlan } from '@codex-claw/shared/contracts';
+import type { Agent, RendererMessage, ThreadPlan } from '@codex-claw/core/contracts';
 import ConversationPane from '../ConversationPane.vue';
 import { i18n } from '../../i18n';
 

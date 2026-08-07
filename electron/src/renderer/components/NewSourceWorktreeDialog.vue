@@ -96,7 +96,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { CreateSourceWorktreeInput, SourceRepository, SourceWorktree } from '@codex-claw/shared/contracts';
+import type { CreateSourceWorktreeInput, SourceRepository, SourceWorktree } from '@codex-claw/core/contracts';
 import { FolderIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{

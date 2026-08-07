@@ -1,10 +1,10 @@
-import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
-import { sendAgentPrompt } from '@codex-claw/shared/agent-chat-service';
-import type { Agent, BackendConversationRef, SystemPermissionsStatus } from '@codex-claw/shared/contracts';
-import { formatConversationTitle } from '@codex-claw/shared/conversation-title';
-import { updateLoopExecutionAgentConversationInSnapshot } from '@codex-claw/shared/loop-manager';
-import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/shared/backend-driver';
-import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
+import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
+import type { Agent, BackendConversationRef, SystemPermissionsStatus } from '@codex-claw/core/contracts';
+import { formatConversationTitle } from '@codex-claw/core/conversation-title';
+import { updateLoopExecutionAgentConversationInSnapshot } from '@codex-claw/core/loop-manager';
+import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/core/backend-driver';
+import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { BackendDriverRpc, createDefaultBackendDrivers } from './driver-rpc';
 import { RemoteClawdClientManager } from './connections/remote-clawd-client';
 import { SshConnectionService } from './connections/ssh-connections';

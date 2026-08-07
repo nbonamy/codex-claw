@@ -1,4 +1,4 @@
-import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
+import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import {
   createClawRpcError,
@@ -13,8 +13,8 @@ import {
   type ClawRpcId,
   type ClawRpcRequest,
   type ClawRpcResponse,
-} from '@codex-claw/shared/backend-protocol/rpc';
-import type { RemoteConnection } from '@codex-claw/shared/contracts';
+} from '@codex-claw/core/backend-protocol/rpc';
+import type { RemoteConnection } from '@codex-claw/core/contracts';
 import { warnMain } from '../log';
 import { sshStdioTransport } from './ssh-connections';
 

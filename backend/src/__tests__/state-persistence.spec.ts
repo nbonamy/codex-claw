@@ -3,9 +3,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { AppStatePersistence, persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
-import { appendUserPrompt, createEmptySnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import { defaultPluginSettings, defaultThemeSettings } from '@codex-claw/shared/settings';
-import type { RemoteConnection } from '@codex-claw/shared/contracts';
+import { appendUserPrompt, createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { defaultPluginSettings, defaultThemeSettings } from '@codex-claw/core/settings';
+import type { RemoteConnection } from '@codex-claw/core/contracts';
 
 let tempDir: string | null = null;
 

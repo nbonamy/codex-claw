@@ -105,7 +105,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { AppThemeSettings, UpdateSettingsInput } from '@codex-claw/shared/contracts';
+import type { AppThemeSettings, UpdateSettingsInput } from '@codex-claw/core/contracts';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsRow from './SettingsRow.vue';
 import SettingsSection from './SettingsSection.vue';

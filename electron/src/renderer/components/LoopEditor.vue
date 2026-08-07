@@ -386,7 +386,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, watch } from 'vue';
-import type { AgentBackend, BackendDefaults, BackendModelOption, BenchTemplate, CreateLoopInput, Loop, ReasoningEffort, SourceRepository, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AgentBackend, BackendDefaults, BackendModelOption, BenchTemplate, CreateLoopInput, Loop, ReasoningEffort, SourceRepository, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import AgentAvatar from './AgentAvatar.vue';
 
 type TeamMode = 'existing' | 'dedicated';

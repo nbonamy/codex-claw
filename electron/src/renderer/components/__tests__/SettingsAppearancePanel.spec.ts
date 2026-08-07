@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import SettingsAppearancePanel from '../SettingsAppearancePanel.vue';
-import { defaultThemeSettings } from '@codex-claw/shared/settings';
+import { defaultThemeSettings } from '@codex-claw/core/settings';
 
 describe('SettingsAppearancePanel', () => {
   it('emits appearance setting updates', async () => {

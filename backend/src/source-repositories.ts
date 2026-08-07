@@ -1,7 +1,7 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { SourceRepository, SourceWorktree } from '@codex-claw/shared/contracts';
+import type { SourceRepository, SourceWorktree } from '@codex-claw/core/contracts';
 
 export function sourceFolderCandidates(): string[] {
   return [

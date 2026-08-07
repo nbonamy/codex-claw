@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import type { CreateSourceWorktreeInput, SourceWorktree } from '@codex-claw/shared/contracts';
+import type { CreateSourceWorktreeInput, SourceWorktree } from '@codex-claw/core/contracts';
 
 const execFileAsync = promisify(execFile);
 

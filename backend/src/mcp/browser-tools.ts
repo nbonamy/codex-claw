@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import * as z from 'zod/v4';
-import { PRIMARY_BROWSER_ID } from '@codex-claw/shared/contracts';
+import { PRIMARY_BROWSER_ID } from '@codex-claw/core/contracts';
 import { errorToolResult, structuredToolResult } from './tool-result';
 
 export type InAppBrowserClient = {

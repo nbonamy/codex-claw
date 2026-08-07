@@ -87,7 +87,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { SourceFolderListing, SourceFolderListInput } from '@codex-claw/shared/contracts';
+import type { SourceFolderListing, SourceFolderListInput } from '@codex-claw/core/contracts';
 import { FolderIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{

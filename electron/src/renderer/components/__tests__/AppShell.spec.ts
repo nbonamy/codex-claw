@@ -10,9 +10,9 @@ import type {
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
-import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { Agent, AppCommand, AppSnapshot, BackendConversationRef, BenchLocation, BenchTemplate, CodexClawApi, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, RendererMessage, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
-import { workItemAssignmentKey } from '@codex-claw/shared/work-assignments';
+import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
+import type { Agent, AppCommand, AppSnapshot, BackendConversationRef, BenchLocation, BenchTemplate, CodexClawApi, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, RendererMessage, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { i18n } from '../../i18n';
 
 vi.mock('../image-annotation', async (importOriginal) => ({

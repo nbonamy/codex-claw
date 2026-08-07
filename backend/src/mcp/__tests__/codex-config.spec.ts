@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Agent } from '@codex-claw/shared/contracts';
+import type { Agent } from '@codex-claw/core/contracts';
 import { agentScopedMcpUrl, buildCodexClawMcpConfigOverrides, buildCodexClawThreadConfig } from '../codex-config';
 
 const agent: Agent = {

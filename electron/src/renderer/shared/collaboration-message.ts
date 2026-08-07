@@ -1,6 +1,6 @@
 import type { CodexChatMessage } from '@codex-app-sdk/vue';
-import type { RendererMessage } from '@codex-claw/shared/contracts';
-import { parseCollaborationMessageEnvelope } from '@codex-claw/shared/collaboration-message-envelope';
+import type { RendererMessage } from '@codex-claw/core/contracts';
+import { parseCollaborationMessageEnvelope } from '@codex-claw/core/collaboration-message-envelope';
 
 export type CollaborationMessagePresentation = {
   content: string;

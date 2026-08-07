@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import type { AppSnapshot } from '@codex-claw/shared/contracts';
+import type { AppSnapshot } from '@codex-claw/core/contracts';
 import { AppStatePersistence } from './state-persistence';
 
 export const CODEX_CLAW_HOME_ENV = 'CODEX_CLAW_HOME';

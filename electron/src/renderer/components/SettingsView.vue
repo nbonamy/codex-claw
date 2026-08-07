@@ -87,8 +87,8 @@
 </template>
 
 <script setup lang="ts">
-import type { AddSshConnectionInput, AppGeneralSettings, AppPluginStatus, AppThemeSettings, ClawdDaemonStatus, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SetCodexResourceSharingInput, SourceFolderListing, SourceFolderListInput, SourceFolderState, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/shared/contracts';
-import { defaultGeneralSettings, defaultSourceFolderState } from '@codex-claw/shared/settings';
+import type { AddSshConnectionInput, AppGeneralSettings, AppPluginStatus, AppThemeSettings, ClawdDaemonStatus, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SetCodexResourceSharingInput, SourceFolderListing, SourceFolderListInput, SourceFolderState, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/core/contracts';
+import { defaultGeneralSettings, defaultSourceFolderState } from '@codex-claw/core/settings';
 import SettingsAppearancePanel from './SettingsAppearancePanel.vue';
 import SettingsAppshotsPanel from './SettingsAppshotsPanel.vue';
 import SettingsChatGptPanel from './SettingsChatGptPanel.vue';

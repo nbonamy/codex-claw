@@ -196,8 +196,8 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onMounted, ref, watch } from 'vue';
-import type { AppSnapshot, BackendConversationRef, BackendModelOption, CreateLoopInput, Loop, LoopLocation, RemoteConnection, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, UpdateLoopInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
-import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
+import type { AppSnapshot, BackendConversationRef, BackendModelOption, CreateLoopInput, Loop, LoopLocation, RemoteConnection, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, UpdateLoopInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import { createEmptySnapshot } from '@codex-claw/core/snapshot';
 import AppDataList from './AppDataList.vue';
 import type { AppDataListColumn, AppDataListRow } from './app-data-list';
 import AppMenu from '../shared/menu/AppMenu.vue';

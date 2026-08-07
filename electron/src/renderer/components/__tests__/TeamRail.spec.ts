@@ -6,7 +6,7 @@ import { ElMessageBox } from 'element-plus';
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import TeamRail from '../TeamRail.vue';
-import type { AccountRateLimits, Team } from '@codex-claw/shared/contracts';
+import type { AccountRateLimits, Team } from '@codex-claw/core/contracts';
 
 let mountedWrappers: ReturnType<typeof mount>[] = [];
 

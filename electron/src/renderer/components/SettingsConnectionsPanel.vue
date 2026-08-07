@@ -202,7 +202,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, ref } from 'vue';
-import type { AddSshConnectionInput, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput } from '@codex-claw/core/contracts';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import { DotsVerticalIcon, RefreshIcon, SettingsIcon, Trash2Icon } from '../shared/icons/app-icons';

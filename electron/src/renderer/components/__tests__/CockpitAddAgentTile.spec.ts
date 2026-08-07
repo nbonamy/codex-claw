@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { nextTick } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
-import type { BenchTemplate, WorkItem } from '@codex-claw/shared/contracts';
+import type { BenchTemplate, WorkItem } from '@codex-claw/core/contracts';
 import CockpitAddAgentTile from '../CockpitAddAgentTile.vue';
 
 type CockpitAddAgentTileProps = {

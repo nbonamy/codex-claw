@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { AgentBackendDriver } from '@codex-claw/shared/backend-driver';
-import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
-import type { Agent, AppSnapshot, Loop } from '@codex-claw/shared/contracts';
-import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/shared/snapshot';
+import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
+import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import type { Agent, AppSnapshot, Loop } from '@codex-claw/core/contracts';
+import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
 import { BackendDriverRpc } from '../../driver-rpc';
 import { ClawMcpService } from '../service';
 

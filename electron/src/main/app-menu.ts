@@ -1,5 +1,5 @@
 import { clipboard, Menu, type BrowserWindow, type MenuItemConstructorOptions } from 'electron';
-import type { AppCommand, DesktopUpdateStatus } from '@codex-claw/shared/contracts';
+import type { AppCommand, DesktopUpdateStatus } from '@codex-claw/core/contracts';
 import { cycleTeamsAccelerator } from './app-shortcuts';
 import { detectPngRetinaPixelRatio, readClipboardPngBuffer } from './clipboard-image';
 import { sendAppCommand } from './ipc-events';

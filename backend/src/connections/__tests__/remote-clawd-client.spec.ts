@@ -1,8 +1,8 @@
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { describe, expect, it, vi } from 'vitest';
-import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
-import type { RemoteConnection } from '@codex-claw/shared/contracts';
+import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import type { RemoteConnection } from '@codex-claw/core/contracts';
 import { RemoteClawdClientManager } from '../remote-clawd-client';
 import { sshStdioTransport } from '../ssh-connections';
 

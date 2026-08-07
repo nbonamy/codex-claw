@@ -17,9 +17,9 @@ import type {
   DevicePairingSession,
   DevicePairingStatus,
   PairedDevice,
-} from '@codex-claw/shared/contracts';
-import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
-import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
+} from '@codex-claw/core/contracts';
+import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/core/backend-driver';
 import { AgentGitService } from '../git/agent-git-service';
 import type { CodexSurfaceAgentAdapter } from './codex-surface-adapter';
 

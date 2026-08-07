@@ -340,11 +340,11 @@
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import debugAnnotationScreenshotUrl from '../../../../docs/codex.png?url';
-import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
-import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
-import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
-import { defaultTeamColor } from '@codex-claw/shared/team-colors';
-import { findAssignedAgentForWorkItem } from '@codex-claw/shared/work-assignments';
+import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
+import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import { createEmptySnapshot } from '@codex-claw/core/snapshot';
+import { defaultTeamColor } from '@codex-claw/core/team-colors';
+import { findAssignedAgentForWorkItem } from '@codex-claw/core/work-assignments';
 import AgentDialog from './AgentDialog.vue';
 import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
@@ -461,7 +461,7 @@ const props = withDefaults(defineProps<{
   updateAgent?: (input: UpdateAgentInput) => Promise<void>;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
   setCodexResourceSharing?: (input: SetCodexResourceSharingInput) => Promise<void>;
-  getPluginStatus?: () => Promise<import('@codex-claw/shared/contracts').AppPluginStatus>;
+  getPluginStatus?: () => Promise<import('@codex-claw/core/contracts').AppPluginStatus>;
   listSshHosts?: () => Promise<SshHostCandidate[]>;
   addSshConnection?: (input: AddSshConnectionInput) => Promise<void>;
   checkRemoteConnection?: (connectionId: string) => Promise<void>;
@@ -2334,7 +2334,7 @@ async function declineCodexResourceSharingMigration(): Promise<void> {
   }
 }
 
-async function getPluginStatus(): Promise<import('@codex-claw/shared/contracts').AppPluginStatus> {
+async function getPluginStatus(): Promise<import('@codex-claw/core/contracts').AppPluginStatus> {
   return props.getPluginStatus();
 }
 

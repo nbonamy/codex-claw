@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
+import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 
 const mocks = vi.hoisted(() => ({
   snapshot: {
@@ -49,11 +49,11 @@ const mocks = vi.hoisted(() => ({
   warnMain: vi.fn(),
 }));
 
-vi.mock('@codex-claw/shared/agent-chat-service', () => ({
+vi.mock('@codex-claw/core/agent-chat-service', () => ({
   sendAgentPrompt: mocks.sendAgentPrompt,
 }));
 
-vi.mock('@codex-claw/shared/loop-manager', () => ({
+vi.mock('@codex-claw/core/loop-manager', () => ({
   updateLoopExecutionAgentConversationInSnapshot: mocks.updateLoopConversation,
 }));
 

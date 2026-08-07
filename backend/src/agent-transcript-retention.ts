@@ -2,7 +2,7 @@ import {
   CodexAppBackendTtlCache,
   type CodexAppBackendTtlCacheScheduler,
 } from '@codex-app-sdk/backend';
-import type { AppSnapshot } from '@codex-claw/shared/contracts';
+import type { AppSnapshot } from '@codex-claw/core/contracts';
 
 export const DEFAULT_AGENT_TRANSCRIPT_TTL_MS = 15 * 60 * 1_000;
 export const DEFAULT_AGENT_TRANSCRIPT_SWEEP_INTERVAL_MS = 60 * 1_000;

@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import { discoveredRuntimePath, resolveRuntimeExecutable, type RuntimeDiscoveryDependencies } from '@codex-claw/shared/runtime-discovery';
+import { discoveredRuntimePath, resolveRuntimeExecutable, type RuntimeDiscoveryDependencies } from '@codex-claw/core/runtime-discovery';
 
 export type RuntimeClawdBackendMode = 'auto' | 'bundled' | 'existing';
 

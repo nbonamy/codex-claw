@@ -58,7 +58,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Agent, WorkItem } from '@codex-claw/shared/contracts';
+import type { Agent, WorkItem } from '@codex-claw/core/contracts';
 import { agentCanReceivePrompt, agentStatusLabel, agentStatusText, folderBasename } from '../shared/agent-display';
 import { SendIcon } from '../shared/icons/app-icons';
 import AgentAvatar from './AgentAvatar.vue';

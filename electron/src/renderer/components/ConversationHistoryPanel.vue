@@ -74,7 +74,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import type { Agent, BackendConversationRef, ConversationSummary } from '@codex-claw/shared/contracts';
+import type { Agent, BackendConversationRef, ConversationSummary } from '@codex-claw/core/contracts';
 import { ChevronRightIcon, PlayerPlayIcon } from '../shared/icons/app-icons';
 
 const STORAGE_KEY = 'conversationHistoryExpanded';

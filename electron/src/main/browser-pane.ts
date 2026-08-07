@@ -1,6 +1,6 @@
 import { BrowserWindow, WebContentsView } from 'electron';
 import path from 'node:path';
-import type { BrowserAnnotation, BrowserBounds, BrowserState } from '@codex-claw/shared/contracts';
+import type { BrowserAnnotation, BrowserBounds, BrowserState } from '@codex-claw/core/contracts';
 
 type BrowserPaneOptions = {
   onAnnotation(annotation: BrowserAnnotation): void;

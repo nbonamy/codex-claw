@@ -13,9 +13,9 @@ import type {
   RendererMessage,
   RendererToolPart,
   SendPromptOptions,
-} from '@codex-claw/shared/contracts';
-import { claudeBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
-import { unsupportedBackendFeature, type AgentBackendDriver, type BackendConversationResumeResult, type BackendEvent, type BackendSendResult } from '@codex-claw/shared/backend-driver';
+} from '@codex-claw/core/contracts';
+import { claudeBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import { unsupportedBackendFeature, type AgentBackendDriver, type BackendConversationResumeResult, type BackendEvent, type BackendSendResult } from '@codex-claw/core/backend-driver';
 import { agentScopedMcpUrl } from '../mcp/codex-config';
 import { codexClawDeveloperInstructions } from '../mcp/agent-prompts';
 import { ClaudeCliTransport, type ClaudeTurnHandle, type ClaudeTurnParams, type ClaudeTurnTransport } from './cli-transport';

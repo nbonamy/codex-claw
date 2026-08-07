@@ -1,4 +1,4 @@
-import type { AppshotHotkey } from '@codex-claw/shared/contracts';
+import type { AppshotHotkey } from '@codex-claw/core/contracts';
 import autolib, { type Autolib, type KeyMonitorEvent } from 'autolib';
 
 const modifierPairs: Record<Exclude<AppshotHotkey, 'none'>, readonly [number, number]> = {

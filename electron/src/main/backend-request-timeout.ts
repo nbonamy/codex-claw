@@ -1,4 +1,4 @@
-import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
+import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 
 const CONVERSATION_HISTORY_TIMEOUT_MS = 120_000;
 

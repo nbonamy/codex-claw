@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
-import { withDiscoveredRuntimePath, type RuntimeDiscoveryDependencies } from '@codex-claw/shared/runtime-discovery';
+import { withDiscoveredRuntimePath, type RuntimeDiscoveryDependencies } from '@codex-claw/core/runtime-discovery';
 import type { Readable } from 'node:stream';
 import { logMain } from '../log';
 import { parseClaudeSdkMessage, type ClaudeSdkMessage } from './protocol';

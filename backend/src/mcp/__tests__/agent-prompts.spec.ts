@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Agent } from '@codex-claw/shared/contracts';
-import { parseCollaborationMessageEnvelope } from '@codex-claw/shared/collaboration-message-envelope';
+import type { Agent } from '@codex-claw/core/contracts';
+import { parseCollaborationMessageEnvelope } from '@codex-claw/core/collaboration-message-envelope';
 import { agentMessagesPrompt, codexClawDeveloperInstructions } from '../agent-prompts';
 
 describe('agent prompts', () => {

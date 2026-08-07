@@ -117,7 +117,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Agent, BackendConversationRef, BenchTemplate, ConversationSummary, OpenInApplication, OpenInApplicationCatalog, ReorderAgentsInput, Team } from '@codex-claw/shared/contracts';
+import type { Agent, BackendConversationRef, BenchTemplate, ConversationSummary, OpenInApplication, OpenInApplicationCatalog, ReorderAgentsInput, Team } from '@codex-claw/core/contracts';
 import {
   PanelLeftCloseIcon,
 } from '../shared/icons/app-icons';

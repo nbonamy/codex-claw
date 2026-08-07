@@ -159,7 +159,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { IconWorld } from '@tabler/icons-vue';
-import type { Agent, AgentGitStatus, OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/shared/contracts';
+import type { Agent, AgentGitStatus, OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
 import { CodeIcon, FileDiffIcon, FileTextIcon, GitHubIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';

@@ -105,9 +105,9 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { AccountRateLimits, CodexAccount, ReorderTeamsInput, Team } from '@codex-claw/shared/contracts';
-import { defaultTeamColor } from '@codex-claw/shared/team-colors';
-import { teamInitials } from '@codex-claw/shared/team-manager';
+import type { AccountRateLimits, CodexAccount, ReorderTeamsInput, Team } from '@codex-claw/core/contracts';
+import { defaultTeamColor } from '@codex-claw/core/team-colors';
+import { teamInitials } from '@codex-claw/core/team-manager';
 import { InfinityIcon, PlusIcon } from '../shared/icons/app-icons';
 import { useListReorderDrag } from '../shared/use-list-reorder-drag';
 import CockpitIcon from './CockpitIcon.vue';

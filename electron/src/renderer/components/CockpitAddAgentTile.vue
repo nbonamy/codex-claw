@@ -57,7 +57,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { BenchTemplate, DeployBenchTemplateInput, WorkItem } from '@codex-claw/shared/contracts';
+import type { BenchTemplate, DeployBenchTemplateInput, WorkItem } from '@codex-claw/core/contracts';
 import NewAgentButton from './NewAgentButton.vue';
 
 type DropTargetKind = 'new-agent' | 'bench-agent';

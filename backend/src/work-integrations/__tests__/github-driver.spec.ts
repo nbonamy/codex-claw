@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { WorkProviderToken } from '@codex-claw/shared/work-integration-tokens';
+import type { WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
 import { GitHubWorkProviderDriver } from '../github-driver';
 
 afterEach(() => {

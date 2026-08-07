@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { OpenInApplicationCatalog } from '@codex-claw/shared/contracts';
+import type { OpenInApplicationCatalog } from '@codex-claw/core/contracts';
 import RightWorkspacePanel from '../RightWorkspacePanel.vue';
 import type { RightWorkspaceFilePanel, RightWorkspaceFileTab, RightWorkspaceImagePanel, RightWorkspaceImageTab, RightWorkspaceTab } from '../right-workspace';
 import type { SidePanelMarkdownState } from '../side-panel';

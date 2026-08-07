@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ClaudeBackendDriver } from '../claude-driver';
 import type { ClaudeSdkMessage } from '../protocol';
 import type { ClaudeTurnHandle, ClaudeTurnParams, ClaudeTurnTransport } from '../cli-transport';
-import type { Agent } from '@codex-claw/shared/contracts';
+import type { Agent } from '@codex-claw/core/contracts';
 
 const agent: Agent = {
   id: 'agent-claude',

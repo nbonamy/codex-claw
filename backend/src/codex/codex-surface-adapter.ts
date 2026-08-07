@@ -20,10 +20,10 @@ import type {
   PairedDevice,
   SendPromptOptions,
   CodexAuthentication,
-} from '@codex-claw/shared/contracts';
-import type { BackendEvent } from '@codex-claw/shared/backend-driver';
-import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
-import { codexApprovalPresetFromDefaults } from '@codex-claw/shared/codex-approval-presets';
+} from '@codex-claw/core/contracts';
+import type { BackendEvent } from '@codex-claw/core/backend-driver';
+import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import { codexApprovalPresetFromDefaults } from '@codex-claw/core/codex-approval-presets';
 import type { CodexConversation, CodexSurface } from '@codex-app-sdk/backend';
 import type {
   CodexConversationEvent,

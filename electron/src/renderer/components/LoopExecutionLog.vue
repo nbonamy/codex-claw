@@ -82,7 +82,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { BackendConversationRef, Loop, LoopExecutionStatus, RendererMessage } from '@codex-claw/shared/contracts';
+import type { BackendConversationRef, Loop, LoopExecutionStatus, RendererMessage } from '@codex-claw/core/contracts';
 import AppDataList from './AppDataList.vue';
 import type { AppDataListColumn, AppDataListRow } from './app-data-list';
 import LoopExecutionConversationOverlay from './LoopExecutionConversationOverlay.vue';

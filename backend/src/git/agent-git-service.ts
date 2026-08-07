@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { AgentGitStatus } from '@codex-claw/shared/contracts';
+import type { AgentGitStatus } from '@codex-claw/core/contracts';
 
 const execFileAsync = promisify(execFile);
 

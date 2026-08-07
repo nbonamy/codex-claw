@@ -1,10 +1,10 @@
-import type { Agent, AppPluginSettings } from '@codex-claw/shared/contracts';
-import { defaultPluginSettings } from '@codex-claw/shared/settings';
+import type { Agent, AppPluginSettings } from '@codex-claw/core/contracts';
+import { defaultPluginSettings } from '@codex-claw/core/settings';
 import {
   collaborationInstructionsEnd,
   collaborationInstructionsStart,
   formatCollaborationMessageEnvelope,
-} from '@codex-claw/shared/collaboration-message-envelope';
+} from '@codex-claw/core/collaboration-message-envelope';
 
 export type MessageInfo = {
   from: string;

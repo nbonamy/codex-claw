@@ -136,7 +136,7 @@
 import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { toString as qrCodeToString } from 'qrcode';
-import type { DevicePairingSession, DevicePairingStatus, PairedDevice, UpdateSettingsInput } from '@codex-claw/shared/contracts';
+import type { DevicePairingSession, DevicePairingStatus, PairedDevice, UpdateSettingsInput } from '@codex-claw/core/contracts';
 import { codexPairingUrl } from '../device-pairing';
 import SettingsRow from './SettingsRow.vue';
 import SettingsSection from './SettingsSection.vue';

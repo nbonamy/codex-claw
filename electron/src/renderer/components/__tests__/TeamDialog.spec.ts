@@ -2,8 +2,8 @@ import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import TeamDialog from '../TeamDialog.vue';
-import { teamColors } from '@codex-claw/shared/team-colors';
-import type { CreateTeamInput, RemoteConnection, Team, UpdateTeamInput } from '@codex-claw/shared/contracts';
+import { teamColors } from '@codex-claw/core/team-colors';
+import type { CreateTeamInput, RemoteConnection, Team, UpdateTeamInput } from '@codex-claw/core/contracts';
 
 describe('TeamDialog', () => {
   it('renders the Skwad-style create team layout and disables save until named', () => {

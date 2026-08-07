@@ -1,4 +1,4 @@
-import type { AppCommand } from '@codex-claw/shared/contracts';
+import type { AppCommand } from '@codex-claw/core/contracts';
 
 export const codexClawDeepLinkScheme = 'codex-claw';
 const codexClawDeepLinkProtocol = `${codexClawDeepLinkScheme}:`;

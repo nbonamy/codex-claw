@@ -62,7 +62,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { AccountRateLimitWindow, AccountRateLimits, CodexAccount } from '@codex-claw/shared/contracts';
+import type { AccountRateLimitWindow, AccountRateLimits, CodexAccount } from '@codex-claw/core/contracts';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import { BrandSpeedTest, QuitIcon, SettingsIcon, SparklesIcon, UserCircleIcon } from '../shared/icons/app-icons';

@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { nextTick } from 'vue';
 import { describe, expect, it } from 'vitest';
-import type { BenchTemplate, Team } from '@codex-claw/shared/contracts';
+import type { BenchTemplate, Team } from '@codex-claw/core/contracts';
 import BenchAgentAssignmentDialog from '../BenchAgentAssignmentDialog.vue';
 
 describe('BenchAgentAssignmentDialog', () => {

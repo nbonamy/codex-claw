@@ -1,5 +1,5 @@
 import { shell, systemPreferences } from 'electron';
-import type { SystemPermissionsStatus } from '@codex-claw/shared/contracts';
+import type { SystemPermissionsStatus } from '@codex-claw/core/contracts';
 
 type SystemPermissionDependencies = {
   openExternal: (url: string) => Promise<unknown>;

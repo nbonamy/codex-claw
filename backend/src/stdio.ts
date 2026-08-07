@@ -1,4 +1,4 @@
-import { createClawRpcError, createClawRpcNotification, createClawRpcRequest, clawRpcErrorCodes, isClawRpcNotification, isClawRpcResponse, parseClawRpcMessage, type ClawRpcId, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
+import { createClawRpcError, createClawRpcNotification, createClawRpcRequest, clawRpcErrorCodes, isClawRpcNotification, isClawRpcResponse, parseClawRpcMessage, type ClawRpcId, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
 import type { Readable, Writable } from 'node:stream';
 
 export type StdioRpcServerOptions = {

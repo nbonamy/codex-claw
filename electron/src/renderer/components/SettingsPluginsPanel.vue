@@ -113,8 +113,8 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { AppPluginSettings, AppPluginStatus, UpdateSettingsInput } from '@codex-claw/shared/contracts';
-import { defaultPluginSettings } from '@codex-claw/shared/settings';
+import type { AppPluginSettings, AppPluginStatus, UpdateSettingsInput } from '@codex-claw/core/contracts';
+import { defaultPluginSettings } from '@codex-claw/core/settings';
 import { ChevronRightIcon, X } from '../shared/icons/app-icons';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsPluginsBanner from './SettingsPluginsBanner.vue';

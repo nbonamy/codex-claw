@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Agent, AgentBackend, AgentStatus, CreateSourceWorktreeInput, SourceRepository, SourceWorktree } from '@codex-claw/shared/contracts';
+import type { Agent, AgentBackend, AgentStatus, CreateSourceWorktreeInput, SourceRepository, SourceWorktree } from '@codex-claw/core/contracts';
 
 export type McpAgentInfo = {
   id: string;

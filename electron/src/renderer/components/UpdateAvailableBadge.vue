@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DesktopUpdateStatus } from '@codex-claw/shared/contracts';
+import type { DesktopUpdateStatus } from '@codex-claw/core/contracts';
 
 const props = defineProps<{
   status: DesktopUpdateStatus;

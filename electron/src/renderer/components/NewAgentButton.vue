@@ -102,7 +102,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue';
 import { ElMessageBox } from 'element-plus';
-import type { BenchTemplate } from '@codex-claw/shared/contracts';
+import type { BenchTemplate } from '@codex-claw/core/contracts';
 import { ChevronDown, PlusCircleIcon, Trash2Icon } from '../shared/icons/app-icons';
 import AgentAvatar from './AgentAvatar.vue';
 

@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { nextTick } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
-import type { BackendModelOption, BenchTemplate, Loop, SourceRepository, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/shared/contracts';
+import type { BackendModelOption, BenchTemplate, Loop, SourceRepository, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import LoopEditor from '../LoopEditor.vue';
 
 describe('LoopEditor', () => {

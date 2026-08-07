@@ -3,7 +3,7 @@ import type {
   MessageBoxOptions,
   MessageBoxReturnValue,
 } from 'electron';
-import type { DesktopUpdateStatus } from '@codex-claw/shared/contracts';
+import type { DesktopUpdateStatus } from '@codex-claw/core/contracts';
 
 type ManualUpdateCheckOptions = {
   getWindow: () => BrowserWindow | null;

@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
-import { defaultAppshotSettings } from '@codex-claw/shared/settings';
+import { defaultAppshotSettings } from '@codex-claw/core/settings';
 import SettingsAppshotsPanel from '../SettingsAppshotsPanel.vue';
 
 describe('SettingsAppshotsPanel', () => {

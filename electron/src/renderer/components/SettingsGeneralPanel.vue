@@ -224,8 +224,8 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onMounted, ref, watch } from 'vue';
-import type { AppGeneralSettings, ClawdDaemonStatus, SetCodexResourceSharingInput, SourceFolderState, SystemPermissionsStatus, UpdateSettingsInput } from '@codex-claw/shared/contracts';
-import { defaultSourceFolderState } from '@codex-claw/shared/settings';
+import type { AppGeneralSettings, ClawdDaemonStatus, SetCodexResourceSharingInput, SourceFolderState, SystemPermissionsStatus, UpdateSettingsInput } from '@codex-claw/core/contracts';
+import { defaultSourceFolderState } from '@codex-claw/core/settings';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsRow from './SettingsRow.vue';
 import SettingsSection from './SettingsSection.vue';

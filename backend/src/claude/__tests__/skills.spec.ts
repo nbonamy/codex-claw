@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { Agent } from '@codex-claw/shared/contracts';
+import type { Agent } from '@codex-claw/core/contracts';
 import { listClaudeSkills } from '../skills';
 
 let tempRoot = '';

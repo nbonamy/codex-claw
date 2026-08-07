@@ -1,6 +1,6 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
-import type { AgentFilePreviewResult, AgentFileSearchItem } from '@codex-claw/shared/contracts';
+import type { AgentFilePreviewResult, AgentFileSearchItem } from '@codex-claw/core/contracts';
 
 export const DEFAULT_AGENT_FILE_LIMIT = 1000;
 export const DEFAULT_AGENT_FILE_DEPTH = 8;

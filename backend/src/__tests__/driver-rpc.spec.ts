@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/shared/backend-driver';
-import type { Agent } from '@codex-claw/shared/contracts';
+import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/core/backend-driver';
+import type { Agent } from '@codex-claw/core/contracts';
 import { BackendDriverRpc, codexClawSurfaceOptions } from '../driver-rpc';
 
 describe('BackendDriverRpc', () => {

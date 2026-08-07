@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus, { ElMessageBox } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import SettingsView from '../SettingsView.vue';
-import { defaultGeneralSettings, defaultThemeSettings } from '@codex-claw/shared/settings';
+import { defaultGeneralSettings, defaultThemeSettings } from '@codex-claw/core/settings';
 
 describe('SettingsView', () => {
   afterEach(() => {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/shared/snapshot';
-import type { AppSnapshot, WorkItem, WorkRepository } from '@codex-claw/shared/contracts';
-import type { WorkProviderToken } from '@codex-claw/shared/work-integration-tokens';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import type { AppSnapshot, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import type { WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
 import { WorkIntegrationManager } from '../manager';
 import { MemoryWorkIntegrationTokenStore } from '../memory-token-store';
 import type { WorkProviderDeviceAuthorization, WorkProviderDeviceTokenResult, WorkProviderDriver } from '../types';

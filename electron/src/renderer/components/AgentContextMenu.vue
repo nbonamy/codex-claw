@@ -14,8 +14,8 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { OpenInApplication, OpenInApplicationCatalog, Team } from '@codex-claw/shared/contracts';
-import { defaultTeamColor } from '@codex-claw/shared/team-colors';
+import type { OpenInApplication, OpenInApplicationCatalog, Team } from '@codex-claw/core/contracts';
+import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import {

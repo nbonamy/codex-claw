@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus, { ElMessageBox } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgentSidebar from '../AgentSidebar.vue';
-import type { Agent, BenchTemplate, Team } from '@codex-claw/shared/contracts';
+import type { Agent, BenchTemplate, Team } from '@codex-claw/core/contracts';
 
 function pointerEvent(type: string, clientX: number): PointerEvent {
   const event = new MouseEvent(type, {

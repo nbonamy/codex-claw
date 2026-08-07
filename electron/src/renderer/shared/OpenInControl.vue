@@ -42,7 +42,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/shared/contracts';
+import type { OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
 import { ChevronDown, ExternalLinkIcon } from './icons/app-icons';
 import AppMenu from './menu/AppMenu.vue';
 import { openInApplicationFromMenuItem, openInMenuItems } from './open-in';

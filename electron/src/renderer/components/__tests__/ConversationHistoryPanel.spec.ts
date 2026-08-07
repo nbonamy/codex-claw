@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Agent, ConversationSummary } from '@codex-claw/shared/contracts';
+import type { Agent, ConversationSummary } from '@codex-claw/core/contracts';
 import ConversationHistoryPanel from '../ConversationHistoryPanel.vue';
 
 const agent: Agent = {

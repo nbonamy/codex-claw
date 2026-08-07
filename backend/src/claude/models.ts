@@ -1,4 +1,4 @@
-import type { BackendModelOption } from '@codex-claw/shared/contracts';
+import type { BackendModelOption } from '@codex-claw/core/contracts';
 
 export const claudeModelOptions: BackendModelOption[] = [
   {

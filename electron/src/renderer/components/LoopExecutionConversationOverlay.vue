@@ -59,7 +59,7 @@
 </template>
 
 <script setup lang="ts">
-import type { RendererMessage } from '@codex-claw/shared/contracts';
+import type { RendererMessage } from '@codex-claw/core/contracts';
 import { CodexMessageList } from '@codex-app-sdk/vue';
 import { useI18n } from 'vue-i18n';
 import { X } from '../shared/icons/app-icons';

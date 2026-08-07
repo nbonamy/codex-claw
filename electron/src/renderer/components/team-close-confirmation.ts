@@ -1,5 +1,5 @@
 import { ElMessageBox } from 'element-plus';
-import type { Team } from '@codex-claw/shared/contracts';
+import type { Team } from '@codex-claw/core/contracts';
 
 export async function confirmCloseTeam(team: Team): Promise<boolean> {
   try {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
-import type { Agent, RendererMessage } from '@codex-claw/shared/contracts';
+import { createEmptySnapshot } from '@codex-claw/core/snapshot';
+import type { Agent, RendererMessage } from '@codex-claw/core/contracts';
 import {
   AgentTranscriptRetention,
   DEFAULT_AGENT_TRANSCRIPT_TTL_MS,

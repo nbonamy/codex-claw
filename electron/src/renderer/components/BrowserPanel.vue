@@ -37,7 +37,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { IconArrowLeft, IconArrowRight, IconCirclePlus, IconDotsVertical, IconRefresh, IconX } from '@tabler/icons-vue';
-import { PRIMARY_BROWSER_ID, type BrowserAnnotation, type BrowserBounds, type BrowserState, type MainToRendererEvent } from '@codex-claw/shared/contracts';
+import { PRIMARY_BROWSER_ID, type BrowserAnnotation, type BrowserBounds, type BrowserState, type MainToRendererEvent } from '@codex-claw/core/contracts';
 import AnnotationSendButton from './AnnotationSendButton.vue';
 
 const props = withDefaults(defineProps<{

@@ -1,8 +1,8 @@
-import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
+import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { mkdir, unlink } from 'node:fs/promises';
 import net, { type Server, type Socket } from 'node:net';
 import path from 'node:path';
-import type { ClawBackendEvent, ClawRpcMessage, ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
+import type { ClawBackendEvent, ClawRpcMessage, ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
 import { StdioRpcPeer } from './stdio';
 
 export type LocalSocketRpcServerOptions = {

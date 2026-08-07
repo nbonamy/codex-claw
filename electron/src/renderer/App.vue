@@ -162,7 +162,7 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { DesktopUpdateStatus } from '@codex-claw/shared/contracts';
+import type { DesktopUpdateStatus } from '@codex-claw/core/contracts';
 import AppShell from './components/AppShell.vue';
 import { useAppState } from './app-state';
 import ConfettiOverlay from './shared/confetti/ConfettiOverlay.vue';

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CodexBackendDriver } from '../codex-driver';
 import type { CodexSurfaceAgentAdapter } from '../codex-surface-adapter';
-import type { Agent } from '@codex-claw/shared/contracts';
-import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
+import type { Agent } from '@codex-claw/core/contracts';
+import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 
 const agent: Agent = {
   id: 'agent-dina',

@@ -32,7 +32,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { BenchTemplate } from '@codex-claw/shared/contracts';
+import type { BenchTemplate } from '@codex-claw/core/contracts';
 import NewAgentButton from './NewAgentButton.vue';
 
 const appIconUrl = new URL('../../../assets/icon.png', import.meta.url).href;

@@ -1,7 +1,7 @@
 import { cp, lstat, mkdir, readlink, rm, symlink } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import type { CodexResourceSharingStatus, SetCodexResourceSharingInput } from '@codex-claw/shared/contracts';
+import type { CodexResourceSharingStatus, SetCodexResourceSharingInput } from '@codex-claw/core/contracts';
 import { backendCodexHomeDir } from './state';
 
 const resourceDirectoryNames = ['skills', 'plugins'] as const;

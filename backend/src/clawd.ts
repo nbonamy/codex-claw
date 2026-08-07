@@ -1,4 +1,4 @@
-import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
+import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { pathToFileURL } from 'node:url';
 import net from 'node:net';
 import type { Readable, Writable } from 'node:stream';

@@ -55,7 +55,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { Agent, AgentGitStatus } from '@codex-claw/shared/contracts';
+import type { Agent, AgentGitStatus } from '@codex-claw/core/contracts';
 import { DotsVerticalIcon, GitHubIcon, ListDetailsIcon, RefreshIcon, TextWrapDisabledIcon, TextWrapIcon } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
