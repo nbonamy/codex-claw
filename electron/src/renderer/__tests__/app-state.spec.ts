@@ -1834,6 +1834,116 @@ describe('useAppState', () => {
     expect(sendPrompt).toHaveBeenCalledTimes(1);
   });
 
+  it('tracks unread agent threads and keeps the Dock badge in sync with window focus', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents.push({
+      ...remoteSnapshot.agents[0],
+      id: 'agent-jesse',
+      name: 'Jesse',
+      backendSession: { kind: 'codex', threadId: 'thread-jesse' },
+    });
+    const setDockBadgeCount = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        selectAgent: vi.fn().mockResolvedValue(snapshotMetadata(remoteSnapshot)),
+        setDockBadgeCount,
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    state.setRendererWindowFocused(true);
+    await state.loadSnapshot();
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-jesse',
+      threadId: 'thread-jesse',
+      turnId: 'turn-jesse',
+      type: 'turn.completed',
+      payload: { status: 'completed' },
+      occurredAt: '2026-08-07T10:00:00.000Z',
+    });
+
+    expect(state.unreadAgentIds.value).toStrictEqual(['agent-jesse']);
+    expect(setDockBadgeCount).toHaveBeenLastCalledWith(1);
+
+    await state.selectAgent('agent-jesse');
+    expect(state.unreadAgentIds.value).toStrictEqual([]);
+    expect(setDockBadgeCount).toHaveBeenLastCalledWith(0);
+
+    state.setRendererWindowFocused(false);
+    listeners[0]?.({
+      seq: 2,
+      agentId: 'agent-jesse',
+      threadId: 'thread-jesse',
+      turnId: 'turn-jesse-2',
+      type: 'backendApproval.requested',
+      payload: {},
+      occurredAt: '2026-08-07T10:01:00.000Z',
+    });
+    expect(state.unreadAgentIds.value).toStrictEqual(['agent-jesse']);
+
+    state.setRendererWindowFocused(true);
+    expect(state.unreadAgentIds.value).toStrictEqual([]);
+    expect(setDockBadgeCount).toHaveBeenLastCalledWith(0);
+  });
+
+  it('marks an inactive current-team agent and an agent from another non-empty team unread for Debug', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const otherAgents = [
+      { ...remoteSnapshot.agents[0], id: 'agent-ellie', teamId: 'team-other', name: 'Ellie' },
+      { ...remoteSnapshot.agents[0], id: 'agent-joel', teamId: 'team-other', name: 'Joel' },
+    ];
+    remoteSnapshot.agents.push(...otherAgents);
+    remoteSnapshot.teams.push({
+      id: 'team-other',
+      name: 'Other',
+      avatar: 'OT',
+      color: '#123456',
+      agentIds: otherAgents.map((agent) => agent.id),
+    }, {
+      id: 'team-empty',
+      name: 'Empty',
+      avatar: 'EM',
+      color: '#654321',
+      agentIds: [],
+    });
+    const setDockBadgeCount = vi.fn().mockResolvedValue(undefined);
+    const selectedTeamSnapshot = structuredClone(remoteSnapshot);
+    selectedTeamSnapshot.activeTeamId = 'team-other';
+    selectedTeamSnapshot.activeAgentId = 'agent-joel';
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        selectTeam: vi.fn().mockResolvedValue(selectedTeamSnapshot),
+        setDockBadgeCount,
+        onEvent: vi.fn(() => () => undefined),
+      } satisfies Partial<CodexClawApi>,
+    });
+    vi.spyOn(Math, 'random')
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0.99);
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    state.markDebugAgentsUnread();
+
+    expect(state.unreadAgentIds.value).toStrictEqual(['agent-jesse', 'agent-joel']);
+    expect(setDockBadgeCount).toHaveBeenLastCalledWith(2);
+
+    await state.selectTeam('team-other');
+
+    expect(state.activeAgent.value?.id).toBe('agent-joel');
+    expect(state.unreadAgentIds.value).toStrictEqual(['agent-jesse']);
+    expect(setDockBadgeCount).toHaveBeenLastCalledWith(1);
+  });
+
   it('shows and removes backend-owned teammate prompts in the target agent queue', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     vi.stubGlobal('window', {

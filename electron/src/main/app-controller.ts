@@ -25,6 +25,7 @@ import { captureAppshot as captureFrontmostAppshot } from './appshots';
 import { createOpenInProvider, resolveProjectPath, type OpenInProvider } from './open-in';
 
 type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
+type BadgeApplication = Pick<typeof app, 'setBadgeCount'>;
 type StartupMaintenance = () => Promise<void>;
 type PendingBrowserOpen = {
   agentId: string;
@@ -80,6 +81,7 @@ export class AppController {
     private readonly daemonStatusLoader: () => Promise<ClawdDaemonStatus> = () => getClawdDaemonStatus(),
     private readonly daemonRefresher: () => Promise<ClawdDaemonStatus> = () => refreshClawdDaemon(),
     private readonly openInProvider: OpenInProvider = createOpenInProvider(),
+    private readonly badgeApplication: BadgeApplication = app,
   ) {
     this.snapshot = initialSnapshot ? metadataOnlySnapshot(initialSnapshot) : null;
     this.backendClient = backendClient ?? createRuntimeClawBackendClient({
@@ -394,6 +396,7 @@ export class AppController {
     ipc.handle(ipcChannels.logoutCodex, () => this.logoutCodex());
     ipc.handle(ipcChannels.getUpdateStatus, () => this.desktopUpdateStatus);
     ipc.handle(ipcChannels.installUpdate, () => this.requestInstallUpdate());
+    ipc.handle(ipcChannels.setDockBadgeCount, (_event, count: number) => this.setDockBadgeCount(count));
 
     ipc.handle(ipcChannels.getDaemonStatus, () => this.getDaemonStatus());
 
@@ -475,6 +478,13 @@ export class AppController {
     ipc.handle(ipcChannels.respondToClientRequest, async (_event, response: ClientRequestResponse) => {
       return this.respondToClientRequest(response);
     });
+  }
+
+  setDockBadgeCount(count: number): void {
+    if (!Number.isInteger(count) || count < 0) {
+      throw new Error('Dock badge count must be a non-negative integer.');
+    }
+    this.badgeApplication.setBadgeCount(count);
   }
 
   createWindow(): void {

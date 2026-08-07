@@ -1671,6 +1671,31 @@ describe('AppShell', () => {
     expect(wrapper.emitted('select-team')).toStrictEqual([['team-codex-claw']]);
   });
 
+  it('derives unread teams from their unread agents', () => {
+    const snapshot = createInitialSnapshot();
+    const otherAgent = {
+      ...snapshot.agents[0]!,
+      id: 'agent-other',
+      teamId: 'team-other',
+      name: 'Other Agent',
+    };
+    snapshot.agents.push(otherAgent);
+    snapshot.teams.push({
+      id: 'team-other',
+      name: 'Other Team',
+      avatar: 'OT',
+      color: '#46A857',
+      agentIds: [otherAgent.id],
+    });
+    const wrapper = mountShell({
+      snapshot,
+      unreadAgentIds: ['agent-jesse', otherAgent.id],
+    });
+
+    expect(wrapper.getComponent({ name: 'TeamRail' }).props('unreadTeamIds'))
+      .toStrictEqual(['team-other']);
+  });
+
   it('opens cockpit from the first rail item and navigates back to an agent', async () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mountShell({ snapshot });
@@ -2904,6 +2929,10 @@ describe('AppShell', () => {
 
     expect(conversationControllerState(wrapper).thread?.approvals).toStrictEqual([]);
     expect(wrapper.emitted('resolve-approval')).toBeUndefined();
+
+    listener({ type: 'debug-mark-unread' });
+    await nextTick();
+    expect(wrapper.emitted('debug-mark-unread')).toStrictEqual([[]]);
   });
 
   it('attaches an Appshot command to the active agent composer', async () => {
@@ -3154,6 +3183,7 @@ describe('AppShell', () => {
 
 function mountShell(overrides: Partial<{
   snapshot: AppSnapshot;
+  unreadAgentIds: string[];
   composerAttachments: readonly CodexNativeAttachment[];
   composerState: { text: string; selectionStart: number; selectionEnd: number };
   chooseAgentFolder: () => Promise<string | null>;
@@ -3191,6 +3221,7 @@ function mountShell(overrides: Partial<{
     props: {
       snapshot,
       activeAgent: snapshot.agents.find((agent) => agent.id === snapshot.activeAgentId) ?? null,
+      unreadAgentIds: overrides.unreadAgentIds ?? [],
       messages: snapshot.messages,
       isLoading: false,
       isSending: false,

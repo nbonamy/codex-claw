@@ -12,6 +12,28 @@ function callPrivate<Result>(controller: AppController, method: string): Promise
 }
 
 describe('AppController', () => {
+  it('validates and applies renderer-owned Dock badge counts', () => {
+    const badgeApplication = { setBadgeCount: vi.fn(() => true) };
+    const controller = new AppController(
+      createInitialSnapshot(),
+      null,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      badgeApplication,
+    );
+
+    controller.setDockBadgeCount(3);
+
+    expect(badgeApplication.setBadgeCount).toHaveBeenCalledWith(3);
+    expect(() => controller.setDockBadgeCount(-1)).toThrow('non-negative integer');
+    expect(() => controller.setDockBadgeCount(1.5)).toThrow('non-negative integer');
+  });
+
   it('keeps agent and AC-only remote-access sleep prevention independent', () => {
     expect(shouldBlockDisplaySleep({
       sourceFolderPath: '',
@@ -1434,6 +1456,8 @@ describe('AppController', () => {
     expect(snapshot.agents[0].plan).toStrictEqual({
       threadId: 'thread-dina',
       turnId: 'turn-plan',
+      kind: 'execution',
+      status: 'inProgress',
       explanation: 'Current plan',
       steps: [
         { step: 'Inspect app-server event', status: 'completed' },
@@ -1475,6 +1499,8 @@ describe('AppController', () => {
     expect(snapshot.agents[0].plan).toStrictEqual({
       threadId: 'thread-dina',
       turnId: 'turn-plan',
+      kind: 'proposed',
+      status: 'completed',
       explanation: '',
       steps: [],
       markdown: '# Dummy False Plan\n\n- [ ] Do not implement',

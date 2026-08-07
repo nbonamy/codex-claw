@@ -85,6 +85,7 @@ describe('ipc channels', () => {
       logoutCodex: 'codex:authentication:logout',
       getUpdateStatus: 'app:update-status:get',
       installUpdate: 'app:update:install',
+      setDockBadgeCount: 'app:dock-badge:set',
       getDaemonStatus: 'daemon:status:get',
       setDaemonEnabled: 'daemon:enabled:set',
       getSystemPermissions: 'system-permissions:get',
@@ -142,5 +143,9 @@ describe('ipc channels', () => {
       .toEqualTypeOf<[agentId: string, application: OpenInApplication, filePath?: string]>();
     expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.openAgentPath]['result']>()
       .toEqualTypeOf<AppSnapshot>();
+    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.setDockBadgeCount]['args']>()
+      .toEqualTypeOf<[count: number]>();
+    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.setDockBadgeCount]['result']>()
+      .toEqualTypeOf<void>();
   });
 });

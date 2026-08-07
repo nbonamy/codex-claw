@@ -14,6 +14,7 @@
     />
     <TeamRail
       :teams="snapshot.teams"
+      :unread-team-ids="unreadTeamIds"
       :active-team-id="cockpitVisible || loopsVisible || settingsVisible ? null : activeTeam?.id ?? null"
       :cockpit-active="cockpitVisible"
       :loops-active="loopsVisible"
@@ -41,6 +42,7 @@
         :agents="activeTeamAgents"
         :forkable-agent-ids="forkableAgentIds"
         :active-agent-id="currentAgent?.id ?? null"
+        :unread-agent-ids="unreadAgentIds"
         :bench="activeBench"
         :teams="snapshot.teams"
         :team-id="activeTeam?.id ?? null"
@@ -398,6 +400,7 @@ import {
 const props = withDefaults(defineProps<{
   snapshot: AppSnapshot;
   activeAgent: Agent | null;
+  unreadAgentIds?: string[];
   agentFiles?: AgentFileSearchItem[];
   messages: RendererMessage[];
   isLoading: boolean;
@@ -597,6 +600,7 @@ const emit = defineEmits<{
   'client-response': [response: ClientRequestResponse];
   'delete-message': [index: number];
   'delete-queued-prompt': [promptId: string];
+  'debug-mark-unread': [];
   'deploy-bench-template': [input: string | DeployBenchTemplateInput];
   'duplicate-agent': [agentId: string];
   'fork-agent': [agentId: string];
@@ -743,6 +747,14 @@ const activeTeamAgents = computed(() => {
   return team.agentIds
     .map((agentId) => props.snapshot.agents.find((agent) => agent.id === agentId))
     .filter((agent): agent is Agent => Boolean(agent));
+});
+const unreadTeamIds = computed(() => {
+  const unreadAgentIdSet = new Set(props.unreadAgentIds);
+  return props.snapshot.teams
+    .filter((team) => (
+      team.id !== activeTeam.value?.id && team.agentIds.some((agentId) => unreadAgentIdSet.has(agentId))
+    ))
+    .map((team) => team.id);
 });
 const forkableAgentIds = computed(() => props.snapshot.agents
   .filter((agent) => {
@@ -2158,6 +2170,11 @@ function handleAppCommand(command: AppCommand): void {
         canDeny: true,
       },
     };
+    return;
+  }
+
+  if (command.type === 'debug-mark-unread') {
+    emit('debug-mark-unread');
     return;
   }
 

@@ -4,6 +4,7 @@
     :aria-hidden="backendRestartInProgress ? 'true' : undefined"
     :snapshot="snapshot"
     :active-agent="activeAgent"
+    :unread-agent-ids="unreadAgentIds"
     :messages="visibleMessages"
     :is-loading="isLoading"
     :is-conversation-loading="isHydratingActiveAgentHistory"
@@ -125,6 +126,7 @@
     @clear-goal="clearActiveGoal"
     @client-response="respondToClientRequest"
     @delete-queued-prompt="removeQueuedPrompt"
+    @debug-mark-unread="markDebugAgentsUnread"
     @delete-message="deleteMessage"
     @edit-message="editMessage"
     @interrupt-agent="interruptActiveAgent"
@@ -176,6 +178,7 @@ const {
   activeQueuedPrompts,
   activeComposerState,
   activeComposerAttachments,
+  unreadAgentIds,
   isLoading,
   isHydratingActiveAgentHistory,
   activeHistoryHasOlder,
@@ -289,6 +292,8 @@ const {
   setPlanMode,
   clearActiveGoal,
   selectAgent,
+  setRendererWindowFocused,
+  markDebugAgentsUnread,
   selectTeam,
   sendPrompt,
   sendAgentPrompt,
@@ -312,7 +317,15 @@ async function installUpdate(): Promise<void> {
   await window.codexClaw?.installUpdate?.();
 }
 
+function syncRendererWindowFocus(): void {
+  setRendererWindowFocused(document.visibilityState === 'visible' && document.hasFocus());
+}
+
 onMounted(() => {
+  window.addEventListener('focus', syncRendererWindowFocus);
+  window.addEventListener('blur', syncRendererWindowFocus);
+  document.addEventListener('visibilitychange', syncRendererWindowFocus);
+  syncRendererWindowFocus();
   unsubscribeSystemAppearance = subscribeToSystemAppearance();
   void loadSnapshot();
   void loadBackendModels();
@@ -329,6 +342,9 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener('focus', syncRendererWindowFocus);
+  window.removeEventListener('blur', syncRendererWindowFocus);
+  document.removeEventListener('visibilitychange', syncRendererWindowFocus);
   unsubscribeSystemAppearance?.();
   unsubscribeSystemAppearance = null;
   unsubscribeUpdateStatus?.();

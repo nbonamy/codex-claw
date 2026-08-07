@@ -25,12 +25,13 @@
         class="team-rail__team"
         :class="[
           { 'team-rail__team--active': isTeamActive(team.id) },
+          { 'team-rail__team--unread': isTeamUnread(team.id) },
           teamReorder.dropTargetClass(team.id),
         ]"
         type="button"
         v-bind="teamReorder.dragItemAttributes(team.id)"
         :style="{ backgroundColor: team.color ?? defaultTeamColor }"
-        :aria-label="team.name"
+        :aria-label="isTeamUnread(team.id) ? `${team.name}, unread activity` : team.name"
         :aria-pressed="isTeamActive(team.id)"
         @click="emit('select-team', team.id)"
         @contextmenu.prevent="openTeamMenu(team.id, $event)"
@@ -41,6 +42,15 @@
         @dragend="teamReorder.onDragEnd"
       >
         {{ team.avatar ?? teamInitials(team.name) }}
+        <span
+          v-if="isTeamUnread(team.id)"
+          class="team-rail__unread-orbit"
+          aria-hidden="true"
+        >
+          <svg viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="46.875" pathLength="360" />
+          </svg>
+        </span>
       </button>
 
       <button
@@ -114,6 +124,7 @@ const props = defineProps<{
   account?: CodexAccount | null;
   settingsActive?: boolean;
   agentSidebarExpanded?: boolean;
+  unreadTeamIds?: string[];
 }>();
 
 const emit = defineEmits<{
@@ -138,6 +149,7 @@ const contextMenuTeam = computed(() => (
   contextMenuTeamId.value ? props.teams.find((team) => team.id === contextMenuTeamId.value) ?? null : null
 ));
 const canCloseContextTeam = computed(() => Boolean(contextMenuTeam.value) && props.teams.length > 1);
+const unreadTeamIdSet = computed(() => new Set(props.unreadTeamIds ?? []));
 const teamReorder = useListReorderDrag<string>({
   itemIds: () => props.teams.map((team) => team.id),
   onDrop: ({ draggedId, beforeId }) => {
@@ -164,6 +176,10 @@ function selectEditTeam(teamId: string): void {
 
 function isTeamActive(teamId: string): boolean {
   return !props.cockpitActive && !props.loopsActive && !props.settingsActive && teamId === props.activeTeamId;
+}
+
+function isTeamUnread(teamId: string): boolean {
+  return teamId !== props.activeTeamId && unreadTeamIdSet.value.has(teamId);
 }
 
 async function requestCloseTeam(teamId: string): Promise<void> {
@@ -296,6 +312,10 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   opacity: 0.6;
 }
 
+.team-rail__team--unread:not(.team-rail__team--active, .list-reorder-drag--dragging) {
+  opacity: 0.9;
+}
+
 .team-rail__team:not(.team-rail__team--active, .list-reorder-drag--dragging):hover,
 .team-rail__team:not(.team-rail__team--active, .list-reorder-drag--dragging):focus-visible {
   opacity: 1;
@@ -392,6 +412,31 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   box-shadow:
     0 0 0 2px var(--color-shell-rail),
     0 0 0 3px var(--color-primary);
+}
+
+.team-rail__unread-orbit {
+  position: absolute;
+  z-index: 2;
+  inset: -4px;
+  color: var(--color-error);
+  pointer-events: none;
+}
+
+.team-rail__unread-orbit svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.team-rail__unread-orbit circle {
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 6.25;
+  stroke-linecap: round;
+  stroke-dasharray: 64 296;
+  transform: rotate(-82deg);
+  transform-origin: center;
 }
 
 .team-rail__new {

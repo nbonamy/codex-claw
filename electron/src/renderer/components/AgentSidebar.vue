@@ -37,6 +37,11 @@
         @drop="agentReorder.onDrop(agent.id, $event)"
         @dragend="agentReorder.onDragEnd"
       >
+        <span
+          v-if="isAgentUnread(agent.id)"
+          class="agent-sidebar__unread-signal"
+          aria-label="Unread activity"
+        />
         <AgentAvatar
           class="agent-sidebar__avatar"
           :avatar="agent.avatar"
@@ -131,6 +136,7 @@ import { useListReorderDrag } from '../shared/use-list-reorder-drag';
 const props = defineProps<{
   agents: Agent[];
   activeAgentId: string | null;
+  unreadAgentIds?: string[];
   bench?: BenchTemplate[];
   forkableAgentIds?: string[];
   compact?: boolean;
@@ -175,6 +181,7 @@ const resolvedOpenInCatalog = computed<OpenInApplicationCatalog>(() => props.ope
   applications: [],
 }));
 const activeAgent = computed(() => props.agents.find((agent) => agent.id === props.activeAgentId) ?? null);
+const unreadAgentIdSet = computed(() => new Set(props.unreadAgentIds ?? []));
 const contextMenuAgentId = ref<string | null>(null);
 const contextMenuPosition = ref({ x: 0, y: 0 });
 const contextMenuAgent = computed(() => (
@@ -242,6 +249,10 @@ function emitResizedWidth(width: number): void {
 
 function selectAgent(agentId: string): void {
   emit('select-agent', agentId);
+}
+
+function isAgentUnread(agentId: string): boolean {
+  return unreadAgentIdSet.value.has(agentId);
 }
 
 function openAgentMenu(agentId: string, event: MouseEvent): void {
@@ -343,6 +354,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   --agent-sidebar-row-min-height: 64px;
   --agent-sidebar-status-column-width: 12px;
   --agent-status-dot-size: 10px;
+  --agent-unread-signal-height: 36px;
   position: relative;
   container-type: inline-size;
   flex: 0 0 clamp(var(--agent-sidebar-min-width), var(--agent-sidebar-width), var(--agent-sidebar-max-width));
@@ -478,6 +490,18 @@ function onResizePointerEnd(event: PointerEvent): void {
   gap: 1.5px;
 }
 
+.agent-sidebar__unread-signal {
+  position: absolute;
+  top: 50%;
+  left: var(--space-2);
+  width: 4px;
+  height: var(--agent-unread-signal-height);
+  border-radius: var(--radius-full);
+  background: var(--color-error);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
 .agent-sidebar__meta strong,
 .agent-sidebar__meta span {
   overflow: hidden;
@@ -546,6 +570,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   --agent-sidebar-row-min-height: var(--space-20);
   --agent-sidebar-status-column-width: var(--space-4);
   --agent-status-dot-size: var(--space-4);
+  --agent-unread-signal-height: var(--space-12);
 }
 
 .agent-sidebar--compact .agent-sidebar__agent {

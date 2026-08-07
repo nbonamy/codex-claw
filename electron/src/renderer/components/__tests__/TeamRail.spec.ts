@@ -71,6 +71,19 @@ describe('TeamRail', () => {
     expect(collapsed.classes()).not.toContain('team-rail--agent-sidebar-expanded');
   });
 
+  it('shows an orbital marker on teams containing unread agents', () => {
+    const wrapper = mountRail({
+      teams,
+      activeTeamId: 'team-claw',
+      unreadTeamIds: ['team-sk', 'team-claw'],
+    });
+
+    const unreadTeam = wrapper.get('[aria-label="Skwad, unread activity"]');
+    expect(unreadTeam.classes()).toContain('team-rail__team--unread');
+    expect(unreadTeam.get('.team-rail__unread-orbit').attributes('aria-hidden')).toBe('true');
+    expect(wrapper.get('[aria-label="Codex Claw"]').find('.team-rail__unread-orbit').exists()).toBe(false);
+  });
+
   it('falls back to team initials when no avatar is set', () => {
     const wrapper = mountRail({
       teams: [teams[1]],
@@ -435,6 +448,7 @@ function mountRail(props: {
   rateLimits?: AccountRateLimits;
   settingsActive?: boolean;
   agentSidebarExpanded?: boolean;
+  unreadTeamIds?: string[];
 }) {
   const wrapper = mount(TeamRail, {
     attachTo: document.body,

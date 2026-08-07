@@ -54,6 +54,8 @@ const daemonStatus = ref<ClawdDaemonStatus | null>(null);
 const daemonStatusError = ref<string | null>(null);
 const codexResourceSharingStatus = ref<CodexResourceSharingStatus>({ enabled: true, migrationRequired: false });
 const backendRestartInProgress = ref(false);
+const unreadAgentIdSet = ref(new Set<string>());
+const rendererWindowFocused = ref(true);
 const hydratingAgentHistoryIds = ref(new Set<string>());
 const loadingOlderHistoryIds = ref(new Set<string>());
 const historyHasOlderByAgentId = ref<Record<string, boolean>>({});
@@ -100,6 +102,7 @@ export function useAppState() {
   let visibleMessageAgentId: string | null = null;
   let visibleMessageCache: RendererMessage[] = [];
   const selectedModel = computed(() => selectedModelFromCatalog());
+  const unreadAgentIds = computed(() => [...unreadAgentIdSet.value]);
 
   const activeAgent = computed(() => {
     return snapshot.value.agents.find((agent) => agent.id === snapshot.value.activeAgentId) ?? null;
@@ -213,6 +216,8 @@ export function useAppState() {
     }
 
     resetCatalogStateIfSourceChanged(window.codexClaw);
+    unreadAgentIdSet.value = new Set();
+    syncDockBadge();
 
     isLoading.value = true;
     bufferedMainEvents = [];
@@ -264,6 +269,7 @@ export function useAppState() {
         selectAgentInSnapshot(state.snapshot, activeAgentId);
       }
       snapshot.value = state.snapshot;
+      pruneUnreadAgentIds();
       connectionState.value = state.connection;
       lastBackendEventSeq = state.lastBackendEventSeq;
       const buffered = bufferedMainEvents;
@@ -484,10 +490,40 @@ export function useAppState() {
     );
     rememberActiveComposerConfiguration();
     snapshot.value = selectAgentInSnapshot(snapshot.value, agentId);
+    markAgentRead(agentId);
     restoreComposerConfiguration(agentId);
     if (needsHistory) markAgentHistoryHydrating(agentId, true);
     void loadActiveAgentCatalogs(agentId);
     void refreshAgentSelection(agentId, requestId, needsHistory);
+  }
+
+  function setRendererWindowFocused(focused: boolean): void {
+    rendererWindowFocused.value = focused;
+    if (focused && snapshot.value.activeAgentId) {
+      markAgentRead(snapshot.value.activeAgentId);
+    }
+  }
+
+  function markDebugAgentsUnread(): void {
+    const activeAgent = snapshot.value.agents.find((agent) => agent.id === snapshot.value.activeAgentId) ?? null;
+    const currentTeam = snapshot.value.teams.find((team) => team.id === snapshot.value.activeTeamId) ??
+      snapshot.value.teams.find((team) => team.agentIds.includes(activeAgent?.id ?? '')) ?? null;
+    const agentsById = new Map(snapshot.value.agents.map((agent) => [agent.id, agent]));
+    const agentsForTeam = (agentIds: readonly string[]): Agent[] => agentIds
+      .map((agentId) => agentsById.get(agentId))
+      .filter((agent): agent is Agent => Boolean(agent));
+    const currentTeamCandidates = agentsForTeam(currentTeam?.agentIds ?? [])
+      .filter((agent) => agent.id !== activeAgent?.id);
+    const otherNonEmptyTeams = snapshot.value.teams.filter((team) => (
+      team.id !== currentTeam?.id && agentsForTeam(team.agentIds).length > 0
+    ));
+    const otherTeam = randomItem(otherNonEmptyTeams);
+    const targets = [
+      randomItem(currentTeamCandidates),
+      randomItem(agentsForTeam(otherTeam?.agentIds ?? [])),
+    ].filter((agent): agent is Agent => Boolean(agent));
+
+    markAgentsUnread(targets.map((agent) => agent.id));
   }
 
   async function chooseAgentFolder(): Promise<string | null> {
@@ -658,6 +694,9 @@ export function useAppState() {
     }
 
     await selectSnapshotWithLoading(() => window.codexClaw!.selectTeam(teamId));
+    if (snapshot.value.activeAgentId) {
+      markAgentRead(snapshot.value.activeAgentId);
+    }
   }
 
   async function getLoopSnapshot(location?: LoopLocation): Promise<AppSnapshot> {
@@ -1494,6 +1533,7 @@ export function useAppState() {
     activeQueuedPrompts,
     activeComposerState,
     activeComposerAttachments,
+    unreadAgentIds,
     isLoading,
     connectionState,
     isHydratingActiveAgentHistory,
@@ -1618,6 +1658,8 @@ export function useAppState() {
     updateComposerState,
     updateComposerAttachments,
     selectAgent,
+    setRendererWindowFocused,
+    markDebugAgentsUnread,
     selectTeam,
     clearActiveGoal,
     sendPrompt,
@@ -1963,6 +2005,7 @@ function handleMainEvent(event: MainToRendererEvent, adoptSnapshot = true): void
     connectionState.value = event.payload;
   }
   if (adoptSnapshot) adoptSnapshotFromMainEvent(event);
+  syncUnreadStateFromMainEvent(event);
   syncAnsweredClientRequestsFromMainEvent(event);
   syncComposerModeFromMainEvent(event);
   syncSidePanelFromMainEvent(event);
@@ -1971,6 +2014,60 @@ function handleMainEvent(event: MainToRendererEvent, adoptSnapshot = true): void
   if (event.type === 'skills.changed') {
     applySkillsChangedEvent(event);
   }
+}
+
+function syncUnreadStateFromMainEvent(event: MainToRendererEvent): void {
+  if (!event.agentId || !isUnreadWorthyEvent(event.type)) return;
+  if (!snapshot.value.agents.some((agent) => agent.id === event.agentId)) return;
+  if (rendererWindowFocused.value && snapshot.value.activeAgentId === event.agentId) {
+    markAgentRead(event.agentId);
+    return;
+  }
+  markAgentUnread(event.agentId);
+}
+
+function isUnreadWorthyEvent(type: MainToRendererEvent['type']): boolean {
+  return type === 'turn.completed' ||
+    type === 'approval.requested' ||
+    type === 'backendApproval.requested' ||
+    type === 'toolInput.requested' ||
+    type === 'error';
+}
+
+function markAgentUnread(agentId: string): void {
+  markAgentsUnread([agentId]);
+}
+
+function markAgentsUnread(agentIds: readonly string[]): void {
+  const next = new Set(unreadAgentIdSet.value);
+  for (const agentId of agentIds) next.add(agentId);
+  if (next.size === unreadAgentIdSet.value.size) return;
+  unreadAgentIdSet.value = next;
+  syncDockBadge();
+}
+
+function markAgentRead(agentId: string): void {
+  if (!unreadAgentIdSet.value.has(agentId)) return;
+  const next = new Set(unreadAgentIdSet.value);
+  next.delete(agentId);
+  unreadAgentIdSet.value = next;
+  syncDockBadge();
+}
+
+function pruneUnreadAgentIds(): void {
+  const agentIds = new Set(snapshot.value.agents.map((agent) => agent.id));
+  const next = new Set([...unreadAgentIdSet.value].filter((agentId) => agentIds.has(agentId)));
+  if (next.size === unreadAgentIdSet.value.size) return;
+  unreadAgentIdSet.value = next;
+  syncDockBadge();
+}
+
+function syncDockBadge(): void {
+  void window.codexClaw?.setDockBadgeCount?.(unreadAgentIdSet.value.size).catch(() => undefined);
+}
+
+function randomItem<T>(items: readonly T[]): T | undefined {
+  return items[Math.floor(Math.random() * items.length)];
 }
 
 function syncHistoryPageStateFromMainEvent(event: MainToRendererEvent): void {
@@ -2082,6 +2179,7 @@ function adoptBackgroundSnapshotMetadata(metadata: AppSnapshotMetadata): void {
   if (activeAgentId && snapshot.value.agents.some((agent) => agent.id === activeAgentId)) {
     selectAgentInSnapshot(snapshot.value, activeAgentId);
   }
+  pruneUnreadAgentIds();
 }
 
 function adoptBackgroundSnapshot(nextSnapshot: AppSnapshot): void {
@@ -2090,12 +2188,14 @@ function adoptBackgroundSnapshot(nextSnapshot: AppSnapshot): void {
     selectAgentInSnapshot(nextSnapshot, activeAgentId);
   }
   snapshot.value = nextSnapshot;
+  pruneUnreadAgentIds();
 }
 
 function adoptNavigationSnapshot(nextSnapshot: AppSnapshot): void {
   const previousAgentId = snapshot.value.activeAgentId;
   rememberActiveComposerConfiguration();
   snapshot.value = nextSnapshot;
+  pruneUnreadAgentIds();
   if (nextSnapshot.activeAgentId && nextSnapshot.activeAgentId !== previousAgentId) {
     restoreComposerConfiguration(nextSnapshot.activeAgentId);
   } else if (!nextSnapshot.activeAgentId) {

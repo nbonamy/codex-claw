@@ -81,6 +81,7 @@ export const ipcChannels = {
   logoutCodex: 'codex:authentication:logout',
   getUpdateStatus: 'app:update-status:get',
   installUpdate: 'app:update:install',
+  setDockBadgeCount: 'app:dock-badge:set',
   getDaemonStatus: 'daemon:status:get',
   setDaemonEnabled: 'daemon:enabled:set',
   getSystemPermissions: 'system-permissions:get',

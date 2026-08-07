@@ -78,6 +78,15 @@ implemented:
 
 - team rail on the far left;
 - agent list with avatar, name, folder, and status;
+- a tall red leading-edge signal marks agents with completed turns,
+  approval/input requests, or errors received outside the visible thread; teams
+  containing at least one unread agent carry a short, thick red orbital sweep
+  at the top-right of their rail avatar, except the
+  currently selected team, which is treated as read for team-level display
+  while retaining unread state for agents not being viewed. Selecting a team
+  explicitly marks the agent it opens as read; selecting an agent or focusing
+  its active thread does the same. The macOS Dock badge shows the number of
+  unread agent threads;
 - persisted View-menu compact agent-list mode with mini avatars, names, and status icons;
 - agent context actions for duplicating configuration or forking the active
   backend conversation; both insert the new selected agent directly below the
@@ -212,7 +221,8 @@ Claw switches to a published npm dependency.
 Development builds expose a native Debug menu with deterministic fixtures for
 sending a real MCP collaboration message to the current agent, opening the
 Codex Claw website in the agent browser, opening a sample Markdown tab, showing
-an approval request, and toggling execution-plan and Plan Review states. Keep
+an approval request, marking inactive agents in the current and another team as
+unread, and toggling execution-plan and Plan Review states. Keep
 these fixtures local and repeatable; resolving a debug approval must never
 reach the backend.
 

@@ -1093,6 +1093,7 @@ export type AppCommand =
   | { type: 'duplicate-active-agent' }
   | { type: 'debug-approval-request' }
   | { type: 'debug-image-annotation'; imageDataUrl?: string; pixelRatio?: 1 | 2 }
+  | { type: 'debug-mark-unread' }
   | { type: 'debug-open-markdown' }
   | { type: 'edit-active-agent' }
   | { type: 'new-agent' }
@@ -1313,6 +1314,7 @@ export type CodexClawApi = {
   logoutCodex(): Promise<CodexAuthentication>;
   getUpdateStatus(): Promise<DesktopUpdateStatus>;
   installUpdate(): Promise<void>;
+  setDockBadgeCount(count: number): Promise<void>;
   getDaemonStatus(): Promise<ClawdDaemonStatus>;
   setDaemonEnabled(enabled: boolean): Promise<ClawdDaemonStatus>;
   getSystemPermissions(): Promise<SystemPermissionsStatus>;

@@ -86,6 +86,7 @@ const api: CodexClawApi = {
   logoutCodex: () => ipc.invoke(ipcChannels.logoutCodex),
   getUpdateStatus: () => ipc.invoke(ipcChannels.getUpdateStatus),
   installUpdate: () => ipc.invoke(ipcChannels.installUpdate),
+  setDockBadgeCount: (count: number) => ipc.invoke(ipcChannels.setDockBadgeCount, count),
   getDaemonStatus: () => ipc.invoke(ipcChannels.getDaemonStatus),
   setDaemonEnabled: (enabled: boolean) => ipc.invoke(ipcChannels.setDaemonEnabled, enabled),
   getSystemPermissions: () => ipc.invoke(ipcChannels.getSystemPermissions),

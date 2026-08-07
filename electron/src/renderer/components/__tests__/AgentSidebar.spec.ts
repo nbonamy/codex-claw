@@ -151,6 +151,23 @@ describe('AgentSidebar', () => {
     expect(wrapper.find('.agent-sidebar__folder').exists()).toBe(false);
   });
 
+  it('marks unread agent threads without replacing their runtime status', () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        unreadAgentIds: ['agent-jesse'],
+        teamName: 'Codex Claw',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    const rows = wrapper.findAll('.agent-sidebar__agent');
+    expect(rows[0]?.find('.agent-sidebar__unread-signal').exists()).toBe(false);
+    expect(rows[1]?.get('.agent-sidebar__unread-signal').attributes('aria-label')).toBe('Unread activity');
+    expect(rows[1]?.find('.agent-sidebar__status').exists()).toBe(true);
+  });
+
   it('replaces the first nine status dots with Command-number shortcuts', () => {
     const manyAgents = Array.from({ length: 10 }, (_, index): Agent => ({
       ...agents[0]!,

@@ -90,6 +90,10 @@ function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions
         click: () => callbacks.sendAppCommand({ type: 'debug-approval-request' }),
       },
       {
+        label: 'Mark as unread',
+        click: () => callbacks.sendAppCommand({ type: 'debug-mark-unread' }),
+      },
+      {
         label: 'Execution Plan',
         enabled: Boolean(callbacks.toggleDebugExecutionPlan),
         click: () => callbacks.toggleDebugExecutionPlan?.(),

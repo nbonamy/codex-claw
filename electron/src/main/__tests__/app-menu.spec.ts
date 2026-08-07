@@ -268,6 +268,7 @@ describe('app menu', () => {
       'Open Codex Claw Website',
       'Open Markdown',
       'Approval Request',
+      'Mark as unread',
       'Execution Plan',
       'Plan Review',
       'Image Annotation',
@@ -284,6 +285,7 @@ describe('app menu', () => {
     clickItem(debugMenu, 'Debug', 'Open Codex Claw Website');
     clickItem(debugMenu, 'Debug', 'Open Markdown');
     clickItem(debugMenu, 'Debug', 'Approval Request');
+    clickItem(debugMenu, 'Debug', 'Mark as unread');
     clickItem(debugMenu, 'Debug', 'Execution Plan');
     clickItem(debugMenu, 'Debug', 'Plan Review');
     clickItem(debugMenu, 'Debug', 'Image Annotation');
@@ -298,6 +300,9 @@ describe('app menu', () => {
     expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(2, { type: 'debug-open-markdown' });
     expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(3, { type: 'debug-approval-request' });
     expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(4, {
+      type: 'debug-mark-unread',
+    });
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(5, {
       type: 'debug-image-annotation',
       imageDataUrl: 'data:image/png;base64,clipboard-image',
       pixelRatio: 2,
