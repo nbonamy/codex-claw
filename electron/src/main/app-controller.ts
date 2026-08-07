@@ -11,7 +11,7 @@ import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards';
 import { applyMainEventToSnapshot, applySnapshotMetadata, snapshotMetadata } from '@codex-claw/shared/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppCommand, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppCommand, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
 import { sendAppCommand, sendRendererEvent } from './ipc-events';
 import { installAppMenu, type AppMenuCallbacks } from './app-menu';
@@ -22,6 +22,7 @@ import { appCommandFromDeepLink, codexClawDeepLinkScheme, deepLinksFromArgv } fr
 import { ManualUpdateCheckController } from './manual-update-check';
 import { AppshotsKeyMonitor } from './appshots-key-monitor';
 import { captureAppshot as captureFrontmostAppshot } from './appshots';
+import { createOpenInProvider, resolveProjectPath, type OpenInProvider } from './open-in';
 
 type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
 type StartupMaintenance = () => Promise<void>;
@@ -78,6 +79,7 @@ export class AppController {
     private readonly appshotsKeyMonitor: AppshotsKeyMonitor | null = null,
     private readonly daemonStatusLoader: () => Promise<ClawdDaemonStatus> = () => getClawdDaemonStatus(),
     private readonly daemonRefresher: () => Promise<ClawdDaemonStatus> = () => refreshClawdDaemon(),
+    private readonly openInProvider: OpenInProvider = createOpenInProvider(),
   ) {
     this.snapshot = initialSnapshot ? metadataOnlySnapshot(initialSnapshot) : null;
     this.backendClient = backendClient ?? createRuntimeClawBackendClient({
@@ -203,6 +205,11 @@ export class AppController {
 
     ipc.handle(ipcChannels.openAgentGitDiff, async (_event, agentId: string) => {
       return this.openAgentGitDiff(agentId);
+    });
+
+    ipc.handle(ipcChannels.getOpenInApplications, () => this.getOpenInApplications());
+    ipc.handle(ipcChannels.openAgentPath, (_event, agentId: string, application: OpenInApplication, filePath?: string) => {
+      return this.openAgentPath(agentId, application, filePath);
     });
 
     ipc.handle(ipcChannels.chooseAgentFolder, async () => {
@@ -650,6 +657,32 @@ export class AppController {
 
   private async updateAgent(input: UpdateAgentInput): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentUpdate, { input }));
+  }
+
+  private getOpenInApplications(): Promise<OpenInApplicationCatalog> {
+    return this.openInProvider.list();
+  }
+
+  private async openAgentPath(
+    agentId: string,
+    application: OpenInApplication,
+    filePath?: string,
+  ): Promise<AppSnapshot> {
+    const agent = this.snapshot?.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) {
+      throw new Error(`Agent not found: ${agentId}`);
+    }
+    const team = this.snapshot?.teams.find((candidate) => candidate.id === agent.teamId);
+    if (team?.remoteConnectionId) {
+      throw new Error('Open In is only available for local agents.');
+    }
+
+    const targetPath = await resolveProjectPath(agent.folder, filePath);
+    await this.openInProvider.open(application, targetPath);
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(
+      backendMethods.agentOpenInApplicationUpdate,
+      { agentId, application },
+    ));
   }
 
   private async duplicateAgent(agentId: string): Promise<AppSnapshot> {

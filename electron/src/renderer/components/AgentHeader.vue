@@ -93,6 +93,12 @@
       >
         <ListIcon aria-hidden="true" />
       </button>
+      <OpenInControl
+        v-if="agent && openInAvailable && openInCatalog && openInCatalog.applications.length > 0"
+        :application="effectiveOpenInApplication(agent, openInCatalog)"
+        :catalog="openInCatalog"
+        @open="emit('open-in', $event)"
+      />
       <button
         class="agent-header__workspace"
         type="button"
@@ -114,12 +120,14 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Agent, AgentGitStatus, BackendRuntimeStatus, DesktopUpdateStatus } from '@codex-claw/shared/contracts';
+import type { Agent, AgentGitStatus, BackendRuntimeStatus, DesktopUpdateStatus, OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/shared/contracts';
 import { ListIcon, PanelLeftOpenIcon } from '../shared/icons/app-icons';
 import { IconLayoutSidebarRight } from '@tabler/icons-vue';
 import { CodexAnimatedDiffStat } from 'codex-app-sdk/vue';
 import AgentAvatar from './AgentAvatar.vue';
 import UpdateAvailableBadge from './UpdateAvailableBadge.vue';
+import OpenInControl from '../shared/OpenInControl.vue';
+import { effectiveOpenInApplication } from '../shared/open-in';
 
 const props = defineProps<{
   agent: Agent | null;
@@ -131,6 +139,8 @@ const props = defineProps<{
   updateStatus?: DesktopUpdateStatus;
   executionPlanAvailable?: boolean;
   executionPlanOpen?: boolean;
+  openInAvailable?: boolean;
+  openInCatalog?: OpenInApplicationCatalog;
 }>();
 
 const emit = defineEmits<{
@@ -139,6 +149,7 @@ const emit = defineEmits<{
   'toggle-execution-plan': [];
   'open-git-diff': [];
   'install-update': [];
+  'open-in': [application: OpenInApplication];
 }>();
 
 const statusLabel = computed(() => {
@@ -209,6 +220,8 @@ const hasHeaderGitStatus = computed(() => {
 <style scoped>
 .agent-header {
   --agent-status-dot-size: 10px;
+  position: relative;
+  z-index: 5;
   flex: 0 0 var(--workbench-appbar-height);
   min-height: var(--workbench-appbar-height);
   display: flex;
@@ -222,8 +235,6 @@ const hasHeaderGitStatus = computed(() => {
 }
 
 .agent-header--with-sidebar-edge {
-  position: relative;
-  z-index: 1;
   box-shadow: var(--shadow-content-edge);
 }
 

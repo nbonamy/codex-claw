@@ -50,6 +50,7 @@
         :min-width="agentSidebarMinWidth"
         :max-width="agentSidebarMaxWidth"
         :list-conversations="listAgentConversations"
+        :open-in-catalog="openInApplications"
         :quick-switch-shortcuts-visible="quickAgentShortcutsVisible"
         :resume-conversation="resumeAgentConversation"
         @collapse-sidebar="agentSidebarCollapsed = true"
@@ -59,6 +60,7 @@
         @fork-agent="$emit('fork-agent', $event)"
         @edit-agent="openEditAgent"
         @move-agent-to-team="$emit('move-agent-to-team', $event)"
+        @open-in="openAgentIn($event.agentId, $event.application)"
         @new-agent="openNewAgent"
         @reorder-agents="$emit('reorder-agents', $event)"
         @restart-agent="$emit('restart-agent', $event)"
@@ -193,10 +195,13 @@
           :update-status="updateStatus"
           :execution-plan-available="Boolean(currentTurnPlan)"
           :execution-plan-open="executionPlanVisible"
+          :open-in-available="isLocalAgent(currentAgent)"
+          :open-in-catalog="openInApplications"
           @expand-sidebar="agentSidebarCollapsed = false"
           @toggle-execution-plan="toggleExecutionPlan"
           @toggle-workspace="toggleRightWorkspace"
           @open-git-diff="openAgentGitDiffPreview"
+          @open-in="openAgentIn(currentAgent.id, $event)"
           @install-update="emit('install-update')"
         />
         <div ref="workspaceBody" class="app-shell__body">
@@ -238,11 +243,14 @@
             :browser-id="rightWorkspaceFor(agent.id).browserId"
             :browser-initial-url="rightWorkspaceFor(agent.id).browserInitialUrl"
             :browser-open-request-id="rightWorkspaceFor(agent.id).browserOpenRequestId"
+            :open-in-available="isLocalAgent(agent)"
+            :open-in-catalog="openInApplications"
             @close-tab="closeRightWorkspaceTab(agent.id, $event)"
             @cancel-plan="cancelPlanReview(agent.id)"
             @comment-plan="commentOnPlan"
             @confirm-plan="confirmPlan"
             @open-tab="openRightWorkspaceTabFromMenu(agent.id, $event)"
+            @open-in="openAgentIn(agent.id, $event.application, $event.filePath)"
             @refresh-git-diff="openAgentGitDiffPreview(agent.id)"
             @select-tab="selectRightWorkspaceTab(agent.id, $event)"
             @send-prompt="forwardPrompt"
@@ -330,7 +338,7 @@
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import debugAnnotationScreenshotUrl from '../../../../docs/codex.png?url';
-import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type PairedDevice, type PromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
+import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type PromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultTeamColor } from '@codex-claw/shared/team-colors';
@@ -441,6 +449,8 @@ const props = withDefaults(defineProps<{
   createSourceWorktree?: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   previewAgentFile?: (agentId: string, filePath: string) => Promise<AgentFilePreviewResult>;
   openAgentGitDiff?: (agentId: string) => Promise<void>;
+  openInApplications?: OpenInApplicationCatalog;
+  openAgentPath?: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   createAgent?: (input: CreateAgentInput) => Promise<Agent | null | void>;
   createTeam?: (input: CreateTeamInput) => Promise<Team | null | void>;
   deployBenchTemplateAction?: (input: string | DeployBenchTemplateInput) => Promise<Agent | null | void>;
@@ -531,6 +541,10 @@ const props = withDefaults(defineProps<{
   },
   openAgentGitDiff: async () => {
     throw new Error('Git diff preview is not available.');
+  },
+  openInApplications: () => ({ defaultApplication: 'finder', applications: [] }),
+  openAgentPath: async () => {
+    throw new Error('Open In is not available.');
   },
   createAgent: async () => undefined,
   createTeam: async () => undefined,
@@ -1900,6 +1914,23 @@ function filePreviewPanel(
     state,
     error,
   } as RightWorkspaceFilePanel;
+}
+
+function isLocalAgent(agent: Agent): boolean {
+  const team = props.snapshot.teams.find((candidate) => candidate.id === agent.teamId);
+  return !team?.remoteConnectionId;
+}
+
+async function openAgentIn(
+  agentId: string,
+  application: OpenInApplication,
+  filePath?: string,
+): Promise<void> {
+  try {
+    await props.openAgentPath(agentId, application, filePath);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
 }
 
 async function openAgentGitDiffPreview(agentId = currentAgent.value?.id): Promise<void> {

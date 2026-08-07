@@ -79,6 +79,12 @@
           v-else-if="item.icon"
           class="app-menu__icon"
         />
+        <img
+          v-else-if="item.iconUrl"
+          class="app-menu__icon app-menu__icon--image"
+          :src="item.iconUrl"
+          alt=""
+        />
         <span
           v-else
           class="app-menu__icon app-menu__icon--empty"
@@ -225,6 +231,11 @@ function isSelected(item: Exclude<AppMenuItem, { type: 'separator' | 'submenu' }
 
 .app-menu__icon--empty {
   visibility: hidden;
+}
+
+.app-menu__icon--image {
+  border-radius: var(--radius-sm);
+  object-fit: contain;
 }
 
 .app-menu__check,

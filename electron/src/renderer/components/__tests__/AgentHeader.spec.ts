@@ -96,6 +96,30 @@ describe('AgentHeader', () => {
     expect(wrapper.emitted('toggle-workspace')).toStrictEqual([[]]);
   });
 
+  it('opens the agent folder in its remembered application from the header', async () => {
+    const wrapper = mount(AgentHeader, {
+      props: {
+        agent: { ...agent, openInApplication: 'xcode' },
+        backendRuntime: { backend: 'codex', status: 'running' },
+        isLoading: false,
+        sidebarCollapsed: false,
+        openInAvailable: true,
+        openInCatalog: {
+          defaultApplication: 'vscode',
+          applications: [
+            { id: 'vscode', label: 'VS Code' },
+            { id: 'xcode', label: 'Xcode' },
+          ],
+        },
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    await wrapper.get('[aria-label="Open in Xcode"]').trigger('click');
+
+    expect(wrapper.emitted('open-in')).toStrictEqual([['xcode']]);
+  });
+
   it('shows the execution-plan toggle only when a plan is available', async () => {
     const wrapper = mount(AgentHeader, {
       props: {

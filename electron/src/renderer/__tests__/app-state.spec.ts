@@ -44,6 +44,36 @@ describe('useAppState', () => {
     expect(state.isLoading.value).toBe(false);
   });
 
+  it('loads native Open In applications and adopts the remembered agent choice after opening', async () => {
+    const initialSnapshot = createInitialSnapshot();
+    const openedSnapshot = structuredClone(initialSnapshot);
+    openedSnapshot.agents[0].openInApplication = 'xcode';
+    const catalog = {
+      defaultApplication: 'vscode' as const,
+      applications: [
+        { id: 'vscode' as const, label: 'VS Code' },
+        { id: 'xcode' as const, label: 'Xcode' },
+      ],
+    };
+    const getOpenInApplications = vi.fn().mockResolvedValue(catalog);
+    const openAgentPath = vi.fn().mockResolvedValue(openedSnapshot);
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getOpenInApplications,
+        openAgentPath,
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    state.snapshot.value = initialSnapshot;
+
+    await state.loadOpenInApplications();
+    await state.openAgentPath('agent-dina', 'xcode', 'src/main.ts');
+
+    expect(state.openInApplications.value).toStrictEqual(catalog);
+    expect(openAgentPath).toHaveBeenCalledWith('agent-dina', 'xcode', 'src/main.ts');
+    expect(state.snapshot.value.agents[0].openInApplication).toBe('xcode');
+  });
+
   it('ignores missing agent selections and does not local-select without preload', async () => {
     vi.stubGlobal('window', {});
     const state = useAppState();

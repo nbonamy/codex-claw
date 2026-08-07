@@ -6,6 +6,7 @@ type AppMenuItemBase = {
   description?: string;
   disabled?: boolean;
   icon?: Component;
+  iconUrl?: string;
   value?: string;
 };
 

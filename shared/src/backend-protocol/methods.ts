@@ -21,6 +21,7 @@ export const backendMethods = {
   agentMessageRetry: 'agent/message/retry',
   agentMessageUpdate: 'agent/message/update',
   agentModelsList: 'agent/models/list',
+  agentOpenInApplicationUpdate: 'agent/openInApplication/update',
   agentPromptSend: 'agent/prompt/send',
   agentPromptSteer: 'agent/prompt/steer',
   agentQueuedPromptDelete: 'agent/queuedPrompt/delete',

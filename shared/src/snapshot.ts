@@ -181,6 +181,22 @@ export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentIn
   return agent;
 }
 
+export function updateAgentOpenInApplication(
+  snapshot: AppSnapshot,
+  agentId: string,
+  application: Agent['openInApplication'],
+  updatedAt = new Date().toISOString(),
+): Agent | null {
+  const agent = findAgent(snapshot, agentId);
+  if (!agent) {
+    return null;
+  }
+
+  agent.openInApplication = application;
+  agent.updatedAt = updatedAt;
+  return agent;
+}
+
 export function appendUserPrompt(
   snapshot: AppSnapshot,
   agentId: string,

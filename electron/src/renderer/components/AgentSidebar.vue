@@ -75,11 +75,14 @@
     <AgentContextMenu
       v-if="contextMenuAgentId"
       :fork-disabled="!canForkContextMenuAgent"
+      :open-in-catalog="resolvedOpenInCatalog"
+      :open-in-disabled="!contextMenuAgentIsLocal"
       :move-targets="contextMenuMoveTargets"
       :x="contextMenuPosition.x"
       :y="contextMenuPosition.y"
       @action="emitContextAgentAction"
       @move-agent-to-team="emitContextAgentMove"
+      @open-in="emitContextAgentOpenIn"
       @close="closeContextMenu"
     />
 
@@ -113,7 +116,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Agent, BackendConversationRef, BenchTemplate, ConversationSummary, ReorderAgentsInput, Team } from '@codex-claw/shared/contracts';
+import type { Agent, BackendConversationRef, BenchTemplate, ConversationSummary, OpenInApplication, OpenInApplicationCatalog, ReorderAgentsInput, Team } from '@codex-claw/shared/contracts';
 import {
   PanelLeftCloseIcon,
 } from '../shared/icons/app-icons';
@@ -139,6 +142,7 @@ const props = defineProps<{
   maxWidth?: number;
   quickSwitchShortcutsVisible?: boolean;
   listConversations?: (agentId: string) => Promise<ConversationSummary[]>;
+  openInCatalog?: OpenInApplicationCatalog;
   resumeConversation?: (agentId: string, ref: BackendConversationRef) => Promise<void>;
 }>();
 
@@ -150,6 +154,7 @@ const emit = defineEmits<{
   'fork-agent': [agentId: string];
   'edit-agent': [agentId: string];
   'move-agent-to-team': [payload: { agentId: string; teamId: string }];
+  'open-in': [payload: { agentId: string; application: OpenInApplication }];
   'new-agent': [];
   'reorder-agents': [payload: ReorderAgentsInput];
   'resize-sidebar': [width: number];
@@ -165,6 +170,10 @@ const resizeStep = 16;
 const currentWidth = computed(() => clampWidth(props.width ?? 260));
 const teamTitle = computed(() => props.teamName.toUpperCase());
 const bench = computed(() => props.bench ?? []);
+const resolvedOpenInCatalog = computed<OpenInApplicationCatalog>(() => props.openInCatalog ?? ({
+  defaultApplication: 'finder',
+  applications: [],
+}));
 const activeAgent = computed(() => props.agents.find((agent) => agent.id === props.activeAgentId) ?? null);
 const contextMenuAgentId = ref<string | null>(null);
 const contextMenuPosition = ref({ x: 0, y: 0 });
@@ -176,6 +185,12 @@ const canForkContextMenuAgent = computed(() => (
   Boolean(contextMenuAgent.value.backendSession) &&
   (props.forkableAgentIds ?? []).includes(contextMenuAgent.value.id)
 ));
+const contextMenuAgentIsLocal = computed(() => {
+  const agent = contextMenuAgent.value;
+  if (!agent) return false;
+  const team = (props.teams ?? []).find((candidate) => candidate.id === agent.teamId);
+  return !team?.remoteConnectionId;
+});
 const contextMenuMoveTargets = computed(() => {
   const agent = contextMenuAgent.value;
   if (!agent) {
@@ -273,6 +288,13 @@ function emitContextAgentMove(teamId: string): void {
   }
 
   emit('move-agent-to-team', { agentId, teamId });
+  closeContextMenu();
+}
+
+function emitContextAgentOpenIn(application: OpenInApplication): void {
+  const agentId = contextMenuAgentId.value;
+  if (!agentId) return;
+  emit('open-in', { agentId, application });
   closeContextMenu();
 }
 

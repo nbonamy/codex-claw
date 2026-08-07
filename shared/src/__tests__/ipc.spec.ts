@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import type { AppCommand, AppSnapshotMetadata, DesktopUpdateStatus, MainToRendererEvent, SendPromptOptions } from '../contracts';
+import type { AppCommand, AppSnapshot, AppSnapshotMetadata, DesktopUpdateStatus, MainToRendererEvent, OpenInApplication, SendPromptOptions } from '../contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '../ipc';
 
 describe('ipc channels', () => {
@@ -31,6 +31,8 @@ describe('ipc channels', () => {
       listAgentFiles: 'agent:files:list',
       previewAgentFile: 'agent:file:preview',
       openAgentGitDiff: 'agent:git-diff:open',
+      getOpenInApplications: 'open-in:applications:get',
+      openAgentPath: 'agent:path:open-in',
       chooseAgentFolder: 'agent:choose-folder',
       chooseCodexBinary: 'codex:binary:choose',
       chooseSourceFolder: 'source-folder:choose',
@@ -136,5 +138,9 @@ describe('ipc channels', () => {
       .toEqualTypeOf<[]>();
     expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.launchChatGptApp]['result']>()
       .toEqualTypeOf<void>();
+    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.openAgentPath]['args']>()
+      .toEqualTypeOf<[agentId: string, application: OpenInApplication, filePath?: string]>();
+    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.openAgentPath]['result']>()
+      .toEqualTypeOf<AppSnapshot>();
   });
 });

@@ -1,5 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { OpenInApplicationCatalog } from '@codex-claw/shared/contracts';
 import RightWorkspacePanel from '../RightWorkspacePanel.vue';
 import type { RightWorkspaceFilePanel, RightWorkspaceFileTab, RightWorkspaceImagePanel, RightWorkspaceImageTab, RightWorkspaceTab } from '../right-workspace';
 import type { SidePanelMarkdownState } from '../side-panel';
@@ -21,6 +22,7 @@ function mountPanel(
   filePanels: Partial<Record<RightWorkspaceFileTab, RightWorkspaceFilePanel>> = {},
   planPanel: SidePanelMarkdownState | null = null,
   imagePanels: Partial<Record<RightWorkspaceImageTab, RightWorkspaceImagePanel>> = {},
+  openInCatalog?: OpenInApplicationCatalog,
 ) {
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
   window.codexClaw = {
@@ -39,6 +41,8 @@ function mountPanel(
       gitPanel: { kind: 'gitDiff', title: 'Review', diff: '', state: 'idle' },
       filePanels,
       imagePanels,
+      openInAvailable: Boolean(openInCatalog),
+      openInCatalog,
       planPanel,
       tabs,
       visible: true,
@@ -106,6 +110,35 @@ describe('RightWorkspacePanel', () => {
 
     await wrapper.get('[aria-label="Close main.ts tab"]').trigger('click');
     expect(wrapper.emitted('closeTab')).toStrictEqual([[fileTab]]);
+  });
+
+  it('opens project files externally but omits Open In for outside-file previews', async () => {
+    const fileTab = 'file:src%2Fmain.ts' as const;
+    const projectPanel = {
+      kind: 'source' as const,
+      title: 'main.ts',
+      subtitle: 'src/main.ts',
+      content: 'export const ready = true;\n',
+      language: 'typescript',
+      state: 'idle' as const,
+      error: null,
+    };
+    const catalog: OpenInApplicationCatalog = {
+      defaultApplication: 'vscode',
+      applications: [{ id: 'vscode', label: 'VS Code' }],
+    };
+    const wrapper = mountPanel([fileTab], fileTab, { [fileTab]: projectPanel }, null, {}, catalog);
+
+    expect(wrapper.get('.open-in-control').classes()).toContain('open-in-control--compact');
+    await wrapper.get('[aria-label="Open in VS Code"]').trigger('click');
+    expect(wrapper.emitted('openIn')).toStrictEqual([[
+      { application: 'vscode', filePath: 'src/main.ts' },
+    ]]);
+
+    const outsideWrapper = mountPanel([fileTab], fileTab, {
+      [fileTab]: { ...projectPanel, subtitle: '/outside/main.ts' },
+    }, null, {}, catalog);
+    expect(outsideWrapper.find('[aria-label="Open in VS Code"]').exists()).toBe(false);
   });
 
   it('renders Plan Review as a normal tab beside existing workspace tabs', async () => {

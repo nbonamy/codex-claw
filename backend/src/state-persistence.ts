@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Loop, LoopAction, LoopExecutionCreatedAgent, LoopExecutionLogEntry, LoopExecutionStatus, LoopSourceConfiguration, LoopTeamTarget, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/shared/contracts';
+import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Loop, LoopAction, LoopExecutionCreatedAgent, LoopExecutionLogEntry, LoopExecutionStatus, LoopSourceConfiguration, LoopTeamTarget, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/shared/contracts';
 import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '@codex-claw/shared/codex-approval-presets';
 import { normalizeGeneralSettings, normalizeSourceFolderState, normalizeThemeSettings } from '@codex-claw/shared/settings';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
@@ -27,6 +27,7 @@ type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'upda
   backend: AgentBackend;
   backendSession?: BackendSession;
   backendDefaults?: BackendDefaults;
+  openInApplication?: OpenInApplication;
   contextUsage?: AgentContextUsage;
   plan?: ThreadPlan;
   goal?: ThreadGoal;
@@ -143,6 +144,7 @@ function persistedAgentFromSnapshot(agent: Agent): PersistedAgent {
     backend: agent.backend,
     ...(agent.backendSession ? { backendSession: cloneBackendSession(agent.backendSession) } : {}),
     ...(agent.backendDefaults ? { backendDefaults: cloneBackendDefaults(agent.backendDefaults) } : {}),
+    ...(agent.openInApplication ? { openInApplication: agent.openInApplication } : {}),
     ...(agent.contextUsage ? { contextUsage: { ...agent.contextUsage } } : {}),
     ...(agent.plan ? { plan: cloneThreadPlan(agent.plan) } : {}),
     ...(agent.goal ? { goal: { ...agent.goal } } : {}),
@@ -224,6 +226,7 @@ function sanitizeAgent(value: unknown): Agent | null {
   const backendDefaults = sanitizeBackendDefaults(value.backendDefaults, backend);
   const plan = sanitizeThreadPlan(value.plan);
   const goal = sanitizeThreadGoal(value.goal);
+  const openInApplication = sanitizeOpenInApplication(value.openInApplication);
   return {
     id: value.id,
     teamId: typeof value.teamId === 'string' ? value.teamId : undefined,
@@ -233,6 +236,7 @@ function sanitizeAgent(value: unknown): Agent | null {
     backend,
     ...(backendSession ? { backendSession } : {}),
     ...(backendDefaults ? { backendDefaults } : {}),
+    ...(openInApplication ? { openInApplication } : {}),
     ...(contextUsage ? { contextUsage } : {}),
     ...(plan ? { plan } : {}),
     ...(goal ? { goal } : {}),
@@ -241,6 +245,19 @@ function sanitizeAgent(value: unknown): Agent | null {
     createdAt,
     updatedAt,
   };
+}
+
+function sanitizeOpenInApplication(value: unknown): OpenInApplication | undefined {
+  return value === 'vscode' ||
+    value === 'finder' ||
+    value === 'terminal' ||
+    value === 'iterm2' ||
+    value === 'ghostty' ||
+    value === 'xcode' ||
+    value === 'android-studio' ||
+    value === 'jetbrains'
+    ? value
+    : undefined;
 }
 
 function sanitizeThreadPlan(value: unknown): ThreadPlan | undefined {

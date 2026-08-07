@@ -414,6 +414,7 @@ function copiedAgent(
     folder: source.folder,
     backend: source.backend,
     backendDefaults: source.backendDefaults ? { ...source.backendDefaults } : undefined,
+    ...(source.openInApplication ? { openInApplication: source.openInApplication } : {}),
     status: { type: 'idle' },
     createdAt,
     updatedAt: createdAt,

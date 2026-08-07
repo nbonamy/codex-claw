@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, AgentHistoryLoadResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, AgentHistoryLoadResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/shared/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
@@ -43,7 +43,11 @@ const workBacklogError = ref<string | null>(null);
 const remoteBenchByConnectionId = ref<Record<string, BenchTemplate[]>>({});
 const remoteBenchStatusByConnectionId = ref<Record<string, 'notLoaded' | 'loading' | 'loaded' | 'error'>>({});
 const remoteBenchErrorByConnectionId = ref<Record<string, string | null>>({});
-const sourceRepositories = ref<SourceRepository[]>([]);
+  const sourceRepositories = ref<SourceRepository[]>([]);
+  const openInApplications = ref<OpenInApplicationCatalog>({
+    defaultApplication: 'finder',
+    applications: [],
+  });
 const sourceRepositoryStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
 const sourceRepositoryError = ref<string | null>(null);
 const daemonStatus = ref<ClawdDaemonStatus | null>(null);
@@ -570,6 +574,22 @@ export function useAppState() {
     }
 
     await window.codexClaw.openAgentGitDiff(agentId);
+  }
+
+  async function loadOpenInApplications(): Promise<void> {
+    if (!window.codexClaw?.getOpenInApplications) return;
+    openInApplications.value = await window.codexClaw.getOpenInApplications();
+  }
+
+  async function openAgentPath(
+    agentId: string,
+    application: OpenInApplication,
+    filePath?: string,
+  ): Promise<void> {
+    if (!window.codexClaw?.openAgentPath) {
+      throw new Error('Open In is not available.');
+    }
+    adoptNavigationSnapshot(await window.codexClaw.openAgentPath(agentId, application, filePath));
   }
 
   async function createAgent(input: CreateAgentInput): Promise<Agent | null> {
@@ -1508,6 +1528,7 @@ export function useAppState() {
     remoteBenchStatusByConnectionId,
     remoteBenchErrorByConnectionId,
     sourceRepositories,
+    openInApplications,
     sourceRepositoryStatus,
     sourceRepositoryError,
     daemonStatus,
@@ -1533,6 +1554,8 @@ export function useAppState() {
     createSourceWorktree,
     previewAgentFile,
     openAgentGitDiff,
+    loadOpenInApplications,
+    openAgentPath,
     createAgent,
     createTeam,
     updateTeam,

@@ -27,6 +27,8 @@ export const ipcChannels = {
   listAgentFiles: 'agent:files:list',
   previewAgentFile: 'agent:file:preview',
   openAgentGitDiff: 'agent:git-diff:open',
+  getOpenInApplications: 'open-in:applications:get',
+  openAgentPath: 'agent:path:open-in',
   chooseAgentFolder: 'agent:choose-folder',
   chooseCodexBinary: 'codex:binary:choose',
   chooseSourceFolder: 'source-folder:choose',

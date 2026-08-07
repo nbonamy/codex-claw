@@ -35,6 +35,14 @@
         </div>
       </div>
 
+      <OpenInControl
+        v-if="activeProjectFilePath && openInAvailable && openInCatalog && openInCatalog.applications.length > 0"
+        :application="effectiveOpenInApplication(agent, openInCatalog)"
+        :catalog="openInCatalog"
+        variant="compact"
+        @open="emit('openIn', { application: $event, filePath: activeProjectFilePath })"
+      />
+
       <div ref="addMenuRoot" class="right-workspace-panel__add">
         <button
           type="button"
@@ -151,10 +159,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { IconWorld } from '@tabler/icons-vue';
-import type { Agent, AgentGitStatus } from '@codex-claw/shared/contracts';
+import type { Agent, AgentGitStatus, OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/shared/contracts';
 import { CodeIcon, FileDiffIcon, FileTextIcon, GitHubIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
+import OpenInControl from '../shared/OpenInControl.vue';
+import { effectiveOpenInApplication } from '../shared/open-in';
 import BrowserPanel from './BrowserPanel.vue';
 import GitDiffPreviewPanel from './GitDiffPreviewPanel.vue';
 import GitReviewPanel from './GitReviewPanel.vue';
@@ -191,6 +201,8 @@ const props = defineProps<{
   browserId?: string;
   browserInitialUrl?: string;
   browserOpenRequestId?: number;
+  openInAvailable?: boolean;
+  openInCatalog?: OpenInApplicationCatalog;
 }>();
 
 const emit = defineEmits<{
@@ -199,6 +211,7 @@ const emit = defineEmits<{
   commentPlan: [comments: PlanReviewComment[]];
   confirmPlan: [];
   openTab: [tab: RightWorkspaceTab];
+  openIn: [payload: { application: OpenInApplication; filePath: string }];
   refreshGitDiff: [];
   selectTab: [tab: RightWorkspaceTab];
   sendPrompt: [prompt: string];
@@ -209,6 +222,12 @@ const addMenuOpen = ref(false);
 const fileTabs = computed(() => props.tabs.filter(isRightWorkspaceFileTab));
 const diffTabs = computed(() => props.tabs.filter(isRightWorkspaceDiffTab));
 const imageTabs = computed(() => props.tabs.filter(isRightWorkspaceImageTab));
+const activeProjectFilePath = computed(() => {
+  if (!props.activeTab || !isRightWorkspaceFileTab(props.activeTab)) return null;
+  const filePath = filePanel(props.activeTab)?.subtitle?.trim();
+  if (!filePath || isAbsoluteFilePath(filePath)) return null;
+  return filePath;
+});
 const addMenuItems = computed<AppMenuItem[]>(() => [
   { id: 'review', type: 'action', label: 'GitHub Review', icon: GitHubIcon },
   { id: 'browser', type: 'action', label: 'Browser', icon: IconWorld },
@@ -259,6 +278,10 @@ function closeAddMenuOnOutsideClick(event: MouseEvent): void {
   if (!addMenuRoot.value?.contains(event.target as Node)) {
     addMenuOpen.value = false;
   }
+}
+
+function isAbsoluteFilePath(filePath: string): boolean {
+  return filePath.startsWith('/') || /^[A-Za-z]:[\\/]/u.test(filePath);
 }
 </script>
 

@@ -413,6 +413,7 @@ describe('AgentSidebar', () => {
       'Edit Agent',
       'Duplicate Agent',
       'Fork Agent',
+      'Open In…',
       'Move to Other Team',
       'Save to Bench',
       'Restart Agent',
@@ -439,6 +440,32 @@ describe('AgentSidebar', () => {
       await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === label)?.trigger('click');
       expect(wrapper.emitted(eventName)).toStrictEqual([['agent-dina']]);
     }
+  });
+
+  it('opens an agent folder from the context menu application list', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: agents.map((agent) => ({ ...agent, teamId: 'team-codex-claw' })),
+        activeAgentId: 'agent-dina',
+        teams,
+        teamName: 'Codex Claw',
+        openInCatalog: {
+          defaultApplication: 'vscode',
+          applications: [
+            { id: 'vscode', label: 'VS Code' },
+            { id: 'finder', label: 'Finder' },
+          ],
+        },
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    await wrapper.findAll('.agent-sidebar__agent')[0].trigger('contextmenu');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Finder')?.trigger('click');
+
+    expect(wrapper.emitted('open-in')).toStrictEqual([[
+      { agentId: 'agent-dina', application: 'finder' },
+    ]]);
   });
 
   it('emits fork for an idle Codex agent with a conversation', async () => {

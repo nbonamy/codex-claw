@@ -2789,12 +2789,22 @@ describe('ClawBackendServer', () => {
       });
       await expect(server.handleMessage({
         jsonrpc: '2.0',
+        id: 'set-open-in-application',
+        method: 'agent/openInApplication/update',
+        params: { agentId, application: 'xcode' },
+      })).resolves.toMatchObject({
+        result: {
+          agents: [{ id: agentId, openInApplication: 'xcode' }],
+        },
+      });
+      await expect(server.handleMessage({
+        jsonrpc: '2.0',
         id: 'duplicate-agent',
         method: 'agent/duplicate',
         params: { agentId },
       })).resolves.toMatchObject({
         result: {
-          agents: [{ id: agentId }, { name: 'Dina Backend (copy)' }],
+          agents: [{ id: agentId }, { name: 'Dina Backend (copy)', openInApplication: 'xcode' }],
         },
       });
       const duplicateId = snapshot.agents[1]?.id ?? '';

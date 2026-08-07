@@ -59,6 +59,18 @@ describe('AppStatePersistence', () => {
     expect(restored.activeAgentId).toBeNull();
   });
 
+  it('restores valid per-agent Open In choices and drops unsupported values', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].openInApplication = 'ghostty';
+    const persisted = persistedStateFromSnapshot(snapshot) as unknown as {
+      agents: Array<Record<string, unknown>>;
+    };
+
+    expect(snapshotFromPersistedState(persisted).agents[0].openInApplication).toBe('ghostty');
+    persisted.agents[0].openInApplication = 'unknown-editor';
+    expect(snapshotFromPersistedState(persisted).agents[0].openInApplication).toBeUndefined();
+  });
+
   it('saves metadata, backend session, context usage, and collaboration status without transcripts or runtime state', async () => {
     const filePath = await tempStatePath();
     const persistence = new AppStatePersistence(filePath);
@@ -93,6 +105,7 @@ describe('AppStatePersistence', () => {
         sandboxMode: 'workspace-write',
         serviceTier: 'fast',
       },
+      openInApplication: 'xcode',
       contextUsage: {
         totalTokens: 1200,
         inputTokens: 900,
@@ -154,6 +167,7 @@ describe('AppStatePersistence', () => {
     const writtenAgent = (written.agents as Array<Record<string, unknown>>)[0];
     expect(writtenAgent.backend).toBe('codex');
     expect(writtenAgent.backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-dina' });
+    expect(writtenAgent.openInApplication).toBe('xcode');
     expect(writtenAgent).not.toHaveProperty('codexThreadId');
     expect(writtenAgent.contextUsage).toStrictEqual({
       totalTokens: 1200,

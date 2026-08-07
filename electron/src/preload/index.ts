@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AddSshConnectionInput, AppCommand, AppPluginStatus, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DesktopUpdateStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AppCommand, AppPluginStatus, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DesktopUpdateStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
 import { exposeCodexNativeRendererApi, TypedIpcRenderer } from 'codex-app-sdk/electron/preload';
 
@@ -32,6 +32,8 @@ const api: CodexClawApi = {
   listAgentFiles: (agentId: string) => ipc.invoke(ipcChannels.listAgentFiles, agentId),
   previewAgentFile: (agentId: string, filePath: string) => ipc.invoke(ipcChannels.previewAgentFile, agentId, filePath),
   openAgentGitDiff: (agentId: string) => ipc.invoke(ipcChannels.openAgentGitDiff, agentId),
+  getOpenInApplications: () => ipc.invoke(ipcChannels.getOpenInApplications),
+  openAgentPath: (agentId: string, application: OpenInApplication, filePath?: string) => ipc.invoke(ipcChannels.openAgentPath, agentId, application, filePath),
   chooseAgentFolder: () => ipc.invoke(ipcChannels.chooseAgentFolder),
   chooseCodexBinary: () => ipc.invoke(ipcChannels.chooseCodexBinary),
   chooseSourceFolder: () => ipc.invoke(ipcChannels.chooseSourceFolder),

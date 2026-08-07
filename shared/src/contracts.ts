@@ -119,6 +119,27 @@ export type ThreadPlan = {
   updatedAt: string;
 };
 
+export type OpenInApplication =
+  | 'vscode'
+  | 'finder'
+  | 'terminal'
+  | 'iterm2'
+  | 'ghostty'
+  | 'xcode'
+  | 'android-studio'
+  | 'jetbrains';
+
+export type OpenInApplicationOption = {
+  id: OpenInApplication;
+  label: string;
+  iconDataUrl?: string;
+};
+
+export type OpenInApplicationCatalog = {
+  defaultApplication: OpenInApplication;
+  applications: OpenInApplicationOption[];
+};
+
 export type Agent = {
   id: string;
   teamId?: string;
@@ -128,6 +149,7 @@ export type Agent = {
   backend: AgentBackend;
   backendSession?: BackendSession;
   backendDefaults?: BackendDefaults;
+  openInApplication?: OpenInApplication;
   contextUsage?: AgentContextUsage;
   plan?: ThreadPlan;
   goal?: ThreadGoal;
@@ -1237,6 +1259,8 @@ export type CodexClawApi = {
   listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]>;
   previewAgentFile(agentId: string, filePath: string): Promise<AgentFilePreviewResult>;
   openAgentGitDiff(agentId: string): Promise<void>;
+  getOpenInApplications(): Promise<OpenInApplicationCatalog>;
+  openAgentPath(agentId: string, application: OpenInApplication, filePath?: string): Promise<AppSnapshot>;
   chooseAgentFolder(): Promise<string | null>;
   chooseCodexBinary(): Promise<string | null>;
   chooseSourceFolder(): Promise<string | null>;

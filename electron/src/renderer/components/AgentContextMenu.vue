@@ -14,12 +14,13 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { Team } from '@codex-claw/shared/contracts';
+import type { OpenInApplication, OpenInApplicationCatalog, Team } from '@codex-claw/shared/contracts';
 import { defaultTeamColor } from '@codex-claw/shared/team-colors';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import {
   CopyIcon,
+  ExternalLinkIcon,
   GitForkIcon,
   PencilIcon,
   RefreshIcon,
@@ -27,6 +28,7 @@ import {
   SwitchHorizontalIcon,
   X,
 } from '../shared/icons/app-icons';
+import { openInApplicationFromMenuItem, openInMenuItems } from '../shared/open-in';
 
 export type AgentContextMenuAction =
   | 'close-agent'
@@ -39,6 +41,8 @@ export type AgentContextMenuAction =
 const props = defineProps<{
   moveTargets?: Team[];
   forkDisabled?: boolean;
+  openInCatalog?: OpenInApplicationCatalog;
+  openInDisabled?: boolean;
   x: number;
   y: number;
 }>();
@@ -47,6 +51,7 @@ const emit = defineEmits<{
   action: [action: AgentContextMenuAction];
   close: [];
   'move-agent-to-team': [teamId: string];
+  'open-in': [application: OpenInApplication];
 }>();
 
 const menuRoot = ref<HTMLElement | null>(null);
@@ -76,6 +81,14 @@ const menuItems = computed<AppMenuItem[]>(() => [
     disabled: props.forkDisabled === true,
   },
   { id: 'group-primary', type: 'separator' },
+  {
+    id: 'open-in',
+    type: 'submenu',
+    label: 'Open In…',
+    icon: ExternalLinkIcon,
+    disabled: props.openInDisabled === true,
+    items: openInMenuItems(props.openInCatalog ?? emptyOpenInCatalog),
+  },
   {
     id: 'move-to-team',
     type: 'submenu',
@@ -110,6 +123,10 @@ const menuItems = computed<AppMenuItem[]>(() => [
     danger: true,
   },
 ]);
+const emptyOpenInCatalog: OpenInApplicationCatalog = {
+  defaultApplication: 'finder',
+  applications: [],
+};
 
 onMounted(() => {
   document.addEventListener('click', closeOnDocumentClick);
@@ -122,6 +139,12 @@ onBeforeUnmount(() => {
 });
 
 function selectMenuItem(itemId: string): void {
+  const application = openInApplicationFromMenuItem(itemId);
+  if (application) {
+    emit('open-in', application);
+    return;
+  }
+
   const teamId = teamIdFromMoveItemId(itemId);
   if (teamId) {
     emit('move-agent-to-team', teamId);

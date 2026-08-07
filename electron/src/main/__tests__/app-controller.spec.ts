@@ -5,6 +5,7 @@ import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { ipcChannels } from '@codex-claw/shared/ipc';
+import type { OpenInProvider } from '../open-in';
 
 function callPrivate<Result>(controller: AppController, method: string): Promise<Result> {
   return (controller as unknown as Record<string, () => Promise<Result>>)[method]!();
@@ -1770,6 +1771,47 @@ describe('AppController', () => {
     });
   });
 
+  it('opens local project paths and persists the selected application per agent', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].folder = '/Users/nbonamy/src/codex-claw';
+    const updatedSnapshot = structuredClone(snapshot);
+    updatedSnapshot.agents[0].openInApplication = 'vscode';
+    const request = vi.fn().mockResolvedValue(updatedSnapshot);
+    const open = vi.fn().mockResolvedValue(undefined);
+    const controller = new AppController(snapshot, createBackendClient({ request }));
+    (controller as unknown as { openInProvider: OpenInProvider }).openInProvider = {
+      list: vi.fn(),
+      open,
+    };
+
+    await expect(openAgentPath(controller, 'agent-dina', 'vscode', 'README.md')).resolves.toBe(updatedSnapshot);
+
+    expect(open).toHaveBeenCalledWith('vscode', '/Users/nbonamy/src/codex-claw/README.md');
+    expect(request).toHaveBeenCalledWith(backendMethods.agentOpenInApplicationUpdate, {
+      agentId: 'agent-dina',
+      application: 'vscode',
+    });
+    expect(currentSnapshot(controller).agents[0].openInApplication).toBe('vscode');
+  });
+
+  it('rejects Open In for remote agents and files outside the project', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].folder = '/Users/nbonamy/src/codex-claw';
+    const open = vi.fn();
+    const controller = new AppController(snapshot, createBackendClient());
+    (controller as unknown as { openInProvider: OpenInProvider }).openInProvider = {
+      list: vi.fn(),
+      open,
+    };
+
+    await expect(openAgentPath(controller, 'agent-dina', 'finder', '/Users/nbonamy/src/skwad/README.md'))
+      .rejects.toThrow('only available for files inside');
+
+    currentSnapshot(controller).teams[0].remoteConnectionId = 'connection-devbox';
+    await expect(openAgentPath(controller, 'agent-dina', 'finder')).rejects.toThrow('only available for local agents');
+    expect(open).not.toHaveBeenCalled();
+  });
+
   it('caches turn diff updates emitted by clawd without deriving side-panel previews', async () => {
     const snapshot = createInitialSnapshot();
     const controller = new AppController(snapshot, createBackendClient());
@@ -2426,6 +2468,17 @@ async function previewAgentFile(controller: AppController, agentId: string, file
   return (controller as unknown as {
     previewAgentFile(agentId: string, filePath: string): Promise<unknown>;
   }).previewAgentFile(agentId, filePath);
+}
+
+async function openAgentPath(
+  controller: AppController,
+  agentId: string,
+  application: 'vscode' | 'finder',
+  filePath?: string,
+): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    openAgentPath(agentId: string, application: 'vscode' | 'finder', filePath?: string): Promise<AppSnapshot>;
+  }).openAgentPath(agentId, application, filePath);
 }
 
 async function listAgentFiles(controller: AppController, agentId: string): Promise<AgentFileSearchItem[]> {

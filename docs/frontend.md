@@ -108,6 +108,12 @@ implemented:
   and uses a clipboard image when present, otherwise a centered crop of the
   bundled shell screenshot;
 - active agent header;
+- ChatGPT-style split Open In controls in the active-agent header and project-file
+  previews, plus the same installed-app list in agent context menus. The primary
+  button reuses each agent's last choice; agents without one default to VS Code,
+  then a detected JetBrains IDE, then Finder. Native app discovery supplies
+  icons and includes Finder, Terminal, iTerm2, Ghostty, Xcode, Android Studio,
+  and a detected JetBrains IDE when installed;
 - central conversation and composer;
 - optimistic agent switching that reveals the cached conversation immediately;
   backend session hydration and agent catalogs refresh asynchronously, while

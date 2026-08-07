@@ -56,6 +56,8 @@
     :create-source-worktree="createSourceWorktree"
     :preview-agent-file="previewAgentFile"
     :open-agent-git-diff="openAgentGitDiff"
+    :open-in-applications="openInApplications"
+    :open-agent-path="openAgentPath"
     :create-agent="createAgent"
     :create-team="createTeam"
     :deploy-bench-template-action="deployBenchTemplate"
@@ -207,6 +209,7 @@ const {
   codexResourceSharingStatus,
   backendRestartInProgress,
   sourceRepositories,
+  openInApplications,
   loadBackendModels,
   loadSnapshot,
   loadOlderAgentHistory,
@@ -221,6 +224,8 @@ const {
   createSourceWorktree,
   previewAgentFile,
   openAgentGitDiff,
+  loadOpenInApplications,
+  openAgentPath,
   createAgent,
   createTeam,
   updateTeam,
@@ -311,6 +316,7 @@ onMounted(() => {
   unsubscribeSystemAppearance = subscribeToSystemAppearance();
   void loadSnapshot();
   void loadBackendModels();
+  void loadOpenInApplications();
   const updateStatusPromise = window.codexClaw?.getUpdateStatus?.();
   if (updateStatusPromise) {
     void updateStatusPromise.then((status) => {

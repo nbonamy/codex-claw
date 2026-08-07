@@ -2,9 +2,9 @@ import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import path from 'node:path';
 import { sendAgentPrompt } from '@codex-claw/shared/agent-chat-service';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
-import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput } from '@codex-claw/shared/snapshot';
+import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput, updateAgentOpenInApplication } from '@codex-claw/shared/snapshot';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/shared/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitStatus, AgentHistoryLoadResult, AgentStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CodexResourceSharingStatus, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, MainToRendererEvent, MoveAgentToTeamInput, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitStatus, AgentHistoryLoadResult, AgentStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CodexResourceSharingStatus, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
@@ -400,6 +400,22 @@ export class ClawBackendServer {
           await this.refreshAgentGitStatus(input.id);
           return snapshot;
         });
+      }
+      case backendMethods.agentOpenInApplicationUpdate: {
+        const { agentId, application } = requireAgentOpenInApplicationUpdate(message.params);
+        return this.routeAgentSnapshotRequest(
+          message.id,
+          agentId,
+          backendMethods.agentOpenInApplicationUpdate,
+          { agentId, application },
+          async () => {
+            const agent = updateAgentOpenInApplication(this.snapshot, agentId, application);
+            if (!agent) {
+              throw new Error(`Agent not found: ${agentId}`);
+            }
+            return this.persistAndEmitSnapshot();
+          },
+        );
       }
       case backendMethods.agentSelect: {
         const agentId = requireAgentId(message.params);
@@ -2728,6 +2744,32 @@ function requireAgentCreateInput(params: unknown): CreateAgentInput {
 function requireAgentUpdateInput(params: unknown): UpdateAgentInput {
   const record = requireRecord(params);
   return requireRecord(record.input) as UpdateAgentInput;
+}
+
+function requireAgentOpenInApplicationUpdate(params: unknown): {
+  agentId: string;
+  application: OpenInApplication;
+} {
+  const record = requireRecord(params);
+  const application = requireString(record.application, 'application');
+  if (!isOpenInApplication(application)) {
+    throw new Error(`Unsupported Open In application: ${application}`);
+  }
+  return {
+    agentId: requireString(record.agentId, 'agentId'),
+    application,
+  };
+}
+
+function isOpenInApplication(value: string): value is OpenInApplication {
+  return value === 'vscode' ||
+    value === 'finder' ||
+    value === 'terminal' ||
+    value === 'iterm2' ||
+    value === 'ghostty' ||
+    value === 'xcode' ||
+    value === 'android-studio' ||
+    value === 'jetbrains';
 }
 
 function requireMoveAgentInput(params: unknown): MoveAgentToTeamInput {
