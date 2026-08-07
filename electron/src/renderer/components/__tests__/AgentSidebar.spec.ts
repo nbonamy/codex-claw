@@ -151,21 +151,23 @@ describe('AgentSidebar', () => {
     expect(wrapper.find('.agent-sidebar__folder').exists()).toBe(false);
   });
 
-  it('marks unread agent threads without replacing their runtime status', () => {
+  it('replaces an unread agent runtime status with the unread indicator', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents,
         activeAgentId: 'agent-dina',
         unreadAgentIds: ['agent-jesse'],
+        quickSwitchShortcutsVisible: true,
         teamName: 'Codex Claw',
       },
       global: { plugins: [ElementPlus] },
     });
 
     const rows = wrapper.findAll('.agent-sidebar__agent');
-    expect(rows[0]?.find('.agent-sidebar__unread-signal').exists()).toBe(false);
-    expect(rows[1]?.get('.agent-sidebar__unread-signal').attributes('aria-label')).toBe('Unread activity');
-    expect(rows[1]?.find('.agent-sidebar__status').exists()).toBe(true);
+    expect(rows[0]?.find('.agent-sidebar__quick-switch-shortcut').exists()).toBe(true);
+    expect(rows[1]?.get('.agent-sidebar__status').classes()).toContain('agent-sidebar__status--unread');
+    expect(rows[1]?.get('.agent-sidebar__status').attributes('aria-label')).toBe('Unread activity');
+    expect(rows[1]?.find('.agent-sidebar__quick-switch-shortcut').exists()).toBe(false);
   });
 
   it('replaces the first nine status dots with Command-number shortcuts', () => {

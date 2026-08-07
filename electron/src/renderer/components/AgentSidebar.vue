@@ -37,11 +37,6 @@
         @drop="agentReorder.onDrop(agent.id, $event)"
         @dragend="agentReorder.onDragEnd"
       >
-        <span
-          v-if="isAgentUnread(agent.id)"
-          class="agent-sidebar__unread-signal"
-          aria-label="Unread activity"
-        />
         <AgentAvatar
           class="agent-sidebar__avatar"
           :avatar="agent.avatar"
@@ -56,15 +51,16 @@
           </template>
         </span>
         <span
-          v-if="quickSwitchShortcutsVisible && index < 9"
+          v-if="!isAgentUnread(agent.id) && quickSwitchShortcutsVisible && index < 9"
           class="agent-sidebar__quick-switch-shortcut"
           :aria-label="`Switch to ${agent.name} with Command ${index + 1}`"
         ><span aria-hidden="true">⌘</span>{{ index + 1 }}</span>
         <span
           v-else
           class="agent-sidebar__status"
+          :class="{ 'agent-sidebar__status--unread': isAgentUnread(agent.id) }"
           :data-status="agent.status.type"
-          :aria-label="agentStatusLabel(agent.status.type)"
+          :aria-label="isAgentUnread(agent.id) ? 'Unread activity' : agentStatusLabel(agent.status.type)"
         />
       </button>
     </nav>
@@ -354,7 +350,6 @@ function onResizePointerEnd(event: PointerEvent): void {
   --agent-sidebar-row-min-height: 64px;
   --agent-sidebar-status-column-width: 12px;
   --agent-status-dot-size: 10px;
-  --agent-unread-signal-height: 36px;
   position: relative;
   container-type: inline-size;
   flex: 0 0 clamp(var(--agent-sidebar-min-width), var(--agent-sidebar-width), var(--agent-sidebar-max-width));
@@ -490,18 +485,6 @@ function onResizePointerEnd(event: PointerEvent): void {
   gap: 1.5px;
 }
 
-.agent-sidebar__unread-signal {
-  position: absolute;
-  top: 50%;
-  left: var(--space-2);
-  width: 4px;
-  height: var(--agent-unread-signal-height);
-  border-radius: var(--radius-full);
-  background: var(--color-error);
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-
 .agent-sidebar__meta strong,
 .agent-sidebar__meta span {
   overflow: hidden;
@@ -547,6 +530,11 @@ function onResizePointerEnd(event: PointerEvent): void {
   background: var(--color-error);
 }
 
+.agent-sidebar__status.agent-sidebar__status--unread {
+  background: var(--color-error);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-error) 20%, transparent);
+}
+
 .agent-sidebar__quick-switch-shortcut {
   display: inline-flex;
   align-items: center;
@@ -570,7 +558,6 @@ function onResizePointerEnd(event: PointerEvent): void {
   --agent-sidebar-row-min-height: var(--space-20);
   --agent-sidebar-status-column-width: var(--space-4);
   --agent-status-dot-size: var(--space-4);
-  --agent-unread-signal-height: var(--space-12);
 }
 
 .agent-sidebar--compact .agent-sidebar__agent {
