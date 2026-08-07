@@ -27,7 +27,7 @@ Override `CODEX_CLAW_WEBSITE_HOST`, `CODEX_CLAW_WEBSITE_ROOT`, or `CODEX_CLAW_NG
 Desktop releases use the same host and are published with:
 
 ```bash
-npm run publish:desktop
+npm run publish
 ```
 
 That command checks that the version is newer than the remote manifest, creates the macOS artifacts, and uploads the DMG, ZIP, and `RELEASES.json`. The landing-page download buttons target the uploaded arm64 DMG.

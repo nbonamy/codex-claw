@@ -141,16 +141,20 @@ describe('runtime config', () => {
     const devScript = readFileSync(path.resolve(__dirname, '../../../../scripts/dev.mjs'), 'utf8');
     const sdkBuildScript = readFileSync(path.resolve(__dirname, '../../../../scripts/build-sdk.mjs'), 'utf8');
 
-    expect(rootPackage.scripts.dev).toBe('node scripts/dev.mjs');
+    expect(rootPackage.scripts.dev).toBe('npm run dev:electron');
     expect(rootPackage.scripts['build:codex']).toBe('node scripts/prepare-codex-app-server.mjs');
     expect(electronPackage.scripts.dev).toBe('node ../scripts/dev.mjs');
     expect(electronPackage.scripts['build:codex']).toBe('node ../scripts/prepare-codex-app-server.mjs');
-    expect(rootPackage.scripts['dev:electron']).toBe('npm run start -w @codex-claw/electron');
+    expect(rootPackage.scripts['dev:electron']).toBe('node scripts/dev.mjs');
+    expect(rootPackage.scripts['start:electron']).toBe('npm run start -w @codex-claw/electron');
     expect(rootPackage.scripts['build:sdk']).toBe('node scripts/build-sdk.mjs');
-    expect(rootPackage.scripts.build).toBe('node scripts/build.mjs');
+    expect(rootPackage.scripts.build).toBe('npm run build:electron');
+    expect(rootPackage.scripts['build:electron']).toBe('node scripts/build.mjs');
     expect(rootPackage.scripts['build:backend']).toMatch(/^npm run build:sdk &&/);
-    expect(rootPackage.scripts.package).toMatch(/^npm run build:sdk &&/);
-    expect(rootPackage.scripts.make).toMatch(/^npm run build:sdk &&/);
+    expect(rootPackage.scripts.package).toBe('npm run package:electron');
+    expect(rootPackage.scripts['package:electron']).toMatch(/^npm run build:sdk &&/);
+    expect(rootPackage.scripts.make).toBe('npm run make:electron');
+    expect(rootPackage.scripts['make:electron']).toMatch(/^npm run build:sdk &&/);
     expect(electronPackage.scripts['build:computer-use']).toBe(
       'node ../scripts/prepare-computer-use.mjs',
     );
@@ -166,7 +170,7 @@ describe('runtime config', () => {
     expect(electronPackage.scripts.build).toContain('npm run build:codex && npm run build:computer-use &&');
     expect(devScript).toContain("await run('npm', ['run', 'build:codex'])");
     expect(devScript).toContain("await run('npm', ['run', 'build:computer-use'])");
-    expect(devScript).toContain("start('npm', ['run', 'dev:electron']");
+    expect(devScript).toContain("start('npm', ['run', 'start:electron']");
     expect(devScript).not.toContain("['run', 'build:sdk']");
     expect(sdkBuildScript).toContain("specifier.startsWith('file:')");
     expect(sdkBuildScript).toContain("spawnSync('npm', ['run', 'build']");

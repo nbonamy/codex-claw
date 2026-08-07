@@ -265,15 +265,21 @@ Root `package.json` should be private and orchestration-only:
   "private": true,
   "workspaces": ["core", "backend", "vue", "electron", "web"],
   "scripts": {
-    "dev": "node scripts/dev.mjs",
-    "dev:electron": "npm run start -w @codex-claw/electron",
+    "dev": "npm run dev:electron",
     "dev:backend": "npm run dev -w @codex-claw/backend",
     "dev:backend:run": "npm run dev:run -w @codex-claw/backend",
-    "build": "npm run build -ws",
+    "dev:electron": "node scripts/dev.mjs",
+    "dev:web": "npm run dev -w @codex-claw/web",
+    "build": "npm run build:electron",
+    "build:electron": "node scripts/build.mjs",
+    "build:web": "npm run build -w @codex-claw/web",
+    "start:electron": "npm run start -w @codex-claw/electron",
+    "start:web": "npm run start -w @codex-claw/web",
     "typecheck": "npm run typecheck -ws",
     "lint": "npm run lint -ws",
     "test": "npm run test -ws",
-    "package": "npm run package -w @codex-claw/electron"
+    "package": "npm run package:electron",
+    "package:electron": "npm run package -w @codex-claw/electron"
   }
 }
 ```
@@ -597,20 +603,22 @@ Target commands:
 ```json
 {
   "scripts": {
-    "dev": "node scripts/dev.mjs",
-    "dev:electron": "npm run start -w @codex-claw/electron",
+    "dev": "npm run dev:electron",
     "dev:backend": "npm run dev -w @codex-claw/backend",
-    "dev:backend:run": "npm run dev:run -w @codex-claw/backend"
+    "dev:backend:run": "npm run dev:run -w @codex-claw/backend",
+    "dev:electron": "node scripts/dev.mjs",
+    "start:electron": "npm run start -w @codex-claw/electron"
   }
 }
 ```
 
 The exact script names can change, but the shape should stay:
 
-- `npm run dev` remains the normal entrypoint for app development. Running it
-  from either the repository root or the `electron` workspace delegates to the
-  same root supervisor and therefore the same backend and Codex home.
-- `dev:electron` runs the `electron` workspace's Electron Forge/Vite flow.
+- `npm run dev` remains the normal Electron-first entrypoint for app
+  development. `dev:electron` names that complete root supervisor explicitly,
+  and the `electron` workspace's own `dev` command delegates to it.
+- `start:electron` runs only the `electron` workspace's Electron Forge/Vite
+  flow, for cases where the backend is already managed separately.
 - `dev:backend` watches `backend/src` and `shared/src`, then writes a bundled
   file such as `backend/dist/clawd-dev.mjs`.
 - `dev:backend:run` supervises `node backend/dist/clawd-dev.mjs --stdio`.
@@ -660,7 +668,7 @@ Daemon development:
 ```bash
 npm run build -w @codex-claw/backend
 npm run dev:backend:serve
-CODEX_CLAW_BACKEND_MODE=existing npm run dev:electron
+CODEX_CLAW_BACKEND_MODE=existing npm run start:electron
 ```
 
 `CODEX_CLAW_BACKEND_MODE=auto` is the desktop default: connect to the local

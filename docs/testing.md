@@ -197,14 +197,18 @@ full relevant gate before handoff.
 For visual changes, run tests plus a local app/screenshot check when the app can
 boot.
 
-Web-only iteration uses the root lifecycle commands:
+Host-only iteration uses the suffixed root lifecycle commands. For example:
 
 ```bash
+npm run typecheck:electron
+npm run test:electron
 npm run typecheck:web
 npm run test:web
 npm run build:web
 npm run preview:web
 ```
+
+The unqualified typecheck, lint, and test commands cover every workspace.
 
 For protocol or persistence changes, run focused tests for the touched module
 and the full coverage gate.

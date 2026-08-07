@@ -100,7 +100,8 @@ describe('release-notes script', () => {
       scripts: Record<string, string>;
     };
 
-    expect(rootPackage.scripts.make).toContain('npm run make -w @codex-claw/electron');
+    expect(rootPackage.scripts.make).toBe('npm run make:electron');
+    expect(rootPackage.scripts['make:electron']).toContain('npm run make -w @codex-claw/electron');
     expect(electronPackage.scripts.make).toContain('npm run release-notes:check');
   });
 });

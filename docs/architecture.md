@@ -217,15 +217,21 @@ public deployment model. Authentication must replace the fixed identity and
 select an isolated backend/state home before the bind address is widened or
 multiple users are admitted.
 
-Run the web host from the repository root:
+Root host commands use the same Electron/Web suffixes:
 
-- `npm run dev:web` builds the local SDK and backend, then builds and runs the
-  web host;
-- `npm run build:web` produces the backend plus web client/server artifacts;
-- `npm run start:web` starts already-built production artifacts;
-- `npm run preview:web` builds and then starts those production artifacts; and
-- `npm run typecheck:web`, `npm run lint:web`, `npm run test:web`, and
-  `npm run test:coverage:web` expose the web-only quality gates.
+| Lifecycle | Electron | Web |
+| --- | --- | --- |
+| Develop | `npm run dev:electron` | `npm run dev:web` |
+| Build | `npm run build:electron` | `npm run build:web` |
+| Start host directly | `npm run start:electron` | `npm run start:web` |
+| Typecheck | `npm run typecheck:electron` | `npm run typecheck:web` |
+| Lint | `npm run lint:electron` | `npm run lint:web` |
+| Test | `npm run test:electron` | `npm run test:web` |
+| Test with coverage | `npm run test:coverage:electron` | `npm run test:coverage:web` |
+
+The unqualified `dev`, `build`, `package`, `make`, and `publish` commands are
+Electron-first aliases. Unqualified typecheck, lint, and test commands continue
+to cover every workspace. Web additionally exposes `preview:web`.
 
 Host capabilities are enforced at both UI and backend boundaries. Electron
 advertises native dialogs, app lifecycle, updates, Dock badges, Open In,

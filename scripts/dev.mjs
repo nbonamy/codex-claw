@@ -29,7 +29,7 @@ const backendWatch = start('npm', ['run', 'dev:backend'], {
 
 await waitForFile(backendBundle);
 
-const electronDev = start('npm', ['run', 'dev:electron'], {
+const electronDev = start('npm', ['run', 'start:electron'], {
   cwd: rootDir,
   name: 'electron',
   env: {
