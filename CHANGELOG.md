@@ -4,28 +4,30 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.6.1] - 2026-08-07
+
 ### New features
 
 - Codex Claw now shares ChatGPT's installed skills and plugins by default,
   explicitly asks existing installs before migrating their resource folders,
   and provides a General → Advanced setting for fresh or copied isolation.
+- The prompt composer now grows with longer messages until twelve lines are
+  visible, then scrolls internally.
+- Pressing Escape twice within two seconds now interrupts an active response,
+  even when the composer does not have focus.
 
 ### Improvements and fixes
 
-- Dialogs now use consistent body padding without double-spacing forms, and
-  changing skills and plugin sharing restarts only the backend instead of the
-  entire app.
+- Changing skills and plugin sharing now keeps the desktop app open while a
+  blocking reconnect screen safely restarts the backend and refreshes
+  conversations, resource catalogs, and workspace state.
+- Dialogs now use consistent body padding without double-spacing forms,
+  including the create and edit forms for teams and agents.
 - Computer Use activity now identifies the target app, control, coordinates,
   window, or display, including dedicated presentation for screenshots and
   Screen Recording permission requests.
 - Absolute file links outside an agent repository now open as read-only tabs in
   that agent's sidebar workspace.
-- Resource sharing changes now show a blocking reconnect overlay, close hosted
-  browser panes, and reload only the renderer so conversations, event cursors,
-  and skill catalogs reconnect cleanly to the restarted backend.
-- Execution task lists now distinguish active, completed, incomplete,
-  interrupted, and failed outcomes instead of remaining indefinitely active
-  after a turn ends.
 - Passive Computer Use checks, app discovery, permission requests, and
   screenshots no longer display the blue virtual cursor over the desktop.
 
