@@ -14,6 +14,7 @@ describe('runtime config', () => {
 
     expect(runtimeClawdCommand({
       defaultApp: true,
+      env: {},
       resourcesPath: '/app/resources',
     })).toBeNull();
   });

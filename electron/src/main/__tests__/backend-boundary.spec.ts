@@ -35,6 +35,10 @@ describe('Electron backend boundary', () => {
       'app-controller.ts',
       'app-menu.ts',
       'app-shortcuts.ts',
+      'appshots-key-monitor.ts',
+      'appshots.ts',
+      'auto-update.ts',
+      'autolib.d.ts',
       'backend-client.ts',
       'backend-process-client.ts',
       'backend-request-timeout.ts',
@@ -42,14 +46,18 @@ describe('Electron backend boundary', () => {
       'browser-pane.ts',
       'chatgpt-app.ts',
       'client-request-handlers.ts',
+      'clipboard-image.ts',
       'computer-use-tools.ts',
       'daemon-launch-agent.ts',
       'daemon-startup-maintenance.ts',
+      'deep-links.ts',
       'forge-env.d.ts',
       'index.ts',
       'ipc-events.ts',
       'log.ts',
       'main-window.ts',
+      'manual-update-check.ts',
+      'open-in.ts',
       'runtime-config.ts',
       'system-permissions.ts',
     ]);
@@ -149,13 +157,13 @@ describe('Electron backend boundary', () => {
   });
 
   it('keeps renderer snapshot replay limited to clawd-authored app events', async () => {
-    const appStatePath = path.resolve(__dirname, '../../renderer/app-state.ts');
+    const appStatePath = path.resolve(__dirname, '../../../../vue/src/app-state.ts');
     const source = await readFile(appStatePath, 'utf8');
 
     expect(source).toContain('applyMainEventToSnapshot');
     expect(source).not.toContain('updateSettingsInSnapshot');
-    expect(source).not.toContain('snapshot.value.activeAgentId =');
-    expect(source).not.toContain('snapshot.value.activeTeamId =');
+    expect(source).not.toMatch(/snapshot\.value\.activeAgentId\s*=(?!=)/u);
+    expect(source).not.toMatch(/snapshot\.value\.activeTeamId\s*=(?!=)/u);
     expect(source).toContain('adoptSnapshotFromMainEvent');
   });
 
@@ -180,10 +188,10 @@ describe('Electron backend boundary', () => {
     const assignments = source.match(/\bthis\.snapshot\s*=/g) ?? [];
 
     expect(assignments).toHaveLength(4);
-    expect(source).toContain('this.snapshot = initialSnapshot;');
-    expect(source).toContain('this.snapshot = snapshot;');
-    expect(source).toContain('this.snapshot = backendState.snapshot;');
-    expect(source).toContain('this.snapshot = event.snapshot;');
+    expect(source).toContain('this.snapshot = initialSnapshot ? metadataOnlySnapshot(initialSnapshot) : null;');
+    expect(source).toContain('this.snapshot = metadataOnlySnapshot(snapshot);');
+    expect(source).toContain('this.snapshot = metadataOnlySnapshot(synchronizedSnapshot);');
+    expect(source).toContain('this.snapshot = metadataOnlySnapshot(event.snapshot);');
     expect(source).not.toContain('this.snapshot = result.snapshot;');
     expect(source).not.toContain('snapshotFromBackendEvent');
     expect(source).toContain('applyMainEventToSnapshot');
@@ -197,7 +205,8 @@ describe('Electron backend boundary', () => {
     const powerSaveBlocker = await readFile(powerSaveBlockerPath, 'utf8');
 
     expect(appController).toContain('request<ClientState>(backendMethods.clientStateGet)');
-    expect(appController).toContain('this.clientState.shouldPreventDisplaySleep');
+    expect(appController).toContain('shouldBlockDisplaySleep(this.clientState');
+    expect(appController).toContain('clientState.shouldPreventDisplaySleep');
     expect(powerSaveBlocker).not.toContain('AppSnapshot');
     expect(powerSaveBlocker).not.toContain('AgentStatus');
     expect(powerSaveBlocker).not.toContain('preventSleepWhenAgentsRun');
@@ -238,9 +247,9 @@ describe('Electron backend boundary', () => {
   });
 
   it('keeps source recent-repository bookkeeping behind clawd', async () => {
-    const appStatePath = path.resolve(__dirname, '../../renderer/app-state.ts');
-    const appShellPath = path.resolve(__dirname, '../../renderer/components/AppShell.vue');
-    const agentDialogPath = path.resolve(__dirname, '../../renderer/components/AgentDialog.vue');
+    const appStatePath = path.resolve(__dirname, '../../../../vue/src/app-state.ts');
+    const appShellPath = path.resolve(__dirname, '../../../../vue/src/components/AppShell.vue');
+    const agentDialogPath = path.resolve(__dirname, '../../../../vue/src/components/AgentDialog.vue');
     const sources = [
       await readFile(appStatePath, 'utf8'),
       await readFile(appShellPath, 'utf8'),
@@ -273,7 +282,7 @@ describe('Electron backend boundary', () => {
     const source = await readFile(appControllerPath, 'utf8');
 
     expect(source).not.toContain('./system-permissions');
-    expect(source).toContain('request(backendMethods.systemPermissionsGet)');
+    expect(source).toContain('request<SystemPermissionsStatus>(backendMethods.systemPermissionsGet)');
     expect(source).toContain('request(backendMethods.systemPermissionsAccessibilityOpen)');
   });
 
