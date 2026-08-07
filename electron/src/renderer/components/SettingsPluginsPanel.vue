@@ -230,10 +230,6 @@ async function launchChatGpt(): Promise<void> {
   margin-left: calc(-1 * var(--space-4));
 }
 
-.settings-plugins-dialog__form {
-  padding: var(--space-12) var(--space-4) 0;
-}
-
 .settings-plugins-dialog__copy,
 .settings-plugins-dialog__error {
   margin: 0;

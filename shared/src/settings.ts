@@ -16,6 +16,7 @@ export const defaultGeneralSettings: AppGeneralSettings = {
   preventSleepWhenRemoteAccessEnabled: true,
   codexBinaryPath: '',
   agentListCompact: false,
+  shareCodexSkillsAndPlugins: true,
   appshots: { ...defaultAppshotSettings },
   plugins: { ...defaultPluginSettings },
 };
@@ -91,6 +92,7 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
     preventSleepWhenRemoteAccessEnabled: value.preventSleepWhenRemoteAccessEnabled !== false,
     codexBinaryPath: normalizeString(value.codexBinaryPath) ?? defaultGeneralSettings.codexBinaryPath,
     agentListCompact: value.agentListCompact === true,
+    shareCodexSkillsAndPlugins: value.shareCodexSkillsAndPlugins !== false,
     appshots: normalizeAppshotSettings(value.appshots),
     plugins: normalizePluginSettings(value.plugins),
   };

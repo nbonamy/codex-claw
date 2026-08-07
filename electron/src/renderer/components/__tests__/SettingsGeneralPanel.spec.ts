@@ -267,6 +267,68 @@ describe('SettingsGeneralPanel', () => {
     });
   });
 
+  it('warns before sharing ChatGPT skills and plugins', async () => {
+    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
+    const setCodexResourceSharing = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({
+      settings: { ...defaultGeneralSettings, shareCodexSkillsAndPlugins: false },
+      setCodexResourceSharing,
+    });
+
+    await flushPromises();
+    await wrapper.findAllComponents({ name: 'ElSwitch' })[2].vm.$emit('update:modelValue', true);
+    await flushPromises();
+
+    expect(confirm).toHaveBeenCalledWith(
+      'You are going to lose all plugins and skills installed only in Codex Claw. Continue?',
+      'Share skills and plugins with ChatGPT?',
+      expect.objectContaining({ confirmButtonText: 'Continue', cancelButtonText: 'Cancel' }),
+    );
+    expect(setCodexResourceSharing).toHaveBeenCalledWith({ enabled: true });
+  });
+
+  it('copies ChatGPT resources when sharing is turned off with Copy', async () => {
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
+    const setCodexResourceSharing = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({ setCodexResourceSharing });
+
+    await flushPromises();
+    await wrapper.findAllComponents({ name: 'ElSwitch' })[2].vm.$emit('update:modelValue', false);
+    await flushPromises();
+
+    expect(setCodexResourceSharing).toHaveBeenCalledWith({ enabled: false, mode: 'copy' });
+  });
+
+  it('starts fresh when sharing is turned off with Fresh', async () => {
+    vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue('cancel');
+    const setCodexResourceSharing = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({ setCodexResourceSharing });
+
+    await flushPromises();
+    await wrapper.findAllComponents({ name: 'ElSwitch' })[2].vm.$emit('update:modelValue', false);
+    await flushPromises();
+
+    expect(setCodexResourceSharing).toHaveBeenCalledWith({ enabled: false, mode: 'fresh' });
+  });
+
+  it('blocks resource sharing changes while chats are running', async () => {
+    const alert = vi.spyOn(ElMessageBox, 'alert').mockResolvedValue('confirm' as never);
+    const setCodexResourceSharing = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({ codexResourceSharingBlocked: true, setCodexResourceSharing });
+
+    await flushPromises();
+    await wrapper.findAllComponents({ name: 'ElSwitch' })[2].vm.$emit('update:modelValue', false);
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('This option cannot be changed while chats are running.');
+    expect(alert).toHaveBeenCalledWith(
+      'This option cannot be changed while chats are running. Wait for every chat to finish and try again.',
+      'Chats are running',
+      expect.objectContaining({ confirmButtonText: 'OK' }),
+    );
+    expect(setCodexResourceSharing).not.toHaveBeenCalled();
+  });
+
   it('shows a grant action when macOS Accessibility is required', async () => {
     const getSystemPermissions = vi.fn().mockResolvedValue(permissionStatus({
       required: true,

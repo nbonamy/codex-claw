@@ -18,6 +18,7 @@ import { FileWorkIntegrationTokenStore } from './work-integrations/file-token-st
 import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
 import { WorkIntegrationManager } from './work-integrations/manager';
 import { warnMain } from './log';
+import { initializeCodexResourceSharing } from './codex-resource-sharing';
 
 export type ClawdClientRequest = <Result>(method: string, params?: unknown) => Promise<Result>;
 
@@ -34,6 +35,7 @@ export type ClawdRuntime = {
 
 export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<ClawdRuntime> {
   const snapshot = await loadBackendSnapshot();
+  await initializeCodexResourceSharing(snapshot.general.shareCodexSkillsAndPlugins);
   await ensureBackendCodexHome();
   const mcpService = new ClawMcpService({
     snapshot,

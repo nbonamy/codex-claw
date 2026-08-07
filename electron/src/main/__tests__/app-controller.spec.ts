@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController, shouldBlockDisplaySleep } from '../app-controller';
 import { createInitialSnapshot, snapshotMetadata } from '@codex-claw/shared/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { ipcChannels } from '@codex-claw/shared/ipc';
@@ -936,6 +936,107 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('settings/update', { input });
   });
 
+  it('restarts the background backend after changing Codex resource sharing', async () => {
+    const snapshot = createInitialSnapshot();
+    const backendSnapshot = {
+      ...snapshot,
+      general: { ...snapshot.general, shareCodexSkillsAndPlugins: false },
+    };
+    const request = vi.fn().mockResolvedValue(backendSnapshot);
+    const lifecycle: string[] = [];
+    const close = vi.fn().mockImplementation(async () => {
+      lifecycle.push('backend-close');
+    });
+    const appLifecycle = fakeAppLifecycle();
+    const daemonStatusLoader = vi.fn().mockResolvedValue({
+      supported: true,
+      installed: true,
+      running: true,
+      socketPath: '/tmp/clawd.sock',
+      launchAgentPath: '/tmp/clawd.plist',
+    });
+    const daemonRefresher = vi.fn().mockResolvedValue({
+      supported: true,
+      installed: true,
+      running: true,
+      socketPath: '/tmp/clawd.sock',
+      launchAgentPath: '/tmp/clawd.plist',
+    });
+    const backendClient = createBackendClient({ request, close });
+    const controller = new AppController(
+      snapshot,
+      backendClient,
+      appLifecycle,
+      async () => undefined,
+      async () => undefined,
+      null,
+      daemonStatusLoader,
+      daemonRefresher,
+    );
+    const closeAllBrowserPanes = vi.spyOn((controller as unknown as {
+      browserPane: { closeAll(): Promise<void> };
+    }).browserPane, 'closeAll').mockImplementation(async () => {
+      lifecycle.push('browser-panes-close');
+    });
+    const input: SetCodexResourceSharingInput = { enabled: false, mode: 'fresh' };
+
+    await controller.initialize();
+    await expect(setCodexResourceSharing(controller, input)).resolves.toBe(backendSnapshot);
+
+    expect(request).toHaveBeenCalledWith(backendMethods.settingsCodexResourceSharingSet, { input });
+    expect(closeAllBrowserPanes).toHaveBeenCalledOnce();
+    expect(lifecycle).toStrictEqual(['browser-panes-close', 'backend-close']);
+    expect(close).toHaveBeenCalledOnce();
+    expect(daemonRefresher).toHaveBeenCalledOnce();
+    expect(backendClient.start).toHaveBeenCalledTimes(2);
+    expect(appLifecycle.relaunch).not.toHaveBeenCalled();
+    expect(appLifecycle.exit).not.toHaveBeenCalled();
+  });
+
+  it('closes hosted browser panes before reloading only the renderer', async () => {
+    const controller = new AppController(createInitialSnapshot(), null);
+    const lifecycle: string[] = [];
+    vi.spyOn((controller as unknown as {
+      browserPane: { closeAll(): Promise<void> };
+    }).browserPane, 'closeAll').mockImplementation(async () => {
+      lifecycle.push('browser-panes-close');
+    });
+    setRendererReloadWindow(controller, () => {
+      lifecycle.push('renderer-reload');
+    });
+
+    await callPrivate(controller, 'reloadRenderer');
+
+    expect(lifecycle).toStrictEqual(['browser-panes-close', 'renderer-reload']);
+  });
+
+  it('reads migration status and keeps the backend running when migration is declined', async () => {
+    const snapshot = createInitialSnapshot();
+    const backendSnapshot = {
+      ...snapshot,
+      general: { ...snapshot.general, shareCodexSkillsAndPlugins: false },
+    };
+    const request = vi.fn(async (method: string) => (
+      method === backendMethods.settingsCodexResourceSharingGet
+        ? { enabled: true, migrationRequired: true }
+        : backendSnapshot
+    ));
+    const close = vi.fn().mockResolvedValue(undefined);
+    const appLifecycle = fakeAppLifecycle();
+    const controller = new AppController(snapshot, createBackendClient({ request, close }), appLifecycle);
+
+    await controller.initialize();
+    await expect(callPrivate(controller, 'getCodexResourceSharingStatus')).resolves.toStrictEqual({
+      enabled: true,
+      migrationRequired: true,
+    });
+    await expect(setCodexResourceSharing(controller, { enabled: false, mode: 'keep' })).resolves.toBe(backendSnapshot);
+
+    expect(close).not.toHaveBeenCalled();
+    expect(appLifecycle.relaunch).not.toHaveBeenCalled();
+    expect(appLifecycle.exit).not.toHaveBeenCalled();
+  });
+
   it('routes isolated Codex authentication and opens the ChatGPT login URL', async () => {
     const authentication: CodexAuthentication = {
       account: null,
@@ -1863,6 +1964,15 @@ function setMainWindowSend(controller: AppController, send: ReturnType<typeof vi
   };
 }
 
+function setRendererReloadWindow(controller: AppController, reload: () => void): void {
+  (controller as unknown as {
+    mainWindow: { isDestroyed(): boolean; webContents: { reload(): void } };
+  }).mainWindow = {
+    isDestroyed: () => false,
+    webContents: { reload },
+  };
+}
+
 function setDeepLinkWindow(
   controller: AppController,
   callbacks: { send(...args: unknown[]): void; show(): void; focus(): void },
@@ -2167,6 +2277,12 @@ async function updateSettings(controller: AppController, input: UpdateSettingsIn
   return (controller as unknown as {
     updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>;
   }).updateSettings(input);
+}
+
+async function setCodexResourceSharing(controller: AppController, input: SetCodexResourceSharingInput): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    setCodexResourceSharing(input: SetCodexResourceSharingInput): Promise<AppSnapshot>;
+  }).setCodexResourceSharing(input);
 }
 
 async function getLoopSnapshot(controller: AppController, location?: LoopLocation): Promise<AppSnapshot> {

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AddSshConnectionInput, AppCommand, AppPluginStatus, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DesktopUpdateStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AppCommand, AppPluginStatus, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DesktopUpdateStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
 import { exposeCodexNativeRendererApi, TypedIpcRenderer } from 'codex-app-sdk/electron/preload';
 
@@ -75,6 +75,8 @@ const api: CodexClawApi = {
   closeAgent: (agentId: string) => ipc.invoke(ipcChannels.closeAgent, agentId),
   selectAgent: (agentId: string) => ipc.invoke(ipcChannels.selectAgent, agentId),
   updateSettings: (input: UpdateSettingsInput) => ipc.invoke(ipcChannels.updateSettings, input),
+  getCodexResourceSharingStatus: () => ipc.invoke(ipcChannels.getCodexResourceSharingStatus),
+  setCodexResourceSharing: (input: SetCodexResourceSharingInput) => ipc.invoke(ipcChannels.setCodexResourceSharing, input),
   getPluginStatus: () => ipc.invoke(ipcChannels.getPluginStatus),
   getCodexAuthentication: () => ipc.invoke(ipcChannels.getCodexAuthentication),
   cancelCodexChatGptLogin: () => ipc.invoke(ipcChannels.cancelCodexChatGptLogin),
@@ -90,6 +92,7 @@ const api: CodexClawApi = {
   launchChatGptApp: () => ipc.invoke(ipcChannels.launchChatGptApp),
   quit: () => ipc.invoke(ipcChannels.quit),
   restartApp: () => ipc.invoke(ipcChannels.restartApp),
+  reloadRenderer: () => ipc.invoke(ipcChannels.reloadRenderer),
   setAgentGoal: (agentId: string, objective: string) => ipc.invoke(ipcChannels.setAgentGoal, agentId, objective),
   clearAgentGoal: (agentId: string) => ipc.invoke(ipcChannels.clearAgentGoal, agentId),
   setAgentApprovalPreset: (agentId: string, preset: ApprovalPreset) => ipc.invoke(ipcChannels.setAgentApprovalPreset, agentId, preset),

@@ -58,6 +58,18 @@ describe('listAgentFolderFiles', () => {
     });
   });
 
+  it('reads an explicitly addressed absolute file outside the agent folder', async () => {
+    const folder = await createTempFolder();
+    const outsideFolder = await createTempFolder();
+    const outsideFile = path.join(outsideFolder, 'notes.md');
+    await writeFile(outsideFile, '# External notes\n', 'utf8');
+
+    await expect(previewAgentFolderFile(folder, outsideFile)).resolves.toStrictEqual({
+      path: outsideFile,
+      content: '# External notes\n',
+    });
+  });
+
   it('rejects traversal, folders, and oversized files before reading content', async () => {
     const folder = await createTempFolder();
     await writeFile(path.join(folder, 'large.md'), 'xxxx', 'utf8');

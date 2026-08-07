@@ -122,8 +122,11 @@ implemented:
 - per-agent in-memory model, reasoning, Fast mode, and plan-mode selections,
   restored synchronously on selection; model catalogs are loaded once per
   backend at startup, while skills and files are cached by working folder and
-  reused across agents; explicit catalog-change events are the only automatic
-  refresh path;
+  reused across agents; explicit catalog-change events refresh skills during
+  normal operation, while resource sharing changes that restart the backend
+  block interaction with a reconnect overlay and reload the renderer from a
+  fresh snapshot so SDK controllers, event cursors, and catalogs cannot retain
+  the previous backend instance;
 - a non-blocking connection strip while Electron reconnects to `clawd`; the
   existing conversation remains visible because agents continue in the
   background daemon;
@@ -133,9 +136,10 @@ implemented:
   a stable Task list heading and presents the backend explanation as a
   separate, full-width title clamped to two lines below the header; completed
   Plan-mode proposals continue to use the explicit review panel;
-- Claw-owned MCP activity keeps its phase-aware titles and uses host-provided
-  semantic icons for browser, Computer Use, collaboration, workspace, Markdown,
-  and work-item tools while unrelated MCP servers retain SDK fallbacks;
+- Claw-owned MCP activity keeps its phase-aware, target-aware titles and uses
+  host-provided semantic icons for browser, every bundled Computer Use action,
+  collaboration, workspace, Markdown, and work-item tools while unrelated MCP
+  servers retain SDK fallbacks;
 - agent-owned right-side tabbed workspaces for the in-app Browser and GitHub
   Review, with full working-tree diffs opened from the agent header's git
   statistics; clicking a conversation image opens it in a Claw-owned image tab,
@@ -177,7 +181,11 @@ implemented:
   pairing progress and paired-device revocation. Appshots configures a
   left-and-right modifier chord, active-agent destination, and capture sound;
   General → System permissions reports both Accessibility and the Computer Use
-  helper's Screen Recording permission. Settings is also available
+  helper's Screen Recording permission. General → Advanced shares ChatGPT's
+  skills and plugins by default and can return to fresh or copied isolated
+  resources only while all chats are idle. Existing non-linked Claw homes show
+  an explicit launch-time migration choice instead of changing in the
+  background. Settings is also available
   from the native macOS app menu and lower-left account menu with `Command+,`.
 
 Avoid layout jumps during streaming, loading, plan updates, approval prompts,
@@ -271,8 +279,9 @@ Rules:
 - Use text buttons for clear commands.
 - Do not create nested cards or card-heavy shells.
 - Keep form-dialog chrome shared: title-only compact headers, full-width header
-  and footer dividers, and the semantic dialog-body surface belong to
-  `.claw-dialog`, not individual product dialogs.
+  and footer dividers, and evenly padded semantic dialog bodies belong to
+  `.claw-dialog`, not individual product dialogs. Form content must not add a
+  second outer padding layer.
 - Avoid decorative layouts that slow down real coding workflows.
 - Keep empty, loading, error, offline, and permission states explicit.
 - Ensure text fits in compact desktop windows.
@@ -305,6 +314,8 @@ High-priority surfaces:
 - approval requests;
 - ask-user prompts;
 - file changes, read-only source previews, and diffs;
+- explicitly clicked absolute file links, including files outside the agent
+  repository, opened as read-only source previews on the agent's host;
 - errors and interrupted turns.
 
 Renderer components consume app-owned state, not raw app-server or backend

@@ -4,7 +4,7 @@ import { sendAgentPrompt } from '@codex-claw/shared/agent-chat-service';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/shared/backend-protocol/rpc';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput } from '@codex-claw/shared/snapshot';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/shared/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitStatus, AgentHistoryLoadResult, AgentStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, MainToRendererEvent, MoveAgentToTeamInput, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitStatus, AgentHistoryLoadResult, AgentStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CodexResourceSharingStatus, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, MainToRendererEvent, MoveAgentToTeamInput, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/shared/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/shared/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/shared/backend-driver';
@@ -27,6 +27,7 @@ import type { WorkIntegrationManager } from './work-integrations/manager';
 import { warnMain } from './log';
 import { AgentTranscriptRetention, type AgentTranscriptRetentionOptions } from './agent-transcript-retention';
 import { loadPluginStatus } from './plugin-status';
+import { getCodexResourceSharingStatus, setCodexResourceSharing } from './codex-resource-sharing';
 
 export type ClawBackendServerOptions = {
   version: string;
@@ -43,6 +44,8 @@ export type ClawBackendServerOptions = {
   remoteClients?: RemoteClawdClientManager;
   transcriptRetention?: Omit<AgentTranscriptRetentionOptions, 'snapshot' | 'onEvicted'>;
   sendAgentMessage?: (fromAgentId: string, toAgentId: string, content: string) => void;
+  configureCodexResourceSharing?: (input: SetCodexResourceSharingInput) => Promise<void>;
+  inspectCodexResourceSharing?: (enabled: boolean) => Promise<CodexResourceSharingStatus>;
 };
 
 export type SystemPermissionsPort = {
@@ -86,6 +89,8 @@ export class ClawBackendServer {
   private readonly sshConnections: SshConnectionService;
   private readonly remoteClients: RemoteClawdClientManager;
   private readonly sendAgentMessage?: (fromAgentId: string, toAgentId: string, content: string) => void;
+  private readonly configureCodexResourceSharing: (input: SetCodexResourceSharingInput) => Promise<void>;
+  private readonly inspectCodexResourceSharing: (enabled: boolean) => Promise<CodexResourceSharingStatus>;
   private readonly clientRequestOwners = new Map<string, { backend: AgentBackend; remoteConnectionId?: string }>();
   private readonly remoteSnapshots = new Map<string, AppSnapshot>();
   private readonly queuedPromptRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -109,6 +114,8 @@ export class ClawBackendServer {
     this.sshConnections = options.sshConnections ?? new SshConnectionService();
     this.remoteClients = options.remoteClients ?? new RemoteClawdClientManager();
     this.sendAgentMessage = options.sendAgentMessage;
+    this.configureCodexResourceSharing = options.configureCodexResourceSharing ?? setCodexResourceSharing;
+    this.inspectCodexResourceSharing = options.inspectCodexResourceSharing ?? getCodexResourceSharingStatus;
     this.transcriptRetention = new AgentTranscriptRetention({
       snapshot: this.snapshot,
       onEvicted: (agentId) => this.releaseEvictedAgentTranscript(agentId),
@@ -1126,6 +1133,24 @@ export class ClawBackendServer {
       case backendMethods.settingsUpdate:
         updateSettingsInSnapshot(this.snapshot, requireSettingsUpdateInput(message.params));
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      case backendMethods.settingsCodexResourceSharingGet:
+        return createClawRpcResult(
+          message.id,
+          await this.inspectCodexResourceSharing(this.snapshot.general.shareCodexSkillsAndPlugins),
+        );
+      case backendMethods.settingsCodexResourceSharingSet: {
+        const input = requireCodexResourceSharingInput(message.params);
+        if (hasActiveChats(this.snapshot) && !(input.enabled === false && input.mode === 'keep')) {
+          throw new Error('Skills and plugins sharing cannot be changed while chats are running.');
+        }
+        await this.configureCodexResourceSharing(input);
+        if (this.snapshot.general.shareCodexSkillsAndPlugins !== input.enabled) {
+          updateSettingsInSnapshot(this.snapshot, {
+            general: { shareCodexSkillsAndPlugins: input.enabled },
+          });
+        }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
       case backendMethods.settingsPluginStatusGet:
         return createClawRpcResult(message.id, await loadPluginStatus());
       case backendMethods.codexAuthenticationGet:
@@ -2787,6 +2812,24 @@ function requireBenchTemplateCreateInput(params: unknown): CreateBenchTemplateIn
 function requireSettingsUpdateInput(params: unknown): UpdateSettingsInput {
   const record = requireRecord(params);
   return requireRecord(record.input) as UpdateSettingsInput;
+}
+
+function requireCodexResourceSharingInput(params: unknown): SetCodexResourceSharingInput {
+  const record = requireRecord(params);
+  const input = requireRecord(record.input);
+  if (input.enabled === true) return { enabled: true };
+  if (input.enabled === false && (input.mode === 'fresh' || input.mode === 'copy' || input.mode === 'keep')) {
+    return { enabled: false, mode: input.mode };
+  }
+  throw new Error('Invalid Codex resource sharing input.');
+}
+
+function hasActiveChats(snapshot: AppSnapshot): boolean {
+  return snapshot.agents.some((agent) => (
+    agent.status.type === 'starting' ||
+    agent.status.type === 'working' ||
+    agent.status.type === 'awaitingInput'
+  ));
 }
 
 function requireAddSshConnectionInput(params: unknown): AddSshConnectionInput {

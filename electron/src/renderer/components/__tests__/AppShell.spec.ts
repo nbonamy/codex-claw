@@ -1028,10 +1028,10 @@ describe('AppShell', () => {
     expect(wrapper.find('.source-preview-panel').exists()).toBe(true);
   });
 
-  it('does not send absolute file preview paths outside the active agent folder', async () => {
+  it('opens absolute file preview paths outside the active agent folder', async () => {
     const snapshot = createInitialSnapshot();
     const previewAgentFile = vi.fn().mockResolvedValue({
-      path: 'README.md',
+      path: '/Users/nbonamy/src/codex-claw/README.md',
       content: '# Codex Claw\n',
     });
     const wrapper = mount(AppShell, {
@@ -1060,8 +1060,9 @@ describe('AppShell', () => {
     await wrapper.get('a[href="file:///Users/nbonamy/src/codex-claw/README.md"]').trigger('click');
     await flushPromises();
 
-    expect(previewAgentFile).not.toHaveBeenCalled();
-    expect(wrapper.find('.side-panel').exists()).toBe(false);
+    expect(previewAgentFile).toHaveBeenCalledWith('agent-dina', '/Users/nbonamy/src/codex-claw/README.md');
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain('README.md');
+    expect(wrapper.text()).toContain('Codex Claw');
   });
 
   it('ignores stale markdown reads after the file tab closes', async () => {

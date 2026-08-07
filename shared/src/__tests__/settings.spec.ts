@@ -15,6 +15,7 @@ describe('settings contracts', () => {
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: true,
+      shareCodexSkillsAndPlugins: true,
       appshots: defaultAppshotSettings,
       plugins: defaultPluginSettings,
     });
@@ -74,6 +75,7 @@ describe('settings contracts', () => {
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: false,
+      shareCodexSkillsAndPlugins: true,
       appshots: defaultAppshotSettings,
       plugins: defaultPluginSettings,
     });

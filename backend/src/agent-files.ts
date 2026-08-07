@@ -108,17 +108,19 @@ export async function previewAgentFolderFile(
 
 export function resolveAgentFilePath(folder: string, filePath: string): { absolutePath: string; relativePath: string } {
   const root = path.resolve(folder);
-  const target = path.isAbsolute(filePath)
+  const absoluteInput = path.isAbsolute(filePath);
+  const target = absoluteInput
     ? path.resolve(filePath)
     : path.resolve(root, filePath);
   const relativePath = path.relative(root, target);
+  const outsideRoot = relativePath === '..' || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath);
 
-  if (relativePath === '..' || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath)) {
+  if (!absoluteInput && outsideRoot) {
     throw new Error(`File is outside the agent folder: ${filePath}`);
   }
 
   return {
     absolutePath: target,
-    relativePath: relativePath.split(path.sep).join('/'),
+    relativePath: (absoluteInput && outsideRoot ? target : relativePath).split(path.sep).join('/'),
   };
 }

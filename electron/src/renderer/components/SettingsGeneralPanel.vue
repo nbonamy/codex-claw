@@ -170,6 +170,21 @@
       title-id="settings-general-advanced-title"
     >
       <SettingsRow
+        as="label"
+        title="Share skills and plugins with ChatGPT"
+        :description="codexResourceSharingDescription"
+        :error="codexResourceSharingError"
+      >
+        <template #control>
+          <el-switch
+            :model-value="settings.shareCodexSkillsAndPlugins"
+            :loading="changingCodexResourceSharing"
+            aria-label="Share skills and plugins with ChatGPT"
+            @update:model-value="updateCodexResourceSharing"
+          />
+        </template>
+      </SettingsRow>
+      <SettingsRow
         title="Codex executable"
         description="Leave empty to use the bundled Codex. Changing this restarts Codex Claw."
         :error="codexBinaryError"
@@ -209,7 +224,7 @@
 <script setup lang="ts">
 import { ElMessageBox } from 'element-plus';
 import { computed, onMounted, ref, watch } from 'vue';
-import type { AppGeneralSettings, ClawdDaemonStatus, SourceFolderState, SystemPermissionsStatus, UpdateSettingsInput } from '@codex-claw/shared/contracts';
+import type { AppGeneralSettings, ClawdDaemonStatus, SetCodexResourceSharingInput, SourceFolderState, SystemPermissionsStatus, UpdateSettingsInput } from '@codex-claw/shared/contracts';
 import { defaultSourceFolderState } from '@codex-claw/shared/settings';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsRow from './SettingsRow.vue';
@@ -238,6 +253,8 @@ const props = defineProps<{
   openScreenRecordingSettings?: () => Promise<SystemPermissionsStatus>;
   restartApp?: () => Promise<void>;
   setDaemonEnabled?: (enabled: boolean) => Promise<void>;
+  setCodexResourceSharing?: (input: SetCodexResourceSharingInput) => Promise<void>;
+  codexResourceSharingBlocked?: boolean;
   settings: AppGeneralSettings;
   sourceFolder?: SourceFolderState;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
@@ -249,10 +266,12 @@ const openingAccessibilitySettings = ref(false);
 const openingScreenRecordingSettings = ref(false);
 const choosingSourceFolder = ref(false);
 const choosingCodexBinary = ref(false);
+const changingCodexResourceSharing = ref(false);
 const settingDaemon = ref(false);
 const daemonOperation = ref<'installing' | 'uninstalling' | null>(null);
 const sourceFolderError = ref<string | null>(null);
 const codexBinaryError = ref<string | null>(null);
+const codexResourceSharingError = ref<string | null>(null);
 const codexBinaryDraft = ref(props.settings.codexBinaryPath);
 
 const showSourceFolderSetting = computed(() => Boolean(props.sourceFolder));
@@ -285,6 +304,9 @@ const daemonDescription = computed(() => {
   }
   return 'Start the Codex Claw agent to keep your loops running.';
 });
+const codexResourceSharingDescription = computed(() => props.codexResourceSharingBlocked
+  ? 'This option cannot be changed while chats are running.'
+  : 'Use the same skills and plugins as ChatGPT. Changing this restarts the backend.');
 const accessibilityGranted = computed(() => permissions.value?.accessibility.trusted ?? false);
 const showAccessibilityGrantButton = computed(() => permissions.value?.accessibility.required === true && !accessibilityGranted.value);
 const screenRecordingGranted = computed(() => permissions.value?.screenRecording.trusted ?? false);
@@ -418,6 +440,72 @@ function clearCodexBinaryPath(): void {
   codexBinaryError.value = null;
   codexBinaryDraft.value = '';
   void updateCodexBinaryPath('');
+}
+
+async function updateCodexResourceSharing(value: boolean | string | number): Promise<void> {
+  codexResourceSharingError.value = null;
+  if (props.codexResourceSharingBlocked) {
+    await ElMessageBox.alert(
+      'This option cannot be changed while chats are running. Wait for every chat to finish and try again.',
+      'Chats are running',
+      {
+        confirmButtonText: 'OK',
+        type: 'warning',
+      },
+    );
+    return;
+  }
+
+  const enabled = value === true;
+  const input = enabled
+    ? await confirmSharingEnabled()
+    : await chooseIsolatedResourceMode();
+  if (!input) return;
+
+  changingCodexResourceSharing.value = true;
+  try {
+    await props.setCodexResourceSharing?.(input);
+  } catch (error) {
+    codexResourceSharingError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    changingCodexResourceSharing.value = false;
+  }
+}
+
+async function confirmSharingEnabled(): Promise<SetCodexResourceSharingInput | null> {
+  try {
+    await ElMessageBox.confirm(
+      'You are going to lose all plugins and skills installed only in Codex Claw. Continue?',
+      'Share skills and plugins with ChatGPT?',
+      {
+        cancelButtonText: 'Cancel',
+        confirmButtonText: 'Continue',
+        distinguishCancelAndClose: true,
+        type: 'warning',
+      },
+    );
+    return { enabled: true };
+  } catch {
+    return null;
+  }
+}
+
+async function chooseIsolatedResourceMode(): Promise<SetCodexResourceSharingInput | null> {
+  try {
+    await ElMessageBox.confirm(
+      'Do you want to start fresh or copy your existing ChatGPT skills and plugins into Codex Claw?',
+      'Stop sharing skills and plugins?',
+      {
+        cancelButtonText: 'Fresh',
+        confirmButtonText: 'Copy',
+        distinguishCancelAndClose: true,
+        type: 'info',
+      },
+    );
+    return { enabled: false, mode: 'copy' };
+  } catch (action) {
+    return action === 'cancel' ? { enabled: false, mode: 'fresh' } : null;
+  }
 }
 
 async function getSystemPermissions(): Promise<SystemPermissionsStatus> {

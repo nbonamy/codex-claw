@@ -15,7 +15,9 @@ import { presentClawTool } from '../tool-presentation';
 describe('Claw tool presentation', () => {
   it.each([
     ['browser-screenshot', BrowserIcon, 'Captured page screenshot'],
-    ['computer-use-get-app-state', DeviceDesktopIcon, 'Inspected'],
+    ['computer-use-get-app-state', DeviceDesktopIcon, 'Inspected Codex Claw'],
+    ['computer-use-screenshot', DeviceDesktopIcon, 'Captured main display screenshot'],
+    ['computer-use-request-screen-recording', DeviceDesktopIcon, 'Requested macOS Screen Recording access for Computer Use'],
     ['send-message', MessageIcon, 'Sent message to codex-app-sdk'],
     ['list-agents', UsersIcon, 'Listed agents'],
     ['create-worktree', GitBranchIcon, 'Created worktree feature/tool-icons'],
@@ -28,6 +30,10 @@ describe('Claw tool presentation', () => {
         ? { branchName: 'feature/tool-icons' }
         : tool === 'display-markdown'
           ? { title: 'Review notes' }
+          : tool === 'computer-use-get-app-state'
+            ? { app: 'Codex Claw' }
+            : tool === 'computer-use-screenshot'
+              ? { scope: 'screen' }
           : {};
 
     expect(presentClawTool(context(tool, args), translate)).toStrictEqual({ icon, title });

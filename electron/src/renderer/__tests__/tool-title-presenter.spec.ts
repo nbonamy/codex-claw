@@ -11,7 +11,12 @@ describe('Claw tool title presenter', () => {
     ['codex_claw.list-agents', {}, 'completed', 'Listed agents'],
     ['codex_claw.browser-screenshot', {}, 'running', 'Capturing page screenshot'],
     ['codex_claw.browser-open', { url: 'https://example.com' }, 'completed', 'Opened https://example.com'],
-    ['mcp__codex_claw__computer_use_launch_app', { name: 'Codex Claw' }, 'completed', 'Launched Codex Claw'],
+    ['mcp__codex_claw__computer_use_launch_app', { path: '/Applications/Codex Claw.app' }, 'completed', 'Launched Codex Claw'],
+    ['mcp__codex_claw__computer_use_get_app_state', { app: 'Codex Claw' }, 'completed', 'Inspected Codex Claw'],
+    ['mcp__codex_claw__computer_use_click', { pid: 74070, x: 33, y: 236 }, 'error', 'Failed clicking target app at (33, 236)'],
+    ['mcp__codex_claw__computer_use_scroll', { app: 'Safari', deltaY: 400 }, 'completed', 'Scrolled down in Safari'],
+    ['mcp__codex_claw__computer_use_screenshot', { displayId: 42, scope: 'screen' }, 'completed', 'Captured display 42 screenshot'],
+    ['mcp__codex_claw__computer_use_request_screen_recording', {}, 'completed', 'Requested macOS Screen Recording access for Computer Use'],
     ['codex_claw.create-worktree', { branchName: 'feature/tool-labels' }, 'error', 'Failed creating worktree feature/tool-labels'],
   ])('presents %s as user-facing activity text', (functionName, args, state, expected) => {
     expect(presentClawToolTitle(context(
@@ -46,6 +51,42 @@ describe('Claw tool title presenter', () => {
       { params: { tool: 'codex_claw.register-agent' }, phase: 'running' },
     ))).toBe('Registering agent');
     expect(presentClawToolTitle(context('github.create_issue', {}, 'completed'))).toBeUndefined();
+  });
+
+  it('uses completed Computer Use result context without exposing entered text or values', () => {
+    const typeText = context('mcp__codex_claw__computer_use_type_text', {
+      pid: 74070,
+      text: 'private draft text',
+    }, 'completed');
+    typeText.toolCall = {
+      ...typeText.toolCall,
+      result: { structuredContent: { app: { localizedName: 'Codex Claw' } } },
+    };
+
+    expect(presentClawToolTitle(typeText)).toBe('Entered text in Codex Claw');
+    expect(presentClawToolTitle(typeText)).not.toContain('private draft text');
+
+    expect(presentClawToolTitle(context(
+      'mcp__codex_claw__computer_use_set_value',
+      { app: 'TextEdit', element_index: 7, value: 'secret' },
+      'completed',
+    ))).toBe('Updated control #7 in TextEdit');
+  });
+
+  it('uses the resolved app name and never exposes a process id', () => {
+    const inspection = context('mcp__codex_claw__computer_use_get_app_state', { pid: 74070 }, 'completed');
+    inspection.toolCall = {
+      ...inspection.toolCall,
+      result: {
+        structuredContent: {
+          app: { localizedName: 'Electron', pid: 74070 },
+          window: { title: 'Codex Claw' },
+        },
+      },
+    };
+
+    expect(presentClawToolTitle(inspection)).toBe('Inspected Electron');
+    expect(presentClawToolTitle(inspection)).not.toContain('74070');
   });
 });
 

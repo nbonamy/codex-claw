@@ -1,5 +1,7 @@
 <template>
   <AppShell
+    :inert="backendRestartInProgress ? '' : undefined"
+    :aria-hidden="backendRestartInProgress ? 'true' : undefined"
     :snapshot="snapshot"
     :active-agent="activeAgent"
     :messages="visibleMessages"
@@ -41,6 +43,7 @@
     :remote-bench-error-by-connection-id="remoteBenchErrorByConnectionId"
     :daemon-status="daemonStatus"
     :daemon-status-error="daemonStatusError"
+    :codex-resource-sharing-migration-required="codexResourceSharingStatus.migrationRequired"
     :source-repositories="sourceRepositories"
     :choose-agent-folder="chooseAgentFolder"
     :choose-codex-binary="chooseCodexBinary"
@@ -59,6 +62,7 @@
     :update-team="updateTeam"
     :update-agent="updateAgent"
     :update-settings="updateSettings"
+    :set-codex-resource-sharing="setCodexResourceSharing"
     :get-plugin-status="getPluginStatus"
     :list-ssh-hosts="listSshHosts"
     :add-ssh-connection="addSshConnection"
@@ -132,6 +136,24 @@
     @install-update="installUpdate"
   />
   <ConfettiOverlay />
+  <Transition name="backend-restart-overlay">
+    <div
+      v-if="backendRestartInProgress"
+      class="backend-restart-overlay"
+      data-testid="backend-restart-overlay"
+      role="status"
+      aria-live="assertive"
+      aria-busy="true"
+    >
+      <div class="backend-restart-overlay__card">
+        <span class="backend-restart-overlay__spinner" aria-hidden="true" />
+        <div class="backend-restart-overlay__copy">
+          <strong>Applying resource changes…</strong>
+          <span>Restarting the backend and reconnecting your chats.</span>
+        </div>
+      </div>
+    </div>
+  </Transition>
 </template>
 
 <script setup lang="ts">
@@ -182,6 +204,8 @@ const {
   remoteBenchErrorByConnectionId,
   daemonStatus,
   daemonStatusError,
+  codexResourceSharingStatus,
+  backendRestartInProgress,
   sourceRepositories,
   loadBackendModels,
   loadSnapshot,
@@ -215,6 +239,7 @@ const {
   restartAgent,
   closeAgent,
   updateSettings,
+  setCodexResourceSharing,
   listSshHosts,
   addSshConnection,
   checkRemoteConnection,
@@ -308,3 +333,75 @@ watch(() => snapshot.value.theme, (theme) => {
   applyAppTheme(theme);
 }, { deep: true, immediate: true });
 </script>
+
+<style scoped>
+.backend-restart-overlay {
+  position: fixed;
+  z-index: 10000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-12);
+  background: var(--color-overlay);
+  backdrop-filter: blur(6px);
+}
+
+.backend-restart-overlay__card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  width: min(420px, 100%);
+  padding: var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-lowest);
+  box-shadow: var(--shadow-lg);
+}
+
+.backend-restart-overlay__spinner {
+  width: var(--space-10);
+  height: var(--space-10);
+  flex: 0 0 auto;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: backend-restart-spin 0.8s linear infinite;
+}
+
+.backend-restart-overlay__copy {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-text);
+}
+
+.backend-restart-overlay__copy strong {
+  font-size: var(--font-size-16);
+  line-height: var(--line-height-22);
+}
+
+.backend-restart-overlay__copy span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-18);
+}
+
+.backend-restart-overlay-enter-active,
+.backend-restart-overlay-leave-active {
+  transition: opacity 120ms ease;
+}
+
+.backend-restart-overlay-enter-from,
+.backend-restart-overlay-leave-to {
+  opacity: 0;
+}
+
+@keyframes backend-restart-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backend-restart-overlay__spinner {
+    animation: none;
+  }
+}
+</style>

@@ -475,6 +475,7 @@ export type AppGeneralSettings = {
   preventSleepWhenRemoteAccessEnabled: boolean;
   codexBinaryPath: string;
   agentListCompact: boolean;
+  shareCodexSkillsAndPlugins: boolean;
   appshots: AppshotSettings;
   /** Optional for backwards compatibility with pre-plugin state files. */
   plugins?: AppPluginSettings;
@@ -810,6 +811,15 @@ export type UpdateSettingsInput = {
   sourceFolder?: Partial<Pick<SourceFolderState, 'path' | 'recentRepoNames'>>;
   theme?: Partial<AppThemeSettings>;
   workProviders?: Partial<Record<WorkProviderKind, WorkProviderSettings>>;
+};
+
+export type SetCodexResourceSharingInput =
+  | { enabled: true }
+  | { enabled: false; mode: 'fresh' | 'copy' | 'keep' };
+
+export type CodexResourceSharingStatus = {
+  enabled: boolean;
+  migrationRequired: boolean;
 };
 
 export type RendererMessageAttachment = {
@@ -1266,6 +1276,8 @@ export type CodexClawApi = {
   closeAgent(agentId: string): Promise<AppSnapshot>;
   selectAgent(agentId: string): Promise<AppSnapshotMetadata>;
   updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>;
+  getCodexResourceSharingStatus(): Promise<CodexResourceSharingStatus>;
+  setCodexResourceSharing(input: SetCodexResourceSharingInput): Promise<AppSnapshot>;
   getPluginStatus(): Promise<AppPluginStatus>;
   getCodexAuthentication(): Promise<CodexAuthentication>;
   cancelCodexChatGptLogin(): Promise<CodexAuthentication>;
@@ -1281,6 +1293,7 @@ export type CodexClawApi = {
   launchChatGptApp(): Promise<void>;
   quit(): Promise<void>;
   restartApp(): Promise<void>;
+  reloadRenderer(): Promise<void>;
   setAgentGoal(agentId: string, objective: string): Promise<AppSnapshot>;
   clearAgentGoal(agentId: string): Promise<AppSnapshot>;
   setAgentApprovalPreset(agentId: string, preset: ApprovalPreset): Promise<AppSnapshot>;

@@ -22,7 +22,9 @@ const TOOL_KEYS: Record<string, string> = {
   'computer-use-launch-app': 'computerUseLaunchApp',
   'computer-use-list-apps': 'computerUseListApps',
   'computer-use-request-accessibility': 'computerUseRequestAccessibility',
+  'computer-use-request-screen-recording': 'computerUseRequestScreenRecording',
   'computer-use-scroll': 'computerUseScroll',
+  'computer-use-screenshot': 'computerUseScreenshot',
   'computer-use-set-value': 'computerUseSetValue',
   'computer-use-status': 'computerUseStatus',
   'computer-use-stop': 'computerUseStop',
@@ -121,11 +123,113 @@ function toolTarget(
             : tool === 'list-worktrees'
               ? [args.repoPath]
               : tool.startsWith('computer-use-')
-                ? [args.name, args.appName, args.bundleIdentifier, args.path]
+                ? [computerUseTarget(tool, args, result)]
                 : [];
 
   const target = candidates.find((candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0);
   return target?.trim() ?? '';
+}
+
+function computerUseTarget(tool: string, args: Record<string, unknown>, result: unknown): string {
+  const app = computerUseAppTarget(args, result);
+  const elementIndex = integer(args.element_index);
+  const rootElementIndex = integer(args.rootElementIndex);
+  const x = finiteNumber(args.x);
+  const y = finiteNumber(args.y);
+
+  switch (tool) {
+    case 'computer-use-click':
+      if (elementIndex !== undefined) return `control #${elementIndex} in ${app}`;
+      if (x !== undefined && y !== undefined) return `${app} at (${x}, ${y})`;
+      return `app control in ${app}`;
+    case 'computer-use-find-apps':
+      return hasExplicitAppTarget(args) ? `installed apps matching ${app}` : 'installed apps';
+    case 'computer-use-focus-app':
+    case 'computer-use-launch-app':
+      return app;
+    case 'computer-use-get-app-state':
+      return rootElementIndex === undefined ? app : `control #${rootElementIndex} in ${app}`;
+    case 'computer-use-list-apps': {
+      const count = resultArrayLength(result, 'apps');
+      return count === undefined ? 'open apps' : `${count} open apps`;
+    }
+    case 'computer-use-scroll': {
+      const deltaY = finiteNumber(args.deltaY);
+      const direction = deltaY === undefined || deltaY === 0 ? '' : deltaY > 0 ? ' down' : ' up';
+      return elementIndex === undefined
+        ? `${direction.trimStart()}${direction ? ' in ' : ''}${app}`
+        : `control #${elementIndex}${direction} in ${app}`;
+    }
+    case 'computer-use-screenshot': {
+      if (args.scope === 'screen') {
+        const displayId = integer(args.displayId);
+        return `${displayId === undefined ? 'main display' : `display ${displayId}`} screenshot`;
+      }
+      return `${app} window screenshot`;
+    }
+    case 'computer-use-set-value':
+      return elementIndex === undefined ? `app control in ${app}` : `control #${elementIndex} in ${app}`;
+    case 'computer-use-type-text':
+      return app;
+    default:
+      return app;
+  }
+}
+
+function computerUseAppTarget(args: Record<string, unknown>, result: unknown): string {
+  return resultAppName(result) ??
+    firstString(args.app, args.name, args.appName) ??
+    appNameFromPath(firstString(args.path)) ??
+    firstString(args.bundleIdentifier) ??
+    (integer(args.pid) === undefined ? 'frontmost app' : 'target app');
+}
+
+function resultAppName(result: unknown): string | undefined {
+  const payloads = nestedResultRecords(result);
+  for (const payload of payloads) {
+    const app = isRecord(payload.app) ? payload.app : undefined;
+    const name = app ? firstString(app.localizedName, app.name) : undefined;
+    if (name) return name;
+  }
+  return undefined;
+}
+
+function resultArrayLength(result: unknown, key: string): number | undefined {
+  for (const payload of nestedResultRecords(result)) {
+    if (Array.isArray(payload[key])) return payload[key].length;
+  }
+  return undefined;
+}
+
+function nestedResultRecords(result: unknown): Record<string, unknown>[] {
+  if (!isRecord(result)) return [];
+  const records = [result];
+  for (const key of ['structuredContent', 'result']) {
+    if (isRecord(result[key])) records.push(result[key]);
+  }
+  return records;
+}
+
+function hasExplicitAppTarget(args: Record<string, unknown>): boolean {
+  return firstString(args.app, args.name, args.appName, args.bundleIdentifier, args.path) !== undefined;
+}
+
+function appNameFromPath(value: string | undefined): string | undefined {
+  const name = value?.split('/').filter(Boolean).at(-1)?.replace(/\.app$/u, '').trim();
+  return name || undefined;
+}
+
+function firstString(...values: unknown[]): string | undefined {
+  const value = values.find((candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0);
+  return value?.trim();
+}
+
+function integer(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isInteger(value) ? value : undefined;
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
 function resultString(result: unknown, key: string): string | undefined {

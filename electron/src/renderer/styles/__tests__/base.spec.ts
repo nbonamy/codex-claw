@@ -16,6 +16,14 @@ describe('shared dialog chrome', () => {
     );
   });
 
+  it('gives ordinary dialog bodies consistent padding on every edge', () => {
+    expect(rule('.claw-dialog .el-dialog__body')).toContain(
+      'padding: var(--space-12);',
+    );
+    expect(baseCss).not.toContain('.claw-dialog .el-dialog__body:has(form)');
+    expect(rule('.claw-form-dialog')).not.toContain('padding:');
+  });
+
   it('rounds the body when a dialog has no footer', () => {
     expect(rule('.claw-dialog .el-dialog__body:last-child')).toContain(
       'border-radius: 0 0 var(--radius-xl) var(--radius-xl);',

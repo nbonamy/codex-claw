@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   updateLoopConversation: vi.fn(),
   loadBackendSnapshot: vi.fn(),
   ensureBackendCodexHome: vi.fn(),
+  initializeCodexResourceSharing: vi.fn(),
   saveBackendSnapshot: vi.fn(),
   backendProviderTokensFilePath: vi.fn(),
   mcpStart: vi.fn(),
@@ -61,6 +62,10 @@ vi.mock('../state', () => ({
   ensureBackendCodexHome: mocks.ensureBackendCodexHome,
   saveBackendSnapshot: mocks.saveBackendSnapshot,
   backendProviderTokensFilePath: mocks.backendProviderTokensFilePath,
+}));
+
+vi.mock('../codex-resource-sharing', () => ({
+  initializeCodexResourceSharing: mocks.initializeCodexResourceSharing,
 }));
 
 vi.mock('../mcp/service', () => ({
@@ -206,6 +211,7 @@ describe('clawd runtime', () => {
     mocks.drivers.set('codex', driver);
     mocks.loadBackendSnapshot.mockResolvedValue(mocks.snapshot);
     mocks.ensureBackendCodexHome.mockResolvedValue(undefined);
+    mocks.initializeCodexResourceSharing.mockResolvedValue(undefined);
     mocks.saveBackendSnapshot.mockResolvedValue(undefined);
     mocks.backendProviderTokensFilePath.mockReturnValue('/tmp/provider-tokens.json');
     mocks.mcpStart.mockResolvedValue('http://127.0.0.1:4242/mcp');
@@ -222,6 +228,7 @@ describe('clawd runtime', () => {
     await createClawdRuntime({ emitEvent, requestClient, version: '1.2.3' });
 
     expect(mocks.loadBackendSnapshot).toHaveBeenCalledOnce();
+    expect(mocks.initializeCodexResourceSharing).toHaveBeenCalledWith(undefined);
     expect(mocks.ensureBackendCodexHome).toHaveBeenCalledOnce();
     expect(mocks.mcpStart).toHaveBeenCalledOnce();
     expect(mocks.createDefaultBackendDrivers).toHaveBeenCalledWith(expect.objectContaining({

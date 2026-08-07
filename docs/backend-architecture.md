@@ -127,9 +127,10 @@ Current implementation checkpoint:
   previews by agent id only, and the backend resolves the folder from its
   snapshot before touching storage. A mobile or web client uses the same
   backend RPC over its transport; it never reads local workspace files. If a
-  transcript contains an absolute or `file://` path, the client normalizes it to
-  an active-agent-relative preview path and refuses paths outside that agent
-  folder.
+  transcript contains an absolute or `file://` path inside the agent folder,
+  the client normalizes it to an agent-relative preview path. An explicitly
+  clicked absolute path outside that folder remains absolute and `clawd` reads
+  it on the agent's local or remote host; relative traversal remains refused.
 - `clawd` now owns work item assignment and unassignment mutations. Electron
   forwards the item payload and adopts the backend snapshot instead of changing
   `workBacklog.assignments` locally.
@@ -487,6 +488,8 @@ names that describe backend ownership:
   `workProvider/repositories/list`, `workProvider/backlog/configure`,
   `workProvider/items/list`
 - `settings/update`
+- `settings/codexResourceSharing/get`
+- `settings/codexResourceSharing/set`
 - `backend/health/get`
 
 Backend events should reuse today's app-owned `MainToRendererEvent` vocabulary
@@ -591,6 +594,18 @@ The exact script names can change, but the shape should stay:
 - Every local `clawd` launch derives Codex app-server `CODEX_HOME` as
   `$CODEX_CLAW_HOME/codex-home` (default
   `~/.codex-claw/codex-home`) and ignores an inherited normal Codex home.
+- Before creating backend drivers, `clawd` initializes missing `skills` and
+  `plugins` entries from the persisted sharing setting. Sharing is on by
+  default and a fresh home links those entries to `~/.codex`. Existing
+  non-linked entries are preserved and reported to the renderer as a pending
+  migration so the user can migrate or persist the isolated setup explicitly.
+  Later changes can create fresh isolated directories or copy the current user
+  resources. Folder-changing actions are rejected while chats are active
+  because restarting `clawd` also closes its Codex app-server processes.
+  Electron closes hosted Browser panes before that restart, and the client then
+  reloads only its renderer from the synchronized backend snapshot so cached
+  conversations, SDK controllers, and event sequence cursors cannot outlive the
+  backend instance.
 - Electron supplies every local `clawd` launch with the pinned Codex executable
   copied into desktop resources. SSH sync uploads only `clawd.mjs`, so a remote
   `clawd` continues to discover and launch Codex installed on that host.

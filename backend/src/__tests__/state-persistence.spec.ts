@@ -816,6 +816,7 @@ describe('AppStatePersistence', () => {
       preventSleepWhenRemoteAccessEnabled: true,
       codexBinaryPath: '/opt/homebrew/bin/codex',
       agentListCompact: true,
+      shareCodexSkillsAndPlugins: false,
       appshots: {
         hotkey: 'option',
         destination: 'active-agent',

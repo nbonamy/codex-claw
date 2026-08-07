@@ -6,12 +6,12 @@ import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-block
 import { initializeMainLogging, installProcessErrorLogging, logMain, warnMain } from './log';
 import { createMainWindow } from './main-window';
 import { createRuntimeClawBackendClient, type ClawBackendClientPort } from './backend-client';
-import { getClawdDaemonStatus, setClawdDaemonEnabled } from './daemon-launch-agent';
+import { getClawdDaemonStatus, refreshClawdDaemon, setClawdDaemonEnabled } from './daemon-launch-agent';
 import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards';
 import { applyMainEventToSnapshot, applySnapshotMetadata, snapshotMetadata } from '@codex-claw/shared/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppCommand, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppCommand, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
 import { sendAppCommand, sendRendererEvent } from './ipc-events';
 import { installAppMenu, type AppMenuCallbacks } from './app-menu';
@@ -76,6 +76,8 @@ export class AppController {
     private readonly startupMaintenance: StartupMaintenance = async () => undefined,
     private readonly openExternal: (url: string) => Promise<unknown> = (url) => shell.openExternal(url),
     private readonly appshotsKeyMonitor: AppshotsKeyMonitor | null = null,
+    private readonly daemonStatusLoader: () => Promise<ClawdDaemonStatus> = () => getClawdDaemonStatus(),
+    private readonly daemonRefresher: () => Promise<ClawdDaemonStatus> = () => refreshClawdDaemon(),
   ) {
     this.snapshot = initialSnapshot ? metadataOnlySnapshot(initialSnapshot) : null;
     this.backendClient = backendClient ?? createRuntimeClawBackendClient({
@@ -374,6 +376,10 @@ export class AppController {
     ipc.handle(ipcChannels.updateSettings, async (_event, input: UpdateSettingsInput) => {
       return this.updateSettings(input);
     });
+    ipc.handle(ipcChannels.getCodexResourceSharingStatus, () => this.getCodexResourceSharingStatus());
+    ipc.handle(ipcChannels.setCodexResourceSharing, async (_event, input: SetCodexResourceSharingInput) => {
+      return this.setCodexResourceSharing(input);
+    });
     ipc.handle(ipcChannels.getPluginStatus, () => this.getPluginStatus());
     ipc.handle(ipcChannels.getCodexAuthentication, () => this.getCodexAuthentication());
     ipc.handle(ipcChannels.cancelCodexChatGptLogin, () => this.cancelCodexChatGptLogin());
@@ -401,6 +407,7 @@ export class AppController {
     });
 
     ipc.handle(ipcChannels.restartApp, () => this.restartApp());
+    ipc.handle(ipcChannels.reloadRenderer, () => this.reloadRenderer());
 
     ipc.handle(ipcChannels.setAgentGoal, (_event, agentId: string, objective: string) => {
       return this.setAgentGoal(agentId, objective);
@@ -761,6 +768,22 @@ export class AppController {
     return snapshot;
   }
 
+  private async setCodexResourceSharing(input: SetCodexResourceSharingInput): Promise<AppSnapshot> {
+    const snapshot = await this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(
+      backendMethods.settingsCodexResourceSharingSet,
+      { input },
+    ));
+    if (!(input.enabled === false && input.mode === 'keep')) {
+      await this.browserPane.closeAll();
+      await this.restartBackend();
+    }
+    return snapshot;
+  }
+
+  private getCodexResourceSharingStatus(): Promise<CodexResourceSharingStatus> {
+    return this.requireBackendClient().request(backendMethods.settingsCodexResourceSharingGet);
+  }
+
   private getPluginStatus(): Promise<AppPluginStatus> {
     return this.requireBackendClient().request<AppPluginStatus>(backendMethods.settingsPluginStatusGet);
   }
@@ -786,7 +809,7 @@ export class AppController {
   }
 
   private async getDaemonStatus(): Promise<ClawdDaemonStatus> {
-    return getClawdDaemonStatus();
+    return this.daemonStatusLoader();
   }
 
   private async setDaemonEnabled(enabled: boolean): Promise<ClawdDaemonStatus> {
@@ -797,6 +820,36 @@ export class AppController {
     await this.shutdown();
     this.appLifecycle.relaunch();
     this.appLifecycle.exit(0);
+  }
+
+  private async reloadRenderer(): Promise<void> {
+    await this.browserPane.closeAll();
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      this.mainWindow.webContents.reload();
+    }
+  }
+
+  private async restartBackend(): Promise<void> {
+    const daemonStatus = await this.daemonStatusLoader();
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+    this.reconnectAttempt = 0;
+    this.backendClientEventUnsubscribe?.();
+    this.backendClientEventUnsubscribe = null;
+    this.backendClientConnectionUnsubscribe?.();
+    this.backendClientConnectionUnsubscribe = null;
+    this.setConnectionState({ status: 'reconnecting', detail: 'Restarting clawd…' });
+    await this.backendClient?.close();
+    if (daemonStatus.installed) {
+      try {
+        await this.daemonRefresher();
+      } catch (error) {
+        warnMain('clawd', 'failed to restart background backend after resource sharing changed', {
+          detail: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    await this.initializeBackendClient();
   }
 
   private async getLoopSnapshot(location?: LoopLocation): Promise<AppSnapshot> {

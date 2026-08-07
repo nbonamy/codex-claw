@@ -4514,6 +4514,103 @@ describe('ClawBackendServer', () => {
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
   });
 
+  it('changes Codex resource sharing only while chats are idle', async () => {
+    const snapshot = createTestSnapshot();
+    const configureCodexResourceSharing = vi.fn().mockResolvedValue(undefined);
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const inspectCodexResourceSharing = vi.fn().mockResolvedValue({ enabled: true, migrationRequired: true });
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      saveSnapshot,
+      configureCodexResourceSharing,
+      inspectCodexResourceSharing,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'resource-sharing-status',
+      method: backendMethods.settingsCodexResourceSharingGet,
+    })).resolves.toStrictEqual({
+      jsonrpc: '2.0',
+      id: 'resource-sharing-status',
+      result: { enabled: true, migrationRequired: true },
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'resource-sharing-off',
+      method: backendMethods.settingsCodexResourceSharingSet,
+      params: { input: { enabled: false, mode: 'copy' } },
+    })).resolves.toMatchObject({
+      result: {
+        general: { shareCodexSkillsAndPlugins: false },
+      },
+    });
+
+    expect(configureCodexResourceSharing).toHaveBeenCalledWith({ enabled: false, mode: 'copy' });
+    expect(inspectCodexResourceSharing).toHaveBeenCalledWith(true);
+    expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
+  });
+
+  it('rejects Codex resource sharing changes while a chat is running', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.agents = [{
+      id: 'agent-working',
+      name: 'Working',
+      folder: '/src/working',
+      backend: 'codex',
+      status: { type: 'working' },
+      createdAt: '2026-08-07T00:00:00.000Z',
+      updatedAt: '2026-08-07T00:00:00.000Z',
+    }];
+    const configureCodexResourceSharing = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      configureCodexResourceSharing,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'resource-sharing-on',
+      method: backendMethods.settingsCodexResourceSharingSet,
+      params: { input: { enabled: true } },
+    })).rejects.toThrow('Skills and plugins sharing cannot be changed while chats are running.');
+
+    expect(configureCodexResourceSharing).not.toHaveBeenCalled();
+  });
+
+  it('allows an active chat to keep the existing isolated resource setup', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.agents = [{
+      id: 'agent-working',
+      name: 'Working',
+      folder: '/src/working',
+      backend: 'codex',
+      status: { type: 'working' },
+      createdAt: '2026-08-07T00:00:00.000Z',
+      updatedAt: '2026-08-07T00:00:00.000Z',
+    }];
+    const configureCodexResourceSharing = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      configureCodexResourceSharing,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'resource-sharing-keep',
+      method: backendMethods.settingsCodexResourceSharingSet,
+      params: { input: { enabled: false, mode: 'keep' } },
+    })).resolves.toMatchObject({
+      result: { general: { shareCodexSkillsAndPlugins: false } },
+    });
+
+    expect(configureCodexResourceSharing).toHaveBeenCalledWith({ enabled: false, mode: 'keep' });
+  });
+
   it('owns source repository discovery path resolution', async () => {
     const snapshot = createTestSnapshot();
     snapshot.sourceFolder = {
@@ -5102,6 +5199,7 @@ function createTestSnapshot(): AppSnapshot {
       preventSleepWhenRemoteAccessEnabled: true,
       codexBinaryPath: '',
       agentListCompact: false,
+      shareCodexSkillsAndPlugins: true,
       appshots: {
         hotkey: 'command',
         destination: 'active-agent',

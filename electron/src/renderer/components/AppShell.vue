@@ -117,6 +117,8 @@
         :complete-work-provider-connection="completeWorkProviderConnection"
         :disconnect-work-provider="disconnectWorkProvider"
         :update-settings="updateSettings"
+        :set-codex-resource-sharing="setCodexResourceSharing"
+        :codex-resource-sharing-blocked="codexResourceSharingBlocked"
         :get-plugin-status="getPluginStatus"
         :set-daemon-enabled="setDaemonEnabled"
         :restart-app="restartApp"
@@ -314,6 +316,13 @@
       @image-error="handleImageAnnotationError"
       @send="finishImageAnnotation"
     />
+    <CodexResourceSharingMigrationDialog
+      :blocked="codexResourceSharingBlocked"
+      :pending="codexResourceSharingMigrationPending"
+      :visible="codexResourceSharingMigrationRequired"
+      @decline="declineCodexResourceSharingMigration"
+      @migrate="migrateCodexResources"
+    />
   </main>
 </template>
 
@@ -321,7 +330,7 @@
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import debugAnnotationScreenshotUrl from '../../../../docs/codex.png?url';
-import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type PairedDevice, type PromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
+import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type PairedDevice, type PromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultTeamColor } from '@codex-claw/shared/team-colors';
@@ -342,6 +351,7 @@ import BenchAgentAssignmentDialog from './BenchAgentAssignmentDialog.vue';
 import RightWorkspacePanel from './RightWorkspacePanel.vue';
 import SettingsView from './SettingsView.vue';
 import CodexLoginLanding from './CodexLoginLanding.vue';
+import CodexResourceSharingMigrationDialog from './CodexResourceSharingMigrationDialog.vue';
 import type { SettingsTab } from './settings-tabs';
 import { confirmCloseTeam } from './team-close-confirmation';
 import {
@@ -418,6 +428,7 @@ const props = withDefaults(defineProps<{
   remoteBenchErrorByConnectionId?: Record<string, string | null>;
   daemonStatus?: ClawdDaemonStatus | null;
   daemonStatusError?: string | null;
+  codexResourceSharingMigrationRequired?: boolean;
   chooseAgentFolder?: () => Promise<string | null>;
   chooseCodexBinary?: () => Promise<string | null>;
   chooseSourceFolder?: () => Promise<string | null>;
@@ -436,6 +447,7 @@ const props = withDefaults(defineProps<{
   updateTeam?: (input: UpdateTeamInput) => Promise<void>;
   updateAgent?: (input: UpdateAgentInput) => Promise<void>;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
+  setCodexResourceSharing?: (input: SetCodexResourceSharingInput) => Promise<void>;
   getPluginStatus?: () => Promise<import('@codex-claw/shared/contracts').AppPluginStatus>;
   listSshHosts?: () => Promise<SshHostCandidate[]>;
   addSshConnection?: (input: AddSshConnectionInput) => Promise<void>;
@@ -504,6 +516,7 @@ const props = withDefaults(defineProps<{
   remoteBenchErrorByConnectionId: () => ({}),
   daemonStatus: null,
   daemonStatusError: null,
+  codexResourceSharingMigrationRequired: false,
   chooseAgentFolder: async () => null,
   chooseCodexBinary: async () => null,
   chooseSourceFolder: async () => null,
@@ -525,6 +538,7 @@ const props = withDefaults(defineProps<{
   updateTeam: async () => undefined,
   updateAgent: async () => undefined,
   updateSettings: async () => undefined,
+  setCodexResourceSharing: async () => undefined,
   getPluginStatus: async () => ({ chromeEnabled: false }),
   listSshHosts: async () => [],
   addSshConnection: async () => undefined,
@@ -636,7 +650,13 @@ type AgentRightWorkspaceState = {
 };
 
 const agentSidebarCollapsed = ref(false);
+const codexResourceSharingMigrationPending = ref(false);
 const agentListCompact = computed(() => props.snapshot.general.agentListCompact);
+const codexResourceSharingBlocked = computed(() => props.snapshot.agents.some((agent) => (
+  agent.status.type === 'starting' ||
+  agent.status.type === 'working' ||
+  agent.status.type === 'awaitingInput'
+)));
 const connectionStatusLabel = computed(() => {
   if (props.connectionState.status === 'connecting') return 'Connecting to clawd…';
   if (props.connectionState.status === 'reconnecting') return 'Reconnecting to clawd… Agents keep working in the background.';
@@ -2236,6 +2256,34 @@ async function updateSettings(input: UpdateSettingsInput): Promise<void> {
   await props.updateSettings(input);
 }
 
+async function setCodexResourceSharing(input: SetCodexResourceSharingInput): Promise<void> {
+  await props.setCodexResourceSharing(input);
+}
+
+async function migrateCodexResources(): Promise<void> {
+  if (codexResourceSharingBlocked.value || codexResourceSharingMigrationPending.value) return;
+  codexResourceSharingMigrationPending.value = true;
+  try {
+    await setCodexResourceSharing({ enabled: true });
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  } finally {
+    codexResourceSharingMigrationPending.value = false;
+  }
+}
+
+async function declineCodexResourceSharingMigration(): Promise<void> {
+  if (codexResourceSharingMigrationPending.value) return;
+  codexResourceSharingMigrationPending.value = true;
+  try {
+    await setCodexResourceSharing({ enabled: false, mode: 'keep' });
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  } finally {
+    codexResourceSharingMigrationPending.value = false;
+  }
+}
+
 async function getPluginStatus(): Promise<import('@codex-claw/shared/contracts').AppPluginStatus> {
   return props.getPluginStatus();
 }
@@ -2419,11 +2467,11 @@ function toBackendPreviewPath(filePath: string, agentFolder?: string): string {
 
   const normalizedFolder = normalizePathSeparators(agentFolder ?? '').replace(/\/+$/u, '');
   if (!normalizedFolder || !isAbsolutePreviewPath(normalizedFolder)) {
-    return '';
+    return normalizedPath;
   }
 
   if (!normalizedPath.startsWith(`${normalizedFolder}/`)) {
-    return '';
+    return normalizedPath;
   }
 
   return normalizedPath.slice(normalizedFolder.length + 1);

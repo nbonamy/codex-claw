@@ -80,10 +80,17 @@ Connection flow:
 8. Cleanly interrupt, stop, or shut down when the app exits.
 
 Codex Claw always gives the SDK an isolated Codex home at
-`~/.codex-claw/codex-home` (or `$CODEX_CLAW_HOME/codex-home`). It never uses
-the user's `~/.codex`, so Claw threads, config, and auth state cannot pollute
-the normal Codex CLI/Desktop home. The isolated home may require its own sign
-in on first launch; do not copy normal Codex thread or auth files into it.
+`~/.codex-claw/codex-home` (or `$CODEX_CLAW_HOME/codex-home`). Threads, config,
+and auth remain isolated so Claw cannot pollute the normal Codex CLI/Desktop
+home. By default, only the isolated home's `skills` and `plugins` entries are
+links to `~/.codex/skills` and `~/.codex/plugins`. General → Advanced can turn
+that sharing off when every chat is idle, either with fresh Claw directories
+or by copying the current ChatGPT resources. A fresh home creates the links
+before any Codex driver starts. An existing non-linked home is left untouched;
+after launch, Claw asks whether to migrate it or keep it isolated. Migration is
+blocked while chats are active because it restarts `clawd` and its app-server
+processes. The isolated home may require its own sign in on first launch; do
+not copy normal Codex thread or auth files into it.
 
 Codex Claw reads and mutates that isolated authentication state through the
 SDK account surface. When `account/read` reports that OpenAI authentication is

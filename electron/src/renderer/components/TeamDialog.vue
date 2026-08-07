@@ -314,7 +314,6 @@ function shouldLoadRemoteTeamOptions(connectionId: string): boolean {
 <style scoped>
 .team-dialog__form {
   gap: var(--space-10);
-  padding: var(--space-12) var(--space-4) 0;
 }
 
 .team-dialog__group {

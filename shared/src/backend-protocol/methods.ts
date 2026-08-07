@@ -106,6 +106,8 @@ export const backendMethods = {
   loopRun: 'loop/run',
   loopUpdate: 'loop/update',
   settingsUpdate: 'settings/update',
+  settingsCodexResourceSharingGet: 'settings/codexResourceSharing/get',
+  settingsCodexResourceSharingSet: 'settings/codexResourceSharing/set',
   settingsPluginStatusGet: 'settings/pluginStatus/get',
   snapshotBenchGet: 'snapshot/bench/get',
   snapshotGet: 'snapshot/get',

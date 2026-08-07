@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, AgentHistoryLoadResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, AgentHistoryLoadResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/shared/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
@@ -48,6 +48,8 @@ const sourceRepositoryStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>
 const sourceRepositoryError = ref<string | null>(null);
 const daemonStatus = ref<ClawdDaemonStatus | null>(null);
 const daemonStatusError = ref<string | null>(null);
+const codexResourceSharingStatus = ref<CodexResourceSharingStatus>({ enabled: true, migrationRequired: false });
+const backendRestartInProgress = ref(false);
 const hydratingAgentHistoryIds = ref(new Set<string>());
 const loadingOlderHistoryIds = ref(new Set<string>());
 const historyHasOlderByAgentId = ref<Record<string, boolean>>({});
@@ -226,6 +228,7 @@ export function useAppState() {
         loadConnectedWorkBacklogs(),
         loadSourceRepositories(),
         loadDaemonStatus(),
+        loadCodexResourceSharingStatus(),
       ]);
     } catch (error) {
       connectionState.value = {
@@ -793,6 +796,34 @@ export function useAppState() {
     if (input.sourceFolder && snapshot.value.sourceFolder.path !== previousSourceFolderPath) {
       await loadSourceRepositories();
     }
+  }
+
+  async function setCodexResourceSharing(input: SetCodexResourceSharingInput): Promise<void> {
+    if (!window.codexClaw?.setCodexResourceSharing) return;
+    const restartsBackend = !(input.enabled === false && input.mode === 'keep');
+    if (restartsBackend) backendRestartInProgress.value = true;
+    try {
+      adoptBackgroundSnapshot(await window.codexClaw.setCodexResourceSharing(input));
+      codexResourceSharingStatus.value = { enabled: input.enabled, migrationRequired: false };
+      if (restartsBackend) {
+        const reload = window.codexClaw.reloadRenderer?.();
+        if (reload) {
+          void reload.catch(() => {
+            backendRestartInProgress.value = false;
+          });
+        } else {
+          backendRestartInProgress.value = false;
+        }
+      }
+    } catch (error) {
+      backendRestartInProgress.value = false;
+      throw error;
+    }
+  }
+
+  async function loadCodexResourceSharingStatus(): Promise<void> {
+    if (!window.codexClaw?.getCodexResourceSharingStatus) return;
+    codexResourceSharingStatus.value = await window.codexClaw.getCodexResourceSharingStatus();
   }
 
   async function getPluginStatus(): Promise<AppPluginStatus> {
@@ -1481,6 +1512,8 @@ export function useAppState() {
     sourceRepositoryError,
     daemonStatus,
     daemonStatusError,
+    codexResourceSharingStatus,
+    backendRestartInProgress,
     loadBackendModels: loadBackendModelsForActiveAgent,
     loadBackendSkills: loadBackendSkillsForActiveAgent,
     loadAgentFiles: loadAgentFilesForActiveAgent,
@@ -1508,6 +1541,7 @@ export function useAppState() {
     disconnectTeam,
     updateAgent,
     updateSettings,
+    setCodexResourceSharing,
     getPluginStatus,
     listSshHosts,
     addSshConnection,
@@ -2261,7 +2295,6 @@ async function loadBackendSkillsForActiveAgent(agentId = snapshot.value.activeAg
   }
   const configuration = composerConfiguration(agent.id);
   if (!_allowConcurrent && configuration.skillStatus === 'loading') return;
-
   const cache = catalogCacheEntry(skillCatalogCache, catalogKey(agent));
   resetCatalogCacheIfSourceChanged(cache, source.listBackendSkills);
   if (!cache.promise && cache.status === 'notLoaded') {

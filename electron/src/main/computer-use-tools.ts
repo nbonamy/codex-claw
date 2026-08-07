@@ -26,6 +26,15 @@ export const computerUseCommands = [
 
 export type ComputerUseCommand = (typeof computerUseCommands)[number];
 
+const cursorlessComputerUseCommands = new Set<ComputerUseCommand>([
+  'status',
+  'request_accessibility',
+  'request_screen_capture',
+  'screenshot',
+  'list_apps',
+  'find_apps',
+]);
+
 export type ComputerUseStatus = {
   accessibilityTrusted: boolean;
   screenCaptureTrusted: boolean;
@@ -120,7 +129,10 @@ export async function executeComputerUseCommand(input: {
   }
 
   if (input.command === 'get_app_state') lastAppStateContext = null;
-  const arguments_ = argumentsWithAppStateContext(input.command, input.arguments, pilotPath);
+  const commandArguments = cursorlessComputerUseCommands.has(input.command)
+    ? { ...input.arguments, showCursor: false }
+    : input.arguments;
+  const arguments_ = argumentsWithAppStateContext(input.command, commandArguments, pilotPath);
   const response = await runPilotRequest(pilotPath, {
     arguments: arguments_,
     command: input.command,

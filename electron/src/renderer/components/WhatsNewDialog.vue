@@ -83,7 +83,6 @@ function onVisibilityChanged(visible: boolean): void {
 
 .whats-new-dialog__notes {
   max-height: min(64vh, 620px);
-  padding: var(--space-12) var(--space-8) var(--space-8);
 }
 
 .whats-new-dialog__notes :deep(.codex-markdown) {

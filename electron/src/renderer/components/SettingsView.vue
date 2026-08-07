@@ -26,6 +26,8 @@
           :settings="generalSettings"
           :source-folder="sourceFolder"
           :set-daemon-enabled="setDaemonEnabled"
+          :set-codex-resource-sharing="setCodexResourceSharing"
+          :codex-resource-sharing-blocked="codexResourceSharingBlocked"
           :restart-app="restartApp"
           :update-settings="updateSettings"
         />
@@ -85,7 +87,7 @@
 </template>
 
 <script setup lang="ts">
-import type { AddSshConnectionInput, AppGeneralSettings, AppPluginStatus, AppThemeSettings, ClawdDaemonStatus, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SourceFolderListing, SourceFolderListInput, SourceFolderState, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AppGeneralSettings, AppPluginStatus, AppThemeSettings, ClawdDaemonStatus, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SetCodexResourceSharingInput, SourceFolderListing, SourceFolderListInput, SourceFolderState, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { defaultGeneralSettings, defaultSourceFolderState } from '@codex-claw/shared/settings';
 import SettingsAppearancePanel from './SettingsAppearancePanel.vue';
 import SettingsAppshotsPanel from './SettingsAppshotsPanel.vue';
@@ -132,6 +134,8 @@ withDefaults(defineProps<{
   disconnectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   openWorkProviderAuthorization?: (provider: WorkProviderKind) => Promise<void>;
   setDaemonEnabled?: (enabled: boolean) => Promise<void>;
+  setCodexResourceSharing?: (input: SetCodexResourceSharingInput) => Promise<void>;
+  codexResourceSharingBlocked?: boolean;
   restartApp?: () => Promise<void>;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
   getPluginStatus?: () => Promise<AppPluginStatus>;
@@ -168,6 +172,8 @@ withDefaults(defineProps<{
   disconnectWorkProvider: async () => undefined,
   openWorkProviderAuthorization: async () => undefined,
   setDaemonEnabled: async () => undefined,
+  setCodexResourceSharing: async () => undefined,
+  codexResourceSharingBlocked: false,
   restartApp: async () => undefined,
 });
 

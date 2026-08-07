@@ -604,6 +604,94 @@ describe('useAppState', () => {
     expect(restartApp).toHaveBeenCalledOnce();
   });
 
+  it('adopts the resource sharing result from the preload bridge', async () => {
+    const updatedSnapshot = createInitialSnapshot();
+    updatedSnapshot.general.shareCodexSkillsAndPlugins = false;
+    const setCodexResourceSharing = vi.fn().mockResolvedValue(updatedSnapshot);
+    const reloadRenderer = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('window', {
+      codexClaw: {
+        setCodexResourceSharing,
+        reloadRenderer,
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+
+    await state.setCodexResourceSharing({ enabled: false, mode: 'copy' });
+
+    expect(setCodexResourceSharing).toHaveBeenCalledWith({ enabled: false, mode: 'copy' });
+    expect(state.snapshot.value.general.shareCodexSkillsAndPlugins).toBe(false);
+    expect(reloadRenderer).toHaveBeenCalledOnce();
+    state.backendRestartInProgress.value = false;
+  });
+
+  it.each([
+    ['initial migration', { enabled: true as const }],
+    ['an Advanced settings change', { enabled: false as const, mode: 'copy' as const }],
+    ['fresh isolation', { enabled: false as const, mode: 'fresh' as const }],
+  ])('blocks the renderer and reloads it after %s', async (_scenario, input) => {
+    const updatedSnapshot = createInitialSnapshot();
+    const setCodexResourceSharing = vi.fn().mockResolvedValue(updatedSnapshot);
+    const reloadRenderer = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('window', {
+      codexClaw: {
+        setCodexResourceSharing,
+        reloadRenderer,
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+
+    const operation = state.setCodexResourceSharing(input);
+    expect(state.backendRestartInProgress.value).toBe(true);
+    await operation;
+
+    expect(setCodexResourceSharing).toHaveBeenCalledWith(input);
+    expect(reloadRenderer).toHaveBeenCalledOnce();
+    state.backendRestartInProgress.value = false;
+  });
+
+  it('keeps the renderer available when the migration is declined without restarting the backend', async () => {
+    const updatedSnapshot = createInitialSnapshot();
+    const setCodexResourceSharing = vi.fn().mockResolvedValue(updatedSnapshot);
+    const reloadRenderer = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('window', {
+      codexClaw: {
+        setCodexResourceSharing,
+        reloadRenderer,
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+
+    await state.setCodexResourceSharing({ enabled: false, mode: 'keep' });
+
+    expect(state.backendRestartInProgress.value).toBe(false);
+    expect(reloadRenderer).not.toHaveBeenCalled();
+  });
+
+  it('loads the resource sharing migration status after startup', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const getCodexResourceSharingStatus = vi.fn().mockResolvedValue({
+      enabled: true,
+      migrationRequired: true,
+    });
+    vi.stubGlobal('window', {
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        getCodexResourceSharingStatus,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+
+    await state.loadSnapshot();
+
+    expect(getCodexResourceSharingStatus).toHaveBeenCalledOnce();
+    expect(state.codexResourceSharingStatus.value).toStrictEqual({
+      enabled: true,
+      migrationRequired: true,
+    });
+  });
+
   it('JSON-normalizes reactive device pairing sessions before Electron IPC', async () => {
     const checkDevicePairing = vi.fn((session: DevicePairingSession) => {
       structuredClone(session);

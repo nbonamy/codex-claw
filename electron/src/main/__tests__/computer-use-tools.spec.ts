@@ -57,6 +57,41 @@ process.stdin.on('data', (chunk) => {
     });
   });
 
+  it.each([
+    'status',
+    'request_accessibility',
+    'request_screen_capture',
+    'screenshot',
+    'list_apps',
+    'find_apps',
+  ] as const)('never shows the virtual cursor for %s commands', async (command) => {
+    await expect(executeComputerUseCommand({
+      command,
+      arguments: { showCursor: true },
+      options: options(),
+    })).resolves.toMatchObject({
+      ok: true,
+      result: {
+        arguments: { showCursor: false },
+        command,
+      },
+    });
+  });
+
+  it('preserves cursor visibility for interactive commands', async () => {
+    await expect(executeComputerUseCommand({
+      command: 'click',
+      arguments: { showCursor: true, x: 10, y: 20 },
+      options: options(),
+    })).resolves.toMatchObject({
+      ok: true,
+      result: {
+        arguments: { showCursor: true, x: 10, y: 20 },
+        command: 'click',
+      },
+    });
+  });
+
   it('keeps one lazy helper session alive across Computer Use commands', async () => {
     const first = await executeComputerUseCommand({ command: 'click', arguments: { x: 1, y: 1 }, options: options() });
     const second = await executeComputerUseCommand({ command: 'get_app_state', arguments: { app: 'TextEdit' }, options: options() });
