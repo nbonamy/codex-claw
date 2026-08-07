@@ -6,7 +6,7 @@ import type {
   CodexConversationPaneState,
   CodexNativeAttachment,
   CodexNativeRendererApi,
-} from 'codex-app-sdk/vue';
+} from '@codex-app-sdk/vue';
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
@@ -296,14 +296,14 @@ describe('AppShell', () => {
     await actions.updateAttachments?.([{
       id: 'attachment-1',
       type: 'file',
-      path: '/tmp/context.txt',
+      reference: 'electron-attachment:context',
       name: 'context.txt',
       mimeType: 'text/plain',
       size: 12,
     }]);
     await actions.updateSettings?.({ modelId: 'gpt-5.1', serviceTier: null });
     await actions.submit?.('review context', {
-      attachments: [{ type: 'file', path: '/tmp/context.txt', name: 'context.txt' }],
+      attachments: [{ type: 'file', reference: 'electron-attachment:context' }],
       model: 'sdk-selection-does-not-cross-host-boundary',
     });
     await actions.openLink?.({ kind: 'external', href: 'https://example.com/docs' });
@@ -325,13 +325,13 @@ describe('AppShell', () => {
     }]]);
     expect(wrapper.emitted('update:composerAttachments')).toStrictEqual([[{
       agentId: activeAgent.id,
-      attachments: [expect.objectContaining({ path: '/tmp/context.txt' })],
+      attachments: [expect.objectContaining({ reference: 'electron-attachment:context' })],
     }]]);
     expect(wrapper.emitted('select-model')).toStrictEqual([['gpt-5.1']]);
     expect(wrapper.emitted('select-service-tier')).toStrictEqual([[null]]);
     expect(wrapper.emitted('sendPrompt')).toStrictEqual([[
       'review context',
-      { attachments: [{ type: 'file', path: '/tmp/context.txt', name: 'context.txt' }] },
+      { attachments: [{ type: 'file', reference: 'electron-attachment:context' }] },
     ]]);
     expect(openExternal).toHaveBeenCalledWith(
       'https://example.com/docs',
@@ -365,7 +365,7 @@ describe('AppShell', () => {
     const originalAttachment: CodexNativeAttachment = {
       id: 'original-image',
       type: 'image',
-      path: '/tmp/original.png',
+      reference: 'electron-attachment:original',
       name: 'original.png',
       mimeType: 'image/png',
       size: 128,
@@ -374,7 +374,7 @@ describe('AppShell', () => {
     const annotatedAttachment: CodexNativeAttachment = {
       id: 'annotated-image',
       type: 'image',
-      path: '/tmp/original-annotated.png',
+      reference: 'electron-attachment:annotated',
       name: 'original-annotated.png',
       mimeType: 'image/png',
       size: 256,
@@ -449,15 +449,12 @@ describe('AppShell', () => {
       {
         attachments: [{
           type: 'image',
-          path: annotatedAttachment.path,
-          name: annotatedAttachment.name,
-          mimeType: annotatedAttachment.mimeType,
-          previewUrl: annotatedAttachment.previewUrl,
+          reference: annotatedAttachment.reference,
         }],
       },
     ]]);
     expect(wrapper.emitted('sendPrompt')?.[0]?.[1]).not.toStrictEqual(expect.objectContaining({
-      attachments: [expect.objectContaining({ path: originalAttachment.path })],
+      attachments: [expect.objectContaining({ reference: originalAttachment.reference })],
     }));
     expect(wrapper.emitted('update:composerState')).toContainEqual([{
       agentId: 'agent-dina',
@@ -2947,7 +2944,7 @@ describe('AppShell', () => {
     const attachment: CodexNativeAttachment = {
       id: 'appshot-image',
       type: 'image',
-      path: '/tmp/electron-appshot.png',
+      reference: 'electron-attachment:appshot',
       name: 'electron-appshot.png',
       mimeType: 'image/png',
       size: 3,

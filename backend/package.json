@@ -17,7 +17,8 @@
   "dependencies": {
     "@codex-claw/shared": "0.6.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "codex-app-sdk": "file:../../codex-app-sdk",
+    "@codex-app-sdk/backend": "file:../../codex-app-sdk-modular-packages/packages/backend",
+    "@codex-app-sdk/core": "file:../../codex-app-sdk-modular-packages/packages/core",
     "pino": "^10.3.1",
     "zod": "^4.4.3"
   },

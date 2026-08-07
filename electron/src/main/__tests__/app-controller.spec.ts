@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController, shouldBlockDisplaySleep } from '../app-controller';
 import { createInitialSnapshot, snapshotMetadata } from '@codex-claw/shared/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/shared/contracts';
 import type { ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { ipcChannels } from '@codex-claw/shared/ipc';
@@ -1597,18 +1597,31 @@ describe('AppController', () => {
     const controller = new AppController(snapshot, createBackendClient({ request }));
 
     await controller.initialize();
+    const attachment = registerNativeAttachment(controller, {
+      type: 'file',
+      path: '/tmp/notes.txt',
+      name: 'notes.txt',
+      mimeType: 'text/plain',
+      size: 12,
+    });
 
     await expect(steerPrompt(controller, 'agent-dina', ' try smaller ')).resolves.toBe(backendSnapshot);
     await expect(steerPrompt(controller, 'agent-dina', ' inspect this ', {
-      attachments: [{ type: 'file', path: '/tmp/notes.txt', name: 'notes.txt' }],
+      attachments: [{ type: 'file', reference: attachment.reference }],
     })).resolves.toBe(backendSnapshot);
 
     expect(request).toHaveBeenCalledWith('agent/prompt/steer', { agentId: 'agent-dina', prompt: ' try smaller ' });
     expect(request).toHaveBeenCalledWith('agent/prompt/steer', {
       agentId: 'agent-dina',
       prompt: ' inspect this ',
-      options: { attachments: [{ type: 'file', path: '/tmp/notes.txt', name: 'notes.txt' }] },
+      options: {
+        attachments: [{ type: 'file', path: '/tmp/notes.txt', name: 'notes.txt', mimeType: 'text/plain' }],
+      },
     });
+
+    await expect(steerPrompt(controller, 'agent-dina', ' invalid attachment ', {
+      attachments: [{ type: 'file', reference: 'electron-attachment:missing' }],
+    })).rejects.toThrow('Attachment reference is invalid or expired');
   });
 
   it('routes queued prompt mutations through clawd', async () => {
@@ -2429,11 +2442,20 @@ async function steerPrompt(
   controller: AppController,
   agentId: string,
   prompt: string,
-  options?: SendPromptOptions,
+  options?: RendererSendPromptOptions,
 ): Promise<AppSnapshot> {
   return (controller as unknown as {
-    steerPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot>;
+    steerPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): Promise<AppSnapshot>;
   }).steerPrompt(agentId, prompt, options);
+}
+
+function registerNativeAttachment(
+  controller: AppController,
+  input: { type: 'file' | 'image'; path: string; name: string; mimeType: string; size: number },
+): { reference: string } {
+  return (controller as unknown as {
+    nativeAttachmentRegistry: { register(value: typeof input): { reference: string } };
+  }).nativeAttachmentRegistry.register(input);
 }
 
 async function steerQueuedPrompt(controller: AppController, agentId: string, promptId: string): Promise<AppSnapshot> {

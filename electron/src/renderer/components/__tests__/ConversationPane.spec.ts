@@ -6,7 +6,7 @@ import {
   createCodexConversationPaneController,
   type CodexConversationPaneController,
   type CodexNativeAttachment,
-} from 'codex-app-sdk/vue';
+} from '@codex-app-sdk/vue';
 import { describe, expect, it } from 'vitest';
 import type { Agent, RendererMessage, ThreadPlan } from '@codex-claw/shared/contracts';
 import ConversationPane from '../ConversationPane.vue';
@@ -218,7 +218,7 @@ describe('ConversationPane', () => {
     const image: CodexNativeAttachment = {
       id: 'image-1',
       type: 'image',
-      path: '/tmp/screenshot.png',
+      reference: '/tmp/screenshot.png',
       name: 'screenshot.png',
       mimeType: 'image/png',
       size: 128,

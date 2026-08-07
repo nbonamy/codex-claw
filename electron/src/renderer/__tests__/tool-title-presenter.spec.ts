@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CodexToolTitlePresenterContext } from 'codex-app-sdk/vue';
+import type { CodexToolTitlePresenterContext } from '@codex-app-sdk/vue';
 import { messages } from '../i18n/messages';
 import { presentClawToolTitle } from '../tool-title-presenter';
 

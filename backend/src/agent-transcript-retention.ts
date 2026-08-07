@@ -1,7 +1,7 @@
 import {
   CodexAppBackendTtlCache,
   type CodexAppBackendTtlCacheScheduler,
-} from 'codex-app-sdk/node';
+} from '@codex-app-sdk/backend';
 import type { AppSnapshot } from '@codex-claw/shared/contracts';
 
 export const DEFAULT_AGENT_TRANSCRIPT_TTL_MS = 15 * 60 * 1_000;

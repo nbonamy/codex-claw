@@ -20,7 +20,7 @@ dotenv.config();
 const skipMacSigning = Boolean(process.env.TEST) || process.env.CODEX_CLAW_SKIP_SIGNING === '1';
 const appleSpeechHelperPath = path.resolve(
   __dirname,
-  '../node_modules/codex-app-sdk/assets/apple-speechanalyzer-cli',
+  '../node_modules/@codex-app-sdk/backend/assets/apple-speechanalyzer-cli',
 );
 
 // osx special configuration

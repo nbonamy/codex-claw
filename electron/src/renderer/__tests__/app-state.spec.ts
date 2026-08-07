@@ -2033,7 +2033,7 @@ describe('useAppState', () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0].status = { type: 'working' };
-    const attachments = [
+    const backendAttachments = [
       {
         type: 'image' as const,
         path: '/tmp/screenshot.png',
@@ -2044,10 +2044,14 @@ describe('useAppState', () => {
       },
       { type: 'file' as const, path: '/tmp/report.txt', name: 'report.txt', mimeType: 'text/plain' },
     ];
+    const rendererAttachments = [
+      { type: 'image' as const, reference: 'electron-attachment:screenshot', detail: 'original' as const },
+      { type: 'file' as const, reference: 'electron-attachment:report' },
+    ];
 
     const queuedSnapshot = createInitialSnapshot();
     queuedSnapshot.agents[0].status = { type: 'working' };
-    queuedSnapshot.queuedPrompts = [{ id: 'prompt-files', agentId: 'agent-dina', text: 'review these files', createdAt: '2026-06-05T00:00:01.000Z', options: { attachments } }];
+    queuedSnapshot.queuedPrompts = [{ id: 'prompt-files', agentId: 'agent-dina', text: 'review these files', createdAt: '2026-06-05T00:00:01.000Z', options: { attachments: backendAttachments } }];
     const sendPrompt = vi.fn().mockResolvedValue(queuedSnapshot);
     vi.stubGlobal('window', {
       codexClaw: {
@@ -2062,16 +2066,16 @@ describe('useAppState', () => {
 
     const state = useAppState();
     await state.loadSnapshot();
-    await state.sendPrompt('review these files', { attachments });
+    await state.sendPrompt('review these files', { attachments: rendererAttachments });
 
     expect(state.activeQueuedPrompts.value).toStrictEqual([
       expect.objectContaining({
         text: 'review these files',
-        options: { attachments },
+        options: { attachments: backendAttachments },
       }),
     ]);
 
-    expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'review these files', { attachments });
+    expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'review these files', { attachments: rendererAttachments });
   });
 
   it('keeps the previous authoritative queue visible while a backend mutation is pending', async () => {
@@ -2151,11 +2155,11 @@ describe('useAppState', () => {
     const state = useAppState();
     await state.loadSnapshot();
     await state.steerPrompt('use the smaller patch', {
-      attachments: [{ type: 'file', path: '/tmp/notes.txt', name: 'notes.txt' }],
+      attachments: [{ type: 'file', reference: 'electron-attachment:notes' }],
     });
 
     expect(steerPrompt).toHaveBeenCalledWith('agent-dina', 'use the smaller patch', {
-      attachments: [{ type: 'file', path: '/tmp/notes.txt', name: 'notes.txt' }],
+      attachments: [{ type: 'file', reference: 'electron-attachment:notes' }],
     });
 
     const queuedPromptId = state.activeQueuedPrompts.value[0]?.id;
@@ -2283,7 +2287,7 @@ describe('useAppState', () => {
     });
     state.updateComposerAttachments('agent-dina', [
       {
-        id: 'attachment-dina', type: 'file', path: '/tmp/dina.txt', name: 'dina.txt',
+        id: 'attachment-dina', type: 'file', reference: 'electron-attachment:dina', name: 'dina.txt',
         mimeType: 'text/plain', size: 10,
       },
     ]);
@@ -2298,7 +2302,7 @@ describe('useAppState', () => {
     });
     state.updateComposerAttachments('agent-jesse', [
       {
-        id: 'attachment-jesse', type: 'image', path: '/tmp/jesse.png', name: 'jesse.png',
+        id: 'attachment-jesse', type: 'image', reference: 'electron-attachment:jesse', name: 'jesse.png',
         mimeType: 'image/png', size: 20,
       },
     ]);
@@ -2313,7 +2317,7 @@ describe('useAppState', () => {
     });
     expect(state.activeComposerAttachments.value).toStrictEqual([
       {
-        id: 'attachment-dina', type: 'file', path: '/tmp/dina.txt', name: 'dina.txt',
+        id: 'attachment-dina', type: 'file', reference: 'electron-attachment:dina', name: 'dina.txt',
         mimeType: 'text/plain', size: 10,
       },
     ]);
@@ -2323,7 +2327,7 @@ describe('useAppState', () => {
     });
     expect(state.activeComposerAttachments.value).toStrictEqual([
       {
-        id: 'attachment-jesse', type: 'image', path: '/tmp/jesse.png', name: 'jesse.png',
+        id: 'attachment-jesse', type: 'image', reference: 'electron-attachment:jesse', name: 'jesse.png',
         mimeType: 'image/png', size: 20,
       },
     ]);

@@ -56,7 +56,7 @@ import {
   type CodexConversationPaneController,
   type CodexNativeAttachment,
   type SurfaceMessage,
-} from 'codex-app-sdk/vue';
+} from '@codex-app-sdk/vue';
 import { PlusCircleIcon } from '../shared/icons/app-icons';
 import type {
   Agent,

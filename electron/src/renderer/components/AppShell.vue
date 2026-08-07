@@ -340,7 +340,7 @@
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import debugAnnotationScreenshotUrl from '../../../../docs/codex.png?url';
-import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type PromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
+import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/shared/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
 import { defaultTeamColor } from '@codex-claw/shared/team-colors';
@@ -377,8 +377,8 @@ import {
   type CodexComposerState,
   languageForFilePath,
   type CodexQueuedPromptData as QueuedChatPrompt,
-  type SendCodexMessageOptions,
-} from 'codex-app-sdk/vue';
+  type CodexRendererSendMessageOptions,
+} from '@codex-app-sdk/vue';
 
 import type { PlanReviewComment, SidePanelGitDiffState, SidePanelImageState, SidePanelMarkdownState } from './side-panel';
 import {
@@ -629,8 +629,8 @@ const emit = defineEmits<{
   'update:composerState': [payload: { agentId: string; state: CodexComposerState }];
   'update:composerAttachments': [payload: { agentId: string; attachments: readonly CodexNativeAttachment[] }];
   'install-update': [];
-  sendPrompt: [prompt: string, options?: SendPromptOptions];
-  steerPrompt: [prompt: string, options?: SendPromptOptions];
+  sendPrompt: [prompt: string, options?: RendererSendPromptOptions];
+  steerPrompt: [prompt: string, options?: RendererSendPromptOptions];
 }>();
 
 type WorkItemAssignmentIntent = {
@@ -1550,12 +1550,9 @@ async function finishImageAnnotation(payload: ImageAnnotationSendPayload): Promi
     if (!annotatedAttachment) throw new Error('Annotated image ingestion returned no attachment.');
 
     const prompt = formatImageAnnotationPrompt(payload.annotations, props.composerState?.text);
-    const attachment: PromptAttachment = {
+    const attachment: RendererPromptAttachment = {
       type: 'image',
-      path: annotatedAttachment.path,
-      name: annotatedAttachment.name,
-      mimeType: annotatedAttachment.mimeType,
-      ...(annotatedAttachment.previewUrl ? { previewUrl: annotatedAttachment.previewUrl } : {}),
+      reference: annotatedAttachment.reference,
     };
     forwardPrompt(prompt, { attachments: [attachment] });
     emit('update:composerState', {
@@ -1694,7 +1691,7 @@ function forwardApprovalResolution(
   emit('resolve-approval', approvalId, decision, scope);
 }
 
-function forwardPrompt(prompt: string, options?: SendPromptOptions): void {
+function forwardPrompt(prompt: string, options?: RendererSendPromptOptions): void {
   if (options) {
     emit('sendPrompt', prompt, options);
   } else {
@@ -1702,7 +1699,7 @@ function forwardPrompt(prompt: string, options?: SendPromptOptions): void {
   }
 }
 
-function forwardSteerPrompt(prompt: string, options?: SendPromptOptions): void {
+function forwardSteerPrompt(prompt: string, options?: RendererSendPromptOptions): void {
   if (options) {
     emit('steerPrompt', prompt, options);
   } else {
@@ -1710,16 +1707,16 @@ function forwardSteerPrompt(prompt: string, options?: SendPromptOptions): void {
   }
 }
 
-function forwardCodexPrompt(prompt: string, options?: SendCodexMessageOptions): void {
+function forwardCodexPrompt(prompt: string, options?: CodexRendererSendMessageOptions): void {
   forwardPrompt(prompt, promptOptions(options));
 }
 
-function forwardCodexSteerPrompt(prompt: string, options?: SendCodexMessageOptions): void {
+function forwardCodexSteerPrompt(prompt: string, options?: CodexRendererSendMessageOptions): void {
   forwardSteerPrompt(prompt, promptOptions(options));
 }
 
-function promptOptions(options?: SendCodexMessageOptions): SendPromptOptions | undefined {
-  const attachments = options?.attachments?.map<PromptAttachment>((attachment) => ({ ...attachment }));
+function promptOptions(options?: CodexRendererSendMessageOptions): RendererSendPromptOptions | undefined {
+  const attachments = options?.attachments?.map<RendererPromptAttachment>((attachment) => ({ ...attachment }));
   return attachments?.length ? { attachments } : undefined;
 }
 

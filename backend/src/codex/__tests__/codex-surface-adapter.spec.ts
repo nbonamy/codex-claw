@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Agent } from '@codex-claw/shared/contracts';
 import type { BackendEvent } from '@codex-claw/shared/backend-driver';
-import { CodexAppServerClient, type RpcMessage, type RpcTransport } from 'codex-app-sdk/codex';
-import { CodexSurface } from 'codex-app-sdk/node';
+import { CodexAppServerClient, type RpcMessage, type RpcTransport } from '@codex-app-sdk/backend/protocol';
+import { CodexSurface } from '@codex-app-sdk/backend';
 import { CodexBackendDriver } from '../codex-driver';
 import { CodexSurfaceAgentAdapter } from '../codex-surface-adapter';
 

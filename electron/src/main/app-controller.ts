@@ -1,7 +1,7 @@
 import { backendMethods } from '@codex-claw/shared/backend-protocol/methods';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, powerMonitor, shell } from 'electron';
 import path from 'node:path';
-import { registerCodexNativeIpc, TypedIpcMain } from 'codex-app-sdk/electron';
+import { CodexElectronAttachmentRegistry, registerCodexNativeIpc, TypedIpcMain } from '@codex-app-sdk/electron';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
 import { initializeMainLogging, installProcessErrorLogging, logMain, warnMain } from './log';
 import { createMainWindow } from './main-window';
@@ -11,7 +11,7 @@ import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/shared/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/shared/snapshot-guards';
 import { applyMainEventToSnapshot, applySnapshotMetadata, snapshotMetadata } from '@codex-claw/shared/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppCommand, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppCommand, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
 import { sendAppCommand, sendRendererEvent } from './ipc-events';
 import { installAppMenu, type AppMenuCallbacks } from './app-menu';
@@ -43,6 +43,7 @@ export class AppController {
   private backendClientEventUnsubscribe: (() => void) | null = null;
   private backendClientConnectionUnsubscribe: (() => void) | null = null;
   private nativeIpcUnregister: (() => void) | null = null;
+  private readonly nativeAttachmentRegistry = new CodexElectronAttachmentRegistry();
   private lastBackendEventSeq = 0;
   private clientEventSeq = 0;
   private backendEventBuffer: ClawBackendEvent[] | null = null;
@@ -128,7 +129,11 @@ export class AppController {
 
   registerIpcHandlers(): void {
     this.nativeIpcUnregister?.();
-    this.nativeIpcUnregister = registerCodexNativeIpc({ clipboard, dialog, ipcMain, shell });
+    this.nativeIpcUnregister = registerCodexNativeIpc(
+      { clipboard, dialog, ipcMain, shell },
+      {},
+      this.nativeAttachmentRegistry,
+    );
     const ipc = new TypedIpcMain<CodexClawIpcRequests>(ipcMain);
     ipc.handle(ipcChannels.getSnapshot, () => this.getSnapshot());
     ipc.handle(ipcChannels.getSnapshotState, () => this.getSnapshotState());
@@ -431,11 +436,11 @@ export class AppController {
       return this.setAgentApprovalPreset(agentId, preset);
     });
 
-    ipc.handle(ipcChannels.sendPrompt, (_event, agentId: string, prompt: string, options?: SendPromptOptions) => {
+    ipc.handle(ipcChannels.sendPrompt, (_event, agentId: string, prompt: string, options?: RendererSendPromptOptions) => {
       return this.sendPrompt(agentId, prompt, options);
     });
 
-    ipc.handle(ipcChannels.steerPrompt, (_event, agentId: string, prompt: string, options?: SendPromptOptions) => {
+    ipc.handle(ipcChannels.steerPrompt, (_event, agentId: string, prompt: string, options?: RendererSendPromptOptions) => {
       return this.steerPrompt(agentId, prompt, options);
     });
 
@@ -989,9 +994,14 @@ export class AppController {
   private async sendPrompt(
     agentId: string,
     prompt: string,
-    options?: SendPromptOptions,
+    options?: RendererSendPromptOptions,
   ): Promise<AppSnapshotMetadata> {
-    return this.adoptBackendMetadata(await this.requireBackendClient().request<AppSnapshotMetadata>(backendMethods.agentPromptSend, { agentId, prompt, options }));
+    const backendOptions = this.resolveRendererPromptOptions(options);
+    return this.adoptBackendMetadata(await this.requireBackendClient().request<AppSnapshotMetadata>(backendMethods.agentPromptSend, {
+      agentId,
+      prompt,
+      options: backendOptions,
+    }));
   }
 
   private async browserOpen(agentId: string, browserId: string, url: string): Promise<BrowserState> {
@@ -1127,11 +1137,27 @@ export class AppController {
     await this.requireBackendClient().request(backendMethods.agentGitDiffOpen, { agentId });
   }
 
-  private async steerPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshotMetadata> {
+  private async steerPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): Promise<AppSnapshotMetadata> {
+    const backendOptions = this.resolveRendererPromptOptions(options);
     return this.adoptBackendMetadata(await this.requireBackendClient().request<AppSnapshotMetadata>(
       backendMethods.agentPromptSteer,
-      options ? { agentId, prompt, options } : { agentId, prompt },
+      backendOptions ? { agentId, prompt, options: backendOptions } : { agentId, prompt },
     ));
+  }
+
+  private resolveRendererPromptOptions(options?: RendererSendPromptOptions): SendPromptOptions | undefined {
+    if (!options) return undefined;
+    const { attachments, ...rest } = options;
+    if (!attachments?.length) return rest;
+    return {
+      ...rest,
+      attachments: attachments.map((attachment) => {
+        const resolved = this.nativeAttachmentRegistry.resolve(attachment);
+        return attachment.type === 'image' && attachment.detail
+          ? { ...resolved, detail: attachment.detail }
+          : resolved;
+      }),
+    };
   }
 
   private async deleteQueuedPrompt(agentId: string, promptId: string): Promise<AppSnapshot> {

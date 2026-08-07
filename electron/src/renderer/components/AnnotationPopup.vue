@@ -55,7 +55,7 @@ import {
   CodexComposerVoiceField,
   getCodexNativeRendererApi,
   useCodexComposerVoice,
-} from 'codex-app-sdk/vue';
+} from '@codex-app-sdk/vue';
 
 export type AnnotationPopupAnchor = {
   x: number;

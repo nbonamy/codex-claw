@@ -8,7 +8,7 @@ import { ClaudeBackendDriver } from './claude/claude-driver';
 import { CodexBackendDriver } from './codex/codex-driver';
 import { CodexSurfaceAgentAdapter } from './codex/codex-surface-adapter';
 import { resolveCodexCommand } from './codex/codex-command';
-import { createCodexSurface } from 'codex-app-sdk/node';
+import { createCodexSurface } from '@codex-app-sdk/backend';
 import { createSourceWorktree, listSourceWorktrees, suggestedSourceWorktreePath } from './git-worktrees';
 import { buildCodexClawMcpConfigOverrides, buildCodexClawThreadConfig } from './mcp/codex-config';
 import { backendCodexHomeDir } from './state';

@@ -1,16 +1,18 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const sdkSourceRoot = fileURLToPath(new URL('../codex-app-sdk/src', import.meta.url));
+export const sdkSourceRoot = fileURLToPath(new URL('../codex-app-sdk-modular-packages', import.meta.url));
 
 export const sdkSourceAliases = {
-  'codex-app-sdk/electron/preload': path.join(sdkSourceRoot, 'electron/preload.ts'),
-  'codex-app-sdk/electron': path.join(sdkSourceRoot, 'electron/index.ts'),
-  'codex-app-sdk/codex': path.join(sdkSourceRoot, 'codex/index.ts'),
-  'codex-app-sdk/events': path.join(sdkSourceRoot, 'events/index.ts'),
-  'codex-app-sdk/node': path.join(sdkSourceRoot, 'node/index.ts'),
-  'codex-app-sdk/styles.css': path.join(sdkSourceRoot, 'vue/styles.css'),
-  'codex-app-sdk/surface': path.join(sdkSourceRoot, 'surface/index.ts'),
-  'codex-app-sdk/vue': path.join(sdkSourceRoot, 'vue/index.ts'),
-  'codex-app-sdk': path.join(sdkSourceRoot, 'index.ts'),
+  '@codex-app-sdk/backend/protocol': path.join(sdkSourceRoot, 'packages/backend/src/codex/index.ts'),
+  '@codex-app-sdk/backend': path.join(sdkSourceRoot, 'packages/backend/src/index.ts'),
+  '@codex-app-sdk/core/events': path.join(sdkSourceRoot, 'packages/core/src/typed-event-bus.ts'),
+  '@codex-app-sdk/core/native': path.join(sdkSourceRoot, 'packages/core/src/native.ts'),
+  '@codex-app-sdk/core/surface-bridge': path.join(sdkSourceRoot, 'packages/core/src/surface-bridge.ts'),
+  '@codex-app-sdk/core/surface': path.join(sdkSourceRoot, 'packages/core/src/surface.ts'),
+  '@codex-app-sdk/core': path.join(sdkSourceRoot, 'packages/core/src/index.ts'),
+  '@codex-app-sdk/electron/preload': path.join(sdkSourceRoot, 'packages/electron/src/preload.ts'),
+  '@codex-app-sdk/electron': path.join(sdkSourceRoot, 'packages/electron/src/index.ts'),
+  '@codex-app-sdk/vue/styles.css': path.join(sdkSourceRoot, 'packages/vue/src/styles.css'),
+  '@codex-app-sdk/vue': path.join(sdkSourceRoot, 'packages/vue/src/index.ts'),
 };

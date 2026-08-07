@@ -746,6 +746,17 @@ export type PromptAttachment =
     mimeType?: string;
   };
 
+export type RendererPromptAttachment =
+  | {
+    type: 'image';
+    reference: string;
+    detail?: 'auto' | 'low' | 'high' | 'original';
+  }
+  | {
+    type: 'file';
+    reference: string;
+  };
+
 export type SendPromptOptions = {
   attachments?: readonly PromptAttachment[];
   model?: string | null;
@@ -754,6 +765,10 @@ export type SendPromptOptions = {
   serviceTier?: string | null;
   skills?: PromptSkillInput[];
   backendOptions?: BackendPromptOptions;
+};
+
+export type RendererSendPromptOptions = Omit<SendPromptOptions, 'attachments'> & {
+  attachments?: readonly RendererPromptAttachment[];
 };
 
 export type BackendPromptOptions =
@@ -1327,8 +1342,8 @@ export type CodexClawApi = {
   setAgentGoal(agentId: string, objective: string): Promise<AppSnapshot>;
   clearAgentGoal(agentId: string): Promise<AppSnapshot>;
   setAgentApprovalPreset(agentId: string, preset: ApprovalPreset): Promise<AppSnapshot>;
-  sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshotMetadata>;
-  steerPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshotMetadata>;
+  sendPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): Promise<AppSnapshotMetadata>;
+  steerPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): Promise<AppSnapshotMetadata>;
   deleteQueuedPrompt(agentId: string, promptId: string): Promise<AppSnapshot>;
   steerQueuedPrompt(agentId: string, promptId: string): Promise<AppSnapshot>;
   interruptAgent(agentId: string): Promise<AppSnapshot>;

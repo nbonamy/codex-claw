@@ -1,6 +1,6 @@
 import {
   type CodexToolTitlePresenterContext,
-} from 'codex-app-sdk/vue';
+} from '@codex-app-sdk/vue';
 
 type ToolPhase = 'completed' | 'failed' | 'running';
 type AgentNameResolver = (identifier: string) => string | undefined;

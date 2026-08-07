@@ -3,7 +3,7 @@ import {
   type CodexToolPresentation,
   type CodexToolPresentationContext,
   type CodexToolTitlePresenterContext,
-} from 'codex-app-sdk/vue';
+} from '@codex-app-sdk/vue';
 import {
   IconBrowser as BrowserIcon,
   IconDeviceDesktop as DeviceDesktopIcon,

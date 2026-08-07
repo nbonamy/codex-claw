@@ -287,8 +287,8 @@ describe('Electron backend boundary', () => {
 
     expect(appController).toContain('registerCodexNativeIpc');
     expect(preload).toContain('exposeCodexNativeRendererApi');
-    expect(preload).toContain("from 'codex-app-sdk/electron/preload'");
-    expect(preload).not.toContain("from 'codex-app-sdk/electron';");
+    expect(preload).toContain("from '@codex-app-sdk/electron/preload'");
+    expect(preload).not.toContain("from '@codex-app-sdk/electron';");
     expect(appController).not.toContain('transcriptionAppleSpeech');
     expect(preload).not.toContain('transcribeAppleSpeech');
     expect(backendMethods).not.toContain('transcription/appleSpeech/create');
@@ -298,7 +298,7 @@ describe('Electron backend boundary', () => {
     const forgeConfigPath = path.resolve(__dirname, '../../../forge.config.ts');
     const source = await readFile(forgeConfigPath, 'utf8');
 
-    expect(source).toContain('node_modules/codex-app-sdk/assets/apple-speechanalyzer-cli');
+    expect(source).toContain('node_modules/@codex-app-sdk/backend/assets/apple-speechanalyzer-cli');
     expect(source).not.toContain("extraResource: ['assets/apple-speechanalyzer-cli'");
   });
 

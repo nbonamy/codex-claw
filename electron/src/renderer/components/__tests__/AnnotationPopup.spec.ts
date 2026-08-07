@@ -10,8 +10,8 @@ const voiceMock = vi.hoisted(() => ({
   toggle: vi.fn<() => Promise<void>>(),
 }));
 
-vi.mock('codex-app-sdk/vue', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('codex-app-sdk/vue')>();
+vi.mock('@codex-app-sdk/vue', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@codex-app-sdk/vue')>();
   const isRecording = ref(false);
   const isTranscribing = ref(false);
   voiceMock.isRecording = isRecording;

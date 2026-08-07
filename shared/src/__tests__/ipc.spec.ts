@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import type { AppCommand, AppSnapshot, AppSnapshotMetadata, DesktopUpdateStatus, MainToRendererEvent, OpenInApplication, SendPromptOptions } from '../contracts';
+import type { AppCommand, AppSnapshot, AppSnapshotMetadata, DesktopUpdateStatus, MainToRendererEvent, OpenInApplication, RendererSendPromptOptions } from '../contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '../ipc';
 
 describe('ipc channels', () => {
@@ -126,7 +126,7 @@ describe('ipc channels', () => {
 
   it('derives request and event payloads from the preload API contract', () => {
     expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.sendPrompt]['args']>()
-      .toEqualTypeOf<[agentId: string, prompt: string, options?: SendPromptOptions]>();
+      .toEqualTypeOf<[agentId: string, prompt: string, options?: RendererSendPromptOptions]>();
     expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.sendPrompt]['result']>()
       .toEqualTypeOf<AppSnapshotMetadata>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.event]>()

@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, AgentHistoryLoadResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, AgentHistoryLoadResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/shared/contracts';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/shared/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/shared/backend-commands';
@@ -8,7 +8,7 @@ import {
   promptSkillInputsFromText,
   type CodexComposerState,
   type CodexNativeAttachment,
-} from 'codex-app-sdk/vue';
+} from '@codex-app-sdk/vue';
 import { workItemAssignmentPrompt } from '@codex-claw/shared/work-item-prompts';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/shared/snapshot-guards';
 import { useConfetti } from './shared/confetti/use-confetti';
@@ -306,7 +306,7 @@ export function useAppState() {
     };
   }
 
-  async function sendPrompt(prompt: string, submissionOptions?: SendPromptOptions): Promise<void> {
+  async function sendPrompt(prompt: string, submissionOptions?: RendererSendPromptOptions): Promise<void> {
     const agentId = activeAgent.value?.id;
     if (!agentId || !window.codexClaw) {
       return;
@@ -334,7 +334,7 @@ export function useAppState() {
     await sendPromptForAgent(agentId, trimmed, submissionOptions);
   }
 
-  async function steerPrompt(prompt: string, submissionOptions?: SendPromptOptions): Promise<void> {
+  async function steerPrompt(prompt: string, submissionOptions?: RendererSendPromptOptions): Promise<void> {
     const agentId = activeAgent.value?.id;
     if (!agentId || !window.codexClaw) {
       return;
@@ -438,7 +438,7 @@ export function useAppState() {
   async function sendPromptForAgent(
     agentId: string,
     prompt: string,
-    submissionOptions?: SendPromptOptions,
+    submissionOptions?: RendererSendPromptOptions,
   ): Promise<void> {
     await sendPreparedPromptForAgent(
       agentId,
@@ -450,7 +450,7 @@ export function useAppState() {
   async function sendPreparedPromptForAgent(
     agentId: string,
     prompt: string,
-    options?: SendPromptOptions,
+    options?: RendererSendPromptOptions,
   ): Promise<void> {
     const api = window.codexClaw;
     if (!api) {
@@ -1830,7 +1830,7 @@ function defaultServiceTier(model: BackendModelOption): string | null {
   return model.defaultServiceTier ?? null;
 }
 
-function selectedPromptOptions(agentId: string, prompt: string): SendPromptOptions | undefined {
+function selectedPromptOptions(agentId: string, prompt: string): RendererSendPromptOptions | undefined {
   const isActiveAgent = agentId === snapshot.value.activeAgentId;
   const model = isActiveAgent ? selectedModelFromCatalog() : null;
   const skills = isActiveAgent ? selectedPromptSkills(prompt) : [];
@@ -1868,8 +1868,8 @@ function selectedPromptOptions(agentId: string, prompt: string): SendPromptOptio
 function resolvedPromptOptions(
   agentId: string,
   prompt: string,
-  submissionOptions?: SendPromptOptions,
-): SendPromptOptions | undefined {
+  submissionOptions?: RendererSendPromptOptions,
+): RendererSendPromptOptions | undefined {
   const selectedOptions = selectedPromptOptions(agentId, prompt);
   const attachments = submissionOptions?.attachments?.length
     ? [...submissionOptions.attachments]

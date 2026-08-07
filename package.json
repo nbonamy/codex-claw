@@ -26,7 +26,7 @@
     "lint:css": "npm run lint:css -w @codex-claw/electron",
     "test": "npm run test --workspaces",
     "test:coverage": "npm run test:coverage --workspaces",
-    "benchmark:conversation": "npm run benchmark:conversation -w @codex-claw/shared && npm --prefix ../codex-app-sdk run benchmark:conversation",
+    "benchmark:conversation": "npm run benchmark:conversation -w @codex-claw/shared && npm --prefix ../codex-app-sdk-modular-packages run benchmark:conversation",
     "test:watch": "npm run test:watch -w @codex-claw/electron",
     "clawd:start": "node scripts/clawd-launch-agent.mjs start",
     "clawd:stop": "node scripts/clawd-launch-agent.mjs stop",

@@ -34,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-import { renderCodeBlock } from 'codex-app-sdk/vue';
+import { renderCodeBlock } from '@codex-app-sdk/vue';
 
 withDefaults(defineProps<{
   content: string;

@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AddSshConnectionInput, AppCommand, AppPluginStatus, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DesktopUpdateStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
+import type { AddSshConnectionInput, AppCommand, AppPluginStatus, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DesktopUpdateStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RendererSendPromptOptions, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/shared/contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '@codex-claw/shared/ipc';
-import { exposeCodexNativeRendererApi, TypedIpcRenderer } from 'codex-app-sdk/electron/preload';
+import { exposeCodexNativeRendererApi, TypedIpcRenderer } from '@codex-app-sdk/electron/preload';
 
 const ipc = new TypedIpcRenderer<CodexClawIpcRequests, CodexClawIpcEvents>(ipcRenderer);
 
@@ -99,8 +99,8 @@ const api: CodexClawApi = {
   setAgentGoal: (agentId: string, objective: string) => ipc.invoke(ipcChannels.setAgentGoal, agentId, objective),
   clearAgentGoal: (agentId: string) => ipc.invoke(ipcChannels.clearAgentGoal, agentId),
   setAgentApprovalPreset: (agentId: string, preset: ApprovalPreset) => ipc.invoke(ipcChannels.setAgentApprovalPreset, agentId, preset),
-  sendPrompt: (agentId: string, prompt: string, options?: SendPromptOptions) => ipc.invoke(ipcChannels.sendPrompt, agentId, prompt, options),
-  steerPrompt: (agentId: string, prompt: string, options?: SendPromptOptions) => ipc.invoke(ipcChannels.steerPrompt, agentId, prompt, options),
+  sendPrompt: (agentId: string, prompt: string, options?: RendererSendPromptOptions) => ipc.invoke(ipcChannels.sendPrompt, agentId, prompt, options),
+  steerPrompt: (agentId: string, prompt: string, options?: RendererSendPromptOptions) => ipc.invoke(ipcChannels.steerPrompt, agentId, prompt, options),
   deleteQueuedPrompt: (agentId: string, promptId: string) => ipc.invoke(ipcChannels.deleteQueuedPrompt, agentId, promptId),
   steerQueuedPrompt: (agentId: string, promptId: string) => ipc.invoke(ipcChannels.steerQueuedPrompt, agentId, promptId),
   interruptAgent: (agentId: string) => ipc.invoke(ipcChannels.interruptAgent, agentId),

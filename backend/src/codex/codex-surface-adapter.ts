@@ -24,7 +24,7 @@ import type {
 import type { BackendEvent } from '@codex-claw/shared/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/shared/backend-capabilities';
 import { codexApprovalPresetFromDefaults } from '@codex-claw/shared/codex-approval-presets';
-import type { CodexConversation, CodexSurface } from 'codex-app-sdk/node';
+import type { CodexConversation, CodexSurface } from '@codex-app-sdk/backend';
 import type {
   CodexConversationEvent,
   CodexConversationSnapshot,
@@ -39,7 +39,7 @@ import type {
   SurfaceMessagePart,
   SurfaceMessageToolPart,
   SurfaceMessageToolPartUpdate,
-} from 'codex-app-sdk/surface';
+} from '@codex-app-sdk/core/surface';
 
 type AdapterListener = (event: BackendEvent) => void;
 

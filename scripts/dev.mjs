@@ -38,7 +38,7 @@ const electronDev = start('npm', ['run', 'dev:electron'], {
     CODEX_CLAW_BACKEND_WATCH_FILE: '',
     CODEX_CLAW_ASSETS_PATH: path.join(rootDir, 'electron', 'assets'),
     CODEX_CLAW_BUNDLED_CODEX_PATH: path.join(rootDir, 'electron', 'resources', 'codex', 'codex'),
-    CODEX_APP_SDK_ASSETS_PATH: path.join(rootDir, 'node_modules', 'codex-app-sdk', 'assets'),
+    CODEX_APP_SDK_ASSETS_PATH: path.join(rootDir, 'node_modules', '@codex-app-sdk', 'backend', 'assets'),
   },
 });
 

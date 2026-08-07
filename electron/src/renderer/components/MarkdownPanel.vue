@@ -30,7 +30,7 @@
 </template>
 
 <script setup lang="ts">
-import { renderMarkdown } from 'codex-app-sdk/vue';
+import { renderMarkdown } from '@codex-app-sdk/vue';
 
 withDefaults(defineProps<{
   content: string;

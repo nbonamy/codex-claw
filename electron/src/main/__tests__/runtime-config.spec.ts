@@ -126,7 +126,7 @@ describe('runtime config', () => {
       "CODEX_CLAW_BUNDLED_CODEX_PATH: path.join(rootDir, 'electron', 'resources', 'codex', 'codex')",
     );
     expect(devScript).toContain(
-      "CODEX_APP_SDK_ASSETS_PATH: path.join(rootDir, 'node_modules', 'codex-app-sdk', 'assets')",
+      "CODEX_APP_SDK_ASSETS_PATH: path.join(rootDir, 'node_modules', '@codex-app-sdk', 'backend', 'assets')",
     );
   });
 
@@ -183,8 +183,8 @@ describe('runtime config', () => {
     ].map((filePath) => readFileSync(path.join(repositoryRoot, filePath), 'utf8'));
 
     expect(devScript).toContain("process.env.CODEX_APP_SDK_SOURCE = '1'");
-    expect(aliasConfig).toContain("'codex-app-sdk/vue': path.join(sdkSourceRoot, 'vue/index.ts')");
-    expect(aliasConfig).toContain("'codex-app-sdk/styles.css': path.join(sdkSourceRoot, 'vue/styles.css')");
+    expect(aliasConfig).toContain("'@codex-app-sdk/vue': path.join(sdkSourceRoot, 'packages/vue/src/index.ts')");
+    expect(aliasConfig).toContain("'@codex-app-sdk/vue/styles.css': path.join(sdkSourceRoot, 'packages/vue/src/styles.css')");
     for (const viteConfig of viteConfigs) {
       expect(viteConfig).toContain('useSdkSources');
       expect(viteConfig).toContain('sdkSourceAliases');
