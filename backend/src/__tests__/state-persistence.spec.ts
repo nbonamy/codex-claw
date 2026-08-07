@@ -106,6 +106,8 @@ describe('AppStatePersistence', () => {
       plan: {
         threadId: 'thread-dina',
         turnId: 'turn-plan',
+        kind: 'execution',
+        status: 'inProgress',
         explanation: 'Current plan',
         steps: [
           { step: 'Inspect composer', status: 'completed' },
@@ -166,6 +168,8 @@ describe('AppStatePersistence', () => {
     expect(writtenAgent.plan).toStrictEqual({
       threadId: 'thread-dina',
       turnId: 'turn-plan',
+      kind: 'execution',
+      status: 'inProgress',
       explanation: 'Current plan',
       steps: [
         { step: 'Inspect composer', status: 'completed' },
@@ -245,6 +249,8 @@ describe('AppStatePersistence', () => {
       plan: {
         threadId: 'thread-dina',
         turnId: 'turn-plan',
+        kind: 'execution',
+        status: 'inProgress',
         explanation: 'Current plan',
         steps: [
           { step: 'Inspect composer', status: 'completed' },
@@ -333,6 +339,8 @@ describe('AppStatePersistence', () => {
       plan: {
         threadId: 'thread-dina',
         turnId: 'turn-plan',
+        kind: 'execution',
+        status: 'inProgress',
         explanation: 'Current plan',
         steps: [
           { step: 'Inspect composer', status: 'completed' },
@@ -715,7 +723,11 @@ describe('AppStatePersistence', () => {
       theme: defaultThemeSettings,
     });
 
-    expect(restored.agents[0].plan?.steps).toStrictEqual([]);
+    expect(restored.agents[0].plan).toMatchObject({
+      kind: 'execution',
+      status: 'incomplete',
+      steps: [],
+    });
   });
 
   it('drops invalid persisted context usage', () => {

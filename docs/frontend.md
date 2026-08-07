@@ -134,8 +134,10 @@ implemented:
   while a turn is running and retained in the agent snapshot; the plan can be
   dismissed and reopened from the header list control; the floating card uses
   a stable Task list heading and presents the backend explanation as a
-  separate, full-width title clamped to two lines below the header; completed
-  Plan-mode proposals continue to use the explicit review panel;
+  separate, full-width title clamped to two lines below the header; their
+  app-owned lifecycle is derived from per-step state and finalized as
+  completed, incomplete, interrupted, or failed when the turn ends, while
+  completed Plan-mode proposals continue to use the explicit review panel;
 - Claw-owned MCP activity keeps its phase-aware, target-aware titles and uses
   host-provided semantic icons for browser, every bundled Computer Use action,
   collaboration, workspace, Markdown, and work-item tools while unrelated MCP

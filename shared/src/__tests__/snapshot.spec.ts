@@ -29,6 +29,8 @@ describe('snapshot reducer', () => {
     snapshot.agents[0].plan = {
       threadId: 'thread-old',
       turnId: 'turn-plan',
+      kind: 'execution',
+      status: 'inProgress',
       explanation: 'Old plan',
       steps: [{ step: 'Do old work', status: 'pending' }],
       markdown: 'Old plan\n- [ ] Do old work',
@@ -162,6 +164,8 @@ describe('snapshot reducer', () => {
     agent.plan = {
       threadId: 'thread-old',
       turnId: 'turn-plan',
+      kind: 'execution',
+      status: 'inProgress',
       explanation: 'Old plan',
       steps: [{ step: 'Do old work', status: 'pending' }],
       markdown: 'Old plan\n- [ ] Do old work',
@@ -2868,6 +2872,7 @@ describe('snapshot reducer', () => {
       turnId: 'turn-plan',
       type: 'turn.planUpdated',
       payload: {
+        status: 'completed',
         explanation: 'Current plan',
         plan: [
           { step: 'Inspect composer', status: 'completed' },
@@ -2880,6 +2885,8 @@ describe('snapshot reducer', () => {
     expect(snapshot.agents[0].plan).toStrictEqual({
       threadId: 'thread-1',
       turnId: 'turn-plan',
+      kind: 'execution',
+      status: 'inProgress',
       explanation: 'Current plan',
       steps: [
         { step: 'Inspect composer', status: 'completed' },
@@ -2911,6 +2918,69 @@ describe('snapshot reducer', () => {
     expect(JSON.stringify(snapshot.messages[0].parts)).not.toContain('Current plan');
   });
 
+  it('derives execution plan completion only from completed steps', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 0,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-plan',
+      type: 'turn.planUpdated',
+      payload: {
+        status: 'completed',
+        explanation: 'Current plan',
+        plan: [
+          { step: 'Inspect composer', status: 'completed' },
+          { step: 'Wire Plan mode', status: 'completed' },
+        ],
+      },
+      occurredAt: '2026-06-05T00:00:00.000Z',
+    });
+
+    expect(snapshot.agents[0].plan).toMatchObject({
+      kind: 'execution',
+      status: 'completed',
+    });
+  });
+
+  it.each([
+    ['completed turn with pending work', { status: 'completed' }, 'incomplete'],
+    ['provider-neutral interrupted turn', { status: 'interrupted' }, 'interrupted'],
+    ['nested provider interrupted turn', { turn: { status: 'interrupted' } }, 'interrupted'],
+    ['failed turn', { status: 'failed' }, 'failed'],
+  ] as const)('finalizes an execution plan for a %s', (_scenario, turnPayload, expectedStatus) => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 0,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-plan',
+      type: 'turn.planUpdated',
+      payload: {
+        explanation: 'Current plan',
+        plan: [{ step: 'Finish the work', status: 'inProgress' }],
+      },
+      occurredAt: '2026-06-05T00:00:00.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-plan',
+      type: 'turn.completed',
+      payload: turnPayload,
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(snapshot.agents[0].plan).toMatchObject({
+      kind: 'execution',
+      status: expectedStatus,
+      updatedAt: '2026-06-05T00:00:01.000Z',
+    });
+  });
+
   it('sanitizes partial plan updates before storing them on the agent', () => {
     const snapshot = createInitialSnapshot();
 
@@ -2934,6 +3004,8 @@ describe('snapshot reducer', () => {
     expect(snapshot.agents[0].plan).toStrictEqual({
       threadId: 'thread-1',
       turnId: 'turn-plan',
+      kind: 'execution',
+      status: 'inProgress',
       explanation: '',
       steps: [
         { step: 'Use fallback status', status: 'pending' },
@@ -3001,9 +3073,27 @@ describe('snapshot reducer', () => {
     expect(snapshot.agents[0].plan).toStrictEqual({
       threadId: 'thread-1',
       turnId: 'turn-plan',
+      kind: 'proposed',
+      status: 'completed',
       explanation: '',
       steps: [],
       markdown: '# Final Plan\n\n- final step',
+      updatedAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 3,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-plan',
+      type: 'turn.completed',
+      payload: { status: 'interrupted' },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+
+    expect(snapshot.agents[0].plan).toMatchObject({
+      kind: 'proposed',
+      status: 'completed',
       updatedAt: '2026-06-05T00:00:02.000Z',
     });
   });
@@ -3062,6 +3152,8 @@ describe('snapshot reducer', () => {
     expect(snapshot.agents[0].plan).toStrictEqual({
       threadId: 'thread-1',
       turnId: 'turn-plan',
+      kind: 'proposed',
+      status: 'completed',
       explanation: '',
       steps: [],
       markdown: '# Dummy Plan\n\n- [ ] Do nothing',
@@ -3090,6 +3182,37 @@ describe('snapshot reducer', () => {
         },
       }),
     ]);
+  });
+
+  it('completes a proposed plan even when the final markdown is unchanged', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 0,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-plan',
+      type: 'turn.proposedPlanDelta',
+      payload: { delta: '# Plan' },
+      occurredAt: '2026-06-05T00:00:00.000Z',
+    });
+    expect(snapshot.agents[0].plan?.status).toBe('inProgress');
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-plan',
+      type: 'turn.proposedPlanCompleted',
+      payload: { markdown: '# Plan' },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(snapshot.agents[0].plan).toMatchObject({
+      kind: 'proposed',
+      status: 'completed',
+      updatedAt: '2026-06-05T00:00:01.000Z',
+    });
   });
 
   it('keeps text around proposed plan tags while hiding the plan body from chat', () => {

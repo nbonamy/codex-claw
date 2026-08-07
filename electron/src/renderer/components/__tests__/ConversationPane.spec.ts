@@ -49,6 +49,8 @@ const messages: RendererMessage[] = [
 const executionPlan: ThreadPlan = {
   threadId: 'thread-plan',
   turnId: 'turn-plan',
+  kind: 'execution',
+  status: 'inProgress',
   explanation: 'Current execution plan',
   steps: [{ step: 'Implement the fix', status: 'inProgress' }],
   markdown: 'Current execution plan\n- [ ] Implement the fix',

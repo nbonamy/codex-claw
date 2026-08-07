@@ -648,6 +648,11 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   }
 
   if (event.type === 'turn.completed' && event.turnId) {
+    const agent = findAgent(snapshot, event.agentId);
+    if (agent?.plan?.kind === 'execution' && agent.plan.turnId === event.turnId) {
+      agent.plan.status = finalizedThreadPlanStatus(agent.plan, event.payload);
+      agent.plan.updatedAt = event.occurredAt;
+    }
     completeAssistantMessage(snapshot, event.agentId, event.turnId);
     setAgentStatus(snapshot, event.agentId, { type: 'idle' });
     return;
@@ -704,11 +709,36 @@ function threadPlan(payload: unknown, threadId: string, turnId: string, updatedA
   return {
     threadId,
     turnId,
+    kind: 'execution',
+    status: executionThreadPlanStatus(steps),
     explanation,
     steps,
     markdown,
     updatedAt,
   };
+}
+
+function executionThreadPlanStatus(steps: ThreadPlanStep[]): ThreadPlan['status'] {
+  return steps.length > 0 && steps.every((step) => step.status === 'completed')
+    ? 'completed'
+    : 'inProgress';
+}
+
+function finalizedThreadPlanStatus(plan: ThreadPlan, payload: unknown): ThreadPlan['status'] {
+  const turnStatus = turnCompletionStatus(payload);
+  if (turnStatus === 'interrupted') return 'interrupted';
+  if (turnStatus === 'failed') return 'failed';
+  return plan.steps.length > 0 && plan.steps.every((step) => step.status === 'completed')
+    ? 'completed'
+    : 'incomplete';
+}
+
+function turnCompletionStatus(payload: unknown): string {
+  if (!isRecord(payload)) return '';
+  if (typeof payload.status === 'string') return payload.status;
+  return isRecord(payload.turn) && typeof payload.turn.status === 'string'
+    ? payload.turn.status
+    : '';
 }
 
 function isThreadPlanStepStatus(value: unknown): value is ThreadPlanStep['status'] {
@@ -733,7 +763,7 @@ function appendAgentPlanMarkdownDelta(
   }
 
   const existingMarkdown = agent.plan?.turnId === turnId ? agent.plan.markdown : '';
-  setAgentPlanMarkdown(agent, threadId, turnId, `${existingMarkdown}${payload.delta}`, updatedAt, { trim: false });
+  setAgentPlanMarkdown(agent, threadId, turnId, `${existingMarkdown}${payload.delta}`, updatedAt, 'inProgress', { trim: false });
 }
 
 function updateAgentPlanMarkdown(
@@ -753,23 +783,30 @@ function updateAgentPlanMarkdown(
     return;
   }
 
-  setAgentPlanMarkdown(agent, threadId, turnId, payload.markdown, updatedAt);
+  setAgentPlanMarkdown(agent, threadId, turnId, payload.markdown, updatedAt, 'completed');
 }
 
-function setAgentPlanMarkdown(agent: Agent, threadId: string, turnId: string, markdown: string, updatedAt: string, options: { trim?: boolean } = {}): void {
+function setAgentPlanMarkdown(agent: Agent, threadId: string, turnId: string, markdown: string, updatedAt: string, status: ThreadPlan['status'], options: { trim?: boolean } = {}): void {
   const content = markdown.trim();
   if (!content) {
     return;
   }
   const nextMarkdown = options.trim === false ? markdown : content;
 
-  if (agent.plan?.turnId === turnId && agent.plan.markdown === nextMarkdown) {
+  if (
+    agent.plan?.turnId === turnId &&
+    agent.plan.kind === 'proposed' &&
+    agent.plan.status === status &&
+    agent.plan.markdown === nextMarkdown
+  ) {
     return;
   }
 
   agent.plan = {
     threadId,
     turnId,
+    kind: 'proposed',
+    status,
     explanation: '',
     steps: [],
     markdown: nextMarkdown,
@@ -813,7 +850,7 @@ function appendAssistantDeltaWithPlanFilter(
         appendAgentPlanMarkdownText(agent, threadId, turnId, planDelta, updatedAt);
       }
       if (closeIndex >= 0 && agent.plan?.turnId === turnId) {
-        setAgentPlanMarkdown(agent, threadId, turnId, agent.plan.markdown, updatedAt);
+        setAgentPlanMarkdown(agent, threadId, turnId, agent.plan.markdown, updatedAt, 'completed');
       }
       if (agent.plan?.turnId === turnId) {
         upsertPlanProgressToolPart(snapshot, agentId, turnId, agent.plan.markdown, closeIndex >= 0 ? 'completed' : 'running', operation, closeIndex < 0);
@@ -847,7 +884,7 @@ function appendAssistantDeltaWithPlanFilter(
 
 function appendAgentPlanMarkdownText(agent: Agent, threadId: string, turnId: string, delta: string, updatedAt: string): void {
   const existingMarkdown = agent.plan?.turnId === turnId ? agent.plan.markdown : '';
-  setAgentPlanMarkdown(agent, threadId, turnId, `${existingMarkdown}${delta}`, updatedAt, { trim: false });
+  setAgentPlanMarkdown(agent, threadId, turnId, `${existingMarkdown}${delta}`, updatedAt, 'inProgress', { trim: false });
 }
 
 function lowerIndexOf(value: string, search: string): number {

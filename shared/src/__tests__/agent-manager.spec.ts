@@ -377,6 +377,8 @@ describe('agent-manager', () => {
     agent.plan = {
       threadId: 'thread-old',
       turnId: 'turn-plan',
+      kind: 'execution',
+      status: 'inProgress',
       explanation: 'Old plan',
       steps: [{ step: 'Do old work', status: 'pending' }],
       markdown: 'Old plan\n- [ ] Do old work',
@@ -430,6 +432,8 @@ describe('agent-manager', () => {
     agent.plan = {
       threadId: 'thread-old',
       turnId: 'turn-plan',
+      kind: 'execution',
+      status: 'inProgress',
       explanation: 'Old plan',
       steps: [{ step: 'Do old work', status: 'pending' }],
       markdown: 'Old plan\n- [ ] Do old work',

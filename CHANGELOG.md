@@ -23,6 +23,9 @@ All notable Codex Claw changes are recorded here.
 - Resource sharing changes now show a blocking reconnect overlay, close hosted
   browser panes, and reload only the renderer so conversations, event cursors,
   and skill catalogs reconnect cleanly to the restarted backend.
+- Execution task lists now distinguish active, completed, incomplete,
+  interrupted, and failed outcomes instead of remaining indefinitely active
+  after a turn ends.
 - Passive Computer Use checks, app discovery, permission requests, and
   screenshots no longer display the blue virtual cursor over the desktop.
 

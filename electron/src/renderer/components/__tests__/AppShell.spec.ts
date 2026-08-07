@@ -134,6 +134,8 @@ describe('AppShell', () => {
     const plan = {
       threadId: 'thread-plan',
       turnId: 'turn-plan',
+      kind: 'execution' as const,
+      status: 'inProgress' as const,
       explanation: 'Current execution plan',
       steps: [{ step: 'Implement the fix', status: 'inProgress' as const }],
       markdown: 'Current execution plan\n- [ ] Implement the fix',
@@ -176,6 +178,8 @@ describe('AppShell', () => {
     activeAgent.plan = {
       threadId: 'thread-persisted',
       turnId: 'turn-old-plan',
+      kind: 'execution',
+      status: 'completed',
       explanation: 'Old execution plan',
       steps: [{ step: 'Old completed work', status: 'completed' }],
       markdown: 'Old execution plan\n- [x] Old completed work',

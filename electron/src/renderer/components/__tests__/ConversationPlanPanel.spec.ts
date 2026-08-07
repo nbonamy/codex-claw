@@ -7,6 +7,8 @@ import { i18n } from '../../i18n';
 const plan: ThreadPlan = {
   threadId: 'thread-plan',
   turnId: 'turn-plan',
+  kind: 'execution',
+  status: 'inProgress',
   explanation: 'Ship the focused fix',
   steps: [
     { step: 'Inspect the event flow', status: 'completed' },

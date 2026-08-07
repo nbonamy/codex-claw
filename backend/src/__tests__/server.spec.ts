@@ -146,6 +146,8 @@ describe('ClawBackendServer', () => {
       plan: {
         threadId: 'thread-old',
         turnId: 'turn-old',
+        kind: 'execution',
+        status: 'incomplete',
         explanation: 'Old plan',
         steps: [{ step: 'Old step', status: 'pending' }],
         markdown: 'Old plan',

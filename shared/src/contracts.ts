@@ -100,6 +100,8 @@ export type ThreadGoal = {
 };
 
 export type ThreadPlanStepStatus = 'pending' | 'inProgress' | 'completed';
+export type ThreadPlanKind = 'execution' | 'proposed';
+export type ThreadPlanStatus = 'inProgress' | 'completed' | 'incomplete' | 'interrupted' | 'failed';
 
 export type ThreadPlanStep = {
   step: string;
@@ -109,6 +111,8 @@ export type ThreadPlanStep = {
 export type ThreadPlan = {
   threadId: string;
   turnId: string;
+  kind: ThreadPlanKind;
+  status: ThreadPlanStatus;
   explanation: string;
   steps: ThreadPlanStep[];
   markdown: string;

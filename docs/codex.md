@@ -521,11 +521,13 @@ Mode notifications stay app-owned:
 - `thread/goal/updated` and `thread/goal/cleared` become app-owned goal events
   so the agent metadata and shelf stay in sync.
 - `turn/plan/updated` is the structured plan artifact event. `clawd` stores it as
-  `agent.plan`, persists it to `state.json`, and opens it in the markdown side
-  panel when the corresponding turn completes.
+  an execution-kind `agent.plan` and derives completion only when every step is
+  complete. `turn/completed` finalizes any remaining execution plan as
+  incomplete, interrupted, or failed before it is persisted to `state.json`.
 - Codex plan-mode output is a separate `ThreadItem` with `type: "plan"`, not a
   normal assistant message. `clawd` stores `item/plan/delta` as a draft
-  `agent.plan` artifact only; the app-server marks those deltas experimental.
+  proposed-kind `agent.plan` artifact only; the app-server marks those deltas
+  experimental. Its item status is not execution task-list status.
 - `item/completed` with `item.type === "plan"` is authoritative. `clawd` overwrites
   any draft plan with the completed item text, persists it to `state.json`, and
   opens it in the markdown side panel when the corresponding turn completes.

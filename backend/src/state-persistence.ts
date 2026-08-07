@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Loop, LoopAction, LoopExecutionCreatedAgent, LoopExecutionLogEntry, LoopExecutionStatus, LoopSourceConfiguration, LoopTeamTarget, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, Team, ThreadGoal, ThreadPlan, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/shared/contracts';
+import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Loop, LoopAction, LoopExecutionCreatedAgent, LoopExecutionLogEntry, LoopExecutionStatus, LoopSourceConfiguration, LoopTeamTarget, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/shared/contracts';
 import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '@codex-claw/shared/codex-approval-presets';
 import { normalizeGeneralSettings, normalizeSourceFolderState, normalizeThemeSettings } from '@codex-claw/shared/settings';
 import { createEmptySnapshot } from '@codex-claw/shared/snapshot';
@@ -261,14 +261,38 @@ function sanitizeThreadPlan(value: unknown): ThreadPlan | undefined {
     return undefined;
   }
 
+  const kind = isThreadPlanKind(value.kind)
+    ? value.kind
+    : (steps.length > 0 || value.explanation.trim() ? 'execution' : 'proposed');
+  const status = isThreadPlanStatus(value.status)
+    ? value.status
+    : legacyThreadPlanStatus(kind, steps);
+
   return {
     threadId: value.threadId,
     turnId: value.turnId,
+    kind,
+    status,
     explanation: value.explanation,
     steps,
     markdown: value.markdown,
     updatedAt: value.updatedAt,
   };
+}
+
+function isThreadPlanKind(value: unknown): value is ThreadPlanKind {
+  return value === 'execution' || value === 'proposed';
+}
+
+function isThreadPlanStatus(value: unknown): value is ThreadPlanStatus {
+  return value === 'inProgress' || value === 'completed' || value === 'incomplete' || value === 'interrupted' || value === 'failed';
+}
+
+function legacyThreadPlanStatus(kind: ThreadPlanKind, steps: ThreadPlanStep[]): ThreadPlanStatus {
+  if (kind === 'proposed') return 'completed';
+  return steps.length > 0 && steps.every((step) => step.status === 'completed')
+    ? 'completed'
+    : 'incomplete';
 }
 
 function sanitizeThreadPlanStep(value: unknown): ThreadPlanStep | null {

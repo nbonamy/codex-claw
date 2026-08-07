@@ -338,6 +338,12 @@ Event `type` values are the app-owned `MainToRendererEvent['type']` union from
 - work backlog: `workBacklog.assignmentUpdated`;
 - failures: `error`.
 
+Execution task-list lifecycle is app-owned: `turn.planUpdated` derives
+completion only when every structured step is completed, and `turn.completed`
+finalizes remaining execution plans as incomplete, interrupted, or failed.
+Proposed Plan-mode documents use the separate proposed-plan events and are not
+interpreted as execution task-list completion.
+
 Clients must ignore unknown event types and refresh via `snapshot/get` if they
 detect sequence gaps.
 
