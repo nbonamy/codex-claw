@@ -503,6 +503,8 @@ export function useAppState() {
     rendererWindowFocused.value = focused;
     if (focused && snapshot.value.activeAgentId) {
       markAgentRead(snapshot.value.activeAgentId);
+    } else if (focused) {
+      syncDockBadge();
     }
   }
 
@@ -2077,10 +2079,11 @@ function markAgentsUnread(agentIds: readonly string[]): void {
 }
 
 function markAgentRead(agentId: string): void {
-  if (!unreadAgentIdSet.value.has(agentId)) return;
-  const next = new Set(unreadAgentIdSet.value);
-  next.delete(agentId);
-  unreadAgentIdSet.value = next;
+  if (unreadAgentIdSet.value.has(agentId)) {
+    const next = new Set(unreadAgentIdSet.value);
+    next.delete(agentId);
+    unreadAgentIdSet.value = next;
+  }
   syncDockBadge();
 }
 

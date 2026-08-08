@@ -1927,6 +1927,10 @@ describe('useAppState', () => {
     state.setRendererWindowFocused(true);
     await state.loadSnapshot();
 
+    setDockBadgeCount.mockClear();
+    state.setRendererWindowFocused(true);
+    expect(setDockBadgeCount).toHaveBeenLastCalledWith(0);
+
     listeners[0]?.({
       seq: 1,
       agentId: 'agent-jesse',
@@ -1942,6 +1946,10 @@ describe('useAppState', () => {
 
     await state.selectAgent('agent-jesse');
     expect(state.unreadAgentIds.value).toStrictEqual([]);
+    expect(setDockBadgeCount).toHaveBeenLastCalledWith(0);
+
+    setDockBadgeCount.mockClear();
+    await state.selectAgent('agent-jesse');
     expect(setDockBadgeCount).toHaveBeenLastCalledWith(0);
 
     state.setRendererWindowFocused(false);
