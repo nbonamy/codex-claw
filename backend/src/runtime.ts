@@ -20,6 +20,7 @@ import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
 import { WorkIntegrationManager } from './work-integrations/manager';
 import { warnMain } from './log';
 import { initializeCodexResourceSharing } from './codex-resource-sharing';
+import { loadPluginStatus } from './plugin-status';
 
 export type ClawdClientRequest = <Result>(method: string, params?: unknown) => Promise<Result>;
 
@@ -41,6 +42,12 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   const snapshot = await loadBackendSnapshot();
   await initializeCodexResourceSharing(snapshot.general.shareCodexSkillsAndPlugins);
   await ensureBackendCodexHome();
+  let pluginStatus = await loadPluginStatus();
+  const pluginSettings = () => ({
+    ...(snapshot.general.plugins ?? { computerUseEnabled: false, chromeEnabled: false }),
+    computerUseEnabled: computerUseAvailable && snapshot.general.plugins?.computerUseEnabled === true,
+    chromeEnabled: pluginStatus.chromeEnabled,
+  });
   const mcpService = new ClawMcpService({
     snapshot,
     computerUse: computerUseAvailable ? {
@@ -59,10 +66,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   const backendDrivers = createDefaultBackendDrivers({
     clawMcpServerUrl: mcpServerUrl,
     generalSettings: snapshot.general,
-    pluginSettings: () => ({
-      ...(snapshot.general.plugins ?? { computerUseEnabled: false, chromeEnabled: false }),
-      computerUseEnabled: computerUseAvailable && snapshot.general.plugins?.computerUseEnabled === true,
-    }),
+    pluginSettings,
   });
   const driverRpc = new BackendDriverRpc(backendDrivers);
   let server: ClawBackendServer;
@@ -120,6 +124,10 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     onEvent: options.emitEvent,
     onBackendEventApplied: (event) => mcpService.handleBackendEvent(event),
     saveSnapshot: (nextSnapshot) => saveBackendSnapshot(nextSnapshot),
+    inspectPluginStatus: async () => {
+      pluginStatus = await loadPluginStatus();
+      return pluginStatus;
+    },
     sendAgentMessage: (fromAgentId, toAgentId, content) => mcpService.sendMessage(fromAgentId, toAgentId, content),
     workIntegrations,
     loopRunner,

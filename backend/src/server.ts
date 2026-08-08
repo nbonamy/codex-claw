@@ -4,7 +4,7 @@ import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput, updateAgentOpenInApplication } from '@codex-claw/core/snapshot';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitStatus, AgentHistoryLoadResult, AgentStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CodexResourceSharingStatus, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitStatus, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CodexResourceSharingStatus, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/core/backend-driver';
@@ -46,6 +46,7 @@ export type ClawBackendServerOptions = {
   sendAgentMessage?: (fromAgentId: string, toAgentId: string, content: string) => void;
   configureCodexResourceSharing?: (input: SetCodexResourceSharingInput) => Promise<void>;
   inspectCodexResourceSharing?: (enabled: boolean) => Promise<CodexResourceSharingStatus>;
+  inspectPluginStatus?: () => Promise<AppPluginStatus>;
 };
 
 export type SystemPermissionsPort = {
@@ -91,6 +92,7 @@ export class ClawBackendServer {
   private readonly sendAgentMessage?: (fromAgentId: string, toAgentId: string, content: string) => void;
   private readonly configureCodexResourceSharing: (input: SetCodexResourceSharingInput) => Promise<void>;
   private readonly inspectCodexResourceSharing: (enabled: boolean) => Promise<CodexResourceSharingStatus>;
+  private readonly inspectPluginStatus: () => Promise<AppPluginStatus>;
   private readonly clientRequestOwners = new Map<string, { backend: AgentBackend; remoteConnectionId?: string }>();
   private readonly remoteSnapshots = new Map<string, AppSnapshot>();
   private readonly queuedPromptRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -116,6 +118,7 @@ export class ClawBackendServer {
     this.sendAgentMessage = options.sendAgentMessage;
     this.configureCodexResourceSharing = options.configureCodexResourceSharing ?? setCodexResourceSharing;
     this.inspectCodexResourceSharing = options.inspectCodexResourceSharing ?? getCodexResourceSharingStatus;
+    this.inspectPluginStatus = options.inspectPluginStatus ?? loadPluginStatus;
     this.transcriptRetention = new AgentTranscriptRetention({
       snapshot: this.snapshot,
       onEvicted: (agentId) => this.releaseEvictedAgentTranscript(agentId),
@@ -1168,7 +1171,7 @@ export class ClawBackendServer {
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.settingsPluginStatusGet:
-        return createClawRpcResult(message.id, await loadPluginStatus());
+        return createClawRpcResult(message.id, await this.inspectPluginStatus());
       case backendMethods.codexAuthenticationGet:
         return createClawRpcResult(
           message.id,

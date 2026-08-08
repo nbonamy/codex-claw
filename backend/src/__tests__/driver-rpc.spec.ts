@@ -25,6 +25,19 @@ describe('BackendDriverRpc', () => {
     }
   });
 
+  it('uses the live plugin settings for Codex transport overrides', () => {
+    const pluginSettings = vi.fn().mockReturnValue({ computerUseEnabled: false, chromeEnabled: true });
+
+    const options = codexClawSurfaceOptions({ pluginSettings });
+
+    expect(options).toMatchObject({
+      transport: {
+        configOverrides: expect.arrayContaining(['mcp_servers.node_repl.enabled=true']),
+      },
+    });
+    expect(pluginSettings).toHaveBeenCalledOnce();
+  });
+
   it('routes model requests to the agent backend driver', async () => {
     const agent = createAgent();
     const listModels = vi.fn().mockResolvedValue([{ id: 'gpt-test', name: 'GPT Test' }]);

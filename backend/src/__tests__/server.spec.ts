@@ -29,6 +29,25 @@ describe('ClawBackendServer', () => {
     });
   });
 
+  it('reads plugin status through the runtime-owned inspector', async () => {
+    const inspectPluginStatus = vi.fn().mockResolvedValue({ chromeEnabled: true });
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      inspectPluginStatus,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'plugin-status',
+      method: backendMethods.settingsPluginStatusGet,
+    })).resolves.toStrictEqual({
+      jsonrpc: '2.0',
+      id: 'plugin-status',
+      result: { chromeEnabled: true },
+    });
+    expect(inspectPluginStatus).toHaveBeenCalledOnce();
+  });
+
   it('rejects malformed mutation payloads at the backend protocol boundary', async () => {
     const server = new ClawBackendServer({
       version: 'test-version',

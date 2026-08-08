@@ -6,7 +6,9 @@ import { codexClawDeveloperInstructions } from './agent-prompts';
 export function buildCodexClawMcpConfigOverrides(pluginSettings: AppPluginSettings = defaultPluginSettings): string[] {
   return [
     configOverride('features.apply_patch_streaming_events', true),
-    configOverride('mcp_servers.node_repl.enabled', pluginSettings.chromeEnabled),
+    ...(pluginSettings.chromeEnabled
+      ? [configOverride('mcp_servers.node_repl.enabled', true)]
+      : []),
   ];
 }
 
@@ -23,7 +25,9 @@ export function buildCodexClawThreadConfig(
     config: {
       'mcp_servers.codex_claw.url': agentScopedMcpUrl(mcpServerUrl, agent.id),
       'mcp_servers.codex_claw.default_tools_approval_mode': 'approve',
-      'mcp_servers.node_repl.enabled': pluginSettings.chromeEnabled,
+      ...(pluginSettings.chromeEnabled
+        ? { 'mcp_servers.node_repl.enabled': true }
+        : {}),
     },
     developerInstructions: codexClawDeveloperInstructions(agent, pluginSettings),
   };

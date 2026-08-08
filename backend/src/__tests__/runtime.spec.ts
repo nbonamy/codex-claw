@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   loadBackendSnapshot: vi.fn(),
   ensureBackendCodexHome: vi.fn(),
   initializeCodexResourceSharing: vi.fn(),
+  loadPluginStatus: vi.fn(),
   saveBackendSnapshot: vi.fn(),
   backendProviderTokensFilePath: vi.fn(),
   mcpStart: vi.fn(),
@@ -66,6 +67,10 @@ vi.mock('../state', () => ({
 
 vi.mock('../codex-resource-sharing', () => ({
   initializeCodexResourceSharing: mocks.initializeCodexResourceSharing,
+}));
+
+vi.mock('../plugin-status', () => ({
+  loadPluginStatus: mocks.loadPluginStatus,
 }));
 
 vi.mock('../mcp/service', () => ({
@@ -162,6 +167,7 @@ type McpOptions = {
 
 type ServerOptions = {
   version: string;
+  inspectPluginStatus(): Promise<{ chromeEnabled: boolean }>;
   onEvent(event: unknown): void;
   onBackendEventApplied(event: unknown): void;
   saveSnapshot(snapshot: unknown): Promise<unknown>;
@@ -213,6 +219,7 @@ describe('clawd runtime', () => {
     mocks.loadBackendSnapshot.mockResolvedValue(mocks.snapshot);
     mocks.ensureBackendCodexHome.mockResolvedValue(undefined);
     mocks.initializeCodexResourceSharing.mockResolvedValue(undefined);
+    mocks.loadPluginStatus.mockResolvedValue({ chromeEnabled: false });
     mocks.saveBackendSnapshot.mockResolvedValue(undefined);
     mocks.backendProviderTokensFilePath.mockReturnValue('/tmp/provider-tokens.json');
     mocks.mcpStart.mockResolvedValue('http://127.0.0.1:4242/mcp');
@@ -305,6 +312,7 @@ describe('clawd runtime', () => {
     mocks.snapshot.general = {
       plugins: { computerUseEnabled: true, chromeEnabled: true },
     };
+    mocks.loadPluginStatus.mockResolvedValueOnce({ chromeEnabled: true });
 
     await createClawdRuntime({
       emitEvent,
@@ -326,6 +334,31 @@ describe('clawd runtime', () => {
       chromeEnabled: true,
     });
     expect(requestClient).not.toHaveBeenCalled();
+  });
+
+  it('uses the installed Chrome plugin status for Codex sessions and refreshes it from settings', async () => {
+    mocks.snapshot.general = {
+      plugins: { computerUseEnabled: false, chromeEnabled: false },
+    };
+    mocks.loadPluginStatus.mockResolvedValueOnce({ chromeEnabled: true });
+
+    await createClawdRuntime({ emitEvent, requestClient, version: '1.2.3' });
+
+    const driverOptions = mocks.createDefaultBackendDrivers.mock.calls[0]?.[0] as {
+      pluginSettings(): { computerUseEnabled: boolean; chromeEnabled: boolean };
+    };
+    expect(driverOptions.pluginSettings()).toStrictEqual({
+      computerUseEnabled: false,
+      chromeEnabled: true,
+    });
+
+    mocks.loadPluginStatus.mockResolvedValueOnce({ chromeEnabled: false });
+    const server = mocks.serverOptions[0] as ServerOptions;
+    await expect(server.inspectPluginStatus()).resolves.toStrictEqual({ chromeEnabled: false });
+    expect(driverOptions.pluginSettings()).toStrictEqual({
+      computerUseEnabled: false,
+      chromeEnabled: false,
+    });
   });
 
   it('runs loop prompts, records new conversations, and emits snapshot updates', async () => {

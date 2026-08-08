@@ -18,7 +18,6 @@ describe('codex-config', () => {
   it('enables the required event feature without creating a partial MCP server config', () => {
     expect(buildCodexClawMcpConfigOverrides()).toStrictEqual([
       'features.apply_patch_streaming_events=true',
-      'mcp_servers.node_repl.enabled=false',
     ]);
   });
 
@@ -34,7 +33,6 @@ describe('codex-config', () => {
       config: {
         'mcp_servers.codex_claw.url': 'http://127.0.0.1:8767/mcp?agentId=agent-dina',
         'mcp_servers.codex_claw.default_tools_approval_mode': 'approve',
-        'mcp_servers.node_repl.enabled': false,
       },
       developerInstructions: expect.stringContaining('Your Codex Claw agent ID is agent-dina.'),
     });

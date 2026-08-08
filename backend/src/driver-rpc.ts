@@ -50,7 +50,9 @@ export function codexClawSurfaceOptions(options: BackendDriverRegistryOptions = 
       command: resolveCodexCommand(options.generalSettings?.codexBinaryPath, {
         bundledPath: process.env.CODEX_CLAW_BUNDLED_CODEX_PATH,
       }),
-      configOverrides: buildCodexClawMcpConfigOverrides(options.generalSettings?.plugins),
+      configOverrides: buildCodexClawMcpConfigOverrides(
+        options.pluginSettings?.() ?? options.generalSettings?.plugins,
+      ),
     },
     extensions: [{
         configureConversation: ({ extensionContext }) => (
