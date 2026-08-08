@@ -37,10 +37,13 @@ export type ClawdRuntime = {
 };
 
 export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<ClawdRuntime> {
+  const codexResourceSharingAvailable = options.features?.codexResourceSharing !== false;
   const computerUseAvailable = options.features?.computerUse !== false;
   const embeddedBrowserAvailable = options.features?.embeddedBrowser !== false;
   const snapshot = await loadBackendSnapshot();
-  await initializeCodexResourceSharing(snapshot.general.shareCodexSkillsAndPlugins);
+  await initializeCodexResourceSharing(
+    codexResourceSharingAvailable && snapshot.general.shareCodexSkillsAndPlugins,
+  );
   await ensureBackendCodexHome();
   let pluginStatus = await loadPluginStatus();
   const pluginSettings = () => ({
@@ -120,6 +123,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   server = new ClawBackendServer({
     version: options.version,
     snapshot,
+    codexResourceSharingAvailable,
     driverRpc,
     onEvent: options.emitEvent,
     onBackendEventApplied: (event) => mcpService.handleBackendEvent(event),

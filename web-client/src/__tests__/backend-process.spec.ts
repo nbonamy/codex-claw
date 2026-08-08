@@ -32,7 +32,7 @@ describe('clawd stdio backend client', () => {
     expect(health).toMatchObject({ id: 1, method: backendMethods.backendHealthGet });
     expect(spawnMock).toHaveBeenNthCalledWith(1, 'node', ['clawd.mjs', '--version'], expect.objectContaining({
       cwd: '/repo',
-      env: expect.objectContaining({ CUSTOM: 'yes', CODEX_CLAW_HOST: 'cloud' }),
+      env: expect.objectContaining({ CUSTOM: 'yes', CODEX_CLAW_HOST: 'managed' }),
       stdio: 'pipe',
     }));
     expect(spawnMock).toHaveBeenNthCalledWith(2, 'node', ['clawd.mjs', '--stdio'], expect.objectContaining({
@@ -230,7 +230,7 @@ function launch(): ClawdEnvironmentLaunchContract {
     commandArgs: ['clawd.mjs'],
     cwd: '/repo',
     expectedVersion: '0.6.1',
-    host: 'cloud',
+    host: 'managed',
   });
 }
 

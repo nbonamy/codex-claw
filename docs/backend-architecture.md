@@ -312,8 +312,8 @@ Package ownership:
   backend internals.
 - `web-client` contains the host-neutral browser client, the versioned browser
   protocol, the gateway session binder, its allowlisted operation mapping, and
-  the Node stdio backend client shared by localhost Web and Cloud. The stdio
-  client preflights `clawd --version`, validates health readiness, correlates
+  the Node stdio backend client shared by localhost Web and managed hosts. The
+  stdio client preflights `clawd --version`, validates health readiness, correlates
   JSON-RPC and events, and performs bounded graceful shutdown. The package
   depends on core and the SDK web transport ports, but owns no HTTP server,
   authentication policy, tenant lookup, or WebSocket URL.
@@ -649,20 +649,21 @@ The exact script names can change, but the shape should stay:
   artifact exposes `--version` for a preflight compatibility check.
 - Managed hosts may additionally set the contract's trusted absolute
   `codexHome`. It is passed as `CODEX_CLAW_CODEX_HOME`, while product state and
-  logs remain under the separate `CODEX_CLAW_HOME`. Cloud uses this to keep a
-  user's provider credentials and conversations at `<user>/.codex` without
-  sharing either directory with another user. When absent, desktop and local
-  Web retain the derived `codex-home` behavior.
+  logs remain under the separate `CODEX_CLAW_HOME`. This lets a host keep
+  provider credentials and conversations separate from product state without
+  sharing either directory between environments. When absent, desktop and
+  local Web retain the derived `codex-home` behavior.
 - A stdio host shuts an environment down by closing stdin or sending SIGTERM,
   waits up to the exported graceful-shutdown timeout, and only then escalates
   with its own process/container policy. Both paths let `clawd` close active
   runtimes and flush logs. Readiness means the health request completed; it
   does not mean a user is authenticated, because identity and environment
-  authorization belong to the Cloud gateway before launch or connection.
-- `CODEX_CLAW_HOST=cloud` selects a fail-closed runtime profile that omits
-  Computer Use and embedded-browser MCP tools regardless of persisted settings.
-  `web` does the same, and any unknown named host also fails closed. Only the
-  absent/explicit `electron` profile enables desktop runtime features.
+  authorization belong to the host gateway before launch or connection.
+- Any unknown `CODEX_CLAW_HOST` value selects a restricted runtime profile that
+  omits Computer Use, embedded-browser MCP tools, and Codex resource sharing
+  regardless of persisted settings. `web` omits the desktop tools while
+  retaining local resource sharing. Only the absent/explicit `electron`
+  profile enables every desktop runtime feature.
 - Before creating backend drivers, `clawd` initializes missing `skills` and
   `plugins` entries from the persisted sharing setting. Sharing is on by
   default and a fresh home links those entries to `~/.codex`. Existing

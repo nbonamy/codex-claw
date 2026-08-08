@@ -5,7 +5,7 @@
 Split Codex Claw into platform-neutral core, reusable Vue UI, Electron host,
 and web host layers while preserving the existing desktop behavior. Keep
 `clawd` as the authoritative backend and establish the transport and tenancy
-seams required for a future multi-user cloud deployment.
+seams required for a future managed multi-user deployment.
 
 ## Architecture
 

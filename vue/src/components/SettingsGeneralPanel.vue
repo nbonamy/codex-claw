@@ -173,6 +173,7 @@
       title-id="settings-general-advanced-title"
     >
       <SettingsRow
+        v-if="clawHostCapabilities.codexResourceSharing"
         as="label"
         title="Share skills and plugins with ChatGPT"
         :description="codexResourceSharingDescription"

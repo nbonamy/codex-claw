@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   assertCompatibleClawdHealth,
   clawdRuntimeFeaturesForHost,
-  cloudClawdRuntimeFeatures,
   createClawdEnvironmentLaunchContract,
   electronClawdRuntimeFeatures,
+  restrictedClawdRuntimeFeatures,
   webClawdRuntimeFeatures,
 } from '../clawd-launch';
 
 describe('clawd environment launch contract', () => {
-  it('describes an isolated authenticated Cloud runtime', () => {
+  it('describes an isolated authenticated managed runtime', () => {
     expect(createClawdEnvironmentLaunchContract({
       backendHome: ' /srv/claw/environments/env-1 ',
       codexHome: ' /srv/claw/users/user-1/.codex ',
@@ -17,14 +17,14 @@ describe('clawd environment launch contract', () => {
       commandArgs: ['/app/clawd.mjs'],
       cwd: '/app',
       expectedVersion: ' 0.6.1 ',
-      host: 'cloud',
+      host: 'managed',
     })).toStrictEqual({
       command: 'node',
       args: ['/app/clawd.mjs', '--stdio'],
       cwd: '/app',
       env: {
         CODEX_CLAW_HOME: '/srv/claw/environments/env-1',
-        CODEX_CLAW_HOST: 'cloud',
+        CODEX_CLAW_HOST: 'managed',
         CODEX_CLAW_CODEX_HOME: '/srv/claw/users/user-1/.codex',
       },
       codexHome: { kind: 'explicit', path: '/srv/claw/users/user-1/.codex' },
@@ -65,7 +65,7 @@ describe('clawd environment launch contract', () => {
     ['backendHome', { command: 'clawd', backendHome: ' ', expectedVersion: '0.6.1' }],
     ['expectedVersion', { command: 'clawd', backendHome: '/tmp/claw', expectedVersion: ' ' }],
   ] as const)('rejects an empty %s', (name, values) => {
-    expect(() => createClawdEnvironmentLaunchContract({ ...values, host: 'cloud' }))
+    expect(() => createClawdEnvironmentLaunchContract({ ...values, host: 'managed' }))
       .toThrow(`clawd launch ${name} must be a non-empty string.`);
   });
 
@@ -76,7 +76,7 @@ describe('clawd environment launch contract', () => {
         backendHome,
         command: 'clawd',
         expectedVersion: '0.6.1',
-        host: 'cloud',
+        host: 'managed',
       }).env.CODEX_CLAW_HOME).toBe(backendHome);
     },
   );
@@ -87,7 +87,7 @@ describe('clawd environment launch contract', () => {
       codexHome: ' ',
       command: 'clawd',
       expectedVersion: '0.6.1',
-      host: 'cloud',
+      host: 'managed',
     })).toThrow('clawd launch codexHome must be a non-empty string.');
   });
 
@@ -99,7 +99,7 @@ describe('clawd environment launch contract', () => {
       backendHome: '/tmp/claw',
       command: 'clawd',
       expectedVersion: '0.6.1',
-      host: 'cloud',
+      host: 'managed',
       ...override,
     })).toThrow(`clawd launch ${name} must be an absolute path.`);
   });
@@ -108,9 +108,13 @@ describe('clawd environment launch contract', () => {
     expect(clawdRuntimeFeaturesForHost(undefined)).toBe(electronClawdRuntimeFeatures);
     expect(clawdRuntimeFeaturesForHost('electron')).toBe(electronClawdRuntimeFeatures);
     expect(clawdRuntimeFeaturesForHost('web')).toBe(webClawdRuntimeFeatures);
-    expect(clawdRuntimeFeaturesForHost('cloud')).toBe(cloudClawdRuntimeFeatures);
-    expect(clawdRuntimeFeaturesForHost('unexpected-host')).toBe(cloudClawdRuntimeFeatures);
-    expect(cloudClawdRuntimeFeatures).toStrictEqual({ computerUse: false, embeddedBrowser: false });
+    expect(clawdRuntimeFeaturesForHost('managed')).toBe(restrictedClawdRuntimeFeatures);
+    expect(clawdRuntimeFeaturesForHost('unexpected-host')).toBe(restrictedClawdRuntimeFeatures);
+    expect(restrictedClawdRuntimeFeatures).toStrictEqual({
+      codexResourceSharing: false,
+      computerUse: false,
+      embeddedBrowser: false,
+    });
   });
 
   it('requires exact clawd artifact compatibility', () => {

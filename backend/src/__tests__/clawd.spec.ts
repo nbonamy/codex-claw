@@ -49,11 +49,27 @@ describe('clawd entrypoint', () => {
     expect(writes.join('')).toContain('CODEX_CLAW_HOME');
   });
 
-  it('disables desktop backend tools for Cloud and unknown named hosts', () => {
-    expect(runtimeFeatures('cloud')).toStrictEqual({ computerUse: false, embeddedBrowser: false });
-    expect(runtimeFeatures('web')).toStrictEqual({ computerUse: false, embeddedBrowser: false });
-    expect(runtimeFeatures('unexpected-host')).toStrictEqual({ computerUse: false, embeddedBrowser: false });
-    expect(runtimeFeatures('electron')).toStrictEqual({ computerUse: true, embeddedBrowser: true });
+  it('uses fail-closed backend options for unknown named hosts', () => {
+    expect(runtimeFeatures('managed')).toStrictEqual({
+      codexResourceSharing: false,
+      computerUse: false,
+      embeddedBrowser: false,
+    });
+    expect(runtimeFeatures('web')).toStrictEqual({
+      codexResourceSharing: true,
+      computerUse: false,
+      embeddedBrowser: false,
+    });
+    expect(runtimeFeatures('unexpected-host')).toStrictEqual({
+      codexResourceSharing: false,
+      computerUse: false,
+      embeddedBrowser: false,
+    });
+    expect(runtimeFeatures('electron')).toStrictEqual({
+      codexResourceSharing: true,
+      computerUse: true,
+      embeddedBrowser: true,
+    });
   });
 
   it('prints usage and exits non-zero when no command is selected', async () => {

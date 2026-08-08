@@ -6,6 +6,7 @@ export type ClawHostCapabilities = {
   appLifecycle: boolean;
   appshots: boolean;
   appUpdates: boolean;
+  codexResourceSharing: boolean;
   computerUse: boolean;
   daemonManagement: boolean;
   dockBadge: boolean;
@@ -25,6 +26,7 @@ export const electronClawHostCapabilities: Readonly<ClawHostCapabilities> = Obje
   appLifecycle: true,
   appshots: true,
   appUpdates: true,
+  codexResourceSharing: true,
   computerUse: true,
   daemonManagement: true,
   dockBadge: true,
@@ -38,20 +40,7 @@ export const webClawHostCapabilities: Readonly<ClawHostCapabilities> = Object.fr
   appLifecycle: false,
   appshots: false,
   appUpdates: false,
-  computerUse: false,
-  daemonManagement: false,
-  dockBadge: false,
-  embeddedBrowser: false,
-  nativeFileDialogs: false,
-  openInApplications: false,
-  systemPermissions: false,
-});
-
-/** Hosted UI profile. Keep distinct from local Web so either surface can evolve safely. */
-export const cloudClawHostCapabilities: Readonly<ClawHostCapabilities> = Object.freeze({
-  appLifecycle: false,
-  appshots: false,
-  appUpdates: false,
+  codexResourceSharing: true,
   computerUse: false,
   daemonManagement: false,
   dockBadge: false,

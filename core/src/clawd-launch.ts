@@ -7,24 +7,28 @@ export const CODEX_CLAW_CODEX_HOME_ENV = 'CODEX_CLAW_CODEX_HOME' as const;
 export const CLAWD_CODEX_HOME_RELATIVE_PATH = 'codex-home' as const;
 export const CLAWD_GRACEFUL_SHUTDOWN_TIMEOUT_MS = 5_000 as const;
 
-export type ClawdHost = 'electron' | 'web' | 'cloud';
+export type ClawdHost = string;
 
 export type ClawdRuntimeFeatures = {
+  codexResourceSharing: boolean;
   computerUse: boolean;
   embeddedBrowser: boolean;
 };
 
-export const cloudClawdRuntimeFeatures: Readonly<ClawdRuntimeFeatures> = Object.freeze({
+export const restrictedClawdRuntimeFeatures: Readonly<ClawdRuntimeFeatures> = Object.freeze({
+  codexResourceSharing: false,
   computerUse: false,
   embeddedBrowser: false,
 });
 
 export const webClawdRuntimeFeatures: Readonly<ClawdRuntimeFeatures> = Object.freeze({
+  codexResourceSharing: true,
   computerUse: false,
   embeddedBrowser: false,
 });
 
 export const electronClawdRuntimeFeatures: Readonly<ClawdRuntimeFeatures> = Object.freeze({
+  codexResourceSharing: true,
   computerUse: true,
   embeddedBrowser: true,
 });
@@ -78,6 +82,7 @@ export function createClawdEnvironmentLaunchContract(
   const command = required(options.command, 'command');
   const backendHome = absolutePath(options.backendHome, 'backendHome');
   const expectedVersion = required(options.expectedVersion, 'expectedVersion');
+  const host = required(options.host, 'host');
   const codexHome = options.codexHome === undefined
     ? undefined
     : absolutePath(options.codexHome, 'codexHome');
@@ -87,7 +92,7 @@ export function createClawdEnvironmentLaunchContract(
     ...(options.cwd ? { cwd: options.cwd } : {}),
     env: {
       CODEX_CLAW_HOME: backendHome,
-      CODEX_CLAW_HOST: options.host,
+      CODEX_CLAW_HOST: host,
       ...(codexHome ? { CODEX_CLAW_CODEX_HOME: codexHome } : {}),
     },
     codexHome: codexHome
@@ -114,7 +119,7 @@ export function createClawdEnvironmentLaunchContract(
 export function clawdRuntimeFeaturesForHost(host: string | undefined): Readonly<ClawdRuntimeFeatures> {
   if (!host || host === 'electron') return electronClawdRuntimeFeatures;
   if (host === 'web') return webClawdRuntimeFeatures;
-  return cloudClawdRuntimeFeatures;
+  return restrictedClawdRuntimeFeatures;
 }
 
 export function assertCompatibleClawdHealth(health: ClawBackendHealth, expectedVersion: string): void {

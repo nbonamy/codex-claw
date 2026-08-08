@@ -31,6 +31,7 @@ import { getCodexResourceSharingStatus, setCodexResourceSharing } from './codex-
 
 export type ClawBackendServerOptions = {
   version: string;
+  codexResourceSharingAvailable?: boolean;
   pid?: number;
   snapshot?: AppSnapshot;
   driverRpc?: BackendDriverRpc;
@@ -92,6 +93,7 @@ export class ClawBackendServer {
   private readonly sendAgentMessage?: (fromAgentId: string, toAgentId: string, content: string) => void;
   private readonly configureCodexResourceSharing: (input: SetCodexResourceSharingInput) => Promise<void>;
   private readonly inspectCodexResourceSharing: (enabled: boolean) => Promise<CodexResourceSharingStatus>;
+  private readonly codexResourceSharingAvailable: boolean;
   private readonly inspectPluginStatus: () => Promise<AppPluginStatus>;
   private readonly clientRequestOwners = new Map<string, { backend: AgentBackend; remoteConnectionId?: string }>();
   private readonly remoteSnapshots = new Map<string, AppSnapshot>();
@@ -116,6 +118,7 @@ export class ClawBackendServer {
     this.sshConnections = options.sshConnections ?? new SshConnectionService();
     this.remoteClients = options.remoteClients ?? new RemoteClawdClientManager();
     this.sendAgentMessage = options.sendAgentMessage;
+    this.codexResourceSharingAvailable = options.codexResourceSharingAvailable !== false;
     this.configureCodexResourceSharing = options.configureCodexResourceSharing ?? setCodexResourceSharing;
     this.inspectCodexResourceSharing = options.inspectCodexResourceSharing ?? getCodexResourceSharingStatus;
     this.inspectPluginStatus = options.inspectPluginStatus ?? loadPluginStatus;
@@ -1155,10 +1158,15 @@ export class ClawBackendServer {
       case backendMethods.settingsCodexResourceSharingGet:
         return createClawRpcResult(
           message.id,
-          await this.inspectCodexResourceSharing(this.snapshot.general.shareCodexSkillsAndPlugins),
+          this.codexResourceSharingAvailable
+            ? await this.inspectCodexResourceSharing(this.snapshot.general.shareCodexSkillsAndPlugins)
+            : { enabled: false, migrationRequired: false },
         );
       case backendMethods.settingsCodexResourceSharingSet: {
         const input = requireCodexResourceSharingInput(message.params);
+        if (!this.codexResourceSharingAvailable) {
+          throw new Error('Skills and plugins sharing is unavailable for this host.');
+        }
         if (hasActiveChats(this.snapshot) && !(input.enabled === false && input.mode === 'keep')) {
           throw new Error('Skills and plugins sharing cannot be changed while chats are running.');
         }

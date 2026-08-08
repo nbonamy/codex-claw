@@ -222,13 +222,12 @@ public deployment model. Authentication must replace the fixed identity and
 select an isolated backend/state home before the bind address is widened or
 multiple users are admitted.
 
-The separately deployed Codex Claw Cloud product consumes the same
-`@codex-claw/core`, `@codex-claw/vue`, and `@codex-claw/web-client` contracts.
-Its authenticated gateway supplies the already-authorized WebSocket to
-`createClawBrowserClient`; the shared client does not choose a URL, attach
-credentials, refresh sessions, or select a tenant environment. The Cloud
-gateway authorizes an opaque environment ID before binding that socket to one
-isolated `clawd` process.
+A separately deployed managed host can consume the same `@codex-claw/core`,
+`@codex-claw/vue`, and `@codex-claw/web-client` contracts. Its authenticated
+gateway supplies the already-authorized WebSocket to `createClawBrowserClient`;
+the shared client does not choose a URL, attach credentials, refresh sessions,
+or select a tenant environment. The gateway authorizes an opaque environment
+ID before binding that socket to one isolated `clawd` process.
 
 Root host commands use the same Electron/Web suffixes:
 
@@ -253,9 +252,9 @@ and its `clawd` runtime omits Computer Use and embedded-browser MCP tools even
 if a persisted desktop preference had enabled them. Voice transcription is an
 SDK-native capability: the SDK composer hides the microphone when a host does
 not provide transcription, so Claw does not maintain a duplicate flag.
-Cloud uses its own explicit all-false host profile and launches `clawd` with
-`CODEX_CLAW_HOST=cloud`; both known non-desktop profiles and unknown named
-profiles fail closed for Computer Use and embedded-browser backend tools.
+Managed browser hosts can supply their own UI capabilities. Unknown named
+`clawd` hosts fail closed for Computer Use, embedded-browser backend tools, and
+Codex resource sharing; the local Web profile enables only resource sharing.
 
 ```mermaid
 flowchart LR

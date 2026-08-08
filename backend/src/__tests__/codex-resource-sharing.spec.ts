@@ -54,6 +54,22 @@ describe('Codex resource sharing', () => {
     });
   });
 
+  it('replaces shared links with isolated directories when sharing is unavailable', async () => {
+    await initializeCodexResourceSharing(true, paths);
+    await writeFile(path.join(paths.userCodexHome, 'skills', 'host-only.md'), 'host');
+
+    await initializeCodexResourceSharing(false, paths);
+
+    for (const name of ['skills', 'plugins'] as const) {
+      const stats = await lstat(path.join(paths.clawCodexHome, name));
+      expect(stats.isDirectory()).toBe(true);
+      expect(stats.isSymbolicLink()).toBe(false);
+    }
+    await expect(readFile(path.join(paths.clawCodexHome, 'skills', 'host-only.md'), 'utf8'))
+      .rejects.toMatchObject({ code: 'ENOENT' });
+    expect(await readFile(path.join(paths.userCodexHome, 'skills', 'host-only.md'), 'utf8')).toBe('host');
+  });
+
   it('creates fresh isolated directories when sharing is turned off', async () => {
     await reconcileCodexResourceSharing(true, paths);
     await writeFile(path.join(paths.userCodexHome, 'skills', 'shared.md'), 'shared');

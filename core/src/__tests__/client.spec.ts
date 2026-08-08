@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cloudClawHostCapabilities, electronClawHostCapabilities, webClawHostCapabilities } from '../client';
+import { electronClawHostCapabilities, webClawHostCapabilities } from '../client';
 
 describe('Claw client host capabilities', () => {
   it('describes the native Electron host', () => {
@@ -7,6 +7,7 @@ describe('Claw client host capabilities', () => {
       appLifecycle: true,
       appshots: true,
       appUpdates: true,
+      codexResourceSharing: true,
       computerUse: true,
       daemonManagement: true,
       dockBadge: true,
@@ -22,6 +23,7 @@ describe('Claw client host capabilities', () => {
       appLifecycle: false,
       appshots: false,
       appUpdates: false,
+      codexResourceSharing: true,
       computerUse: false,
       daemonManagement: false,
       dockBadge: false,
@@ -30,22 +32,5 @@ describe('Claw client host capabilities', () => {
       openInApplications: false,
       systemPermissions: false,
     });
-  });
-
-  it('gives Cloud an explicit fail-closed host profile', () => {
-    expect(cloudClawHostCapabilities).toStrictEqual({
-      appLifecycle: false,
-      appshots: false,
-      appUpdates: false,
-      computerUse: false,
-      daemonManagement: false,
-      dockBadge: false,
-      embeddedBrowser: false,
-      nativeFileDialogs: false,
-      openInApplications: false,
-      systemPermissions: false,
-    });
-    expect(cloudClawHostCapabilities).not.toBe(webClawHostCapabilities);
-    expect(Object.isFrozen(cloudClawHostCapabilities)).toBe(true);
   });
 });
