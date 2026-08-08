@@ -1,4 +1,5 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { clawdRuntimeFeaturesForHost } from '@codex-claw/core/clawd-launch';
 import { pathToFileURL } from 'node:url';
 import net from 'node:net';
 import type { Readable, Writable } from 'node:stream';
@@ -185,10 +186,8 @@ async function serve(): Promise<void> {
   });
 }
 
-function runtimeFeatures(): ClawdRuntimeOptions['features'] {
-  return process.env.CODEX_CLAW_HOST === 'web'
-    ? { computerUse: false, embeddedBrowser: false }
-    : undefined;
+export function runtimeFeatures(host = process.env.CODEX_CLAW_HOST): ClawdRuntimeOptions['features'] {
+  return clawdRuntimeFeaturesForHost(host);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

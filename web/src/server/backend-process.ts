@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { CODEX_CLAW_HOST_ENV } from '@codex-claw/core/clawd-launch';
 import {
   createClawRpcError,
   clawRpcErrorCodes,
@@ -39,7 +40,7 @@ export class ClawWebBackendProcess {
     if (this.child) return;
     const child = spawn(this.options.command, this.options.args, {
       cwd: this.options.cwd,
-      env: { ...process.env, ...this.options.env, CODEX_CLAW_HOST: 'web' },
+      env: { ...process.env, ...this.options.env, [CODEX_CLAW_HOST_ENV]: 'web' },
       stdio: 'pipe',
     });
     this.child = child;

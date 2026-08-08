@@ -10,6 +10,12 @@ adapter, client state, renderer behavior, or a fake backend transport.
 As the backend seam grows, prefer fake backend drivers for app-controller
 routing tests and fake Codex transports for Codex-driver/session tests.
 
+Browser transport and gateway protocol tests live in
+`@codex-claw/web-client`; the localhost `@codex-claw/web` workspace tests only
+its Express/process composition. `npm run test:web`, `typecheck:web`, and
+`test:coverage:web` cover both workspaces so a shared protocol change is tested
+against its local consumer.
+
 ## Quality Bar
 
 Every code change must add or update tests for the behavior it changes. There

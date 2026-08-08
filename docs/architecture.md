@@ -205,8 +205,11 @@ The workspace layers are explicit:
 - `@codex-claw/vue` owns the reusable Vue product shell and receives a typed
   `ClawClient` at bootstrap;
 - `@codex-claw/electron` composes preload IPC and desktop-native capabilities;
-- `@codex-claw/web` composes the same Vue shell with an Express-owned WebSocket
-  adapter built on the SDK web socket ports; and
+- `@codex-claw/web-client` owns the versioned browser protocol, browser client
+  factory, gateway session binder, and allowlisted browser-to-backend operation
+  mapper without owning authentication or a WebSocket URL;
+- `@codex-claw/web` is the localhost Express composition root using that shared
+  browser/gateway package; and
 - `@codex-claw/backend` remains the product authority and agent runtime.
 
 The initial web server binds to `127.0.0.1`, uses an explicit fixed
@@ -216,6 +219,14 @@ methods are rejected server-side. This is deliberately not an acceptable
 public deployment model. Authentication must replace the fixed identity and
 select an isolated backend/state home before the bind address is widened or
 multiple users are admitted.
+
+The separately deployed Codex Claw Cloud product consumes the same
+`@codex-claw/core`, `@codex-claw/vue`, and `@codex-claw/web-client` contracts.
+Its authenticated gateway supplies the already-authorized WebSocket to
+`createClawBrowserClient`; the shared client does not choose a URL, attach
+credentials, refresh sessions, or select a tenant environment. The Cloud
+gateway authorizes an opaque environment ID before binding that socket to one
+isolated `clawd` process.
 
 Root host commands use the same Electron/Web suffixes:
 
@@ -240,6 +251,9 @@ and its `clawd` runtime omits Computer Use and embedded-browser MCP tools even
 if a persisted desktop preference had enabled them. Voice transcription is an
 SDK-native capability: the SDK composer hides the microphone when a host does
 not provide transcription, so Claw does not maintain a duplicate flag.
+Cloud uses its own explicit all-false host profile and launches `clawd` with
+`CODEX_CLAW_HOST=cloud`; both known non-desktop profiles and unknown named
+profiles fail closed for Computer Use and embedded-browser backend tools.
 
 ```mermaid
 flowchart LR

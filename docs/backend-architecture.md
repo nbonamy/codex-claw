@@ -290,6 +290,7 @@ Workspace package names:
 - `@codex-claw/backend`
 - `@codex-claw/vue`
 - `@codex-claw/electron`
+- `@codex-claw/web-client`
 - `@codex-claw/web`
 
 Package ownership:
@@ -309,18 +310,24 @@ Package ownership:
   depends on `@codex-claw/core` and `@codex-claw/vue`; it should talk to the
   backend through the app-owned backend protocol/client rather than importing
   backend internals.
-- `web` contains the browser composition root and the Express-owned product
-  WebSocket bridge. It depends on core, Vue, and the SDK web transport ports,
-  and starts a built `clawd` artifact rather than importing backend internals.
+- `web-client` contains the host-neutral browser client, the versioned browser
+  protocol, the gateway session binder, and its allowlisted operation mapping.
+  It depends on core and the SDK web transport ports, but owns no HTTP server,
+  authentication policy, tenant lookup, or WebSocket URL.
+- `web` contains the localhost browser composition root and Express server. It
+  depends on core, Vue, and web-client, and starts a built `clawd` artifact
+  rather than importing backend internals.
 
 Dependency rules:
 
-- `core` has no dependency on `backend`, `vue`, `electron`, or `web`.
+- `core` has no dependency on `backend`, `vue`, `electron`, `web-client`, or
+  `web`.
 - `backend` may depend on `core`, never on a host or UI package.
 - `vue` may depend on `core`, never on a host package.
-- `electron` and `web` may depend on `core` and `vue`, but should not depend on `backend` at the
-  source-code level. In development it may spawn `backend`'s built `clawd`
-  artifact, and in release it may package the backend executable or bundled
+- `electron` and `web` may depend on `core` and `vue`; `web` also depends on
+  `web-client`. Hosts should not depend on `backend` at the source-code level.
+  In development they may spawn `backend`'s built `clawd`
+  artifact, and in release they may package the backend executable or bundled
   script as a resource.
 - Cross-package imports should use package names such as
   `@codex-claw/core`, not deep relative paths across workspace boundaries.
@@ -329,9 +336,9 @@ Dependency rules:
   stable, but the first reorg can keep build wiring simple if needed.
 
 This layout makes the process boundary visible in the filesystem. Root is the
-product monorepo; `electron` and `web` are host runtimes; `vue` is the reusable
-UI; `backend` is the product backend; and `core` is the compile-time contract
-bridge.
+product monorepo; `electron` and `web` are host runtimes; `web-client` is the
+reusable browser/gateway bridge; `vue` is the reusable UI; `backend` is the
+product backend; and `core` is the compile-time contract bridge.
 
 ## Source Facts
 
@@ -630,6 +637,23 @@ The exact script names can change, but the shape should stay:
 - Every local `clawd` launch derives Codex app-server `CODEX_HOME` as
   `$CODEX_CLAW_HOME/codex-home` (default
   `~/.codex-claw/codex-home`) and ignores an inherited normal Codex home.
+- Hosted environments use the exported
+  `@codex-claw/core/clawd-launch` contract. Each authorized environment gets a
+  unique absolute `CODEX_CLAW_HOME`; its provider state is therefore isolated
+  at the derived `codex-home` child. Hosts start the exact release artifact
+  with `--stdio`, wait for `backend/health/get`, and require the returned
+  `name=clawd` and version to match the expected application artifact. The same
+  artifact exposes `--version` for a preflight compatibility check.
+- A stdio host shuts an environment down by closing stdin or sending SIGTERM,
+  waits up to the exported graceful-shutdown timeout, and only then escalates
+  with its own process/container policy. Both paths let `clawd` close active
+  runtimes and flush logs. Readiness means the health request completed; it
+  does not mean a user is authenticated, because identity and environment
+  authorization belong to the Cloud gateway before launch or connection.
+- `CODEX_CLAW_HOST=cloud` selects a fail-closed runtime profile that omits
+  Computer Use and embedded-browser MCP tools regardless of persisted settings.
+  `web` does the same, and any unknown named host also fails closed. Only the
+  absent/explicit `electron` profile enables desktop runtime features.
 - Before creating backend drivers, `clawd` initializes missing `skills` and
   `plugins` entries from the persisted sharing setting. Sharing is on by
   default and a fresh home links those entries to `~/.codex`. Existing

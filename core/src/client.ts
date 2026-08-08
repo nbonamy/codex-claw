@@ -46,3 +46,17 @@ export const webClawHostCapabilities: Readonly<ClawHostCapabilities> = Object.fr
   openInApplications: false,
   systemPermissions: false,
 });
+
+/** Hosted UI profile. Keep distinct from local Web so either surface can evolve safely. */
+export const cloudClawHostCapabilities: Readonly<ClawHostCapabilities> = Object.freeze({
+  appLifecycle: false,
+  appshots: false,
+  appUpdates: false,
+  computerUse: false,
+  daemonManagement: false,
+  dockBadge: false,
+  embeddedBrowser: false,
+  nativeFileDialogs: false,
+  openInApplications: false,
+  systemPermissions: false,
+});

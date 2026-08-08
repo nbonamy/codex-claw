@@ -4,7 +4,7 @@ import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import { afterEach, describe, expect, it } from 'vitest';
 import backendPackage from '../../package.json';
-import { CLAWD_VERSION, connectToDaemon, main } from '../clawd';
+import { CLAWD_VERSION, connectToDaemon, main, runtimeFeatures } from '../clawd';
 import { LocalSocketRpcServer } from '../socket-server';
 
 describe('clawd entrypoint', () => {
@@ -47,6 +47,13 @@ describe('clawd entrypoint', () => {
     expect(process.exitCode).toBe(1);
     expect(writes.join('')).toContain('Unsupported option: --state-dir');
     expect(writes.join('')).toContain('CODEX_CLAW_HOME');
+  });
+
+  it('disables desktop backend tools for Cloud and unknown named hosts', () => {
+    expect(runtimeFeatures('cloud')).toStrictEqual({ computerUse: false, embeddedBrowser: false });
+    expect(runtimeFeatures('web')).toStrictEqual({ computerUse: false, embeddedBrowser: false });
+    expect(runtimeFeatures('unexpected-host')).toStrictEqual({ computerUse: false, embeddedBrowser: false });
+    expect(runtimeFeatures('electron')).toStrictEqual({ computerUse: true, embeddedBrowser: true });
   });
 
   it('prints usage and exits non-zero when no command is selected', async () => {

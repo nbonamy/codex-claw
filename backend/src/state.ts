@@ -2,9 +2,10 @@ import path from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import type { AppSnapshot } from '@codex-claw/core/contracts';
+import { CODEX_CLAW_HOME_ENV } from '@codex-claw/core/clawd-launch';
 import { AppStatePersistence } from './state-persistence';
 
-export const CODEX_CLAW_HOME_ENV = 'CODEX_CLAW_HOME';
+export { CODEX_CLAW_HOME_ENV };
 let persistence: AppStatePersistence | null = null;
 let persistencePath: string | null = null;
 

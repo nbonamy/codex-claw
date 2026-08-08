@@ -5,6 +5,7 @@ import { formatConversationTitle } from '@codex-claw/core/conversation-title';
 import { updateLoopExecutionAgentConversationInSnapshot } from '@codex-claw/core/loop-manager';
 import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/core/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
+import type { ClawdRuntimeFeatures } from '@codex-claw/core/clawd-launch';
 import { BackendDriverRpc, createDefaultBackendDrivers } from './driver-rpc';
 import { RemoteClawdClientManager } from './connections/remote-clawd-client';
 import { SshConnectionService } from './connections/ssh-connections';
@@ -24,10 +25,7 @@ export type ClawdClientRequest = <Result>(method: string, params?: unknown) => P
 
 export type ClawdRuntimeOptions = {
   emitEvent(event: ClawBackendEvent): void;
-  features?: {
-    computerUse?: boolean;
-    embeddedBrowser?: boolean;
-  };
+  features?: Partial<ClawdRuntimeFeatures>;
   requestClient: ClawdClientRequest;
   version: string;
 };
