@@ -65,7 +65,7 @@ describe('clawd entrypoint', () => {
       computerUse: false,
       embeddedBrowser: false,
     });
-    expect(runtimeFeatures('electron')).toStrictEqual({
+    expect(runtimeFeatures('desktop')).toStrictEqual({
       codexResourceSharing: true,
       computerUse: true,
       embeddedBrowser: true,

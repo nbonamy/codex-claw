@@ -2,11 +2,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
 import { createEmptySnapshot, createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
+import { webClawHostCapabilities } from '@codex-claw/core/client';
 import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
 import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';
 import { stubElectronTestWindow } from '../test/client';
+import { configureClawClient } from '../platform-api';
 
 describe('useAppState', () => {
   afterEach(() => {
@@ -1003,6 +1005,47 @@ describe('useAppState', () => {
     expect(state.workProviderAuthorization.value).toBeNull();
     expect(state.workRepositoriesByProvider.value.github).toStrictEqual([repository]);
     expect(state.workItemsByRepository.value['github:nbonamy/codex-claw']).toStrictEqual([item]);
+  });
+
+  it('opens provider authorization through a custom host action', async () => {
+    vi.useFakeTimers();
+    const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.connections = [{ provider: 'github', status: 'connecting' }];
+    const connectWorkProvider = vi.fn().mockResolvedValue({
+      snapshot,
+      authorization: {
+        provider: 'github',
+        userCode: 'ABCD-1234',
+        verificationUri: 'https://github.com/login/device',
+        expiresAt: '2026-06-09T12:05:00.000Z',
+      },
+    });
+    const backendOpenAuthorization = vi.fn();
+    const openExternal = vi.fn();
+    const api = {
+      connectWorkProvider,
+      openWorkProviderAuthorization: backendOpenAuthorization,
+    } as unknown as CodexClawApi;
+    configureClawClient({
+      api,
+      capabilities: {
+        ...webClawHostCapabilities,
+        chromePlugin: false,
+        codexResourceSharing: false,
+        remoteAgentConnections: false,
+      },
+      actions: { managePlugins: vi.fn(), openExternal },
+      platform: 'custom',
+    });
+    const state = useAppState();
+    state.snapshot.value = createInitialSnapshot();
+
+    await state.connectWorkProvider('github');
+    await state.openWorkProviderAuthorization('github');
+
+    expect(openExternal).toHaveBeenCalledWith('https://github.com/login/device');
+    expect(backendOpenAuthorization).not.toHaveBeenCalled();
+    expect(state.workBacklogStatus.value).toBe('loaded');
   });
 
   it('assigns work items through the existing agent prompt path', async () => {

@@ -1,5 +1,4 @@
 import { mountClawVueApp } from '@codex-claw/vue/bootstrap';
-import { webClawHostCapabilities } from '@codex-claw/core/client';
 import { createClawBrowserClient } from '@codex-claw/web-client/client';
 
 const api = createClawBrowserClient({
@@ -9,7 +8,6 @@ const api = createClawBrowserClient({
 mountClawVueApp({
   client: {
     api,
-    capabilities: webClawHostCapabilities,
     platform: 'web',
   },
 });

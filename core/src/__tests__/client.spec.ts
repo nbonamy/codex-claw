@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { electronClawHostCapabilities, webClawHostCapabilities } from '../client';
+import { desktopClawHostCapabilities, webClawHostCapabilities } from '../client';
 
 describe('Claw client host capabilities', () => {
   it('describes the native Electron host', () => {
-    expect(electronClawHostCapabilities).toStrictEqual({
+    expect(desktopClawHostCapabilities).toStrictEqual({
       appLifecycle: true,
       appshots: true,
       appUpdates: true,
+      chromePlugin: true,
       codexResourceSharing: true,
       computerUse: true,
       daemonManagement: true,
@@ -14,6 +15,7 @@ describe('Claw client host capabilities', () => {
       embeddedBrowser: true,
       nativeFileDialogs: true,
       openInApplications: true,
+      remoteAgentConnections: true,
       systemPermissions: true,
     });
   });
@@ -23,6 +25,7 @@ describe('Claw client host capabilities', () => {
       appLifecycle: false,
       appshots: false,
       appUpdates: false,
+      chromePlugin: true,
       codexResourceSharing: true,
       computerUse: false,
       daemonManagement: false,
@@ -30,6 +33,7 @@ describe('Claw client host capabilities', () => {
       embeddedBrowser: false,
       nativeFileDialogs: false,
       openInApplications: false,
+      remoteAgentConnections: true,
       systemPermissions: false,
     });
   });

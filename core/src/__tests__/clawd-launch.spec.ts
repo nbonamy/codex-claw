@@ -3,7 +3,7 @@ import {
   assertCompatibleClawdHealth,
   clawdRuntimeFeaturesForHost,
   createClawdEnvironmentLaunchContract,
-  electronClawdRuntimeFeatures,
+  desktopClawdRuntimeFeatures,
   restrictedClawdRuntimeFeatures,
   webClawdRuntimeFeatures,
 } from '../clawd-launch';
@@ -105,8 +105,8 @@ describe('clawd environment launch contract', () => {
   });
 
   it('defines fail-closed runtime feature profiles', () => {
-    expect(clawdRuntimeFeaturesForHost(undefined)).toBe(electronClawdRuntimeFeatures);
-    expect(clawdRuntimeFeaturesForHost('electron')).toBe(electronClawdRuntimeFeatures);
+    expect(clawdRuntimeFeaturesForHost(undefined)).toBe(desktopClawdRuntimeFeatures);
+    expect(clawdRuntimeFeaturesForHost('desktop')).toBe(desktopClawdRuntimeFeatures);
     expect(clawdRuntimeFeaturesForHost('web')).toBe(webClawdRuntimeFeatures);
     expect(clawdRuntimeFeaturesForHost('managed')).toBe(restrictedClawdRuntimeFeatures);
     expect(clawdRuntimeFeaturesForHost('unexpected-host')).toBe(restrictedClawdRuntimeFeatures);

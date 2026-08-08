@@ -1,4 +1,3 @@
-import { electronClawHostCapabilities } from '@codex-claw/core/client';
 import { mountClawVueApp } from '@codex-claw/vue/bootstrap';
 
 if (!window.codexClaw) {
@@ -8,7 +7,6 @@ if (!window.codexClaw) {
 mountClawVueApp({
   client: {
     api: window.codexClaw,
-    capabilities: electronClawHostCapabilities,
-    platform: 'electron',
+    platform: 'desktop',
   },
 });

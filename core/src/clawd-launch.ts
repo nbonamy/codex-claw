@@ -27,7 +27,7 @@ export const webClawdRuntimeFeatures: Readonly<ClawdRuntimeFeatures> = Object.fr
   embeddedBrowser: false,
 });
 
-export const electronClawdRuntimeFeatures: Readonly<ClawdRuntimeFeatures> = Object.freeze({
+export const desktopClawdRuntimeFeatures: Readonly<ClawdRuntimeFeatures> = Object.freeze({
   codexResourceSharing: true,
   computerUse: true,
   embeddedBrowser: true,
@@ -117,7 +117,7 @@ export function createClawdEnvironmentLaunchContract(
 
 /** Unknown named hosts fail closed; an absent host keeps desktop compatibility. */
 export function clawdRuntimeFeaturesForHost(host: string | undefined): Readonly<ClawdRuntimeFeatures> {
-  if (!host || host === 'electron') return electronClawdRuntimeFeatures;
+  if (!host || host === 'desktop') return desktopClawdRuntimeFeatures;
   if (host === 'web') return webClawdRuntimeFeatures;
   return restrictedClawdRuntimeFeatures;
 }

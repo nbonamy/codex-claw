@@ -1,13 +1,11 @@
 import { vi } from 'vitest';
-import { electronClawHostCapabilities } from '@codex-claw/core/client';
 import type { CodexClawApi } from '@codex-claw/core/contracts';
 import { configureClawClient } from '../platform-api';
 
 export function configureElectronTestClient(api?: Partial<CodexClawApi>): void {
   configureClawClient({
     api: api as CodexClawApi,
-    capabilities: electronClawHostCapabilities,
-    platform: 'electron',
+    platform: 'desktop',
   });
 }
 

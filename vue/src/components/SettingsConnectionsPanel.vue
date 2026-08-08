@@ -3,7 +3,7 @@
     title="Connections"
     title-id="settings-connections-title"
   >
-    <template #actions>
+    <template v-if="clawHostCapabilities.remoteAgentConnections" #actions>
       <el-button
         size="small"
         type="primary"
@@ -14,6 +14,7 @@
     </template>
 
     <SettingsSection
+      v-if="clawHostCapabilities.remoteAgentConnections"
       title="Remote Codex Claw agents"
       title-id="settings-connections-remotes-title"
     >
@@ -210,6 +211,7 @@ import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsDevicePairingSection from './SettingsDevicePairingSection.vue';
 import SettingsSection from './SettingsSection.vue';
+import { clawHostCapabilities } from '../platform-api';
 
 const props = withDefaults(defineProps<{
   addSshConnection?: (input: AddSshConnectionInput) => Promise<void>;

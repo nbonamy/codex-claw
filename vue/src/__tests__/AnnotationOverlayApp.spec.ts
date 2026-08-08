@@ -1,6 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { electronClawHostCapabilities } from '@codex-claw/core/client';
 
 afterEach(() => {
   window.history.replaceState({}, '', '/');
@@ -14,8 +13,7 @@ describe('AnnotationOverlayApp', () => {
     const { configureClawClient } = await import('../platform-api');
     configureClawClient({
       api: { browserResolveAnnotation } as never,
-      capabilities: electronClawHostCapabilities,
-      platform: 'electron',
+      platform: 'desktop',
     });
     const AnnotationOverlayApp = (await import('../AnnotationOverlayApp.vue')).default;
     const wrapper = mount(AnnotationOverlayApp);
@@ -40,8 +38,7 @@ describe('AnnotationOverlayApp', () => {
     const { configureClawClient } = await import('../platform-api');
     configureClawClient({
       api: { browserResolveAnnotation } as never,
-      capabilities: electronClawHostCapabilities,
-      platform: 'electron',
+      platform: 'desktop',
     });
     const AnnotationOverlayApp = (await import('../AnnotationOverlayApp.vue')).default;
     const wrapper = mount(AnnotationOverlayApp);

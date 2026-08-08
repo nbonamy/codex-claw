@@ -7,7 +7,7 @@
       :default-active="activeTab"
       @select="selectTab"
     >
-      <el-menu-item index="chatgpt">
+      <el-menu-item v-if="showChatGpt" index="chatgpt">
         <BrandOpenaiIcon aria-hidden="true" />
         <span>ChatGPT</span>
       </el-menu-item>
@@ -44,9 +44,12 @@ import type { SettingsTab } from './settings-tabs';
 import { AffiliateIcon, BrandOpenaiIcon, PaletteIcon, PhotoIcon, SettingsIcon, TerminalIcon } from '../shared/icons/app-icons';
 import { clawHostCapabilities } from '../platform-api';
 
-defineProps<{
+withDefaults(defineProps<{
   activeTab: SettingsTab;
-}>();
+  showChatGpt?: boolean;
+}>(), {
+  showChatGpt: true,
+});
 
 const emit = defineEmits<{
   select: [tab: SettingsTab];

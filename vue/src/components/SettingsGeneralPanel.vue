@@ -4,6 +4,7 @@
     title-id="settings-general-title"
   >
     <SettingsSection
+      v-if="clawHostCapabilities.daemonManagement"
       title="Behavior"
       title-id="settings-general-behavior-title"
     >
@@ -169,6 +170,7 @@
     </SettingsSection>
 
     <SettingsSection
+      v-if="clawHostCapabilities.codexResourceSharing || clawHostCapabilities.nativeFileDialogs"
       title="Advanced"
       title-id="settings-general-advanced-title"
     >

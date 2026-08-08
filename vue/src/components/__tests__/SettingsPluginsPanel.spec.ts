@@ -1,17 +1,19 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { electronClawHostCapabilities } from '@codex-claw/core/client';
+import { webClawHostCapabilities } from '@codex-claw/core/client';
 import type { CodexClawApi } from '@codex-claw/core/contracts';
 import SettingsPluginsPanel from '../SettingsPluginsPanel.vue';
 import { configureClawClient } from '../../platform-api';
 
 describe('SettingsPluginsPanel', () => {
+  let builtInLaunchChatGpt: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
+    builtInLaunchChatGpt = vi.fn().mockResolvedValue(undefined);
     configureClawClient({
-      api: {} as CodexClawApi,
-      capabilities: electronClawHostCapabilities,
-      platform: 'electron',
+      api: { launchChatGptApp: builtInLaunchChatGpt } as unknown as CodexClawApi,
+      platform: 'desktop',
     });
   });
 
@@ -19,12 +21,11 @@ describe('SettingsPluginsPanel', () => {
     document.body.innerHTML = '';
   });
 
-  it('asks to launch ChatGPT without changing Chrome settings', async () => {
-    const launchChatGptApp = vi.fn().mockResolvedValue(undefined);
+  it('opens the desktop plugin manager without changing Chrome settings', async () => {
     const updateSettings = vi.fn().mockResolvedValue(undefined);
     const getPluginStatus = vi.fn().mockResolvedValue({ chromeEnabled: false });
     const wrapper = mount(SettingsPluginsPanel, {
-      props: { launchChatGptApp, updateSettings, getPluginStatus },
+      props: { updateSettings, getPluginStatus },
       global: { plugins: [ElementPlus] },
       attachTo: document.body,
     });
@@ -32,20 +33,12 @@ describe('SettingsPluginsPanel', () => {
     await wrapper.get('[aria-label="Enable Chrome"]').trigger('click');
     await flushPromises();
 
-    expect(wrapper.text()).toContain('Manage plugins in ChatGPT');
-    expect(updateSettings).not.toHaveBeenCalled();
-
-    const launchButton = [...document.body.querySelectorAll('button')]
-      .find((button) => button.textContent?.includes('Launch ChatGPT'));
-    launchButton?.click();
-    await flushPromises();
-
-    expect(launchChatGptApp).toHaveBeenCalledOnce();
+    expect(builtInLaunchChatGpt).toHaveBeenCalledOnce();
     expect(updateSettings).not.toHaveBeenCalled();
     expect(getPluginStatus).toHaveBeenCalled();
   });
 
-  it('opens the ChatGPT dialog when Chrome is already enabled and clicked off', async () => {
+  it('opens the plugin manager when Chrome is already enabled and clicked off', async () => {
     const updateSettings = vi.fn().mockResolvedValue(undefined);
     const wrapper = mount(SettingsPluginsPanel, {
       props: {
@@ -60,11 +53,11 @@ describe('SettingsPluginsPanel', () => {
     await wrapper.get('[aria-label="Enable Chrome"]').trigger('click');
     await flushPromises();
 
-    expect(wrapper.text()).toContain('Manage plugins in ChatGPT');
+    expect(builtInLaunchChatGpt).toHaveBeenCalledOnce();
     expect(updateSettings).not.toHaveBeenCalled();
   });
 
-  it('disables a capability without opening the ChatGPT dialog', async () => {
+  it('disables a capability without opening the plugin manager', async () => {
     const updateSettings = vi.fn().mockResolvedValue(undefined);
     const wrapper = mount(SettingsPluginsPanel, {
       props: {
@@ -78,10 +71,10 @@ describe('SettingsPluginsPanel', () => {
     await flushPromises();
 
     expect(updateSettings).toHaveBeenCalledWith({ general: { plugins: { computerUseEnabled: false } } });
-    expect(wrapper.text()).not.toContain('Manage plugins in ChatGPT');
+    expect(builtInLaunchChatGpt).not.toHaveBeenCalled();
   });
 
-  it('enables Computer Use directly without opening the ChatGPT dialog', async () => {
+  it('enables Computer Use directly without opening the plugin manager', async () => {
     const updateSettings = vi.fn().mockResolvedValue(undefined);
     const wrapper = mount(SettingsPluginsPanel, {
       props: {
@@ -95,7 +88,7 @@ describe('SettingsPluginsPanel', () => {
     await flushPromises();
 
     expect(updateSettings).toHaveBeenCalledWith({ general: { plugins: { computerUseEnabled: true } } });
-    expect(wrapper.text()).not.toContain('Manage plugins in ChatGPT');
+    expect(builtInLaunchChatGpt).not.toHaveBeenCalled();
   });
 
   it('does not offer Computer Use when the host does not provide it', () => {
@@ -107,7 +100,7 @@ describe('SettingsPluginsPanel', () => {
     expect(wrapper.find('[aria-label="Enable Computer Use"]').exists()).toBe(false);
   });
 
-  it('opens the ChatGPT dialog for other plugins without changing capability settings', async () => {
+  it('opens the configured manager directly for other plugins', async () => {
     const updateSettings = vi.fn().mockResolvedValue(undefined);
     const wrapper = mount(SettingsPluginsPanel, {
       props: { updateSettings },
@@ -117,32 +110,43 @@ describe('SettingsPluginsPanel', () => {
 
     await wrapper.get('[aria-label="Manage other plugins in ChatGPT"]').trigger('click');
     await flushPromises();
-    expect(wrapper.text()).toContain('Manage plugins in ChatGPT');
 
-    const launchButton = [...document.body.querySelectorAll('button')]
-      .find((button) => button.textContent?.includes('Launch ChatGPT'));
-    launchButton?.click();
-    await flushPromises();
-
+    expect(builtInLaunchChatGpt).toHaveBeenCalledOnce();
     expect(updateSettings).not.toHaveBeenCalled();
   });
 
-  it('keeps the dialog open when ChatGPT cannot be launched', async () => {
-    const launchChatGptApp = vi.fn().mockRejectedValue(new Error('ChatGPT is unavailable.'));
+  it('shows plugin manager failures inline', async () => {
+    builtInLaunchChatGpt.mockRejectedValueOnce(new Error('ChatGPT is unavailable.'));
     const wrapper = mount(SettingsPluginsPanel, {
-      props: { launchChatGptApp },
       global: { plugins: [ElementPlus] },
       attachTo: document.body,
     });
 
     await wrapper.get('[aria-label="Enable Chrome"]').trigger('click');
     await flushPromises();
-    const launchButton = [...document.body.querySelectorAll('button')]
-      .find((button) => button.textContent?.includes('Launch ChatGPT'));
-    launchButton?.click();
+
+    expect(wrapper.text()).toContain('ChatGPT is unavailable.');
+  });
+
+  it('lets a custom host hide Chrome and open web plugin management', async () => {
+    const managePlugins = vi.fn().mockResolvedValue(undefined);
+    const getPluginStatus = vi.fn();
+    configureClawClient({
+      api: {} as CodexClawApi,
+      capabilities: { ...webClawHostCapabilities, chromePlugin: false },
+      actions: { managePlugins, openExternal: vi.fn() },
+      platform: 'custom',
+    });
+    const wrapper = mount(SettingsPluginsPanel, {
+      props: { getPluginStatus },
+      global: { plugins: [ElementPlus] },
+    });
+
+    expect(wrapper.find('[aria-label="Enable Chrome"]').exists()).toBe(false);
+    await wrapper.get('[aria-label="Manage other plugins in ChatGPT"]').trigger('click');
     await flushPromises();
 
-    expect(wrapper.get('[role="alert"]').text()).toBe('ChatGPT is unavailable.');
-    expect(wrapper.text()).toContain('Manage plugins in ChatGPT');
+    expect(managePlugins).toHaveBeenCalledOnce();
+    expect(getPluginStatus).not.toHaveBeenCalled();
   });
 });

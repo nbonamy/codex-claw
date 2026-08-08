@@ -12,7 +12,7 @@ import {
 import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
 import { useConfetti } from './shared/confetti/use-confetti';
-import { clawHostCapabilities, codexClawApi } from './platform-api';
+import { clawHostActions, clawHostCapabilities, codexClawApi } from './platform-api';
 
 const snapshot = ref<AppSnapshot>(createEmptySnapshot());
 const isLoading = ref(false);
@@ -1031,14 +1031,17 @@ export function useAppState() {
   }
 
   async function openWorkProviderAuthorization(provider: WorkProviderKind): Promise<void> {
-    if (!codexClawApi?.openWorkProviderAuthorization) {
-      return;
-    }
-
     workBacklogStatus.value = 'loading';
     workBacklogError.value = null;
     try {
-      adoptBackgroundSnapshot(await codexClawApi.openWorkProviderAuthorization(provider));
+      const authorization = workProviderAuthorization.value;
+      if (authorization?.provider === provider && clawHostActions.openExternal) {
+        await clawHostActions.openExternal(authorization.verificationUri);
+      } else if (codexClawApi?.openWorkProviderAuthorization) {
+        adoptBackgroundSnapshot(await codexClawApi.openWorkProviderAuthorization(provider));
+      } else {
+        return;
+      }
       scheduleWorkProviderAuthorizationPoll(provider);
       workBacklogStatus.value = 'loaded';
     } catch (error) {

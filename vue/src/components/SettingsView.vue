@@ -6,7 +6,8 @@
     <div class="settings-view__header" />
     
     <SettingsSidebar
-      :active-tab="activeTab"
+      :active-tab="renderedTab"
+      :show-chat-gpt="chatGptAvailable"
       class="settings-view__sidebar"
       @select="selectTab"
     />
@@ -14,11 +15,11 @@
     <main class="settings-view__content">
       <div class="settings-view__panel">
         <SettingsChatGptPanel
-          v-if="activeTab === 'chatgpt'"
+          v-if="renderedTab === 'chatgpt'"
           :launch-chat-gpt-app="launchChatGptApp"
         />
         <SettingsGeneralPanel
-          v-else-if="activeTab === 'general'"
+          v-else-if="renderedTab === 'general'"
           :choose-codex-binary="chooseCodexBinary"
           :choose-source-folder="chooseSourceFolder"
           :daemon-status="daemonStatus"
@@ -32,12 +33,12 @@
           :update-settings="updateSettings"
         />
         <SettingsAppshotsPanel
-          v-else-if="activeTab === 'appshots' && clawHostCapabilities.appshots"
+          v-else-if="renderedTab === 'appshots' && clawHostCapabilities.appshots"
           :settings="generalSettings.appshots"
           :update-settings="updateSettings"
         />
         <SettingsIntegrationsPanel
-          v-else-if="activeTab === 'integrations'"
+          v-else-if="renderedTab === 'integrations'"
           :authorization="workProviderAuthorization"
           :connections="workBacklogConnections"
           :error="workBacklogError"
@@ -50,14 +51,13 @@
           @open-authorization="openWorkProviderAuthorization"
         />
         <SettingsPluginsPanel
-          v-else-if="activeTab === 'plugins'"
+          v-else-if="renderedTab === 'plugins'"
           :settings="generalSettings?.plugins"
-          :launch-chat-gpt-app="launchChatGptApp"
           :update-settings="updateSettings"
           :get-plugin-status="getPluginStatus"
         />
         <SettingsConnectionsPanel
-          v-else-if="activeTab === 'connections'"
+          v-else-if="renderedTab === 'connections'"
           :connections="remoteConnections"
           :settings="generalSettings"
           :update-settings="updateSettings"
@@ -87,6 +87,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import type { AddSshConnectionInput, AppGeneralSettings, AppPluginStatus, AppThemeSettings, ClawdDaemonStatus, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SetCodexResourceSharingInput, SourceFolderListing, SourceFolderListInput, SourceFolderState, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/core/contracts';
 import { defaultGeneralSettings, defaultSourceFolderState } from '@codex-claw/core/settings';
 import SettingsAppearancePanel from './SettingsAppearancePanel.vue';
@@ -98,9 +99,9 @@ import SettingsIntegrationsPanel from './SettingsIntegrationsPanel.vue';
 import SettingsPluginsPanel from './SettingsPluginsPanel.vue';
 import SettingsSidebar from './SettingsSidebar.vue';
 import type { SettingsTab } from './settings-tabs';
-import { clawHostCapabilities } from '../platform-api';
+import { clawHostActions, clawHostCapabilities } from '../platform-api';
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   activeTab?: SettingsTab;
   settings: AppThemeSettings;
   generalSettings?: AppGeneralSettings;
@@ -177,6 +178,11 @@ withDefaults(defineProps<{
   codexResourceSharingBlocked: false,
   restartApp: async () => undefined,
 });
+
+const chatGptAvailable = computed(() => Boolean(props.launchChatGptApp ?? clawHostActions.launchChatGpt));
+const renderedTab = computed<SettingsTab>(() => (
+  props.activeTab === 'chatgpt' && !chatGptAvailable.value ? 'general' : props.activeTab
+));
 
 const emit = defineEmits<{
   selectTab: [tab: SettingsTab];

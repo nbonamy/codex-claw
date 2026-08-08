@@ -295,13 +295,16 @@ describe('SettingsGeneralPanel', () => {
     configureClawClient({
       api: window.codexClaw!,
       capabilities: { ...webClawHostCapabilities, codexResourceSharing: false },
-      platform: 'web',
+      actions: { managePlugins: vi.fn(), openExternal: vi.fn() },
+      platform: 'custom',
     });
 
     const wrapper = mountPanel({});
     await flushPromises();
 
     expect(wrapper.text()).not.toContain('Share skills and plugins with ChatGPT');
+    expect(wrapper.text()).not.toContain('Behavior');
+    expect(wrapper.text()).not.toContain('Advanced');
   });
 
   it('copies ChatGPT resources when sharing is turned off with Copy', async () => {

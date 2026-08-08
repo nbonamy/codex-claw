@@ -2,6 +2,8 @@ import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus, { ElMessageBox } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import SettingsView from '../SettingsView.vue';
+import { webClawHostCapabilities } from '@codex-claw/core/client';
+import type { CodexClawApi } from '@codex-claw/core/contracts';
 import { defaultGeneralSettings, defaultThemeSettings } from '@codex-claw/core/settings';
 import { configureClawClient } from '../../platform-api';
 
@@ -16,6 +18,7 @@ describe('SettingsView', () => {
       props: {
         settings: defaultThemeSettings,
         generalSettings: defaultGeneralSettings,
+        launchChatGptApp: vi.fn().mockResolvedValue(undefined),
       },
       global: {
         plugins: [ElementPlus],
@@ -77,15 +80,18 @@ describe('SettingsView', () => {
     expect(wrapper.text()).toContain('Accessibility');
   });
 
-  it('places plugin controls before integrations and forwards ChatGPT actions', async () => {
+  it('places plugin controls before integrations and forwards plugin management actions', async () => {
     const launchChatGptApp = vi.fn().mockResolvedValue(undefined);
+    configureClawClient({
+      api: { launchChatGptApp } as unknown as CodexClawApi,
+      platform: 'desktop',
+    });
     const updateSettings = vi.fn().mockResolvedValue(undefined);
     const wrapper = mount(SettingsView, {
       props: {
         settings: defaultThemeSettings,
         generalSettings: defaultGeneralSettings,
         activeTab: 'plugins',
-        launchChatGptApp,
         updateSettings,
       },
       global: { plugins: [ElementPlus] },
@@ -98,8 +104,7 @@ describe('SettingsView', () => {
 
     await wrapper.get('[aria-label="Enable Chrome"]').trigger('click');
     await flushPromises();
-    await wrapper.findComponent({ name: 'ElDialog' }).vm.$emit('update:modelValue', false);
-    expect(launchChatGptApp).not.toHaveBeenCalled();
+    expect(launchChatGptApp).toHaveBeenCalledOnce();
     expect(updateSettings).not.toHaveBeenCalled();
   });
 
@@ -174,6 +179,61 @@ describe('SettingsView', () => {
     expect(wrapper.text()).not.toContain('Keep Codex Claw ready in the background');
     expect(wrapper.text()).not.toContain('System permissions');
     expect(wrapper.text()).not.toContain('Codex executable');
+  });
+
+  it('uses an explicit custom-host profile for managed settings', () => {
+    const openExternal = vi.fn();
+    configureClawClient({
+      api: {} as CodexClawApi,
+      capabilities: {
+        ...webClawHostCapabilities,
+        chromePlugin: false,
+        codexResourceSharing: false,
+        remoteAgentConnections: false,
+      },
+      actions: {
+        managePlugins: () => openExternal('https://chatgpt.com/plugins'),
+        openExternal,
+      },
+      platform: 'custom',
+    });
+
+    const general = mount(SettingsView, {
+      props: {
+        activeTab: 'chatgpt',
+        settings: defaultThemeSettings,
+        generalSettings: defaultGeneralSettings,
+      },
+      global: { plugins: [ElementPlus] },
+    });
+    expect(general.findAll('.el-menu-item').map((item) => item.text())).not.toContain('ChatGPT');
+    expect(general.text()).toContain('General');
+    expect(general.text()).not.toContain('Behavior');
+    expect(general.text()).not.toContain('Advanced');
+    general.unmount();
+
+    const plugins = mount(SettingsView, {
+      props: {
+        activeTab: 'plugins',
+        settings: defaultThemeSettings,
+        generalSettings: defaultGeneralSettings,
+      },
+      global: { plugins: [ElementPlus] },
+    });
+    expect(plugins.find('[aria-label="Enable Chrome"]').exists()).toBe(false);
+    plugins.unmount();
+
+    const connections = mount(SettingsView, {
+      props: {
+        activeTab: 'connections',
+        settings: defaultThemeSettings,
+        generalSettings: defaultGeneralSettings,
+      },
+      global: { plugins: [ElementPlus] },
+    });
+    expect(connections.text()).not.toContain('Remote Codex Claw agents');
+    expect(connections.text()).not.toContain('Add remote');
+    expect(connections.text()).toContain('Device pairing');
   });
 });
 
