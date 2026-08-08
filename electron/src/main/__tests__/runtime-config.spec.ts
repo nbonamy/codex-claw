@@ -227,6 +227,16 @@ describe('runtime config', () => {
     expect(forgeConfig).toContain('copyPackagedNativeDependencies(buildPath)');
   });
 
+  it('loads Electron build environment variables from the workspace root', () => {
+    const repositoryRoot = path.resolve(__dirname, '../../../..');
+    const forgeConfig = readFileSync(path.join(repositoryRoot, 'electron/forge.config.ts'), 'utf8');
+    const mainViteConfig = readFileSync(path.join(repositoryRoot, 'electron/vite.main.config.ts'), 'utf8');
+
+    for (const config of [forgeConfig, mainViteConfig]) {
+      expect(config).toContain("dotenv.config({ path: path.resolve(__dirname, '../.env'), quiet: true })");
+    }
+  });
+
   it('pins and verifies the bundled Codex app-server executable', () => {
     const repositoryRoot = path.resolve(__dirname, '../../../..');
     const releaseConfig = JSON.parse(

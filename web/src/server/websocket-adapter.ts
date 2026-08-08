@@ -71,8 +71,8 @@ export function bindClawWebSocket(options: {
 
 function webSocketText(data: unknown): string {
   if (typeof data === 'string') return data;
-  if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) return new TextDecoder().decode(data);
   if (typeof Buffer !== 'undefined' && Buffer.isBuffer(data)) return data.toString();
+  if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) return new TextDecoder().decode(data);
   throw new TypeError('Claw WebSocket messages must contain text or UTF-8 bytes.');
 }
 

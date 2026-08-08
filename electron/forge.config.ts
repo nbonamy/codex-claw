@@ -13,7 +13,7 @@ import {
 import { copyPackagedNativeDependencies } from './build/package-native-dependencies';
 
 import dotenv from 'dotenv';
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../.env'), quiet: true });
 
 // macOS signing/notarization is release-only. Agents should set
 // CODEX_CLAW_SKIP_SIGNING=1 for local package/build verification.

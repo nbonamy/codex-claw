@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import path from 'node:path';
 import { sdkSourceAliases } from '../vite.sdk-aliases';
 
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../.env'), quiet: true });
 const useSdkSources = process.env.CODEX_APP_SDK_SOURCE === '1';
 
 export default defineConfig({

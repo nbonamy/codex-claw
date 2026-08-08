@@ -92,6 +92,67 @@ describe('Claw web WebSocket adapter', () => {
       ok: true,
     }));
   });
+
+  it('accepts byte frames and closes idempotently on socket errors', async () => {
+    const socket = new FakeSocket();
+    const unsubscribeEvent = vi.fn();
+    const backend = {
+      request: vi.fn().mockResolvedValue({ ok: true }),
+      onEvent: () => unsubscribeEvent,
+    };
+    const session = bindClawWebSocket({ backend, socket, userId: 'local-single-user' });
+    socket.receive(Buffer.from(JSON.stringify({
+      version: 1,
+      type: 'request',
+      id: 'bytes',
+      operation: 'getPluginStatus',
+      args: [],
+    })));
+    await vi.waitFor(() => expect(socket.messages.map(JSON.parse)).toContainEqual({
+      version: 1,
+      type: 'response',
+      id: 'bytes',
+      ok: true,
+      result: { ok: true },
+    }));
+
+    socket.fail();
+    session.close(1000, 'again');
+    expect(unsubscribeEvent).toHaveBeenCalledOnce();
+    expect(socket.closed).toBeNull();
+  });
+
+  it('returns string failures and ignores outbound messages after closing', async () => {
+    const socket = new FakeSocket();
+    let emitEvent: ((event: never) => void) | undefined;
+    const backend = {
+      request: vi.fn().mockRejectedValue('plain failure'),
+      onEvent: (listener: (event: never) => void) => {
+        emitEvent = listener;
+        return () => undefined;
+      },
+    };
+    const session = bindClawWebSocket({ backend, socket, userId: 'local-single-user' });
+    socket.receive(JSON.stringify({
+      version: 1,
+      type: 'request',
+      id: 'failure',
+      operation: 'getPluginStatus',
+      args: [],
+    }));
+    await vi.waitFor(() => expect(socket.messages.map(JSON.parse)).toContainEqual({
+      version: 1,
+      type: 'response',
+      id: 'failure',
+      ok: false,
+      error: 'plain failure',
+    }));
+    const count = socket.messages.length;
+    session.close(1000, 'done');
+    emitEvent?.({ seq: 9 } as never);
+    expect(socket.messages).toHaveLength(count);
+    expect(socket.closed).toEqual({ code: 1000, reason: 'done' });
+  });
 });
 
 class FakeSocket implements CodexWebSocketPort {
@@ -99,6 +160,7 @@ class FakeSocket implements CodexWebSocketPort {
   closed: { code?: number; reason?: string } | null = null;
   private readonly messageListeners = new Set<(data: unknown) => void>();
   private readonly closeListeners = new Set<(event: CodexWebSocketClose) => void>();
+  private readonly errorListeners = new Set<(error: unknown) => void>();
 
   send(data: string): void { this.messages.push(data); }
   close(code?: number, reason?: string): void { this.closed = { code, reason }; }
@@ -110,7 +172,14 @@ class FakeSocket implements CodexWebSocketPort {
     this.closeListeners.add(listener);
     return () => this.closeListeners.delete(listener);
   }
+  onError(listener: (error: unknown) => void): () => void {
+    this.errorListeners.add(listener);
+    return () => this.errorListeners.delete(listener);
+  }
   receive(data: unknown): void {
     for (const listener of this.messageListeners) listener(data);
+  }
+  fail(): void {
+    for (const listener of this.errorListeners) listener(new Error('socket failed'));
   }
 }
