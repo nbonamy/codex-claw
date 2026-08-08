@@ -7,7 +7,6 @@
     "backend",
     "vue",
     "electron",
-    "web-client",
     "web"
   ],
   "scripts": {
@@ -19,7 +18,7 @@
     "build:computer-use:local": "node scripts/prepare-computer-use.mjs --local",
     "build:electron": "node scripts/build.mjs",
     "build:sdk": "node scripts/build-sdk.mjs",
-    "build:web": "npm run build:sdk && npm run build -w @codex-claw/backend && npm run build -w @codex-claw/web-client && npm run build -w @codex-claw/web",
+    "build:web": "npm run build:sdk && npm run build -w @codex-claw/backend && npm run build -w @codex-claw/web",
     "check-publish:macos": "node scripts/publish-macos.mjs --check-only",
     "clawd:start": "node scripts/clawd-launch-agent.mjs start",
     "clawd:stop": "node scripts/clawd-launch-agent.mjs stop",
@@ -32,7 +31,7 @@
     "lint": "npm run lint --workspaces",
     "lint:css": "npm run lint:css -w @codex-claw/vue",
     "lint:electron": "npm run lint -w @codex-claw/electron",
-    "lint:web": "npm run lint -w @codex-claw/web-client && npm run lint -w @codex-claw/web",
+    "lint:web": "npm run lint -w @codex-claw/web",
     "make": "npm run make:electron",
     "make:electron": "npm run build:sdk && npm run build -w @codex-claw/backend && node scripts/package-backend.mjs && npm run make -w @codex-claw/electron",
     "package": "npm run package:electron",
@@ -48,12 +47,12 @@
     "test": "npm run test --workspaces",
     "test:coverage": "npm run test:coverage --workspaces",
     "test:coverage:electron": "npm run test:coverage -w @codex-claw/electron",
-    "test:coverage:web": "npm run test:coverage -w @codex-claw/web-client && npm run test:coverage -w @codex-claw/web",
+    "test:coverage:web": "npm run test:coverage -w @codex-claw/web",
     "test:electron": "npm run test -w @codex-claw/electron",
     "test:watch:electron": "npm run test:watch -w @codex-claw/electron",
-    "test:web": "npm run test -w @codex-claw/web-client && npm run test -w @codex-claw/web",
+    "test:web": "npm run test -w @codex-claw/web",
     "typecheck": "npm run typecheck --workspaces",
     "typecheck:electron": "npm run typecheck -w @codex-claw/electron",
-    "typecheck:web": "npm run typecheck -w @codex-claw/web-client && npm run typecheck -w @codex-claw/web"
+    "typecheck:web": "npm run typecheck -w @codex-claw/web"
   }
 }

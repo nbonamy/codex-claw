@@ -99,7 +99,6 @@ const desktopOnlyOperations = new Set([
   'openScreenRecordingSettings', 'quit', 'reloadRenderer', 'restartApp', 'setDaemonEnabled', 'setDockBadgeCount',
 ]);
 
-/** Maps the browser-facing API allowlist onto app-owned clawd methods. */
 export async function invokeClawWebOperation(
   backend: ClawBackendPort,
   operation: string,

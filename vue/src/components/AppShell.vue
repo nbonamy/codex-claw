@@ -346,7 +346,7 @@ import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilitie
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { findAssignedAgentForWorkItem } from '@codex-claw/core/work-assignments';
-import { clawHostActions, clawHostCapabilities, codexClawApi } from '../platform-api';
+import { clawHostCapabilities, codexClawApi } from '../platform-api';
 import AgentDialog from './AgentDialog.vue';
 import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
@@ -697,7 +697,7 @@ const authenticationLoading = ref(true);
 const authenticationCancelling = ref(false);
 const authenticationError = ref<string | null>(null);
 let authenticationPoll: ReturnType<typeof setInterval> | null = null;
-const settingsActiveTab = ref<SettingsTab>(clawHostActions.launchChatGpt ? 'chatgpt' : 'general');
+const settingsActiveTab = ref<SettingsTab>('chatgpt');
 const agentDialogVisible = ref(false);
 const agentDialogMode = ref<'create' | 'edit'>('create');
 const editingAgentId = ref<string | null>(null);

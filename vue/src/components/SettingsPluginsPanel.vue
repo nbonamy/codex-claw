@@ -24,7 +24,6 @@
         </template>
       </SettingsRow>
       <SettingsRow
-        v-if="clawHostCapabilities.chromePlugin"
         as="label"
         title="Chrome"
         :error="settingsError"
@@ -67,9 +66,9 @@ import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsPluginsBanner from './SettingsPluginsBanner.vue';
 import SettingsRow from './SettingsRow.vue';
 import SettingsSection from './SettingsSection.vue';
-import { clawHostActions, clawHostCapabilities } from '../platform-api';
+import { clawHostCapabilities, clawPlatformActions } from '../platform-api';
 
-type PendingPlugin = 'computerUse' | 'chrome' | null;
+type PendingPlugin = 'computerUse' | 'chrome';
 
 const props = withDefaults(defineProps<{
   settings?: AppPluginSettings;
@@ -104,7 +103,6 @@ watch(() => props.settings?.chromeEnabled, (value) => {
 });
 
 onMounted(() => {
-  if (!clawHostCapabilities.chromePlugin) return;
   void refreshPluginStatus();
   pluginStatusTimer = window.setInterval(() => { void refreshPluginStatus(); }, 5_000);
 });
@@ -113,7 +111,7 @@ onBeforeUnmount(() => {
   if (pluginStatusTimer !== undefined) window.clearInterval(pluginStatusTimer);
 });
 
-function updatePlugin(plugin: Exclude<PendingPlugin, null>, enabled: boolean): void {
+function updatePlugin(plugin: PendingPlugin, enabled: boolean): void {
   if (plugin === 'chrome') {
     settingsError.value = null;
     void managePlugins();
@@ -128,14 +126,13 @@ function updatePlugin(plugin: Exclude<PendingPlugin, null>, enabled: boolean): v
   void persistPlugin(plugin, false);
 }
 
-async function persistPlugin(plugin: Exclude<PendingPlugin, null>, enabled: boolean): Promise<void> {
+async function persistPlugin(plugin: PendingPlugin, enabled: boolean): Promise<void> {
   const key = plugin === 'computerUse' ? 'computerUseEnabled' : 'chromeEnabled';
   settingsError.value = null;
   try {
     await props.updateSettings({ general: { plugins: { [key]: enabled } } });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    settingsError.value = message;
+    settingsError.value = error instanceof Error ? error.message : String(error);
   }
 }
 
@@ -143,11 +140,7 @@ async function managePlugins(): Promise<void> {
   managingPlugins.value = true;
   settingsError.value = null;
   try {
-    const openManager = clawHostActions.managePlugins;
-    if (!openManager) {
-      throw new Error('Plugin management is unavailable from this host.');
-    }
-    await openManager();
+    await clawPlatformActions.managePlugins();
   } catch (error) {
     settingsError.value = error instanceof Error ? error.message : String(error);
   } finally {

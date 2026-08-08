@@ -5,7 +5,6 @@ import { formatConversationTitle } from '@codex-claw/core/conversation-title';
 import { updateLoopExecutionAgentConversationInSnapshot } from '@codex-claw/core/loop-manager';
 import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/core/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
-import type { ClawdRuntimeFeatures } from '@codex-claw/core/clawd-launch';
 import { BackendDriverRpc, createDefaultBackendDrivers } from './driver-rpc';
 import { RemoteClawdClientManager } from './connections/remote-clawd-client';
 import { SshConnectionService } from './connections/ssh-connections';
@@ -26,7 +25,10 @@ export type ClawdClientRequest = <Result>(method: string, params?: unknown) => P
 
 export type ClawdRuntimeOptions = {
   emitEvent(event: ClawBackendEvent): void;
-  features?: Partial<ClawdRuntimeFeatures>;
+  features?: {
+    computerUse?: boolean;
+    embeddedBrowser?: boolean;
+  };
   requestClient: ClawdClientRequest;
   version: string;
 };
@@ -37,13 +39,10 @@ export type ClawdRuntime = {
 };
 
 export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<ClawdRuntime> {
-  const codexResourceSharingAvailable = options.features?.codexResourceSharing !== false;
   const computerUseAvailable = options.features?.computerUse !== false;
   const embeddedBrowserAvailable = options.features?.embeddedBrowser !== false;
   const snapshot = await loadBackendSnapshot();
-  await initializeCodexResourceSharing(
-    codexResourceSharingAvailable && snapshot.general.shareCodexSkillsAndPlugins,
-  );
+  await initializeCodexResourceSharing(snapshot.general.shareCodexSkillsAndPlugins);
   await ensureBackendCodexHome();
   let pluginStatus = await loadPluginStatus();
   const pluginSettings = () => ({
@@ -123,7 +122,6 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   server = new ClawBackendServer({
     version: options.version,
     snapshot,
-    codexResourceSharingAvailable,
     driverRpc,
     onEvent: options.emitEvent,
     onBackendEventApplied: (event) => mcpService.handleBackendEvent(event),

@@ -9,7 +9,6 @@ export default defineConfig({
     alias: {
       '@codex-claw/core': path.resolve(__dirname, '../core/src'),
       '@codex-claw/vue': path.resolve(__dirname, '../vue/src'),
-      '@codex-claw/web-client': path.resolve(__dirname, '../web-client/src'),
     },
   },
   build: {

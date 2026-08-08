@@ -9,7 +9,6 @@
       title-id="settings-general-behavior-title"
     >
       <SettingsRow
-        v-if="clawHostCapabilities.daemonManagement"
         as="label"
         title="Prevent sleep while agents run"
         description="Keep this computer awake while an agent is active"
@@ -23,7 +22,6 @@
         </template>
       </SettingsRow>
       <SettingsRow
-        v-if="clawHostCapabilities.daemonManagement"
         as="label"
         title="Keep Codex Claw ready in the background"
         :description="daemonDescription"
@@ -170,12 +168,10 @@
     </SettingsSection>
 
     <SettingsSection
-      v-if="clawHostCapabilities.codexResourceSharing || clawHostCapabilities.nativeFileDialogs"
       title="Advanced"
       title-id="settings-general-advanced-title"
     >
       <SettingsRow
-        v-if="clawHostCapabilities.codexResourceSharing"
         as="label"
         title="Share skills and plugins with ChatGPT"
         :description="codexResourceSharingDescription"

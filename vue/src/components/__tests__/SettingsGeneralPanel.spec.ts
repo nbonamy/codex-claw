@@ -1,17 +1,13 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus, { ElMessageBox } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { webClawHostCapabilities } from '@codex-claw/core/client';
 import type { ClawdDaemonStatus, SystemPermissionsStatus } from '@codex-claw/core/contracts';
 import { defaultGeneralSettings } from '@codex-claw/core/settings';
-import { configureClawClient } from '../../platform-api';
-import { configureElectronTestClient } from '../../test/client';
 import SettingsGeneralPanel from '../SettingsGeneralPanel.vue';
 
 describe('SettingsGeneralPanel', () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    configureElectronTestClient(window.codexClaw);
   });
 
   it('updates the prevent sleep setting', async () => {
@@ -289,22 +285,6 @@ describe('SettingsGeneralPanel', () => {
       expect.objectContaining({ confirmButtonText: 'Continue', cancelButtonText: 'Cancel' }),
     );
     expect(setCodexResourceSharing).toHaveBeenCalledWith({ enabled: true });
-  });
-
-  it('hides resource sharing when the host does not provide it', async () => {
-    configureClawClient({
-      api: window.codexClaw!,
-      capabilities: { ...webClawHostCapabilities, codexResourceSharing: false },
-      actions: { managePlugins: vi.fn(), openExternal: vi.fn() },
-      platform: 'custom',
-    });
-
-    const wrapper = mountPanel({});
-    await flushPromises();
-
-    expect(wrapper.text()).not.toContain('Share skills and plugins with ChatGPT');
-    expect(wrapper.text()).not.toContain('Behavior');
-    expect(wrapper.text()).not.toContain('Advanced');
   });
 
   it('copies ChatGPT resources when sharing is turned off with Copy', async () => {

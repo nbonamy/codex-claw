@@ -39,16 +39,6 @@ describe('backend state loading', () => {
     expect(directory.isDirectory()).toBe(true);
   });
 
-  it('uses the trusted managed Codex home without moving Claw product state', async () => {
-    const codexHome = path.join(tempDir, 'user', '.codex');
-    vi.stubEnv('CODEX_CLAW_CODEX_HOME', codexHome);
-
-    expect(backendCodexHomeDir()).toBe(codexHome);
-    expect(backendStateFilePath()).toBe(path.join(homeDir, 'state.json'));
-    await expect(ensureBackendCodexHome()).resolves.toBe(codexHome);
-    expect((await stat(codexHome)).isDirectory()).toBe(true);
-  });
-
   it('creates a default snapshot when no state file exists', async () => {
     const snapshot = await loadBackendSnapshot();
 

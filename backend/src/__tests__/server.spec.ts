@@ -4660,38 +4660,6 @@ describe('ClawBackendServer', () => {
     expect(configureCodexResourceSharing).not.toHaveBeenCalled();
   });
 
-  it('reports resource sharing as disabled and rejects changes when the host disallows it', async () => {
-    const snapshot = createTestSnapshot();
-    const configureCodexResourceSharing = vi.fn().mockResolvedValue(undefined);
-    const inspectCodexResourceSharing = vi.fn().mockResolvedValue({ enabled: true, migrationRequired: true });
-    const server = new ClawBackendServer({
-      version: 'test-version',
-      snapshot,
-      codexResourceSharingAvailable: false,
-      configureCodexResourceSharing,
-      inspectCodexResourceSharing,
-    });
-
-    await expect(server.handleMessage({
-      jsonrpc: '2.0',
-      id: 'resource-sharing-unavailable-status',
-      method: backendMethods.settingsCodexResourceSharingGet,
-    })).resolves.toStrictEqual({
-      jsonrpc: '2.0',
-      id: 'resource-sharing-unavailable-status',
-      result: { enabled: false, migrationRequired: false },
-    });
-    await expect(server.handleMessage({
-      jsonrpc: '2.0',
-      id: 'resource-sharing-unavailable-set',
-      method: backendMethods.settingsCodexResourceSharingSet,
-      params: { input: { enabled: true } },
-    })).rejects.toThrow('Skills and plugins sharing is unavailable for this host.');
-
-    expect(inspectCodexResourceSharing).not.toHaveBeenCalled();
-    expect(configureCodexResourceSharing).not.toHaveBeenCalled();
-  });
-
   it('allows an active chat to keep the existing isolated resource setup', async () => {
     const snapshot = createTestSnapshot();
     snapshot.agents = [{

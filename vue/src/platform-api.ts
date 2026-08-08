@@ -2,7 +2,6 @@ import {
   desktopClawHostCapabilities,
   webClawHostCapabilities,
   type ClawClient,
-  type ClawHostActions,
   type ClawHostCapabilities,
 } from '@codex-claw/core/client';
 import type { CodexClawApi } from '@codex-claw/core/contracts';
@@ -10,29 +9,30 @@ import type { CodexClawApi } from '@codex-claw/core/contracts';
 export const CODEX_APP_DEEP_LINK = 'codex://' as const;
 export const CHATGPT_PLUGINS_URL = 'https://chatgpt.com/plugins' as const;
 
+export type ClawPlatformActions = {
+  launchChatGpt(): void | Promise<void>;
+  managePlugins(): void | Promise<void>;
+  openExternal?: (url: string) => void | Promise<void>;
+};
+
 export let codexClawApi: CodexClawApi | undefined;
 export let clawHostCapabilities: Readonly<ClawHostCapabilities> = webClawHostCapabilities;
 export let clawClientPlatform: ClawClient['platform'] = 'web';
-export let clawHostActions: Readonly<ClawHostActions> = webHostActions();
+export let clawPlatformActions: Readonly<ClawPlatformActions> = webPlatformActions();
 
 export function configureClawClient(client?: ClawClient): void {
   codexClawApi = client?.api;
   clawClientPlatform = client?.platform ?? 'web';
-  if (client?.platform === 'custom') {
-    clawHostCapabilities = client.capabilities;
-    clawHostActions = client.actions;
-    return;
-  }
   if (client?.platform === 'desktop') {
     clawHostCapabilities = desktopClawHostCapabilities;
-    clawHostActions = desktopHostActions(client.api);
+    clawPlatformActions = desktopPlatformActions(client.api);
     return;
   }
   clawHostCapabilities = webClawHostCapabilities;
-  clawHostActions = webHostActions();
+  clawPlatformActions = webPlatformActions();
 }
 
-function desktopHostActions(api: CodexClawApi | undefined): Readonly<ClawHostActions> {
+function desktopPlatformActions(api: CodexClawApi | undefined): Readonly<ClawPlatformActions> {
   const launchChatGpt = () => {
     if (typeof api?.launchChatGptApp !== 'function') {
       throw new Error('ChatGPT could not be launched from this window.');
@@ -45,7 +45,7 @@ function desktopHostActions(api: CodexClawApi | undefined): Readonly<ClawHostAct
   };
 }
 
-function webHostActions(): Readonly<ClawHostActions> {
+function webPlatformActions(): Readonly<ClawPlatformActions> {
   return {
     launchChatGpt: () => {
       window.location.assign(CODEX_APP_DEEP_LINK);

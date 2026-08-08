@@ -74,10 +74,8 @@ Rules:
   Components consume injected app APIs and capability flags; they do not read
   Electron globals or branch on user-agent strings.
 - Keep product platform names separate from implementation technology.
-  `ClawClient.platform` is `desktop`, `web`, or `custom`: Claw owns the complete
-  desktop and web profiles, while custom embedders must explicitly provide
-  their capabilities and host actions. Electron is the current desktop adapter,
-  not a renderer platform contract.
+  `ClawClient.platform` is `desktop` or `web`; Electron is the current desktop
+  adapter, not a renderer platform contract.
 - Treat transcription as an SDK-native capability. A host that does not supply
   transcription gets no microphone from the SDK composer; do not add a second
   Claw transcription setting or feature flag.
@@ -206,18 +204,13 @@ implemented:
   account menu;
 - full-space Settings surface launched from the rail, with its own category
   sidebar and screen-level panels instead of dialog chrome. Desktop launches
-  the ChatGPT process with Claw's isolated `CODEX_HOME`, web opens the
-  `codex://` deep link, and custom hosts expose the ChatGPT page only when they
-  supply a launch action. Plugins keeps Computer Use and Chrome disabled by
-  default, persists explicit capability choices, and routes plugin management
-  through the host action (the built-in web profile uses
-  `https://chatgpt.com/plugins`). Empty General sections are omitted so a
-  restricted custom profile can intentionally leave the page blank.
-  Connections keeps optional remote Claw hosts separate from official Codex
-  device pairing, including pairing progress and paired-device revocation;
-  custom hosts may omit remote-host management while retaining device pairing.
-  External authorization links use a host action instead of assuming the clawd
-  process can open a local browser. Appshots configures a
+  the ChatGPT process with Claw's isolated `CODEX_HOME`, while web opens the
+  `codex://` deep link. Plugins keeps Computer Use and Chrome disabled by
+  default, persists explicit capability choices, and opens plugin management
+  through the built-in platform behavior (ChatGPT on desktop and
+  `https://chatgpt.com/plugins` on web); Connections keeps
+  remote Claw hosts separate from official Codex device pairing, including
+  pairing progress and paired-device revocation. Appshots configures a
   left-and-right modifier chord, active-agent destination, and capture sound;
   General → System permissions reports both Accessibility and the Computer Use
   helper's Screen Recording permission. General → Advanced shares ChatGPT's

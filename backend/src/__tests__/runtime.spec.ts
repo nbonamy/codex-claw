@@ -336,20 +336,6 @@ describe('clawd runtime', () => {
     expect(requestClient).not.toHaveBeenCalled();
   });
 
-  it('forces isolated Codex resources when sharing is unavailable', async () => {
-    mocks.snapshot.general = { shareCodexSkillsAndPlugins: true };
-
-    await createClawdRuntime({
-      emitEvent,
-      features: { codexResourceSharing: false },
-      requestClient,
-      version: '1.2.3',
-    });
-
-    expect(mocks.initializeCodexResourceSharing).toHaveBeenCalledWith(false);
-    expect(mocks.serverOptions[0]).toMatchObject({ codexResourceSharingAvailable: false });
-  });
-
   it('uses the installed Chrome plugin status for Codex sessions and refreshes it from settings', async () => {
     mocks.snapshot.general = {
       plugins: { computerUseEnabled: false, chromeEnabled: false },

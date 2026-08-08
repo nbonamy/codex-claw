@@ -4,7 +4,7 @@ import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import { afterEach, describe, expect, it } from 'vitest';
 import backendPackage from '../../package.json';
-import { CLAWD_VERSION, connectToDaemon, main, runtimeFeatures } from '../clawd';
+import { CLAWD_VERSION, connectToDaemon, main } from '../clawd';
 import { LocalSocketRpcServer } from '../socket-server';
 
 describe('clawd entrypoint', () => {
@@ -47,29 +47,6 @@ describe('clawd entrypoint', () => {
     expect(process.exitCode).toBe(1);
     expect(writes.join('')).toContain('Unsupported option: --state-dir');
     expect(writes.join('')).toContain('CODEX_CLAW_HOME');
-  });
-
-  it('uses fail-closed backend options for unknown named hosts', () => {
-    expect(runtimeFeatures('managed')).toStrictEqual({
-      codexResourceSharing: false,
-      computerUse: false,
-      embeddedBrowser: false,
-    });
-    expect(runtimeFeatures('web')).toStrictEqual({
-      codexResourceSharing: true,
-      computerUse: false,
-      embeddedBrowser: false,
-    });
-    expect(runtimeFeatures('unexpected-host')).toStrictEqual({
-      codexResourceSharing: false,
-      computerUse: false,
-      embeddedBrowser: false,
-    });
-    expect(runtimeFeatures('desktop')).toStrictEqual({
-      codexResourceSharing: true,
-      computerUse: true,
-      embeddedBrowser: true,
-    });
   });
 
   it('prints usage and exits non-zero when no command is selected', async () => {

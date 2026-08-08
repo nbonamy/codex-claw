@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { invokeClawWebOperation } from '../operations';
+import { invokeClawWebOperation } from '../server/operations';
 
 describe('Claw web operations', () => {
   it('maps allowlisted product operations to clawd methods', async () => {

@@ -42,7 +42,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { BrandOpenaiIcon } from '../shared/icons/app-icons';
-import { clawHostActions } from '../platform-api';
+import { clawPlatformActions } from '../platform-api';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 
 const props = defineProps<{
@@ -56,10 +56,7 @@ async function launch(): Promise<void> {
   launchError.value = null;
   launching.value = true;
   try {
-    const launchApp = props.launchChatGptApp ?? clawHostActions.launchChatGpt;
-    if (!launchApp) {
-      throw new Error('ChatGPT could not be launched from this window.');
-    }
+    const launchApp = props.launchChatGptApp ?? clawPlatformActions.launchChatGpt;
     await launchApp();
   } catch (error) {
     launchError.value = error instanceof Error ? error.message : String(error);

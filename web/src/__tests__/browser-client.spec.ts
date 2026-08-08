@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createClawBrowserClient } from '../client';
+import { createClawBrowserClient } from '../browser-client';
 
 describe('Claw browser client', () => {
   it('waits for readiness, correlates operations, and emits backend events', async () => {
@@ -9,10 +9,10 @@ describe('Claw browser client', () => {
     api.onEvent(listener);
     queueMicrotask(() => socket.receive({ version: 1, type: 'ready', userId: 'local-single-user' }));
 
-    const pending = api.createTeam({ name: 'Claw', color: '#000000' });
+    const pending = api.createTeam({ name: 'Claw' });
     await vi.waitFor(() => expect(socket.sent).toHaveLength(1));
     const request = JSON.parse(socket.sent[0]!);
-    expect(request).toMatchObject({ operation: 'createTeam', args: [{ name: 'Claw', color: '#000000' }] });
+    expect(request).toMatchObject({ operation: 'createTeam', args: [{ name: 'Claw' }] });
 
     socket.receive({ version: 1, type: 'response', id: request.id, ok: true, result: { teams: [] } });
     await expect(pending).resolves.toEqual({ teams: [] });
@@ -51,7 +51,7 @@ describe('Claw browser client', () => {
     expect(unsubscribeUpdate()).toBeUndefined();
     socket.receive({ version: 1, type: 'ready', userId: 'local-single-user' });
 
-    const failed = api.createTeam({ name: 'Claw', color: '#000000' });
+    const failed = api.createTeam({ name: 'Claw' });
     await vi.waitFor(() => expect(socket.sent).toHaveLength(1));
     const failedRequest = JSON.parse(socket.sent[0]!);
     socket.receiveBytes({

@@ -1,10 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import {
-  assertCompatibleClawdHealth,
-  type ClawdEnvironmentLaunchContract,
-} from '@codex-claw/core/clawd-launch';
-import {
   createClawRpcError,
   clawRpcErrorCodes,
   isClawRpcNotification,
@@ -12,16 +8,16 @@ import {
   isClawRpcResponse,
   parseClawRpcMessage,
   type ClawBackendEvent,
-  type ClawBackendHealth,
   type ClawRpcId,
   type ClawRpcResponse,
 } from '@codex-claw/core/backend-protocol/rpc';
 
-export type ClawdStdioBackendClientOptions = {
-  launch: ClawdEnvironmentLaunchContract;
+export type ClawWebBackendProcessOptions = {
+  command: string;
+  args: string[];
+  cwd?: string;
   env?: NodeJS.ProcessEnv;
   requestTimeoutMs?: number;
-  versionPreflightTimeoutMs?: number;
 };
 
 type PendingRequest = {
@@ -30,22 +26,20 @@ type PendingRequest = {
   timeout: ReturnType<typeof setTimeout>;
 };
 
-export class ClawdStdioBackendClient {
+export class ClawWebBackendProcess {
   private child: ChildProcessWithoutNullStreams | null = null;
   private stdoutBuffer = '';
   private sequence = 0;
   private readonly pending = new Map<ClawRpcId, PendingRequest>();
   private readonly eventListeners = new Set<(event: ClawBackendEvent) => void>();
 
-  constructor(private readonly options: ClawdStdioBackendClientOptions) {}
+  constructor(private readonly options: ClawWebBackendProcessOptions) {}
 
   async start(): Promise<void> {
     if (this.child) return;
-    await this.verifyArtifactVersion();
-    const launch = this.options.launch;
-    const child = spawn(launch.command, [...launch.args], {
-      cwd: launch.cwd,
-      env: { ...process.env, ...this.options.env, ...launch.env },
+    const child = spawn(this.options.command, this.options.args, {
+      cwd: this.options.cwd,
+      env: { ...process.env, ...this.options.env, CODEX_CLAW_HOST: 'web' },
       stdio: 'pipe',
     });
     this.child = child;
@@ -56,18 +50,12 @@ export class ClawdStdioBackendClient {
       child,
       new Error(`clawd exited (code=${code ?? 'null'}, signal=${signal ?? 'null'}).`),
     ));
-    try {
-      const health = await this.request<ClawBackendHealth>(backendMethods.backendHealthGet);
-      assertCompatibleClawdHealth(health, launch.readiness.expectedVersion);
-    } catch (error) {
-      await this.stopChild(child);
-      throw error;
-    }
+    await this.request(backendMethods.backendHealthGet);
   }
 
   request<Result>(method: string, params?: unknown): Promise<Result> {
     const child = this.child;
-    if (!child) return Promise.reject(new Error('clawd is not running.'));
+    if (!child) return Promise.reject(new Error('Claw web backend is not running.'));
     const id = ++this.sequence;
     const message = params === undefined
       ? { jsonrpc: '2.0' as const, id, method }
@@ -91,64 +79,15 @@ export class ClawdStdioBackendClient {
   async close(): Promise<void> {
     const child = this.child;
     this.child = null;
-    this.rejectPending(new Error('clawd closed.'));
+    this.rejectPending(new Error('Claw web backend closed.'));
     if (!child || child.killed) return;
-    await this.stopChild(child);
-  }
-
-  private async verifyArtifactVersion(): Promise<void> {
-    const launch = this.options.launch;
-    const child = spawn(launch.command, [...launch.artifact.versionArgs], {
-      cwd: launch.cwd,
-      env: { ...process.env, ...this.options.env, ...launch.env },
-      stdio: 'pipe',
-    });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
-    child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
-    await new Promise<void>((resolve, reject) => {
-      let settled = false;
-      let timeout: ReturnType<typeof setTimeout>;
-      const finish = (error?: Error) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timeout);
-        error ? reject(error) : resolve();
-      };
-      timeout = setTimeout(() => {
-        child.kill(launch.shutdown.signal);
-        finish(new Error('clawd version preflight timed out.'));
-      }, this.options.versionPreflightTimeoutMs ?? this.options.requestTimeoutMs ?? 60_000);
-      child.once('error', (error) => finish(error));
-      child.once('exit', (code, signal) => {
-        if (code !== 0) {
-          const detail = stderr.trim() || `signal=${signal ?? 'null'}`;
-          finish(new Error(`clawd version preflight failed (code=${code ?? 'null'}): ${detail}`));
-          return;
-        }
-        const expected = `clawd ${launch.artifact.expectedVersion}`;
-        if (stdout.trim() !== expected) {
-          finish(new Error(`Incompatible clawd artifact: expected '${expected}', received '${stdout.trim()}'.`));
-          return;
-        }
-        finish();
-      });
-    });
-  }
-
-  private async stopChild(child: ChildProcessWithoutNullStreams): Promise<void> {
-    await new Promise<void>((resolve, reject) => {
-      const onExit = () => {
+    await new Promise<void>((resolve) => {
+      const timeout = setTimeout(resolve, 5_000);
+      child.once('exit', () => {
         clearTimeout(timeout);
         resolve();
-      };
-      const timeout = setTimeout(() => {
-        child.off('exit', onExit);
-        reject(new Error(`clawd did not exit within ${this.options.launch.shutdown.timeoutMs}ms.`));
-      }, this.options.launch.shutdown.timeoutMs);
-      child.once('exit', onExit);
-      child.kill(this.options.launch.shutdown.signal);
+      });
+      child.kill();
     });
   }
 
@@ -181,7 +120,7 @@ export class ClawdStdioBackendClient {
       this.writeResponse(createClawRpcError(
         message.id,
         clawRpcErrorCodes.methodNotFound,
-        `Client method '${message.method}' is unavailable for this clawd host.`,
+        `Client method '${message.method}' is unavailable in Claw Web.`,
       ));
       return;
     }

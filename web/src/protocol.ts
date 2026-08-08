@@ -1,6 +1,5 @@
 import type { MainToRendererEvent } from '@codex-claw/core/contracts';
 
-/** Version shared by browser clients and their Claw gateway. */
 export const clawWebProtocolVersion = 1 as const;
 
 export type ClawWebRequest = {

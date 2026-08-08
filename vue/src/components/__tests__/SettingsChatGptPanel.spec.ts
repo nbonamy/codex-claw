@@ -1,9 +1,15 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { CodexClawApi } from '@codex-claw/core/contracts';
 import SettingsChatGptPanel from '../SettingsChatGptPanel.vue';
+import { configureClawClient } from '../../platform-api';
 
 describe('SettingsChatGptPanel', () => {
+  beforeEach(() => {
+    configureClawClient({ api: {} as CodexClawApi, platform: 'desktop' });
+  });
+
   it('explains where Codex settings are managed and launches ChatGPT', async () => {
     const launchChatGptApp = vi.fn().mockResolvedValue(undefined);
     const wrapper = mount(SettingsChatGptPanel, {
@@ -64,7 +70,7 @@ describe('SettingsChatGptPanel', () => {
     expect(wrapper.get('button').classes()).not.toContain('is-loading');
   });
 
-  it('shows a friendly error when the desktop bridge is unavailable', async () => {
+  it('shows a friendly error when the desktop action is unavailable', async () => {
     const wrapper = mount(SettingsChatGptPanel, {
       global: { plugins: [ElementPlus] },
     });

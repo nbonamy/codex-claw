@@ -1,7 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { webClawHostCapabilities } from '@codex-claw/core/client';
 import type { CodexClawApi } from '@codex-claw/core/contracts';
 import SettingsPluginsPanel from '../SettingsPluginsPanel.vue';
 import { configureClawClient } from '../../platform-api';
@@ -110,7 +109,6 @@ describe('SettingsPluginsPanel', () => {
 
     await wrapper.get('[aria-label="Manage other plugins in ChatGPT"]').trigger('click');
     await flushPromises();
-
     expect(builtInLaunchChatGpt).toHaveBeenCalledOnce();
     expect(updateSettings).not.toHaveBeenCalled();
   });
@@ -126,27 +124,5 @@ describe('SettingsPluginsPanel', () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain('ChatGPT is unavailable.');
-  });
-
-  it('lets a custom host hide Chrome and open web plugin management', async () => {
-    const managePlugins = vi.fn().mockResolvedValue(undefined);
-    const getPluginStatus = vi.fn();
-    configureClawClient({
-      api: {} as CodexClawApi,
-      capabilities: { ...webClawHostCapabilities, chromePlugin: false },
-      actions: { managePlugins, openExternal: vi.fn() },
-      platform: 'custom',
-    });
-    const wrapper = mount(SettingsPluginsPanel, {
-      props: { getPluginStatus },
-      global: { plugins: [ElementPlus] },
-    });
-
-    expect(wrapper.find('[aria-label="Enable Chrome"]').exists()).toBe(false);
-    await wrapper.get('[aria-label="Manage other plugins in ChatGPT"]').trigger('click');
-    await flushPromises();
-
-    expect(managePlugins).toHaveBeenCalledOnce();
-    expect(getPluginStatus).not.toHaveBeenCalled();
   });
 });

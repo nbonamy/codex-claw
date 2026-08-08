@@ -1,5 +1,5 @@
 import { mountClawVueApp } from '@codex-claw/vue/bootstrap';
-import { createClawBrowserClient } from '@codex-claw/web-client/client';
+import { createClawBrowserClient } from '../browser-client';
 
 const api = createClawBrowserClient({
   createSocket: () => new WebSocket(webSocketUrl('/claw')),

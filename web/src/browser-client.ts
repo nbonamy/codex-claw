@@ -17,7 +17,6 @@ type PendingRequest = {
   timeout: ReturnType<typeof setTimeout>;
 };
 
-/** Builds the Claw API over a WebSocket whose authentication and URL are owned by the host. */
 export function createClawBrowserClient(options: CreateClawBrowserClientOptions): CodexClawApi {
   const transport = new ClawBrowserTransport(options);
   return new Proxy({}, {

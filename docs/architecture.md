@@ -205,29 +205,15 @@ The workspace layers are explicit:
 - `@codex-claw/vue` owns the reusable Vue product shell and receives a typed
   `ClawClient` at bootstrap;
 - `@codex-claw/electron` composes preload IPC and desktop-native capabilities;
-- `@codex-claw/web-client` owns the versioned browser protocol, browser client
-  factory, gateway session binder, and allowlisted browser-to-backend operation
-  mapper without owning authentication or a WebSocket URL. Its Node subpath
-  also owns the reusable stdio client that preflights and connects a managed
-  `clawd` artifact;
-- `@codex-claw/web` is the localhost Express composition root using that shared
-  browser/gateway package; and
+- `@codex-claw/web` composes the same Vue shell with an Express-owned WebSocket
+  adapter built on the SDK web socket ports; and
 - `@codex-claw/backend` remains the product authority and agent runtime.
 
 The initial web server binds to `127.0.0.1`, uses an explicit fixed
 `local-single-user` identity, and starts a dedicated stdio `clawd` child. The
 browser can invoke only an allowlisted set of product operations; desktop-only
-methods are rejected server-side. This is deliberately not an acceptable
-public deployment model. Authentication must replace the fixed identity and
-select an isolated backend/state home before the bind address is widened or
-multiple users are admitted.
-
-A separately deployed managed host can consume the same `@codex-claw/core`,
-`@codex-claw/vue`, and `@codex-claw/web-client` contracts. Its authenticated
-gateway supplies the already-authorized WebSocket to `createClawBrowserClient`;
-the shared client does not choose a URL, attach credentials, refresh sessions,
-or select a tenant environment. The gateway authorizes an opaque environment
-ID before binding that socket to one isolated `clawd` process.
+methods are rejected server-side. It is intentionally a local, single-user
+host and is not a public deployment foundation.
 
 Root host commands use the same Electron/Web suffixes:
 
@@ -252,9 +238,6 @@ and its `clawd` runtime omits Computer Use and embedded-browser MCP tools even
 if a persisted desktop preference had enabled them. Voice transcription is an
 SDK-native capability: the SDK composer hides the microphone when a host does
 not provide transcription, so Claw does not maintain a duplicate flag.
-Managed browser hosts can supply their own UI capabilities. Unknown named
-`clawd` hosts fail closed for Computer Use, embedded-browser backend tools, and
-Codex resource sharing; the local Web profile enables only resource sharing.
 
 ```mermaid
 flowchart LR

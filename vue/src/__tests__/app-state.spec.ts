@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
 import { createEmptySnapshot, createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
-import { webClawHostCapabilities } from '@codex-claw/core/client';
 import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
@@ -1007,7 +1006,7 @@ describe('useAppState', () => {
     expect(state.workItemsByRepository.value['github:nbonamy/codex-claw']).toStrictEqual([item]);
   });
 
-  it('opens provider authorization through a custom host action', async () => {
+  it('opens provider authorization in the browser for the web platform', async () => {
     vi.useFakeTimers();
     const snapshot = createInitialSnapshot();
     snapshot.workBacklog.connections = [{ provider: 'github', status: 'connecting' }];
@@ -1021,31 +1020,26 @@ describe('useAppState', () => {
       },
     });
     const backendOpenAuthorization = vi.fn();
-    const openExternal = vi.fn();
+    const openExternal = vi.spyOn(window, 'open').mockReturnValue(null);
     const api = {
       connectWorkProvider,
       openWorkProviderAuthorization: backendOpenAuthorization,
     } as unknown as CodexClawApi;
-    configureClawClient({
-      api,
-      capabilities: {
-        ...webClawHostCapabilities,
-        chromePlugin: false,
-        codexResourceSharing: false,
-        remoteAgentConnections: false,
-      },
-      actions: { managePlugins: vi.fn(), openExternal },
-      platform: 'custom',
-    });
+    configureClawClient({ api, platform: 'web' });
     const state = useAppState();
     state.snapshot.value = createInitialSnapshot();
 
     await state.connectWorkProvider('github');
     await state.openWorkProviderAuthorization('github');
 
-    expect(openExternal).toHaveBeenCalledWith('https://github.com/login/device');
+    expect(openExternal).toHaveBeenCalledWith(
+      'https://github.com/login/device',
+      '_blank',
+      'noopener,noreferrer',
+    );
     expect(backendOpenAuthorization).not.toHaveBeenCalled();
     expect(state.workBacklogStatus.value).toBe('loaded');
+    openExternal.mockRestore();
   });
 
   it('assigns work items through the existing agent prompt path', async () => {

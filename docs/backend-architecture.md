@@ -40,8 +40,7 @@ Current implementation checkpoint:
   dedicated stdio `clawd` child.
 - The initial web identity is fixed and server-owned, the listener defaults to
   localhost, and the browser protocol is an explicit allowlist over app-owned
-  backend methods. Multi-user hosting requires authenticated tenant lookup and
-  a per-user backend/state lease at this seam.
+  backend methods. The web host is intentionally local and single-user.
 - Web-launched `clawd` processes receive a host feature profile. Computer Use
   and embedded-browser MCP tools are removed from that runtime rather than
   being hidden only in the renderer.
@@ -290,7 +289,6 @@ Workspace package names:
 - `@codex-claw/backend`
 - `@codex-claw/vue`
 - `@codex-claw/electron`
-- `@codex-claw/web-client`
 - `@codex-claw/web`
 
 Package ownership:
@@ -310,27 +308,18 @@ Package ownership:
   depends on `@codex-claw/core` and `@codex-claw/vue`; it should talk to the
   backend through the app-owned backend protocol/client rather than importing
   backend internals.
-- `web-client` contains the host-neutral browser client, the versioned browser
-  protocol, the gateway session binder, its allowlisted operation mapping, and
-  the Node stdio backend client shared by localhost Web and managed hosts. The
-  stdio client preflights `clawd --version`, validates health readiness, correlates
-  JSON-RPC and events, and performs bounded graceful shutdown. The package
-  depends on core and the SDK web transport ports, but owns no HTTP server,
-  authentication policy, tenant lookup, or WebSocket URL.
-- `web` contains the localhost browser composition root and Express server. It
-  depends on core, Vue, and web-client, and starts a built `clawd` artifact
-  rather than importing backend internals.
+- `web` contains the browser composition root and the Express-owned product
+  WebSocket bridge. It depends on core, Vue, and the SDK web transport ports,
+  and starts a built `clawd` artifact rather than importing backend internals.
 
 Dependency rules:
 
-- `core` has no dependency on `backend`, `vue`, `electron`, `web-client`, or
-  `web`.
+- `core` has no dependency on `backend`, `vue`, `electron`, or `web`.
 - `backend` may depend on `core`, never on a host or UI package.
 - `vue` may depend on `core`, never on a host package.
-- `electron` and `web` may depend on `core` and `vue`; `web` also depends on
-  `web-client`. Hosts should not depend on `backend` at the source-code level.
-  In development they may spawn `backend`'s built `clawd`
-  artifact, and in release they may package the backend executable or bundled
+- `electron` and `web` may depend on `core` and `vue`, but should not depend on `backend` at the
+  source-code level. In development it may spawn `backend`'s built `clawd`
+  artifact, and in release it may package the backend executable or bundled
   script as a resource.
 - Cross-package imports should use package names such as
   `@codex-claw/core`, not deep relative paths across workspace boundaries.
@@ -339,9 +328,9 @@ Dependency rules:
   stable, but the first reorg can keep build wiring simple if needed.
 
 This layout makes the process boundary visible in the filesystem. Root is the
-product monorepo; `electron` and `web` are host runtimes; `web-client` is the
-reusable browser/gateway bridge; `vue` is the reusable UI; `backend` is the
-product backend; and `core` is the compile-time contract bridge.
+product monorepo; `electron` and `web` are host runtimes; `vue` is the reusable
+UI; `backend` is the product backend; and `core` is the compile-time contract
+bridge.
 
 ## Source Facts
 
@@ -640,30 +629,6 @@ The exact script names can change, but the shape should stay:
 - Every local `clawd` launch derives Codex app-server `CODEX_HOME` as
   `$CODEX_CLAW_HOME/codex-home` (default
   `~/.codex-claw/codex-home`) and ignores an inherited normal Codex home.
-- Hosted environments use the exported
-  `@codex-claw/core/clawd-launch` contract. Each authorized environment gets a
-  unique absolute `CODEX_CLAW_HOME`; its provider state is therefore isolated
-  at the derived `codex-home` child. Hosts start the exact release artifact
-  with `--stdio`, wait for `backend/health/get`, and require the returned
-  `name=clawd` and version to match the expected application artifact. The same
-  artifact exposes `--version` for a preflight compatibility check.
-- Managed hosts may additionally set the contract's trusted absolute
-  `codexHome`. It is passed as `CODEX_CLAW_CODEX_HOME`, while product state and
-  logs remain under the separate `CODEX_CLAW_HOME`. This lets a host keep
-  provider credentials and conversations separate from product state without
-  sharing either directory between environments. When absent, desktop and
-  local Web retain the derived `codex-home` behavior.
-- A stdio host shuts an environment down by closing stdin or sending SIGTERM,
-  waits up to the exported graceful-shutdown timeout, and only then escalates
-  with its own process/container policy. Both paths let `clawd` close active
-  runtimes and flush logs. Readiness means the health request completed; it
-  does not mean a user is authenticated, because identity and environment
-  authorization belong to the host gateway before launch or connection.
-- Any unknown `CODEX_CLAW_HOST` value selects a restricted runtime profile that
-  omits Computer Use, embedded-browser MCP tools, and Codex resource sharing
-  regardless of persisted settings. `web` omits the desktop tools while
-  retaining local resource sharing. Only the absent/explicit `electron`
-  profile enables every desktop runtime feature.
 - Before creating backend drivers, `clawd` initializes missing `skills` and
   `plugins` entries from the persisted sharing setting. Sharing is on by
   default and a fresh home links those entries to `~/.codex`. Existing
