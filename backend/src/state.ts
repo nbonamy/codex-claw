@@ -2,7 +2,7 @@ import path from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import type { AppSnapshot } from '@codex-claw/core/contracts';
-import { CODEX_CLAW_HOME_ENV } from '@codex-claw/core/clawd-launch';
+import { CODEX_CLAW_CODEX_HOME_ENV, CODEX_CLAW_HOME_ENV } from '@codex-claw/core/clawd-launch';
 import { AppStatePersistence } from './state-persistence';
 
 export { CODEX_CLAW_HOME_ENV };
@@ -22,8 +22,10 @@ export function backendProviderTokensFilePath(): string {
   return path.join(backendHomeDir(), 'provider-tokens.json');
 }
 
-/** Isolated Codex app-server state; never share the user's ~/.codex threads. */
+/** Isolated provider home; managed hosts may supply a trusted per-user path. */
 export function backendCodexHomeDir(): string {
+  const configured = process.env[CODEX_CLAW_CODEX_HOME_ENV]?.trim();
+  if (configured) return configured;
   return path.join(backendHomeDir(), 'codex-home');
 }
 

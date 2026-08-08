@@ -207,7 +207,9 @@ The workspace layers are explicit:
 - `@codex-claw/electron` composes preload IPC and desktop-native capabilities;
 - `@codex-claw/web-client` owns the versioned browser protocol, browser client
   factory, gateway session binder, and allowlisted browser-to-backend operation
-  mapper without owning authentication or a WebSocket URL;
+  mapper without owning authentication or a WebSocket URL. Its Node subpath
+  also owns the reusable stdio client that preflights and connects a managed
+  `clawd` artifact;
 - `@codex-claw/web` is the localhost Express composition root using that shared
   browser/gateway package; and
 - `@codex-claw/backend` remains the product authority and agent runtime.

@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./backend-process": "./src/backend-process.ts",
     "./client": "./src/client.ts",
     "./gateway": "./src/gateway.ts",
     "./operations": "./src/operations.ts",

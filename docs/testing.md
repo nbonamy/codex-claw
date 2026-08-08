@@ -12,9 +12,11 @@ routing tests and fake Codex transports for Codex-driver/session tests.
 
 Browser transport and gateway protocol tests live in
 `@codex-claw/web-client`; the localhost `@codex-claw/web` workspace tests only
-its Express/process composition. `npm run test:web`, `typecheck:web`, and
-`test:coverage:web` cover both workspaces so a shared protocol change is tested
-against its local consumer.
+its Express composition. The shared package also owns fake-child-process tests
+for artifact preflight, exact-version readiness, JSON-RPC correlation, process
+failure, request timeout, and bounded graceful shutdown. `npm run test:web`,
+`typecheck:web`, and `test:coverage:web` cover both workspaces so a shared
+protocol change is tested against its local consumer.
 
 ## Quality Bar
 

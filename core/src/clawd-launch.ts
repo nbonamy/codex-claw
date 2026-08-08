@@ -3,6 +3,7 @@ import type { ClawBackendHealth } from './backend-protocol/rpc';
 
 export const CODEX_CLAW_HOME_ENV = 'CODEX_CLAW_HOME' as const;
 export const CODEX_CLAW_HOST_ENV = 'CODEX_CLAW_HOST' as const;
+export const CODEX_CLAW_CODEX_HOME_ENV = 'CODEX_CLAW_CODEX_HOME' as const;
 export const CLAWD_CODEX_HOME_RELATIVE_PATH = 'codex-home' as const;
 export const CLAWD_GRACEFUL_SHUTDOWN_TIMEOUT_MS = 5_000 as const;
 
@@ -30,6 +31,7 @@ export const electronClawdRuntimeFeatures: Readonly<ClawdRuntimeFeatures> = Obje
 
 export type CreateClawdEnvironmentLaunchOptions = {
   backendHome: string;
+  codexHome?: string;
   command: string;
   commandArgs?: readonly string[];
   cwd?: string;
@@ -44,10 +46,11 @@ export type ClawdEnvironmentLaunchContract = {
   env: {
     CODEX_CLAW_HOME: string;
     CODEX_CLAW_HOST: ClawdHost;
+    CODEX_CLAW_CODEX_HOME?: string;
   };
-  paths: {
-    codexHomeRelativeToBackendHome: typeof CLAWD_CODEX_HOME_RELATIVE_PATH;
-  };
+  codexHome:
+    | { kind: 'backend-home-relative'; relativePath: typeof CLAWD_CODEX_HOME_RELATIVE_PATH }
+    | { kind: 'explicit'; path: string };
   artifact: {
     expectedVersion: string;
     versionArgs: readonly string[];
@@ -73,8 +76,11 @@ export function createClawdEnvironmentLaunchContract(
   options: CreateClawdEnvironmentLaunchOptions,
 ): ClawdEnvironmentLaunchContract {
   const command = required(options.command, 'command');
-  const backendHome = required(options.backendHome, 'backendHome');
+  const backendHome = absolutePath(options.backendHome, 'backendHome');
   const expectedVersion = required(options.expectedVersion, 'expectedVersion');
+  const codexHome = options.codexHome === undefined
+    ? undefined
+    : absolutePath(options.codexHome, 'codexHome');
   return {
     command,
     args: [...(options.commandArgs ?? []), '--stdio'],
@@ -82,10 +88,11 @@ export function createClawdEnvironmentLaunchContract(
     env: {
       CODEX_CLAW_HOME: backendHome,
       CODEX_CLAW_HOST: options.host,
+      ...(codexHome ? { CODEX_CLAW_CODEX_HOME: codexHome } : {}),
     },
-    paths: {
-      codexHomeRelativeToBackendHome: CLAWD_CODEX_HOME_RELATIVE_PATH,
-    },
+    codexHome: codexHome
+      ? { kind: 'explicit', path: codexHome }
+      : { kind: 'backend-home-relative', relativePath: CLAWD_CODEX_HOME_RELATIVE_PATH },
     artifact: {
       expectedVersion,
       versionArgs: [...(options.commandArgs ?? []), '--version'],
@@ -120,4 +127,10 @@ function required(value: string, name: string): string {
   const result = value.trim();
   if (!result) throw new TypeError(`clawd launch ${name} must be a non-empty string.`);
   return result;
+}
+
+function absolutePath(value: string, name: string): string {
+  const result = required(value, name);
+  if (result.startsWith('/') || result.startsWith('\\\\') || /^[A-Za-z]:[\\/]/.test(result)) return result;
+  throw new TypeError(`clawd launch ${name} must be an absolute path.`);
 }

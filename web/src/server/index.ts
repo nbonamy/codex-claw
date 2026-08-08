@@ -1,11 +1,18 @@
 import { createServer } from 'node:http';
+import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { WebSocketServer } from 'ws';
 import { createCodexNodeWebSocketPort } from '@codex-app-sdk/web/server';
-import { ClawWebBackendProcess } from './backend-process.js';
 import { bindClawWebSocket } from '@codex-claw/web-client/gateway';
+import { ClawdStdioBackendClient } from '@codex-claw/web-client/backend-process';
+import {
+  CODEX_CLAW_CODEX_HOME_ENV,
+  CODEX_CLAW_HOME_ENV,
+  createClawdEnvironmentLaunchContract,
+} from '@codex-claw/core/clawd-launch';
+import webPackage from '../../package.json';
 
 type SiteUser = { id: string };
 
@@ -18,7 +25,7 @@ const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
 const clientDirectory = path.resolve(moduleDirectory, '../client');
 const repositoryDirectory = path.resolve(moduleDirectory, '../../..');
 const backendBundle = path.join(repositoryDirectory, 'backend/dist/clawd.mjs');
-const backend = new ClawWebBackendProcess(backendCommand());
+const backend = new ClawdStdioBackendClient({ launch: backendCommand() });
 const app = express();
 const httpServer = createServer(app);
 const webSocketServer = new WebSocketServer({ noServer: true });
@@ -60,18 +67,18 @@ function isLoopbackHost(value: string): boolean {
 
 function backendCommand() {
   const command = process.env.CODEX_CLAW_BACKEND_COMMAND?.trim();
-  if (command) {
-    return {
-      command,
-      args: process.env.CODEX_CLAW_BACKEND_ARGS?.split(',').map((arg) => arg.trim()).filter(Boolean) ?? ['--stdio'],
-      cwd: repositoryDirectory,
-    };
-  }
-  return {
-    command: process.execPath,
-    args: [backendBundle, '--stdio'],
+  const commandArgs = command
+    ? process.env.CODEX_CLAW_BACKEND_ARGS?.split(',').map((arg) => arg.trim()).filter((arg) => Boolean(arg) && arg !== '--stdio') ?? []
+    : [backendBundle];
+  return createClawdEnvironmentLaunchContract({
+    backendHome: process.env[CODEX_CLAW_HOME_ENV]?.trim() || path.join(homedir(), '.codex-claw'),
+    codexHome: process.env[CODEX_CLAW_CODEX_HOME_ENV]?.trim() || undefined,
+    command: command || process.execPath,
+    commandArgs,
     cwd: repositoryDirectory,
-  };
+    expectedVersion: webPackage.version,
+    host: 'web',
+  });
 }
 
 async function shutdown(): Promise<void> {

@@ -12,6 +12,7 @@ describe('clawd environment launch contract', () => {
   it('describes an isolated authenticated Cloud runtime', () => {
     expect(createClawdEnvironmentLaunchContract({
       backendHome: ' /srv/claw/environments/env-1 ',
+      codexHome: ' /srv/claw/users/user-1/.codex ',
       command: ' node ',
       commandArgs: ['/app/clawd.mjs'],
       cwd: '/app',
@@ -24,8 +25,9 @@ describe('clawd environment launch contract', () => {
       env: {
         CODEX_CLAW_HOME: '/srv/claw/environments/env-1',
         CODEX_CLAW_HOST: 'cloud',
+        CODEX_CLAW_CODEX_HOME: '/srv/claw/users/user-1/.codex',
       },
-      paths: { codexHomeRelativeToBackendHome: 'codex-home' },
+      codexHome: { kind: 'explicit', path: '/srv/claw/users/user-1/.codex' },
       artifact: {
         expectedVersion: '0.6.1',
         versionArgs: ['/app/clawd.mjs', '--version'],
@@ -44,12 +46,18 @@ describe('clawd environment launch contract', () => {
   });
 
   it('omits cwd when the host does not supply one', () => {
-    expect(createClawdEnvironmentLaunchContract({
+    const launch = createClawdEnvironmentLaunchContract({
       backendHome: '/tmp/claw',
       command: 'clawd',
       expectedVersion: '0.6.1',
       host: 'web',
-    })).not.toHaveProperty('cwd');
+    });
+    expect(launch).not.toHaveProperty('cwd');
+    expect(launch.codexHome).toStrictEqual({
+      kind: 'backend-home-relative',
+      relativePath: 'codex-home',
+    });
+    expect(launch.env).not.toHaveProperty('CODEX_CLAW_CODEX_HOME');
   });
 
   it.each([
@@ -59,6 +67,41 @@ describe('clawd environment launch contract', () => {
   ] as const)('rejects an empty %s', (name, values) => {
     expect(() => createClawdEnvironmentLaunchContract({ ...values, host: 'cloud' }))
       .toThrow(`clawd launch ${name} must be a non-empty string.`);
+  });
+
+  it.each(['C:\\claw\\state', '\\\\server\\claw\\state'])(
+    'accepts a cross-platform absolute backend home: %s',
+    (backendHome) => {
+      expect(createClawdEnvironmentLaunchContract({
+        backendHome,
+        command: 'clawd',
+        expectedVersion: '0.6.1',
+        host: 'cloud',
+      }).env.CODEX_CLAW_HOME).toBe(backendHome);
+    },
+  );
+
+  it('rejects an empty explicit Codex home', () => {
+    expect(() => createClawdEnvironmentLaunchContract({
+      backendHome: '/tmp/claw',
+      codexHome: ' ',
+      command: 'clawd',
+      expectedVersion: '0.6.1',
+      host: 'cloud',
+    })).toThrow('clawd launch codexHome must be a non-empty string.');
+  });
+
+  it.each([
+    ['backendHome', { backendHome: 'relative/state' }],
+    ['codexHome', { codexHome: 'relative/.codex' }],
+  ] as const)('rejects a relative %s', (name, override) => {
+    expect(() => createClawdEnvironmentLaunchContract({
+      backendHome: '/tmp/claw',
+      command: 'clawd',
+      expectedVersion: '0.6.1',
+      host: 'cloud',
+      ...override,
+    })).toThrow(`clawd launch ${name} must be an absolute path.`);
   });
 
   it('defines fail-closed runtime feature profiles', () => {

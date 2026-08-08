@@ -311,8 +311,11 @@ Package ownership:
   backend through the app-owned backend protocol/client rather than importing
   backend internals.
 - `web-client` contains the host-neutral browser client, the versioned browser
-  protocol, the gateway session binder, and its allowlisted operation mapping.
-  It depends on core and the SDK web transport ports, but owns no HTTP server,
+  protocol, the gateway session binder, its allowlisted operation mapping, and
+  the Node stdio backend client shared by localhost Web and Cloud. The stdio
+  client preflights `clawd --version`, validates health readiness, correlates
+  JSON-RPC and events, and performs bounded graceful shutdown. The package
+  depends on core and the SDK web transport ports, but owns no HTTP server,
   authentication policy, tenant lookup, or WebSocket URL.
 - `web` contains the localhost browser composition root and Express server. It
   depends on core, Vue, and web-client, and starts a built `clawd` artifact
@@ -644,6 +647,12 @@ The exact script names can change, but the shape should stay:
   with `--stdio`, wait for `backend/health/get`, and require the returned
   `name=clawd` and version to match the expected application artifact. The same
   artifact exposes `--version` for a preflight compatibility check.
+- Managed hosts may additionally set the contract's trusted absolute
+  `codexHome`. It is passed as `CODEX_CLAW_CODEX_HOME`, while product state and
+  logs remain under the separate `CODEX_CLAW_HOME`. Cloud uses this to keep a
+  user's provider credentials and conversations at `<user>/.codex` without
+  sharing either directory with another user. When absent, desktop and local
+  Web retain the derived `codex-home` behavior.
 - A stdio host shuts an environment down by closing stdin or sending SIGTERM,
   waits up to the exported graceful-shutdown timeout, and only then escalates
   with its own process/container policy. Both paths let `clawd` close active
