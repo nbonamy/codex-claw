@@ -5,10 +5,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '@codex-claw/core': path.resolve(__dirname, '../core/src'),
+      '@codex-claw/web-client': path.resolve(__dirname, '../web-client/src'),
     },
   },
   ssr: {
-    noExternal: ['@codex-claw/core'],
+    noExternal: ['@codex-claw/core', '@codex-claw/web-client'],
   },
   build: {
     ssr: path.resolve(__dirname, 'src/server/index.ts'),

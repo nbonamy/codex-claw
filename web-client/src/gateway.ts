@@ -5,8 +5,8 @@ import {
   clawWebProtocolVersion,
   encodeClawWebMessage,
   parseClawWebClientMessage,
-} from '../protocol.js';
-import { invokeClawWebOperation, type ClawBackendPort } from './operations.js';
+} from './protocol';
+import { invokeClawWebOperation, type ClawBackendPort } from './operations';
 
 export type ClawWebSocketSession = {
   close(code?: number, reason?: string): void;

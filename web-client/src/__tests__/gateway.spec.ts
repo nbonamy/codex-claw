@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CodexWebSocketClose, CodexWebSocketPort } from '@codex-app-sdk/web';
-import { bindClawWebSocket } from '../server/websocket-adapter';
+import { bindClawWebSocket } from '../gateway';
 
 describe('Claw web WebSocket adapter', () => {
   it('sends tenant context, correlates requests, and forwards backend events', async () => {
@@ -15,7 +15,7 @@ describe('Claw web WebSocket adapter', () => {
     };
 
     bindClawWebSocket({ backend, socket, userId: 'local-single-user' });
-    expect(socket.messages.map(JSON.parse)).toContainEqual({
+    expect(parsedMessages(socket)).toContainEqual({
       version: 1,
       type: 'ready',
       userId: 'local-single-user',
@@ -28,7 +28,7 @@ describe('Claw web WebSocket adapter', () => {
       operation: 'createTeam',
       args: [{ name: 'Claw' }],
     }));
-    await vi.waitFor(() => expect(socket.messages.map(JSON.parse)).toContainEqual({
+    await vi.waitFor(() => expect(parsedMessages(socket)).toContainEqual({
       version: 1,
       type: 'response',
       id: 'request-1',
@@ -42,7 +42,7 @@ describe('Claw web WebSocket adapter', () => {
       payload: { type: 'idle' },
       occurredAt: '2026-08-07T00:00:00.000Z',
     } as never);
-    expect(socket.messages.map(JSON.parse)).toContainEqual({
+    expect(parsedMessages(socket)).toContainEqual({
       version: 1,
       type: 'event',
       event: expect.objectContaining({ seq: 7, source: 'backend' }),
@@ -58,7 +58,7 @@ describe('Claw web WebSocket adapter', () => {
     bindClawWebSocket({ backend, socket, userId: 'local-single-user' });
 
     socket.receive(JSON.stringify({ version: 1, type: 'request', id: 'bad', operation: 'quit', args: [] }));
-    await vi.waitFor(() => expect(socket.messages.map(JSON.parse)).toContainEqual({
+    await vi.waitFor(() => expect(parsedMessages(socket)).toContainEqual({
       version: 1,
       type: 'response',
       id: 'bad',
@@ -85,7 +85,7 @@ describe('Claw web WebSocket adapter', () => {
       operation: 'revokePairedDevice',
       args: ['environment', 'client'],
     }));
-    await vi.waitFor(() => expect(socket.messages.map(JSON.parse)).toContainEqual({
+    await vi.waitFor(() => expect(parsedMessages(socket)).toContainEqual({
       version: 1,
       type: 'response',
       id: 'void',
@@ -108,7 +108,7 @@ describe('Claw web WebSocket adapter', () => {
       operation: 'getPluginStatus',
       args: [],
     })));
-    await vi.waitFor(() => expect(socket.messages.map(JSON.parse)).toContainEqual({
+    await vi.waitFor(() => expect(parsedMessages(socket)).toContainEqual({
       version: 1,
       type: 'response',
       id: 'bytes',
@@ -140,7 +140,7 @@ describe('Claw web WebSocket adapter', () => {
       operation: 'getPluginStatus',
       args: [],
     }));
-    await vi.waitFor(() => expect(socket.messages.map(JSON.parse)).toContainEqual({
+    await vi.waitFor(() => expect(parsedMessages(socket)).toContainEqual({
       version: 1,
       type: 'response',
       id: 'failure',
@@ -182,4 +182,8 @@ class FakeSocket implements CodexWebSocketPort {
   fail(): void {
     for (const listener of this.errorListeners) listener(new Error('socket failed'));
   }
+}
+
+function parsedMessages(socket: FakeSocket): unknown[] {
+  return socket.messages.map((message) => JSON.parse(message));
 }

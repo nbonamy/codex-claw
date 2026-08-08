@@ -17,7 +17,7 @@ describe('root host scripts', () => {
       'dev:web': expect.stringContaining('@codex-claw/web'),
       'build:web': expect.stringContaining('@codex-claw/web'),
       'lint:electron': 'npm run lint -w @codex-claw/electron',
-      'lint:web': 'npm run lint -w @codex-claw/web',
+      'lint:web': 'npm run lint -w @codex-claw/web-client && npm run lint -w @codex-claw/web',
       make: 'npm run make:electron',
       package: 'npm run package:electron',
       'preview:web': 'npm run build:web && npm run start:web',
@@ -25,11 +25,11 @@ describe('root host scripts', () => {
       'start:electron': 'npm run start -w @codex-claw/electron',
       'start:web': 'npm run start -w @codex-claw/web',
       'test:coverage:electron': 'npm run test:coverage -w @codex-claw/electron',
-      'test:coverage:web': 'npm run test:coverage -w @codex-claw/web',
+      'test:coverage:web': 'npm run test:coverage -w @codex-claw/web-client && npm run test:coverage -w @codex-claw/web',
       'test:electron': 'npm run test -w @codex-claw/electron',
-      'test:web': 'npm run test -w @codex-claw/web',
+      'test:web': 'npm run test -w @codex-claw/web-client && npm run test -w @codex-claw/web',
       'typecheck:electron': 'npm run typecheck -w @codex-claw/electron',
-      'typecheck:web': 'npm run typecheck -w @codex-claw/web',
+      'typecheck:web': 'npm run typecheck -w @codex-claw/web-client && npm run typecheck -w @codex-claw/web',
     });
     expect(rootPackage.scripts['dev:web']).toContain('npm run build:sdk');
     expect(rootPackage.scripts['build:web']).toContain('npm run build -w @codex-claw/backend');

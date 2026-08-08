@@ -1,0 +1,31 @@
+{
+  "name": "@codex-claw/web-client",
+  "version": "0.6.1",
+  "description": "Reusable browser transport and gateway protocol for Codex Claw Web hosts.",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./gateway": "./src/gateway.ts",
+    "./operations": "./src/operations.ts",
+    "./protocol": "./src/protocol.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@codex-app-sdk/web": "file:../../codex-app-sdk/packages/web",
+    "@codex-claw/core": "0.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "@vitest/coverage-v8": "4.1.8",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
+  }
+}

@@ -5,7 +5,7 @@ import express from 'express';
 import { WebSocketServer } from 'ws';
 import { createCodexNodeWebSocketPort } from '@codex-app-sdk/web/server';
 import { ClawWebBackendProcess } from './backend-process.js';
-import { bindClawWebSocket } from './websocket-adapter.js';
+import { bindClawWebSocket } from '@codex-claw/web-client/gateway';
 
 type SiteUser = { id: string };
 
