@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ElMessageBox } from 'element-plus';
 import PlanReviewPanel from '../PlanReviewPanel.vue';
 import { i18n } from '../../i18n';
 
@@ -112,6 +113,45 @@ describe('PlanReviewPanel', () => {
     await nextTick();
 
     expect(wrapper.find('.annotation-popup').exists()).toBe(false);
+  });
+
+  it('edits, deletes, and clears saved comments', async () => {
+    const wrapper = mountPanel();
+    mockPlanSelection(wrapper, 'Ship this carefully.');
+    await wrapper.get('.markdown-panel').trigger('mouseup');
+    await wrapper.get('.annotation-popup__input').setValue('First comment');
+    await wrapper.get('form.annotation-popup').trigger('submit');
+
+    await wrapper.get('[aria-label="Edit comment"]').trigger('click');
+    expect((wrapper.get('.annotation-popup__input').element as HTMLInputElement).value).toBe('First comment');
+    await wrapper.get('.annotation-popup__input').setValue('Revised comment');
+    await wrapper.get('form.annotation-popup').trigger('submit');
+    expect(wrapper.get('.plan-review-footer__comment').attributes('title')).toContain('Revised comment');
+
+    await wrapper.get('[aria-label="Delete comment"]').trigger('click');
+    expect(wrapper.find('.plan-review-footer__comment').exists()).toBe(false);
+
+    mockPlanSelection(wrapper, 'Ship this carefully.');
+    await wrapper.get('.markdown-panel').trigger('mouseup');
+    await wrapper.get('.annotation-popup__input').setValue('Clear me');
+    await wrapper.get('form.annotation-popup').trigger('submit');
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
+    await wrapper.findAll('.plan-review-footer__button').find((button) => button.text() === 'Clear')!.trigger('click');
+    await nextTick();
+    expect(wrapper.find('.plan-review-footer__comment').exists()).toBe(false);
+  });
+
+  it('keeps comments when clear is canceled and truncates long selections', async () => {
+    const wrapper = mountPanel();
+    mockPlanSelection(wrapper, 'x'.repeat(220));
+    await wrapper.get('.markdown-panel').trigger('mouseup');
+    expect(wrapper.get('form.annotation-popup').attributes('aria-description')).toBe(`${'x'.repeat(177)}...`);
+    await wrapper.get('.annotation-popup__input').setValue('Keep me');
+    await wrapper.get('form.annotation-popup').trigger('submit');
+    vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue(new Error('cancel'));
+    await wrapper.findAll('.plan-review-footer__button').find((button) => button.text() === 'Clear')!.trigger('click');
+    await nextTick();
+    expect(wrapper.find('.plan-review-footer__comment').exists()).toBe(true);
   });
 });
 

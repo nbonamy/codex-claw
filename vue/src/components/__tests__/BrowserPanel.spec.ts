@@ -14,8 +14,8 @@ function mountPanel(props: { initialUrl?: string; openRequestId?: number } = {})
   const browserOpen = vi.fn().mockResolvedValue({
     url: '',
     title: '',
-    canGoBack: false,
-    canGoForward: false,
+    canGoBack: true,
+    canGoForward: true,
   });
   const api = {
     browserOpen,
@@ -25,9 +25,9 @@ function mountPanel(props: { initialUrl?: string; openRequestId?: number } = {})
       canGoBack: false,
       canGoForward: false,
     }),
-    browserGoBack: vi.fn(),
-    browserGoForward: vi.fn(),
-    browserReload: vi.fn(),
+    browserGoBack: vi.fn().mockResolvedValue({ url: 'https://back.example/', title: 'Back', canGoBack: false, canGoForward: true }),
+    browserGoForward: vi.fn().mockResolvedValue({ url: 'https://forward.example/', title: 'Forward', canGoBack: true, canGoForward: false }),
+    browserReload: vi.fn().mockResolvedValue({ url: 'https://reload.example/', title: 'Reload', canGoBack: true, canGoForward: true }),
     browserSetBounds: vi.fn().mockResolvedValue(undefined),
     browserSetVisible: vi.fn().mockResolvedValue(undefined),
     browserSetAnnotationMode: vi.fn().mockResolvedValue(undefined),
@@ -164,5 +164,33 @@ describe('BrowserPanel', () => {
 
     expect(api.browserClose).toHaveBeenCalledWith('agent-1', 'primary');
     expect(wrapper.emitted('close')).toStrictEqual([[]]);
+  });
+
+  it('runs navigation controls, visibility updates, errors, resize, and cleanup', async () => {
+    const { api, emitEvent, wrapper } = mountPanel();
+    await flushPromises();
+
+    await wrapper.get('[aria-label="Go back"]').trigger('click');
+    await flushPromises();
+    await wrapper.get('[aria-label="Go forward"]').trigger('click');
+    await flushPromises();
+    api.browserReload.mockRejectedValueOnce('reload failed');
+    await wrapper.get('[aria-label="Reload page"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toBe('Could not load this page.');
+
+    await wrapper.setProps({ visible: false });
+    await wrapper.setProps({ visible: true });
+    window.dispatchEvent(new Event('resize'));
+    emitEvent({ seq: 10, type: 'snapshot.updated', payload: {}, occurredAt: 'now' } as MainToRendererEvent);
+    emitEvent({ seq: 11, type: 'browser.annotationCreated', payload: [], occurredAt: 'now' } as MainToRendererEvent);
+    await flushPromises();
+
+    expect(api.browserGoBack).toHaveBeenCalledWith('agent-1', 'primary');
+    expect(api.browserGoForward).toHaveBeenCalledWith('agent-1', 'primary');
+    expect(api.browserSetVisible).toHaveBeenNthCalledWith(1, 'agent-1', 'primary', false);
+    expect(api.browserSetVisible).toHaveBeenNthCalledWith(2, 'agent-1', 'primary', true);
+    wrapper.unmount();
+    expect(api.browserClose).toHaveBeenCalledWith('agent-1', 'primary');
   });
 });

@@ -29,6 +29,54 @@ describe('ClawBackendServer', () => {
     });
   });
 
+  it('rejects malformed mutation payloads at the backend protocol boundary', async () => {
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot: createTestSnapshot(),
+    });
+
+    await expect(server.handleMessage({ jsonrpc: '2.0', method: 'ignored/notification' })).resolves.toBeUndefined();
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'response', result: {} })).resolves.toMatchObject({
+      error: { code: -32600 },
+    });
+
+    const invalidRequests: Array<[string, unknown, string]> = [
+      [backendMethods.agentCreate, { input: { name: '', folder: '' } }, 'name'],
+      [backendMethods.agentFork, { agentId: 'agent-1', messageIndex: -1 }, 'fork message index'],
+      [backendMethods.agentOpenInApplicationUpdate, { agentId: 'agent-1', application: 'emacs' }, 'application'],
+      [backendMethods.teamCreate, { input: { name: '', color: '#123456' } }, 'name'],
+      [backendMethods.teamCreate, { input: { name: 'Team', color: 'transparent' } }, 'color'],
+      [backendMethods.benchTemplateCreate, { input: { name: 'Bench', folder: '/tmp', backend: 'other' } }, 'backend'],
+      [backendMethods.benchTemplateCreate, { input: { name: '', folder: '', backend: 'codex' } }, 'name'],
+      [backendMethods.settingsCodexResourceSharingSet, { input: { enabled: false, mode: 'later' } }, 'sharing'],
+      [backendMethods.sourceWorktreesList, { repoPath: '' }, 'repoPath'],
+      [backendMethods.sourceWorktreeCreate, { input: { repoPath: '', branchName: '' } }, 'configured'],
+      [backendMethods.workProviderConnect, { provider: 'linear' }, 'work integrations'],
+      [backendMethods.snapshotBenchGet, { location: { kind: 'elsewhere' } }, 'location'],
+      [backendMethods.snapshotLoopsGet, { location: { kind: 'elsewhere' } }, 'location'],
+    ];
+
+    for (const [method, params, message] of invalidRequests) {
+      let actualMessage = '';
+      try {
+        const response = await server.handleMessage({ jsonrpc: '2.0', id: method, method, params });
+        actualMessage = response && 'error' in response ? response.error.message : '';
+      } catch (error) {
+        actualMessage = error instanceof Error ? error.message : String(error);
+      }
+      expect(actualMessage.toLowerCase()).toContain(message.toLowerCase());
+    }
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0', id: 'work-manager', method: backendMethods.workProviderConnectionsReload,
+    })).rejects.toThrow('Work integrations are not configured');
+    await expect(server.handleMessage({
+      jsonrpc: '2.0', id: 'loop-runner', method: backendMethods.loopDueRun,
+    })).rejects.toThrow('Loop runner is not configured');
+    await server.close();
+  });
+
   it('routes the debug message fixture through the MCP messaging port', async () => {
     const snapshot = createTestSnapshot();
     snapshot.agents = [
@@ -2790,7 +2838,7 @@ describe('ClawBackendServer', () => {
       await expect(server.handleMessage({
         jsonrpc: '2.0',
         id: 'set-open-in-application',
-        method: 'agent/openInApplication/update',
+        method: 'agent/externalApplication/update',
         params: { agentId, application: 'xcode' },
       })).resolves.toMatchObject({
         result: {

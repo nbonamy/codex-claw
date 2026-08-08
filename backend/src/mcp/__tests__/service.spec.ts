@@ -33,6 +33,54 @@ describe('ClawMcpService', () => {
     }));
   });
 
+  it('serves health and debug routes while rejecting invalid HTTP and MCP requests', async () => {
+    service = new ClawMcpService({ snapshot: createInitialSnapshot() });
+    const mcpUrl = await service.start();
+    await expect(service.start()).resolves.toBe(mcpUrl);
+    const origin = new URL(mcpUrl).origin;
+
+    const health = await fetch(`${origin}/health`);
+    expect(health.status).toBe(200);
+    await expect(health.text()).resolves.toBe('OK');
+    const debug = await fetch(`${origin}/`);
+    expect(debug.status).toBe(200);
+    await expect(debug.json()).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'agent-dina' }),
+    ]));
+    await expect(fetch(mcpUrl)).resolves.toMatchObject({ status: 405 });
+    await expect(fetch(mcpUrl, { method: 'DELETE' })).resolves.toMatchObject({ status: 405 });
+    await expect(fetch(`${origin}/missing`)).resolves.toMatchObject({ status: 404 });
+
+    const missingIdentity = await fetch(mcpUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
+    });
+    expect(missingIdentity.status).toBe(400);
+    const invalidRequest = await fetch(agentUrl(mcpUrl, 'agent-dina'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'resources/list', params: {} }),
+    });
+    expect(invalidRequest.status).toBe(400);
+    const malformedJson = await fetch(agentUrl(mcpUrl, 'agent-dina'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{',
+    });
+    expect(malformedJson.status).toBe(500);
+    const oversized = await fetch(agentUrl(mcpUrl, 'agent-dina'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ payload: 'x'.repeat(1024 * 1024) }),
+    });
+    expect(oversized.status).toBe(500);
+
+    await service.stop();
+    await service.stop();
+    service = null;
+  });
+
   it('serves Claw collaboration tools from clawd and injects teammate messages through backend drivers', async () => {
     const snapshot = createInitialSnapshot();
     const events: unknown[] = [];
@@ -323,6 +371,109 @@ describe('ClawMcpService', () => {
     expect(execute).toHaveBeenCalledWith({ agentId: 'agent-dina', browserId: 'primary', command: 'dom', arguments: { selector: '#save' } });
   });
 
+  it('displays generated Markdown and creates agents through the service boundary', async () => {
+    const snapshot = createInitialSnapshot();
+    const events: any[] = [];
+    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    const url = await service.start();
+    const callerUrl = agentUrl(url, 'agent-dina');
+
+    const markdownResponse = await postJson(callerUrl, {
+      jsonrpc: '2.0', id: 1, method: 'tools/call',
+      params: { name: 'display-markdown', arguments: { markdown: '# Coverage report', title: 'Coverage' } },
+    });
+    expect(markdownResponse.result.structuredContent).toMatchObject({
+      success: true,
+      message: 'Displayed Markdown in the side panel.',
+      title: 'Coverage',
+    });
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-dina',
+      type: 'sidePanel.markdownRequested',
+      payload: { kind: 'markdown', title: 'Coverage', content: '# Coverage report' },
+    }));
+
+    const createResponse = await postJson(callerUrl, {
+      jsonrpc: '2.0', id: 2, method: 'tools/call',
+      params: {
+        name: 'create-agent',
+        arguments: { repoPath: '/tmp/new-agent', name: 'New Agent', avatar: 'NA', backend: 'claude' },
+      },
+    });
+    expect(createResponse.result.structuredContent).toMatchObject({ success: true, agentId: expect.any(String) });
+    expect(snapshot.agents).toContainEqual(expect.objectContaining({
+      name: 'New Agent',
+      avatar: 'NA',
+      backend: 'claude',
+      folder: '/tmp/new-agent',
+      teamId: 'team-codex-claw',
+    }));
+
+    const missingRepo = await postJson(callerUrl, {
+      jsonrpc: '2.0', id: 3, method: 'tools/call',
+      params: { name: 'create-agent', arguments: { repoPath: '   ' } },
+    });
+    expect(missingRepo.result.structuredContent).toStrictEqual({ success: false, message: 'repoPath is required' });
+    const missingBranch = await postJson(callerUrl, {
+      jsonrpc: '2.0', id: 4, method: 'tools/call',
+      params: { name: 'create-agent', arguments: { repoPath: '/tmp/new-agent', createWorktree: true } },
+    });
+    expect(missingBranch.result.structuredContent).toStrictEqual({
+      success: false,
+      message: 'branchName is required when createWorktree is true',
+    });
+  });
+
+  it('requires loop completion instructions before confirming work completion', async () => {
+    const snapshot = createLoopSnapshot({
+      teamTarget: { mode: 'existing', teamId: 'team-codex-claw' },
+      createdAgents: [{
+        agentId: 'agent-one',
+        agentName: 'One',
+        workItemId: 'github:nbonamy/codex-claw#5',
+        workItemTitle: 'Fix first issue',
+        workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/5',
+      }],
+    });
+    snapshot.loops[0]!.instructions.beforeCompletion = 'Remove the bug label first.';
+    const events: any[] = [];
+    service = new ClawMcpService({
+      snapshot,
+      now: () => new Date('2026-06-15T01:30:48.802Z'),
+      onEvent: (event) => events.push(event),
+    });
+    const url = await service.start();
+
+    const first = await callTool(url, 'agent-one', 'mark-work-item-completed', {
+      workItemId: 'github:nbonamy/codex-claw#5',
+    });
+    expect(first.result.structuredContent).toMatchObject({
+      status: 'completion-instructions-required',
+      instructions: 'Remove the bug label first.',
+      confirmCompletionRequired: true,
+    });
+    const second = await callTool(url, 'agent-one', 'mark-work-item-completed', {
+      workItemId: 'github:nbonamy/codex-claw#5',
+    });
+    expect(second.result.structuredContent.status).toBe('completion-instructions-required');
+    const completed = await callTool(url, 'agent-one', 'mark-work-item-completed', {
+      workItemId: 'github:nbonamy/codex-claw#5',
+      confirmCompletion: true,
+    });
+    expect(completed.result.structuredContent).toMatchObject({ status: 'completed' });
+    expect(events.filter((event) => event.type === 'workBacklog.assignmentUpdated')).toHaveLength(2);
+
+    const missing = await fetch(agentUrl(url, 'agent-one'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0', id: 'missing-work-item', method: 'tools/call',
+        params: { name: 'mark-work-item-completed', arguments: { workItemId: 'missing' } },
+      }),
+    });
+    expect(missing.status).toBe(500);
+  });
+
   it('completes existing-team loop executions only after every created assignment is done and deletes the created agents', async () => {
     const snapshot = createLoopSnapshot({
       teamTarget: { mode: 'existing', teamId: 'team-codex-claw' },
@@ -468,6 +619,15 @@ async function markWorkItemCompleted(url: string, agentId: string, workItemId: s
   });
 
   expect(response.result.isError).toBe(false);
+}
+
+function callTool(url: string, agentId: string, name: string, arguments_: Record<string, unknown>): Promise<any> {
+  return postJson(agentUrl(url, agentId), {
+    jsonrpc: '2.0',
+    id: `${name}-${agentId}`,
+    method: 'tools/call',
+    params: { name, arguments: arguments_ },
+  });
 }
 
 function createLoopSnapshot(input: {

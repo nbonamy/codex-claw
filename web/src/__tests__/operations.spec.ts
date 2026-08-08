@@ -24,6 +24,46 @@ describe('Claw web operations', () => {
     });
   });
 
+  it('routes snapshot variants for local and remote locations', async () => {
+    const snapshot = { teams: [] };
+    const request = vi.fn().mockResolvedValue({ snapshot, lastEventSeq: 2 });
+    const backend = { request };
+
+    await expect(invokeClawWebOperation(backend, 'getSnapshot', [])).resolves.toBe(snapshot);
+    await expect(invokeClawWebOperation(backend, 'getBenchSnapshot', [undefined])).resolves.toBe(snapshot);
+    await expect(invokeClawWebOperation(backend, 'getLoopSnapshot', [{ kind: 'local' }])).resolves.toBe(snapshot);
+    const remote = { kind: 'remote', connectionId: 'ssh-1' };
+    await invokeClawWebOperation(backend, 'getBenchSnapshot', [remote]);
+    await invokeClawWebOperation(backend, 'getLoopSnapshot', [remote]);
+
+    expect(request).toHaveBeenNthCalledWith(1, backendMethods.snapshotGet);
+    expect(request).toHaveBeenNthCalledWith(2, backendMethods.snapshotGet);
+    expect(request).toHaveBeenNthCalledWith(3, backendMethods.snapshotGet);
+    expect(request).toHaveBeenNthCalledWith(4, backendMethods.snapshotBenchGet, { location: remote });
+    expect(request).toHaveBeenNthCalledWith(5, backendMethods.snapshotLoopsGet, { location: remote });
+  });
+
+  it('builds required, optional, and pass-through operation parameters', async () => {
+    const request = vi.fn().mockResolvedValue('ok');
+    const backend = { request };
+
+    await invokeClawWebOperation(backend, 'listSourceFolders', [{ kind: 'remote' }]);
+    await invokeClawWebOperation(backend, 'listSourceRepositories', []);
+    await invokeClawWebOperation(backend, 'listSourceRepositories', ['ssh-1']);
+    await invokeClawWebOperation(backend, 'forkAgent', ['agent-1', undefined]);
+    await invokeClawWebOperation(backend, 'listWorkItems', ['github', null, { kind: 'remote' }]);
+    await invokeClawWebOperation(backend, 'getPluginStatus', []);
+
+    expect(request.mock.calls).toStrictEqual([
+      [backendMethods.sourceFoldersList, { kind: 'remote' }],
+      [backendMethods.sourceRepositoriesList, undefined],
+      [backendMethods.sourceRepositoriesList, { remoteConnectionId: 'ssh-1' }],
+      [backendMethods.agentFork, { agentId: 'agent-1' }],
+      [backendMethods.workProviderItemsList, { provider: 'github', location: { kind: 'remote' } }],
+      [backendMethods.settingsPluginStatusGet, undefined],
+    ]);
+  });
+
   it('rejects desktop-only and unknown operations without forwarding them', async () => {
     const request = vi.fn();
 

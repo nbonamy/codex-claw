@@ -38,6 +38,7 @@ describe('work item prompts', () => {
 
   it('uses the provider display label', () => {
     expect(workProviderLabel('github')).toBe('GitHub');
+    expect(workProviderLabel('future-provider' as never)).toBe('work provider');
   });
 });
 

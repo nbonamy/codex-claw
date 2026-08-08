@@ -97,4 +97,64 @@ describe('runtime discovery', () => {
     expect(env.TEST_FLAG).toBe('1');
     expect(env.PATH).toBe('/usr/bin:/opt/homebrew/bin');
   });
+
+  it('handles absolute and Windows executable candidates', () => {
+    expect(resolveRuntimeExecutable('/opt/bin/node', {
+      existsSync: (filePath) => filePath === '/opt/bin/node',
+    })).toBe('/opt/bin/node');
+    expect(resolveRuntimeExecutable('/missing/node', { existsSync: () => false })).toBeNull();
+    expect(resolveRuntimeExecutable('missing', {
+      env: { PATH: '/bin' },
+      execFileSync: vi.fn(() => ''),
+      existsSync: () => false,
+      homedir: () => '/home/nicolas',
+      pathDelimiter: ':',
+      platform: 'linux',
+    })).toBeNull();
+
+    const existsSync = vi.fn((filePath: string) => filePath === 'C:\\bin/codex.cmd');
+    expect(resolveRuntimeExecutable('codex', {
+      env: { PATH: 'C:\\bin', PATHEXT: '.EXE;.CMD' },
+      existsSync,
+      pathDelimiter: ';',
+      platform: 'win32',
+    })).toBe('C:\\bin/codex.cmd');
+    expect(discoveredRuntimePathEntries({ env: {}, pathDelimiter: ';', platform: 'win32' })).toStrictEqual([]);
+  });
+
+  it('handles nushell paths and unusable nvm aliases', () => {
+    const execFileSync = vi.fn()
+      .mockReturnValueOnce('/nu/bin')
+      .mockImplementationOnce(() => { throw new Error('nvm unavailable'); });
+    expect(discoveredRuntimePathEntries({
+      env: { SHELL: '/opt/nu' },
+      execFileSync,
+      existsSync: () => false,
+      homedir: () => '/home/nicolas',
+      pathDelimiter: ':',
+      platform: 'linux',
+    })).toStrictEqual(['/nu/bin']);
+    expect(execFileSync).toHaveBeenNthCalledWith(1, '/opt/nu', ['-l', '-c', 'print $env.PATH'], expect.any(Object));
+
+    expect(discoveredRuntimePathEntries({
+      env: { PATH: '/usr/bin' },
+      execFileSync: vi.fn(() => { throw new Error('no shell'); }),
+      existsSync: (filePath) => filePath.endsWith('/.nvm/alias/default') || filePath.endsWith('/.nvm/versions/node'),
+      homedir: () => '/home/nicolas',
+      pathDelimiter: ':',
+      platform: 'linux',
+      readFileSync: () => '',
+      readdirSync: () => [],
+    })).toStrictEqual(['/usr/bin']);
+    expect(discoveredRuntimePathEntries({
+      env: { PATH: '/usr/bin' },
+      execFileSync: vi.fn(() => { throw new Error('no shell'); }),
+      existsSync: (filePath) => filePath.endsWith('/.nvm/alias/default') || filePath.endsWith('/.nvm/versions/node'),
+      homedir: () => '/home/nicolas',
+      pathDelimiter: ':',
+      platform: 'linux',
+      readFileSync: () => { throw new Error('unreadable'); },
+      readdirSync: () => [],
+    })).toStrictEqual(['/usr/bin']);
+  });
 });

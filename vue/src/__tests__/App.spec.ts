@@ -86,4 +86,38 @@ describe('App', () => {
     expect(reloadRenderer).toHaveBeenCalledOnce();
     expect(wrapper.find('[data-testid="backend-restart-overlay"]').exists()).toBe(false);
   });
+
+  it('tracks desktop update status, installs updates, and releases subscriptions', async () => {
+    const snapshot = createInitialSnapshot();
+    let statusListener: ((status: { state: 'available'; version: string }) => void) | undefined;
+    const unsubscribe = vi.fn();
+    const installUpdate = vi.fn().mockResolvedValue(undefined);
+    setElectronTestClient({
+      getSnapshot: vi.fn().mockResolvedValue(snapshot),
+      onEvent: vi.fn(),
+      getUpdateStatus: vi.fn().mockResolvedValue({ state: 'idle' }),
+      onUpdateStatusChanged: vi.fn((listener) => {
+        statusListener = listener as typeof statusListener;
+        return unsubscribe;
+      }),
+      installUpdate,
+    });
+    const wrapper = mount(App, {
+      global: { plugins: [ElementPlus] },
+    });
+    await flushPromises();
+
+    statusListener?.({ state: 'available', version: '0.7.0' });
+    await wrapper.vm.$nextTick();
+    const appShell = wrapper.findComponent(AppShell);
+    appShell.vm.$emit('install-update');
+    await flushPromises();
+    window.dispatchEvent(new Event('blur'));
+    window.dispatchEvent(new Event('focus'));
+    document.dispatchEvent(new Event('visibilitychange'));
+
+    expect(installUpdate).toHaveBeenCalledOnce();
+    wrapper.unmount();
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  });
 });

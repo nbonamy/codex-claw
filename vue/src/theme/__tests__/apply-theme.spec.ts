@@ -104,4 +104,33 @@ describe('applyAppTheme', () => {
   it('resubscribes system theme changes without throwing when unavailable', () => {
     expect(subscribeToSystemAppearance()).toBeTypeOf('function');
   });
+
+  it('reapplies system themes on appearance changes and removes the listener', async () => {
+    const addEventListener = vi.fn();
+    const removeEventListener = vi.fn();
+    vi.stubGlobal('window', {
+      ...window,
+      matchMedia: vi.fn().mockReturnValue({
+        matches: false,
+        addEventListener,
+        removeEventListener,
+      }),
+    });
+    vi.resetModules();
+    const themeModule = await import('../apply-theme');
+    themeModule.applyAppTheme({
+      id: 'codex-claw-light',
+      mode: 'system',
+      uiFontSize: 14,
+      chatFontSize: 15,
+      codeFontSize: 13,
+    });
+
+    const unsubscribe = themeModule.subscribeToSystemAppearance();
+    expect(addEventListener).toHaveBeenCalledWith('change', expect.any(Function));
+    addEventListener.mock.calls[0][1]();
+    unsubscribe();
+
+    expect(removeEventListener).toHaveBeenCalledWith('change', addEventListener.mock.calls[0][1]);
+  });
 });

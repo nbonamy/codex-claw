@@ -100,6 +100,7 @@ describe('appThemes', () => {
     expect(defaultThemeSettings.id).toBe('codex-claw-light');
     expect(effectiveTheme(defaultThemeSettings, false).id).toBe('codex-claw-light');
     expect(effectiveTheme(defaultThemeSettings, true).id).toBe('codex-claw-dark');
+    expect(themeIdForAppearance('codex-claw-light', 'light')).toBe('codex-claw-light');
     expect(themeIdForAppearance('codex-claw-light', 'dark')).toBe('codex-claw-dark');
     expect(themeIdForAppearance('codex-claw-dark-blue', 'light')).toBe('codex-claw-light');
   });

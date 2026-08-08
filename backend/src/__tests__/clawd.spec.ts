@@ -49,6 +49,20 @@ describe('clawd entrypoint', () => {
     expect(writes.join('')).toContain('CODEX_CLAW_HOME');
   });
 
+  it('prints usage and exits non-zero when no command is selected', async () => {
+    const writes: string[] = [];
+    process.exitCode = undefined;
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stderr.write;
+
+    await main([]);
+
+    expect(process.exitCode).toBe(1);
+    expect(writes.join('')).toContain('Usage: clawd --stdio | serve | connect | --version');
+  });
+
   it('bridges clawd connect stdio to a running daemon socket', async () => {
     const socketPath = await tempSocketPath();
     socketServer = new LocalSocketRpcServer({
@@ -93,6 +107,27 @@ describe('clawd entrypoint', () => {
     })).resolves.toBe(1);
 
     expect(Buffer.concat(outputChunks).toString('utf8')).toBe('');
+  });
+
+  it.each(['socket', 'input', 'output'] as const)('exits non-zero when the connected %s stream fails', async (failingStream) => {
+    const socket = new PassThrough() as PassThrough & { destroy: () => PassThrough };
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const connect = connectToDaemon({
+      connectSocket: (() => {
+        queueMicrotask(() => socket.emit('connect'));
+        return socket as unknown as ReturnType<typeof import('node:net').createConnection>;
+      }) as never,
+      input,
+      output,
+      socketPath: '/tmp/fake-clawd.sock',
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    (failingStream === 'socket' ? socket : failingStream === 'input' ? input : output).emit('error', new Error('stream failed'));
+
+    await expect(connect).resolves.toBe(1);
   });
 });
 

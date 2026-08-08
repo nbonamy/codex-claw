@@ -213,6 +213,76 @@ describe('LoopsView', () => {
     expect(deleteLoop).toHaveBeenCalledWith('loop-bugs');
   });
 
+  it('edits an existing loop from its action menu', async () => {
+    const updateLoop = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountView({
+      loops: [loop()],
+      updateLoop,
+    });
+
+    await wrapper.get('[aria-label="GitHub bugs actions"]').trigger('click');
+    await flushPromises();
+    bodyButton('Edit').click();
+    await flushPromises();
+
+    const editor = wrapper.findComponent({ name: 'LoopEditor' });
+    expect(editor.props('mode')).toBe('edit');
+    expect(editor.props('loop')).toMatchObject({ id: 'loop-bugs' });
+    editor.vm.$emit('submit', {
+      source: {
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
+      },
+      action: {
+        type: 'create-agent',
+        sourceRepositoryPath: '/tmp/fresh-agent',
+        backend: 'codex',
+        teamTarget: { mode: 'dedicated' },
+      },
+    });
+    await flushPromises();
+
+    expect(updateLoop).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'loop-bugs',
+      action: expect.objectContaining({ type: 'create-agent' }),
+    }));
+    expect(wrapper.findComponent({ name: 'LoopEditor' }).exists()).toBe(false);
+  });
+
+  it('keeps loop data when destructive confirmations are cancelled', async () => {
+    const clearLoopHistory = vi.fn();
+    const deleteLoop = vi.fn();
+    const deleteLoopExecution = vi.fn();
+    vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue(new Error('cancelled'));
+    const populatedLoop = loop({
+      executionLog: [{
+        id: 'loop-exec-1',
+        loopId: 'loop-bugs',
+        startedAt: '2026-06-09T10:00:00.000Z',
+        completedAt: '2026-06-09T10:01:00.000Z',
+        status: 'completed',
+        createdCount: 0,
+        createdAgents: [],
+      }],
+    });
+    const wrapper = mountView({ clearLoopHistory, deleteLoop, deleteLoopExecution, loops: [populatedLoop] });
+
+    await wrapper.get('[aria-label="GitHub bugs actions"]').trigger('click');
+    await flushPromises();
+    bodyButton('Delete').click();
+    await flushPromises();
+
+    await wrapper.get('[aria-label="View logs for GitHub bugs"]').trigger('click');
+    const clearButton = wrapper.findAll('button').find((button) => button.text() === 'Clear');
+    await clearButton!.trigger('click');
+    await wrapper.get('[aria-label="Delete execution for execution"]').trigger('click');
+    await flushPromises();
+
+    expect(deleteLoop).not.toHaveBeenCalled();
+    expect(clearLoopHistory).not.toHaveBeenCalled();
+    expect(deleteLoopExecution).not.toHaveBeenCalled();
+  });
+
   it('renders compact loop rows and runs a loop from the row action', async () => {
     const runLoop = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountView({
@@ -394,9 +464,94 @@ describe('LoopsView', () => {
     );
     expect(clearLoopHistory).toHaveBeenCalledWith('loop-bugs');
   });
+
+  it('loads local repositories and delegates local agent-folder selection', async () => {
+    const chooseAgentFolder = vi.fn().mockResolvedValue('/Users/nbonamy/src/new-agent');
+    const loadWorkRepositories = vi.fn().mockResolvedValue([repository()]);
+    const wrapper = mountView({
+      chooseAgentFolder,
+      loadWorkRepositories,
+      workRepositoriesByProvider: {},
+    });
+    await flushPromises();
+
+    expect(loadWorkRepositories).toHaveBeenCalledWith('github');
+    await wrapper.find('.loop-welcome__button').trigger('click');
+    const editor = wrapper.findComponent({ name: 'LoopEditor' });
+    await expect((editor.props('chooseAgentFolder') as () => Promise<string | null>)()).resolves.toBe('/Users/nbonamy/src/new-agent');
+    expect(chooseAgentFolder).toHaveBeenCalledOnce();
+  });
+
+  it('shows remote loading errors and returns to local when the connection disappears', async () => {
+    const getLoopSnapshot = vi.fn().mockRejectedValue('remote unavailable');
+    const wrapper = mountView({
+      getLoopSnapshot,
+      loops: [loop({ name: 'Local bugs' })],
+      remoteConnections: [readyRemoteConnection()],
+    });
+
+    wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'remote:connection-devbox');
+    await flushPromises();
+    expect(wrapper.text()).toContain('remote unavailable');
+
+    await wrapper.setProps({ remoteConnections: [] });
+    await flushPromises();
+    expect(wrapper.text()).toContain('Local bugs');
+  });
+
+  it('cancels the remote folder picker and loads remote work items', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.loops = [loop({ name: 'Remote bugs' })];
+    remoteSnapshot.workBacklog.connections = [{ provider: 'github', status: 'connected' }];
+    const loadWorkItems = vi.fn().mockResolvedValue([workItem()]);
+    const wrapper = mountView({
+      getLoopSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+      listSourceRepositories: vi.fn().mockResolvedValue([]),
+      loadWorkItems,
+      loadWorkRepositories: vi.fn().mockResolvedValue([repository()]),
+      remoteConnections: [readyRemoteConnection()],
+    });
+
+    wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'remote:connection-devbox');
+    await flushPromises();
+    const newLoopButton = wrapper.findAll('button').find((button) => button.text() === 'New Loop');
+    await newLoopButton!.trigger('click');
+    const editor = wrapper.findComponent({ name: 'LoopEditor' });
+    editor.vm.$emit('load-items', 'nbonamy/codex-claw');
+    const folderPromise = (editor.props('chooseAgentFolder') as () => Promise<string | null>)();
+    await flushPromises();
+    wrapper.findComponent({ name: 'RemoteFolderPickerDialog' }).vm.$emit('close');
+
+    await expect(folderPromise).resolves.toBeNull();
+    await flushPromises();
+    expect(loadWorkItems).toHaveBeenCalledWith(
+      'github',
+      'nbonamy/codex-claw',
+      { kind: 'remote', remoteConnectionId: 'connection-devbox' },
+    );
+  });
+
+  it('labels non-GitHub and direct-agent loops without assuming valid dates', () => {
+    const wrapper = mountView({
+      loops: [loop({
+        lastRunAt: 'not-a-date',
+        source: { provider: 'linear' as never, repositoryId: 'workspace' },
+        action: {
+          type: 'create-agent',
+          sourceRepositoryPath: '/tmp/fresh',
+          backend: 'codex',
+          teamTarget: { mode: 'dedicated' },
+        },
+      })],
+    });
+
+    expect(wrapper.text()).toContain('New Agent @ Work provider');
+    expect(wrapper.text()).toContain('Unknown');
+  });
 });
 
 function mountView(overrides: Partial<{
+  chooseAgentFolder: () => Promise<string | null>;
   clearLoopHistory: (loopId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
   createLoop: (input: CreateLoopInput, location?: LoopLocation) => Promise<AppSnapshot | void>;
   deleteLoopExecution: (loopId: string, executionId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
@@ -404,6 +559,7 @@ function mountView(overrides: Partial<{
   getLoopSnapshot: (location?: LoopLocation) => Promise<AppSnapshot>;
   listSourceFolders: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
   listSourceRepositories: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
+  loadWorkItems: (provider: 'github', repositoryId: string, location?: LoopLocation) => Promise<WorkItem[] | void>;
   loadWorkRepositories: (provider: 'github', location?: LoopLocation) => Promise<WorkRepository[] | void>;
   loops: Loop[];
   messages: RendererMessage[];
@@ -411,6 +567,8 @@ function mountView(overrides: Partial<{
   remoteConnections: RemoteConnection[];
   runLoop: (loopId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
   snapshot: AppSnapshot;
+  updateLoop: (input: Parameters<NonNullable<InstanceType<typeof LoopsView>['$props']['updateLoop']>>[0], location?: LoopLocation) => Promise<AppSnapshot | void>;
+  workRepositoriesByProvider: Partial<Record<'github', WorkRepository[]>>;
 }> = {}) {
   const snapshot = overrides.snapshot ?? createInitialSnapshot();
   snapshot.bench = [{
@@ -431,6 +589,7 @@ function mountView(overrides: Partial<{
     props: {
       agents: snapshot.agents,
       bench: snapshot.bench,
+      chooseAgentFolder: overrides.chooseAgentFolder ?? vi.fn().mockResolvedValue(null),
       clearLoopHistory: overrides.clearLoopHistory ?? vi.fn().mockResolvedValue(undefined),
       createLoop: overrides.createLoop ?? vi.fn().mockResolvedValue(undefined),
       deleteLoopExecution: overrides.deleteLoopExecution ?? vi.fn().mockResolvedValue(undefined),
@@ -438,7 +597,7 @@ function mountView(overrides: Partial<{
       getLoopSnapshot: overrides.getLoopSnapshot ?? vi.fn().mockResolvedValue(snapshot),
       listSourceFolders: overrides.listSourceFolders ?? vi.fn().mockResolvedValue({ path: '', parentPath: null, entries: [] }),
       listSourceRepositories: overrides.listSourceRepositories ?? vi.fn().mockResolvedValue([]),
-      loadWorkItems: vi.fn().mockResolvedValue(undefined),
+      loadWorkItems: overrides.loadWorkItems ?? vi.fn().mockResolvedValue(undefined),
       loadWorkRepositories: overrides.loadWorkRepositories ?? vi.fn().mockResolvedValue(undefined),
       loops: overrides.loops ?? [],
       messages: overrides.messages ?? snapshot.messages,
@@ -446,12 +605,12 @@ function mountView(overrides: Partial<{
       remoteConnections: overrides.remoteConnections ?? [],
       runLoop: overrides.runLoop ?? vi.fn().mockResolvedValue(undefined),
       teams: snapshot.teams,
-      updateLoop: vi.fn().mockResolvedValue(undefined),
+      updateLoop: overrides.updateLoop ?? vi.fn().mockResolvedValue(undefined),
       workBacklog: snapshot.workBacklog,
       workItemsByRepository: {
         'github:nbonamy/codex-claw': [workItem()],
       },
-      workRepositoriesByProvider: {
+      workRepositoriesByProvider: overrides.workRepositoriesByProvider ?? {
         github: [repository()],
       },
     },

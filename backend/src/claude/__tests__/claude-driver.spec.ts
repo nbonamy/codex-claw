@@ -157,6 +157,62 @@ describe('ClaudeBackendDriver', () => {
     ]);
   });
 
+  it('exposes capabilities and rejects operations that have no valid Claude session context', async () => {
+    const transport = createFakeTransport();
+    const historyLoader = vi.fn().mockResolvedValue(null);
+    const driver = new ClaudeBackendDriver(transport, historyLoader);
+
+    expect(driver.getRuntimeStatus()).toStrictEqual({
+      backend: 'claude',
+      status: 'notConfigured',
+      detail: 'Claude backend has not been started yet.',
+    });
+    expect(driver.getCapabilities(agent)).toMatchObject({ attachments: false });
+    await expect(driver.interrupt(agent)).rejects.toThrow('No active Claude turn');
+    await expect(driver.respondToRequest({ id: 'request-1', payload: {} })).rejects.toThrow('not supported');
+    await expect(driver.hydrateAgent(agent)).resolves.toBeNull();
+    await expect(driver.resumeConversation(agent, { backend: 'codex', threadId: 'thread-1' })).rejects.toThrow('non-Claude');
+    await expect(driver.readConversationMessages({ backend: 'codex', threadId: 'thread-1' }, agent.id)).rejects.toThrow('non-Claude');
+
+    const first = driver.sendPrompt(agent, 'first');
+    await expect(driver.sendPrompt(agent, 'second')).rejects.toThrow('already has an active turn');
+    transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-first' });
+    await first;
+    await driver.interrupt(agent);
+  });
+
+  it('normalizes startup failures and an early clean exit before Claude reports a session', async () => {
+    const missingTransport = createFakeTransport();
+    const missingDriver = new ClaudeBackendDriver(missingTransport);
+    const missing = missingDriver.sendPrompt(agent, 'missing executable');
+    missingTransport.rejectDone(new Error('spawn claude ENOENT'));
+    await expect(missing).rejects.toThrow('Claude Code CLI was not found');
+
+    const earlyTransport = createFakeTransport();
+    const earlyDriver = new ClaudeBackendDriver(earlyTransport);
+    const early = earlyDriver.sendPrompt(agent, 'exit early');
+    earlyTransport.resolveDone();
+    await expect(early).rejects.toThrow('exited before reporting a session id');
+  });
+
+  it('unsubscribes listeners and closes active persisted turns', async () => {
+    const transport = createFakeTransport();
+    const driver = new ClaudeBackendDriver(transport);
+    const listener = vi.fn();
+    const unsubscribe = driver.onEvent(listener);
+    unsubscribe();
+    const persistedAgent: Agent = {
+      ...agent,
+      backendSession: { kind: 'claude', sessionId: 'claude-session-existing', transport: 'stdio' },
+    };
+
+    await driver.sendPrompt(persistedAgent, 'keep working');
+    await driver.close();
+
+    expect(transport.lastHandle.interrupt).toHaveBeenCalledOnce();
+    expect(transport.close).toHaveBeenCalledOnce();
+  });
+
   it('passes Claw MCP config and allows Claw MCP tools by default', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport, async () => null, {
@@ -603,13 +659,16 @@ describe('ClaudeBackendDriver', () => {
 function createFakeTransport(): ClaudeTurnTransport & {
   emit(message: ClaudeSdkMessage): void;
   rejectDone(error: Error): void;
+  resolveDone(): void;
   lastHandle: ClaudeTurnHandle & { interrupt: ReturnType<typeof vi.fn> };
   startTurn: ReturnType<typeof vi.fn<(params: ClaudeTurnParams, onMessage: (message: ClaudeSdkMessage) => void) => ClaudeTurnHandle>>;
 } {
   let onMessage: (message: ClaudeSdkMessage) => void = () => undefined;
   let rejectDone: (error: Error) => void = () => undefined;
+  let resolveDone: () => void = () => undefined;
   const lastHandle = {
-    done: new Promise<void>((_resolve, reject) => {
+    done: new Promise<void>((resolve, reject) => {
+      resolveDone = resolve;
       rejectDone = reject;
     }),
     interrupt: vi.fn(),
@@ -625,6 +684,9 @@ function createFakeTransport(): ClaudeTurnTransport & {
     },
     rejectDone: (error: Error) => {
       rejectDone(error);
+    },
+    resolveDone: () => {
+      resolveDone();
     },
     close: vi.fn().mockResolvedValue(undefined),
   };

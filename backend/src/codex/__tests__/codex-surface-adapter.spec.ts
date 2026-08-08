@@ -279,6 +279,61 @@ describe('CodexSurfaceAgentAdapter', () => {
     expect(lastRequest(transport, 'account/login/cancel')).toBeDefined();
     expect(lastRequest(transport, 'account/logout')).toBeDefined();
   });
+
+  it('supports the full public conversation lifecycle', async () => {
+    const { adapter, transport } = createAdapter();
+
+    await adapter.start();
+    await expect(adapter.enableDevicePairing()).resolves.toMatchObject({ status: 'connected', allowRemoteControl: null });
+    await expect(adapter.disableDevicePairing()).resolves.toMatchObject({ status: 'disabled', allowRemoteControl: null });
+    await expect(adapter.checkDevicePairing({
+      pairingCode: '',
+      manualPairingCode: 'ABCD-EFGH',
+      environmentId: 'environment-1',
+      expiresAt: '2030-03-17T17:46:40.000Z',
+    })).resolves.toBe(true);
+    expect(adapter.getRuntimeStatus()).toMatchObject({ backend: 'codex', status: 'running' });
+    expect(adapter.getCapabilities().approvalPresets).toContain('ask-for-approval');
+    await expect(adapter.listModels()).resolves.toMatchObject([{
+      id: 'gpt-1',
+      supportedReasoningEfforts: [{ reasoningEffort: 'medium' }],
+      serviceTiers: [{ id: 'fast' }],
+    }]);
+    await expect(adapter.listSkills({ ...agentA, folder: '~' }, true)).resolves.toEqual([
+      expect.objectContaining({ id: expect.stringContaining('/skill-1/SKILL.md') }),
+    ]);
+    await expect(adapter.listConversations(agentA)).resolves.toHaveLength(2);
+    await expect(adapter.readConversationMessages('thread-a', 'agent-a')).resolves.toStrictEqual([]);
+
+    await adapter.setConversationTitle(agentA, 'Renamed');
+    await expect(adapter.setThreadGoal(agentA, 'Ship it')).resolves.toMatchObject({
+      threadId: 'thread-a',
+      goal: { objective: 'Ship it' },
+    });
+    await expect(adapter.clearThreadGoal(agentA)).resolves.toStrictEqual({ threadId: 'thread-a', cleared: true });
+    await expect(adapter.setApprovalPreset(agentA, 'ask-for-approval')).resolves.toStrictEqual({
+      threadId: 'thread-a',
+      approvalPreset: 'ask-for-approval',
+    });
+    await expect(adapter.reviewThread(agentA, { type: 'uncommittedChanges' })).resolves.toMatchObject({
+      threadId: 'thread-a',
+      turnId: 'review-thread-a',
+    });
+
+    const sent = await adapter.sendPrompt(agentA, 'Hello', {
+      model: 'gpt-1',
+      planMode: true,
+      backendOptions: { kind: 'codex', reasoningEffort: 'medium', serviceTier: 'fast' },
+    });
+    expect(sent).toMatchObject({ threadId: 'thread-a', turnId: expect.any(String) });
+    await expect(adapter.steerPrompt(agentA, 'One more thing')).resolves.toMatchObject({ threadId: 'thread-a' });
+    await expect(adapter.interruptTurn(agentA)).resolves.toStrictEqual({ threadId: 'thread-a', turnId: sent.turnId });
+
+    expect(lastRequest(transport, 'thread/name/set')).toBeDefined();
+    adapter.forgetAgentSession('agent-missing');
+    adapter.forgetAgentSession('agent-a');
+  });
+
   it('routes simultaneous semantic conversation events without transcript replacement or cross-routing', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];

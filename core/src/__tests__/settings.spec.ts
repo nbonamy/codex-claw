@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptySnapshot } from '../snapshot';
-import { defaultAppshotSettings, defaultGeneralSettings, defaultPluginSettings, defaultThemeSettings, normalizeGeneralSettings, normalizeThemeSettings, updateSettingsInSnapshot } from '../settings';
+import { defaultAppshotSettings, defaultGeneralSettings, defaultPluginSettings, defaultSourceFolderState, defaultThemeSettings, normalizeAppshotSettings, normalizeGeneralSettings, normalizePluginSettings, normalizeSourceFolderState, normalizeThemeSettings, updateSettingsInSnapshot } from '../settings';
 
 describe('settings contracts', () => {
   it('normalizes general settings', () => {
@@ -21,6 +21,11 @@ describe('settings contracts', () => {
     });
 
     expect(normalizeGeneralSettings({})).toStrictEqual(defaultGeneralSettings);
+    expect(normalizeGeneralSettings(null)).toStrictEqual(defaultGeneralSettings);
+    expect(normalizeAppshotSettings(null)).toStrictEqual(defaultAppshotSettings);
+    expect(normalizePluginSettings([])).toStrictEqual(defaultPluginSettings);
+    expect(normalizeSourceFolderState(undefined)).toStrictEqual(defaultSourceFolderState);
+    expect(normalizeSourceFolderState({ recentRepoNames: 'not-an-array' })).toStrictEqual(defaultSourceFolderState);
   });
 
   it('normalizes theme settings with bounded font sizes', () => {
@@ -39,6 +44,8 @@ describe('settings contracts', () => {
     });
 
     expect(normalizeThemeSettings({ mode: 'sepia' })).toStrictEqual(defaultThemeSettings);
+    expect(normalizeThemeSettings(null)).toStrictEqual(defaultThemeSettings);
+    expect(normalizeThemeSettings({ uiFontSize: Number.NaN })).toStrictEqual(defaultThemeSettings);
   });
 
   it('updates snapshot theme settings without replacing unrelated state', () => {
@@ -168,6 +175,11 @@ describe('settings contracts', () => {
       },
     });
 
+    expect(snapshot.workBacklog.providerSettings).toStrictEqual({});
+
+    updateSettingsInSnapshot(snapshot, {
+      workProviders: { github: { oauthClientId: null as never } },
+    });
     expect(snapshot.workBacklog.providerSettings).toStrictEqual({});
   });
 });

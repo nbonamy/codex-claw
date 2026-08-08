@@ -2827,6 +2827,17 @@ describe('useAppState', () => {
     const before = state.snapshot.value;
 
     await expect(state.chooseAgentFolder()).resolves.toBeNull();
+    await expect(state.chooseCodexBinary()).resolves.toBeNull();
+    await expect(state.chooseSourceFolder()).resolves.toBeNull();
+    await expect(state.listSourceFolders()).resolves.toStrictEqual({ path: '', parentPath: null, entries: [] });
+    await expect(state.listSourceRepositories()).resolves.toStrictEqual([]);
+    await expect(state.listSourceWorktrees('/repo')).resolves.toStrictEqual([]);
+    await expect(state.suggestSourceWorktreePath({ repoPath: '/repo', branchName: 'feature' })).resolves.toBe('');
+    await expect(state.chooseSourceWorktreeDestination('/repo-feature')).resolves.toBeNull();
+    await expect(state.createSourceWorktree({} as never)).rejects.toThrow('Source worktree creation is not available.');
+    await expect(state.previewAgentFile('agent-dina', 'README.md')).rejects.toThrow('File preview is not available.');
+    await expect(state.openAgentGitDiff('agent-dina')).rejects.toThrow('Git diff preview is not available.');
+    await expect(state.openAgentPath('agent-dina', 'finder')).rejects.toThrow('Open In is not available.');
     await state.createTeam({ name: 'Ignored Team', color: '#46A857' });
     await state.updateTeam({ id: 'team-codex-claw', name: 'Ignored Team', color: '#46A857' });
     await state.reorderTeams({ teamId: 'team-codex-claw', beforeTeamId: null });
@@ -2842,8 +2853,205 @@ describe('useAppState', () => {
     await state.removeBenchTemplate('missing-template');
     await state.restartAgent('agent-dina');
     await state.closeAgent('agent-dina');
+    await state.disconnectTeam('team-codex-claw');
+    await expect(state.getLoopSnapshot({ kind: 'remote', remoteConnectionId: 'ssh-1' })).resolves.toBe(before);
+    await expect(state.createLoop({} as never)).resolves.toBeUndefined();
+    await expect(state.updateLoop({ id: 'missing' } as never)).resolves.toBeUndefined();
+    await expect(state.runLoop('missing')).resolves.toBeUndefined();
+    await expect(state.clearLoopHistory('missing')).resolves.toBeUndefined();
+    await expect(state.deleteLoopExecution('missing', 'execution')).resolves.toBeUndefined();
+    await expect(state.deleteLoop('missing')).resolves.toBeUndefined();
+    await expect(state.readConversationMessages({ backend: 'codex', threadId: 'thread' }, 'agent-dina')).resolves.toStrictEqual([]);
+    await expect(state.listAgentConversations('agent-dina')).resolves.toStrictEqual([]);
+    await state.resumeAgentConversation('agent-dina', { backend: 'codex', threadId: 'thread' });
+    await state.updateSettings({});
+    await state.setCodexResourceSharing({ enabled: true });
+    await expect(state.getPluginStatus()).resolves.toStrictEqual({ chromeEnabled: false });
+    await expect(state.listSshHosts()).resolves.toStrictEqual([]);
+    await state.addSshConnection({} as never);
+    await state.checkRemoteConnection('ssh-1');
+    await state.updateRemoteConnection('ssh-1', {} as never);
+    await state.removeRemoteConnection('ssh-1');
+    await expect(state.getDevicePairingStatus()).resolves.toStrictEqual({ status: 'disabled' });
+    await expect(state.enableDevicePairing()).resolves.toStrictEqual({ status: 'disabled' });
+    await expect(state.disableDevicePairing()).resolves.toStrictEqual({ status: 'disabled' });
+    await expect(state.startDevicePairing()).rejects.toThrow('Device pairing is not available.');
+    await expect(state.checkDevicePairing({} as never)).resolves.toBe(false);
+    await expect(state.listPairedDevices('environment')).resolves.toStrictEqual([]);
+    await state.revokePairedDevice('environment', 'client');
+    await state.loadDaemonStatus();
+    await state.setDaemonEnabled(true);
+    await state.connectWorkProvider('github');
+    await state.openWorkProviderAuthorization('github');
+    await state.completeWorkProviderConnection('github');
+    await state.disconnectWorkProvider('github');
+    await expect(state.loadWorkRepositories('github')).resolves.toStrictEqual([]);
+    await expect(state.loadWorkItems('github', '')).resolves.toStrictEqual([]);
+    await state.configureWorkBacklog({} as never);
+    await expect(state.getBenchSnapshot({ kind: 'remote', remoteConnectionId: 'ssh-1' })).resolves.toStrictEqual(createEmptySnapshot());
+    await expect(state.loadBench({ kind: 'remote', remoteConnectionId: 'ssh-1' })).resolves.toStrictEqual([]);
+    await state.assignWorkItemToAgent({ agentId: 'agent-dina', item: workItem() });
+    await state.removeWorkItemAssignment(workItem());
+    await state.forkAgent('agent-dina');
+    state.snapshot.value.activeAgentId = null;
+    await state.forkActiveAgentMessage(0);
+    await state.resolveBackendApproval('missing', 'approve', 'once');
+    state.selectModel('missing');
+    state.selectReasoningEffort('high');
+    state.selectServiceTier('fast');
+    await state.setApprovalPreset('full-access');
+    state.updateComposerState('missing', { text: 'ignored', selectionStart: 0, selectionEnd: 0 });
+    state.updateComposerAttachments('missing', []);
+    await state.loadOlderAgentHistory('agent-dina');
 
     expect(state.snapshot.value).toBe(before);
+  });
+
+  it('routes optional desktop operations through the preload bridge and adopts their results', async () => {
+    const initialSnapshot = createInitialSnapshot();
+    initialSnapshot.sourceFolder.path = '/Users/nbonamy/src';
+    initialSnapshot.teams.push({
+      id: 'team-other',
+      name: 'Other',
+      color: '#123456',
+      agentIds: [],
+    });
+    const updatedSnapshot = structuredClone(initialSnapshot);
+    updatedSnapshot.sourceFolder.path = '/Users/nbonamy/projects';
+    const repositories: SourceRepository[] = [{
+      name: 'codex-claw',
+      path: '/Users/nbonamy/projects/codex-claw',
+      worktrees: [],
+    }];
+    const pairingSession: DevicePairingSession = {
+      pairingCode: 'ABCD-EFGH',
+      environmentId: 'environment-1',
+      expiresAt: '2026-06-05T00:10:00.000Z',
+    };
+    const daemonStatus = {
+      supported: true,
+      installed: true,
+      running: true,
+      socketPath: '/tmp/clawd.sock',
+      pid: 1234,
+    };
+    const api = {
+      listSourceRepositories: vi.fn().mockResolvedValue(repositories),
+      previewAgentFile: vi.fn().mockResolvedValue({ path: 'README.md', content: '# Claw' }),
+      openAgentGitDiff: vi.fn().mockResolvedValue(undefined),
+      disconnectTeam: vi.fn().mockResolvedValue(initialSnapshot),
+      getLoopSnapshot: vi.fn().mockResolvedValue(initialSnapshot),
+      updateSettings: vi.fn().mockResolvedValue(updatedSnapshot),
+      listSshHosts: vi.fn().mockResolvedValue([{ host: 'devbox' }]),
+      addSshConnection: vi.fn().mockResolvedValue(initialSnapshot),
+      checkRemoteConnection: vi.fn().mockResolvedValue(initialSnapshot),
+      updateRemoteConnection: vi.fn().mockResolvedValue(initialSnapshot),
+      removeRemoteConnection: vi.fn().mockResolvedValue(initialSnapshot),
+      getDevicePairingStatus: vi.fn().mockResolvedValue({ status: 'connected', environmentId: 'environment-1' }),
+      enableDevicePairing: vi.fn().mockResolvedValue({ status: 'connecting' }),
+      disableDevicePairing: vi.fn().mockResolvedValue({ status: 'disabled' }),
+      startDevicePairing: vi.fn().mockResolvedValue(pairingSession),
+      checkDevicePairing: vi.fn().mockResolvedValue(true),
+      listPairedDevices: vi.fn().mockResolvedValue([{ clientId: 'client-1', displayName: 'Phone' }]),
+      revokePairedDevice: vi.fn().mockResolvedValue(undefined),
+      getDaemonStatus: vi.fn().mockResolvedValue(daemonStatus),
+      setDaemonEnabled: vi.fn().mockResolvedValue(daemonStatus),
+      getBenchSnapshot: vi.fn().mockResolvedValue(initialSnapshot),
+      loadOlderAgentHistory: vi.fn().mockResolvedValue({ hasOlder: false }),
+    } satisfies Partial<CodexClawApi>;
+    stubElectronTestWindow({ codexClaw: api });
+
+    const state = useAppState();
+    state.snapshot.value = initialSnapshot;
+
+    await expect(state.listSourceRepositories('ssh-1')).resolves.toStrictEqual(repositories);
+    await expect(state.previewAgentFile('agent-dina', 'README.md')).resolves.toStrictEqual({ path: 'README.md', content: '# Claw' });
+    await state.openAgentGitDiff('agent-dina');
+    await state.disconnectTeam('team-other');
+    await expect(state.getLoopSnapshot({ kind: 'remote', remoteConnectionId: 'ssh-1' })).resolves.toBe(initialSnapshot);
+    await state.updateSettings({ sourceFolder: { path: '/Users/nbonamy/projects' } });
+    await expect(state.listSshHosts()).resolves.toStrictEqual([{ host: 'devbox' }]);
+    await state.addSshConnection({ host: 'devbox' });
+    await state.checkRemoteConnection('ssh-1');
+    await state.updateRemoteConnection('ssh-1', { sourceFolderPath: '/srv/src' });
+    await state.removeRemoteConnection('ssh-1');
+    await expect(state.getDevicePairingStatus()).resolves.toMatchObject({ status: 'connected' });
+    await expect(state.enableDevicePairing()).resolves.toMatchObject({ status: 'connecting' });
+    await expect(state.disableDevicePairing()).resolves.toMatchObject({ status: 'disabled' });
+    await expect(state.startDevicePairing()).resolves.toBe(pairingSession);
+    await expect(state.checkDevicePairing(pairingSession)).resolves.toBe(true);
+    await expect(state.listPairedDevices('environment-1')).resolves.toMatchObject([{ clientId: 'client-1' }]);
+    await state.revokePairedDevice('environment-1', 'client-1');
+    await state.loadDaemonStatus();
+    await state.setDaemonEnabled(true);
+    await expect(state.getBenchSnapshot()).resolves.toBe(state.snapshot.value);
+    await expect(state.getBenchSnapshot({ kind: 'remote', remoteConnectionId: 'ssh-1' })).resolves.toBe(initialSnapshot);
+    await expect(state.loadBench()).resolves.toBe(state.snapshot.value.bench);
+    await state.loadOlderAgentHistory('agent-dina');
+
+    expect(api.listSourceRepositories).toHaveBeenCalledWith('ssh-1');
+    expect(api.updateSettings).toHaveBeenCalledWith({ sourceFolder: { path: '/Users/nbonamy/projects' } });
+    expect(state.sourceRepositories.value).toStrictEqual(repositories);
+    expect(state.daemonStatus.value).toStrictEqual(daemonStatus);
+    expect(state.daemonStatusError.value).toBeNull();
+    expect(state.activeHistoryHasOlder.value).toBe(false);
+  });
+
+  it('recovers from optional desktop operation failures without leaving stale loading state', async () => {
+    const initialSnapshot = createInitialSnapshot();
+    const history = deferred<{ hasOlder: boolean }>();
+    const getDaemonStatus = vi.fn()
+      .mockRejectedValueOnce('daemon unavailable')
+      .mockRejectedValueOnce(new Error('refresh unavailable'));
+    const setCodexResourceSharing = vi.fn()
+      .mockResolvedValueOnce(initialSnapshot)
+      .mockRejectedValueOnce(new Error('migration failed'));
+    const api = {
+      setCodexResourceSharing,
+      getDaemonStatus,
+      setDaemonEnabled: vi.fn().mockRejectedValue(new Error('cannot stop daemon')),
+      openWorkProviderAuthorization: vi.fn().mockRejectedValue('authorization unavailable'),
+      getBenchSnapshot: vi.fn().mockRejectedValue('remote bench unavailable'),
+      listBackendSkills: vi.fn().mockRejectedValue('skills unavailable'),
+      listAgentFiles: vi.fn().mockRejectedValue(new Error('files unavailable')),
+      loadOlderAgentHistory: vi.fn().mockReturnValue(history.promise),
+    } satisfies Partial<CodexClawApi>;
+    stubElectronTestWindow({ codexClaw: api });
+
+    const state = useAppState();
+    state.snapshot.value = initialSnapshot;
+
+    await state.setCodexResourceSharing({ enabled: true });
+    expect(state.backendRestartInProgress.value).toBe(false);
+    await expect(state.setCodexResourceSharing({ enabled: true })).rejects.toThrow('migration failed');
+    expect(state.backendRestartInProgress.value).toBe(false);
+
+    await state.loadDaemonStatus();
+    expect(state.daemonStatusError.value).toBe('daemon unavailable');
+    await state.setDaemonEnabled(false);
+    expect(state.daemonStatusError.value).toBe('cannot stop daemon');
+
+    await expect(state.openWorkProviderAuthorization('github')).rejects.toBe('authorization unavailable');
+    expect(state.workBacklogStatus.value).toBe('error');
+    expect(state.workBacklogError.value).toBe('authorization unavailable');
+    await expect(state.loadBench({ kind: 'remote', remoteConnectionId: 'ssh-1' })).resolves.toStrictEqual([]);
+    expect(state.remoteBenchStatusByConnectionId.value['ssh-1']).toBe('error');
+    expect(state.remoteBenchErrorByConnectionId.value['ssh-1']).toBe('remote bench unavailable');
+
+    await state.loadBackendSkills();
+    expect(state.skillCatalogStatus.value).toBe('error');
+    expect(state.skillCatalogError.value).toBe('skills unavailable');
+    await state.loadAgentFiles();
+    expect(state.fileCatalogStatus.value).toBe('error');
+    expect(state.fileCatalogError.value).toBe('files unavailable');
+
+    const firstHistoryLoad = state.loadOlderAgentHistory('agent-dina');
+    await state.loadOlderAgentHistory('agent-dina');
+    expect(api.loadOlderAgentHistory).toHaveBeenCalledTimes(1);
+    history.resolve({ hasOlder: true });
+    await firstHistoryLoad;
+    expect(state.isLoadingOlderHistory.value).toBe(false);
+    expect(state.activeHistoryHasOlder.value).toBe(true);
   });
 
   it('creates, updates, and deletes loops through the preload bridge', async () => {
