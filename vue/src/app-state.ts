@@ -96,6 +96,7 @@ let bufferedMainEvents: MainToRendererEvent[] | null = null;
 let lastBackendEventSeq = 0;
 let rendererSynchronization: Promise<void> | null = null;
 let synchronizeRendererSnapshotRequest: (() => Promise<void>) | null = null;
+let rendererConnectionRecovery: Promise<void> | null = null;
 const workProviderAuthorizationPollTimers = new Map<WorkProviderKind, ReturnType<typeof globalThis.setTimeout>>();
 const WORK_PROVIDER_AUTHORIZATION_POLL_MS = 5_000;
 
@@ -2003,7 +2004,11 @@ function subscribeToMainEvents(): void {
 
 function handleMainEvent(event: MainToRendererEvent, adoptSnapshot = true): void {
   if (event.type === 'client.connectionChanged' && isBackendConnectionState(event.payload)) {
+    const wasConnected = connectionState.value.status === 'connected';
     connectionState.value = event.payload;
+    if (!wasConnected && event.payload.status === 'connected') {
+      void recoverRendererAfterBackendConnection();
+    }
   }
   if (adoptSnapshot) adoptSnapshotFromMainEvent(event);
   syncUnreadStateFromMainEvent(event);
@@ -2015,6 +2020,30 @@ function handleMainEvent(event: MainToRendererEvent, adoptSnapshot = true): void
   if (event.type === 'skills.changed') {
     applySkillsChangedEvent(event);
   }
+}
+
+function recoverRendererAfterBackendConnection(): Promise<void> {
+  if (rendererConnectionRecovery) return rendererConnectionRecovery;
+  rendererConnectionRecovery = (async () => {
+    try {
+      await synchronizeRendererSnapshotRequest?.();
+      const activeAgentId = snapshot.value.activeAgentId;
+      if (activeAgentId) restoreComposerConfiguration(activeAgentId);
+      pruneRemoteBenchCache();
+      await Promise.all([
+        hydrateActiveAgentHistory(),
+        loadActiveAgentCatalogs(activeAgentId),
+      ]);
+    } catch (error) {
+      connectionState.value = {
+        status: 'error',
+        detail: error instanceof Error ? error.message : String(error),
+      };
+    }
+  })().finally(() => {
+    rendererConnectionRecovery = null;
+  });
+  return rendererConnectionRecovery;
 }
 
 function syncUnreadStateFromMainEvent(event: MainToRendererEvent): void {

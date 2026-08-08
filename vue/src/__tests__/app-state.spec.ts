@@ -315,6 +315,73 @@ describe('useAppState', () => {
     expect(state.visibleMessages.value).toStrictEqual(remoteSnapshot.messages);
   });
 
+  it('restores the selected agent when the desktop backend connects after the renderer starts', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-persisted' };
+    const restoredMessage: RendererMessage = {
+      id: 'assistant-restored-after-connect',
+      agentId: 'agent-dina',
+      role: 'assistant',
+      status: 'complete',
+      createdAt: '2026-06-05T00:00:00.000Z',
+      parts: [{ type: 'text', text: 'Restored after clawd connected.' }],
+    };
+    const getSnapshotState = vi.fn()
+      .mockRejectedValueOnce(new Error('clawd snapshot is not available.'))
+      .mockResolvedValue({
+        snapshot: remoteSnapshot,
+        lastBackendEventSeq: 0,
+        connection: { status: 'connected' as const },
+      });
+    const hydrateAgentHistory = vi.fn().mockImplementation(async () => {
+      listeners[0]?.({
+        seq: 1,
+        source: 'backend',
+        agentId: 'agent-dina',
+        threadId: 'thread-persisted',
+        type: 'thread.historyLoaded',
+        payload: { messages: [restoredMessage], replace: true },
+        occurredAt: '2026-06-05T00:00:01.000Z',
+      });
+      return snapshotMetadata(remoteSnapshot);
+    });
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshotState,
+        hydrateAgentHistory,
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    state.snapshot.value = createEmptySnapshot();
+    await state.loadSnapshot();
+
+    expect(state.connectionState.value).toStrictEqual({
+      status: 'error',
+      detail: 'clawd snapshot is not available.',
+    });
+    expect(state.activeAgent.value).toBeNull();
+
+    listeners[0]?.({
+      seq: 1,
+      source: 'client',
+      type: 'client.connectionChanged',
+      payload: { status: 'connected' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    await vi.waitFor(() => expect(state.activeAgent.value?.id).toBe('agent-dina'));
+    await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalledWith('agent-dina'));
+    await vi.waitFor(() => expect(state.visibleMessages.value).toStrictEqual([restoredMessage]));
+    expect(getSnapshotState).toHaveBeenCalledTimes(2);
+    expect(state.connectionState.value).toStrictEqual({ status: 'connected' });
+  });
+
   it('subscribes before loading and preserves transient events received with the startup snapshot', async () => {
     const snapshotLoad = deferred<ReturnType<typeof createInitialSnapshot>>();
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
