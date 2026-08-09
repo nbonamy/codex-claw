@@ -4,6 +4,12 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.8.1] - 2026-08-09
+
+### Improvements and fixes
+
+- What’s New now lets you browse notes from every previous Codex Claw release.
+
 ## [0.8.0] - 2026-08-09
 
 ### New features

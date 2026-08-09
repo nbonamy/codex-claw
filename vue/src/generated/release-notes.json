@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.8.0",
+  "currentVersion": "0.8.1",
   "releases": [
+    {
+      "version": "0.8.1",
+      "releasedAt": "2026-08-09",
+      "sourceSha256": "aa7f8169615541f364e4293c07d423d79202a7d23e84a0218473b6fc105ba027",
+      "markdown": "### Improvements and fixes\n\n- What’s New now lets you browse notes from every previous Codex Claw release."
+    },
     {
       "version": "0.8.0",
       "releasedAt": "2026-08-09",
