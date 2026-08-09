@@ -4,6 +4,31 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.7.0] - 2026-08-09
+
+### New features
+
+- Agents and project files can now be opened directly in installed editors,
+  Finder, or terminals, with each agent remembering its preferred application.
+- Unread agent activity is now visible in the agent list, team rail, and macOS
+  Dock badge so completed work and requests are easier to locate.
+- Every composer image can now keep its own saved annotation draft, be reopened
+  for edits, and submit grouped feedback for multiple images in one prompt.
+- Code blocks in conversations now include a dedicated copy action.
+
+### Improvements and fixes
+
+- Image annotation now keeps the in-app browser behind its modal, uses explicit
+  Clear, Cancel, and counted Save actions, and supports Command+Enter to save.
+- The selected agent now remains active after reconnecting to the backend, and
+  the Chrome plugin configuration is restored correctly at startup.
+- Unread Dock badges no longer retain stale counts, and Command-number hints
+  disappear as soon as a real Command shortcut is used.
+- Generated images now use the correct tool presentation and support reliable
+  fullscreen viewing and downloads, while pasted images retain their previews.
+- Empty completed responses now show a clear fallback, and interrupted or
+  restored turns no longer leave tool activity displayed as running forever.
+
 ## [0.6.1] - 2026-08-07
 
 ### New features
