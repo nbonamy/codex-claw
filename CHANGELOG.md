@@ -4,6 +4,21 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.8.0] - 2026-08-09
+
+### New features
+
+- Subagents are now visible from the agent header, with live and completed
+  workers grouped in a compact menu and each conversation opening in its own
+  workspace tab.
+
+### Improvements and fixes
+
+- Prompts submitted remotely now appear in the conversation without requiring
+  a reload.
+- File and diff previews, including Review, now scroll horizontally when long
+  lines extend beyond the workspace pane.
+
 ## [0.7.0] - 2026-08-09
 
 ### New features

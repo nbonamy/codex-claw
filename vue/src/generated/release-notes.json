@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "version": "0.7.0",
+  "version": "0.8.0",
   "releasedAt": "2026-08-09",
-  "sourceSha256": "d9157be1b73a18dde2719a3f647c57d9ff0fb0b9abeb4b195e401183a331dc1b",
-  "markdown": "### New features\n\n- Agents and project files can now be opened directly in installed editors,\n  Finder, or terminals, with each agent remembering its preferred application.\n- Unread agent activity is now visible in the agent list, team rail, and macOS\n  Dock badge so completed work and requests are easier to locate.\n- Every composer image can now keep its own saved annotation draft, be reopened\n  for edits, and submit grouped feedback for multiple images in one prompt.\n- Code blocks in conversations now include a dedicated copy action.\n\n### Improvements and fixes\n\n- Image annotation now keeps the in-app browser behind its modal, uses explicit\n  Clear, Cancel, and counted Save actions, and supports Command+Enter to save.\n- The selected agent now remains active after reconnecting to the backend, and\n  the Chrome plugin configuration is restored correctly at startup.\n- Unread Dock badges no longer retain stale counts, and Command-number hints\n  disappear as soon as a real Command shortcut is used.\n- Generated images now use the correct tool presentation and support reliable\n  fullscreen viewing and downloads, while pasted images retain their previews.\n- Empty completed responses now show a clear fallback, and interrupted or\n  restored turns no longer leave tool activity displayed as running forever."
+  "sourceSha256": "9f6492716f9cab639b23643edd2b2d9ac2363c83435a3c2f7cc2c86235eb38ea",
+  "markdown": "### New features\n\n- Subagents are now visible from the agent header, with live and completed\n  workers grouped in a compact menu and each conversation opening in its own\n  workspace tab.\n\n### Improvements and fixes\n\n- Prompts submitted remotely now appear in the conversation without requiring\n  a reload.\n- File and diff previews, including Review, now scroll horizontally when long\n  lines extend beyond the workspace pane."
 }
