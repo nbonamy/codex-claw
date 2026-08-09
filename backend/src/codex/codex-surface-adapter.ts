@@ -20,6 +20,9 @@ import type {
   PairedDevice,
   SendPromptOptions,
   CodexAuthentication,
+  SubagentActivityChange,
+  SubagentOperationChange,
+  SubagentStatusChange,
 } from '@codex-claw/core/contracts';
 import type { BackendEvent } from '@codex-claw/core/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
@@ -34,6 +37,7 @@ import type {
   CodexSurfaceReviewTarget,
   CodexSurfaceSnapshot,
   CodexSurfaceSkill,
+  CodexSurfaceThreadStatus,
   SendCodexMessageOptions,
   SurfaceMessage,
   SurfaceMessagePart,
@@ -54,6 +58,11 @@ type AgentConversation = {
   unsubscribe: () => void;
 };
 
+type SubagentOwner = {
+  agentId: string;
+  rootConversationId: string;
+};
+
 export class CodexSurfaceAgentAdapter {
   private readonly listeners = new Set<AdapterListener>();
   private readonly sessionsByAgentId = new Map<string, AgentConversation>();
@@ -61,6 +70,7 @@ export class CodexSurfaceAgentAdapter {
   private readonly agentIdsByThreadId = new Map<string, string>();
   private readonly approvalOwners = new Map<string, AgentConversation>();
   private readonly clientRequestOwners = new Map<string, AgentConversation>();
+  private readonly subagentOwners = new Map<string, SubagentOwner>();
   private readonly unsubscribeSurface: () => void;
   private closed = false;
 
@@ -254,6 +264,9 @@ export class CodexSurfaceAgentAdapter {
     if (this.agentIdsByThreadId.get(session.handle.id) === agentId) {
       this.agentIdsByThreadId.delete(session.handle.id);
     }
+    for (const [conversationId, owner] of this.subagentOwners) {
+      if (owner.agentId === agentId) this.subagentOwners.delete(conversationId);
+    }
     this.removePendingOwners(session);
     this.surface.forgetConversation(session.handle.id);
   }
@@ -270,7 +283,24 @@ export class CodexSurfaceAgentAdapter {
   async readConversationMessages(threadId: string, agentId: string): Promise<RendererMessage[]> {
     await this.start();
     const history = await this.surface.conversation(threadId).readHistory();
-    return surfaceMessages(history.messages, agentId);
+    const messages = surfaceMessages(history.messages, agentId);
+    const session = this.sessionsByAgentId.get(agentId);
+    if (session && session.handle.id !== threadId) {
+      const status = subagentStatusFromHistory(history.threadStatus, messages);
+      if (status) {
+        this.subagentOwners.set(threadId, {
+          agentId,
+          rootConversationId: session.handle.id,
+        });
+        this.emitSubagentStatus(
+          session,
+          threadId,
+          status,
+          messages.at(-1)?.createdAt ?? new Date().toISOString(),
+        );
+      }
+    }
+    return messages;
   }
 
   async loadOlderHistory(agent: Agent): Promise<{ hasOlder: boolean }> {
@@ -287,7 +317,14 @@ export class CodexSurfaceAgentAdapter {
     const conversations = await this.surface.listConversations({ cwd: expandHome(agent.folder), limit: 30 });
     return conversations.map((conversation) => ({
       id: conversation.id,
+      ...(conversation.sessionId ? { sessionId: conversation.sessionId } : {}),
+      ...(conversation.parentConversationId ? { parentConversationId: conversation.parentConversationId } : {}),
+      ...(conversation.agentNickname ? { agentNickname: conversation.agentNickname } : {}),
+      ...(conversation.agentRole ? { agentRole: conversation.agentRole } : {}),
       title: conversation.title,
+      preview: conversation.preview,
+      status: conversation.status,
+      createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
       messageCount: conversation.turnCount,
       ref: { backend: 'codex', threadId: conversation.id },
@@ -389,6 +426,7 @@ export class CodexSurfaceAgentAdapter {
     this.agentIdsByThreadId.clear();
     this.approvalOwners.clear();
     this.clientRequestOwners.clear();
+    this.subagentOwners.clear();
     await this.closeSurface();
   }
 
@@ -537,7 +575,36 @@ export class CodexSurfaceAgentAdapter {
   }
 
   private handleSurfaceEvent(event: CodexSurfaceEvent): void {
-    if ('conversationId' in event) return;
+    if ('conversationId' in event) {
+      const owner = this.subagentOwners.get(event.conversationId);
+      if (!owner) return;
+      const session = this.sessionsByAgentId.get(owner.agentId);
+      if (!session || session.handle.id !== owner.rootConversationId) return;
+      if (event.type === 'subagent.toolCallChanged') {
+        this.emitSubagentToolCall(session, event);
+      } else if (event.type === 'subagent.activity') {
+        this.emitSubagentActivity(session, event);
+      } else if (event.type === 'turn.started') {
+        this.emitSubagentStatus(session, event.conversationId, 'running', event.occurredAt);
+      } else if (event.type === 'turn.completed') {
+        this.emitSubagentStatus(
+          session,
+          event.conversationId,
+          subagentStatusFromTurn(event.payload.status),
+          event.occurredAt,
+          event.payload.error?.message ?? undefined,
+        );
+      } else if (event.type === 'turn.error' && !event.payload.willRetry) {
+        this.emitSubagentStatus(
+          session,
+          event.conversationId,
+          'errored',
+          event.occurredAt,
+          event.payload.error.message,
+        );
+      }
+      return;
+    }
     if (event.type === 'surface.statusChanged') {
       this.emit({ backend: 'codex', type: 'backend.statusChanged', payload: runtimeStatus(this.surface.getSnapshot()), occurredAt: event.occurredAt });
       return;
@@ -627,6 +694,14 @@ export class CodexSurfaceAgentAdapter {
       case 'conversation.diffUpdated':
         if (event.payload.diff) this.emitDiff(session, event.payload.diff, event.occurredAt);
         return;
+      case 'subagent.toolCallChanged': {
+        this.emitSubagentToolCall(session, event);
+        return;
+      }
+      case 'subagent.activity': {
+        this.emitSubagentActivity(session, event);
+        return;
+      }
       case 'turn.started':
         this.emitThread(session, {
           type: 'turn.started', turnId: event.turnId,
@@ -935,6 +1010,97 @@ export class CodexSurfaceAgentAdapter {
     });
   }
 
+  private emitSubagentToolCall(
+    session: AgentConversation,
+    event: Extract<CodexConversationEvent, { type: 'subagent.toolCallChanged' }>,
+  ): void {
+    const toolCall = event.payload.toolCall;
+    const owner = { agentId: session.agent.id, rootConversationId: session.handle.id };
+    for (const conversationId of toolCall.receiverConversationIds) {
+      this.subagentOwners.set(conversationId, owner);
+    }
+    const operation: SubagentOperationChange['operation'] = {
+      id: toolCall.id,
+      ...(event.turnId ? { turnId: event.turnId } : {}),
+      lifecycle: event.payload.lifecycle,
+      kind: toolCall.tool,
+      status: toolCall.status,
+      senderConversationId: toolCall.senderConversationId,
+      receiverConversationIds: [...toolCall.receiverConversationIds],
+      ...(toolCall.prompt ? { prompt: toolCall.prompt } : {}),
+      ...(toolCall.model ? { model: toolCall.model } : {}),
+      ...(toolCall.reasoningEffort ? { reasoningEffort: toolCall.reasoningEffort } : {}),
+      occurredAt: event.occurredAt,
+    };
+    const agentStates: SubagentOperationChange['agentStates'] = {};
+    for (const [conversationId, state] of Object.entries(toolCall.agentStates)) {
+      this.subagentOwners.set(conversationId, owner);
+      agentStates[conversationId] = {
+        status: state.status,
+        ...(state.message ? { message: state.message } : {}),
+      };
+    }
+    this.emitThread(session, {
+      type: 'subagent.operationChanged',
+      turnId: event.turnId,
+      payload: {
+        rootConversationId: session.handle.id,
+        operation,
+        agentStates,
+      } satisfies SubagentOperationChange,
+      occurredAt: event.occurredAt,
+    });
+  }
+
+  private emitSubagentActivity(
+    session: AgentConversation,
+    event: Extract<CodexConversationEvent, { type: 'subagent.activity' }>,
+  ): void {
+    const activity: SubagentActivityChange['activity'] = {
+      id: event.payload.activity.id,
+      ...(event.turnId ? { turnId: event.turnId } : {}),
+      lifecycle: event.payload.lifecycle,
+      kind: event.payload.activity.kind,
+      conversationId: event.payload.activity.agentConversationId,
+      agentPath: event.payload.activity.agentPath,
+      occurredAt: event.occurredAt,
+    };
+    if (activity.conversationId === session.handle.id) return;
+    this.subagentOwners.set(activity.conversationId, {
+      agentId: session.agent.id,
+      rootConversationId: session.handle.id,
+    });
+    this.emitThread(session, {
+      type: 'subagent.activityChanged',
+      turnId: event.turnId,
+      payload: {
+        rootConversationId: session.handle.id,
+        parentConversationId: event.conversationId,
+        activity,
+      } satisfies SubagentActivityChange,
+      occurredAt: event.occurredAt,
+    });
+  }
+
+  private emitSubagentStatus(
+    session: AgentConversation,
+    conversationId: string,
+    status: SubagentStatusChange['status'],
+    occurredAt: string,
+    statusMessage?: string,
+  ): void {
+    this.emitThread(session, {
+      type: 'subagent.statusChanged',
+      payload: {
+        rootConversationId: session.handle.id,
+        conversationId,
+        status,
+        ...(statusMessage ? { statusMessage } : {}),
+      } satisfies SubagentStatusChange,
+      occurredAt,
+    });
+  }
+
   private emitThread(
     session: AgentConversation,
     event: Omit<BackendEvent, 'agentId' | 'backend' | 'threadId'>,
@@ -967,6 +1133,27 @@ function epochTimestampToIso(value: bigint): string {
   const date = new Date(milliseconds);
   if (Number.isNaN(date.getTime())) throw new Error('Codex returned an invalid remote-control timestamp.');
   return date.toISOString();
+}
+
+function subagentStatusFromTurn(
+  status: Extract<CodexConversationEvent, { type: 'turn.completed' }>['payload']['status'],
+): SubagentStatusChange['status'] {
+  if (status === 'completed') return 'completed';
+  if (status === 'interrupted') return 'interrupted';
+  if (status === 'failed') return 'errored';
+  return 'running';
+}
+
+function subagentStatusFromHistory(
+  threadStatus: CodexSurfaceThreadStatus | null,
+  messages: readonly RendererMessage[],
+): SubagentStatusChange['status'] | null {
+  if (threadStatus?.type === 'active') return 'running';
+  if (threadStatus?.type === 'systemError') return 'errored';
+  if (threadStatus?.type !== 'idle') return null;
+  const assistantMessages = messages.filter((message) => message.role === 'assistant');
+  if (assistantMessages.some((message) => message.status === 'error')) return 'errored';
+  return assistantMessages.some((message) => message.status === 'complete') ? 'completed' : null;
 }
 
 function authenticationFromSurface(

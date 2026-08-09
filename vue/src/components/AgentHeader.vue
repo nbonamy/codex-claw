@@ -50,13 +50,6 @@
     </div>
 
     <div class="agent-header__activity">
-      <div class="agent-header__activity-line">
-        <span
-          :data-status="agent?.status.type ?? backendRuntime.status"
-          aria-hidden="true"
-        />
-        <strong>{{ activityTitle }}</strong>
-      </div>
       <span
         v-if="hasHeaderGitStatus"
         class="agent-header__git-status"
@@ -82,6 +75,12 @@
           />
         </button>
       </span>
+      <SubagentControl
+        v-if="displaySubagentTree"
+        :tree="displaySubagentTree"
+        :selected-conversation-id="selectedSubagentConversationId"
+        @select="emit('select-subagent', $event)"
+      />
       <button
         v-if="executionPlanAvailable"
         class="agent-header__execution-plan"
@@ -120,13 +119,14 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Agent, AgentGitStatus, BackendRuntimeStatus, DesktopUpdateStatus, OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
+import type { Agent, AgentGitStatus, AgentSubagentTree, BackendRuntimeStatus, DesktopUpdateStatus, OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
 import { ListIcon, PanelLeftOpenIcon } from '../shared/icons/app-icons';
 import { IconLayoutSidebarRight } from '@tabler/icons-vue';
 import { CodexAnimatedDiffStat } from '@codex-app-sdk/vue';
 import AgentAvatar from './AgentAvatar.vue';
 import UpdateAvailableBadge from './UpdateAvailableBadge.vue';
 import OpenInControl from '../shared/OpenInControl.vue';
+import SubagentControl from './SubagentControl.vue';
 import { effectiveOpenInApplication } from '../shared/open-in';
 
 const props = defineProps<{
@@ -141,6 +141,8 @@ const props = defineProps<{
   executionPlanOpen?: boolean;
   openInAvailable?: boolean;
   openInCatalog?: OpenInApplicationCatalog;
+  subagentTree?: AgentSubagentTree | null;
+  selectedSubagentConversationId?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -150,7 +152,15 @@ const emit = defineEmits<{
   'open-git-diff': [];
   'install-update': [];
   'open-in': [application: OpenInApplication];
+  'select-subagent': [conversationId: string];
 }>();
+
+const displaySubagentTree = computed(() => {
+  const tree = props.subagentTree;
+  return tree && Object.values(tree.nodes).some((node) => node.conversationId !== tree.rootConversationId)
+    ? tree
+    : null;
+});
 
 const statusLabel = computed(() => {
   if (props.isLoading) {
@@ -168,20 +178,6 @@ const statusLabel = computed(() => {
   return `${backendLabel.value} pending`;
 });
 const backendLabel = computed(() => (props.backendRuntime.backend === 'claude' ? 'Claude' : 'Codex'));
-const agentStateLabel = computed(() => {
-  switch (props.agent?.status.type) {
-    case 'working':
-    case 'starting':
-      return 'Working';
-    case 'awaitingInput':
-    case 'error':
-      return 'Blocked';
-    case 'idle':
-      return 'Idle';
-    default:
-      return statusLabel.value;
-  }
-});
 const agentStatusDetail = computed(() => {
   if (!props.agent) {
     return statusLabel.value;
@@ -205,7 +201,6 @@ const agentStatusDetail = computed(() => {
   }
 });
 
-const activityTitle = computed(() => agentStateLabel.value);
 const hasHeaderGitStatus = computed(() => {
   const gitStatus = props.gitStatus;
   if (!gitStatus || gitStatus.state === 'unknown') {
@@ -265,38 +260,12 @@ const hasHeaderGitStatus = computed(() => {
   white-space: nowrap;
 }
 
-.agent-header__inline-dot,
-.agent-header__activity-line > span {
+.agent-header__inline-dot {
   flex: 0 0 auto;
   width: var(--agent-status-dot-size);
   height: var(--agent-status-dot-size);
   border-radius: var(--radius-full);
-}
-
-.agent-header__inline-dot {
   background: var(--color-outline);
-}
-
-.agent-header__activity-line > span {
-  background: var(--color-success);
-}
-
-.agent-header__activity-line > span[data-status='working'],
-.agent-header__activity-line > span[data-status='starting'] {
-  background: var(--color-warning);
-}
-
-.agent-header__activity-line > span[data-status='awaitingInput'],
-.agent-header__activity-line > span[data-status='notConfigured'] {
-  background: var(--color-warning);
-}
-
-.agent-header__activity-line > span[data-status='error'] {
-  background: var(--color-error);
-}
-
-.agent-header__activity-line > span[data-status='running'] {
-  background: var(--color-success);
 }
 
 .agent-header__inline-status {
@@ -364,32 +333,14 @@ const hasHeaderGitStatus = computed(() => {
   height: var(--icon-md);
 }
 
-.agent-header__activity-line {
+.agent-header__git-status {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-4);
-  min-width: 0;
-}
-
-.agent-header__activity-line strong,
-.agent-header__git-status {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.agent-header__activity-line strong {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-13);
-  font-weight: var(--font-weight-medium);
-}
-
-.agent-header__git-status {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-4);
   font-size: var(--font-size-13);
 }
 

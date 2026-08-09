@@ -377,6 +377,133 @@ describe('CodexSurfaceAgentAdapter', () => {
     ]);
   });
 
+  it('adapts SDK subagent events into app-owned tree events', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
+    await adapter.hydrateAgent(agentA);
+    events.length = 0;
+
+    transport.emit({
+      method: 'item/started',
+      params: {
+        threadId: 'thread-a', turnId: 'turn-subagent', startedAtMs: 1,
+        item: {
+          type: 'collabAgentToolCall', id: 'spawn-1', tool: 'spawnAgent', status: 'inProgress',
+          senderThreadId: 'thread-a', receiverThreadIds: ['thread-child'], prompt: 'Inspect tests',
+          model: 'gpt-5', reasoningEffort: 'high',
+          agentsStates: { 'thread-child': { status: 'running', message: null } },
+        },
+      },
+    });
+    transport.emit({
+      method: 'item/completed',
+      params: {
+        threadId: 'thread-a', turnId: 'turn-subagent', completedAtMs: 2,
+        item: {
+          type: 'subAgentActivity', id: 'activity-1', kind: 'interacted',
+          agentThreadId: 'thread-child', agentPath: '/root/scout',
+        },
+      },
+    });
+
+    expect(events).toStrictEqual([
+      expect.objectContaining({
+        type: 'subagent.operationChanged', agentId: 'agent-a', threadId: 'thread-a', turnId: 'turn-subagent',
+        payload: {
+          rootConversationId: 'thread-a',
+          operation: expect.objectContaining({
+            id: 'spawn-1', kind: 'spawnAgent', receiverConversationIds: ['thread-child'], prompt: 'Inspect tests',
+          }),
+          agentStates: { 'thread-child': { status: 'running' } },
+        },
+      }),
+      expect.objectContaining({
+        type: 'subagent.activityChanged', agentId: 'agent-a', threadId: 'thread-a', turnId: 'turn-subagent',
+        payload: {
+          rootConversationId: 'thread-a',
+          parentConversationId: 'thread-a',
+          activity: expect.objectContaining({
+            id: 'activity-1', kind: 'interacted', conversationId: 'thread-child', agentPath: '/root/scout',
+          }),
+        },
+      }),
+    ]);
+
+    events.length = 0;
+    transport.emit({
+      method: 'item/completed',
+      params: {
+        threadId: 'thread-child', turnId: 'turn-child', completedAtMs: 3,
+        item: {
+          type: 'subAgentActivity', id: 'activity-root', kind: 'interacted',
+          agentThreadId: 'thread-a', agentPath: '/root',
+        },
+      },
+    });
+    expect(events.filter((event) => event.type === 'subagent.activityChanged')).toStrictEqual([]);
+
+    events.length = 0;
+    transport.emit({ method: 'thread/started', params: { thread: thread('thread-child', '/workspace/a') } });
+    transport.emit({
+      method: 'turn/started',
+      params: { threadId: 'thread-child', turn: turn('turn-child', 'inProgress') },
+    });
+    transport.emit({
+      method: 'turn/completed',
+      params: { threadId: 'thread-child', turn: turn('turn-child', 'completed') },
+    });
+
+    expect(events.filter((event) => event.type === 'subagent.statusChanged')).toStrictEqual([
+      expect.objectContaining({
+        type: 'subagent.statusChanged',
+        agentId: 'agent-a',
+        threadId: 'thread-a',
+        payload: {
+          rootConversationId: 'thread-a',
+          conversationId: 'thread-child',
+          status: 'running',
+        },
+      }),
+      expect.objectContaining({
+        type: 'subagent.statusChanged',
+        agentId: 'agent-a',
+        threadId: 'thread-a',
+        payload: {
+          rootConversationId: 'thread-a',
+          conversationId: 'thread-child',
+          status: 'completed',
+        },
+      }),
+    ]);
+  });
+
+  it('reconciles a completed child status when its history is read after reload', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
+    transport.fullHistoryTurnsByThreadId.set('thread-child', [
+      turn('turn-child', 'completed', [agentMessage('child-answer', 'Finished the probe')]),
+    ]);
+    await adapter.hydrateAgent(agentA);
+    events.length = 0;
+
+    await expect(adapter.readConversationMessages('thread-child', agentA.id)).resolves.toEqual([
+      expect.objectContaining({ role: 'assistant', status: 'complete' }),
+    ]);
+
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'subagent.statusChanged',
+      agentId: agentA.id,
+      threadId: 'thread-a',
+      payload: {
+        rootConversationId: 'thread-a',
+        conversationId: 'thread-child',
+        status: 'completed',
+      },
+    }));
+  });
+
   it('maps tool and plan mutations once while retaining Claw plan events', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];

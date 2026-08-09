@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Loop, LoopAction, LoopExecutionCreatedAgent, LoopExecutionLogEntry, LoopExecutionStatus, LoopSourceConfiguration, LoopTeamTarget, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/core/contracts';
+import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AgentSubagentTree, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Loop, LoopAction, LoopExecutionCreatedAgent, LoopExecutionLogEntry, LoopExecutionStatus, LoopSourceConfiguration, LoopTeamTarget, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, SubagentActivity, SubagentNode, SubagentOperation, SubagentStatus, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/core/contracts';
 import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '@codex-claw/core/codex-approval-presets';
 import { normalizeGeneralSettings, normalizeSourceFolderState, normalizeThemeSettings } from '@codex-claw/core/settings';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
@@ -15,6 +15,7 @@ type PersistedState = {
   activeTeamId: string | null;
   activeAgentId: string | null;
   accountRateLimits?: AccountRateLimits;
+  subagentTrees?: Record<string, AgentSubagentTree>;
   workBacklog?: WorkBacklogState;
   remoteConnections?: RemoteConnectionsState;
   general?: AppGeneralSettings;
@@ -120,6 +121,7 @@ export function persistedStateFromSnapshot(snapshot: AppSnapshot): PersistedStat
     activeTeamId: snapshot.activeTeamId,
     activeAgentId: snapshot.activeAgentId,
     ...(snapshot.accountRateLimits ? { accountRateLimits: { ...snapshot.accountRateLimits } } : {}),
+    subagentTrees: cloneSubagentTrees(snapshot.subagentTrees),
     workBacklog: cloneWorkBacklogState(snapshot.workBacklog),
     remoteConnections: cloneRemoteConnectionsState(snapshot.remoteConnections),
     general: {
@@ -194,6 +196,7 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
     activeTeamId: typeof value.activeTeamId === 'string' ? value.activeTeamId : null,
     activeAgentId: typeof value.activeAgentId === 'string' ? value.activeAgentId : null,
     ...(accountRateLimits ? { accountRateLimits } : {}),
+    subagentTrees: sanitizeSubagentTrees(value.subagentTrees),
     workBacklog,
     remoteConnections,
     general: normalizeGeneralSettings(value.general),
@@ -211,6 +214,141 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
   snapshot.activeTeamId = repairedActiveTeamId(snapshot);
 
   return snapshot;
+}
+
+function cloneSubagentTrees(trees: Record<string, AgentSubagentTree>): Record<string, AgentSubagentTree> {
+  return Object.fromEntries(Object.entries(trees).map(([agentId, tree]) => [agentId, {
+    rootConversationId: tree.rootConversationId,
+    nodes: Object.fromEntries(Object.entries(tree.nodes).map(([id, node]) => [id, { ...node }])),
+    operations: Object.fromEntries(Object.entries(tree.operations).map(([id, operation]) => [id, {
+      ...operation,
+      receiverConversationIds: [...operation.receiverConversationIds],
+    }])),
+    activities: Object.fromEntries(Object.entries(tree.activities).map(([id, activity]) => [id, { ...activity }])),
+  }]));
+}
+
+function sanitizeSubagentTrees(value: unknown): Record<string, AgentSubagentTree> {
+  if (!isRecord(value)) return {};
+  const trees: Record<string, AgentSubagentTree> = {};
+  for (const [agentId, candidate] of Object.entries(value)) {
+    if (!isRecord(candidate) || typeof candidate.rootConversationId !== 'string') continue;
+    const rootConversationId = candidate.rootConversationId;
+    const nodes: Record<string, SubagentNode> = {};
+    if (isRecord(candidate.nodes)) {
+      for (const [id, node] of Object.entries(candidate.nodes)) {
+        const sanitized = sanitizeSubagentNode(node);
+        if (sanitized && sanitized.conversationId !== rootConversationId) nodes[id] = sanitized;
+      }
+    }
+    const operations: Record<string, SubagentOperation> = {};
+    if (isRecord(candidate.operations)) {
+      for (const [id, operation] of Object.entries(candidate.operations)) {
+        const sanitized = sanitizeSubagentOperation(operation);
+        if (sanitized) operations[id] = sanitized;
+      }
+    }
+    const activities: Record<string, SubagentActivity> = {};
+    if (isRecord(candidate.activities)) {
+      for (const [id, activity] of Object.entries(candidate.activities)) {
+        const sanitized = sanitizeSubagentActivity(activity);
+        if (sanitized && sanitized.conversationId !== rootConversationId) activities[id] = sanitized;
+      }
+    }
+    trees[agentId] = { rootConversationId, nodes, operations, activities };
+  }
+  return trees;
+}
+
+function sanitizeSubagentNode(value: unknown): SubagentNode | null {
+  if (
+    !isRecord(value) ||
+    typeof value.conversationId !== 'string' ||
+    typeof value.parentConversationId !== 'string' ||
+    !isSubagentStatus(value.status) ||
+    typeof value.updatedAt !== 'string'
+  ) return null;
+  return {
+    conversationId: value.conversationId,
+    parentConversationId: value.parentConversationId,
+    createdAt: typeof value.createdAt === 'string' ? value.createdAt : value.updatedAt,
+    status: value.status,
+    ...(typeof value.statusMessage === 'string' ? { statusMessage: value.statusMessage } : {}),
+    ...(typeof value.agentPath === 'string' ? { agentPath: value.agentPath } : {}),
+    ...(typeof value.prompt === 'string' ? { prompt: value.prompt } : {}),
+    ...(typeof value.model === 'string' ? { model: value.model } : {}),
+    ...(typeof value.reasoningEffort === 'string' ? { reasoningEffort: value.reasoningEffort } : {}),
+    updatedAt: value.updatedAt,
+  };
+}
+
+function sanitizeSubagentOperation(value: unknown): SubagentOperation | null {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== 'string' ||
+    !isSubagentOperationLifecycle(value.lifecycle) ||
+    !isSubagentOperationKind(value.kind) ||
+    !isSubagentOperationStatus(value.status) ||
+    typeof value.senderConversationId !== 'string' ||
+    !Array.isArray(value.receiverConversationIds) ||
+    value.receiverConversationIds.some((id) => typeof id !== 'string') ||
+    typeof value.occurredAt !== 'string'
+  ) return null;
+  return {
+    id: value.id,
+    ...(typeof value.turnId === 'string' ? { turnId: value.turnId } : {}),
+    lifecycle: value.lifecycle,
+    kind: value.kind,
+    status: value.status,
+    senderConversationId: value.senderConversationId,
+    receiverConversationIds: [...value.receiverConversationIds] as string[],
+    ...(typeof value.prompt === 'string' ? { prompt: value.prompt } : {}),
+    ...(typeof value.model === 'string' ? { model: value.model } : {}),
+    ...(typeof value.reasoningEffort === 'string' ? { reasoningEffort: value.reasoningEffort } : {}),
+    occurredAt: value.occurredAt,
+  };
+}
+
+function sanitizeSubagentActivity(value: unknown): SubagentActivity | null {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== 'string' ||
+    !isSubagentOperationLifecycle(value.lifecycle) ||
+    !isSubagentActivityKind(value.kind) ||
+    typeof value.conversationId !== 'string' ||
+    typeof value.agentPath !== 'string' ||
+    typeof value.occurredAt !== 'string'
+  ) return null;
+  return {
+    id: value.id,
+    ...(typeof value.turnId === 'string' ? { turnId: value.turnId } : {}),
+    lifecycle: value.lifecycle,
+    kind: value.kind,
+    conversationId: value.conversationId,
+    agentPath: value.agentPath,
+    occurredAt: value.occurredAt,
+  };
+}
+
+function isSubagentStatus(value: unknown): value is SubagentStatus {
+  return value === 'pendingInit' || value === 'running' || value === 'interrupted' || value === 'completed' ||
+    value === 'errored' || value === 'shutdown' || value === 'notFound';
+}
+
+function isSubagentOperationLifecycle(value: unknown): value is SubagentOperation['lifecycle'] {
+  return value === 'started' || value === 'completed';
+}
+
+function isSubagentOperationKind(value: unknown): value is SubagentOperation['kind'] {
+  return value === 'spawnAgent' || value === 'sendInput' || value === 'resumeAgent' || value === 'wait' || value === 'closeAgent';
+}
+
+function isSubagentOperationStatus(value: unknown): value is SubagentOperation['status'] {
+  return value === 'inProgress' || value === 'completed' || value === 'failed';
+}
+
+function isSubagentActivityKind(value: unknown): value is SubagentActivity['kind'] {
+  return value === 'started' || value === 'interacted' || value === 'interrupted';
 }
 
 function sanitizeAgent(value: unknown): Agent | null {

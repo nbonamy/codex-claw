@@ -199,11 +199,14 @@
           :execution-plan-open="executionPlanVisible"
           :open-in-available="clawHostCapabilities.openInApplications && isLocalAgent(currentAgent)"
           :open-in-catalog="openInApplications"
+          :subagent-tree="currentSubagentTree"
+          :selected-subagent-conversation-id="selectedSubagentConversationIdFor(currentAgent.id)"
           @expand-sidebar="agentSidebarCollapsed = false"
           @toggle-execution-plan="toggleExecutionPlan"
           @toggle-workspace="toggleRightWorkspace"
           @open-git-diff="openAgentGitDiffPreview"
           @open-in="openAgentIn(currentAgent.id, $event)"
+          @select-subagent="openSubagent(currentAgent.id, $event)"
           @install-update="emit('install-update')"
         />
         <div ref="workspaceBody" class="app-shell__body">
@@ -234,6 +237,7 @@
             :style="{ flexBasis: `${rightWorkspaceFor(agent.id).width}px` }"
             :active-tab="rightWorkspaceFor(agent.id).activeTab"
             :agent="agent"
+            :agents="snapshot.agents"
             :git-panel="effectiveGitReviewPanelFor(agent)"
             :git-status="snapshot.agentGitStatuses[agent.id] ?? null"
             :plan-panel="rightWorkspaceFor(agent.id).planPanel"
@@ -249,12 +253,15 @@
             :browser-available="clawHostCapabilities.embeddedBrowser"
             :open-in-available="clawHostCapabilities.openInApplications && isLocalAgent(agent)"
             :open-in-catalog="openInApplications"
+            :subagent-tree="subagentTreeFor(agent.id)"
+            :load-subagent-messages="(conversationId) => loadSubagentMessages(agent.id, conversationId)"
             @close-tab="closeRightWorkspaceTab(agent.id, $event)"
             @cancel-plan="cancelPlanReview(agent.id)"
             @comment-plan="commentOnPlan"
             @confirm-plan="confirmPlan"
             @open-tab="openRightWorkspaceTabFromMenu(agent.id, $event)"
             @open-in="openAgentIn(agent.id, $event.application, $event.filePath)"
+            @open-link="openConversationLink"
             @refresh-git-diff="openAgentGitDiffPreview(agent.id)"
             @select-tab="selectRightWorkspaceTab(agent.id, $event)"
             @send-prompt="forwardPrompt"
@@ -342,7 +349,7 @@
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
-import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
+import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
@@ -388,10 +395,13 @@ import {
   isRightWorkspaceFileTab,
   isRightWorkspaceDiffTab,
   isRightWorkspaceImageTab,
+  isRightWorkspaceSubagentTab,
   rightWorkspaceDiffTab,
   rightWorkspaceFileTab,
   rightWorkspaceImageTab,
   rightWorkspaceMarkdownTab,
+  rightWorkspaceSubagentConversationId,
+  rightWorkspaceSubagentTab,
   type RightWorkspaceDiffPanel,
   type RightWorkspaceDiffTab,
   type RightWorkspaceFilePanel,
@@ -795,6 +805,22 @@ const currentBackendRuntime = computed<BackendRuntimeStatus>(() => {
 const currentAgentGitStatus = computed<AgentGitStatus | null>(() => {
   const agentId = currentAgent.value?.id;
   return agentId ? props.snapshot.agentGitStatuses[agentId] ?? null : null;
+});
+const currentSubagentTree = computed<AgentSubagentTree | null>(() => {
+  const agentId = currentAgent.value?.id;
+  return agentId ? subagentTreeFor(agentId) : null;
+});
+watch(() => props.snapshot.agents.map((agent) => (
+  `${agent.id}:${agent.backendSession?.kind === 'codex' ? agent.backendSession.threadId : ''}:${props.snapshot.subagentTrees[agent.id]?.rootConversationId ?? ''}:${Object.keys(props.snapshot.subagentTrees[agent.id]?.nodes ?? {}).sort().join(',')}`
+)), () => {
+  for (const [agentId, workspace] of Object.entries(rightWorkspaces)) {
+    for (const tab of workspace.tabs.filter(isRightWorkspaceSubagentTab)) {
+      const conversationId = rightWorkspaceSubagentConversationId(tab);
+      if (!subagentTreeFor(agentId)?.nodes[conversationId]) {
+        closeRightWorkspaceTab(agentId, tab);
+      }
+    }
+  }
 });
 const currentTurnPlan = computed<ThreadPlan | null>(() => {
   const plan = currentAgent.value?.plan;
@@ -1260,6 +1286,33 @@ function openRightWorkspaceTab(tab: RightWorkspaceTab, agentId = currentAgent.va
   }
   workspace.activeTab = tab;
   workspace.open = true;
+}
+
+function subagentTreeFor(agentId: string): AgentSubagentTree | null {
+  const agent = props.snapshot.agents.find((candidate) => candidate.id === agentId);
+  const tree = props.snapshot.subagentTrees[agentId];
+  return agent?.backendSession?.kind === 'codex' && tree?.rootConversationId === agent.backendSession.threadId
+    ? tree
+    : null;
+}
+
+function openSubagent(agentId: string, conversationId: string): void {
+  const tree = subagentTreeFor(agentId);
+  if (!tree?.nodes[conversationId]) return;
+  openRightWorkspaceTab(rightWorkspaceSubagentTab(conversationId), agentId);
+}
+
+function selectedSubagentConversationIdFor(agentId: string): string | null {
+  const tab = rightWorkspaceFor(agentId).activeTab;
+  return tab && isRightWorkspaceSubagentTab(tab)
+    ? rightWorkspaceSubagentConversationId(tab)
+    : null;
+}
+
+function loadSubagentMessages(agentId: string, conversationId: string): Promise<RendererMessage[]> {
+  const tree = subagentTreeFor(agentId);
+  if (!tree?.nodes[conversationId]) return Promise.reject(new Error('Subagent conversation is unavailable.'));
+  return readConversationMessages({ backend: 'codex', threadId: conversationId }, agentId);
 }
 
 function openRequestedBrowser(agentId: string, command: Extract<AppCommand, { type: 'open-browser' }>): void {

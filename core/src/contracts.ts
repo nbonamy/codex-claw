@@ -352,10 +352,94 @@ export type BackendConversationRef =
 
 export type ConversationSummary = {
   id: string;
+  sessionId?: string;
+  parentConversationId?: string;
+  agentNickname?: string;
+  agentRole?: string;
   title: string;
+  preview?: string;
+  status?: 'idle' | 'active' | 'error';
+  createdAt?: string;
   updatedAt: string;
   messageCount: number;
   ref: BackendConversationRef;
+};
+
+export type SubagentStatus =
+  | 'pendingInit'
+  | 'running'
+  | 'interrupted'
+  | 'completed'
+  | 'errored'
+  | 'shutdown'
+  | 'notFound';
+
+export type SubagentOperationKind = 'spawnAgent' | 'sendInput' | 'resumeAgent' | 'wait' | 'closeAgent';
+export type SubagentOperationLifecycle = 'started' | 'completed';
+export type SubagentOperationStatus = 'inProgress' | 'completed' | 'failed';
+export type SubagentActivityKind = 'started' | 'interacted' | 'interrupted';
+
+export type SubagentNode = {
+  conversationId: string;
+  parentConversationId: string;
+  createdAt: string;
+  status: SubagentStatus;
+  statusMessage?: string;
+  agentPath?: string;
+  prompt?: string;
+  model?: string;
+  reasoningEffort?: string;
+  updatedAt: string;
+};
+
+export type SubagentOperation = {
+  id: string;
+  turnId?: string;
+  lifecycle: SubagentOperationLifecycle;
+  kind: SubagentOperationKind;
+  status: SubagentOperationStatus;
+  senderConversationId: string;
+  receiverConversationIds: string[];
+  prompt?: string;
+  model?: string;
+  reasoningEffort?: string;
+  occurredAt: string;
+};
+
+export type SubagentOperationChange = {
+  rootConversationId: string;
+  operation: SubagentOperation;
+  agentStates: Record<string, { status: SubagentStatus; message?: string }>;
+};
+
+export type SubagentActivity = {
+  id: string;
+  turnId?: string;
+  lifecycle: SubagentOperationLifecycle;
+  kind: SubagentActivityKind;
+  conversationId: string;
+  agentPath: string;
+  occurredAt: string;
+};
+
+export type SubagentActivityChange = {
+  rootConversationId: string;
+  parentConversationId: string;
+  activity: SubagentActivity;
+};
+
+export type SubagentStatusChange = {
+  rootConversationId: string;
+  conversationId: string;
+  status: SubagentStatus;
+  statusMessage?: string;
+};
+
+export type AgentSubagentTree = {
+  rootConversationId: string;
+  nodes: Record<string, SubagentNode>;
+  operations: Record<string, SubagentOperation>;
+  activities: Record<string, SubagentActivity>;
 };
 
 export type LoopExecutionCreatedAgent = {
@@ -995,6 +1079,7 @@ export type AppSnapshot = {
   backendApprovals: Record<string, BackendApprovalRequest[]>;
   agentGitStatuses: Record<string, AgentGitStatus>;
   turnGitDiffs: Record<string, TurnGitDiff>;
+  subagentTrees: Record<string, AgentSubagentTree>;
   backendRuntimes: BackendRuntimeStatus[];
   accountRateLimits?: AccountRateLimits;
   workBacklog: WorkBacklogState;
@@ -1055,6 +1140,9 @@ export type MainToRendererEvent = {
     | 'thread.goalUpdated'
     | 'thread.goalCleared'
     | 'thread.tokenUsageUpdated'
+    | 'subagent.operationChanged'
+    | 'subagent.activityChanged'
+    | 'subagent.statusChanged'
     | 'turn.started'
     | 'turn.planUpdated'
     | 'turn.proposedPlanDelta'

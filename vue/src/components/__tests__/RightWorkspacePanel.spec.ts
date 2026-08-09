@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { OpenInApplicationCatalog } from '@codex-claw/core/contracts';
+import type { AgentSubagentTree, OpenInApplicationCatalog, RendererMessage } from '@codex-claw/core/contracts';
 import RightWorkspacePanel from '../RightWorkspacePanel.vue';
 import type { RightWorkspaceFilePanel, RightWorkspaceFileTab, RightWorkspaceImagePanel, RightWorkspaceImageTab, RightWorkspaceTab } from '../right-workspace';
 import type { SidePanelMarkdownState } from '../side-panel';
@@ -24,6 +24,10 @@ function mountPanel(
   imagePanels: Partial<Record<RightWorkspaceImageTab, RightWorkspaceImagePanel>> = {},
   openInCatalog?: OpenInApplicationCatalog,
   browserAvailable = true,
+  subagent?: {
+    tree: AgentSubagentTree;
+    loadMessages: (conversationId: string) => Promise<RendererMessage[]>;
+  },
 ) {
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
   window.codexClaw = {
@@ -48,6 +52,8 @@ function mountPanel(
       planPanel,
       tabs,
       visible: true,
+      subagentTree: subagent?.tree,
+      loadSubagentMessages: subagent?.loadMessages,
     },
     global: { plugins: [i18n] },
   });
@@ -196,5 +202,41 @@ describe('RightWorkspacePanel', () => {
 
     await wrapper.get('[aria-label="Close diagram.png tab"]').trigger('click');
     expect(wrapper.emitted('closeTab')).toStrictEqual([[imageTab]]);
+  });
+
+  it('renders selected subagents as independent workspace tabs', async () => {
+    const loadMessages = vi.fn().mockResolvedValue([]);
+    const wrapper = mountPanel(['subagent:thread-scout', 'subagent:thread-reviewer'], 'subagent:thread-reviewer', {}, null, {}, undefined, true, {
+      loadMessages,
+      tree: {
+        rootConversationId: 'thread-root',
+        nodes: {
+          'thread-scout': {
+            conversationId: 'thread-scout',
+            parentConversationId: 'thread-root',
+            createdAt: '2026-08-01T00:00:00.000Z',
+            status: 'running',
+            agentPath: '/root/scout',
+            updatedAt: '2026-08-01T00:00:00.000Z',
+          },
+          'thread-reviewer': {
+            conversationId: 'thread-reviewer',
+            parentConversationId: 'thread-root',
+            createdAt: '2026-08-01T00:00:01.000Z',
+            status: 'completed',
+            agentPath: '/root/reviewer',
+            updatedAt: '2026-08-01T00:00:01.000Z',
+          },
+        },
+        operations: {},
+        activities: {},
+      },
+    });
+    await flushPromises();
+
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['scout', 'reviewer']);
+    expect(wrapper.findAllComponents({ name: 'SubagentPanel' })).toHaveLength(2);
+    expect(loadMessages).not.toHaveBeenCalledWith('thread-scout');
+    expect(loadMessages).toHaveBeenCalledWith('thread-reviewer');
   });
 });

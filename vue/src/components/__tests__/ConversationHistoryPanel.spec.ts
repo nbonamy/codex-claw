@@ -33,6 +33,14 @@ const conversations: ConversationSummary[] = [
     messageCount: 4,
     ref: { backend: 'codex', threadId: 'thread-old' },
   },
+  {
+    id: 'thread-child',
+    parentConversationId: 'thread-current',
+    title: 'Scout',
+    updatedAt: '2026-06-10T09:45:00.000Z',
+    messageCount: 2,
+    ref: { backend: 'codex', threadId: 'thread-child' },
+  },
 ];
 
 beforeEach(() => {
@@ -67,6 +75,7 @@ describe('ConversationHistoryPanel', () => {
     expect(listConversations).toHaveBeenCalledWith('agent-dina');
     expect(wrapper.text()).toContain('Current work');
     expect(wrapper.text()).toContain('Older work');
+    expect(wrapper.text()).not.toContain('Scout');
     expect(wrapper.text()).toContain('30m ago');
     expect(wrapper.text()).toContain('1h ago');
   });

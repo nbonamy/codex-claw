@@ -3,7 +3,8 @@ import type { SidePanelGitDiffState, SidePanelImageState, SidePanelMarkdownState
 export type RightWorkspaceFileTab = `file:${string}`;
 export type RightWorkspaceDiffTab = `diff:${string}`;
 export type RightWorkspaceImageTab = `image:${string}`;
-export type RightWorkspaceTab = 'review' | 'browser' | 'plan' | RightWorkspaceFileTab | RightWorkspaceDiffTab | RightWorkspaceImageTab;
+export type RightWorkspaceSubagentTab = `subagent:${string}`;
+export type RightWorkspaceTab = 'review' | 'browser' | 'plan' | RightWorkspaceFileTab | RightWorkspaceDiffTab | RightWorkspaceImageTab | RightWorkspaceSubagentTab;
 export type RightWorkspaceFilePanel = SidePanelMarkdownState | SidePanelSourceState;
 export type RightWorkspaceDiffPanel = SidePanelGitDiffState;
 export type RightWorkspaceImagePanel = SidePanelImageState;
@@ -39,4 +40,16 @@ export function rightWorkspaceImageTab(identifier: string): RightWorkspaceImageT
 
 export function isRightWorkspaceImageTab(tab: RightWorkspaceTab): tab is RightWorkspaceImageTab {
   return tab.startsWith('image:');
+}
+
+export function rightWorkspaceSubagentTab(conversationId: string): RightWorkspaceSubagentTab {
+  return `subagent:${encodeURIComponent(conversationId)}`;
+}
+
+export function isRightWorkspaceSubagentTab(tab: RightWorkspaceTab): tab is RightWorkspaceSubagentTab {
+  return tab.startsWith('subagent:');
+}
+
+export function rightWorkspaceSubagentConversationId(tab: RightWorkspaceSubagentTab): string {
+  return decodeURIComponent(tab.slice('subagent:'.length));
 }

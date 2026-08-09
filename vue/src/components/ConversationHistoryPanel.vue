@@ -119,7 +119,7 @@ async function refreshConversations(): Promise<void> {
   try {
     const nextConversations = await props.listConversations(props.agent.id);
     if (requestId === currentRequestId) {
-      conversations.value = nextConversations;
+      conversations.value = nextConversations.filter((conversation) => !conversation.parentConversationId);
     }
   } catch (caught) {
     if (requestId === currentRequestId) {

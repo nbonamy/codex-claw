@@ -18,6 +18,7 @@
             <GitHubIcon v-if="tab === 'review'" aria-hidden="true" />
             <IconWorld v-else-if="tab === 'browser'" aria-hidden="true" />
             <FileTextIcon v-else-if="tab === 'plan'" aria-hidden="true" />
+            <IconLego v-else-if="isRightWorkspaceSubagentTab(tab)" aria-hidden="true" />
             <FileDiffIcon v-else-if="diffPanel(tab)" aria-hidden="true" />
             <PhotoIcon v-else-if="imagePanel(tab)" aria-hidden="true" />
             <FileTextIcon v-else-if="filePanel(tab)?.kind === 'markdown'" aria-hidden="true" />
@@ -111,6 +112,20 @@
       @confirm-plan="emit('confirmPlan')"
     />
 
+    <template v-if="subagentTree && loadSubagentMessages">
+      <SubagentPanel
+        v-for="tab in subagentTabs"
+        :key="tab"
+        v-show="activeTab === tab"
+        :agents="agents"
+        :tree="subagentTree"
+        :conversation-id="rightWorkspaceSubagentConversationId(tab)"
+        :visible="visible && activeTab === tab"
+        :load-messages="loadSubagentMessages"
+        @open-link="emit('openLink', $event)"
+      />
+    </template>
+
     <div
       v-for="tab in fileTabs"
       :key="tab"
@@ -158,8 +173,9 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { IconWorld } from '@tabler/icons-vue';
-import type { Agent, AgentGitStatus, OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
+import { IconLego, IconWorld } from '@tabler/icons-vue';
+import type { Agent, AgentGitStatus, AgentSubagentTree, OpenInApplication, OpenInApplicationCatalog, RendererMessage } from '@codex-claw/core/contracts';
+import type { CodexConversationLink } from '@codex-app-sdk/vue';
 import { CodeIcon, FileDiffIcon, FileTextIcon, GitHubIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
@@ -172,23 +188,28 @@ import ImagePreviewPanel from './ImagePreviewPanel.vue';
 import MarkdownPanel from './MarkdownPanel.vue';
 import PlanReviewPanel from './PlanReviewPanel.vue';
 import SourcePreviewPanel from './SourcePreviewPanel.vue';
+import SubagentPanel from './SubagentPanel.vue';
 import type { PlanReviewComment, SidePanelGitDiffState, SidePanelMarkdownState, SidePanelSourceState } from './side-panel';
 import {
   isRightWorkspaceDiffTab,
   isRightWorkspaceFileTab,
   isRightWorkspaceImageTab,
+  isRightWorkspaceSubagentTab,
+  rightWorkspaceSubagentConversationId,
   type RightWorkspaceDiffPanel,
   type RightWorkspaceDiffTab,
   type RightWorkspaceFilePanel,
   type RightWorkspaceFileTab,
   type RightWorkspaceImagePanel,
   type RightWorkspaceImageTab,
+  type RightWorkspaceSubagentTab,
   type RightWorkspaceTab,
 } from './right-workspace';
 
 const props = defineProps<{
   activeTab: RightWorkspaceTab | null;
   agent: Agent;
+  agents?: readonly Agent[];
   gitPanel: SidePanelGitDiffState;
   gitStatus?: AgentGitStatus | null;
   planPanel?: SidePanelMarkdownState | null;
@@ -204,6 +225,8 @@ const props = defineProps<{
   browserAvailable?: boolean;
   openInAvailable?: boolean;
   openInCatalog?: OpenInApplicationCatalog;
+  subagentTree?: AgentSubagentTree | null;
+  loadSubagentMessages?: (conversationId: string) => Promise<RendererMessage[]>;
 }>();
 
 const emit = defineEmits<{
@@ -213,6 +236,7 @@ const emit = defineEmits<{
   confirmPlan: [];
   openTab: [tab: RightWorkspaceTab];
   openIn: [payload: { application: OpenInApplication; filePath: string }];
+  openLink: [link: CodexConversationLink];
   refreshGitDiff: [];
   selectTab: [tab: RightWorkspaceTab];
   sendPrompt: [prompt: string];
@@ -223,6 +247,7 @@ const addMenuOpen = ref(false);
 const fileTabs = computed(() => props.tabs.filter(isRightWorkspaceFileTab));
 const diffTabs = computed(() => props.tabs.filter(isRightWorkspaceDiffTab));
 const imageTabs = computed(() => props.tabs.filter(isRightWorkspaceImageTab));
+const subagentTabs = computed<RightWorkspaceSubagentTab[]>(() => props.tabs.filter(isRightWorkspaceSubagentTab));
 const activeProjectFilePath = computed(() => {
   if (!props.activeTab || !isRightWorkspaceFileTab(props.activeTab)) return null;
   const filePath = filePanel(props.activeTab)?.subtitle?.trim();
@@ -241,6 +266,10 @@ function tabLabel(tab: RightWorkspaceTab): string {
   if (tab === 'review') return 'Review';
   if (tab === 'browser') return 'Browser';
   if (tab === 'plan') return props.planPanel?.title ?? 'Plan';
+  if (isRightWorkspaceSubagentTab(tab)) {
+    const node = props.subagentTree?.nodes[rightWorkspaceSubagentConversationId(tab)];
+    return node?.agentPath?.split('/').filter(Boolean).at(-1)?.trim() || 'Subagent';
+  }
   if (diffPanel(tab)) return diffPanel(tab)?.title ?? 'Diff';
   if (imagePanel(tab)) return imagePanel(tab)?.title ?? 'Image';
   return filePanel(tab)?.title ?? 'File';

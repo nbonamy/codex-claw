@@ -12,6 +12,7 @@ export function isAppSnapshotMetadata(value: unknown): value is AppSnapshotMetad
     Array.isArray(value.agents) &&
     Array.isArray(value.bench) &&
     Array.isArray(value.loops) &&
+    isRecord(value.subagentTrees) &&
     isRecord(value.backendApprovals) &&
     Array.isArray(value.backendRuntimes) &&
     isRecord(value.workBacklog) &&

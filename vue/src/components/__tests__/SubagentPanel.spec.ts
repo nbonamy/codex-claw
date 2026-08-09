@@ -1,0 +1,178 @@
+import { flushPromises, mount } from '@vue/test-utils';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import SubagentPanel from '../SubagentPanel.vue';
+import type { AgentSubagentTree, RendererMessage } from '@codex-claw/core/contracts';
+import { i18n } from '../../i18n';
+
+const tree: AgentSubagentTree = {
+  rootConversationId: 'thread-root',
+  nodes: {
+    'thread-scout': {
+      conversationId: 'thread-scout',
+      parentConversationId: 'thread-root',
+      createdAt: '2026-06-05T00:00:01.000Z',
+      status: 'running',
+      agentPath: '/root/scout',
+      model: 'gpt-5',
+      reasoningEffort: 'high',
+      updatedAt: '2026-06-05T00:00:02.000Z',
+    },
+  },
+  operations: {
+    'spawn-1': {
+      id: 'spawn-1',
+      lifecycle: 'started',
+      kind: 'spawnAgent',
+      status: 'inProgress',
+      senderConversationId: 'thread-root',
+      receiverConversationIds: ['thread-scout'],
+      prompt: 'Inspect tests',
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    },
+  },
+  activities: {
+    'activity-1': {
+      id: 'activity-1',
+      lifecycle: 'completed',
+      kind: 'interacted',
+      conversationId: 'thread-scout',
+      agentPath: '/root/scout',
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    },
+  },
+};
+
+const messages: RendererMessage[] = [{
+  id: 'message-1',
+  agentId: 'agent-dina',
+  role: 'assistant',
+  status: 'complete',
+  parts: [{ type: 'text', text: 'Found the issue.' }],
+  createdAt: '2026-06-05T00:00:02.000Z',
+}];
+
+describe('SubagentPanel', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('loads a read-only child conversation without a redundant pane header', async () => {
+    const inheritedMessage: RendererMessage = {
+      id: 'message-parent',
+      agentId: 'agent-dina',
+      role: 'assistant',
+      status: 'complete',
+      parts: [{ type: 'text', text: 'Inherited parent output.' }],
+      createdAt: '2026-06-05T00:00:01.000Z',
+    };
+    const loadMessages = vi.fn().mockResolvedValue([inheritedMessage, ...messages]);
+    const wrapper = mount(SubagentPanel, {
+      props: { tree, conversationId: 'thread-scout', loadMessages },
+      global: {
+        plugins: [i18n],
+        stubs: {
+          CodexMessageList: {
+            props: ['messages', 'actionsDisabled', 'canDeleteMessage', 'canEditMessage', 'canRetryMessage'],
+            template: '<div class="message-list-stub" :data-message-id="messages[0] && messages[0].id">{{ messages.length }} messages</div>',
+          },
+        },
+      },
+    });
+    await flushPromises();
+
+    expect(loadMessages).toHaveBeenCalledWith('thread-scout');
+    expect(wrapper.find('.subagent-panel__header').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('scout');
+    expect(wrapper.text()).not.toContain('Running');
+    expect(wrapper.get('.message-list-stub').text()).toBe('1 messages');
+    expect(wrapper.get('.message-list-stub').attributes('data-message-id')).toBe('message-1');
+    expect(wrapper.find('[role="tablist"]').exists()).toBe(false);
+  });
+
+  it('uses Claw tool presentation for child conversation activity', async () => {
+    const toolMessage: RendererMessage = {
+      id: 'message-tool',
+      agentId: 'agent-dina',
+      role: 'assistant',
+      status: 'complete',
+      createdAt: '2026-06-05T00:00:03.000Z',
+      parts: [{
+        type: 'tool',
+        id: 'call-set-status',
+        kind: 'mcp',
+        title: 'codex_claw.set-status',
+        status: 'completed',
+        input: { status: 'Reviewing changes' },
+        metadata: { server: 'codex_claw', tool: 'set-status' },
+      }],
+    };
+    const wrapper = mount(SubagentPanel, {
+      props: { tree, conversationId: 'thread-scout', loadMessages: vi.fn().mockResolvedValue([toolMessage]) },
+      global: { plugins: [i18n] },
+    });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Updated status');
+    expect(wrapper.text()).not.toContain('codex_claw.set-status');
+  });
+
+  it('shows conversation loading errors', async () => {
+    const wrapper = mount(SubagentPanel, {
+      props: {
+        tree,
+        conversationId: 'thread-scout',
+        loadMessages: vi.fn().mockRejectedValue(new Error('History unavailable')),
+      },
+      global: { plugins: [i18n], stubs: { CodexMessageList: true } },
+    });
+    await flushPromises();
+
+    expect(wrapper.get('.subagent-panel__state--error').text()).toBe('History unavailable');
+  });
+
+  it('refreshes a visible running conversation until the child completes', async () => {
+    vi.useFakeTimers();
+    const loadMessages = vi.fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValue(messages);
+    const wrapper = mount(SubagentPanel, {
+      props: { tree, conversationId: 'thread-scout', visible: true, loadMessages },
+      global: {
+        plugins: [i18n],
+        stubs: {
+          CodexMessageList: {
+            props: ['messages'],
+            template: '<div class="message-list-stub">{{ messages.length }} messages</div>',
+          },
+        },
+      },
+    });
+    await flushPromises();
+
+    expect(loadMessages).toHaveBeenCalledTimes(1);
+    expect(wrapper.get('.message-list-stub').text()).toBe('0 messages');
+
+    await vi.advanceTimersByTimeAsync(1_500);
+    await flushPromises();
+
+    expect(loadMessages).toHaveBeenCalledTimes(2);
+    expect(wrapper.get('.message-list-stub').text()).toBe('1 messages');
+
+    await wrapper.setProps({
+      tree: {
+        ...tree,
+        nodes: {
+          ...tree.nodes,
+          'thread-scout': {
+            ...tree.nodes['thread-scout']!,
+            status: 'completed',
+            updatedAt: '2026-06-05T00:00:03.000Z',
+          },
+        },
+      },
+    });
+    await flushPromises();
+    expect(loadMessages).toHaveBeenCalledTimes(3);
+
+    await vi.advanceTimersByTimeAsync(1_500);
+    expect(loadMessages).toHaveBeenCalledTimes(3);
+  });
+});

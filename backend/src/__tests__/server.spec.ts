@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { AppSnapshot, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/core/contracts';
+import type { AppSnapshot, BackendConversationRef, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/core/contracts';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
@@ -1810,6 +1810,51 @@ describe('ClawBackendServer', () => {
     expect(saveSnapshot).toHaveBeenCalledOnce();
   });
 
+  it('persists subagent state as soon as semantic activity arrives', async () => {
+    const snapshot = createTestSnapshot();
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({ version: 'test-version', pid: 123, snapshot, saveSnapshot });
+
+    server.emitEvent({
+      agentId: 'agent-dina',
+      threadId: 'thread-root',
+      turnId: 'turn-1',
+      type: 'subagent.operationChanged',
+      payload: {
+        rootConversationId: 'thread-root',
+        operation: {
+          id: 'spawn-1',
+          lifecycle: 'started',
+          kind: 'spawnAgent',
+          status: 'inProgress',
+          senderConversationId: 'thread-root',
+          receiverConversationIds: ['thread-child'],
+          occurredAt: '2026-06-05T00:00:00.000Z',
+        },
+        agentStates: { 'thread-child': { status: 'running' } },
+      },
+    });
+    await Promise.resolve();
+
+    expect(snapshot.subagentTrees['agent-dina']?.nodes['thread-child']?.status).toBe('running');
+    expect(saveSnapshot).toHaveBeenCalledOnce();
+
+    server.emitEvent({
+      agentId: 'agent-dina',
+      threadId: 'thread-root',
+      type: 'subagent.statusChanged',
+      payload: {
+        rootConversationId: 'thread-root',
+        conversationId: 'thread-child',
+        status: 'completed',
+      },
+    });
+    await Promise.resolve();
+
+    expect(snapshot.subagentTrees['agent-dina']?.nodes['thread-child']?.status).toBe('completed');
+    expect(saveSnapshot).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps execution plans passive and previews only proposed plans', () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
@@ -2993,10 +3038,57 @@ describe('ClawBackendServer', () => {
       name: 'Dina',
       folder: '/Users/nbonamy/src/codex-claw',
       backend: 'codex',
+      backendSession: { kind: 'codex', threadId: 'thread-root' },
       status: { type: 'idle' },
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
     }];
+    snapshot.activeAgentId = 'agent-dina';
+    snapshot.subagentTrees['agent-dina'] = {
+      rootConversationId: 'thread-root',
+      nodes: {
+        'thread-child': {
+          conversationId: 'thread-child',
+          parentConversationId: 'thread-root',
+          createdAt: '2026-06-13T00:00:00.000Z',
+          status: 'completed',
+          updatedAt: '2026-06-13T00:00:00.000Z',
+        },
+        'thread-grandchild': {
+          conversationId: 'thread-grandchild',
+          parentConversationId: 'thread-child',
+          createdAt: '2026-06-13T00:00:00.000Z',
+          status: 'completed',
+          updatedAt: '2026-06-13T00:00:00.000Z',
+        },
+        'thread-legacy-child': {
+          conversationId: 'thread-legacy-child',
+          parentConversationId: 'thread-root',
+          createdAt: '2026-06-13T00:00:00.000Z',
+          status: 'completed',
+          updatedAt: '2026-06-13T00:00:00.000Z',
+        },
+      },
+      operations: {},
+      activities: {
+        'activity-child': {
+          id: 'activity-child',
+          lifecycle: 'completed',
+          kind: 'started',
+          conversationId: 'thread-child',
+          agentPath: '/root/child',
+          occurredAt: '2026-06-13T00:00:01.000Z',
+        },
+        'activity-grandchild': {
+          id: 'activity-grandchild',
+          lifecycle: 'completed',
+          kind: 'started',
+          conversationId: 'thread-grandchild',
+          agentPath: '/root/child/grandchild',
+          occurredAt: '2026-06-13T00:00:02.000Z',
+        },
+      },
+    };
     snapshot.loops = [{
       id: 'loop-bugs',
       name: 'GitHub bugs',
@@ -3033,11 +3125,33 @@ describe('ClawBackendServer', () => {
       messageCount: 3,
       ref: { backend: 'codex' as const, threadId: 'thread-dina' },
     }];
-    const messages = [createTextMessage('user-thread-dina-user-1', 'agent-dina', 'hello')];
+    const messages = [{
+      ...createTextMessage('user-thread-dina-user-1', 'agent-dina', 'hello'),
+      turnId: 'turn-root',
+    }];
+    const subagentMessage = {
+      ...createTextMessage('assistant-thread-child-1', 'agent-dina', 'child result'),
+      turnId: 'turn-child',
+    };
+    const nestedSubagentMessage = {
+      ...createTextMessage('assistant-thread-grandchild-1', 'agent-dina', 'nested child result'),
+      turnId: 'turn-grandchild',
+    };
+    const legacySubagentMessage = createTextMessage('assistant-thread-legacy-child-1', 'agent-dina', 'legacy child result');
+    const childMessages = [...messages, subagentMessage];
+    const grandchildMessages = [subagentMessage, nestedSubagentMessage];
+    const legacyChildMessages = [...messages, legacySubagentMessage];
+    snapshot.messages = messages;
     const listModels = vi.fn().mockResolvedValue([{ id: 'gpt-test', name: 'GPT Test' }]);
     const listSkills = vi.fn().mockResolvedValue([{ name: 'frontend-design', path: '/skills/frontend-design/SKILL.md' }]);
     const listConversations = vi.fn().mockResolvedValue(conversations);
-    const readConversationMessages = vi.fn().mockResolvedValue(messages);
+    const readConversationMessages = vi.fn(async (ref: BackendConversationRef) => {
+      if (ref.backend !== 'codex') return messages;
+      if (ref.threadId === 'thread-grandchild') return grandchildMessages;
+      if (ref.threadId === 'thread-child') return childMessages;
+      if (ref.threadId === 'thread-legacy-child') return legacyChildMessages;
+      return messages;
+    });
     const driver: AgentBackendDriver = {
       backend: 'codex',
       getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
@@ -3085,6 +3199,28 @@ describe('ClawBackendServer', () => {
     })).resolves.toMatchObject({ result: messages });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
+      id: 'subagent-messages',
+      method: 'agent/conversation/messages/get',
+      params: { agentId: 'agent-dina', ref: { backend: 'codex', threadId: 'thread-child' } },
+    })).resolves.toMatchObject({ result: childMessages });
+    expect(readConversationMessages).not.toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-root' }, 'agent-dina');
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'nested-subagent-messages',
+      method: 'agent/conversation/messages/get',
+      params: { agentId: 'agent-dina', ref: { backend: 'codex', threadId: 'thread-grandchild' } },
+    })).resolves.toMatchObject({ result: grandchildMessages });
+    expect(readConversationMessages.mock.calls.filter(([candidate]) => (
+      candidate.backend === 'codex' && candidate.threadId === 'thread-child'
+    ))).toHaveLength(1);
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'legacy-subagent-messages',
+      method: 'agent/conversation/messages/get',
+      params: { agentId: 'agent-dina', ref: { backend: 'codex', threadId: 'thread-legacy-child' } },
+    })).resolves.toMatchObject({ result: legacyChildMessages });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
       id: 'unknown-ref',
       method: 'agent/conversation/messages/get',
       params: { agentId: 'agent-dina', ref: { backend: 'codex', threadId: 'thread-unknown' } },
@@ -3100,6 +3236,10 @@ describe('ClawBackendServer', () => {
     expect(listSkills).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
     expect(listConversations).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
     expect(readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-dina' }, 'agent-dina');
+    expect(readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-child' }, 'agent-dina');
+    expect(readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-grandchild' }, 'agent-dina');
+    expect(readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-legacy-child' }, 'agent-dina');
+    expect(readConversationMessages).not.toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-root' }, 'agent-dina');
     await server.close();
   });
 
@@ -5263,6 +5403,7 @@ function createTestSnapshot(): AppSnapshot {
     backendApprovals: {},
     agentGitStatuses: {},
     turnGitDiffs: {},
+    subagentTrees: {},
     backendRuntimes: [],
     workBacklog: {
       connections: [],

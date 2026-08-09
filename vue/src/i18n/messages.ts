@@ -8,6 +8,27 @@ export const messages = {
       cancel: 'Cancel sign-in',
     },
     chat: {
+      subagents: {
+        label: 'Subagents',
+        triggerActive: 'Subagents ({count} active)',
+        activeCount: '{count} active',
+        totalCount: '{count} total',
+        unnamed: 'Subagent',
+        detailsLabel: 'Subagent details',
+        conversationLabel: 'Subagent conversation',
+        loadingConversation: 'Loading conversation…',
+        emptyConversation: 'No conversation activity yet',
+        loadError: 'Unable to load subagent conversation',
+        status: {
+          pendingInit: 'Starting',
+          running: 'Running',
+          interrupted: 'Interrupted',
+          completed: 'Completed',
+          errored: 'Error',
+          shutdown: 'Closed',
+          notFound: 'Unavailable',
+        },
+      },
       attachments: {
         annotate: 'Annotate {name}',
         editAnnotations: 'Edit annotations for {name} ({count})',

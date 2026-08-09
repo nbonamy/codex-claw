@@ -3,6 +3,7 @@ import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import AgentHeader from '../AgentHeader.vue';
 import type { Agent, AgentGitStatus, BackendRuntimeStatus } from '@codex-claw/core/contracts';
+import { i18n } from '../../i18n';
 
 const agent: Agent = {
   id: 'agent-dina',
@@ -33,12 +34,13 @@ function mountHeader(backendRuntime: BackendRuntimeStatus, isLoading = false, gi
 }
 
 describe('AgentHeader', () => {
-  it('renders the expanded active agent identity and activity block', () => {
+  it('renders the active agent identity without a duplicate right-side status', () => {
     const wrapper = mountHeader({ backend: 'codex', status: 'notConfigured' });
 
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('~/src/id8');
     expect(wrapper.text()).toContain('Ready to get going');
+    expect(wrapper.find('.agent-header__activity-line').exists()).toBe(false);
     expect(wrapper.find('[aria-label="Show agent sidebar"]').exists()).toBe(false);
     expect(wrapper.classes()).toContain('agent-header--with-sidebar-edge');
   });
@@ -112,7 +114,7 @@ describe('AgentHeader', () => {
           ],
         },
       },
-      global: { plugins: [ElementPlus] },
+      global: { plugins: [ElementPlus, i18n] },
     });
 
     await wrapper.get('[aria-label="Open in Xcode"]').trigger('click');
@@ -170,26 +172,6 @@ describe('AgentHeader', () => {
     expect(wrapper.emitted('install-update')).toStrictEqual([[]]);
   });
 
-  it('renders loading, running, and error fallback labels without an agent', () => {
-    const props = {
-      agent: null,
-      sidebarCollapsed: false,
-    };
-
-    expect(mount(AgentHeader, {
-      props: { ...props, backendRuntime: { backend: 'codex', status: 'notConfigured' }, isLoading: true },
-      global: { plugins: [ElementPlus] },
-    }).text()).toContain('Loading');
-    expect(mount(AgentHeader, {
-      props: { ...props, backendRuntime: { backend: 'codex', status: 'running' }, isLoading: false },
-      global: { plugins: [ElementPlus] },
-    }).text()).toContain('Connected');
-    expect(mount(AgentHeader, {
-      props: { ...props, backendRuntime: { backend: 'codex', status: 'error', detail: 'failed' }, isLoading: false },
-      global: { plugins: [ElementPlus] },
-    }).text()).toContain('Codex error');
-  });
-
   it('shows the agent collaboration status when one is set', () => {
     const wrapper = mount(AgentHeader, {
       props: {
@@ -207,18 +189,18 @@ describe('AgentHeader', () => {
     });
 
     expect(wrapper.text()).toContain('Running tests');
-    expect(wrapper.get('.agent-header__activity-line strong').text()).toBe('Idle');
+    expect(wrapper.find('.agent-header__activity-line').exists()).toBe(false);
     expect(wrapper.get('.agent-header__inline-status').text()).toBe('Running tests');
   });
 
   it.each([
-    [{ type: 'working' as const, detail: 'Getting stats...' }, 'Working', 'Getting stats...'],
-    [{ type: 'working' as const }, 'Working', 'Working'],
-    [{ type: 'starting' as const }, 'Working', 'Starting'],
-    [{ type: 'awaitingInput' as const, detail: 'Approval needed' }, 'Blocked', 'Approval needed'],
-    [{ type: 'awaitingInput' as const }, 'Blocked', 'Awaiting input'],
-    [{ type: 'error' as const, message: 'Tool failed' }, 'Blocked', 'Tool failed'],
-  ])('renders expanded state label and status detail for %s', (status, stateLabel, detail) => {
+    [{ type: 'working' as const, detail: 'Getting stats...' }, 'Getting stats...'],
+    [{ type: 'working' as const }, 'Working'],
+    [{ type: 'starting' as const }, 'Starting'],
+    [{ type: 'awaitingInput' as const, detail: 'Approval needed' }, 'Approval needed'],
+    [{ type: 'awaitingInput' as const }, 'Awaiting input'],
+    [{ type: 'error' as const, message: 'Tool failed' }, 'Tool failed'],
+  ])('renders the inline status detail for %s', (status, detail) => {
     const wrapper = mount(AgentHeader, {
       props: {
         agent: {
@@ -234,7 +216,7 @@ describe('AgentHeader', () => {
       },
     });
 
-    expect(wrapper.get('.agent-header__activity-line strong').text()).toBe(stateLabel);
+    expect(wrapper.find('.agent-header__activity-line').exists()).toBe(false);
     expect(wrapper.text()).toContain(detail);
   });
 
@@ -281,7 +263,7 @@ describe('AgentHeader', () => {
     });
 
     expect(wrapper.text()).toContain('Dina');
-    expect(wrapper.text()).toContain('Idle');
+    expect(wrapper.text()).toContain('Ready to get going');
     expect(wrapper.text()).toContain('~/src/id8');
     expect(wrapper.text()).toContain('+12');
     expect(wrapper.text()).toContain('-4');
@@ -292,5 +274,79 @@ describe('AgentHeader', () => {
     await wrapper.get('[aria-label="Show agent sidebar"]').trigger('click');
 
     expect(wrapper.emitted('expand-sidebar')).toStrictEqual([[]]);
+  });
+
+  it('shows the icon-only subagent control and forwards a selected child', async () => {
+    const wrapper = mount(AgentHeader, {
+      props: {
+        agent,
+        backendRuntime: { backend: 'codex', status: 'running' },
+        gitStatus: {
+          folder: '/Users/nbonamy/src/id8',
+          branch: 'main',
+          ahead: 0,
+          behind: 0,
+          changedFiles: 1,
+          addedLines: 12,
+          removedLines: 4,
+          hasUntracked: false,
+          state: 'dirty',
+          updatedAt: '2026-06-05T00:00:00.000Z',
+        },
+        isLoading: false,
+        sidebarCollapsed: false,
+        subagentTree: {
+          rootConversationId: 'thread-root',
+          nodes: {
+            'thread-child': {
+              conversationId: 'thread-child',
+              parentConversationId: 'thread-root',
+              createdAt: '2026-06-05T00:00:00.000Z',
+              status: 'running',
+              agentPath: '/root/scout',
+              updatedAt: '2026-06-05T00:00:00.000Z',
+            },
+          },
+          operations: {},
+          activities: {},
+        },
+      },
+      global: { plugins: [ElementPlus, i18n] },
+    });
+
+    expect(wrapper.get('.agent-header__git-status').element.nextElementSibling).toBe(wrapper.get('.subagent-control').element);
+    await wrapper.get('[aria-label="Subagents (1 active)"]').trigger('click');
+    await wrapper.get('[role="menuitem"]').trigger('click');
+
+    expect(wrapper.emitted('select-subagent')).toStrictEqual([['thread-child']]);
+  });
+
+  it('does not show the subagent control for a stale parent-conversation node', () => {
+    const wrapper = mount(AgentHeader, {
+      props: {
+        agent,
+        backendRuntime: { backend: 'codex', status: 'running' },
+        isLoading: false,
+        sidebarCollapsed: false,
+        subagentTree: {
+          rootConversationId: 'thread-root',
+          nodes: {
+            'thread-root': {
+              conversationId: 'thread-root',
+              parentConversationId: 'thread-child',
+              createdAt: '2026-06-05T00:00:00.000Z',
+              status: 'running',
+              agentPath: '/root',
+              updatedAt: '2026-06-05T00:00:00.000Z',
+            },
+          },
+          operations: {},
+          activities: {},
+        },
+      },
+      global: { plugins: [ElementPlus, i18n] },
+    });
+
+    expect(wrapper.find('.subagent-control').exists()).toBe(false);
   });
 });

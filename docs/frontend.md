@@ -135,7 +135,9 @@ implemented:
   fixture is available from Debug → Image Annotation
   and uses a clipboard image when present, otherwise a centered crop of the
   bundled shell screenshot;
-- active agent header;
+- single-line active agent header with contextual agent status beside the
+  identity and quiet right-side actions ordered from git stats into subagents,
+  without a duplicate activity indicator;
 - ChatGPT-style split Open In controls in the active-agent header and project-file
   previews, plus the same installed-app list in agent context menus. The primary
   button reuses each agent's last choice; agents without one default to VS Code,
@@ -187,6 +189,19 @@ implemented:
   MCP Markdown previews open as Markdown tabs in this same workspace, while
   plan-review Markdown opens a dedicated per-agent Plan tab with its explicit
   review controls and preserved draft comments;
+- subagents stay scoped to their parent conversation instead of becoming team
+  agents. An icon-only hierarchy control with a count badge appears in the
+  active-agent header when children exist; the control remains available for
+  completed history while its badge appears only when needed and counts active
+  children. Its dropdown shows a nested one-line list with lifecycle-colored
+  indicators and names ordered newest-first by stable creation time, and every
+  selected child opens an independent
+  right-workspace tab with its read-only conversation. The tab itself owns the
+  child identity, so the pane begins directly with the child conversation's
+  latest message instead of inherited history. Each preview refreshes while
+  its visible conversation is still producing activity, routes child-turn
+  completion back into the persisted hierarchy status, and uses the same Claw
+  tool titles and icons as the main thread;
   clicking an SDK tool-call file target is the only action that opens its
   canonical path in the owning workspace. Edit targets with turn context open
   a turn-scoped diff tab; links without that context fall back to the current

@@ -2215,12 +2215,20 @@ export class ClawBackendServer {
   }
 
   private isStoredConversationRef(ref: BackendConversationRef, agentId: string): boolean {
-    return this.snapshot.loops.some((loop) => loop.executionLog.some((entry) => (
+    const storedLoopConversation = this.snapshot.loops.some((loop) => loop.executionLog.some((entry) => (
       entry.createdAgents.some((createdAgent) => (
         createdAgent.agentId === agentId &&
         (createdAgent.conversationRef ? sameConversationRef(createdAgent.conversationRef, ref) : false)
       ))
     )));
+    if (storedLoopConversation) return true;
+
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    const tree = this.snapshot.subagentTrees[agentId];
+    return ref.backend === 'codex' &&
+      agent?.backendSession?.kind === 'codex' &&
+      tree?.rootConversationId === agent.backendSession.threadId &&
+      Boolean(tree.nodes[ref.threadId]);
   }
 
   private async openAgentGitDiff(agent: Agent): Promise<void> {
@@ -2694,6 +2702,16 @@ function projectRemoteTeam(target: AppSnapshot, localTeam: Team, remoteSnapshot:
     ...Object.fromEntries(
       Object.entries(remoteSnapshot.turnGitDiffs)
         .filter(([turnId]) => projectedTurnIds.has(turnId)),
+    ),
+  };
+  target.subagentTrees = {
+    ...Object.fromEntries(
+      Object.entries(target.subagentTrees)
+        .filter(([agentId]) => !projectedAgentIds.has(agentId)),
+    ),
+    ...Object.fromEntries(
+      Object.entries(remoteSnapshot.subagentTrees)
+        .filter(([agentId]) => projectedAgentIds.has(agentId)),
     ),
   };
   target.workBacklog.assignments = {
@@ -3204,6 +3222,9 @@ function shouldPersistSnapshotForEvent(event: BackendEvent): boolean {
     event.type === 'workBacklog.assignmentUpdated' ||
     event.type === 'thread.started' ||
     event.type === 'thread.settingsUpdated' ||
+    event.type === 'subagent.operationChanged' ||
+    event.type === 'subagent.activityChanged' ||
+    event.type === 'subagent.statusChanged' ||
     // Token usage and plan updates are high-frequency during a turn. The
     // completed event persists their latest state in one durable write.
     event.type === 'turn.completed' ||

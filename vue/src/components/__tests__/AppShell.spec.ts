@@ -632,6 +632,56 @@ describe('AppShell', () => {
     expect(wrapper.find('.app-shell__right-workspace').isVisible()).toBe(false);
   });
 
+  it('opens each selected header subagent in an independent right-workspace tab', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-root' };
+    snapshot.subagentTrees[snapshot.agents[0].id] = {
+      rootConversationId: 'thread-root',
+      nodes: {
+        'thread-scout': {
+          conversationId: 'thread-scout',
+          parentConversationId: 'thread-root',
+          createdAt: '2026-06-05T00:00:00.000Z',
+          status: 'running',
+          agentPath: '/root/scout',
+          updatedAt: '2026-06-05T00:00:00.000Z',
+        },
+        'thread-reviewer': {
+          conversationId: 'thread-reviewer',
+          parentConversationId: 'thread-root',
+          createdAt: '2026-06-05T00:00:01.000Z',
+          status: 'completed',
+          agentPath: '/root/reviewer',
+          updatedAt: '2026-06-05T00:00:01.000Z',
+        },
+      },
+      operations: {},
+      activities: {},
+    };
+    const readConversationMessages = vi.fn().mockResolvedValue([]);
+    const wrapper = mountShell({ snapshot, readConversationMessages });
+
+    await wrapper.get('[aria-label="Subagents (1 active)"]').trigger('click');
+    await wrapper.findAll('.subagent-control__row')[0]?.trigger('click');
+    await wrapper.get('[aria-label="Subagents (1 active)"]').trigger('click');
+    await wrapper.findAll('.subagent-control__row')[1]?.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.getComponent({ name: 'RightWorkspacePanel' }).props('tabs')).toStrictEqual([
+      'subagent:thread-reviewer',
+      'subagent:thread-scout',
+    ]);
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['reviewer', 'scout']);
+    expect(readConversationMessages).toHaveBeenCalledWith(
+      { backend: 'codex', threadId: 'thread-scout' },
+      snapshot.agents[0].id,
+    );
+    expect(readConversationMessages).toHaveBeenCalledWith(
+      { backend: 'codex', threadId: 'thread-reviewer' },
+      snapshot.agents[0].id,
+    );
+  });
+
   it('keeps each agent workspace and browser mounted while switching agents', async () => {
     vi.stubGlobal('ResizeObserver', class {
       observe() {}

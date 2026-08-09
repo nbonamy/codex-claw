@@ -71,6 +71,67 @@ describe('AppStatePersistence', () => {
     expect(snapshotFromPersistedState(persisted).agents[0].openInApplication).toBeUndefined();
   });
 
+  it('persists the observed subagent tree for backend and renderer reloads', () => {
+    const snapshot = createInitialSnapshot();
+    const agentId = snapshot.agents[0].id;
+    snapshot.subagentTrees[agentId] = {
+      rootConversationId: 'thread-root',
+      nodes: {
+        'thread-child': {
+          conversationId: 'thread-child',
+          parentConversationId: 'thread-root',
+          createdAt: '2026-06-05T00:00:01.000Z',
+          status: 'completed',
+          agentPath: '/root/scout',
+          updatedAt: '2026-06-05T00:00:02.000Z',
+        },
+      },
+      operations: {
+        'spawn-1': {
+          id: 'spawn-1',
+          lifecycle: 'completed',
+          kind: 'spawnAgent',
+          status: 'completed',
+          senderConversationId: 'thread-root',
+          receiverConversationIds: ['thread-child'],
+          occurredAt: '2026-06-05T00:00:01.000Z',
+        },
+      },
+      activities: {},
+    };
+
+    const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
+
+    expect(restored.subagentTrees).toStrictEqual(snapshot.subagentTrees);
+
+    const legacyPersisted = persistedStateFromSnapshot(snapshot) as unknown as {
+      subagentTrees: Record<string, { nodes: Record<string, { createdAt?: string }> }>;
+    };
+    delete legacyPersisted.subagentTrees[agentId]?.nodes['thread-child']?.createdAt;
+    expect(snapshotFromPersistedState(legacyPersisted).subagentTrees[agentId]?.nodes['thread-child']?.createdAt)
+      .toBe('2026-06-05T00:00:02.000Z');
+
+    snapshot.subagentTrees[agentId]!.nodes['thread-root'] = {
+      conversationId: 'thread-root',
+      parentConversationId: 'thread-child',
+      createdAt: '2026-06-05T00:00:03.000Z',
+      status: 'running',
+      agentPath: '/root',
+      updatedAt: '2026-06-05T00:00:03.000Z',
+    };
+    snapshot.subagentTrees[agentId]!.activities['activity-root'] = {
+      id: 'activity-root',
+      lifecycle: 'completed',
+      kind: 'interacted',
+      conversationId: 'thread-root',
+      agentPath: '/root',
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    };
+    const cleaned = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
+    expect(cleaned.subagentTrees[agentId]?.nodes['thread-root']).toBeUndefined();
+    expect(cleaned.subagentTrees[agentId]?.activities['activity-root']).toBeUndefined();
+  });
+
   it('saves metadata, backend session, context usage, and collaboration status without transcripts or runtime state', async () => {
     const filePath = await tempStatePath();
     const persistence = new AppStatePersistence(filePath);
