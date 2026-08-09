@@ -196,12 +196,23 @@ implemented:
   children. Its dropdown shows a nested one-line list with lifecycle-colored
   indicators and names ordered newest-first by stable creation time, and every
   selected child opens an independent
-  right-workspace tab with its read-only conversation. The tab itself owns the
-  child identity, so the pane begins directly with the child conversation's
-  latest message instead of inherited history. Each preview refreshes while
-  its visible conversation is still producing activity, routes child-turn
-  completion back into the persisted hierarchy status, and uses the same Claw
-  tool titles and icons as the main thread;
+  right-workspace tab with its read-only conversation. Running children use an
+  orange indicator, pending initialization uses blue, completed/interrupted/
+  shutdown history recedes to gray, and failures use red. The flat dropdown
+  keeps active children first, shows live elapsed time for them, and shows last
+  activity for finished children without redundant group or status labels. The
+  tab itself owns the
+  child identity. Subagents observed live retain every child-owned message from
+  the moment Claw discovers them, while older or reloaded children fall back to
+  only their latest message instead of exposing inherited parent history.
+  Each preview refreshes while its visible conversation is still producing
+  activity, routes child-turn completion back into the persisted hierarchy
+  status, and uses the same Claw tool titles and icons as the main thread;
+  app-server-assigned nicknames are preferred for dropdown and tab labels,
+  falling back to the final agent-path segment when metadata is unavailable.
+  New children resolve their metadata directly without loading turns, and
+  persisted children missing identity are backfilled in the background after
+  startup;
   clicking an SDK tool-call file target is the only action that opens its
   canonical path in the owning workspace. Edit targets with turn context open
   a turn-scoped diff tab; links without that context fall back to the current

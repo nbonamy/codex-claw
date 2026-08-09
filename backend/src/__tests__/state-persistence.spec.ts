@@ -83,6 +83,8 @@ describe('AppStatePersistence', () => {
           createdAt: '2026-06-05T00:00:01.000Z',
           status: 'completed',
           agentPath: '/root/scout',
+          agentNickname: 'Harvey',
+          agentRole: 'worker',
           updatedAt: '2026-06-05T00:00:02.000Z',
         },
       },

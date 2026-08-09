@@ -122,6 +122,7 @@ describe('runtime config', () => {
     const devScript = readFileSync(path.resolve(__dirname, '../../../../scripts/dev.mjs'), 'utf8');
 
     expect(devScript).toContain("CODEX_CLAW_ASSETS_PATH: path.join(rootDir, 'electron', 'assets')");
+    expect(devScript).toContain("CODEX_CLAW_BACKEND_MODE: 'bundled'");
     expect(devScript).not.toContain("CODEX_CLAW_ASSETS_PATH: path.join(rootDir, 'assets')");
     expect(devScript).toContain(
       "CODEX_CLAW_BUNDLED_CODEX_PATH: path.join(rootDir, 'electron', 'resources', 'codex', 'codex')",

@@ -54,16 +54,16 @@ const messages: RendererMessage[] = [{
 describe('SubagentPanel', () => {
   afterEach(() => vi.useRealTimers());
 
-  it('loads a read-only child conversation without a redundant pane header', async () => {
-    const inheritedMessage: RendererMessage = {
-      id: 'message-parent',
+  it('loads every supplied live child message without a redundant pane header', async () => {
+    const firstChildMessage: RendererMessage = {
+      id: 'message-first-child',
       agentId: 'agent-dina',
       role: 'assistant',
       status: 'complete',
-      parts: [{ type: 'text', text: 'Inherited parent output.' }],
+      parts: [{ type: 'text', text: 'First child output.' }],
       createdAt: '2026-06-05T00:00:01.000Z',
     };
-    const loadMessages = vi.fn().mockResolvedValue([inheritedMessage, ...messages]);
+    const loadMessages = vi.fn().mockResolvedValue([firstChildMessage, ...messages]);
     const wrapper = mount(SubagentPanel, {
       props: { tree, conversationId: 'thread-scout', loadMessages },
       global: {
@@ -82,8 +82,8 @@ describe('SubagentPanel', () => {
     expect(wrapper.find('.subagent-panel__header').exists()).toBe(false);
     expect(wrapper.text()).not.toContain('scout');
     expect(wrapper.text()).not.toContain('Running');
-    expect(wrapper.get('.message-list-stub').text()).toBe('1 messages');
-    expect(wrapper.get('.message-list-stub').attributes('data-message-id')).toBe('message-1');
+    expect(wrapper.get('.message-list-stub').text()).toBe('2 messages');
+    expect(wrapper.get('.message-list-stub').attributes('data-message-id')).toBe('message-first-child');
     expect(wrapper.find('[role="tablist"]').exists()).toBe(false);
   });
 

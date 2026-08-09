@@ -263,6 +263,13 @@ export class BackendDriverRpc {
         }
         return driver.readConversationMessages(record.ref as never, requireString(record.agentId, 'agentId'));
       }
+      case backendMethods.driverConversationSummaryGet: {
+        const { agent } = requireAgentParams(params);
+        const record = requireRecord(params);
+        const driver = this.requireDriver(agent.backend);
+        if (!driver.readConversationSummary) return null;
+        return driver.readConversationSummary(agent, record.ref as never);
+      }
       case backendMethods.driverPromptSteer: {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);

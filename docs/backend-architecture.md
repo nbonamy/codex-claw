@@ -615,7 +615,9 @@ The exact script names can change, but the shape should stay:
 
 - `npm run dev` remains the normal Electron-first entrypoint for app
   development. `dev:electron` names that complete root supervisor explicitly,
-  and the `electron` workspace's own `dev` command delegates to it.
+  and the `electron` workspace's own `dev` command delegates to it. The
+  supervisor forces the freshly built local stdio backend instead of reusing
+  an installed background daemon with the same package version.
 - `start:electron` runs only the `electron` workspace's Electron Forge/Vite
   flow, for cases where the backend is already managed separately.
 - `dev:backend` watches `backend/src` and `shared/src`, then writes a bundled

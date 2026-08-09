@@ -20,10 +20,10 @@
     >
       <header class="subagent-control__menu-header">
         <strong>{{ t('chat.subagents.label') }}</strong>
-        <span>{{ statusSummary }}</span>
+        <span>{{ t('chat.subagents.totalCount', { count: nodes.length }) }}</span>
       </header>
       <button
-        v-for="entry in flattenedNodes"
+        v-for="entry in displayedEntries"
         :key="entry.node.conversationId"
         class="subagent-control__row"
         :class="{ 'subagent-control__row--selected': entry.node.conversationId === selectedConversationId }"
@@ -37,14 +37,17 @@
           :data-status="entry.node.status"
           aria-hidden="true"
         />
-        <strong class="subagent-control__name">{{ nodeLabel(entry.node) }}</strong>
+        <span class="subagent-control__info">
+          <strong class="subagent-control__name">{{ nodeLabel(entry.node) }}</strong>
+        </span>
+        <span class="subagent-control__time">{{ nodeTime(entry.node) }}</span>
       </button>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { IconLego } from '@tabler/icons-vue';
 import { useI18n } from 'vue-i18n';
 import type { AgentSubagentTree, SubagentNode } from '@codex-claw/core/contracts';
@@ -69,13 +72,28 @@ const activeCount = computed(() => nodes.value.filter((node) => node.status === 
 const triggerLabel = computed(() => activeCount.value > 0
   ? t('chat.subagents.triggerActive', { count: activeCount.value })
   : t('chat.subagents.label'));
-const statusSummary = computed(() => activeCount.value > 0
-  ? t('chat.subagents.activeCount', { count: activeCount.value })
-  : t('chat.subagents.totalCount', { count: nodes.value.length }));
 const flattenedNodes = computed(() => flattenNodes(props.tree));
+const activeEntries = computed(() => flattenedNodes.value.filter(({ node }) => isActive(node)));
+const doneEntries = computed(() => flattenedNodes.value.filter(({ node }) => !isActive(node)));
+const displayedEntries = computed(() => [...activeEntries.value, ...doneEntries.value]);
+const now = ref(Date.now());
+let clockInterval: number | undefined;
 
 onMounted(() => document.addEventListener('click', closeMenuOnOutsideClick));
-onBeforeUnmount(() => document.removeEventListener('click', closeMenuOnOutsideClick));
+onBeforeUnmount(() => {
+  document.removeEventListener('click', closeMenuOnOutsideClick);
+  stopClock();
+});
+
+watch([menuOpen, activeCount], ([isOpen, count]) => {
+  stopClock();
+  now.value = Date.now();
+  if (isOpen && count > 0) {
+    clockInterval = window.setInterval(() => {
+      now.value = Date.now();
+    }, 1_000);
+  }
+});
 
 function selectSubagent(conversationId: string): void {
   menuOpen.value = false;
@@ -87,8 +105,50 @@ function closeMenuOnOutsideClick(event: MouseEvent): void {
 }
 
 function nodeLabel(node: SubagentNode): string {
+  const nickname = node.agentNickname?.trim();
   const pathLabel = node.agentPath?.split('/').filter(Boolean).at(-1)?.trim();
-  return pathLabel || t('chat.subagents.unnamed');
+  return nickname || pathLabel || t('chat.subagents.unnamed');
+}
+
+function isActive(node: SubagentNode): boolean {
+  return node.status === 'running' || node.status === 'pendingInit';
+}
+
+function nodeTime(node: SubagentNode): string {
+  return isActive(node)
+    ? formatElapsed(node.createdAt, now.value)
+    : formatRelative(node.updatedAt, now.value);
+}
+
+function formatElapsed(value: string, currentTime: number): string {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return '';
+  const seconds = Math.max(0, Math.floor((currentTime - timestamp) / 1_000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ${minutes % 60}m`;
+  return `${Math.floor(hours / 24)}d ${hours % 24}h`;
+}
+
+function formatRelative(value: string, currentTime: number): string {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return '';
+  const seconds = Math.max(0, Math.floor((currentTime - timestamp) / 1_000));
+  if (seconds < 60) return t('chat.subagents.now');
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return t('chat.subagents.minutesAgo', { count: minutes });
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return t('chat.subagents.hoursAgo', { count: hours });
+  return t('chat.subagents.daysAgo', { count: Math.floor(hours / 24) });
+}
+
+function stopClock(): void {
+  if (clockInterval !== undefined) {
+    window.clearInterval(clockInterval);
+    clockInterval = undefined;
+  }
 }
 
 function flattenNodes(tree: AgentSubagentTree): Array<{ node: SubagentNode; depth: number }> {
@@ -178,9 +238,9 @@ function flattenNodes(tree: AgentSubagentTree): Array<{ node: SubagentNode; dept
   top: calc(100% + var(--space-2));
   right: 0;
   display: flex;
-  width: 300px;
-  max-height: min(420px, calc(100vh - var(--workbench-appbar-height) - var(--space-8)));
-  padding: var(--space-2);
+  width: 200px;
+  max-height: min(320px, calc(100vh - var(--workbench-appbar-height) - var(--space-8)));
+  padding: var(--space-4);
   flex-direction: column;
   overflow-y: auto;
   border: 1px solid var(--color-border);
@@ -234,13 +294,12 @@ function flattenNodes(tree: AgentSubagentTree): Array<{ node: SubagentNode; dept
   background: var(--color-outline);
 }
 
-.subagent-control__status[data-status='running'],
-.subagent-control__status[data-status='pendingInit'] {
+.subagent-control__status[data-status='running'] {
   background: var(--color-warning);
 }
 
-.subagent-control__status[data-status='completed'] {
-  background: var(--color-success);
+.subagent-control__status[data-status='pendingInit'] {
+  background: var(--color-primary);
 }
 
 .subagent-control__status[data-status='errored'],
@@ -249,11 +308,26 @@ function flattenNodes(tree: AgentSubagentTree): Array<{ node: SubagentNode; dept
 }
 
 .subagent-control__name {
+  display: block;
   min-width: 0;
   overflow: hidden;
   font-size: var(--font-size-13);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-regular);
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subagent-control__info {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.subagent-control__time {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-regular);
   white-space: nowrap;
 }
 </style>

@@ -225,6 +225,7 @@ describe('RightWorkspacePanel', () => {
             createdAt: '2026-08-01T00:00:01.000Z',
             status: 'completed',
             agentPath: '/root/reviewer',
+            agentNickname: 'Harvey',
             updatedAt: '2026-08-01T00:00:01.000Z',
           },
         },
@@ -234,7 +235,7 @@ describe('RightWorkspacePanel', () => {
     });
     await flushPromises();
 
-    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['scout', 'reviewer']);
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['scout', 'Harvey']);
     expect(wrapper.findAllComponents({ name: 'SubagentPanel' })).toHaveLength(2);
     expect(loadMessages).not.toHaveBeenCalledWith('thread-scout');
     expect(loadMessages).toHaveBeenCalledWith('thread-reviewer');

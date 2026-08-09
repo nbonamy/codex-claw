@@ -275,6 +275,8 @@ function sanitizeSubagentNode(value: unknown): SubagentNode | null {
     status: value.status,
     ...(typeof value.statusMessage === 'string' ? { statusMessage: value.statusMessage } : {}),
     ...(typeof value.agentPath === 'string' ? { agentPath: value.agentPath } : {}),
+    ...(typeof value.agentNickname === 'string' ? { agentNickname: value.agentNickname } : {}),
+    ...(typeof value.agentRole === 'string' ? { agentRole: value.agentRole } : {}),
     ...(typeof value.prompt === 'string' ? { prompt: value.prompt } : {}),
     ...(typeof value.model === 'string' ? { model: value.model } : {}),
     ...(typeof value.reasoningEffort === 'string' ? { reasoningEffort: value.reasoningEffort } : {}),

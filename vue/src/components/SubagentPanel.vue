@@ -5,7 +5,7 @@
       <div v-else-if="error" class="subagent-panel__state subagent-panel__state--error">{{ error }}</div>
       <CodexMessageList
         v-else
-        :messages="latestMessages"
+        :messages="messages"
         :reset-key="conversationId"
         :actions-disabled="true"
         :can-delete-message="false"
@@ -59,7 +59,6 @@ const maxPollAttempts = 80;
 
 const node = computed(() => props.tree.nodes[props.conversationId] ?? null);
 const refreshKey = computed(() => `${props.conversationId}:${node.value?.updatedAt ?? ''}`);
-const latestMessages = computed(() => messages.value.slice(-1));
 
 watch(
   () => [refreshKey.value, props.visible !== false] as const,

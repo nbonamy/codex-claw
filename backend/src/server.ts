@@ -4,7 +4,7 @@ import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput, updateAgentOpenInApplication } from '@codex-claw/core/snapshot';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitStatus, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CodexResourceSharingStatus, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitStatus, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/core/backend-driver';
@@ -98,6 +98,7 @@ export class ClawBackendServer {
   private readonly queuedPromptRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly analyzedGitAgentIds = new Set<string>();
   private readonly gitAnalysisPromises = new Map<string, Promise<void>>();
+  private subagentIdentityBackfillPromise: Promise<void> | null = null;
   private readonly transcriptRetention: AgentTranscriptRetention;
   private unsubscribeDriverEvents?: () => void;
   private lastEventSeq = 0;
@@ -147,6 +148,7 @@ export class ClawBackendServer {
       case backendMethods.snapshotGet:
         await this.initializeSourceFolderIfNeeded();
         await this.ensureRemoteControlStatus();
+        void this.backfillSubagentIdentities();
         const snapshot = await this.clientSnapshot();
         if (snapshot.activeAgentId) {
           void this.analyzeAgentGitStatusOnce(snapshot.activeAgentId);
@@ -2299,6 +2301,57 @@ export class ClawBackendServer {
     }
   }
 
+  private async backfillSubagentIdentities(): Promise<void> {
+    if (!this.driverRpc) return;
+    if (this.subagentIdentityBackfillPromise) return this.subagentIdentityBackfillPromise;
+    const targets = this.snapshot.agents.flatMap((agent) => {
+      if (agent.backendSession?.kind !== 'codex') return [];
+      const tree = this.snapshot.subagentTrees[agent.id];
+      if (!tree || tree.rootConversationId !== agent.backendSession.threadId) return [];
+      return Object.values(tree.nodes)
+        .filter((node) => !node.agentNickname && !node.agentRole)
+        .map((node) => ({ agent, conversationId: node.conversationId, rootConversationId: tree.rootConversationId }));
+    });
+    if (targets.length === 0) return;
+
+    const backfill = Promise.allSettled(targets.map(async ({ agent, conversationId, rootConversationId }) => {
+      const summary = await this.driverRpc!.handle(backendMethods.driverConversationSummaryGet, {
+        agent,
+        ref: { backend: 'codex', threadId: conversationId },
+      }) as ConversationSummary | null;
+      if (!summary?.agentNickname && !summary?.agentRole) return false;
+      const currentNode = this.snapshot.subagentTrees[agent.id]?.nodes[conversationId];
+      if (
+        currentNode?.agentNickname === summary.agentNickname &&
+        currentNode.agentRole === summary.agentRole
+      ) return false;
+      this.handleBackendEvent({
+        agentId: agent.id,
+        backend: 'codex',
+        threadId: rootConversationId,
+        type: 'subagent.identityChanged',
+        payload: {
+          rootConversationId,
+          conversationId,
+          ...(summary.agentNickname ? { agentNickname: summary.agentNickname } : {}),
+          ...(summary.agentRole ? { agentRole: summary.agentRole } : {}),
+        },
+        occurredAt: summary.updatedAt,
+      }, { persist: false });
+      return true;
+    })).then(async (results) => {
+      if (results.some((result) => result.status === 'fulfilled' && result.value)) {
+        await this.persistSnapshotOnly();
+      }
+    }).finally(() => {
+      if (this.subagentIdentityBackfillPromise === backfill) {
+        this.subagentIdentityBackfillPromise = null;
+      }
+    });
+    this.subagentIdentityBackfillPromise = backfill;
+    return backfill;
+  }
+
   private async hydrateAndRefreshSelectedAgent(agentId: string): Promise<void> {
     await this.hydrateAgentHistory(agentId);
     await this.analyzeAgentGitStatusOnce(agentId);
@@ -3224,6 +3277,7 @@ function shouldPersistSnapshotForEvent(event: BackendEvent): boolean {
     event.type === 'thread.settingsUpdated' ||
     event.type === 'subagent.operationChanged' ||
     event.type === 'subagent.activityChanged' ||
+    event.type === 'subagent.identityChanged' ||
     event.type === 'subagent.statusChanged' ||
     // Token usage and plan updates are high-frequency during a turn. The
     // completed event persists their latest state in one durable write.

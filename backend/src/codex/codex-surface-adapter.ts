@@ -21,6 +21,7 @@ import type {
   SendPromptOptions,
   CodexAuthentication,
   SubagentActivityChange,
+  SubagentIdentityChange,
   SubagentOperationChange,
   SubagentStatusChange,
 } from '@codex-claw/core/contracts';
@@ -30,6 +31,7 @@ import { codexApprovalPresetFromDefaults } from '@codex-claw/core/codex-approval
 import type { CodexConversation, CodexSurface } from '@codex-app-sdk/backend';
 import type {
   CodexConversationEvent,
+  CodexConversationSummary,
   CodexConversationSnapshot,
   CodexSurfaceApproval,
   CodexSurfaceClientRequest,
@@ -71,6 +73,10 @@ export class CodexSurfaceAgentAdapter {
   private readonly approvalOwners = new Map<string, AgentConversation>();
   private readonly clientRequestOwners = new Map<string, AgentConversation>();
   private readonly subagentOwners = new Map<string, SubagentOwner>();
+  private readonly conversationSummaries = new Map<string, CodexConversationSummary>();
+  private readonly lastSubagentIdentityByConversationId = new Map<string, string>();
+  private readonly subagentIdentityLoads = new Map<string, Promise<void>>();
+  private readonly liveSubagentConversationIds = new Set<string>();
   private readonly unsubscribeSurface: () => void;
   private closed = false;
 
@@ -265,7 +271,11 @@ export class CodexSurfaceAgentAdapter {
       this.agentIdsByThreadId.delete(session.handle.id);
     }
     for (const [conversationId, owner] of this.subagentOwners) {
-      if (owner.agentId === agentId) this.subagentOwners.delete(conversationId);
+      if (owner.agentId !== agentId) continue;
+      this.subagentOwners.delete(conversationId);
+      this.lastSubagentIdentityByConversationId.delete(conversationId);
+      this.subagentIdentityLoads.delete(conversationId);
+      this.liveSubagentConversationIds.delete(conversationId);
     }
     this.removePendingOwners(session);
     this.surface.forgetConversation(session.handle.id);
@@ -282,6 +292,10 @@ export class CodexSurfaceAgentAdapter {
 
   async readConversationMessages(threadId: string, agentId: string): Promise<RendererMessage[]> {
     await this.start();
+    const owner = this.subagentOwners.get(threadId);
+    if (owner?.agentId === agentId && this.liveSubagentConversationIds.has(threadId)) {
+      return surfaceMessages(this.surface.conversation(threadId).getSnapshot().messages, agentId);
+    }
     const history = await this.surface.conversation(threadId).readHistory();
     const messages = surfaceMessages(history.messages, agentId);
     const session = this.sessionsByAgentId.get(agentId);
@@ -300,7 +314,19 @@ export class CodexSurfaceAgentAdapter {
         );
       }
     }
-    return messages;
+    return session && session.handle.id !== threadId ? messages.slice(-1) : messages;
+  }
+
+  async readConversationSummary(agent: Agent, threadId: string): Promise<ConversationSummary> {
+    const session = await this.ensureSession(agent);
+    this.subagentOwners.set(threadId, {
+      agentId: agent.id,
+      rootConversationId: session.handle.id,
+    });
+    const summary = await this.surface.readConversationSummary(threadId);
+    this.conversationSummaries.set(summary.id, summary);
+    this.emitSubagentIdentity(session, summary);
+    return conversationSummary(summary);
   }
 
   async loadOlderHistory(agent: Agent): Promise<{ hasOlder: boolean }> {
@@ -315,20 +341,15 @@ export class CodexSurfaceAgentAdapter {
 
   async listConversations(agent: Agent): Promise<ConversationSummary[]> {
     const conversations = await this.surface.listConversations({ cwd: expandHome(agent.folder), limit: 30 });
-    return conversations.map((conversation) => ({
-      id: conversation.id,
-      ...(conversation.sessionId ? { sessionId: conversation.sessionId } : {}),
-      ...(conversation.parentConversationId ? { parentConversationId: conversation.parentConversationId } : {}),
-      ...(conversation.agentNickname ? { agentNickname: conversation.agentNickname } : {}),
-      ...(conversation.agentRole ? { agentRole: conversation.agentRole } : {}),
-      title: conversation.title,
-      preview: conversation.preview,
-      status: conversation.status,
-      createdAt: conversation.createdAt,
-      updatedAt: conversation.updatedAt,
-      messageCount: conversation.turnCount,
-      ref: { backend: 'codex', threadId: conversation.id },
-    }));
+    for (const conversation of conversations) {
+      this.conversationSummaries.set(conversation.id, conversation);
+      const owner = this.subagentOwners.get(conversation.id);
+      const session = owner ? this.sessionsByAgentId.get(owner.agentId) : undefined;
+      if (session && session.handle.id === owner?.rootConversationId) {
+        this.emitSubagentIdentity(session, conversation);
+      }
+    }
+    return conversations.map(conversationSummary);
   }
 
   async resumeConversation(agent: Agent, threadId: string) {
@@ -427,6 +448,10 @@ export class CodexSurfaceAgentAdapter {
     this.approvalOwners.clear();
     this.clientRequestOwners.clear();
     this.subagentOwners.clear();
+    this.conversationSummaries.clear();
+    this.lastSubagentIdentityByConversationId.clear();
+    this.subagentIdentityLoads.clear();
+    this.liveSubagentConversationIds.clear();
     await this.closeSurface();
   }
 
@@ -575,11 +600,33 @@ export class CodexSurfaceAgentAdapter {
   }
 
   private handleSurfaceEvent(event: CodexSurfaceEvent): void {
+    if (event.type === 'conversation.summaryUpserted') {
+      this.conversationSummaries.set(event.conversationId, event.payload.summary);
+      const owner = this.subagentOwners.get(event.conversationId);
+      const session = owner ? this.sessionsByAgentId.get(owner.agentId) : undefined;
+      if (session && session.handle.id === owner?.rootConversationId) {
+        this.emitSubagentIdentity(session, event.payload.summary);
+      }
+      return;
+    }
+    if (event.type === 'conversation.summaryRemoved') {
+      this.conversationSummaries.delete(event.conversationId);
+      this.lastSubagentIdentityByConversationId.delete(event.conversationId);
+      return;
+    }
     if ('conversationId' in event) {
       const owner = this.subagentOwners.get(event.conversationId);
       if (!owner) return;
       const session = this.sessionsByAgentId.get(owner.agentId);
       if (!session || session.handle.id !== owner.rootConversationId) return;
+      if (
+        event.origin === 'notification' &&
+        event.type !== 'conversation.historyReplaced' &&
+        event.type !== 'conversation.historyPrepended'
+      ) {
+        this.liveSubagentConversationIds.add(event.conversationId);
+      }
+      this.refreshSubagentIdentity(session, event.conversationId);
       if (event.type === 'subagent.toolCallChanged') {
         this.emitSubagentToolCall(session, event);
       } else if (event.type === 'subagent.activity') {
@@ -1050,6 +1097,14 @@ export class CodexSurfaceAgentAdapter {
       } satisfies SubagentOperationChange,
       occurredAt: event.occurredAt,
     });
+    for (const conversationId of new Set([
+      ...toolCall.receiverConversationIds,
+      ...Object.keys(toolCall.agentStates),
+    ])) {
+      const summary = this.conversationSummaries.get(conversationId);
+      if (summary) this.emitSubagentIdentity(session, summary);
+      this.refreshSubagentIdentity(session, conversationId);
+    }
   }
 
   private emitSubagentActivity(
@@ -1079,6 +1134,43 @@ export class CodexSurfaceAgentAdapter {
         activity,
       } satisfies SubagentActivityChange,
       occurredAt: event.occurredAt,
+    });
+    const summary = this.conversationSummaries.get(activity.conversationId);
+    if (summary) this.emitSubagentIdentity(session, summary);
+    this.refreshSubagentIdentity(session, activity.conversationId);
+  }
+
+  private refreshSubagentIdentity(session: AgentConversation, conversationId: string): void {
+    if (this.lastSubagentIdentityByConversationId.has(conversationId)) return;
+    if (this.subagentIdentityLoads.has(conversationId)) return;
+    const load = this.surface.readConversationSummary(conversationId).then((summary) => {
+      const owner = this.subagentOwners.get(conversationId);
+      if (owner?.agentId !== session.agent.id || owner.rootConversationId !== session.handle.id) return;
+      this.conversationSummaries.set(summary.id, summary);
+      this.emitSubagentIdentity(session, summary);
+    }).catch(() => undefined).finally(() => {
+      if (this.subagentIdentityLoads.get(conversationId) === load) {
+        this.subagentIdentityLoads.delete(conversationId);
+      }
+    });
+    this.subagentIdentityLoads.set(conversationId, load);
+  }
+
+  private emitSubagentIdentity(session: AgentConversation, summary: CodexConversationSummary): void {
+    if (summary.id === session.handle.id) return;
+    if (!summary.agentNickname && !summary.agentRole) return;
+    const identityKey = `${summary.agentNickname ?? ''}\u0000${summary.agentRole ?? ''}`;
+    if (this.lastSubagentIdentityByConversationId.get(summary.id) === identityKey) return;
+    this.lastSubagentIdentityByConversationId.set(summary.id, identityKey);
+    this.emitThread(session, {
+      type: 'subagent.identityChanged',
+      payload: {
+        rootConversationId: session.handle.id,
+        conversationId: summary.id,
+        ...(summary.agentNickname ? { agentNickname: summary.agentNickname } : {}),
+        ...(summary.agentRole ? { agentRole: summary.agentRole } : {}),
+      } satisfies SubagentIdentityChange,
+      occurredAt: summary.updatedAt,
     });
   }
 
@@ -1133,6 +1225,23 @@ function epochTimestampToIso(value: bigint): string {
   const date = new Date(milliseconds);
   if (Number.isNaN(date.getTime())) throw new Error('Codex returned an invalid remote-control timestamp.');
   return date.toISOString();
+}
+
+function conversationSummary(conversation: CodexConversationSummary): ConversationSummary {
+  return {
+    id: conversation.id,
+    ...(conversation.sessionId ? { sessionId: conversation.sessionId } : {}),
+    ...(conversation.parentConversationId ? { parentConversationId: conversation.parentConversationId } : {}),
+    ...(conversation.agentNickname ? { agentNickname: conversation.agentNickname } : {}),
+    ...(conversation.agentRole ? { agentRole: conversation.agentRole } : {}),
+    title: conversation.title,
+    preview: conversation.preview,
+    status: conversation.status,
+    createdAt: conversation.createdAt,
+    updatedAt: conversation.updatedAt,
+    messageCount: conversation.turnCount,
+    ref: { backend: 'codex', threadId: conversation.id },
+  };
 }
 
 function subagentStatusFromTurn(

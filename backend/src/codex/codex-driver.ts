@@ -233,6 +233,11 @@ export class CodexBackendDriver implements AgentBackendDriver {
     return this.sessionManager.readConversationMessages(ref.threadId, agentId);
   }
 
+  async readConversationSummary(agent: Agent, ref: BackendConversationRef): Promise<ConversationSummary | null> {
+    if (ref.backend !== 'codex') return null;
+    return this.sessionManager.readConversationSummary(agent, ref.threadId);
+  }
+
   async listConversations(agent: Agent): Promise<ConversationSummary[]> {
     return this.sessionManager.listConversations(agent);
   }

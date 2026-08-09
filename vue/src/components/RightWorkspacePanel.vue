@@ -268,7 +268,9 @@ function tabLabel(tab: RightWorkspaceTab): string {
   if (tab === 'plan') return props.planPanel?.title ?? 'Plan';
   if (isRightWorkspaceSubagentTab(tab)) {
     const node = props.subagentTree?.nodes[rightWorkspaceSubagentConversationId(tab)];
-    return node?.agentPath?.split('/').filter(Boolean).at(-1)?.trim() || 'Subagent';
+    return node?.agentNickname?.trim()
+      || node?.agentPath?.split('/').filter(Boolean).at(-1)?.trim()
+      || 'Subagent';
   }
   if (diffPanel(tab)) return diffPanel(tab)?.title ?? 'Diff';
   if (imagePanel(tab)) return imagePanel(tab)?.title ?? 'Image';

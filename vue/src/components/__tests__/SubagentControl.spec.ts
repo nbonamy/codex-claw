@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { nextTick } from 'vue';
 import SubagentControl from '../SubagentControl.vue';
 import type { AgentSubagentTree } from '@codex-claw/core/contracts';
 import { i18n } from '../../i18n';
@@ -19,7 +20,7 @@ const tree: AgentSubagentTree = {
       conversationId: 'thread-auditor',
       parentConversationId: 'thread-root',
       createdAt: '2026-06-05T00:00:03.000Z',
-      status: 'completed',
+      status: 'interrupted',
       agentPath: '/root/auditor',
       updatedAt: '2026-06-05T00:00:03.000Z',
     },
@@ -29,6 +30,7 @@ const tree: AgentSubagentTree = {
       createdAt: '2026-06-05T00:00:01.000Z',
       status: 'running',
       agentPath: '/root/scout',
+      agentNickname: 'Harvey',
       updatedAt: '2026-06-05T00:00:01.000Z',
     },
     'thread-reviewer': {
@@ -45,6 +47,8 @@ const tree: AgentSubagentTree = {
 };
 
 describe('SubagentControl', () => {
+  afterEach(() => vi.useRealTimers());
+
   it('counts only active agents in the icon-only badge and opens the full hierarchical menu', async () => {
     const wrapper = mount(SubagentControl, { props: { tree }, global: { plugins: [i18n] } });
     const trigger = wrapper.get('[aria-label="Subagents (1 active)"]');
@@ -53,16 +57,19 @@ describe('SubagentControl', () => {
     expect(wrapper.find('[role="menu"]').exists()).toBe(false);
     await trigger.trigger('click');
 
-    expect(wrapper.get('[role="menu"]').text()).toContain('Subagents');
-    expect(wrapper.get('[role="menu"]').text()).toContain('1 active');
-    expect(wrapper.findAll('[role="menuitem"]').map((row) => row.text())).toStrictEqual([
+    expect(wrapper.get('.subagent-control__menu-header').text()).toBe('Subagents3 total');
+    expect(wrapper.get('[role="menu"]').text()).not.toContain('Active ·');
+    expect(wrapper.get('[role="menu"]').text()).not.toContain('Done ·');
+    expect(wrapper.findAll('.subagent-control__name').map((name) => name.text())).toStrictEqual([
+      'Harvey',
       'auditor',
-      'scout',
       'reviewer',
     ]);
     expect(wrapper.get('[role="menu"]').text()).not.toContain('root');
     expect(wrapper.get('[role="menu"]').text()).not.toContain('Running');
     expect(wrapper.get('[role="menu"]').text()).not.toContain('Completed');
+    expect(wrapper.get('[role="menu"]').text()).not.toContain('Interrupted');
+    expect(wrapper.get('[role="menu"]').text()).not.toContain('Working');
     expect(wrapper.findAll('[role="menuitem"]')[2].attributes('style')).toContain('--subagent-depth: 1');
     expect(wrapper.findAll('[role="menuitem"]')[0].attributes('style')).toContain('--subagent-depth: 0');
     expect(wrapper.findAll('[role="menuitem"]')[1].attributes('style')).toContain('--subagent-depth: 0');
@@ -77,7 +84,7 @@ describe('SubagentControl', () => {
     const rows = wrapper.findAll('[role="menuitem"]');
 
     expect(rows[2].classes()).toContain('subagent-control__row--selected');
-    await rows[1].trigger('click');
+    await rows[0].trigger('click');
 
     expect(wrapper.emitted('select')).toStrictEqual([['thread-scout']]);
     expect(wrapper.find('[role="menu"]').exists()).toBe(false);
@@ -95,6 +102,25 @@ describe('SubagentControl', () => {
     await trigger.trigger('click');
 
     expect(wrapper.findAll('[role="menuitem"]')).toHaveLength(3);
-    expect(wrapper.get('.subagent-control__menu-header').text()).toContain('3 total');
+    expect(wrapper.get('.subagent-control__menu-header').text()).toBe('Subagents3 total');
+    expect(wrapper.get('[role="menu"]').text()).not.toContain('Done ·');
+  });
+
+  it('shows live elapsed time for active agents and relative activity for finished agents', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-05T00:02:01.000Z'));
+    const wrapper = mount(SubagentControl, { props: { tree }, global: { plugins: [i18n] } });
+
+    await wrapper.get('[aria-label="Subagents (1 active)"]').trigger('click');
+    expect(wrapper.findAll('.subagent-control__time').map((time) => time.text())).toStrictEqual([
+      '2m 0s',
+      '1m ago',
+      '1m ago',
+    ]);
+
+    vi.advanceTimersByTime(1_000);
+    await nextTick();
+    expect(wrapper.findAll('.subagent-control__time')[0].text()).toBe('2m 1s');
+    wrapper.unmount();
   });
 });

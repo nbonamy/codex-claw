@@ -1842,6 +1842,25 @@ describe('ClawBackendServer', () => {
     server.emitEvent({
       agentId: 'agent-dina',
       threadId: 'thread-root',
+      type: 'subagent.identityChanged',
+      payload: {
+        rootConversationId: 'thread-root',
+        conversationId: 'thread-child',
+        agentNickname: 'Harvey',
+        agentRole: 'worker',
+      },
+    });
+    await Promise.resolve();
+
+    expect(snapshot.subagentTrees['agent-dina']?.nodes['thread-child']).toMatchObject({
+      agentNickname: 'Harvey',
+      agentRole: 'worker',
+    });
+    expect(saveSnapshot).toHaveBeenCalledTimes(2);
+
+    server.emitEvent({
+      agentId: 'agent-dina',
+      threadId: 'thread-root',
       type: 'subagent.statusChanged',
       payload: {
         rootConversationId: 'thread-root',
@@ -1852,7 +1871,7 @@ describe('ClawBackendServer', () => {
     await Promise.resolve();
 
     expect(snapshot.subagentTrees['agent-dina']?.nodes['thread-child']?.status).toBe('completed');
-    expect(saveSnapshot).toHaveBeenCalledTimes(2);
+    expect(saveSnapshot).toHaveBeenCalledTimes(3);
   });
 
   it('keeps execution plans passive and previews only proposed plans', () => {
@@ -3152,6 +3171,19 @@ describe('ClawBackendServer', () => {
       if (ref.threadId === 'thread-legacy-child') return legacyChildMessages;
       return messages;
     });
+    const readConversationSummary = vi.fn(async (_agent: unknown, ref: BackendConversationRef) => ({
+      id: ref.backend === 'codex' ? ref.threadId : 'thread-unknown',
+      parentConversationId: ref.backend === 'codex' && ref.threadId === 'thread-grandchild'
+        ? 'thread-child'
+        : 'thread-root',
+      agentNickname: ref.backend === 'codex' ? `Nickname ${ref.threadId}` : undefined,
+      title: 'Subagent',
+      status: 'idle' as const,
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:01.000Z',
+      messageCount: 1,
+      ref,
+    }));
     const driver: AgentBackendDriver = {
       backend: 'codex',
       getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
@@ -3163,6 +3195,7 @@ describe('ClawBackendServer', () => {
       listModels,
       listSkills,
       readConversationMessages,
+      readConversationSummary,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -3171,6 +3204,16 @@ describe('ClawBackendServer', () => {
       pid: 123,
       snapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await server.handleMessage({ jsonrpc: '2.0', id: 'snapshot', method: 'snapshot/get' });
+    await vi.waitFor(() => {
+      expect(snapshot.subagentTrees['agent-dina']?.nodes['thread-child']?.agentNickname)
+        .toBe('Nickname thread-child');
+      expect(snapshot.subagentTrees['agent-dina']?.nodes['thread-grandchild']?.agentNickname)
+        .toBe('Nickname thread-grandchild');
+      expect(snapshot.subagentTrees['agent-dina']?.nodes['thread-legacy-child']?.agentNickname)
+        .toBe('Nickname thread-legacy-child');
     });
 
     await expect(server.handleMessage({

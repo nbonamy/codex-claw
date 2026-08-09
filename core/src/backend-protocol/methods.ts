@@ -69,6 +69,7 @@ export const backendMethods = {
   driverCodexLogout: 'driver/codex/authentication/logout',
   driverClientRequestRespond: 'driver/clientRequest/respond',
   driverConversationMessagesGet: 'driver/conversation/messages/get',
+  driverConversationSummaryGet: 'driver/conversation/summary/get',
   driverConversationFork: 'driver/conversation/fork',
   driverConversationResume: 'driver/conversation/resume',
   driverConversationTitleUpdate: 'driver/conversation/title/update',

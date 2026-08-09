@@ -16,6 +16,7 @@ class FakeTransport implements RpcTransport {
   turnsListDelayMs = 0;
   readonly fullHistoryTurnsByThreadId = new Map<string, Record<string, unknown>[]>();
   readonly summaryTurnsByThreadId = new Map<string, Record<string, unknown>[]>();
+  readonly threadMetadataByThreadId = new Map<string, Record<string, unknown>>();
   readonly staleActiveThreadIds = new Set<string>();
   private readonly listeners = new Set<(message: unknown) => void>();
   private readonly errorListeners = new Set<(error: Error) => void>();
@@ -139,7 +140,13 @@ class FakeTransport implements RpcTransport {
       }
       case 'thread/read': {
         const threadId = String((params as { threadId: string }).threadId);
-        return { thread: thread(threadId, `/workspace/${threadId.at(-1)}`) };
+        return {
+          thread: thread(
+            threadId,
+            `/workspace/${threadId.at(-1)}`,
+            this.threadMetadataByThreadId.get(threadId),
+          ),
+        };
       }
       case 'thread/turns/list': {
         const threadId = String((params as { threadId: string }).threadId);
@@ -383,6 +390,11 @@ describe('CodexSurfaceAgentAdapter', () => {
     adapter.onEvent((event) => events.push(event));
     await adapter.hydrateAgent(agentA);
     events.length = 0;
+    transport.threadMetadataByThreadId.set('thread-child', {
+      parentThreadId: 'thread-a',
+      agentNickname: 'Kuhn',
+      agentRole: 'researcher',
+    });
 
     transport.emit({
       method: 'item/started',
@@ -407,7 +419,7 @@ describe('CodexSurfaceAgentAdapter', () => {
       },
     });
 
-    expect(events).toStrictEqual([
+    expect(events.slice(0, 2)).toStrictEqual([
       expect.objectContaining({
         type: 'subagent.operationChanged', agentId: 'agent-a', threadId: 'thread-a', turnId: 'turn-subagent',
         payload: {
@@ -430,6 +442,18 @@ describe('CodexSurfaceAgentAdapter', () => {
       }),
     ]);
 
+    await vi.waitFor(() => {
+      expect(events).toContainEqual(expect.objectContaining({
+        type: 'subagent.identityChanged', agentId: 'agent-a', threadId: 'thread-a',
+        payload: {
+          rootConversationId: 'thread-a',
+          conversationId: 'thread-child',
+          agentNickname: 'Kuhn',
+          agentRole: 'researcher',
+        },
+      }));
+    });
+
     events.length = 0;
     transport.emit({
       method: 'item/completed',
@@ -444,7 +468,6 @@ describe('CodexSurfaceAgentAdapter', () => {
     expect(events.filter((event) => event.type === 'subagent.activityChanged')).toStrictEqual([]);
 
     events.length = 0;
-    transport.emit({ method: 'thread/started', params: { thread: thread('thread-child', '/workspace/a') } });
     transport.emit({
       method: 'turn/started',
       params: { threadId: 'thread-child', turn: turn('turn-child', 'inProgress') },
@@ -478,11 +501,81 @@ describe('CodexSurfaceAgentAdapter', () => {
     ]);
   });
 
+  it('reads every live child message without reloading inherited history', async () => {
+    const { adapter, transport } = createAdapter();
+    await adapter.hydrateAgent(agentA);
+    transport.fullHistoryTurnsByThreadId.set('thread-child', [
+      turn('turn-parent', 'completed', [agentMessage('parent-answer', 'Inherited parent answer')]),
+    ]);
+
+    transport.emit({
+      method: 'item/started',
+      params: {
+        threadId: 'thread-a', turnId: 'turn-subagent', startedAtMs: 1,
+        item: {
+          type: 'collabAgentToolCall', id: 'spawn-1', tool: 'spawnAgent', status: 'inProgress',
+          senderThreadId: 'thread-a', receiverThreadIds: ['thread-child'], prompt: 'Inspect tests',
+          model: 'gpt-5', reasoningEffort: 'high',
+          agentsStates: { 'thread-child': { status: 'running', message: null } },
+        },
+      },
+    });
+    transport.emit({ method: 'thread/started', params: { thread: thread('thread-child', '/workspace/a') } });
+    transport.emit({
+      method: 'turn/started',
+      params: { threadId: 'thread-child', turn: turn('turn-child-1', 'inProgress') },
+    });
+    transport.emit({
+      method: 'item/completed',
+      params: {
+        threadId: 'thread-child', turnId: 'turn-child-1', completedAtMs: 2,
+        item: agentMessage('child-answer-1', 'First child answer'),
+      },
+    });
+    transport.emit({
+      method: 'turn/completed',
+      params: { threadId: 'thread-child', turn: turn('turn-child-1', 'completed') },
+    });
+    transport.emit({
+      method: 'turn/started',
+      params: { threadId: 'thread-child', turn: turn('turn-child-2', 'inProgress') },
+    });
+    transport.emit({
+      method: 'item/completed',
+      params: {
+        threadId: 'thread-child', turnId: 'turn-child-2', completedAtMs: 3,
+        item: agentMessage('child-answer-2', 'Second child answer'),
+      },
+    });
+    transport.emit({
+      method: 'turn/completed',
+      params: { threadId: 'thread-child', turn: turn('turn-child-2', 'completed') },
+    });
+
+    const historyRequestCount = transport.sent.filter((message) => (
+      'method' in message && message.method === 'thread/turns/list'
+    )).length;
+    await expect(adapter.readConversationMessages('thread-child', agentA.id)).resolves.toEqual([
+      expect.objectContaining({
+        turnId: 'turn-child-1',
+        parts: [expect.objectContaining({ type: 'text', text: 'First child answer' })],
+      }),
+      expect.objectContaining({
+        turnId: 'turn-child-2',
+        parts: [expect.objectContaining({ type: 'text', text: 'Second child answer' })],
+      }),
+    ]);
+    expect(transport.sent.filter((message) => (
+      'method' in message && message.method === 'thread/turns/list'
+    ))).toHaveLength(historyRequestCount);
+  });
+
   it('reconciles a completed child status when its history is read after reload', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
     transport.fullHistoryTurnsByThreadId.set('thread-child', [
+      turn('turn-parent', 'completed', [agentMessage('parent-answer', 'Inherited parent answer')]),
       turn('turn-child', 'completed', [agentMessage('child-answer', 'Finished the probe')]),
     ]);
     await adapter.hydrateAgent(agentA);
@@ -1249,10 +1342,11 @@ function createForkTarget(): Agent {
   return target;
 }
 
-function thread(id: string, cwd: string): Record<string, unknown> {
+function thread(id: string, cwd: string, overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id, preview: id, name: id, cwd, status: { type: 'idle' },
     createdAt: 1_700_000_000, updatedAt: 1_700_000_001, recencyAt: null, turns: [],
+    ...overrides,
   };
 }
 

@@ -21,6 +21,7 @@ import type {
   RendererToolPartUpdate,
   SendPromptOptions,
   SubagentActivityChange,
+  SubagentIdentityChange,
   SubagentOperationChange,
   SubagentStatusChange,
   SubagentStatus,
@@ -382,6 +383,11 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
 
   if (event.type === 'subagent.activityChanged') {
     applySubagentActivityChange(snapshot, event.agentId, event.payload);
+    return;
+  }
+
+  if (event.type === 'subagent.identityChanged') {
+    applySubagentIdentityChange(snapshot, event.agentId, event.payload);
     return;
   }
 
@@ -753,6 +759,8 @@ function applySubagentOperationChange(snapshot: AppSnapshot, agentId: string, va
         ? { statusMessage: state.message }
         : existing?.statusMessage ? { statusMessage: existing.statusMessage } : {}),
       ...(existing?.agentPath ? { agentPath: existing.agentPath } : {}),
+      ...(existing?.agentNickname ? { agentNickname: existing.agentNickname } : {}),
+      ...(existing?.agentRole ? { agentRole: existing.agentRole } : {}),
       ...(typeof operation.prompt === 'string'
         ? { prompt: operation.prompt }
         : existing?.prompt ? { prompt: existing.prompt } : {}),
@@ -803,11 +811,37 @@ function applySubagentActivityChange(snapshot: AppSnapshot, agentId: string, val
     status: activity.kind === 'interrupted' ? 'interrupted' : existing?.status ?? 'running',
     ...(existing?.statusMessage ? { statusMessage: existing.statusMessage } : {}),
     agentPath: activity.agentPath,
+    ...(existing?.agentNickname ? { agentNickname: existing.agentNickname } : {}),
+    ...(existing?.agentRole ? { agentRole: existing.agentRole } : {}),
     ...(existing?.prompt ? { prompt: existing.prompt } : {}),
     ...(existing?.model ? { model: existing.model } : {}),
     ...(existing?.reasoningEffort ? { reasoningEffort: existing.reasoningEffort } : {}),
     updatedAt: activity.occurredAt,
   };
+}
+
+function applySubagentIdentityChange(snapshot: AppSnapshot, agentId: string, value: unknown): void {
+  if (
+    !isRecord(value) ||
+    typeof value.rootConversationId !== 'string' ||
+    typeof value.conversationId !== 'string'
+  ) return;
+  const tree = snapshot.subagentTrees[agentId];
+  if (!tree || tree.rootConversationId !== value.rootConversationId) return;
+  const existing = tree.nodes[value.conversationId];
+  if (!existing) return;
+  const change: SubagentIdentityChange = {
+    rootConversationId: value.rootConversationId,
+    conversationId: value.conversationId,
+    ...(typeof value.agentNickname === 'string' ? { agentNickname: value.agentNickname } : {}),
+    ...(typeof value.agentRole === 'string' ? { agentRole: value.agentRole } : {}),
+  };
+  const updatedNode = { ...existing };
+  if (change.agentNickname) updatedNode.agentNickname = change.agentNickname;
+  else delete updatedNode.agentNickname;
+  if (change.agentRole) updatedNode.agentRole = change.agentRole;
+  else delete updatedNode.agentRole;
+  tree.nodes[value.conversationId] = updatedNode;
 }
 
 function applySubagentStatusChange(

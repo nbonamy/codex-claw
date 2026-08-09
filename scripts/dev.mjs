@@ -33,6 +33,7 @@ const electronDev = start('npm', ['run', 'start:electron'], {
   cwd: rootDir,
   name: 'electron',
   env: {
+    CODEX_CLAW_BACKEND_MODE: 'bundled',
     CODEX_CLAW_BACKEND_COMMAND: process.execPath,
     CODEX_CLAW_BACKEND_ARGS: `${backendBundle},--stdio`,
     CODEX_CLAW_BACKEND_WATCH_FILE: '',

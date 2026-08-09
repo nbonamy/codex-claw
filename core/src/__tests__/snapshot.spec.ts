@@ -357,7 +357,6 @@ describe('snapshot reducer', () => {
       },
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
-
     expect(snapshot.messages).toBe(transcript);
     expect(snapshot.messages[0]).toBe(olderMessage);
     expect(snapshot.messages).toHaveLength(2);
@@ -3397,6 +3396,19 @@ describe('snapshot reducer', () => {
       },
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 3,
+      agentId,
+      threadId: 'thread-root',
+      type: 'subagent.identityChanged',
+      payload: {
+        rootConversationId: 'thread-root',
+        conversationId: 'thread-child',
+        agentNickname: 'Harvey',
+        agentRole: 'worker',
+      },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
 
     expect(snapshot.subagentTrees[agentId]).toStrictEqual({
       rootConversationId: 'thread-root',
@@ -3407,6 +3419,8 @@ describe('snapshot reducer', () => {
           createdAt: '2026-06-05T00:00:01.000Z',
           status: 'running',
           agentPath: '/root/scout',
+          agentNickname: 'Harvey',
+          agentRole: 'worker',
           prompt: 'Inspect tests',
           model: 'gpt-5',
           reasoningEffort: 'high',
@@ -3422,7 +3436,7 @@ describe('snapshot reducer', () => {
     });
 
     applyMainEventToSnapshot(snapshot, {
-      seq: 3,
+      seq: 4,
       agentId,
       threadId: 'thread-child',
       turnId: 'turn-child',

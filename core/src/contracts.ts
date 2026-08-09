@@ -386,6 +386,8 @@ export type SubagentNode = {
   status: SubagentStatus;
   statusMessage?: string;
   agentPath?: string;
+  agentNickname?: string;
+  agentRole?: string;
   prompt?: string;
   model?: string;
   reasoningEffort?: string;
@@ -433,6 +435,13 @@ export type SubagentStatusChange = {
   conversationId: string;
   status: SubagentStatus;
   statusMessage?: string;
+};
+
+export type SubagentIdentityChange = {
+  rootConversationId: string;
+  conversationId: string;
+  agentNickname?: string;
+  agentRole?: string;
 };
 
 export type AgentSubagentTree = {
@@ -1142,6 +1151,7 @@ export type MainToRendererEvent = {
     | 'thread.tokenUsageUpdated'
     | 'subagent.operationChanged'
     | 'subagent.activityChanged'
+    | 'subagent.identityChanged'
     | 'subagent.statusChanged'
     | 'turn.started'
     | 'turn.planUpdated'

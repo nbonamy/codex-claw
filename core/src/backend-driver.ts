@@ -80,6 +80,7 @@ export type AgentBackendDriver = {
   resumeConversation?(agent: Agent, ref: BackendConversationRef): Promise<BackendConversationResumeResult>;
   forkConversation?(agent: Agent, targetAgent: Agent, messageIndex?: number): Promise<BackendConversationForkResult>;
   readConversationMessages?(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]>;
+  readConversationSummary?(agent: Agent, ref: BackendConversationRef): Promise<ConversationSummary | null>;
   steerPrompt?(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>;
   rollbackToTurn?(agent: Agent, turnId: string): Promise<BackendRollbackResult>;
   listModels?(agent: Agent): Promise<BackendModelOption[]>;
