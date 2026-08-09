@@ -1,6 +1,10 @@
 import { mount } from '@vue/test-utils';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import SourcePreviewPanel from '../SourcePreviewPanel.vue';
+
+const componentSource = readFileSync(resolve(process.cwd(), 'src/components/SourcePreviewPanel.vue'), 'utf8');
 
 describe('SourcePreviewPanel', () => {
   it('renders read-only highlighted source content', () => {
@@ -30,6 +34,16 @@ describe('SourcePreviewPanel', () => {
 
     expect(wrapper.get('.source-preview-panel').classes()).toContain('source-preview-panel--hide-line-numbers');
     expect(wrapper.get('.source-preview-panel').classes()).toContain('source-preview-panel--wrap');
+  });
+
+  it('keeps long unwrapped lines horizontally scrollable', () => {
+    expect(componentSource).toMatch(
+      /\.source-preview-panel \{[^}]*min-width: 0;[^}]*overflow-x: auto;[^}]*overflow-y: auto;/,
+    );
+    expect(componentSource).toMatch(/\.source-preview-panel__content \{[^}]*min-width: max-content;/);
+    expect(componentSource).toMatch(
+      /\.source-preview-panel--wrap \.source-preview-panel__content \{[^}]*min-width: 0;/,
+    );
   });
 
   it('renders loading, empty, and error states', () => {

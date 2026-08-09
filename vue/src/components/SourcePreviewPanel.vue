@@ -55,8 +55,10 @@ withDefaults(defineProps<{
 <style scoped>
 .source-preview-panel {
   flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
   padding: 0;
   background: var(--color-surface-lowest);
   scrollbar-width: thin;

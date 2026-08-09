@@ -488,6 +488,7 @@ function isAbsoluteFilePath(filePath: string): boolean {
 
 .right-workspace-panel__file-preview {
   flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
   display: flex;
 }

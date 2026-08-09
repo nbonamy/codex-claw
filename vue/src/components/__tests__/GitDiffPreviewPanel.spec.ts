@@ -1,6 +1,10 @@
 import { mount } from '@vue/test-utils';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import GitDiffPreviewPanel from '../GitDiffPreviewPanel.vue';
+
+const componentSource = readFileSync(resolve(process.cwd(), 'src/components/GitDiffPreviewPanel.vue'), 'utf8');
 
 describe('GitDiffPreviewPanel', () => {
   it('renders multiple files, hunks, line numbers, and line states', () => {
@@ -102,6 +106,18 @@ describe('GitDiffPreviewPanel', () => {
 
     expect(wrapper.get('.git-diff-preview-panel__file-header').attributes('aria-expanded')).toBe('true');
     expect(wrapper.emitted('allExpandedChange')?.at(-1)).toStrictEqual([true]);
+  });
+
+  it('keeps long unwrapped diff lines horizontally scrollable', () => {
+    expect(componentSource).toMatch(
+      /\.git-diff-preview-panel \{[^}]*min-width: 0;[^}]*overflow-x: auto;[^}]*overflow-y: auto;/,
+    );
+    expect(componentSource).toMatch(
+      /\.git-diff-preview-panel__line \{[^}]*grid-template-columns: 5ch 5ch 2ch max-content;[^}]*width: max-content;[^}]*min-width: 100%;/,
+    );
+    expect(componentSource).toMatch(
+      /\.git-diff-preview-panel--wrap \.git-diff-preview-panel__line \{[^}]*grid-template-columns: 5ch 5ch 2ch minmax\(0, 1fr\);[^}]*width: auto;[^}]*min-width: 0;/,
+    );
   });
 
   it('renders empty, loading, and error states', () => {

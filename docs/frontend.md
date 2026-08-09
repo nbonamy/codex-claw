@@ -318,6 +318,9 @@ Theme rules:
 - Syntax highlighting and diff rendering should be fed by the same theme
   source whenever practical. Source previews use Shiki; git diff previews use
   Claw-owned Vue rendering fed by parsed unified diff data.
+- Read-only source and diff panes own both scroll axes. Long lines scroll
+  horizontally when word wrap is disabled and remain constrained to the pane
+  when word wrap is enabled.
 
 ## Internationalization
 
