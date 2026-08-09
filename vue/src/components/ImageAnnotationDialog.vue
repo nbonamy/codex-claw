@@ -4,8 +4,8 @@
     :model-value="visible"
     :show-close="false"
     :teleported="false"
-    :close-on-click-modal="!submitting && !sending"
-    :close-on-press-escape="!activeComment && !submitting && !sending"
+    :close-on-click-modal="!saving"
+    :close-on-press-escape="!activeComment && !saving"
     destroy-on-close
     style="height: 80vh; margin-top: 10vh"
     width="80vw"
@@ -61,16 +61,6 @@
                 @click="undoLastAnnotation"
               >
                 <ArrowBackUpIcon aria-hidden="true" />
-              </button>
-              <button
-                class="image-annotation-dialog__tool"
-                type="button"
-                aria-label="Clear annotations"
-                title="Clear annotations"
-                :disabled="annotations.length === 0"
-                @click="clearAnnotations"
-              >
-                <Trash2Icon aria-hidden="true" />
               </button>
             </div>
           </div>
@@ -156,7 +146,7 @@
               submit-label="Save annotation comment"
               :width="320"
               @cancel="cancelComment"
-              @command-submit="saveCommentAndSend"
+              @command-submit="saveCommentAndSave"
               @submit="saveComment"
             />
           </div>
@@ -195,13 +185,22 @@
 
     <template #footer>
       <div class="claw-dialog__footer image-annotation-dialog__footer">
-        <el-button :disabled="submitting || sending" @click="emit('close')">Cancel</el-button>
-        <AnnotationSendButton
-          :count="annotations.length"
-          :disabled="annotations.length === 0 || submitting || sending"
-          :label="`Send annotated image with ${annotations.length} annotations`"
-          @click="sendAnnotatedImage"
-        />
+        <el-button :disabled="saving" @click="emit('close')">Cancel</el-button>
+        <el-button
+          aria-label="Clear image annotations"
+          :disabled="annotations.length === 0 || saving"
+          @click="clearAnnotations"
+        >Clear</el-button>
+        <el-button
+          class="image-annotation-dialog__save"
+          type="primary"
+          aria-label="Save image annotations"
+          :disabled="!imageReady || saving"
+          @click="saveAnnotatedImage"
+        >
+          Save
+          <span class="image-annotation-dialog__save-count">{{ annotations.length }}</span>
+        </el-button>
       </div>
     </template>
   </el-dialog>
@@ -216,11 +215,9 @@ import {
   ArrowsVerticalIcon,
   Circle,
   RectangleIcon,
-  Trash2Icon,
   X,
 } from '../shared/icons/app-icons';
 import AnnotationPopup, { type AnnotationPopupAnchor } from './AnnotationPopup.vue';
-import AnnotationSendButton from './AnnotationSendButton.vue';
 import {
   annotationAnchor,
   annotationPixelLength,
@@ -231,39 +228,33 @@ import {
   type ImageAnnotation,
   type ImageAnnotationPalette,
   type ImageAnnotationPoint,
+  type SavedImageAnnotations,
   type ImageAnnotationTool,
 } from './image-annotation';
 
-export type ImageAnnotationSendPayload = {
-  annotations: ImageAnnotation[];
-  dataUrl: string;
-  fileName: string;
-  height: number;
-  pixelRatio: 1 | 2;
-  width: number;
-};
+export type ImageAnnotationSavePayload = SavedImageAnnotations;
 
 const props = withDefaults(defineProps<{
   fallbackImageSrc?: string;
   fileName?: string;
   imageAlt?: string;
   imageSrc: string;
+  initialAnnotations?: readonly ImageAnnotation[];
   initialPixelRatio?: 1 | 2;
-  submitting?: boolean;
   title?: string;
   visible: boolean;
 }>(), {
   fileName: 'annotated-image.png',
   imageAlt: 'Image to annotate',
+  initialAnnotations: () => [],
   initialPixelRatio: 1,
-  submitting: false,
   title: 'Annotate',
 });
 
 const emit = defineEmits<{
   close: [];
   'image-error': [];
-  send: [payload: ImageAnnotationSendPayload];
+  save: [payload: ImageAnnotationSavePayload];
 }>();
 
 type ToolItem = {
@@ -290,13 +281,14 @@ const activeTool = ref<ImageAnnotationTool>('arrow');
 const annotations = ref<ImageAnnotation[]>([]);
 const draft = ref<ImageAnnotation | null>(null);
 const imageData = ref<ImageData | null>(null);
+const imageReady = ref(false);
 const imageSize = ref({ width: 1, height: 1 });
 const resolvedImageSrc = ref(props.imageSrc);
 const zoom = ref(1);
 const retinaMode = ref(props.initialPixelRatio === 2);
 const hoverPoint = ref<ImageAnnotationPoint | null>(null);
 const drawing = ref(false);
-const sending = ref(false);
+const saving = ref(false);
 const activeComment = ref<{
   anchor: AnnotationPopupAnchor;
   annotationId: string;
@@ -356,11 +348,19 @@ const cursorSwatchStyle = computed(() => {
     : {};
 });
 
+watch(canvasPadding, (nextPadding, previousPadding) => {
+  const offset = nextPadding - previousPadding;
+  if (offset === 0) return;
+  annotations.value = annotations.value.map((annotation) => offsetAnnotation(annotation, offset));
+  if (draft.value) draft.value = offsetAnnotation(draft.value, offset);
+  renderCanvas();
+});
+
 watch(() => props.visible, (visible) => {
   if (!visible) return;
   resetEditor();
   void nextTick(() => dialogBody.value?.focus());
-});
+}, { immediate: true });
 
 watch(() => props.imageSrc, (source) => {
   resolvedImageSrc.value = source;
@@ -400,17 +400,21 @@ function focusDialog(): void {
 }
 
 function resetEditor(): void {
-  annotations.value = [];
+  annotations.value = props.initialAnnotations.map((annotation) => offsetAnnotation(annotation, canvasPadding.value));
   draft.value = null;
   activeComment.value = null;
   activeTool.value = 'arrow';
   drawing.value = false;
-  sending.value = false;
+  imageReady.value = false;
+  saving.value = false;
   imageScale.value = 1;
   zoom.value = 1;
   retinaMode.value = props.initialPixelRatio === 2;
   hoverPoint.value = null;
-  annotationId = 0;
+  annotationId = Math.max(
+    annotations.value.length,
+    ...annotations.value.map((annotation) => Number.parseInt(annotation.id.match(/(\d+)$/)?.[1] ?? '0', 10)),
+  );
   renderCanvas();
 }
 
@@ -428,6 +432,7 @@ function imageLoaded(): void {
     width,
     height,
   };
+  imageReady.value = true;
   void nextTick(() => {
     fitSourceImage();
     void nextTick(() => {
@@ -478,6 +483,7 @@ function handleWorkspaceWheel(event: WheelEvent): void {
 
 function imageFailed(): void {
   clearImageLoadTimer();
+  imageReady.value = false;
   if (failedImageSource === resolvedImageSrc.value) return;
   failedImageSource = resolvedImageSrc.value;
   if (props.fallbackImageSrc && resolvedImageSrc.value !== props.fallbackImageSrc) {
@@ -736,9 +742,9 @@ function saveComment(comment: string): void {
   refreshMeasurementPreview();
 }
 
-function saveCommentAndSend(comment: string): void {
+function saveCommentAndSave(comment: string): void {
   saveComment(comment);
-  void sendAnnotatedImage();
+  void saveAnnotatedImage();
 }
 
 function cancelComment(): void {
@@ -793,11 +799,11 @@ function clearAnnotations(): void {
   refreshMeasurementPreview();
 }
 
-async function sendAnnotatedImage(): Promise<void> {
-  if (annotations.value.length === 0 || props.submitting || sending.value) return;
+async function saveAnnotatedImage(): Promise<void> {
+  if (!imageReady.value || saving.value) return;
   const element = image.value;
   if (!element) return;
-  sending.value = true;
+  saving.value = true;
   try {
     const output = document.createElement('canvas');
     output.width = canvasSize.value.width;
@@ -818,12 +824,8 @@ async function sendAnnotatedImage(): Promise<void> {
       palette: canvasPalette(),
       pixelRatio: pixelRatio.value,
     });
-    emit('send', {
-      annotations: annotations.value.map((annotation) => ({
-        ...annotation,
-        start: { ...annotation.start },
-        end: { ...annotation.end },
-      })),
+    emit('save', {
+      annotations: annotations.value.map((annotation) => offsetAnnotation(annotation, -canvasPadding.value)),
       dataUrl: output.toDataURL('image/png'),
       fileName: props.fileName,
       width: output.width,
@@ -831,7 +833,7 @@ async function sendAnnotatedImage(): Promise<void> {
       pixelRatio: pixelRatio.value,
     });
   } finally {
-    sending.value = false;
+    saving.value = false;
   }
 }
 
@@ -845,7 +847,7 @@ function handleKeyDown(event: KeyboardEvent): void {
   }
   if (event.metaKey && event.key === 'Enter' && !activeComment.value) {
     event.preventDefault();
-    void sendAnnotatedImage();
+    void saveAnnotatedImage();
     return;
   }
   if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
@@ -875,6 +877,14 @@ function handleKeyDown(event: KeyboardEvent): void {
     event.preventDefault();
     undoLastAnnotation();
   }
+}
+
+function offsetAnnotation(annotation: ImageAnnotation, offset: number): ImageAnnotation {
+  return {
+    ...annotation,
+    start: { x: annotation.start.x + offset, y: annotation.start.y + offset },
+    end: { x: annotation.end.x + offset, y: annotation.end.y + offset },
+  };
 }
 
 async function copyCursorColor(): Promise<void> {
@@ -922,6 +932,19 @@ function clamp(value: number, minimum: number, maximum: number): number {
 
 :global(.image-annotation-dialog.el-dialog > .el-dialog__footer) {
   padding: var(--space-3) var(--space-4);
+}
+
+.image-annotation-dialog__save-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: var(--space-2);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--color-on-primary) 18%, transparent);
+  font-size: var(--font-size-11);
+  line-height: 1;
 }
 
 .image-annotation-dialog__header {
@@ -1257,10 +1280,6 @@ function clamp(value: number, minimum: number, maximum: number): number {
 .image-annotation-dialog__comment-remove svg {
   width: 15px;
   height: 15px;
-}
-
-.image-annotation-dialog__footer :deep(.annotation-send-button) {
-  --annotation-send-button-height: 32px;
 }
 
 @media (max-width: 820px) {

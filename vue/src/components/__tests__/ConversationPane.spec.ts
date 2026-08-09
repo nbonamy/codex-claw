@@ -214,7 +214,7 @@ describe('ConversationPane', () => {
     expect(wrapper.get('a.chat-attachment-block--chip').attributes('href')).toBe('/tmp/report.txt');
   });
 
-  it('offers annotation only for a single composer image attachment', async () => {
+  it('offers annotation for every composer image attachment and reports saved counts', async () => {
     const image: CodexNativeAttachment = {
       id: 'image-1',
       type: 'image',
@@ -226,7 +226,7 @@ describe('ConversationPane', () => {
     };
     const wrapper = mountPane({ controller: controllerWithAttachments([image]), agent });
 
-    const annotate = wrapper.get('[aria-label="Annotate"]');
+    const annotate = wrapper.get('[aria-label="Annotate screenshot.png"]');
     expect(annotate.find('.tabler-icon-circle-plus').exists()).toBe(true);
     await annotate.trigger('click');
     expect(wrapper.emitted('annotate-attachment')).toStrictEqual([[image]]);
@@ -235,19 +235,27 @@ describe('ConversationPane', () => {
       controller: controllerWithAttachments([{ ...image, id: 'file-1', type: 'file', mimeType: 'text/plain' }]),
       agent,
     });
-    expect(fileWrapper.find('[aria-label="Annotate"]').exists()).toBe(false);
+    expect(fileWrapper.find('[aria-label^="Annotate "]').exists()).toBe(false);
 
+    const secondImage = { ...image, id: 'image-2', reference: '/tmp/second.png', name: 'second.png' };
     const multipleWrapper = mountPane({
-      controller: controllerWithAttachments([image, { ...image, id: 'image-2' }]),
+      controller: controllerWithAttachments([image, secondImage]),
       agent,
+      attachmentAnnotationCounts: { [image.reference]: 2 },
     });
-    expect(multipleWrapper.find('[aria-label="Annotate"]').exists()).toBe(false);
+    const multipleActions = multipleWrapper.findAll('.conversation-pane__annotate-attachment');
+    expect(multipleActions).toHaveLength(2);
+    expect(multipleActions[0]?.attributes('aria-label')).toBe('Edit annotations for screenshot.png (2)');
+    expect(multipleActions[0]?.text()).toBe('');
+    expect(multipleActions[0]?.classes()).toContain('conversation-pane__annotate-attachment--saved');
+    expect(multipleActions[1]?.attributes('aria-label')).toBe('Annotate second.png');
   });
 });
 
 function mountPane(props: {
   controller: CodexConversationPaneController;
   agent: Agent | null;
+  attachmentAnnotationCounts?: Readonly<Record<string, number>>;
   plan?: ThreadPlan | null;
   planVisible?: boolean;
 }) {

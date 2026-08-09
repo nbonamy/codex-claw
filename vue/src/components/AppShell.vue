@@ -220,6 +220,7 @@
             :controller="conversationPaneController"
             :agent="currentAgent"
             :agents="snapshot.agents"
+            :attachment-annotation-counts="activeAttachmentAnnotationCounts"
             :plan="currentTurnPlan"
             :plan-visible="executionPlanVisible"
             @annotate-attachment="openAttachmentImageAnnotation"
@@ -320,12 +321,12 @@
       :visible="imageAnnotationVisible"
       :image-src="imageAnnotationImageSource"
       :fallback-image-src="attachmentAnnotationTarget ? undefined : debugAnnotationScreenshotUrl"
+      :initial-annotations="imageAnnotationInitialAnnotations"
       :initial-pixel-ratio="imageAnnotationPixelRatio"
       :file-name="imageAnnotationFileName"
-      :submitting="imageAnnotationSubmitting"
       @close="closeImageAnnotation"
       @image-error="handleImageAnnotationError"
-      @send="finishImageAnnotation"
+      @save="saveImageAnnotation"
     />
     <CodexResourceSharingMigrationDialog
       :blocked="codexResourceSharingBlocked"
@@ -353,8 +354,8 @@ import AgentHeader from './AgentHeader.vue';
 import AgentSidebar from './AgentSidebar.vue';
 import CockpitView from './CockpitView.vue';
 import ConversationPane from './ConversationPane.vue';
-import ImageAnnotationDialog, { type ImageAnnotationSendPayload } from './ImageAnnotationDialog.vue';
-import { centeredImageCropDataUrl, formatImageAnnotationPrompt } from './image-annotation';
+import ImageAnnotationDialog, { type ImageAnnotationSavePayload } from './ImageAnnotationDialog.vue';
+import { centeredImageCropDataUrl, formatImageAnnotationPrompt, type SavedImageAnnotations } from './image-annotation';
 import LoopsView from './LoopsView.vue';
 import TeamDialog from './TeamDialog.vue';
 import TeamRail from './TeamRail.vue';
@@ -687,6 +688,7 @@ const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
 const activeSurface = ref<AppSurface>('agent');
 const rightWorkspaces = reactive<Record<string, AgentRightWorkspaceState>>({});
+const attachmentAnnotationsByAgentId = reactive<Record<string, Record<string, SavedImageAnnotations>>>({});
 const executionPlanStates = reactive<Record<string, { open: boolean; turnId: string }>>({});
 const quickAgentShortcutsVisible = ref(false);
 const debugApproval = ref<{ agentId: string; request: BackendApprovalRequest } | null>(null);
@@ -714,7 +716,6 @@ const debugImageAnnotationVisible = ref(false);
 const debugAnnotationPixelRatio = ref<1 | 2>(1);
 const debugAnnotationImageSource = ref(debugAnnotationScreenshotUrl);
 const attachmentAnnotationTarget = ref<AttachmentAnnotationTarget | null>(null);
-const imageAnnotationSubmitting = ref(false);
 const editingTeamId = ref<string | null>(null);
 let filePreviewRequestId = 0;
 let markdownPreviewId = 0;
@@ -1033,14 +1034,26 @@ const imageAnnotationVisible = computed(() => (
 const imageAnnotationImageSource = computed(() => (
   attachmentAnnotationTarget.value?.attachment.previewUrl ?? debugAnnotationImageSource.value
 ));
+const imageAnnotationSavedDraft = computed<SavedImageAnnotations | null>(() => {
+  const target = attachmentAnnotationTarget.value;
+  return target ? attachmentAnnotationsByAgentId[target.agentId]?.[target.attachment.reference] ?? null : null;
+});
+const imageAnnotationInitialAnnotations = computed(() => imageAnnotationSavedDraft.value?.annotations ?? []);
 const imageAnnotationPixelRatio = computed<1 | 2>(() => (
-  attachmentAnnotationTarget.value ? 1 : debugAnnotationPixelRatio.value
+  attachmentAnnotationTarget.value
+    ? imageAnnotationSavedDraft.value?.pixelRatio ?? 1
+    : debugAnnotationPixelRatio.value
 ));
 const imageAnnotationFileName = computed(() => {
   const name = attachmentAnnotationTarget.value?.attachment.name;
   if (!name) return 'codex-claw-annotated.png';
   const baseName = name.replace(/\.[^.]+$/, '') || 'image';
   return `${baseName}-annotated.png`;
+});
+const activeAttachmentAnnotationCounts = computed<Readonly<Record<string, number>>>(() => {
+  const agentId = currentAgent.value?.id;
+  const saved = agentId ? attachmentAnnotationsByAgentId[agentId] ?? {} : {};
+  return Object.fromEntries(Object.entries(saved).map(([reference, draft]) => [reference, draft.annotations.length]));
 });
 const isModalDialogVisible = computed(() => (
   agentDialogVisible.value
@@ -1516,7 +1529,6 @@ function openAttachmentImageAnnotation(attachment: CodexNativeAttachment): void 
 }
 
 function closeImageAnnotation(): void {
-  if (imageAnnotationSubmitting.value) return;
   debugImageAnnotationVisible.value = false;
   attachmentAnnotationTarget.value = null;
 }
@@ -1530,45 +1542,41 @@ function handleImageAnnotationError(): void {
   void useDebugAnnotationFallback();
 }
 
-async function finishImageAnnotation(payload: ImageAnnotationSendPayload): Promise<void> {
+function saveImageAnnotation(payload: ImageAnnotationSavePayload): void {
   const target = attachmentAnnotationTarget.value;
   if (!target) {
     debugImageAnnotationVisible.value = false;
     return;
   }
 
-  const nativeApi = getCodexNativeRendererApi();
-  if (!nativeApi || currentAgent.value?.id !== target.agentId) {
-    ElMessage.error('The annotated image could not be prepared.');
-    return;
-  }
-
-  imageAnnotationSubmitting.value = true;
-  try {
-    const [annotatedAttachment] = await nativeApi.ingestAttachments([{
-      name: payload.fileName,
-      mimeType: 'image/png',
-      data: imageDataUrlArrayBuffer(payload.dataUrl),
-    }]);
-    if (!annotatedAttachment) throw new Error('Annotated image ingestion returned no attachment.');
-
-    const prompt = formatImageAnnotationPrompt(payload.annotations, props.composerState?.text);
-    const attachment: RendererPromptAttachment = {
-      type: 'image',
-      reference: annotatedAttachment.reference,
+  if (payload.annotations.length === 0) {
+    removeSavedImageAnnotations(target.agentId, target.attachment.reference);
+  } else {
+    attachmentAnnotationsByAgentId[target.agentId] = {
+      ...attachmentAnnotationsByAgentId[target.agentId],
+      [target.attachment.reference]: cloneSavedImageAnnotations(payload),
     };
-    forwardPrompt(prompt, { attachments: [attachment] });
-    emit('update:composerState', {
-      agentId: target.agentId,
-      state: { text: '', selectionStart: 0, selectionEnd: 0 },
-    });
-    emit('update:composerAttachments', { agentId: target.agentId, attachments: [] });
-    attachmentAnnotationTarget.value = null;
-  } catch {
-    ElMessage.error('The annotated image could not be prepared.');
-  } finally {
-    imageAnnotationSubmitting.value = false;
   }
+  attachmentAnnotationTarget.value = null;
+}
+
+function removeSavedImageAnnotations(agentId: string, reference: string): void {
+  const existing = attachmentAnnotationsByAgentId[agentId];
+  if (!existing?.[reference]) return;
+  const next = { ...existing };
+  delete next[reference];
+  attachmentAnnotationsByAgentId[agentId] = next;
+}
+
+function cloneSavedImageAnnotations(draft: SavedImageAnnotations): SavedImageAnnotations {
+  return {
+    ...draft,
+    annotations: draft.annotations.map((annotation) => ({
+      ...annotation,
+      start: { ...annotation.start },
+      end: { ...annotation.end },
+    })),
+  };
 }
 
 async function openDebugImageAnnotation(imageDataUrl?: string, pixelRatio: 1 | 2 = 1): Promise<void> {
@@ -1710,12 +1718,78 @@ function forwardSteerPrompt(prompt: string, options?: RendererSendPromptOptions)
   }
 }
 
-function forwardCodexPrompt(prompt: string, options?: CodexRendererSendMessageOptions): void {
-  forwardPrompt(prompt, promptOptions(options));
+async function forwardCodexPrompt(prompt: string, options?: CodexRendererSendMessageOptions): Promise<void> {
+  await forwardCodexPromptWithImageAnnotations(prompt, options, forwardPrompt);
 }
 
-function forwardCodexSteerPrompt(prompt: string, options?: CodexRendererSendMessageOptions): void {
-  forwardSteerPrompt(prompt, promptOptions(options));
+async function forwardCodexSteerPrompt(prompt: string, options?: CodexRendererSendMessageOptions): Promise<void> {
+  await forwardCodexPromptWithImageAnnotations(prompt, options, forwardSteerPrompt);
+}
+
+async function forwardCodexPromptWithImageAnnotations(
+  prompt: string,
+  options: CodexRendererSendMessageOptions | undefined,
+  forward: (nextPrompt: string, nextOptions?: RendererSendPromptOptions) => void,
+): Promise<void> {
+  const agentId = currentAgent.value?.id;
+  const savedByReference = agentId ? attachmentAnnotationsByAgentId[agentId] ?? {} : {};
+  let imageNumber = 0;
+  const annotatedImages = props.composerAttachments.flatMap((attachment) => {
+    if (attachment.type !== 'image') return [];
+    imageNumber += 1;
+    const draft = savedByReference[attachment.reference];
+    return draft?.annotations.length ? [{ attachment, draft: cloneSavedImageAnnotations(draft), imageNumber }] : [];
+  });
+  if (!agentId || annotatedImages.length === 0) {
+    forward(prompt, promptOptions(options));
+    return;
+  }
+
+  const nativeApi = getCodexNativeRendererApi();
+  if (!nativeApi?.capabilities.attachments) {
+    throw new Error('Annotated images cannot be prepared by this host.');
+  }
+  const composerState = { ...props.composerState };
+  const composerAttachments = props.composerAttachments.map((attachment) => ({ ...attachment }));
+  const savedDrafts = Object.fromEntries(
+    Object.entries(savedByReference).map(([reference, draft]) => [reference, cloneSavedImageAnnotations(draft)]),
+  );
+
+  try {
+    const ingested = await nativeApi.ingestAttachments(annotatedImages.map(({ draft }) => ({
+      name: draft.fileName,
+      mimeType: 'image/png',
+      data: imageDataUrlArrayBuffer(draft.dataUrl),
+    })));
+    if (ingested.length !== annotatedImages.length) {
+      throw new Error('One or more annotated images could not be prepared.');
+    }
+    const replacementReferences = new Map(annotatedImages.map(({ attachment }, index) => [
+      attachment.reference,
+      ingested[index]!.reference,
+    ]));
+    const submittedAttachments = options?.attachments ?? composerAttachments.map((attachment) => ({
+      type: attachment.type,
+      reference: attachment.reference,
+    }));
+    const nextOptions: CodexRendererSendMessageOptions = {
+      ...options,
+      attachments: submittedAttachments.map((attachment) => ({
+        ...attachment,
+        reference: replacementReferences.get(attachment.reference) ?? attachment.reference,
+      })),
+    };
+    forward(formatImageAnnotationPrompt(annotatedImages.map(({ attachment, draft, imageNumber: number }) => ({
+      annotations: draft.annotations,
+      fileName: attachment.name,
+      imageNumber: number,
+    })), prompt), promptOptions(nextOptions));
+  } catch (error) {
+    attachmentAnnotationsByAgentId[agentId] = savedDrafts;
+    emit('update:composerState', { agentId, state: composerState });
+    emit('update:composerAttachments', { agentId, attachments: composerAttachments });
+    throw error;
+  }
 }
 
 function promptOptions(options?: CodexRendererSendMessageOptions): RendererSendPromptOptions | undefined {
@@ -1784,7 +1858,17 @@ function updateConversationComposerState(state: CodexComposerState): void {
 
 function updateConversationAttachments(attachments: readonly CodexNativeAttachment[]): void {
   const agentId = currentAgent.value?.id;
-  if (agentId) emit('update:composerAttachments', { agentId, attachments });
+  if (!agentId) return;
+  pruneSavedImageAnnotations(agentId, attachments);
+  emit('update:composerAttachments', { agentId, attachments });
+}
+
+function pruneSavedImageAnnotations(agentId: string, attachments: readonly CodexNativeAttachment[]): void {
+  const existing = attachmentAnnotationsByAgentId[agentId];
+  if (!existing) return;
+  const references = new Set(attachments.map((attachment) => attachment.reference));
+  const next = Object.fromEntries(Object.entries(existing).filter(([reference]) => references.has(reference)));
+  attachmentAnnotationsByAgentId[agentId] = next;
 }
 
 function cancelPlanReview(agentId: string): void {
@@ -1986,6 +2070,10 @@ function handleShellShortcut(event: KeyboardEvent): void {
   if (event.key === 'Meta') {
     startQuickAgentShortcutReveal(event);
     return;
+  }
+
+  if (event.metaKey) {
+    resetQuickAgentShortcuts();
   }
 
   if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && /^[1-9]$/.test(event.key)) {

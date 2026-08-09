@@ -19,6 +19,21 @@ export type ImageAnnotation = {
   comment: string;
 };
 
+export type SavedImageAnnotations = {
+  annotations: ImageAnnotation[];
+  dataUrl: string;
+  fileName: string;
+  height: number;
+  pixelRatio: 1 | 2;
+  width: number;
+};
+
+export type ImageAnnotationPromptGroup = {
+  annotations: readonly ImageAnnotation[];
+  fileName: string;
+  imageNumber: number;
+};
+
 export type ImageAnnotationPalette = {
   stroke: string;
   halo: string;
@@ -32,14 +47,20 @@ export type ImageAnnotationCounterPlacement = {
 };
 
 export function formatImageAnnotationPrompt(
-  annotations: readonly ImageAnnotation[],
+  groups: readonly ImageAnnotationPromptGroup[],
   existingPrompt = '',
 ): string {
+  const prompt = existingPrompt.trim() === '(no user instructions)' ? '' : existingPrompt.trim();
   const annotationText = [
     'Image annotations:',
-    ...annotations.map((annotation) => `${annotation.number}. ${annotation.comment.trim()}`),
+    '',
+    ...groups.flatMap((group, index) => [
+      `Image ${group.imageNumber} — ${group.fileName}`,
+      ...group.annotations.map((annotation) => `${annotation.number}. ${annotation.comment.trim()}`),
+      ...(index === groups.length - 1 ? [] : ['']),
+    ]),
   ].join('\n');
-  return [existingPrompt.trim(), annotationText].filter(Boolean).join('\n\n');
+  return [prompt, annotationText].filter(Boolean).join('\n\n');
 }
 
 export const defaultImageAnnotationPalette: ImageAnnotationPalette = {

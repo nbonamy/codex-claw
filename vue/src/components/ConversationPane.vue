@@ -20,15 +20,16 @@
       </template>
       <template #composer-attachment-actions="{ attachments, index, disabled }">
         <el-tooltip
-          v-if="attachments.length === 1 && attachments[index]?.type === 'image'"
-          :content="t('chat.attachments.annotate')"
+          v-if="attachments[index]?.type === 'image'"
+          :content="annotationActionLabel(attachments[index])"
           placement="top"
           :show-after="300"
         >
           <button
             class="conversation-pane__annotate-attachment"
+            :class="{ 'conversation-pane__annotate-attachment--saved': annotationCount(attachments[index]) > 0 }"
             type="button"
-            :aria-label="t('chat.attachments.annotate')"
+            :aria-label="annotationActionLabel(attachments[index])"
             :disabled="disabled"
             @click="requestAttachmentAnnotation(attachments[index])"
           >
@@ -81,10 +82,12 @@ const props = withDefaults(defineProps<{
   controller: CodexConversationPaneController;
   agent: Agent | null;
   agents?: readonly Agent[];
+  attachmentAnnotationCounts?: Readonly<Record<string, number>>;
   plan?: ThreadPlan | null;
   planVisible?: boolean;
 }>(), {
   agents: () => [],
+  attachmentAnnotationCounts: () => ({}),
   planVisible: true,
 });
 provideClawToolPresentation(
@@ -121,6 +124,18 @@ function collaborationMessageLabel(messageId: string | undefined): string | null
 
 function requestAttachmentAnnotation(attachment: CodexNativeAttachment | undefined): void {
   if (attachment?.type === 'image') emit('annotate-attachment', attachment);
+}
+
+function annotationCount(attachment: CodexNativeAttachment | undefined): number {
+  return attachment ? props.attachmentAnnotationCounts[attachment.reference] ?? 0 : 0;
+}
+
+function annotationActionLabel(attachment: CodexNativeAttachment | undefined): string {
+  if (!attachment) return t('chat.attachments.annotate', { name: 'image' });
+  const count = annotationCount(attachment);
+  return count > 0
+    ? t('chat.attachments.editAnnotations', { count, name: attachment.name })
+    : t('chat.attachments.annotate', { name: attachment.name });
 }
 
 function transformConversationMessage(
@@ -197,6 +212,14 @@ defineExpose({ focusComposer });
 .conversation-pane__annotate-attachment:disabled {
   color: var(--color-text-muted);
   cursor: default;
+}
+
+.conversation-pane__annotate-attachment--saved {
+  color: var(--color-primary);
+}
+
+.conversation-pane__annotate-attachment--saved svg {
+  stroke-width: 2.5;
 }
 
 .conversation-pane__annotate-attachment svg {

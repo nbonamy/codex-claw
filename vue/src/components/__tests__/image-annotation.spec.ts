@@ -18,29 +18,69 @@ afterEach(() => {
 
 describe('image annotation geometry', () => {
   it('formats every numbered image annotation after an existing composer prompt', () => {
-    expect(formatImageAnnotationPrompt([
-      {
+    expect(formatImageAnnotationPrompt([{
+      imageNumber: 1,
+      fileName: 'home.png',
+      annotations: [
+        {
+          id: 'first',
+          number: 1,
+          tool: 'arrow',
+          start: { x: 1, y: 2 },
+          end: { x: 3, y: 4 },
+          comment: 'Move this control.',
+        },
+        {
+          id: 'second',
+          number: 2,
+          tool: 'rectangle',
+          start: { x: 5, y: 6 },
+          end: { x: 7, y: 8 },
+          comment: '  Increase the spacing.  ',
+        },
+      ],
+    }, {
+      imageNumber: 2,
+      fileName: 'settings.png',
+      annotations: [{
+        id: 'third',
+        number: 1,
+        tool: 'oval',
+        start: { x: 9, y: 10 },
+        end: { x: 11, y: 12 },
+        comment: 'Rename this section.',
+      }],
+    }], 'Please update these screens.')).toBe([
+      'Please update these screens.',
+      '',
+      'Image annotations:',
+      '',
+      'Image 1 — home.png',
+      '1. Move this control.',
+      '2. Increase the spacing.',
+      '',
+      'Image 2 — settings.png',
+      '1. Rename this section.',
+    ].join('\n'));
+  });
+
+  it('omits the empty-instructions placeholder when only image annotations are submitted', () => {
+    expect(formatImageAnnotationPrompt([{
+      imageNumber: 1,
+      fileName: 'image.png',
+      annotations: [{
         id: 'first',
         number: 1,
         tool: 'arrow',
         start: { x: 1, y: 2 },
         end: { x: 3, y: 4 },
         comment: 'Move this control.',
-      },
-      {
-        id: 'second',
-        number: 2,
-        tool: 'rectangle',
-        start: { x: 5, y: 6 },
-        end: { x: 7, y: 8 },
-        comment: '  Increase the spacing.  ',
-      },
-    ], 'Please update this screen.')).toBe([
-      'Please update this screen.',
-      '',
+      }],
+    }], '(no user instructions)')).toBe([
       'Image annotations:',
+      '',
+      'Image 1 — image.png',
       '1. Move this control.',
-      '2. Increase the spacing.',
     ].join('\n'));
   });
 

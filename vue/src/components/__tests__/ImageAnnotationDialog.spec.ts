@@ -1,9 +1,11 @@
 import { mount, type VueWrapper } from '@vue/test-utils';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { ElButton } from 'element-plus';
 import { nextTick } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ImageAnnotationDialog from '../ImageAnnotationDialog.vue';
+import type { ImageAnnotation } from '../image-annotation';
 
 const context = {
   arc: vi.fn(),
@@ -100,14 +102,29 @@ describe('ImageAnnotationDialog', () => {
     expect(ovalTool.element.parentElement?.dataset.content).toBe('Oval (O)');
   });
 
-  it('prevents closing while the annotated image is being prepared', async () => {
-    const wrapper = await mountDialog();
-    await wrapper.setProps({ submitting: true });
+  it('restores saved annotations and can clear them before saving', async () => {
+    const wrapper = await mountDialog(800, 400, 1, [{
+      id: 'image-annotation-4',
+      number: 1,
+      tool: 'rectangle',
+      start: { x: 10, y: 20 },
+      end: { x: 110, y: 120 },
+      comment: 'Keep this saved comment.',
+    }]);
 
-    expect(wrapper.getComponent({ name: 'ElDialog' }).props('closeOnClickModal')).toBe(false);
-    expect(wrapper.getComponent({ name: 'ElDialog' }).props('closeOnPressEscape')).toBe(false);
-    expect(wrapper.get('.image-annotation-dialog__footer').findAll('button')[0]?.attributes('disabled'))
-      .toBeDefined();
+    expect(wrapper.get('.image-annotation-dialog__comments').text()).toContain('Keep this saved comment.');
+    expect(wrapper.get('.image-annotation-dialog__save-count').text()).toBe('1');
+    expect(wrapper.get('[aria-label="Clear image annotations"]').attributes('disabled')).toBeUndefined();
+    expect(wrapper.findAll('.image-annotation-dialog__footer .el-button').map((button) => button.text()))
+      .toStrictEqual(['Cancel', 'Clear', 'Save 1']);
+
+    await wrapper.get('[aria-label="Clear image annotations"]').trigger('click');
+    expect(wrapper.get('.image-annotation-dialog__comments-empty').text()).toBe('No annotations yet');
+    expect(wrapper.get('.image-annotation-dialog__save-count').text()).toBe('0');
+    expect(wrapper.get('[aria-label="Clear image annotations"]').attributes('disabled')).toBeDefined();
+
+    await wrapper.get('[aria-label="Save image annotations"]').trigger('click');
+    expect(wrapper.emitted('save')?.[0]?.[0]).toStrictEqual(expect.objectContaining({ annotations: [] }));
   });
 
   it('shows the pixel color under the cursor and copies it with Tab', async () => {
@@ -149,6 +166,11 @@ describe('ImageAnnotationDialog', () => {
     });
     await wrapper.get('img').trigger('load');
     expect(wrapper.emitted('image-error')).toStrictEqual([[], []]);
+    Object.defineProperties(wrapper.get('img').element, {
+      naturalWidth: { configurable: true, value: 800 },
+      naturalHeight: { configurable: true, value: 400 },
+    });
+    await wrapper.get('img').trigger('load');
 
     await wrapper.get('[aria-label="Rectangle"]').trigger('click');
     dispatchPointer(canvas, 'pointerdown', 50, 40);
@@ -165,10 +187,11 @@ describe('ImageAnnotationDialog', () => {
     expect(wrapper.get('.image-annotation-dialog__comments').text()).toContain('Keep this control aligned.');
     expect(wrapper.get('.image-annotation-dialog__comment-number').text()).toBe('1');
 
-    await wrapper.get('[aria-label="Send annotated image with 1 annotations"]').trigger('click');
+    expect(wrapper.get('.image-annotation-dialog__save-count').text()).toBe('1');
+    await wrapper.get('[aria-label="Save image annotations"]').trigger('click');
 
     expect(context.drawImage).toHaveBeenCalled();
-    expect(wrapper.emitted('send')).toStrictEqual([[
+    expect(wrapper.emitted('save')).toStrictEqual([[
       expect.objectContaining({
         dataUrl: 'data:image/png;base64,annotated',
         fileName: 'fixture.png',
@@ -184,7 +207,7 @@ describe('ImageAnnotationDialog', () => {
     ]]);
   });
 
-  it('sends every saved annotation with Command-Enter', async () => {
+  it('saves every annotation with Command-Enter', async () => {
     const wrapper = await mountDialog();
     const canvas = annotationCanvas(wrapper);
     await drawAndSaveComment(wrapper, canvas, 30, 30, 160, 80);
@@ -200,7 +223,7 @@ describe('ImageAnnotationDialog', () => {
     await nextTick();
 
     expect(shortcut.defaultPrevented).toBe(true);
-    expect(wrapper.emitted('send')).toStrictEqual([[
+    expect(wrapper.emitted('save')).toStrictEqual([[
       expect.objectContaining({
         dataUrl: 'data:image/png;base64,annotated',
         annotations: [
@@ -211,7 +234,7 @@ describe('ImageAnnotationDialog', () => {
     ]]);
   });
 
-  it('saves the active annotation comment before Command-Enter sends the batch', async () => {
+  it('saves the active annotation comment before Command-Enter saves the batch', async () => {
     const wrapper = await mountDialog();
     const canvas = annotationCanvas(wrapper);
     await drawAndSaveComment(wrapper, canvas, 30, 30, 160, 80);
@@ -226,7 +249,7 @@ describe('ImageAnnotationDialog', () => {
     await input.trigger('keydown', { key: 'Enter', metaKey: true });
     await nextTick();
 
-    expect(wrapper.emitted('send')).toStrictEqual([[
+    expect(wrapper.emitted('save')).toStrictEqual([[
       expect.objectContaining({
         annotations: [
           expect.objectContaining({ number: 1, comment: 'Saved annotation' }),
@@ -479,6 +502,7 @@ describe('ImageAnnotationDialog', () => {
         imageSrc: 'stalled-image.png',
       },
       global: {
+        components: { ElButton },
         stubs: {
           ElTooltip: ElTooltipStub,
           ElDialog: {
@@ -503,6 +527,7 @@ describe('ImageAnnotationDialog', () => {
         fallbackImageSrc: 'fallback-image.png',
       },
       global: {
+        components: { ElButton },
         stubs: {
           ElTooltip: ElTooltipStub,
           ElDialog: {
@@ -521,15 +546,22 @@ describe('ImageAnnotationDialog', () => {
   });
 });
 
-async function mountDialog(width = 800, height = 400, initialPixelRatio: 1 | 2 = 1): Promise<VueWrapper> {
+async function mountDialog(
+  width = 800,
+  height = 400,
+  initialPixelRatio: 1 | 2 = 1,
+  initialAnnotations: ImageAnnotation[] = [],
+): Promise<VueWrapper> {
   const wrapper = trackWrapper(mount(ImageAnnotationDialog, {
     props: {
       visible: true,
       imageSrc: 'fixture.png',
       fileName: 'fixture.png',
+      initialAnnotations,
       initialPixelRatio,
     },
     global: {
+      components: { ElButton },
       stubs: {
         Teleport: true,
         ElTooltip: ElTooltipStub,

@@ -122,12 +122,16 @@ implemented:
   separate `@2x` toolbar toggle reports image dimensions
   and measured gaps in logical Retina pixels; clipboard images enable it
   automatically from a 2x native representation or macOS screenshot PNG
-  density metadata. A single image in the conversation composer exposes the
-  Browser-style annotation action; sending from the dialog submits the rendered
-  annotated PNG instead of the original attachment, alongside the numbered
-  annotation comments and any existing composer text. Escape
+  density metadata. Every image in the conversation composer exposes its own
+  Browser-style annotation action. The dialog saves a per-image annotation
+  draft without submitting the composer, restores that draft for later edits,
+  and offers explicit Clear, Cancel, and counted Save actions. Annotated image
+  actions use a stronger primary-colored icon without adding a badge to the
+  attachment. Final composer submission ingests every saved annotated image once,
+  replaces only those original attachments, and appends comments grouped by
+  image name and attachment order to the existing prompt. Escape
   cancels the active mark before it can close the dialog, and Command+Enter
-  sends every annotation after saving any active comment. The development
+  saves every annotation after saving any active comment. The development
   fixture is available from Debug → Image Annotation
   and uses a clipboard image when present, otherwise a centered crop of the
   bundled shell screenshot;

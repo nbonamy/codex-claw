@@ -9,7 +9,8 @@ export const messages = {
     },
     chat: {
       attachments: {
-        annotate: 'Annotate',
+        annotate: 'Annotate {name}',
+        editAnnotations: 'Edit annotations for {name} ({count})',
       },
       collaboration: {
         messageFrom: 'Message from {name}',

@@ -362,26 +362,52 @@ describe('AppShell', () => {
     expect(imageWorkspace.props('imagePanels')).toStrictEqual({});
   });
 
-  it('sends the rendered annotation image and every annotation comment instead of the original attachment', async () => {
-    const originalAttachment: CodexNativeAttachment = {
-      id: 'original-image',
+  it('saves, reopens, and submits annotations for multiple composer images', async () => {
+    const firstImage: CodexNativeAttachment = {
+      id: 'first-image',
       type: 'image',
-      reference: 'electron-attachment:original',
-      name: 'original.png',
+      reference: 'electron-attachment:first',
+      name: 'first.png',
       mimeType: 'image/png',
       size: 128,
-      previewUrl: 'data:image/png;base64,b3JpZ2luYWw=',
+      previewUrl: 'data:image/png;base64,Zmlyc3Q=',
     };
-    const annotatedAttachment: CodexNativeAttachment = {
-      id: 'annotated-image',
+    const secondImage: CodexNativeAttachment = {
+      ...firstImage,
+      id: 'second-image',
+      reference: 'electron-attachment:second',
+      name: 'second.png',
+      previewUrl: 'data:image/png;base64,c2Vjb25k',
+    };
+    const contextFile: CodexNativeAttachment = {
+      id: 'context-file',
+      type: 'file',
+      reference: 'electron-attachment:context',
+      name: 'context.md',
+      mimeType: 'text/markdown',
+      size: 64,
+    };
+    const unannotatedImage: CodexNativeAttachment = {
+      ...firstImage,
+      id: 'unannotated-image',
+      reference: 'electron-attachment:unannotated',
+      name: 'reference.png',
+    };
+    const firstAnnotatedAttachment: CodexNativeAttachment = {
+      id: 'first-annotated',
       type: 'image',
-      reference: 'electron-attachment:annotated',
-      name: 'original-annotated.png',
+      reference: 'electron-attachment:first-annotated',
+      name: 'first-annotated.png',
       mimeType: 'image/png',
       size: 256,
-      previewUrl: 'data:image/png;base64,YW5ub3RhdGVk',
     };
-    const ingestAttachments = vi.fn().mockResolvedValue([annotatedAttachment]);
+    const secondAnnotatedAttachment: CodexNativeAttachment = {
+      ...firstAnnotatedAttachment,
+      id: 'second-annotated',
+      reference: 'electron-attachment:second-annotated',
+      name: 'second-annotated.png',
+    };
+    const ingestAttachments = vi.fn().mockResolvedValue([firstAnnotatedAttachment, secondAnnotatedAttachment]);
     (window as Window & { codexAppSdkNative?: Partial<CodexNativeRendererApi> }).codexAppSdkNative = {
       capabilities: {
         attachments: true,
@@ -392,80 +418,114 @@ describe('AppShell', () => {
       ingestAttachments,
     };
     const wrapper = mountShell({
-      composerState: {
-        text: 'Please update this screen.',
-        selectionStart: 26,
-        selectionEnd: 26,
-      },
-      composerAttachments: [originalAttachment],
+      composerAttachments: [firstImage, secondImage, unannotatedImage, contextFile],
     });
 
-    await wrapper.get('[aria-label="Annotate"]').trigger('click');
+    await wrapper.get('[aria-label="Annotate first.png"]').trigger('click');
     const dialog = wrapper.getComponent({ name: 'ImageAnnotationDialog' });
     expect(dialog.props('visible')).toBe(true);
-    expect(dialog.props('imageSrc')).toBe(originalAttachment.previewUrl);
-    expect(dialog.props('fileName')).toBe('original-annotated.png');
+    expect(dialog.props('imageSrc')).toBe(firstImage.previewUrl);
+    expect(dialog.props('fileName')).toBe('first-annotated.png');
 
-    dialog.vm.$emit('send', {
-      annotations: [
-        {
-          id: 'annotation-1',
-          number: 1,
-          tool: 'arrow',
-          start: { x: 1, y: 2 },
-          end: { x: 3, y: 4 },
-          comment: 'Move the button.',
-        },
-        {
-          id: 'annotation-2',
-          number: 2,
-          tool: 'rectangle',
-          start: { x: 5, y: 6 },
-          end: { x: 7, y: 8 },
-          comment: 'Increase this margin.',
-        },
-      ],
-      dataUrl: 'data:image/png;base64,YW5ub3RhdGVk',
-      fileName: 'original-annotated.png',
+    const firstAnnotations = [
+      {
+        id: 'annotation-1',
+        number: 1,
+        tool: 'arrow' as const,
+        start: { x: 1, y: 2 },
+        end: { x: 3, y: 4 },
+        comment: 'Move the button.',
+      },
+      {
+        id: 'annotation-2',
+        number: 2,
+        tool: 'rectangle' as const,
+        start: { x: 5, y: 6 },
+        end: { x: 7, y: 8 },
+        comment: 'Increase this margin.',
+      },
+    ];
+    dialog.vm.$emit('save', {
+      annotations: firstAnnotations,
+      dataUrl: 'data:image/png;base64,Zmlyc3QtYW5ub3RhdGVk',
+      fileName: 'first-annotated.png',
       height: 80,
       pixelRatio: 1,
       width: 120,
     });
+    await nextTick();
+
+    expect(ingestAttachments).not.toHaveBeenCalled();
+    expect(wrapper.emitted('sendPrompt')).toBeUndefined();
+    expect(wrapper.getComponent({ name: 'ConversationPane' }).props('attachmentAnnotationCounts')).toStrictEqual({
+      [firstImage.reference]: 2,
+    });
+    await wrapper.get('[aria-label="Edit annotations for first.png (2)"]').trigger('click');
+    expect(dialog.props('initialAnnotations')).toStrictEqual(firstAnnotations);
+    dialog.vm.$emit('close');
+    await nextTick();
+
+    await wrapper.get('[aria-label="Annotate second.png"]').trigger('click');
+    dialog.vm.$emit('save', {
+      annotations: [
+        {
+          id: 'annotation-second',
+          number: 1,
+          tool: 'oval',
+          start: { x: 9, y: 10 },
+          end: { x: 11, y: 12 },
+          comment: 'Rename this section.',
+        },
+      ],
+      dataUrl: 'data:image/png;base64,c2Vjb25kLWFubm90YXRlZA==',
+      fileName: 'second-annotated.png',
+      height: 80,
+      pixelRatio: 2,
+      width: 120,
+    });
+    await nextTick();
+
+    await conversationControllerActions(wrapper).submit?.('Please update these screens.', {
+      attachments: [
+        { type: 'image', reference: firstImage.reference },
+        { type: 'image', reference: secondImage.reference },
+        { type: 'image', reference: unannotatedImage.reference },
+        { type: 'file', reference: contextFile.reference },
+      ],
+    });
     await flushPromises();
 
     expect(ingestAttachments).toHaveBeenCalledOnce();
-    expect(ingestAttachments.mock.calls[0]?.[0]).toStrictEqual([{
-      name: 'original-annotated.png',
-      mimeType: 'image/png',
-      data: expect.any(ArrayBuffer),
-    }]);
+    expect(ingestAttachments.mock.calls[0]?.[0]).toStrictEqual([
+      { name: 'first-annotated.png', mimeType: 'image/png', data: expect.any(ArrayBuffer) },
+      { name: 'second-annotated.png', mimeType: 'image/png', data: expect.any(ArrayBuffer) },
+    ]);
     expect(wrapper.emitted('sendPrompt')).toStrictEqual([[
       [
-        'Please update this screen.',
+        'Please update these screens.',
         '',
         'Image annotations:',
+        '',
+        'Image 1 — first.png',
         '1. Move the button.',
         '2. Increase this margin.',
+        '',
+        'Image 2 — second.png',
+        '1. Rename this section.',
       ].join('\n'),
       {
-        attachments: [{
-          type: 'image',
-          reference: annotatedAttachment.reference,
-        }],
+        attachments: [
+          { type: 'image', reference: firstAnnotatedAttachment.reference },
+          { type: 'image', reference: secondAnnotatedAttachment.reference },
+          { type: 'image', reference: unannotatedImage.reference },
+          { type: 'file', reference: contextFile.reference },
+        ],
       },
     ]]);
-    expect(wrapper.emitted('sendPrompt')?.[0]?.[1]).not.toStrictEqual(expect.objectContaining({
-      attachments: [expect.objectContaining({ reference: originalAttachment.reference })],
-    }));
-    expect(wrapper.emitted('update:composerState')).toContainEqual([{
-      agentId: 'agent-dina',
-      state: { text: '', selectionStart: 0, selectionEnd: 0 },
-    }]);
-    expect(wrapper.emitted('update:composerAttachments')).toContainEqual([{
-      agentId: 'agent-dina',
-      attachments: [],
-    }]);
     expect(dialog.props('visible')).toBe(false);
+
+    await conversationControllerActions(wrapper).updateAttachments?.([]);
+    expect(wrapper.getComponent({ name: 'ConversationPane' }).props('attachmentAnnotationCounts')).toStrictEqual({});
   });
 
   it('hides the native browser while the image annotation dialog is open', async () => {
@@ -503,7 +563,7 @@ describe('AppShell', () => {
     expect(workspace.props('visible')).toBe(true);
     browserSetVisible.mockClear();
 
-    await wrapper.get('[aria-label="Annotate"]').trigger('click');
+    await wrapper.get('[aria-label="Annotate screen.png"]').trigger('click');
     await flushPromises();
 
     const dialog = wrapper.getComponent({ name: 'ImageAnnotationDialog' });
@@ -2811,8 +2871,10 @@ describe('AppShell', () => {
         cancelable: true,
       });
       window.dispatchEvent(switchEvent);
+      await nextTick();
       expect(switchEvent.defaultPrevented).toBe(true);
       expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-dina'], ['agent-jesse']]);
+      expect(wrapper.find('.agent-sidebar__quick-switch-shortcut').exists()).toBe(false);
 
       window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Meta' }));
       await nextTick();
