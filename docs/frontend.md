@@ -235,8 +235,9 @@ and artifact pane changes.
 replacement, while main, preload, and `clawd` SDK edits rebuild through their
 existing watchers. Package, make, backend, and release builds consume SDK
 `dist`; while the dependency uses a local `file:` reference, every root build
-entrypoint rebuilds the sibling SDK first. The build step becomes a no-op when
-Claw switches to a published npm dependency.
+entrypoint rebuilds the sibling SDK and refreshes the installed package
+snapshots before Claw bundles them. The build step becomes a no-op when Claw
+switches to a published npm dependency.
 
 Development builds expose a native Debug menu with deterministic fixtures for
 sending a real MCP collaboration message to the current agent, opening the
