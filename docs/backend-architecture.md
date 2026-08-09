@@ -797,10 +797,11 @@ publish uses `npm run publish:macos` after a signed `npm run make`; the script
 uploads the ZIP, manifest, and DMG through SSH using
 `CODEX_CLAW_UPDATE_PUBLISH_HOST` and `CODEX_CLAW_UPDATE_REMOTE_ROOT`.
 
-The release notes embedded in the renderer are generated from the matching
+The release notes embedded in the renderer are generated from every released
 versioned section of `CHANGELOG.md` with `npm run release-notes:generate`. The
-generated JSON freezes the package version, release date, Markdown, and source
-digest. Root `npm run make` reaches the Electron workspace's
+generated JSON identifies the current package version and freezes each release's
+version, date, Markdown, and source digest so the What’s New dialog can browse
+the complete release history. Root `npm run make` reaches the Electron workspace's
 `release-notes:check` step before Forge packages the app. That check fails when
 root, workspace, internal dependency, or lockfile versions differ; when the
 matching changelog section is missing; or when the committed JSON is stale.

@@ -11,7 +11,20 @@
     <template #header>
       <div class="claw-dialog__header whats-new-dialog__header">
         <div class="whats-new-dialog__heading">
-          <span class="whats-new-dialog__version">Version {{ releaseNotes.version }}</span>
+          <el-select
+            v-model="selectedVersion"
+            class="whats-new-dialog__version-select"
+            aria-label="Release version"
+            size="small"
+            :teleported="false"
+          >
+            <el-option
+              v-for="release in releaseNotes.releases"
+              :key="release.version"
+              :label="`Version ${release.version}`"
+              :value="release.version"
+            />
+          </el-select>
           <h2 class="claw-dialog__title">What’s new in Codex Claw</h2>
           <p class="claw-dialog__subtitle">Released {{ formattedReleaseDate }}</p>
         </div>
@@ -28,18 +41,18 @@
 
     <MarkdownPanel
       class="whats-new-dialog__notes"
-      :content="releaseNotes.markdown"
+      :content="selectedRelease.markdown"
     />
   </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import releaseNotes from '../generated/release-notes.json';
 import { X } from '../shared/icons/app-icons';
 import MarkdownPanel from './MarkdownPanel.vue';
 
-defineProps<{
+const props = defineProps<{
   visible: boolean;
 }>();
 
@@ -47,12 +60,20 @@ const emit = defineEmits<{
   close: [];
 }>();
 
+const selectedVersion = ref(releaseNotes.currentVersion);
+const selectedRelease = computed(() => releaseNotes.releases.find(
+  (release) => release.version === selectedVersion.value,
+) ?? releaseNotes.releases[0]);
 const formattedReleaseDate = computed(() => new Intl.DateTimeFormat(undefined, {
   day: 'numeric',
   month: 'long',
   year: 'numeric',
   timeZone: 'UTC',
-}).format(new Date(`${releaseNotes.releasedAt}T00:00:00Z`)));
+}).format(new Date(`${selectedRelease.value.releasedAt}T00:00:00Z`)));
+
+watch(() => props.visible, (visible) => {
+  if (visible) selectedVersion.value = releaseNotes.currentVersion;
+});
 
 function onVisibilityChanged(visible: boolean): void {
   if (!visible) emit('close');
@@ -69,16 +90,26 @@ function onVisibilityChanged(visible: boolean): void {
   gap: var(--space-1);
 }
 
-.whats-new-dialog__version {
-  width: fit-content;
+.whats-new-dialog__version-select {
+  width: 132px;
   margin-bottom: var(--space-2);
-  padding: var(--space-1) var(--space-4);
+}
+
+.whats-new-dialog__version-select :deep(.el-select__wrapper) {
+  min-height: 26px;
+  padding: 0 var(--space-3);
   border-radius: var(--radius-full);
   color: var(--color-on-primary-container);
   background: var(--color-primary-container);
   font-size: var(--font-size-11);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-18);
+  box-shadow: none;
+}
+
+.whats-new-dialog__version-select :deep(.el-select__selected-item),
+.whats-new-dialog__version-select :deep(.el-select__caret) {
+  color: inherit;
 }
 
 .whats-new-dialog__notes {

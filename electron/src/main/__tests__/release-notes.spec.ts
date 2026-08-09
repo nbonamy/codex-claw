@@ -11,10 +11,13 @@ type ReleaseNotesScript = {
   }) => string;
   createReleaseNotes: (input: { version: string; changelog: string }) => {
     schemaVersion: number;
-    version: string;
-    releasedAt: string;
-    sourceSha256: string;
-    markdown: string;
+    currentVersion: string;
+    releases: Array<{
+      version: string;
+      releasedAt: string;
+      sourceSha256: string;
+      markdown: string;
+    }>;
   };
 };
 
@@ -24,7 +27,7 @@ async function loadScript(): Promise<ReleaseNotesScript> {
 }
 
 describe('release-notes script', () => {
-  it('freezes the package version, date, markdown, and source digest', async () => {
+  it('freezes the current version and complete released changelog history', async () => {
     const { createReleaseNotes } = await loadScript();
     const notes = createReleaseNotes({
       version: '0.5.0',
@@ -46,11 +49,22 @@ describe('release-notes script', () => {
     });
 
     expect(notes).toStrictEqual({
-      schemaVersion: 1,
-      version: '0.5.0',
-      releasedAt: '2026-08-04',
-      sourceSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
-      markdown: '### New features\n\n- Added What’s New.',
+      schemaVersion: 2,
+      currentVersion: '0.5.0',
+      releases: [
+        {
+          version: '0.5.0',
+          releasedAt: '2026-08-04',
+          sourceSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+          markdown: '### New features\n\n- Added What’s New.',
+        },
+        {
+          version: '0.4.0',
+          releasedAt: '2026-08-03',
+          sourceSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+          markdown: '- Previous release.',
+        },
+      ],
     });
   });
 

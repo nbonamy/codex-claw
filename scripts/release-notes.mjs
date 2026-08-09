@@ -11,29 +11,27 @@ function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
 
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+export function extractReleaseSections(changelog) {
+  const headingPattern = /^## \[([^\]]+)\] - (\d{4}-\d{2}-\d{2})\s*$/gm;
+  const matches = [...changelog.matchAll(headingPattern)];
 
-export function extractReleaseSection(changelog, version) {
-  const headingPattern = new RegExp(`^## \\[${escapeRegExp(version)}\\] - (\\d{4}-\\d{2}-\\d{2})\\s*$`, 'm');
-  const match = headingPattern.exec(changelog);
-  if (!match) {
-    throw new Error(`CHANGELOG.md must contain a release heading for ${version}: ## [${version}] - YYYY-MM-DD`);
-  }
+  return matches.map((match, index) => {
+    const version = match[1];
+    const releasedAt = match[2];
+    const bodyStart = (match.index ?? 0) + match[0].length;
+    const bodyEnd = matches[index + 1]?.index ?? changelog.length;
+    const markdown = changelog.slice(bodyStart, bodyEnd).trim();
+    if (!markdown) {
+      throw new Error(`CHANGELOG.md release ${version} has no release notes.`);
+    }
 
-  const bodyStart = match.index + match[0].length;
-  const nextHeadingOffset = changelog.slice(bodyStart).search(/^##\s/m);
-  const bodyEnd = nextHeadingOffset === -1 ? changelog.length : bodyStart + nextHeadingOffset;
-  const markdown = changelog.slice(bodyStart, bodyEnd).trim();
-  if (!markdown) {
-    throw new Error(`CHANGELOG.md release ${version} has no release notes.`);
-  }
-
-  return {
-    releasedAt: match[1],
-    markdown,
-  };
+    return {
+      version,
+      releasedAt,
+      sourceSha256: createHash('sha256').update(markdown).digest('hex'),
+      markdown,
+    };
+  });
 }
 
 export function assertVersionConsistency({ rootPackage, workspaces, lockfile }) {
@@ -70,13 +68,15 @@ export function assertVersionConsistency({ rootPackage, workspaces, lockfile }) 
 }
 
 export function createReleaseNotes({ version, changelog }) {
-  const release = extractReleaseSection(changelog, version);
+  const releases = extractReleaseSections(changelog);
+  if (!releases.some((release) => release.version === version)) {
+    throw new Error(`CHANGELOG.md must contain a release heading for ${version}: ## [${version}] - YYYY-MM-DD`);
+  }
+
   return {
-    schemaVersion: 1,
-    version,
-    releasedAt: release.releasedAt,
-    sourceSha256: createHash('sha256').update(release.markdown).digest('hex'),
-    markdown: release.markdown,
+    schemaVersion: 2,
+    currentVersion: version,
+    releases,
   };
 }
 

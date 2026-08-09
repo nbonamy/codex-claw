@@ -1,7 +1,72 @@
 {
-  "schemaVersion": 1,
-  "version": "0.8.0",
-  "releasedAt": "2026-08-09",
-  "sourceSha256": "9f6492716f9cab639b23643edd2b2d9ac2363c83435a3c2f7cc2c86235eb38ea",
-  "markdown": "### New features\n\n- Subagents are now visible from the agent header, with live and completed\n  workers grouped in a compact menu and each conversation opening in its own\n  workspace tab.\n\n### Improvements and fixes\n\n- Prompts submitted remotely now appear in the conversation without requiring\n  a reload.\n- File and diff previews, including Review, now scroll horizontally when long\n  lines extend beyond the workspace pane."
+  "schemaVersion": 2,
+  "currentVersion": "0.8.0",
+  "releases": [
+    {
+      "version": "0.8.0",
+      "releasedAt": "2026-08-09",
+      "sourceSha256": "9f6492716f9cab639b23643edd2b2d9ac2363c83435a3c2f7cc2c86235eb38ea",
+      "markdown": "### New features\n\n- Subagents are now visible from the agent header, with live and completed\n  workers grouped in a compact menu and each conversation opening in its own\n  workspace tab.\n\n### Improvements and fixes\n\n- Prompts submitted remotely now appear in the conversation without requiring\n  a reload.\n- File and diff previews, including Review, now scroll horizontally when long\n  lines extend beyond the workspace pane."
+    },
+    {
+      "version": "0.7.0",
+      "releasedAt": "2026-08-09",
+      "sourceSha256": "d9157be1b73a18dde2719a3f647c57d9ff0fb0b9abeb4b195e401183a331dc1b",
+      "markdown": "### New features\n\n- Agents and project files can now be opened directly in installed editors,\n  Finder, or terminals, with each agent remembering its preferred application.\n- Unread agent activity is now visible in the agent list, team rail, and macOS\n  Dock badge so completed work and requests are easier to locate.\n- Every composer image can now keep its own saved annotation draft, be reopened\n  for edits, and submit grouped feedback for multiple images in one prompt.\n- Code blocks in conversations now include a dedicated copy action.\n\n### Improvements and fixes\n\n- Image annotation now keeps the in-app browser behind its modal, uses explicit\n  Clear, Cancel, and counted Save actions, and supports Command+Enter to save.\n- The selected agent now remains active after reconnecting to the backend, and\n  the Chrome plugin configuration is restored correctly at startup.\n- Unread Dock badges no longer retain stale counts, and Command-number hints\n  disappear as soon as a real Command shortcut is used.\n- Generated images now use the correct tool presentation and support reliable\n  fullscreen viewing and downloads, while pasted images retain their previews.\n- Empty completed responses now show a clear fallback, and interrupted or\n  restored turns no longer leave tool activity displayed as running forever."
+    },
+    {
+      "version": "0.6.1",
+      "releasedAt": "2026-08-07",
+      "sourceSha256": "5c4b507cc5fc9a1904ee5e98883fb9b90882f2b9b8e488b2e3288f6b589bdef7",
+      "markdown": "### New features\n\n- Codex Claw now shares ChatGPT's installed skills and plugins by default,\n  explicitly asks existing installs before migrating their resource folders,\n  and provides a General → Advanced setting for fresh or copied isolation.\n- The prompt composer now grows with longer messages until twelve lines are\n  visible, then scrolls internally.\n- Pressing Escape twice within two seconds now interrupts an active response,\n  even when the composer does not have focus.\n\n### Improvements and fixes\n\n- Changing skills and plugin sharing now keeps the desktop app open while a\n  blocking reconnect screen safely restarts the backend and refreshes\n  conversations, resource catalogs, and workspace state.\n- Dialogs now use consistent body padding without double-spacing forms,\n  including the create and edit forms for teams and agents.\n- Computer Use activity now identifies the target app, control, coordinates,\n  window, or display, including dedicated presentation for screenshots and\n  Screen Recording permission requests.\n- Absolute file links outside an agent repository now open as read-only tabs in\n  that agent's sidebar workspace.\n- Passive Computer Use checks, app discovery, permission requests, and\n  screenshots no longer display the blue virtual cursor over the desktop."
+    },
+    {
+      "version": "0.6.0",
+      "releasedAt": "2026-08-06",
+      "sourceSha256": "580d081bc98bdb5cf87dbf152d07ca03e55c62cd2354c78c3e21eb3bda20bcac",
+      "markdown": "### New features\n\n- Codex Claw now bundles its local Codex app-server executable, while remote\n  agents continue using the Codex installation on their remote host.\n- Existing Codex conversations can now be forked into a new agent from the\n  agent menu or from a specific user or assistant message.\n- Image annotation now lets you mark up a composer image with arrows,\n  rectangles, numbered comments, zoom, color inspection, and Retina-aware\n  measurements, then send the annotated image and feedback together.\n- Appshots capture the frontmost macOS window directly into the active agent\n  with a configurable dual-Command, dual-Option, or dual-Shift hotkey and an\n  optional confirmation sound.\n- Computer Use can now capture a target application window or macOS display as\n  an image, with Screen Recording permission surfaced in Settings.\n- Clicking an image in a conversation now opens it in a dedicated per-agent\n  workspace tab.\n\n### Improvements and fixes\n\n- Execution plans now keep a stable Task list heading and show the model's\n  plan-update title as a separate, full-width block below the header.\n- Duplicated and forked agents now appear directly below their source agent.\n- Conversations now open with less initial history while older turns remain\n  available on demand.\n- Historical image attachments render previews again, and selected attachments\n  stay contained within the composer.\n- Web searches now use their own tool presentation, while new SDK tool kinds\n  keep their intended identity instead of falling back to a generic tool.\n- Message actions are disabled while an agent is busy, controlled composer\n  caret movement is preserved, and user-message presentation is more\n  consistent."
+    },
+    {
+      "version": "0.5.1",
+      "releasedAt": "2026-08-04",
+      "sourceSha256": "d8e2ecbeccbdc435108dac564eba0ce7cc60d75bb742bc43d4eda6b6ecede902",
+      "markdown": "### Improvements and fixes\n\n- Dialog close buttons now sit closer to the top-right corner, and dialogs\n  without footers keep their rounded bottom corners."
+    },
+    {
+      "version": "0.5.0",
+      "releasedAt": "2026-08-04",
+      "sourceSha256": "53daa0d8865efdc2c794193097a8ae07337845146b420880a8bb51bd527b9146",
+      "markdown": "### New features\n\n- Added an in-app What’s New dialog, available from the native Help menu and\n  lower-left account menu, with release notes verified during release packaging.\n\n### Improvements and fixes\n\n- Long conversations now load progressively, keep only recent messages mounted\n  until you scroll upward, and use less memory across long sessions.\n- Large conversations no longer retransmit and redraw their full transcript for\n  routine agent selection, prompt, status, or background-state updates.\n- Mobile remote access can keep a plugged-in Mac awake, with streamlined\n  connection, pairing, and device controls in Settings.\n- Added keyboard shortcuts for opening Settings and compacting the active\n  agent's context.\n- Holding Command now reveals numbered shortcuts for the first nine agents in\n  the active team, and Command+1 through Command+9 switches directly to them.\n- Inactive agent transcripts now remain warm for 15 minutes before they are\n  eligible for eviction.\n- Conversations now preserve submitted `/review` commands and open external\n  links correctly, while Git status is analyzed when an agent is first shown.\n- Restored conversations no longer briefly show a stale execution plan while\n  their message history is loading."
+    },
+    {
+      "version": "0.4.0",
+      "releasedAt": "2026-08-03",
+      "sourceSha256": "0b619a87757a7df66c9f77e98bba582313e7edc5c800dadbe74157762e66e710",
+      "markdown": "### New features\n\n- Turn-aware file links now open edit targets in their own diff tabs, while\n  read and create targets continue to open source tabs.\n- Agent workspaces retain per-turn diff tabs and fall back to the current Git\n  review when a link has no usable turn context.\n- Added a Plugins settings page with opt-in Computer Use and Chrome controls,\n  ChatGPT handoff, and a catalog of common integrations.\n- Markdown previews now open as tabs in the right sidebar.\n- Chrome availability stays in sync with ChatGPT.\n- Execution plans can be dismissed and reopened from the agent header.\n- Browser and plan annotations now support voice recording and transcription.\n\n### Improvements and fixes\n\n- Browser annotations now dismiss on outside click and immediately resume\n  element selection while annotation mode remains active.\n- Plan reviews now support compact inline comments, batch refinement, clear\n  confirmation, and a locked review state while a revised plan is generated;\n  they now open as agent workspace tabs instead of replacing the sidebar.\n- Fixed macOS voice transcription in development builds by resolving the\n  bundled Apple Speech helper from the linked SDK assets."
+    },
+    {
+      "version": "0.3.1",
+      "releasedAt": "2026-08-02",
+      "sourceSha256": "29e6898e6dadb764e926b1fad84dcbc2091b7f42fbe148b9ffc56b30b0d00abe",
+      "markdown": "### New features\n\n- Added macOS update checks, a Codex Claw menu action, a downloaded-update\n  badge, and install-and-relaunch flow.\n- Added the signed desktop release publishing workflow and update feed.\n- Added live file activity in conversations and clickable file targets for\n  reads, edits, and creates.\n- Published the Codex Claw landing page with release downloads and product\n  documentation.\n\n### Improvements and fixes\n\n- Computer Use MCP tools are hidden until explicitly enabled, while plugin\n  settings persist across launches and apply to new and resumed conversations.\n- Refined Plugins and Integrations settings cards, banners, spacing, and\n  dialog presentation.\n\n- Update checks now run at startup and once per hour in packaged builds.\n- Git review now includes untracked files and keeps the change statistics\n  visible alongside long filenames.\n- File activity no longer opens files unexpectedly; explicit file targets remain\n  available from the conversation.\n- Preserved conversation workspace context while navigating between agents.\n- Refined exploration labels and made right-sidebar resize affordances subtler."
+    },
+    {
+      "version": "0.3.0",
+      "releasedAt": "2026-08-02",
+      "sourceSha256": "8fd2d9e80648c68880eeafbe1cf230efa9225cf05b04012c09f5e4c7de465f3d",
+      "markdown": "### New features\n\n- In-app browser with agent-specific tabs, annotations, and tools that continue\n  working while another agent is selected.\n- Native macOS Computer Use tools for agents to inspect and operate desktop\n  applications.\n- Git workspace review, source previews, streamlined agent setup, compact agent\n  lists, and a refined native macOS shell.\n- ChatGPT authentication, mobile device pairing, Fast mode, and clearer Claw\n  tool presentation.\n- Per-agent drafts, attachments, queues, model settings, and side-panel state.\n- Prompt automation through the `codex-claw://` deep-link protocol.\n- Sender labels and cleaner message bubbles for agent-to-agent collaboration.\n\n### Improvements and fixes\n\n- Made agent switching immediate and kept the interface responsive with several\n  agents streaming concurrently.\n- Reduced conversation rendering, catalog loading, snapshot processing, and\n  long-session memory overhead; inactive transcripts now unload safely after\n  five minutes and reload on demand.\n- Prevented backend event-stream overload and output-backpressure crashes.\n- Stabilized queued and steered prompt submission, attachments, compaction\n  state, background-agent selection, and app-server reconnection.\n- Preserved live tool calls, drafts, queues, and conversation state across agent\n  switches and background activity.\n- Fixed GitHub token refresh, device pairing, Fast mode hydration, catalog\n  flicker, status clearing, and tool presentation regressions."
+    },
+    {
+      "version": "0.2.0",
+      "releasedAt": "2026-06-18",
+      "sourceSha256": "30b1586fdd88f4540adb4756dcb947c6af0648692748fa7d8adcea4431ca143f",
+      "markdown": "### New features\n\n- Always-on background agents through the `clawd` daemon, including automatic\n  daemon upgrades when the desktop app is updated.\n- SSH connections to remote Claw instances with remote teams, agents, loops,\n  and work integrations.\n- Conversation history and resume, source and Git diff previews, agent Git\n  statistics, and repository worktree selection.\n- System permission controls and sleep prevention while agents are working.\n\n### Improvements and fixes\n\n- Made agent and team state survive desktop restarts while background work\n  continues in the daemon.\n- Improved remote connection recovery, conversation hydration, agent restart\n  behavior, and packaged runtime discovery.\n- Fixed direct teammate delivery, GitHub authentication in packaged builds,\n  snapshot consistency, and scoped file previews."
+    },
+    {
+      "version": "0.1.0",
+      "releasedAt": "2026-06-05",
+      "sourceSha256": "7ecb0ab1dc72fbb8a2dc4c5673f5e5741c795e237941d3e0705613b7f3dcf68d",
+      "markdown": "### New features\n\n- Native Codex conversations with streaming messages, tools, approvals,\n  questions, plans, goals, context usage, queues, steering, and interruption.\n- Teams, multiple agents, Bench templates, agent messaging, avatars, themes,\n  settings, keyboard shortcuts, file mentions, skills, and dictation.\n- Claude CLI conversations and transcript hydration behind a provider-neutral\n  backend contract.\n- Cockpit, GitHub backlog connections, work assignments, automation loops,\n  Markdown previews, and source worktree creation.\n\n### Improvements and fixes\n\n- Stabilized thread persistence, status updates, tool ordering, user-input\n  handling, compaction, message actions, native menus, and packaged Codex paths."
+    }
+  ]
 }
