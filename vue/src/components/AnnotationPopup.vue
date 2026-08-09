@@ -7,7 +7,8 @@
       :aria-description="description"
       :style="positionStyle"
       @keydown.esc.stop.prevent="emit('cancel')"
-      @submit.prevent="submit"
+      @keydown.meta.enter="submitWithCommandEnter"
+      @submit.prevent="submit()"
     >
     <CodexComposerVoiceField
       v-if="voiceVisible && (voiceRecording || voiceTranscribing)"
@@ -66,6 +67,7 @@ export type AnnotationPopupAnchor = {
 
 const props = withDefaults(defineProps<{
   anchor: AnnotationPopupAnchor;
+  commandEnterSubmit?: boolean;
   description?: string;
   initialValue?: string;
   label?: string;
@@ -76,6 +78,7 @@ const props = withDefaults(defineProps<{
   width?: number;
 }>(), {
   description: '',
+  commandEnterSubmit: false,
   initialValue: '',
   label: 'Annotation comment',
   placement: 'below',
@@ -86,6 +89,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   cancel: [];
+  'command-submit': [comment: string];
   submit: [comment: string];
 }>();
 
@@ -177,7 +181,14 @@ function insertTranscript(value: string): void {
   });
 }
 
-async function submit(): Promise<void> {
+function submitWithCommandEnter(event: KeyboardEvent): void {
+  if (!props.commandEnterSubmit) return;
+  event.preventDefault();
+  event.stopPropagation();
+  void submit('command-submit');
+}
+
+async function submit(eventName: 'command-submit' | 'submit' = 'submit'): Promise<void> {
   if (voiceTranscribing.value || voiceSubmitPending.value) return;
 
   if (voiceRecording.value) {
@@ -192,6 +203,10 @@ async function submit(): Promise<void> {
   const comment = draft.value.trim();
   if (!comment) {
     input.value?.focus();
+    return;
+  }
+  if (eventName === 'command-submit') {
+    emit('command-submit', comment);
     return;
   }
   emit('submit', comment);

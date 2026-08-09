@@ -98,6 +98,29 @@ describe('AnnotationPopup', () => {
     expect(wrapper.emitted('cancel')).toStrictEqual([[]]);
   });
 
+  it('emits the current comment through the optional Command-Enter action', async () => {
+    const wrapper = mount(AnnotationPopup, {
+      props: {
+        anchor: { x: 0, y: 0, width: 0, height: 0 },
+        commandEnterSubmit: true,
+      },
+    });
+    await wrapper.get('input').setValue('Send the whole batch.');
+    const shortcut = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      metaKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+
+    wrapper.get('input').element.dispatchEvent(shortcut);
+    await nextTick();
+
+    expect(shortcut.defaultPrevented).toBe(true);
+    expect(wrapper.emitted('command-submit')).toStrictEqual([['Send the whole batch.']]);
+    expect(wrapper.emitted('submit')).toBeUndefined();
+  });
+
   it('supports host-provided full-width placement above an anchor', () => {
     const wrapper = mount(AnnotationPopup, {
       props: {

@@ -184,6 +184,58 @@ describe('ImageAnnotationDialog', () => {
     ]]);
   });
 
+  it('sends every saved annotation with Command-Enter', async () => {
+    const wrapper = await mountDialog();
+    const canvas = annotationCanvas(wrapper);
+    await drawAndSaveComment(wrapper, canvas, 30, 30, 160, 80);
+    await drawAndSaveComment(wrapper, canvas, 100, 100, 280, 180);
+    const shortcut = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      metaKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+
+    window.dispatchEvent(shortcut);
+    await nextTick();
+
+    expect(shortcut.defaultPrevented).toBe(true);
+    expect(wrapper.emitted('send')).toStrictEqual([[
+      expect.objectContaining({
+        dataUrl: 'data:image/png;base64,annotated',
+        annotations: [
+          expect.objectContaining({ number: 1, comment: 'Saved annotation' }),
+          expect.objectContaining({ number: 2, comment: 'Saved annotation' }),
+        ],
+      }),
+    ]]);
+  });
+
+  it('saves the active annotation comment before Command-Enter sends the batch', async () => {
+    const wrapper = await mountDialog();
+    const canvas = annotationCanvas(wrapper);
+    await drawAndSaveComment(wrapper, canvas, 30, 30, 160, 80);
+    dispatchPointer(canvas, 'pointerdown', 100, 100);
+    dispatchPointer(canvas, 'pointermove', 280, 180);
+    dispatchPointer(canvas, 'pointerup', 280, 180);
+    await nextTick();
+    await nextTick();
+    const input = wrapper.get<HTMLInputElement>('.annotation-popup__input');
+    await input.setValue('Send this annotation too.');
+
+    await input.trigger('keydown', { key: 'Enter', metaKey: true });
+    await nextTick();
+
+    expect(wrapper.emitted('send')).toStrictEqual([[
+      expect.objectContaining({
+        annotations: [
+          expect.objectContaining({ number: 1, comment: 'Saved annotation' }),
+          expect.objectContaining({ number: 2, comment: 'Send this annotation too.' }),
+        ],
+      }),
+    ]]);
+  });
+
   it('draws arrows beyond the image and supports measurement shortcuts', async () => {
     const wrapper = await mountDialog();
     const canvas = annotationCanvas(wrapper);

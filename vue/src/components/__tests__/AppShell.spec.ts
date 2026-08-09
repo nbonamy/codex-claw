@@ -468,6 +468,56 @@ describe('AppShell', () => {
     expect(dialog.props('visible')).toBe(false);
   });
 
+  it('hides the native browser while the image annotation dialog is open', async () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    });
+    const browserSetVisible = vi.fn().mockResolvedValue(undefined);
+    setElectronTestClient({
+      browserOpen: vi.fn().mockResolvedValue({ url: '', title: '', canGoBack: false, canGoForward: false }),
+      browserSetBounds: vi.fn().mockResolvedValue(undefined),
+      browserSetVisible,
+      browserClose: vi.fn().mockResolvedValue(undefined),
+      onEvent: vi.fn(() => vi.fn()),
+    });
+    const wrapper = mountShell({
+      composerAttachments: [{
+        id: 'image-to-annotate',
+        type: 'image',
+        reference: 'electron-attachment:image-to-annotate',
+        name: 'screen.png',
+        mimeType: 'image/png',
+        size: 128,
+        previewUrl: 'data:image/png;base64,c2NyZWVu',
+      }],
+    });
+
+    await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
+    await wrapper.findAll('.right-workspace-panel__launcher button')
+      .find((button) => button.text().includes('Browser'))
+      ?.trigger('click');
+    await flushPromises();
+
+    const workspace = wrapper.getComponent({ name: 'RightWorkspacePanel' });
+    expect(workspace.props('visible')).toBe(true);
+    browserSetVisible.mockClear();
+
+    await wrapper.get('[aria-label="Annotate"]').trigger('click');
+    await flushPromises();
+
+    const dialog = wrapper.getComponent({ name: 'ImageAnnotationDialog' });
+    expect(dialog.props('visible')).toBe(true);
+    expect(workspace.props('visible')).toBe(false);
+    expect(browserSetVisible).toHaveBeenCalledWith('agent-dina', 'primary', false);
+
+    dialog.vm.$emit('close');
+    await flushPromises();
+
+    expect(workspace.props('visible')).toBe(true);
+    expect(browserSetVisible).toHaveBeenLastCalledWith('agent-dina', 'primary', true);
+  });
+
   it('opens the empty workspace launcher before preserving a selected Browser tab', async () => {
     const snapshot = createInitialSnapshot();
     vi.stubGlobal('ResizeObserver', class {

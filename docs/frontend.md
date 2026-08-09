@@ -126,7 +126,8 @@ implemented:
   Browser-style annotation action; sending from the dialog submits the rendered
   annotated PNG instead of the original attachment, alongside the numbered
   annotation comments and any existing composer text. Escape
-  cancels the active mark before it can close the dialog. The development
+  cancels the active mark before it can close the dialog, and Command+Enter
+  sends every annotation after saving any active comment. The development
   fixture is available from Debug → Image Annotation
   and uses a clipboard image when present, otherwise a centered crop of the
   bundled shell screenshot;

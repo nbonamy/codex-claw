@@ -146,6 +146,7 @@
             <AnnotationPopup
               v-if="activeComment"
               :anchor="activeComment.anchor"
+              command-enter-submit
               :description="activeComment.description"
               :initial-value="activeComment.initialValue"
               label="Image annotation comment"
@@ -155,6 +156,7 @@
               submit-label="Save annotation comment"
               :width="320"
               @cancel="cancelComment"
+              @command-submit="saveCommentAndSend"
               @submit="saveComment"
             />
           </div>
@@ -734,6 +736,11 @@ function saveComment(comment: string): void {
   refreshMeasurementPreview();
 }
 
+function saveCommentAndSend(comment: string): void {
+  saveComment(comment);
+  void sendAnnotatedImage();
+}
+
 function cancelComment(): void {
   const target = activeComment.value;
   activeComment.value = null;
@@ -787,7 +794,7 @@ function clearAnnotations(): void {
 }
 
 async function sendAnnotatedImage(): Promise<void> {
-  if (annotations.value.length === 0 || sending.value) return;
+  if (annotations.value.length === 0 || props.submitting || sending.value) return;
   const element = image.value;
   if (!element) return;
   sending.value = true;
@@ -834,6 +841,11 @@ function handleKeyDown(event: KeyboardEvent): void {
     event.preventDefault();
     event.stopPropagation();
     cancelComment();
+    return;
+  }
+  if (event.metaKey && event.key === 'Enter' && !activeComment.value) {
+    event.preventDefault();
+    void sendAnnotatedImage();
     return;
   }
   if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;

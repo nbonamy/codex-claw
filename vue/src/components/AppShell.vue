@@ -241,7 +241,7 @@
             :image-panels="rightWorkspaceFor(agent.id).imagePanels"
             :diff-panels="rightWorkspaceFor(agent.id).diffPanels"
             :tabs="rightWorkspaceFor(agent.id).tabs"
-            :visible="isRightWorkspaceVisible(agent.id)"
+            :visible="isRightWorkspaceVisible(agent.id) && !isModalDialogVisible"
             :browser-id="rightWorkspaceFor(agent.id).browserId"
             :browser-initial-url="rightWorkspaceFor(agent.id).browserInitialUrl"
             :browser-open-request-id="rightWorkspaceFor(agent.id).browserOpenRequestId"
@@ -1048,6 +1048,7 @@ const isModalDialogVisible = computed(() => (
   || teamDialogVisible.value
   || whatsNewVisible.value
   || imageAnnotationVisible.value
+  || props.codexResourceSharingMigrationRequired
 ));
 const showAgentSidebar = computed(() => isAgentWorkspaceVisible.value && !agentSidebarCollapsed.value && !isAgentEmpty.value);
 const showLoginLanding = computed(() => (
