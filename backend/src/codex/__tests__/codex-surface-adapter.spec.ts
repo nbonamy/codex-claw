@@ -971,6 +971,44 @@ describe('CodexSurfaceAgentAdapter', () => {
     expect(events.some((event) => event.type === 'thread.historyLoaded')).toBe(false);
   });
 
+  it('forwards user messages submitted through remote control', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
+    await adapter.hydrateAgent(agentA);
+    events.length = 0;
+
+    transport.emit({
+      method: 'turn/started',
+      params: { threadId: 'thread-a', turn: turn('turn-remote', 'inProgress') },
+    });
+    transport.emit({
+      method: 'item/started',
+      params: {
+        threadId: 'thread-a', turnId: 'turn-remote', startedAtMs: 1_700_000_000_000,
+        item: {
+          type: 'userMessage', id: 'remote-user-message', clientId: null,
+          content: [{ type: 'text', text: 'Sent from my iPhone', textElements: [] }],
+        },
+      },
+    });
+
+    expect(events.filter((event) => event.type === 'message.userSubmitted')).toStrictEqual([
+      expect.objectContaining({
+        agentId: agentA.id,
+        threadId: 'thread-a',
+        turnId: 'turn-remote',
+        payload: {
+          message: expect.objectContaining({
+            role: 'user',
+            parts: [{ type: 'text', text: 'Sent from my iPhone' }],
+          }),
+        },
+      }),
+    ]);
+    expect(events.some((event) => event.type === 'thread.historyLoaded')).toBe(false);
+  });
+
   it('revalidates an idle cached transcript after its 15-minute freshness ttl', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     try {
