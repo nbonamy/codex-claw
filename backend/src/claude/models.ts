@@ -28,6 +28,7 @@ export function claudeModelOptionsFromSdk(models: readonly ClaudeAvailableModel[
       model: model.value,
       displayName: model.displayName || model.value,
       ...(model.description ? { description: model.description } : {}),
+      ...(model.resolvedModel ? { providerMetadata: { resolvedModel: model.resolvedModel } } : {}),
       ...(model.supportsEffort && model.supportedEffortLevels?.length
         ? {
             supportedReasoningEfforts: model.supportedEffortLevels.map((reasoningEffort) => ({

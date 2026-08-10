@@ -108,8 +108,14 @@ app-owned backend events:
 - `stream_event` tool starts and input JSON deltas create and update running
   tool cards before the final assistant message arrives.
 - assistant text blocks become `message.delta`.
-- `tool_use` blocks become generic running tool cards.
-- `tool_result` blocks update those tool cards.
+- `tool_use` blocks pass through a shared Claude semantic adapter. Bash keeps
+  its command and description; Read, Write, Edit, Glob, Grep, web, Agent, and
+  MCP tools expose app-owned titles, paths, actions, icons, and available line
+  statistics without making the renderer provider-aware.
+- Read, Write, Edit, and NotebookEdit emit app-owned file activity so file
+  links and authoritative repository Git status stay current while Claude is
+  working.
+- `tool_result` blocks update those tool cards and their semantic lifecycle.
 - `result` completes the turn or emits an app error.
 
 This gives Claude agents local prompt send, persistent multi-turn sessions,
@@ -159,7 +165,9 @@ displayable records:
 
 - `type: "user"` entries with non-meta text become user `RendererMessage`s.
 - `type: "assistant"` text blocks become assistant message text parts.
-- assistant `tool_use` blocks become generic Claude tool cards.
+- assistant `tool_use` blocks use the same semantic Claude tool adapter as the
+  live stream, preserving commands, filenames, MCP identity, and available
+  line statistics after restart.
 - user `tool_result` blocks complete the matching tool cards.
 - Claude queue operations, attachments, `last-prompt`, sidechains, and meta
   local-command records are ignored.
@@ -191,7 +199,12 @@ restart without creating an empty Claude conversation. Display names,
 descriptions, and supported effort levels come from the SDK, so the composer
 only offers an effort selector for models that advertise it. The selected
 effort is passed to the Agent SDK on the first turn and updated on later turns
-with its runtime flag settings API.
+with its runtime flag settings API. Claude transcript hydration also reads the
+latest main-thread assistant model and effort from the JSONL record, so opening
+or reloading a conversation restores its own selection. When older history has
+no such metadata, Claw falls back to the last Claude model and effort used by
+that agent; resolved transcript model IDs are matched back to the SDK catalog's
+friendly model entry.
 
 The transport prepends common user binary folders such as `~/.local/bin`,
 `~/bin`, `/opt/homebrew/bin`, and `/usr/local/bin` to `PATH` because packaged or

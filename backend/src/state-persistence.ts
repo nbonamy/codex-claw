@@ -1315,6 +1315,8 @@ function sanitizeBackendSession(value: unknown, expectedBackend: AgentBackend): 
       transport: value.transport,
       ...(typeof value.transcriptSessionId === 'string' ? { transcriptSessionId: value.transcriptSessionId } : {}),
       ...(typeof value.serverUrl === 'string' ? { serverUrl: value.serverUrl } : {}),
+      ...(typeof value.model === 'string' ? { model: value.model } : {}),
+      ...(typeof value.reasoningEffort === 'string' ? { reasoningEffort: value.reasoningEffort } : {}),
     } satisfies BackendSession;
     return session.kind === expectedBackend ? session : undefined;
   }
@@ -1346,6 +1348,7 @@ function sanitizeBackendDefaults(value: unknown, expectedBackend: AgentBackend):
     const defaults = {
       kind: 'claude',
       ...(typeof value.model === 'string' ? { model: value.model } : {}),
+      ...(typeof value.reasoningEffort === 'string' ? { reasoningEffort: value.reasoningEffort } : {}),
       ...(typeof value.permissionMode === 'string' ? { permissionMode: value.permissionMode } : {}),
       ...(thinking ? { thinking } : {}),
     } satisfies BackendDefaults;

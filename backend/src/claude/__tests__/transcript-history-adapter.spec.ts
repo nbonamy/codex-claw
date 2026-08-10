@@ -2,7 +2,7 @@ import { mkdir, utimes, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
-import { claudeTranscriptToRendererMessages, listClaudeTranscriptSummaries, loadClaudeTranscriptHistory } from '../transcript-history-adapter';
+import { claudeTranscriptSettings, claudeTranscriptToRendererMessages, listClaudeTranscriptSummaries, loadClaudeTranscriptHistory } from '../transcript-history-adapter';
 import type { Agent } from '@codex-claw/core/contracts';
 
 describe('claudeTranscriptToRendererMessages', () => {
@@ -24,6 +24,7 @@ describe('claudeTranscriptToRendererMessages', () => {
         type: 'assistant',
         uuid: 'assistant-1',
         timestamp: '2026-06-06T22:33:43.100Z',
+        cwd: '/workspace/project',
         message: {
           role: 'assistant',
           content: [
@@ -66,15 +67,27 @@ describe('claudeTranscriptToRendererMessages', () => {
           {
             type: 'tool',
             id: 'tool-1',
-            kind: 'generic',
+            kind: 'command',
             title: 'Read',
             status: 'completed',
-            input: { file_path: 'README.md' },
+            statusText: JSON.stringify({
+              source: 'claude',
+              action: 'read',
+              phase: 'completed',
+              params: { target: 'README.md' },
+            }),
+            input: {
+              file_path: 'README.md',
+              path: '/workspace/project/README.md',
+              cwd: '/workspace/project',
+            },
             output: '# Codex Claw',
             body: '# Codex Claw',
             metadata: {
               provider: 'claude',
               itemType: 'tool_use',
+              claudeToolName: 'Read',
+              cwd: '/workspace/project',
             },
           },
         ],
@@ -113,17 +126,79 @@ describe('claudeTranscriptToRendererMessages', () => {
   });
 });
 
+describe('claudeTranscriptSettings', () => {
+  it('returns the latest main-thread model and effort without reading sidechains', () => {
+    const content = [
+      JSON.stringify({
+        type: 'assistant',
+        uuid: 'assistant-old',
+        effort: 'high',
+        message: { id: 'message-old', model: 'claude-sonnet-5', role: 'assistant', content: 'old' },
+      }),
+      JSON.stringify({
+        type: 'assistant',
+        uuid: 'assistant-sidechain',
+        isSidechain: true,
+        effort: 'max',
+        message: { id: 'message-sidechain', model: 'claude-opus-5', role: 'assistant', content: 'ignore' },
+      }),
+      JSON.stringify({
+        type: 'assistant',
+        uuid: 'assistant-new-1',
+        effort: 'xhigh',
+        message: { id: 'message-new', model: 'claude-sonnet-5', role: 'assistant', content: 'new' },
+      }),
+      JSON.stringify({
+        type: 'assistant',
+        uuid: 'assistant-new-2',
+        message: { id: 'message-new', model: 'claude-sonnet-5', role: 'assistant', content: [] },
+      }),
+    ].join('\n');
+
+    expect(claudeTranscriptSettings(content)).toStrictEqual({
+      model: 'claude-sonnet-5',
+      reasoningEffort: 'xhigh',
+    });
+  });
+
+  it('clears an earlier effort when the latest response uses a different model without one', () => {
+    const content = [
+      JSON.stringify({
+        type: 'assistant',
+        effort: 'xhigh',
+        message: { id: 'message-sonnet', model: 'claude-sonnet-5', role: 'assistant', content: 'first' },
+      }),
+      JSON.stringify({
+        type: 'assistant',
+        message: { id: 'message-haiku', model: 'claude-haiku-4-5-20251001', role: 'assistant', content: 'second' },
+      }),
+    ].join('\n');
+
+    expect(claudeTranscriptSettings(content)).toStrictEqual({
+      model: 'claude-haiku-4-5-20251001',
+    });
+  });
+});
+
 describe('loadClaudeTranscriptHistory', () => {
   it('loads the transcript for a persisted Claude session from the project directory', async () => {
     const projectsRoot = path.join(tmpdir(), `codex-claw-claude-history-${Date.now()}`);
     const projectDirectory = path.join(projectsRoot, '-Users-nbonamy-src-id8');
     await mkdir(projectDirectory, { recursive: true });
-    await writeFile(path.join(projectDirectory, 'session-1.jsonl'), JSON.stringify({
-      type: 'user',
-      uuid: 'user-1',
-      promptId: 'prompt-1',
-      message: { role: 'user', content: 'hello' },
-    }));
+    await writeFile(path.join(projectDirectory, 'session-1.jsonl'), [
+      JSON.stringify({
+        type: 'user',
+        uuid: 'user-1',
+        promptId: 'prompt-1',
+        message: { role: 'user', content: 'hello' },
+      }),
+      JSON.stringify({
+        type: 'assistant',
+        uuid: 'assistant-1',
+        effort: 'high',
+        message: { id: 'message-1', role: 'assistant', model: 'claude-sonnet-5', content: 'hello back' },
+      }),
+    ].join('\n'));
 
     const agent: Agent = {
       id: 'agent-claude',
@@ -137,11 +212,22 @@ describe('loadClaudeTranscriptHistory', () => {
     };
 
     await expect(loadClaudeTranscriptHistory(agent, { projectsRoot })).resolves.toStrictEqual({
-      backendSession: { kind: 'claude', sessionId: 'session-1', transcriptSessionId: 'session-1', transport: 'stdio' },
+      backendSession: {
+        kind: 'claude',
+        sessionId: 'session-1',
+        transcriptSessionId: 'session-1',
+        transport: 'stdio',
+        model: 'claude-sonnet-5',
+        reasoningEffort: 'high',
+      },
       messages: [
         expect.objectContaining({
           id: 'user-session-1-user-1',
           parts: [{ type: 'text', text: 'hello' }],
+        }),
+        expect.objectContaining({
+          id: 'assistant-claude-prompt-1',
+          parts: [{ type: 'text', text: 'hello back' }],
         }),
       ],
     });

@@ -31,6 +31,13 @@ import { claudeModelOptions, claudeModelOptionsFromSdk } from './models';
 import { listClaudeSkills } from './skills';
 import { listClaudeTranscriptSummaries, loadClaudeTranscriptHistory, type ClaudeTranscriptHistory } from './transcript-history-adapter';
 import {
+  claudeToolFileActivity,
+  claudeToolPart,
+  claudeToolPartInputUpdate,
+  completedClaudeToolPart,
+  type ClaudeToolFileActivity,
+} from './claude-tool-part-adapter';
+import {
   claudeMessageContentBlocks,
   claudeMessageSessionId,
   claudeResultErrorMessage,
@@ -51,14 +58,19 @@ type StreamedClaudeTool = {
 
 type ActiveClaudeTurn = {
   agentId: string;
+  cwd: string;
   turnId: string;
   sessionId: string | null;
+  model: string | null;
+  reasoningEffort: ClaudeTurnParams['effort'];
   handle: ClaudeTurnHandle;
   planMode: boolean;
   completed: boolean;
   interrupted: boolean;
   streamedText: string;
   streamedToolsByIndex: Map<number, StreamedClaudeTool>;
+  toolPartsById: Map<string, RendererToolPart>;
+  fileActivitiesById: Map<string, ClaudeToolFileActivity>;
   completedPlanMarkdown: string | null;
   resolveStart: (result: BackendSendResult) => void;
   rejectStart: (error: Error) => void;
@@ -131,15 +143,16 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
     }
     let activeTurn: ActiveClaudeTurn | null = null;
     const started = new Promise<BackendSendResult>((resolve, reject) => {
+      const turnParams = claudeTurnParams(
+        agent,
+        prompt,
+        options,
+        existingSessionId,
+        this.driverOptions.clawMcpServerUrl,
+        this.driverOptions.pluginSettings?.(),
+      );
       const handle = this.transport.startTurn(
-        claudeTurnParams(
-          agent,
-          prompt,
-          options,
-          existingSessionId,
-          this.driverOptions.clawMcpServerUrl,
-          this.driverOptions.pluginSettings?.(),
-        ),
+        turnParams,
         (message) => {
           if (activeTurn) {
             this.handleSdkMessage(activeTurn, message);
@@ -153,14 +166,19 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
       );
       activeTurn = {
         agentId: agent.id,
+        cwd: agent.folder,
         turnId,
         sessionId: existingSessionId,
+        model: turnParams.model ?? null,
+        reasoningEffort: turnParams.effort ?? null,
         handle,
         planMode: Boolean(options.planMode),
         completed: false,
         interrupted: false,
         streamedText: '',
         streamedToolsByIndex: new Map(),
+        toolPartsById: new Map(),
+        fileActivitiesById: new Map(),
         completedPlanMarkdown: null,
         resolveStart: resolve,
         rejectStart: reject,
@@ -199,7 +217,11 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
     this.activeTurnsByAgentId.delete(agent.id);
 
     return {
-      backendSession: claudeBackendSession(activeTurn.sessionId ?? claudeSessionId(agent) ?? agent.id),
+      backendSession: claudeBackendSession(
+        activeTurn.sessionId ?? claudeSessionId(agent) ?? agent.id,
+        activeTurn.model,
+        activeTurn.reasoningEffort,
+      ),
       turnId: activeTurn.turnId,
     };
   }
@@ -392,16 +414,7 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
           continue;
         }
 
-        this.emit({
-          agentId: activeTurn.agentId,
-          backend: this.backend,
-          backendSessionId: activeTurn.sessionId ?? undefined,
-          turnId: activeTurn.turnId,
-          type: 'item.started',
-          payload: {
-            toolPart: claudeToolPart(block),
-          },
-        });
+        this.emitClaudeToolPart(activeTurn, block);
       }
     }
   }
@@ -428,20 +441,11 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
         return;
       }
 
-      this.emit({
-        agentId: activeTurn.agentId,
-        backend: this.backend,
-        backendSessionId: activeTurn.sessionId ?? undefined,
-        turnId: activeTurn.turnId,
-        type: 'item.started',
-        payload: {
-          toolPart: claudeToolPart({
-            type: 'tool_use',
-            id: toolUseStart.id,
-            name: toolUseStart.name,
-            input: toolUseStart.input,
-          }),
-        },
+      this.emitClaudeToolPart(activeTurn, {
+        type: 'tool_use',
+        id: toolUseStart.id,
+        name: toolUseStart.name,
+        input: toolUseStart.input,
       });
       return;
     }
@@ -469,6 +473,15 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
         continue;
       }
 
+      const existingToolPart = activeTurn.toolPartsById.get(block.tool_use_id);
+      const status = block.is_error ? 'failed' : 'completed';
+      const body = claudeToolResultText(block.content);
+      const completedToolPart = existingToolPart
+        ? completedClaudeToolPart(existingToolPart, status, block.content, body)
+        : null;
+      if (completedToolPart) {
+        activeTurn.toolPartsById.set(completedToolPart.id, completedToolPart);
+      }
       this.emit({
         agentId: activeTurn.agentId,
         backend: this.backend,
@@ -477,11 +490,13 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
         type: 'item.updated',
         payload: {
           itemId: block.tool_use_id,
-          status: block.is_error ? 'failed' : 'completed',
+          status,
+          ...(completedToolPart?.statusText ? { statusText: completedToolPart.statusText } : {}),
           output: block.content,
-          body: claudeToolResultText(block.content),
+          body,
         },
       });
+      this.emitClaudeFileActivity(activeTurn, block.tool_use_id, status);
     }
   }
 
@@ -500,16 +515,80 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
       return;
     }
 
+    if (!input) {
+      this.emit({
+        agentId: activeTurn.agentId,
+        backend: this.backend,
+        backendSessionId: activeTurn.sessionId ?? undefined,
+        turnId: activeTurn.turnId,
+        type: 'item.updated',
+        payload: {
+          itemId: streamedTool.id,
+          statusText: 'Preparing tool input...',
+        },
+      });
+      return;
+    }
+
+    this.emitClaudeToolPart(activeTurn, {
+      type: 'tool_use',
+      id: streamedTool.id,
+      name: streamedTool.name,
+      input,
+    });
+  }
+
+  private emitClaudeToolPart(
+    activeTurn: ActiveClaudeTurn,
+    block: Extract<ClaudeSdkContentBlock, { type: 'tool_use' }>,
+  ): void {
+    const toolPart = claudeToolPart(block, { cwd: activeTurn.cwd });
+    const existing = activeTurn.toolPartsById.get(toolPart.id);
+    activeTurn.toolPartsById.set(toolPart.id, toolPart);
     this.emit({
       agentId: activeTurn.agentId,
       backend: this.backend,
       backendSessionId: activeTurn.sessionId ?? undefined,
       turnId: activeTurn.turnId,
-      type: 'item.updated',
+      type: existing ? 'item.updated' : 'item.started',
+      payload: existing
+        ? claudeToolPartInputUpdate(toolPart)
+        : { toolPart },
+    });
+    this.emitClaudeFileActivity(activeTurn, toolPart.id, 'running');
+  }
+
+  private emitClaudeFileActivity(
+    activeTurn: ActiveClaudeTurn,
+    itemId: string,
+    status: RendererToolPart['status'],
+  ): void {
+    const toolPart = activeTurn.toolPartsById.get(itemId);
+    if (!toolPart) {
+      return;
+    }
+    const activity = claudeToolFileActivity(toolPart);
+    if (!activity) {
+      return;
+    }
+    const previous = activeTurn.fileActivitiesById.get(itemId);
+    if (status === 'running' && previous?.path === activity.path && previous.action === activity.action) {
+      return;
+    }
+    activeTurn.fileActivitiesById.set(itemId, activity);
+    this.emit({
+      agentId: activeTurn.agentId,
+      backend: this.backend,
+      backendSessionId: activeTurn.sessionId ?? undefined,
+      threadId: claudeThreadId(activeTurn),
+      turnId: activeTurn.turnId,
+      type: 'file.activity',
       payload: {
-        itemId: streamedTool.id,
-        statusText: input ? null : 'Preparing tool input...',
-        ...(input ? { input } : {}),
+        messageId: `assistant-${activeTurn.turnId}`,
+        itemId,
+        path: activity.path,
+        action: activity.action,
+        status,
       },
     });
   }
@@ -708,13 +787,18 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
       backend: this.backend,
       backendSessionId: sessionId,
       type: 'thread.started',
-      payload: { sessionId, transport: 'stdio' },
+      payload: {
+        sessionId,
+        transport: 'stdio',
+        ...(activeTurn.model ? { model: activeTurn.model } : {}),
+        ...(activeTurn.reasoningEffort ? { reasoningEffort: activeTurn.reasoningEffort } : {}),
+      },
     });
 
     if (!activeTurn.startResolved) {
       activeTurn.startResolved = true;
       activeTurn.resolveStart({
-        backendSession: claudeBackendSession(sessionId),
+        backendSession: claudeBackendSession(sessionId, activeTurn.model, activeTurn.reasoningEffort),
         turnId: activeTurn.turnId,
       });
     }
@@ -876,7 +960,7 @@ function claudeTurnParams(
     prompt,
     sessionId: existingSessionId ?? undefined,
     model: options.model ?? defaults?.model ?? null,
-    effort: claudeEffort(options.reasoningEffort),
+    effort: claudeEffort(options.reasoningEffort ?? defaults?.reasoningEffort),
     permissionMode: options.planMode ? 'plan' : claudeOptions?.permissionMode ?? defaults?.permissionMode ?? null,
     appendSystemPrompt: codexClawDeveloperInstructions(agent, pluginSettings),
     mcpServerUrl,
@@ -898,11 +982,17 @@ function claudeSessionId(agent: Agent): string | null {
   return agent.backendSession?.kind === 'claude' ? agent.backendSession.sessionId : null;
 }
 
-function claudeBackendSession(sessionId: string): BackendSession {
+function claudeBackendSession(
+  sessionId: string,
+  model?: string | null,
+  reasoningEffort?: string | null,
+): BackendSession {
   return {
     kind: 'claude',
     sessionId,
     transport: 'stdio',
+    ...(model ? { model } : {}),
+    ...(reasoningEffort ? { reasoningEffort } : {}),
   };
 }
 
@@ -912,21 +1002,6 @@ function isClaudeToolUseBlock(block: ClaudeSdkContentBlock): block is Extract<Cl
 
 function isClaudeToolResultBlock(block: ClaudeSdkContentBlock): block is Extract<ClaudeSdkContentBlock, { type: 'tool_result' }> {
   return block.type === 'tool_result' && typeof block.tool_use_id === 'string';
-}
-
-function claudeToolPart(block: Extract<ClaudeSdkContentBlock, { type: 'tool_use' }>): RendererToolPart {
-  return {
-    type: 'tool',
-    id: block.id,
-    kind: 'generic',
-    title: block.name,
-    status: 'running',
-    input: block.input,
-    metadata: {
-      provider: 'claude',
-      itemType: 'tool_use',
-    },
-  };
 }
 
 function finalAssistantTextDelta(activeTurn: ActiveClaudeTurn, text: string): string {

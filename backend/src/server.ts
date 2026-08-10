@@ -3395,7 +3395,16 @@ function shouldPersistSnapshotForEvent(event: BackendEvent): boolean {
 function shouldRefreshGitStatusForEvent(event: BackendEvent): boolean {
   return event.type === 'turn.started' ||
     event.type === 'diff.updated' ||
-    event.type === 'turn.completed';
+    event.type === 'turn.completed' ||
+    isCompletedFileMutation(event);
+}
+
+function isCompletedFileMutation(event: BackendEvent): boolean {
+  if (event.type !== 'file.activity' || !isRecord(event.payload)) {
+    return false;
+  }
+  return event.payload.status === 'completed' &&
+    (event.payload.action === 'edit' || event.payload.action === 'create');
 }
 
 function clientStateFromSnapshot(snapshot: AppSnapshot, remoteControlStatus: DevicePairingStatus): ClientState {

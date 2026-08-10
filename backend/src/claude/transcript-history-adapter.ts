@@ -3,6 +3,7 @@ import { access, readFile, readdir, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { Agent, BackendSession, ConversationSummary, RendererMessage, RendererMessagePart, RendererToolPart } from '@codex-claw/core/contracts';
+import { claudeToolPart, completedClaudeToolPart } from './claude-tool-part-adapter';
 import { claudeMessageContentBlocks, parseClaudeSdkMessage, type ClaudeSdkContentBlock, type ClaudeSdkMessage } from './protocol';
 
 export type ClaudeTranscriptHistory = {
@@ -12,6 +13,11 @@ export type ClaudeTranscriptHistory = {
 
 export type ClaudeTranscriptHistoryOptions = {
   projectsRoot?: string;
+};
+
+export type ClaudeTranscriptSettings = {
+  model?: string;
+  reasoningEffort?: string;
 };
 
 type TranscriptLine = ClaudeSdkMessage & {
@@ -47,12 +53,51 @@ export async function loadClaudeTranscriptHistory(
   }
 
   const content = await readFile(transcriptPath, 'utf8');
+  const settings = claudeTranscriptSettings(content);
+  const { model: _model, reasoningEffort: _reasoningEffort, ...session } = agent.backendSession;
   return {
     backendSession: {
-      ...agent.backendSession,
+      ...session,
       transcriptSessionId: sessionId,
+      ...settings,
     },
     messages: claudeTranscriptToRendererMessages(content, agent.id, sessionId),
+  };
+}
+
+export function claudeTranscriptSettings(content: string): ClaudeTranscriptSettings {
+  let model: string | undefined;
+  let reasoningEffort: string | undefined;
+  let assistantMessageId: string | undefined;
+
+  for (const line of content.split(/\r?\n/)) {
+    const entry = parseClaudeSdkMessage(line) as TranscriptLine | null;
+    if (!entry || entry.type !== 'assistant' || entry.isSidechain || !isRecord(entry.message)) {
+      continue;
+    }
+
+    const nextMessageId = typeof entry.message.id === 'string' ? entry.message.id : entry.uuid;
+    if (nextMessageId && nextMessageId !== assistantMessageId) {
+      reasoningEffort = undefined;
+      assistantMessageId = nextMessageId;
+    }
+
+    if (typeof entry.message.model === 'string' && entry.message.model.trim()) {
+      const nextModel = entry.message.model.trim();
+      if (model && nextModel !== model) {
+        reasoningEffort = undefined;
+      }
+      model = nextModel;
+    }
+    const effort = (entry as Record<string, unknown>).effort;
+    if (typeof effort === 'string' && effort.trim()) {
+      reasoningEffort = effort.trim();
+    }
+  }
+
+  return {
+    ...(model ? { model } : {}),
+    ...(reasoningEffort ? { reasoningEffort } : {}),
   };
 }
 
@@ -191,7 +236,7 @@ export function claudeTranscriptToRendererMessages(content: string, agentId: str
     }
 
     if (entry.type === 'assistant') {
-      const parts = assistantMessageParts(entry);
+      const parts = assistantMessageParts(entry, entry.cwd);
       if (parts.length === 0) {
         continue;
       }
@@ -313,14 +358,14 @@ async function findIndexedTranscriptPath(projectsRoot: string, folder: string, s
   return null;
 }
 
-function assistantMessageParts(message: ClaudeSdkMessage): RendererMessagePart[] {
+function assistantMessageParts(message: ClaudeSdkMessage, cwd?: string): RendererMessagePart[] {
   return claudeMessageContentBlocks(message).flatMap((block): RendererMessagePart[] => {
     if (block.type === 'text' && typeof block.text === 'string' && block.text) {
       return [{ type: 'text', text: block.text }];
     }
 
     if (isClaudeToolUseBlock(block)) {
-      return [claudeToolPart(block)];
+      return [claudeToolPart(block, { cwd })];
     }
 
     return [];
@@ -341,24 +386,15 @@ function applyToolResult(parts: RendererMessagePart[], block: Extract<ClaudeSdkC
     return;
   }
 
-  toolPart.status = block.is_error ? 'failed' : 'completed';
-  toolPart.output = block.content;
-  toolPart.body = claudeToolResultText(block.content);
-}
-
-function claudeToolPart(block: Extract<ClaudeSdkContentBlock, { type: 'tool_use' }>): RendererToolPart {
-  return {
-    type: 'tool',
-    id: block.id,
-    kind: 'generic',
-    title: block.name,
-    status: 'running',
-    input: block.input,
-    metadata: {
-      provider: 'claude',
-      itemType: 'tool_use',
-    },
-  };
+  Object.assign(
+    toolPart,
+    completedClaudeToolPart(
+      toolPart,
+      block.is_error ? 'failed' : 'completed',
+      block.content,
+      claudeToolResultText(block.content),
+    ),
+  );
 }
 
 function claudeToolResultText(value: unknown): string {

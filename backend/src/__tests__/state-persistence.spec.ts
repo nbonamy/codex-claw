@@ -864,6 +864,32 @@ describe('AppStatePersistence', () => {
     expect(restored.agents[0].backendDefaults).toBeUndefined();
   });
 
+  it('persists Claude thread and fallback model selections', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0] = {
+      ...snapshot.agents[0],
+      backend: 'claude',
+      backendSession: {
+        kind: 'claude',
+        sessionId: 'claude-session-1',
+        transport: 'stdio',
+        transcriptSessionId: 'claude-session-1',
+        model: 'claude-sonnet-5',
+        reasoningEffort: 'xhigh',
+      },
+      backendDefaults: {
+        kind: 'claude',
+        model: 'sonnet',
+        reasoningEffort: 'high',
+      },
+    };
+
+    const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
+
+    expect(restored.agents[0].backendSession).toStrictEqual(snapshot.agents[0].backendSession);
+    expect(restored.agents[0].backendDefaults).toStrictEqual(snapshot.agents[0].backendDefaults);
+  });
+
   it('repairs team membership and selected agent when persisted ids drift', async () => {
     const filePath = await tempStatePath();
     await writeFile(filePath, JSON.stringify({

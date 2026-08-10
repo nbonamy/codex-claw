@@ -1506,6 +1506,54 @@ describe('useAppState', () => {
     expect(state.isSending.value).toBe(false);
   });
 
+  it('adopts Claude model metadata discovered by startup history hydration', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0] = {
+      ...remoteSnapshot.agents[0],
+      backend: 'claude',
+      backendSession: {
+        kind: 'claude',
+        sessionId: 'claude-session-existing',
+        transport: 'stdio',
+      },
+      backendDefaults: { kind: 'claude', model: 'haiku' },
+    };
+    const hydratedSnapshot = structuredClone(remoteSnapshot);
+    hydratedSnapshot.agents[0].backendSession = {
+      kind: 'claude',
+      sessionId: 'claude-session-existing',
+      transport: 'stdio',
+      model: 'claude-sonnet-5',
+      reasoningEffort: 'xhigh',
+    };
+    const hydrateAgentHistory = vi.fn().mockResolvedValue(snapshotMetadata(hydratedSnapshot));
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        hydrateAgentHistory,
+        listBackendModels: vi.fn().mockResolvedValue([
+          { id: 'haiku', model: 'haiku', displayName: 'Haiku', isDefault: true },
+          {
+            id: 'sonnet',
+            model: 'sonnet',
+            displayName: 'Sonnet',
+            providerMetadata: { resolvedModel: 'claude-sonnet-5' },
+            supportedReasoningEfforts: [
+              { reasoningEffort: 'xhigh', description: 'Deeper reasoning' },
+            ],
+          },
+        ]),
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    await vi.waitFor(() => expect(state.selectedModelId.value).toBe('sonnet'));
+    expect(state.selectedReasoningEffort.value).toBe('xhigh');
+  });
+
   it('does not hydrate startup history for agents without a persisted thread', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const hydrateAgentHistory = vi.fn();
@@ -2471,6 +2519,81 @@ describe('useAppState', () => {
     expect(state.selectedReasoningEffort.value).toBe('high');
   });
 
+  it('restores Claude thread settings ahead of the agent fallback selection', async () => {
+    const base = createInitialSnapshot();
+    base.agents[0] = {
+      ...base.agents[0],
+      backend: 'claude',
+      backendSession: {
+        kind: 'claude',
+        sessionId: 'claude-session-current',
+        transport: 'stdio',
+        model: 'claude-sonnet-5',
+        reasoningEffort: 'xhigh',
+      },
+      backendDefaults: {
+        kind: 'claude',
+        model: 'haiku',
+        reasoningEffort: 'low',
+      },
+    };
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(base),
+        listBackendModels: vi.fn().mockResolvedValue([
+          {
+            id: 'sonnet',
+            model: 'sonnet',
+            displayName: 'Sonnet',
+            providerMetadata: { resolvedModel: 'claude-sonnet-5' },
+            supportedReasoningEfforts: [
+              { reasoningEffort: 'high', description: 'Deep reasoning' },
+              { reasoningEffort: 'xhigh', description: 'Deeper reasoning' },
+            ],
+          },
+          { id: 'haiku', model: 'haiku', displayName: 'Haiku', isDefault: true },
+        ]),
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    expect(state.selectedModelId.value).toBe('sonnet');
+    expect(state.selectedReasoningEffort.value).toBe('xhigh');
+  });
+
+  it('uses the last Claude selection when the thread has no model metadata', async () => {
+    const base = createInitialSnapshot();
+    base.agents[0] = {
+      ...base.agents[0],
+      backend: 'claude',
+      backendSession: {
+        kind: 'claude',
+        sessionId: 'claude-session-without-settings',
+        transport: 'stdio',
+      },
+      backendDefaults: {
+        kind: 'claude',
+        model: 'haiku',
+        reasoningEffort: 'low',
+      },
+    };
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(base),
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    expect(state.selectedModelId.value).toBe('haiku');
+    expect(state.selectedReasoningEffort.value).toBe('low');
+  });
+
   it('shares the warmed catalogs across agent switches while preserving composer settings', async () => {
     const base = createInitialSnapshot();
     const models = [{
@@ -3366,6 +3489,69 @@ describe('useAppState', () => {
     expect(resumeAgentConversation).toHaveBeenCalledWith('agent-dina', { backend: 'codex', threadId: 'thread-dina' });
     expect(resumeAgentConversation.mock.calls.at(-1)?.[1]).not.toBe(reactiveConversationRef);
     expect(state.snapshot.value).toStrictEqual(resumedSnapshot);
+  });
+
+  it('switches the Claude composer selection when a different conversation is resumed', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0] = {
+      ...remoteSnapshot.agents[0],
+      backend: 'claude',
+      backendSession: {
+        kind: 'claude',
+        sessionId: 'claude-session-haiku',
+        transport: 'stdio',
+        model: 'claude-haiku-4-5-20251001',
+      },
+      backendDefaults: { kind: 'claude', model: 'haiku' },
+    };
+    const resumedSnapshot = structuredClone(remoteSnapshot);
+    resumedSnapshot.agents[0].backendSession = {
+      kind: 'claude',
+      sessionId: 'claude-session-sonnet',
+      transport: 'stdio',
+      model: 'claude-sonnet-5',
+      reasoningEffort: 'xhigh',
+    };
+    const resumeAgentConversation = vi.fn().mockResolvedValue(resumedSnapshot);
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        listBackendModels: vi.fn().mockResolvedValue([
+          {
+            id: 'haiku',
+            model: 'haiku',
+            displayName: 'Haiku',
+            providerMetadata: { resolvedModel: 'claude-haiku-4-5-20251001' },
+            isDefault: true,
+          },
+          {
+            id: 'sonnet',
+            model: 'sonnet',
+            displayName: 'Sonnet',
+            providerMetadata: { resolvedModel: 'claude-sonnet-5' },
+            supportedReasoningEfforts: [
+              { reasoningEffort: 'high', description: 'Deep reasoning' },
+              { reasoningEffort: 'xhigh', description: 'Deeper reasoning' },
+            ],
+          },
+        ]),
+        resumeAgentConversation,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    expect(state.selectedModelId.value).toBe('haiku');
+
+    await state.resumeAgentConversation('agent-dina', {
+      backend: 'claude',
+      folder: remoteSnapshot.agents[0].folder,
+      sessionId: 'claude-session-sonnet',
+    });
+
+    expect(state.selectedModelId.value).toBe('sonnet');
+    expect(state.selectedReasoningEffort.value).toBe('xhigh');
   });
 
   it('ignores invalid reorder requests before calling main', async () => {

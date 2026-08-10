@@ -63,6 +63,8 @@ export type BackendSession =
     transport: 'stdio' | 'websocket';
     transcriptSessionId?: string;
     serverUrl?: string;
+    model?: string;
+    reasoningEffort?: ReasoningEffort;
   };
 
 export type BackendDefaults =
@@ -79,6 +81,7 @@ export type BackendDefaults =
   | {
     kind: 'claude';
     model?: string;
+    reasoningEffort?: ReasoningEffort;
     permissionMode?: string;
     thinking?: {
       type: 'enabled' | 'disabled';

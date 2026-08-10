@@ -76,6 +76,7 @@ const modelCatalogCache = new Map<AgentBackend, CatalogCacheEntry<BackendModelOp
 const skillCatalogCache = new Map<string, CatalogCacheEntry<BackendSkillSummary>>();
 const fileCatalogCache = new Map<string, CatalogCacheEntry<AgentFileSearchItem>>();
 type AgentComposerConfiguration = {
+  selectionSource: string;
   models: BackendModelOption[];
   modelStatus: CatalogStatus;
   modelError: string | null;
@@ -869,6 +870,7 @@ export function useAppState() {
     }
 
     adoptBackgroundSnapshot(await codexClawApi.resumeAgentConversation(agentId, plainConversationRef(ref)));
+    synchronizeComposerSelectionForAgent(agentId);
     await loadActiveAgentCatalogs();
   }
 
@@ -1780,10 +1782,14 @@ function messageActionCapabilities(agentId: string) {
 
 function composerConfiguration(agentId: string): AgentComposerConfiguration {
   const existing = composerConfigurationByAgentId.get(agentId);
-  if (existing) return existing;
   const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
-  const defaults = agent?.backendDefaults?.kind === 'codex' ? agent.backendDefaults : undefined;
+  if (existing) {
+    if (agent) synchronizeComposerSelectionWithAgent(existing, agent);
+    return existing;
+  }
+  const selection = composerSelectionFromAgent(agent);
   const configuration: AgentComposerConfiguration = {
+    selectionSource: selection.source,
     models: [],
     modelStatus: 'notLoaded',
     modelError: null,
@@ -1793,9 +1799,9 @@ function composerConfiguration(agentId: string): AgentComposerConfiguration {
     files: [],
     fileStatus: 'notLoaded',
     fileError: null,
-    selectedModelId: defaults?.model ?? null,
-    selectedReasoningEffort: defaults?.reasoningEffort ?? null,
-    selectedServiceTier: defaults?.serviceTier ?? null,
+    selectedModelId: selection.model,
+    selectedReasoningEffort: selection.reasoningEffort,
+    selectedServiceTier: selection.serviceTier,
     planMode: false,
   };
   composerConfigurationByAgentId.set(agentId, configuration);
@@ -1856,11 +1862,73 @@ function clearActiveComposerConfiguration(): void {
 }
 
 function selectDefaultModelForConfiguration(configuration: AgentComposerConfiguration): void {
-  if (configuration.models.some((model) => model.id === configuration.selectedModelId)) return;
+  const selectedModel = configuration.models.find((model) => modelMatchesSelection(model, configuration.selectedModelId));
+  if (selectedModel) {
+    configuration.selectedModelId = selectedModel.id;
+    if (
+      configuration.selectedReasoningEffort &&
+      !selectedModel.supportedReasoningEfforts?.some((option) => (
+        option.reasoningEffort === configuration.selectedReasoningEffort
+      ))
+    ) {
+      configuration.selectedReasoningEffort = defaultReasoningEffort(selectedModel);
+    }
+    return;
+  }
   const defaultModel = configuration.models.find((model) => model.isDefault) ?? configuration.models[0] ?? null;
   configuration.selectedModelId = defaultModel?.id ?? null;
   configuration.selectedReasoningEffort = defaultModel ? defaultReasoningEffort(defaultModel) : null;
   configuration.selectedServiceTier = defaultModel ? defaultServiceTier(defaultModel) : null;
+}
+
+function composerSelectionFromAgent(agent: Agent | undefined): {
+  source: string;
+  model: string | null;
+  reasoningEffort: ReasoningEffort | null;
+  serviceTier: string | null;
+} {
+  if (!agent) {
+    return { source: 'missing', model: null, reasoningEffort: null, serviceTier: null };
+  }
+  const defaults = agent.backendDefaults?.kind === agent.backend ? agent.backendDefaults : undefined;
+  const claudeSession = agent.backendSession?.kind === 'claude' ? agent.backendSession : undefined;
+  const model = claudeSession?.model ?? defaults?.model ?? null;
+  const reasoningEffort = claudeSession?.reasoningEffort ?? defaults?.reasoningEffort ?? null;
+  const serviceTier = defaults?.kind === 'codex' ? defaults.serviceTier ?? null : null;
+  const sessionId = agent.backendSession?.kind === 'codex'
+    ? agent.backendSession.threadId
+    : agent.backendSession?.sessionId ?? 'new';
+  return {
+    source: JSON.stringify([agent.backend, sessionId, model, reasoningEffort, serviceTier]),
+    model,
+    reasoningEffort,
+    serviceTier,
+  };
+}
+
+function synchronizeComposerSelectionWithAgent(configuration: AgentComposerConfiguration, agent: Agent): void {
+  const selection = composerSelectionFromAgent(agent);
+  if (configuration.selectionSource === selection.source) return;
+  configuration.selectionSource = selection.source;
+  configuration.selectedModelId = selection.model;
+  configuration.selectedReasoningEffort = selection.reasoningEffort;
+  configuration.selectedServiceTier = selection.serviceTier;
+  if (configuration.modelStatus === 'loaded') selectDefaultModelForConfiguration(configuration);
+}
+
+function synchronizeComposerSelectionForAgent(agentId: string | undefined): void {
+  if (!agentId || !composerConfigurationByAgentId.has(agentId)) return;
+  const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
+  if (!agent) return;
+  synchronizeComposerSelectionWithAgent(composerConfigurationByAgentId.get(agentId)!, agent);
+  if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
+}
+
+function modelMatchesSelection(model: BackendModelOption, selection: string | null): boolean {
+  if (!selection) return false;
+  return model.id === selection ||
+    model.model === selection ||
+    model.providerMetadata?.resolvedModel === selection;
 }
 
 function selectedModelFromCatalog(): BackendModelOption | null {
@@ -2285,6 +2353,9 @@ function adoptSnapshotFromMainEvent(event: MainToRendererEvent): void {
     return;
   }
   applyMainEventToSnapshot(snapshot.value, event);
+  if (event.type === 'thread.started' && event.backend === 'claude') {
+    synchronizeComposerSelectionForAgent(event.agentId);
+  }
 }
 
 function adoptBackgroundSnapshotMetadata(metadata: AppSnapshotMetadata): void {
@@ -2718,6 +2789,7 @@ async function hydrateActiveAgentHistory(): Promise<void> {
   markAgentHistoryHydrating(activeAgent.id, true);
   try {
     adoptBackgroundSnapshotMetadata(await codexClawApi.hydrateAgentHistory(activeAgent.id));
+    synchronizeComposerSelectionForAgent(activeAgent.id);
   } finally {
     markAgentHistoryHydrating(activeAgent.id, false);
   }
@@ -2766,6 +2838,7 @@ async function refreshAgentSelection(agentId: string, requestId: number, needsHi
     const nextSnapshot = await codexClawApi!.selectAgent(agentId);
     if (requestId === agentSelectionRequestId) {
       adoptBackgroundSnapshotMetadata(nextSnapshot);
+      synchronizeComposerSelectionForAgent(agentId);
     }
   } catch {
     // The optimistic selection remains visible; the next snapshot/event will reconcile it.

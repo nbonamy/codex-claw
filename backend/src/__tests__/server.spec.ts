@@ -1605,6 +1605,80 @@ describe('ClawBackendServer', () => {
     });
   });
 
+  it('refreshes authoritative git status after a completed file mutation', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      status: { type: 'working' },
+      backendSession: { kind: 'codex', threadId: 'thread-test' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    let emitEvent: (event: BackendEvent) => void = () => undefined;
+    const getGitStatus = vi.fn().mockResolvedValue({
+      folder: '/Users/nbonamy/src/codex-claw',
+      branch: 'main',
+      ahead: 0,
+      behind: 0,
+      changedFiles: 1,
+      addedLines: 3,
+      removedLines: 1,
+      hasUntracked: false,
+      state: 'dirty',
+      updatedAt: '2026-06-13T00:00:01.000Z',
+    });
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      getGitStatus,
+      onEvent: (listener) => {
+        emitEvent = listener;
+        return () => undefined;
+      },
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    emitEvent({
+      backend: 'codex',
+      agentId: 'agent-dina',
+      threadId: 'thread-test',
+      turnId: 'turn-test',
+      type: 'file.activity',
+      payload: {
+        messageId: 'assistant-turn-test',
+        itemId: 'edit-file',
+        path: '/Users/nbonamy/src/codex-claw/README.md',
+        action: 'edit',
+        status: 'completed',
+      },
+    });
+
+    await vi.waitFor(() => {
+      expect(getGitStatus).toHaveBeenCalledOnce();
+      expect(snapshot.agentGitStatuses['agent-dina']).toMatchObject({
+        addedLines: 3,
+        removedLines: 1,
+        state: 'dirty',
+      });
+    });
+    await server.close();
+  });
+
   it('owns client request response routing', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];

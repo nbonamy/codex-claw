@@ -551,11 +551,27 @@ describe('snapshot reducer', () => {
       backend: 'claude',
       backendSessionId: 'claude-session-1',
       type: 'thread.started',
-      payload: { sessionId: 'claude-session-1', transport: 'stdio' },
+      payload: {
+        sessionId: 'claude-session-1',
+        transport: 'stdio',
+        model: 'haiku',
+        reasoningEffort: 'low',
+      },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
 
-    expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' });
+    expect(snapshot.agents[0].backendSession).toStrictEqual({
+      kind: 'claude',
+      sessionId: 'claude-session-1',
+      transport: 'stdio',
+      model: 'haiku',
+      reasoningEffort: 'low',
+    });
+    expect(snapshot.agents[0].backendDefaults).toStrictEqual({
+      kind: 'claude',
+      model: 'haiku',
+      reasoningEffort: 'low',
+    });
   });
 
   it('records thread settings updates as durable agent thread mappings', () => {

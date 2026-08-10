@@ -360,8 +360,30 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   if (event.type === 'thread.started') {
     const agent = findAgent(snapshot, event.agentId);
     if (agent && event.backend === 'claude' && typeof event.backendSessionId === 'string') {
+      const payload = isRecord(event.payload) ? event.payload : {};
+      const model = typeof payload.model === 'string' && payload.model.trim() ? payload.model : undefined;
+      const reasoningEffort = typeof payload.reasoningEffort === 'string' && payload.reasoningEffort.trim()
+        ? payload.reasoningEffort
+        : undefined;
       agent.backend = 'claude';
-      agent.backendSession = { kind: 'claude', sessionId: event.backendSessionId, transport: 'stdio' };
+      agent.backendSession = {
+        kind: 'claude',
+        sessionId: event.backendSessionId,
+        transport: 'stdio',
+        ...(model ? { model } : {}),
+        ...(reasoningEffort ? { reasoningEffort } : {}),
+      };
+      const defaults = agent.backendDefaults?.kind === 'claude'
+        ? agent.backendDefaults
+        : { kind: 'claude' as const };
+      agent.backendDefaults = {
+        ...defaults,
+        ...(model ? { model } : {}),
+        ...(reasoningEffort ? { reasoningEffort } : {}),
+      };
+      if (model && !reasoningEffort) {
+        delete agent.backendDefaults.reasoningEffort;
+      }
       return;
     }
 

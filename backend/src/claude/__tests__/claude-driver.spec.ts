@@ -37,7 +37,12 @@ describe('ClaudeBackendDriver', () => {
 
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-1' });
     await expect(sendResult).resolves.toStrictEqual({
-      backendSession: { kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' },
+      backendSession: {
+        kind: 'claude',
+        sessionId: 'claude-session-1',
+        transport: 'stdio',
+        model: 'claude-sonnet-4-5',
+      },
       turnId: expect.stringMatching(/^claude-turn-/),
     });
     const turnId = (await sendResult).turnId;
@@ -68,7 +73,11 @@ describe('ClaudeBackendDriver', () => {
       backend: 'claude',
       backendSessionId: 'claude-session-1',
       type: 'thread.started',
-      payload: { sessionId: 'claude-session-1', transport: 'stdio' },
+      payload: {
+        sessionId: 'claude-session-1',
+        transport: 'stdio',
+        model: 'claude-sonnet-4-5',
+      },
     }));
     expect(events).toContainEqual(expect.objectContaining({
       agentId: 'agent-claude',
@@ -84,9 +93,10 @@ describe('ClaudeBackendDriver', () => {
       payload: {
         toolPart: expect.objectContaining({
           id: 'tool-1',
-          title: 'Bash',
+          kind: 'command',
+          title: 'npm test',
           status: 'running',
-          input: { command: 'npm test' },
+          input: { command: 'npm test', cwd: '/Users/nbonamy/src/codex-claw' },
         }),
       },
     }));
@@ -147,6 +157,37 @@ describe('ClaudeBackendDriver', () => {
     }));
   });
 
+  it('uses persisted Claude model and effort defaults and keeps them on the session', async () => {
+    const transport = createFakeTransport();
+    const driver = new ClaudeBackendDriver(transport);
+    const configuredAgent: Agent = {
+      ...agent,
+      backendDefaults: {
+        kind: 'claude',
+        model: 'haiku',
+        reasoningEffort: 'low',
+      },
+    };
+
+    const sendResult = driver.sendPrompt(configuredAgent, 'use my defaults');
+    expect(transport.startTurn).toHaveBeenCalledWith(expect.objectContaining({
+      model: 'haiku',
+      effort: 'low',
+    }), expect.any(Function), expect.any(Function));
+
+    transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-defaults' });
+    await expect(sendResult).resolves.toStrictEqual({
+      backendSession: {
+        kind: 'claude',
+        sessionId: 'claude-session-defaults',
+        transport: 'stdio',
+        model: 'haiku',
+        reasoningEffort: 'low',
+      },
+      turnId: expect.stringMatching(/^claude-turn-/),
+    });
+  });
+
   it('lists the Claude model aliases used by the CLI', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
@@ -175,6 +216,7 @@ describe('ClaudeBackendDriver', () => {
     const transport = createFakeTransport();
     transport.discoverModels.mockResolvedValue([{
       value: 'claude-fable-1',
+      resolvedModel: 'claude-fable-1-20260810',
       displayName: 'Fable',
       description: 'Experimental coding model',
       supportsEffort: true,
@@ -185,6 +227,7 @@ describe('ClaudeBackendDriver', () => {
     await expect(driver.listModels(agent)).resolves.toEqual([expect.objectContaining({
       id: 'claude-fable-1',
       displayName: 'Fable',
+      providerMetadata: { resolvedModel: 'claude-fable-1-20260810' },
       supportedReasoningEfforts: [
         { reasoningEffort: 'low', description: expect.any(String) },
         { reasoningEffort: 'medium', description: expect.any(String) },
@@ -798,21 +841,121 @@ describe('ClaudeBackendDriver', () => {
       payload: {
         toolPart: expect.objectContaining({
           id: 'tool-streamed',
+          kind: 'command',
           title: 'Bash',
           status: 'running',
-          input: {},
+          input: { cwd: '/Users/nbonamy/src/codex-claw' },
         }),
       },
     }));
     expect(events).toContainEqual(expect.objectContaining({
       turnId,
       type: 'item.updated',
-      payload: {
+      payload: expect.objectContaining({
         itemId: 'tool-streamed',
-        statusText: null,
-        input: { command: 'npm test' },
+        title: 'npm test',
+        statusText: JSON.stringify({
+          source: 'claude',
+          action: 'run',
+          phase: 'running',
+          params: { target: 'npm test' },
+        }),
+        input: { command: 'npm test', cwd: '/Users/nbonamy/src/codex-claw' },
+      }),
+    }));
+  });
+
+  it('emits semantic file activity and completes file tool status', async () => {
+    const transport = createFakeTransport();
+    const driver = new ClaudeBackendDriver(transport);
+    const events: Array<{ type?: string; turnId?: string; payload?: unknown }> = [];
+    driver.onEvent((event) => events.push(event));
+
+    const sendResult = driver.sendPrompt(agent, 'edit the readme');
+    transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-files' });
+    const turnId = (await sendResult).turnId;
+
+    transport.emit({
+      type: 'assistant',
+      session_id: 'claude-session-files',
+      message: {
+        content: [{
+          type: 'tool_use',
+          id: 'tool-edit',
+          name: 'Edit',
+          input: {
+            file_path: '/workspace/project/README.md',
+            old_string: 'Old title',
+            new_string: 'New title\nNew subtitle',
+          },
+        }],
+      },
+    });
+    transport.emit({
+      type: 'user',
+      session_id: 'claude-session-files',
+      message: {
+        content: [{
+          type: 'tool_result',
+          tool_use_id: 'tool-edit',
+          content: 'Updated README.md',
+        }],
+      },
+    });
+
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'item.started',
+      turnId,
+      payload: {
+        toolPart: expect.objectContaining({
+          id: 'tool-edit',
+          kind: 'fileChange',
+          title: '1 file change',
+          statusText: JSON.stringify({
+            source: 'claude',
+            action: 'edit',
+            phase: 'running',
+            params: { target: 'README.md', addedLines: 2, removedLines: 1 },
+          }),
+        }),
       },
     }));
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'item.updated',
+      turnId,
+      payload: expect.objectContaining({
+        itemId: 'tool-edit',
+        status: 'completed',
+        statusText: JSON.stringify({
+          source: 'claude',
+          action: 'edit',
+          phase: 'completed',
+          params: { target: 'README.md', addedLines: 2, removedLines: 1 },
+        }),
+      }),
+    }));
+    expect(events.filter((event) => event.type === 'file.activity')).toStrictEqual([
+      expect.objectContaining({
+        turnId,
+        payload: {
+          messageId: `assistant-${turnId}`,
+          itemId: 'tool-edit',
+          path: '/workspace/project/README.md',
+          action: 'edit',
+          status: 'running',
+        },
+      }),
+      expect.objectContaining({
+        turnId,
+        payload: {
+          messageId: `assistant-${turnId}`,
+          itemId: 'tool-edit',
+          path: '/workspace/project/README.md',
+          action: 'edit',
+          status: 'completed',
+        },
+      }),
+    ]);
   });
 
   it('surfaces Claude result errors once when the process exits non-zero after result', async () => {
