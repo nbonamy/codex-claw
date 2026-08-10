@@ -41,5 +41,4 @@ const squares = computed(() => Array.from({ length: 4 }, (_, index) => ({
   border: 2px solid var(--color-border-strong);
   border-radius: 4px;
 }
-
 </style>

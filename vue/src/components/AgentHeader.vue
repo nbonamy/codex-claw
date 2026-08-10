@@ -329,7 +329,7 @@ const gitReviewAvailable = computed(() => {
 }
 
 .agent-header__execution-plan:hover,
-.agent-header__execution-plan[aria-pressed='true'] {
+.agent-header__execution-plan[aria-pressed="true"] {
   background: var(--color-surface-high);
   color: var(--color-text);
 }
@@ -340,7 +340,7 @@ const gitReviewAvailable = computed(() => {
 }
 
 .agent-header__workspace:hover,
-.agent-header__workspace[aria-pressed='true'] {
+.agent-header__workspace[aria-pressed="true"] {
   background: var(--color-surface-high);
   color: var(--color-text);
 }
@@ -404,5 +404,4 @@ const gitReviewAvailable = computed(() => {
   height: var(--icon-md);
   color: var(--color-text-muted);
 }
-
 </style>

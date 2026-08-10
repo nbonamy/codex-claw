@@ -465,7 +465,6 @@ function statusLabel(status: RemoteConnection['status']): string {
 </script>
 
 <style scoped>
-
 .settings-connections-panel__empty,
 .settings-connections-panel__loading {
   color: var(--color-text-muted);

@@ -97,7 +97,9 @@ withDefaults(defineProps<{
   position: relative;
   display: block;
   min-height: var(--source-preview-line-height);
-  padding-left: calc(var(--source-preview-gutter-width) + var(--source-preview-code-gap));
+  padding-left: calc(
+    var(--source-preview-gutter-width) + var(--source-preview-code-gap)
+  );
   padding-right: var(--space-8);
   line-height: var(--source-preview-line-height);
   white-space: pre;
@@ -113,11 +115,15 @@ withDefaults(defineProps<{
   overflow-wrap: anywhere;
 }
 
-.source-preview-panel--hide-line-numbers .source-preview-panel__content :deep(.line) {
+.source-preview-panel--hide-line-numbers
+  .source-preview-panel__content
+  :deep(.line) {
   padding-left: var(--space-8);
 }
 
-.source-preview-panel--hide-line-numbers .source-preview-panel__content :deep(.line::before) {
+.source-preview-panel--hide-line-numbers
+  .source-preview-panel__content
+  :deep(.line::before) {
   content: none;
 }
 

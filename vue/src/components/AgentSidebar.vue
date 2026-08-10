@@ -352,8 +352,17 @@ function onResizePointerEnd(event: PointerEvent): void {
   --agent-status-dot-size: 10px;
   position: relative;
   container-type: inline-size;
-  flex: 0 0 clamp(var(--agent-sidebar-min-width), var(--agent-sidebar-width), var(--agent-sidebar-max-width));
-  width: clamp(var(--agent-sidebar-min-width), var(--agent-sidebar-width), var(--agent-sidebar-max-width));
+  flex: 0 0
+    clamp(
+      var(--agent-sidebar-min-width),
+      var(--agent-sidebar-width),
+      var(--agent-sidebar-max-width)
+    );
+  width: clamp(
+    var(--agent-sidebar-min-width),
+    var(--agent-sidebar-width),
+    var(--agent-sidebar-max-width)
+  );
   min-width: var(--agent-sidebar-min-width);
   max-width: var(--agent-sidebar-max-width);
   min-height: 0;
@@ -425,7 +434,9 @@ function onResizePointerEnd(event: PointerEvent): void {
   width: 100%;
   min-height: var(--agent-sidebar-row-min-height);
   display: grid;
-  grid-template-columns: var(--agent-sidebar-avatar-size) minmax(0, 1fr) var(--agent-sidebar-status-column-width);
+  grid-template-columns: var(--agent-sidebar-avatar-size) minmax(0, 1fr) var(
+      --agent-sidebar-status-column-width
+    );
   align-items: center;
   gap: var(--space-8);
   margin-bottom: var(--space-1);
@@ -517,16 +528,16 @@ function onResizePointerEnd(event: PointerEvent): void {
   background: var(--color-success);
 }
 
-.agent-sidebar__status[data-status='working'],
-.agent-sidebar__status[data-status='starting'] {
+.agent-sidebar__status[data-status="working"],
+.agent-sidebar__status[data-status="starting"] {
   background: var(--color-warning);
 }
 
-.agent-sidebar__status[data-status='awaitingInput'] {
+.agent-sidebar__status[data-status="awaitingInput"] {
   background: var(--color-warning);
 }
 
-.agent-sidebar__status[data-status='error'] {
+.agent-sidebar__status[data-status="error"] {
   background: var(--color-error);
 }
 
@@ -610,7 +621,6 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 @container (max-width: 140px) {
-  
   .agent-sidebar__header {
     justify-content: center;
     padding: 0;
@@ -665,6 +675,5 @@ function onResizePointerEnd(event: PointerEvent): void {
   .agent-sidebar__conversations {
     display: none;
   }
-
 }
 </style>

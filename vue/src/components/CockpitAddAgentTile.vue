@@ -247,7 +247,8 @@ function isInteractiveNewAgentButtonTarget(target: EventTarget | null): boolean 
 }
 
 .cockpit-view__add-drop-target + .cockpit-view__add-drop-target {
-  border-top: 1px solid color-mix(in srgb, var(--color-primary) 30%, var(--color-border));
+  border-top: 1px solid
+    color-mix(in srgb, var(--color-primary) 30%, var(--color-border));
 }
 
 .cockpit-view__add-drop-target--active,

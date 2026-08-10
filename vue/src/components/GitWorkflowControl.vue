@@ -242,34 +242,202 @@ async function perform(action: () => Promise<void>): Promise<void> { busy.value 
 </script>
 
 <style scoped>
-.git-workflow-control { position: relative; display: inline-flex; align-items: stretch; height: 32px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface-lowest); -webkit-app-region: no-drag; }
-.git-workflow-control > button { display: grid; place-items: center; padding: 0; border: 0; color: var(--color-text-muted); background: transparent; cursor: pointer; }
-.git-workflow-control__primary { width: 34px; border-radius: calc(var(--radius-lg) - 1px) 0 0 calc(var(--radius-lg) - 1px); }
-.git-workflow-control__trigger { width: 28px; border-left: 1px solid var(--color-border) !important; border-radius: 0 calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0; }
-.git-workflow-control > button:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-high); }
-.git-workflow-control > button:disabled { opacity: .45; cursor: default; }
-.git-workflow-control svg { width: var(--icon-md); height: var(--icon-md); }
-.git-workflow-control__menu { position: absolute; z-index: 30; top: calc(100% + var(--space-2)); right: 0; }
-.git-workflow-control__dialog-form { display: grid; gap: 0; }
-.git-workflow-control__dialog-header { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-8); min-width: 0; }
-.git-workflow-control__dialog-header .git-workflow-control__branch { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
-.git-workflow-control__dialog-form textarea { width: 100%; box-sizing: border-box; min-height: 112px; border: 0; border-radius: 0; padding: var(--space-4) 0; color: var(--color-text); background: transparent; font: inherit; outline: none; resize: none; }
-.git-workflow-control__dialog-form input[type='text'], .git-workflow-control__dialog-form > input:not([type]) { width: 100%; box-sizing: border-box; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-4) var(--space-6); color: var(--color-text); background: var(--color-surface-lowest); font: inherit; outline: none; }
-.git-workflow-control__dialog-form input[type='text']:focus, .git-workflow-control__dialog-form > input:not([type]):focus { border-color: var(--color-primary); background: var(--color-surface-low); }
-.git-workflow-control__branch, .git-workflow-control__hint { color: var(--color-text-muted); }
-.git-workflow-control__check { display: flex; align-items: center; gap: var(--space-6); min-height: var(--space-16); border-top: 1px solid var(--color-border); padding: var(--space-4) 0; }
-.git-workflow-control__merge-strategy { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
-.git-workflow-control__merge-strategy label { display: flex; align-items: center; gap: var(--space-4); min-height: var(--space-20); padding: 0 var(--space-2); color: var(--color-text-muted); cursor: pointer; }
-.git-workflow-control__merge-strategy label + label { border-left: 1px solid var(--color-border); }
-.git-workflow-control__merge-strategy label:hover, .git-workflow-control__merge-option--selected { color: var(--color-text) !important; background: var(--color-surface-low); }
-.git-workflow-control__merge-strategy input { margin: 0; accent-color: var(--color-primary); }
-.git-workflow-control__stats { margin-left: auto; color: var(--color-success); font-variant-numeric: tabular-nums; }
-.git-workflow-control__stats em { color: var(--color-error); font-style: normal; }
+.git-workflow-control {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-lowest);
+  -webkit-app-region: no-drag;
+}
+
+.git-workflow-control > button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.git-workflow-control__primary {
+  width: 34px;
+  border-radius: calc(var(--radius-lg) - 1px) 0 0 calc(var(--radius-lg) - 1px);
+}
+
+.git-workflow-control__trigger {
+  width: 28px;
+  border-left: 1px solid var(--color-border) !important;
+  border-radius: 0 calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0;
+}
+
+.git-workflow-control > button:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--color-surface-high);
+}
+
+.git-workflow-control > button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.git-workflow-control svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+.git-workflow-control__menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + var(--space-2));
+  right: 0;
+}
+
+.git-workflow-control__dialog-form {
+  display: grid;
+  gap: 0;
+}
+
+.git-workflow-control__dialog-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+.git-workflow-control__dialog-header .git-workflow-control__branch {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.git-workflow-control__dialog-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 112px;
+  border: 0;
+  border-radius: 0;
+  padding: var(--space-4) 0;
+  color: var(--color-text);
+  background: transparent;
+  font: inherit;
+  outline: none;
+  resize: none;
+}
+
+.git-workflow-control__dialog-form input[type="text"],
+.git-workflow-control__dialog-form > input:not([type]) {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-6);
+  color: var(--color-text);
+  background: var(--color-surface-lowest);
+  font: inherit;
+  outline: none;
+}
+
+.git-workflow-control__dialog-form input[type="text"]:focus,
+.git-workflow-control__dialog-form > input:not([type]):focus {
+  border-color: var(--color-primary);
+  background: var(--color-surface-low);
+}
+
+.git-workflow-control__branch,
+.git-workflow-control__hint {
+  color: var(--color-text-muted);
+}
+
+.git-workflow-control__check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: var(--space-16);
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-4) 0;
+}
+
+.git-workflow-control__merge-strategy {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.git-workflow-control__merge-strategy label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--space-20);
+  padding: 0 var(--space-2);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.git-workflow-control__merge-strategy label + label {
+  border-left: 1px solid var(--color-border);
+}
+
+.git-workflow-control__merge-strategy label:hover,
+.git-workflow-control__merge-option--selected {
+  color: var(--color-text) !important;
+  background: var(--color-surface-low);
+}
+
+.git-workflow-control__merge-strategy input {
+  margin: 0;
+  accent-color: var(--color-primary);
+}
+
+.git-workflow-control__stats {
+  margin-left: auto;
+  color: var(--color-success);
+  font-variant-numeric: tabular-nums;
+}
+
+.git-workflow-control__stats em {
+  color: var(--color-error);
+  font-style: normal;
+}
+
 .git-workflow-control__stats--muted,
-.git-workflow-control__stats--muted em { color: var(--color-text-muted); }
-:global(.git-workflow-control__dialog .el-dialog__body) { padding-bottom: 0; }
-.git-workflow-control__cancel, .git-workflow-control__submit { border-radius: var(--radius-md); padding: var(--space-4) var(--space-8); font: inherit; font-size: var(--font-size-13); line-height: var(--line-height-18); cursor: pointer; }
-.git-workflow-control__cancel { border: 1px solid var(--color-border); background: transparent; }
-.git-workflow-control__submit { border: 1px solid var(--color-primary); background: var(--color-primary); color: var(--color-on-primary); }
-.git-workflow-control__submit:disabled { opacity: .5; cursor: default; }
+.git-workflow-control__stats--muted em {
+  color: var(--color-text-muted);
+}
+
+:global(.git-workflow-control__dialog .el-dialog__body) {
+  padding-bottom: 0;
+}
+
+.git-workflow-control__cancel,
+.git-workflow-control__submit {
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-8);
+  font: inherit;
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-18);
+  cursor: pointer;
+}
+
+.git-workflow-control__cancel {
+  border: 1px solid var(--color-border);
+  background: transparent;
+}
+
+.git-workflow-control__submit {
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.git-workflow-control__submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 </style>

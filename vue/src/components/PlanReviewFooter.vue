@@ -172,9 +172,14 @@ function commentTitle(comment: PlanReviewComment): string {
   align-items: center;
   column-gap: var(--space-3);
   padding: var(--space-2) var(--space-4);
-  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, var(--color-border));
+  border: 1px solid
+    color-mix(in srgb, var(--color-primary) 18%, var(--color-border));
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-surface-lowest));
+  background: color-mix(
+    in srgb,
+    var(--color-primary) 7%,
+    var(--color-surface-lowest)
+  );
 }
 
 .plan-review-footer__comment-copy {

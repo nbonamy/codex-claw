@@ -574,16 +574,16 @@ function summaryLabel(status: AgentStatus['type'], count: number): string {
   background: var(--color-success);
 }
 
-.cockpit-view__status-dot[data-status='working'],
-.cockpit-view__status-dot[data-status='starting'] {
+.cockpit-view__status-dot[data-status="working"],
+.cockpit-view__status-dot[data-status="starting"] {
   background: var(--color-warning);
 }
 
-.cockpit-view__status-dot[data-status='awaitingInput'] {
+.cockpit-view__status-dot[data-status="awaitingInput"] {
   background: var(--color-warning);
 }
 
-.cockpit-view__status-dot[data-status='error'] {
+.cockpit-view__status-dot[data-status="error"] {
   background: var(--color-error);
 }
 
@@ -662,7 +662,10 @@ function summaryLabel(status: AgentStatus['type'], count: number): string {
 .cockpit-view__grid {
   --cockpit-tile-width: 320px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--cockpit-tile-width)), var(--cockpit-tile-width)));
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(min(100%, var(--cockpit-tile-width)), var(--cockpit-tile-width))
+  );
   gap: var(--space-12);
 }
 

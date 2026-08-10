@@ -204,7 +204,6 @@ function selectMenuItem(itemId: string): void {
 </script>
 
 <style scoped>
-
 .settings-menu__trigger {
   border: 0;
   color: var(--color-text-muted);
@@ -312,5 +311,4 @@ function selectMenuItem(itemId: string): void {
 .settings-menu__actions {
   padding-bottom: var(--space-2);
 }
-
 </style>

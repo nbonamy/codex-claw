@@ -244,7 +244,6 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 </script>
 
 <style scoped>
-
 .team-rail {
   --team-rail-button-size: calc(var(--space-16) * var(--team-rail-scale));
   --team-text-color: white;
@@ -312,12 +311,21 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   opacity: 0.6;
 }
 
-.team-rail__team--unread:not(.team-rail__team--active, .list-reorder-drag--dragging) {
+.team-rail__team--unread:not(
+  .team-rail__team--active,
+  .list-reorder-drag--dragging
+) {
   opacity: 0.9;
 }
 
-.team-rail__team:not(.team-rail__team--active, .list-reorder-drag--dragging):hover,
-.team-rail__team:not(.team-rail__team--active, .list-reorder-drag--dragging):focus-visible {
+.team-rail__team:not(
+    .team-rail__team--active,
+    .list-reorder-drag--dragging
+  ):hover,
+.team-rail__team:not(
+    .team-rail__team--active,
+    .list-reorder-drag--dragging
+  ):focus-visible {
   opacity: 1;
 }
 
@@ -483,5 +491,4 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   align-items: center;
   gap: var(--space-6);
 }
-
 </style>

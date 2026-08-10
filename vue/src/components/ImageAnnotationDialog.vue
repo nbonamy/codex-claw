@@ -1025,7 +1025,11 @@ function clamp(value: number, minimum: number, maximum: number): number {
     linear-gradient(-45deg, var(--color-surface-low) 25%, transparent 25%),
     linear-gradient(45deg, transparent 75%, var(--color-surface-low) 75%),
     linear-gradient(-45deg, transparent 75%, var(--color-surface-low) 75%);
-  background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+  background-position:
+    0 0,
+    0 4px,
+    4px -4px,
+    -4px 0;
   background-size: 8px 8px;
 }
 
@@ -1128,7 +1132,11 @@ function clamp(value: number, minimum: number, maximum: number): number {
     linear-gradient(-45deg, var(--color-surface-low) 25%, transparent 25%),
     linear-gradient(45deg, transparent 75%, var(--color-surface-low) 75%),
     linear-gradient(-45deg, transparent 75%, var(--color-surface-low) 75%);
-  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
   background-size: 16px 16px;
 }
 
@@ -1286,6 +1294,5 @@ function clamp(value: number, minimum: number, maximum: number): number {
   .image-annotation-dialog__comments {
     display: none;
   }
-
 }
 </style>

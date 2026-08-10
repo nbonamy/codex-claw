@@ -198,8 +198,13 @@ function fileBasename(path: string): string {
   font-size: var(--font-size-13);
 }
 
-.git-review-panel__added { color: var(--color-success); }
-.git-review-panel__removed { color: var(--color-error); }
+.git-review-panel__added {
+  color: var(--color-success);
+}
+
+.git-review-panel__removed {
+  color: var(--color-error);
+}
 
 .git-review-panel__actions {
   position: relative;
@@ -220,7 +225,7 @@ function fileBasename(path: string): string {
 }
 
 .git-review-panel__actions > button:hover,
-.git-review-panel__actions > button[aria-expanded='true'] {
+.git-review-panel__actions > button[aria-expanded="true"] {
   color: var(--color-text);
   background: var(--color-surface-low);
 }
@@ -236,5 +241,4 @@ function fileBasename(path: string): string {
   top: calc(100% + var(--space-2));
   right: 0;
 }
-
 </style>

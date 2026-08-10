@@ -187,15 +187,22 @@ function folderBasename(folder: string): string {
 </script>
 
 <style scoped>
-
 .new-agent-button {
   --new-agent-button-height: 44px;
   --new-agent-button-border-radius: var(--radius-lg);
   --new-agent-button-color: white;
   --new-agent-button-bg: var(--color-primary);
   --new-agent-button-border: var(--color-primary);
-  --new-agent-button-hover-bg: color-mix(in srgb, var(--color-primary) 80%, var(--color-background));
-  --new-agent-button-hover-border: color-mix(in srgb, var(--color-primary) 80%, var(--color-background));
+  --new-agent-button-hover-bg: color-mix(
+    in srgb,
+    var(--color-primary) 80%,
+    var(--color-background)
+  );
+  --new-agent-button-hover-border: color-mix(
+    in srgb,
+    var(--color-primary) 80%,
+    var(--color-background)
+  );
   --new-agent-button-padding-inline: var(--space-8);
   --new-agent-button-icon-display: none;
   --new-agent-button-label-display: inline;
@@ -533,7 +540,9 @@ function folderBasename(folder: string): string {
     height: var(--space-20);
     min-height: var(--space-20);
     border-top-right-radius: var(--new-agent-button-border-radius) !important;
-    border-bottom-right-radius: var(--new-agent-button-border-radius) !important;
+    border-bottom-right-radius: var(
+      --new-agent-button-border-radius
+    ) !important;
     justify-content: center;
     padding: 0;
   }

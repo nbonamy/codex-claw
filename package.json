@@ -2,6 +2,9 @@
   "name": "codex-claw",
   "version": "0.8.1",
   "private": true,
+  "devDependencies": {
+    "prettier": "^3.8.3"
+  },
   "workspaces": [
     "core",
     "backend",
@@ -28,6 +31,8 @@
     "dev:backend:serve": "npm run serve -w @codex-claw/backend",
     "dev:electron": "node scripts/dev.mjs",
     "dev:web": "npm run build:sdk && npm run build -w @codex-claw/backend && npm run dev -w @codex-claw/web",
+    "format:vue-styles": "node scripts/format-vue-styles.mjs",
+    "format:vue-styles:check": "node scripts/format-vue-styles.mjs --check",
     "lint": "npm run lint --workspaces",
     "lint:css": "npm run lint:css -w @codex-claw/vue",
     "lint:electron": "npm run lint -w @codex-claw/electron",

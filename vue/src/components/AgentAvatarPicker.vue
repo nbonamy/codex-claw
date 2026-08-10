@@ -371,5 +371,4 @@ function applyCroppedAvatar(nextAvatar: string): void {
 .agent-avatar-picker__file {
   display: none;
 }
-
 </style>

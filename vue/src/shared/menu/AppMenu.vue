@@ -285,7 +285,7 @@ function isSelected(item: Exclude<AppMenuItem, { type: 'separator' | 'submenu' }
 }
 
 .app-menu__submenu::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   right: calc(-1 * var(--space-4));

@@ -189,16 +189,28 @@ function dropWorkItem(event: DragEvent): void {
 .cockpit-view__agent-card:hover,
 .cockpit-view__agent-card:focus-visible {
   border-color: var(--color-border-strong);
-  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-low));
+  background: color-mix(
+    in srgb,
+    var(--color-primary) 8%,
+    var(--color-surface-low)
+  );
 }
 
 .cockpit-view__agent-card--drop-ready {
-  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+  border-color: color-mix(
+    in srgb,
+    var(--color-primary) 45%,
+    var(--color-border)
+  );
 }
 
 .cockpit-view__agent-card--drop-target {
   border-color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface-low));
+  background: color-mix(
+    in srgb,
+    var(--color-primary) 12%,
+    var(--color-surface-low)
+  );
   box-shadow: inset 0 0 0 1px var(--color-primary);
 }
 
@@ -254,13 +266,13 @@ function dropWorkItem(event: DragEvent): void {
   line-height: var(--line-height-18);
 }
 
-.cockpit-view__agent-state[data-status='working'],
-.cockpit-view__agent-state[data-status='starting'],
-.cockpit-view__agent-state[data-status='awaitingInput'] {
+.cockpit-view__agent-state[data-status="working"],
+.cockpit-view__agent-state[data-status="starting"],
+.cockpit-view__agent-state[data-status="awaitingInput"] {
   color: var(--color-warning);
 }
 
-.cockpit-view__agent-state[data-status='error'] {
+.cockpit-view__agent-state[data-status="error"] {
   color: var(--color-error);
 }
 

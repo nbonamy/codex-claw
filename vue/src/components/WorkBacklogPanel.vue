@@ -520,7 +520,11 @@ function workProviderLabel(provider: WorkIntegrationConnection['provider']): str
 
 .work-backlog-panel__item:hover {
   border-color: var(--color-border-strong);
-  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface-lowest));
+  background: color-mix(
+    in srgb,
+    var(--color-primary) 6%,
+    var(--color-surface-lowest)
+  );
 }
 
 .work-backlog-panel__item:active {
@@ -532,8 +536,16 @@ function workProviderLabel(provider: WorkIntegrationConnection['provider']): str
 }
 
 .work-backlog-panel__item--completed {
-  border-color: color-mix(in srgb, var(--color-success) 32%, var(--color-border));
-  background: color-mix(in srgb, var(--color-success) 6%, var(--color-surface-lowest));
+  border-color: color-mix(
+    in srgb,
+    var(--color-success) 32%,
+    var(--color-border)
+  );
+  background: color-mix(
+    in srgb,
+    var(--color-success) 6%,
+    var(--color-surface-lowest)
+  );
 }
 
 .work-backlog-panel__item--assigned:active {
@@ -631,13 +643,13 @@ function workProviderLabel(provider: WorkIntegrationConnection['provider']): str
   font-weight: var(--font-weight-semibold);
 }
 
-.work-backlog-panel__assignee-status[data-status='working'],
-.work-backlog-panel__assignee-status[data-status='starting'],
-.work-backlog-panel__assignee-status[data-status='awaitingInput'] {
+.work-backlog-panel__assignee-status[data-status="working"],
+.work-backlog-panel__assignee-status[data-status="starting"],
+.work-backlog-panel__assignee-status[data-status="awaitingInput"] {
   color: var(--color-warning);
 }
 
-.work-backlog-panel__assignee-status[data-status='error'] {
+.work-backlog-panel__assignee-status[data-status="error"] {
   color: var(--color-error);
 }
 

@@ -839,7 +839,8 @@ function resetEditSourceSelection(): void {
   background: var(--color-surface-low);
 }
 
-.agent-dialog__identity-avatar :deep(.agent-avatar-picker__trigger .agent-avatar-picker__preview) {
+.agent-dialog__identity-avatar
+  :deep(.agent-avatar-picker__trigger .agent-avatar-picker__preview) {
   --agent-avatar-size: var(--space-20);
 }
 
@@ -850,5 +851,4 @@ function resetEditSourceSelection(): void {
 .agent-dialog__source-custom-option {
   color: var(--color-text);
 }
-
 </style>

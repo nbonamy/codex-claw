@@ -212,18 +212,21 @@ async function confirmClearPlanComments(): Promise<void> {
   display: flex;
 }
 
-.plan-review-panel__markdown-frame :deep(.codex-markdown ul:has(> li > input[type='checkbox'])) {
+.plan-review-panel__markdown-frame
+  :deep(.codex-markdown ul:has(> li > input[type="checkbox"])) {
   padding-left: 0;
   list-style: none;
 }
 
-.plan-review-panel__markdown-frame :deep(.codex-markdown ul:has(> li > input[type='checkbox']) > li) {
+.plan-review-panel__markdown-frame
+  :deep(.codex-markdown ul:has(> li > input[type="checkbox"]) > li) {
   display: flex;
   align-items: flex-start;
   gap: var(--space-4);
 }
 
-.plan-review-panel__markdown-frame :deep(.codex-markdown ul > li > input[type='checkbox']) {
+.plan-review-panel__markdown-frame
+  :deep(.codex-markdown ul > li > input[type="checkbox"]) {
   flex: 0 0 auto;
   margin: 0.3em 0 0;
 }

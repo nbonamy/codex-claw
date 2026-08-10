@@ -435,7 +435,9 @@ watch(() => snapshot.value.theme, (theme) => {
 }
 
 @keyframes backend-restart-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

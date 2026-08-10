@@ -126,17 +126,93 @@ function toggleFolder(path: string): void {
 </script>
 
 <style scoped>
-.file-explorer { min-width: 0; min-height: 0; flex: 1; display: flex; flex-direction: column; background: var(--color-shell-main); }
-.file-explorer__toolbar { display: flex; gap: var(--space-2); padding: var(--space-3); border-bottom: 1px solid var(--color-border); }
-.file-explorer__toolbar input { min-width: 0; flex: 1; padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-text); background: var(--color-surface-low); }
-.file-explorer__tree { min-height: 0; overflow: auto; padding-block: var(--space-2); }
-.file-explorer__row { min-width: 0; min-height: 30px; display: flex; align-items: center; gap: var(--space-2); padding-inline-end: var(--space-2); }
-.file-explorer__row:hover { background: var(--color-surface-low); }
-.file-explorer__item { min-width: 0; flex: 1; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2); border: 0; color: var(--color-text); background: transparent; text-align: left; }
-.file-explorer__item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.file-explorer__item svg { width: var(--icon-sm); height: var(--icon-sm); flex: 0 0 auto; color: var(--color-text-muted); }
-.file-explorer__folder svg:first-child { transition: transform 120ms ease; }
-.file-explorer__folder .file-explorer__chevron--open { transform: rotate(90deg); }
-.file-explorer__status { margin: auto; padding: var(--space-8); color: var(--color-text-muted); text-align: center; }
-.file-explorer__status--error { color: var(--color-error); }
+.file-explorer {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-shell-main);
+}
+
+.file-explorer__toolbar {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.file-explorer__toolbar input {
+  min-width: 0;
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  background: var(--color-surface-low);
+}
+
+.file-explorer__tree {
+  min-height: 0;
+  overflow: auto;
+  padding-block: var(--space-2);
+}
+
+.file-explorer__row {
+  min-width: 0;
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-inline-end: var(--space-2);
+}
+
+.file-explorer__row:hover {
+  background: var(--color-surface-low);
+}
+
+.file-explorer__item {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 0;
+  color: var(--color-text);
+  background: transparent;
+  text-align: left;
+}
+
+.file-explorer__item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-explorer__item svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+}
+
+.file-explorer__folder svg:first-child {
+  transition: transform 120ms ease;
+}
+
+.file-explorer__folder .file-explorer__chevron--open {
+  transform: rotate(90deg);
+}
+
+.file-explorer__status {
+  margin: auto;
+  padding: var(--space-8);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.file-explorer__status--error {
+  color: var(--color-error);
+}
 </style>

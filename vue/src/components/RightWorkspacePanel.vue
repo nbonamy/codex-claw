@@ -526,7 +526,7 @@ function isAbsoluteFilePath(filePath: string): boolean {
 .right-workspace-panel__tab-close:hover,
 .right-workspace-panel__files-toggle:hover,
 .right-workspace-panel__add > button:hover,
-.right-workspace-panel__add > button[aria-expanded='true'] {
+.right-workspace-panel__add > button[aria-expanded="true"] {
   color: var(--color-text);
   background: var(--color-surface-high);
 }
@@ -545,7 +545,7 @@ function isAbsoluteFilePath(filePath: string): boolean {
   cursor: pointer;
 }
 
-.right-workspace-panel__files-toggle[aria-pressed='true'] {
+.right-workspace-panel__files-toggle[aria-pressed="true"] {
   color: var(--color-text);
   background: var(--color-surface-low);
 }

@@ -57,15 +57,88 @@ function select(path: string): void { emit('select', path); emit('close'); }
 </script>
 
 <style scoped>
-.file-quick-open { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; background: color-mix(in srgb, var(--color-surface-highest), transparent 30%); }
-.file-quick-open__panel { width: min(560px, calc(100vw - var(--space-16))); max-height: min(440px, 70vh); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface-lowest); box-shadow: var(--shadow-lg); }
-.file-quick-open__search { padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--color-border); }
-.file-quick-open__search input { width: 100%; border: 0; outline: 0; color: var(--color-text); background: transparent; font-size: var(--font-size-16); }
-.file-quick-open__results { min-height: 0; overflow: auto; padding: var(--space-2); }
-.file-quick-open__results button { width: 100%; display: grid; grid-template-columns: var(--icon-md) minmax(80px, auto) minmax(0, 1fr); align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-4); border: 0; border-radius: var(--radius-md); color: var(--color-text); background: transparent; text-align: left; }
-.file-quick-open__results button:hover, .file-quick-open__item--selected { background: var(--color-primary-container) !important; }
-.file-quick-open__results svg { width: var(--icon-md); height: var(--icon-md); color: var(--color-text-muted); }
-.file-quick-open__results span, .file-quick-open__results small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.file-quick-open__results small { color: var(--color-text-muted); }
-.file-quick-open__results p { padding: var(--space-12); color: var(--color-text-muted); text-align: center; }
+.file-quick-open {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 12vh;
+  background: color-mix(in srgb, var(--color-surface-highest), transparent 30%);
+}
+
+.file-quick-open__panel {
+  width: min(560px, calc(100vw - var(--space-16)));
+  max-height: min(440px, 70vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-lowest);
+  box-shadow: var(--shadow-lg);
+}
+
+.file-quick-open__search {
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.file-quick-open__search input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  color: var(--color-text);
+  background: transparent;
+  font-size: var(--font-size-16);
+}
+
+.file-quick-open__results {
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-2);
+}
+
+.file-quick-open__results button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: var(--icon-md) minmax(80px, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  background: transparent;
+  text-align: left;
+}
+
+.file-quick-open__results button:hover,
+.file-quick-open__item--selected {
+  background: var(--color-primary-container) !important;
+}
+
+.file-quick-open__results svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  color: var(--color-text-muted);
+}
+
+.file-quick-open__results span,
+.file-quick-open__results small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-quick-open__results small {
+  color: var(--color-text-muted);
+}
+
+.file-quick-open__results p {
+  padding: var(--space-12);
+  color: var(--color-text-muted);
+  text-align: center;
+}
 </style>

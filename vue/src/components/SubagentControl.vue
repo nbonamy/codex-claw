@@ -206,7 +206,7 @@ function flattenNodes(tree: AgentSubagentTree): Array<{ node: SubagentNode; dept
 }
 
 .subagent-control__trigger:hover,
-.subagent-control__trigger[aria-expanded='true'] {
+.subagent-control__trigger[aria-expanded="true"] {
   color: var(--color-text);
   background: var(--color-surface-high);
 }
@@ -239,7 +239,10 @@ function flattenNodes(tree: AgentSubagentTree): Array<{ node: SubagentNode; dept
   right: 0;
   display: flex;
   width: 200px;
-  max-height: min(320px, calc(100vh - var(--workbench-appbar-height) - var(--space-8)));
+  max-height: min(
+    320px,
+    calc(100vh - var(--workbench-appbar-height) - var(--space-8))
+  );
   padding: var(--space-4);
   flex-direction: column;
   overflow-y: auto;
@@ -294,16 +297,16 @@ function flattenNodes(tree: AgentSubagentTree): Array<{ node: SubagentNode; dept
   background: var(--color-outline);
 }
 
-.subagent-control__status[data-status='running'] {
+.subagent-control__status[data-status="running"] {
   background: var(--color-warning);
 }
 
-.subagent-control__status[data-status='pendingInit'] {
+.subagent-control__status[data-status="pendingInit"] {
   background: var(--color-primary);
 }
 
-.subagent-control__status[data-status='errored'],
-.subagent-control__status[data-status='notFound'] {
+.subagent-control__status[data-status="errored"],
+.subagent-control__status[data-status="notFound"] {
   background: var(--color-error);
 }
 
