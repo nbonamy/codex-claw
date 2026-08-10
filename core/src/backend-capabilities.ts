@@ -36,7 +36,7 @@ export const claudeBackendCapabilities: BackendCapabilities = {
   rollback: false,
   editMessage: false,
   retryMessage: false,
-  approvals: false,
+  approvals: true,
   approvalPresets: [],
 };
 

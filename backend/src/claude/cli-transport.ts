@@ -2,6 +2,7 @@ import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { withDiscoveredRuntimePath, type RuntimeDiscoveryDependencies } from '@codex-claw/core/runtime-discovery';
+import type { AskUserAnswers, AskUserQuestion } from '@codex-claw/core/contracts';
 import type { Readable } from 'node:stream';
 import { logMain } from '../log';
 import { parseClaudeSdkMessage, type ClaudeSdkMessage } from './protocol';
@@ -13,6 +14,7 @@ export type ClaudeCliTransportOptions = {
 };
 
 export type ClaudeTurnParams = {
+  ownerId?: string;
   cwd: string;
   prompt: string;
   sessionId?: string;
@@ -25,11 +27,40 @@ export type ClaudeTurnParams = {
 
 export type ClaudeTurnHandle = {
   readonly done: Promise<void>;
-  interrupt(): void;
+  interrupt(): Promise<void>;
+};
+
+export type ClaudePermissionRequest = {
+  kind: 'confirm_tool' | 'ask_user';
+  id: string;
+  toolName: string;
+  input: Record<string, unknown>;
+  blockedPath?: string;
+  decisionReason?: string;
+  title?: string;
+  displayName?: string;
+  description?: string;
+  allowConversation: boolean;
+  allowAlways: boolean;
+  questions?: AskUserQuestion[];
+};
+
+export type ClaudePermissionDecision = 'allow' | 'allow_conversation' | 'always_allow' | 'deny';
+
+export type ClaudePermissionResponse = {
+  decision?: ClaudePermissionDecision | null;
+  answers?: AskUserAnswers;
+  cancelled?: boolean;
 };
 
 export type ClaudeTurnTransport = {
-  startTurn(params: ClaudeTurnParams, onMessage: (message: ClaudeSdkMessage) => void): ClaudeTurnHandle;
+  startTurn(
+    params: ClaudeTurnParams,
+    onMessage: (message: ClaudeSdkMessage) => void,
+    onPermissionRequest?: (request: ClaudePermissionRequest) => void,
+  ): ClaudeTurnHandle;
+  respondToPermissionRequest?(requestId: string, response: ClaudePermissionResponse): Promise<void>;
+  closeSession?(sessionId: string): void | Promise<void>;
   close(): Promise<void>;
 };
 
@@ -135,7 +166,7 @@ export class ClaudeCliTransport implements ClaudeTurnTransport {
 
     return {
       done,
-      interrupt: () => {
+      interrupt: async () => {
         interrupted = true;
         child.kill();
       },

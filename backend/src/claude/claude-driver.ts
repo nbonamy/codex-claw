@@ -8,6 +8,7 @@ import type {
   BackendRuntimeStatus,
   BackendSession,
   BackendSkillSummary,
+  ClientRequest,
   ClientRequestResponse,
   ConversationSummary,
   RendererMessage,
@@ -18,7 +19,13 @@ import { claudeBackendCapabilities } from '@codex-claw/core/backend-capabilities
 import { unsupportedBackendFeature, type AgentBackendDriver, type BackendConversationResumeResult, type BackendEvent, type BackendSendResult } from '@codex-claw/core/backend-driver';
 import { agentScopedMcpUrl } from '../mcp/codex-config';
 import { codexClawDeveloperInstructions } from '../mcp/agent-prompts';
-import { ClaudeCliTransport, type ClaudeTurnHandle, type ClaudeTurnParams, type ClaudeTurnTransport } from './cli-transport';
+import { ClaudeAgentSdkTransport } from './agent-sdk-transport';
+import {
+  type ClaudePermissionRequest,
+  type ClaudeTurnHandle,
+  type ClaudeTurnParams,
+  type ClaudeTurnTransport,
+} from './cli-transport';
 import { claudeModelOptions } from './models';
 import { listClaudeSkills } from './skills';
 import { listClaudeTranscriptSummaries, loadClaudeTranscriptHistory, type ClaudeTranscriptHistory } from './transcript-history-adapter';
@@ -70,10 +77,12 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
 
   private readonly listeners = new Set<EventListener>();
   private readonly activeTurnsByAgentId = new Map<string, ActiveClaudeTurn>();
+  private readonly pendingRequestOwners = new Map<string, ActiveClaudeTurn>();
+  private readonly liveSessionIdsByAgentId = new Map<string, string>();
   private turnCounter = 0;
 
   constructor(
-    private readonly transport: ClaudeTurnTransport = new ClaudeCliTransport(),
+    private readonly transport: ClaudeTurnTransport = new ClaudeAgentSdkTransport(),
     private readonly historyLoader: ClaudeHistoryLoader = loadClaudeTranscriptHistory,
     private readonly driverOptions: ClaudeBackendDriverOptions = {},
   ) {}
@@ -108,20 +117,33 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
 
     const turnId = this.nextTurnId();
     const existingSessionId = claudeSessionId(agent);
+    const liveSessionId = this.liveSessionIdsByAgentId.get(agent.id);
+    if (liveSessionId && liveSessionId !== existingSessionId) {
+      await this.transport.closeSession?.(liveSessionId);
+      this.liveSessionIdsByAgentId.delete(agent.id);
+    }
     let activeTurn: ActiveClaudeTurn | null = null;
     const started = new Promise<BackendSendResult>((resolve, reject) => {
-      const handle = this.transport.startTurn(claudeTurnParams(
-        agent,
-        prompt,
-        options,
-        existingSessionId,
-        this.driverOptions.clawMcpServerUrl,
-        this.driverOptions.pluginSettings?.(),
-      ), (message) => {
-        if (activeTurn) {
-          this.handleSdkMessage(activeTurn, message);
-        }
-      });
+      const handle = this.transport.startTurn(
+        claudeTurnParams(
+          agent,
+          prompt,
+          options,
+          existingSessionId,
+          this.driverOptions.clawMcpServerUrl,
+          this.driverOptions.pluginSettings?.(),
+        ),
+        (message) => {
+          if (activeTurn) {
+            this.handleSdkMessage(activeTurn, message);
+          }
+        },
+        (request) => {
+          if (activeTurn) {
+            this.emitPermissionRequest(activeTurn, request);
+          }
+        },
+      );
       activeTurn = {
         agentId: agent.id,
         turnId,
@@ -165,7 +187,7 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
     }
 
     activeTurn.interrupted = true;
-    activeTurn.handle.interrupt();
+    await activeTurn.handle.interrupt();
     this.completeTurn(activeTurn);
     this.activeTurnsByAgentId.delete(agent.id);
 
@@ -175,8 +197,31 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
     };
   }
 
-  async respondToRequest(_response: ClientRequestResponse): Promise<void> {
-    throw new Error('Claude CLI permission responses are not supported yet.');
+  async respondToRequest(response: ClientRequestResponse): Promise<void> {
+    if (!this.transport.respondToPermissionRequest) {
+      throw new Error('Claude permission responses are not supported by the active transport.');
+    }
+    const owner = this.pendingRequestOwners.get(response.id);
+    if (!owner) {
+      throw new Error(`Claude permission request '${response.id}' is no longer pending.`);
+    }
+    await this.transport.respondToPermissionRequest(response.id, response.payload ?? {});
+    this.pendingRequestOwners.delete(response.id);
+    this.emit({
+      agentId: owner.agentId,
+      backend: this.backend,
+      backendSessionId: owner.sessionId ?? undefined,
+      turnId: owner.turnId,
+      type: 'clientRequest.resolved',
+      payload: { id: response.id },
+    });
+  }
+
+  forgetAgentSession(agentId: string): void {
+    const sessionId = this.liveSessionIdsByAgentId.get(agentId);
+    if (!sessionId) return;
+    this.liveSessionIdsByAgentId.delete(agentId);
+    void this.transport.closeSession?.(sessionId);
   }
 
   async hydrateAgent(agent: Agent): Promise<BackendSession | null> {
@@ -270,11 +315,14 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
   }
 
   async close(): Promise<void> {
+    const interrupts: Promise<void>[] = [];
     for (const activeTurn of this.activeTurnsByAgentId.values()) {
       activeTurn.interrupted = true;
-      activeTurn.handle.interrupt();
+      interrupts.push(activeTurn.handle.interrupt());
     }
     this.activeTurnsByAgentId.clear();
+    this.liveSessionIdsByAgentId.clear();
+    await Promise.allSettled(interrupts);
     await this.transport.close();
   }
 
@@ -479,6 +527,44 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
     });
   }
 
+  private emitPermissionRequest(activeTurn: ActiveClaudeTurn, request: ClaudePermissionRequest): void {
+    const payload: ClientRequest = request.kind === 'ask_user'
+      ? {
+          id: request.id,
+          kind: 'ask_user',
+          payload: {
+            request: {
+              itemId: request.id,
+              questions: request.questions ?? [],
+            },
+          },
+        }
+      : {
+          id: request.id,
+          kind: 'confirm_tool',
+          payload: {
+            confirmation: {
+              argumentsPreview: formatPermissionArguments(request.input),
+              integrationId: 'claude',
+              integrationName: 'Claude',
+              summary: request.title ?? request.description ?? request.displayName ?? `Claude wants to use ${request.toolName}.`,
+              toolName: request.toolName,
+              allowConversation: request.allowConversation,
+              allowAlways: request.allowAlways,
+            },
+          },
+        };
+    this.pendingRequestOwners.set(request.id, activeTurn);
+    this.emit({
+      agentId: activeTurn.agentId,
+      backend: this.backend,
+      backendSessionId: activeTurn.sessionId ?? undefined,
+      turnId: activeTurn.turnId,
+      type: request.kind === 'ask_user' ? 'toolInput.requested' : 'approval.requested',
+      payload,
+    });
+  }
+
   private shouldSuppressPlanTool(activeTurn: ActiveClaudeTurn, toolName: string): boolean {
     if (toolName === 'EnterPlanMode' || toolName === 'ExitPlanMode') {
       return true;
@@ -596,6 +682,7 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
 
   private resolveTurnStart(activeTurn: ActiveClaudeTurn, sessionId: string): void {
     activeTurn.sessionId = sessionId;
+    this.liveSessionIdsByAgentId.set(activeTurn.agentId, sessionId);
     this.emit({
       backend: this.backend,
       type: 'backend.statusChanged',
@@ -678,6 +765,7 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
     }
 
     activeTurn.completed = true;
+    this.resolvePendingRequests(activeTurn);
     this.emit({
       agentId: activeTurn.agentId,
       backend: this.backend,
@@ -686,6 +774,21 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
       type: 'turn.completed',
       payload: { turn: { id: activeTurn.turnId, status: activeTurn.interrupted ? 'interrupted' : 'completed' } },
     });
+  }
+
+  private resolvePendingRequests(activeTurn: ActiveClaudeTurn): void {
+    for (const [requestId, owner] of this.pendingRequestOwners) {
+      if (owner !== activeTurn) continue;
+      this.pendingRequestOwners.delete(requestId);
+      this.emit({
+        agentId: activeTurn.agentId,
+        backend: this.backend,
+        backendSessionId: activeTurn.sessionId ?? undefined,
+        turnId: activeTurn.turnId,
+        type: 'clientRequest.resolved',
+        payload: { id: requestId },
+      });
+    }
   }
 
   private emit(event: BackendEvent): void {
@@ -712,6 +815,7 @@ function claudeTurnParams(
   const defaults = agent.backendDefaults?.kind === 'claude' ? agent.backendDefaults : undefined;
   const mcpServerUrl = clawMcpServerUrl ? agentScopedMcpUrl(clawMcpServerUrl, agent.id) : null;
   return {
+    ownerId: agent.id,
     cwd: agent.folder,
     prompt: claudePrompt(prompt, options),
     sessionId: existingSessionId ?? undefined,
@@ -809,6 +913,14 @@ function claudeToolResultText(value: unknown): string {
   }
 
   return JSON.stringify(value);
+}
+
+function formatPermissionArguments(input: Record<string, unknown>): string {
+  try {
+    return JSON.stringify(input, null, 2);
+  } catch {
+    return '[Unable to display tool arguments]';
+  }
 }
 
 function parseJsonObject(value: string): Record<string, unknown> | null {

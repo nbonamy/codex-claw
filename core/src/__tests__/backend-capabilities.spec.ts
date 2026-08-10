@@ -27,7 +27,7 @@ describe('backend capabilities', () => {
       goals: false,
       serviceTier: false,
       steerPrompt: false,
-      approvals: false,
+      approvals: true,
       conversationFork: false,
     });
   });

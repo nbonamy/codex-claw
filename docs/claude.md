@@ -1,6 +1,6 @@
 # Claude Code Integration Research
 
-Status: implementation notes plus historical research, 2026-06-06.
+Status: implementation notes plus historical research, 2026-08-09.
 
 Update, 2026-06-06: the Codex-bias inventory in this document was written
 before the backend driver seam landed. The current code now has
@@ -36,10 +36,10 @@ the `claude server` path.
 
 ## Existing Claw Integration Shape
 
-Codex Claw currently talks to Codex through `codex app-server --listen
-stdio://`. Electron main owns the process, JSON-RPC request ids, server
-requests, and event adaptation. Renderer code consumes app-owned
-`MainToRendererEvent` and `RendererMessage` shapes.
+Codex Claw currently talks to provider runtimes through `clawd`. The daemon
+owns the Codex app-server and Claude Code child processes, request routing, and
+provider-to-app event adaptation. Electron and Web clients consume app-owned
+backend events and `RendererMessage` shapes.
 
 The backend driver seam has landed. The current shared/main seam is:
 
@@ -74,19 +74,33 @@ prompt send, interrupt, history hydration, rollback, request responses, model
 loading, and skill loading through the backend driver. Claude is represented in
 shared contracts and capabilities.
 
-Update, 2026-06-06: Codex Claw now has a first Claude driver implementation
-under `src/main/claude/`. The driver uses the local Claude Code CLI print-mode
-streaming JSON surface instead of the direct-connect websocket path:
+Update, 2026-08-09: Codex Claw's Claude driver lives under
+`backend/src/claude/` and now uses the official
+`@anthropic-ai/claude-agent-sdk` as its default transport. The SDK launches the
+user-installed Claude Code executable, so it keeps Claude Code's coding-agent
+behavior, local login, settings, skills, hooks, and project instructions. Claw
+does not call the Messages API directly or replace Claude Code with a generic
+model loop.
 
-```text
-claude -p "<prompt>" --output-format stream-json --include-partial-messages --verbose \
-  --mcp-config '{"mcpServers":{"codex_claw":{"type":"http","url":"http://127.0.0.1:<port>/mcp?agentId=<agent-id>"}}}' \
-  --allowed-tools 'mcp__codex_claw__*' \
-  --append-system-prompt "<Codex Claw developer instructions>"
-```
+Each live Claude session owns one long-running Agent SDK query. Claw sends
+subsequent turns through that query's streaming input instead of spawning a new
+`claude -p` process for every prompt. A persisted agent with no live query is
+resumed through the SDK's `resume` option. Claw retains at most one idle live
+query per agent: switching conversations releases the previous query, while an
+agent-identity, instruction, MCP, or permission-safety change restarts and
+resumes the query so stale configuration cannot leak into later turns. The
+transport configures:
 
-Persisted Claude agents resume with `--resume <session_id>`. The driver maps
-Claude SDK stream messages into app-owned backend events:
+- the Claude Code system-prompt and tool presets;
+- user, project, and local setting sources;
+- the active Claw agent's working directory, model, and permission mode;
+- Claw's agent-scoped collaboration MCP server and allowed-tool rule;
+- partial streaming events for responsive text and tool cards.
+
+The legacy print-mode `ClaudeCliTransport` remains an isolated transport seam,
+but it is no longer the driver's default. Both transports feed the same
+app-owned message adapter. The driver maps Claude SDK stream messages into
+app-owned backend events:
 
 - `system/init` or any message with `session_id` records a Claude
   `BackendSession`.
@@ -98,11 +112,16 @@ Claude SDK stream messages into app-owned backend events:
 - `tool_result` blocks update those tool cards.
 - `result` completes the turn or emits an app error.
 
-This gives Claude agents local prompt send, streaming display, session resume,
-and process interrupt through the same `AgentBackendDriver` seam as Codex.
-Capabilities intentionally do not advertise approvals, rollback, or edit/retry
-until those surfaces are implemented for Claude. Model listing is local. Skill
-listing is filesystem-derived: Claw reads user skills from `~/.claude/skills`
+This gives Claude agents local prompt send, persistent multi-turn sessions,
+streaming display, session resume, and interrupt through the same
+`AgentBackendDriver` seam as Codex. Agent SDK permission callbacks are
+normalized to Claw's existing approval cards. Claude's `AskUserQuestion` tool
+is normalized to the existing multi-question form, and the response is routed
+back to the blocked SDK tool call. Session-scoped and persistent permission
+suggestions back Claw's Allow for conversation and Always allow choices.
+Capabilities still do not advertise attachments, rollback, or edit/retry until
+those surfaces are implemented reliably for Claude. Model listing is local.
+Skill listing is filesystem-derived: Claw reads user skills from `~/.claude/skills`
 and project skills from `<agent-folder>/.claude/skills`, parses each
 `SKILL.md` frontmatter, and lets project skills override global skills with the
 same name.
@@ -154,12 +173,12 @@ newest first by file modification time, and returns app-owned
 `ConversationSummary` rows with an opaque `BackendConversationRef`. Clicking a
 Claude conversation stores that session id as the agent's current
 `BackendSession`, reloads its transcript messages, and the next prompt resumes
-with `--resume <session_id>`. Resume is allowed only while the agent is idle.
+that session through the Agent SDK. Resume is allowed only while the agent is
+idle.
 
-The actual Electron process uses `spawn(command, args)`, not shell string
-execution, so `-p` and `--append-system-prompt` values are passed as single argv
-entries even when they contain quotes, shell metacharacters, or newlines. Logs
-redact those two values.
+The Agent SDK launches the configured executable directly rather than through
+a shell. Prompt and developer-instruction text is delivered over the SDK input
+stream and is not included in Claw's process logs.
 
 Claude model listing is local for now. The driver returns the CLI aliases
 `opus`, `sonnet`, and `haiku`, with `sonnet` as the default visible option.
