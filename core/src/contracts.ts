@@ -1215,6 +1215,7 @@ export type MainToRendererEvent = {
     | 'account.rateLimitsUpdated'
     | 'devicePairing.statusChanged'
     | 'workBacklog.assignmentUpdated'
+    | 'models.changed'
     | 'skills.changed'
     | 'sidePanel.markdownRequested'
     | 'sidePanel.gitDiffRequested'

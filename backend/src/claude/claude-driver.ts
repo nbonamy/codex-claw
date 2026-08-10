@@ -22,11 +22,12 @@ import { codexClawDeveloperInstructions } from '../mcp/agent-prompts';
 import { ClaudeAgentSdkTransport } from './agent-sdk-transport';
 import {
   type ClaudePermissionRequest,
+  type ClaudeAvailableModel,
   type ClaudeTurnHandle,
   type ClaudeTurnParams,
   type ClaudeTurnTransport,
 } from './cli-transport';
-import { claudeModelOptions } from './models';
+import { claudeModelOptions, claudeModelOptionsFromSdk } from './models';
 import { listClaudeSkills } from './skills';
 import { listClaudeTranscriptSummaries, loadClaudeTranscriptHistory, type ClaudeTranscriptHistory } from './transcript-history-adapter';
 import {
@@ -79,6 +80,8 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
   private readonly activeTurnsByAgentId = new Map<string, ActiveClaudeTurn>();
   private readonly pendingRequestOwners = new Map<string, ActiveClaudeTurn>();
   private readonly liveSessionIdsByAgentId = new Map<string, string>();
+  private modelCatalog = claudeModelOptions.map((model) => ({ ...model }));
+  private modelCatalogDiscovery: Promise<void> | null = null;
   private turnCounter = 0;
 
   constructor(
@@ -95,12 +98,16 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
     };
   }
 
-  getCapabilities(_agent: Agent): BackendCapabilities {
-    return claudeBackendCapabilities;
+  getCapabilities(_agent?: Agent): BackendCapabilities {
+    return {
+      ...claudeBackendCapabilities,
+      reasoningEffort: this.modelCatalog.some((model) => (model.supportedReasoningEfforts?.length ?? 0) > 0),
+    };
   }
 
-  async listModels(_agent: Agent): Promise<BackendModelOption[]> {
-    return claudeModelOptions.map((model) => ({ ...model }));
+  async listModels(agent: Agent): Promise<BackendModelOption[]> {
+    await this.discoverModelCatalog(agent);
+    return this.modelCatalog.map((model) => ({ ...model }));
   }
 
   async listSkills(agent: Agent): Promise<BackendSkillSummary[]> {
@@ -333,6 +340,9 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
     }
 
     if (message.type === 'system') {
+      if ((message as Record<string, unknown>).subtype === 'init') {
+        void this.refreshModelCatalog().catch(() => undefined);
+      }
       this.emitPermissionModeStatus(activeTurn, message);
       return;
     }
@@ -690,6 +700,7 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
         backend: this.backend,
         status: 'running',
         detail: 'Claude backend connected.',
+        capabilities: this.getCapabilities(),
       },
     });
     this.emit({
@@ -801,6 +812,51 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
     this.turnCounter += 1;
     return `claude-turn-${Date.now().toString(36)}-${this.turnCounter}`;
   }
+
+  private async refreshModelCatalog(): Promise<void> {
+    const availableModels = await this.transport.listModels?.();
+    if (!availableModels?.length) return;
+    this.applyModelCatalog(availableModels);
+  }
+
+  private async discoverModelCatalog(agent: Agent): Promise<void> {
+    if (!this.transport.discoverModels || this.modelCatalogDiscovery) {
+      await this.modelCatalogDiscovery;
+      return;
+    }
+    const discovery = this.transport.discoverModels({ cwd: agent.folder })
+      .then((availableModels) => {
+        if (availableModels?.length) this.applyModelCatalog(availableModels);
+      })
+      .catch(() => undefined);
+    this.modelCatalogDiscovery = discovery;
+    try {
+      await discovery;
+    } finally {
+      if (this.modelCatalogDiscovery === discovery) this.modelCatalogDiscovery = null;
+    }
+  }
+
+  private applyModelCatalog(availableModels: readonly ClaudeAvailableModel[]): void {
+    const models = claudeModelOptionsFromSdk(availableModels);
+    if (!models.length || sameModelCatalog(this.modelCatalog, models)) return;
+    this.modelCatalog = models;
+    this.emit({
+      backend: this.backend,
+      type: 'models.changed',
+      payload: { models: this.modelCatalog.map((model) => ({ ...model })) },
+    });
+    this.emit({
+      backend: this.backend,
+      type: 'backend.statusChanged',
+      payload: {
+        backend: this.backend,
+        status: 'running',
+        detail: 'Claude backend connected.',
+        capabilities: this.getCapabilities(),
+      },
+    });
+  }
 }
 
 function claudeTurnParams(
@@ -817,23 +873,25 @@ function claudeTurnParams(
   return {
     ownerId: agent.id,
     cwd: agent.folder,
-    prompt: claudePrompt(prompt, options),
+    prompt,
     sessionId: existingSessionId ?? undefined,
     model: options.model ?? defaults?.model ?? null,
-    permissionMode: claudeOptions?.permissionMode ?? defaults?.permissionMode ?? null,
+    effort: claudeEffort(options.reasoningEffort),
+    permissionMode: options.planMode ? 'plan' : claudeOptions?.permissionMode ?? defaults?.permissionMode ?? null,
     appendSystemPrompt: codexClawDeveloperInstructions(agent, pluginSettings),
     mcpServerUrl,
     allowedTools: mcpServerUrl ? ['mcp__codex_claw__*'] : [],
   };
 }
 
-function claudePrompt(prompt: string, options: SendPromptOptions): string {
-  if (!options.planMode) {
-    return prompt;
-  }
+function claudeEffort(value: string | null | undefined): ClaudeTurnParams['effort'] {
+  return value === 'low' || value === 'medium' || value === 'high' || value === 'xhigh' || value === 'max'
+    ? value
+    : null;
+}
 
-  const trimmed = prompt.trim();
-  return trimmed.startsWith('/plan') ? trimmed : `/plan ${trimmed}`;
+function sameModelCatalog(left: readonly BackendModelOption[], right: readonly BackendModelOption[]): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function claudeSessionId(agent: Agent): string | null {

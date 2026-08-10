@@ -17,6 +17,8 @@ import { debugMain, logMain } from '../log';
 import {
   type ClaudePermissionRequest,
   type ClaudePermissionResponse,
+  type ClaudeAvailableModel,
+  type ClaudeModelDiscoveryParams,
   type ClaudeTurnHandle,
   type ClaudeTurnParams,
   type ClaudeTurnTransport,
@@ -33,6 +35,7 @@ export type ClaudeAgentSdkTransportOptions = {
 
 export type ClaudeQueryRuntime = AsyncIterable<SDKMessage> & Pick<Query,
   'close' | 'interrupt' | 'setModel' | 'setPermissionMode'
+  | 'applyFlagSettings' | 'supportedModels' | 'initializationResult'
 >;
 
 export type ClaudeQueryFactory = (input: {
@@ -57,6 +60,7 @@ type ClaudeSdkSession = {
   query: ClaudeQueryRuntime;
   activeTurn: ActiveTransportTurn | null;
   model: string | null;
+  effort: ClaudeTurnParams['effort'];
   permissionMode: PermissionMode;
   closed: boolean;
 };
@@ -159,6 +163,32 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
     this.closeSessionRecord(session, 'Claude session released.');
   }
 
+  async listModels(): Promise<ClaudeAvailableModel[] | null> {
+    const session = [...this.sessions.values()].find((candidate) => !candidate.closed);
+    if (!session) return null;
+    const models = await session.query.supportedModels();
+    return toClaudeAvailableModels(models);
+  }
+
+  async discoverModels(params: ClaudeModelDiscoveryParams): Promise<ClaudeAvailableModel[] | null> {
+    if (this.closing) return null;
+    const input = new AsyncPushQueue<SDKUserMessage>();
+    const queryRuntime = this.createQuery({
+      prompt: input,
+      options: {
+        ...claudeQueryOptions({ cwd: params.cwd, prompt: '' }, this.createSessionId(), null, denyCatalogToolUse, this.options),
+        persistSession: false,
+      },
+    });
+    try {
+      const initialization = await queryRuntime.initializationResult();
+      return toClaudeAvailableModels(initialization.models);
+    } finally {
+      input.close();
+      queryRuntime.close();
+    }
+  }
+
   async close(): Promise<void> {
     this.closing = true;
     const sessions = [...this.sessions.values()];
@@ -192,6 +222,7 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
       query: queryRuntime,
       activeTurn,
       model: params.model ?? null,
+      effort: params.effort ?? null,
       permissionMode: normalizedPermissionMode(params.permissionMode) ?? 'default',
       closed: false,
     };
@@ -210,6 +241,12 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
     if (session.model !== nextModel) {
       await session.query.setModel(nextModel ?? undefined);
       session.model = nextModel;
+    }
+
+    const nextEffort = params.effort ?? null;
+    if (session.effort !== nextEffort) {
+      await session.query.applyFlagSettings({ effortLevel: nextEffort });
+      session.effort = nextEffort;
     }
 
     const nextPermissionMode = normalizedPermissionMode(params.permissionMode) ?? 'default';
@@ -409,6 +446,7 @@ function claudeQueryOptions(
     canUseTool,
     env,
     ...(params.model ? { model: params.model } : {}),
+    ...(params.effort ? { effort: params.effort } : {}),
     ...(permissionMode ? { permissionMode } : {}),
     ...(permissionMode === 'bypassPermissions' ? { allowDangerouslySkipPermissions: true } : {}),
     ...(resumeSessionId ? { resume: resumeSessionId } : { sessionId }),
@@ -428,6 +466,23 @@ function claudeQueryOptions(
     },
   };
 }
+
+function toClaudeAvailableModels(models: Awaited<ReturnType<Query['supportedModels']>>): ClaudeAvailableModel[] {
+  return models.map((model) => ({
+    value: model.value,
+    ...(model.resolvedModel ? { resolvedModel: model.resolvedModel } : {}),
+    displayName: model.displayName,
+    ...(model.description ? { description: model.description } : {}),
+    ...(model.supportsEffort === undefined ? {} : { supportsEffort: model.supportsEffort }),
+    ...(model.supportedEffortLevels ? { supportedEffortLevels: [...model.supportedEffortLevels] } : {}),
+    ...(model.supportsAdaptiveThinking === undefined ? {} : { supportsAdaptiveThinking: model.supportsAdaptiveThinking }),
+  }));
+}
+
+const denyCatalogToolUse: CanUseTool = async () => ({
+  behavior: 'deny',
+  message: 'This Claude session only reads available model metadata.',
+});
 
 function sessionConfigurationKey(params: ClaudeTurnParams): string {
   return JSON.stringify({

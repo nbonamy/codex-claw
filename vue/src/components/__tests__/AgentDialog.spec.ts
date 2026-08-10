@@ -18,7 +18,7 @@ const idleAgent: Agent = {
 };
 
 describe('AgentDialog', () => {
-  it('leads with repository selection and keeps Codex implementation details hidden', () => {
+  it('leads with repository selection and lets new agents choose their coding agent', () => {
     const wrapper = mountDialog();
 
     expect(wrapper.get('.agent-dialog__header').text()).toContain('New agent');
@@ -35,8 +35,11 @@ describe('AgentDialog', () => {
     expect(wrapper.text()).not.toContain('Checkout');
     expect(wrapper.get('[aria-label="Agent name"]').attributes('aria-label')).toBe('Agent name');
     expect(wrapper.text()).not.toContain('Resolved path');
-    expect(wrapper.text()).not.toContain('Backend');
-    expect(wrapper.text()).not.toContain('Claude Code');
+    expect(wrapper.text()).toContain('Coding agent');
+    expect(wrapper.findAllComponents({ name: 'ElOption' }).map((option) => option.props('label'))).toEqual(expect.arrayContaining([
+      'Codex',
+      'Claude Code',
+    ]));
     expect(wrapper.get('.agent-dialog__text-input').attributes('placeholder')).toBe('Name this agent');
     expect(wrapper.findAllComponents({ name: 'ElOption' })[0]?.props('label')).toBe('Choose folder...');
     expect(saveButton(wrapper).attributes()).toHaveProperty('disabled');
@@ -77,6 +80,25 @@ describe('AgentDialog', () => {
       avatar: '🤖',
       folder: '/Users/nbonamy/src/new-agent',
       backend: 'codex',
+    });
+  });
+
+  it('creates a Claude Code agent when selected', async () => {
+    const createAgent = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountDialog({
+      chooseAgentFolder: vi.fn().mockResolvedValue('/Users/nbonamy/src/claude-agent'),
+      createAgent,
+    });
+
+    await chooseCustomFolder(wrapper);
+    await emitSelect(wrapper, 'agent-dialog-backend', 'claude');
+    await saveButton(wrapper).trigger('click');
+
+    expect(createAgent).toHaveBeenCalledWith({
+      name: 'claude-agent',
+      avatar: '🤖',
+      folder: '/Users/nbonamy/src/claude-agent',
+      backend: 'claude',
     });
   });
 
@@ -574,9 +596,11 @@ async function emitSelect(wrapper: ReturnType<typeof mountDialog>, id: string, v
     ? selects[0]
     : id === 'agent-dialog-worktree'
       ? selects[1]
-      : id === 'agent-dialog-team'
+      : id === 'agent-dialog-backend'
         ? selects.at(-1)
-        : undefined;
+        : id === 'agent-dialog-team'
+          ? (wrapper.props('mode') === 'create' ? selects.at(-2) : selects.at(-1))
+          : undefined;
   if (!select) {
     throw new Error(`Select not found: ${id}`);
   }

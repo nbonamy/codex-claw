@@ -185,6 +185,26 @@
               </div>
             </div>
           </div>
+
+          <div class="agent-dialog__workspace-row">
+            <div class="agent-dialog__row-copy">
+              <label
+                class="agent-dialog__row-label"
+                for="agent-dialog-backend"
+              >Coding agent</label>
+            </div>
+            <div class="agent-dialog__row-control">
+              <el-select
+                id="agent-dialog-backend"
+                v-model="backend"
+                class="agent-dialog__workspace-select"
+                aria-label="Coding agent"
+              >
+                <el-option label="Codex" value="codex" />
+                <el-option label="Claude Code" value="claude" />
+              </el-select>
+            </div>
+          </div>
         </div>
       </section>
 

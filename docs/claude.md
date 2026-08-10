@@ -126,9 +126,11 @@ and project skills from `<agent-folder>/.claude/skills`, parses each
 `SKILL.md` frontmatter, and lets project skills override global skills with the
 same name.
 Claude advertises `planMode: "prompted"`: Claw owns the composer Plan-mode
-flag, and when the renderer sends `planMode: true`, the driver passes the next
-prompt to Claude Code as a native `/plan <prompt>` command. Claude's stream-json
-output then exposes a provider-specific plan flow:
+flag, and when the renderer sends `planMode: true`, the driver keeps the prompt
+text unchanged and starts the Agent SDK turn with its native `permissionMode:
+"plan"`. This avoids relying on the interactive `/plan` slash command, which
+is not available in every SDK environment. Claude's stream output then exposes
+a provider-specific plan flow:
 
 - `EnterPlanMode` marks the Claude session as planning.
 - `system/status.permissionMode: "plan"` is normalized to
@@ -180,8 +182,16 @@ The Agent SDK launches the configured executable directly rather than through
 a shell. Prompt and developer-instruction text is delivered over the SDK input
 stream and is not included in Claw's process logs.
 
-Claude model listing is local for now. The driver returns the CLI aliases
-`opus`, `sonnet`, and `haiku`, with `sonnet` as the default visible option.
+Before a Claude session starts, Claw offers the safe local aliases `opus`,
+`sonnet`, and `haiku`, with `sonnet` as the default. When a Claude agent is
+selected, Claw opens a short-lived Agent SDK query with session persistence
+disabled, reads its initialization model catalog, and closes it without sending
+a prompt. The composer therefore refreshes to the SDK's current models after a
+restart without creating an empty Claude conversation. Display names,
+descriptions, and supported effort levels come from the SDK, so the composer
+only offers an effort selector for models that advertise it. The selected
+effort is passed to the Agent SDK on the first turn and updated on later turns
+with its runtime flag settings API.
 
 The transport prepends common user binary folders such as `~/.local/bin`,
 `~/bin`, `/opt/homebrew/bin`, and `/usr/local/bin` to `PATH` because packaged or
@@ -666,12 +676,15 @@ avoids mutating global user state.
 
 ### Models, Thinking, Skills
 
-The current Claw model and skill contracts are backend-neutral, but only the
-Codex driver currently returns real model and skill catalogs.
+The current Claw model and skill contracts are backend-neutral. Codex returns
+its catalog from app-server; Claude refreshes its model catalog from the Agent
+SDK after session initialization and exposes only model-supported effort levels.
 
-Claude exposes model information in `initialize` responses and `system/init`
-messages, and it can accept `set_model`. Thinking is `ThinkingConfig` or older
-`max_thinking_tokens`, not Codex `ReasoningEffort`.
+Claude exposes model information through the Agent SDK and `system/init`
+messages. The SDK's `supportedModels()` response supplies model-specific effort
+levels, which Claw maps to its backend-neutral reasoning-effort picker and
+passes as the SDK `effort` option. Adaptive thinking remains SDK-controlled for
+now: Claw does not expose a separate thinking-budget control.
 
 Claude `system/init` contains `skills`, `plugins`, `slash_commands`, and
 `tools`, but the inspected websocket protocol does not show a direct equivalent
@@ -724,8 +737,9 @@ Claude Driver Work".
 ### Renderer
 
 - Previously, renderer components passed `codexModels` and `codexSkills`.
-- Model, reasoning, skill, goal, and steering controls are now capability
-  gated, but Codex is the only backend with populated model/skill catalogs.
+- Model, reasoning, skill, goal, and steering controls are capability gated.
+  Claude starts with local model aliases, then receives its live model catalog
+  and supported effort levels from the Agent SDK after initialization.
 - Composer and headers may still show user-visible Codex copy for Codex agents;
   another backend should supply its own display name through app-owned state.
 - Tool rendering logic still understands descriptors with `source: "codex"`

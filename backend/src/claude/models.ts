@@ -1,4 +1,5 @@
 import type { BackendModelOption } from '@codex-claw/core/contracts';
+import type { ClaudeAvailableModel } from './cli-transport';
 
 export const claudeModelOptions: BackendModelOption[] = [
   {
@@ -18,3 +19,35 @@ export const claudeModelOptions: BackendModelOption[] = [
     displayName: 'Haiku',
   },
 ];
+
+export function claudeModelOptionsFromSdk(models: readonly ClaudeAvailableModel[]): BackendModelOption[] {
+  return models
+    .filter((model) => model.value.trim().length > 0)
+    .map((model) => ({
+      id: model.value,
+      model: model.value,
+      displayName: model.displayName || model.value,
+      ...(model.description ? { description: model.description } : {}),
+      ...(model.supportsEffort && model.supportedEffortLevels?.length
+        ? {
+            supportedReasoningEfforts: model.supportedEffortLevels.map((reasoningEffort) => ({
+              reasoningEffort,
+              description: claudeEffortDescription(reasoningEffort),
+            })),
+            defaultReasoningEffort: model.supportedEffortLevels.includes('high')
+              ? 'high'
+              : model.supportedEffortLevels[0],
+          }
+        : {}),
+    }));
+}
+
+function claudeEffortDescription(effort: NonNullable<ClaudeAvailableModel['supportedEffortLevels']>[number]): string {
+  return ({
+    low: 'Minimal thinking for faster responses',
+    medium: 'Moderate thinking',
+    high: 'Deep reasoning',
+    xhigh: 'Deeper reasoning',
+    max: 'Maximum reasoning',
+  })[effort];
+}

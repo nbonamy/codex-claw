@@ -1747,9 +1747,28 @@ type BackendRuntimeCapabilities = NonNullable<AppSnapshot['backendRuntimes'][num
 
 function backendCapabilities(value: Record<string, unknown>): Partial<BackendRuntimeCapabilities> {
   return {
+    ...(typeof value.attachments === 'boolean' ? { attachments: value.attachments } : {}),
+    ...(typeof value.models === 'boolean' ? { models: value.models } : {}),
+    ...(typeof value.skills === 'boolean' ? { skills: value.skills } : {}),
+    ...(typeof value.reasoningEffort === 'boolean' ? { reasoningEffort: value.reasoningEffort } : {}),
+    ...(typeof value.serviceTier === 'boolean' ? { serviceTier: value.serviceTier } : {}),
+    ...(typeof value.thinkingBudget === 'boolean' ? { thinkingBudget: value.thinkingBudget } : {}),
+    ...(isBackendPlanModeSupport(value.planMode) ? { planMode: value.planMode } : {}),
+    ...(typeof value.goals === 'boolean' ? { goals: value.goals } : {}),
+    ...(typeof value.steerPrompt === 'boolean' ? { steerPrompt: value.steerPrompt } : {}),
+    ...(typeof value.interrupt === 'boolean' ? { interrupt: value.interrupt } : {}),
+    ...(typeof value.history === 'boolean' ? { history: value.history } : {}),
     ...(typeof value.conversationFork === 'boolean' ? { conversationFork: value.conversationFork } : {}),
+    ...(typeof value.rollback === 'boolean' ? { rollback: value.rollback } : {}),
+    ...(typeof value.editMessage === 'boolean' ? { editMessage: value.editMessage } : {}),
+    ...(typeof value.retryMessage === 'boolean' ? { retryMessage: value.retryMessage } : {}),
+    ...(typeof value.approvals === 'boolean' ? { approvals: value.approvals } : {}),
     ...(Array.isArray(value.approvalPresets) ? { approvalPresets: value.approvalPresets.filter(isApprovalPreset) } : {}),
   };
+}
+
+function isBackendPlanModeSupport(value: unknown): value is BackendRuntimeCapabilities['planMode'] {
+  return value === 'native' || value === 'prompted' || value === 'unsupported';
 }
 
 function isApprovalPreset(value: unknown): value is ApprovalPreset {

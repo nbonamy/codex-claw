@@ -2379,7 +2379,9 @@ describe('AppShell', () => {
     expect(agentDialog.find('#agent-dialog-team').exists()).toBe(true);
 
     await chooseCustomAgentFolder(wrapper);
-    const teamSelect = agentDialog.findAllComponents({ name: 'ElSelect' }).at(-1);
+    const teamSelect = agentDialog.findAllComponents({ name: 'ElSelect' }).find((select) => (
+      select.find('#agent-dialog-team').exists()
+    ));
     await teamSelect?.vm.$emit('update:modelValue', '__new_team__');
     await nextTick();
     expect(agentDialog.get<HTMLInputElement>('[aria-label="New team name"]').element.value).toBe('GitHub #12');

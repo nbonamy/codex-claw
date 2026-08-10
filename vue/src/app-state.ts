@@ -69,6 +69,7 @@ type CatalogCacheEntry<T> = {
   error: string | null;
   promise: Promise<void> | null;
   source: unknown;
+  revision: number;
 };
 
 const modelCatalogCache = new Map<AgentBackend, CatalogCacheEntry<BackendModelOption>>();
@@ -2062,6 +2063,9 @@ function handleMainEvent(event: MainToRendererEvent, adoptSnapshot = true): void
   if (event.type === 'skills.changed') {
     applySkillsChangedEvent(event);
   }
+  if (event.type === 'models.changed') {
+    applyModelsChangedEvent(event);
+  }
 }
 
 function recoverRendererAfterBackendConnection(): Promise<void> {
@@ -2178,6 +2182,41 @@ function applySkillsChangedEvent(event: MainToRendererEvent): void {
     syncSkillCatalogToConfiguration(agent.id, cache);
     if (agent.id === snapshot.value.activeAgentId) restoreComposerConfiguration(agent.id);
   }
+}
+
+function applyModelsChangedEvent(event: MainToRendererEvent): void {
+  if (!event.backend || !isRecord(event.payload) || !Array.isArray(event.payload.models)) return;
+  const models = event.payload.models
+    .filter(isBackendModelOption)
+    .map((model) => ({ ...model }));
+  const cache = catalogCacheEntry(modelCatalogCache, event.backend);
+  if (cache.status === 'loaded' && sameBackendModels(cache.value, models)) return;
+  cache.revision += 1;
+  cache.value = models;
+  cache.status = 'loaded';
+  cache.error = null;
+  cache.promise = null;
+
+  for (const agent of snapshot.value.agents) {
+    if (agent.backend !== event.backend) continue;
+    syncModelCatalogToConfiguration(agent.id, cache);
+    if (agent.id === snapshot.value.activeAgentId) restoreComposerConfiguration(agent.id);
+  }
+}
+
+function isBackendModelOption(value: unknown): value is BackendModelOption {
+  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.model !== 'string' || typeof value.displayName !== 'string') {
+    return false;
+  }
+  return value.supportedReasoningEfforts === undefined || (
+    Array.isArray(value.supportedReasoningEfforts) && value.supportedReasoningEfforts.every((option) => (
+      isRecord(option) && typeof option.reasoningEffort === 'string' && typeof option.description === 'string'
+    ))
+  );
+}
+
+function sameBackendModels(left: readonly BackendModelOption[], right: readonly BackendModelOption[]): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function isBackendSkillSummary(value: unknown): value is BackendSkillSummary {
@@ -2317,6 +2356,7 @@ function catalogCacheEntry<T>(cache: Map<string | AgentBackend, CatalogCacheEntr
     error: null,
     promise: null,
     source: null,
+    revision: 0,
   };
   cache.set(key, created);
   return created;
@@ -2335,6 +2375,7 @@ function resetCatalogCacheIfSourceChanged<T>(cache: CatalogCacheEntry<T>, source
   cache.status = 'notLoaded';
   cache.error = null;
   cache.promise = null;
+  cache.revision += 1;
   cache.source = source;
 }
 
@@ -2455,19 +2496,23 @@ async function loadBackendModelsForActiveAgent(agentId = snapshot.value.activeAg
   if (!cache.promise && cache.status === 'notLoaded') {
     cache.status = 'loading';
     cache.error = null;
-    cache.promise = source.listBackendModels(agent.id)
+    const revision = cache.revision;
+    const request = source.listBackendModels(agent.id)
       .then((models) => {
+        if (cache.revision !== revision) return;
         cache.value = models.map((model) => ({ ...model }));
         cache.status = 'loaded';
       })
       .catch((error) => {
+        if (cache.revision !== revision) return;
         cache.value = [];
         cache.status = 'error';
         cache.error = error instanceof Error ? error.message : String(error);
-      })
-      .finally(() => {
-        cache.promise = null;
       });
+    cache.promise = request;
+    void request.finally(() => {
+      if (cache.promise === request) cache.promise = null;
+    });
   }
 
   syncModelCatalogToConfiguration(agent.id, cache);

@@ -3816,6 +3816,53 @@ describe('useAppState', () => {
     expect(state.backendSkills.value).toBe(skillsReference);
   });
 
+  it('refreshes the Claude model catalog and reasoning choices after a models changed event', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0] = { ...remoteSnapshot.agents[0]!, backend: 'claude' };
+    const listBackendModels = vi.fn().mockResolvedValue([]);
+
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        listBackendModels,
+        onEvent: vi.fn((nextListener) => {
+          listeners.push(nextListener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    listeners[0]?.({
+      seq: 1,
+      backend: 'claude',
+      type: 'models.changed',
+      payload: {
+        models: [{
+          id: 'claude-sonnet-4-5',
+          model: 'claude-sonnet-4-5',
+          displayName: 'Sonnet 4.5',
+          supportedReasoningEfforts: [
+            { reasoningEffort: 'low', description: 'Minimal thinking' },
+            { reasoningEffort: 'high', description: 'Deep reasoning' },
+          ],
+          defaultReasoningEffort: 'high',
+          isDefault: true,
+        }],
+      },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    await vi.waitFor(() => {
+      expect(state.backendModels.value).toEqual([expect.objectContaining({ id: 'claude-sonnet-4-5' })]);
+      expect(state.selectedModelId.value).toBe('claude-sonnet-4-5');
+      expect(state.selectedReasoningEffort.value).toBe('high');
+    });
+    expect(listBackendModels).toHaveBeenCalled();
+  });
+
   it('publishes validated file activity for inactive and active agents', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();

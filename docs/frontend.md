@@ -237,10 +237,10 @@ implemented:
   `Command+9` hints; pressing the matching number switches agents;
 - focused artifact panes for documents, plans, and read-only source previews;
 - Bench entry point in the agent creation flow;
-- repository-first agent creation that keeps Codex implicit, puts custom folder
-  selection first, progressively reveals checkout controls, and hides backend
-  and resolved-path implementation details; identity and workspace settings
-  use grouped surfaces with compact row controls;
+- repository-first agent creation that puts custom folder selection first,
+  progressively reveals checkout controls, offers Codex or Claude Code for new
+  agents, and hides resolved-path implementation details; identity and
+  workspace settings use grouped surfaces with compact row controls;
 - a theme-aware What’s New dialog that embeds the complete released changelog,
   opens on the current version, allows browsing previous versions, and opens
   from both the native Help menu and lower-left account menu;

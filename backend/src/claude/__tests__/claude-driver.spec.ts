@@ -171,6 +171,63 @@ describe('ClaudeBackendDriver', () => {
     ]);
   });
 
+  it('discovers the available Claude models before the first prompt', async () => {
+    const transport = createFakeTransport();
+    transport.discoverModels.mockResolvedValue([{
+      value: 'claude-fable-1',
+      displayName: 'Fable',
+      description: 'Experimental coding model',
+      supportsEffort: true,
+      supportedEffortLevels: ['low', 'medium'],
+    }]);
+    const driver = new ClaudeBackendDriver(transport);
+
+    await expect(driver.listModels(agent)).resolves.toEqual([expect.objectContaining({
+      id: 'claude-fable-1',
+      displayName: 'Fable',
+      supportedReasoningEfforts: [
+        { reasoningEffort: 'low', description: expect.any(String) },
+        { reasoningEffort: 'medium', description: expect.any(String) },
+      ],
+    })]);
+    expect(transport.discoverModels).toHaveBeenCalledWith({ cwd: agent.folder });
+    expect(driver.getCapabilities(agent)).toMatchObject({ reasoningEffort: true });
+  });
+
+  it('publishes the live Agent SDK model catalog and supported reasoning efforts after initialization', async () => {
+    const transport = createFakeTransport();
+    transport.listModels.mockResolvedValue([{
+      value: 'claude-sonnet-4-5',
+      displayName: 'Sonnet 4.5',
+      description: 'Balanced for coding',
+      supportsEffort: true,
+      supportedEffortLevels: ['low', 'high'],
+    }]);
+    const driver = new ClaudeBackendDriver(transport);
+    const events: unknown[] = [];
+    driver.onEvent((event) => events.push(event));
+
+    const started = driver.sendPrompt(agent, 'hello', { reasoningEffort: 'high' });
+    expect(transport.startTurn).toHaveBeenCalledWith(expect.objectContaining({ effort: 'high' }), expect.any(Function), expect.any(Function));
+    transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-catalog' });
+    await started;
+    await vi.waitFor(() => expect(events).toContainEqual(expect.objectContaining({
+      type: 'models.changed',
+      payload: {
+        models: [expect.objectContaining({
+          id: 'claude-sonnet-4-5',
+          supportedReasoningEfforts: [
+            { reasoningEffort: 'low', description: expect.any(String) },
+            { reasoningEffort: 'high', description: expect.any(String) },
+          ],
+          defaultReasoningEffort: 'high',
+        })],
+      },
+    })));
+    expect(driver.getCapabilities(agent)).toMatchObject({ reasoningEffort: true });
+    await expect(driver.listModels(agent)).resolves.toEqual([expect.objectContaining({ id: 'claude-sonnet-4-5' })]);
+  });
+
   it('releases an idle live query when the agent starts a different conversation', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
@@ -505,12 +562,15 @@ describe('ClaudeBackendDriver', () => {
     expect(historyLoader).not.toHaveBeenCalled();
   });
 
-  it('converts prompted plan mode into Claude slash plan commands', async () => {
+  it('maps plan mode to the Agent SDK plan permission mode without changing the prompt text', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
     const sendResult = driver.sendPrompt(agent, 'build the thing', { planMode: true });
 
-    expect(transport.startTurn.mock.calls[0]?.[0].prompt).toBe('/plan build the thing');
+    expect(transport.startTurn.mock.calls[0]?.[0]).toMatchObject({
+      prompt: 'build the thing',
+      permissionMode: 'plan',
+    });
 
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-plan' });
     await expect(sendResult).resolves.toMatchObject({
@@ -808,6 +868,8 @@ function createFakeTransport(): ClaudeTurnTransport & {
   startTurn: ReturnType<typeof vi.fn<(params: ClaudeTurnParams, onMessage: (message: ClaudeSdkMessage) => void) => ClaudeTurnHandle>>;
   respondToPermissionRequest: ReturnType<typeof vi.fn>;
   closeSession: ReturnType<typeof vi.fn>;
+  discoverModels: ReturnType<typeof vi.fn>;
+  listModels: ReturnType<typeof vi.fn>;
 } {
   let onMessage: (message: ClaudeSdkMessage) => void = () => undefined;
   let onPermissionRequest: (request: import('../cli-transport').ClaudePermissionRequest) => void = () => undefined;
@@ -845,6 +907,8 @@ function createFakeTransport(): ClaudeTurnTransport & {
     },
     respondToPermissionRequest: vi.fn().mockRejectedValue(new Error("Claude permission request 'request-1' is no longer pending.")),
     closeSession: vi.fn().mockResolvedValue(undefined),
+    discoverModels: vi.fn().mockResolvedValue(null),
+    listModels: vi.fn().mockResolvedValue(null),
     close: vi.fn().mockResolvedValue(undefined),
   };
 }

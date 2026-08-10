@@ -521,6 +521,7 @@ describe('snapshot reducer', () => {
         capabilities: {
           approvalPresets: ['ask-for-approval', 'not-a-preset'],
           conversationFork: true,
+          reasoningEffort: true,
         },
       },
       occurredAt: '2026-06-05T00:00:02.000Z',
@@ -534,6 +535,7 @@ describe('snapshot reducer', () => {
       capabilities: {
         approvalPresets: ['ask-for-approval'],
         conversationFork: true,
+        reasoningEffort: true,
       },
     });
   });

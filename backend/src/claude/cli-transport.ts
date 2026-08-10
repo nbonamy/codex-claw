@@ -19,10 +19,25 @@ export type ClaudeTurnParams = {
   prompt: string;
   sessionId?: string;
   model?: string | null;
+  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
   permissionMode?: string | null;
   appendSystemPrompt?: string | null;
   mcpServerUrl?: string | null;
   allowedTools?: string[];
+};
+
+export type ClaudeAvailableModel = {
+  value: string;
+  resolvedModel?: string;
+  displayName: string;
+  description?: string;
+  supportsEffort?: boolean;
+  supportedEffortLevels?: Array<'low' | 'medium' | 'high' | 'xhigh' | 'max'>;
+  supportsAdaptiveThinking?: boolean;
+};
+
+export type ClaudeModelDiscoveryParams = {
+  cwd: string;
 };
 
 export type ClaudeTurnHandle = {
@@ -60,6 +75,8 @@ export type ClaudeTurnTransport = {
     onPermissionRequest?: (request: ClaudePermissionRequest) => void,
   ): ClaudeTurnHandle;
   respondToPermissionRequest?(requestId: string, response: ClaudePermissionResponse): Promise<void>;
+  discoverModels?(params: ClaudeModelDiscoveryParams): Promise<ClaudeAvailableModel[] | null>;
+  listModels?(): Promise<ClaudeAvailableModel[] | null>;
   closeSession?(sessionId: string): void | Promise<void>;
   close(): Promise<void>;
 };

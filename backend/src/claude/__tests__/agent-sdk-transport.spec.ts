@@ -14,6 +14,24 @@ import type { ClaudePermissionRequest } from '../cli-transport';
 import type { ClaudeSdkMessage } from '../protocol';
 
 describe('ClaudeAgentSdkTransport', () => {
+  it('discovers the model catalog without persisting a Claude conversation', async () => {
+    const harness = createQueryHarness([{
+      value: 'claude-opus-4-6',
+      displayName: 'Opus 4.6',
+      description: 'Best for complex work',
+      supportsEffort: true,
+      supportedEffortLevels: ['medium', 'high'],
+    }]);
+    const transport = new ClaudeAgentSdkTransport({ createQuery: harness.createQuery });
+
+    await expect(transport.discoverModels({ cwd: '/tmp/project' })).resolves.toEqual([expect.objectContaining({
+      value: 'claude-opus-4-6',
+      displayName: 'Opus 4.6',
+    })]);
+    expect(harness.options[0]).toMatchObject({ cwd: '/tmp/project', persistSession: false });
+    expect(harness.runtimes[0]?.close).toHaveBeenCalledOnce();
+  });
+
   it('keeps one Agent SDK query alive across turns in the same session', async () => {
     const harness = createQueryHarness();
     const transport = new ClaudeAgentSdkTransport({
@@ -67,6 +85,21 @@ describe('ClaudeAgentSdkTransport', () => {
       },
     });
 
+    harness.runtimes[0]?.supportedModels.mockResolvedValueOnce([{
+      value: 'claude-sonnet-4-5',
+      displayName: 'Sonnet 4.5',
+      description: 'Balanced for coding',
+      supportsEffort: true,
+      supportedEffortLevels: ['low', 'high'],
+    }]);
+    await expect(transport.listModels()).resolves.toEqual([{
+      value: 'claude-sonnet-4-5',
+      displayName: 'Sonnet 4.5',
+      description: 'Balanced for coding',
+      supportsEffort: true,
+      supportedEffortLevels: ['low', 'high'],
+    }]);
+
     harness.emit({ type: 'system', subtype: 'init', session_id: '11111111-1111-4111-8111-111111111111' });
     harness.emit({ type: 'result', subtype: 'success', session_id: '11111111-1111-4111-8111-111111111111', is_error: false });
     await expect(first.done).resolves.toBeUndefined();
@@ -78,6 +111,7 @@ describe('ClaudeAgentSdkTransport', () => {
       prompt: 'second prompt',
       sessionId: '11111111-1111-4111-8111-111111111111',
       model: 'opus',
+      effort: 'high',
       permissionMode: 'acceptEdits',
       appendSystemPrompt: 'Claw instructions',
       mcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-1',
@@ -88,6 +122,7 @@ describe('ClaudeAgentSdkTransport', () => {
     expect(harness.createQuery).toHaveBeenCalledOnce();
     expect(harness.runtimes[0]?.setModel).toHaveBeenCalledWith('opus');
     expect(harness.runtimes[0]?.setPermissionMode).toHaveBeenCalledWith('acceptEdits');
+    expect(harness.runtimes[0]?.applyFlagSettings).toHaveBeenCalledWith({ effortLevel: 'high' });
     expect(harness.inputs[1]?.message.content).toStrictEqual([{ type: 'text', text: 'second prompt' }]);
 
     harness.emit({ type: 'result', subtype: 'success', session_id: '11111111-1111-4111-8111-111111111111', is_error: false });
@@ -383,7 +418,7 @@ describe('ClaudeAgentSdkTransport', () => {
   });
 });
 
-function createQueryHarness(): {
+function createQueryHarness(initializationModels: Array<Record<string, unknown>> = []): {
   createQuery: ReturnType<typeof vi.fn<ClaudeQueryFactory>>;
   inputs: SDKUserMessage[];
   options: ClaudeQueryOptions[];
@@ -391,6 +426,9 @@ function createQueryHarness(): {
     interrupt: ReturnType<typeof vi.fn>;
     setModel: ReturnType<typeof vi.fn>;
     setPermissionMode: ReturnType<typeof vi.fn>;
+    applyFlagSettings: ReturnType<typeof vi.fn>;
+    supportedModels: ReturnType<typeof vi.fn>;
+    initializationResult: ReturnType<typeof vi.fn>;
   }>;
   emit(message: ClaudeSdkMessage): void;
 } {
@@ -400,22 +438,31 @@ function createQueryHarness(): {
     interrupt: ReturnType<typeof vi.fn>;
     setModel: ReturnType<typeof vi.fn>;
     setPermissionMode: ReturnType<typeof vi.fn>;
+    applyFlagSettings: ReturnType<typeof vi.fn>;
+    supportedModels: ReturnType<typeof vi.fn>;
+    initializationResult: ReturnType<typeof vi.fn>;
   }> = [];
   let output = new TestAsyncQueue<SDKMessage>();
   const createQuery = vi.fn<ClaudeQueryFactory>((input) => {
     options.push(input.options);
     void collectInputs(input.prompt, inputs);
     output = new TestAsyncQueue<SDKMessage>();
-    const runtime = {
+    const runtime: ClaudeQueryRuntime & {
+      interrupt: ReturnType<typeof vi.fn>;
+      setModel: ReturnType<typeof vi.fn>;
+      setPermissionMode: ReturnType<typeof vi.fn>;
+      applyFlagSettings: ReturnType<typeof vi.fn>;
+      supportedModels: ReturnType<typeof vi.fn>;
+      initializationResult: ReturnType<typeof vi.fn>;
+    } = {
       [Symbol.asyncIterator]: () => output[Symbol.asyncIterator](),
       interrupt: vi.fn().mockResolvedValue(undefined),
       setModel: vi.fn().mockResolvedValue(undefined),
       setPermissionMode: vi.fn().mockResolvedValue(undefined),
+      applyFlagSettings: vi.fn().mockResolvedValue(undefined),
+      supportedModels: vi.fn().mockResolvedValue([]),
+      initializationResult: vi.fn().mockResolvedValue({ models: initializationModels }),
       close: vi.fn(() => output.close()),
-    } satisfies ClaudeQueryRuntime & {
-      interrupt: ReturnType<typeof vi.fn>;
-      setModel: ReturnType<typeof vi.fn>;
-      setPermissionMode: ReturnType<typeof vi.fn>;
     };
     runtimes.push(runtime);
     return runtime;
