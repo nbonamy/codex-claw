@@ -201,6 +201,11 @@
           :open-in-catalog="openInApplications"
           :subagent-tree="currentSubagentTree"
           :selected-subagent-conversation-id="selectedSubagentConversationIdFor(currentAgent.id)"
+          :get-git-workflow="props.getAgentGitWorkflow"
+          :commit-git-changes="props.commitAgentGitChanges"
+          :push-git-branch="props.pushAgentGitBranch"
+          :create-git-pull-request="props.createAgentGitPullRequest"
+          :merge-git-branch="props.mergeAgentGitBranch"
           @expand-sidebar="agentSidebarCollapsed = false"
           @toggle-execution-plan="toggleExecutionPlan"
           @toggle-workspace="toggleRightWorkspace"
@@ -488,6 +493,7 @@ const props = withDefaults(defineProps<{
   commitAgentGitChanges?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitCommitInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   pushAgentGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPushInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   createAgentGitPullRequest?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPullRequestInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
+  mergeAgentGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitMergeInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   openInApplications?: OpenInApplicationCatalog;
   openAgentPath?: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   createAgent?: (input: CreateAgentInput) => Promise<Agent | null | void>;
@@ -586,6 +592,7 @@ const props = withDefaults(defineProps<{
   commitAgentGitChanges: async () => { throw new Error('Git commit is not available.'); },
   pushAgentGitBranch: async () => { throw new Error('Git push is not available.'); },
   createAgentGitPullRequest: async () => { throw new Error('Pull request creation is not available.'); },
+  mergeAgentGitBranch: async () => { throw new Error('Git merge is not available.'); },
   openInApplications: () => ({ defaultApplication: 'finder', applications: [] }),
   openAgentPath: async () => {
     throw new Error('Open In is not available.');

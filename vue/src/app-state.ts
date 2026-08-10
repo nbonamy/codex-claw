@@ -642,6 +642,11 @@ export function useAppState() {
     return codexClawApi.createAgentGitPullRequest(agentId, input);
   }
 
+  async function mergeAgentGitBranch(agentId: string, input: import('@codex-claw/core/contracts').AgentGitMergeInput): Promise<AgentGitWorkflow> {
+    if (!codexClawApi?.mergeAgentGitBranch) throw new Error('Git merge is not available.');
+    return codexClawApi.mergeAgentGitBranch(agentId, input);
+  }
+
   async function loadOpenInApplications(): Promise<void> {
     if (!clawHostCapabilities.openInApplications || !codexClawApi?.getOpenInApplications) return;
     openInApplications.value = await codexClawApi.getOpenInApplications();
@@ -1632,6 +1637,7 @@ export function useAppState() {
     commitAgentGitChanges,
     pushAgentGitBranch,
     createAgentGitPullRequest,
+    mergeAgentGitBranch,
     loadOpenInApplications,
     openAgentPath,
     createAgent,

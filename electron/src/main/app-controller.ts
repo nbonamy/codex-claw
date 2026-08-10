@@ -218,6 +218,7 @@ export class AppController {
     ipc.handle(ipcChannels.commitAgentGitChanges, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitCommit, { agentId, input }));
     ipc.handle(ipcChannels.pushAgentGitBranch, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitPush, { agentId, input }));
     ipc.handle(ipcChannels.createAgentGitPullRequest, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitPullRequestCreate, { agentId, input }));
+    ipc.handle(ipcChannels.mergeAgentGitBranch, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitMerge, { agentId, input }));
 
     ipc.handle(ipcChannels.getOpenInApplications, () => this.getOpenInApplications());
     ipc.handle(ipcChannels.openAgentPath, (_event, agentId: string, application: OpenInApplication, filePath?: string) => {

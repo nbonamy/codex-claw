@@ -36,6 +36,7 @@ describe('ipc channels', () => {
       commitAgentGitChanges: 'agent:git-workflow:commit',
       pushAgentGitBranch: 'agent:git-workflow:push',
       createAgentGitPullRequest: 'agent:git-workflow:pull-request:create',
+      mergeAgentGitBranch: 'agent:git-workflow:merge',
       getOpenInApplications: 'open-in:applications:get',
       openAgentPath: 'agent:path:open-in',
       chooseAgentFolder: 'agent:choose-folder',

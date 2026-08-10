@@ -76,12 +76,13 @@ export class AgentGitService {
   }
 
   async workflow(folder: string): Promise<Omit<AgentGitWorkflow, 'githubConnected' | 'existingPullRequest'>> {
-    const [root, branch, upstream, remote, status] = await Promise.all([
+    const [root, branch, upstream, remote, status, branchStatusResult] = await Promise.all([
       this.runGit(folder, ['rev-parse', '--show-toplevel']),
       this.runGit(folder, ['symbolic-ref', '--quiet', '--short', 'HEAD']).catch(() => ({ stdout: '' })),
       this.runGit(folder, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']).catch(() => ({ stdout: '' })),
       this.runGit(folder, ['remote']).catch(() => ({ stdout: '' })),
       this.runGit(folder, ['status', '--porcelain=v1', '-z']),
+      this.runGit(folder, ['status', '--porcelain=v1', '--branch']),
     ]);
     const remotes = remote.stdout.split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
     const trackedRemote = upstream.stdout.trim().split('/')[0];
@@ -91,6 +92,7 @@ export class AgentGitService {
       ? (await this.runGit(folder, ['remote', 'get-url', remoteName])).stdout.trim()
       : undefined;
     const files = parsePorcelainFiles(status.stdout);
+    const branchStatus = parseBranchStatus(branchStatusResult.stdout);
     const repository = githubRepositoryFromRemote(remoteUrl) ?? fileName(root.stdout.trim());
     return {
       repository,
@@ -100,6 +102,8 @@ export class AgentGitService {
       ...(remoteName ? { remote: remoteName } : {}),
       ...(remoteUrl ? { remoteUrl } : {}),
       ...(upstream.stdout.trim() ? { upstream: upstream.stdout.trim() } : {}),
+      ahead: branchStatus.ahead ?? 0,
+      behind: branchStatus.behind ?? 0,
       files,
       stagedFiles: files.filter((file) => file.indexStatus !== ' ' && file.indexStatus !== '?').map((file) => file.path),
       unstagedFiles: files.filter((file) => file.worktreeStatus !== ' ' || file.indexStatus === '?').map((file) => file.path),
@@ -125,6 +129,23 @@ export class AgentGitService {
       ? ['push', '--set-upstream', remote, branch]
       : ['push', remote, branch]);
   }
+
+  async merge(folder: string, strategy: 'merge' | 'squash', deleteBranch: boolean, deleteWorktree: boolean): Promise<void> {
+    const current = await this.workflow(folder);
+    if (!current.branch || current.detached) throw new Error('Create or check out a branch before merging.');
+    const worktrees = parseWorktrees((await this.runGit(folder, ['worktree', 'list', '--porcelain'])).stdout);
+    const target = worktrees.find((item) => item.path !== current.folder && (item.branch === 'main' || item.branch === 'master')) ?? worktrees.find((item) => item.path !== current.folder);
+    if (!target) throw new Error('A base worktree is required before merging.');
+    await this.runGit(target.path, strategy === 'squash' ? ['merge', '--squash', current.branch] : ['merge', current.branch]);
+    if (strategy === 'squash') await this.runGit(target.path, ['commit', '-m', `Merge branch '${current.branch}'`]);
+    if (deleteBranch) await this.runGit(target.path, ['branch', '-d', current.branch]);
+    if (deleteWorktree) await this.runGit(target.path, ['worktree', 'remove', current.folder]);
+  }
+}
+
+function parseWorktrees(output: string): Array<{ path: string; branch?: string }> {
+  const records = output.split(/\n\n+/).map((record) => record.split(/\r?\n/)).filter((lines) => lines[0]?.startsWith('worktree '));
+  return records.map((lines) => ({ path: lines[0]!.slice('worktree '.length), branch: lines.find((line) => line.startsWith('branch '))?.slice('branch refs/heads/'.length) }));
 }
 
 export function parsePorcelainFiles(output: string): AgentGitFile[] {

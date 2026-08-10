@@ -1093,6 +1093,8 @@ export type AgentGitWorkflow = {
   remote?: string;
   remoteUrl?: string;
   upstream?: string;
+  ahead: number;
+  behind: number;
   files: AgentGitFile[];
   stagedFiles: string[];
   unstagedFiles: string[];
@@ -1102,9 +1104,10 @@ export type AgentGitWorkflow = {
 };
 
 export type AgentGitStageInput = { paths: string[]; confirmed: boolean };
-export type AgentGitCommitInput = { message: string; confirmed: boolean };
+export type AgentGitCommitInput = { message: string; confirmed: boolean; includeUnstaged?: boolean };
 export type AgentGitPushInput = { confirmed: boolean };
 export type AgentGitPullRequestInput = { title: string; body: string; confirmed: boolean };
+export type AgentGitMergeInput = { strategy: 'merge' | 'squash'; deleteBranch: boolean; deleteWorktree: boolean; confirmed: boolean };
 
 export type TurnGitDiff = {
   turnId: string;
@@ -1416,6 +1419,7 @@ export type CodexClawApi = {
   commitAgentGitChanges(agentId: string, input: AgentGitCommitInput): Promise<AgentGitWorkflow>;
   pushAgentGitBranch(agentId: string, input: AgentGitPushInput): Promise<AgentGitWorkflow>;
   createAgentGitPullRequest(agentId: string, input: AgentGitPullRequestInput): Promise<AgentGitWorkflow>;
+  mergeAgentGitBranch(agentId: string, input: AgentGitMergeInput): Promise<AgentGitWorkflow>;
   getOpenInApplications(): Promise<OpenInApplicationCatalog>;
   openAgentPath(agentId: string, application: OpenInApplication, filePath?: string): Promise<AppSnapshot>;
   chooseAgentFolder(): Promise<string | null>;

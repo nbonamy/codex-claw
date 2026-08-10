@@ -655,6 +655,10 @@ export class ClawBackendServer {
         const agentId = requireString(params.agentId, 'agentId');
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitCommit, params, async (agent) => {
           const input = requireConfirmed(params.input, 'Creating a commit');
+          const workflow = await this.agentGitService.workflow(agent.folder);
+          if (input.includeUnstaged === true && workflow.unstagedFiles.length > 0) {
+            await this.agentGitService.stage(agent.folder, workflow.unstagedFiles);
+          }
           await this.agentGitService.commit(agent.folder, requireString(input.message, 'message'));
           return this.gitWorkflow(agent);
         });
@@ -687,6 +691,17 @@ export class ClawBackendServer {
             body: typeof input.body === 'string' ? input.body : '',
           });
           return this.gitWorkflow(agent);
+        });
+      }
+      case backendMethods.agentGitMerge: {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitMerge, params, async (agent) => {
+          const input = requireConfirmed(params.input, 'Merging a branch');
+          const strategy = input.strategy === 'squash' ? 'squash' : 'merge';
+          const workflow = await this.gitWorkflow(agent);
+          await this.agentGitService.merge(agent.folder, strategy, input.deleteBranch === true, input.deleteWorktree === true);
+          return workflow;
         });
       }
       case backendMethods.agentWorkItemAssign: {

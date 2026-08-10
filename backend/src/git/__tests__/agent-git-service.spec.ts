@@ -146,4 +146,22 @@ describe('agent git service parsers', () => {
     await expect(service.stage('/repo', ['../secret'])).rejects.toThrow('inside the repository');
     expect(parsePorcelainFiles('R  new.ts\0old.ts\0')).toStrictEqual([{ path: 'old.ts', indexStatus: 'R', worktreeStatus: ' ' }]);
   });
+
+  it('merges a feature worktree into the main worktree and applies cleanup options', async () => {
+    const runGit = vi.fn(async (folder: string, args: string[]) => {
+      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/repo-feature\n' };
+      if (args[0] === 'symbolic-ref') return { stdout: 'feature\n' };
+      if (args.includes('@{upstream}')) return { stdout: '' };
+      if (args[0] === 'remote' && args[1] === undefined) return { stdout: '' };
+      if (args[0] === 'status') return { stdout: '## feature\n' };
+      if (args[0] === 'worktree') return { stdout: 'worktree /repo\nHEAD abc\nbranch refs/heads/main\n\nworktree /repo-feature\nHEAD def\nbranch refs/heads/feature\n' };
+      return { stdout: '' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
+    await service.merge('/repo-feature', 'squash', true, true);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['merge', '--squash', 'feature']);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['commit', '-m', "Merge branch 'feature'"]);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['branch', '-d', 'feature']);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['worktree', 'remove', '/repo-feature']);
+  });
 });

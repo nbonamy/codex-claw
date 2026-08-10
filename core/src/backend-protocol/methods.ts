@@ -17,6 +17,7 @@ export const backendMethods = {
   agentGitCommit: 'agent/git/commit',
   agentGitPush: 'agent/git/push',
   agentGitPullRequestCreate: 'agent/git/pullRequest/create',
+  agentGitMerge: 'agent/git/merge',
   agentGoalClear: 'agent/goal/clear',
   agentGoalUpdate: 'agent/goal/update',
   agentHistoryHydrate: 'agent/history/hydrate',

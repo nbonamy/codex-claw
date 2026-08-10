@@ -75,16 +75,16 @@
           />
         </button>
       </span>
-      <button
-        v-if="gitReviewAvailable"
-        class="agent-header__git-review"
-        aria-label="Open GitHub Review"
-        title="Open GitHub Review"
-        type="button"
-        @click="emit('open-git-diff')"
-      >
-        <GitHubIcon aria-hidden="true" />
-      </button>
+      <GitWorkflowControl
+        v-if="gitReviewAvailable && agent"
+        :agent="agent"
+        :git-status="gitStatus"
+        :get-workflow="getGitWorkflow"
+        :commit-changes="commitGitChanges"
+        :push-branch="pushGitBranch"
+        :create-pull-request="createGitPullRequest"
+        :merge-branch="mergeGitBranch"
+      />
       <OpenInControl
         v-if="agent && openInAvailable && openInCatalog && openInCatalog.applications.length > 0"
         :application="effectiveOpenInApplication(agent, openInCatalog)"
@@ -130,13 +130,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Agent, AgentGitStatus, AgentSubagentTree, BackendRuntimeStatus, DesktopUpdateStatus, OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
-import { GitHubIcon, ListIcon, PanelLeftOpenIcon } from '../shared/icons/app-icons';
+import { ListIcon, PanelLeftOpenIcon } from '../shared/icons/app-icons';
 import { IconLayoutSidebarRight } from '@tabler/icons-vue';
 import { CodexAnimatedDiffStat } from '@codex-app-sdk/vue';
 import AgentAvatar from './AgentAvatar.vue';
 import UpdateAvailableBadge from './UpdateAvailableBadge.vue';
 import OpenInControl from '../shared/OpenInControl.vue';
 import SubagentControl from './SubagentControl.vue';
+import GitWorkflowControl from './GitWorkflowControl.vue';
 import { effectiveOpenInApplication } from '../shared/open-in';
 
 const props = defineProps<{
@@ -153,6 +154,11 @@ const props = defineProps<{
   openInCatalog?: OpenInApplicationCatalog;
   subagentTree?: AgentSubagentTree | null;
   selectedSubagentConversationId?: string | null;
+  getGitWorkflow?: (agentId: string) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
+  commitGitChanges?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitCommitInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
+  pushGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPushInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
+  createGitPullRequest?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPullRequestInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
+  mergeGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitMergeInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
 }>();
 
 const emit = defineEmits<{
@@ -376,41 +382,6 @@ const gitReviewAvailable = computed(() => {
 }
 
 .agent-header__git-diff:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-}
-
-.agent-header__git-review {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-4);
-  min-width: 32px;
-  height: 32px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-text-muted);
-  background: transparent;
-  font: inherit;
-  font-size: var(--font-size-13);
-  cursor: pointer;
-  -webkit-app-region: no-drag;
-}
-
-.agent-header__git-review:hover {
-  border-color: var(--color-border-strong);
-  color: var(--color-text);
-  background: var(--color-surface-high);
-}
-
-.agent-header__git-review :deep(.github-icon) {
-  width: var(--icon-md);
-  height: var(--icon-md);
-}
-
-.agent-header__git-review:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
