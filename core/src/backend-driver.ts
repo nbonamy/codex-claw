@@ -6,6 +6,7 @@ import type {
   AppSnapshot,
   BackendCapabilities,
   BackendConversationRef,
+  BackendDefaults,
   BackendModelOption,
   BackendPromptOptions,
   BackendRuntimeStatus,
@@ -58,6 +59,10 @@ export type BackendApprovalPresetResult = {
   approvalPreset: ApprovalPreset;
 };
 
+export type BackendPermissionModeResult = {
+  backendDefaults: BackendDefaults;
+};
+
 export type AgentBackendDriver = {
   readonly backend: AgentBackend;
   getRuntimeStatus(): BackendRuntimeStatus;
@@ -71,6 +76,7 @@ export type AgentBackendDriver = {
   setGoal?(agent: Agent, objective: string): Promise<BackendGoalResult>;
   clearGoal?(agent: Agent): Promise<BackendGoalResult>;
   setApprovalPreset?(agent: Agent, preset: ApprovalPreset): Promise<BackendApprovalPresetResult>;
+  setPermissionMode?(agent: Agent, mode: string): Promise<BackendPermissionModeResult>;
   forgetAgentSession?(agentId: string): void;
   interrupt(agent: Agent): Promise<BackendSendResult>;
   respondToRequest(response: ClientRequestResponse): Promise<void>;

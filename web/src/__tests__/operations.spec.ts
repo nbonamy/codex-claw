@@ -53,6 +53,7 @@ describe('Claw web operations', () => {
     await invokeClawWebOperation(backend, 'forkAgent', ['agent-1', undefined]);
     await invokeClawWebOperation(backend, 'listWorkItems', ['github', null, { kind: 'remote' }]);
     await invokeClawWebOperation(backend, 'getPluginStatus', []);
+    await invokeClawWebOperation(backend, 'setAgentPermissionMode', ['agent-claude', 'acceptEdits']);
 
     expect(request.mock.calls).toStrictEqual([
       [backendMethods.sourceFoldersList, { kind: 'remote' }],
@@ -61,6 +62,7 @@ describe('Claw web operations', () => {
       [backendMethods.agentFork, { agentId: 'agent-1' }],
       [backendMethods.workProviderItemsList, { provider: 'github', location: { kind: 'remote' } }],
       [backendMethods.settingsPluginStatusGet, undefined],
+      [backendMethods.agentPermissionModeUpdate, { agentId: 'agent-claude', mode: 'acceptEdits' }],
     ]);
   });
 

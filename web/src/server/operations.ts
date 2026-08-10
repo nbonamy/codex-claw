@@ -79,6 +79,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   setAgentGoal: [backendMethods.agentGoalUpdate, named('agentId', 'objective')],
   clearAgentGoal: [backendMethods.agentGoalClear, named('agentId')],
   setAgentApprovalPreset: [backendMethods.agentApprovalPresetUpdate, named('agentId', 'preset')],
+  setAgentPermissionMode: [backendMethods.agentPermissionModeUpdate, named('agentId', 'mode')],
   sendPrompt: [backendMethods.agentPromptSend, namedOptional('agentId', 'prompt', 'options')],
   steerPrompt: [backendMethods.agentPromptSteer, namedOptional('agentId', 'prompt', 'options')],
   deleteQueuedPrompt: [backendMethods.agentQueuedPromptDelete, named('agentId', 'promptId')],

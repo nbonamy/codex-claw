@@ -261,6 +261,30 @@ describe('agent chat service', () => {
     ]);
   });
 
+  it('submits attachment-only prompts', () => {
+    const snapshot = createInitialSnapshot();
+    const backendDriver = createFakeBackendDriver(Promise.resolve({
+      backendSession: { kind: 'codex', threadId: 'thread-1' },
+      turnId: 'turn-1',
+    }));
+    const attachments = [{ type: 'file' as const, path: '/tmp/report.txt', name: 'report.txt' }];
+
+    sendAgentPrompt(snapshot, backendDriver, 'agent-dina', '   ', { attachments }, vi.fn());
+
+    expect(backendDriver.sendPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-dina' }),
+      '',
+      { attachments },
+    );
+    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([
+      { type: 'text', text: '' },
+      {
+        type: 'attachment',
+        attachment: { kind: 'file', name: 'report.txt', path: '/tmp/report.txt' },
+      },
+    ]);
+  });
+
   it('lets the backend driver prepare selected prompt skills', () => {
     const snapshot = createInitialSnapshot();
     const backendDriver = createFakeBackendDriver(Promise.resolve({ backendSession: { kind: 'codex', threadId: 'thread-1' }, turnId: 'turn-1' }));

@@ -21,7 +21,7 @@ export const codexBackendCapabilities: BackendCapabilities = {
 };
 
 export const claudeBackendCapabilities: BackendCapabilities = {
-  attachments: false,
+  attachments: true,
   models: true,
   skills: true,
   reasoningEffort: false,
@@ -38,6 +38,34 @@ export const claudeBackendCapabilities: BackendCapabilities = {
   retryMessage: false,
   approvals: true,
   approvalPresets: [],
+  permissionModes: [
+    {
+      id: 'default',
+      label: 'Default',
+      description: 'Claude asks before tools that need permission.',
+    },
+    {
+      id: 'acceptEdits',
+      label: 'Accept edits',
+      description: 'Claude applies file edits without asking and still asks for other protected actions.',
+    },
+    {
+      id: 'dontAsk',
+      label: "Don't ask",
+      description: 'Claude never asks for permission and denies tools that are not already allowed.',
+    },
+    {
+      id: 'auto',
+      label: 'Auto (experimental)',
+      description: 'Claude uses its permission classifier to approve or deny tool requests.',
+    },
+    {
+      id: 'bypassPermissions',
+      label: 'Dangerously skip permissions',
+      description: 'Claude bypasses every permission check. Use only in a trusted environment.',
+      dangerous: true,
+    },
+  ],
 };
 
 export function defaultBackendCapabilities(backend: AgentBackend): BackendCapabilities {

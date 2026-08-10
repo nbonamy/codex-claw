@@ -49,6 +49,33 @@ describe('BackendDriverRpc', () => {
     expect(listModels).toHaveBeenCalledWith(agent);
   });
 
+  it('routes only advertised permission modes to the backend driver', async () => {
+    const agent: Agent = {
+      ...createAgent(),
+      backend: 'claude',
+      backendDefaults: { kind: 'claude' },
+    };
+    const setPermissionMode = vi.fn().mockResolvedValue({
+      backendDefaults: { kind: 'claude', permissionMode: 'acceptEdits' },
+    });
+    const driver = createDriver({
+      backend: 'claude',
+      getCapabilities: vi.fn().mockReturnValue({
+        permissionModes: [{ id: 'acceptEdits', label: 'Accept edits', description: 'Allow file edits.' }],
+      }),
+      setPermissionMode,
+    });
+    const rpc = new BackendDriverRpc(new Map([['claude', driver]]));
+
+    await expect(rpc.handle('driver/permissionMode/update', { agent, mode: 'acceptEdits' })).resolves.toStrictEqual({
+      backendDefaults: { kind: 'claude', permissionMode: 'acceptEdits' },
+    });
+    await expect(rpc.handle('driver/permissionMode/update', { agent, mode: 'bypassPermissions' }))
+      .rejects.toThrow('Unsupported permission mode for claude: bypassPermissions');
+    expect(setPermissionMode).toHaveBeenCalledOnce();
+    expect(setPermissionMode).toHaveBeenCalledWith(agent, 'acceptEdits');
+  });
+
   it('lets backend drivers handle slash commands before normal prompts', async () => {
     const agent = createAgent();
     const commandResult: BackendSendResult = {

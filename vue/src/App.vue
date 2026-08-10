@@ -24,6 +24,7 @@
     :goal="activeGoal"
     :approvals="activeBackendApprovals"
     :approval-preset="activeApprovalPreset"
+    :permission-mode="activePermissionMode"
     :plan-mode="planMode"
     :selected-model-id="selectedModelId"
     :selected-reasoning-effort="selectedReasoningEffort"
@@ -127,6 +128,7 @@
     @select-reasoning-effort="selectReasoningEffort"
     @select-service-tier="selectServiceTier"
     @select-approval-preset="setApprovalPreset"
+    @select-permission-mode="setPermissionMode"
     @resolve-approval="resolveBackendApproval"
     @update:plan-mode="setPlanMode"
     @clear-goal="clearActiveGoal"
@@ -181,6 +183,7 @@ const {
   activeGoal,
   activeBackendApprovals,
   activeApprovalPreset,
+  activePermissionMode,
   visibleMessages,
   activeQueuedPrompts,
   activeComposerState,
@@ -300,6 +303,7 @@ const {
   selectReasoningEffort,
   selectServiceTier,
   setApprovalPreset,
+  setPermissionMode,
   updateComposerState,
   updateComposerAttachments,
   setPlanMode,

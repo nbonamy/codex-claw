@@ -16,6 +16,32 @@ const agent: Agent = {
 };
 
 describe('ClaudeBackendDriver', () => {
+  it('exposes and persists Claude permission modes without creating a session', async () => {
+    const transport = createFakeTransport();
+    const driver = new ClaudeBackendDriver(transport);
+    const configuredAgent: Agent = {
+      ...agent,
+      backendDefaults: { kind: 'claude', model: 'sonnet', reasoningEffort: 'high' },
+    };
+
+    expect(driver.getCapabilities(configuredAgent).permissionModes).toStrictEqual([
+      expect.objectContaining({ id: 'default', label: 'Default' }),
+      expect.objectContaining({ id: 'acceptEdits', label: 'Accept edits' }),
+      expect.objectContaining({ id: 'dontAsk', label: "Don't ask" }),
+      expect.objectContaining({ id: 'auto', label: 'Auto (experimental)' }),
+      expect.objectContaining({ id: 'bypassPermissions', dangerous: true }),
+    ]);
+    await expect(driver.setPermissionMode(configuredAgent, 'acceptEdits')).resolves.toStrictEqual({
+      backendDefaults: {
+        kind: 'claude',
+        model: 'sonnet',
+        reasoningEffort: 'high',
+        permissionMode: 'acceptEdits',
+      },
+    });
+    expect(transport.startTurn).not.toHaveBeenCalled();
+  });
+
   it('starts Claude turns and adapts stream-json messages into backend events', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
@@ -300,7 +326,7 @@ describe('ClaudeBackendDriver', () => {
       status: 'notConfigured',
       detail: 'Claude backend has not been started yet.',
     });
-    expect(driver.getCapabilities(agent)).toMatchObject({ attachments: false, approvals: true });
+    expect(driver.getCapabilities(agent)).toMatchObject({ attachments: true, approvals: true });
     await expect(driver.interrupt(agent)).rejects.toThrow('No active Claude turn');
     await expect(driver.respondToRequest({ id: 'request-1', payload: {} })).rejects.toThrow('no longer pending');
     await expect(driver.hydrateAgent(agent)).resolves.toBeNull();
@@ -621,14 +647,22 @@ describe('ClaudeBackendDriver', () => {
     });
   });
 
-  it('rejects attachment descriptors when the Claude adapter capability is disabled', async () => {
+  it('passes provider-neutral attachment descriptors to the Claude transport', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
+    const attachments = [{ type: 'file' as const, path: '/tmp/report.txt', name: 'report.txt' }];
 
-    await expect(driver.sendPrompt(agent, 'review this', {
-      attachments: [{ type: 'file', path: '/tmp/report.txt', name: 'report.txt' }],
-    })).rejects.toThrow('Claude does not support prompt attachments.');
-    expect(transport.startTurn).not.toHaveBeenCalled();
+    const sendResult = driver.sendPrompt(agent, 'review this', { attachments });
+
+    expect(transport.startTurn).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'review this', attachments }),
+      expect.any(Function),
+      expect.any(Function),
+    );
+    transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-attachments' });
+    await expect(sendResult).resolves.toMatchObject({
+      backendSession: { kind: 'claude', sessionId: 'claude-session-attachments' },
+    });
   });
 
   it('maps Claude plan-mode tool flow into app-owned proposed plan events', async () => {

@@ -82,6 +82,17 @@ describe('ClaudeCliTransport', () => {
     expect(messages).toStrictEqual([{ type: 'system', subtype: 'init', session_id: 'claude-session-1' }]);
   });
 
+  it('rejects attachments instead of silently dropping them in legacy print mode', () => {
+    const transport = new ClaudeCliTransport();
+
+    expect(() => transport.startTurn({
+      cwd: '/Users/nbonamy/src/codex-claw',
+      prompt: 'review this',
+      attachments: [{ type: 'file', path: '/tmp/report.txt', name: 'report.txt' }],
+    }, vi.fn())).toThrow('legacy Claude CLI transport does not support prompt attachments');
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
   it('passes prompt, appended system prompt, MCP config, and allowed tools as single argv entries', async () => {
     const child = createFakeChild();
     spawnMock.mockReturnValue(child);

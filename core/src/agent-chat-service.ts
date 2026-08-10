@@ -27,7 +27,8 @@ export function sendAgentPrompt(
 ): AppSnapshot {
   const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
   const trimmedPrompt = prompt.trim();
-  if (!agent || !trimmedPrompt || isBusy(agent.status)) {
+  const hasAttachments = (options?.attachments?.length ?? 0) > 0;
+  if (!agent || (!trimmedPrompt && !hasAttachments) || isBusy(agent.status)) {
     return snapshot;
   }
 

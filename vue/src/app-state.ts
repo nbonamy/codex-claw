@@ -203,6 +203,23 @@ export function useAppState() {
     return allowedPresets[0] ?? null;
   });
 
+  const activePermissionMode = computed<string | null>(() => {
+    const agent = activeAgent.value;
+    if (!agent) {
+      return null;
+    }
+
+    const modes = backendCapabilitiesForAgent(agent).permissionModes ?? [];
+    const storedMode = agent.backendDefaults?.kind === 'claude'
+      ? agent.backendDefaults.permissionMode
+      : undefined;
+    if (storedMode && modes.some((option) => option.id === storedMode)) {
+      return storedMode;
+    }
+
+    return modes[0]?.id ?? null;
+  });
+
   const isSending = computed(() => {
     const agent = activeAgent.value;
     if (!agent) {
@@ -332,7 +349,7 @@ export function useAppState() {
     }
 
     const trimmed = parsedPlanCommand?.prompt ?? prompt.trim();
-    if (!trimmed) {
+    if (!trimmed && !submissionOptions?.attachments?.length) {
       return;
     }
 
@@ -346,7 +363,7 @@ export function useAppState() {
     }
 
     const trimmed = prompt.trim();
-    if (!trimmed) {
+    if (!trimmed && !submissionOptions?.attachments?.length) {
       return;
     }
 
@@ -1538,6 +1555,20 @@ export function useAppState() {
     adoptBackgroundSnapshot(await codexClawApi.setAgentApprovalPreset(agent.id, preset));
   }
 
+  async function setPermissionMode(mode: string): Promise<void> {
+    const agent = activeAgent.value;
+    const supportedModes = agent ? backendCapabilitiesForAgent(agent).permissionModes ?? [] : [];
+    if (
+      !agent ||
+      !supportedModes.some((option) => option.id === mode) ||
+      !codexClawApi?.setAgentPermissionMode
+    ) {
+      return;
+    }
+
+    adoptBackgroundSnapshot(await codexClawApi.setAgentPermissionMode(agent.id, mode));
+  }
+
   async function benchForLocation(location: BenchLocation): Promise<BenchTemplate[]> {
     if (!isRemoteBenchLocation(location)) {
       return snapshot.value.bench;
@@ -1570,6 +1601,7 @@ export function useAppState() {
     activeGoal,
     activeBackendApprovals,
     activeApprovalPreset,
+    activePermissionMode,
     visibleMessages,
     activeQueuedPrompts,
     activeComposerState,
@@ -1702,6 +1734,7 @@ export function useAppState() {
     selectServiceTier,
     setPlanMode,
     setApprovalPreset,
+    setPermissionMode,
     updateComposerState,
     updateComposerAttachments,
     selectAgent,

@@ -1587,6 +1587,23 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('agent/approvalPreset/update', { agentId: 'agent-dina', preset: 'approve-for-me' });
   });
 
+  it('routes permission mode updates through their separate clawd method', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.sourceFolder.initialized = true;
+    snapshot.agents[0] = {
+      ...snapshot.agents[0]!,
+      backend: 'claude',
+      backendDefaults: { kind: 'claude', permissionMode: 'acceptEdits' },
+    };
+    const request = vi.fn().mockResolvedValue(snapshot);
+    const controller = new AppController(snapshot, createBackendClient({ request }));
+
+    await controller.initialize();
+
+    await expect(setAgentPermissionMode(controller, 'agent-dina', 'acceptEdits')).resolves.toBe(snapshot);
+    expect(request).toHaveBeenCalledWith('agent/permissionMode/update', { agentId: 'agent-dina', mode: 'acceptEdits' });
+  });
+
   it('routes active-turn steering through clawd', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
@@ -2514,6 +2531,12 @@ async function setAgentApprovalPreset(controller: AppController, agentId: string
   return (controller as unknown as {
     setAgentApprovalPreset(agentId: string, preset: 'ask-for-approval' | 'approve-for-me' | 'full-access'): Promise<AppSnapshot>;
   }).setAgentApprovalPreset(agentId, preset);
+}
+
+async function setAgentPermissionMode(controller: AppController, agentId: string, mode: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    setAgentPermissionMode(agentId: string, mode: string): Promise<AppSnapshot>;
+  }).setAgentPermissionMode(agentId, mode);
 }
 
 async function previewAgentFile(controller: AppController, agentId: string, filePath: string): Promise<unknown> {

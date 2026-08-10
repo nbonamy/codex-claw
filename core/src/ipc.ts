@@ -100,6 +100,7 @@ export const ipcChannels = {
   setAgentGoal: 'agent:goal:set',
   clearAgentGoal: 'agent:goal:clear',
   setAgentApprovalPreset: 'agent:approval-preset:set',
+  setAgentPermissionMode: 'agent:permission-mode:set',
   sendPrompt: 'agent:send-prompt',
   steerPrompt: 'agent:steer-prompt',
   deleteQueuedPrompt: 'agent:delete-queued-prompt',

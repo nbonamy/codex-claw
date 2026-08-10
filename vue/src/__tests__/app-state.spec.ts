@@ -661,6 +661,47 @@ describe('useAppState', () => {
     expect(setAgentApprovalPreset).not.toHaveBeenCalled();
   });
 
+  it('sets Claude permission modes through their separate backend contract', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0] = {
+      ...remoteSnapshot.agents[0],
+      backend: 'claude',
+      backendSession: undefined,
+      backendDefaults: { kind: 'claude', model: 'sonnet', permissionMode: 'acceptEdits' },
+    };
+    const updatedSnapshot = structuredClone(remoteSnapshot);
+    updatedSnapshot.agents[0].backendDefaults = {
+      kind: 'claude',
+      model: 'sonnet',
+      permissionMode: 'bypassPermissions',
+    };
+    const setAgentPermissionMode = vi.fn().mockResolvedValue(updatedSnapshot);
+    stubElectronTestWindow({
+      codexClaw: {
+        setAgentPermissionMode,
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    state.snapshot.value = remoteSnapshot;
+
+    expect(state.activePermissionMode.value).toBe('acceptEdits');
+    expect(state.activeBackendCapabilities.value.approvalPresets).toStrictEqual([]);
+    expect(state.activeBackendCapabilities.value.permissionModes?.map((option) => option.id)).toStrictEqual([
+      'default',
+      'acceptEdits',
+      'dontAsk',
+      'auto',
+      'bypassPermissions',
+    ]);
+    await state.setPermissionMode('bypassPermissions');
+
+    expect(setAgentPermissionMode).toHaveBeenCalledWith('agent-dina', 'bypassPermissions');
+    expect(state.activePermissionMode.value).toBe('bypassPermissions');
+    await state.setPermissionMode('not-a-claude-mode');
+    expect(setAgentPermissionMode).toHaveBeenCalledOnce();
+  });
+
   it('updates settings and forwards app quit and restart through the preload bridge', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();
@@ -2237,6 +2278,25 @@ describe('useAppState', () => {
     ]);
 
     expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'review these files', { attachments: rendererAttachments });
+  });
+
+  it('submits attachments without requiring composer text', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const sendPrompt = vi.fn().mockResolvedValue(remoteSnapshot);
+    const attachments = [{ type: 'image' as const, reference: 'electron-attachment:screenshot' }];
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        sendPrompt,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await state.sendPrompt('   ', { attachments });
+
+    expect(sendPrompt).toHaveBeenCalledWith('agent-dina', '', { attachments });
   });
 
   it('keeps the previous authoritative queue visible while a backend mutation is pending', async () => {

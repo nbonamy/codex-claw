@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { AppSnapshot, BackendConversationRef, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/core/contracts';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
-import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
@@ -4070,6 +4070,63 @@ describe('ClawBackendServer', () => {
       expect.objectContaining({ type: 'snapshot.updated' }),
     ]));
     expect(saveSnapshot).toHaveBeenCalledTimes(3);
+    await server.close();
+  });
+
+  it('persists Claude permission modes independently of Codex approval presets', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-claude'];
+    snapshot.agents = [{
+      id: 'agent-claude',
+      teamId: 'team-test',
+      name: 'Claude',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'claude',
+      backendDefaults: { kind: 'claude', model: 'sonnet' },
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const setPermissionMode = vi.fn().mockResolvedValue({
+      backendDefaults: { kind: 'claude', model: 'sonnet', permissionMode: 'bypassPermissions' },
+    });
+    const driver: AgentBackendDriver = {
+      backend: 'claude',
+      getRuntimeStatus: () => ({ backend: 'claude', status: 'running' }),
+      getCapabilities: () => claudeBackendCapabilities,
+      setPermissionMode,
+      sendPrompt: async () => ({ backendSession: { kind: 'claude', sessionId: 'session-test', transport: 'stdio' } }),
+      interrupt: async () => ({ backendSession: { kind: 'claude', sessionId: 'session-test', transport: 'stdio' } }),
+      respondToRequest: async () => undefined,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+      driverRpc: new BackendDriverRpc(new Map([['claude', driver]])),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'set-permission-mode',
+      method: backendMethods.agentPermissionModeUpdate,
+      params: { agentId: 'agent-claude', mode: 'bypassPermissions' },
+    })).resolves.toMatchObject({
+      result: {
+        agents: [{
+          id: 'agent-claude',
+          backendDefaults: { kind: 'claude', model: 'sonnet', permissionMode: 'bypassPermissions' },
+        }],
+      },
+    });
+
+    expect(setPermissionMode).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-claude' }), 'bypassPermissions');
+    expect(snapshot.agents[0]?.backendSession).toBeUndefined();
+    expect(saveSnapshot).toHaveBeenCalledOnce();
     await server.close();
   });
 

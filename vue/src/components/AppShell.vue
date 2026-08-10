@@ -366,7 +366,7 @@
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
-import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
+import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BackendPermissionModeOption, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
@@ -399,6 +399,7 @@ import {
   type CodexConversationLink,
   type CodexConversationPaneActions,
   type CodexConversationPaneState,
+  type CodexComposerMenuItem,
   type CodexMessageImage,
   type CodexMessageImageContext,
   type CodexNativeAttachment,
@@ -407,6 +408,7 @@ import {
   type CodexQueuedPromptData as QueuedChatPrompt,
   type CodexRendererSendMessageOptions,
 } from '@codex-app-sdk/vue';
+import { ShieldCheckIcon } from '../shared/icons/app-icons';
 
 import type { PlanReviewComment, SidePanelGitDiffState, SidePanelImageState, SidePanelMarkdownState } from './side-panel';
 import {
@@ -443,6 +445,7 @@ const props = withDefaults(defineProps<{
   goal?: ThreadGoal | null;
   approvals?: BackendApprovalRequest[];
   approvalPreset?: ApprovalPreset | null;
+  permissionMode?: string | null;
   answeredClientRequestIds?: Set<string>;
   backendModels?: BackendModelOption[];
   backendCommands?: BackendCommandSummary[];
@@ -551,6 +554,7 @@ const props = withDefaults(defineProps<{
   selectedReasoningEffort: null,
   selectedServiceTier: null,
   approvalPreset: null,
+  permissionMode: null,
   queuedPrompts: () => [],
   composerState: () => ({ text: '', selectionStart: 0, selectionEnd: 0 }),
   composerAttachments: () => [],
@@ -666,6 +670,7 @@ const emit = defineEmits<{
   'select-reasoning-effort': [reasoningEffort: ReasoningEffort];
   'select-service-tier': [serviceTier: string | null];
   'select-approval-preset': [preset: ApprovalPreset];
+  'select-permission-mode': [mode: string];
   'select-team': [teamId: string];
   'steer-queued-prompt': [promptId: string];
   'update:planMode': [enabled: boolean];
@@ -910,6 +915,22 @@ const conversationCapabilities = computed<CodexCapabilities>(() => ({
   approvals: props.backendCapabilities.approvals,
   approvalPresets: props.backendCapabilities.approvalPresets ?? [],
 }));
+const permissionModeMenuItems = computed<CodexComposerMenuItem[]>(() => {
+  const modes = props.backendCapabilities.permissionModes ?? [];
+  if (modes.length === 0) {
+    return [];
+  }
+
+  return [{
+    id: 'backend-permissions',
+    type: 'submenu',
+    label: 'Permissions',
+    icon: ShieldCheckIcon,
+    submenuAlignment: 'bottom',
+    submenuWidth: 'wide',
+    items: modes.map((mode) => permissionModeMenuItem(mode, props.permissionMode)),
+  }];
+});
 const conversationPaneState: CodexConversationPaneState = {
   identity: {
     get conversationKey() { return conversationKey.value; },
@@ -942,6 +963,7 @@ const conversationPaneState: CodexConversationPaneState = {
       return props.isSending ? `${backend} is working...` : 'Ask for follow-up changes';
     },
     get approvalPreset() { return props.approvalPreset; },
+    get leadingMenuItems() { return permissionModeMenuItems.value; },
     get planMode() { return props.planMode; },
     get selectedModelId() { return props.selectedModelId; },
     get selectedReasoningEffort() { return props.selectedReasoningEffort; },
@@ -976,6 +998,10 @@ const conversationPaneActions: CodexConversationPaneActions = {
   forkMessage: (index) => emit('fork-message', index),
   interrupt: () => emit('interrupt-agent'),
   loadOlderHistory: () => props.loadOlderAgentHistory?.(currentAgent.value?.id ?? ''),
+  menuSelect: (item) => {
+    const command = permissionModeCommand(item.payload);
+    if (command) emit('select-permission-mode', command.mode);
+  },
   openLink: openConversationLink,
   openImage: openConversationImage,
   resolveApproval: forwardApprovalResolution,
@@ -993,6 +1019,28 @@ const conversationPaneActions: CodexConversationPaneActions = {
     if (settings.serviceTier !== undefined) emit('select-service-tier', settings.serviceTier);
   },
 };
+
+function permissionModeMenuItem(
+  mode: BackendPermissionModeOption,
+  selectedMode: string | null,
+): CodexComposerMenuItem {
+  return {
+    id: `permission-mode:${mode.id}`,
+    type: 'radio',
+    label: mode.label,
+    description: mode.description,
+    checked: mode.id === selectedMode,
+    payload: { kind: 'permission-mode', mode: mode.id },
+  };
+}
+
+function permissionModeCommand(payload: unknown): { kind: 'permission-mode'; mode: string } | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  const record = payload as Record<string, unknown>;
+  return record.kind === 'permission-mode' && typeof record.mode === 'string'
+    ? { kind: 'permission-mode', mode: record.mode }
+    : null;
+}
 const conversationPaneController = createCodexConversationPaneController({
   state: conversationPaneState,
   actions: conversationPaneActions,

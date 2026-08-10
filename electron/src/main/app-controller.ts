@@ -442,6 +442,10 @@ export class AppController {
       return this.setAgentApprovalPreset(agentId, preset);
     });
 
+    ipc.handle(ipcChannels.setAgentPermissionMode, (_event, agentId: string, mode: string) => {
+      return this.setAgentPermissionMode(agentId, mode);
+    });
+
     ipc.handle(ipcChannels.sendPrompt, (_event, agentId: string, prompt: string, options?: RendererSendPromptOptions) => {
       return this.sendPrompt(agentId, prompt, options);
     });
@@ -1116,6 +1120,10 @@ export class AppController {
 
   private async setAgentApprovalPreset(agentId: string, preset: ApprovalPreset): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentApprovalPresetUpdate, { agentId, preset }));
+  }
+
+  private async setAgentPermissionMode(agentId: string, mode: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentPermissionModeUpdate, { agentId, mode }));
   }
 
   private async listBackendModels(agentId: string): Promise<BackendModelOption[]> {

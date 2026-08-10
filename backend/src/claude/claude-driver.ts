@@ -16,7 +16,7 @@ import type {
   SendPromptOptions,
 } from '@codex-claw/core/contracts';
 import { claudeBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { unsupportedBackendFeature, type AgentBackendDriver, type BackendConversationResumeResult, type BackendEvent, type BackendSendResult } from '@codex-claw/core/backend-driver';
+import { type AgentBackendDriver, type BackendConversationResumeResult, type BackendEvent, type BackendPermissionModeResult, type BackendSendResult } from '@codex-claw/core/backend-driver';
 import { agentScopedMcpUrl } from '../mcp/codex-config';
 import { codexClawDeveloperInstructions } from '../mcp/agent-prompts';
 import { ClaudeAgentSdkTransport } from './agent-sdk-transport';
@@ -126,14 +126,22 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
     return listClaudeSkills(agent, { homeDir: this.driverOptions.homeDir });
   }
 
+  async setPermissionMode(agent: Agent, mode: string): Promise<BackendPermissionModeResult> {
+    const defaults = agent.backendDefaults?.kind === 'claude'
+      ? agent.backendDefaults
+      : { kind: 'claude' as const };
+    return {
+      backendDefaults: {
+        ...defaults,
+        permissionMode: mode,
+      },
+    };
+  }
+
   async sendPrompt(agent: Agent, prompt: string, options: SendPromptOptions = {}): Promise<BackendSendResult> {
     if (this.activeTurnsByAgentId.has(agent.id)) {
       throw new Error('Claude already has an active turn for this agent.');
     }
-    if ((options.attachments?.length ?? 0) > 0) {
-      throw unsupportedBackendFeature(agent, 'prompt attachments');
-    }
-
     const turnId = this.nextTurnId();
     const existingSessionId = claudeSessionId(agent);
     const liveSessionId = this.liveSessionIdsByAgentId.get(agent.id);
@@ -965,6 +973,7 @@ function claudeTurnParams(
     appendSystemPrompt: codexClawDeveloperInstructions(agent, pluginSettings),
     mcpServerUrl,
     allowedTools: mcpServerUrl ? ['mcp__codex_claw__*'] : [],
+    ...(options.attachments?.length ? { attachments: [...options.attachments] } : {}),
   };
 }
 

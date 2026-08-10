@@ -4,6 +4,9 @@ import type {
   SDKMessage,
   SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ClaudeAgentSdkTransport,
@@ -14,6 +17,26 @@ import type { ClaudePermissionRequest } from '../cli-transport';
 import type { ClaudeSdkMessage } from '../protocol';
 
 describe('ClaudeAgentSdkTransport', () => {
+  it('opts into the SDK safety gate for bypass-permissions sessions', async () => {
+    const harness = createQueryHarness();
+    const transport = new ClaudeAgentSdkTransport({ createQuery: harness.createQuery });
+
+    const turn = transport.startTurn({
+      cwd: '/tmp/project',
+      prompt: 'trusted task',
+      permissionMode: 'bypassPermissions',
+    }, () => undefined);
+    await vi.waitFor(() => expect(harness.inputs).toHaveLength(1));
+
+    expect(harness.options[0]).toMatchObject({
+      permissionMode: 'bypassPermissions',
+      allowDangerouslySkipPermissions: true,
+    });
+    harness.emit({ type: 'result', subtype: 'success', session_id: 'bypass-session', is_error: false });
+    await turn.done;
+    await transport.close();
+  });
+
   it('discovers the model catalog without persisting a Claude conversation', async () => {
     const harness = createQueryHarness([{
       value: 'claude-opus-4-6',
@@ -143,6 +166,74 @@ describe('ClaudeAgentSdkTransport', () => {
     harness.emit({ type: 'result', subtype: 'success', session_id: '11111111-1111-4111-8111-111111111111', is_error: false });
     await third.done;
     await transport.close();
+  });
+
+  it('sends image, text, and PDF attachments as native Agent SDK content blocks', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-claude-attachments-'));
+    const imagePath = path.join(directory, 'reference.png');
+    const textPath = path.join(directory, 'notes.md');
+    const pdfPath = path.join(directory, 'report.pdf');
+    await Promise.all([
+      writeFile(imagePath, Buffer.from('png bytes')),
+      writeFile(textPath, '# Notes\nUse the narrow layout.'),
+      writeFile(pdfPath, Buffer.from('pdf bytes')),
+    ]);
+    const harness = createQueryHarness();
+    const transport = new ClaudeAgentSdkTransport({ createQuery: harness.createQuery });
+
+    try {
+      const turn = transport.startTurn({
+        cwd: directory,
+        prompt: 'Review the attachments.',
+        attachments: [
+          { type: 'image', path: imagePath, name: 'reference.png', mimeType: 'image/png' },
+          { type: 'file', path: textPath, name: 'notes.md', mimeType: 'application/octet-stream' },
+          { type: 'file', path: pdfPath, name: 'report.pdf', mimeType: 'application/octet-stream' },
+          { type: 'file', path: '/tmp/archive.zip', name: 'archive.zip', mimeType: 'application/zip' },
+        ],
+      }, () => undefined);
+
+      await vi.waitFor(() => expect(harness.inputs).toHaveLength(1));
+      expect(harness.inputs[0]?.message.content).toStrictEqual([
+        { type: 'text', text: 'Review the attachments.' },
+        {
+          type: 'image',
+          source: { type: 'base64', media_type: 'image/png', data: Buffer.from('png bytes').toString('base64') },
+        },
+        {
+          type: 'document',
+          source: { type: 'text', media_type: 'text/plain', data: '# Notes\nUse the narrow layout.' },
+          title: 'notes.md',
+        },
+        {
+          type: 'document',
+          source: { type: 'base64', media_type: 'application/pdf', data: Buffer.from('pdf bytes').toString('base64') },
+          title: 'report.pdf',
+        },
+        { type: 'text', text: 'Attached file "archive.zip" is available at /tmp/archive.zip.' },
+      ]);
+
+      harness.emit({ type: 'result', subtype: 'success', session_id: 'attachment-session', is_error: false });
+      await turn.done;
+
+      const attachmentOnlyTurn = transport.startTurn({
+        cwd: directory,
+        prompt: '',
+        sessionId: 'attachment-session',
+        attachments: [{ type: 'file', path: textPath, name: 'notes.md' }],
+      }, () => undefined);
+      await vi.waitFor(() => expect(harness.inputs).toHaveLength(2));
+      expect(harness.inputs[1]?.message.content).toStrictEqual([{
+        type: 'document',
+        source: { type: 'text', media_type: 'text/plain', data: '# Notes\nUse the narrow layout.' },
+        title: 'notes.md',
+      }]);
+      harness.emit({ type: 'result', subtype: 'success', session_id: 'attachment-session', is_error: false });
+      await attachmentOnlyTurn.done;
+    } finally {
+      await transport.close();
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it('resumes a persisted session when no live SDK query exists', async () => {

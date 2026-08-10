@@ -881,6 +881,7 @@ describe('AppStatePersistence', () => {
         kind: 'claude',
         model: 'sonnet',
         reasoningEffort: 'high',
+        permissionMode: 'acceptEdits',
       },
     };
 

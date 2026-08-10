@@ -563,6 +563,14 @@ export type BackendCapabilities = {
   retryMessage: boolean;
   approvals: boolean;
   approvalPresets?: ApprovalPreset[];
+  permissionModes?: BackendPermissionModeOption[];
+};
+
+export type BackendPermissionModeOption = {
+  id: string;
+  label: string;
+  description: string;
+  dangerous?: boolean;
 };
 
 export type AppearanceMode = 'dark' | 'light' | 'system';
@@ -1497,6 +1505,7 @@ export type CodexClawApi = {
   setAgentGoal(agentId: string, objective: string): Promise<AppSnapshot>;
   clearAgentGoal(agentId: string): Promise<AppSnapshot>;
   setAgentApprovalPreset(agentId: string, preset: ApprovalPreset): Promise<AppSnapshot>;
+  setAgentPermissionMode(agentId: string, mode: string): Promise<AppSnapshot>;
   sendPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): Promise<AppSnapshotMetadata>;
   steerPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): Promise<AppSnapshotMetadata>;
   deleteQueuedPrompt(agentId: string, promptId: string): Promise<AppSnapshot>;

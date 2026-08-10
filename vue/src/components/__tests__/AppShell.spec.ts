@@ -11,6 +11,7 @@ import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { claudeBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendConversationRef, BenchLocation, BenchTemplate, CodexClawApi, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, RendererMessage, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { i18n } from '../../i18n';
@@ -360,6 +361,56 @@ describe('AppShell', () => {
     await nextTick();
     expect(imageWorkspace.props('tabs')).not.toContain(imageTab);
     expect(imageWorkspace.props('imagePanels')).toStrictEqual({});
+  });
+
+  it('exposes Claude permission modes as a distinct composer submenu', async () => {
+    const snapshot = createInitialSnapshot();
+    const activeAgent = snapshot.agents[0];
+    if (!activeAgent) throw new Error('Expected seeded agent.');
+    activeAgent.backend = 'claude';
+    activeAgent.backendSession = undefined;
+    activeAgent.backendDefaults = { kind: 'claude', permissionMode: 'acceptEdits' };
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent,
+        messages: [],
+        isLoading: false,
+        isSending: false,
+        backendCapabilities: claudeBackendCapabilities,
+        permissionMode: 'acceptEdits',
+      },
+      global: { plugins: [ElementPlus, i18n] },
+    });
+
+    expect(conversationControllerState(wrapper).capabilities?.approvalPresets).toStrictEqual([]);
+    expect(conversationControllerState(wrapper).composer?.leadingMenuItems).toEqual([
+      expect.objectContaining({
+        id: 'backend-permissions',
+        type: 'submenu',
+        label: 'Permissions',
+        items: [
+          expect.objectContaining({ id: 'permission-mode:default', label: 'Default', checked: false }),
+          expect.objectContaining({ id: 'permission-mode:acceptEdits', label: 'Accept edits', checked: true }),
+          expect.objectContaining({ id: 'permission-mode:dontAsk', label: "Don't ask", checked: false }),
+          expect.objectContaining({ id: 'permission-mode:auto', label: 'Auto (experimental)', checked: false }),
+          expect.objectContaining({
+            id: 'permission-mode:bypassPermissions',
+            label: 'Dangerously skip permissions',
+            checked: false,
+          }),
+        ],
+      }),
+    ]);
+
+    await conversationControllerActions(wrapper).menuSelect?.({
+      id: 'permission-mode:bypassPermissions',
+      type: 'radio',
+      label: 'Dangerously skip permissions',
+      checked: false,
+      payload: { kind: 'permission-mode', mode: 'bypassPermissions' },
+    });
+    expect(wrapper.emitted('select-permission-mode')).toStrictEqual([['bypassPermissions']]);
   });
 
   it('saves, reopens, and submits annotations for multiple composer images', async () => {

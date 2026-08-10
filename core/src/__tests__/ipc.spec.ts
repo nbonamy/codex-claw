@@ -104,6 +104,7 @@ describe('ipc channels', () => {
       setAgentGoal: 'agent:goal:set',
       clearAgentGoal: 'agent:goal:clear',
       setAgentApprovalPreset: 'agent:approval-preset:set',
+      setAgentPermissionMode: 'agent:permission-mode:set',
       sendPrompt: 'agent:send-prompt',
       steerPrompt: 'agent:steer-prompt',
       steerQueuedPrompt: 'agent:steer-queued-prompt',

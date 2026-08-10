@@ -520,6 +520,10 @@ describe('snapshot reducer', () => {
         detail: 'connected',
         capabilities: {
           approvalPresets: ['ask-for-approval', 'not-a-preset'],
+          permissionModes: [
+            { id: 'default', label: 'Default', description: 'Ask when needed.' },
+            { id: 123, label: 'Invalid', description: 'Dropped.' },
+          ],
           conversationFork: true,
           reasoningEffort: true,
         },
@@ -534,6 +538,7 @@ describe('snapshot reducer', () => {
       detail: 'connected',
       capabilities: {
         approvalPresets: ['ask-for-approval'],
+        permissionModes: [{ id: 'default', label: 'Default', description: 'Ask when needed.' }],
         conversationFork: true,
         reasoningEffort: true,
       },

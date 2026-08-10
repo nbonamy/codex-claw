@@ -1786,7 +1786,26 @@ function backendCapabilities(value: Record<string, unknown>): Partial<BackendRun
     ...(typeof value.retryMessage === 'boolean' ? { retryMessage: value.retryMessage } : {}),
     ...(typeof value.approvals === 'boolean' ? { approvals: value.approvals } : {}),
     ...(Array.isArray(value.approvalPresets) ? { approvalPresets: value.approvalPresets.filter(isApprovalPreset) } : {}),
+    ...(Array.isArray(value.permissionModes) ? { permissionModes: value.permissionModes.flatMap(permissionModeOption) } : {}),
   };
+}
+
+function permissionModeOption(value: unknown): NonNullable<BackendRuntimeCapabilities['permissionModes']> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.id !== 'string' ||
+    typeof record.label !== 'string' ||
+    typeof record.description !== 'string'
+  ) {
+    return [];
+  }
+  return [{
+    id: record.id,
+    label: record.label,
+    description: record.description,
+    ...(typeof record.dangerous === 'boolean' ? { dangerous: record.dangerous } : {}),
+  }];
 }
 
 function isBackendPlanModeSupport(value: unknown): value is BackendRuntimeCapabilities['planMode'] {

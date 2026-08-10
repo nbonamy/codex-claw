@@ -2,7 +2,7 @@ import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { withDiscoveredRuntimePath, type RuntimeDiscoveryDependencies } from '@codex-claw/core/runtime-discovery';
-import type { AskUserAnswers, AskUserQuestion } from '@codex-claw/core/contracts';
+import type { AskUserAnswers, AskUserQuestion, PromptAttachment } from '@codex-claw/core/contracts';
 import type { Readable } from 'node:stream';
 import { logMain } from '../log';
 import { parseClaudeSdkMessage, type ClaudeSdkMessage } from './protocol';
@@ -24,6 +24,7 @@ export type ClaudeTurnParams = {
   appendSystemPrompt?: string | null;
   mcpServerUrl?: string | null;
   allowedTools?: string[];
+  attachments?: readonly PromptAttachment[];
 };
 
 export type ClaudeAvailableModel = {
@@ -87,6 +88,9 @@ export class ClaudeCliTransport implements ClaudeTurnTransport {
   constructor(private readonly options: ClaudeCliTransportOptions = {}) {}
 
   startTurn(params: ClaudeTurnParams, onMessage: (message: ClaudeSdkMessage) => void): ClaudeTurnHandle {
+    if (params.attachments?.length) {
+      throw new Error('The legacy Claude CLI transport does not support prompt attachments.');
+    }
     const command = this.options.command ?? process.env.CODEX_CLAW_CLAUDE_COMMAND ?? 'claude';
     const args = claudeArgs(params);
     const cwd = expandHome(params.cwd);

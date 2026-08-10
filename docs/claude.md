@@ -125,8 +125,24 @@ normalized to Claw's existing approval cards. Claude's `AskUserQuestion` tool
 is normalized to the existing multi-question form, and the response is routed
 back to the blocked SDK tool call. Session-scoped and persistent permission
 suggestions back Claw's Allow for conversation and Always allow choices.
-Capabilities still do not advertise attachments, rollback, or edit/retry until
-those surfaces are implemented reliably for Claude. Model listing is local.
+Claude's proactive permission posture remains distinct from Codex approval
+presets. The composer renders a capability-driven Permissions submenu with
+Claude's own `default`, `acceptEdits`, `dontAsk`, `auto`, and
+`bypassPermissions` modes. Native `plan` permission mode remains behind
+Claw's separate Plan-mode control. The last permission choice is persisted in
+the Claude branch of the agent defaults and routed to the Claude driver as an
+opaque mode ID. The driver validates the advertised mode before applying it;
+`bypassPermissions` also enables the Agent SDK's explicit dangerous-skip
+safety gate. Codex continues to use its independent approval-preset contract
+and menu.
+Claude advertises prompt attachments through the shared composer. The Electron
+attachment registry resolves renderer-safe references before they reach
+`clawd`; the Agent SDK transport sends supported images, PDFs, and text/source
+files as native multimodal content blocks. Other binary files remain available
+to Claude Code by their trusted local path. The legacy print-mode transport
+rejects attachments explicitly rather than silently dropping them. Rollback
+and edit/retry remain disabled until those surfaces are implemented reliably
+for Claude. Model listing is local.
 Skill listing is filesystem-derived: Claw reads user skills from `~/.claude/skills`
 and project skills from `<agent-folder>/.claude/skills`, parses each
 `SKILL.md` frontmatter, and lets project skills override global skills with the

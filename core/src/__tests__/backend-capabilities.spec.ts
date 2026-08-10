@@ -22,13 +22,21 @@ describe('backend capabilities', () => {
   it('returns the prompted Claude capability set', () => {
     expect(defaultBackendCapabilities('claude')).toBe(claudeBackendCapabilities);
     expect(claudeBackendCapabilities).toMatchObject({
-      attachments: false,
+      attachments: true,
       planMode: 'prompted',
       goals: false,
       serviceTier: false,
       steerPrompt: false,
       approvals: true,
       conversationFork: false,
+      approvalPresets: [],
+      permissionModes: [
+        expect.objectContaining({ id: 'default', label: 'Default' }),
+        expect.objectContaining({ id: 'acceptEdits', label: 'Accept edits' }),
+        expect.objectContaining({ id: 'dontAsk', label: "Don't ask" }),
+        expect.objectContaining({ id: 'auto', label: 'Auto (experimental)' }),
+        expect.objectContaining({ id: 'bypassPermissions', dangerous: true }),
+      ],
     });
   });
 });

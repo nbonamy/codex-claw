@@ -193,6 +193,20 @@ export class BackendDriverRpc {
         }
         return driver.setApprovalPreset(agent, record.preset as never);
       }
+      case backendMethods.driverPermissionModeUpdate: {
+        const { agent } = requireAgentParams(params);
+        const record = requireRecord(params);
+        const driver = this.requireDriver(agent.backend);
+        if (!driver.setPermissionMode) {
+          throw unsupportedBackendFeature(agent, 'permission modes');
+        }
+        const mode = requireString(record.mode, 'mode');
+        const supportedModes = driver.getCapabilities(agent).permissionModes ?? [];
+        if (!supportedModes.some((option) => option.id === mode)) {
+          throw new Error(`Unsupported permission mode for ${agent.backend}: ${mode}`);
+        }
+        return driver.setPermissionMode(agent, mode);
+      }
       case backendMethods.driverSessionForget: {
         const { backend, agentId } = requireBackendAgentIdParams(params);
         this.requireDriver(backend).forgetAgentSession?.(agentId);

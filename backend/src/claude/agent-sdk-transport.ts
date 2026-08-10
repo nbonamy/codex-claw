@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
@@ -255,7 +256,7 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
       session.permissionMode = nextPermissionMode;
     }
 
-    session.input.push(claudeUserMessage(params.prompt));
+    session.input.push(await claudeUserMessage(params.prompt, params.attachments));
   }
 
   private async consumeSession(session: ClaudeSdkSession): Promise<void> {
@@ -495,16 +496,115 @@ function sessionConfigurationKey(params: ClaudeTurnParams): string {
   });
 }
 
-function claudeUserMessage(prompt: string): SDKUserMessage {
+type ClaudeUserContent = Exclude<SDKUserMessage['message']['content'], string>;
+type ClaudeUserContentBlock = ClaudeUserContent[number];
+
+const textFileExtensions = new Set([
+  '.c', '.cc', '.cfg', '.conf', '.cpp', '.cs', '.css', '.csv', '.go', '.graphql',
+  '.h', '.hpp', '.html', '.ini', '.java', '.js', '.json', '.jsx', '.kt', '.less',
+  '.log', '.lua', '.md', '.mjs', '.mm', '.php', '.plist', '.properties', '.py',
+  '.rb', '.rs', '.scss', '.sh', '.sql', '.svelte', '.svg', '.swift', '.toml', '.ts', '.tsx',
+  '.txt', '.vue', '.xml', '.yaml', '.yml', '.zsh',
+]);
+
+async function claudeUserMessage(
+  prompt: string,
+  attachments: ClaudeTurnParams['attachments'] = [],
+): Promise<SDKUserMessage> {
+  const content: ClaudeUserContent = [];
+  if (prompt) {
+    content.push({ type: 'text', text: prompt });
+  }
+  for (const attachment of attachments) {
+    content.push(...await claudeAttachmentBlocks(attachment));
+  }
   return {
     type: 'user',
     session_id: '',
     parent_tool_use_id: null,
     message: {
       role: 'user',
-      content: [{ type: 'text', text: prompt }],
+      content,
     },
   };
+}
+
+async function claudeAttachmentBlocks(
+  attachment: NonNullable<ClaudeTurnParams['attachments']>[number],
+): Promise<ClaudeUserContentBlock[]> {
+  const name = attachment.name?.trim() || path.basename(attachment.path);
+  const extension = path.extname(attachment.path).toLowerCase();
+  const declaredMimeType = attachment.mimeType?.toLowerCase();
+  const imageMediaType = supportedImageMediaType(declaredMimeType, extension);
+
+  if (attachment.type === 'image' && imageMediaType) {
+    const data = await readFile(attachment.path);
+    return [{
+      type: 'image',
+      source: {
+        type: 'base64',
+        media_type: imageMediaType,
+        data: data.toString('base64'),
+      },
+    }];
+  }
+
+  if (declaredMimeType === 'application/pdf' || extension === '.pdf') {
+    const data = await readFile(attachment.path);
+    return [{
+      type: 'document',
+      source: {
+        type: 'base64',
+        media_type: 'application/pdf',
+        data: data.toString('base64'),
+      },
+      title: name,
+    }];
+  }
+
+  if (isTextAttachment(declaredMimeType, extension)) {
+    return [{
+      type: 'document',
+      source: {
+        type: 'text',
+        media_type: 'text/plain',
+        data: await readFile(attachment.path, 'utf8'),
+      },
+      title: name,
+    }];
+  }
+
+  return [{
+    type: 'text',
+    text: `Attached file "${name}" is available at ${attachment.path}.`,
+  }];
+}
+
+function supportedImageMediaType(
+  mimeType: string | undefined,
+  extension: string,
+): 'image/gif' | 'image/jpeg' | 'image/png' | 'image/webp' | null {
+  if (mimeType === 'image/gif'
+    || mimeType === 'image/jpeg'
+    || mimeType === 'image/png'
+    || mimeType === 'image/webp') {
+    return mimeType;
+  }
+  return ({
+    '.gif': 'image/gif',
+    '.jpeg': 'image/jpeg',
+    '.jpg': 'image/jpeg',
+    '.png': 'image/png',
+    '.webp': 'image/webp',
+  } as Partial<Record<string, 'image/gif' | 'image/jpeg' | 'image/png' | 'image/webp'>>)[extension] ?? null;
+}
+
+function isTextAttachment(mimeType: string | undefined, extension: string): boolean {
+  return mimeType?.startsWith('text/') === true
+    || mimeType === 'application/json'
+    || mimeType === 'application/xml'
+    || mimeType === 'application/yaml'
+    || textFileExtensions.has(extension);
 }
 
 function permissionResult(pending: PendingPermission, response: ClaudePermissionResponse): PermissionResult {
