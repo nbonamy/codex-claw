@@ -122,6 +122,10 @@ class FakeTransport implements RpcTransport {
         data: [thread('thread-a', '/workspace/a'), thread('thread-b', '/workspace/b')],
         nextCursor: null,
       };
+      case 'thread/start': {
+        const cwd = String((params as { cwd?: string }).cwd ?? '/workspace/new');
+        return resumeResponse(thread('thread-new', cwd));
+      }
       case 'thread/resume': {
         const threadId = String((params as { threadId: string }).threadId);
         const cwd = String((params as { cwd?: string }).cwd ?? `/workspace/${threadId.at(-1)}`);
@@ -339,6 +343,21 @@ describe('CodexSurfaceAgentAdapter', () => {
     expect(lastRequest(transport, 'thread/name/set')).toBeDefined();
     adapter.forgetAgentSession('agent-missing');
     adapter.forgetAgentSession('agent-a');
+  });
+
+  it('creates new agent conversations as user threads in their assigned folder', async () => {
+    const { adapter, transport } = createAdapter();
+    const agent = createAgent('agent-new', 'thread-new', '/workspace/new');
+    delete agent.backendSession;
+
+    await adapter.sendPrompt(agent, 'Start work');
+
+    expect(lastRequest(transport, 'thread/start')).toMatchObject({
+      params: {
+        cwd: '/workspace/new',
+        threadSource: 'user',
+      },
+    });
   });
 
   it('routes simultaneous semantic conversation events without transcript replacement or cross-routing', async () => {

@@ -7,6 +7,19 @@ export type RuntimeGitHubOAuthSettings = {
   oauthClientId?: string | null;
 };
 
-export function runtimeGitHubOAuthClientId(settings?: RuntimeGitHubOAuthSettings): string {
-  return (settings?.oauthClientId ?? process.env.CODEX_CLAW_GITHUB_CLIENT_ID ?? PACKAGED_GITHUB_CLIENT_ID).trim();
+type RuntimeGitHubOAuthSources = {
+  environmentClientId?: string | null;
+  packagedClientId?: string | null;
+};
+
+export function runtimeGitHubOAuthClientId(
+  settings?: RuntimeGitHubOAuthSettings,
+  sources?: RuntimeGitHubOAuthSources,
+): string {
+  return (
+    settings?.oauthClientId
+    ?? (sources ? sources.environmentClientId : process.env.CODEX_CLAW_GITHUB_CLIENT_ID)
+    ?? (sources ? sources.packagedClientId : PACKAGED_GITHUB_CLIENT_ID)
+    ?? ''
+  ).trim();
 }

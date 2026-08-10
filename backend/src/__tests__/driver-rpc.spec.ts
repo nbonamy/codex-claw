@@ -233,6 +233,8 @@ describe('BackendDriverRpc', () => {
       ]);
       await expect(rpc.handle('driver/file/preview', { folder: tempDir, filePath: 'README.md' })).resolves.toStrictEqual({
         path: 'README.md',
+        size: 10,
+        kind: 'text',
         content: '# Read me\n',
       });
     } finally {

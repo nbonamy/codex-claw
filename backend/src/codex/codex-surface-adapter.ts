@@ -470,6 +470,7 @@ export class CodexSurfaceAgentAdapter {
     const effectivePreset = effectiveApprovalPreset(requestedPreset, this.surface.getSnapshot().approvalPresets);
     const snapshot = await this.surface.createConversation({
       cwd: expandHome(agent.folder),
+      threadSource: 'user',
       ...(effectivePreset ? { approvalPreset: effectivePreset } : {}),
     }, { extensionContext: agent });
     const threadId = snapshot.activeConversationId;
