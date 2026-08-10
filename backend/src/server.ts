@@ -4,7 +4,7 @@ import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput, updateAgentOpenInApplication } from '@codex-claw/core/snapshot';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitStatus, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/core/backend-driver';
@@ -28,6 +28,7 @@ import { warnMain } from './log';
 import { AgentTranscriptRetention, type AgentTranscriptRetentionOptions } from './agent-transcript-retention';
 import { loadPluginStatus } from './plugin-status';
 import { getCodexResourceSharingStatus, setCodexResourceSharing } from './codex-resource-sharing';
+import { AgentGitService } from './git/agent-git-service';
 
 export type ClawBackendServerOptions = {
   version: string;
@@ -47,6 +48,7 @@ export type ClawBackendServerOptions = {
   configureCodexResourceSharing?: (input: SetCodexResourceSharingInput) => Promise<void>;
   inspectCodexResourceSharing?: (enabled: boolean) => Promise<CodexResourceSharingStatus>;
   inspectPluginStatus?: () => Promise<AppPluginStatus>;
+  agentGitService?: AgentGitService;
 };
 
 export type SystemPermissionsPort = {
@@ -97,6 +99,7 @@ export class ClawBackendServer {
   private readonly remoteSnapshots = new Map<string, AppSnapshot>();
   private readonly queuedPromptRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly analyzedGitAgentIds = new Set<string>();
+  private readonly agentGitService: AgentGitService;
   private readonly gitAnalysisPromises = new Map<string, Promise<void>>();
   private subagentIdentityBackfillPromise: Promise<void> | null = null;
   private readonly transcriptRetention: AgentTranscriptRetention;
@@ -120,6 +123,7 @@ export class ClawBackendServer {
     this.configureCodexResourceSharing = options.configureCodexResourceSharing ?? setCodexResourceSharing;
     this.inspectCodexResourceSharing = options.inspectCodexResourceSharing ?? getCodexResourceSharingStatus;
     this.inspectPluginStatus = options.inspectPluginStatus ?? loadPluginStatus;
+    this.agentGitService = options.agentGitService ?? new AgentGitService();
     this.transcriptRetention = new AgentTranscriptRetention({
       snapshot: this.snapshot,
       onEvicted: (agentId) => this.releaseEvictedAgentTranscript(agentId),
@@ -629,6 +633,60 @@ export class ClawBackendServer {
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitDiffOpen, { agentId }, async (agent) => {
           await this.openAgentGitDiff(agent);
           return true;
+        });
+      }
+      case backendMethods.agentGitWorkflowGet: {
+        const agentId = requireAgentId(message.params);
+        return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitWorkflowGet, { agentId }, (agent) => this.gitWorkflow(agent));
+      }
+      case backendMethods.agentGitStage: {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitStage, params, async (agent) => {
+          requireConfirmed(params.input, 'Staging files');
+          const input = requireRecord(params.input);
+          const paths = requireStringArray(input.paths, 'paths');
+          await this.agentGitService.stage(agent.folder, paths);
+          return this.gitWorkflow(agent);
+        });
+      }
+      case backendMethods.agentGitCommit: {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitCommit, params, async (agent) => {
+          const input = requireConfirmed(params.input, 'Creating a commit');
+          await this.agentGitService.commit(agent.folder, requireString(input.message, 'message'));
+          return this.gitWorkflow(agent);
+        });
+      }
+      case backendMethods.agentGitPush: {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitPush, params, async (agent) => {
+          requireConfirmed(params.input, 'Pushing a branch');
+          const workflow = await this.agentGitService.workflow(agent.folder);
+          if (workflow.detached || !workflow.branch) throw new Error('Create or check out a branch before pushing.');
+          if (!workflow.remote) throw new Error('Add a Git remote before pushing.');
+          await this.agentGitService.push(agent.folder, workflow.remote, workflow.branch, !workflow.upstream);
+          return this.gitWorkflow(agent);
+        });
+      }
+      case backendMethods.agentGitPullRequestCreate: {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitPullRequestCreate, params, async (agent) => {
+          const input = requireConfirmed(params.input, 'Creating a pull request');
+          const workflow = await this.gitWorkflow(agent);
+          if (!workflow.branch || workflow.detached) throw new Error('Create or check out a branch before creating a pull request.');
+          if (!workflow.remote || !workflow.remoteUrl) throw new Error('Add a GitHub remote before creating a pull request.');
+          if (workflow.githubError) throw new Error(`Could not verify existing pull requests: ${workflow.githubError}`);
+          if (workflow.existingPullRequest) throw new Error(`Pull request #${workflow.existingPullRequest.number} already exists for this branch.`);
+          await this.requireWorkIntegrations().createPullRequest(workflow.repository, {
+            branch: workflow.branch,
+            title: requireString(input.title, 'title'),
+            body: typeof input.body === 'string' ? input.body : '',
+          });
+          return this.gitWorkflow(agent);
         });
       }
       case backendMethods.agentWorkItemAssign: {
@@ -2284,6 +2342,26 @@ export class ClawBackendServer {
     }
   }
 
+  private async gitWorkflow(agent: Agent): Promise<AgentGitWorkflow> {
+    const workflow = await this.agentGitService.workflow(agent.folder);
+    const githubConnected = await this.requireWorkIntegrations().githubConnected();
+    let existingPullRequest = null;
+    let githubError: string | undefined;
+    if (githubConnected && workflow.branch && workflow.repository.includes('/')) {
+      try {
+        existingPullRequest = await this.requireWorkIntegrations().findPullRequest(workflow.repository, workflow.branch);
+      } catch (error) {
+        githubError = error instanceof Error ? error.message : String(error);
+      }
+    }
+    return {
+      ...workflow,
+      githubConnected,
+      ...(existingPullRequest ? { existingPullRequest } : {}),
+      ...(githubError ? { githubError } : {}),
+    };
+  }
+
   private async hydrateAgentHistory(agentId: string): Promise<void> {
     const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
     if (!agent?.backendSession) {
@@ -3128,6 +3206,17 @@ function requireString(value: unknown, name: string): string {
     throw new Error(`Invalid ${name}.`);
   }
   return value;
+}
+
+function requireStringArray(value: unknown, name: string): string[] {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) throw new Error(`Invalid ${name}.`);
+  return value as string[];
+}
+
+function requireConfirmed(value: unknown, action: string): Record<string, unknown> {
+  const input = requireRecord(value);
+  if (input.confirmed !== true) throw new Error(`${action} requires explicit confirmation.`);
+  return input;
 }
 
 function optionalTrimmedString(value: unknown): string | null {

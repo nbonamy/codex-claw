@@ -185,6 +185,20 @@ describe('GitHubWorkProviderDriver', () => {
       updatedAt: '2026-06-09T12:30:00.000Z',
     }]);
   });
+
+  it('looks up and creates draft pull requests', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(jsonResponse([{ number: 7, title: 'Existing', html_url: 'https://github.com/o/r/pull/7', draft: true }]))
+      .mockResolvedValueOnce(jsonResponse({ default_branch: 'main' }))
+      .mockResolvedValueOnce(jsonResponse({ number: 8, title: 'New PR', html_url: 'https://github.com/o/r/pull/8', draft: true }));
+    vi.stubGlobal('fetch', fetch);
+    const driver = new GitHubWorkProviderDriver('client-id');
+    const token = { provider: 'github' as const, accessToken: 'secret', tokenType: 'bearer', connectedAt: 'now' };
+
+    await expect(driver.findPullRequest(token, 'o/r', 'feature')).resolves.toMatchObject({ number: 7 });
+    await expect(driver.createPullRequest(token, 'o/r', { branch: 'feature', title: 'New PR', body: 'Body' })).resolves.toMatchObject({ number: 8, draft: true });
+    expect(JSON.parse(String(fetch.mock.calls[2]?.[1]?.body))).toStrictEqual({ title: 'New PR', body: 'Body', head: 'feature', base: 'main', draft: true });
+  });
 });
 
 function jsonResponse(value: unknown): Response {

@@ -1,4 +1,4 @@
-import type { WorkItem, WorkItemLabel, WorkRepository } from '@codex-claw/core/contracts';
+import type { AgentGitPullRequest, WorkItem, WorkItemLabel, WorkRepository } from '@codex-claw/core/contracts';
 import type { WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
 import { runtimeGitHubOAuthClientId } from '../runtime-config';
 import type { WorkProviderDeviceAuthorization, WorkProviderDeviceTokenResult, WorkProviderDriver } from './types';
@@ -192,6 +192,26 @@ export class GitHubWorkProviderDriver implements WorkProviderDriver {
     return issues.map((issue) => githubIssue(issue, repositoryId, repository.fullName)).filter((item): item is WorkItem => Boolean(item));
   }
 
+  async findPullRequest(token: WorkProviderToken, repositoryId: string, branch: string): Promise<AgentGitPullRequest | null> {
+    const repository = parseRepositoryId(repositoryId);
+    if (!repository) return null;
+    const pulls = await githubApiRequest(token, `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}/pulls?state=open&head=${encodeURIComponent(`${repository.owner}:${branch}`)}&per_page=1`);
+    if (!Array.isArray(pulls)) throw new Error('GitHub returned an invalid pull request response.');
+    return githubPullRequest(pulls[0]) ?? null;
+  }
+
+  async createPullRequest(token: WorkProviderToken, repositoryId: string, input: { branch: string; title: string; body: string }): Promise<AgentGitPullRequest> {
+    const repository = parseRepositoryId(repositoryId);
+    if (!repository) throw new Error('The Git remote is not a GitHub repository.');
+    const response = await githubApiRequest(token, `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}/pulls`, {
+      method: 'POST',
+      body: JSON.stringify({ title: input.title, body: input.body, head: input.branch, base: await defaultBranch(token, repositoryId), draft: true }),
+    });
+    const pullRequest = githubPullRequest(response);
+    if (!pullRequest) throw new Error('GitHub returned an invalid pull request response.');
+    return pullRequest;
+  }
+
   private clientId(): string {
     const value = typeof this.clientIdProvider === 'function' ? this.clientIdProvider() : this.clientIdProvider;
     return typeof value === 'string' ? value.trim() : '';
@@ -229,12 +249,15 @@ function githubOAuthErrorMessage(response: Record<string, unknown>): string {
     : 'GitHub authorization failed.';
 }
 
-async function githubApiRequest(token: WorkProviderToken, path: string): Promise<unknown> {
+async function githubApiRequest(token: WorkProviderToken, path: string, init: RequestInit = {}): Promise<unknown> {
   const response = await fetch(`${GITHUB_API_BASE_URL}${path}`, {
+    ...init,
     headers: {
       Accept: 'application/vnd.github+json',
       Authorization: `${token.tokenType || 'Bearer'} ${token.accessToken}`,
       'X-GitHub-Api-Version': GITHUB_API_VERSION,
+      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+      ...init.headers,
     },
   });
 
@@ -243,6 +266,19 @@ async function githubApiRequest(token: WorkProviderToken, path: string): Promise
   }
 
   return response.json();
+}
+
+async function defaultBranch(token: WorkProviderToken, repositoryId: string): Promise<string> {
+  const repository = parseRepositoryId(repositoryId);
+  if (!repository) throw new Error('The Git remote is not a GitHub repository.');
+  const response = await githubApiRequest(token, `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}`);
+  if (!isRecord(response) || typeof response.default_branch !== 'string') throw new Error('GitHub returned an invalid repository response.');
+  return response.default_branch;
+}
+
+function githubPullRequest(value: unknown): AgentGitPullRequest | null {
+  if (!isRecord(value) || !Number.isInteger(value.number) || typeof value.title !== 'string' || typeof value.html_url !== 'string') return null;
+  return { number: value.number as number, title: value.title, url: value.html_url, draft: value.draft === true };
 }
 
 function githubRepository(value: unknown): WorkRepository | null {

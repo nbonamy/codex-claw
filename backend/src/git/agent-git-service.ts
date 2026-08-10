@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import type { AgentGitFile, AgentGitWorkflow } from '@codex-claw/core/contracts';
 import type { AgentGitStatus } from '@codex-claw/core/contracts';
 
 const execFileAsync = promisify(execFile);
@@ -73,6 +74,81 @@ export class AgentGitService {
 
     return joinDiffOutputs(diffs);
   }
+
+  async workflow(folder: string): Promise<Omit<AgentGitWorkflow, 'githubConnected' | 'existingPullRequest'>> {
+    const [root, branch, upstream, remote, status] = await Promise.all([
+      this.runGit(folder, ['rev-parse', '--show-toplevel']),
+      this.runGit(folder, ['symbolic-ref', '--quiet', '--short', 'HEAD']).catch(() => ({ stdout: '' })),
+      this.runGit(folder, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']).catch(() => ({ stdout: '' })),
+      this.runGit(folder, ['remote']).catch(() => ({ stdout: '' })),
+      this.runGit(folder, ['status', '--porcelain=v1', '-z']),
+    ]);
+    const remotes = remote.stdout.split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
+    const trackedRemote = upstream.stdout.trim().split('/')[0];
+    const remoteName = (trackedRemote && remotes.includes(trackedRemote) ? trackedRemote : undefined)
+      ?? (remotes.includes('origin') ? 'origin' : remotes[0]);
+    const remoteUrl = remoteName
+      ? (await this.runGit(folder, ['remote', 'get-url', remoteName])).stdout.trim()
+      : undefined;
+    const files = parsePorcelainFiles(status.stdout);
+    const repository = githubRepositoryFromRemote(remoteUrl) ?? fileName(root.stdout.trim());
+    return {
+      repository,
+      folder: root.stdout.trim(),
+      ...(branch.stdout.trim() ? { branch: branch.stdout.trim() } : {}),
+      detached: !branch.stdout.trim(),
+      ...(remoteName ? { remote: remoteName } : {}),
+      ...(remoteUrl ? { remoteUrl } : {}),
+      ...(upstream.stdout.trim() ? { upstream: upstream.stdout.trim() } : {}),
+      files,
+      stagedFiles: files.filter((file) => file.indexStatus !== ' ' && file.indexStatus !== '?').map((file) => file.path),
+      unstagedFiles: files.filter((file) => file.worktreeStatus !== ' ' || file.indexStatus === '?').map((file) => file.path),
+    };
+  }
+
+  async stage(folder: string, paths: string[]): Promise<void> {
+    if (paths.length === 0) throw new Error('Select at least one file to stage.');
+    if (paths.some((path) => !path.trim() || path.startsWith('/') || path.split(/[\\/]/).includes('..'))) {
+      throw new Error('Stage paths must stay inside the repository.');
+    }
+    await this.runGit(folder, ['add', '--', ...paths]);
+  }
+
+  async commit(folder: string, message: string): Promise<void> {
+    const normalized = message.trim();
+    if (!normalized) throw new Error('Enter a commit message.');
+    await this.runGit(folder, ['commit', '-m', normalized]);
+  }
+
+  async push(folder: string, remote: string, branch: string, setUpstream: boolean): Promise<void> {
+    await this.runGit(folder, setUpstream
+      ? ['push', '--set-upstream', remote, branch]
+      : ['push', remote, branch]);
+  }
+}
+
+export function parsePorcelainFiles(output: string): AgentGitFile[] {
+  const entries = output.split('\0').filter(Boolean);
+  const files: AgentGitFile[] = [];
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index]!;
+    const indexStatus = entry[0] ?? ' ';
+    const worktreeStatus = entry[1] ?? ' ';
+    let path = entry.slice(3);
+    if ((indexStatus === 'R' || indexStatus === 'C') && entries[index + 1]) path = entries[++index]!;
+    files.push({ path, indexStatus, worktreeStatus });
+  }
+  return files;
+}
+
+function githubRepositoryFromRemote(remoteUrl?: string): string | null {
+  if (!remoteUrl) return null;
+  const match = remoteUrl.match(/github\.com[/:]([^/]+\/[^/]+?)(?:\.git)?$/i);
+  return match?.[1] ?? null;
+}
+
+function fileName(value: string): string {
+  return value.replace(/\\/g, '/').split('/').filter(Boolean).at(-1) ?? value;
 }
 
 function joinDiffOutputs(diffs: string[]): string {

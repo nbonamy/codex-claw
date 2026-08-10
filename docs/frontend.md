@@ -137,7 +137,9 @@ implemented:
   bundled shell screenshot;
 - single-line active agent header with contextual agent status beside the
   identity and quiet right-side actions ordered from git stats into subagents,
-  without a duplicate activity indicator;
+  without a duplicate activity indicator. The agent's Review workspace supports
+  explicit file staging, editable commit messages, safe push, existing-PR
+  detection, and editable draft PR creation;
 - ChatGPT-style split Open In controls in the active-agent header and project-file
   previews, plus the same installed-app list in agent context menus. The primary
   button reuses each agent's last choice; agents without one default to VS Code,

@@ -258,6 +258,11 @@
             :open-in-catalog="openInApplications"
             :subagent-tree="subagentTreeFor(agent.id)"
             :load-subagent-messages="(conversationId) => loadSubagentMessages(agent.id, conversationId)"
+            :get-git-workflow="props.getAgentGitWorkflow"
+            :stage-git-files="props.stageAgentGitFiles"
+            :commit-git-changes="props.commitAgentGitChanges"
+            :push-git-branch="props.pushAgentGitBranch"
+            :create-git-pull-request="props.createAgentGitPullRequest"
             @close-tab="closeRightWorkspaceTab(agent.id, $event)"
             @cancel-plan="cancelPlanReview(agent.id)"
             @comment-plan="commentOnPlan"
@@ -478,6 +483,11 @@ const props = withDefaults(defineProps<{
   createSourceWorktree?: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   previewAgentFile?: (agentId: string, filePath: string) => Promise<AgentFilePreviewResult>;
   openAgentGitDiff?: (agentId: string) => Promise<void>;
+  getAgentGitWorkflow?: (agentId: string) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
+  stageAgentGitFiles?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitStageInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
+  commitAgentGitChanges?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitCommitInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
+  pushAgentGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPushInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
+  createAgentGitPullRequest?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPullRequestInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   openInApplications?: OpenInApplicationCatalog;
   openAgentPath?: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   createAgent?: (input: CreateAgentInput) => Promise<Agent | null | void>;
@@ -571,6 +581,11 @@ const props = withDefaults(defineProps<{
   openAgentGitDiff: async () => {
     throw new Error('Git diff preview is not available.');
   },
+  getAgentGitWorkflow: async () => { throw new Error('Git workflow is not available.'); },
+  stageAgentGitFiles: async () => { throw new Error('Git staging is not available.'); },
+  commitAgentGitChanges: async () => { throw new Error('Git commit is not available.'); },
+  pushAgentGitBranch: async () => { throw new Error('Git push is not available.'); },
+  createAgentGitPullRequest: async () => { throw new Error('Pull request creation is not available.'); },
   openInApplications: () => ({ defaultApplication: 'finder', applications: [] }),
   openAgentPath: async () => {
     throw new Error('Open In is not available.');

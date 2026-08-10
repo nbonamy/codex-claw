@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { vi } from 'vitest';
-import { AgentGitService, parseBranchStatus, parseChangedFiles, parseNumstat } from '../agent-git-service';
+import { AgentGitService, parseBranchStatus, parseChangedFiles, parseNumstat, parsePorcelainFiles } from '../agent-git-service';
 
 describe('agent git service parsers', () => {
   it('parses branch tracking status', () => {
@@ -115,5 +115,35 @@ describe('agent git service parsers', () => {
       process.platform === 'win32' ? 'NUL' : '/dev/null',
       '-leading-dash.md',
     ]);
+  });
+
+  it('inspects workflow state and performs bounded git mutations', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/repo\n' };
+      if (args[0] === 'symbolic-ref') return { stdout: 'feature\n' };
+      if (args.includes('@{upstream}')) return { stdout: '' };
+      if (args[0] === 'remote' && args[1] === undefined) return { stdout: 'origin\n' };
+      if (args[0] === 'remote') return { stdout: 'git@github.com:nbonamy/codex-claw.git\n' };
+      if (args[0] === 'status') return { stdout: ' M src/a.ts\0?? src/new.ts\0' };
+      return { stdout: '' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
+
+    await expect(service.workflow('/repo')).resolves.toMatchObject({
+      repository: 'nbonamy/codex-claw', branch: 'feature', remote: 'origin', detached: false,
+      unstagedFiles: ['src/a.ts', 'src/new.ts'], stagedFiles: [],
+    });
+    await service.stage('/repo', ['src/a.ts']);
+    await service.commit('/repo', 'feat: ship workflow');
+    await service.push('/repo', 'origin', 'feature', true);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['add', '--', 'src/a.ts']);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['commit', '-m', 'feat: ship workflow']);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['push', '--set-upstream', 'origin', 'feature']);
+  });
+
+  it('rejects staging paths that escape the repository', async () => {
+    const service = new AgentGitService(() => new Date(), vi.fn());
+    await expect(service.stage('/repo', ['../secret'])).rejects.toThrow('inside the repository');
+    expect(parsePorcelainFiles('R  new.ts\0old.ts\0')).toStrictEqual([{ path: 'old.ts', indexStatus: 'R', worktreeStatus: ' ' }]);
   });
 });

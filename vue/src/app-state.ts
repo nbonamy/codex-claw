@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue';
+import type { AgentGitCommitInput, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitWorkflow } from '@codex-claw/core/contracts';
 import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, AgentHistoryLoadResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/core/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
@@ -614,6 +615,31 @@ export function useAppState() {
     }
 
     await codexClawApi.openAgentGitDiff(agentId);
+  }
+
+  async function getAgentGitWorkflow(agentId: string): Promise<AgentGitWorkflow> {
+    if (!codexClawApi?.getAgentGitWorkflow) throw new Error('Git workflow is not available.');
+    return codexClawApi.getAgentGitWorkflow(agentId);
+  }
+
+  async function stageAgentGitFiles(agentId: string, input: AgentGitStageInput): Promise<AgentGitWorkflow> {
+    if (!codexClawApi?.stageAgentGitFiles) throw new Error('Git staging is not available.');
+    return codexClawApi.stageAgentGitFiles(agentId, input);
+  }
+
+  async function commitAgentGitChanges(agentId: string, input: AgentGitCommitInput): Promise<AgentGitWorkflow> {
+    if (!codexClawApi?.commitAgentGitChanges) throw new Error('Git commit is not available.');
+    return codexClawApi.commitAgentGitChanges(agentId, input);
+  }
+
+  async function pushAgentGitBranch(agentId: string, input: AgentGitPushInput): Promise<AgentGitWorkflow> {
+    if (!codexClawApi?.pushAgentGitBranch) throw new Error('Git push is not available.');
+    return codexClawApi.pushAgentGitBranch(agentId, input);
+  }
+
+  async function createAgentGitPullRequest(agentId: string, input: AgentGitPullRequestInput): Promise<AgentGitWorkflow> {
+    if (!codexClawApi?.createAgentGitPullRequest) throw new Error('Pull request creation is not available.');
+    return codexClawApi.createAgentGitPullRequest(agentId, input);
   }
 
   async function loadOpenInApplications(): Promise<void> {
@@ -1601,6 +1627,11 @@ export function useAppState() {
     createSourceWorktree,
     previewAgentFile,
     openAgentGitDiff,
+    getAgentGitWorkflow,
+    stageAgentGitFiles,
+    commitAgentGitChanges,
+    pushAgentGitBranch,
+    createAgentGitPullRequest,
     loadOpenInApplications,
     openAgentPath,
     createAgent,

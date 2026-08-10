@@ -1072,6 +1072,40 @@ export type AgentGitStatus = {
   error?: string;
 };
 
+export type AgentGitFile = {
+  path: string;
+  indexStatus: string;
+  worktreeStatus: string;
+};
+
+export type AgentGitPullRequest = {
+  number: number;
+  title: string;
+  url: string;
+  draft: boolean;
+};
+
+export type AgentGitWorkflow = {
+  repository: string;
+  folder: string;
+  branch?: string;
+  detached: boolean;
+  remote?: string;
+  remoteUrl?: string;
+  upstream?: string;
+  files: AgentGitFile[];
+  stagedFiles: string[];
+  unstagedFiles: string[];
+  existingPullRequest?: AgentGitPullRequest;
+  githubConnected: boolean;
+  githubError?: string;
+};
+
+export type AgentGitStageInput = { paths: string[]; confirmed: boolean };
+export type AgentGitCommitInput = { message: string; confirmed: boolean };
+export type AgentGitPushInput = { confirmed: boolean };
+export type AgentGitPullRequestInput = { title: string; body: string; confirmed: boolean };
+
 export type TurnGitDiff = {
   turnId: string;
   addedLines: number;
@@ -1377,6 +1411,11 @@ export type CodexClawApi = {
   listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]>;
   previewAgentFile(agentId: string, filePath: string): Promise<AgentFilePreviewResult>;
   openAgentGitDiff(agentId: string): Promise<void>;
+  getAgentGitWorkflow(agentId: string): Promise<AgentGitWorkflow>;
+  stageAgentGitFiles(agentId: string, input: AgentGitStageInput): Promise<AgentGitWorkflow>;
+  commitAgentGitChanges(agentId: string, input: AgentGitCommitInput): Promise<AgentGitWorkflow>;
+  pushAgentGitBranch(agentId: string, input: AgentGitPushInput): Promise<AgentGitWorkflow>;
+  createAgentGitPullRequest(agentId: string, input: AgentGitPullRequestInput): Promise<AgentGitWorkflow>;
   getOpenInApplications(): Promise<OpenInApplicationCatalog>;
   openAgentPath(agentId: string, application: OpenInApplication, filePath?: string): Promise<AppSnapshot>;
   chooseAgentFolder(): Promise<string | null>;

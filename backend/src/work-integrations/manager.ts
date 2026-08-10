@@ -1,4 +1,4 @@
-import type { AppSnapshot, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkProviderAuthorization, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AgentGitPullRequest, AppSnapshot, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkProviderAuthorization, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import type { WorkIntegrationTokenStore, WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
 import type { WorkProviderDeviceAuthorization, WorkProviderDriver } from './types';
 
@@ -80,6 +80,22 @@ export class WorkIntegrationManager {
     if (changed) {
       await this.options.saveSnapshot();
     }
+  }
+
+  async findPullRequest(repositoryId: string, branch: string): Promise<AgentGitPullRequest | null> {
+    const driver = this.driver('github');
+    if (!driver.findPullRequest) return null;
+    return driver.findPullRequest(await this.connectedToken('github'), repositoryId, branch);
+  }
+
+  async createPullRequest(repositoryId: string, input: { branch: string; title: string; body: string }): Promise<AgentGitPullRequest> {
+    const driver = this.driver('github');
+    if (!driver.createPullRequest) throw new Error('GitHub pull request creation is unavailable.');
+    return driver.createPullRequest(await this.connectedToken('github'), repositoryId, input);
+  }
+
+  async githubConnected(): Promise<boolean> {
+    return Boolean(await this.options.tokenStore.get('github'));
   }
 
   async connect(provider: WorkProviderKind): Promise<WorkProviderConnectResult> {

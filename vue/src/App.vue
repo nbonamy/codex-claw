@@ -57,6 +57,11 @@
     :create-source-worktree="createSourceWorktree"
     :preview-agent-file="previewAgentFile"
     :open-agent-git-diff="openAgentGitDiff"
+    :get-agent-git-workflow="getAgentGitWorkflow"
+    :stage-agent-git-files="stageAgentGitFiles"
+    :commit-agent-git-changes="commitAgentGitChanges"
+    :push-agent-git-branch="pushAgentGitBranch"
+    :create-agent-git-pull-request="createAgentGitPullRequest"
     :open-in-applications="openInApplications"
     :open-agent-path="openAgentPath"
     :create-agent="createAgent"
@@ -228,6 +233,11 @@ const {
   createSourceWorktree,
   previewAgentFile,
   openAgentGitDiff,
+  getAgentGitWorkflow,
+  stageAgentGitFiles,
+  commitAgentGitChanges,
+  pushAgentGitBranch,
+  createAgentGitPullRequest,
   loadOpenInApplications,
   openAgentPath,
   createAgent,

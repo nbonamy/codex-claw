@@ -213,6 +213,11 @@ export class AppController {
     ipc.handle(ipcChannels.openAgentGitDiff, async (_event, agentId: string) => {
       return this.openAgentGitDiff(agentId);
     });
+    ipc.handle(ipcChannels.getAgentGitWorkflow, (_event, agentId: string) => this.requireBackendClient().request(backendMethods.agentGitWorkflowGet, { agentId }));
+    ipc.handle(ipcChannels.stageAgentGitFiles, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitStage, { agentId, input }));
+    ipc.handle(ipcChannels.commitAgentGitChanges, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitCommit, { agentId, input }));
+    ipc.handle(ipcChannels.pushAgentGitBranch, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitPush, { agentId, input }));
+    ipc.handle(ipcChannels.createAgentGitPullRequest, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitPullRequestCreate, { agentId, input }));
 
     ipc.handle(ipcChannels.getOpenInApplications, () => this.getOpenInApplications());
     ipc.handle(ipcChannels.openAgentPath, (_event, agentId: string, application: OpenInApplication, filePath?: string) => {

@@ -12,8 +12,23 @@ import { CodexBackendDriver } from '../codex/codex-driver';
 import type { CodexSurfaceAgentAdapter } from '../codex/codex-surface-adapter';
 import type { WorkIntegrationManager } from '../work-integrations/manager';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import type { AgentGitService } from '../git/agent-git-service';
 
 describe('ClawBackendServer', () => {
+  it('rejects unconfirmed git mutations before invoking git', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{ id: 'agent-dina', teamId: snapshot.teams[0]!.id, name: 'Dina', folder: '/repo', backend: 'codex', status: { type: 'idle' }, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' }];
+    const stage = vi.fn();
+    const server = new ClawBackendServer({
+      version: 'test-version', snapshot,
+      agentGitService: { stage } as unknown as AgentGitService,
+    });
+
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'stage', method: backendMethods.agentGitStage, params: { agentId: 'agent-dina', input: { paths: ['a.ts'], confirmed: false } } })).rejects.toThrow('Staging files requires explicit confirmation.');
+    expect(stage).not.toHaveBeenCalled();
+  });
+
   it('responds to backend health requests', async () => {
     const server = new ClawBackendServer({ version: 'test-version', pid: 123 });
 
