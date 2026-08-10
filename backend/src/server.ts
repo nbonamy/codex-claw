@@ -656,8 +656,11 @@ export class ClawBackendServer {
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitCommit, params, async (agent) => {
           const input = requireConfirmed(params.input, 'Creating a commit');
           const workflow = await this.agentGitService.workflow(agent.folder);
-          if (input.includeUnstaged === true && workflow.unstagedFiles.length > 0) {
-            await this.agentGitService.stage(agent.folder, workflow.unstagedFiles);
+          const pathsToStage = workflow.files
+            .filter((file) => (file.indexStatus === '?' ? input.includeUntracked === true : input.includeUnstaged === true))
+            .map((file) => file.path);
+          if (pathsToStage.length > 0) {
+            await this.agentGitService.stage(agent.folder, pathsToStage);
           }
           await this.agentGitService.commit(agent.folder, requireString(input.message, 'message'));
           return this.gitWorkflow(agent);

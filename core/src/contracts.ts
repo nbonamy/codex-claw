@@ -1099,6 +1099,8 @@ export type AgentGitWorkflow = {
   stagedRemovedLines?: number;
   unstagedAddedLines?: number;
   unstagedRemovedLines?: number;
+  untrackedAddedLines?: number;
+  untrackedRemovedLines?: number;
   files: AgentGitFile[];
   stagedFiles: string[];
   unstagedFiles: string[];
@@ -1108,7 +1110,7 @@ export type AgentGitWorkflow = {
 };
 
 export type AgentGitStageInput = { paths: string[]; confirmed: boolean };
-export type AgentGitCommitInput = { message: string; confirmed: boolean; includeUnstaged?: boolean };
+export type AgentGitCommitInput = { message: string; confirmed: boolean; includeUnstaged?: boolean; includeUntracked?: boolean };
 export type AgentGitPushInput = { confirmed: boolean };
 export type AgentGitPullRequestInput = { title: string; body: string; confirmed: boolean };
 export type AgentGitMergeInput = { strategy: 'merge' | 'squash'; deleteBranch: boolean; deleteWorktree: boolean; confirmed: boolean };

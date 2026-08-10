@@ -125,6 +125,9 @@ describe('agent git service parsers', () => {
       if (args[0] === 'remote' && args[1] === undefined) return { stdout: 'origin\n' };
       if (args[0] === 'remote') return { stdout: 'git@github.com:nbonamy/codex-claw.git\n' };
       if (args[0] === 'status') return { stdout: ' M src/a.ts\0?? src/new.ts\0' };
+      if (args.includes('--no-index')) return { stdout: '2\t0\tsrc/new.ts\n' };
+      if (args[0] === 'diff' && args[1] === '--cached') return { stdout: '4\t1\tsrc/a.ts\n' };
+      if (args[0] === 'diff') return { stdout: '2\t0\tsrc/a.ts\n' };
       return { stdout: '' };
     });
     const service = new AgentGitService(() => new Date(), runGit);
@@ -132,6 +135,9 @@ describe('agent git service parsers', () => {
     await expect(service.workflow('/repo')).resolves.toMatchObject({
       repository: 'nbonamy/codex-claw', branch: 'feature', remote: 'origin', detached: false,
       unstagedFiles: ['src/a.ts', 'src/new.ts'], stagedFiles: [],
+      stagedAddedLines: 4, stagedRemovedLines: 1,
+      unstagedAddedLines: 2, unstagedRemovedLines: 0,
+      untrackedAddedLines: 2, untrackedRemovedLines: 0,
     });
     await service.stage('/repo', ['src/a.ts']);
     await service.commit('/repo', 'feat: ship workflow');

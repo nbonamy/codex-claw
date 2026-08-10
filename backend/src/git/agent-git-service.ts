@@ -97,6 +97,7 @@ export class AgentGitService {
     const branchStatus = parseBranchStatus(branchStatusResult.stdout);
     const stagedDiff = parseNumstat(stagedNumstat.stdout);
     const unstagedDiff = parseNumstat(unstagedNumstat.stdout);
+    const untrackedDiff = await untrackedNumstat(this.runGit, folder, files.filter((file) => file.indexStatus === '?').map((file) => file.path));
     const repository = githubRepositoryFromRemote(remoteUrl) ?? fileName(root.stdout.trim());
     return {
       repository,
@@ -112,6 +113,8 @@ export class AgentGitService {
       stagedRemovedLines: stagedDiff.removedLines,
       unstagedAddedLines: unstagedDiff.addedLines,
       unstagedRemovedLines: unstagedDiff.removedLines,
+      untrackedAddedLines: untrackedDiff.addedLines,
+      untrackedRemovedLines: untrackedDiff.removedLines,
       files,
       stagedFiles: files.filter((file) => file.indexStatus !== ' ' && file.indexStatus !== '?').map((file) => file.path),
       unstagedFiles: files.filter((file) => file.worktreeStatus !== ' ' || file.indexStatus === '?').map((file) => file.path),
@@ -200,6 +203,17 @@ async function workingTreeDiff(runGit: AgentGitRunner, folder: string, args: str
     ]);
     return { stdout: [staged.stdout, unstaged.stdout].filter(Boolean).join('\n') };
   }
+}
+
+async function untrackedNumstat(runGit: AgentGitRunner, folder: string, paths: string[]): Promise<{ addedLines: number; removedLines: number }> {
+  const results = await Promise.all(paths.map(async (filePath) => {
+    try {
+      return parseNumstat((await runGit(folder, ['diff', '--no-index', '--numstat', '--', process.platform === 'win32' ? 'NUL' : '/dev/null', filePath])).stdout);
+    } catch {
+      return { addedLines: 0, removedLines: 0 };
+    }
+  }));
+  return results.reduce((total, result) => ({ addedLines: total.addedLines + result.addedLines, removedLines: total.removedLines + result.removedLines }), { addedLines: 0, removedLines: 0 });
 }
 
 async function git(cwd: string, args: string[]): Promise<{ stdout: string }> {

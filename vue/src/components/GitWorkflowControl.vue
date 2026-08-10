@@ -47,16 +47,20 @@
         v-model="commitMessage"
         autofocus
         rows="4"
-        placeholder="Commit message (leave blank to generate)…"
+        placeholder="Commit message…"
       />
       <label class="git-workflow-control__check">
-        <input v-model="includeUnstaged" type="checkbox" />
+        <el-switch v-model="includeUnstaged" size="small" />
         <span>Include unstaged changes</span>
+      </label>
+      <label class="git-workflow-control__check">
+        <el-switch v-model="includeUntracked" size="small" />
+        <span>Include untracked files</span>
         <span class="git-workflow-control__stats">+{{ commitAddedLines }} <em>−{{ commitRemovedLines }}</em></span>
       </label>
     </div>
     <template #footer>
-      <div class="claw-dialog__footer"><button class="git-workflow-control__cancel" type="button" @click="commitDialogOpen = false">Cancel</button><button class="git-workflow-control__submit" type="button" :disabled="busy" @click="commit(false)">Commit</button><button class="git-workflow-control__submit" type="button" :disabled="busy || !pushCapable" @click="commit(true)">Commit and push</button></div>
+      <div class="claw-dialog__footer"><button class="git-workflow-control__cancel" type="button" @click="commitDialogOpen = false">Cancel</button><button class="git-workflow-control__submit" type="button" :disabled="busy || !canCommit" @click="commit(false)">Commit</button><button class="git-workflow-control__submit" type="button" :disabled="busy || !canCommit || !pushCapable" @click="commit(true)">Commit and push</button></div>
     </template>
   </el-dialog>
 
@@ -130,18 +134,16 @@ const pullRequestDialogOpen = ref(false);
 const mergeDialogOpen = ref(false);
 const commitMessage = ref('');
 const includeUnstaged = ref(true);
+const includeUntracked = ref(true);
 const pullRequestTitle = ref('');
 const pullRequestBody = ref('');
 const mergeStrategy = ref<'merge' | 'squash'>('merge');
 const deleteBranch = ref(false);
 const deleteWorktree = ref(false);
 const mergeUnavailable = computed(() => !props.mergeBranch);
-const commitAddedLines = computed(() => includeUnstaged.value
-  ? (workflow.value?.stagedAddedLines ?? 0) + (workflow.value?.unstagedAddedLines ?? props.gitStatus?.addedLines ?? 0)
-  : (workflow.value?.stagedAddedLines ?? 0));
-const commitRemovedLines = computed(() => includeUnstaged.value
-  ? (workflow.value?.stagedRemovedLines ?? 0) + (workflow.value?.unstagedRemovedLines ?? props.gitStatus?.removedLines ?? 0)
-  : (workflow.value?.stagedRemovedLines ?? 0));
+const commitAddedLines = computed(() => (workflow.value?.stagedAddedLines ?? 0) + (includeUnstaged.value ? workflow.value?.unstagedAddedLines ?? props.gitStatus?.addedLines ?? 0 : 0) + (includeUntracked.value ? workflow.value?.untrackedAddedLines ?? 0 : 0));
+const commitRemovedLines = computed(() => (workflow.value?.stagedRemovedLines ?? 0) + (includeUnstaged.value ? workflow.value?.unstagedRemovedLines ?? props.gitStatus?.removedLines ?? 0 : 0) + (includeUntracked.value ? workflow.value?.untrackedRemovedLines ?? 0 : 0));
+const canCommit = computed(() => Boolean(commitMessage.value.trim()) && (commitAddedLines.value > 0 || commitRemovedLines.value > 0));
 
 const commitEnabled = computed(() => Boolean(workflow.value?.files.length));
 const pushEnabled = computed(() => Boolean(workflow.value?.branch && workflow.value?.remote && (workflow.value?.ahead ?? props.gitStatus?.ahead ?? 0) > 0));
@@ -188,7 +190,7 @@ function selectAction(action: string): void {
 async function commit(pushAfter: boolean): Promise<void> {
   if (!props.commitChanges) return;
   await perform(async () => {
-    workflow.value = await props.commitChanges!(props.agent.id, { message: commitMessage.value, includeUnstaged: includeUnstaged.value, confirmed: true });
+    workflow.value = await props.commitChanges!(props.agent.id, { message: commitMessage.value, includeUnstaged: includeUnstaged.value, includeUntracked: includeUntracked.value, confirmed: true });
     if (pushAfter && props.pushBranch) workflow.value = await props.pushBranch(props.agent.id, { confirmed: true });
     commitMessage.value = '';
     commitDialogOpen.value = false;
