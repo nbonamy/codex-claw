@@ -53,9 +53,8 @@ afterEach(() => {
 });
 
 describe('ImageAnnotationDialog', () => {
-  it('scopes its compact title inset to the image annotation dialog', () => {
-    expect(componentSource).toContain(':global(.image-annotation-dialog.el-dialog > .el-dialog__header)');
-    expect(componentSource).toContain('padding-left: var(--space-12);');
+  it('uses the shared dialog header gutter while keeping its body compact', () => {
+    expect(componentSource).not.toContain(':global(.image-annotation-dialog.el-dialog > .el-dialog__header)');
     expect(componentSource).toMatch(
       /:global\(\.image-annotation-dialog\.el-dialog > \.el-dialog__body\) \{[^}]*padding: 0;/,
     );

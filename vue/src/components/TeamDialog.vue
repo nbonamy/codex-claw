@@ -313,14 +313,16 @@ function shouldLoadRemoteTeamOptions(connectionId: string): boolean {
 
 <style scoped>
 .team-dialog__form {
-  gap: var(--space-10);
+  gap: var(--space-4);
+}
+
+.team-dialog__group + .team-dialog__group {
+  margin-top: var(--space-4);
 }
 
 .team-dialog__group {
   overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  background: var(--color-surface-lowest);
+  background: transparent;
 }
 
 .team-dialog__row {
@@ -329,7 +331,7 @@ function shouldLoadRemoteTeamOptions(connectionId: string): boolean {
   align-items: center;
   gap: var(--space-8);
   min-height: calc(var(--space-20) + var(--space-8));
-  padding: 0 var(--space-8);
+  padding: 0 var(--space-2);
 }
 
 .team-dialog__row + .team-dialog__row {
@@ -354,13 +356,15 @@ function shouldLoadRemoteTeamOptions(connectionId: string): boolean {
 .team-dialog__select :deep(.el-select__wrapper) {
   min-height: var(--space-20);
   padding: 0 var(--space-4);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: transparent;
+  background: var(--color-surface-lowest);
   box-shadow: none;
 }
 
 .team-dialog__select :deep(.el-select__wrapper:hover),
 .team-dialog__select :deep(.el-select__wrapper.is-focused) {
+  border-color: var(--color-primary);
   background: var(--color-surface-low);
   box-shadow: none;
 }
@@ -375,15 +379,18 @@ function shouldLoadRemoteTeamOptions(connectionId: string): boolean {
   min-height: var(--space-16);
   display: flex;
   align-items: center;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+  background: var(--color-surface-lowest);
 }
 
 .team-dialog__name-control:focus-within {
+  border-color: var(--color-primary);
   background: var(--color-surface-low);
 }
 
 .team-dialog__text-input {
-  height: var(--space-16);
+  height: var(--space-20);
   padding: 0 var(--space-4);
   line-height: var(--line-height-20);
 }

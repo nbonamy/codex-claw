@@ -915,10 +915,6 @@ function clamp(value: number, minimum: number, maximum: number): number {
 </script>
 
 <style scoped>
-:global(.image-annotation-dialog.el-dialog > .el-dialog__header) {
-  padding-left: var(--space-12);
-}
-
 :global(.image-annotation-dialog.el-dialog) {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;

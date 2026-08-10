@@ -3,7 +3,7 @@
     class="claw-dialog agent-dialog"
     :model-value="visible"
     :teleported="false"
-    width="560px"
+    width="520px"
     :show-close="false"
     destroy-on-close
     @update:model-value="onVisibilityChanged"
@@ -711,12 +711,8 @@ function resetEditSourceSelection(): void {
 </script>
 
 <style scoped>
-.agent-dialog__header {
-  margin-left: calc(-1 * var(--space-4));
-}
-
 .agent-dialog__form {
-  gap: var(--space-10);
+  gap: var(--space-4);
 }
 
 .agent-dialog__workspace-group,
@@ -726,9 +722,7 @@ function resetEditSourceSelection(): void {
 
 .agent-dialog__workspace-rows,
 .agent-dialog__identity-rows {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  background: var(--color-surface-lowest);
+  background: transparent;
 }
 
 .agent-dialog__workspace-rows {
@@ -752,11 +746,7 @@ function resetEditSourceSelection(): void {
   align-items: center;
   gap: var(--space-8);
   min-height: calc(var(--space-20) + var(--space-8));
-  padding: 0 var(--space-8);
-}
-
-.agent-dialog__workspace-row + .agent-dialog__workspace-row {
-  border-top: 1px solid var(--color-border);
+  padding: 0 var(--space-2);
 }
 
 .agent-dialog__row-copy {
@@ -781,13 +771,15 @@ function resetEditSourceSelection(): void {
 .agent-dialog__workspace-select :deep(.el-select__wrapper) {
   min-height: var(--space-20);
   padding: 0 var(--space-4);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: transparent;
+  background: var(--color-surface-lowest);
   box-shadow: none;
 }
 
 .agent-dialog__workspace-select :deep(.el-select__wrapper:hover),
 .agent-dialog__workspace-select :deep(.el-select__wrapper.is-focused) {
+  border-color: var(--color-primary);
   background: var(--color-surface-low);
   box-shadow: none;
 }
@@ -816,19 +808,21 @@ function resetEditSourceSelection(): void {
 .agent-dialog__identity-input {
   flex: 1 1 auto;
   min-width: 0;
-  min-height: var(--space-16);
+  min-height: var(--space-20);
   display: flex;
   align-items: center;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: transparent;
+  background: var(--color-surface-lowest);
 }
 
 .agent-dialog__identity-input:focus-within {
+  border-color: var(--color-primary);
   background: var(--color-surface-low);
 }
 
 .agent-dialog__text-input {
-  height: var(--space-16);
+  height: var(--space-20);
   padding: 0 var(--space-4);
   line-height: var(--line-height-20);
 }
@@ -839,14 +833,14 @@ function resetEditSourceSelection(): void {
 }
 
 .agent-dialog__identity-avatar :deep(.agent-avatar-picker__trigger) {
-  width: var(--space-16);
-  height: var(--space-16);
+  width: var(--space-20);
+  height: var(--space-20);
   border-radius: var(--radius-md);
   background: var(--color-surface-low);
 }
 
 .agent-dialog__identity-avatar :deep(.agent-avatar-picker__trigger .agent-avatar-picker__preview) {
-  --agent-avatar-size: var(--space-16);
+  --agent-avatar-size: var(--space-20);
 }
 
 .agent-dialog__identity-avatar :deep(.agent-avatar-picker__hint) {

@@ -35,7 +35,7 @@
   <el-dialog
     v-if="commitDialogOpen"
     v-model="commitDialogOpen"
-    class="claw-dialog"
+    class="claw-dialog git-workflow-control__dialog"
     width="min(560px, calc(100vw - 32px))"
     :teleported="false"
     :show-close="false"
@@ -44,6 +44,7 @@
     <template #header><div class="claw-form-dialog__header git-workflow-control__dialog-header"><h2 class="claw-dialog__title">Commit changes</h2><span class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch ?? 'detached HEAD' }}</span></div></template>
     <div class="git-workflow-control__dialog-form">
       <textarea
+        ref="commitMessageInput"
         v-model="commitMessage"
         autofocus
         rows="4"
@@ -52,11 +53,12 @@
       <label class="git-workflow-control__check">
         <el-switch v-model="includeUnstaged" size="small" />
         <span>Include unstaged changes</span>
+        <span class="git-workflow-control__stats" :class="{ 'git-workflow-control__stats--muted': !includeUnstaged }">+{{ trackedAddedLines }} <em>−{{ trackedRemovedLines }}</em></span>
       </label>
       <label class="git-workflow-control__check">
-        <el-switch v-model="includeUntracked" size="small" />
-        <span>Include untracked files</span>
-        <span class="git-workflow-control__stats">+{{ commitAddedLines }} <em>−{{ commitRemovedLines }}</em></span>
+        <el-switch v-model="includeUntracked" size="small" :disabled="!hasUntrackedFiles || busy" />
+        <span>{{ hasUntrackedFiles ? 'Include untracked files' : 'No untracked files' }}</span>
+        <span v-if="hasUntrackedFiles" class="git-workflow-control__stats" :class="{ 'git-workflow-control__stats--muted': !includeUntracked }">+{{ untrackedAddedLines }}</span>
       </label>
     </div>
     <template #footer>
@@ -67,7 +69,7 @@
   <el-dialog
     v-if="pullRequestDialogOpen"
     v-model="pullRequestDialogOpen"
-    class="claw-dialog"
+    class="claw-dialog git-workflow-control__dialog"
     width="min(560px, calc(100vw - 32px))"
     :teleported="false"
     :show-close="false"
@@ -86,7 +88,7 @@
   <el-dialog
     v-if="mergeDialogOpen"
     v-model="mergeDialogOpen"
-    class="claw-dialog"
+    class="claw-dialog git-workflow-control__dialog"
     width="min(560px, calc(100vw - 32px))"
     :teleported="false"
     :show-close="false"
@@ -94,10 +96,24 @@
   >
     <template #header><div class="claw-form-dialog__header git-workflow-control__dialog-header"><h2 class="claw-dialog__title">Merge branch</h2><span class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
     <div class="git-workflow-control__dialog-form">
-      <label><input v-model="mergeStrategy" type="radio" value="merge" /> Merge commit</label>
-      <label><input v-model="mergeStrategy" type="radio" value="squash" /> Squash and merge</label>
-      <label class="git-workflow-control__check"><input v-model="deleteBranch" type="checkbox" /> Delete branch after merging</label>
-      <label class="git-workflow-control__check"><input v-model="deleteWorktree" type="checkbox" /> Delete worktree after merging</label>
+      <div class="git-workflow-control__merge-strategy" role="radiogroup" aria-label="Merge strategy">
+        <label :class="{ 'git-workflow-control__merge-option--selected': mergeStrategy === 'merge' }">
+          <input v-model="mergeStrategy" type="radio" value="merge" />
+          <span>Merge commit</span>
+        </label>
+        <label :class="{ 'git-workflow-control__merge-option--selected': mergeStrategy === 'squash' }">
+          <input v-model="mergeStrategy" type="radio" value="squash" />
+          <span>Squash and merge</span>
+        </label>
+      </div>
+      <label class="git-workflow-control__check">
+        <el-switch v-model="deleteBranch" size="small" />
+        <span>Delete branch after merging</span>
+      </label>
+      <label class="git-workflow-control__check">
+        <el-switch v-model="deleteWorktree" size="small" />
+        <span>Delete worktree after merging</span>
+      </label>
       <p v-if="mergeUnavailable" class="git-workflow-control__hint">Merge is available once a merge target is configured for this worktree.</p>
     </div>
     <template #footer>
@@ -107,7 +123,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { Agent, AgentGitCommitInput, AgentGitMergeInput, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStatus, AgentGitWorkflow } from '@codex-claw/core/contracts';
 import { ChevronDown, CloudUploadIcon, GitCommitIcon, GitForkIcon, GitHubIcon, GitMergeIcon } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
@@ -132,6 +148,7 @@ const busy = ref(false);
 const commitDialogOpen = ref(false);
 const pullRequestDialogOpen = ref(false);
 const mergeDialogOpen = ref(false);
+const commitMessageInput = ref<HTMLTextAreaElement | null>(null);
 const commitMessage = ref('');
 const includeUnstaged = ref(true);
 const includeUntracked = ref(true);
@@ -141,8 +158,17 @@ const mergeStrategy = ref<'merge' | 'squash'>('merge');
 const deleteBranch = ref(false);
 const deleteWorktree = ref(false);
 const mergeUnavailable = computed(() => !props.mergeBranch);
-const commitAddedLines = computed(() => (workflow.value?.stagedAddedLines ?? 0) + (includeUnstaged.value ? workflow.value?.unstagedAddedLines ?? props.gitStatus?.addedLines ?? 0 : 0) + (includeUntracked.value ? workflow.value?.untrackedAddedLines ?? 0 : 0));
-const commitRemovedLines = computed(() => (workflow.value?.stagedRemovedLines ?? 0) + (includeUnstaged.value ? workflow.value?.unstagedRemovedLines ?? props.gitStatus?.removedLines ?? 0 : 0) + (includeUntracked.value ? workflow.value?.untrackedRemovedLines ?? 0 : 0));
+const unstagedAddedLines = computed(() => workflow.value?.unstagedAddedLines ?? props.gitStatus?.addedLines ?? 0);
+const unstagedRemovedLines = computed(() => workflow.value?.unstagedRemovedLines ?? props.gitStatus?.removedLines ?? 0);
+const trackedAddedLines = computed(() => (workflow.value?.stagedAddedLines ?? 0) + unstagedAddedLines.value);
+const trackedRemovedLines = computed(() => (workflow.value?.stagedRemovedLines ?? 0) + unstagedRemovedLines.value);
+const commitTrackedAddedLines = computed(() => (workflow.value?.stagedAddedLines ?? 0) + (includeUnstaged.value ? unstagedAddedLines.value : 0));
+const commitTrackedRemovedLines = computed(() => (workflow.value?.stagedRemovedLines ?? 0) + (includeUnstaged.value ? unstagedRemovedLines.value : 0));
+const commitAddedLines = computed(() => commitTrackedAddedLines.value + (includeUntracked.value ? workflow.value?.untrackedAddedLines ?? 0 : 0));
+const commitRemovedLines = computed(() => commitTrackedRemovedLines.value + (includeUntracked.value ? workflow.value?.untrackedRemovedLines ?? 0 : 0));
+const untrackedFileCount = computed(() => workflow.value?.files.filter((file) => file.indexStatus === '?').length ?? 0);
+const hasUntrackedFiles = computed(() => untrackedFileCount.value > 0);
+const untrackedAddedLines = computed(() => workflow.value?.untrackedAddedLines ?? 0);
 const canCommit = computed(() => Boolean(commitMessage.value.trim()) && (commitAddedLines.value > 0 || commitRemovedLines.value > 0));
 
 const commitEnabled = computed(() => Boolean(workflow.value?.files.length));
@@ -159,6 +185,10 @@ const menuItems = computed<AppMenuItem[]>(() => [
   { id: 'create-pr', type: 'action', label: 'Create PR', icon: GitForkIcon, disabled: !prEnabled.value },
   { id: 'merge', type: 'action', label: 'Merge', icon: GitMergeIcon, disabled: !mergeEnabled.value || mergeUnavailable.value },
 ]);
+
+watch(commitDialogOpen, (open) => {
+  if (open) void nextTick(() => commitMessageInput.value?.focus());
+});
 
 onMounted(() => {
   document.addEventListener('click', closeMenu);
@@ -220,14 +250,24 @@ async function perform(action: () => Promise<void>): Promise<void> { busy.value 
 .git-workflow-control > button:disabled { opacity: .45; cursor: default; }
 .git-workflow-control svg { width: var(--icon-md); height: var(--icon-md); }
 .git-workflow-control__menu { position: absolute; z-index: 30; top: calc(100% + var(--space-2)); right: 0; }
-.git-workflow-control__dialog-form { display: grid; gap: var(--space-8); }
+.git-workflow-control__dialog-form { display: grid; gap: 0; }
 .git-workflow-control__dialog-header { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-8); min-width: 0; }
 .git-workflow-control__dialog-header .git-workflow-control__branch { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
-.git-workflow-control__dialog-form textarea, .git-workflow-control__dialog-form input[type='text'], .git-workflow-control__dialog-form > input:not([type]) { width: 100%; box-sizing: border-box; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-8); font: inherit; }
+.git-workflow-control__dialog-form textarea { width: 100%; box-sizing: border-box; min-height: 112px; border: 0; border-radius: 0; padding: var(--space-4) 0; color: var(--color-text); background: transparent; font: inherit; outline: none; resize: none; }
+.git-workflow-control__dialog-form input[type='text'], .git-workflow-control__dialog-form > input:not([type]) { width: 100%; box-sizing: border-box; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-4) var(--space-6); color: var(--color-text); background: var(--color-surface-lowest); font: inherit; outline: none; }
+.git-workflow-control__dialog-form input[type='text']:focus, .git-workflow-control__dialog-form > input:not([type]):focus { border-color: var(--color-primary); background: var(--color-surface-low); }
 .git-workflow-control__branch, .git-workflow-control__hint { color: var(--color-text-muted); }
-.git-workflow-control__check { display: flex; align-items: center; gap: var(--space-6); }
+.git-workflow-control__check { display: flex; align-items: center; gap: var(--space-6); min-height: var(--space-16); border-top: 1px solid var(--color-border); padding: var(--space-4) 0; }
+.git-workflow-control__merge-strategy { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
+.git-workflow-control__merge-strategy label { display: flex; align-items: center; gap: var(--space-4); min-height: var(--space-20); padding: 0 var(--space-2); color: var(--color-text-muted); cursor: pointer; }
+.git-workflow-control__merge-strategy label + label { border-left: 1px solid var(--color-border); }
+.git-workflow-control__merge-strategy label:hover, .git-workflow-control__merge-option--selected { color: var(--color-text) !important; background: var(--color-surface-low); }
+.git-workflow-control__merge-strategy input { margin: 0; accent-color: var(--color-primary); }
 .git-workflow-control__stats { margin-left: auto; color: var(--color-success); font-variant-numeric: tabular-nums; }
 .git-workflow-control__stats em { color: var(--color-error); font-style: normal; }
+.git-workflow-control__stats--muted,
+.git-workflow-control__stats--muted em { color: var(--color-text-muted); }
+:global(.git-workflow-control__dialog .el-dialog__body) { padding-bottom: 0; }
 .git-workflow-control__cancel, .git-workflow-control__submit { border-radius: var(--radius-md); padding: var(--space-4) var(--space-8); font: inherit; font-size: var(--font-size-13); line-height: var(--line-height-18); cursor: pointer; }
 .git-workflow-control__cancel { border: 1px solid var(--color-border); background: transparent; }
 .git-workflow-control__submit { border: 1px solid var(--color-primary); background: var(--color-primary); color: var(--color-on-primary); }

@@ -37,16 +37,15 @@ button {
   overflow: visible;
   border-radius: var(--radius-xl);
   background: var(--color-surface-lowest);
+  box-shadow: var(--shadow-lg);
 }
 
 .claw-dialog .el-dialog__header {
-  padding: var(--space-8) var(--space-8) var(--space-8) var(--space-20);
-  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-8) var(--space-12) var(--space-4);
 }
 
 .claw-dialog .el-dialog__body {
-  padding: var(--space-12);
-  background: var(--color-dialog-body);
+  padding: 0 var(--space-12) var(--space-8);
 }
 
 .claw-dialog .el-dialog__body:last-child {

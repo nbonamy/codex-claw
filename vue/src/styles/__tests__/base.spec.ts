@@ -10,15 +10,15 @@ function rule(selector: string): string {
 }
 
 describe('shared dialog chrome', () => {
-  it('keeps close controls near the outer edge without moving dialog titles', () => {
+  it('aligns dialog headers with the shared body and footer gutters', () => {
     expect(rule('.claw-dialog .el-dialog__header')).toContain(
-      'padding: var(--space-8) var(--space-8) var(--space-8) var(--space-20);',
+      'padding: var(--space-8) var(--space-12) var(--space-4);',
     );
   });
 
-  it('gives ordinary dialog bodies consistent padding on every edge', () => {
+  it('lets dialog content sit beneath the header with the shared horizontal gutter', () => {
     expect(rule('.claw-dialog .el-dialog__body')).toContain(
-      'padding: var(--space-12);',
+      'padding: 0 var(--space-12) var(--space-8);',
     );
     expect(baseCss).not.toContain('.claw-dialog .el-dialog__body:has(form)');
     expect(rule('.claw-form-dialog')).not.toContain('padding:');
