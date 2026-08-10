@@ -174,7 +174,7 @@ describe('runtime config', () => {
     expect(devScript).toContain("start('npm', ['run', 'start:electron']");
     expect(devScript).not.toContain("['run', 'build:sdk']");
     expect(sdkBuildScript).toContain("specifier.startsWith('file:')");
-    expect(sdkBuildScript).toContain("spawnSync('npm', ['run', 'build']");
+    expect(sdkBuildScript).toContain("spawnSync(npmCommand, ['run', 'build']");
   });
 
   it('uses sibling SDK sources for dev while leaving package builds on dist', () => {
