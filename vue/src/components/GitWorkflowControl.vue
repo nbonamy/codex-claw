@@ -19,7 +19,7 @@
       aria-label="Choose Git action"
       title="Choose Git action"
       :aria-expanded="menuOpen"
-      @click.stop="menuOpen = !menuOpen"
+      @click.stop="toggleMenu"
     >
       <ChevronDown aria-hidden="true" />
     </button>
@@ -159,14 +159,18 @@ onMounted(() => {
 onBeforeUnmount(() => document.removeEventListener('click', closeMenu));
 watch(() => [props.agent.id, props.gitStatus?.updatedAt], () => { void loadWorkflow(); });
 
-async function loadWorkflow(): Promise<void> {
+async function loadWorkflow(closeMenu = true): Promise<void> {
   if (!props.getWorkflow) return;
   workflow.value = null;
   workflowError.value = null;
-  menuOpen.value = false;
+  if (closeMenu) menuOpen.value = false;
   try { workflow.value = await props.getWorkflow(props.agent.id); } catch (error) { workflowError.value = error instanceof Error ? error.message : String(error); }
 }
 function closeMenu(event: MouseEvent): void { if (!root.value?.contains(event.target as Node)) menuOpen.value = false; }
+function toggleMenu(): void {
+  menuOpen.value = !menuOpen.value;
+  if (menuOpen.value) void loadWorkflow(false);
+}
 function runFirstEnabled(): void { if (firstEnabledAction.value) selectAction(firstEnabledAction.value); }
 function selectAction(action: string): void {
   menuOpen.value = false;

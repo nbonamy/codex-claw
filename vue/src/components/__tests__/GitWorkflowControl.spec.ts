@@ -75,4 +75,15 @@ describe('GitWorkflowControl', () => {
     const featurePr = featureWrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'));
     expect(featurePr?.attributes('disabled')).toBeUndefined();
   });
+
+  it('refreshes stale workflow state when the menu opens', async () => {
+    let clean = false;
+    const getWorkflow = vi.fn(async () => clean ? { ...workflow, files: [], unstagedFiles: [], ahead: 0 } : workflow);
+    const wrapper = mountControl({ getWorkflow });
+    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    clean = true;
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await vi.waitFor(() => expect(getWorkflow).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(wrapper.get('.app-menu__item').attributes('disabled')).toBeDefined());
+  });
 });
