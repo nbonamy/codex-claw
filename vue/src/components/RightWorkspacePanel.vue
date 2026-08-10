@@ -108,11 +108,6 @@
       :agent="agent"
       :git-status="gitStatus"
       :panel="gitPanel"
-      :get-workflow="getGitWorkflow"
-      :stage-files="stageGitFiles"
-      :commit-changes="commitGitChanges"
-      :push-branch="pushGitBranch"
-      :create-pull-request="createGitPullRequest"
       @refresh="emit('refreshGitDiff')"
     />
 
@@ -298,11 +293,6 @@ const props = withDefaults(defineProps<{
   openInCatalog?: OpenInApplicationCatalog;
   subagentTree?: AgentSubagentTree | null;
   loadSubagentMessages?: (conversationId: string) => Promise<RendererMessage[]>;
-  getGitWorkflow?: (agentId: string) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
-  stageGitFiles?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitStageInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
-  commitGitChanges?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitCommitInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
-  pushGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPushInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
-  createGitPullRequest?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPullRequestInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
 }>(), {
   filesPaneWidth: 280,
 });

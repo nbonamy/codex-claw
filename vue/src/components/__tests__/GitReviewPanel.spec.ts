@@ -74,25 +74,16 @@ describe('GitReviewPanel', () => {
     expect(wrapper.get('.git-diff-preview-panel__file-header').attributes('aria-expanded')).toBe('false');
   });
 
-  it('requires contextual confirmation before staging and preserves cancellation', async () => {
-    const stageFiles = vi.fn();
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
-    const workflow = {
-      repository: 'nbonamy/codex-claw', folder: '/repo', branch: 'feature', detached: false,
-      remote: 'origin', remoteUrl: 'git@github.com:nbonamy/codex-claw.git', githubConnected: true,
-      files: [{ path: 'src/main.ts', indexStatus: ' ', worktreeStatus: 'M' }], stagedFiles: [], unstagedFiles: ['src/main.ts'],
-    };
+  it('keeps the review workspace focused on the diff', () => {
     const wrapper = mount(GitReviewPanel, {
       props: {
         agent: { id: 'agent-1', teamId: 'team-1', name: 'Dina', avatar: 'D', folder: '/repo', backend: 'codex', status: { type: 'idle' }, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
         panel: { kind: 'gitDiff', title: 'Review', diff, state: 'idle' },
-        getWorkflow: vi.fn().mockResolvedValue(workflow), stageFiles,
       },
     });
-    await vi.waitFor(() => expect(wrapper.text()).toContain('Select changes to stage'));
-    await wrapper.findAll('button').find((button) => button.text() === 'Stage selected')!.trigger('click');
 
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('nbonamy/codex-claw on feature'));
-    expect(stageFiles).not.toHaveBeenCalled();
+    expect(wrapper.find('.git-review-panel__workflow').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('Select changes to stage');
+    expect(wrapper.text()).not.toContain('Create draft PR');
   });
 });
