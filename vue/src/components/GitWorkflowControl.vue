@@ -52,7 +52,7 @@
       <label class="git-workflow-control__check">
         <input v-model="includeUnstaged" type="checkbox" />
         <span>Include unstaged changes</span>
-        <span class="git-workflow-control__stats">+{{ gitStatus?.addedLines ?? 0 }} <em>−{{ gitStatus?.removedLines ?? 0 }}</em></span>
+        <span class="git-workflow-control__stats">+{{ commitAddedLines }} <em>−{{ commitRemovedLines }}</em></span>
       </label>
     </div>
     <template #footer>
@@ -136,6 +136,12 @@ const mergeStrategy = ref<'merge' | 'squash'>('merge');
 const deleteBranch = ref(false);
 const deleteWorktree = ref(false);
 const mergeUnavailable = computed(() => !props.mergeBranch);
+const commitAddedLines = computed(() => includeUnstaged.value
+  ? (workflow.value?.stagedAddedLines ?? 0) + (workflow.value?.unstagedAddedLines ?? props.gitStatus?.addedLines ?? 0)
+  : (workflow.value?.stagedAddedLines ?? 0));
+const commitRemovedLines = computed(() => includeUnstaged.value
+  ? (workflow.value?.stagedRemovedLines ?? 0) + (workflow.value?.unstagedRemovedLines ?? props.gitStatus?.removedLines ?? 0)
+  : (workflow.value?.stagedRemovedLines ?? 0));
 
 const commitEnabled = computed(() => Boolean(workflow.value?.files.length));
 const pushEnabled = computed(() => Boolean(workflow.value?.branch && workflow.value?.remote && (workflow.value?.ahead ?? props.gitStatus?.ahead ?? 0) > 0));

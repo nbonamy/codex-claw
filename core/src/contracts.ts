@@ -1095,6 +1095,10 @@ export type AgentGitWorkflow = {
   upstream?: string;
   ahead: number;
   behind: number;
+  stagedAddedLines?: number;
+  stagedRemovedLines?: number;
+  unstagedAddedLines?: number;
+  unstagedRemovedLines?: number;
   files: AgentGitFile[];
   stagedFiles: string[];
   unstagedFiles: string[];

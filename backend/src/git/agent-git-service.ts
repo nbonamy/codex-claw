@@ -76,13 +76,15 @@ export class AgentGitService {
   }
 
   async workflow(folder: string): Promise<Omit<AgentGitWorkflow, 'githubConnected' | 'existingPullRequest'>> {
-    const [root, branch, upstream, remote, status, branchStatusResult] = await Promise.all([
+    const [root, branch, upstream, remote, status, branchStatusResult, stagedNumstat, unstagedNumstat] = await Promise.all([
       this.runGit(folder, ['rev-parse', '--show-toplevel']),
       this.runGit(folder, ['symbolic-ref', '--quiet', '--short', 'HEAD']).catch(() => ({ stdout: '' })),
       this.runGit(folder, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']).catch(() => ({ stdout: '' })),
       this.runGit(folder, ['remote']).catch(() => ({ stdout: '' })),
       this.runGit(folder, ['status', '--porcelain=v1', '-z']),
       this.runGit(folder, ['status', '--porcelain=v1', '--branch']),
+      this.runGit(folder, ['diff', '--cached', '--numstat', '--']).catch(() => ({ stdout: '' })),
+      this.runGit(folder, ['diff', '--numstat', '--']).catch(() => ({ stdout: '' })),
     ]);
     const remotes = remote.stdout.split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
     const trackedRemote = upstream.stdout.trim().split('/')[0];
@@ -93,6 +95,8 @@ export class AgentGitService {
       : undefined;
     const files = parsePorcelainFiles(status.stdout);
     const branchStatus = parseBranchStatus(branchStatusResult.stdout);
+    const stagedDiff = parseNumstat(stagedNumstat.stdout);
+    const unstagedDiff = parseNumstat(unstagedNumstat.stdout);
     const repository = githubRepositoryFromRemote(remoteUrl) ?? fileName(root.stdout.trim());
     return {
       repository,
@@ -104,6 +108,10 @@ export class AgentGitService {
       ...(upstream.stdout.trim() ? { upstream: upstream.stdout.trim() } : {}),
       ahead: branchStatus.ahead ?? 0,
       behind: branchStatus.behind ?? 0,
+      stagedAddedLines: stagedDiff.addedLines,
+      stagedRemovedLines: stagedDiff.removedLines,
+      unstagedAddedLines: unstagedDiff.addedLines,
+      unstagedRemovedLines: unstagedDiff.removedLines,
       files,
       stagedFiles: files.filter((file) => file.indexStatus !== ' ' && file.indexStatus !== '?').map((file) => file.path),
       unstagedFiles: files.filter((file) => file.worktreeStatus !== ' ' || file.indexStatus === '?').map((file) => file.path),

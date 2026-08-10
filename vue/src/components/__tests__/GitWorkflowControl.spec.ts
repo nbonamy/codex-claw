@@ -20,6 +20,9 @@ describe('GitWorkflowControl', () => {
     await wrapper.get('.git-workflow-control__primary').trigger('click');
     expect(wrapper.find('[role="dialog"]').attributes('aria-labelledby')).toBeDefined();
     expect(wrapper.text()).toContain('Commit and push');
+    expect(wrapper.find('.git-workflow-control__stats').text()).toContain('+4');
+    await wrapper.find('.git-workflow-control__check input').setValue(false);
+    expect(wrapper.find('.git-workflow-control__stats').text()).toContain('+0');
   });
 
   it('shows icon-only action menu entries without descriptions', async () => {
