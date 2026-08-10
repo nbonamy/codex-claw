@@ -75,6 +75,22 @@
           />
         </button>
       </span>
+      <button
+        v-if="gitReviewAvailable"
+        class="agent-header__git-review"
+        aria-label="Open GitHub Review"
+        title="Open GitHub Review"
+        type="button"
+        @click="emit('open-git-diff')"
+      >
+        <GitHubIcon aria-hidden="true" />
+      </button>
+      <OpenInControl
+        v-if="agent && openInAvailable && openInCatalog && openInCatalog.applications.length > 0"
+        :application="effectiveOpenInApplication(agent, openInCatalog)"
+        :catalog="openInCatalog"
+        @open="emit('open-in', $event)"
+      />
       <SubagentControl
         v-if="displaySubagentTree"
         :tree="displaySubagentTree"
@@ -92,12 +108,6 @@
       >
         <ListIcon aria-hidden="true" />
       </button>
-      <OpenInControl
-        v-if="agent && openInAvailable && openInCatalog && openInCatalog.applications.length > 0"
-        :application="effectiveOpenInApplication(agent, openInCatalog)"
-        :catalog="openInCatalog"
-        @open="emit('open-in', $event)"
-      />
       <button
         class="agent-header__workspace"
         type="button"
@@ -120,7 +130,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Agent, AgentGitStatus, AgentSubagentTree, BackendRuntimeStatus, DesktopUpdateStatus, OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
-import { ListIcon, PanelLeftOpenIcon } from '../shared/icons/app-icons';
+import { GitHubIcon, ListIcon, PanelLeftOpenIcon } from '../shared/icons/app-icons';
 import { IconLayoutSidebarRight } from '@tabler/icons-vue';
 import { CodexAnimatedDiffStat } from '@codex-app-sdk/vue';
 import AgentAvatar from './AgentAvatar.vue';
@@ -203,11 +213,12 @@ const agentStatusDetail = computed(() => {
 
 const hasHeaderGitStatus = computed(() => {
   const gitStatus = props.gitStatus;
-  if (!gitStatus || gitStatus.state === 'unknown') {
-    return false;
-  }
+  return Boolean(gitStatus && gitStatus.state !== 'unknown' && (gitStatus.addedLines || gitStatus.removedLines));
+});
 
-  return Boolean(gitStatus.addedLines || gitStatus.removedLines);
+const gitReviewAvailable = computed(() => {
+  const gitStatus = props.gitStatus;
+  return Boolean(gitStatus && gitStatus.state !== 'unknown');
 });
 
 </script>
@@ -365,6 +376,41 @@ const hasHeaderGitStatus = computed(() => {
 }
 
 .agent-header__git-diff:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.agent-header__git-review {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  min-width: 32px;
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-size-13);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.agent-header__git-review:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+  background: var(--color-surface-high);
+}
+
+.agent-header__git-review :deep(.github-icon) {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+.agent-header__git-review:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }

@@ -225,8 +225,8 @@ implemented:
   uses a plural-folders icon, shows directories before files at each level,
   and preserves matching files' ancestor folders while filtering. The first
   selected file replaces the Open file placeholder; later selections open
-  additional source, Markdown, image, or diff tabs. The explorer appears only
-  on the Open file, source, and Markdown tabs, and hides while any
+  additional source, Markdown, image, or diff tabs. The explorer and its toggle
+  appear only on the Open file, source, and Markdown tabs, and hide while any
   other tab is active. Command/Ctrl-P opens a keyboard-navigable quick file
   search for the active agent. Manually closing the last tab collapses the
   workspace. Review uses

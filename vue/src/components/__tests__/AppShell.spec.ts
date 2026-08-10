@@ -660,8 +660,8 @@ describe('AppShell', () => {
     await wrapper.get('button[title="Preview main.ts"]').trigger('click');
     await flushPromises();
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['README.md', 'main.ts']);
-    expect(wrapper.find('[aria-label="Collapse file explorer"]').exists()).toBe(false);
-    expect(wrapper.find('.right-workspace-panel__files-pane').exists()).toBe(true);
+    await wrapper.get('[aria-label="Collapse file explorer"]').trigger('click');
+    expect(wrapper.find('.right-workspace-panel__files-pane').exists()).toBe(false);
   });
 
   it('opens each selected header subagent in an independent right-workspace tab', async () => {

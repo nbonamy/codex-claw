@@ -270,6 +270,7 @@
             @open-tab="openRightWorkspaceTabFromMenu(agent.id, $event)"
             @open-in="openAgentIn(agent.id, $event.application, $event.filePath)"
             @preview-file="openFilePreviewForAgent(agent.id, $event)"
+            @toggle-files-pane="toggleFileExplorer(agent.id)"
             @resize-files-pane="rightWorkspaceFor(agent.id).filesPaneWidth = $event"
             @open-link="openConversationLink"
             @refresh-git-diff="openAgentGitDiffPreview(agent.id)"
@@ -1371,6 +1372,11 @@ function openRightWorkspaceTabFromMenu(agentId: string, tab: RightWorkspaceTab):
     rightWorkspaceFor(agentId).filesPaneOpen = true;
   }
   openRightWorkspaceTab(tab, agentId);
+}
+
+function toggleFileExplorer(agentId: string): void {
+  const workspace = rightWorkspaceFor(agentId);
+  workspace.filesPaneOpen = !workspace.filesPaneOpen;
 }
 
 function selectRightWorkspaceTab(agentId: string, tab: RightWorkspaceTab): void {

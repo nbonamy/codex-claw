@@ -45,7 +45,7 @@ describe('AgentHeader', () => {
     expect(wrapper.classes()).toContain('agent-header--with-sidebar-edge');
   });
 
-  it('renders repo diff stats without file count or branch details', () => {
+  it('renders repo diff stats and a separate bordered GitHub Review button', () => {
     const wrapper = mountHeader({ backend: 'codex', status: 'running' }, false, {
       folder: '/Users/nbonamy/src/id8',
       branch: 'main',
@@ -65,6 +65,9 @@ describe('AgentHeader', () => {
     expect(wrapper.text()).not.toContain('main');
     expect(wrapper.text()).not.toContain('ahead');
     expect(wrapper.findComponent({ name: 'ChatAnimatedDiffStat' }).exists()).toBe(true);
+    expect(wrapper.get('[aria-label="Open GitHub Review"]').element.tagName).toBe('BUTTON');
+    expect(wrapper.get('[aria-label="Open GitHub Review"]').classes()).toContain('agent-header__git-review');
+    expect(wrapper.get('[aria-label="Open GitHub Review"]').text()).toBe('');
   });
 
   it('emits a git diff preview request when repo diff stats are clicked', async () => {
@@ -84,6 +87,24 @@ describe('AgentHeader', () => {
     await wrapper.get('[aria-label="Open repository diff"]').trigger('click');
 
     expect(wrapper.emitted('open-git-diff')).toStrictEqual([[]]);
+  });
+
+  it('keeps GitHub Review available for a clean repository', () => {
+    const wrapper = mountHeader({ backend: 'codex', status: 'running' }, false, {
+      folder: '/Users/nbonamy/src/id8',
+      branch: 'main',
+      ahead: 0,
+      behind: 0,
+      changedFiles: 0,
+      addedLines: 0,
+      removedLines: 0,
+      hasUntracked: false,
+      state: 'clean',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    });
+
+    expect(wrapper.get('[aria-label="Open GitHub Review"]').text()).toBe('');
+    expect(wrapper.findComponent({ name: 'ChatAnimatedDiffStat' }).exists()).toBe(false);
   });
 
   it('renders an icon-only right-workspace action in the header', async () => {
@@ -314,11 +335,73 @@ describe('AgentHeader', () => {
       global: { plugins: [ElementPlus, i18n] },
     });
 
-    expect(wrapper.get('.agent-header__git-status').element.nextElementSibling).toBe(wrapper.get('.subagent-control').element);
+    const gitStats = wrapper.get('.agent-header__git-status');
+    const gitReview = wrapper.get('.agent-header__git-review');
+    expect(gitStats.element.nextElementSibling).toBe(gitReview.element);
+    expect(gitReview.element.nextElementSibling).toBe(wrapper.get('.subagent-control').element);
     await wrapper.get('[aria-label="Subagents (1 active)"]').trigger('click');
     await wrapper.get('[role="menuitem"]').trigger('click');
 
     expect(wrapper.emitted('select-subagent')).toStrictEqual([['thread-child']]);
+  });
+
+  it('orders repository actions, Open In, subagents, plan, workspace, and update controls', () => {
+    const wrapper = mount(AgentHeader, {
+      props: {
+        agent: { ...agent, openInApplication: 'vscode' },
+        gitStatus: {
+          folder: '/Users/nbonamy/src/id8',
+          branch: 'main',
+          ahead: 0,
+          behind: 0,
+          changedFiles: 1,
+          addedLines: 12,
+          removedLines: 4,
+          hasUntracked: false,
+          state: 'dirty',
+          updatedAt: '2026-06-05T00:00:00.000Z',
+        },
+        backendRuntime: { backend: 'codex', status: 'running' },
+        isLoading: false,
+        sidebarCollapsed: false,
+        openInAvailable: true,
+        openInCatalog: {
+          defaultApplication: 'vscode',
+          applications: [{ id: 'vscode', label: 'VS Code' }],
+        },
+        subagentTree: {
+          rootConversationId: 'thread-root',
+          nodes: {
+            'thread-child': {
+              conversationId: 'thread-child',
+              parentConversationId: 'thread-root',
+              createdAt: '2026-06-05T00:00:00.000Z',
+              status: 'running',
+              agentPath: '/root/scout',
+              updatedAt: '2026-06-05T00:00:00.000Z',
+            },
+          },
+          operations: {},
+          activities: {},
+        },
+        executionPlanAvailable: true,
+        executionPlanOpen: false,
+        workspaceOpen: false,
+        updateStatus: { state: 'downloaded', version: '0.4.0' },
+      },
+      global: { plugins: [ElementPlus, i18n] },
+    });
+
+    const activity = wrapper.get('.agent-header__activity');
+    expect([...activity.element.children].map((child) => child.className)).toStrictEqual([
+      'agent-header__git-status',
+      'agent-header__git-review',
+      'open-in-control',
+      'subagent-control',
+      'agent-header__execution-plan',
+      'agent-header__workspace',
+      'update-available-badge',
+    ]);
   });
 
   it('does not show the subagent control for a stale parent-conversation node', () => {
