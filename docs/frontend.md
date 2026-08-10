@@ -217,8 +217,17 @@ implemented:
   canonical path in the owning workspace. Edit targets with turn context open
   a turn-scoped diff tab; links without that context fall back to the current
   Git review;
-- empty right-workspace launcher for opening Review or Browser before any tab
-  exists; manually closing the last tab collapses the workspace. Review uses
+- empty right-workspace launcher for opening Review, Browser, or a workspace-scoped
+  Files launcher; it opens an Open file tab with a collapsible explorer pane
+  anchored to the right edge of the workspace. The explorer is resizable,
+  uses a plural-folders icon, shows directories before files at each level,
+  and preserves matching files' ancestor folders while filtering. The first
+  selected file replaces the Open file placeholder; later selections open
+  additional source, Markdown, image, or diff tabs. The explorer and its toggle
+  appear only on the Open file, source, and Markdown tabs, and hide while any
+  other tab is active. Command/Ctrl-P opens a keyboard-navigable quick file
+  search for the active agent. Manually closing the last tab collapses the
+  workspace. Review uses
   `Command+G` and Browser uses `Command+B`, while existing `Command+D`
   duplicate-agent and `Command+R` restart-agent shortcuts remain unchanged;
   `Command+K` submits `/compact` for the active agent. Holding Command briefly
@@ -382,8 +391,8 @@ High-priority surfaces:
 - approval requests;
 - ask-user prompts;
 - file changes, read-only source previews, and diffs;
-- explicitly clicked absolute file links, including files outside the agent
-  repository, opened as read-only source previews on the agent's host;
+- explicitly clicked file links normalized to workspace-relative paths before
+  backend preview; links outside the agent workspace are rejected;
 - errors and interrupted turns.
 
 Renderer components consume app-owned state, not raw app-server or backend

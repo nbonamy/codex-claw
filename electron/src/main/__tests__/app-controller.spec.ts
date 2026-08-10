@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AppController, shouldBlockDisplaySleep } from '../app-controller';
+import { AppController, requiresSingleInstanceLock, shouldBlockDisplaySleep } from '../app-controller';
 import { createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
 import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
@@ -12,6 +12,10 @@ function callPrivate<Result>(controller: AppController, method: string): Promise
 }
 
 describe('AppController', () => {
+  it('enforces the single-instance lock only for packaged builds', () => {
+    expect(requiresSingleInstanceLock(true)).toBe(true);
+    expect(requiresSingleInstanceLock(false)).toBe(false);
+  });
   it('validates and applies renderer-owned Dock badge counts', () => {
     const badgeApplication = { setBadgeCount: vi.fn(() => true) };
     const controller = new AppController(
@@ -1791,7 +1795,7 @@ describe('AppController', () => {
     snapshot.sourceFolder.initialized = true;
     snapshot.agents[0].folder = '/Users/nbonamy/src/codex-claw';
     const files: AgentFileSearchItem[] = [{ name: 'README.md', path: 'README.md' }];
-    const readResult: AgentFilePreviewResult = { path: 'README.md', content: '# Read me\n' };
+    const readResult: AgentFilePreviewResult = { path: 'README.md', size: 10, kind: 'text', content: '# Read me\n' };
     const request = vi.fn()
       .mockResolvedValueOnce(files)
       .mockResolvedValueOnce(readResult);

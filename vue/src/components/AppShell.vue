@@ -238,6 +238,9 @@
             :active-tab="rightWorkspaceFor(agent.id).activeTab"
             :agent="agent"
             :agents="snapshot.agents"
+            :files="agent.id === currentAgent?.id ? agentFiles : []"
+            :files-pane-open="rightWorkspaceFor(agent.id).filesPaneOpen"
+            :files-pane-width="rightWorkspaceFor(agent.id).filesPaneWidth"
             :git-panel="effectiveGitReviewPanelFor(agent)"
             :git-status="snapshot.agentGitStatuses[agent.id] ?? null"
             :plan-panel="rightWorkspaceFor(agent.id).planPanel"
@@ -261,6 +264,9 @@
             @confirm-plan="confirmPlan"
             @open-tab="openRightWorkspaceTabFromMenu(agent.id, $event)"
             @open-in="openAgentIn(agent.id, $event.application, $event.filePath)"
+            @preview-file="openFilePreviewForAgent(agent.id, $event)"
+            @toggle-files-pane="toggleFileExplorer(agent.id)"
+            @resize-files-pane="rightWorkspaceFor(agent.id).filesPaneWidth = $event"
             @open-link="openConversationLink"
             @refresh-git-diff="openAgentGitDiffPreview(agent.id)"
             @select-tab="selectRightWorkspaceTab(agent.id, $event)"
@@ -342,6 +348,12 @@
       @decline="declineCodexResourceSharingMigration"
       @migrate="migrateCodexResources"
     />
+    <FileQuickOpen
+      v-if="fileQuickOpenVisible"
+      :files="agentFiles"
+      @close="fileQuickOpenVisible = false"
+      @select="currentAgent && openFilePreviewForAgent(currentAgent.id, $event)"
+    />
   </main>
 </template>
 
@@ -362,6 +374,7 @@ import AgentSidebar from './AgentSidebar.vue';
 import CockpitView from './CockpitView.vue';
 import ConversationPane from './ConversationPane.vue';
 import ImageAnnotationDialog, { type ImageAnnotationSavePayload } from './ImageAnnotationDialog.vue';
+import FileQuickOpen from './FileQuickOpen.vue';
 import { centeredImageCropDataUrl, formatImageAnnotationPrompt, type SavedImageAnnotations } from './image-annotation';
 import LoopsView from './LoopsView.vue';
 import TeamDialog from './TeamDialog.vue';
@@ -670,6 +683,8 @@ type AgentRightWorkspaceState = {
   browserInitialUrl: string;
   browserOpenRequestId: number;
   filePanels: Partial<Record<RightWorkspaceFileTab, RightWorkspaceFilePanel>>;
+  filesPaneOpen: boolean;
+  filesPaneWidth: number;
   filePreviewRequestIds: Partial<Record<RightWorkspaceFileTab, number>>;
   diffPanels: Partial<Record<RightWorkspaceDiffTab, RightWorkspaceDiffPanel>>;
   gitReviewPanel: SidePanelGitDiffState | null;
@@ -698,6 +713,7 @@ const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
 const activeSurface = ref<AppSurface>('agent');
 const rightWorkspaces = reactive<Record<string, AgentRightWorkspaceState>>({});
+const fileQuickOpenVisible = ref(false);
 const attachmentAnnotationsByAgentId = reactive<Record<string, Record<string, SavedImageAnnotations>>>({});
 const executionPlanStates = reactive<Record<string, { open: boolean; turnId: string }>>({});
 const quickAgentShortcutsVisible = ref(false);
@@ -1087,6 +1103,7 @@ const isModalDialogVisible = computed(() => (
   || teamDialogVisible.value
   || whatsNewVisible.value
   || imageAnnotationVisible.value
+  || fileQuickOpenVisible.value
   || props.codexResourceSharingMigrationRequired
 ));
 const showAgentSidebar = computed(() => isAgentWorkspaceVisible.value && !agentSidebarCollapsed.value && !isAgentEmpty.value);
@@ -1238,6 +1255,8 @@ function rightWorkspaceFor(agentId: string): AgentRightWorkspaceState {
     browserInitialUrl: '',
     browserOpenRequestId: 0,
     filePanels: {},
+    filesPaneOpen: false,
+    filesPaneWidth: 280,
     filePreviewRequestIds: {},
     diffPanels: {},
     gitReviewPanel: null,
@@ -1334,7 +1353,15 @@ function openRightWorkspaceTabFromMenu(agentId: string, tab: RightWorkspaceTab):
     void openAgentGitDiffPreview(agentId);
     return;
   }
+  if (tab === 'files') {
+    rightWorkspaceFor(agentId).filesPaneOpen = true;
+  }
   openRightWorkspaceTab(tab, agentId);
+}
+
+function toggleFileExplorer(agentId: string): void {
+  const workspace = rightWorkspaceFor(agentId);
+  workspace.filesPaneOpen = !workspace.filesPaneOpen;
 }
 
 function selectRightWorkspaceTab(agentId: string, tab: RightWorkspaceTab): void {
@@ -1358,6 +1385,9 @@ function closeRightWorkspaceTab(agentId: string, tab: RightWorkspaceTab): void {
   }
   if (tab === 'plan') {
     workspace.planPanel = null;
+  }
+  if (tab === 'files') {
+    workspace.filesPaneOpen = false;
   }
   if (isRightWorkspaceFileTab(tab)) {
     const { [tab]: _closedPanel, ...filePanels } = workspace.filePanels;
@@ -2020,16 +2050,56 @@ async function openFilePreviewForAgent(agentId: string, filePath: string, reveal
     ...workspace.filePanels,
     [tab]: filePreviewPanel(trimmedPath, existingContent, 'loading', null),
   };
-  if (reveal) openRightWorkspaceTab(tab, agent.id);
+  if (reveal && workspace.activeTab === 'files' && workspace.tabs.includes('files')) {
+    workspace.tabs = workspace.tabs
+      .map((candidate) => candidate === 'files' ? tab : candidate)
+      .filter((candidate, index, tabs) => tabs.indexOf(candidate) === index);
+    workspace.activeTab = tab;
+    workspace.open = true;
+  } else if (reveal) {
+    openRightWorkspaceTab(tab, agent.id);
+  }
 
   try {
     const result = await props.previewAgentFile(agent.id, trimmedPath);
     if (workspace.filePreviewRequestIds[tab] !== requestId) {
       return;
     }
+    if (result.kind === 'image' && result.dataUrl) {
+      const imageTab = rightWorkspaceImageTab(`workspace:${result.path}`);
+      workspace.imagePanels = {
+        ...workspace.imagePanels,
+        [imageTab]: {
+          kind: 'image', title: fileBasename(result.path), subtitle: result.path,
+          alt: result.path, path: result.path, src: result.dataUrl, mimeType: result.mimeType,
+          state: 'idle', error: null,
+        },
+      };
+      closeRightWorkspaceTab(agent.id, tab);
+      openRightWorkspaceTab(imageTab, agent.id);
+      return;
+    }
+    if (result.kind === 'text' && /\.(?:diff|patch)$/iu.test(result.path)) {
+      const diffTab = rightWorkspaceDiffTab('workspace', result.path);
+      workspace.diffPanels = {
+        ...workspace.diffPanels,
+        [diffTab]: {
+          kind: 'gitDiff', title: fileBasename(result.path), subtitle: result.path,
+          diff: result.content ?? '', state: 'idle', error: null,
+        },
+      };
+      closeRightWorkspaceTab(agent.id, tab);
+      openRightWorkspaceTab(diffTab, agent.id);
+      return;
+    }
+    const unavailable = result.kind === 'tooLarge'
+      ? `Preview unavailable: this file is ${formatFileSize(result.size)} and exceeds the preview limit.`
+      : result.kind === 'binary'
+        ? 'Preview unavailable: this is a binary or unsupported file.'
+        : result.content ?? '';
     workspace.filePanels = {
       ...workspace.filePanels,
-      [tab]: filePreviewPanel(result.path, result.content, 'idle', null),
+      [tab]: filePreviewPanel(result.path, unavailable, 'idle', null),
     };
   } catch (error) {
     if (workspace.filePreviewRequestIds[tab] !== requestId) {
@@ -2045,6 +2115,12 @@ async function openFilePreviewForAgent(agentId: string, filePath: string, reveal
       ),
     };
   }
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function filePreviewPanel(
@@ -2127,6 +2203,12 @@ function handleShellShortcut(event: KeyboardEvent): void {
 
   if (event.metaKey) {
     resetQuickAgentShortcuts();
+  }
+
+  if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'p' && currentAgent.value) {
+    event.preventDefault();
+    fileQuickOpenVisible.value = true;
+    return;
   }
 
   if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && /^[1-9]$/.test(event.key)) {

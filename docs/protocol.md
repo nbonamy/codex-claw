@@ -115,7 +115,7 @@ therefore never replayed after reconnect or renderer reload.
 | `agent/delete` | `{ agentId }` | `AppSnapshot` | Removes the active product agent. |
 | `agent/folder/update` | `{ agentId, folder }` | `AppSnapshot` | Folder picker remains client-side; mutation and validation are backend-owned. |
 | `agent/files/list` | `{ agentId }` | `AgentFileSearchItem[]` | Lists files under the agent folder. |
-| `agent/file/preview` | `{ agentId, filePath }` | `AgentFilePreviewResult` | Reads a backend-owned agent resource. Clients must not read workspace files directly. |
+| `agent/file/preview` | `{ agentId, filePath }` | `AgentFilePreviewResult` | Reads a backend-owned agent resource. The backend confines relative and absolute inputs (including resolved symlinks) to the agent workspace, caps preview bytes, and classifies text, image, binary, and oversized results. Clients must not read workspace files directly. |
 | `agent/models/list` | `{ agentId }` | `BackendModelOption[]` | Provider-specific catalog adapted to app-owned shape. |
 | `agent/skills/list` | `{ agentId }` | `BackendSkillSummary[]` | Provider-specific skills adapted to app-owned shape. |
 | `agent/git/diff/open` | `{ agentId }` | `true` | Emits a working-tree review event from backend-owned git state. |

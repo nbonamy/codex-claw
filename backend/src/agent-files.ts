@@ -1,4 +1,4 @@
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { readFile, readdir, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { AgentFilePreviewResult, AgentFileSearchItem } from '@codex-claw/core/contracts';
 
@@ -90,37 +90,67 @@ export async function previewAgentFolderFile(
   filePath: string,
   options: { maxBytes?: number } = {},
 ): Promise<AgentFilePreviewResult> {
-  const resolvedPath = resolveAgentFilePath(folder, filePath);
+  const resolvedPath = await resolveAgentFilePath(folder, filePath);
   const fileStat = await stat(resolvedPath.absolutePath);
   if (!fileStat.isFile()) {
     throw new Error(`Path is not a file: ${resolvedPath.relativePath}`);
   }
 
   if (fileStat.size > (options.maxBytes ?? DEFAULT_AGENT_FILE_READ_BYTES)) {
-    throw new Error(`File is too large to preview: ${resolvedPath.relativePath}`);
+    return { path: resolvedPath.relativePath, size: fileStat.size, kind: 'tooLarge' };
   }
 
+  const buffer = await readFile(resolvedPath.absolutePath);
+  const mimeType = imageMimeType(resolvedPath.relativePath);
+  if (mimeType) {
+    return {
+      path: resolvedPath.relativePath,
+      size: fileStat.size,
+      kind: 'image',
+      mimeType,
+      dataUrl: `data:${mimeType};base64,${buffer.toString('base64')}`,
+    };
+  }
+  if (buffer.includes(0)) {
+    return { path: resolvedPath.relativePath, size: fileStat.size, kind: 'binary' };
+  }
   return {
     path: resolvedPath.relativePath,
-    content: await readFile(resolvedPath.absolutePath, 'utf8'),
+    size: fileStat.size,
+    kind: 'text',
+    content: buffer.toString('utf8'),
   };
 }
 
-export function resolveAgentFilePath(folder: string, filePath: string): { absolutePath: string; relativePath: string } {
+export async function resolveAgentFilePath(folder: string, filePath: string): Promise<{ absolutePath: string; relativePath: string }> {
   const root = path.resolve(folder);
-  const absoluteInput = path.isAbsolute(filePath);
-  const target = absoluteInput
-    ? path.resolve(filePath)
-    : path.resolve(root, filePath);
+  const target = path.resolve(root, filePath);
   const relativePath = path.relative(root, target);
   const outsideRoot = relativePath === '..' || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath);
 
-  if (!absoluteInput && outsideRoot) {
+  if (outsideRoot) {
+    throw new Error(`File is outside the agent folder: ${filePath}`);
+  }
+
+  const [realRoot, realTarget] = await Promise.all([realpath(root), realpath(target)]);
+  const realRelativePath = path.relative(realRoot, realTarget);
+  if (realRelativePath === '..' || realRelativePath.startsWith(`..${path.sep}`) || path.isAbsolute(realRelativePath)) {
     throw new Error(`File is outside the agent folder: ${filePath}`);
   }
 
   return {
-    absolutePath: target,
-    relativePath: (absoluteInput && outsideRoot ? target : relativePath).split(path.sep).join('/'),
+    absolutePath: realTarget,
+    relativePath: relativePath.split(path.sep).join('/'),
   };
+}
+
+function imageMimeType(filePath: string): string | null {
+  const extension = path.extname(filePath).toLowerCase();
+  return ({
+    '.gif': 'image/gif',
+    '.jpeg': 'image/jpeg',
+    '.jpg': 'image/jpeg',
+    '.png': 'image/png',
+    '.webp': 'image/webp',
+  } as Record<string, string>)[extension] ?? null;
 }

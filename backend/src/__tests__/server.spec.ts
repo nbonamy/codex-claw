@@ -3042,6 +3042,12 @@ describe('ClawBackendServer', () => {
           message: 'Agent not found: agent-missing',
         },
       });
+      await expect(server.handleMessage({
+        jsonrpc: '2.0',
+        id: 'traversal-file',
+        method: 'agent/file/preview',
+        params: { agentId: 'agent-dina', filePath: '../outside.md' },
+      })).rejects.toThrow('outside the agent folder');
     } finally {
       await server.close();
       await rm(tempDir, { recursive: true, force: true });

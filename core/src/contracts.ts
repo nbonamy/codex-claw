@@ -767,7 +767,11 @@ export type AgentFileSearchItem = {
 
 export type AgentFilePreviewResult = {
   path: string;
-  content: string;
+  size: number;
+  kind: 'text' | 'image' | 'binary' | 'tooLarge';
+  content?: string;
+  dataUrl?: string;
+  mimeType?: string;
 };
 
 export type SidePanelMarkdownRequest = {

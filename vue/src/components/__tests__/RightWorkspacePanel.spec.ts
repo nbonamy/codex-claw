@@ -67,13 +67,15 @@ describe('RightWorkspacePanel', () => {
     expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('Browser');
     expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('⌘G');
     expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('⌘B');
+    expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('Files');
+    expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('⌘P');
     expect(wrapper.text()).not.toContain('Terminal');
-    expect(wrapper.text()).not.toContain('Files');
 
     await wrapper.findAll('.right-workspace-panel__launcher button')[0]?.trigger('click');
     await wrapper.findAll('.right-workspace-panel__launcher button')[1]?.trigger('click');
+    await wrapper.findAll('.right-workspace-panel__launcher button')[2]?.trigger('click');
 
-    expect(wrapper.emitted('openTab')).toStrictEqual([['review'], ['browser']]);
+    expect(wrapper.emitted('openTab')).toStrictEqual([['review'], ['browser'], ['files']]);
   });
 
   it('switches and closes Browser and Review tabs', async () => {
@@ -81,6 +83,7 @@ describe('RightWorkspacePanel', () => {
     await flushPromises();
 
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['Review', 'Browser']);
+    expect(wrapper.find('[aria-label="Show file explorer"]').exists()).toBe(false);
     await wrapper.findAll('[role="tab"]')[1]?.trigger('click');
     await wrapper.get('[aria-label="Close Review tab"]').trigger('click');
 
@@ -88,11 +91,55 @@ describe('RightWorkspacePanel', () => {
     expect(wrapper.emitted('closeTab')).toStrictEqual([['review']]);
   });
 
+  it('renders Files as a collapsible pane beside the active workspace tab', async () => {
+    const wrapper = mountPanel(['files'], 'files');
+    await wrapper.setProps({
+      filesPaneOpen: true,
+      files: [{ name: 'README.md', path: 'README.md' }],
+    });
+
+    expect(wrapper.get('[role="tab"]').text()).toBe('Open file');
+    expect(wrapper.get('.right-workspace-panel__files-pane').text()).toContain('README.md');
+    expect(wrapper.get('[aria-label="Collapse file explorer"]').attributes('aria-pressed')).toBe('true');
+
+    await wrapper.get('button[title="Preview README.md"]').trigger('click');
+    await wrapper.get('[aria-label="Collapse file explorer"]').trigger('click');
+
+    expect(wrapper.emitted('previewFile')).toStrictEqual([['README.md']]);
+    expect(wrapper.emitted('toggleFilesPane')).toHaveLength(1);
+
+    await wrapper.setProps({ activeTab: 'review', tabs: ['files', 'review'] });
+    expect(wrapper.find('.right-workspace-panel__files-pane').exists()).toBe(false);
+
+    await wrapper.setProps({ activeTab: 'files' });
+    expect(wrapper.get('.right-workspace-panel__files-pane').text()).toContain('README.md');
+  });
+
+  it('resizes the file explorer with its keyboard-accessible separator', async () => {
+    const wrapper = mountPanel(['files'], 'files');
+    await wrapper.setProps({ filesPaneOpen: true, filesPaneWidth: 280 });
+    vi.spyOn(wrapper.get('.right-workspace-panel__body').element, 'getBoundingClientRect').mockReturnValue({
+      bottom: 600, height: 560, left: 0, right: 500, top: 40, width: 500, x: 0, y: 40, toJSON: () => ({}),
+    });
+
+    await wrapper.get('[aria-label="Resize file explorer"]').trigger('keydown', { key: 'ArrowLeft' });
+    expect(wrapper.emitted('resizeFilesPane')).toStrictEqual([[296]]);
+    expect(wrapper.get('.right-workspace-panel__files-shell').attributes('style')).toContain('width: 296px');
+
+    await wrapper.get('[aria-label="Resize file explorer"]').trigger('pointerdown');
+    document.dispatchEvent(new MouseEvent('pointermove', { clientX: 180 }));
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.emitted('resizeFilesPane')).toStrictEqual([[296], [320]]);
+    expect(wrapper.get('.right-workspace-panel__files-shell').attributes('style')).toContain('width: 320px');
+    document.dispatchEvent(new MouseEvent('pointerup'));
+  });
+
   it('opens Browser or GitHub Review from the add-tab menu', async () => {
     const wrapper = mountPanel();
 
     await wrapper.get('[aria-label="Open right workspace tab"]').trigger('click');
-    expect(wrapper.findAll('.app-menu__item').map((item) => item.text())).toStrictEqual(['GitHub Review', 'Browser']);
+    expect(wrapper.findAll('.app-menu__item').map((item) => item.text())).toStrictEqual(['GitHub Review', 'Browser', 'Files']);
     await wrapper.findAll('.app-menu__item')[0]?.trigger('click');
 
     expect(wrapper.emitted('openTab')).toStrictEqual([['review']]);
@@ -104,7 +151,7 @@ describe('RightWorkspacePanel', () => {
     expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('Review');
     expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).not.toContain('Browser');
     await wrapper.get('[aria-label="Open right workspace tab"]').trigger('click');
-    expect(wrapper.findAll('.app-menu__item').map((item) => item.text())).toStrictEqual(['GitHub Review']);
+    expect(wrapper.findAll('.app-menu__item').map((item) => item.text())).toStrictEqual(['GitHub Review', 'Files']);
   });
 
   it('renders file previews as independently closable workspace tabs', async () => {
@@ -124,6 +171,7 @@ describe('RightWorkspacePanel', () => {
 
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['Browser', 'main.ts']);
     expect(wrapper.get('.source-preview-panel').text()).toContain('ready');
+    expect(wrapper.get('[aria-label="Show file explorer"]').attributes('aria-pressed')).toBe('false');
 
     await wrapper.get('[aria-label="Close main.ts tab"]').trigger('click');
     expect(wrapper.emitted('closeTab')).toStrictEqual([[fileTab]]);

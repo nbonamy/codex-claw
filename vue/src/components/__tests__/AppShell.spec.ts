@@ -11,7 +11,7 @@ import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { Agent, AppCommand, AppSnapshot, BackendConversationRef, BenchLocation, BenchTemplate, CodexClawApi, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, RendererMessage, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendConversationRef, BenchLocation, BenchTemplate, CodexClawApi, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, RendererMessage, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { i18n } from '../../i18n';
 import { setElectronTestClient } from '../../test/client';
@@ -632,6 +632,38 @@ describe('AppShell', () => {
     expect(wrapper.find('.app-shell__right-workspace').isVisible()).toBe(false);
   });
 
+  it('opens Files as a right-side explorer pane and keeps it open beside previews', async () => {
+    const previewAgentFile = vi.fn().mockImplementation(async (_agentId: string, path: string) => ({
+      path, size: 8, kind: 'text' as const, content: path === 'README.md' ? '# Claw\n' : 'export {};\n',
+    }));
+    const wrapper = mountShell({
+      agentFiles: [
+        { name: 'README.md', path: 'README.md' },
+        { name: 'main.ts', path: 'main.ts' },
+      ],
+      previewAgentFile,
+    });
+
+    await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
+    await wrapper.findAll('.right-workspace-panel__launcher button')
+      .find((button) => button.text().includes('Files'))
+      ?.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[role="tab"]').text()).toBe('Open file');
+    expect(wrapper.find('.right-workspace-panel__files-pane').exists()).toBe(true);
+    await wrapper.get('button[title="Preview README.md"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['README.md']);
+    expect(wrapper.find('.right-workspace-panel__files-pane').exists()).toBe(true);
+    await wrapper.get('button[title="Preview main.ts"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['README.md', 'main.ts']);
+    await wrapper.get('[aria-label="Collapse file explorer"]').trigger('click');
+    expect(wrapper.find('.right-workspace-panel__files-pane').exists()).toBe(false);
+  });
+
   it('opens each selected header subagent in an independent right-workspace tab', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-root' };
@@ -668,10 +700,10 @@ describe('AppShell', () => {
     await flushPromises();
 
     expect(wrapper.getComponent({ name: 'RightWorkspacePanel' }).props('tabs')).toStrictEqual([
-      'subagent:thread-reviewer',
       'subagent:thread-scout',
+      'subagent:thread-reviewer',
     ]);
-    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['reviewer', 'scout']);
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['scout', 'reviewer']);
     expect(readConversationMessages).toHaveBeenCalledWith(
       { backend: 'codex', threadId: 'thread-scout' },
       snapshot.agents[0].id,
@@ -2875,6 +2907,25 @@ describe('AppShell', () => {
     expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-jesse'], ['agent-dina']]);
   });
 
+  it('opens active-agent quick file search with Command-P and previews the keyboard selection', async () => {
+    const previewAgentFile = vi.fn().mockResolvedValue({
+      path: 'src/main.ts', size: 12, kind: 'text', content: 'export {}',
+    });
+    const wrapper = mountShell({
+      agentFiles: [{ name: 'main.ts', path: 'src/main.ts' }],
+      previewAgentFile,
+    });
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', metaKey: true, cancelable: true }));
+    await flushPromises();
+    const quickOpen = wrapper.getComponent({ name: 'FileQuickOpen' });
+    await quickOpen.get('.file-quick-open__results button').trigger('click');
+    await flushPromises();
+
+    expect(previewAgentFile).toHaveBeenCalledWith('agent-dina', 'src/main.ts');
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain('main.ts');
+  });
+
   it('reveals delayed Command-number hints and switches to the numbered agent', async () => {
     vi.useFakeTimers();
     let listener: (command: AppCommand) => void = () => undefined;
@@ -3340,6 +3391,8 @@ describe('AppShell', () => {
 
 function mountShell(overrides: Partial<{
   snapshot: AppSnapshot;
+  agentFiles: AgentFileSearchItem[];
+  previewAgentFile: (agentId: string, path: string) => Promise<AgentFilePreviewResult>;
   unreadAgentIds: string[];
   composerAttachments: readonly CodexNativeAttachment[];
   composerState: { text: string; selectionStart: number; selectionEnd: number };
@@ -3379,6 +3432,7 @@ function mountShell(overrides: Partial<{
       snapshot,
       activeAgent: snapshot.agents.find((agent) => agent.id === snapshot.activeAgentId) ?? null,
       unreadAgentIds: overrides.unreadAgentIds ?? [],
+      agentFiles: overrides.agentFiles ?? [],
       messages: snapshot.messages,
       isLoading: false,
       isSending: false,
@@ -3403,6 +3457,7 @@ function mountShell(overrides: Partial<{
       resumeAgentConversation: overrides.resumeAgentConversation ?? vi.fn().mockResolvedValue(undefined),
       readConversationMessages: overrides.readConversationMessages ?? vi.fn().mockResolvedValue([]),
       openAgentGitDiff: overrides.openAgentGitDiff ?? vi.fn().mockResolvedValue(undefined),
+      previewAgentFile: overrides.previewAgentFile ?? vi.fn().mockRejectedValue(new Error('Unavailable')),
       configureWorkBacklog: overrides.configureWorkBacklog ?? vi.fn().mockResolvedValue(undefined),
       loadWorkRepositories: overrides.loadWorkRepositories ?? vi.fn().mockResolvedValue(undefined),
       loadWorkItems: overrides.loadWorkItems ?? vi.fn().mockResolvedValue(undefined),

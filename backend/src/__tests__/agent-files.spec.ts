@@ -54,20 +54,21 @@ describe('listAgentFolderFiles', () => {
 
     await expect(previewAgentFolderFile(folder, 'README.md')).resolves.toStrictEqual({
       path: 'README.md',
+      size: 10,
+      kind: 'text',
       content: '# Read me\n',
     });
   });
 
-  it('reads an explicitly addressed absolute file outside the agent folder', async () => {
+  it('rejects absolute files and symlinks outside the agent folder', async () => {
     const folder = await createTempFolder();
     const outsideFolder = await createTempFolder();
     const outsideFile = path.join(outsideFolder, 'notes.md');
     await writeFile(outsideFile, '# External notes\n', 'utf8');
 
-    await expect(previewAgentFolderFile(folder, outsideFile)).resolves.toStrictEqual({
-      path: outsideFile,
-      content: '# External notes\n',
-    });
+    await symlink(outsideFile, path.join(folder, 'notes-link.md'));
+    await expect(previewAgentFolderFile(folder, outsideFile)).rejects.toThrow('outside the agent folder');
+    await expect(previewAgentFolderFile(folder, 'notes-link.md')).rejects.toThrow('outside the agent folder');
   });
 
   it('rejects traversal, folders, and oversized files before reading content', async () => {
@@ -76,7 +77,22 @@ describe('listAgentFolderFiles', () => {
 
     await expect(previewAgentFolderFile(folder, '../outside.md')).rejects.toThrow('outside the agent folder');
     await expect(previewAgentFolderFile(folder, '.')).rejects.toThrow('Path is not a file');
-    await expect(previewAgentFolderFile(folder, 'large.md', { maxBytes: 3 })).rejects.toThrow('File is too large');
+    await expect(previewAgentFolderFile(folder, 'large.md', { maxBytes: 3 })).resolves.toStrictEqual({
+      path: 'large.md', size: 4, kind: 'tooLarge',
+    });
+  });
+
+  it('classifies binary and image previews without decoding them as text', async () => {
+    const folder = await createTempFolder();
+    await writeFile(path.join(folder, 'archive.bin'), Buffer.from([1, 0, 2]));
+    await writeFile(path.join(folder, 'pixel.png'), Buffer.from([1, 2, 3]));
+
+    await expect(previewAgentFolderFile(folder, 'archive.bin')).resolves.toStrictEqual({
+      path: 'archive.bin', size: 3, kind: 'binary',
+    });
+    await expect(previewAgentFolderFile(folder, 'pixel.png')).resolves.toStrictEqual({
+      path: 'pixel.png', size: 3, kind: 'image', mimeType: 'image/png', dataUrl: 'data:image/png;base64,AQID',
+    });
   });
 });
 

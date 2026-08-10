@@ -1612,7 +1612,9 @@ export function startMainApp(): void {
   });
   controller.setAutoUpdateService(autoUpdateService);
   let shutdownStarted = false;
-  if (!app.requestSingleInstanceLock()) {
+  // Development temporarily runs alongside the installed app. Keep packaged
+  // releases single-instance while allowing Electron Forge to start normally.
+  if (requiresSingleInstanceLock(app.isPackaged) && !app.requestSingleInstanceLock()) {
     app.quit();
     return;
   }
@@ -1686,6 +1688,10 @@ function createEmptyClientState(): ClientState {
 export function shouldBlockDisplaySleep(clientState: ClientState, isOnBattery: boolean): boolean {
   return clientState.shouldPreventDisplaySleep ||
     (clientState.shouldPreventDisplaySleepForRemoteAccess === true && !isOnBattery);
+}
+
+export function requiresSingleInstanceLock(isPackaged: boolean): boolean {
+  return isPackaged;
 }
 
 function metadataOnlySnapshot(snapshot: AppSnapshot): AppSnapshot {
