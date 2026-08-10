@@ -266,7 +266,8 @@
               aria-label="Loop backend"
             >
               <el-option label="Codex" value="codex" />
-              <el-option label="Claude" value="claude" />
+              <!-- Claude stays hidden until Claw has a reliable, supported integration. -->
+              <!-- <el-option label="Claude" value="claude" /> -->
             </el-select>
           </div>
 

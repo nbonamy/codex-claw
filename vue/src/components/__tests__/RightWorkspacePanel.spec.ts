@@ -91,7 +91,7 @@ describe('RightWorkspacePanel', () => {
     expect(wrapper.emitted('closeTab')).toStrictEqual([['review']]);
   });
 
-  it('renders Files as a collapsible pane beside the active workspace tab', async () => {
+  it('renders Files beside supported workspace tabs without a standalone toggle', async () => {
     const wrapper = mountPanel(['files'], 'files');
     await wrapper.setProps({
       filesPaneOpen: true,
@@ -100,13 +100,12 @@ describe('RightWorkspacePanel', () => {
 
     expect(wrapper.get('[role="tab"]').text()).toBe('Open file');
     expect(wrapper.get('.right-workspace-panel__files-pane').text()).toContain('README.md');
-    expect(wrapper.get('[aria-label="Collapse file explorer"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.find('[aria-label="Collapse file explorer"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Show file explorer"]').exists()).toBe(false);
 
     await wrapper.get('button[title="Preview README.md"]').trigger('click');
-    await wrapper.get('[aria-label="Collapse file explorer"]').trigger('click');
 
     expect(wrapper.emitted('previewFile')).toStrictEqual([['README.md']]);
-    expect(wrapper.emitted('toggleFilesPane')).toHaveLength(1);
 
     await wrapper.setProps({ activeTab: 'review', tabs: ['files', 'review'] });
     expect(wrapper.find('.right-workspace-panel__files-pane').exists()).toBe(false);
@@ -171,7 +170,7 @@ describe('RightWorkspacePanel', () => {
 
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['Browser', 'main.ts']);
     expect(wrapper.get('.source-preview-panel').text()).toContain('ready');
-    expect(wrapper.get('[aria-label="Show file explorer"]').attributes('aria-pressed')).toBe('false');
+    expect(wrapper.find('[aria-label="Show file explorer"]').exists()).toBe(false);
 
     await wrapper.get('[aria-label="Close main.ts tab"]').trigger('click');
     expect(wrapper.emitted('closeTab')).toStrictEqual([[fileTab]]);

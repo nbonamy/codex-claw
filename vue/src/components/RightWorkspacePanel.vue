@@ -45,18 +45,6 @@
         @open="emit('openIn', { application: $event, filePath: activeProjectFilePath })"
       />
 
-      <button
-        v-if="fileExplorerToggleVisible"
-        class="right-workspace-panel__files-toggle"
-        type="button"
-        :aria-label="filesPaneOpen ? 'Collapse file explorer' : 'Show file explorer'"
-        :aria-pressed="filesPaneOpen"
-        @click="emit('toggleFilesPane')"
-      >
-        <IconLayoutSidebarRightCollapse v-if="filesPaneOpen" aria-hidden="true" />
-        <IconLayoutSidebarRightExpand v-else aria-hidden="true" />
-      </button>
-
       <div ref="addMenuRoot" class="right-workspace-panel__add">
         <button
           type="button"
@@ -238,7 +226,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconLego, IconWorld } from '@tabler/icons-vue';
+import { IconLego, IconWorld } from '@tabler/icons-vue';
 import type { Agent, AgentFileSearchItem, AgentGitStatus, AgentSubagentTree, OpenInApplication, OpenInApplicationCatalog, RendererMessage } from '@codex-claw/core/contracts';
 import type { CodexConversationLink } from '@codex-app-sdk/vue';
 import { CodeIcon, FileDiffIcon, FileTextIcon, FoldersIcon, GitHubIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
@@ -319,7 +307,6 @@ const emit = defineEmits<{
   selectTab: [tab: RightWorkspaceTab];
   sendPrompt: [prompt: string];
   previewFile: [path: string];
-  toggleFilesPane: [];
   resizeFilesPane: [width: number];
 }>();
 
@@ -491,7 +478,6 @@ function isAbsoluteFilePath(filePath: string): boolean {
 
 .right-workspace-panel__tab-select,
 .right-workspace-panel__tab-close,
-.right-workspace-panel__files-toggle,
 .right-workspace-panel__add > button {
   border: 0;
   color: inherit;
@@ -516,7 +502,6 @@ function isAbsoluteFilePath(filePath: string): boolean {
 
 .right-workspace-panel__tab-select svg,
 .right-workspace-panel__tab-close svg,
-.right-workspace-panel__files-toggle svg,
 .right-workspace-panel__add svg {
   flex: 0 0 auto;
   width: var(--icon-md);
@@ -534,27 +519,10 @@ function isAbsoluteFilePath(filePath: string): boolean {
 }
 
 .right-workspace-panel__tab-close:hover,
-.right-workspace-panel__files-toggle:hover,
 .right-workspace-panel__add > button:hover,
 .right-workspace-panel__add > button[aria-expanded='true'] {
   color: var(--color-text);
   background: var(--color-surface-high);
-}
-
-.right-workspace-panel__files-toggle {
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  width: var(--space-16);
-  height: var(--space-16);
-  padding: 0;
-  border-radius: var(--radius-lg);
-  color: var(--color-text-muted);
-}
-
-.right-workspace-panel__files-toggle[aria-pressed='true'] {
-  color: var(--color-text);
-  background: var(--color-surface-low);
 }
 
 .right-workspace-panel__add {

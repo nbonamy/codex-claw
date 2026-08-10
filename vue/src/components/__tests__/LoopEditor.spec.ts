@@ -81,30 +81,14 @@ describe('LoopEditor', () => {
     });
   });
 
-  it('emits Claude model and thinking defaults for new agents', async () => {
+  it('keeps Claude unavailable in the loop backend selector', () => {
     const wrapper = mountEditor();
+    const backendSelect = wrapper.findAllComponents({ name: 'ElSelect' })
+      .find((select) => select.find('[aria-label="Loop backend"]').exists());
 
-    await wrapper.findAllComponents({ name: 'ElSelect' })[8]?.vm.$emit('update:modelValue', 'claude');
-    await nextTick();
-    await wrapper.get('input#loop-editor-model').setValue('claude-opus-4.1');
-    await wrapper.findAllComponents({ name: 'ElSelect' })[9]?.vm.$emit('update:modelValue', 'enabled');
-    await wrapper.findComponent({ name: 'ElInputNumber' }).vm.$emit('update:modelValue', 4096);
-    await wrapper.find('form').trigger('submit');
-
-    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({
-      action: {
-        type: 'create-agent',
-        backend: 'claude',
-        backendDefaults: {
-          kind: 'claude',
-          model: 'claude-opus-4.1',
-          thinking: {
-            type: 'enabled',
-            budgetTokens: 4096,
-          },
-        },
-      },
-    });
+    expect(backendSelect).toBeDefined();
+    expect(backendSelect?.findAllComponents({ name: 'ElOption' }).map((option) => option.props('label')))
+      .toStrictEqual(['Codex']);
   });
 
   it('can pick a custom folder for new agents', async () => {
