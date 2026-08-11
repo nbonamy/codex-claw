@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { claudeStreamTextDelta, claudeStreamToolInputDelta, claudeStreamToolUseStart, parseClaudeSdkMessage } from '../protocol';
+import { claudeCompactionEvent, claudeStreamTextDelta, claudeStreamToolInputDelta, claudeStreamToolUseStart, parseClaudeSdkMessage } from '../protocol';
 
 describe('Claude protocol helpers', () => {
   it('extracts text deltas from partial stream events', () => {
@@ -75,5 +75,25 @@ describe('Claude protocol helpers', () => {
       index: 1,
       partialJson: '{"command":"npm test"}',
     });
+  });
+
+  it('normalizes Claude compaction status and boundary messages', () => {
+    expect(claudeCompactionEvent({
+      type: 'system',
+      subtype: 'status',
+      status: 'compacting',
+    })).toStrictEqual({ phase: 'started' });
+    expect(claudeCompactionEvent({
+      type: 'system',
+      subtype: 'compact_boundary',
+      compact_metadata: { trigger: 'auto', pre_tokens: 190_000, post_tokens: 20_000 },
+    })).toStrictEqual({ phase: 'completed', trigger: 'auto' });
+    expect(claudeCompactionEvent({
+      type: 'system',
+      subtype: 'status',
+      status: null,
+      compact_result: 'failed',
+      compact_error: 'summary failed',
+    })).toStrictEqual({ phase: 'failed', error: 'summary failed' });
   });
 });

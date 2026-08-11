@@ -19,6 +19,7 @@ import {
   type ClaudePermissionRequest,
   type ClaudePermissionResponse,
   type ClaudeAvailableModel,
+  type ClaudeContextUsage,
   type ClaudeModelDiscoveryParams,
   type ClaudeTurnHandle,
   type ClaudeTurnParams,
@@ -36,7 +37,7 @@ export type ClaudeAgentSdkTransportOptions = {
 
 export type ClaudeQueryRuntime = AsyncIterable<SDKMessage> & Pick<Query,
   'close' | 'interrupt' | 'setModel' | 'setPermissionMode'
-  | 'applyFlagSettings' | 'supportedModels' | 'initializationResult'
+  | 'applyFlagSettings' | 'supportedModels' | 'initializationResult' | 'getContextUsage'
 >;
 
 export type ClaudeQueryFactory = (input: {
@@ -169,6 +170,26 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
     if (!session) return null;
     const models = await session.query.supportedModels();
     return toClaudeAvailableModels(models);
+  }
+
+  async getContextUsage(sessionId: string): Promise<ClaudeContextUsage | null> {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.closed) return null;
+    const usage = await session.query.getContextUsage();
+    if (
+      !Number.isFinite(usage.totalTokens) ||
+      !Number.isFinite(usage.maxTokens) ||
+      !Number.isFinite(usage.percentage) ||
+      usage.totalTokens < 0 ||
+      usage.maxTokens <= 0
+    ) {
+      return null;
+    }
+    return {
+      totalTokens: usage.totalTokens,
+      maxTokens: usage.maxTokens,
+      percentage: usage.percentage,
+    };
   }
 
   async discoverModels(params: ClaudeModelDiscoveryParams): Promise<ClaudeAvailableModel[] | null> {

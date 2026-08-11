@@ -141,6 +141,67 @@ describe('ClaudeBackendDriver', () => {
     }));
   });
 
+  it('routes Claude compact commands and publishes context usage and compaction lifecycle', async () => {
+    const transport = createFakeTransport();
+    transport.getContextUsage.mockResolvedValue({
+      totalTokens: 44_000,
+      maxTokens: 200_000,
+      percentage: 22,
+    });
+    const driver = new ClaudeBackendDriver(transport);
+    const events: Array<{ type?: string; turnId?: string; payload?: unknown }> = [];
+    driver.onEvent((event) => events.push(event));
+
+    const compactResult = driver.tryHandlePromptCommand(agent, '/compact keep the decisions');
+    expect(compactResult).not.toBeNull();
+    expect(transport.startTurn).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: '/compact keep the decisions',
+    }), expect.any(Function), expect.any(Function));
+    expect(driver.tryHandlePromptCommand(agent, '/review')).toBeNull();
+
+    transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-context-session' });
+    await compactResult;
+    transport.emit({
+      type: 'system',
+      subtype: 'status',
+      status: 'compacting',
+      session_id: 'claude-context-session',
+    });
+    transport.emit({
+      type: 'system',
+      subtype: 'compact_boundary',
+      compact_metadata: { trigger: 'manual', pre_tokens: 180_000, post_tokens: 44_000 },
+      session_id: 'claude-context-session',
+    });
+    transport.emit({
+      type: 'system',
+      subtype: 'status',
+      status: null,
+      compact_result: 'success',
+      session_id: 'claude-context-session',
+    });
+    transport.emit({ type: 'result', subtype: 'success', session_id: 'claude-context-session', is_error: false });
+
+    await vi.waitFor(() => expect(transport.getContextUsage).toHaveBeenCalled());
+    await vi.waitFor(() => expect(events).toContainEqual(expect.objectContaining({
+      type: 'thread.tokenUsageUpdated',
+      payload: {
+        contextUsage: {
+          totalTokens: 44_000,
+          inputTokens: 44_000,
+          cachedInputTokens: 0,
+          outputTokens: 0,
+          reasoningOutputTokens: 0,
+          lastTotalTokens: 44_000,
+          modelContextWindow: 200_000,
+          usedPercent: 22,
+        },
+      },
+    })));
+    expect(events.filter((event) => event.type === 'context.compactionStarted')).toHaveLength(1);
+    expect(events.filter((event) => event.type === 'context.compactionCompleted')).toHaveLength(1);
+  });
+
   it('resumes persisted Claude sessions and interrupts active turns', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
@@ -1047,6 +1108,7 @@ function createFakeTransport(): ClaudeTurnTransport & {
   closeSession: ReturnType<typeof vi.fn>;
   discoverModels: ReturnType<typeof vi.fn>;
   listModels: ReturnType<typeof vi.fn>;
+  getContextUsage: ReturnType<typeof vi.fn>;
 } {
   let onMessage: (message: ClaudeSdkMessage) => void = () => undefined;
   let onPermissionRequest: (request: import('../cli-transport').ClaudePermissionRequest) => void = () => undefined;
@@ -1086,6 +1148,7 @@ function createFakeTransport(): ClaudeTurnTransport & {
     closeSession: vi.fn().mockResolvedValue(undefined),
     discoverModels: vi.fn().mockResolvedValue(null),
     listModels: vi.fn().mockResolvedValue(null),
+    getContextUsage: vi.fn().mockResolvedValue(null),
     close: vi.fn().mockResolvedValue(undefined),
   };
 }

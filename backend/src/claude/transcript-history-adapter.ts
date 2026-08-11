@@ -247,6 +247,22 @@ export function claudeTranscriptToRendererMessages(content: string, agentId: str
       }
       assistantCreatedAt ??= timestampToIso(entry.timestamp);
       assistantParts.push(...parts);
+      continue;
+    }
+
+    if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
+      flushAssistantMessage();
+      const turnId = `claude-compact-${entry.uuid ?? messages.length}`;
+      messages.push({
+        id: `compaction-${turnId}`,
+        agentId,
+        kind: 'compaction',
+        role: 'assistant',
+        status: 'complete',
+        turnId,
+        createdAt: timestampToIso(entry.timestamp),
+        parts: [],
+      });
     }
   }
 

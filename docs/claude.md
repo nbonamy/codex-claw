@@ -143,6 +143,13 @@ to Claude Code by their trusted local path. The legacy print-mode transport
 rejects attachments explicitly rather than silently dropping them. Rollback
 and edit/retry remain disabled until those surfaces are implemented reliably
 for Claude. Model listing is local.
+Claude context usage comes from the Agent SDK's `getContextUsage()` control
+request and is normalized into Claw's provider-neutral context gauge after
+session initialization, turns, and compaction. Claude's automatic and manual
+compaction status/boundary messages reuse Claw's existing compaction lifecycle.
+`/compact` (including optional summary instructions) remains a Claude-owned
+local command; Claw routes it without displaying a user prompt, and completed
+boundaries are restored from Claude transcript history.
 Skill listing is filesystem-derived: Claw reads user skills from `~/.claude/skills`
 and project skills from `<agent-folder>/.claude/skills`, parses each
 `SKILL.md` frontmatter, and lets project skills override global skills with the

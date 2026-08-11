@@ -16,6 +16,15 @@ describe('backend command catalog', () => {
     expect(defaultBackendCommands('claude')).toBe(claudeBackendCommands);
     expect(claudeBackendCommands).toStrictEqual([
       {
+        id: 'claude.compact',
+        backend: 'claude',
+        name: 'compact',
+        displayName: 'Compact',
+        description: 'Compact the current Claude context while preserving a summary.',
+        slashName: 'compact',
+        submitOnSelect: true,
+      },
+      {
         id: 'claude.plan',
         backend: 'claude',
         name: 'plan',

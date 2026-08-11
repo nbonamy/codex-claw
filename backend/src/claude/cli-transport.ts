@@ -46,6 +46,12 @@ export type ClaudeTurnHandle = {
   interrupt(): Promise<void>;
 };
 
+export type ClaudeContextUsage = {
+  totalTokens: number;
+  maxTokens: number;
+  percentage: number;
+};
+
 export type ClaudePermissionRequest = {
   kind: 'confirm_tool' | 'ask_user';
   id: string;
@@ -78,6 +84,7 @@ export type ClaudeTurnTransport = {
   respondToPermissionRequest?(requestId: string, response: ClaudePermissionResponse): Promise<void>;
   discoverModels?(params: ClaudeModelDiscoveryParams): Promise<ClaudeAvailableModel[] | null>;
   listModels?(): Promise<ClaudeAvailableModel[] | null>;
+  getContextUsage?(sessionId: string): Promise<ClaudeContextUsage | null>;
   closeSession?(sessionId: string): void | Promise<void>;
   close(): Promise<void>;
 };

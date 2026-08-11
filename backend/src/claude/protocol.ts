@@ -25,6 +25,14 @@ export type ClaudeSdkMessage =
     type: 'system';
     subtype?: string;
     session_id?: string;
+    status?: string | null;
+    compact_result?: 'success' | 'failed';
+    compact_error?: string;
+    compact_metadata?: {
+      trigger?: 'manual' | 'auto';
+      pre_tokens?: number;
+      post_tokens?: number;
+    };
     [key: string]: unknown;
   }
   | {
@@ -195,6 +203,37 @@ export function claudeStreamToolInputDelta(message: ClaudeSdkMessage): { index: 
     index,
     partialJson: delta.partial_json,
   };
+}
+
+export type ClaudeCompactionEvent =
+  | { phase: 'started' }
+  | { phase: 'completed'; trigger: 'manual' | 'auto' | null }
+  | { phase: 'failed'; error: string | null };
+
+export function claudeCompactionEvent(message: ClaudeSdkMessage): ClaudeCompactionEvent | null {
+  if (message.type !== 'system') return null;
+  if (message.subtype === 'compact_boundary') {
+    const metadata = isRecord((message as Record<string, unknown>).compact_metadata)
+      ? (message as Record<string, unknown>).compact_metadata as Record<string, unknown>
+      : null;
+    const trigger = metadata?.trigger;
+    return {
+      phase: 'completed',
+      trigger: trigger === 'manual' || trigger === 'auto' ? trigger : null,
+    };
+  }
+  if (message.subtype !== 'status') return null;
+  if (message.status === 'compacting') return { phase: 'started' };
+  if (message.compact_result === 'success') return { phase: 'completed', trigger: null };
+  if (message.compact_result === 'failed') {
+    return {
+      phase: 'failed',
+      error: typeof message.compact_error === 'string' && message.compact_error.trim()
+        ? message.compact_error
+        : null,
+    };
+  }
+  return null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

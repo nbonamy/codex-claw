@@ -124,6 +124,49 @@ describe('claudeTranscriptToRendererMessages', () => {
       }),
     ]);
   });
+
+  it('restores completed Claude compaction boundaries', () => {
+    const content = [
+      JSON.stringify({
+        type: 'user',
+        uuid: 'user-1',
+        promptId: 'prompt-1',
+        timestamp: '2026-08-10T12:00:00.000Z',
+        message: { role: 'user', content: 'long conversation' },
+      }),
+      JSON.stringify({
+        type: 'assistant',
+        uuid: 'assistant-1',
+        timestamp: '2026-08-10T12:00:01.000Z',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'Before compaction.' }] },
+      }),
+      JSON.stringify({
+        type: 'system',
+        subtype: 'compact_boundary',
+        uuid: 'boundary-1',
+        timestamp: '2026-08-10T12:00:02.000Z',
+        compact_metadata: { trigger: 'manual', pre_tokens: 180_000, post_tokens: 30_000 },
+      }),
+    ].join('\n');
+
+    expect(claudeTranscriptToRendererMessages(content, 'agent-claude', 'session-1')).toStrictEqual([
+      expect.objectContaining({ id: 'user-session-1-user-1' }),
+      expect.objectContaining({
+        id: 'assistant-claude-prompt-1',
+        parts: [{ type: 'text', text: 'Before compaction.' }],
+      }),
+      {
+        id: 'compaction-claude-compact-boundary-1',
+        agentId: 'agent-claude',
+        kind: 'compaction',
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'claude-compact-boundary-1',
+        createdAt: '2026-08-10T12:00:02.000Z',
+        parts: [],
+      },
+    ]);
+  });
 });
 
 describe('claudeTranscriptSettings', () => {

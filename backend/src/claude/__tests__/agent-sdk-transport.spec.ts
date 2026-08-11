@@ -168,6 +168,42 @@ describe('ClaudeAgentSdkTransport', () => {
     await transport.close();
   });
 
+  it('reads exact context-window usage from a live Agent SDK query', async () => {
+    const harness = createQueryHarness();
+    const transport = new ClaudeAgentSdkTransport({
+      createQuery: harness.createQuery,
+      createSessionId: () => '19191919-1919-4191-8191-191919191919',
+    });
+    const messages: ClaudeSdkMessage[] = [];
+    const turn = transport.startTurn({ cwd: '/tmp/project', prompt: 'measure context' }, (message) => messages.push(message));
+    await vi.waitFor(() => expect(harness.inputs).toHaveLength(1));
+    harness.emit({ type: 'system', subtype: 'init', session_id: 'context-session' });
+    await vi.waitFor(() => expect(messages).toHaveLength(1));
+    harness.runtimes[0]?.getContextUsage.mockResolvedValueOnce({
+      categories: [],
+      totalTokens: 51_200,
+      maxTokens: 200_000,
+      rawMaxTokens: 200_000,
+      percentage: 25.6,
+      gridRows: [],
+      model: 'claude-sonnet-5',
+      memoryFiles: [],
+      mcpTools: [],
+      agents: [],
+    });
+
+    await expect(transport.getContextUsage('context-session')).resolves.toStrictEqual({
+      totalTokens: 51_200,
+      maxTokens: 200_000,
+      percentage: 25.6,
+    });
+    await expect(transport.getContextUsage('missing-session')).resolves.toBeNull();
+
+    harness.emit({ type: 'result', subtype: 'success', session_id: 'context-session', is_error: false });
+    await turn.done;
+    await transport.close();
+  });
+
   it('sends image, text, and PDF attachments as native Agent SDK content blocks', async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-claude-attachments-'));
     const imagePath = path.join(directory, 'reference.png');
@@ -520,6 +556,7 @@ function createQueryHarness(initializationModels: Array<Record<string, unknown>>
     applyFlagSettings: ReturnType<typeof vi.fn>;
     supportedModels: ReturnType<typeof vi.fn>;
     initializationResult: ReturnType<typeof vi.fn>;
+    getContextUsage: ReturnType<typeof vi.fn>;
   }>;
   emit(message: ClaudeSdkMessage): void;
 } {
@@ -532,6 +569,7 @@ function createQueryHarness(initializationModels: Array<Record<string, unknown>>
     applyFlagSettings: ReturnType<typeof vi.fn>;
     supportedModels: ReturnType<typeof vi.fn>;
     initializationResult: ReturnType<typeof vi.fn>;
+    getContextUsage: ReturnType<typeof vi.fn>;
   }> = [];
   let output = new TestAsyncQueue<SDKMessage>();
   const createQuery = vi.fn<ClaudeQueryFactory>((input) => {
@@ -545,6 +583,7 @@ function createQueryHarness(initializationModels: Array<Record<string, unknown>>
       applyFlagSettings: ReturnType<typeof vi.fn>;
       supportedModels: ReturnType<typeof vi.fn>;
       initializationResult: ReturnType<typeof vi.fn>;
+      getContextUsage: ReturnType<typeof vi.fn>;
     } = {
       [Symbol.asyncIterator]: () => output[Symbol.asyncIterator](),
       interrupt: vi.fn().mockResolvedValue(undefined),
@@ -553,6 +592,18 @@ function createQueryHarness(initializationModels: Array<Record<string, unknown>>
       applyFlagSettings: vi.fn().mockResolvedValue(undefined),
       supportedModels: vi.fn().mockResolvedValue([]),
       initializationResult: vi.fn().mockResolvedValue({ models: initializationModels }),
+      getContextUsage: vi.fn().mockResolvedValue({
+        categories: [],
+        totalTokens: 0,
+        maxTokens: 200_000,
+        rawMaxTokens: 200_000,
+        percentage: 0,
+        gridRows: [],
+        model: 'sonnet',
+        memoryFiles: [],
+        mcpTools: [],
+        agents: [],
+      }),
       close: vi.fn(() => output.close()),
     };
     runtimes.push(runtime);

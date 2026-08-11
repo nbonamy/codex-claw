@@ -40,6 +40,7 @@ import {
 import {
   claudeMessageContentBlocks,
   claudeMessageSessionId,
+  claudeCompactionEvent,
   claudeResultErrorMessage,
   claudeStreamTextDelta,
   claudeStreamToolInputDelta,
@@ -72,6 +73,8 @@ type ActiveClaudeTurn = {
   toolPartsById: Map<string, RendererToolPart>;
   fileActivitiesById: Map<string, ClaudeToolFileActivity>;
   completedPlanMarkdown: string | null;
+  compactionStarted: boolean;
+  compactionCompleted: boolean;
   resolveStart: (result: BackendSendResult) => void;
   rejectStart: (error: Error) => void;
   startResolved: boolean;
@@ -94,6 +97,7 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
   private readonly liveSessionIdsByAgentId = new Map<string, string>();
   private modelCatalog = claudeModelOptions.map((model) => ({ ...model }));
   private modelCatalogDiscovery: Promise<void> | null = null;
+  private readonly contextUsageRefreshesByAgentId = new Map<string, Promise<void>>();
   private turnCounter = 0;
 
   constructor(
@@ -136,6 +140,10 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
         permissionMode: mode,
       },
     };
+  }
+
+  tryHandlePromptCommand(agent: Agent, prompt: string): Promise<BackendSendResult> | null {
+    return /^\/compact(?:\s+.*)?$/s.test(prompt) ? this.sendPrompt(agent, prompt) : null;
   }
 
   async sendPrompt(agent: Agent, prompt: string, options: SendPromptOptions = {}): Promise<BackendSendResult> {
@@ -188,6 +196,8 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
         toolPartsById: new Map(),
         fileActivitiesById: new Map(),
         completedPlanMarkdown: null,
+        compactionStarted: false,
+        compactionCompleted: false,
         resolveStart: resolve,
         rejectStart: reject,
         startResolved: false,
@@ -372,7 +382,9 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
     if (message.type === 'system') {
       if ((message as Record<string, unknown>).subtype === 'init') {
         void this.refreshModelCatalog().catch(() => undefined);
+        this.queueContextUsageRefresh(activeTurn);
       }
+      this.handleCompactionEvent(activeTurn, message);
       this.emitPermissionModeStatus(activeTurn, message);
       return;
     }
@@ -403,8 +415,98 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
       } else {
         this.completeTurn(activeTurn);
       }
+      if (!activeTurn.compactionCompleted) {
+        this.queueContextUsageRefresh(activeTurn);
+      }
       this.activeTurnsByAgentId.delete(activeTurn.agentId);
     }
+  }
+
+  private handleCompactionEvent(activeTurn: ActiveClaudeTurn, message: ClaudeSdkMessage): void {
+    const event = claudeCompactionEvent(message);
+    if (!event) return;
+    if (event.phase === 'started') {
+      this.emitCompactionStarted(activeTurn);
+      return;
+    }
+    if (event.phase === 'failed') {
+      if (event.error) {
+        this.emit({
+          agentId: activeTurn.agentId,
+          backend: this.backend,
+          backendSessionId: activeTurn.sessionId ?? undefined,
+          turnId: activeTurn.turnId,
+          type: 'error',
+          payload: { message: `Claude context compaction failed: ${event.error}` },
+        });
+      }
+      return;
+    }
+    this.emitCompactionStarted(activeTurn);
+    if (!activeTurn.compactionCompleted) {
+      activeTurn.compactionCompleted = true;
+      this.emit({
+        agentId: activeTurn.agentId,
+        backend: this.backend,
+        backendSessionId: activeTurn.sessionId ?? undefined,
+        turnId: activeTurn.turnId,
+        type: 'context.compactionCompleted',
+        payload: {},
+      });
+    }
+    this.queueContextUsageRefresh(activeTurn);
+  }
+
+  private emitCompactionStarted(activeTurn: ActiveClaudeTurn): void {
+    if (activeTurn.compactionStarted) return;
+    activeTurn.compactionStarted = true;
+    this.emit({
+      agentId: activeTurn.agentId,
+      backend: this.backend,
+      backendSessionId: activeTurn.sessionId ?? undefined,
+      turnId: activeTurn.turnId,
+      type: 'context.compactionStarted',
+      payload: {},
+    });
+  }
+
+  private queueContextUsageRefresh(activeTurn: ActiveClaudeTurn): void {
+    const sessionId = activeTurn.sessionId;
+    if (!sessionId || !this.transport.getContextUsage) return;
+    const previous = this.contextUsageRefreshesByAgentId.get(activeTurn.agentId) ?? Promise.resolve();
+    const refresh = previous
+      .catch(() => undefined)
+      .then(async () => {
+        const usage = await this.transport.getContextUsage?.(sessionId);
+        if (!usage || this.liveSessionIdsByAgentId.get(activeTurn.agentId) !== sessionId) return;
+        this.emit({
+          agentId: activeTurn.agentId,
+          backend: this.backend,
+          backendSessionId: sessionId,
+          threadId: sessionId,
+          turnId: activeTurn.turnId,
+          type: 'thread.tokenUsageUpdated',
+          payload: {
+            contextUsage: {
+              totalTokens: usage.totalTokens,
+              inputTokens: usage.totalTokens,
+              cachedInputTokens: 0,
+              outputTokens: 0,
+              reasoningOutputTokens: 0,
+              lastTotalTokens: usage.totalTokens,
+              modelContextWindow: usage.maxTokens,
+              usedPercent: usage.percentage,
+            },
+          },
+        });
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (this.contextUsageRefreshesByAgentId.get(activeTurn.agentId) === refresh) {
+          this.contextUsageRefreshesByAgentId.delete(activeTurn.agentId);
+        }
+      });
+    this.contextUsageRefreshesByAgentId.set(activeTurn.agentId, refresh);
   }
 
   private emitAssistantMessage(activeTurn: ActiveClaudeTurn, message: ClaudeSdkMessage): void {

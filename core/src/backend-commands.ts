@@ -41,6 +41,15 @@ export const codexBackendCommands: BackendCommandSummary[] = [
 
 export const claudeBackendCommands: BackendCommandSummary[] = [
   {
+    id: 'claude.compact',
+    backend: 'claude',
+    name: 'compact',
+    displayName: 'Compact',
+    description: 'Compact the current Claude context while preserving a summary.',
+    slashName: 'compact',
+    submitOnSelect: true,
+  },
+  {
     id: 'claude.plan',
     backend: 'claude',
     name: 'plan',
