@@ -5,6 +5,7 @@ import type {
   BackendConversationRef,
   AgentGitStatus,
   BackendModelOption,
+  BackendPluginSummary,
   BackendRuntimeStatus,
   BackendSession,
   BackendSkillSummary,
@@ -73,6 +74,10 @@ export class CodexBackendDriver implements AgentBackendDriver {
 
   async listSkills(agent: Agent): Promise<BackendSkillSummary[]> {
     return this.sessionManager.listSkills(agent);
+  }
+
+  async listPlugins(_agent: Agent): Promise<BackendPluginSummary[]> {
+    return this.sessionManager.listPlugins();
   }
 
   getDevicePairingStatus(): Promise<DevicePairingStatus> {

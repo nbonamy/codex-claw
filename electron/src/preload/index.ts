@@ -28,6 +28,7 @@ const api: CodexClawApi = {
   configureWorkBacklog: (input: WorkBacklogConfigurationInput, location?: LoopLocation) => ipc.invoke(ipcChannels.configureWorkBacklog, input, location),
   listWorkItems: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation) => ipc.invoke(ipcChannels.listWorkItems, provider, repositoryId, location),
   listBackendModels: (agentId: string) => ipc.invoke(ipcChannels.listBackendModels, agentId),
+  listBackendPlugins: (agentId: string) => ipc.invoke(ipcChannels.listBackendPlugins, agentId),
   listBackendSkills: (agentId: string) => ipc.invoke(ipcChannels.listBackendSkills, agentId),
   listAgentFiles: (agentId: string) => ipc.invoke(ipcChannels.listAgentFiles, agentId),
   previewAgentFile: (agentId: string, filePath: string) => ipc.invoke(ipcChannels.previewAgentFile, agentId, filePath),

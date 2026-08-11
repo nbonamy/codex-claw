@@ -17,6 +17,7 @@
     :agent-files="agentFiles"
     :backend-models="backendModels"
     :backend-commands="activeBackendCommands"
+    :backend-plugins="backendPlugins"
     :backend-skills="backendSkills"
     :backend-capabilities="activeBackendCapabilities"
     :model-catalog-status="modelCatalogStatus"
@@ -199,6 +200,7 @@ const {
   agentFiles,
   backendModels,
   activeBackendCommands,
+  backendPlugins,
   activeBackendCapabilities,
   modelCatalogStatus,
   backendSkills,

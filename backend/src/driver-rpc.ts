@@ -311,6 +311,11 @@ export class BackendDriverRpc {
         const driver = this.requireDriver(agent.backend);
         return driver.listModels ? driver.listModels(agent) : [];
       }
+      case backendMethods.driverPluginsList: {
+        const { agent } = requireAgentParams(params);
+        const driver = this.requireDriver(agent.backend);
+        return driver.listPlugins ? driver.listPlugins(agent) : [];
+      }
       case backendMethods.driverSkillsList: {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);

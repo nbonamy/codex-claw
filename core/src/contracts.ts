@@ -761,6 +761,18 @@ export type BackendSkillSummary = {
   providerMetadata?: Record<string, unknown>;
 };
 
+export type BackendPluginSummary = {
+  id: string;
+  name: string;
+  displayName: string;
+  shortDescription?: string;
+  longDescription?: string;
+  brandColor?: string;
+  iconUrl?: string;
+  iconUrlDark?: string;
+  enabled: boolean;
+};
+
 export type BackendCommandSummary = {
   id: string;
   backend: AgentBackend;
@@ -1443,6 +1455,7 @@ export type CodexClawApi = {
   configureWorkBacklog(input: WorkBacklogConfigurationInput, location?: LoopLocation): Promise<AppSnapshot>;
   listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: LoopLocation): Promise<WorkItem[]>;
   listBackendModels(agentId: string): Promise<BackendModelOption[]>;
+  listBackendPlugins(agentId: string): Promise<BackendPluginSummary[]>;
   listBackendSkills(agentId: string): Promise<BackendSkillSummary[]>;
   listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]>;
   previewAgentFile(agentId: string, filePath: string): Promise<AgentFilePreviewResult>;

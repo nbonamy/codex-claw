@@ -9,6 +9,7 @@ import type {
   BackendConversationRef,
   BackendDefaults,
   BackendModelOption,
+  BackendPluginSummary,
   BackendPromptOptions,
   BackendRuntimeStatus,
   BackendSession,
@@ -91,6 +92,7 @@ export type AgentBackendDriver = {
   steerPrompt?(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>;
   rollbackToTurn?(agent: Agent, turnId: string): Promise<BackendRollbackResult>;
   listModels?(agent: Agent): Promise<BackendModelOption[]>;
+  listPlugins?(agent: Agent): Promise<BackendPluginSummary[]>;
   listSkills?(agent: Agent): Promise<BackendSkillSummary[]>;
   getDevicePairingStatus?(): Promise<DevicePairingStatus>;
   enableDevicePairing?(): Promise<DevicePairingStatus>;

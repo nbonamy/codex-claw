@@ -49,6 +49,16 @@ describe('BackendDriverRpc', () => {
     expect(listModels).toHaveBeenCalledWith(agent);
   });
 
+  it('routes plugin catalog requests to the agent backend driver', async () => {
+    const agent = createAgent();
+    const plugins = [{ id: 'dropbox', name: 'dropbox', displayName: 'Dropbox', enabled: true }];
+    const listPlugins = vi.fn().mockResolvedValue(plugins);
+    const rpc = new BackendDriverRpc(new Map([['codex', createDriver({ listPlugins })]]));
+
+    await expect(rpc.handle('driver/plugins/list', { agent })).resolves.toStrictEqual(plugins);
+    expect(listPlugins).toHaveBeenCalledWith(agent);
+  });
+
   it('routes structured git diffs to the agent backend driver', async () => {
     const agent = createAgent();
     const result = {

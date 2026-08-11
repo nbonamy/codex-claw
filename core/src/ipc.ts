@@ -23,6 +23,7 @@ export const ipcChannels = {
   configureWorkBacklog: 'work-provider:backlog:configure',
   listWorkItems: 'work-provider:items:list',
   listBackendModels: 'backend:models:list',
+  listBackendPlugins: 'backend:plugins:list',
   listBackendSkills: 'backend:skills:list',
   listAgentFiles: 'agent:files:list',
   previewAgentFile: 'agent:file:preview',

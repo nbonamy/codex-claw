@@ -3940,11 +3940,18 @@ describe('useAppState', () => {
         enabled: true,
       },
     ]);
+    const listBackendPlugins = vi.fn().mockResolvedValue([{
+      id: 'app-69b31dc2110c8191b8b47dc98fe5a052',
+      name: 'dropbox',
+      displayName: 'Dropbox',
+      enabled: true,
+    }]);
     const sendPrompt = vi.fn().mockResolvedValue(updatedSnapshot);
 
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        listBackendPlugins,
         listBackendSkills,
         sendPrompt,
         onEvent: vi.fn(),
@@ -3957,6 +3964,13 @@ describe('useAppState', () => {
 
     expect(state.skillCatalogStatus.value).toBe('loaded');
     expect(listBackendSkills).toHaveBeenCalledWith('agent-dina');
+    expect(listBackendPlugins).toHaveBeenCalledWith('agent-dina');
+    expect(state.backendPlugins.value).toStrictEqual([{
+      id: 'app-69b31dc2110c8191b8b47dc98fe5a052',
+      name: 'dropbox',
+      displayName: 'Dropbox',
+      enabled: true,
+    }]);
     expect(state.backendSkills.value.map((skill) => skill.name)).toStrictEqual([
       'frontend-design',
       'skill-creator',

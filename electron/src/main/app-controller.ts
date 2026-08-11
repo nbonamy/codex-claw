@@ -11,7 +11,7 @@ import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/core/snapshot-guards';
 import { applyMainEventToSnapshot, applySnapshotMetadata, snapshotMetadata } from '@codex-claw/core/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppCommand, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppCommand, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendPluginSummary, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
 import { sendAppCommand, sendRendererEvent } from './ipc-events';
 import { installAppMenu, type AppMenuCallbacks } from './app-menu';
@@ -196,6 +196,10 @@ export class AppController {
 
     ipc.handle(ipcChannels.listBackendModels, async (_event, agentId: string) => {
       return this.listBackendModels(agentId);
+    });
+
+    ipc.handle(ipcChannels.listBackendPlugins, async (_event, agentId: string) => {
+      return this.listBackendPlugins(agentId);
     });
 
     ipc.handle(ipcChannels.listBackendSkills, async (_event, agentId: string) => {
@@ -1132,6 +1136,10 @@ export class AppController {
 
   private async listBackendModels(agentId: string): Promise<BackendModelOption[]> {
     return this.requireBackendClient().request(backendMethods.agentModelsList, { agentId });
+  }
+
+  private async listBackendPlugins(agentId: string): Promise<BackendPluginSummary[]> {
+    return this.requireBackendClient().request(backendMethods.agentPluginsList, { agentId });
   }
 
   private async listBackendSkills(agentId: string): Promise<BackendSkillSummary[]> {

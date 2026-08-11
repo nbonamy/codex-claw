@@ -3391,6 +3391,7 @@ describe('ClawBackendServer', () => {
     const legacyChildMessages = [...messages, legacySubagentMessage];
     snapshot.messages = messages;
     const listModels = vi.fn().mockResolvedValue([{ id: 'gpt-test', name: 'GPT Test' }]);
+    const listPlugins = vi.fn().mockResolvedValue([{ id: 'dropbox', name: 'dropbox', displayName: 'Dropbox', enabled: true }]);
     const listSkills = vi.fn().mockResolvedValue([{ name: 'frontend-design', path: '/skills/frontend-design/SKILL.md' }]);
     const listConversations = vi.fn().mockResolvedValue(conversations);
     const readConversationMessages = vi.fn(async (ref: BackendConversationRef) => {
@@ -3422,6 +3423,7 @@ describe('ClawBackendServer', () => {
       respondToRequest: async () => undefined,
       listConversations,
       listModels,
+      listPlugins,
       listSkills,
       readConversationMessages,
       readConversationSummary,
@@ -3451,6 +3453,12 @@ describe('ClawBackendServer', () => {
       method: 'agent/models/list',
       params: { agentId: 'agent-dina' },
     })).resolves.toMatchObject({ result: [{ id: 'gpt-test', name: 'GPT Test' }] });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'plugins',
+      method: 'agent/plugins/list',
+      params: { agentId: 'agent-dina' },
+    })).resolves.toMatchObject({ result: [{ id: 'dropbox', displayName: 'Dropbox' }] });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'skills',
@@ -3505,6 +3513,7 @@ describe('ClawBackendServer', () => {
     })).resolves.toMatchObject({ error: { message: 'Invalid conversation reference.' } });
 
     expect(listModels).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(listPlugins).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
     expect(listSkills).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
     expect(listConversations).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
     expect(readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-dina' }, 'agent-dina');

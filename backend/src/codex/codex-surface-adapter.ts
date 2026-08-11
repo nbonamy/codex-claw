@@ -6,6 +6,7 @@ import type {
   ApprovalPreset,
   BackendApprovalRequest,
   BackendModelOption,
+  BackendPluginSummary,
   BackendRuntimeStatus,
   BackendSkillSummary,
   ClientRequest,
@@ -197,6 +198,27 @@ export class CodexSurfaceAgentAdapter {
   async listSkills(agent: Agent, forceReload = false): Promise<BackendSkillSummary[]> {
     const skills = await this.surface.listSkills({ cwd: expandHome(agent.folder), forceReload });
     return skills.map((skill) => ({ id: skill.path, ...skill }));
+  }
+
+  async listPlugins(): Promise<BackendPluginSummary[]> {
+    await this.start();
+    const snapshot = this.surface.getSnapshot();
+    if (snapshot.pluginCatalogStatus === 'loaded' || snapshot.pluginCatalogStatus === 'error') {
+      return snapshot.plugins.map((plugin) => ({ ...plugin }));
+    }
+
+    return new Promise((resolve) => {
+      const unsubscribe = this.surface.onEvent((event) => {
+        if (event.type !== 'catalog.pluginsChanged' || event.payload.status === 'loading') return;
+        unsubscribe();
+        resolve(event.payload.plugins.map((plugin) => ({ ...plugin })));
+      });
+      const current = this.surface.getSnapshot();
+      if (current.pluginCatalogStatus === 'loaded' || current.pluginCatalogStatus === 'error') {
+        unsubscribe();
+        resolve(current.plugins.map((plugin) => ({ ...plugin })));
+      }
+    });
   }
 
   async sendPrompt(agent: Agent, prompt: string, options: SendPromptOptions = {}) {

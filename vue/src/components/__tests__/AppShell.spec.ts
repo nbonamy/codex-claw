@@ -258,6 +258,12 @@ describe('AppShell', () => {
         selectedModelId: 'gpt-5',
         selectedReasoningEffort: 'high',
         selectedServiceTier: 'fast',
+        backendPlugins: [{
+          id: 'app-69b31dc2110c8191b8b47dc98fe5a052',
+          name: 'dropbox',
+          displayName: 'Dropbox',
+          enabled: true,
+        }],
         composerState: { text: 'saved draft', selectionStart: 5, selectionEnd: 5 },
       },
       global: { plugins: [ElementPlus, i18n] },
@@ -276,6 +282,12 @@ describe('AppShell', () => {
       selectedServiceTier: 'fast',
       state: { text: 'saved draft', selectionStart: 5, selectionEnd: 5 },
     });
+    expect(state.catalogs?.plugins).toStrictEqual([{
+      id: 'app-69b31dc2110c8191b8b47dc98fe5a052',
+      name: 'dropbox',
+      displayName: 'Dropbox',
+      enabled: true,
+    }]);
     expect(state.policy?.canForkMessage).toBe(true);
 
     const updatedMessages: RendererMessage[] = [{

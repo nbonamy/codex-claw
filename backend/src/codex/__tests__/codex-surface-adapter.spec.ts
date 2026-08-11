@@ -75,6 +75,19 @@ class FakeTransport implements RpcTransport {
           }],
         };
       }
+      case 'plugin/installed': return {
+        marketplaces: [{
+          name: 'curated',
+          plugins: [{
+            id: 'app-69b31dc2110c8191b8b47dc98fe5a052',
+            name: 'dropbox',
+            installed: true,
+            enabled: true,
+            interface: { displayName: 'Dropbox' },
+          }],
+        }],
+        marketplaceLoadErrors: [],
+      };
       case 'permissionProfile/list': {
         const cwd = (params as { cwd?: string } | undefined)?.cwd;
         return {
@@ -313,6 +326,12 @@ describe('CodexSurfaceAgentAdapter', () => {
     await expect(adapter.listSkills({ ...agentA, folder: '~' }, true)).resolves.toEqual([
       expect.objectContaining({ id: expect.stringContaining('/skill-1/SKILL.md') }),
     ]);
+    await expect(adapter.listPlugins()).resolves.toStrictEqual([{
+      id: 'app-69b31dc2110c8191b8b47dc98fe5a052',
+      name: 'dropbox',
+      displayName: 'Dropbox',
+      enabled: true,
+    }]);
     await expect(adapter.listConversations(agentA)).resolves.toHaveLength(2);
     await expect(adapter.readConversationMessages('thread-a', 'agent-a')).resolves.toStrictEqual([]);
 

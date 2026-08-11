@@ -592,6 +592,10 @@ export class ClawBackendServer {
         const agentId = requireAgentId(message.params);
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentModelsList, { agentId }, (agent) => this.handleAgentDriverRequest(agent, backendMethods.driverModelsList, { agent }));
       }
+      case backendMethods.agentPluginsList: {
+        const agentId = requireAgentId(message.params);
+        return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentPluginsList, { agentId }, (agent) => this.handleAgentDriverRequest(agent, backendMethods.driverPluginsList, { agent }));
+      }
       case backendMethods.agentSkillsList: {
         const agentId = requireAgentId(message.params);
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentSkillsList, { agentId }, (agent) => this.handleAgentDriverRequest(agent, backendMethods.driverSkillsList, { agent }));
