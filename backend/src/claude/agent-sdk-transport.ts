@@ -20,6 +20,7 @@ import {
   type ClaudePermissionResponse,
   type ClaudeAvailableModel,
   type ClaudeContextUsage,
+  type ClaudeContextUsageParams,
   type ClaudeModelDiscoveryParams,
   type ClaudeTurnHandle,
   type ClaudeTurnParams,
@@ -88,6 +89,7 @@ const permissionModes = new Set<PermissionMode>([
 
 export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
   private readonly sessions = new Map<string, ClaudeSdkSession>();
+  private readonly inspectionQueries = new Set<ClaudeQueryRuntime>();
   private readonly pendingPermissions = new Map<string, PendingPermission>();
   private readonly createQuery: ClaudeQueryFactory;
   private readonly createSessionId: () => string;
@@ -175,21 +177,39 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
   async getContextUsage(sessionId: string): Promise<ClaudeContextUsage | null> {
     const session = this.sessions.get(sessionId);
     if (!session || session.closed) return null;
-    const usage = await session.query.getContextUsage();
-    if (
-      !Number.isFinite(usage.totalTokens) ||
-      !Number.isFinite(usage.maxTokens) ||
-      !Number.isFinite(usage.percentage) ||
-      usage.totalTokens < 0 ||
-      usage.maxTokens <= 0
-    ) {
-      return null;
+    return normalizedContextUsage(await session.query.getContextUsage());
+  }
+
+  async readContextUsage(params: ClaudeContextUsageParams): Promise<ClaudeContextUsage | null> {
+    const liveSession = this.sessions.get(params.sessionId);
+    if (liveSession && !liveSession.closed) {
+      return normalizedContextUsage(await liveSession.query.getContextUsage());
     }
-    return {
-      totalTokens: usage.totalTokens,
-      maxTokens: usage.maxTokens,
-      percentage: usage.percentage,
-    };
+    if (this.closing) return null;
+
+    const input = new AsyncPushQueue<SDKUserMessage>();
+    const queryRuntime = this.createQuery({
+      prompt: input,
+      options: {
+        ...claudeQueryOptions(
+          { ...params, prompt: '' },
+          this.createSessionId(),
+          params.sessionId,
+          denyInspectionToolUse,
+          this.options,
+        ),
+        persistSession: false,
+      },
+    });
+    this.inspectionQueries.add(queryRuntime);
+    try {
+      await queryRuntime.initializationResult();
+      return normalizedContextUsage(await queryRuntime.getContextUsage());
+    } finally {
+      this.inspectionQueries.delete(queryRuntime);
+      input.close();
+      queryRuntime.close();
+    }
   }
 
   async discoverModels(params: ClaudeModelDiscoveryParams): Promise<ClaudeAvailableModel[] | null> {
@@ -213,6 +233,10 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
 
   async close(): Promise<void> {
     this.closing = true;
+    for (const queryRuntime of this.inspectionQueries) {
+      queryRuntime.close();
+    }
+    this.inspectionQueries.clear();
     const sessions = [...this.sessions.values()];
     this.sessions.clear();
     for (const session of sessions) {
@@ -505,6 +529,28 @@ const denyCatalogToolUse: CanUseTool = async () => ({
   behavior: 'deny',
   message: 'This Claude session only reads available model metadata.',
 });
+
+const denyInspectionToolUse: CanUseTool = async () => ({
+  behavior: 'deny',
+  message: 'This Claude session only reads conversation metadata.',
+});
+
+function normalizedContextUsage(usage: Awaited<ReturnType<Query['getContextUsage']>>): ClaudeContextUsage | null {
+  if (
+    !Number.isFinite(usage.totalTokens) ||
+    !Number.isFinite(usage.maxTokens) ||
+    !Number.isFinite(usage.percentage) ||
+    usage.totalTokens < 0 ||
+    usage.maxTokens <= 0
+  ) {
+    return null;
+  }
+  return {
+    totalTokens: usage.totalTokens,
+    maxTokens: usage.maxTokens,
+    percentage: usage.percentage,
+  };
+}
 
 function sessionConfigurationKey(params: ClaudeTurnParams): string {
   return JSON.stringify({

@@ -564,6 +564,11 @@ describe('ClaudeBackendDriver', () => {
 
   it('hydrates persisted Claude transcript history through the driver', async () => {
     const transport = createFakeTransport();
+    transport.readContextUsage.mockResolvedValueOnce({
+      totalTokens: 33_120,
+      maxTokens: 200_000,
+      percentage: 16.56,
+    });
     const driver = new ClaudeBackendDriver(transport, async () => ({
       backendSession: { kind: 'claude', sessionId: 'claude-session-existing', transcriptSessionId: 'claude-session-existing', transport: 'stdio' },
       messages: [
@@ -591,6 +596,14 @@ describe('ClaudeBackendDriver', () => {
       transcriptSessionId: 'claude-session-existing',
       transport: 'stdio',
     });
+    await vi.waitFor(() => expect(transport.readContextUsage).toHaveBeenCalledOnce());
+    expect(transport.readContextUsage).toHaveBeenCalledWith(expect.objectContaining({
+      ownerId: 'agent-claude',
+      cwd: '/Users/nbonamy/src/codex-claw',
+      sessionId: 'claude-session-existing',
+    }));
+    expect(transport.readContextUsage.mock.calls[0]?.[0]).not.toHaveProperty('prompt');
+    await vi.waitFor(() => expect(events).toHaveLength(2));
     expect(events).toStrictEqual([
       expect.objectContaining({
         agentId: 'agent-claude',
@@ -604,6 +617,25 @@ describe('ClaudeBackendDriver', () => {
               parts: [{ type: 'text', text: 'hello' }],
             }),
           ],
+        },
+      }),
+      expect.objectContaining({
+        agentId: 'agent-claude',
+        backend: 'claude',
+        backendSessionId: 'claude-session-existing',
+        threadId: 'claude-session-existing',
+        type: 'thread.tokenUsageUpdated',
+        payload: {
+          contextUsage: {
+            totalTokens: 33_120,
+            inputTokens: 33_120,
+            cachedInputTokens: 0,
+            outputTokens: 0,
+            reasoningOutputTokens: 0,
+            lastTotalTokens: 33_120,
+            modelContextWindow: 200_000,
+            usedPercent: 16.56,
+          },
         },
       }),
     ]);
@@ -645,6 +677,11 @@ describe('ClaudeBackendDriver', () => {
 
   it('resumes Claude conversations from transcript refs', async () => {
     const transport = createFakeTransport();
+    transport.readContextUsage.mockResolvedValueOnce({
+      totalTokens: 12_000,
+      maxTokens: 200_000,
+      percentage: 6,
+    });
     const messages = [{
       id: 'user-claude-session-existing-user-1',
       agentId: 'agent-claude',
@@ -659,6 +696,8 @@ describe('ClaudeBackendDriver', () => {
       messages,
     });
     const driver = new ClaudeBackendDriver(transport, historyLoader);
+    const events: unknown[] = [];
+    driver.onEvent((event) => events.push(event));
 
     await expect(driver.resumeConversation(agent, {
       backend: 'claude',
@@ -677,6 +716,14 @@ describe('ClaudeBackendDriver', () => {
         transport: 'stdio',
       },
     }));
+    await vi.waitFor(() => expect(transport.readContextUsage).toHaveBeenCalledWith(expect.objectContaining({
+      sessionId: 'claude-session-existing',
+    })));
+    await vi.waitFor(() => expect(events).toContainEqual(expect.objectContaining({
+      type: 'thread.tokenUsageUpdated',
+      threadId: 'claude-session-existing',
+      payload: { contextUsage: expect.objectContaining({ totalTokens: 12_000, usedPercent: 6 }) },
+    })));
   });
 
   it('rejects Claude conversation refs from another folder', async () => {
@@ -1109,6 +1156,7 @@ function createFakeTransport(): ClaudeTurnTransport & {
   discoverModels: ReturnType<typeof vi.fn>;
   listModels: ReturnType<typeof vi.fn>;
   getContextUsage: ReturnType<typeof vi.fn>;
+  readContextUsage: ReturnType<typeof vi.fn>;
 } {
   let onMessage: (message: ClaudeSdkMessage) => void = () => undefined;
   let onPermissionRequest: (request: import('../cli-transport').ClaudePermissionRequest) => void = () => undefined;
@@ -1149,6 +1197,7 @@ function createFakeTransport(): ClaudeTurnTransport & {
     discoverModels: vi.fn().mockResolvedValue(null),
     listModels: vi.fn().mockResolvedValue(null),
     getContextUsage: vi.fn().mockResolvedValue(null),
+    readContextUsage: vi.fn().mockResolvedValue(null),
     close: vi.fn().mockResolvedValue(undefined),
   };
 }

@@ -23,6 +23,7 @@ import { ClaudeAgentSdkTransport } from './agent-sdk-transport';
 import {
   type ClaudePermissionRequest,
   type ClaudeAvailableModel,
+  type ClaudeContextUsage,
   type ClaudeTurnHandle,
   type ClaudeTurnParams,
   type ClaudeTurnTransport,
@@ -98,6 +99,7 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
   private modelCatalog = claudeModelOptions.map((model) => ({ ...model }));
   private modelCatalogDiscovery: Promise<void> | null = null;
   private readonly contextUsageRefreshesByAgentId = new Map<string, Promise<void>>();
+  private readonly contextUsageSessionIdsByAgentId = new Map<string, string>();
   private turnCounter = 0;
 
   constructor(
@@ -266,6 +268,7 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
 
   forgetAgentSession(agentId: string): void {
     const sessionId = this.liveSessionIdsByAgentId.get(agentId);
+    this.contextUsageSessionIdsByAgentId.delete(agentId);
     if (!sessionId) return;
     this.liveSessionIdsByAgentId.delete(agentId);
     void this.transport.closeSession?.(sessionId);
@@ -287,6 +290,10 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
           messages: history.messages,
         },
       });
+    }
+
+    if (history.backendSession.kind === 'claude') {
+      this.queueHydratedContextUsageRefresh(agent, history.backendSession);
     }
 
     return history.backendSession;
@@ -311,8 +318,12 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
       ...agent,
       backendSession,
     });
+    const resolvedBackendSession = history?.backendSession ?? backendSession;
+    if (resolvedBackendSession.kind === 'claude') {
+      this.queueHydratedContextUsageRefresh({ ...agent, backendSession: resolvedBackendSession }, resolvedBackendSession);
+    }
     return {
-      backendSession: history?.backendSession ?? backendSession,
+      backendSession: resolvedBackendSession,
       messages: history?.messages ?? [],
     };
   }
@@ -479,26 +490,7 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
       .then(async () => {
         const usage = await this.transport.getContextUsage?.(sessionId);
         if (!usage || this.liveSessionIdsByAgentId.get(activeTurn.agentId) !== sessionId) return;
-        this.emit({
-          agentId: activeTurn.agentId,
-          backend: this.backend,
-          backendSessionId: sessionId,
-          threadId: sessionId,
-          turnId: activeTurn.turnId,
-          type: 'thread.tokenUsageUpdated',
-          payload: {
-            contextUsage: {
-              totalTokens: usage.totalTokens,
-              inputTokens: usage.totalTokens,
-              cachedInputTokens: 0,
-              outputTokens: 0,
-              reasoningOutputTokens: 0,
-              lastTotalTokens: usage.totalTokens,
-              modelContextWindow: usage.maxTokens,
-              usedPercent: usage.percentage,
-            },
-          },
-        });
+        this.emitContextUsage(activeTurn.agentId, sessionId, usage, activeTurn.turnId);
       })
       .catch(() => undefined)
       .finally(() => {
@@ -507,6 +499,59 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
         }
       });
     this.contextUsageRefreshesByAgentId.set(activeTurn.agentId, refresh);
+  }
+
+  private queueHydratedContextUsageRefresh(agent: Agent, backendSession: Extract<BackendSession, { kind: 'claude' }>): void {
+    if (!this.transport.readContextUsage) return;
+    const sessionId = backendSession.sessionId;
+    this.contextUsageSessionIdsByAgentId.set(agent.id, sessionId);
+    const previous = this.contextUsageRefreshesByAgentId.get(agent.id) ?? Promise.resolve();
+    const refresh = previous
+      .catch(() => undefined)
+      .then(async () => {
+        const turnParams = claudeTurnParams(
+          { ...agent, backendSession },
+          '',
+          {},
+          sessionId,
+          this.driverOptions.clawMcpServerUrl,
+          this.driverOptions.pluginSettings?.(),
+        );
+        const { prompt: _prompt, attachments: _attachments, ...params } = turnParams;
+        const usage = await this.transport.readContextUsage?.({ ...params, sessionId });
+        if (!usage || this.contextUsageSessionIdsByAgentId.get(agent.id) !== sessionId) return;
+        this.emitContextUsage(agent.id, sessionId, usage);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (this.contextUsageRefreshesByAgentId.get(agent.id) === refresh) {
+          this.contextUsageRefreshesByAgentId.delete(agent.id);
+        }
+      });
+    this.contextUsageRefreshesByAgentId.set(agent.id, refresh);
+  }
+
+  private emitContextUsage(agentId: string, sessionId: string, usage: ClaudeContextUsage, turnId?: string): void {
+    this.emit({
+      agentId,
+      backend: this.backend,
+      backendSessionId: sessionId,
+      threadId: sessionId,
+      ...(turnId ? { turnId } : {}),
+      type: 'thread.tokenUsageUpdated',
+      payload: {
+        contextUsage: {
+          totalTokens: usage.totalTokens,
+          inputTokens: usage.totalTokens,
+          cachedInputTokens: 0,
+          outputTokens: 0,
+          reasoningOutputTokens: 0,
+          lastTotalTokens: usage.totalTokens,
+          modelContextWindow: usage.maxTokens,
+          usedPercent: usage.percentage,
+        },
+      },
+    });
   }
 
   private emitAssistantMessage(activeTurn: ActiveClaudeTurn, message: ClaudeSdkMessage): void {
@@ -882,6 +927,7 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
   private resolveTurnStart(activeTurn: ActiveClaudeTurn, sessionId: string): void {
     activeTurn.sessionId = sessionId;
     this.liveSessionIdsByAgentId.set(activeTurn.agentId, sessionId);
+    this.contextUsageSessionIdsByAgentId.set(activeTurn.agentId, sessionId);
     this.emit({
       backend: this.backend,
       type: 'backend.statusChanged',

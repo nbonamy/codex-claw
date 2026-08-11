@@ -52,6 +52,10 @@ export type ClaudeContextUsage = {
   percentage: number;
 };
 
+export type ClaudeContextUsageParams = Omit<ClaudeTurnParams, 'prompt' | 'attachments'> & {
+  sessionId: string;
+};
+
 export type ClaudePermissionRequest = {
   kind: 'confirm_tool' | 'ask_user';
   id: string;
@@ -85,6 +89,7 @@ export type ClaudeTurnTransport = {
   discoverModels?(params: ClaudeModelDiscoveryParams): Promise<ClaudeAvailableModel[] | null>;
   listModels?(): Promise<ClaudeAvailableModel[] | null>;
   getContextUsage?(sessionId: string): Promise<ClaudeContextUsage | null>;
+  readContextUsage?(params: ClaudeContextUsageParams): Promise<ClaudeContextUsage | null>;
   closeSession?(sessionId: string): void | Promise<void>;
   close(): Promise<void>;
 };

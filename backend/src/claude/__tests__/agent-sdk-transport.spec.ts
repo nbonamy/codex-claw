@@ -204,6 +204,52 @@ describe('ClaudeAgentSdkTransport', () => {
     await transport.close();
   });
 
+  it('reads context usage from a persisted conversation without sending or saving a prompt', async () => {
+    const harness = createQueryHarness();
+    const transport = new ClaudeAgentSdkTransport({
+      createQuery: harness.createQuery,
+      createSessionId: () => '20202020-2020-4020-8020-202020202020',
+    });
+
+    const result = transport.readContextUsage({
+      ownerId: 'agent-claude',
+      cwd: '/tmp/project',
+      sessionId: '21212121-2121-4121-8121-212121212121',
+      model: 'haiku',
+      appendSystemPrompt: 'Claw instructions',
+      mcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-claude',
+      allowedTools: ['mcp__codex_claw__*'],
+    });
+    expect(harness.runtimes).toHaveLength(1);
+    harness.runtimes[0]?.getContextUsage.mockResolvedValueOnce({
+      categories: [],
+      totalTokens: 33_120,
+      maxTokens: 200_000,
+      rawMaxTokens: 200_000,
+      percentage: 16.56,
+      gridRows: [],
+      model: 'claude-haiku-4-5',
+      memoryFiles: [],
+      mcpTools: [],
+      agents: [],
+    });
+
+    await expect(result).resolves.toStrictEqual({
+      totalTokens: 33_120,
+      maxTokens: 200_000,
+      percentage: 16.56,
+    });
+    expect(harness.options[0]).toMatchObject({
+      cwd: '/tmp/project',
+      resume: '21212121-2121-4121-8121-212121212121',
+      model: 'haiku',
+      persistSession: false,
+    });
+    expect(harness.options[0]).not.toHaveProperty('sessionId');
+    expect(harness.inputs).toStrictEqual([]);
+    expect(harness.runtimes[0]?.close).toHaveBeenCalledOnce();
+  });
+
   it('sends image, text, and PDF attachments as native Agent SDK content blocks', async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-claude-attachments-'));
     const imagePath = path.join(directory, 'reference.png');
