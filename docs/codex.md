@@ -176,10 +176,10 @@ the shared SDK does not define or normalize a second sandbox-policy model.
 `thread/resume` returns a full-item page of the 50 newest turns in app-server
 protocol v2. `clawd` translates that page into app-owned `RendererMessage`s and
 emits it immediately. Codex Claw currently selects lazy loading, so the SDK
-retains the opaque cursor and requests one older page of 25 turns only when the
-user reaches the top; each page is emitted as an incremental
-`thread.historyLoaded` batch. Eager loading can instead hydrate every page
-progressively. Since
+retains the opaque cursor and prefetches one older page of 25 turns when the
+user scrolls within one viewport of the top. Each page is emitted as an
+incremental `thread.historyLoaded` batch. Eager loading can instead hydrate
+every page progressively. Since
 app-server history may omit tool calls already observed live, Claw only adds
 unknown turns from lifecycle hydration and never rewrites a turn already present
 in memory. Lifecycle hydration is reconciled chronologically because its refreshed
