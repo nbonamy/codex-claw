@@ -151,6 +151,30 @@ describe('AppController', () => {
     await expect(opened).resolves.toStrictEqual(state);
   });
 
+  it('scopes in-app browser files to the owning agent folder', async () => {
+    const controller = new AppController(createInitialSnapshot(), null);
+    setMainWindowSend(controller, vi.fn());
+    const state: BrowserState = {
+      url: 'file:///Users/nbonamy/src/codex-claw/README.md',
+      title: 'README.md',
+      canGoBack: false,
+      canGoForward: false,
+    };
+    const browserPane = (controller as unknown as {
+      browserPane: { open: ReturnType<typeof vi.fn> };
+    }).browserPane;
+    const open = vi.spyOn(browserPane, 'open').mockResolvedValue(state);
+
+    await expect(openBrowser(controller, 'agent-dina', 'primary', state.url)).resolves.toStrictEqual(state);
+    expect(open).toHaveBeenCalledWith(
+      expect.anything(),
+      'agent-dina',
+      'primary',
+      state.url,
+      '~/src/codex-claw',
+    );
+  });
+
   it('tracks concurrent browser opens independently by agent and browser id', async () => {
     const controller = new AppController(createInitialSnapshot(), null);
     const send = vi.fn();
@@ -2102,6 +2126,12 @@ function requestBrowserOpen(controller: AppController, agentId: string, browserI
   return (controller as unknown as {
     requestBrowserOpen(agentId: string, browserId: string, url: string): Promise<unknown>;
   }).requestBrowserOpen(agentId, browserId, url);
+}
+
+function openBrowser(controller: AppController, agentId: string, browserId: string, url: string): Promise<BrowserState> {
+  return (controller as unknown as {
+    browserOpen(agentId: string, browserId: string, url: string): Promise<BrowserState>;
+  }).browserOpen(agentId, browserId, url);
 }
 
 function resolvePendingBrowserOpen(controller: AppController, agentId: string, browserId: string, state: BrowserState): void {

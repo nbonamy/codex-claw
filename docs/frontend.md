@@ -182,7 +182,9 @@ implemented:
   servers retain SDK fallbacks;
 - agent-owned right-side tabbed workspaces for the in-app Browser and GitHub
   Review, with full working-tree diffs opened from the agent header's git
-  statistics; clicking a conversation image opens it in a Claw-owned image tab,
+  statistics; the in-app Browser accepts HTTP and HTTPS pages plus local
+  `file://` URLs that resolve inside the owning agent's workspace; clicking a
+  conversation image opens it in a Claw-owned image tab,
   where native trackpad pinch gestures zoom around the pointer and ordinary
   scrolling pans the enlarged image, while the SDK lightbox remains the fallback
   for hosts without that action;

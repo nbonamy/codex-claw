@@ -1019,7 +1019,11 @@ export class AppController {
       throw new Error('Browser window is not available.');
     }
     try {
-      const state = await this.browserPane.open(this.mainWindow, agentId, browserId, url);
+      const agent = this.snapshot?.agents.find((candidate) => candidate.id === agentId);
+      if (!agent) {
+        throw new Error(`Agent not found: ${agentId}`);
+      }
+      const state = await this.browserPane.open(this.mainWindow, agentId, browserId, url, agent.folder);
       this.resolvePendingBrowserOpen(agentId, browserId, state);
       return state;
     } catch (error) {

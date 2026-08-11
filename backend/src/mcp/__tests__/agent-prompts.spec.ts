@@ -71,7 +71,8 @@ describe('agent prompts', () => {
     expect(instructions).toContain('Never acknowledge an acknowledgment');
     expect(instructions).toContain('Do not proactively message other agents');
     expect(instructions).toContain('Never send FYIs, progress reports, acknowledgments, commit/hash notices');
-    expect(instructions).toContain('Use browser-open with an HTTP or HTTPS URL');
+    expect(instructions).toContain('Use browser-open with an HTTP, HTTPS, or workspace-local file URL');
+    expect(instructions).toContain('File URLs must resolve inside your agent folder');
     expect(instructions).toContain('use only the codex_claw MCP Computer Use tools');
     expect(instructions).toContain('chrome:control-chrome');
   });

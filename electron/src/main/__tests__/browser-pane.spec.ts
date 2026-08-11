@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const electronMocks = vi.hoisted(() => {
   class BrowserWindowMock {
@@ -34,12 +38,21 @@ const electronMocks = vi.hoisted(() => {
     getURL = vi.fn(() => this.url);
     isDestroyed = vi.fn(() => this.destroyed);
     loadURL = vi.fn(async (url: string) => { this.url = url; });
-    on = vi.fn();
+    on = vi.fn((event: string, listener: (...args: unknown[]) => void) => {
+      this.listeners.set(event, listener);
+    });
     setWindowOpenHandler = vi.fn();
     canGoBack = vi.fn(() => false);
     canGoForward = vi.fn(() => false);
     private destroyed = false;
+    private readonly listeners = new Map<string, (...args: unknown[]) => void>();
     private url = '';
+
+    emitNavigation(event: 'will-navigate' | 'will-redirect', url: string) {
+      const navigationEvent = { preventDefault: vi.fn() };
+      this.listeners.get(event)?.(navigationEvent, url);
+      return navigationEvent;
+    }
   }
 
   class WebContentsViewMock {
@@ -77,7 +90,45 @@ describe('browser pane helpers', () => {
 
   it('rejects unsafe protocols and empty addresses', () => {
     expect(() => normalizeBrowserUrl('')).toThrow('Enter a URL');
-    expect(() => normalizeBrowserUrl('file:///Users/nicolas/.ssh/id_rsa')).toThrow('Only http and https');
+    expect(() => normalizeBrowserUrl('javascript:alert(1)')).toThrow('Only http, https, and workspace file URLs');
+    expect(() => normalizeBrowserUrl('file:///Users/nicolas/.ssh/id_rsa')).toThrow('require an agent workspace');
+  });
+
+  it('opens existing workspace files while rejecting escapes and symlinks outside the workspace', async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-browser-workspace-'));
+    const outside = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-browser-outside-'));
+    const localFile = path.join(workspace, 'preview.html');
+    const outsideFile = path.join(outside, 'secret.html');
+    const linkedFile = path.join(workspace, 'linked-secret.html');
+    await writeFile(localFile, '<h1>Local preview</h1>');
+    await writeFile(outsideFile, '<h1>Secret</h1>');
+    await symlink(outsideFile, linkedFile);
+
+    try {
+      const browserWindow = {
+        contentView: { addChildView: vi.fn(), removeChildView: vi.fn() },
+        isDestroyed: vi.fn(() => false),
+      };
+      const pane = new BrowserPane({ onAnnotation: vi.fn() });
+      const localUrl = pathToFileURL(localFile).toString();
+
+      await expect(pane.open(browserWindow as never, 'agent-one', 'primary', localUrl, workspace)).resolves.toMatchObject({
+        url: localUrl,
+        title: `Title for ${localUrl}`,
+      });
+      const guest = electronMocks.WebContentsViewMock.instances[0];
+      expect(guest?.webContents.loadURL).toHaveBeenCalledWith(localUrl);
+      expect(() => normalizeBrowserUrl(pathToFileURL(outsideFile).toString(), workspace)).toThrow('stay inside the agent workspace');
+      expect(() => normalizeBrowserUrl(pathToFileURL(linkedFile).toString(), workspace)).toThrow('stay inside the agent workspace');
+
+      const navigation = guest?.webContents.emitNavigation('will-navigate', pathToFileURL(outsideFile).toString());
+      expect(navigation?.preventDefault).toHaveBeenCalledOnce();
+    } finally {
+      await Promise.all([
+        rm(workspace, { recursive: true, force: true }),
+        rm(outside, { recursive: true, force: true }),
+      ]);
+    }
   });
 
   it('uses a safe, stable profile partition name for each agent', () => {
@@ -95,8 +146,8 @@ describe('browser pane helpers', () => {
     };
     const pane = new BrowserPane({ onAnnotation: vi.fn() });
 
-    await pane.open(browserWindow as never, 'agent-one', 'primary', 'https://one.example');
-    await pane.open(browserWindow as never, 'agent-one', 'secondary', 'https://two.example');
+    await pane.open(browserWindow as never, 'agent-one', 'primary', 'https://one.example', '/tmp/project');
+    await pane.open(browserWindow as never, 'agent-one', 'secondary', 'https://two.example', '/tmp/project');
 
     const [primary, secondary] = electronMocks.WebContentsViewMock.instances;
     expect(browserWindow.contentView.addChildView).toHaveBeenCalledTimes(2);
@@ -125,7 +176,7 @@ describe('browser pane helpers', () => {
       isDestroyed: vi.fn(() => false),
     };
     const pane = new BrowserPane({ onAnnotation });
-    await pane.open(browserWindow as never, 'agent-one', 'primary', 'https://one.example');
+    await pane.open(browserWindow as never, 'agent-one', 'primary', 'https://one.example', '/tmp/project');
     pane.setBounds('agent-one', 'primary', { x: 100, y: 50, width: 600, height: 500 });
     const guest = electronMocks.WebContentsViewMock.instances[0];
     guest?.webContents.executeJavaScript.mockResolvedValueOnce({
@@ -166,7 +217,7 @@ describe('browser pane helpers', () => {
       isDestroyed: vi.fn(() => false),
     };
     const pane = new BrowserPane({ onAnnotation });
-    await pane.open(browserWindow as never, 'agent-one', 'primary', 'https://one.example');
+    await pane.open(browserWindow as never, 'agent-one', 'primary', 'https://one.example', '/tmp/project');
     pane.setBounds('agent-one', 'primary', { x: 0, y: 0, width: 800, height: 600 });
     const guest = electronMocks.WebContentsViewMock.instances[0];
     guest?.webContents.executeJavaScript.mockResolvedValueOnce({

@@ -1,5 +1,8 @@
 import { BrowserWindow, WebContentsView } from 'electron';
+import { realpathSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { BrowserAnnotation, BrowserBounds, BrowserState } from '@codex-claw/core/contracts';
 
 type BrowserPaneOptions = {
@@ -17,6 +20,7 @@ type HostedBrowserPane = {
   browserId: string;
   browserWindow: BrowserWindow;
   consoleMessages: Array<{ level: string; message: string; timestamp: string }>;
+  fileRoot: string;
   view: WebContentsView;
 };
 
@@ -29,7 +33,13 @@ export class BrowserPane {
 
   constructor(private readonly options: BrowserPaneOptions) {}
 
-  async open(browserWindow: BrowserWindow, agentId: string, browserId: string, url: string): Promise<BrowserState> {
+  async open(
+    browserWindow: BrowserWindow,
+    agentId: string,
+    browserId: string,
+    url: string,
+    fileRoot: string,
+  ): Promise<BrowserState> {
     await this.close(agentId, browserId);
     const view = new WebContentsView({
       webPreferences: {
@@ -50,12 +60,22 @@ export class BrowserPane {
       browserId,
       browserWindow,
       consoleMessages: [],
+      fileRoot,
       view,
     };
     this.panes.set(browserPaneKey(agentId, browserId), pane);
     browserWindow.contentView.addChildView(view);
     view.setVisible(false);
     view.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    const preventDisallowedNavigation = (event: { preventDefault(): void }, target: string): void => {
+      try {
+        normalizeBrowserUrl(target, pane.fileRoot);
+      } catch {
+        event.preventDefault();
+      }
+    };
+    view.webContents.on('will-navigate', preventDisallowedNavigation);
+    view.webContents.on('will-redirect', preventDisallowedNavigation);
     view.webContents.on('console-message', (_event, level, message) => {
       pane.consoleMessages.push({ level: String(level), message, timestamp: new Date().toISOString() });
       if (pane.consoleMessages.length > 100) pane.consoleMessages.shift();
@@ -66,8 +86,8 @@ export class BrowserPane {
   }
 
   async navigate(agentId: string, browserId: string, url: string): Promise<BrowserState> {
-    const target = normalizeBrowserUrl(url);
     const pane = this.requirePane(agentId, browserId);
+    const target = normalizeBrowserUrl(url, pane.fileRoot);
     await pane.view.webContents.loadURL(target);
     return this.state(pane);
   }
@@ -328,15 +348,42 @@ export function browserPaneKey(agentId: string, browserId: string): string {
   return JSON.stringify([agentId, browserId]);
 }
 
-export function normalizeBrowserUrl(value: string): string {
+export function normalizeBrowserUrl(value: string, fileRoot?: string): string {
   const trimmed = value.trim();
   if (!trimmed) throw new Error('Enter a URL to open.');
   const candidate = /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(trimmed) ? trimmed : `https://${trimmed}`;
   const parsed = new URL(candidate);
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error('Only http and https URLs can be opened in the browser.');
+  if (parsed.protocol === 'file:') {
+    assertFileUrlInsideRoot(parsed, fileRoot);
+  } else if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('Only http, https, and workspace file URLs can be opened in the browser.');
   }
   return parsed.toString();
+}
+
+function assertFileUrlInsideRoot(url: URL, fileRoot?: string): void {
+  if (!fileRoot?.trim()) {
+    throw new Error('File URLs require an agent workspace.');
+  }
+
+  let canonicalRoot: string;
+  let canonicalTarget: string;
+  try {
+    canonicalRoot = realpathSync(expandHome(fileRoot));
+    canonicalTarget = realpathSync(fileURLToPath(url));
+  } catch {
+    throw new Error('File URLs must point to an existing file inside the agent workspace.');
+  }
+
+  const relative = path.relative(canonicalRoot, canonicalTarget);
+  if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    throw new Error('File URLs must stay inside the agent workspace.');
+  }
+}
+
+function expandHome(value: string): string {
+  if (value === '~') return os.homedir();
+  return value.startsWith(`~${path.sep}`) ? path.join(os.homedir(), value.slice(2)) : value;
 }
 
 export function safePartitionName(agentId: string): string {

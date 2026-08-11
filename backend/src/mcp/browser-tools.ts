@@ -11,7 +11,7 @@ export type InAppBrowserClient = {
 
 export function registerInAppBrowserTools(server: McpServer, agentId: string, browser: InAppBrowserClient): void {
   const run = (command: string, arguments_: Record<string, unknown>) => browserResult(() => browser.execute({ agentId, browserId: PRIMARY_BROWSER_ID, command, arguments: arguments_ }));
-  server.registerTool('browser-open', { description: 'Open an HTTP or HTTPS URL in this agent\'s Codex Claw in-app browser. The tool waits until the browser pane has loaded before returning.', inputSchema: { url: z.string().trim().min(1).describe('HTTP or HTTPS URL to open.') } }, ({ url }) => browserResult(() => browser.open({ agentId, browserId: PRIMARY_BROWSER_ID, url })));
+  server.registerTool('browser-open', { description: 'Open an HTTP, HTTPS, or workspace-local file URL in this agent\'s Codex Claw in-app browser. File URLs must resolve inside the agent folder. The tool waits until the browser pane has loaded before returning.', inputSchema: { url: z.string().trim().min(1).describe('HTTP, HTTPS, or workspace-local file URL to open.') } }, ({ url }) => browserResult(() => browser.open({ agentId, browserId: PRIMARY_BROWSER_ID, url })));
   server.registerTool('browser-get-dom', { description: 'Inspect the current in-app browser page or one CSS selector. Returns URL, title, text, HTML, and bounds. Use this before browser interactions.', inputSchema: { selector: z.string().optional() } }, ({ selector }) => run('dom', selector ? { selector } : {}));
   server.registerTool('browser-screenshot', { description: 'Capture the current in-app browser viewport as a PNG screenshot for visual debugging.', inputSchema: {} }, async () => {
     try {
