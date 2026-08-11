@@ -18,7 +18,7 @@ const idleAgent: Agent = {
 };
 
 describe('AgentDialog', () => {
-  it('leads with repository selection and lets new agents choose their coding agent', () => {
+  it('leads with repository selection and hides coding-agent selection by default', () => {
     const wrapper = mountDialog();
 
     expect(wrapper.get('.agent-dialog__header').text()).toContain('New agent');
@@ -35,14 +35,21 @@ describe('AgentDialog', () => {
     expect(wrapper.text()).not.toContain('Checkout');
     expect(wrapper.get('[aria-label="Agent name"]').attributes('aria-label')).toBe('Agent name');
     expect(wrapper.text()).not.toContain('Resolved path');
+    expect(wrapper.text()).not.toContain('Coding agent');
+    expect(wrapper.find('#agent-dialog-backend').exists()).toBe(false);
+    expect(wrapper.get('.agent-dialog__text-input').attributes('placeholder')).toBe('Name this agent');
+    expect(wrapper.findAllComponents({ name: 'ElOption' })[0]?.props('label')).toBe('Choose folder...');
+    expect(saveButton(wrapper).attributes()).toHaveProperty('disabled');
+  });
+
+  it('offers Claude Code when the experimental setting is enabled', () => {
+    const wrapper = mountDialog({ claudeCodeEnabled: true });
+
     expect(wrapper.text()).toContain('Coding agent');
     expect(wrapper.findAllComponents({ name: 'ElOption' }).map((option) => option.props('label'))).toEqual(expect.arrayContaining([
       'Codex',
       'Claude Code',
     ]));
-    expect(wrapper.get('.agent-dialog__text-input').attributes('placeholder')).toBe('Name this agent');
-    expect(wrapper.findAllComponents({ name: 'ElOption' })[0]?.props('label')).toBe('Choose folder...');
-    expect(saveButton(wrapper).attributes()).toHaveProperty('disabled');
   });
 
   it('auto-fills the name from the chosen folder and creates an agent', async () => {
@@ -86,6 +93,7 @@ describe('AgentDialog', () => {
   it('creates a Claude Code agent when selected', async () => {
     const createAgent = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountDialog({
+      claudeCodeEnabled: true,
       chooseAgentFolder: vi.fn().mockResolvedValue('/Users/nbonamy/src/claude-agent'),
       createAgent,
     });
@@ -519,6 +527,7 @@ describe('AgentDialog', () => {
 
 function mountDialog(overrides: Partial<{
   agent: Agent | null;
+  claudeCodeEnabled: boolean;
   chooseAgentFolder: () => Promise<string | null>;
   listSourceFolders: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
   suggestSourceWorktreePath: (input: { branchName: string; repoPath: string }) => Promise<string>;
@@ -599,7 +608,7 @@ async function emitSelect(wrapper: ReturnType<typeof mountDialog>, id: string, v
       : id === 'agent-dialog-backend'
         ? selects.at(-1)
         : id === 'agent-dialog-team'
-          ? (wrapper.props('mode') === 'create' ? selects.at(-2) : selects.at(-1))
+          ? (wrapper.props('claudeCodeEnabled') ? selects.at(-2) : selects.at(-1))
           : undefined;
   if (!select) {
     throw new Error(`Select not found: ${id}`);

@@ -267,6 +267,23 @@ describe('SettingsGeneralPanel', () => {
     });
   });
 
+  it('keeps experimental Claude Code support off by default and allows enabling it', async () => {
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({ updateSettings });
+
+    const claudeSwitch = switchInput(wrapper, 'Enable Claude Code (experimental)');
+    expect(wrapper.text()).toContain('Enable Claude Code (experimental)');
+    expect(claudeSwitch.element.checked).toBe(false);
+
+    await claudeSwitch.setValue(true);
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      general: {
+        claudeCodeEnabled: true,
+      },
+    });
+  });
+
   it('warns before sharing ChatGPT skills and plugins', async () => {
     const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
     const setCodexResourceSharing = vi.fn().mockResolvedValue(undefined);
@@ -276,7 +293,7 @@ describe('SettingsGeneralPanel', () => {
     });
 
     await flushPromises();
-    await wrapper.findAllComponents({ name: 'ElSwitch' })[2].vm.$emit('update:modelValue', true);
+    await switchInput(wrapper, 'Share skills and plugins with ChatGPT').setValue(true);
     await flushPromises();
 
     expect(confirm).toHaveBeenCalledWith(
@@ -293,7 +310,7 @@ describe('SettingsGeneralPanel', () => {
     const wrapper = mountPanel({ setCodexResourceSharing });
 
     await flushPromises();
-    await wrapper.findAllComponents({ name: 'ElSwitch' })[2].vm.$emit('update:modelValue', false);
+    await switchInput(wrapper, 'Share skills and plugins with ChatGPT').setValue(false);
     await flushPromises();
 
     expect(setCodexResourceSharing).toHaveBeenCalledWith({ enabled: false, mode: 'copy' });
@@ -305,7 +322,7 @@ describe('SettingsGeneralPanel', () => {
     const wrapper = mountPanel({ setCodexResourceSharing });
 
     await flushPromises();
-    await wrapper.findAllComponents({ name: 'ElSwitch' })[2].vm.$emit('update:modelValue', false);
+    await switchInput(wrapper, 'Share skills and plugins with ChatGPT').setValue(false);
     await flushPromises();
 
     expect(setCodexResourceSharing).toHaveBeenCalledWith({ enabled: false, mode: 'fresh' });
@@ -317,7 +334,7 @@ describe('SettingsGeneralPanel', () => {
     const wrapper = mountPanel({ codexResourceSharingBlocked: true, setCodexResourceSharing });
 
     await flushPromises();
-    await wrapper.findAllComponents({ name: 'ElSwitch' })[2].vm.$emit('update:modelValue', false);
+    await switchInput(wrapper, 'Share skills and plugins with ChatGPT').setValue(false);
     await flushPromises();
 
     expect(wrapper.text()).toContain('This option cannot be changed while chats are running.');
@@ -409,6 +426,10 @@ function mountPanel(props: Record<string, unknown>) {
       plugins: [ElementPlus],
     },
   });
+}
+
+function switchInput(wrapper: ReturnType<typeof mountPanel>, label: string) {
+  return wrapper.get<HTMLInputElement>(`input[aria-label="${label}"]`);
 }
 
 function permissionStatus(

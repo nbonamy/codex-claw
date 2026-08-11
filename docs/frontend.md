@@ -242,9 +242,11 @@ implemented:
 - focused artifact panes for documents, plans, and read-only source previews;
 - Bench entry point in the agent creation flow;
 - repository-first agent creation that puts custom folder selection first,
-  progressively reveals checkout controls, offers Codex or Claude Code for new
-  agents, and hides resolved-path implementation details; identity and
-  workspace settings use grouped surfaces with compact row controls;
+  progressively reveals checkout controls, uses Codex without a redundant
+  coding-agent field by default, and reveals experimental Claude Code selection
+  only when enabled from General → Advanced; Loop creation and editing remain
+  Codex-only. Resolved-path implementation details stay hidden, while identity
+  and workspace settings use grouped surfaces with compact row controls;
 - a theme-aware What’s New dialog that embeds the complete released changelog,
   opens on the current version, allows browsing previous versions, and opens
   from both the native Help menu and lower-left account menu;

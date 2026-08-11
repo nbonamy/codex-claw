@@ -266,15 +266,13 @@
               aria-label="Loop backend"
             >
               <el-option label="Codex" value="codex" />
-              <!-- Claude stays hidden until Claw has a reliable, supported integration. -->
-              <!-- <el-option label="Claude" value="claude" /> -->
             </el-select>
           </div>
 
           <div class="loop-editor__section">
             <label for="loop-editor-model">Model</label>
             <el-select
-              v-if="form.backend === 'codex' && backendModels.length > 0"
+              v-if="backendModels.length > 0"
               id="loop-editor-model"
               v-model="form.model"
               clearable
@@ -304,10 +302,7 @@
           class="loop-editor__source-row"
           aria-label="Loop thinking defaults"
         >
-          <div
-            v-if="form.backend === 'codex'"
-            class="loop-editor__section"
-          >
+          <div class="loop-editor__section">
             <label for="loop-editor-thinking">Thinking</label>
             <el-select
               id="loop-editor-thinking"
@@ -327,32 +322,6 @@
             </el-select>
           </div>
 
-          <template v-else>
-            <div class="loop-editor__section">
-              <label for="loop-editor-thinking">Thinking</label>
-              <el-select
-                id="loop-editor-thinking"
-                v-model="form.claudeThinkingType"
-                aria-label="Loop thinking"
-              >
-                <el-option label="Disabled" value="disabled" />
-                <el-option label="Enabled" value="enabled" />
-              </el-select>
-            </div>
-
-            <div class="loop-editor__section">
-              <label for="loop-editor-thinking-budget">Budget</label>
-              <el-input-number
-                id="loop-editor-thinking-budget"
-                v-model="form.claudeThinkingBudget"
-                :disabled="form.claudeThinkingType !== 'enabled'"
-                :min="1024"
-                :step="1024"
-                controls-position="right"
-                aria-label="Loop thinking budget"
-              />
-            </div>
-          </template>
         </div>
       </section>
 
@@ -387,7 +356,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, watch } from 'vue';
-import type { AgentBackend, BackendDefaults, BackendModelOption, BenchTemplate, CreateLoopInput, Loop, ReasoningEffort, SourceRepository, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import type { BackendDefaults, BackendModelOption, BenchTemplate, CreateLoopInput, Loop, ReasoningEffort, SourceRepository, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import AgentAvatar from './AgentAvatar.vue';
 
 type TeamMode = 'existing' | 'dedicated';
@@ -433,11 +402,9 @@ const form = reactive({
   assignmentInstructions: props.loop?.instructions.assignment ?? '',
   beforeCompletionInstructions: props.loop?.instructions.beforeCompletion ?? '',
   actionMode: initialActionMode(props.loop),
-  backend: initialBackend(props.loop),
+  backend: 'codex' as const,
   model: initialModel(props.loop),
   reasoningEffort: initialReasoningEffort(props.loop),
-  claudeThinkingType: initialClaudeThinkingType(props.loop),
-  claudeThinkingBudget: initialClaudeThinkingBudget(props.loop),
   sourceRepositoryPath: props.loop?.action.type === 'create-agent'
     ? props.loop.action.sourceRepositoryPath
     : props.sourceRepositories[0]?.path ?? '',
@@ -564,21 +531,7 @@ watch(() => props.teams, (teams) => {
   }
 });
 
-watch(() => form.backend, (backend) => {
-  if (backend === 'codex') {
-    const model = selectedModel.value;
-    form.model = form.model || model?.model || '';
-    form.reasoningEffort = form.reasoningEffort || model?.defaultReasoningEffort || model?.supportedReasoningEfforts?.[0]?.reasoningEffort || '';
-  } else {
-    form.reasoningEffort = '';
-  }
-});
-
 watch(() => form.model, () => {
-  if (form.backend !== 'codex') {
-    return;
-  }
-
   const model = selectedModel.value;
   if (!model?.supportedReasoningEfforts?.some((effort) => effort.reasoningEffort === form.reasoningEffort)) {
     form.reasoningEffort = model?.defaultReasoningEffort || model?.supportedReasoningEfforts?.[0]?.reasoningEffort || '';
@@ -657,17 +610,6 @@ function submit(): void {
 }
 
 function loopBackendDefaults(): BackendDefaults {
-  if (form.backend === 'claude') {
-    return {
-      kind: 'claude',
-      ...(form.model.trim() ? { model: form.model.trim() } : {}),
-      thinking: {
-        type: form.claudeThinkingType,
-        ...(form.claudeThinkingType === 'enabled' && form.claudeThinkingBudget ? { budgetTokens: form.claudeThinkingBudget } : {}),
-      },
-    };
-  }
-
   return {
     kind: 'codex',
     ...(form.model.trim() ? { model: form.model.trim() } : {}),
@@ -682,30 +624,16 @@ function initialActionMode(loop: Loop | null | undefined): ActionMode {
   return 'new-agent';
 }
 
-function initialBackend(loop: Loop | null | undefined): AgentBackend {
-  return loop?.action.type === 'create-agent' && loop.action.backend === 'claude' ? 'claude' : 'codex';
-}
-
 function initialModel(loop: Loop | null | undefined): string {
-  return loop?.action.type === 'create-agent' ? loop.action.backendDefaults?.model ?? '' : '';
+  return loop?.action.type === 'create-agent' && loop.action.backendDefaults?.kind === 'codex'
+    ? loop.action.backendDefaults.model ?? ''
+    : '';
 }
 
 function initialReasoningEffort(loop: Loop | null | undefined): ReasoningEffort | '' {
   return loop?.action.type === 'create-agent' && loop.action.backendDefaults?.kind === 'codex'
     ? loop.action.backendDefaults.reasoningEffort ?? ''
     : '';
-}
-
-function initialClaudeThinkingType(loop: Loop | null | undefined): 'enabled' | 'disabled' {
-  return loop?.action.type === 'create-agent' && loop.action.backendDefaults?.kind === 'claude'
-    ? loop.action.backendDefaults.thinking?.type ?? 'disabled'
-    : 'disabled';
-}
-
-function initialClaudeThinkingBudget(loop: Loop | null | undefined): number | undefined {
-  return loop?.action.type === 'create-agent' && loop.action.backendDefaults?.kind === 'claude'
-    ? loop.action.backendDefaults.thinking?.budgetTokens
-    : undefined;
 }
 
 function effortLabel(effort: ReasoningEffort): string {

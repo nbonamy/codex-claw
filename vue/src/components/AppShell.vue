@@ -290,6 +290,7 @@
       :visible="agentDialogVisible"
       :mode="agentDialogMode"
       :agent="editingAgent"
+      :claude-code-enabled="snapshot.general.claudeCodeEnabled"
       :choose-agent-folder="chooseAgentFolder"
       :choose-source-worktree-destination="chooseSourceWorktreeDestination"
       :create-agent="createAgentFromDialog"

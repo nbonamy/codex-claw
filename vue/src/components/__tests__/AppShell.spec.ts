@@ -2323,6 +2323,7 @@ describe('AppShell', () => {
 
     expect(wrapper.text()).toContain('New agent');
     expect(wrapper.find('#agent-dialog-team').exists()).toBe(false);
+    expect(wrapper.find('#agent-dialog-backend').exists()).toBe(false);
     await chooseCustomAgentFolder(wrapper);
     await wrapper.get('.agent-dialog__text-input').setValue('Jules');
     await wrapper.find('.claw-dialog__footer .el-button--primary').trigger('click');
@@ -2334,6 +2335,18 @@ describe('AppShell', () => {
       backend: 'codex',
       teamId: 'team-codex-claw',
     });
+  });
+
+  it('forwards the experimental Claude Code setting to the new agent dialog', async () => {
+    const snapshot = createInitialSnapshot();
+    Object.assign(snapshot.general, { claudeCodeEnabled: true });
+    const wrapper = mountShell({ snapshot });
+
+    await wrapper.get('.agent-sidebar__new').trigger('click');
+
+    expect(wrapper.find('#agent-dialog-backend').exists()).toBe(true);
+    expect(wrapper.findAllComponents({ name: 'ElOption' }).map((option) => option.props('label')))
+      .toContain('Claude Code');
   });
 
   it('loads new-agent repositories through the active team connection', async () => {

@@ -186,7 +186,10 @@
             </div>
           </div>
 
-          <div class="agent-dialog__workspace-row">
+          <div
+            v-if="claudeCodeEnabled"
+            class="agent-dialog__workspace-row"
+          >
             <div class="agent-dialog__row-copy">
               <label
                 class="agent-dialog__row-label"
@@ -274,6 +277,7 @@ export type AgentDialogCreateInput = CreateAgentInput & {
 
 const props = withDefaults(defineProps<{
   agent: Agent | null;
+  claudeCodeEnabled?: boolean;
   chooseAgentFolder: () => Promise<string | null>;
   listSourceFolders?: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
   listSourceRepositories?: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
@@ -294,6 +298,7 @@ const props = withDefaults(defineProps<{
   updateAgent: (input: UpdateAgentInput) => Promise<void>;
   visible: boolean;
 }>(), {
+  claudeCodeEnabled: false,
   initialNewTeamName: '',
   initialTeamId: null,
   remoteConnectionId: '',

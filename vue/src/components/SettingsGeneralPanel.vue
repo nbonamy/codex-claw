@@ -173,6 +173,19 @@
     >
       <SettingsRow
         as="label"
+        title="Enable Claude Code (experimental)"
+        description="Show Claude Code as an experimental option when creating agents"
+      >
+        <template #control>
+          <el-switch
+            :model-value="settings.claudeCodeEnabled"
+            aria-label="Enable Claude Code (experimental)"
+            @update:model-value="updateClaudeCodeEnabled"
+          />
+        </template>
+      </SettingsRow>
+      <SettingsRow
+        as="label"
         title="Share skills and plugins with ChatGPT"
         :description="codexResourceSharingDescription"
         :error="codexResourceSharingError"
@@ -444,6 +457,14 @@ function clearCodexBinaryPath(): void {
   codexBinaryError.value = null;
   codexBinaryDraft.value = '';
   void updateCodexBinaryPath('');
+}
+
+function updateClaudeCodeEnabled(value: boolean | string | number): void {
+  void props.updateSettings?.({
+    general: {
+      claudeCodeEnabled: value === true,
+    },
+  });
 }
 
 async function updateCodexResourceSharing(value: boolean | string | number): Promise<void> {

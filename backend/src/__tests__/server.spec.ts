@@ -4904,14 +4904,14 @@ describe('ClawBackendServer', () => {
       method: 'settings/update',
       params: {
         input: {
-          general: { preventSleepWhenAgentsRun: false },
+          general: { claudeCodeEnabled: true, preventSleepWhenAgentsRun: false },
           sourceFolder: { path: '/Users/nbonamy/src', recentRepoNames: ['codex-claw', 'id8'] },
           theme: { id: 'codex-claw-dark', mode: 'dark', uiFontSize: 18 },
         },
       },
     })).resolves.toMatchObject({
       result: {
-        general: { preventSleepWhenAgentsRun: false },
+        general: { claudeCodeEnabled: true, preventSleepWhenAgentsRun: false },
         sourceFolder: {
           path: '/Users/nbonamy/src',
           initialized: true,
@@ -5613,6 +5613,7 @@ function createTestSnapshot(): AppSnapshot {
       preventSleepWhenAgentsRun: true,
       preventSleepWhenRemoteAccessEnabled: true,
       codexBinaryPath: '',
+      claudeCodeEnabled: false,
       agentListCompact: false,
       shareCodexSkillsAndPlugins: true,
       appshots: {

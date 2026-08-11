@@ -91,6 +91,31 @@ describe('LoopEditor', () => {
       .toStrictEqual(['Codex']);
   });
 
+  it('normalizes a legacy Claude loop to the only available Codex backend', async () => {
+    const wrapper = mountEditor({
+      loop: loop({
+        action: {
+          type: 'create-agent',
+          sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+          backend: 'claude',
+          backendDefaults: { kind: 'claude', model: 'haiku' },
+          teamTarget: { mode: 'existing', teamId: 'team-codex-claw' },
+          cleanup: { deleteAgent: true },
+        },
+      }),
+    });
+
+    await wrapper.find('form').trigger('submit');
+
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({
+      action: {
+        type: 'create-agent',
+        backend: 'codex',
+        backendDefaults: { kind: 'codex' },
+      },
+    });
+  });
+
   it('can pick a custom folder for new agents', async () => {
     const chooseAgentFolder = vi.fn().mockResolvedValue('/Users/nbonamy/src/id8');
     const wrapper = mountEditor({ chooseAgentFolder });

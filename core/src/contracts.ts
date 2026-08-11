@@ -604,6 +604,7 @@ export type AppGeneralSettings = {
   preventSleepWhenAgentsRun: boolean;
   preventSleepWhenRemoteAccessEnabled: boolean;
   codexBinaryPath: string;
+  claudeCodeEnabled: boolean;
   agentListCompact: boolean;
   shareCodexSkillsAndPlugins: boolean;
   appshots: AppshotSettings;

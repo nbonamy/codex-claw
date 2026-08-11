@@ -6,12 +6,14 @@ describe('settings contracts', () => {
   it('normalizes general settings', () => {
     expect(normalizeGeneralSettings({
       codexBinaryPath: ' /opt/homebrew/bin/codex ',
+      claudeCodeEnabled: true,
       preventSleepWhenAgentsRun: false,
       agentListCompact: true,
       appshots: defaultAppshotSettings,
       plugins: defaultPluginSettings,
     })).toStrictEqual({
       codexBinaryPath: '/opt/homebrew/bin/codex',
+      claudeCodeEnabled: true,
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: true,
@@ -79,6 +81,7 @@ describe('settings contracts', () => {
 
     expect(snapshot.general).toStrictEqual({
       codexBinaryPath: '',
+      claudeCodeEnabled: false,
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: false,
