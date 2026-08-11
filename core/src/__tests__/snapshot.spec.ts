@@ -280,6 +280,7 @@ describe('snapshot reducer', () => {
       agentId: 'agent-dina',
       role: 'assistant',
       status: 'streaming',
+      createdAt: '2026-06-05T00:00:02.000Z',
       parts: [],
     });
     const messages = snapshot.messages;
@@ -396,6 +397,90 @@ describe('snapshot reducer', () => {
     expect(snapshot.messages).toBe(transcript);
     expect(snapshot.messages.map((message) => message.id)).toStrictEqual([
       'split-1', 'split-2', 'split-3', 'split-4', 'current',
+    ]);
+  });
+
+  it('repositions an updated historical message when its canonical page arrives', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.messages.push({
+      id: 'current', agentId: 'agent-dina', role: 'assistant', status: 'complete',
+      turnId: 'turn-current', createdAt: '2026-06-05T00:00:05.000Z',
+      parts: [{ type: 'text', text: 'Current history' }],
+    });
+    const transcript = snapshot.messages;
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.historyLoaded',
+      payload: {
+        preserveKnownMessages: true,
+        replace: false,
+        messages: [
+          {
+            id: 'page-one-user', agentId: 'agent-dina', role: 'user', status: 'complete',
+            turnId: 'turn-page-one', createdAt: '2026-06-05T00:00:03.000Z',
+            parts: [{ type: 'text', text: 'Later historical prompt' }],
+          },
+          {
+            id: 'page-one-assistant', agentId: 'agent-dina', role: 'assistant', status: 'complete',
+            turnId: 'turn-page-one', createdAt: '2026-06-05T00:00:03.000Z',
+            parts: [{ type: 'text', text: 'Later historical response' }],
+          },
+        ],
+      },
+      occurredAt: '2026-06-05T00:00:06.000Z',
+    });
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-page-two',
+      type: 'message.updated',
+      payload: {
+        message: {
+          id: 'page-two-assistant', agentId: 'agent-dina', role: 'assistant', status: 'complete',
+          turnId: 'turn-page-two', createdAt: '2026-06-05T00:00:01.000Z',
+          parts: [{ type: 'text', text: 'Hydrated historical response' }],
+        },
+      },
+      occurredAt: '2026-06-05T00:00:06.500Z',
+    });
+    const hydratedAssistant = snapshot.messages.at(-1);
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 3,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.historyLoaded',
+      payload: {
+        preserveKnownMessages: true,
+        replace: false,
+        messages: [
+          {
+            id: 'page-two-user', agentId: 'agent-dina', role: 'user', status: 'complete',
+            turnId: 'turn-page-two', createdAt: '2026-06-05T00:00:01.000Z',
+            parts: [{ type: 'text', text: 'Earlier historical prompt' }],
+          },
+          {
+            id: 'page-two-assistant', agentId: 'agent-dina', role: 'assistant', status: 'complete',
+            turnId: 'turn-page-two', createdAt: '2026-06-05T00:00:01.000Z',
+            parts: [{ type: 'text', text: 'Unhydrated historical response' }],
+          },
+        ],
+      },
+      occurredAt: '2026-06-05T00:00:07.000Z',
+    });
+
+    expect(snapshot.messages).toBe(transcript);
+    expect(snapshot.messages.map((message) => message.id)).toStrictEqual([
+      'page-two-user', 'page-two-assistant', 'page-one-user', 'page-one-assistant', 'current',
+    ]);
+    expect(snapshot.messages[1]).toBe(hydratedAssistant);
+    expect(snapshot.messages[1]?.parts).toStrictEqual([
+      { type: 'text', text: 'Hydrated historical response' },
     ]);
   });
 
@@ -939,7 +1024,7 @@ describe('snapshot reducer', () => {
     expect(snapshot.messages.map((message) => message.id)).toStrictEqual(['user-turn-1']);
   });
 
-  it('adds unknown hydrated turns without replacing known tool calls or steering', () => {
+  it('merges older and newer hydrated turns without replacing known tool calls or steering', () => {
     const snapshot = createInitialSnapshot();
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
@@ -997,6 +1082,15 @@ describe('snapshot reducer', () => {
             createdAt: '2026-06-05T00:00:03.000Z',
             parts: [{ type: 'text', text: 'Incomplete app-server history.' }],
           },
+          {
+            id: 'assistant-turn-new',
+            agentId: 'agent-dina',
+            role: 'assistant',
+            status: 'complete',
+            turnId: 'turn-new',
+            createdAt: '2026-06-05T00:00:05.000Z',
+            parts: [{ type: 'text', text: 'Newer history.' }],
+          },
         ],
       },
       occurredAt: '2026-06-05T00:00:05.000Z',
@@ -1007,7 +1101,7 @@ describe('snapshot reducer', () => {
       'assistant-turn-old',
       'assistant-turn-live',
       'steer-turn-live-20260605t000004000z',
-      'assistant-turn-live-segment-20260605t000004000z',
+      'assistant-turn-new',
     ]);
     expect(snapshot.messages[1]).toMatchObject({
       id: 'assistant-turn-live',
@@ -1017,6 +1111,50 @@ describe('snapshot reducer', () => {
       kind: 'steer',
       parts: [{ type: 'text', text: 'Keep going with the focused test.' }],
     });
+  });
+
+  it('repairs previously misordered known turns when history is refreshed', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.messages.push(
+      {
+        id: 'assistant-turn-new',
+        agentId: 'agent-dina',
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'turn-new',
+        createdAt: '2026-06-05T00:00:03.000Z',
+        parts: [{ type: 'text', text: 'Newer history.' }],
+      },
+      {
+        id: 'assistant-turn-old',
+        agentId: 'agent-dina',
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'turn-old',
+        createdAt: '2026-06-05T00:00:01.000Z',
+        parts: [{ type: 'text', text: 'Older history.' }],
+      },
+    );
+    const messages = snapshot.messages;
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.historyLoaded',
+      payload: {
+        replace: false,
+        preserveKnownTurns: true,
+        messages: [...snapshot.messages].reverse(),
+      },
+      occurredAt: '2026-06-05T00:00:04.000Z',
+    });
+
+    expect(snapshot.messages).toBe(messages);
+    expect(snapshot.messages.map((message) => message.id)).toStrictEqual([
+      'assistant-turn-old',
+      'assistant-turn-new',
+    ]);
   });
 
   it('ignores malformed resumed history payloads', () => {

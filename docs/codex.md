@@ -182,7 +182,11 @@ user reaches the top; each page is emitted as an incremental
 progressively. Since
 app-server history may omit tool calls already observed live, Claw only adds
 unknown turns from lifecycle hydration and never rewrites a turn already present
-in memory.
+in memory. Lifecycle hydration is reconciled chronologically because its refreshed
+window can contain unknown turns on either side of the live transcript. An explicit
+older-history page owns message placement: Claw preserves the page order, moves any
+overlapping known messages into that position, and retains their richer in-memory
+content.
 Existing active sessions remain memory-authoritative and are not re-resumed on
 selection. The renderer asks through the typed bridge to re-select the active
 persisted agent after subscribing to events, so relaunch restores visible

@@ -474,7 +474,7 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
 
   if (event.type === 'turn.started') {
     if (event.turnId) {
-      ensureAssistantMessage(snapshot, event.agentId, event.turnId);
+      ensureAssistantMessage(snapshot, event.agentId, event.turnId, assistantMessageId(event.turnId), event.occurredAt);
       pruneSupersededEmptyAssistantPlaceholders(snapshot, event.agentId);
     }
     setAgentStatus(snapshot, event.agentId, { type: 'working' });
@@ -487,7 +487,7 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     if (agent && plan) {
       const operation = planProgressOperation(agent, event.turnId);
       agent.plan = plan;
-      upsertPlanProgressToolPart(snapshot, event.agentId, event.turnId, plan.markdown, 'completed', operation);
+      upsertPlanProgressToolPart(snapshot, event.agentId, event.turnId, plan.markdown, 'completed', operation, event.occurredAt);
     }
     return;
   }
@@ -498,7 +498,7 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     appendAgentPlanMarkdownDelta(snapshot, event.agentId, event.threadId, event.turnId, event.payload, event.occurredAt);
     const updatedAgent = findAgent(snapshot, event.agentId);
     if (updatedAgent?.plan?.turnId === event.turnId) {
-      upsertPlanProgressToolPart(snapshot, event.agentId, event.turnId, updatedAgent.plan.markdown, 'running', operation);
+      upsertPlanProgressToolPart(snapshot, event.agentId, event.turnId, updatedAgent.plan.markdown, 'running', operation, event.occurredAt);
     }
     return;
   }
@@ -509,7 +509,7 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     updateAgentPlanMarkdown(snapshot, event.agentId, event.threadId, event.turnId, event.payload, event.occurredAt);
     const updatedAgent = findAgent(snapshot, event.agentId);
     if (updatedAgent?.plan?.turnId === event.turnId) {
-      upsertPlanProgressToolPart(snapshot, event.agentId, event.turnId, updatedAgent.plan.markdown, 'completed', operation);
+      upsertPlanProgressToolPart(snapshot, event.agentId, event.turnId, updatedAgent.plan.markdown, 'completed', operation, event.occurredAt);
     }
     return;
   }
@@ -675,13 +675,13 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     const payload = event.payload as { toolPart?: unknown };
     const toolPart = rendererToolPart(payload.toolPart);
     if (toolPart) {
-      upsertAssistantToolPart(snapshot, event.agentId, event.turnId, toolPart);
+      upsertAssistantToolPart(snapshot, event.agentId, event.turnId, toolPart, event.occurredAt);
     }
     return;
   }
 
   if (event.type === 'item.updated' && event.turnId) {
-    updateAssistantToolPart(snapshot, event.agentId, event.turnId, event.payload);
+    updateAssistantToolPart(snapshot, event.agentId, event.turnId, event.payload, event.occurredAt);
     return;
   }
 
@@ -697,7 +697,7 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   }
 
   if (event.type === 'approval.requested' && event.turnId) {
-    applyApprovalRequest(snapshot, event.agentId, event.turnId, event.payload);
+    applyApprovalRequest(snapshot, event.agentId, event.turnId, event.payload, event.occurredAt);
     const confirmation = confirmToolRequest(event.payload);
     setAgentStatus(snapshot, event.agentId, {
       type: 'awaitingInput',
@@ -707,7 +707,7 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   }
 
   if (event.type === 'toolInput.requested' && event.turnId) {
-    applyToolInputRequest(snapshot, event.agentId, event.turnId, event.payload);
+    applyToolInputRequest(snapshot, event.agentId, event.turnId, event.payload, event.occurredAt);
     const request = askUserRequest(event.payload);
     setAgentStatus(snapshot, event.agentId, {
       type: 'awaitingInput',
@@ -730,7 +730,7 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   if (event.type === 'error') {
     const payload = event.payload as { message?: unknown };
     const message = typeof payload.message === 'string' ? payload.message : 'Backend error';
-    appendSystemMessage(snapshot, event.agentId, message);
+    appendSystemMessage(snapshot, event.agentId, message, event.occurredAt);
     setAgentStatus(snapshot, event.agentId, { type: 'error', message });
   }
 }
@@ -1096,13 +1096,13 @@ function appendAssistantDeltaWithPlanFilter(
   }
 
   if (!threadId) {
-    appendAssistantDelta(snapshot, agentId, turnId, delta, itemId);
+    appendAssistantDelta(snapshot, agentId, turnId, delta, updatedAt, itemId);
     return;
   }
 
   const agent = findAgent(snapshot, agentId);
   if (!agent) {
-    appendAssistantDelta(snapshot, agentId, turnId, delta, itemId);
+    appendAssistantDelta(snapshot, agentId, turnId, delta, updatedAt, itemId);
     return;
   }
 
@@ -1121,7 +1121,16 @@ function appendAssistantDeltaWithPlanFilter(
         setAgentPlanMarkdown(agent, threadId, turnId, agent.plan.markdown, updatedAt, 'completed');
       }
       if (agent.plan?.turnId === turnId) {
-        upsertPlanProgressToolPart(snapshot, agentId, turnId, agent.plan.markdown, closeIndex >= 0 ? 'completed' : 'running', operation, closeIndex < 0);
+        upsertPlanProgressToolPart(
+          snapshot,
+          agentId,
+          turnId,
+          agent.plan.markdown,
+          closeIndex >= 0 ? 'completed' : 'running',
+          operation,
+          updatedAt,
+          closeIndex < 0,
+        );
       }
 
       if (closeIndex < 0) {
@@ -1135,18 +1144,27 @@ function appendAssistantDeltaWithPlanFilter(
 
     const openIndex = lowerIndexOf(remaining, '<proposed_plan>');
     if (openIndex < 0) {
-      appendAssistantDelta(snapshot, agentId, turnId, remaining, itemId);
+      appendAssistantDelta(snapshot, agentId, turnId, remaining, updatedAt, itemId);
       return;
     }
 
     const visibleDelta = remaining.slice(0, openIndex);
     if (visibleDelta) {
-      appendAssistantDelta(snapshot, agentId, turnId, visibleDelta, itemId);
+      appendAssistantDelta(snapshot, agentId, turnId, visibleDelta, updatedAt, itemId);
     }
 
     remaining = remaining.slice(openIndex + '<proposed_plan>'.length);
     capturing = true;
-    upsertPlanProgressToolPart(snapshot, agentId, turnId, agent.plan?.turnId === turnId ? agent.plan.markdown : '', 'running', operation, true);
+    upsertPlanProgressToolPart(
+      snapshot,
+      agentId,
+      turnId,
+      agent.plan?.turnId === turnId ? agent.plan.markdown : '',
+      'running',
+      operation,
+      updatedAt,
+      true,
+    );
   }
 }
 
@@ -1179,6 +1197,7 @@ function upsertPlanProgressToolPart(
   markdown: string,
   status: ToolPart['status'],
   operation: 'update' | 'write',
+  createdAt: string,
   capturingProposedPlan = false,
 ): void {
   upsertAssistantToolPart(snapshot, agentId, turnId, {
@@ -1201,7 +1220,7 @@ function upsertPlanProgressToolPart(
       capturingProposedPlan,
       planProgress: true,
     },
-  });
+  }, createdAt);
 }
 
 function planProgressToolPartId(turnId: string): string {
@@ -1212,7 +1231,13 @@ function planLineCount(markdown: string): number {
   return markdown.split(/\r?\n/).filter((line) => line.trim()).length;
 }
 
-function updateAssistantToolPart(snapshot: AppSnapshot, agentId: string, turnId: string, payload: unknown): void {
+function updateAssistantToolPart(
+  snapshot: AppSnapshot,
+  agentId: string,
+  turnId: string,
+  payload: unknown,
+  createdAt: string,
+): void {
   const update = rendererToolPartUpdate(payload);
   if (!update) {
     return;
@@ -1224,7 +1249,7 @@ function updateAssistantToolPart(snapshot: AppSnapshot, agentId: string, turnId:
   });
 
   if (!toolPart && update.fallbackToolPart) {
-    message = message ?? ensureAssistantMessage(snapshot, agentId, turnId);
+    message = message ?? ensureAssistantMessage(snapshot, agentId, turnId, assistantMessageId(turnId), createdAt);
     message.parts.push(update.fallbackToolPart);
     toolPart = update.fallbackToolPart;
   }
@@ -1641,11 +1666,11 @@ function hydrateAgentMessages(
   options: { preserveKnownMessages?: boolean; preserveKnownTurns?: boolean; replace?: boolean } = {},
 ): void {
   if (options.preserveKnownMessages) {
-    mergeUnknownAgentMessages(snapshot, agentId, messages);
+    reconcilePrependedAgentMessages(snapshot, agentId, messages);
     return;
   }
   if (options.preserveKnownTurns) {
-    mergeUnknownAgentTurns(snapshot, agentId, messages);
+    reconcileHydratedAgentTurns(snapshot, agentId, messages);
     return;
   }
 
@@ -1673,37 +1698,77 @@ function hydrateAgentMessages(
   pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
 }
 
-function mergeUnknownAgentMessages(snapshot: AppSnapshot, agentId: string, messages: RendererMessage[]): void {
-  const knownMessageIds = new Set(snapshot.messages
+function reconcilePrependedAgentMessages(
+  snapshot: AppSnapshot,
+  agentId: string,
+  messages: RendererMessage[],
+): void {
+  if (messages.length === 0) return;
+
+  const existingById = new Map(snapshot.messages
     .filter((message) => message.agentId === agentId)
-    .map((message) => message.id));
-  const additions = messages.filter((message) => !knownMessageIds.has(message.id));
-  insertOlderAgentMessages(snapshot, agentId, additions);
+    .map((message) => [message.id, message]));
+  const pageMessageIds = new Set<string>();
+  const canonicalPage = messages.flatMap((message) => {
+    if (pageMessageIds.has(message.id)) return [];
+    pageMessageIds.add(message.id);
+    return [existingById.get(message.id) ?? message];
+  });
+  const firstAgentMessageIndex = snapshot.messages.findIndex((message) => message.agentId === agentId);
+
+  // A lifecycle update can hydrate a historical message before the pagination
+  // chunk containing it arrives. The chunk is authoritative for placement, so
+  // move any overlap into its canonical page position while preserving the
+  // richer message object already held by the live transcript.
+  for (let index = snapshot.messages.length - 1; index >= 0; index -= 1) {
+    const message = snapshot.messages[index];
+    if (message?.agentId === agentId && pageMessageIds.has(message.id)) {
+      snapshot.messages.splice(index, 1);
+    }
+  }
+  if (firstAgentMessageIndex === -1) snapshot.messages.push(...canonicalPage);
+  else snapshot.messages.splice(firstAgentMessageIndex, 0, ...canonicalPage);
+  pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
 }
 
-function mergeUnknownAgentTurns(snapshot: AppSnapshot, agentId: string, messages: RendererMessage[]): void {
+function reconcileHydratedAgentTurns(snapshot: AppSnapshot, agentId: string, messages: RendererMessage[]): void {
   const existing = snapshot.messages.filter((message) => message.agentId === agentId);
   const knownTurnIds = new Set(existing.flatMap((message) => message.turnId ? [message.turnId] : []));
   const knownMessageIds = new Set(existing.map((message) => message.id));
+  // Lifecycle hydration is a refreshed window, not an older page: it can add turns
+  // on either side of the richer live transcript while known live turns stay authoritative.
   const additions = messages.filter((message) => (
     message.turnId ? !knownTurnIds.has(message.turnId) : !knownMessageIds.has(message.id)
   ));
-  insertOlderAgentMessages(snapshot, agentId, additions);
+  replaceAgentMessagesInPlace(snapshot, agentId, orderAgentMessagesByTurn([...existing, ...additions]));
+  pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
 }
 
-function insertOlderAgentMessages(snapshot: AppSnapshot, agentId: string, additions: RendererMessage[]): void {
-  if (additions.length === 0) return;
+function orderAgentMessagesByTurn(messages: RendererMessage[]): RendererMessage[] {
+  const groups = new Map<string, { createdAt: string; index: number; messages: RendererMessage[] }>();
+  for (const [index, message] of messages.entries()) {
+    const key = message.turnId ? `turn:${message.turnId}` : `message:${message.id}`;
+    const group = groups.get(key);
+    if (group) {
+      group.messages.push(message);
+      if (message.createdAt < group.createdAt) group.createdAt = message.createdAt;
+    } else {
+      groups.set(key, { createdAt: message.createdAt, index, messages: [message] });
+    }
+  }
 
-  const orderedAdditions = additions
-    .map((message, index) => ({ message, index }))
-    .sort((left, right) => (
-      left.message.createdAt.localeCompare(right.message.createdAt) || left.index - right.index
-    ))
-    .map(({ message }) => message);
+  return [...groups.values()]
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.index - right.index)
+    .flatMap((group) => group.messages);
+}
+
+function replaceAgentMessagesInPlace(snapshot: AppSnapshot, agentId: string, messages: RendererMessage[]): void {
   const firstAgentMessageIndex = snapshot.messages.findIndex((message) => message.agentId === agentId);
-  if (firstAgentMessageIndex === -1) snapshot.messages.push(...orderedAdditions);
-  else snapshot.messages.splice(firstAgentMessageIndex, 0, ...orderedAdditions);
-  pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
+  for (let index = snapshot.messages.length - 1; index >= 0; index -= 1) {
+    if (snapshot.messages[index]?.agentId === agentId) snapshot.messages.splice(index, 1);
+  }
+  if (firstAgentMessageIndex === -1) snapshot.messages.push(...messages);
+  else snapshot.messages.splice(firstAgentMessageIndex, 0, ...messages);
 }
 
 function rendererToolPartUpdate(value: unknown): RendererToolPartUpdate | null {
@@ -1816,8 +1881,15 @@ function isApprovalPreset(value: unknown): value is ApprovalPreset {
   return value === 'ask-for-approval' || value === 'approve-for-me' || value === 'full-access';
 }
 
-function upsertAssistantToolPart(snapshot: AppSnapshot, agentId: string, turnId: string, toolPart: ToolPart): void {
-  const message = findAssistantMessageWithToolPart(snapshot, agentId, turnId, toolPart.id) ?? ensureAssistantMessage(snapshot, agentId, turnId);
+function upsertAssistantToolPart(
+  snapshot: AppSnapshot,
+  agentId: string,
+  turnId: string,
+  toolPart: ToolPart,
+  createdAt: string,
+): void {
+  const message = findAssistantMessageWithToolPart(snapshot, agentId, turnId, toolPart.id) ??
+    ensureAssistantMessage(snapshot, agentId, turnId, assistantMessageId(turnId), createdAt);
   const existingIndex = message.parts.findIndex((part) => part.type === 'tool' && part.id === toolPart.id);
 
   if (existingIndex >= 0) {
@@ -1842,7 +1914,13 @@ function upsertAssistantToolPart(snapshot: AppSnapshot, agentId: string, turnId:
   pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
 }
 
-function applyApprovalRequest(snapshot: AppSnapshot, agentId: string, turnId: string, payload: unknown): void {
+function applyApprovalRequest(
+  snapshot: AppSnapshot,
+  agentId: string,
+  turnId: string,
+  payload: unknown,
+  createdAt: string,
+): void {
   const request = confirmToolRequest(payload);
   if (!request) {
     return;
@@ -1892,10 +1970,16 @@ function applyApprovalRequest(snapshot: AppSnapshot, agentId: string, turnId: st
       server: confirmation.integrationId,
       tool: confirmation.toolName,
     },
-  });
+  }, createdAt);
 }
 
-function applyToolInputRequest(snapshot: AppSnapshot, agentId: string, turnId: string, payload: unknown): void {
+function applyToolInputRequest(
+  snapshot: AppSnapshot,
+  agentId: string,
+  turnId: string,
+  payload: unknown,
+  createdAt: string,
+): void {
   const request = askUserRequest(payload);
   if (!request) {
     return;
@@ -1922,7 +2006,7 @@ function applyToolInputRequest(snapshot: AppSnapshot, agentId: string, turnId: s
       requestId: request.id,
       question: question?.question,
     },
-  });
+  }, createdAt);
 }
 
 function findPendingMcpToolPart(snapshot: AppSnapshot, agentId: string, turnId: string, server: string, tool: string): ToolPart | undefined {
@@ -2001,8 +2085,15 @@ function parseJsonPreview(preview: string): unknown {
   }
 }
 
-function appendAssistantDelta(snapshot: AppSnapshot, agentId: string, turnId: string, delta: string, itemId?: string): void {
-  const message = ensureAssistantMessage(snapshot, agentId, turnId);
+function appendAssistantDelta(
+  snapshot: AppSnapshot,
+  agentId: string,
+  turnId: string,
+  delta: string,
+  createdAt: string,
+  itemId?: string,
+): void {
+  const message = ensureAssistantMessage(snapshot, agentId, turnId, assistantMessageId(turnId), createdAt);
   if (message.status !== 'complete') {
     message.status = 'streaming';
   }
@@ -2051,8 +2142,8 @@ function ensureAssistantMessage(
   snapshot: AppSnapshot,
   agentId: string,
   turnId: string,
-  messageId = assistantMessageId(turnId),
-  createdAt = new Date().toISOString(),
+  messageId: string,
+  createdAt: string,
 ): RendererMessage {
   let effectiveMessageId = messageId;
   let effectiveCreatedAt = createdAt;
