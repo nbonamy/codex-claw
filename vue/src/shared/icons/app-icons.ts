@@ -3,7 +3,9 @@ export { default as GitHubIcon } from './GitHubIcon.vue';
 export {
   IconAffiliate as AffiliateIcon,
   IconArrowBackUp as ArrowBackUpIcon,
+  IconArrowRight as ArrowRightIcon,
   IconArrowUpRight as ArrowUpRightIcon,
+  IconArrowsMinimize as ArrowsMinimizeIcon,
   IconArrowsHorizontal as ArrowsHorizontalIcon,
   IconArrowsVertical as ArrowsVerticalIcon,
   IconBolt as BoltIcon,

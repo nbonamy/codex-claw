@@ -217,7 +217,7 @@ function toggleFile(fileKey: string): void {
   collapsedFileKeys.value = nextCollapsedKeys;
 }
 
-function mapFile(file: AnyFileChange): DiffFileView {
+function mapFile(file: AnyFileChange, fileIndex: number): DiffFileView {
   const title = file.type === 'RenamedFile'
     ? `${file.pathBefore} -> ${file.pathAfter}`
     : file.path;
@@ -229,7 +229,7 @@ function mapFile(file: AnyFileChange): DiffFileView {
     return mappedChunks;
   }, []);
   return {
-    key: `${file.type}:${title}`,
+    key: `${file.type}:${title}:${fileIndex}`,
     directory: compactDirectory(directory),
     fullPath: visiblePath,
     name,

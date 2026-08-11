@@ -136,10 +136,35 @@ implemented:
   and uses a clipboard image when present, otherwise a centered crop of the
   bundled shell screenshot;
 - single-line active agent header with contextual agent status beside the
-  identity and quiet right-side actions ordered from git stats into subagents,
+  identity, a compact `branch @ repository` location for Git folders (falling
+  back to the full folder otherwise), and quiet right-side actions ordered from
+  git stats into subagents,
   without a duplicate activity indicator. The agent's Review workspace supports
   explicit file staging, editable commit messages, safe push, existing-PR
-  detection, and editable draft PR creation;
+  detection, and editable draft PR creation. Its Git workflow control keeps
+  branch merges local: Merge commit always creates a merge commit, while Squash
+  and merge asks for an editable commit message before creating one local squash
+  commit. A primary feature checkout switches that same folder to its local base
+  branch before merging; a linked feature worktree merges into the surviving base
+  worktree. Cleanup controls appear only when the current
+  agent folder is a secondary linked worktree; branch deletion requires and
+  follows worktree removal. Removing a linked worktree rehomes the agent onto
+  the surviving base checkout and clears its folder-bound backend session before
+  Git state refreshes. Merge actions use the same animated progress, passive
+  success, and retry treatment as commit and push. The dialog offers Merge and
+  Merge and push actions; the combined action pushes the resulting base branch,
+  and a partial failure retries only that push without repeating the merge. Commit actions
+  replace the form with a shared animated operation state, retain a passive
+  success confirmation for 1.5 seconds before closing, and offer push-only retry
+  when Commit and push creates the commit but the remote rejects the push.
+  Standalone pushes first confirm the commit count and destination, warn when
+  dirty worktree changes will stay local, and use the same progress, success,
+  and retry treatment. Header and Review statistics share the total of staged,
+  unstaged, and untracked changes. The Commit dialog presents those three
+  scopes separately: staged changes are fixed, unstaged changes default on,
+  and untracked changes default off. Git Review includes all three scopes and
+  exposes local visibility toggles for each one without reloading repository
+  state;
 - ChatGPT-style split Open In controls in the active-agent header and project-file
   previews, plus the same installed-app list in agent context menus. The primary
   button reuses each agent's last choice; agents without one default to VS Code,

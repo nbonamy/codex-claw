@@ -43,7 +43,7 @@
 
     <GitDiffPreviewPanel
       :collapse-all-signal="collapseAllSignal"
-      :diff="panel.diff"
+      :diff="visibleDiff"
       :error="panel.error"
       :expand-all-signal="expandAllSignal"
       :state="panel.state"
@@ -55,8 +55,8 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { Agent, AgentGitStatus } from '@codex-claw/core/contracts';
-import { DotsVerticalIcon, GitHubIcon, ListDetailsIcon, RefreshIcon, TextWrapDisabledIcon, TextWrapIcon } from '../shared/icons/app-icons';
+import type { Agent, AgentGitDiffScope, AgentGitStatus } from '@codex-claw/core/contracts';
+import { DotsVerticalIcon, FileDiffIcon, FileTextIcon, GitCommitIcon, GitHubIcon, ListDetailsIcon, RefreshIcon, TextWrapDisabledIcon, TextWrapIcon } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import GitDiffPreviewPanel from './GitDiffPreviewPanel.vue';
@@ -78,8 +78,43 @@ const wordWrap = ref(false);
 const allExpanded = ref(true);
 const expandAllSignal = ref(0);
 const collapseAllSignal = ref(0);
+const visibleScopes = ref<Record<AgentGitDiffScope, boolean>>({
+  staged: true,
+  unstaged: true,
+  untracked: true,
+});
 const repositoryName = computed(() => fileBasename(props.gitStatus?.folder ?? props.agent.folder));
+const visibleDiff = computed(() => {
+  if (!props.panel.sections) return props.panel.diff;
+  return props.panel.sections
+    .filter((section) => visibleScopes.value[section.scope] && section.diff.trim())
+    .map((section) => section.diff.trimEnd())
+    .join('\n');
+});
+const sectionMenuItems = computed<AppMenuItem[]>(() => {
+  if (!props.panel.sections) return [];
+  const labels: Record<AgentGitDiffScope, string> = {
+    staged: 'Staged changes',
+    unstaged: 'Unstaged changes',
+    untracked: 'Untracked files',
+  };
+  const icons = {
+    staged: GitCommitIcon,
+    unstaged: FileDiffIcon,
+    untracked: FileTextIcon,
+  };
+  return props.panel.sections.map((section) => ({
+    id: `scope-${section.scope}`,
+    type: 'checkbox' as const,
+    label: labels[section.scope],
+    icon: icons[section.scope],
+    checked: visibleScopes.value[section.scope],
+    disabled: !section.diff.trim(),
+  }));
+});
 const menuItems = computed<AppMenuItem[]>(() => [
+  ...sectionMenuItems.value,
+  ...(sectionMenuItems.value.length ? [{ id: 'scope-separator', type: 'separator' as const }] : []),
   {
     id: 'word-wrap',
     type: 'checkbox',
@@ -102,7 +137,12 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenuOnOutsideCl
 
 function selectMenuItem(itemId: string): void {
   menuOpen.value = false;
-  if (itemId === 'word-wrap') {
+  if (itemId.startsWith('scope-')) {
+    const scope = itemId.slice('scope-'.length) as AgentGitDiffScope;
+    if (scope === 'staged' || scope === 'unstaged' || scope === 'untracked') {
+      visibleScopes.value[scope] = !visibleScopes.value[scope];
+    }
+  } else if (itemId === 'word-wrap') {
     wordWrap.value = !wordWrap.value;
   } else if (itemId === 'expand-all') {
     expandAllSignal.value += 1;

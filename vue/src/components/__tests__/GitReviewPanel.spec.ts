@@ -12,6 +12,12 @@ const diff = [
   '+export const anotherValue = 3;',
 ].join('\n');
 
+const scopedDiffs = [
+  { scope: 'staged' as const, diff: diff.replaceAll('src/main.ts', 'src/staged.ts') },
+  { scope: 'unstaged' as const, diff: diff.replaceAll('src/main.ts', 'src/unstaged.ts') },
+  { scope: 'untracked' as const, diff: diff.replaceAll('src/main.ts', 'src/untracked.ts') },
+];
+
 describe('GitReviewPanel', () => {
   afterEach(() => vi.restoreAllMocks());
   it('shows repository context, totals, and every file diff', async () => {
@@ -72,6 +78,53 @@ describe('GitReviewPanel', () => {
     await wrapper.get('[aria-label="Review options"]').trigger('click');
     await wrapper.findAll('.app-menu__item').find((item) => item.text().includes('Collapse all'))?.trigger('click');
     expect(wrapper.get('.git-diff-preview-panel__file-header').attributes('aria-expanded')).toBe('false');
+  });
+
+  it('shows all git scopes by default and toggles each section locally', async () => {
+    const wrapper = mount(GitReviewPanel, {
+      props: {
+        agent: {
+          id: 'agent-1', teamId: 'team-1', name: 'Dina', avatar: 'D', folder: '/repo', backend: 'codex', status: { type: 'idle' }, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+        },
+        panel: { kind: 'gitDiff', title: 'Review', diff: scopedDiffs.map((section) => section.diff).join('\n'), sections: scopedDiffs, state: 'idle' },
+      },
+    });
+
+    expect(wrapper.text()).toContain('src/staged.ts');
+    expect(wrapper.text()).toContain('src/unstaged.ts');
+    expect(wrapper.text()).toContain('src/untracked.ts');
+
+    await wrapper.get('[aria-label="Review options"]').trigger('click');
+    const unstaged = wrapper.findAll('.app-menu__item').find((item) => item.text().includes('Unstaged changes'));
+    expect(unstaged).toBeDefined();
+    await unstaged!.trigger('click');
+
+    expect(wrapper.text()).toContain('src/staged.ts');
+    expect(wrapper.text()).not.toContain('src/unstaged.ts');
+    expect(wrapper.text()).toContain('src/untracked.ts');
+  });
+
+  it('keeps staged and unstaged patches for the same file independently reviewable', () => {
+    const wrapper = mount(GitReviewPanel, {
+      props: {
+        agent: {
+          id: 'agent-1', teamId: 'team-1', name: 'Dina', avatar: 'D', folder: '/repo', backend: 'codex', status: { type: 'idle' }, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+        },
+        panel: {
+          kind: 'gitDiff',
+          title: 'Review',
+          diff: `${diff}\n${diff}`,
+          sections: [
+            { scope: 'staged', diff },
+            { scope: 'unstaged', diff },
+            { scope: 'untracked', diff: '' },
+          ],
+          state: 'idle',
+        },
+      },
+    });
+
+    expect(wrapper.findAll('.git-diff-preview-panel__file')).toHaveLength(2);
   });
 
   it('keeps the review workspace focused on the diff', () => {

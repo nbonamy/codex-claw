@@ -4230,6 +4230,11 @@ describe('useAppState', () => {
         title: 'Current diff',
         subtitle: 'Working tree',
         diff: 'diff --git a/a.ts b/a.ts\n',
+        sections: [
+          { scope: 'staged', diff: 'diff --git a/staged.ts b/staged.ts\n' },
+          { scope: 'unstaged', diff: 'diff --git a/a.ts b/a.ts\n' },
+          { scope: 'untracked', diff: '' },
+        ],
       },
       occurredAt: '2026-06-05T00:00:03.000Z',
     });
@@ -4240,6 +4245,11 @@ describe('useAppState', () => {
       title: 'Current diff',
       subtitle: 'Working tree',
       diff: 'diff --git a/a.ts b/a.ts\n',
+      sections: [
+        { scope: 'staged', diff: 'diff --git a/staged.ts b/staged.ts\n' },
+        { scope: 'unstaged', diff: 'diff --git a/a.ts b/a.ts\n' },
+        { scope: 'untracked', diff: '' },
+      ],
     });
   });
 

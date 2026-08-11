@@ -2771,15 +2771,32 @@ function syncSidePanelFromMainEvent(event: MainToRendererEvent): void {
     return;
   }
 
+  const sections = parseGitDiffSections(event.payload.sections);
+  if (event.payload.sections !== undefined && !sections) return;
+
   sidePanelRequest.value = {
     kind: 'gitDiff',
     diff: event.payload.diff,
+    ...(sections ? { sections } : {}),
     ...(event.payload.scope === 'workingTree' || event.payload.scope === 'turn' ? { scope: event.payload.scope } : {}),
     ...(typeof event.payload.title === 'string' ? { title: event.payload.title } : {}),
     ...(typeof event.payload.subtitle === 'string' ? { subtitle: event.payload.subtitle } : {}),
     ...(event.payload.state === 'error' ? { state: 'error' } : {}),
     ...(typeof event.payload.error === 'string' ? { error: event.payload.error } : {}),
   };
+}
+
+function parseGitDiffSections(value: unknown): Array<{ scope: 'staged' | 'unstaged' | 'untracked'; diff: string }> | null {
+  if (value === undefined) return null;
+  if (!Array.isArray(value)) return null;
+  const sections: Array<{ scope: 'staged' | 'unstaged' | 'untracked'; diff: string }> = [];
+  for (const item of value) {
+    if (!isRecord(item) || (item.scope !== 'staged' && item.scope !== 'unstaged' && item.scope !== 'untracked') || typeof item.diff !== 'string') {
+      return null;
+    }
+    sections.push({ scope: item.scope, diff: item.diff });
+  }
+  return sections;
 }
 
 function syncFileActivityFromMainEvent(event: MainToRendererEvent): void {

@@ -29,6 +29,140 @@ describe('ClawBackendServer', () => {
     expect(stage).not.toHaveBeenCalled();
   });
 
+  it('requires and forwards an explicit squash commit message', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{ id: 'agent-dina', teamId: snapshot.teams[0]!.id, name: 'Dina', folder: '/repo-feature', backend: 'codex', status: { type: 'idle' }, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' }];
+    const workflow = vi.fn().mockResolvedValue({
+      repository: 'owner/repo', folder: '/repo-feature', branch: 'feature/demo', detached: false,
+      remote: 'origin', remoteUrl: 'git@github.com:owner/repo.git', upstream: 'origin/feature/demo',
+      ahead: 0, behind: 0, files: [], stagedFiles: [], unstagedFiles: [],
+    });
+    const merge = vi.fn();
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      getGitStatus: async () => null,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      agentGitService: { workflow, merge } as unknown as AgentGitService,
+      workIntegrations: { githubConnected: vi.fn().mockResolvedValue(false) } as unknown as WorkIntegrationManager,
+    });
+
+    await server.handleMessage({
+      jsonrpc: '2.0', id: 'merge', method: backendMethods.agentGitMerge,
+      params: { agentId: 'agent-dina', input: { strategy: 'squash', commitMessage: 'feat: combine demo work', deleteBranch: false, deleteWorktree: false, confirmed: true } },
+    });
+    expect(merge).toHaveBeenCalledWith('/repo-feature', 'squash', false, false, 'feat: combine demo work');
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0', id: 'merge-empty', method: backendMethods.agentGitMerge,
+      params: { agentId: 'agent-dina', input: { strategy: 'squash', commitMessage: ' ', deleteBranch: false, deleteWorktree: false, confirmed: true } },
+    })).rejects.toThrow('Invalid commitMessage.');
+    await server.close();
+  });
+
+  it('rehomes an agent before refreshing git after its linked worktree is removed', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina', teamId: snapshot.teams[0]!.id, name: 'Dina', folder: '/repo-feature',
+      backend: 'codex', backendSession: { kind: 'codex', threadId: 'thread-feature' },
+      status: { type: 'idle' }, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+    }];
+    const featureWorkflow = {
+      repository: 'owner/repo', folder: '/repo-feature', isLinkedWorktree: true,
+      branch: 'feature/demo', detached: false, ahead: 0, behind: 0,
+      files: [], stagedFiles: [], unstagedFiles: [],
+    };
+    const baseWorkflow = {
+      ...featureWorkflow,
+      folder: '/repo', isLinkedWorktree: false, branch: 'main',
+    };
+    const workflow = vi.fn().mockResolvedValue(baseWorkflow);
+    const merge = vi.fn().mockResolvedValue('/repo');
+    const forgetAgentSession = vi.fn();
+    const saveSnapshot = vi.fn();
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      forgetAgentSession,
+      getGitStatus: async (agent) => ({
+        folder: agent.folder, ahead: 0, behind: 0, changedFiles: 0, addedLines: 0, removedLines: 0,
+        hasUntracked: false, state: 'clean', updatedAt: '2026-08-11T00:00:00.000Z',
+      }),
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version', snapshot, saveSnapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      agentGitService: { workflow, merge } as unknown as AgentGitService,
+      workIntegrations: { githubConnected: vi.fn().mockResolvedValue(false) } as unknown as WorkIntegrationManager,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0', id: 'merge-cleanup', method: backendMethods.agentGitMerge,
+      params: { agentId: 'agent-dina', input: { strategy: 'merge', deleteBranch: true, deleteWorktree: true, confirmed: true } },
+    })).resolves.toMatchObject({ result: { folder: '/repo', branch: 'main', isLinkedWorktree: false } });
+
+    expect(merge).toHaveBeenCalledWith('/repo-feature', 'merge', true, true, undefined);
+    expect(snapshot.agents[0]).toMatchObject({ folder: '/repo' });
+    expect(snapshot.agents[0]).not.toHaveProperty('backendSession');
+    expect(forgetAgentSession).toHaveBeenCalledWith('agent-dina');
+    expect(saveSnapshot).toHaveBeenCalled();
+    expect(workflow).toHaveBeenCalledOnce();
+    expect(workflow).toHaveBeenCalledWith('/repo');
+    await server.close();
+  });
+
+  it('pushes the merged base branch instead of a retained feature worktree', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina', teamId: snapshot.teams[0]!.id, name: 'Dina', folder: '/repo-feature',
+      backend: 'codex', status: { type: 'idle' }, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+    }];
+    const featureWorkflow = {
+      repository: 'owner/repo', folder: '/repo-feature', isLinkedWorktree: false,
+      branch: 'feature/demo', detached: false, remote: 'origin', upstream: 'origin/feature/demo',
+      ahead: 0, behind: 0, files: [], stagedFiles: [], unstagedFiles: [],
+    };
+    const baseWorkflow = {
+      ...featureWorkflow, folder: '/repo', isLinkedWorktree: false, branch: 'main', upstream: 'origin/main', ahead: 2,
+    };
+    const workflow = vi.fn(async (folder: string) => folder === '/repo' ? baseWorkflow : featureWorkflow);
+    const mergeTarget = vi.fn().mockResolvedValue('/repo');
+    const push = vi.fn();
+    const server = new ClawBackendServer({
+      version: 'test-version', snapshot,
+      agentGitService: { workflow, mergeTarget, push } as unknown as AgentGitService,
+      workIntegrations: { githubConnected: vi.fn().mockResolvedValue(false) } as unknown as WorkIntegrationManager,
+    });
+
+    await server.handleMessage({
+      jsonrpc: '2.0', id: 'push-merge-target', method: backendMethods.agentGitPush,
+      params: { agentId: 'agent-dina', input: { target: 'mergeTarget', confirmed: true } },
+    });
+
+    expect(mergeTarget).toHaveBeenCalledWith('/repo-feature');
+    expect(push).toHaveBeenCalledWith('/repo', 'origin', 'main', false);
+    await server.close();
+  });
+
   it('responds to backend health requests', async () => {
     const server = new ClawBackendServer({ version: 'test-version', pid: 123 });
 
@@ -3651,7 +3785,27 @@ describe('ClawBackendServer', () => {
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
     }];
-    const getGitDiff = vi.fn().mockResolvedValue('diff --git a/a.ts b/a.ts\n');
+    const getGitDiff = vi.fn().mockResolvedValue({
+      diff: 'diff --git a/a.ts b/a.ts\n',
+      sections: [
+        { scope: 'staged', diff: 'diff --git a/staged.ts b/staged.ts\n' },
+        { scope: 'unstaged', diff: 'diff --git a/a.ts b/a.ts\n' },
+        { scope: 'untracked', diff: 'diff --git a/new.ts b/new.ts\n' },
+      ],
+    });
+    const getGitStatus = vi.fn().mockResolvedValue({
+      folder: '/Users/nbonamy/src/codex-claw',
+      branch: 'main',
+      upstream: 'origin/main',
+      ahead: 0,
+      behind: 0,
+      changedFiles: 1,
+      addedLines: 1,
+      removedLines: 0,
+      hasUntracked: false,
+      state: 'dirty',
+      updatedAt: '2026-08-11T00:00:00.000Z',
+    });
     const driver: AgentBackendDriver = {
       backend: 'codex',
       getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
@@ -3660,6 +3814,7 @@ describe('ClawBackendServer', () => {
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       respondToRequest: async () => undefined,
       getGitDiff,
+      getGitStatus,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -3680,6 +3835,7 @@ describe('ClawBackendServer', () => {
     })).resolves.toMatchObject({ result: true });
 
     expect(getGitDiff).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(getGitStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
     expect(events).toContainEqual(expect.objectContaining({
       agentId: 'agent-dina',
       type: 'sidePanel.gitDiffRequested',
@@ -3689,7 +3845,101 @@ describe('ClawBackendServer', () => {
         title: 'Git Diff',
         subtitle: '/Users/nbonamy/src/codex-claw',
         diff: 'diff --git a/a.ts b/a.ts\n',
+        sections: [
+          { scope: 'staged', diff: 'diff --git a/staged.ts b/staged.ts\n' },
+          { scope: 'unstaged', diff: 'diff --git a/a.ts b/a.ts\n' },
+          { scope: 'untracked', diff: 'diff --git a/new.ts b/new.ts\n' },
+        ],
       },
+    }));
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-dina',
+      type: 'git.statusUpdated',
+      payload: expect.objectContaining({ addedLines: 1, removedLines: 0 }),
+    }));
+    await server.close();
+  });
+
+  it('refreshes shared git status when workflow details are requested', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/repo',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const workflow = vi.fn().mockResolvedValue({
+      repository: 'owner/repo',
+      folder: '/repo',
+      branch: 'feature/demo',
+      detached: false,
+      remote: 'origin',
+      upstream: 'origin/feature/demo',
+      ahead: 2,
+      behind: 0,
+      stagedAddedLines: 0,
+      stagedRemovedLines: 0,
+      unstagedAddedLines: 1,
+      unstagedRemovedLines: 0,
+      untrackedAddedLines: 0,
+      untrackedRemovedLines: 0,
+      files: [{ path: 'a.ts', indexStatus: ' ', worktreeStatus: 'M' }],
+      stagedFiles: [],
+      unstagedFiles: ['a.ts'],
+    });
+    const getGitStatus = vi.fn().mockResolvedValue({
+      folder: '/repo',
+      branch: 'feature/demo',
+      upstream: 'origin/feature/demo',
+      ahead: 2,
+      behind: 0,
+      changedFiles: 1,
+      addedLines: 1,
+      removedLines: 0,
+      hasUntracked: false,
+      state: 'dirty',
+      updatedAt: '2026-08-11T00:00:00.000Z',
+    });
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      getGitStatus,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const events: unknown[] = [];
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      agentGitService: { workflow } as unknown as AgentGitService,
+      workIntegrations: { githubConnected: vi.fn().mockResolvedValue(false) } as unknown as WorkIntegrationManager,
+      onEvent: (event) => events.push(event),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'workflow',
+      method: backendMethods.agentGitWorkflowGet,
+      params: { agentId: 'agent-dina' },
+    })).resolves.toMatchObject({
+      result: { repository: 'owner/repo', unstagedAddedLines: 1 },
+    });
+
+    expect(getGitStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-dina',
+      type: 'git.statusUpdated',
+      payload: expect.objectContaining({ addedLines: 1, removedLines: 0 }),
     }));
     await server.close();
   });

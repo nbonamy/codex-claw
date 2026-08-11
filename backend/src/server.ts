@@ -4,7 +4,7 @@ import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput, updateAgentOpenInApplication } from '@codex-claw/core/snapshot';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitDiff, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/core/backend-driver';
@@ -670,11 +670,15 @@ export class ClawBackendServer {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitPush, params, async (agent) => {
-          requireConfirmed(params.input, 'Pushing a branch');
-          const workflow = await this.agentGitService.workflow(agent.folder);
+          const input = requireConfirmed(params.input, 'Pushing a branch');
+          const currentWorkflow = await this.agentGitService.workflow(agent.folder);
+          const pushFolder = input.target === 'mergeTarget' && !isIntegrationBranchName(currentWorkflow.branch)
+            ? await this.agentGitService.mergeTarget(agent.folder)
+            : agent.folder;
+          const workflow = pushFolder === agent.folder ? currentWorkflow : await this.agentGitService.workflow(pushFolder);
           if (workflow.detached || !workflow.branch) throw new Error('Create or check out a branch before pushing.');
           if (!workflow.remote) throw new Error('Add a Git remote before pushing.');
-          await this.agentGitService.push(agent.folder, workflow.remote, workflow.branch, !workflow.upstream);
+          await this.agentGitService.push(pushFolder, workflow.remote, workflow.branch, !workflow.upstream);
           return this.gitWorkflow(agent);
         });
       }
@@ -702,9 +706,15 @@ export class ClawBackendServer {
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitMerge, params, async (agent) => {
           const input = requireConfirmed(params.input, 'Merging a branch');
           const strategy = input.strategy === 'squash' ? 'squash' : 'merge';
-          const workflow = await this.gitWorkflow(agent);
-          await this.agentGitService.merge(agent.folder, strategy, input.deleteBranch === true, input.deleteWorktree === true);
-          return workflow;
+          const commitMessage = strategy === 'squash' ? requireString(input.commitMessage, 'commitMessage') : undefined;
+          const deleteWorktree = input.deleteWorktree === true;
+          const targetFolder = await this.agentGitService.merge(agent.folder, strategy, input.deleteBranch === true, deleteWorktree, commitMessage);
+          if (deleteWorktree) {
+            updateAgentFolder(this.snapshot, agentId, targetFolder);
+            await this.driverRpc?.handle(backendMethods.driverSessionForget, { backend: agent.backend, agentId });
+            await this.persistAndEmitSnapshot();
+          }
+          return this.gitWorkflow(agent);
         });
       }
       case backendMethods.agentWorkItemAssign: {
@@ -2324,8 +2334,11 @@ export class ClawBackendServer {
     const subtitle = agent.folder;
 
     try {
-      const diff = await this.handleAgentDriverRequest(agent, backendMethods.driverGitDiffGet, { agent }) as string | null;
-      if (diff === null) {
+      const [review] = await Promise.all([
+        this.handleAgentDriverRequest(agent, backendMethods.driverGitDiffGet, { agent }) as Promise<AgentGitDiff | null>,
+        this.refreshAgentGitStatus(agent.id),
+      ]);
+      if (review === null) {
         this.applyAndEmitBackendEvent({
           agentId: agent.id,
           type: 'sidePanel.gitDiffRequested',
@@ -2350,7 +2363,8 @@ export class ClawBackendServer {
           scope: 'workingTree',
           title,
           subtitle,
-          diff,
+          diff: review.diff,
+          sections: review.sections,
         },
       });
     } catch (error) {
@@ -2371,7 +2385,10 @@ export class ClawBackendServer {
   }
 
   private async gitWorkflow(agent: Agent): Promise<AgentGitWorkflow> {
-    const workflow = await this.agentGitService.workflow(agent.folder);
+    const [workflow] = await Promise.all([
+      this.agentGitService.workflow(agent.folder),
+      this.refreshAgentGitStatus(agent.id),
+    ]);
     const githubConnected = await this.requireWorkIntegrations().githubConnected();
     let existingPullRequest = null;
     let githubError: string | undefined;
@@ -3253,6 +3270,10 @@ function optionalTrimmedString(value: unknown): string | null {
   }
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+function isIntegrationBranchName(branch?: string): boolean {
+  return branch === 'main' || branch === 'master' || branch === 'develop' || branch === 'development' || branch === 'trunk';
 }
 
 function createUnsupportedSystemPermissionsPort(): SystemPermissionsPort {

@@ -2998,6 +2998,7 @@ function openGitDiffRequest(request: Extract<SidePanelRequest, { kind: 'gitDiff'
     title: request.title ?? 'Review',
     ...(request.subtitle ? { subtitle: request.subtitle } : {}),
     diff: request.diff,
+    ...(request.sections ? { sections: request.sections } : {}),
     state: request.state ?? 'idle',
     error: request.error ?? null,
   };

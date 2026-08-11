@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
+import { resolve } from 'node:path';
 import { promisify } from 'node:util';
-import type { AgentGitFile, AgentGitWorkflow } from '@codex-claw/core/contracts';
+import type { AgentGitDiff, AgentGitDiffSection, AgentGitFile, AgentGitWorkflow } from '@codex-claw/core/contracts';
 import type { AgentGitStatus } from '@codex-claw/core/contracts';
 
 const execFileAsync = promisify(execFile);
@@ -17,12 +18,20 @@ export class AgentGitService {
   async status(folder: string): Promise<AgentGitStatus> {
     const updatedAt = this.now().toISOString();
     try {
-      const [statusResult, diffResult] = await Promise.all([
+      const [statusResult, stagedNumstat, unstagedNumstat, untrackedFilesResult] = await Promise.all([
         this.runGit(folder, ['status', '--porcelain=v1', '--branch']),
-        workingTreeDiff(this.runGit, folder, ['--numstat']),
+        this.runGit(folder, ['diff', '--cached', '--numstat', '--']),
+        this.runGit(folder, ['diff', '--numstat', '--']),
+        this.runGit(folder, ['ls-files', '--others', '--exclude-standard', '-z', '--']),
       ]);
       const branch = parseBranchStatus(statusResult.stdout);
-      const diff = parseNumstat(diffResult.stdout);
+      const stagedDiff = parseNumstat(stagedNumstat.stdout);
+      const unstagedDiff = parseNumstat(unstagedNumstat.stdout);
+      const untrackedDiff = await untrackedNumstat(this.runGit, folder, untrackedFilesResult.stdout.split('\0').filter(Boolean));
+      const diff = {
+        addedLines: stagedDiff.addedLines + unstagedDiff.addedLines + untrackedDiff.addedLines,
+        removedLines: stagedDiff.removedLines + unstagedDiff.removedLines + untrackedDiff.removedLines,
+      };
       const changed = parseChangedFiles(statusResult.stdout);
       const isDirty = changed.changedFiles > 0 || diff.addedLines > 0 || diff.removedLines > 0;
 
@@ -53,12 +62,21 @@ export class AgentGitService {
     }
   }
 
-  async diff(folder: string): Promise<string> {
-    const [tracked, untrackedFiles] = await Promise.all([
-      workingTreeDiff(this.runGit, folder, ['--no-ext-diff']),
+  async diff(folder: string): Promise<AgentGitDiff> {
+    const sections = await this.diffSections(folder);
+    return {
+      diff: joinDiffOutputs(sections.map((section) => section.diff)),
+      sections,
+    };
+  }
+
+  async diffSections(folder: string): Promise<AgentGitDiffSection[]> {
+    const [staged, unstaged, untrackedFiles] = await Promise.all([
+      this.runGit(folder, ['diff', '--cached', '--no-ext-diff', '--']),
+      this.runGit(folder, ['diff', '--no-ext-diff', '--']),
       this.runGit(folder, ['ls-files', '--others', '--exclude-standard', '-z', '--']),
     ]);
-    const diffs = [tracked.stdout];
+    const untrackedDiffs: string[] = [];
 
     for (const file of untrackedFiles.stdout.split('\0').filter(Boolean)) {
       const result = await this.runGit(folder, [
@@ -69,14 +87,18 @@ export class AgentGitService {
         process.platform === 'win32' ? 'NUL' : '/dev/null',
         file,
       ]);
-      diffs.push(result.stdout);
+      untrackedDiffs.push(result.stdout);
     }
 
-    return joinDiffOutputs(diffs);
+    return [
+      { scope: 'staged', diff: staged.stdout },
+      { scope: 'unstaged', diff: unstaged.stdout },
+      { scope: 'untracked', diff: joinDiffOutputs(untrackedDiffs) },
+    ];
   }
 
   async workflow(folder: string): Promise<Omit<AgentGitWorkflow, 'githubConnected' | 'existingPullRequest'>> {
-    const [root, branch, upstream, remote, status, branchStatusResult, stagedNumstat, unstagedNumstat] = await Promise.all([
+    const [root, branch, upstream, remote, status, branchStatusResult, stagedNumstat, unstagedNumstat, worktreeList] = await Promise.all([
       this.runGit(folder, ['rev-parse', '--show-toplevel']),
       this.runGit(folder, ['symbolic-ref', '--quiet', '--short', 'HEAD']).catch(() => ({ stdout: '' })),
       this.runGit(folder, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']).catch(() => ({ stdout: '' })),
@@ -85,6 +107,7 @@ export class AgentGitService {
       this.runGit(folder, ['status', '--porcelain=v1', '--branch']),
       this.runGit(folder, ['diff', '--cached', '--numstat', '--']).catch(() => ({ stdout: '' })),
       this.runGit(folder, ['diff', '--numstat', '--']).catch(() => ({ stdout: '' })),
+      this.runGit(folder, ['worktree', 'list', '--porcelain']).catch(() => ({ stdout: '' })),
     ]);
     const remotes = remote.stdout.split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
     const trackedRemote = upstream.stdout.trim().split('/')[0];
@@ -98,10 +121,14 @@ export class AgentGitService {
     const stagedDiff = parseNumstat(stagedNumstat.stdout);
     const unstagedDiff = parseNumstat(unstagedNumstat.stdout);
     const untrackedDiff = await untrackedNumstat(this.runGit, folder, files.filter((file) => file.indexStatus === '?').map((file) => file.path));
-    const repository = githubRepositoryFromRemote(remoteUrl) ?? fileName(root.stdout.trim());
+    const repositoryFolder = root.stdout.trim();
+    const worktrees = parseWorktrees(worktreeList.stdout);
+    const currentWorktreeIndex = worktrees.findIndex((item) => resolve(item.path) === resolve(repositoryFolder));
+    const repository = githubRepositoryFromRemote(remoteUrl) ?? fileName(repositoryFolder);
     return {
       repository,
-      folder: root.stdout.trim(),
+      folder: repositoryFolder,
+      isLinkedWorktree: currentWorktreeIndex > 0,
       ...(branch.stdout.trim() ? { branch: branch.stdout.trim() } : {}),
       detached: !branch.stdout.trim(),
       ...(remoteName ? { remote: remoteName } : {}),
@@ -141,17 +168,48 @@ export class AgentGitService {
       : ['push', remote, branch]);
   }
 
-  async merge(folder: string, strategy: 'merge' | 'squash', deleteBranch: boolean, deleteWorktree: boolean): Promise<void> {
+  async mergeTarget(folder: string): Promise<string> {
+    const current = await this.workflow(folder);
+    const worktrees = parseWorktrees((await this.runGit(folder, ['worktree', 'list', '--porcelain'])).stdout);
+    const target = selectMergeTarget(worktrees, current.folder);
+    if (!target) throw new Error('A base worktree is required before merging.');
+    return target.path;
+  }
+
+  async merge(folder: string, strategy: 'merge' | 'squash', deleteBranch: boolean, deleteWorktree: boolean, commitMessage?: string): Promise<string> {
+    const normalizedCommitMessage = commitMessage?.trim();
+    if (strategy === 'squash' && !normalizedCommitMessage) throw new Error('Enter a squash commit message.');
     const current = await this.workflow(folder);
     if (!current.branch || current.detached) throw new Error('Create or check out a branch before merging.');
+    if (deleteWorktree && !current.isLinkedWorktree) throw new Error('The current folder is not a linked worktree.');
+    if (deleteBranch && !deleteWorktree) throw new Error('Remove the linked worktree before deleting its branch.');
     const worktrees = parseWorktrees((await this.runGit(folder, ['worktree', 'list', '--porcelain'])).stdout);
-    const target = worktrees.find((item) => item.path !== current.folder && (item.branch === 'main' || item.branch === 'master')) ?? worktrees.find((item) => item.path !== current.folder);
-    if (!target) throw new Error('A base worktree is required before merging.');
-    await this.runGit(target.path, strategy === 'squash' ? ['merge', '--squash', current.branch] : ['merge', current.branch]);
-    if (strategy === 'squash') await this.runGit(target.path, ['commit', '-m', `Merge branch '${current.branch}'`]);
-    if (deleteBranch) await this.runGit(target.path, ['branch', '-d', current.branch]);
-    if (deleteWorktree) await this.runGit(target.path, ['worktree', 'remove', current.folder]);
+    const target = selectMergeTarget(worktrees, current.folder);
+    let targetFolder = target?.path;
+    if (!targetFolder) {
+      if (current.isLinkedWorktree) throw new Error('A base worktree is required before merging.');
+      const branches = (await this.runGit(folder, ['branch', '--format=%(refname:short)'])).stdout
+        .split(/\r?\n/)
+        .map((branch) => branch.trim())
+        .filter(Boolean);
+      const baseBranch = integrationBranches.find((branch) => branch !== current.branch && branches.includes(branch));
+      if (!baseBranch) throw new Error('Create a local base branch before merging.');
+      await this.runGit(current.folder, ['switch', baseBranch]);
+      targetFolder = current.folder;
+    }
+    await this.runGit(targetFolder, strategy === 'squash' ? ['merge', '--squash', current.branch] : ['merge', '--no-ff', current.branch]);
+    if (strategy === 'squash') await this.runGit(targetFolder, ['commit', '-m', normalizedCommitMessage!]);
+    if (deleteWorktree) await this.runGit(targetFolder, ['worktree', 'remove', current.folder]);
+    if (deleteBranch) await this.runGit(targetFolder, ['branch', '-d', current.branch]);
+    return targetFolder;
   }
+}
+
+const integrationBranches = ['main', 'master', 'develop', 'development', 'trunk'] as const;
+
+function selectMergeTarget(worktrees: Array<{ path: string; branch?: string }>, currentFolder: string): { path: string; branch?: string } | undefined {
+  return worktrees.find((item) => item.path !== currentFolder && integrationBranches.some((branch) => item.branch === branch))
+    ?? worktrees.find((item) => item.path !== currentFolder);
 }
 
 function parseWorktrees(output: string): Array<{ path: string; branch?: string }> {
@@ -191,18 +249,6 @@ function joinDiffOutputs(diffs: string[]): string {
     output += diff;
   }
   return output;
-}
-
-async function workingTreeDiff(runGit: AgentGitRunner, folder: string, args: string[]): Promise<{ stdout: string }> {
-  try {
-    return await runGit(folder, ['diff', 'HEAD', ...args, '--']);
-  } catch {
-    const [staged, unstaged] = await Promise.all([
-      runGit(folder, ['diff', '--cached', ...args, '--']),
-      runGit(folder, ['diff', ...args, '--']),
-    ]);
-    return { stdout: [staged.stdout, unstaged.stdout].filter(Boolean).join('\n') };
-  }
 }
 
 async function untrackedNumstat(runGit: AgentGitRunner, folder: string, paths: string[]): Promise<{ addedLines: number; removedLines: number }> {

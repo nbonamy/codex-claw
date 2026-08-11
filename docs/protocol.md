@@ -119,11 +119,12 @@ therefore never replayed after reconnect or renderer reload.
 | `agent/models/list` | `{ agentId }` | `BackendModelOption[]` | Provider-specific catalog adapted to app-owned shape. |
 | `agent/skills/list` | `{ agentId }` | `BackendSkillSummary[]` | Provider-specific skills adapted to app-owned shape. |
 | `agent/git/diff/open` | `{ agentId }` | `true` | Emits a working-tree review event from backend-owned git state. |
-| `agent/git/workflow/get` | `{ agentId }` | `AgentGitWorkflow` | Reads branch, remote, staged/unstaged files, GitHub connection, and existing-PR state. |
+| `agent/git/workflow/get` | `{ agentId }` | `AgentGitWorkflow` | Reads branch, remote, staged/unstaged files, linked-worktree state, GitHub connection, and existing-PR state. |
 | `agent/git/stage` | `{ agentId, input: { paths, confirmed } }` | `AgentGitWorkflow` | Stages explicitly selected repository-relative paths; rejects unconfirmed requests. |
 | `agent/git/commit` | `{ agentId, input: { message, confirmed } }` | `AgentGitWorkflow` | Creates a commit from the index with an explicit message and confirmation. |
-| `agent/git/push` | `{ agentId, input: { confirmed } }` | `AgentGitWorkflow` | Pushes the current named branch to its remote and sets upstream when missing. |
+| `agent/git/push` | `{ agentId, input: { confirmed, target? } }` | `AgentGitWorkflow` | Pushes the current named branch by default; `target: 'mergeTarget'` pushes the base branch produced by the preceding merge. Sets upstream when missing. |
 | `agent/git/pullRequest/create` | `{ agentId, input: { title, body, confirmed } }` | `AgentGitWorkflow` | Creates a draft GitHub PR through the connected work-provider token after existing-PR lookup. |
+| `agent/git/merge` | `{ agentId, input: { strategy, commitMessage?, deleteBranch, deleteWorktree, confirmed } }` | `AgentGitWorkflow` | Merges the current branch into a checked-out base worktree when one exists, otherwise switches the primary checkout to a local integration branch first. Squash merges require the explicit commit message, and worktree cleanup is accepted only from a linked worktree. |
 | `agent/workItem/assign` | `{ agentId, item }` | `AppSnapshot` | Records provider-neutral work item assignment in the owning backend location. Remote assignments are projected for connected remote-team pointers. |
 | `agent/workItem/assignment/delete` | `{ item }` | `AppSnapshot` | Clears provider-neutral assignment state from the backend location that owns the assigned agent. |
 
@@ -278,7 +279,7 @@ implementation messages, not the preferred app protocol for clients.
 | `driver/file/preview` | `{ folder, filePath }` | `AgentFilePreviewResult` |
 | `agent/folder/validate` | `{ folder }` | `null` |
 | `driver/git/status/get` | `{ agent }` | `AgentGitStatus | null` |
-| `driver/git/diff/get` | `{ agent }` | `string | null` |
+| `driver/git/diff/get` | `{ agent }` | `AgentGitDiff | null` |
 | `driver/promptCommand/handle` | `{ agent, prompt }` | `BackendSendResult | null` |
 | `driver/prompt/send` | `{ agent, prompt, options? }` | `BackendSendResult` |
 | `driver/conversation/title/update` | `{ agent, title }` | `null` |

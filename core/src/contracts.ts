@@ -800,6 +800,7 @@ export type SidePanelGitDiffRequest = {
   title?: string;
   subtitle?: string;
   diff: string;
+  sections?: AgentGitDiffSection[];
   state?: 'idle' | 'error';
   error?: string | null;
 };
@@ -1084,6 +1085,18 @@ export type AgentGitStatus = {
   error?: string;
 };
 
+export type AgentGitDiffScope = 'staged' | 'unstaged' | 'untracked';
+
+export type AgentGitDiffSection = {
+  scope: AgentGitDiffScope;
+  diff: string;
+};
+
+export type AgentGitDiff = {
+  diff: string;
+  sections: AgentGitDiffSection[];
+};
+
 export type AgentGitFile = {
   path: string;
   indexStatus: string;
@@ -1100,6 +1113,7 @@ export type AgentGitPullRequest = {
 export type AgentGitWorkflow = {
   repository: string;
   folder: string;
+  isLinkedWorktree: boolean;
   branch?: string;
   detached: boolean;
   remote?: string;
@@ -1123,9 +1137,9 @@ export type AgentGitWorkflow = {
 
 export type AgentGitStageInput = { paths: string[]; confirmed: boolean };
 export type AgentGitCommitInput = { message: string; confirmed: boolean; includeUnstaged?: boolean; includeUntracked?: boolean };
-export type AgentGitPushInput = { confirmed: boolean };
+export type AgentGitPushInput = { confirmed: boolean; target?: 'current' | 'mergeTarget' };
 export type AgentGitPullRequestInput = { title: string; body: string; confirmed: boolean };
-export type AgentGitMergeInput = { strategy: 'merge' | 'squash'; deleteBranch: boolean; deleteWorktree: boolean; confirmed: boolean };
+export type AgentGitMergeInput = { strategy: 'merge' | 'squash'; commitMessage?: string; deleteBranch: boolean; deleteWorktree: boolean; confirmed: boolean };
 
 export type TurnGitDiff = {
   turnId: string;

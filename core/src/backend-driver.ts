@@ -1,6 +1,7 @@
 import type {
   Agent,
   AgentBackend,
+  AgentGitDiff,
   AgentGitStatus,
   ApprovalPreset,
   AppSnapshot,
@@ -68,7 +69,7 @@ export type AgentBackendDriver = {
   getRuntimeStatus(): BackendRuntimeStatus;
   getCapabilities(agent: Agent): BackendCapabilities;
   getGitStatus?(agent: Agent): Promise<AgentGitStatus | null>;
-  getGitDiff?(agent: Agent): Promise<string | null>;
+  getGitDiff?(agent: Agent): Promise<AgentGitDiff | null>;
   tryHandlePromptCommand?(agent: Agent, prompt: string): Promise<BackendSendResult> | null;
   preparePromptOptions?(agent: Agent, options?: SendPromptOptions): SendPromptOptions | undefined;
   sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>;

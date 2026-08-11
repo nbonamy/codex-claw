@@ -27,8 +27,9 @@
         <strong>{{ agent.name }}</strong>
         <span
           class="agent-header__folder"
+          :title="agent.folder"
         >
-          {{ agent.folder }}
+          {{ agentLocationLabel }}
         </span>
         <span
           class="agent-header__inline-dot"
@@ -194,6 +195,21 @@ const statusLabel = computed(() => {
   return `${backendLabel.value} pending`;
 });
 const backendLabel = computed(() => (props.backendRuntime.backend === 'claude' ? 'Claude' : 'Codex'));
+const agentLocationLabel = computed(() => {
+  const agent = props.agent;
+  const gitStatus = props.gitStatus;
+  if (!agent || !gitStatus || gitStatus.state === 'unknown' || !gitStatus.branch) {
+    return agent?.folder ?? '';
+  }
+
+  const repository = gitStatus.folder
+    .replace(/[\\/]+$/u, '')
+    .split(/[\\/]/u)
+    .filter(Boolean)
+    .at(-1);
+
+  return repository ? `${gitStatus.branch} @ ${repository}` : agent.folder;
+});
 const agentStatusDetail = computed(() => {
   if (!props.agent) {
     return statusLabel.value;

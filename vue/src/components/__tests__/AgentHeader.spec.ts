@@ -61,8 +61,9 @@ describe('AgentHeader', () => {
 
     expect(wrapper.text()).toContain('+134');
     expect(wrapper.text()).toContain('-1');
+    expect(wrapper.get('.agent-header__folder').text()).toBe('main @ id8');
+    expect(wrapper.get('.agent-header__folder').attributes('title')).toBe('~/src/id8');
     expect(wrapper.text()).not.toContain('3 files');
-    expect(wrapper.text()).not.toContain('main');
     expect(wrapper.text()).not.toContain('ahead');
     expect(wrapper.findComponent({ name: 'ChatAnimatedDiffStat' }).exists()).toBe(true);
     expect(wrapper.get('.git-workflow-control').classes()).toContain('agent-header__git-actions');
@@ -284,7 +285,8 @@ describe('AgentHeader', () => {
 
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('Ready to get going');
-    expect(wrapper.text()).toContain('~/src/id8');
+    expect(wrapper.text()).toContain('main @ id8');
+    expect(wrapper.text()).not.toContain('~/src/id8');
     expect(wrapper.text()).toContain('+12');
     expect(wrapper.text()).toContain('-4');
     expect(wrapper.get('.agent-header__avatar').classes()).toContain('agent-avatar--sm');
@@ -294,6 +296,23 @@ describe('AgentHeader', () => {
     await wrapper.get('[aria-label="Show agent sidebar"]').trigger('click');
 
     expect(wrapper.emitted('expand-sidebar')).toStrictEqual([[]]);
+  });
+
+  it('falls back to the agent folder when Git status is unavailable', () => {
+    const wrapper = mountHeader({ backend: 'codex', status: 'running' }, false, {
+      folder: '/Users/nbonamy/src/id8',
+      ahead: 0,
+      behind: 0,
+      changedFiles: 0,
+      addedLines: 0,
+      removedLines: 0,
+      hasUntracked: false,
+      state: 'unknown',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+      error: 'Not a Git repository',
+    });
+
+    expect(wrapper.get('.agent-header__folder').text()).toBe('~/src/id8');
   });
 
   it('shows the icon-only subagent control and forwards a selected child', async () => {
