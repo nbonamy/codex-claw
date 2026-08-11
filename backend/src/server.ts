@@ -687,7 +687,7 @@ export class ClawBackendServer {
         const agentId = requireString(params.agentId, 'agentId');
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitPullRequestCreate, params, async (agent) => {
           const input = requireConfirmed(params.input, 'Creating a pull request');
-          const workflow = await this.gitWorkflow(agent);
+          const workflow = await this.gitWorkflow(agent, { includePullRequest: true });
           if (!workflow.branch || workflow.detached) throw new Error('Create or check out a branch before creating a pull request.');
           if (!workflow.remote || !workflow.remoteUrl) throw new Error('Add a GitHub remote before creating a pull request.');
           if (workflow.githubError) throw new Error(`Could not verify existing pull requests: ${workflow.githubError}`);
@@ -2384,7 +2384,7 @@ export class ClawBackendServer {
     }
   }
 
-  private async gitWorkflow(agent: Agent): Promise<AgentGitWorkflow> {
+  private async gitWorkflow(agent: Agent, options: { includePullRequest?: boolean } = {}): Promise<AgentGitWorkflow> {
     const [workflow] = await Promise.all([
       this.agentGitService.workflow(agent.folder),
       this.refreshAgentGitStatus(agent.id),
@@ -2392,7 +2392,7 @@ export class ClawBackendServer {
     const githubConnected = await this.requireWorkIntegrations().githubConnected();
     let existingPullRequest = null;
     let githubError: string | undefined;
-    if (githubConnected && workflow.branch && workflow.repository.includes('/')) {
+    if (options.includePullRequest && githubConnected && workflow.branch && workflow.repository.includes('/')) {
       try {
         existingPullRequest = await this.requireWorkIntegrations().findPullRequest(workflow.repository, workflow.branch);
       } catch (error) {

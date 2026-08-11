@@ -159,7 +159,9 @@ implemented:
   when Commit and push creates the commit but the remote rejects the push.
   Standalone pushes first confirm the commit count and destination, warn when
   dirty worktree changes will stay local, and use the same progress, success,
-  and retry treatment. Header and Review statistics share the total of staged,
+  and retry treatment. Draft pull request creation likewise replaces its form
+  with progress, passive success, or an in-place retryable error. Header and
+  Review statistics share the total of staged,
   unstaged, and untracked changes. The Commit dialog presents those three
   scopes separately: staged changes are fixed, unstaged changes default on,
   and untracked changes default off. Git Review includes all three scopes and

@@ -199,11 +199,36 @@ describe('GitHubWorkProviderDriver', () => {
     await expect(driver.createPullRequest(token, 'o/r', { branch: 'feature', title: 'New PR', body: 'Body' })).resolves.toMatchObject({ number: 8, draft: true });
     expect(JSON.parse(String(fetch.mock.calls[2]?.[1]?.body))).toStrictEqual({ title: 'New PR', body: 'Body', head: 'feature', base: 'main', draft: true });
   });
+
+  it('reports GitHub API rate-limit resets instead of a generic 403', async () => {
+    const fetch = vi.fn().mockResolvedValue(errorResponse(403, {
+      message: 'API rate limit exceeded for this user.',
+    }, {
+      'x-ratelimit-remaining': '0',
+      'x-ratelimit-reset': '1786490212',
+    }));
+    vi.stubGlobal('fetch', fetch);
+    const driver = new GitHubWorkProviderDriver('client-id');
+    const token = { provider: 'github' as const, accessToken: 'secret', tokenType: 'bearer', connectedAt: 'now' };
+
+    await expect(driver.findPullRequest(token, 'o/r', 'feature')).rejects.toThrow(
+      'GitHub API rate limit exceeded. Try again after 2026-08-11T23:16:52.000Z.',
+    );
+  });
 });
 
 function jsonResponse(value: unknown): Response {
   return {
     ok: true,
+    json: vi.fn().mockResolvedValue(value),
+  } as unknown as Response;
+}
+
+function errorResponse(status: number, value: unknown, headers: Record<string, string> = {}): Response {
+  return {
+    ok: false,
+    status,
+    headers: new Headers(headers),
     json: vi.fn().mockResolvedValue(value),
   } as unknown as Response;
 }

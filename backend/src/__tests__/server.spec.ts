@@ -3917,12 +3917,16 @@ describe('ClawBackendServer', () => {
       close: async () => undefined,
     };
     const events: unknown[] = [];
+    const findPullRequest = vi.fn().mockResolvedValue(null);
     const server = new ClawBackendServer({
       version: 'test-version',
       snapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
       agentGitService: { workflow } as unknown as AgentGitService,
-      workIntegrations: { githubConnected: vi.fn().mockResolvedValue(false) } as unknown as WorkIntegrationManager,
+      workIntegrations: {
+        githubConnected: vi.fn().mockResolvedValue(true),
+        findPullRequest,
+      } as unknown as WorkIntegrationManager,
       onEvent: (event) => events.push(event),
     });
 
@@ -3936,11 +3940,78 @@ describe('ClawBackendServer', () => {
     });
 
     expect(getGitStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(findPullRequest).not.toHaveBeenCalled();
     expect(events).toContainEqual(expect.objectContaining({
       agentId: 'agent-dina',
       type: 'git.statusUpdated',
       payload: expect.objectContaining({ addedLines: 1, removedLines: 0 }),
     }));
+    await server.close();
+  });
+
+  it('checks for an existing pull request only when creation is confirmed', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/repo',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const workflow = vi.fn().mockResolvedValue({
+      repository: 'owner/repo',
+      folder: '/repo',
+      branch: 'feature/demo',
+      detached: false,
+      remote: 'origin',
+      remoteUrl: 'git@github.com:owner/repo.git',
+      upstream: 'origin/feature/demo',
+      ahead: 0,
+      behind: 0,
+      files: [],
+      stagedFiles: [],
+      unstagedFiles: [],
+    });
+    const findPullRequest = vi.fn().mockResolvedValue(null);
+    const createPullRequest = vi.fn().mockResolvedValue({
+      number: 12,
+      title: 'A useful change',
+      url: 'https://github.com/owner/repo/pull/12',
+      draft: true,
+    });
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      agentGitService: { workflow } as unknown as AgentGitService,
+      workIntegrations: {
+        githubConnected: vi.fn().mockResolvedValue(true),
+        findPullRequest,
+        createPullRequest,
+      } as unknown as WorkIntegrationManager,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'create-pr',
+      method: backendMethods.agentGitPullRequestCreate,
+      params: {
+        agentId: 'agent-dina',
+        input: { title: 'A useful change', body: 'Details', confirmed: true },
+      },
+    })).resolves.toMatchObject({ result: { repository: 'owner/repo', branch: 'feature/demo' } });
+
+    expect(findPullRequest).toHaveBeenCalledOnce();
+    expect(findPullRequest).toHaveBeenCalledWith('owner/repo', 'feature/demo');
+    expect(createPullRequest).toHaveBeenCalledOnce();
+    expect(createPullRequest).toHaveBeenCalledWith('owner/repo', {
+      branch: 'feature/demo',
+      title: 'A useful change',
+      body: 'Details',
+    });
     await server.close();
   });
 

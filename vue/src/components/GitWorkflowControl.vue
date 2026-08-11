@@ -142,18 +142,39 @@
     v-if="pullRequestDialogOpen"
     v-model="pullRequestDialogOpen"
     class="claw-dialog git-workflow-control__dialog"
+    :class="{ 'git-workflow-control__dialog--transient': pullRequestOperation.status === 'creating' || pullRequestOperation.status === 'success' }"
     width="min(560px, calc(100vw - 32px))"
     :teleported="false"
     :show-close="false"
+    :close-on-click-modal="!pullRequestOperationRunning"
+    :close-on-press-escape="!pullRequestOperationRunning"
     destroy-on-close
   >
     <template #header><div class="claw-form-dialog__header git-workflow-control__dialog-header"><h2 class="claw-dialog__title">Create pull request</h2><span class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
-    <div class="git-workflow-control__dialog-form">
+    <div
+      v-if="pullRequestOperation.status === 'editing'"
+      class="git-workflow-control__dialog-form git-workflow-control__pull-request-form"
+    >
       <input v-model="pullRequestTitle" autofocus placeholder="Title" />
       <textarea v-model="pullRequestBody" rows="5" placeholder="Describe the change (optional)" />
     </div>
+    <GitOperationFeedback
+      v-else
+      :status="pullRequestFeedbackStatus"
+      :title="pullRequestOperationTitle"
+      :detail="pullRequestOperationDetail"
+    >
+      <template #icon><GitForkIcon /></template>
+    </GitOperationFeedback>
     <template #footer>
-      <div class="claw-dialog__footer"><button class="git-workflow-control__cancel" type="button" @click="pullRequestDialogOpen = false">Cancel</button><button class="git-workflow-control__submit" type="button" :disabled="busy || !pullRequestTitle.trim()" @click="createPullRequest">Create PR</button></div>
+      <div
+        v-if="pullRequestOperation.status === 'editing'"
+        class="claw-dialog__footer"
+      ><button class="git-workflow-control__cancel" type="button" @click="pullRequestDialogOpen = false">Cancel</button><button class="git-workflow-control__submit" type="button" :disabled="busy || !pullRequestTitle.trim()" @click="createPullRequest">Create PR</button></div>
+      <div
+        v-else-if="pullRequestOperation.status === 'error'"
+        class="claw-dialog__footer"
+      ><button class="git-workflow-control__cancel" type="button" @click="pullRequestDialogOpen = false">Close</button><button class="git-workflow-control__submit" type="button" @click="createPullRequest">Retry</button></div>
     </template>
   </el-dialog>
 
@@ -276,6 +297,12 @@ type PushOperation =
   | { status: 'success' }
   | { status: 'error'; message: string };
 const pushOperation = ref<PushOperation>({ status: 'confirming' });
+type PullRequestOperation =
+  | { status: 'editing' }
+  | { status: 'creating' }
+  | { status: 'success' }
+  | { status: 'error'; message: string };
+const pullRequestOperation = ref<PullRequestOperation>({ status: 'editing' });
 type MergeOperation =
   | { status: 'confirming' }
   | { status: 'merging'; branch: string; pushAfter: boolean }
@@ -285,6 +312,7 @@ type MergeOperation =
 const mergeOperation = ref<MergeOperation>({ status: 'confirming' });
 let commitSuccessTimer: ReturnType<typeof setTimeout> | null = null;
 let pushSuccessTimer: ReturnType<typeof setTimeout> | null = null;
+let pullRequestSuccessTimer: ReturnType<typeof setTimeout> | null = null;
 let mergeSuccessTimer: ReturnType<typeof setTimeout> | null = null;
 const mergeUnavailable = computed(() => !props.mergeBranch);
 const unstagedAddedLines = computed(() => workflow.value?.unstagedAddedLines ?? props.gitStatus?.addedLines ?? 0);
@@ -316,6 +344,18 @@ const pushOperationRunning = computed(() => pushOperation.value.status === 'push
 const pushFeedbackStatus = computed<'running' | 'success' | 'error'>(() => pushOperation.value.status === 'success' ? 'success' : pushOperation.value.status === 'error' ? 'error' : 'running');
 const pushOperationTitle = computed(() => pushOperation.value.status === 'pushing' ? `Pushing ${pendingPushCount.value} ${pendingPushCount.value === 1 ? 'commit' : 'commits'}` : pushOperation.value.status === 'success' ? 'Push complete' : 'Push failed');
 const pushOperationDetail = computed(() => pushOperation.value.status === 'error' ? pushOperation.value.message : pushDestination.value);
+const pullRequestOperationRunning = computed(() => pullRequestOperation.value.status === 'creating');
+const pullRequestFeedbackStatus = computed<'running' | 'success' | 'error'>(() => pullRequestOperation.value.status === 'success' ? 'success' : pullRequestOperation.value.status === 'error' ? 'error' : 'running');
+const pullRequestOperationTitle = computed(() => pullRequestOperation.value.status === 'creating'
+  ? 'Creating pull request'
+  : pullRequestOperation.value.status === 'success'
+    ? 'Pull request created'
+    : pullRequestOperation.value.status === 'error'
+      ? 'Pull request failed'
+      : '');
+const pullRequestOperationDetail = computed(() => pullRequestOperation.value.status === 'error'
+  ? pullRequestOperation.value.message
+  : pullRequestTitle.value.trim());
 const mergeOperationRunning = computed(() => mergeOperation.value.status === 'merging' || mergeOperation.value.status === 'pushing');
 const mergeFeedbackStatus = computed<'running' | 'success' | 'error'>(() => mergeOperation.value.status === 'success' ? 'success' : mergeOperation.value.status === 'error' ? 'error' : 'running');
 const mergeOperationTitle = computed(() => mergeOperation.value.status === 'success'
@@ -367,6 +407,10 @@ watch(pushDialogOpen, (open) => {
   if (!open) resetPushOperation();
 });
 
+watch(pullRequestDialogOpen, (open) => {
+  if (!open) resetPullRequestOperation();
+});
+
 watch(mergeDialogOpen, (open) => {
   if (open) {
     resetMergeOperation();
@@ -396,6 +440,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('click', closeMenu);
   clearCommitSuccessTimer();
   clearPushSuccessTimer();
+  clearPullRequestSuccessTimer();
   clearMergeSuccessTimer();
 });
 watch(() => props.agent.id, () => { void loadWorkflow({ reset: true }); });
@@ -425,7 +470,12 @@ function selectAction(action: string): void {
     resetPushOperation();
     pushDialogOpen.value = true;
   }
-  else if (action === 'create-pr' && prEnabled.value) { pullRequestTitle.value = `Update ${workflow.value?.branch ?? ''}`.trim(); pullRequestDialogOpen.value = true; }
+  else if (action === 'create-pr' && prEnabled.value) {
+    resetPullRequestOperation();
+    pullRequestTitle.value = '';
+    pullRequestBody.value = '';
+    pullRequestDialogOpen.value = true;
+  }
   else if (action === 'merge' && mergeEnabled.value && !mergeUnavailable.value) mergeDialogOpen.value = true;
 }
 async function commit(pushAfter: boolean): Promise<void> {
@@ -491,7 +541,27 @@ async function push(): Promise<void> {
 }
 async function createPullRequest(): Promise<void> {
   if (!props.createPullRequest) return;
-  await perform(async () => { workflow.value = await props.createPullRequest!(props.agent.id, { title: pullRequestTitle.value, body: pullRequestBody.value, confirmed: true }); pullRequestDialogOpen.value = false; });
+  clearPullRequestSuccessTimer();
+  busy.value = true;
+  workflowError.value = null;
+  pullRequestOperation.value = { status: 'creating' };
+  try {
+    workflow.value = await props.createPullRequest(props.agent.id, {
+      title: pullRequestTitle.value,
+      body: pullRequestBody.value,
+      confirmed: true,
+    });
+    pullRequestOperation.value = { status: 'success' };
+    pullRequestSuccessTimer = setTimeout(() => {
+      pullRequestDialogOpen.value = false;
+    }, 1500);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    workflowError.value = message;
+    pullRequestOperation.value = { status: 'error', message };
+  } finally {
+    busy.value = false;
+  }
 }
 async function merge(pushAfter: boolean): Promise<void> {
   if (!props.mergeBranch || !canMerge.value) return;
@@ -540,7 +610,6 @@ async function retryMergePush(): Promise<void> {
     busy.value = false;
   }
 }
-async function perform(action: () => Promise<void>): Promise<void> { busy.value = true; workflowError.value = null; try { await action(); } catch (error) { workflowError.value = error instanceof Error ? error.message : String(error); } finally { busy.value = false; } }
 function returnToCommitForm(): void {
   commitOperation.value = { status: 'editing' };
   void nextTick(() => commitMessageInput.value?.focus());
@@ -571,6 +640,16 @@ function clearPushSuccessTimer(): void {
   if (pushSuccessTimer !== null) {
     clearTimeout(pushSuccessTimer);
     pushSuccessTimer = null;
+  }
+}
+function resetPullRequestOperation(): void {
+  clearPullRequestSuccessTimer();
+  pullRequestOperation.value = { status: 'editing' };
+}
+function clearPullRequestSuccessTimer(): void {
+  if (pullRequestSuccessTimer !== null) {
+    clearTimeout(pullRequestSuccessTimer);
+    pullRequestSuccessTimer = null;
   }
 }
 function resetMergeOperation(): void {
@@ -705,6 +784,23 @@ function clearMergeSuccessTimer(): void {
 .git-workflow-control__dialog-form > input:not([type]):focus {
   border-color: var(--color-primary);
   background: var(--color-surface-low);
+}
+
+.git-workflow-control__pull-request-form > input:not([type]) {
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  padding: var(--space-4) 0 var(--space-6);
+  background: transparent;
+}
+
+.git-workflow-control__pull-request-form > input:not([type]):focus {
+  border-color: var(--color-border);
+  background: transparent;
+}
+
+.git-workflow-control__pull-request-form textarea {
+  padding: var(--space-6) 0 var(--space-4);
 }
 
 .git-workflow-control__branch,

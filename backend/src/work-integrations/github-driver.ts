@@ -262,10 +262,34 @@ async function githubApiRequest(token: WorkProviderToken, path: string, init: Re
   });
 
   if (!response.ok) {
-    throw new Error(`GitHub request failed with ${response.status}.`);
+    throw await githubApiError(response);
   }
 
   return response.json();
+}
+
+async function githubApiError(response: Response): Promise<Error> {
+  if (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0') {
+    const resetSeconds = Number(response.headers.get('x-ratelimit-reset'));
+    const resetAt = Number.isFinite(resetSeconds) && resetSeconds > 0
+      ? new Date(resetSeconds * 1_000).toISOString()
+      : null;
+    return new Error(resetAt
+      ? `GitHub API rate limit exceeded. Try again after ${resetAt}.`
+      : 'GitHub API rate limit exceeded. Try again later.');
+  }
+
+  let detail: string | null = null;
+  try {
+    const body = await response.json() as unknown;
+    detail = isRecord(body) && typeof body.message === 'string' ? body.message.trim() : null;
+  } catch {
+    // GitHub can return an empty or non-JSON response for infrastructure errors.
+  }
+
+  return new Error(detail
+    ? `GitHub request failed with ${response.status}: ${detail}`
+    : `GitHub request failed with ${response.status}.`);
 }
 
 async function defaultBranch(token: WorkProviderToken, repositoryId: string): Promise<string> {

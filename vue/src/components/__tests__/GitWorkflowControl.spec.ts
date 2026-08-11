@@ -378,6 +378,69 @@ describe('GitWorkflowControl', () => {
     expect(featurePr?.attributes('disabled')).toBeUndefined();
   });
 
+  it('opens pull request fields in one writing surface', async () => {
+    const wrapper = mountControl({
+      getWorkflow: async () => ({ ...workflow, branch: 'feature/dialog' }),
+    });
+    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
+
+    const writingSurface = wrapper.get('.git-workflow-control__pull-request-form');
+    expect(writingSurface.get('input').attributes('placeholder')).toBe('Title');
+    expect((writingSurface.get('input').element as HTMLInputElement).value).toBe('');
+    expect(writingSurface.get('textarea').attributes('placeholder')).toBe('Describe the change (optional)');
+  });
+
+  it('shows pull request progress and passive success before closing automatically', async () => {
+    const pendingPullRequest = deferred<AgentGitWorkflow>();
+    const createPullRequest = vi.fn(() => pendingPullRequest.promise);
+    const wrapper = mountControl({ createPullRequest });
+    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
+    await wrapper.get('.git-workflow-control__pull-request-form input').setValue('Improve Git workflow');
+    await submitButton(wrapper, 'Create PR').trigger('click');
+
+    expect(wrapper.text()).toContain('Creating pull request');
+    expect(wrapper.text()).toContain('Improve Git workflow');
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true);
+
+    vi.useFakeTimers();
+    pendingPullRequest.resolve(workflow);
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Pull request created');
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true);
+    await vi.advanceTimersByTimeAsync(1499);
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+  });
+
+  it('keeps a failed pull request open and retries from the same dialog', async () => {
+    const createPullRequest = vi.fn()
+      .mockRejectedValueOnce(new Error('GitHub API rate limit exceeded.'))
+      .mockResolvedValueOnce(workflow);
+    const wrapper = mountControl({ createPullRequest });
+    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
+    await wrapper.get('.git-workflow-control__pull-request-form input').setValue('Improve Git workflow');
+    await submitButton(wrapper, 'Create PR').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Pull request failed');
+    expect(wrapper.text()).toContain('GitHub API rate limit exceeded.');
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true);
+
+    await submitButton(wrapper, 'Retry').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Pull request created');
+    expect(createPullRequest).toHaveBeenCalledTimes(2);
+  });
+
   it('refreshes stale workflow state when the menu opens', async () => {
     let clean = false;
     const getWorkflow = vi.fn(async () => clean ? { ...workflow, files: [], unstagedFiles: [], ahead: 0 } : workflow);
