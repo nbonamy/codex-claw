@@ -1,6 +1,6 @@
 {
   "name": "@codex-claw/core",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "description": "Platform-neutral Codex Claw product contracts and state primitives.",
   "private": true,
   "type": "module",

@@ -4,6 +4,34 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.9.0] - 2026-08-11
+
+### New features
+
+- The agent header now provides a complete Git workflow for committing selected
+  staged, unstaged, or untracked changes, pushing branches, creating draft pull
+  requests, and merging or squashing branches with safe worktree cleanup and
+  visible progress, success, and retry states.
+- Experimental Claude Code agents can now be enabled from General → Advanced,
+  using the installed Claude Code runtime with its own model, effort, permission,
+  attachment, context-usage, compaction, tool-detail, and conversation-history
+  support.
+- Agent workspaces now include a searchable file browser and Command-P quick
+  open, while workspace-local files can open safely in the in-app browser.
+- Image workspace tabs now support native trackpad pinch-to-zoom around the
+  pointer.
+
+### Improvements and fixes
+
+- Long conversations now prefetch older history before reaching the top and
+  preserve chronological placement without briefly showing stale content at the
+  bottom; restored local Markdown images also render again.
+- Git workflow refreshes no longer spend GitHub API quota checking for pull
+  requests, and rate-limit failures now report when creation can be retried.
+- New Codex conversations retain their workspace classification when opened in
+  ChatGPT, plugin skills use friendly plugin-qualified names, and narrow
+  tool-call rows truncate cleanly instead of overflowing.
+
 ## [0.8.1] - 2026-08-09
 
 ### Improvements and fixes

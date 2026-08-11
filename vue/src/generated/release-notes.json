@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.8.1",
+  "currentVersion": "0.9.0",
   "releases": [
+    {
+      "version": "0.9.0",
+      "releasedAt": "2026-08-11",
+      "sourceSha256": "bc77fc5d5d0a161755c22236b3ef029808141d61b3b8db2dc2ee33a5f13888cb",
+      "markdown": "### New features\n\n- The agent header now provides a complete Git workflow for committing selected\n  staged, unstaged, or untracked changes, pushing branches, creating draft pull\n  requests, and merging or squashing branches with safe worktree cleanup and\n  visible progress, success, and retry states.\n- Experimental Claude Code agents can now be enabled from General → Advanced,\n  using the installed Claude Code runtime with its own model, effort, permission,\n  attachment, context-usage, compaction, tool-detail, and conversation-history\n  support.\n- Agent workspaces now include a searchable file browser and Command-P quick\n  open, while workspace-local files can open safely in the in-app browser.\n- Image workspace tabs now support native trackpad pinch-to-zoom around the\n  pointer.\n\n### Improvements and fixes\n\n- Long conversations now prefetch older history before reaching the top and\n  preserve chronological placement without briefly showing stale content at the\n  bottom; restored local Markdown images also render again.\n- Git workflow refreshes no longer spend GitHub API quota checking for pull\n  requests, and rate-limit failures now report when creation can be retried.\n- New Codex conversations retain their workspace classification when opened in\n  ChatGPT, plugin skills use friendly plugin-qualified names, and narrow\n  tool-call rows truncate cleanly instead of overflowing."
+    },
     {
       "version": "0.8.1",
       "releasedAt": "2026-08-09",
