@@ -14,6 +14,7 @@ import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/sna
 import { claudeBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendConversationRef, BenchLocation, BenchTemplate, CodexClawApi, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, RendererMessage, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import { workItemAssignmentPrompt, workItemComposerPrompt } from '@codex-claw/core/work-item-prompts';
 import { i18n } from '../../i18n';
 import { setElectronTestClient } from '../../test/client';
 
@@ -940,10 +941,10 @@ describe('AppShell', () => {
     expect(backlog.props('items')).toStrictEqual([item]);
 
     await backlog.props('startWorkAction')({
+      action: 'fix',
       item,
       target: 'current',
-      branchName: 'fix/12-backlog',
-      createWorktree: true,
+      workspace: { branchName: 'fix/12-backlog', kind: 'worktree' },
     });
 
     expect(createAgentGitBranch).toHaveBeenCalledWith('agent-dina', {
@@ -951,12 +952,42 @@ describe('AppShell', () => {
       createWorktree: true,
       confirmed: true,
     });
-    expect(assignWorkItemAction).toHaveBeenCalledWith({ agentId: 'agent-dina', item });
+    expect(assignWorkItemAction).toHaveBeenCalledWith({
+      agentId: 'agent-dina',
+      item,
+      prompt: workItemAssignmentPrompt(item, { action: 'fix' }),
+    });
+
+    backlog.props('prefillAction')(item);
+    await nextTick();
+    expect(wrapper.emitted('update:composerState')).toContainEqual([{
+      agentId: 'agent-dina',
+      state: {
+        text: workItemComposerPrompt(item),
+        selectionStart: workItemComposerPrompt(item).length,
+        selectionEnd: workItemComposerPrompt(item).length,
+      },
+    }]);
+
+    createAgentGitBranch.mockClear();
+    assignWorkItemAction.mockClear();
+    await backlog.props('startWorkAction')({
+      action: 'investigate',
+      item,
+      target: 'current',
+      workspace: { kind: 'current' },
+    });
+    expect(createAgentGitBranch).not.toHaveBeenCalled();
+    expect(assignWorkItemAction).toHaveBeenCalledWith({
+      agentId: 'agent-dina',
+      item,
+      prompt: workItemAssignmentPrompt(item, { action: 'investigate' }),
+    });
   });
 
   it('duplicates an agent into a pull-request review worktree before assigning it', async () => {
     const snapshot = createInitialSnapshot();
-    const item = workItem({ kind: 'pullRequest', number: 42, id: 'nbonamy/codex-claw#42' });
+    const item = workItem({ branchName: 'feature/pull-request-42', kind: 'pullRequest', number: 42, id: 'nbonamy/codex-claw#42' });
     const duplicate = { ...snapshot.agents[0]!, id: 'agent-reviewer', name: 'Dina copy' };
     const duplicateAgentAction = vi.fn().mockResolvedValue(duplicate);
     const createAgentGitBranch = vi.fn().mockResolvedValue({});
@@ -965,20 +996,82 @@ describe('AppShell', () => {
     const workspace = wrapper.getComponent({ name: 'RightWorkspacePanel' });
 
     await workspace.props('startRepositoryWork')({
+      action: 'review',
       item,
       target: 'duplicate',
-      branchName: 'review/42-backlog',
-      createWorktree: true,
+      workspace: { branchName: 'feature/pull-request-42', kind: 'worktree' },
     });
 
     expect(duplicateAgentAction).toHaveBeenCalledWith('agent-dina');
     expect(createAgentGitBranch).toHaveBeenCalledWith('agent-reviewer', {
-      name: 'review/42-backlog',
+      name: 'feature/pull-request-42',
       createWorktree: true,
       pullRequestNumber: 42,
       confirmed: true,
     });
-    expect(assignWorkItemAction).toHaveBeenCalledWith({ agentId: 'agent-reviewer', item });
+    expect(assignWorkItemAction).toHaveBeenCalledWith({
+      agentId: 'agent-reviewer',
+      item,
+      prompt: workItemAssignmentPrompt(item, { action: 'review' }),
+    });
+  });
+
+  it('checks out a pull request branch in the current agent workspace before dispatching work', async () => {
+    const snapshot = createInitialSnapshot();
+    const item = workItem({ branchName: 'feature/pull-request-43', kind: 'pullRequest', number: 43, id: 'nbonamy/codex-claw#43' });
+    const createAgentGitBranch = vi.fn().mockResolvedValue({});
+    const assignWorkItemAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, createAgentGitBranch, assignWorkItemAction });
+    const workspace = wrapper.getComponent({ name: 'RightWorkspacePanel' });
+
+    await workspace.props('startRepositoryWork')({
+      action: 'addressFeedback',
+      item,
+      target: 'current',
+      workspace: { kind: 'current' },
+    });
+
+    expect(createAgentGitBranch).toHaveBeenCalledWith('agent-dina', {
+      name: 'feature/pull-request-43',
+      createWorktree: false,
+      pullRequestNumber: 43,
+      confirmed: true,
+    });
+    expect(assignWorkItemAction).toHaveBeenCalledWith({
+      agentId: 'agent-dina',
+      item,
+      prompt: workItemAssignmentPrompt(item, { action: 'addressFeedback' }),
+    });
+  });
+
+  it('resolves missing pull request branch metadata when work starts', async () => {
+    const snapshot = createInitialSnapshot();
+    const item = workItem({ kind: 'pullRequest', number: 44, id: 'nbonamy/codex-claw#44' });
+    const refreshedItem = { ...item, branchName: 'feature/resolved-pr-44' };
+    const loadWorkItems = vi.fn().mockResolvedValue([refreshedItem]);
+    const createAgentGitBranch = vi.fn().mockResolvedValue({});
+    const assignWorkItemAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, loadWorkItems, createAgentGitBranch, assignWorkItemAction });
+    const workspace = wrapper.getComponent({ name: 'RightWorkspacePanel' });
+
+    await workspace.props('startRepositoryWork')({
+      action: 'review',
+      item,
+      target: 'current',
+      workspace: { kind: 'current' },
+    });
+
+    expect(loadWorkItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw', undefined, {
+      kind: 'pullRequest',
+      state: 'all',
+    });
+    expect(createAgentGitBranch).toHaveBeenCalledWith('agent-dina', {
+      name: 'feature/resolved-pr-44',
+      createWorktree: false,
+      pullRequestNumber: 44,
+      confirmed: true,
+    });
+    expect(assignWorkItemAction).toHaveBeenCalledWith(expect.objectContaining({ item: refreshedItem }));
   });
 
   it('does not auto-open repository review for a turn-scoped diff event', () => {
@@ -3570,7 +3663,7 @@ function mountShell(overrides: Partial<{
   loadWorkItems: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery) => Promise<WorkItem[] | void>;
   createAgentGitBranch: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitBranchInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   duplicateAgentAction: (agentId: string) => Promise<Agent | null>;
-  assignWorkItemAction: (payload: { agentId: string; item: WorkItem }) => Promise<void>;
+  assignWorkItemAction: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
   loadBench: (location?: BenchLocation) => Promise<void>;
   getLoopSnapshot: (location?: LoopLocation) => Promise<AppSnapshot>;
   remoteBenchByConnectionId: Record<string, BenchTemplate[]>;

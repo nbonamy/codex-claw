@@ -1,14 +1,18 @@
 import type { LoopInstructions, WorkItem } from './contracts';
 import { workItemAssignmentKey } from './work-assignments';
 
-export function workItemAssignmentPrompt(item: WorkItem, instructions: Pick<LoopInstructions, 'assignment'> = {}): string {
+export type WorkItemAssignmentAction = 'addressFeedback' | 'fix' | 'investigate' | 'review';
+
+type WorkItemPromptOptions = Pick<LoopInstructions, 'assignment'> & {
+  action?: WorkItemAssignmentAction;
+};
+
+export function workItemAssignmentPrompt(item: WorkItem, options: WorkItemPromptOptions = {}): string {
   const body = truncateWorkItemBody(item.body?.trim() ?? '');
-  const assignmentInstructions = instructions.assignment?.trim();
+  const assignmentInstructions = options.assignment?.trim();
   const workItemId = workItemAssignmentKey(item);
   return [
-    item.kind === 'pullRequest'
-      ? `Please review this ${workProviderLabel(item.provider)} pull request and drive the requested work to completion.`
-      : `Please take this ${workProviderLabel(item.provider)} issue and drive it to completion.`,
+    workItemActionInstruction(item, options.action),
     '',
     `Work item ID: ${workItemId}`,
     'When you are done with this work item, call the codex_claw MCP tool `mark-work-item-completed` with this exact Work item ID.',
@@ -23,12 +27,36 @@ export function workItemAssignmentPrompt(item: WorkItem, instructions: Pick<Loop
   ].filter((line): line is string => line !== null).join('\n');
 }
 
+export function workItemComposerPrompt(item: WorkItem): string {
+  const kind = item.kind === 'pullRequest' ? 'pull request' : 'issue';
+  return `Regarding ${workProviderLabel(item.provider)} ${kind} #${item.number} — ${item.title}:\n\n`;
+}
+
 export function workProviderLabel(provider: WorkItem['provider']): string {
   if (provider === 'github') {
     return 'GitHub';
   }
   provider satisfies never;
   return 'work provider';
+}
+
+function workItemActionInstruction(item: WorkItem, action?: WorkItemAssignmentAction): string {
+  const provider = workProviderLabel(item.provider);
+  if (action === 'investigate') {
+    return `Investigate this ${provider} issue and report the root cause, impact, and recommended fix. Do not modify files or implement the fix.`;
+  }
+  if (action === 'fix') {
+    return `Fix this ${provider} issue. Reproduce the problem, implement the fix, verify it, and summarize the outcome.`;
+  }
+  if (action === 'addressFeedback') {
+    return `Address actionable review feedback on this ${provider} pull request. Inspect the current review comments, update the branch, verify the changes, and summarize what you addressed.`;
+  }
+  if (action === 'review') {
+    return `Review this ${provider} pull request for correctness, regressions, missing tests, and maintainability. Report concrete findings and do not modify files.`;
+  }
+  return item.kind === 'pullRequest'
+    ? `Please review this ${provider} pull request and drive the requested work to completion.`
+    : `Please take this ${provider} issue and drive it to completion.`;
 }
 
 function truncateWorkItemBody(value: string): string {

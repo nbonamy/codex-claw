@@ -273,6 +273,7 @@
             :github-repository="snapshot.agentGitStatuses[agent.id]?.githubRepository ?? null"
             :github-connection="snapshot.workBacklog.connections.find((connection) => connection.provider === 'github') ?? null"
             :work-assignments="snapshot.workBacklog.assignments"
+            :prefill-repository-work="(item) => prefillRepositoryWork(agent.id, item)"
             :start-repository-work="(input) => startRepositoryWork(agent.id, input)"
             @close-tab="closeRightWorkspaceTab(agent.id, $event)"
             @cancel-plan="cancelPlanReview(agent.id)"
@@ -422,6 +423,7 @@ import {
   type CodexRendererSendMessageOptions,
 } from '@codex-app-sdk/vue';
 import { ShieldCheckIcon } from '../shared/icons/app-icons';
+import { workItemAssignmentPrompt, workItemComposerPrompt } from '@codex-claw/core/work-item-prompts';
 
 import type { PlanReviewComment, SidePanelGitDiffState, SidePanelImageState, SidePanelMarkdownState } from './side-panel';
 import {
@@ -552,7 +554,7 @@ const props = withDefaults(defineProps<{
   loadWorkRepositories?: (provider: WorkProviderKind, location?: LoopLocation) => Promise<WorkRepository[] | void>;
   loadWorkItems?: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: WorkItemQuery) => Promise<WorkItem[] | void>;
   duplicateAgentAction?: (agentId: string) => Promise<Agent | null>;
-  assignWorkItemAction?: (payload: { agentId: string; item: WorkItem }) => Promise<void>;
+  assignWorkItemAction?: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
   loadOlderAgentHistory?: (agentId: string) => Promise<void>;
   quit?: () => Promise<void>;
 }>(), {
@@ -1494,8 +1496,18 @@ async function startRepositoryWork(agentId: string, input: RepositoryWorkStartIn
   const sourceAgent = props.snapshot.agents.find((agent) => agent.id === agentId);
   if (!sourceAgent) throw new Error('The selected agent is unavailable.');
 
+  let workItem = input.item;
+  if (workItem.kind === 'pullRequest' && !workItem.branchName?.trim()) {
+    const refreshedItems = await props.loadWorkItems(workItem.provider, workItem.repositoryId, undefined, {
+      kind: 'pullRequest',
+      state: 'all',
+    });
+    workItem = refreshedItems?.find((candidate) => candidate.id === workItem.id)
+      ?? workItem;
+  }
+
   const targetLabel = input.target === 'duplicate' ? `a duplicate of ${sourceAgent.name}` : sourceAgent.name;
-  if (!await confirmAssignedWorkItemOverride(input.item, targetLabel, input.target === 'current' ? sourceAgent.id : undefined)) {
+  if (!await confirmAssignedWorkItemOverride(workItem, targetLabel, input.target === 'current' ? sourceAgent.id : undefined)) {
     throw new Error('Assignment cancelled.');
   }
 
@@ -1504,13 +1516,45 @@ async function startRepositoryWork(agentId: string, input: RepositoryWorkStartIn
     : sourceAgent;
   if (!targetAgent) throw new Error('The duplicate agent could not be created.');
 
-  await props.createAgentGitBranch(targetAgent.id, {
-    name: input.branchName,
-    createWorktree: input.target === 'duplicate' || input.createWorktree,
-    ...(input.item.kind === 'pullRequest' ? { pullRequestNumber: input.item.number } : {}),
-    confirmed: true,
+  if (input.target === 'duplicate' && input.workspace.kind !== 'worktree') {
+    throw new Error('A duplicated agent requires a new worktree.');
+  }
+
+  const pullRequestBranch = workItem.kind === 'pullRequest' ? workItem.branchName?.trim() : undefined;
+  if (workItem.kind === 'pullRequest' && !pullRequestBranch) {
+    throw new Error('GitHub did not return the pull request branch.');
+  }
+
+  const checkoutBranch = pullRequestBranch
+    ?? (input.workspace.kind === 'worktree' ? input.workspace.branchName : undefined);
+  if (checkoutBranch) {
+    await props.createAgentGitBranch(targetAgent.id, {
+      name: checkoutBranch,
+      createWorktree: input.workspace.kind === 'worktree',
+      ...(workItem.kind === 'pullRequest' ? { pullRequestNumber: workItem.number } : {}),
+      confirmed: true,
+    });
+  }
+  await props.assignWorkItemAction({
+    agentId: targetAgent.id,
+    item: workItem,
+    prompt: workItemAssignmentPrompt(workItem, { action: input.action }),
   });
-  await props.assignWorkItemAction({ agentId: targetAgent.id, item: input.item });
+}
+
+function prefillRepositoryWork(agentId: string, item: WorkItem): void {
+  const prompt = workItemComposerPrompt(item);
+  const existingText = props.composerState.text.trimEnd();
+  const text = existingText ? `${existingText}\n\n${prompt}` : prompt;
+  emit('update:composerState', {
+    agentId,
+    state: {
+      text,
+      selectionStart: text.length,
+      selectionEnd: text.length,
+    },
+  });
+  void nextTick(() => conversationPane.value?.focusComposer());
 }
 
 function toggleFileExplorer(agentId: string): void {

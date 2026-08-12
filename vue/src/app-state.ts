@@ -1339,14 +1339,14 @@ export function useAppState() {
     }
   }
 
-  async function assignWorkItemToAgent(payload: { agentId: string; item: WorkItem }): Promise<void> {
+  async function assignWorkItemToAgent(payload: { agentId: string; item: WorkItem; prompt?: string }): Promise<void> {
     if (!codexClawApi?.assignWorkItemToAgent) {
       return;
     }
 
     const item = cloneWorkItemForIpc(payload.item);
     adoptBackgroundSnapshot(await codexClawApi.assignWorkItemToAgent(payload.agentId, item));
-    await sendAgentPrompt(payload.agentId, workItemAssignmentPrompt(item));
+    await sendAgentPrompt(payload.agentId, payload.prompt ?? workItemAssignmentPrompt(item));
   }
 
   async function removeWorkItemAssignment(item: WorkItem): Promise<void> {

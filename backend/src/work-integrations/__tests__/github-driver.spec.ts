@@ -147,6 +147,15 @@ describe('GitHubWorkProviderDriver', () => {
         pull_request: {},
         created_at: '2026-06-09T12:00:00.000Z',
         updated_at: '2026-06-09T12:30:00.000Z',
+      }]))
+      .mockResolvedValueOnce(jsonResponse([{
+        number: 13,
+        title: 'This is a pull request',
+        html_url: 'https://github.com/nbonamy/codex-claw/pull/13',
+        state: 'open',
+        head: { ref: 'feature/backlog-workspace' },
+        created_at: '2026-06-09T12:00:00.000Z',
+        updated_at: '2026-06-09T12:30:00.000Z',
       }]));
     vi.stubGlobal('fetch', fetch);
 
@@ -188,6 +197,7 @@ describe('GitHubWorkProviderDriver', () => {
       provider: 'github',
       id: 'nbonamy/codex-claw#13',
       kind: 'pullRequest',
+      branchName: 'feature/backlog-workspace',
       repositoryId: 'nbonamy/codex-claw',
       repositoryFullName: 'nbonamy/codex-claw',
       number: 13,
@@ -199,7 +209,7 @@ describe('GitHubWorkProviderDriver', () => {
       updatedAt: '2026-06-09T12:30:00.000Z',
     }]);
     expect(fetch).toHaveBeenLastCalledWith(
-      'https://api.github.com/repos/nbonamy/codex-claw/issues?state=open&per_page=100',
+      'https://api.github.com/repos/nbonamy/codex-claw/pulls?state=open&per_page=100',
       expect.any(Object),
     );
   });
@@ -210,7 +220,7 @@ describe('GitHubWorkProviderDriver', () => {
       title: 'Review backlog workspace',
       html_url: 'https://github.com/nbonamy/codex-claw/pull/13',
       state: 'closed',
-      pull_request: {},
+      head: { ref: 'feature/review-backlog' },
       created_at: '2026-06-09T12:00:00.000Z',
       updated_at: '2026-06-09T12:30:00.000Z',
     }]));
@@ -221,7 +231,7 @@ describe('GitHubWorkProviderDriver', () => {
     await expect(driver.listItems(token, 'nbonamy/codex-claw', { kind: 'pullRequest', state: 'closed' }))
       .resolves.toEqual([expect.objectContaining({ kind: 'pullRequest', state: 'closed' })]);
     expect(fetch).toHaveBeenCalledWith(
-      'https://api.github.com/repos/nbonamy/codex-claw/issues?state=closed&per_page=100',
+      'https://api.github.com/repos/nbonamy/codex-claw/pulls?state=closed&per_page=100',
       expect.any(Object),
     );
   });

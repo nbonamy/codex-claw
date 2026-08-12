@@ -1,4 +1,5 @@
 import type { WorkItem } from '@codex-claw/core/contracts';
+import type { WorkItemAssignmentAction } from '@codex-claw/core/work-item-prompts';
 import type { SidePanelGitDiffState, SidePanelImageState, SidePanelMarkdownState, SidePanelSourceState } from './side-panel';
 
 export type RightWorkspaceFileTab = `file:${string}`;
@@ -11,11 +12,14 @@ export type RightWorkspaceDiffPanel = SidePanelGitDiffState;
 export type RightWorkspaceImagePanel = SidePanelImageState;
 
 export type RepositoryWorkStartInput = {
-  branchName: string;
-  createWorktree: boolean;
+  action: WorkItemAssignmentAction;
   item: WorkItem;
   target: 'current' | 'duplicate';
-};
+} & ({
+  workspace: { kind: 'current' };
+} | {
+  workspace: { branchName: string; kind: 'worktree' };
+});
 
 export function rightWorkspaceFileTab(filePath: string): RightWorkspaceFileTab {
   return `file:${encodeURIComponent(filePath)}`;

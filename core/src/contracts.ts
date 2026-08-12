@@ -290,6 +290,7 @@ export type WorkItem = {
   provider: WorkProviderKind;
   id: string;
   kind?: WorkItemKind;
+  branchName?: string;
   repositoryId: string;
   repositoryFullName: string;
   number: number;

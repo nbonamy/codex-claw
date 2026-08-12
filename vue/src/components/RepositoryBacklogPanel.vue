@@ -226,26 +226,46 @@
           </div>
 
           <div class="repository-backlog__isolation">
-            <span>{{ t('repositoryBacklog.isolation') }}</span>
-            <label>
-              <input v-model="isolation" type="radio" value="worktree">
-              <IconGitBranch aria-hidden="true" />
-              <strong>{{ t('repositoryBacklog.newWorktree') }}</strong>
-            </label>
-            <input v-model="branchName" class="repository-backlog__branch" :aria-label="t('repositoryBacklog.branchName')">
+            <span>{{ t('repositoryBacklog.workspace') }}</span>
             <label :class="{ 'repository-backlog__isolation-option--disabled': target === 'duplicate' }">
-              <input v-model="isolation" type="radio" value="branch" :disabled="target === 'duplicate'">
-              <IconGitBranch aria-hidden="true" />
-              <strong>{{ t('repositoryBacklog.newBranch') }}</strong>
+              <input v-model="workspaceMode" type="radio" value="current" :disabled="target === 'duplicate'">
+              <IconFolder aria-hidden="true" />
+              <span>
+                <strong>{{ t('repositoryBacklog.currentWorkspace') }}</strong>
+                <small>{{ currentWorkspaceDetail }}</small>
+              </span>
             </label>
+            <label>
+              <input v-model="workspaceMode" type="radio" value="worktree">
+              <IconGitBranch aria-hidden="true" />
+              <span>
+                <strong>{{ t('repositoryBacklog.newWorktree') }}</strong>
+                <small>{{ newWorktreeDetail }}</small>
+              </span>
+            </label>
+            <input
+              v-if="workspaceMode === 'worktree' && selectedItem.kind !== 'pullRequest'"
+              v-model="branchName"
+              class="repository-backlog__branch"
+              :aria-label="t('repositoryBacklog.branchName')"
+            >
+            <div v-else-if="workspaceMode === 'worktree'" class="repository-backlog__branch repository-backlog__branch--fixed">
+              <IconGitPullRequest aria-hidden="true" />
+              {{ branchName }}
+            </div>
           </div>
 
           <p v-if="operationError" class="repository-backlog__operation-error">{{ operationError }}</p>
 
           <footer>
-            <button class="claw-button claw-button--tertiary" type="button" @click="closeStartWork">{{ t('repositoryBacklog.cancel') }}</button>
-            <button class="claw-button claw-button--primary" type="button" :disabled="!branchName.trim()" @click="startWork">
-              {{ t('repositoryBacklog.start') }}
+            <button class="claw-button claw-button--tertiary" type="button" @click="prefillCustomPrompt">
+              {{ t('repositoryBacklog.custom') }}
+            </button>
+            <button class="claw-button claw-button--secondary" type="button" :disabled="workActionDisabled" @click="startWork(secondaryAction)">
+              {{ selectedItem.kind === 'pullRequest' ? t('repositoryBacklog.addressFeedback') : t('repositoryBacklog.investigate') }}
+            </button>
+            <button class="claw-button claw-button--primary" type="button" :disabled="workActionDisabled" @click="startWork(primaryAction)">
+              {{ selectedItem.kind === 'pullRequest' ? t('repositoryBacklog.review') : t('repositoryBacklog.fix') }}
             </button>
           </footer>
         </template>
@@ -254,7 +274,7 @@
           <span v-if="operationState === 'running'" class="repository-backlog__operation-spinner" aria-hidden="true" />
           <IconCircleCheck v-else aria-hidden="true" />
           <strong>{{ operationState === 'running' ? t('repositoryBacklog.starting') : t('repositoryBacklog.started') }}</strong>
-          <span>{{ branchName }}</span>
+          <span>{{ operationWorkspaceLabel }}</span>
         </div>
       </div>
     </el-popover>
@@ -273,6 +293,7 @@ import {
   IconDeviceFloppy,
   IconDots,
   IconFilter,
+  IconFolder,
   IconGitBranch,
   IconGitPullRequest,
   IconRefresh,
@@ -281,6 +302,7 @@ import {
   IconX,
 } from '@tabler/icons-vue';
 import type { Agent, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem } from '@codex-claw/core/contracts';
+import type { WorkItemAssignmentAction } from '@codex-claw/core/work-item-prompts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import type { RepositoryWorkStartInput } from './right-workspace';
 
@@ -294,6 +316,7 @@ const props = defineProps<{
   error?: string | null;
   items: WorkItem[];
   repositoryId: string;
+  prefillAction: (item: WorkItem) => void;
   status: 'notLoaded' | 'loading' | 'loaded' | 'error';
   startWorkAction: (input: RepositoryWorkStartInput) => Promise<void>;
   visible: boolean;
@@ -317,11 +340,26 @@ const selectedItem = ref<WorkItem | null>(null);
 const openItemId = ref<string | null>(null);
 const startWorkVisible = ref(false);
 const target = ref<'current' | 'duplicate'>('current');
-const isolation = ref<'branch' | 'worktree'>('worktree');
+const workspaceMode = ref<'current' | 'worktree'>('worktree');
 const branchName = ref('');
 const operationState = ref<'idle' | 'running' | 'success' | 'error'>('idle');
 const operationError = ref<string | null>(null);
 const virtualReference = ref({ getBoundingClientRect: () => new DOMRect() });
+
+const secondaryAction = computed<WorkItemAssignmentAction>(() => selectedItem.value?.kind === 'pullRequest' ? 'addressFeedback' : 'investigate');
+const primaryAction = computed<WorkItemAssignmentAction>(() => selectedItem.value?.kind === 'pullRequest' ? 'review' : 'fix');
+const workActionDisabled = computed(() => selectedItem.value?.kind !== 'pullRequest'
+  && workspaceMode.value === 'worktree'
+  && !branchName.value.trim());
+const currentWorkspaceDetail = computed(() => selectedItem.value?.kind === 'pullRequest'
+  ? t('repositoryBacklog.pullRequestCurrentWorkspaceDetail', { branch: branchName.value || t('repositoryBacklog.unknownBranch') })
+  : t('repositoryBacklog.currentWorkspaceDetail', { branch: props.branch || t('repositoryBacklog.currentBranch') }));
+const newWorktreeDetail = computed(() => selectedItem.value?.kind === 'pullRequest'
+  ? t('repositoryBacklog.pullRequestWorktreeDetail', { branch: branchName.value || t('repositoryBacklog.unknownBranch') })
+  : t('repositoryBacklog.newWorktreeDetail'));
+const operationWorkspaceLabel = computed(() => selectedItem.value?.kind === 'pullRequest' || workspaceMode.value === 'worktree'
+  ? branchName.value
+  : props.branch || t('repositoryBacklog.currentWorkspace'));
 
 const accountLabel = computed(() => props.connection?.accountLabel?.trim() ?? '');
 const repositoryName = computed(() => props.repositoryId.split('/').at(-1) ?? props.repositoryId);
@@ -347,7 +385,7 @@ const attentionItems = computed(() => filteredItems.value.filter((item) => {
 const otherItems = computed(() => filteredItems.value.filter((item) => !attentionItems.value.includes(item)));
 
 watch(target, (value) => {
-  if (value === 'duplicate') isolation.value = 'worktree';
+  if (value === 'duplicate') workspaceMode.value = 'worktree';
 });
 
 watch(() => props.visible, (visible) => {
@@ -469,8 +507,8 @@ function openItem(item: WorkItem, element?: HTMLElement): void {
   openItemId.value = item.id;
   startWorkVisible.value = true;
   target.value = 'current';
-  isolation.value = 'worktree';
-  branchName.value = suggestedBranch(item);
+  workspaceMode.value = 'worktree';
+  branchName.value = item.kind === 'pullRequest' ? item.branchName?.trim() ?? '' : suggestedBranch(item);
   operationState.value = 'idle';
   operationError.value = null;
 }
@@ -489,18 +527,23 @@ function setStartWorkVisible(visible: boolean): void {
   closeStartWork();
 }
 
-async function startWork(): Promise<void> {
+function prefillCustomPrompt(): void {
   const item = selectedItem.value;
-  if (!item || !branchName.value.trim() || operationState.value === 'running') return;
+  if (!item) return;
+  props.prefillAction(item);
+  closeStartWork();
+}
+
+async function startWork(action: WorkItemAssignmentAction): Promise<void> {
+  const item = selectedItem.value;
+  if (!item || workActionDisabled.value || operationState.value === 'running') return;
   operationState.value = 'running';
   operationError.value = null;
   try {
-    await props.startWorkAction({
-      item,
-      target: target.value,
-      branchName: branchName.value.trim(),
-      createWorktree: target.value === 'duplicate' || isolation.value === 'worktree',
-    });
+    const input: RepositoryWorkStartInput = workspaceMode.value === 'worktree'
+      ? { action, item, target: target.value, workspace: { kind: 'worktree', branchName: branchName.value.trim() } }
+      : { action, item, target: target.value, workspace: { kind: 'current' } };
+    await props.startWorkAction(input);
     operationState.value = 'success';
     globalThis.setTimeout(closeStartWork, 1_200);
   } catch (error) {
@@ -1145,6 +1188,18 @@ function labelStyle(color?: string): Record<string, string> {
   font-size: var(--font-size-12);
 }
 
+.repository-backlog__isolation label > span {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.repository-backlog__isolation label small {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-11);
+  font-weight: var(--font-weight-regular);
+}
+
 .repository-backlog__isolation label svg {
   width: var(--icon-sm);
   height: var(--icon-sm);
@@ -1166,6 +1221,18 @@ function labelStyle(color?: string): Record<string, string> {
   background: var(--color-surface-lowest);
   font-family: var(--font-family-mono);
   font-size: var(--font-size-11);
+}
+
+.repository-backlog__branch--fixed {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.repository-backlog__branch--fixed svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  color: var(--color-text-muted);
 }
 
 .repository-backlog__operation-error {

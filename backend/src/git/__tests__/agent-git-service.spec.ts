@@ -311,9 +311,42 @@ describe('agent git service parsers', () => {
     ]);
   });
 
-  it('fetches a pull request head before creating its review worktree', async () => {
+  it('checks out the pull request head branch in either the current folder or a new worktree', async () => {
     const runGit = vi.fn(async (_folder: string, args: string[]) => {
       if (args[0] === 'check-ref-format') return { stdout: '' };
+      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/repo\n' };
+      if (args[0] === 'rev-parse' && args.includes('@{upstream}')) return { stdout: 'origin/main\n' };
+      if (args[0] === 'symbolic-ref') return { stdout: 'main\n' };
+      if (args[0] === 'remote' && args[1] === 'get-url') return { stdout: 'git@github.com:nbonamy/repo.git\n' };
+      if (args[0] === 'remote') return { stdout: 'origin\n' };
+      if (args[0] === 'status' && args.includes('--branch')) return { stdout: '## main...origin/main\n' };
+      if (args[0] === 'status') return { stdout: '' };
+      if (args[0] === 'worktree' && args[1] === 'list') return { stdout: 'worktree /repo\nHEAD abc\nbranch refs/heads/main\n' };
+      if (args[0] === 'show-ref') throw new Error('missing ref');
+      return { stdout: '' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
+
+    await expect(service.createBranch('/repo', 'feature/pull-request-42', true, 42))
+      .resolves.toBe('/repo-feature-pull-request-42');
+
+    expect(runGit).toHaveBeenCalledWith('/repo', ['fetch', 'origin', 'pull/42/head']);
+    expect(runGit).toHaveBeenCalledWith('/repo', [
+      'worktree',
+      'add',
+      '-b',
+      'feature/pull-request-42',
+      '/repo-feature-pull-request-42',
+      'FETCH_HEAD',
+    ]);
+
+    await expect(service.createBranch('/repo', 'feature/pull-request-43', false, 43)).resolves.toBe('/repo');
+    expect(runGit).toHaveBeenCalledWith('/repo', ['fetch', 'origin', 'pull/43/head']);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['switch', '-c', 'feature/pull-request-43', 'FETCH_HEAD']);
+  });
+
+  it('reuses and fast-forwards an existing local pull request branch', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
       if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/repo\n' };
       if (args[0] === 'rev-parse' && args.includes('@{upstream}')) return { stdout: 'origin/main\n' };
       if (args[0] === 'symbolic-ref') return { stdout: 'main\n' };
@@ -326,18 +359,11 @@ describe('agent git service parsers', () => {
     });
     const service = new AgentGitService(() => new Date(), runGit);
 
-    await expect(service.createBranch('/repo', 'review/42-fix-the-bug', true, 42))
-      .resolves.toBe('/repo-review-42-fix-the-bug');
+    await expect(service.createBranch('/repo', 'feature/existing-pr', false, 44)).resolves.toBe('/repo');
 
-    expect(runGit).toHaveBeenCalledWith('/repo', ['fetch', 'origin', 'pull/42/head']);
-    expect(runGit).toHaveBeenCalledWith('/repo', [
-      'worktree',
-      'add',
-      '-b',
-      'review/42-fix-the-bug',
-      '/repo-review-42-fix-the-bug',
-      'FETCH_HEAD',
-    ]);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['switch', 'feature/existing-pr']);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['merge', '--ff-only', 'FETCH_HEAD']);
+    expect(runGit).not.toHaveBeenCalledWith('/repo', expect.arrayContaining(['-c']));
   });
 
   it('rejects empty, option-like, and invalid branch names before switching', async () => {

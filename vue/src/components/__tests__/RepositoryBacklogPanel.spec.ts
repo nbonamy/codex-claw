@@ -109,43 +109,130 @@ describe('RepositoryBacklogPanel', () => {
     expect(wrapper.text()).toContain('Fix backlog assignment');
   });
 
-  it('starts assigned issue work in an isolated worktree', async () => {
+  it('offers contextual issue actions and fixes an issue in an isolated worktree', async () => {
     const startWorkAction = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountPanel({ startWorkAction });
 
     await wrapper.get('[aria-label="Work item actions #12"]').trigger('click');
     expect(wrapper.text()).toContain('Start work on #12');
+    expect(wrapper.text()).toContain('Custom');
+    expect(wrapper.text()).toContain('Investigate');
+    expect(wrapper.text()).toContain('Fix');
+    expect(wrapper.text()).not.toContain('Cancel');
     expect(wrapper.get('[aria-label="Branch name"]').element).toHaveProperty('value', 'fix/12-fix-backlog-assignment');
 
     await wrapper.get('.repository-backlog__start-work .claw-button--primary').trigger('click');
 
     expect(startWorkAction).toHaveBeenCalledWith({
-      branchName: 'fix/12-fix-backlog-assignment',
-      createWorktree: true,
+      action: 'fix',
       item: expect.objectContaining({ id: 'nbonamy/codex-claw#12' }),
       target: 'current',
+      workspace: { branchName: 'fix/12-fix-backlog-assignment', kind: 'worktree' },
     });
     await nextTick();
     expect(wrapper.text()).toContain('Work started');
   });
 
+  it('prefills custom issue work without dispatching it', async () => {
+    const prefillAction = vi.fn();
+    const startWorkAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({ prefillAction, startWorkAction });
+
+    await wrapper.get('[aria-label="Work item actions #12"]').trigger('click');
+    await wrapper.get('.repository-backlog__start-work .claw-button--tertiary').trigger('click');
+
+    expect(prefillAction).toHaveBeenCalledWith(expect.objectContaining({ id: 'nbonamy/codex-claw#12' }));
+    expect(startWorkAction).not.toHaveBeenCalled();
+    expect(wrapper.text()).not.toContain('Start work on #12');
+  });
+
+  it('dispatches issue investigation without using the fix prompt', async () => {
+    const startWorkAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({ startWorkAction });
+
+    await wrapper.get('[aria-label="Work item actions #12"]').trigger('click');
+    await wrapper.get('.repository-backlog__start-work .claw-button--secondary').trigger('click');
+
+    expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({ action: 'investigate' }));
+  });
+
+  it('can dispatch work in the current folder and branch without creating a branch', async () => {
+    const startWorkAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({ branch: 'feature/current-work', startWorkAction });
+
+    await wrapper.get('[aria-label="Work item actions #12"]').trigger('click');
+    expect(wrapper.text()).toContain('Current workspace');
+    expect(wrapper.text()).toContain('Keep feature/current-work in this folder');
+    expect(wrapper.text()).toContain('New worktree');
+
+    await wrapper.get('input[type="radio"][value="current"]').setValue(true);
+    expect(wrapper.find('[aria-label="Branch name"]').exists()).toBe(false);
+    await wrapper.get('.repository-backlog__start-work .claw-button--primary').trigger('click');
+
+    expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({
+      target: 'current',
+      workspace: { kind: 'current' },
+    }));
+  });
+
   it('forces duplicated agents into a worktree and suggests a review branch for pull requests', async () => {
     const startWorkAction = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountPanel({
-      items: [workItem({ kind: 'pullRequest', number: 21, title: 'Ship backlog workspace' })],
+      items: [workItem({ branchName: 'feature/backlog-workspace', kind: 'pullRequest', number: 21, title: 'Ship backlog workspace' })],
       startWorkAction,
     });
 
     await wrapper.get('[role="radio"][aria-checked="false"]').trigger('click');
     await wrapper.get('[aria-label="Work item actions #21"]').trigger('click');
+    expect(wrapper.text()).toContain('Address feedback');
+    expect(wrapper.text()).toContain('Review');
+    expect(wrapper.text()).toContain('Check out feature/backlog-workspace in an isolated folder');
+    expect(wrapper.find('[aria-label="Branch name"]').exists()).toBe(false);
     await wrapper.findAll('.repository-backlog__target-options > button')[1]?.trigger('click');
+    expect(wrapper.get('input[type="radio"][value="current"]').attributes('disabled')).toBeDefined();
     await wrapper.get('.repository-backlog__start-work .claw-button--primary').trigger('click');
 
     expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({
-      branchName: 'review/21-ship-backlog-workspace',
-      createWorktree: true,
+      action: 'review',
       target: 'duplicate',
+      workspace: { branchName: 'feature/backlog-workspace', kind: 'worktree' },
     }));
+  });
+
+  it('can check out the pull request branch in the current agent workspace', async () => {
+    const startWorkAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({
+      items: [workItem({ branchName: 'feature/current-pr', kind: 'pullRequest', number: 22, title: 'Update current workspace' })],
+      startWorkAction,
+    });
+
+    await wrapper.get('[role="radio"][aria-checked="false"]').trigger('click');
+    await wrapper.get('[aria-label="Work item actions #22"]').trigger('click');
+    await wrapper.get('input[type="radio"][value="current"]').setValue(true);
+
+    expect(wrapper.text()).toContain('Check out feature/current-pr in this folder');
+    await wrapper.get('.repository-backlog__start-work .claw-button--primary').trigger('click');
+    expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'review',
+      target: 'current',
+      workspace: { kind: 'current' },
+    }));
+  });
+
+  it('allows pull request work to resolve missing branch metadata at dispatch time', async () => {
+    const startWorkAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({
+      items: [workItem({ kind: 'pullRequest', number: 23, title: 'Resolve remote branch' })],
+      startWorkAction,
+    });
+
+    await wrapper.get('[role="radio"][aria-checked="false"]').trigger('click');
+    await wrapper.get('[aria-label="Work item actions #23"]').trigger('click');
+    expect(wrapper.text()).not.toContain('The pull request branch is unavailable');
+    expect(wrapper.get('.repository-backlog__start-work .claw-button--primary').attributes('disabled')).toBeUndefined();
+    await wrapper.get('.repository-backlog__start-work .claw-button--primary').trigger('click');
+
+    expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({ action: 'review' }));
   });
 
   it('dismisses start work when the popover closes or the workspace becomes inactive', async () => {
@@ -174,6 +261,7 @@ function mountPanel(overrides: Partial<InstanceType<typeof RepositoryBacklogPane
       error: null,
       items: [workItem()],
       repositoryId: 'nbonamy/codex-claw',
+      prefillAction: vi.fn(),
       status: 'loaded',
       startWorkAction: vi.fn().mockResolvedValue(undefined),
       visible: true,

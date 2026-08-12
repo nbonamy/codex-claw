@@ -148,12 +148,14 @@ describe('RightWorkspacePanel', () => {
   });
 
   it('offers and renders a repository backlog only for linked GitHub repositories', async () => {
+    const prefillRepositoryWork = vi.fn();
     const startRepositoryWork = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountPanel(['backlog'], 'backlog');
     await wrapper.setProps({
       githubRepository: 'nbonamy/codex-claw',
       backlogStatus: 'loaded',
       backlogItems: [],
+      prefillRepositoryWork,
       startRepositoryWork,
     });
 
@@ -162,6 +164,7 @@ describe('RightWorkspacePanel', () => {
     expect(wrapper.findComponent({ name: 'RepositoryBacklogPanel' }).props()).toMatchObject({
       repositoryId: 'nbonamy/codex-claw',
       status: 'loaded',
+      prefillAction: prefillRepositoryWork,
     });
 
     await wrapper.get('[aria-label="Open right workspace tab"]').trigger('click');

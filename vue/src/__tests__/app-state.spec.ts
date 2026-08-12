@@ -1123,6 +1123,28 @@ describe('useAppState', () => {
     expect(state.snapshot.value.workBacklog.assignments).toStrictEqual(assignedSnapshot.workBacklog.assignments);
   });
 
+  it('dispatches an explicit work item action prompt after assignment', async () => {
+    const assignedSnapshot = createInitialSnapshot();
+    const assignWorkItemToAgent = vi.fn().mockResolvedValue(assignedSnapshot);
+    const sendPrompt = vi.fn().mockResolvedValue(assignedSnapshot);
+    stubElectronTestWindow({
+      codexClaw: {
+        assignWorkItemToAgent,
+        sendPrompt,
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    state.snapshot.value = createInitialSnapshot();
+
+    await state.assignWorkItemToAgent({
+      agentId: 'agent-dina',
+      item: workItem(),
+      prompt: 'Investigate only. Do not fix.',
+    });
+
+    expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'Investigate only. Do not fix.');
+  });
+
   it('removes work item assignments through preload without prompting the agent', async () => {
     const assignedSnapshot = createInitialSnapshot();
     const item = reactive(workItem());

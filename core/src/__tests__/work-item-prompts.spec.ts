@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { WorkItem } from '../contracts';
-import { workItemAssignmentPrompt, workProviderLabel } from '../work-item-prompts';
+import { workItemAssignmentPrompt, workItemComposerPrompt, workProviderLabel } from '../work-item-prompts';
 
 describe('work item prompts', () => {
   it('includes completion instructions and all available issue context', () => {
@@ -39,6 +39,20 @@ describe('work item prompts', () => {
   it('uses the provider display label', () => {
     expect(workProviderLabel('github')).toBe('GitHub');
     expect(workProviderLabel('future-provider' as never)).toBe('work provider');
+  });
+
+  it('creates deterministic prompts for each repository action', () => {
+    expect(workItemAssignmentPrompt(workItem(), { action: 'investigate' })).toContain('Do not modify files or implement the fix.');
+    expect(workItemAssignmentPrompt(workItem(), { action: 'fix' })).toContain('Reproduce the problem, implement the fix, verify it');
+
+    const pullRequest = workItem({ kind: 'pullRequest' });
+    expect(workItemAssignmentPrompt(pullRequest, { action: 'addressFeedback' })).toContain('Inspect the current review comments, update the branch');
+    expect(workItemAssignmentPrompt(pullRequest, { action: 'review' })).toContain('Report concrete findings and do not modify files.');
+  });
+
+  it('creates an editable composer prompt without dispatch instructions', () => {
+    expect(workItemComposerPrompt(workItem())).toBe('Regarding GitHub issue #42 — Keep queued messages visible:\n\n');
+    expect(workItemComposerPrompt(workItem({ kind: 'pullRequest' }))).toBe('Regarding GitHub pull request #42 — Keep queued messages visible:\n\n');
   });
 });
 

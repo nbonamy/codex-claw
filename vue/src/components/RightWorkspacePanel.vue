@@ -117,7 +117,7 @@
     />
 
     <RepositoryBacklogPanel
-      v-if="tabs.includes('backlog') && githubRepository && startRepositoryWork"
+      v-if="tabs.includes('backlog') && githubRepository && prefillRepositoryWork && startRepositoryWork"
       v-show="activeTab === 'backlog'"
       :agent="agent"
       :assignments="workAssignments"
@@ -126,6 +126,7 @@
       :error="backlogError"
       :items="backlogItems"
       :repository-id="githubRepository"
+      :prefill-action="prefillRepositoryWork"
       :status="backlogStatus"
       :start-work-action="startRepositoryWork"
       :visible="visible && activeTab === 'backlog'"
@@ -321,6 +322,7 @@ const props = withDefaults(defineProps<{
   githubRepository?: string | null;
   githubConnection?: WorkIntegrationConnection | null;
   workAssignments?: Record<string, WorkBacklogAssignment>;
+  prefillRepositoryWork?: (item: WorkItem) => void;
   startRepositoryWork?: (input: import('./right-workspace').RepositoryWorkStartInput) => Promise<void>;
 }>(), {
   filesPaneWidth: 280,

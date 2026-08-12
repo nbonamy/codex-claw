@@ -240,7 +240,11 @@ export class AgentGitService {
     }
     if (createWorktree && startPoint) {
       const worktreePath = suggestedSourceWorktreePath(folder, normalized);
-      await this.runGit(folder, ['worktree', 'add', '-b', normalized, worktreePath, startPoint]);
+      const branchExists = await this.localBranchExists(folder, normalized);
+      await this.runGit(folder, branchExists
+        ? ['worktree', 'add', worktreePath, normalized]
+        : ['worktree', 'add', '-b', normalized, worktreePath, startPoint]);
+      if (branchExists) await this.runGit(worktreePath, ['merge', '--ff-only', startPoint]);
       return worktreePath;
     }
     if (createWorktree) {
@@ -252,8 +256,22 @@ export class AgentGitService {
       });
       return worktree.path;
     }
-    await this.runGit(folder, ['switch', '-c', normalized, ...(startPoint ? [startPoint] : [])]);
+    if (startPoint && await this.localBranchExists(folder, normalized)) {
+      await this.runGit(folder, ['switch', normalized]);
+      await this.runGit(folder, ['merge', '--ff-only', startPoint]);
+    } else {
+      await this.runGit(folder, ['switch', '-c', normalized, ...(startPoint ? [startPoint] : [])]);
+    }
     return folder;
+  }
+
+  private async localBranchExists(folder: string, branch: string): Promise<boolean> {
+    try {
+      await this.runGit(folder, ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`]);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async mergeTarget(folder: string): Promise<string> {

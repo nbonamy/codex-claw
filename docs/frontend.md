@@ -220,9 +220,12 @@ implemented:
   provider-neutral backlog action beside the git workflow control. Backlog lists the linked repository's
   issues and pull requests with a compact, on-demand search plus state, assignee,
   and label filters whose defaults can be saved per repository;
-  an item can start work on the current agent or a duplicate, using a suggested
-  branch in either the current checkout or an isolated worktree. Pull-request
-  review work fetches the pull-request head before creating its branch. Full
+  an item can prefill an editable custom prompt or immediately dispatch a
+  contextual issue investigation/fix or pull-request feedback/review action to
+  the current agent or a duplicate, either continuing in the agent's current
+  workspace or creating a suggested branch in a new worktree by default.
+  Pull-request work instead checks out the pull request's own head branch in
+  the current folder or in a new worktree. Full
   working-tree diffs continue to open from the agent header's git statistics;
   the in-app Browser accepts HTTP and HTTPS pages plus local
   `file://` URLs that resolve inside the owning agent's workspace; clicking a

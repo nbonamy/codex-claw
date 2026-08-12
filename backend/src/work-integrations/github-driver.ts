@@ -185,15 +185,22 @@ export class GitHubWorkProviderDriver implements WorkProviderDriver {
     }
 
     const state = query.state ?? 'open';
-    const issues = await githubApiRequest(token, `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}/issues?state=${state}&per_page=100`);
-    if (!Array.isArray(issues)) {
-      throw new Error('GitHub returned an invalid issues response.');
+    const items: WorkItem[] = [];
+    if (query.kind !== 'pullRequest') {
+      const issues = await githubApiRequest(token, `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}/issues?state=${state}&per_page=100`);
+      if (!Array.isArray(issues)) throw new Error('GitHub returned an invalid issues response.');
+      items.push(...issues
+        .map((issue) => githubIssue(issue, repositoryId, repository.fullName))
+        .filter((item): item is WorkItem => item !== null && item.kind !== 'pullRequest'));
     }
-
-    return issues
-      .map((issue) => githubIssue(issue, repositoryId, repository.fullName))
-      .filter((item): item is WorkItem => Boolean(item))
-      .filter((item) => !query.kind || query.kind === 'all' || item.kind === query.kind);
+    if (query.kind !== 'issue') {
+      const pulls = await githubApiRequest(token, `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}/pulls?state=${state}&per_page=100`);
+      if (!Array.isArray(pulls)) throw new Error('GitHub returned an invalid pull request response.');
+      items.push(...pulls
+        .map((pullRequest) => githubPullRequestItem(pullRequest, repositoryId, repository.fullName))
+        .filter((item): item is WorkItem => Boolean(item)));
+    }
+    return items;
   }
 
   async findPullRequest(token: WorkProviderToken, repositoryId: string, branch: string): Promise<AgentGitPullRequest | null> {
@@ -360,6 +367,14 @@ function githubIssue(value: unknown, repositoryId: string, repositoryFullName: s
     createdAt: value.created_at,
     updatedAt: value.updated_at,
   };
+}
+
+function githubPullRequestItem(value: unknown, repositoryId: string, repositoryFullName: string): WorkItem | null {
+  const item = githubIssue(isRecord(value) ? { ...value, pull_request: {} } : value, repositoryId, repositoryFullName);
+  if (!item || !isRecord(value) || !isRecord(value.head) || typeof value.head.ref !== 'string' || !value.head.ref.trim()) {
+    return null;
+  }
+  return { ...item, kind: 'pullRequest', branchName: value.head.ref.trim() };
 }
 
 function githubIssueAssignee(value: unknown): string | null {
