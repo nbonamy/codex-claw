@@ -1,13 +1,21 @@
+import type { WorkItem } from '@codex-claw/core/contracts';
 import type { SidePanelGitDiffState, SidePanelImageState, SidePanelMarkdownState, SidePanelSourceState } from './side-panel';
 
 export type RightWorkspaceFileTab = `file:${string}`;
 export type RightWorkspaceDiffTab = `diff:${string}`;
 export type RightWorkspaceImageTab = `image:${string}`;
 export type RightWorkspaceSubagentTab = `subagent:${string}`;
-export type RightWorkspaceTab = 'review' | 'browser' | 'files' | 'plan' | RightWorkspaceFileTab | RightWorkspaceDiffTab | RightWorkspaceImageTab | RightWorkspaceSubagentTab;
+export type RightWorkspaceTab = 'review' | 'backlog' | 'browser' | 'files' | 'plan' | RightWorkspaceFileTab | RightWorkspaceDiffTab | RightWorkspaceImageTab | RightWorkspaceSubagentTab;
 export type RightWorkspaceFilePanel = SidePanelMarkdownState | SidePanelSourceState;
 export type RightWorkspaceDiffPanel = SidePanelGitDiffState;
 export type RightWorkspaceImagePanel = SidePanelImageState;
+
+export type RepositoryWorkStartInput = {
+  branchName: string;
+  createWorktree: boolean;
+  item: WorkItem;
+  target: 'current' | 'duplicate';
+};
 
 export function rightWorkspaceFileTab(filePath: string): RightWorkspaceFileTab {
   return `file:${encodeURIComponent(filePath)}`;

@@ -741,7 +741,14 @@ export class ClawBackendServer {
         const agentId = requireString(params.agentId, 'agentId');
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitBranchCreate, params, async (agent) => {
           const input = requireConfirmed(params.input, 'Creating a branch');
-          const targetFolder = await this.agentGitService.createBranch(agent.folder, requireString(input.name, 'name'), input.createWorktree === true);
+          const pullRequestNumber = input.pullRequestNumber;
+          if (pullRequestNumber !== undefined && (!Number.isInteger(pullRequestNumber) || (pullRequestNumber as number) <= 0)) {
+            throw new Error('Invalid pull request number.');
+          }
+          const branchName = requireString(input.name, 'name');
+          const targetFolder = pullRequestNumber === undefined
+            ? await this.agentGitService.createBranch(agent.folder, branchName, input.createWorktree === true)
+            : await this.agentGitService.createBranch(agent.folder, branchName, input.createWorktree === true, pullRequestNumber as number);
           if (input.createWorktree === true) {
             updateAgentFolder(this.snapshot, agentId, targetFolder);
             await this.driverRpc?.handle(backendMethods.driverSessionForget, { backend: agent.backend, agentId });
@@ -1472,6 +1479,7 @@ export class ClawBackendServer {
       }
       case backendMethods.workProviderItemsList: {
         const params = requireRecord(message.params);
+        const query = workItemQuery(params.query);
         return this.respondInLocation(
           message.id,
           this.loopLocationFromParams(params),
@@ -1479,8 +1487,11 @@ export class ClawBackendServer {
           {
             provider: requireWorkProvider(params),
             repositoryId: requireString(params.repositoryId, 'repositoryId'),
+            ...(query ? { query } : {}),
           },
-          () => this.requireWorkIntegrations().listItems(requireWorkProvider(params), requireString(params.repositoryId, 'repositoryId')),
+          () => query
+            ? this.requireWorkIntegrations().listItems(requireWorkProvider(params), requireString(params.repositoryId, 'repositoryId'), query)
+            : this.requireWorkIntegrations().listItems(requireWorkProvider(params), requireString(params.repositoryId, 'repositoryId')),
         );
       }
       case backendMethods.snapshotLoopsGet: {
@@ -2996,6 +3007,23 @@ function requireWorkProvider(params: unknown): WorkProviderKind {
     throw new Error(`Unsupported work provider: ${provider}`);
   }
   return provider;
+}
+
+function workItemQuery(value: unknown): import('@codex-claw/core/contracts').WorkItemQuery | undefined {
+  if (value === undefined) return undefined;
+  const query = requireRecord(value);
+  const kind = query.kind;
+  const state = query.state;
+  if (kind !== undefined && kind !== 'issue' && kind !== 'pullRequest' && kind !== 'all') {
+    throw new Error('Invalid work item kind.');
+  }
+  if (state !== undefined && state !== 'open' && state !== 'closed' && state !== 'all') {
+    throw new Error('Invalid work item state.');
+  }
+  return {
+    ...(kind ? { kind } : {}),
+    ...(state ? { state } : {}),
+  };
 }
 
 function requireAgentCreateInput(params: unknown): CreateAgentInput {

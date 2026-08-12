@@ -279,10 +279,17 @@ export type WorkItemLabel = {
 };
 
 export type WorkItemState = 'open' | 'closed';
+export type WorkItemKind = 'issue' | 'pullRequest';
+
+export type WorkItemQuery = {
+  kind?: WorkItemKind | 'all';
+  state?: WorkItemState | 'all';
+};
 
 export type WorkItem = {
   provider: WorkProviderKind;
   id: string;
+  kind?: WorkItemKind;
   repositoryId: string;
   repositoryFullName: string;
   number: number;
@@ -1085,6 +1092,7 @@ export type AgentQueuedPrompt = {
 export type AgentGitStatus = {
   folder: string;
   repository?: string;
+  githubRepository?: string;
   branch?: string;
   upstream?: string;
   ahead: number;
@@ -1151,7 +1159,7 @@ export type AgentGitWorkflow = {
 export type AgentGitStageInput = { paths: string[]; confirmed: boolean };
 export type AgentGitCommitInput = { message: string; confirmed: boolean; includeUnstaged?: boolean; includeUntracked?: boolean };
 export type AgentGitPushInput = { confirmed: boolean; target?: 'current' | 'mergeTarget' };
-export type AgentGitBranchInput = { name: string; createWorktree?: boolean; confirmed: boolean };
+export type AgentGitBranchInput = { name: string; createWorktree?: boolean; pullRequestNumber?: number; confirmed: boolean };
 export type AgentGitPullRequestInput = { title: string; body: string; confirmed: boolean };
 export type AgentGitMergeInput = { strategy: 'merge' | 'squash'; commitMessage?: string; deleteBranch: boolean; deleteWorktree: boolean; confirmed: boolean };
 export type AgentGitMessageGenerationInput =
@@ -1461,7 +1469,7 @@ export type CodexClawApi = {
   disconnectWorkProvider(provider: WorkProviderKind): Promise<AppSnapshot>;
   listWorkRepositories(provider: WorkProviderKind, location?: LoopLocation): Promise<WorkRepository[]>;
   configureWorkBacklog(input: WorkBacklogConfigurationInput, location?: LoopLocation): Promise<AppSnapshot>;
-  listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: LoopLocation): Promise<WorkItem[]>;
+  listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: WorkItemQuery): Promise<WorkItem[]>;
   listBackendModels(agentId: string): Promise<BackendModelOption[]>;
   listBackendPlugins(agentId: string): Promise<BackendPluginSummary[]>;
   listBackendSkills(agentId: string): Promise<BackendSkillSummary[]>;

@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue';
 import type { AgentGitBranchInput, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitWorkflow } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, AgentHistoryLoadResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendPluginSummary, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, AgentHistoryLoadResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendPluginSummary, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/core/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/core/backend-commands';
@@ -1267,13 +1267,17 @@ export function useAppState() {
     }
   }
 
-  async function loadWorkItems(provider: WorkProviderKind, repositoryId: string, location?: LoopLocation): Promise<WorkItem[]> {
+  async function loadWorkItems(provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: WorkItemQuery): Promise<WorkItem[]> {
     if (!codexClawApi?.listWorkItems || !repositoryId) {
       return [];
     }
 
     if (isRemoteLoopLocation(location)) {
-      return await codexClawApi.listWorkItems(provider, repositoryId, location);
+      return await codexClawApi.listWorkItems(provider, repositoryId, location, query);
+    }
+
+    if (query) {
+      return await codexClawApi.listWorkItems(provider, repositoryId, undefined, query);
     }
 
     workBacklogStatus.value = 'loading';
@@ -1353,13 +1357,17 @@ export function useAppState() {
     adoptBackgroundSnapshot(await codexClawApi.removeWorkItemAssignment(cloneWorkItemForIpc(item)));
   }
 
-  async function duplicateAgent(agentId: string): Promise<void> {
+  async function duplicateAgent(agentId: string): Promise<Agent | null> {
     if (!codexClawApi?.duplicateAgent) {
-      return;
+      return null;
     }
 
-    adoptNavigationSnapshot(await codexClawApi.duplicateAgent(agentId));
+    const previousAgentIds = new Set(snapshot.value.agents.map((agent) => agent.id));
+    const nextSnapshot = await codexClawApi.duplicateAgent(agentId);
+    const duplicate = nextSnapshot.agents.find((agent) => !previousAgentIds.has(agent.id)) ?? null;
+    adoptNavigationSnapshot(nextSnapshot);
     await loadActiveAgentCatalogs();
+    return duplicate;
   }
 
   async function forkAgent(agentId: string, messageIndex?: number): Promise<void> {
@@ -1791,6 +1799,7 @@ function cloneWorkItemForIpc(item: WorkItem): WorkItem {
   return {
     provider: item.provider,
     id: item.id,
+    ...(item.kind ? { kind: item.kind } : {}),
     repositoryId: item.repositoryId,
     repositoryFullName: item.repositoryFullName,
     number: item.number,
@@ -1798,6 +1807,7 @@ function cloneWorkItemForIpc(item: WorkItem): WorkItem {
     url: item.url,
     state: item.state,
     ...(typeof item.authorName === 'string' ? { authorName: item.authorName } : {}),
+    ...(item.assignees ? { assignees: [...item.assignees] } : {}),
     ...(typeof item.body === 'string' ? { body: item.body } : {}),
     labels: item.labels.map((label) => ({
       name: label.name,

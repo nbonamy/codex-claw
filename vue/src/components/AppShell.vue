@@ -201,6 +201,7 @@
           :open-in-catalog="openInApplications"
           :subagent-tree="currentSubagentTree"
           :selected-subagent-conversation-id="selectedSubagentConversationIdFor(currentAgent.id)"
+          :github-backlog-available="Boolean(currentAgentGitStatus?.githubRepository)"
           :get-git-workflow="props.getAgentGitWorkflow"
           :generate-git-message="props.generateAgentGitMessage"
           :commit-git-changes="props.commitAgentGitChanges"
@@ -212,6 +213,7 @@
           @toggle-execution-plan="toggleExecutionPlan"
           @toggle-workspace="toggleRightWorkspace"
           @open-git-diff="openAgentGitDiffPreview"
+          @open-backlog="openRepositoryBacklog(currentAgent.id)"
           @open-in="openAgentIn(currentAgent.id, $event)"
           @select-subagent="openSubagent(currentAgent.id, $event)"
           @install-update="emit('install-update')"
@@ -265,6 +267,13 @@
             :open-in-catalog="openInApplications"
             :subagent-tree="subagentTreeFor(agent.id)"
             :load-subagent-messages="(conversationId) => loadSubagentMessages(agent.id, conversationId)"
+            :backlog-items="rightWorkspaceFor(agent.id).backlogItems"
+            :backlog-status="rightWorkspaceFor(agent.id).backlogStatus"
+            :backlog-error="rightWorkspaceFor(agent.id).backlogError"
+            :github-repository="snapshot.agentGitStatuses[agent.id]?.githubRepository ?? null"
+            :github-connection="snapshot.workBacklog.connections.find((connection) => connection.provider === 'github') ?? null"
+            :work-assignments="snapshot.workBacklog.assignments"
+            :start-repository-work="(input) => startRepositoryWork(agent.id, input)"
             @close-tab="closeRightWorkspaceTab(agent.id, $event)"
             @cancel-plan="cancelPlanReview(agent.id)"
             @comment-plan="commentOnPlan"
@@ -276,6 +285,7 @@
             @resize-files-pane="rightWorkspaceFor(agent.id).filesPaneWidth = $event"
             @open-link="openConversationLink"
             @refresh-git-diff="openAgentGitDiffPreview(agent.id)"
+            @refresh-backlog="loadRepositoryBacklog(agent.id)"
             @select-tab="selectRightWorkspaceTab(agent.id, $event)"
             @send-prompt="forwardPrompt"
           />
@@ -369,7 +379,7 @@
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
-import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BackendPermissionModeOption, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendPluginSummary, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
+import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BackendPermissionModeOption, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendPluginSummary, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkItemQuery, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
@@ -431,6 +441,7 @@ import {
   type RightWorkspaceFileTab,
   type RightWorkspaceImageTab,
   type RightWorkspaceTab,
+  type RepositoryWorkStartInput,
 } from './right-workspace';
 
 const props = withDefaults(defineProps<{
@@ -539,7 +550,9 @@ const props = withDefaults(defineProps<{
   configureWorkBacklog?: (input: WorkBacklogConfigurationInput) => Promise<void>;
   loadBench?: (location?: BenchLocation) => Promise<BenchTemplate[] | void>;
   loadWorkRepositories?: (provider: WorkProviderKind, location?: LoopLocation) => Promise<WorkRepository[] | void>;
-  loadWorkItems?: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation) => Promise<WorkItem[] | void>;
+  loadWorkItems?: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: WorkItemQuery) => Promise<WorkItem[] | void>;
+  duplicateAgentAction?: (agentId: string) => Promise<Agent | null>;
+  assignWorkItemAction?: (payload: { agentId: string; item: WorkItem }) => Promise<void>;
   loadOlderAgentHistory?: (agentId: string) => Promise<void>;
   quit?: () => Promise<void>;
 }>(), {
@@ -645,6 +658,8 @@ const props = withDefaults(defineProps<{
   loadBench: async () => undefined,
   loadWorkRepositories: async () => undefined,
   loadWorkItems: async () => undefined,
+  duplicateAgentAction: async () => null,
+  assignWorkItemAction: async () => undefined,
   quit: async () => undefined,
 });
 
@@ -710,6 +725,9 @@ type AppSurface = 'agent' | 'cockpit' | 'loops' | 'settings';
 type BenchLoadStatus = 'notLoaded' | 'loading' | 'loaded' | 'error';
 type AgentRightWorkspaceState = {
   activeTab: RightWorkspaceTab | null;
+  backlogError: string | null;
+  backlogItems: WorkItem[];
+  backlogStatus: 'notLoaded' | 'loading' | 'loaded' | 'error';
   browserId: string;
   browserInitialUrl: string;
   browserOpenRequestId: number;
@@ -1326,6 +1344,9 @@ function rightWorkspaceFor(agentId: string): AgentRightWorkspaceState {
 
   const created: AgentRightWorkspaceState = {
     activeTab: null,
+    backlogError: null,
+    backlogItems: [],
+    backlogStatus: 'notLoaded',
     browserId: PRIMARY_BROWSER_ID,
     browserInitialUrl: '',
     browserOpenRequestId: 0,
@@ -1424,6 +1445,10 @@ function handleBrowserOpenCommand(command: Extract<AppCommand, { type: 'open-bro
 }
 
 function openRightWorkspaceTabFromMenu(agentId: string, tab: RightWorkspaceTab): void {
+  if (tab === 'backlog') {
+    void openRepositoryBacklog(agentId);
+    return;
+  }
   if (tab === 'review') {
     void openAgentGitDiffPreview(agentId);
     return;
@@ -1432,6 +1457,60 @@ function openRightWorkspaceTabFromMenu(agentId: string, tab: RightWorkspaceTab):
     rightWorkspaceFor(agentId).filesPaneOpen = true;
   }
   openRightWorkspaceTab(tab, agentId);
+}
+
+async function openRepositoryBacklog(agentId: string): Promise<void> {
+  openRightWorkspaceTab('backlog', agentId);
+  const workspace = rightWorkspaceFor(agentId);
+  if (workspace.backlogStatus === 'notLoaded' || workspace.backlogStatus === 'error') {
+    await loadRepositoryBacklog(agentId);
+  }
+}
+
+async function loadRepositoryBacklog(agentId: string): Promise<void> {
+  const workspace = rightWorkspaceFor(agentId);
+  const repositoryId = props.snapshot.agentGitStatuses[agentId]?.githubRepository?.trim();
+  if (!repositoryId) {
+    workspace.backlogStatus = 'error';
+    workspace.backlogError = 'This repository is not connected to GitHub.';
+    return;
+  }
+
+  workspace.backlogStatus = 'loading';
+  workspace.backlogError = null;
+  try {
+    workspace.backlogItems = await props.loadWorkItems('github', repositoryId, undefined, {
+      kind: 'all',
+      state: 'all',
+    }) ?? [];
+    workspace.backlogStatus = 'loaded';
+  } catch (error) {
+    workspace.backlogStatus = 'error';
+    workspace.backlogError = error instanceof Error ? error.message : String(error);
+  }
+}
+
+async function startRepositoryWork(agentId: string, input: RepositoryWorkStartInput): Promise<void> {
+  const sourceAgent = props.snapshot.agents.find((agent) => agent.id === agentId);
+  if (!sourceAgent) throw new Error('The selected agent is unavailable.');
+
+  const targetLabel = input.target === 'duplicate' ? `a duplicate of ${sourceAgent.name}` : sourceAgent.name;
+  if (!await confirmAssignedWorkItemOverride(input.item, targetLabel, input.target === 'current' ? sourceAgent.id : undefined)) {
+    throw new Error('Assignment cancelled.');
+  }
+
+  const targetAgent = input.target === 'duplicate'
+    ? await props.duplicateAgentAction(sourceAgent.id)
+    : sourceAgent;
+  if (!targetAgent) throw new Error('The duplicate agent could not be created.');
+
+  await props.createAgentGitBranch(targetAgent.id, {
+    name: input.branchName,
+    createWorktree: input.target === 'duplicate' || input.createWorktree,
+    ...(input.item.kind === 'pullRequest' ? { pullRequestNumber: input.item.number } : {}),
+    confirmed: true,
+  });
+  await props.assignWorkItemAction({ agentId: targetAgent.id, item: input.item });
 }
 
 function toggleFileExplorer(agentId: string): void {

@@ -215,9 +215,16 @@ implemented:
   host-provided semantic icons for browser, every bundled Computer Use action,
   collaboration, workspace, Markdown, and work-item tools while unrelated MCP
   servers retain SDK fallbacks;
-- agent-owned right-side tabbed workspaces for the in-app Browser and GitHub
-  Review, with full working-tree diffs opened from the agent header's git
-  statistics; the in-app Browser accepts HTTP and HTTPS pages plus local
+- agent-owned right-side tabbed workspaces for the in-app Browser, GitHub
+  Review, and a repository Backlog opened from a dedicated outlined,
+  provider-neutral backlog action beside the git workflow control. Backlog lists the linked repository's
+  issues and pull requests with a compact, on-demand search plus state, assignee,
+  and label filters whose defaults can be saved per repository;
+  an item can start work on the current agent or a duplicate, using a suggested
+  branch in either the current checkout or an isolated worktree. Pull-request
+  review work fetches the pull-request head before creating its branch. Full
+  working-tree diffs continue to open from the agent header's git statistics;
+  the in-app Browser accepts HTTP and HTTPS pages plus local
   `file://` URLs that resolve inside the owning agent's workspace; clicking a
   conversation image opens it in a Claw-owned image tab,
   where native trackpad pinch gestures zoom around the pointer and ordinary

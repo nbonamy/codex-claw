@@ -171,6 +171,7 @@ describe('GitHubWorkProviderDriver', () => {
     await expect(driver.listItems(token, 'nbonamy/codex-claw')).resolves.toStrictEqual([{
       provider: 'github',
       id: 'nbonamy/codex-claw#12',
+      kind: 'issue',
       repositoryId: 'nbonamy/codex-claw',
       repositoryFullName: 'nbonamy/codex-claw',
       number: 12,
@@ -183,7 +184,46 @@ describe('GitHubWorkProviderDriver', () => {
       labels: [{ name: 'bug', color: 'ff0000' }],
       createdAt: '2026-06-09T12:00:00.000Z',
       updatedAt: '2026-06-09T12:30:00.000Z',
+    }, {
+      provider: 'github',
+      id: 'nbonamy/codex-claw#13',
+      kind: 'pullRequest',
+      repositoryId: 'nbonamy/codex-claw',
+      repositoryFullName: 'nbonamy/codex-claw',
+      number: 13,
+      title: 'This is a pull request',
+      url: 'https://github.com/nbonamy/codex-claw/pull/13',
+      state: 'open',
+      labels: [],
+      createdAt: '2026-06-09T12:00:00.000Z',
+      updatedAt: '2026-06-09T12:30:00.000Z',
     }]);
+    expect(fetch).toHaveBeenLastCalledWith(
+      'https://api.github.com/repos/nbonamy/codex-claw/issues?state=open&per_page=100',
+      expect.any(Object),
+    );
+  });
+
+  it('filters issue and pull request results by item kind and state', async () => {
+    const fetch = vi.fn().mockResolvedValue(jsonResponse([{
+      number: 13,
+      title: 'Review backlog workspace',
+      html_url: 'https://github.com/nbonamy/codex-claw/pull/13',
+      state: 'closed',
+      pull_request: {},
+      created_at: '2026-06-09T12:00:00.000Z',
+      updated_at: '2026-06-09T12:30:00.000Z',
+    }]));
+    vi.stubGlobal('fetch', fetch);
+    const driver = new GitHubWorkProviderDriver('client-id');
+    const token = { provider: 'github' as const, accessToken: 'secret', tokenType: 'bearer', connectedAt: 'now' };
+
+    await expect(driver.listItems(token, 'nbonamy/codex-claw', { kind: 'pullRequest', state: 'closed' }))
+      .resolves.toEqual([expect.objectContaining({ kind: 'pullRequest', state: 'closed' })]);
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.github.com/repos/nbonamy/codex-claw/issues?state=closed&per_page=100',
+      expect.any(Object),
+    );
   });
 
   it('looks up and creates draft pull requests', async () => {

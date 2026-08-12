@@ -15,7 +15,8 @@
             :aria-selected="activeTab === tab"
             @click="emit('selectTab', tab)"
           >
-            <GitHubIcon v-if="tab === 'review'" aria-hidden="true" />
+            <IconListDetails v-if="tab === 'backlog'" aria-hidden="true" />
+            <GitHubIcon v-else-if="tab === 'review'" aria-hidden="true" />
             <IconWorld v-else-if="tab === 'browser'" aria-hidden="true" />
             <FoldersIcon v-else-if="tab === 'files'" aria-hidden="true" />
             <FileTextIcon v-else-if="tab === 'plan'" aria-hidden="true" />
@@ -85,6 +86,10 @@
       class="right-workspace-panel__launcher"
       aria-label="Open a workspace tab"
     >
+      <button v-if="githubRepository" type="button" @click="emit('openTab', 'backlog')">
+        <IconListDetails aria-hidden="true" />
+        <span>Backlog</span>
+      </button>
       <button type="button" @click="emit('openTab', 'review')">
         <GitHubIcon aria-hidden="true" />
         <span>Review</span>
@@ -109,6 +114,22 @@
       :git-status="gitStatus"
       :panel="gitPanel"
       @refresh="emit('refreshGitDiff')"
+    />
+
+    <RepositoryBacklogPanel
+      v-if="tabs.includes('backlog') && githubRepository && startRepositoryWork"
+      v-show="activeTab === 'backlog'"
+      :agent="agent"
+      :assignments="workAssignments"
+      :branch="gitStatus?.branch"
+      :connection="githubConnection"
+      :error="backlogError"
+      :items="backlogItems"
+      :repository-id="githubRepository"
+      :status="backlogStatus"
+      :start-work-action="startRepositoryWork"
+      :visible="visible && activeTab === 'backlog'"
+      @refresh="emit('refreshBacklog')"
     />
 
     <BrowserPanel
@@ -233,8 +254,8 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconLego, IconWorld } from '@tabler/icons-vue';
-import type { Agent, AgentFileSearchItem, AgentGitStatus, AgentSubagentTree, OpenInApplication, OpenInApplicationCatalog, RendererMessage } from '@codex-claw/core/contracts';
+import { IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconLego, IconListDetails, IconWorld } from '@tabler/icons-vue';
+import type { Agent, AgentFileSearchItem, AgentGitStatus, AgentSubagentTree, OpenInApplication, OpenInApplicationCatalog, RendererMessage, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem } from '@codex-claw/core/contracts';
 import type { CodexConversationLink } from '@codex-app-sdk/vue';
 import { CodeIcon, FileDiffIcon, FileTextIcon, FoldersIcon, GitHubIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
@@ -248,6 +269,7 @@ import GitReviewPanel from './GitReviewPanel.vue';
 import ImagePreviewPanel from './ImagePreviewPanel.vue';
 import MarkdownPanel from './MarkdownPanel.vue';
 import PlanReviewPanel from './PlanReviewPanel.vue';
+import RepositoryBacklogPanel from './RepositoryBacklogPanel.vue';
 import SourcePreviewPanel from './SourcePreviewPanel.vue';
 import SubagentPanel from './SubagentPanel.vue';
 import type { PlanReviewComment, SidePanelGitDiffState, SidePanelMarkdownState, SidePanelSourceState } from './side-panel';
@@ -293,8 +315,21 @@ const props = withDefaults(defineProps<{
   openInCatalog?: OpenInApplicationCatalog;
   subagentTree?: AgentSubagentTree | null;
   loadSubagentMessages?: (conversationId: string) => Promise<RendererMessage[]>;
+  backlogItems?: WorkItem[];
+  backlogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
+  backlogError?: string | null;
+  githubRepository?: string | null;
+  githubConnection?: WorkIntegrationConnection | null;
+  workAssignments?: Record<string, WorkBacklogAssignment>;
+  startRepositoryWork?: (input: import('./right-workspace').RepositoryWorkStartInput) => Promise<void>;
 }>(), {
   filesPaneWidth: 280,
+  backlogItems: () => [],
+  backlogStatus: 'notLoaded',
+  backlogError: null,
+  githubRepository: null,
+  githubConnection: null,
+  workAssignments: () => ({}),
 });
 
 const emit = defineEmits<{
@@ -306,6 +341,7 @@ const emit = defineEmits<{
   openIn: [payload: { application: OpenInApplication; filePath: string }];
   openLink: [link: CodexConversationLink];
   refreshGitDiff: [];
+  refreshBacklog: [];
   selectTab: [tab: RightWorkspaceTab];
   sendPrompt: [prompt: string];
   previewFile: [path: string];
@@ -339,6 +375,7 @@ const activeProjectFilePath = computed(() => {
   return filePath;
 });
 const addMenuItems = computed<AppMenuItem[]>(() => [
+  ...(props.githubRepository ? [{ id: 'backlog', type: 'action', label: 'Backlog', icon: IconListDetails } satisfies AppMenuItem] : []),
   { id: 'review', type: 'action', label: 'GitHub Review', icon: GitHubIcon },
   ...(props.browserAvailable ? [{ id: 'browser', type: 'action', label: 'Browser', icon: IconWorld } satisfies AppMenuItem] : []),
   { id: 'files', type: 'action', label: 'Files', icon: FoldersIcon },
@@ -378,6 +415,7 @@ function stopFilesPaneResize(): void {
 }
 
 function tabLabel(tab: RightWorkspaceTab): string {
+  if (tab === 'backlog') return 'Backlog';
   if (tab === 'review') return 'Review';
   if (tab === 'browser') return 'Browser';
   if (tab === 'files') return 'Open file';
@@ -417,7 +455,7 @@ function sourceFilePanel(tab: RightWorkspaceFileTab): SidePanelSourceState | nul
 
 function openTabFromMenu(tab: string): void {
   addMenuOpen.value = false;
-  if (tab === 'review' || tab === 'files' || (tab === 'browser' && props.browserAvailable)) {
+  if ((tab === 'backlog' && props.githubRepository) || tab === 'review' || tab === 'files' || (tab === 'browser' && props.browserAvailable)) {
     emit('openTab', tab);
   }
 }

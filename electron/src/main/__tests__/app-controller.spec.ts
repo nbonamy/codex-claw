@@ -713,6 +713,7 @@ describe('AppController', () => {
       title: 'Fix bug',
       url: 'https://github.com/nbonamy/codex-claw/issues/12',
     }]);
+    await expect(listWorkItems(controller, 'github', 'nbonamy/codex-claw', { kind: 'all', state: 'all' })).resolves.toHaveLength(1);
     await expect(configureWorkBacklog(
       controller,
       { provider: 'github', configuration: { repositoryId: 'nbonamy/remote' } },
@@ -722,7 +723,12 @@ describe('AppController', () => {
     expect(request).toHaveBeenNthCalledWith(1, 'workProvider/connect', { provider: 'github' });
     expect(request).toHaveBeenNthCalledWith(2, 'workProvider/backlog/configure', { input: { provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } } });
     expect(request).toHaveBeenNthCalledWith(3, 'workProvider/items/list', { provider: 'github', repositoryId: 'nbonamy/codex-claw' });
-    expect(request).toHaveBeenNthCalledWith(4, 'workProvider/backlog/configure', {
+    expect(request).toHaveBeenNthCalledWith(4, 'workProvider/items/list', {
+      provider: 'github',
+      repositoryId: 'nbonamy/codex-claw',
+      query: { kind: 'all', state: 'all' },
+    });
+    expect(request).toHaveBeenNthCalledWith(5, 'workProvider/backlog/configure', {
       input: { provider: 'github', configuration: { repositoryId: 'nbonamy/remote' } },
       location: { kind: 'remote', remoteConnectionId: 'connection-devbox' },
     });
@@ -2669,10 +2675,10 @@ async function configureWorkBacklog(controller: AppController, input: WorkBacklo
   }).configureWorkBacklog(input, location);
 }
 
-async function listWorkItems(controller: AppController, provider: WorkProviderKind, repositoryId: string): Promise<WorkItem[]> {
+async function listWorkItems(controller: AppController, provider: WorkProviderKind, repositoryId: string, query?: import('@codex-claw/core/contracts').WorkItemQuery): Promise<WorkItem[]> {
   return (controller as unknown as {
-    listWorkItems(provider: WorkProviderKind, repositoryId: string): Promise<WorkItem[]>;
-  }).listWorkItems(provider, repositoryId);
+    listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: import('@codex-claw/core/contracts').LoopLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery): Promise<WorkItem[]>;
+  }).listWorkItems(provider, repositoryId, undefined, query);
 }
 
 function createWorkItem(): WorkItem {

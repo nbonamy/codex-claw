@@ -909,6 +909,78 @@ describe('AppShell', () => {
     expect(wrapper.text()).toContain('newValue');
   });
 
+  it('opens the linked repository backlog and starts isolated work for the current agent', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agentGitStatuses['agent-dina'] = {
+      folder: '/Users/nbonamy/src/codex-claw',
+      repository: 'codex-claw',
+      githubRepository: 'nbonamy/codex-claw',
+      branch: 'main',
+      ahead: 0,
+      behind: 0,
+      changedFiles: 0,
+      addedLines: 0,
+      removedLines: 0,
+      hasUntracked: false,
+      state: 'clean',
+      updatedAt: '2026-08-12T00:00:00.000Z',
+    };
+    const item = workItem();
+    const loadWorkItems = vi.fn().mockResolvedValue([item]);
+    const createAgentGitBranch = vi.fn().mockResolvedValue({});
+    const assignWorkItemAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, loadWorkItems, createAgentGitBranch, assignWorkItemAction });
+
+    await wrapper.get('[aria-label="Open repository backlog"]').trigger('click');
+    await flushPromises();
+
+    expect(loadWorkItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw', undefined, { kind: 'all', state: 'all' });
+    expect(wrapper.get('[role="tab"]').text()).toBe('Backlog');
+    const backlog = wrapper.getComponent({ name: 'RepositoryBacklogPanel' });
+    expect(backlog.props('items')).toStrictEqual([item]);
+
+    await backlog.props('startWorkAction')({
+      item,
+      target: 'current',
+      branchName: 'fix/12-backlog',
+      createWorktree: true,
+    });
+
+    expect(createAgentGitBranch).toHaveBeenCalledWith('agent-dina', {
+      name: 'fix/12-backlog',
+      createWorktree: true,
+      confirmed: true,
+    });
+    expect(assignWorkItemAction).toHaveBeenCalledWith({ agentId: 'agent-dina', item });
+  });
+
+  it('duplicates an agent into a pull-request review worktree before assigning it', async () => {
+    const snapshot = createInitialSnapshot();
+    const item = workItem({ kind: 'pullRequest', number: 42, id: 'nbonamy/codex-claw#42' });
+    const duplicate = { ...snapshot.agents[0]!, id: 'agent-reviewer', name: 'Dina copy' };
+    const duplicateAgentAction = vi.fn().mockResolvedValue(duplicate);
+    const createAgentGitBranch = vi.fn().mockResolvedValue({});
+    const assignWorkItemAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, duplicateAgentAction, createAgentGitBranch, assignWorkItemAction });
+    const workspace = wrapper.getComponent({ name: 'RightWorkspacePanel' });
+
+    await workspace.props('startRepositoryWork')({
+      item,
+      target: 'duplicate',
+      branchName: 'review/42-backlog',
+      createWorktree: true,
+    });
+
+    expect(duplicateAgentAction).toHaveBeenCalledWith('agent-dina');
+    expect(createAgentGitBranch).toHaveBeenCalledWith('agent-reviewer', {
+      name: 'review/42-backlog',
+      createWorktree: true,
+      pullRequestNumber: 42,
+      confirmed: true,
+    });
+    expect(assignWorkItemAction).toHaveBeenCalledWith({ agentId: 'agent-reviewer', item });
+  });
+
   it('does not auto-open repository review for a turn-scoped diff event', () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mount(AppShell, {
@@ -3495,7 +3567,10 @@ function mountShell(overrides: Partial<{
   openAgentGitDiff: (agentId: string) => Promise<void>;
   configureWorkBacklog: (input: WorkBacklogConfigurationInput) => Promise<void>;
   loadWorkRepositories: (provider: WorkProviderKind) => Promise<void>;
-  loadWorkItems: (provider: WorkProviderKind, repositoryId: string) => Promise<void>;
+  loadWorkItems: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery) => Promise<WorkItem[] | void>;
+  createAgentGitBranch: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitBranchInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
+  duplicateAgentAction: (agentId: string) => Promise<Agent | null>;
+  assignWorkItemAction: (payload: { agentId: string; item: WorkItem }) => Promise<void>;
   loadBench: (location?: BenchLocation) => Promise<void>;
   getLoopSnapshot: (location?: LoopLocation) => Promise<AppSnapshot>;
   remoteBenchByConnectionId: Record<string, BenchTemplate[]>;
@@ -3539,6 +3614,9 @@ function mountShell(overrides: Partial<{
       configureWorkBacklog: overrides.configureWorkBacklog ?? vi.fn().mockResolvedValue(undefined),
       loadWorkRepositories: overrides.loadWorkRepositories ?? vi.fn().mockResolvedValue(undefined),
       loadWorkItems: overrides.loadWorkItems ?? vi.fn().mockResolvedValue(undefined),
+      createAgentGitBranch: overrides.createAgentGitBranch ?? vi.fn().mockResolvedValue({}),
+      duplicateAgentAction: overrides.duplicateAgentAction ?? vi.fn().mockResolvedValue(null),
+      assignWorkItemAction: overrides.assignWorkItemAction ?? vi.fn().mockResolvedValue(undefined),
       loadBench: overrides.loadBench ?? vi.fn().mockResolvedValue(undefined),
       getLoopSnapshot: overrides.getLoopSnapshot ?? vi.fn().mockResolvedValue(createEmptySnapshot()),
       remoteBenchByConnectionId: overrides.remoteBenchByConnectionId ?? {},
@@ -3591,7 +3669,7 @@ async function chooseCustomAgentFolder(wrapper: ReturnType<typeof mountShell>, r
   await flushPromises();
 }
 
-function workItem(): WorkItem {
+function workItem(overrides: Partial<WorkItem> = {}): WorkItem {
   return {
     provider: 'github',
     id: 'nbonamy/codex-claw#12',
@@ -3606,6 +3684,7 @@ function workItem(): WorkItem {
     labels: [],
     createdAt: '2026-06-09T12:00:00.000Z',
     updatedAt: '2026-06-09T12:30:00.000Z',
+    ...overrides,
   };
 }
 

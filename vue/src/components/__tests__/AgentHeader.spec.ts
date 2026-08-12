@@ -125,6 +125,26 @@ describe('AgentHeader', () => {
     expect(wrapper.findComponent({ name: 'ChatAnimatedDiffStat' }).exists()).toBe(false);
   });
 
+  it('shows a separate bordered repository backlog action for GitHub repositories', async () => {
+    const wrapper = mount(AgentHeader, {
+      props: {
+        agent,
+        backendRuntime: { backend: 'codex', status: 'running' },
+        isLoading: false,
+        sidebarCollapsed: false,
+        githubBacklogAvailable: true,
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    const action = wrapper.get('[aria-label="Open repository backlog"]');
+    expect(action.classes()).toContain('agent-header__repository-backlog');
+    expect(action.find('.tabler-icon-list-details').exists()).toBe(true);
+    await action.trigger('click');
+
+    expect(wrapper.emitted('open-backlog')).toStrictEqual([[]]);
+  });
+
   it('renders an icon-only right-workspace action in the header', async () => {
     const wrapper = mountHeader({ backend: 'codex', status: 'running' }, false, null, true);
     const workspaceAction = wrapper.get('[aria-label="Toggle right workspace"]');

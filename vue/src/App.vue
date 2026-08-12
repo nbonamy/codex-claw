@@ -108,6 +108,8 @@
     :configure-work-backlog="configureWorkBacklog"
     :load-work-repositories="loadWorkRepositories"
     :load-work-items="loadWorkItems"
+    :duplicate-agent-action="duplicateAgent"
+    :assign-work-item-action="assignWorkItemToAgent"
     :quit="quit"
     :restart-app="restartApp"
     @close-team="closeTeam"

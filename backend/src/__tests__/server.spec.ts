@@ -2403,10 +2403,23 @@ describe('ClawBackendServer', () => {
     })).resolves.toMatchObject({
       result: [{ id: 'github:nbonamy/codex-claw#12' }],
     });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'all-items',
+      method: 'workProvider/items/list',
+      params: {
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
+        query: { kind: 'all', state: 'all' },
+      },
+    })).resolves.toMatchObject({
+      result: [{ id: 'github:nbonamy/codex-claw#12' }],
+    });
 
     expect(workIntegrations.connect).toHaveBeenCalledWith('github');
     expect(workIntegrations.configureBacklog).toHaveBeenCalledWith({ provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } });
     expect(workIntegrations.listItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw');
+    expect(workIntegrations.listItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw', { kind: 'all', state: 'all' });
   });
 
   it('reloads work provider connections from token storage', async () => {

@@ -1,4 +1,4 @@
-import type { AgentGitPullRequest, WorkItem, WorkItemLabel, WorkRepository } from '@codex-claw/core/contracts';
+import type { AgentGitPullRequest, WorkItem, WorkItemLabel, WorkItemQuery, WorkRepository } from '@codex-claw/core/contracts';
 import type { WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
 import { runtimeGitHubOAuthClientId } from '../runtime-config';
 import type { WorkProviderDeviceAuthorization, WorkProviderDeviceTokenResult, WorkProviderDriver } from './types';
@@ -178,18 +178,22 @@ export class GitHubWorkProviderDriver implements WorkProviderDriver {
     return repositories.map(githubRepository).filter((repository): repository is WorkRepository => Boolean(repository));
   }
 
-  async listItems(token: WorkProviderToken, repositoryId: string): Promise<WorkItem[]> {
+  async listItems(token: WorkProviderToken, repositoryId: string, query: WorkItemQuery = {}): Promise<WorkItem[]> {
     const repository = parseRepositoryId(repositoryId);
     if (!repository) {
       return [];
     }
 
-    const issues = await githubApiRequest(token, `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}/issues?state=open&per_page=50`);
+    const state = query.state ?? 'open';
+    const issues = await githubApiRequest(token, `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}/issues?state=${state}&per_page=100`);
     if (!Array.isArray(issues)) {
       throw new Error('GitHub returned an invalid issues response.');
     }
 
-    return issues.map((issue) => githubIssue(issue, repositoryId, repository.fullName)).filter((item): item is WorkItem => Boolean(item));
+    return issues
+      .map((issue) => githubIssue(issue, repositoryId, repository.fullName))
+      .filter((item): item is WorkItem => Boolean(item))
+      .filter((item) => !query.kind || query.kind === 'all' || item.kind === query.kind);
   }
 
   async findPullRequest(token: WorkProviderToken, repositoryId: string, branch: string): Promise<AgentGitPullRequest | null> {
@@ -339,13 +343,10 @@ function githubIssue(value: unknown, repositoryId: string, repositoryFullName: s
     return null;
   }
 
-  if (isRecord(value.pull_request)) {
-    return null;
-  }
-
   return {
     provider: 'github',
     id: `${repositoryId}#${issueNumber}`,
+    kind: isRecord(value.pull_request) ? 'pullRequest' : 'issue',
     repositoryId,
     repositoryFullName,
     number: issueNumber,

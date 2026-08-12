@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import type { AgentGitDiff, AgentGitDiffSection, AgentGitFile, AgentGitWorkflow } from '@codex-claw/core/contracts';
 import type { AgentGitStatus } from '@codex-claw/core/contracts';
-import { createSourceWorktree } from '../git-worktrees';
+import { createSourceWorktree, suggestedSourceWorktreePath } from '../git-worktrees';
 
 const execFileAsync = promisify(execFile);
 
@@ -24,12 +24,13 @@ export class AgentGitService {
   async status(folder: string): Promise<AgentGitStatus> {
     const updatedAt = this.now().toISOString();
     try {
-      const [statusResult, stagedNumstat, unstagedNumstat, untrackedFilesResult, commonDirectoryResult] = await Promise.all([
+      const [statusResult, stagedNumstat, unstagedNumstat, untrackedFilesResult, commonDirectoryResult, remotesResult] = await Promise.all([
         this.runGit(folder, ['status', '--porcelain=v1', '--branch']),
         this.runGit(folder, ['diff', '--cached', '--numstat', '--']),
         this.runGit(folder, ['diff', '--numstat', '--']),
         this.runGit(folder, ['ls-files', '--others', '--exclude-standard', '-z', '--']),
         this.runGit(folder, ['rev-parse', '--git-common-dir']).catch(() => ({ stdout: '' })),
+        this.runGit(folder, ['remote', '-v']).catch(() => ({ stdout: '' })),
       ]);
       const branch = parseBranchStatus(statusResult.stdout);
       const stagedDiff = parseNumstat(stagedNumstat.stdout);
@@ -43,10 +44,12 @@ export class AgentGitService {
       const isDirty = changed.changedFiles > 0 || diff.addedLines > 0 || diff.removedLines > 0;
       const commonDirectory = commonDirectoryResult.stdout.trim();
       const repository = commonDirectory ? fileName(dirname(resolve(folder, commonDirectory))) : undefined;
+      const githubRepository = githubRepositoryFromRemotes(remotesResult.stdout);
 
       return {
         folder,
         ...(repository ? { repository } : {}),
+        ...(githubRepository ? { githubRepository } : {}),
         ...branch,
         ...diff,
         changedFiles: changed.changedFiles,
@@ -218,7 +221,7 @@ export class AgentGitService {
       : ['push', remote, branch]);
   }
 
-  async createBranch(folder: string, name: string, createWorktree = false): Promise<string> {
+  async createBranch(folder: string, name: string, createWorktree = false, pullRequestNumber?: number): Promise<string> {
     const normalized = name.trim();
     if (!normalized) throw new Error('Enter a branch name.');
     if (normalized.startsWith('-')) throw new Error('Enter a valid branch name.');
@@ -226,6 +229,19 @@ export class AgentGitService {
       await this.runGit(folder, ['check-ref-format', '--branch', normalized]);
     } catch {
       throw new Error('Enter a valid branch name.');
+    }
+    let startPoint: string | undefined;
+    if (pullRequestNumber !== undefined) {
+      if (!Number.isInteger(pullRequestNumber) || pullRequestNumber <= 0) throw new Error('Enter a valid pull request number.');
+      const workflow = await this.workflow(folder);
+      if (!workflow.remote) throw new Error('Add a GitHub remote before checking out a pull request.');
+      await this.runGit(folder, ['fetch', workflow.remote, `pull/${pullRequestNumber}/head`]);
+      startPoint = 'FETCH_HEAD';
+    }
+    if (createWorktree && startPoint) {
+      const worktreePath = suggestedSourceWorktreePath(folder, normalized);
+      await this.runGit(folder, ['worktree', 'add', '-b', normalized, worktreePath, startPoint]);
+      return worktreePath;
     }
     if (createWorktree) {
       const worktree = await createSourceWorktree({ repoPath: folder, branchName: normalized }, {
@@ -236,7 +252,7 @@ export class AgentGitService {
       });
       return worktree.path;
     }
-    await this.runGit(folder, ['switch', '-c', normalized]);
+    await this.runGit(folder, ['switch', '-c', normalized, ...(startPoint ? [startPoint] : [])]);
     return folder;
   }
 
@@ -335,6 +351,15 @@ function githubRepositoryFromRemote(remoteUrl?: string): string | null {
   if (!remoteUrl) return null;
   const match = remoteUrl.match(/github\.com[/:]([^/]+\/[^/]+?)(?:\.git)?$/i);
   return match?.[1] ?? null;
+}
+
+function githubRepositoryFromRemotes(output: string): string | null {
+  for (const line of output.split(/\r?\n/u)) {
+    const remoteUrl = line.trim().split(/\s+/u)[1];
+    const repository = githubRepositoryFromRemote(remoteUrl);
+    if (repository) return repository;
+  }
+  return null;
 }
 
 function fileName(value: string): string {

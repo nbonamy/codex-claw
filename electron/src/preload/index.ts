@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AddSshConnectionInput, AgentGitBranchInput, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AppCommand, AppPluginStatus, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DesktopUpdateStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RendererSendPromptOptions, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, AgentGitBranchInput, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AppCommand, AppPluginStatus, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DesktopUpdateStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RendererSendPromptOptions, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemQuery, WorkProviderKind } from '@codex-claw/core/contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
 import { exposeCodexNativeRendererApi, TypedIpcRenderer } from '@codex-app-sdk/electron/preload';
 
@@ -26,7 +26,7 @@ const api: CodexClawApi = {
   disconnectWorkProvider: (provider: WorkProviderKind) => ipc.invoke(ipcChannels.disconnectWorkProvider, provider),
   listWorkRepositories: (provider: WorkProviderKind, location?: LoopLocation) => ipc.invoke(ipcChannels.listWorkRepositories, provider, location),
   configureWorkBacklog: (input: WorkBacklogConfigurationInput, location?: LoopLocation) => ipc.invoke(ipcChannels.configureWorkBacklog, input, location),
-  listWorkItems: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation) => ipc.invoke(ipcChannels.listWorkItems, provider, repositoryId, location),
+  listWorkItems: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: WorkItemQuery) => ipc.invoke(ipcChannels.listWorkItems, provider, repositoryId, location, query),
   listBackendModels: (agentId: string) => ipc.invoke(ipcChannels.listBackendModels, agentId),
   listBackendPlugins: (agentId: string) => ipc.invoke(ipcChannels.listBackendPlugins, agentId),
   listBackendSkills: (agentId: string) => ipc.invoke(ipcChannels.listBackendSkills, agentId),

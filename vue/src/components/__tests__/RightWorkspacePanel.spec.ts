@@ -147,6 +147,29 @@ describe('RightWorkspacePanel', () => {
     expect(wrapper.emitted('openTab')).toStrictEqual([['review']]);
   });
 
+  it('offers and renders a repository backlog only for linked GitHub repositories', async () => {
+    const startRepositoryWork = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel(['backlog'], 'backlog');
+    await wrapper.setProps({
+      githubRepository: 'nbonamy/codex-claw',
+      backlogStatus: 'loaded',
+      backlogItems: [],
+      startRepositoryWork,
+    });
+
+    expect(wrapper.get('[role="tab"]').text()).toBe('Backlog');
+    expect(wrapper.get('[role="tab"]').find('.tabler-icon-list-details').exists()).toBe(true);
+    expect(wrapper.findComponent({ name: 'RepositoryBacklogPanel' }).props()).toMatchObject({
+      repositoryId: 'nbonamy/codex-claw',
+      status: 'loaded',
+    });
+
+    await wrapper.get('[aria-label="Open right workspace tab"]').trigger('click');
+    expect(wrapper.findAll('.app-menu__item').map((item) => item.text())[0]).toBe('Backlog');
+    await wrapper.findAll('.app-menu__item')[0]?.trigger('click');
+    expect(wrapper.emitted('openTab')).toStrictEqual([['backlog']]);
+  });
+
   it('omits the embedded Browser when the host does not provide it', async () => {
     const wrapper = mountPanel([], null, {}, null, {}, undefined, false);
 

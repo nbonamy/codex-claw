@@ -6,13 +6,15 @@ export function workItemAssignmentPrompt(item: WorkItem, instructions: Pick<Loop
   const assignmentInstructions = instructions.assignment?.trim();
   const workItemId = workItemAssignmentKey(item);
   return [
-    `Please take this ${workProviderLabel(item.provider)} issue and drive it to completion.`,
+    item.kind === 'pullRequest'
+      ? `Please review this ${workProviderLabel(item.provider)} pull request and drive the requested work to completion.`
+      : `Please take this ${workProviderLabel(item.provider)} issue and drive it to completion.`,
     '',
     `Work item ID: ${workItemId}`,
     'When you are done with this work item, call the codex_claw MCP tool `mark-work-item-completed` with this exact Work item ID.',
     '',
     `Repository: ${item.repositoryFullName}`,
-    `Issue: #${item.number} ${item.title}`,
+    `${item.kind === 'pullRequest' ? 'Pull request' : 'Issue'}: #${item.number} ${item.title}`,
     `URL: ${item.url}`,
     item.labels.length > 0 ? `Labels: ${item.labels.map((label) => label.name).join(', ')}` : null,
     item.authorName ? `Author: ${item.authorName}` : null,
