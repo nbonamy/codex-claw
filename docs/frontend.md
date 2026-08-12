@@ -136,7 +136,8 @@ implemented:
   and uses a clipboard image when present, otherwise a centered crop of the
   bundled shell screenshot;
 - single-line active agent header with contextual agent status beside the
-  identity, a compact `branch @ repository` location for Git folders (falling
+  identity, a compact `branch @ repository` location using the primary repository
+  name even for linked worktrees (falling
   back to the full folder otherwise), and quiet right-side actions ordered from
   git stats into subagents,
   without a duplicate activity indicator. The agent's Review workspace supports
@@ -168,8 +169,9 @@ implemented:
   exposes local visibility toggles for each one without reloading repository
   state. The Git action menu is ordered Commit, Push, Branch, Merge, and Create
   PR. Branch is available for every initialized Git checkout and creates plus
-  checks out a new branch from the current HEAD, with the shared progress and
-  passive-success treatment. Commit and pull-request editors can ask Codex for an ephemeral draft;
+  checks out a new branch from the current HEAD, or optionally creates an
+  adjacent worktree and relocates the agent there. Both paths use the shared
+  progress and passive-success treatment. Commit and pull-request editors can ask Codex for an ephemeral draft;
   generated text stays editable and never creates or appears in a visible agent
   conversation;
 - ChatGPT-style split Open In controls in the active-agent header and project-file

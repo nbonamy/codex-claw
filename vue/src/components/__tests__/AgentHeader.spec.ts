@@ -70,6 +70,24 @@ describe('AgentHeader', () => {
     expect(wrapper.get('[aria-label="Run Git action"]').element.tagName).toBe('BUTTON');
   });
 
+  it('shows the canonical repository name for a linked worktree', () => {
+    const wrapper = mountHeader({ backend: 'codex', status: 'running' }, false, {
+      folder: '/Users/nbonamy/src/codex-claw-git-fixture-test',
+      repository: 'codex-claw-git-fixture',
+      branch: 'test',
+      ahead: 0,
+      behind: 0,
+      changedFiles: 0,
+      addedLines: 0,
+      removedLines: 0,
+      hasUntracked: false,
+      state: 'clean',
+      updatedAt: '2026-08-11T00:00:00.000Z',
+    });
+
+    expect(wrapper.get('.agent-header__folder').text()).toBe('test @ codex-claw-git-fixture');
+  });
+
   it('emits a git diff preview request when repo diff stats are clicked', async () => {
     const wrapper = mountHeader({ backend: 'codex', status: 'running' }, false, {
       folder: '/Users/nbonamy/src/id8',

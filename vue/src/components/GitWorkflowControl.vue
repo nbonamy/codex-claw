@@ -179,6 +179,10 @@
         placeholder="Branch name…"
         @keydown.enter.prevent="createBranch"
       />
+      <label class="git-workflow-control__check git-workflow-control__branch-worktree">
+        <el-switch v-model="createBranchWorktree" size="small" :disabled="busy" />
+        <span>Create in a new worktree</span>
+      </label>
     </div>
     <GitOperationFeedback
       v-else
@@ -356,6 +360,7 @@ const includeUntracked = ref(false);
 const pullRequestTitle = ref('');
 const pullRequestBody = ref('');
 const branchName = ref('');
+const createBranchWorktree = ref(false);
 const mergeStrategy = ref<'merge' | 'squash'>('merge');
 const squashCommitMessage = ref('');
 const deleteBranch = ref(false);
@@ -436,9 +441,9 @@ const pushOperationDetail = computed(() => pushOperation.value.status === 'error
 const branchOperationRunning = computed(() => branchOperation.value.status === 'creating');
 const branchFeedbackStatus = computed<'running' | 'success' | 'error'>(() => branchOperation.value.status === 'success' ? 'success' : branchOperation.value.status === 'error' ? 'error' : 'running');
 const branchOperationTitle = computed(() => branchOperation.value.status === 'creating'
-  ? 'Creating branch'
+  ? createBranchWorktree.value ? 'Creating branch and worktree' : 'Creating branch'
   : branchOperation.value.status === 'success'
-    ? 'Branch created'
+    ? createBranchWorktree.value ? 'Branch and worktree created' : 'Branch created'
     : branchOperation.value.status === 'error'
       ? 'Branch creation failed'
       : '');
@@ -693,7 +698,7 @@ async function createBranch(): Promise<void> {
   workflowError.value = null;
   branchOperation.value = { status: 'creating' };
   try {
-    workflow.value = await props.createBranch(props.agent.id, { name, confirmed: true });
+    workflow.value = await props.createBranch(props.agent.id, { name, createWorktree: createBranchWorktree.value, confirmed: true });
     branchOperation.value = { status: 'success', name };
     branchSuccessTimer = setTimeout(() => {
       branchDialogOpen.value = false;
@@ -839,6 +844,7 @@ function clearPushSuccessTimer(): void {
 }
 function resetBranchOperation(): void {
   clearBranchSuccessTimer();
+  createBranchWorktree.value = false;
   branchOperation.value = { status: 'editing' };
 }
 function clearBranchSuccessTimer(): void {
@@ -1016,7 +1022,7 @@ function clearMergeSuccessTimer(): void {
 }
 
 .git-workflow-control__branch-form {
-  padding: var(--space-8) 0;
+  padding: var(--space-4) 0 var(--space-2);
 }
 
 .git-workflow-control__branch-form input[type="text"] {
@@ -1029,6 +1035,12 @@ function clearMergeSuccessTimer(): void {
 .git-workflow-control__branch-form input[type="text"]:focus {
   border-color: transparent;
   background: transparent;
+}
+
+.git-workflow-control__branch-worktree {
+  min-height: 40px;
+  margin-top: var(--space-2);
+  padding: var(--space-2) 0;
 }
 
 .git-workflow-control__message-editor {

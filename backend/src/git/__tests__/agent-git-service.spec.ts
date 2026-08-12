@@ -89,6 +89,20 @@ describe('agent git service parsers', () => {
     });
   });
 
+  it('reports the primary repository name for a linked worktree', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'status') return { stdout: '## test\n' };
+      if (args[0] === 'rev-parse') return { stdout: '/Users/nbonamy/src/codex-claw-git-fixture/.git\n' };
+      return { stdout: '' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
+
+    await expect(service.status('/Users/nbonamy/src/codex-claw-git-fixture-test')).resolves.toMatchObject({
+      repository: 'codex-claw-git-fixture',
+      branch: 'test',
+    });
+  });
+
   it('reviews staged plus unstaged diffs before the first commit', async () => {
     const runGit = vi.fn(async (_folder: string, args: string[]) => {
       if (args.includes('--cached')) {
@@ -275,11 +289,23 @@ describe('agent git service parsers', () => {
     const runGit = vi.fn().mockResolvedValue({ stdout: '' });
     const service = new AgentGitService(() => new Date(), runGit);
 
-    await service.createBranch('/repo', ' feature/from-current ');
+    await expect(service.createBranch('/repo', ' feature/from-current ')).resolves.toBe('/repo');
 
     expect(runGit.mock.calls).toStrictEqual([
       ['/repo', ['check-ref-format', '--branch', 'feature/from-current']],
       ['/repo', ['switch', '-c', 'feature/from-current']],
+    ]);
+  });
+
+  it('creates a branch in an adjacent worktree without switching the current checkout', async () => {
+    const runGit = vi.fn().mockResolvedValue({ stdout: '' });
+    const service = new AgentGitService(() => new Date(), runGit);
+
+    await expect(service.createBranch('/repo', 'feature/worktree', true)).resolves.toBe('/repo-feature-worktree');
+
+    expect(runGit.mock.calls).toStrictEqual([
+      ['/repo', ['check-ref-format', '--branch', 'feature/worktree']],
+      ['/repo', ['worktree', 'add', '-b', 'feature/worktree', '/repo-feature-worktree']],
     ]);
   });
 

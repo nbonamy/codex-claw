@@ -51,8 +51,55 @@ describe('ClawBackendServer', () => {
       params: { agentId: 'agent-dina', input: { name: 'feature/from-current', confirmed: true } },
     })).resolves.toMatchObject({ result: { branch: 'feature/from-current' } });
 
-    expect(createBranch).toHaveBeenCalledWith('/repo', 'feature/from-current');
+    expect(createBranch).toHaveBeenCalledWith('/repo', 'feature/from-current', false);
     expect(workflow).toHaveBeenCalledWith('/repo');
+    await server.close();
+  });
+
+  it('rehomes the agent and clears its session when a branch creates a worktree', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina', teamId: snapshot.teams[0]!.id, name: 'Dina', folder: '/repo', backend: 'codex',
+      backendSession: { kind: 'codex', threadId: 'thread-old' }, status: { type: 'idle' },
+      createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+    }];
+    const createBranch = vi.fn().mockResolvedValue('/repo-feature-worktree');
+    const workflow = vi.fn().mockResolvedValue({
+      repository: 'owner/repo', folder: '/repo-feature-worktree', isLinkedWorktree: true,
+      branch: 'feature/worktree', detached: false, ahead: 0, behind: 0,
+      files: [], stagedFiles: [], unstagedFiles: [],
+    });
+    const forgetAgentSession = vi.fn();
+    const saveSnapshot = vi.fn();
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      forgetAgentSession,
+      getGitStatus: async () => null,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version', snapshot, saveSnapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      agentGitService: { createBranch, workflow } as unknown as AgentGitService,
+      workIntegrations: { githubConnected: vi.fn().mockResolvedValue(false) } as unknown as WorkIntegrationManager,
+    });
+
+    await server.handleMessage({
+      jsonrpc: '2.0', id: 'branch-worktree', method: backendMethods.agentGitBranchCreate,
+      params: { agentId: 'agent-dina', input: { name: 'feature/worktree', createWorktree: true, confirmed: true } },
+    });
+
+    expect(snapshot.agents[0]).toMatchObject({ folder: '/repo-feature-worktree' });
+    expect(snapshot.agents[0]).not.toHaveProperty('backendSession');
+    expect(forgetAgentSession).toHaveBeenCalledWith('agent-dina');
+    expect(saveSnapshot).toHaveBeenCalled();
     await server.close();
   });
 

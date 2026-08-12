@@ -1,8 +1,9 @@
 import { execFile } from 'node:child_process';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import type { AgentGitDiff, AgentGitDiffSection, AgentGitFile, AgentGitWorkflow } from '@codex-claw/core/contracts';
 import type { AgentGitStatus } from '@codex-claw/core/contracts';
+import { createSourceWorktree } from '../git-worktrees';
 
 const execFileAsync = promisify(execFile);
 
@@ -23,11 +24,12 @@ export class AgentGitService {
   async status(folder: string): Promise<AgentGitStatus> {
     const updatedAt = this.now().toISOString();
     try {
-      const [statusResult, stagedNumstat, unstagedNumstat, untrackedFilesResult] = await Promise.all([
+      const [statusResult, stagedNumstat, unstagedNumstat, untrackedFilesResult, commonDirectoryResult] = await Promise.all([
         this.runGit(folder, ['status', '--porcelain=v1', '--branch']),
         this.runGit(folder, ['diff', '--cached', '--numstat', '--']),
         this.runGit(folder, ['diff', '--numstat', '--']),
         this.runGit(folder, ['ls-files', '--others', '--exclude-standard', '-z', '--']),
+        this.runGit(folder, ['rev-parse', '--git-common-dir']).catch(() => ({ stdout: '' })),
       ]);
       const branch = parseBranchStatus(statusResult.stdout);
       const stagedDiff = parseNumstat(stagedNumstat.stdout);
@@ -39,9 +41,12 @@ export class AgentGitService {
       };
       const changed = parseChangedFiles(statusResult.stdout);
       const isDirty = changed.changedFiles > 0 || diff.addedLines > 0 || diff.removedLines > 0;
+      const commonDirectory = commonDirectoryResult.stdout.trim();
+      const repository = commonDirectory ? fileName(dirname(resolve(folder, commonDirectory))) : undefined;
 
       return {
         folder,
+        ...(repository ? { repository } : {}),
         ...branch,
         ...diff,
         changedFiles: changed.changedFiles,
@@ -213,7 +218,7 @@ export class AgentGitService {
       : ['push', remote, branch]);
   }
 
-  async createBranch(folder: string, name: string): Promise<void> {
+  async createBranch(folder: string, name: string, createWorktree = false): Promise<string> {
     const normalized = name.trim();
     if (!normalized) throw new Error('Enter a branch name.');
     if (normalized.startsWith('-')) throw new Error('Enter a valid branch name.');
@@ -222,7 +227,17 @@ export class AgentGitService {
     } catch {
       throw new Error('Enter a valid branch name.');
     }
+    if (createWorktree) {
+      const worktree = await createSourceWorktree({ repoPath: folder, branchName: normalized }, {
+        run: async (command, args, options) => {
+          if (command !== 'git') throw new Error(`Unsupported command: ${command}`);
+          return this.runGit(options.cwd, args);
+        },
+      });
+      return worktree.path;
+    }
     await this.runGit(folder, ['switch', '-c', normalized]);
+    return folder;
   }
 
   async mergeTarget(folder: string): Promise<string> {

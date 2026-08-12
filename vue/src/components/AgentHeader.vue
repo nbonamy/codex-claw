@@ -206,7 +206,7 @@ const agentLocationLabel = computed(() => {
     return agent?.folder ?? '';
   }
 
-  const repository = gitStatus.folder
+  const repository = gitStatus.repository ?? gitStatus.folder
     .replace(/[\\/]+$/u, '')
     .split(/[\\/]/u)
     .filter(Boolean)

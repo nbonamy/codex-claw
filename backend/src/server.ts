@@ -725,7 +725,12 @@ export class ClawBackendServer {
         const agentId = requireString(params.agentId, 'agentId');
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitBranchCreate, params, async (agent) => {
           const input = requireConfirmed(params.input, 'Creating a branch');
-          await this.agentGitService.createBranch(agent.folder, requireString(input.name, 'name'));
+          const targetFolder = await this.agentGitService.createBranch(agent.folder, requireString(input.name, 'name'), input.createWorktree === true);
+          if (input.createWorktree === true) {
+            updateAgentFolder(this.snapshot, agentId, targetFolder);
+            await this.driverRpc?.handle(backendMethods.driverSessionForget, { backend: agent.backend, agentId });
+            await this.persistAndEmitSnapshot();
+          }
           return this.gitWorkflow(agent);
         });
       }
