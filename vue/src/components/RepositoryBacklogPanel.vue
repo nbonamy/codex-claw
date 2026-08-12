@@ -540,7 +540,7 @@ function labelStyle(color?: string): Record<string, string> {
   display: flex;
   flex-direction: column;
   color: var(--color-text);
-  background: var(--color-shell-main);
+  background: var(--color-surface-low);
 }
 
 .repository-backlog__repository {
@@ -550,6 +550,7 @@ function labelStyle(color?: string): Record<string, string> {
   gap: var(--space-4);
   padding: 0 var(--space-6);
   border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-lowest);
 }
 
 .repository-backlog__repository > div {
@@ -618,6 +619,7 @@ function labelStyle(color?: string): Record<string, string> {
   gap: var(--space-3);
   padding: var(--space-4) var(--space-6);
   border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-lowest);
 }
 
 .repository-backlog__segments {
@@ -861,8 +863,8 @@ function labelStyle(color?: string): Record<string, string> {
   display: grid;
   place-items: center;
   border-radius: var(--radius-full);
-  color: var(--color-text-muted);
-  background: var(--color-surface-low);
+  color: var(--color-on-primary-container);
+  background: var(--color-primary-container);
   font-size: var(--font-size-11);
   font-weight: var(--font-weight-regular);
 }
@@ -875,9 +877,10 @@ function labelStyle(color?: string): Record<string, string> {
   gap: var(--space-3);
   min-height: 54px;
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-border);
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
   border-radius: var(--radius-md);
   background: var(--color-surface-lowest);
+  box-shadow: var(--shadow-sm);
 }
 
 :deep(.repository-backlog__item + .repository-backlog__item) {
@@ -886,11 +889,18 @@ function labelStyle(color?: string): Record<string, string> {
 
 :deep(.repository-backlog__item:hover),
 :deep(.repository-backlog__item--active) {
-  background: var(--color-surface-low);
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-lowest);
+  box-shadow: var(--shadow-md);
 }
 
 :deep(.repository-backlog__item--active) {
   border-color: var(--color-primary);
+  background: color-mix(
+    in srgb,
+    var(--color-primary-container) 38%,
+    var(--color-surface-lowest)
+  );
 }
 
 :deep(.repository-backlog__item-kind) {
@@ -954,11 +964,17 @@ function labelStyle(color?: string): Record<string, string> {
   text-overflow: ellipsis;
   white-space: nowrap;
   padding: 1px var(--space-3);
+  border: 1px solid
+    color-mix(
+      in srgb,
+      var(--repository-label-color, var(--color-outline)) 20%,
+      transparent
+    );
   border-radius: var(--radius-full);
   color: var(--repository-label-color, var(--color-text-muted));
   background: color-mix(
     in srgb,
-    var(--repository-label-color, var(--color-outline)) 12%,
+    var(--repository-label-color, var(--color-outline)) 15%,
     transparent
   );
 }
