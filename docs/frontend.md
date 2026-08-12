@@ -220,6 +220,8 @@ implemented:
   provider-neutral backlog action beside the git workflow control. Backlog lists the linked repository's
   issues and pull requests with a compact, on-demand search plus state, assignee,
   and label filters whose defaults can be saved per repository;
+  issue and pull-request numbers and titles open their source page in the
+  system browser without adding another permanent row action;
   an item can prefill an editable custom prompt or immediately dispatch a
   contextual issue investigation/fix or pull-request feedback/review action to
   the current agent or a duplicate, either continuing in the agent's current

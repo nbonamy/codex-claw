@@ -29,6 +29,35 @@ describe('RepositoryBacklogPanel', () => {
     expect(wrapper.text()).toContain('Ship backlog workspace');
   });
 
+  it('opens issue and pull request titles in the system browser without adding another row action', async () => {
+    const wrapper = mountPanel({
+      items: [
+        workItem(),
+        workItem({
+          id: 'nbonamy/codex-claw#21',
+          kind: 'pullRequest',
+          number: 21,
+          title: 'Ship backlog workspace',
+          url: 'https://github.com/nbonamy/codex-claw/pull/21',
+        }),
+      ],
+    });
+
+    const issueLink = wrapper.get('.repository-backlog__item-title');
+    expect(issueLink.attributes()).toMatchObject({
+      href: 'https://github.com/nbonamy/codex-claw/issues/12',
+      target: '_blank',
+      rel: 'noopener noreferrer',
+    });
+    expect(wrapper.findAll('[aria-label^="Work item actions"]')).toHaveLength(1);
+
+    await wrapper.get('[role="radio"][aria-checked="false"]').trigger('click');
+
+    const pullRequestLink = wrapper.get('.repository-backlog__item-title');
+    expect(pullRequestLink.attributes('href')).toBe('https://github.com/nbonamy/codex-claw/pull/21');
+    expect(wrapper.findAll('[aria-label^="Work item actions"]')).toHaveLength(1);
+  });
+
   it('keeps only active assignments in needs attention', () => {
     const wrapper = mountPanel({
       assignments: {

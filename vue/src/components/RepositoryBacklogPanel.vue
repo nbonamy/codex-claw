@@ -418,7 +418,12 @@ const RepositoryItemRow = (rowProps: { item: WorkItem; active: boolean }, contex
   }, [
     h(item.kind === 'pullRequest' ? IconGitPullRequest : IconCircleDot, { class: 'repository-backlog__item-kind', 'aria-hidden': 'true' }),
     h('div', { class: 'repository-backlog__item-copy' }, [
-      h('div', { class: 'repository-backlog__item-title' }, [h('span', `#${item.number}`), h('strong', item.title)]),
+      h('a', {
+        class: 'repository-backlog__item-title',
+        href: item.url,
+        target: '_blank',
+        rel: 'noopener noreferrer',
+      }, [h('span', `#${item.number}`), h('strong', item.title)]),
       h('div', { class: 'repository-backlog__item-meta' }, [
         h('span', { class: `repository-backlog__state-dot repository-backlog__state-dot--${item.state}` }),
         h('span', item.state === 'open' ? t('repositoryBacklog.open') : t('repositoryBacklog.closed')),
@@ -963,6 +968,14 @@ function labelStyle(color?: string): Record<string, string> {
   display: flex;
   align-items: baseline;
   gap: var(--space-3);
+  color: inherit;
+  text-decoration: none;
+}
+
+:deep(.repository-backlog__item-title:hover strong) {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
 }
 
 :deep(.repository-backlog__item-title span) {
