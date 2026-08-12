@@ -1,7 +1,28 @@
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import WhatsNewDialog from '../WhatsNewDialog.vue';
+
+vi.mock('../../generated/release-notes.json', () => ({
+  default: {
+    schemaVersion: 2,
+    currentVersion: '9.9.0',
+    releases: [
+      {
+        version: '9.9.0',
+        releasedAt: '2026-01-02',
+        sourceSha256: 'current-release-fixture',
+        markdown: '### Current release fixture\n\n- Stable current release copy.',
+      },
+      {
+        version: '9.8.0',
+        releasedAt: '2025-12-20',
+        sourceSha256: 'previous-release-fixture',
+        markdown: '### Previous release fixture\n\n- Stable previous release copy.',
+      },
+    ],
+  },
+}));
 
 describe('WhatsNewDialog', () => {
   it('defaults to the current release, navigates release history, and closes from the header', async () => {
@@ -24,28 +45,17 @@ describe('WhatsNewDialog', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('Version 0.9.0');
+    expect(wrapper.text()).toContain('Version 9.9.0');
     expect(wrapper.text()).toContain('What’s new in Codex Claw');
-    expect(wrapper.get('h3').text()).toBe('New features');
-    expect(wrapper.text()).toContain('complete Git workflow');
+    expect(wrapper.get('h3').text()).toBe('Current release fixture');
+    expect(wrapper.text()).toContain('Stable current release copy');
 
-    await wrapper.getComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', '0.8.1');
+    await wrapper.getComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', '9.8.0');
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.get('h3').text()).toBe('Improvements and fixes');
-    expect(wrapper.text()).toContain('browse notes from every previous');
-
-    await wrapper.getComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', '0.8.0');
-    await wrapper.vm.$nextTick();
-
-    expect(wrapper.get('h3').text()).toBe('New features');
-    expect(wrapper.text()).toContain('Subagents are now visible');
-
-    await wrapper.getComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', '0.7.0');
-    await wrapper.vm.$nextTick();
-
-    expect(wrapper.text()).toContain('Every composer image');
-    expect(wrapper.text()).not.toContain('Subagents are now visible');
+    expect(wrapper.get('h3').text()).toBe('Previous release fixture');
+    expect(wrapper.text()).toContain('Stable previous release copy');
+    expect(wrapper.text()).not.toContain('Stable current release copy');
 
     await wrapper.get('[aria-label="Close What’s New"]').trigger('click');
     expect(wrapper.emitted('close')).toStrictEqual([[]]);
