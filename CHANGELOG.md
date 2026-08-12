@@ -4,6 +4,25 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.9.1] - 2026-08-11
+
+### New features
+
+- The Git workflow menu can now create and switch to a branch in the current
+  folder or a new worktree, automatically keeping the agent attached to the
+  resulting workspace.
+- Commit and pull-request dialogs can now ask Codex to draft concise messages
+  from the selected changes without creating a visible conversation.
+- Previously submitted prompts can now be recalled from the composer for quick
+  reuse or editing.
+
+### Improvements and fixes
+
+- Settings are now organized around Codex and Claude Code, with clearer plugin
+  ownership and Codex Device Pairing labels.
+- Git dialogs and other app dialogs now use consistent compact actions,
+  repository context, progress feedback, and completion states.
+
 ## [0.9.0] - 2026-08-11
 
 ### New features

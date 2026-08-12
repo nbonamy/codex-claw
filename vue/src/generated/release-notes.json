@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.9.0",
+  "currentVersion": "0.9.1",
   "releases": [
+    {
+      "version": "0.9.1",
+      "releasedAt": "2026-08-11",
+      "sourceSha256": "f0274637af83e42f7c88e48acfcfc7f397306ecb4c308571663fa775ba1d6059",
+      "markdown": "### New features\n\n- The Git workflow menu can now create and switch to a branch in the current\n  folder or a new worktree, automatically keeping the agent attached to the\n  resulting workspace.\n- Commit and pull-request dialogs can now ask Codex to draft concise messages\n  from the selected changes without creating a visible conversation.\n- Previously submitted prompts can now be recalled from the composer for quick\n  reuse or editing.\n\n### Improvements and fixes\n\n- Settings are now organized around Codex and Claude Code, with clearer plugin\n  ownership and Codex Device Pairing labels.\n- Git dialogs and other app dialogs now use consistent compact actions,\n  repository context, progress feedback, and completion states."
+    },
     {
       "version": "0.9.0",
       "releasedAt": "2026-08-11",
