@@ -24,8 +24,14 @@ describe('WhatsNewDialog', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('Version 0.8.1');
+    expect(wrapper.text()).toContain('Version 0.9.0');
     expect(wrapper.text()).toContain('What’s new in Codex Claw');
+    expect(wrapper.get('h3').text()).toBe('New features');
+    expect(wrapper.text()).toContain('complete Git workflow');
+
+    await wrapper.getComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', '0.8.1');
+    await wrapper.vm.$nextTick();
+
     expect(wrapper.get('h3').text()).toBe('Improvements and fixes');
     expect(wrapper.text()).toContain('browse notes from every previous');
 
