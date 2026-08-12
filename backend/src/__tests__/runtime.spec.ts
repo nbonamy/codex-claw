@@ -396,7 +396,7 @@ describe('clawd runtime', () => {
     );
     expect(driver.setConversationTitle).toHaveBeenCalledWith(
       mocks.snapshot.agents[0],
-      expect.stringMatching(/^Dina - /),
+      'Dina',
     );
     expect(mocks.updateLoopConversation).toHaveBeenCalledWith(
       mocks.snapshot,

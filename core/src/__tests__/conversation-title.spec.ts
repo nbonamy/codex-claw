@@ -3,9 +3,8 @@ import type { Agent } from '../contracts';
 import { formatConversationTitle } from '../conversation-title';
 
 describe('conversation titles', () => {
-  it('formats a stable English title from the agent and timestamp', () => {
-    expect(formatConversationTitle(agent(), new Date(2026, 7, 2, 19, 7)))
-      .toBe('Dina - Aug 2, 2026 7:07 PM');
+  it('uses the Claw agent name', () => {
+    expect(formatConversationTitle(agent())).toBe('Dina');
   });
 });
 

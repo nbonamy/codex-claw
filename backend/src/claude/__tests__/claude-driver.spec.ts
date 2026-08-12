@@ -377,6 +377,14 @@ describe('ClaudeBackendDriver', () => {
     expect(transport.closeSession).toHaveBeenLastCalledWith('claude-session-second');
   });
 
+  it('preserves Claude transcripts when a Claw agent retires its conversation', async () => {
+    const transport = createFakeTransport();
+    const driver = new ClaudeBackendDriver(transport);
+
+    await expect(driver.retireConversation(agent)).resolves.toBeUndefined();
+    expect(transport.closeSession).not.toHaveBeenCalled();
+  });
+
   it('exposes capabilities and rejects operations that have no valid Claude session context', async () => {
     const transport = createFakeTransport();
     const historyLoader = vi.fn().mockResolvedValue(null);

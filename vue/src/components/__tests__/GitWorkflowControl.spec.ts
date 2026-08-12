@@ -572,20 +572,20 @@ describe('GitWorkflowControl', () => {
     expect(createPullRequest).toHaveBeenCalledTimes(2);
   });
 
-  it('refreshes stale workflow state when the menu opens', async () => {
-    let clean = false;
-    const getWorkflow = vi.fn(async () => clean ? { ...workflow, files: [], unstagedFiles: [], ahead: 0 } : workflow);
+  it('does not reload workflow state when the menu opens', async () => {
+    const getWorkflow = vi.fn(async () => workflow);
     const wrapper = mountControl({ getWorkflow });
     await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
-    clean = true;
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
-    await vi.waitFor(() => expect(getWorkflow).toHaveBeenCalledTimes(2));
-    await vi.waitFor(() => expect(wrapper.get('.app-menu__item').attributes('disabled')).toBeDefined());
+    await flushPromises();
+
+    expect(getWorkflow).toHaveBeenCalledOnce();
   });
 
-  it('keeps the menu open when its workflow refresh updates git status', async () => {
-    const wrapper = mountControl();
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+  it('reloads workflow state once when git status changes', async () => {
+    const getWorkflow = vi.fn(async () => workflow);
+    const wrapper = mountControl({ getWorkflow });
+    await vi.waitFor(() => expect(getWorkflow).toHaveBeenCalledOnce());
 
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     expect(wrapper.get('.git-workflow-control__trigger').attributes('aria-expanded')).toBe('true');
@@ -595,13 +595,25 @@ describe('GitWorkflowControl', () => {
 
     expect(wrapper.get('.git-workflow-control__trigger').attributes('aria-expanded')).toBe('true');
     expect(wrapper.find('[role="menu"]').exists()).toBe(true);
+    expect(getWorkflow).toHaveBeenCalledTimes(2);
   });
 
-  it('keeps the last known action availability while a same-agent refresh is pending', async () => {
-    const pendingRefresh = deferred<AgentGitWorkflow>();
-    const getWorkflow = vi.fn()
-      .mockResolvedValueOnce(workflow)
-      .mockReturnValue(pendingRefresh.promise);
+  it('coalesces a git status update with an in-flight active-agent workflow load', async () => {
+    const pendingWorkflow = deferred<AgentGitWorkflow>();
+    const getWorkflow = vi.fn(() => pendingWorkflow.promise);
+    const wrapper = mountControl({ getWorkflow });
+    await vi.waitFor(() => expect(getWorkflow).toHaveBeenCalledOnce());
+
+    await wrapper.setProps({ gitStatus: { ...status, updatedAt: '2026-08-11T20:00:00.000Z' } });
+    await flushPromises();
+
+    expect(getWorkflow).toHaveBeenCalledOnce();
+    pendingWorkflow.resolve(workflow);
+    await flushPromises();
+  });
+
+  it('keeps the last known action availability when the menu opens', async () => {
+    const getWorkflow = vi.fn().mockResolvedValueOnce(workflow);
     const wrapper = mountControl({ getWorkflow });
     await vi.waitFor(() => expect(getWorkflow).toHaveBeenCalledOnce());
     await flushPromises();
@@ -612,9 +624,7 @@ describe('GitWorkflowControl', () => {
     const createPr = wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'));
     expect(push?.attributes('disabled')).toBeUndefined();
     expect(createPr?.attributes('disabled')).toBeUndefined();
-
-    pendingRefresh.resolve(workflow);
-    await flushPromises();
+    expect(getWorkflow).toHaveBeenCalledOnce();
   });
 });
 

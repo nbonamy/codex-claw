@@ -82,6 +82,7 @@ export const backendMethods = {
   driverConversationSummaryGet: 'driver/conversation/summary/get',
   driverConversationFork: 'driver/conversation/fork',
   driverConversationResume: 'driver/conversation/resume',
+  driverConversationRetire: 'driver/conversation/retire',
   driverConversationTitleUpdate: 'driver/conversation/title/update',
   driverConversationsList: 'driver/conversations/list',
   driverFilePreview: 'driver/file/preview',

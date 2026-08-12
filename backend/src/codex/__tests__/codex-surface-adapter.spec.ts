@@ -396,6 +396,10 @@ describe('CodexSurfaceAgentAdapter', () => {
     await expect(adapter.interruptTurn(agentA)).resolves.toStrictEqual({ threadId: 'thread-a', turnId: sent.turnId });
 
     expect(lastRequest(transport, 'thread/name/set')).toBeDefined();
+    await expect(adapter.retireConversation(agentA)).resolves.toBeUndefined();
+    expect(lastRequest(transport, 'thread/archive')).toMatchObject({
+      params: { threadId: 'thread-a' },
+    });
     adapter.forgetAgentSession('agent-missing');
     adapter.forgetAgentSession('agent-a');
   });
@@ -413,6 +417,24 @@ describe('CodexSurfaceAgentAdapter', () => {
         threadSource: 'user',
       },
     });
+    expect(lastRequest(transport, 'thread/name/set')).toMatchObject({
+      params: {
+        threadId: 'thread-new',
+        name: 'agent-new',
+      },
+    });
+    const requestMethods = transport.sent
+      .filter((message): message is RpcMessage & { method: string } => 'method' in message)
+      .map((message) => message.method);
+    expect(requestMethods.indexOf('thread/name/set')).toBeLessThan(requestMethods.indexOf('turn/start'));
+
+    await adapter.setConversationTitle({
+      ...agent,
+      backendSession: { kind: 'codex', threadId: 'thread-new' },
+    }, 'agent-new');
+    expect(transport.sent.filter((message) => (
+      'method' in message && message.method === 'thread/name/set'
+    ))).toHaveLength(1);
   });
 
   it('routes simultaneous semantic conversation events without transcript replacement or cross-routing', async () => {

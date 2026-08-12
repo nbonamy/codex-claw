@@ -274,6 +274,11 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
     void this.transport.closeSession?.(sessionId);
   }
 
+  async retireConversation(_agent: Agent): Promise<void> {
+    // Claude Code has no session archive primitive. Closing a Claw agent only
+    // releases its live runtime; the local transcript remains available.
+  }
+
   async hydrateAgent(agent: Agent): Promise<BackendSession | null> {
     const history = await this.loadHistory(agent);
     if (!history) {

@@ -249,7 +249,13 @@ export class CodexSurfaceAgentAdapter {
 
   async setConversationTitle(agent: Agent, title: string): Promise<void> {
     const session = await this.ensureSession(agent);
-    await session.handle.rename(title);
+    await this.renameSessionIfNeeded(session, title);
+  }
+
+  async retireConversation(agent: Agent): Promise<void> {
+    if (agent.backendSession?.kind !== 'codex') return;
+    await this.start();
+    await this.surface.archiveConversation(agent.backendSession.threadId);
   }
 
   async setThreadGoal(agent: Agent, objective: string) {
@@ -509,7 +515,23 @@ export class CodexSurfaceAgentAdapter {
     }, { extensionContext: agent });
     const threadId = snapshot.activeConversationId;
     if (!threadId) throw new Error('Codex did not create a conversation.');
-    return this.bindRuntime(agent, threadId, true, false);
+    const session = this.bindRuntime(agent, threadId, true, false);
+    try {
+      await this.renameSessionIfNeeded(session, agent.name);
+    } catch {
+      // Naming is best effort and must not prevent the first prompt. clawd
+      // retries through its normal post-session title synchronization.
+    }
+    return session;
+  }
+
+  private async renameSessionIfNeeded(session: AgentConversation, title: string): Promise<void> {
+    const name = title.trim();
+    const summary = session.handle.getSnapshot().conversations.find(
+      (conversation) => conversation.id === session.handle.id,
+    );
+    if (summary?.title === name) return;
+    await session.handle.rename(name);
   }
 
   private async bindAndLoad(

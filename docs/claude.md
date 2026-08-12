@@ -51,6 +51,7 @@ type AgentBackendDriver = {
   tryHandlePromptCommand?(agent: Agent, prompt: string): Promise<BackendSendResult> | null
   sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>
   setConversationTitle?(agent: Agent, title: string): Promise<void>
+  retireConversation?(agent: Agent): Promise<void>
   setGoal?(agent: Agent, objective: string): Promise<BackendGoalResult>
   clearGoal?(agent: Agent): Promise<BackendGoalResult>
   setCodexApprovalPreset?(agent: Agent, preset: CodexApprovalPreset): Promise<BackendCodexApprovalPresetResult>

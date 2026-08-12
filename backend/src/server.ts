@@ -98,9 +98,8 @@ export class ClawBackendServer {
   private readonly clientRequestOwners = new Map<string, { backend: AgentBackend; remoteConnectionId?: string }>();
   private readonly remoteSnapshots = new Map<string, AppSnapshot>();
   private readonly queuedPromptRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  private readonly analyzedGitAgentIds = new Set<string>();
   private readonly agentGitService: AgentGitService;
-  private readonly gitAnalysisPromises = new Map<string, Promise<void>>();
+  private readonly gitStatusRefreshPromises = new Map<string, Promise<boolean>>();
   private subagentIdentityBackfillPromise: Promise<void> | null = null;
   private readonly transcriptRetention: AgentTranscriptRetention;
   private unsubscribeDriverEvents?: () => void;
@@ -155,7 +154,7 @@ export class ClawBackendServer {
         void this.backfillSubagentIdentities();
         const snapshot = await this.clientSnapshot();
         if (snapshot.activeAgentId) {
-          void this.analyzeAgentGitStatusOnce(snapshot.activeAgentId);
+          await this.refreshAgentGitStatus(snapshot.activeAgentId);
         }
         return createClawRpcResult(message.id, {
           snapshot,
@@ -393,7 +392,7 @@ export class ClawBackendServer {
         this.addRecentSourceRepository(input.sourceRepositoryName);
         const snapshot = await this.persistAndEmitSnapshot();
         if (snapshot.activeAgentId) {
-          void this.refreshAgentGitStatus(snapshot.activeAgentId);
+          await this.refreshAgentGitStatus(snapshot.activeAgentId);
         }
         return createClawRpcResult(message.id, snapshot);
       }
@@ -401,12 +400,19 @@ export class ClawBackendServer {
         const input = requireAgentUpdateInput(message.params);
         return this.routeAgentSnapshotRequest(message.id, input.id, backendMethods.agentUpdate, { input }, async (existingAgent) => {
           await this.validateAgentInput(input, this.remoteConnectionIdForAgent(existingAgent));
+          const previousName = existingAgent.name;
+          const previousFolder = existingAgent.folder;
           const agent = updateAgentFromInput(this.snapshot, input);
           if (!agent) {
             throw new Error(`Agent not found: ${input.id}`);
           }
+          if (agent.name !== previousName && agent.backendSession) {
+            await this.updateConversationTitle(agent.id);
+          }
           const snapshot = await this.persistAndEmitSnapshot();
-          await this.refreshAgentGitStatus(input.id);
+          if (agent.folder !== previousFolder) {
+            await this.refreshAgentGitStatus(input.id);
+          }
           return snapshot;
         });
       }
@@ -507,6 +513,7 @@ export class ClawBackendServer {
           if (result.activeTurnId) {
             forked.status = { type: 'working' };
           }
+          await this.updateConversationTitle(forked.id);
           return this.persistAndEmitSnapshot();
         });
       }
@@ -552,7 +559,16 @@ export class ClawBackendServer {
       }
       case backendMethods.agentDelete: {
         const agentId = requireAgentId(message.params);
-        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentDelete, { agentId }, async () => {
+        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentDelete, { agentId }, async (existingAgent) => {
+          if (existingAgent.backendSession) {
+            await this.handleAgentDriverRequest(existingAgent, backendMethods.driverConversationRetire, {
+              agent: existingAgent,
+            });
+            await this.driverRpc?.handle(backendMethods.driverSessionForget, {
+              backend: existingAgent.backend,
+              agentId,
+            });
+          }
           const agent = closeAgentInSnapshot(this.snapshot, agentId);
           if (!agent) {
             throw new Error(`Agent not found: ${agentId}`);
@@ -685,7 +701,7 @@ export class ClawBackendServer {
           const input = requireRecord(params.input);
           const paths = requireStringArray(input.paths, 'paths');
           await this.agentGitService.stage(agent.folder, paths);
-          return this.gitWorkflow(agent);
+          return this.gitWorkflow(agent, { refreshStatus: true });
         });
       }
       case backendMethods.agentGitCommit: {
@@ -701,7 +717,7 @@ export class ClawBackendServer {
             await this.agentGitService.stage(agent.folder, pathsToStage);
           }
           await this.agentGitService.commit(agent.folder, requireString(input.message, 'message'));
-          return this.gitWorkflow(agent);
+          return this.gitWorkflow(agent, { refreshStatus: true });
         });
       }
       case backendMethods.agentGitPush: {
@@ -717,7 +733,7 @@ export class ClawBackendServer {
           if (workflow.detached || !workflow.branch) throw new Error('Create or check out a branch before pushing.');
           if (!workflow.remote) throw new Error('Add a Git remote before pushing.');
           await this.agentGitService.push(pushFolder, workflow.remote, workflow.branch, !workflow.upstream);
-          return this.gitWorkflow(agent);
+          return this.gitWorkflow(agent, { refreshStatus: true });
         });
       }
       case backendMethods.agentGitBranchCreate: {
@@ -731,7 +747,7 @@ export class ClawBackendServer {
             await this.driverRpc?.handle(backendMethods.driverSessionForget, { backend: agent.backend, agentId });
             await this.persistAndEmitSnapshot();
           }
-          return this.gitWorkflow(agent);
+          return this.gitWorkflow(agent, { refreshStatus: true });
         });
       }
       case backendMethods.agentGitPullRequestCreate: {
@@ -750,7 +766,7 @@ export class ClawBackendServer {
             title: requireString(input.title, 'title'),
             body: typeof input.body === 'string' ? input.body : '',
           });
-          return this.gitWorkflow(agent);
+          return this.gitWorkflow(agent, { refreshStatus: true });
         });
       }
       case backendMethods.agentGitMerge: {
@@ -767,7 +783,7 @@ export class ClawBackendServer {
             await this.driverRpc?.handle(backendMethods.driverSessionForget, { backend: agent.backend, agentId });
             await this.persistAndEmitSnapshot();
           }
-          return this.gitWorkflow(agent);
+          return this.gitWorkflow(agent, { refreshStatus: true });
         });
       }
       case backendMethods.agentWorkItemAssign: {
@@ -846,6 +862,7 @@ export class ClawBackendServer {
           if (!resumedAgent) {
             throw new Error(`Agent not found: ${agentId}`);
           }
+          await this.updateConversationTitle(resumedAgent.id);
           return this.persistAndEmitSnapshot();
         });
       }
@@ -2387,10 +2404,7 @@ export class ClawBackendServer {
     const subtitle = agent.folder;
 
     try {
-      const [review] = await Promise.all([
-        this.handleAgentDriverRequest(agent, backendMethods.driverGitDiffGet, { agent }) as Promise<AgentGitDiff | null>,
-        this.refreshAgentGitStatus(agent.id),
-      ]);
+      const review = await this.handleAgentDriverRequest(agent, backendMethods.driverGitDiffGet, { agent }) as AgentGitDiff | null;
       if (review === null) {
         this.applyAndEmitBackendEvent({
           agentId: agent.id,
@@ -2437,11 +2451,11 @@ export class ClawBackendServer {
     }
   }
 
-  private async gitWorkflow(agent: Agent, options: { includePullRequest?: boolean } = {}): Promise<AgentGitWorkflow> {
-    const [workflow] = await Promise.all([
-      this.agentGitService.workflow(agent.folder),
-      this.refreshAgentGitStatus(agent.id),
-    ]);
+  private async gitWorkflow(agent: Agent, options: { includePullRequest?: boolean; refreshStatus?: boolean } = {}): Promise<AgentGitWorkflow> {
+    const workflow = await this.agentGitService.workflow(agent.folder);
+    if (options.refreshStatus) {
+      await this.refreshAgentGitStatus(agent.id);
+    }
     const githubConnected = await this.requireWorkIntegrations().githubConnected();
     let existingPullRequest = null;
     let githubError: string | undefined;
@@ -2530,29 +2544,24 @@ export class ClawBackendServer {
 
   private async hydrateAndRefreshSelectedAgent(agentId: string): Promise<void> {
     await this.hydrateAgentHistory(agentId);
-    await this.analyzeAgentGitStatusOnce(agentId);
-  }
-
-  private async analyzeAgentGitStatusOnce(agentId: string): Promise<void> {
-    if (this.analyzedGitAgentIds.has(agentId)) {
-      return;
-    }
-    const existing = this.gitAnalysisPromises.get(agentId);
-    if (existing) {
-      return existing;
-    }
-    const analysis = this.refreshAgentGitStatus(agentId).then((updated) => {
-      if (updated) {
-        this.analyzedGitAgentIds.add(agentId);
-      }
-    }).finally(() => {
-      this.gitAnalysisPromises.delete(agentId);
-    });
-    this.gitAnalysisPromises.set(agentId, analysis);
-    return analysis;
+    await this.refreshAgentGitStatus(agentId);
   }
 
   private async refreshAgentGitStatus(agentId: string): Promise<boolean> {
+    const existing = this.gitStatusRefreshPromises.get(agentId);
+    if (existing) {
+      return existing;
+    }
+    const refresh = this.performAgentGitStatusRefresh(agentId).finally(() => {
+      if (this.gitStatusRefreshPromises.get(agentId) === refresh) {
+        this.gitStatusRefreshPromises.delete(agentId);
+      }
+    });
+    this.gitStatusRefreshPromises.set(agentId, refresh);
+    return refresh;
+  }
+
+  private async performAgentGitStatusRefresh(agentId: string): Promise<boolean> {
     const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
     if (!agent) {
       return false;
@@ -2573,7 +2582,6 @@ export class ClawBackendServer {
       type: 'git.statusUpdated',
       payload: status,
     });
-    this.analyzedGitAgentIds.add(agentId);
     return true;
   }
 
@@ -2628,6 +2636,10 @@ export class ClawBackendServer {
       return;
     }
 
+    await this.updateConversationTitle(agentId);
+  }
+
+  private async updateConversationTitle(agentId: string): Promise<void> {
     const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
     if (!agent) {
       return;
@@ -2688,7 +2700,7 @@ export class ClawBackendServer {
         });
       }
     }
-    if (event.agentId && shouldRefreshGitStatusForEvent(event)) {
+    if (event.agentId === this.snapshot.activeAgentId && shouldRefreshGitStatusForEvent(event)) {
       void this.refreshAgentGitStatus(event.agentId);
     }
   }
@@ -3514,18 +3526,7 @@ function shouldPersistSnapshotForEvent(event: BackendEvent): boolean {
 }
 
 function shouldRefreshGitStatusForEvent(event: BackendEvent): boolean {
-  return event.type === 'turn.started' ||
-    event.type === 'diff.updated' ||
-    event.type === 'turn.completed' ||
-    isCompletedFileMutation(event);
-}
-
-function isCompletedFileMutation(event: BackendEvent): boolean {
-  if (event.type !== 'file.activity' || !isRecord(event.payload)) {
-    return false;
-  }
-  return event.payload.status === 'completed' &&
-    (event.payload.action === 'edit' || event.payload.action === 'create');
+  return event.type === 'turn.completed';
 }
 
 function clientStateFromSnapshot(snapshot: AppSnapshot, remoteControlStatus: DevicePairingStatus): ClientState {

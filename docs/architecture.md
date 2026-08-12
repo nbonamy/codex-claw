@@ -321,6 +321,7 @@ type AgentBackendDriver = {
   tryHandlePromptCommand?(agent: Agent, prompt: string): Promise<BackendSendResult> | null
   sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>
   setConversationTitle?(agent: Agent, title: string): Promise<void>
+  retireConversation?(agent: Agent): Promise<void>
   setGoal?(agent: Agent, objective: string): Promise<BackendGoalResult>
   clearGoal?(agent: Agent): Promise<BackendGoalResult>
   setCodexApprovalPreset?(agent: Agent, preset: CodexApprovalPreset): Promise<BackendCodexApprovalPresetResult>
@@ -338,6 +339,12 @@ type AgentBackendDriver = {
   close(): Promise<void>
 }
 ```
+
+Closing a Claw agent invokes the provider-neutral `retireConversation` hook
+before removing app-owned state. Each backend owns that policy: Codex archives
+the thread, while Claude Code currently preserves its local transcript because
+the Agent SDK exposes no archive operation. A retirement failure leaves the
+Claw agent intact instead of orphaning a still-visible provider conversation.
 
 `BackendEvent` is produced by backend drivers inside `clawd`. Codex and Claude
 get their own drivers/adapters that emit the same app-owned `BackendEvent`

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { AppSnapshot, BackendConversationRef, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/core/contracts';
+import type { Agent, AppSnapshot, BackendConversationRef, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/core/contracts';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
 import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
@@ -165,6 +165,10 @@ describe('ClawBackendServer', () => {
     const workflow = vi.fn().mockResolvedValue(baseWorkflow);
     const merge = vi.fn().mockResolvedValue('/repo');
     const forgetAgentSession = vi.fn();
+    const getGitStatus = vi.fn(async (agent: Agent) => ({
+      folder: agent.folder, ahead: 0, behind: 0, changedFiles: 0, addedLines: 0, removedLines: 0,
+      hasUntracked: false, state: 'clean' as const, updatedAt: '2026-08-11T00:00:00.000Z',
+    }));
     const saveSnapshot = vi.fn();
     const driver: AgentBackendDriver = {
       backend: 'codex',
@@ -174,10 +178,7 @@ describe('ClawBackendServer', () => {
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       respondToRequest: async () => undefined,
       forgetAgentSession,
-      getGitStatus: async (agent) => ({
-        folder: agent.folder, ahead: 0, behind: 0, changedFiles: 0, addedLines: 0, removedLines: 0,
-        hasUntracked: false, state: 'clean', updatedAt: '2026-08-11T00:00:00.000Z',
-      }),
+      getGitStatus,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -200,6 +201,8 @@ describe('ClawBackendServer', () => {
     expect(saveSnapshot).toHaveBeenCalled();
     expect(workflow).toHaveBeenCalledOnce();
     expect(workflow).toHaveBeenCalledWith('/repo');
+    expect(getGitStatus).toHaveBeenCalledOnce();
+    expect(getGitStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina', folder: '/repo' }));
     await server.close();
   });
 
@@ -1813,20 +1816,34 @@ describe('ClawBackendServer', () => {
     });
   });
 
-  it('refreshes authoritative git status after a completed file mutation', async () => {
+  it('refreshes git status only when the active agent turn completes', async () => {
     const snapshot = createTestSnapshot();
-    snapshot.teams[0]!.agentIds = ['agent-dina'];
-    snapshot.agents = [{
-      id: 'agent-dina',
-      teamId: 'team-test',
-      name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
-      backend: 'codex',
-      status: { type: 'working' },
-      backendSession: { kind: 'codex', threadId: 'thread-test' },
-      createdAt: '2026-06-13T00:00:00.000Z',
-      updatedAt: '2026-06-13T00:00:00.000Z',
-    }];
+    snapshot.teams[0]!.agentIds = ['agent-dina', 'agent-jesse'];
+    snapshot.activeAgentId = 'agent-dina';
+    snapshot.agents = [
+      {
+        id: 'agent-dina',
+        teamId: 'team-test',
+        name: 'Dina',
+        folder: '/Users/nbonamy/src/codex-claw',
+        backend: 'codex',
+        status: { type: 'working' },
+        backendSession: { kind: 'codex', threadId: 'thread-dina' },
+        createdAt: '2026-06-13T00:00:00.000Z',
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      },
+      {
+        id: 'agent-jesse',
+        teamId: 'team-test',
+        name: 'Jesse',
+        folder: '/Users/nbonamy/src/multi-llm-ts',
+        backend: 'codex',
+        status: { type: 'working' },
+        backendSession: { kind: 'codex', threadId: 'thread-jesse' },
+        createdAt: '2026-06-13T00:00:00.000Z',
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      },
+    ];
     let emitEvent: (event: BackendEvent) => void = () => undefined;
     const getGitStatus = vi.fn().mockResolvedValue({
       folder: '/Users/nbonamy/src/codex-claw',
@@ -1864,7 +1881,7 @@ describe('ClawBackendServer', () => {
     emitEvent({
       backend: 'codex',
       agentId: 'agent-dina',
-      threadId: 'thread-test',
+      threadId: 'thread-dina',
       turnId: 'turn-test',
       type: 'file.activity',
       payload: {
@@ -1874,6 +1891,33 @@ describe('ClawBackendServer', () => {
         action: 'edit',
         status: 'completed',
       },
+    });
+    emitEvent({
+      backend: 'codex',
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-test',
+      type: 'diff.updated',
+      payload: { addedLines: 3, removedLines: 1, diff: 'diff --git a/README.md b/README.md\n' },
+    });
+    emitEvent({
+      backend: 'codex',
+      agentId: 'agent-jesse',
+      threadId: 'thread-jesse',
+      turnId: 'turn-jesse',
+      type: 'turn.completed',
+      payload: { status: 'completed' },
+    });
+    await Promise.resolve();
+    expect(getGitStatus).not.toHaveBeenCalled();
+
+    emitEvent({
+      backend: 'codex',
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-test',
+      type: 'turn.completed',
+      payload: { status: 'completed' },
     });
 
     await vi.waitFor(() => {
@@ -2483,7 +2527,7 @@ describe('ClawBackendServer', () => {
     });
 
     expect(hydrateAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
-    expect(getGitStatus).toHaveBeenCalledOnce();
+    expect(getGitStatus).toHaveBeenCalledTimes(2);
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'snapshot.updated' }),
       expect.objectContaining({ type: 'git.statusUpdated', agentId: 'agent-dina' }),
@@ -2711,7 +2755,7 @@ describe('ClawBackendServer', () => {
     ]));
 
     expect(hydrateAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
-    expect(getGitStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(getGitStatus).toHaveBeenCalledOnce();
     await server.close();
   });
 
@@ -3279,6 +3323,110 @@ describe('ClawBackendServer', () => {
       await rm(tempDir, { recursive: true, force: true });
       await rm(nextTempDir, { recursive: true, force: true });
     }
+  });
+
+  it('lets the selected backend retire a conversation before closing its agent', async () => {
+    const snapshot = createTestSnapshot();
+    const agent = {
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/repo',
+      backend: 'codex' as const,
+      backendSession: { kind: 'codex' as const, threadId: 'thread-dina' },
+      status: { type: 'idle' as const },
+      createdAt: '2026-08-01T00:00:00.000Z',
+      updatedAt: '2026-08-01T00:00:00.000Z',
+    };
+    snapshot.teams[0]!.agentIds = [agent.id];
+    snapshot.agents = [agent];
+    snapshot.activeAgentId = agent.id;
+    const retireConversation = vi.fn(async () => {
+      expect(snapshot.agents).toContainEqual(agent);
+    });
+    const forgetAgentSession = vi.fn();
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      retireConversation,
+      forgetAgentSession,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      saveSnapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'close-agent',
+      method: backendMethods.agentDelete,
+      params: { agentId: agent.id },
+    })).resolves.toMatchObject({ result: { agents: [] } });
+
+    expect(retireConversation).toHaveBeenCalledWith(agent);
+    expect(forgetAgentSession).toHaveBeenCalledWith(agent.id);
+    expect(snapshot.agents).toStrictEqual([]);
+    expect(saveSnapshot).toHaveBeenCalledOnce();
+    await server.close();
+  });
+
+  it('keeps an agent when its backend cannot retire the conversation', async () => {
+    const snapshot = createTestSnapshot();
+    const agent = {
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/repo',
+      backend: 'codex' as const,
+      backendSession: { kind: 'codex' as const, threadId: 'thread-dina' },
+      status: { type: 'idle' as const },
+      createdAt: '2026-08-01T00:00:00.000Z',
+      updatedAt: '2026-08-01T00:00:00.000Z',
+    };
+    snapshot.teams[0]!.agentIds = [agent.id];
+    snapshot.agents = [agent];
+    snapshot.activeAgentId = agent.id;
+    const forgetAgentSession = vi.fn();
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      retireConversation: vi.fn().mockRejectedValue(new Error('archive failed')),
+      forgetAgentSession,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      saveSnapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'close-agent',
+      method: backendMethods.agentDelete,
+      params: { agentId: agent.id },
+    })).rejects.toThrow('archive failed');
+
+    expect(forgetAgentSession).not.toHaveBeenCalled();
+    expect(snapshot.agents).toStrictEqual([agent]);
+    expect(saveSnapshot).not.toHaveBeenCalled();
+    await server.close();
   });
 
   it('owns agent file listing and reads by resolving agent folders internally', async () => {
@@ -3918,7 +4066,7 @@ describe('ClawBackendServer', () => {
     })).resolves.toMatchObject({ result: true });
 
     expect(getGitDiff).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
-    expect(getGitStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(getGitStatus).not.toHaveBeenCalled();
     expect(events).toContainEqual(expect.objectContaining({
       agentId: 'agent-dina',
       type: 'sidePanel.gitDiffRequested',
@@ -3935,15 +4083,11 @@ describe('ClawBackendServer', () => {
         ],
       },
     }));
-    expect(events).toContainEqual(expect.objectContaining({
-      agentId: 'agent-dina',
-      type: 'git.statusUpdated',
-      payload: expect.objectContaining({ addedLines: 1, removedLines: 0 }),
-    }));
+    expect(events).not.toContainEqual(expect.objectContaining({ type: 'git.statusUpdated' }));
     await server.close();
   });
 
-  it('refreshes shared git status when workflow details are requested', async () => {
+  it('keeps workflow detail reads side-effect free', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     snapshot.agents = [{
@@ -4022,13 +4166,9 @@ describe('ClawBackendServer', () => {
       result: { repository: 'owner/repo', unstagedAddedLines: 1 },
     });
 
-    expect(getGitStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(getGitStatus).not.toHaveBeenCalled();
     expect(findPullRequest).not.toHaveBeenCalled();
-    expect(events).toContainEqual(expect.objectContaining({
-      agentId: 'agent-dina',
-      type: 'git.statusUpdated',
-      payload: expect.objectContaining({ addedLines: 1, removedLines: 0 }),
-    }));
+    expect(events).not.toContainEqual(expect.objectContaining({ type: 'git.statusUpdated' }));
     await server.close();
   });
 
@@ -4293,6 +4433,7 @@ describe('ClawBackendServer', () => {
       backendSession: { kind: 'codex', threadId: 'thread-new' },
       messages: resumedMessages,
     });
+    const setConversationTitle = vi.fn().mockResolvedValue(undefined);
     const driver: AgentBackendDriver = {
       backend: 'codex',
       getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
@@ -4302,6 +4443,7 @@ describe('ClawBackendServer', () => {
       respondToRequest: async () => undefined,
       forgetAgentSession,
       resumeConversation,
+      setConversationTitle,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -4338,6 +4480,10 @@ describe('ClawBackendServer', () => {
 
     expect(forgetAgentSession).toHaveBeenCalledWith('agent-dina');
     expect(resumeConversation).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), { backend: 'codex', threadId: 'thread-new' });
+    expect(setConversationTitle).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-dina', backendSession: { kind: 'codex', threadId: 'thread-new' } }),
+      'Dina',
+    );
     expect(snapshot.messages.map((message) => [message.id, message.agentId])).toStrictEqual([
       ['old-jesse', 'agent-jesse'],
       ['new-dina', 'agent-dina'],
@@ -4375,6 +4521,7 @@ describe('ClawBackendServer', () => {
       messages: forkedMessages,
       activeTurnId: 'turn-forked',
     });
+    const setConversationTitle = vi.fn().mockResolvedValue(undefined);
     const driver: AgentBackendDriver = {
       backend: 'codex',
       getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
@@ -4383,6 +4530,7 @@ describe('ClawBackendServer', () => {
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       respondToRequest: async () => undefined,
       forkConversation,
+      setConversationTitle,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -4420,6 +4568,10 @@ describe('ClawBackendServer', () => {
       expect.objectContaining({ id: 'agent-dina' }),
       expect.objectContaining({ name: 'Dina (fork)' }),
       2,
+    );
+    expect(setConversationTitle).toHaveBeenCalledWith(
+      expect.objectContaining({ id: forkedAgentId, backendSession: { kind: 'codex', threadId: 'thread-forked' } }),
+      'Dina (fork)',
     );
     expect(snapshot.teams[0]?.agentIds).toStrictEqual(['agent-dina', forkedAgentId, 'agent-jesse']);
     expect(snapshot.messages).toContainEqual(expect.objectContaining({ id: 'forked-message', agentId: forkedAgentId }));
@@ -4865,7 +5017,7 @@ describe('ClawBackendServer', () => {
       expect(snapshot.agents[0]?.status).toStrictEqual({ type: 'working' });
       expect(setConversationTitle).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'agent-dina', backendSession: { kind: 'codex', threadId: 'thread-dina' } }),
-        'Dina - Jun 10, 2026 3:42 PM',
+        'Dina',
       );
       expect(events).toEqual(expect.arrayContaining([
         expect.objectContaining({ type: 'agent.statusChanged', payload: { type: 'starting' } }),
@@ -4876,6 +5028,68 @@ describe('ClawBackendServer', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('renames the active conversation when the Claw agent name changes', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      backendSession: { kind: 'codex', threadId: 'thread-dina' },
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const setConversationTitle = vi.fn().mockResolvedValue(undefined);
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-dina' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-dina' } }),
+      respondToRequest: async () => undefined,
+      setConversationTitle,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'rename-agent',
+      method: 'agent/update',
+      params: {
+        input: {
+          id: 'agent-dina',
+          name: 'Dina Renamed',
+          folder: '/Users/nbonamy/src/codex-claw',
+          backend: 'codex',
+        },
+      },
+    })).resolves.toMatchObject({
+      result: {
+        agents: [{ id: 'agent-dina', name: 'Dina Renamed' }],
+      },
+    });
+
+    expect(setConversationTitle).toHaveBeenCalledOnce();
+    expect(setConversationTitle).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-dina', name: 'Dina Renamed' }),
+      'Dina Renamed',
+    );
+    expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
+    await server.close();
   });
 
   it('keeps slash command prompts hidden while starting the backend turn', async () => {

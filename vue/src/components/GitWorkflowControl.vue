@@ -563,20 +563,46 @@ onBeforeUnmount(() => {
   clearMergeSuccessTimer();
 });
 watch(() => props.agent.id, () => { void loadWorkflow({ reset: true }); });
-watch(() => props.gitStatus?.updatedAt, () => { void loadWorkflow({ closeMenu: false }); });
+watch(() => props.gitStatus?.updatedAt, () => {
+  if (!busy.value) void loadWorkflow({ closeMenu: false });
+});
+
+let workflowLoadRequestId = 0;
+let workflowLoadAgentId: string | null = null;
+let workflowLoadPromise: Promise<void> | null = null;
 
 async function loadWorkflow(options: { closeMenu?: boolean; reset?: boolean } = {}): Promise<void> {
   const { closeMenu = true, reset = false } = options;
   if (reset) workflow.value = null;
   if (!props.getWorkflow) return;
+  const agentId = props.agent.id;
+  if (workflowLoadAgentId === agentId && workflowLoadPromise) {
+    return workflowLoadPromise;
+  }
+  const requestId = ++workflowLoadRequestId;
   workflowError.value = null;
   if (closeMenu) menuOpen.value = false;
-  try { workflow.value = await props.getWorkflow(props.agent.id); } catch (error) { workflowError.value = error instanceof Error ? error.message : String(error); }
+  workflowLoadAgentId = agentId;
+  const request = props.getWorkflow(agentId).then((nextWorkflow) => {
+    if (requestId === workflowLoadRequestId && props.agent.id === agentId) {
+      workflow.value = nextWorkflow;
+    }
+  }).catch((error: unknown) => {
+    if (requestId === workflowLoadRequestId && props.agent.id === agentId) {
+      workflowError.value = error instanceof Error ? error.message : String(error);
+    }
+  }).finally(() => {
+    if (requestId === workflowLoadRequestId) {
+      workflowLoadAgentId = null;
+      workflowLoadPromise = null;
+    }
+  });
+  workflowLoadPromise = request;
+  return request;
 }
 function closeMenu(event: MouseEvent): void { if (!root.value?.contains(event.target as Node)) menuOpen.value = false; }
 function toggleMenu(): void {
   menuOpen.value = !menuOpen.value;
-  if (menuOpen.value) void loadWorkflow({ closeMenu: false });
 }
 function runFirstEnabled(): void { if (firstEnabledAction.value) selectAction(firstEnabledAction.value); }
 function selectAction(action: string): void {

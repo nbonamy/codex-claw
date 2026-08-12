@@ -148,9 +148,14 @@ and app-owned `agentId`.
 
 If an agent has a persisted Codex `backendSession`, `clawd` resumes it with
 `thread/resume` before starting the next turn. New agents without a Codex
-session use `thread/start`. After the app stores a newly created backend
-session, it sets the generic conversation title through the backend seam;
-Codex implements this with `thread/name/set`. `thread/settings/updated`
+session use `thread/start`, then set the conversation title to the Claw agent
+name with `thread/name/set` before the first `turn/start`. The generic backend
+seam repeats title synchronization after storing the new session, but the
+Codex adapter treats an already-matching title as a no-op. Editing the Claw
+agent name updates the active conversation title as well. Closing a Claw agent calls
+the provider-neutral conversation-retirement hook; the Codex driver implements
+that policy with `thread/archive` before app-owned agent state is removed.
+`thread/settings/updated`
 confirms the active thread settings and should update the app-owned
 agent/session mapping so the id is saved in backend-owned state and reused
 after relaunch.
