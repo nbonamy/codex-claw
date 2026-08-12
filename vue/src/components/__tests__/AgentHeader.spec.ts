@@ -139,7 +139,7 @@ describe('AgentHeader', () => {
 
     const action = wrapper.get('[aria-label="Open repository backlog"]');
     expect(action.classes()).toContain('agent-header__repository-backlog');
-    expect(action.find('.tabler-icon-list-details').exists()).toBe(true);
+    expect(action.findComponent({ name: 'BacklogIcon' }).exists()).toBe(true);
     await action.trigger('click');
 
     expect(wrapper.emitted('open-backlog')).toStrictEqual([[]]);

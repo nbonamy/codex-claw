@@ -1562,6 +1562,7 @@ export type CodexClawApi = {
   editMessage(agentId: string, messageId: string, prompt: string): Promise<AppSnapshot>;
   retryMessage(agentId: string, messageId: string): Promise<AppSnapshot>;
   browserOpen(agentId: string, browserId: string, url: string): Promise<BrowserState>;
+  browserOpenVisualization(agentId: string, browserId: string, path: string, title: string): Promise<BrowserState>;
   browserNavigate(agentId: string, browserId: string, url: string): Promise<BrowserState>;
   browserGoBack(agentId: string, browserId: string): Promise<BrowserState>;
   browserGoForward(agentId: string, browserId: string): Promise<BrowserState>;

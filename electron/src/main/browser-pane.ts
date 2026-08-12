@@ -1,5 +1,6 @@
 import { BrowserWindow, WebContentsView } from 'electron';
-import { realpathSync } from 'node:fs';
+import { constants as fsConstants, realpathSync } from 'node:fs';
+import { open } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,8 +22,12 @@ type HostedBrowserPane = {
   browserWindow: BrowserWindow;
   consoleMessages: Array<{ level: string; message: string; timestamp: string }>;
   fileRoot: string;
+  presentedTitle: string | null;
+  presentedUrl: string | null;
   view: WebContentsView;
 };
+
+const maximumVisualizationBytes = 1_048_576;
 
 /**
  * Hosts untrusted web content in a native child view. The renderer only gets a
@@ -40,13 +45,43 @@ export class BrowserPane {
     url: string,
     fileRoot: string,
   ): Promise<BrowserState> {
+    const pane = await this.createPane(browserWindow, agentId, browserId, fileRoot, true);
+    if (url.trim()) return this.navigate(agentId, browserId, url);
+    await pane.view.webContents.loadURL('about:blank');
+    return { ...this.state(pane), url: '', title: '' };
+  }
+
+  async openVisualization(
+    browserWindow: BrowserWindow,
+    agentId: string,
+    browserId: string,
+    filePath: string,
+    title: string,
+  ): Promise<BrowserState> {
+    const document = await readVisualizationDocument(filePath, title);
+    const pane = await this.createPane(browserWindow, agentId, browserId, '', false);
+    pane.presentedTitle = title.trim() || 'Visualization';
+    pane.presentedUrl = '';
+    await pane.view.webContents.loadURL(document);
+    return this.state(pane);
+  }
+
+  private async createPane(
+    browserWindow: BrowserWindow,
+    agentId: string,
+    browserId: string,
+    fileRoot: string,
+    navigationEnabled: boolean,
+  ): Promise<HostedBrowserPane> {
     await this.close(agentId, browserId);
     const view = new WebContentsView({
       webPreferences: {
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
-        partition: `persist:codex-claw-browser-${safePartitionName(agentId)}`,
+        partition: navigationEnabled
+          ? `persist:codex-claw-browser-${safePartitionName(agentId)}`
+          : `codex-claw-visualization-${safePartitionName(agentId)}`,
       },
     });
     const pane: HostedBrowserPane = {
@@ -61,6 +96,8 @@ export class BrowserPane {
       browserWindow,
       consoleMessages: [],
       fileRoot,
+      presentedTitle: null,
+      presentedUrl: null,
       view,
     };
     this.panes.set(browserPaneKey(agentId, browserId), pane);
@@ -68,6 +105,10 @@ export class BrowserPane {
     view.setVisible(false);
     view.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     const preventDisallowedNavigation = (event: { preventDefault(): void }, target: string): void => {
+      if (!navigationEnabled) {
+        event.preventDefault();
+        return;
+      }
       try {
         normalizeBrowserUrl(target, pane.fileRoot);
       } catch {
@@ -80,9 +121,7 @@ export class BrowserPane {
       pane.consoleMessages.push({ level: String(level), message, timestamp: new Date().toISOString() });
       if (pane.consoleMessages.length > 100) pane.consoleMessages.shift();
     });
-    if (url.trim()) return this.navigate(agentId, browserId, url);
-    await view.webContents.loadURL('about:blank');
-    return { ...this.state(pane), url: '', title: '' };
+    return pane;
   }
 
   async navigate(agentId: string, browserId: string, url: string): Promise<BrowserState> {
@@ -330,8 +369,8 @@ export class BrowserPane {
   private state(pane: HostedBrowserPane): BrowserState {
     const webContents = pane.view.webContents;
     return {
-      url: webContents.getURL(),
-      title: webContents.getTitle(),
+      url: pane.presentedUrl ?? webContents.getURL(),
+      title: pane.presentedTitle ?? webContents.getTitle(),
       canGoBack: webContents.canGoBack(),
       canGoForward: webContents.canGoForward(),
     };
@@ -342,6 +381,94 @@ export class BrowserPane {
     if (!pane || pane.view.webContents.isDestroyed()) throw new Error('Browser is not open.');
     return pane;
   }
+}
+
+export async function readVisualizationDocument(filePath: string, title: string): Promise<string> {
+  const trimmedPath = filePath.trim();
+  if (!/\.html?$/iu.test(trimmedPath)) {
+    throw new Error('Visualizations must be HTML files.');
+  }
+
+  const handle = await open(trimmedPath, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0))
+    .catch(() => null);
+  if (!handle) {
+    throw new Error('Visualization file is unavailable.');
+  }
+  let fragment: string;
+  try {
+    const metadata = await handle.stat();
+    if (!metadata.isFile()) {
+      throw new Error('Visualization file is unavailable.');
+    }
+    if (metadata.size > maximumVisualizationBytes) {
+      throw new Error('Visualization exceeds the 1 MB size limit.');
+    }
+    fragment = await handle.readFile({ encoding: 'utf8' });
+  } finally {
+    await handle.close();
+  }
+  const safeTitle = escapeHtml(title.trim() || 'Visualization');
+  const document = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://cdnjs.cloudflare.com https://esm.sh https://cdn.jsdelivr.net https://unpkg.com; style-src 'unsafe-inline' https://fonts.googleapis.com https://fonts.bunny.net; font-src data: https://fonts.gstatic.com https://fonts.bunny.net; img-src data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<title>${safeTitle}</title>
+<style>${visualizationHostStyles()}</style>
+</head>
+<body>${fragment}</body>
+</html>`;
+  return `data:text/html;base64,${Buffer.from(document).toString('base64')}`;
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/gu, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[character] ?? character);
+}
+
+function visualizationHostStyles(): string {
+  return `
+:root {
+  color-scheme: light dark;
+  --background: light-dark(#ffffff, #181818);
+  --foreground: light-dark(#242424, #f1f1f1);
+  --card: light-dark(#ffffff, #202020);
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --primary: light-dark(#2557bd, #7aa2ff);
+  --primary-foreground: light-dark(#ffffff, #10192e);
+  --secondary: light-dark(#f0f1f3, #2b2b2b);
+  --secondary-foreground: var(--foreground);
+  --muted: light-dark(#f4f4f5, #292929);
+  --muted-foreground: light-dark(#71717a, #a1a1aa);
+  --accent: light-dark(#ebf1ff, #243456);
+  --accent-foreground: var(--foreground);
+  --destructive: light-dark(#d92d20, #ff7469);
+  --border: light-dark(#d8dadd, #444444);
+  --input: var(--border);
+  --ring: var(--primary);
+  --blue: light-dark(#2563eb, #60a5fa);
+  --orange: light-dark(#d97706, #f59e0b);
+  --green: light-dark(#059669, #34d399);
+  --red: light-dark(#dc2626, #f87171);
+  --purple: light-dark(#7c3aed, #a78bfa);
+  --yellow: light-dark(#ca8a04, #facc15);
+  --viz-series-1: var(--blue);
+  --viz-series-2: var(--orange);
+  --viz-series-3: var(--green);
+  --viz-series-4: var(--purple);
+  --viz-series-5: var(--red);
+  --viz-series-6: var(--yellow);
+  --font-size-base: 14px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: var(--background); color: var(--foreground); }
+body { padding: 16px; font: var(--font-size-base)/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+button, input, select, textarea { font: inherit; }
+`;
 }
 
 export function browserPaneKey(agentId: string, browserId: string): string {

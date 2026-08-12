@@ -118,6 +118,7 @@ const api: CodexClawApi = {
   editMessage: (agentId: string, messageId: string, prompt: string) => ipc.invoke(ipcChannels.editMessage, agentId, messageId, prompt),
   retryMessage: (agentId: string, messageId: string) => ipc.invoke(ipcChannels.retryMessage, agentId, messageId),
   browserOpen: (agentId: string, browserId: string, url: string) => ipc.invoke(ipcChannels.browserOpen, agentId, browserId, url),
+  browserOpenVisualization: (agentId: string, browserId: string, path: string, title: string) => ipc.invoke(ipcChannels.browserOpenVisualization, agentId, browserId, path, title),
   browserNavigate: (agentId: string, browserId: string, url: string) => ipc.invoke(ipcChannels.browserNavigate, agentId, browserId, url),
   browserGoBack: (agentId: string, browserId: string) => ipc.invoke(ipcChannels.browserGoBack, agentId, browserId),
   browserGoForward: (agentId: string, browserId: string) => ipc.invoke(ipcChannels.browserGoForward, agentId, browserId),

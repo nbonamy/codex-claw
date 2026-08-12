@@ -1,17 +1,18 @@
 <template>
   <section class="browser-panel" aria-label="In-app browser">
-    <header class="browser-panel__toolbar">
-      <div class="browser-panel__navigation" aria-label="Browser navigation">
+    <header class="browser-panel__toolbar" :class="{ 'browser-panel__toolbar--visualization': visualization }">
+      <div v-if="!visualization" class="browser-panel__navigation" aria-label="Browser navigation">
         <button type="button" aria-label="Go back" title="Go back" :disabled="!state.canGoBack || loading" @click="goBack"><IconArrowLeft /></button>
         <button type="button" aria-label="Go forward" title="Go forward" :disabled="!state.canGoForward || loading" @click="goForward"><IconArrowRight /></button>
         <button type="button" aria-label="Reload page" title="Reload" :disabled="loading" @click="reload"><IconRefresh /></button>
       </div>
-      <form v-if="!annotationMode" class="browser-panel__address" @submit.prevent="navigate">
+      <form v-if="!annotationMode && !visualization" class="browser-panel__address" @submit.prevent="navigate">
         <input v-model="address" aria-label="Browser address" spellcheck="false" :title="state.title || address" />
       </form>
+      <div v-else-if="visualization" class="browser-panel__visualization-title">{{ visualization.title }}</div>
       <div v-else class="browser-panel__annotation-title"><strong>Annotating</strong><span>•</span><span>{{ displayHost }}</span></div>
       <div class="browser-panel__actions">
-        <button class="browser-panel__annotate" type="button" :aria-label="annotationMode ? 'Exit annotation mode' : 'Annotate page'" :title="annotationMode ? 'Exit annotation mode' : 'Annotate page'" :aria-pressed="annotationMode" @click="toggleAnnotation"><IconX v-if="annotationMode" /><IconCirclePlus v-else /></button>
+        <button v-if="!visualization" class="browser-panel__annotate" type="button" :aria-label="annotationMode ? 'Exit annotation mode' : 'Annotate page'" :title="annotationMode ? 'Exit annotation mode' : 'Annotate page'" :aria-pressed="annotationMode" @click="toggleAnnotation"><IconX v-if="annotationMode" /><IconCirclePlus v-else /></button>
         <AnnotationSendButton
           v-if="annotations.length"
           :count="annotations.length"
@@ -47,11 +48,13 @@ const props = withDefaults(defineProps<{
   initialUrl?: string;
   openRequestId?: number;
   visible?: boolean;
+  visualization?: { path: string; title: string } | null;
 }>(), {
   initialUrl: '',
   browserId: PRIMARY_BROWSER_ID,
   openRequestId: 0,
   visible: true,
+  visualization: null,
 });
 const emit = defineEmits<{ close: []; 'send-prompt': [prompt: string] }>();
 
@@ -79,7 +82,7 @@ onMounted(async () => {
   window.addEventListener('resize', syncBoundsAfterWindowResize);
   if (viewport.value) resizeObserver.observe(viewport.value);
   try {
-    state.value = await requireBrowserApi().browserOpen(props.agentId, props.browserId, address.value);
+    state.value = await openInitialContent();
     if (state.value.url) address.value = state.value.url;
   } catch (reason) {
     error.value = messageFor(reason);
@@ -107,10 +110,29 @@ watch(() => props.visible, async (visible) => {
 });
 
 watch(() => props.openRequestId, async (requestId, previousRequestId) => {
-  if (!requestId || requestId === previousRequestId || !props.initialUrl) return;
+  if (!requestId || requestId === previousRequestId) return;
+  if (props.visualization) {
+    await runNavigation(openInitialContent);
+    return;
+  }
+  if (!props.initialUrl) return;
   address.value = props.initialUrl;
   await navigate();
 });
+
+function openInitialContent(): Promise<BrowserState> {
+  const api = requireBrowserApi();
+  if (props.visualization) {
+    return api.browserOpenVisualization(
+      props.agentId,
+      props.browserId,
+      props.visualization.path,
+      props.visualization.title,
+    );
+  }
+  address.value = props.initialUrl;
+  return api.browserOpen(props.agentId, props.browserId, address.value);
+}
 
 async function navigate(): Promise<void> {
   await runNavigation(() => requireBrowserApi().browserNavigate(props.agentId, props.browserId, address.value));
@@ -256,6 +278,10 @@ function messageFor(reason: unknown): string {
   background: var(--color-shell-main);
 }
 
+.browser-panel__toolbar--visualization {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .browser-panel button {
   display: inline-grid;
   place-items: center;
@@ -291,9 +317,19 @@ function messageFor(reason: unknown): string {
 }
 
 .browser-panel__address,
-.browser-panel__annotation-title {
+.browser-panel__annotation-title,
+.browser-panel__visualization-title {
   width: 100%;
   min-width: 0;
+}
+
+.browser-panel__visualization-title {
+  overflow: hidden;
+  padding: 0 var(--space-4);
+  color: var(--color-text-muted);
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .browser-panel__address {

@@ -15,7 +15,7 @@
             :aria-selected="activeTab === tab"
             @click="emit('selectTab', tab)"
           >
-            <IconListDetails v-if="tab === 'backlog'" aria-hidden="true" />
+            <BacklogIcon v-if="tab === 'backlog'" aria-hidden="true" />
             <GitHubIcon v-else-if="tab === 'review'" aria-hidden="true" />
             <IconWorld v-else-if="tab === 'browser'" aria-hidden="true" />
             <FoldersIcon v-else-if="tab === 'files'" aria-hidden="true" />
@@ -87,7 +87,7 @@
       aria-label="Open a workspace tab"
     >
       <button v-if="githubRepository" type="button" @click="emit('openTab', 'backlog')">
-        <IconListDetails aria-hidden="true" />
+        <BacklogIcon aria-hidden="true" />
         <span>Backlog</span>
       </button>
       <button type="button" @click="emit('openTab', 'review')">
@@ -140,6 +140,7 @@
       :browser-id="browserId"
       :initial-url="browserInitialUrl"
       :open-request-id="browserOpenRequestId"
+      :visualization="browserVisualization"
       :visible="visible && activeTab === 'browser'"
       @close="emit('closeTab', 'browser')"
       @send-prompt="emit('sendPrompt', $event)"
@@ -255,10 +256,10 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconLego, IconListDetails, IconWorld } from '@tabler/icons-vue';
+import { IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconLego, IconWorld } from '@tabler/icons-vue';
 import type { Agent, AgentFileSearchItem, AgentGitStatus, AgentSubagentTree, OpenInApplication, OpenInApplicationCatalog, RendererMessage, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem } from '@codex-claw/core/contracts';
-import type { CodexConversationLink } from '@codex-app-sdk/vue';
-import { CodeIcon, FileDiffIcon, FileTextIcon, FoldersIcon, GitHubIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
+import type { CodexConversationLink, CodexConversationVisualization } from '@codex-app-sdk/vue';
+import { BacklogIcon, CodeIcon, FileDiffIcon, FileTextIcon, FoldersIcon, GitHubIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import OpenInControl from '../shared/OpenInControl.vue';
@@ -311,6 +312,7 @@ const props = withDefaults(defineProps<{
   browserId?: string;
   browserInitialUrl?: string;
   browserOpenRequestId?: number;
+  browserVisualization?: CodexConversationVisualization | null;
   browserAvailable?: boolean;
   openInAvailable?: boolean;
   openInCatalog?: OpenInApplicationCatalog;
@@ -377,7 +379,7 @@ const activeProjectFilePath = computed(() => {
   return filePath;
 });
 const addMenuItems = computed<AppMenuItem[]>(() => [
-  ...(props.githubRepository ? [{ id: 'backlog', type: 'action', label: 'Backlog', icon: IconListDetails } satisfies AppMenuItem] : []),
+  ...(props.githubRepository ? [{ id: 'backlog', type: 'action', label: 'Backlog', icon: BacklogIcon } satisfies AppMenuItem] : []),
   { id: 'review', type: 'action', label: 'GitHub Review', icon: GitHubIcon },
   ...(props.browserAvailable ? [{ id: 'browser', type: 'action', label: 'Browser', icon: IconWorld } satisfies AppMenuItem] : []),
   { id: 'files', type: 'action', label: 'Files', icon: FoldersIcon },
@@ -419,7 +421,7 @@ function stopFilesPaneResize(): void {
 function tabLabel(tab: RightWorkspaceTab): string {
   if (tab === 'backlog') return 'Backlog';
   if (tab === 'review') return 'Review';
-  if (tab === 'browser') return 'Browser';
+  if (tab === 'browser') return props.browserVisualization?.title || 'Browser';
   if (tab === 'files') return 'Open file';
   if (tab === 'plan') return props.planPanel?.title ?? 'Plan';
   if (isRightWorkspaceSubagentTab(tab)) {

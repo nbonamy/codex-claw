@@ -175,6 +175,36 @@ describe('AppController', () => {
     );
   });
 
+  it('opens visualization documents through the dedicated browser boundary', async () => {
+    const controller = new AppController(createInitialSnapshot(), null);
+    setMainWindowSend(controller, vi.fn());
+    const state: BrowserState = {
+      url: '',
+      title: 'Backlog icon candidates',
+      canGoBack: false,
+      canGoForward: false,
+    };
+    const browserPane = (controller as unknown as {
+      browserPane: { openVisualization: ReturnType<typeof vi.fn> };
+    }).browserPane;
+    const openVisualization = vi.spyOn(browserPane, 'openVisualization').mockResolvedValue(state);
+
+    await expect(openBrowserVisualization(
+      controller,
+      'agent-dina',
+      'primary',
+      '/tmp/backlog-icon-candidates.html',
+      'Backlog icon candidates',
+    )).resolves.toStrictEqual(state);
+    expect(openVisualization).toHaveBeenCalledWith(
+      expect.anything(),
+      'agent-dina',
+      'primary',
+      '/tmp/backlog-icon-candidates.html',
+      'Backlog icon candidates',
+    );
+  });
+
   it('tracks concurrent browser opens independently by agent and browser id', async () => {
     const controller = new AppController(createInitialSnapshot(), null);
     const send = vi.fn();
@@ -2138,6 +2168,23 @@ function openBrowser(controller: AppController, agentId: string, browserId: stri
   return (controller as unknown as {
     browserOpen(agentId: string, browserId: string, url: string): Promise<BrowserState>;
   }).browserOpen(agentId, browserId, url);
+}
+
+function openBrowserVisualization(
+  controller: AppController,
+  agentId: string,
+  browserId: string,
+  filePath: string,
+  title: string,
+): Promise<BrowserState> {
+  return (controller as unknown as {
+    browserOpenVisualization(
+      agentId: string,
+      browserId: string,
+      filePath: string,
+      title: string,
+    ): Promise<BrowserState>;
+  }).browserOpenVisualization(agentId, browserId, filePath, title);
 }
 
 function resolvePendingBrowserOpen(controller: AppController, agentId: string, browserId: string, state: BrowserState): void {

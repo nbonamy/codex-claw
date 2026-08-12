@@ -160,7 +160,7 @@ describe('RightWorkspacePanel', () => {
     });
 
     expect(wrapper.get('[role="tab"]').text()).toBe('Backlog');
-    expect(wrapper.get('[role="tab"]').find('.tabler-icon-list-details').exists()).toBe(true);
+    expect(wrapper.get('[role="tab"]').findComponent({ name: 'BacklogIcon' }).exists()).toBe(true);
     expect(wrapper.findComponent({ name: 'RepositoryBacklogPanel' }).props()).toMatchObject({
       repositoryId: 'nbonamy/codex-claw',
       status: 'loaded',

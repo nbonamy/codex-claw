@@ -113,6 +113,7 @@ export const ipcChannels = {
   editMessage: 'message:edit',
   retryMessage: 'message:retry',
   browserOpen: 'browser:open',
+  browserOpenVisualization: 'browser:visualization:open',
   browserNavigate: 'browser:navigate',
   browserGoBack: 'browser:go-back',
   browserGoForward: 'browser:go-forward',

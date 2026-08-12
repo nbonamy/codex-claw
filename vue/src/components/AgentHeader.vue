@@ -96,7 +96,7 @@
         title="Open repository backlog"
         @click="emit('open-backlog')"
       >
-        <IconListDetails aria-hidden="true" />
+        <BacklogIcon aria-hidden="true" />
       </button>
       <OpenInControl
         v-if="agent && openInAvailable && openInCatalog && openInCatalog.applications.length > 0"
@@ -143,8 +143,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Agent, AgentGitStatus, AgentSubagentTree, BackendRuntimeStatus, DesktopUpdateStatus, OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
-import { ListIcon, PanelLeftOpenIcon } from '../shared/icons/app-icons';
-import { IconLayoutSidebarRight, IconListDetails } from '@tabler/icons-vue';
+import { BacklogIcon, ListIcon, PanelLeftOpenIcon } from '../shared/icons/app-icons';
+import { IconLayoutSidebarRight } from '@tabler/icons-vue';
 import { CodexAnimatedDiffStat } from '@codex-app-sdk/vue';
 import AgentAvatar from './AgentAvatar.vue';
 import UpdateAvailableBadge from './UpdateAvailableBadge.vue';

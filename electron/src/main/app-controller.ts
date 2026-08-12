@@ -485,6 +485,7 @@ export class AppController {
     });
 
     ipc.handle(ipcChannels.browserOpen, (_event, agentId: string, browserId: string, url: string) => this.browserOpen(agentId, browserId, url));
+    ipc.handle(ipcChannels.browserOpenVisualization, (_event, agentId: string, browserId: string, filePath: string, title: string) => this.browserOpenVisualization(agentId, browserId, filePath, title));
     ipc.handle(ipcChannels.browserNavigate, (_event, agentId: string, browserId: string, url: string) => this.browserNavigate(agentId, browserId, url));
     ipc.handle(ipcChannels.browserGoBack, (_event, agentId: string, browserId: string) => this.browserPane.goBack(agentId, browserId));
     ipc.handle(ipcChannels.browserGoForward, (_event, agentId: string, browserId: string) => this.browserPane.goForward(agentId, browserId));
@@ -1037,6 +1038,22 @@ export class AppController {
       this.rejectPendingBrowserOpen(agentId, browserId, error);
       throw error;
     }
+  }
+
+  private async browserOpenVisualization(
+    agentId: string,
+    browserId: string,
+    filePath: string,
+    title: string,
+  ): Promise<BrowserState> {
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) {
+      throw new Error('Browser window is not available.');
+    }
+    const agent = this.snapshot?.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) {
+      throw new Error(`Agent not found: ${agentId}`);
+    }
+    return this.browserPane.openVisualization(this.mainWindow, agentId, browserId, filePath, title);
   }
 
   private async browserNavigate(agentId: string, browserId: string, url: string): Promise<BrowserState> {

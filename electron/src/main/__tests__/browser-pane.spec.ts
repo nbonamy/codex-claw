@@ -74,7 +74,7 @@ vi.mock('electron', () => ({
   WebContentsView: electronMocks.WebContentsViewMock,
 }));
 
-import { BrowserPane, browserPaneKey, normalizeBrowserUrl, safePartitionName } from '../browser-pane';
+import { BrowserPane, browserPaneKey, normalizeBrowserUrl, readVisualizationDocument, safePartitionName } from '../browser-pane';
 
 beforeEach(() => {
   vi.stubGlobal('MAIN_WINDOW_VITE_DEV_SERVER_URL', 'http://localhost:5174');
@@ -128,6 +128,64 @@ describe('browser pane helpers', () => {
         rm(workspace, { recursive: true, force: true }),
         rm(outside, { recursive: true, force: true }),
       ]);
+    }
+  });
+
+  it('opens a bounded external visualization as a sandboxed data document without weakening file navigation', async () => {
+    const scratch = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-visualization-'));
+    const visualizationPath = path.join(scratch, 'chart.html');
+    const outsideFile = path.join(scratch, 'secret.txt');
+    await writeFile(visualizationPath, '<section id="chart">Chart</section><script>document.body.dataset.ready = "yes"</script>');
+    await writeFile(outsideFile, 'secret');
+
+    try {
+      const browserWindow = {
+        contentView: { addChildView: vi.fn(), removeChildView: vi.fn() },
+        isDestroyed: vi.fn(() => false),
+      };
+      const pane = new BrowserPane({ onAnnotation: vi.fn() });
+
+      await expect(pane.openVisualization(
+        browserWindow as never,
+        'agent-one',
+        'primary',
+        visualizationPath,
+        'Interactive chart',
+      )).resolves.toStrictEqual({
+        url: '',
+        title: 'Interactive chart',
+        canGoBack: false,
+        canGoForward: false,
+      });
+
+      const guest = electronMocks.WebContentsViewMock.instances[0];
+      const loadedUrl = guest?.webContents.loadURL.mock.calls[0]?.[0] as string;
+      expect(loadedUrl).toMatch(/^data:text\/html;base64,/u);
+      const document = Buffer.from(loadedUrl.slice(loadedUrl.indexOf(',') + 1), 'base64').toString('utf8');
+      expect(document).toContain('Content-Security-Policy');
+      expect(document).toContain("connect-src 'none'");
+      expect(document).toContain('<section id="chart">Chart</section>');
+      expect(guest?.webContents.emitNavigation('will-navigate', pathToFileURL(outsideFile).toString()).preventDefault).toHaveBeenCalledOnce();
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects non-HTML, symlinked, and oversized visualization files', async () => {
+    const scratch = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-visualization-invalid-'));
+    const textPath = path.join(scratch, 'notes.txt');
+    const htmlPath = path.join(scratch, 'large.html');
+    const linkedPath = path.join(scratch, 'linked.html');
+    await writeFile(textPath, 'not html');
+    await writeFile(htmlPath, 'x'.repeat(1_048_577));
+    await symlink(htmlPath, linkedPath);
+
+    try {
+      await expect(readVisualizationDocument(textPath, 'Notes')).rejects.toThrow('must be HTML');
+      await expect(readVisualizationDocument(linkedPath, 'Linked')).rejects.toThrow('unavailable');
+      await expect(readVisualizationDocument(htmlPath, 'Large')).rejects.toThrow('1 MB');
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
     }
   });
 

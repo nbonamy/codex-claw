@@ -232,7 +232,10 @@ implemented:
   conversation image opens it in a Claw-owned image tab,
   where native trackpad pinch gestures zoom around the pointer and ordinary
   scrolling pans the enlarged image, while the SDK lightbox remains the fallback
-  for hosts without that action;
+  for hosts without that action. SDK visualization rows open through a dedicated
+  Claw browser action: the desktop host reads only a bounded regular HTML file,
+  wraps it in a network-restricted document, and renders it in the sandboxed
+  right workspace without relaxing ordinary workspace file-preview confinement;
   every agent preserves its own open/active tabs, open state, and
   width, and inactive workspaces stay mounted so background browser tooling can
   continue without stealing the user's selected agent. Live edits refresh files

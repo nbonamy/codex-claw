@@ -9,7 +9,7 @@ class ResizeObserverStub {
   disconnect = vi.fn();
 }
 
-function mountPanel(props: { initialUrl?: string; openRequestId?: number } = {}) {
+function mountPanel(props: { initialUrl?: string; openRequestId?: number; visualization?: { path: string; title: string } } = {}) {
   let listener: ((event: MainToRendererEvent) => void) | null = null;
   const browserOpen = vi.fn().mockResolvedValue({
     url: '',
@@ -19,6 +19,12 @@ function mountPanel(props: { initialUrl?: string; openRequestId?: number } = {})
   });
   const api = {
     browserOpen,
+    browserOpenVisualization: vi.fn().mockResolvedValue({
+      url: '',
+      title: 'Backlog icon candidates',
+      canGoBack: false,
+      canGoForward: false,
+    }),
     browserNavigate: vi.fn().mockResolvedValue({
       url: 'https://example.com/',
       title: 'Example',
@@ -67,6 +73,24 @@ describe('BrowserPanel', () => {
 
     expect(api.browserNavigate).toHaveBeenCalledWith('agent-1', 'primary', 'https://example.com');
     expect((wrapper.get('[aria-label="Browser address"]').element as HTMLInputElement).value).toBe('https://example.com/');
+  });
+
+  it('opens visualization content through the dedicated host API without exposing it as a browser address', async () => {
+    const { api, browserOpen, wrapper } = mountPanel({
+      visualization: { path: '/tmp/backlog-icon-candidates.html', title: 'Backlog icon candidates' },
+    });
+    await flushPromises();
+
+    expect(browserOpen).not.toHaveBeenCalled();
+    expect(api.browserOpenVisualization).toHaveBeenCalledWith(
+      'agent-1',
+      'primary',
+      '/tmp/backlog-icon-candidates.html',
+      'Backlog icon candidates',
+    );
+    expect(wrapper.get('.browser-panel__visualization-title').text()).toBe('Backlog icon candidates');
+    expect(wrapper.find('[aria-label="Browser address"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Annotate page"]').exists()).toBe(false);
   });
 
   it('accumulates annotations and sends one scoped prompt when the batch is ready', async () => {

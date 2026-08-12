@@ -245,6 +245,19 @@ describe('AppShell', () => {
   });
 
   it('owns the SDK conversation controller state and actions at the shell boundary', async () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe = vi.fn();
+      disconnect = vi.fn();
+    });
+    setElectronTestClient({
+      browserOpenVisualization: vi.fn().mockResolvedValue({
+        url: '', title: 'Backlog icon candidates', canGoBack: false, canGoForward: false,
+      }),
+      browserSetBounds: vi.fn().mockResolvedValue(undefined),
+      browserSetVisible: vi.fn().mockResolvedValue(undefined),
+      browserClose: vi.fn().mockResolvedValue(undefined),
+      onEvent: vi.fn(() => vi.fn()),
+    });
     const snapshot = createInitialSnapshot();
     const activeAgent = snapshot.agents[0];
     if (!activeAgent) throw new Error('Expected seeded agent.');
@@ -374,6 +387,19 @@ describe('AppShell', () => {
     await nextTick();
     expect(imageWorkspace.props('tabs')).not.toContain(imageTab);
     expect(imageWorkspace.props('imagePanels')).toStrictEqual({});
+
+    await actions.openVisualization?.({
+      path: '/tmp/backlog-icon-candidates.html',
+      title: 'Backlog icon candidates',
+    });
+    await nextTick();
+    expect(imageWorkspace.props('tabs')).toContain('browser');
+    expect(imageWorkspace.props('activeTab')).toBe('browser');
+    expect(imageWorkspace.props('browserInitialUrl')).toBe('');
+    expect(imageWorkspace.props('browserVisualization')).toStrictEqual({
+      path: '/tmp/backlog-icon-candidates.html',
+      title: 'Backlog icon candidates',
+    });
   });
 
   it('exposes Claude permission modes as a distinct composer submenu', async () => {

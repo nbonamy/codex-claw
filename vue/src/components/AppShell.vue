@@ -262,6 +262,7 @@
             :browser-id="rightWorkspaceFor(agent.id).browserId"
             :browser-initial-url="rightWorkspaceFor(agent.id).browserInitialUrl"
             :browser-open-request-id="rightWorkspaceFor(agent.id).browserOpenRequestId"
+            :browser-visualization="rightWorkspaceFor(agent.id).browserVisualization"
             :browser-available="clawHostCapabilities.embeddedBrowser"
             :open-in-available="clawHostCapabilities.openInApplications && isLocalAgent(agent)"
             :open-in-catalog="openInApplications"
@@ -413,6 +414,7 @@ import {
   type CodexConversationLink,
   type CodexConversationPaneActions,
   type CodexConversationPaneState,
+  type CodexConversationVisualization,
   type CodexComposerMenuItem,
   type CodexMessageImage,
   type CodexMessageImageContext,
@@ -733,6 +735,7 @@ type AgentRightWorkspaceState = {
   browserId: string;
   browserInitialUrl: string;
   browserOpenRequestId: number;
+  browserVisualization: CodexConversationVisualization | null;
   filePanels: Partial<Record<RightWorkspaceFileTab, RightWorkspaceFilePanel>>;
   filesPaneOpen: boolean;
   filesPaneWidth: number;
@@ -1034,6 +1037,7 @@ const conversationPaneActions: CodexConversationPaneActions = {
   },
   openLink: openConversationLink,
   openImage: openConversationImage,
+  openVisualization: openConversationVisualization,
   resolveApproval: forwardApprovalResolution,
   retryMessage: (index) => emit('retry-message', index),
   steer: forwardCodexSteerPrompt,
@@ -1352,6 +1356,7 @@ function rightWorkspaceFor(agentId: string): AgentRightWorkspaceState {
     browserId: PRIMARY_BROWSER_ID,
     browserInitialUrl: '',
     browserOpenRequestId: 0,
+    browserVisualization: null,
     filePanels: {},
     filesPaneOpen: false,
     filesPaneWidth: 280,
@@ -1436,8 +1441,20 @@ function openRequestedBrowser(agentId: string, command: Extract<AppCommand, { ty
   const workspace = rightWorkspaceFor(agentId);
   workspace.browserId = command.browserId ?? PRIMARY_BROWSER_ID;
   workspace.browserInitialUrl = command.url ?? '';
+  workspace.browserVisualization = null;
   workspace.browserOpenRequestId += 1;
   openRightWorkspaceTab('browser', agentId);
+}
+
+function openConversationVisualization(visualization: CodexConversationVisualization): void {
+  const agent = currentAgent.value;
+  if (!agent || !clawHostCapabilities.embeddedBrowser) return;
+  const workspace = rightWorkspaceFor(agent.id);
+  workspace.browserId = PRIMARY_BROWSER_ID;
+  workspace.browserInitialUrl = '';
+  workspace.browserVisualization = { ...visualization };
+  workspace.browserOpenRequestId += 1;
+  openRightWorkspaceTab('browser', agent.id);
 }
 
 function handleBrowserOpenCommand(command: Extract<AppCommand, { type: 'open-browser' }>): void {
