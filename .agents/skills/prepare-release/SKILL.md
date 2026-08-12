@@ -1,12 +1,13 @@
 ---
 name: prepare-release
-description: Prepare a Codex Claw desktop release by invoking the repo-level update-changelog audit, presenting an evidence-backed semantic-version recommendation, synchronizing package versions, freezing generated release notes, committing release preparation, and creating an annotated local tag with SDK provenance. Use when Nicolas asks to prepare, cut, freeze, or version a Codex Claw release, including $prepare-release with or without a version.
+description: Prepare and publish a Codex Claw desktop release by invoking the repo-level update-changelog audit, presenting an evidence-backed semantic-version recommendation, synchronizing package versions, freezing generated release notes, committing and tagging the release with SDK provenance, then building and publishing it by default. Use when Nicolas asks to prepare, cut, freeze, version, build, or publish a Codex Claw release, including $prepare-release with or without a version.
 ---
 
 # Prepare Release
 
-Prepare the release commit and local annotated tag only. Do not build, push,
-publish, or upload until Nicolas separately chooses who will build it.
+Prepare the release commit and annotated tag, then build and publish the signed
+desktop release by default. Only stop after the local tag when Nicolas
+explicitly says not to build or publish.
 
 ## 1. Require clean, reproducible repositories
 
@@ -135,7 +136,8 @@ chore: release prep
 ```
 
 After the commit, require both repositories to remain clean and the SDK `HEAD`
-to still equal `<sdk-head>`. Do not push.
+to still equal `<sdk-head>`. Do not push until the release build and publication
+have succeeded.
 
 Require `v<target-version>` not to exist, then create an annotated tag on the
 release-prep commit:
@@ -150,18 +152,33 @@ Verify the tag resolves to `HEAD` and its annotation contains exactly one
 `codex-app-sdk: <sdk-head>` provenance line. Never move, replace, or push an
 existing tag.
 
-## 7. Hand off the build decision
+## 7. Build and publish by default
 
-Report the version, Claw commit hash, local tag, and recorded SDK commit. Ask
-Nicolas explicitly:
+If Nicolas explicitly opted out of building or publishing, report the version,
+Claw commit hash, local tag, and recorded SDK commit, then stop without pushing.
 
-```text
-Who should run npm run make—you or me?
+Otherwise, immediately before building, require both repositories to be clean
+again and verify that the live SDK `HEAD` exactly matches the commit recorded
+in the release tag. Abort if any check fails because the release build rebuilds
+`../codex-app-sdk` directly.
+
+Run the complete signed and notarized macOS publication workflow:
+
+```bash
+npm run publish
 ```
 
-Stop and wait. Do not start `npm run make` until he answers.
+Never set `CODEX_CLAW_SKIP_SIGNING` for a release. Require the publish command
+to complete successfully before publishing Git state. Then push the current
+branch and the new tag explicitly:
 
-Immediately before an authorized build, require both repositories to be clean
-again and verify that the live SDK `HEAD` exactly matches the commit recorded
-in the release tag. Abort if any check fails because `npm run make` rebuilds
-`../codex-app-sdk` directly.
+```bash
+git push
+git push origin "v<target-version>"
+```
+
+Verify the branch upstream contains the release-prep commit, the remote tag
+resolves to that commit, and both repositories remain clean. Report the
+version, Claw commit hash, pushed tag, recorded SDK commit, and published macOS
+artifact. If build, signing, notarization, upload, or Git push fails, stop and
+report the exact failing phase; never claim the release was published.
