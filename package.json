@@ -1,6 +1,6 @@
 {
   "name": "codex-claw",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "private": true,
   "devDependencies": {
     "prettier": "^3.8.3"

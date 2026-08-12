@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.9.1",
+  "currentVersion": "0.10.0",
   "releases": [
+    {
+      "version": "0.10.0",
+      "releasedAt": "2026-08-12",
+      "sourceSha256": "18815d2c37fe79ff4b405b39e9b039dd01c90d5d5d5d2718242c5dbf9f0ffa57",
+      "markdown": "### New features\n\n- A new repository Backlog workspace lets you browse, search, and filter GitHub\n  issues and pull requests, then prefill a custom prompt or dispatch focused\n  investigate, fix, feedback, and review actions to the current agent or an\n  isolated duplicate; work can stay in the current folder or use a new\n  worktree, while pull requests check out their actual head branch.\n\n### Improvements and fixes\n\n- Conversation titles now stay aligned with Claw agent names, including agent\n  renames, and closing an agent archives its Codex conversation.\n- Git status refreshes are now limited to meaningful active-agent and Git\n  lifecycle events, avoiding redundant background requests and stale results.\n- Long code lines in conversations now wrap instead of overflowing the message\n  pane."
+    },
     {
       "version": "0.9.1",
       "releasedAt": "2026-08-11",

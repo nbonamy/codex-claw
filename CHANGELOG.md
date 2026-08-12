@@ -4,6 +4,25 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.10.0] - 2026-08-12
+
+### New features
+
+- A new repository Backlog workspace lets you browse, search, and filter GitHub
+  issues and pull requests, then prefill a custom prompt or dispatch focused
+  investigate, fix, feedback, and review actions to the current agent or an
+  isolated duplicate; work can stay in the current folder or use a new
+  worktree, while pull requests check out their actual head branch.
+
+### Improvements and fixes
+
+- Conversation titles now stay aligned with Claw agent names, including agent
+  renames, and closing an agent archives its Codex conversation.
+- Git status refreshes are now limited to meaningful active-agent and Git
+  lifecycle events, avoiding redundant background requests and stale results.
+- Long code lines in conversations now wrap instead of overflowing the message
+  pane.
+
 ## [0.9.1] - 2026-08-11
 
 ### New features
