@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.10.0",
+  "currentVersion": "0.10.1",
   "releases": [
+    {
+      "version": "0.10.1",
+      "releasedAt": "2026-08-12",
+      "sourceSha256": "012010f18bfae2beeeb90a66bfb9669b2befe2de8ea07e8508a4ab67359490bb",
+      "markdown": "### New features\n\n- Agent responses can now open interactive visualizations in a dedicated,\n  sandboxed workspace tab."
+    },
     {
       "version": "0.10.0",
       "releasedAt": "2026-08-12",

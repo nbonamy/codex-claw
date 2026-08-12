@@ -4,6 +4,13 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.10.1] - 2026-08-12
+
+### New features
+
+- Agent responses can now open interactive visualizations in a dedicated,
+  sandboxed workspace tab.
+
 ## [0.10.0] - 2026-08-12
 
 ### New features
