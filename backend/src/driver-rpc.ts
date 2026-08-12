@@ -145,6 +145,18 @@ export class BackendDriverRpc {
         const driver = this.requireDriver(agent.backend);
         return driver.getGitDiff ? driver.getGitDiff(agent) : null;
       }
+      case backendMethods.driverTextGenerate: {
+        const { agent } = requireAgentParams(params);
+        const record = requireRecord(params);
+        const driver = this.requireDriver(agent.backend);
+        if (!driver.generateText) throw unsupportedBackendFeature(agent, 'ephemeral text generation');
+        return driver.generateText(agent, {
+          prompt: requireString(record.prompt, 'prompt'),
+          cwd: requireString(record.cwd, 'cwd'),
+          ...(typeof record.developerInstructions === 'string' ? { developerInstructions: record.developerInstructions } : {}),
+          ...(record.outputSchema !== undefined ? { outputSchema: record.outputSchema as never } : {}),
+        });
+      }
       case backendMethods.driverPromptCommandHandle: {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);

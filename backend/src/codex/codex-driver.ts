@@ -20,7 +20,7 @@ import type {
   PairedDevice,
 } from '@codex-claw/core/contracts';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/core/backend-driver';
+import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult, BackendTextGenerationInput, BackendTextGenerationResult } from '@codex-claw/core/backend-driver';
 import { AgentGitService } from '../git/agent-git-service';
 import type { CodexSurfaceAgentAdapter } from './codex-surface-adapter';
 
@@ -66,6 +66,10 @@ export class CodexBackendDriver implements AgentBackendDriver {
 
   async getGitDiff(agent: Agent) {
     return this.gitService.diff(agent.folder);
+  }
+
+  async generateText(agent: Agent, input: BackendTextGenerationInput): Promise<BackendTextGenerationResult> {
+    return this.sessionManager.generateText(agent, input);
   }
 
   async listModels(_agent: Agent): Promise<BackendModelOption[]> {

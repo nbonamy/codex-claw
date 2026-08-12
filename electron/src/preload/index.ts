@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AddSshConnectionInput, AgentGitCommitInput, AgentGitMergeInput, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AppCommand, AppPluginStatus, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DesktopUpdateStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RendererSendPromptOptions, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, AgentGitBranchInput, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AppCommand, AppPluginStatus, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DesktopUpdateStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RendererSendPromptOptions, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind } from '@codex-claw/core/contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
 import { exposeCodexNativeRendererApi, TypedIpcRenderer } from '@codex-app-sdk/electron/preload';
 
@@ -34,9 +34,11 @@ const api: CodexClawApi = {
   previewAgentFile: (agentId: string, filePath: string) => ipc.invoke(ipcChannels.previewAgentFile, agentId, filePath),
   openAgentGitDiff: (agentId: string) => ipc.invoke(ipcChannels.openAgentGitDiff, agentId),
   getAgentGitWorkflow: (agentId: string) => ipc.invoke(ipcChannels.getAgentGitWorkflow, agentId),
+  generateAgentGitMessage: (agentId: string, input: AgentGitMessageGenerationInput) => ipc.invoke(ipcChannels.generateAgentGitMessage, agentId, input),
   stageAgentGitFiles: (agentId: string, input: AgentGitStageInput) => ipc.invoke(ipcChannels.stageAgentGitFiles, agentId, input),
   commitAgentGitChanges: (agentId: string, input: AgentGitCommitInput) => ipc.invoke(ipcChannels.commitAgentGitChanges, agentId, input),
   pushAgentGitBranch: (agentId: string, input: AgentGitPushInput) => ipc.invoke(ipcChannels.pushAgentGitBranch, agentId, input),
+  createAgentGitBranch: (agentId: string, input: AgentGitBranchInput) => ipc.invoke(ipcChannels.createAgentGitBranch, agentId, input),
   createAgentGitPullRequest: (agentId: string, input: AgentGitPullRequestInput) => ipc.invoke(ipcChannels.createAgentGitPullRequest, agentId, input),
   mergeAgentGitBranch: (agentId: string, input: AgentGitMergeInput) => ipc.invoke(ipcChannels.mergeAgentGitBranch, agentId, input),
   getOpenInApplications: () => ipc.invoke(ipcChannels.getOpenInApplications),

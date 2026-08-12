@@ -1150,8 +1150,15 @@ export type AgentGitWorkflow = {
 export type AgentGitStageInput = { paths: string[]; confirmed: boolean };
 export type AgentGitCommitInput = { message: string; confirmed: boolean; includeUnstaged?: boolean; includeUntracked?: boolean };
 export type AgentGitPushInput = { confirmed: boolean; target?: 'current' | 'mergeTarget' };
+export type AgentGitBranchInput = { name: string; confirmed: boolean };
 export type AgentGitPullRequestInput = { title: string; body: string; confirmed: boolean };
 export type AgentGitMergeInput = { strategy: 'merge' | 'squash'; commitMessage?: string; deleteBranch: boolean; deleteWorktree: boolean; confirmed: boolean };
+export type AgentGitMessageGenerationInput =
+  | { kind: 'commit'; includeUnstaged: boolean; includeUntracked: boolean }
+  | { kind: 'pullRequest' };
+export type AgentGitMessageGenerationResult =
+  | { kind: 'commit'; message: string }
+  | { kind: 'pullRequest'; title: string; body: string };
 
 export type TurnGitDiff = {
   turnId: string;
@@ -1461,9 +1468,11 @@ export type CodexClawApi = {
   previewAgentFile(agentId: string, filePath: string): Promise<AgentFilePreviewResult>;
   openAgentGitDiff(agentId: string): Promise<void>;
   getAgentGitWorkflow(agentId: string): Promise<AgentGitWorkflow>;
+  generateAgentGitMessage(agentId: string, input: AgentGitMessageGenerationInput): Promise<AgentGitMessageGenerationResult>;
   stageAgentGitFiles(agentId: string, input: AgentGitStageInput): Promise<AgentGitWorkflow>;
   commitAgentGitChanges(agentId: string, input: AgentGitCommitInput): Promise<AgentGitWorkflow>;
   pushAgentGitBranch(agentId: string, input: AgentGitPushInput): Promise<AgentGitWorkflow>;
+  createAgentGitBranch(agentId: string, input: AgentGitBranchInput): Promise<AgentGitWorkflow>;
   createAgentGitPullRequest(agentId: string, input: AgentGitPullRequestInput): Promise<AgentGitWorkflow>;
   mergeAgentGitBranch(agentId: string, input: AgentGitMergeInput): Promise<AgentGitWorkflow>;
   getOpenInApplications(): Promise<OpenInApplicationCatalog>;

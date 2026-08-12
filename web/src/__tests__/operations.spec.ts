@@ -54,6 +54,8 @@ describe('Claw web operations', () => {
     await invokeClawWebOperation(backend, 'listWorkItems', ['github', null, { kind: 'remote' }]);
     await invokeClawWebOperation(backend, 'getPluginStatus', []);
     await invokeClawWebOperation(backend, 'setAgentPermissionMode', ['agent-claude', 'acceptEdits']);
+    await invokeClawWebOperation(backend, 'generateAgentGitMessage', ['agent-1', { kind: 'pullRequest' }]);
+    await invokeClawWebOperation(backend, 'createAgentGitBranch', ['agent-1', { name: 'feature/demo', confirmed: true }]);
 
     expect(request.mock.calls).toStrictEqual([
       [backendMethods.sourceFoldersList, { kind: 'remote' }],
@@ -63,6 +65,8 @@ describe('Claw web operations', () => {
       [backendMethods.workProviderItemsList, { provider: 'github', location: { kind: 'remote' } }],
       [backendMethods.settingsPluginStatusGet, undefined],
       [backendMethods.agentPermissionModeUpdate, { agentId: 'agent-claude', mode: 'acceptEdits' }],
+      [backendMethods.agentGitMessageGenerate, { agentId: 'agent-1', input: { kind: 'pullRequest' } }],
+      [backendMethods.agentGitBranchCreate, { agentId: 'agent-1', input: { name: 'feature/demo', confirmed: true } }],
     ]);
   });
 

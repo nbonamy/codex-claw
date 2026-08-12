@@ -218,9 +218,11 @@ export class AppController {
       return this.openAgentGitDiff(agentId);
     });
     ipc.handle(ipcChannels.getAgentGitWorkflow, (_event, agentId: string) => this.requireBackendClient().request(backendMethods.agentGitWorkflowGet, { agentId }));
+    ipc.handle(ipcChannels.generateAgentGitMessage, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitMessageGenerate, { agentId, input }));
     ipc.handle(ipcChannels.stageAgentGitFiles, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitStage, { agentId, input }));
     ipc.handle(ipcChannels.commitAgentGitChanges, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitCommit, { agentId, input }));
     ipc.handle(ipcChannels.pushAgentGitBranch, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitPush, { agentId, input }));
+    ipc.handle(ipcChannels.createAgentGitBranch, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitBranchCreate, { agentId, input }));
     ipc.handle(ipcChannels.createAgentGitPullRequest, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitPullRequestCreate, { agentId, input }));
     ipc.handle(ipcChannels.mergeAgentGitBranch, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitMerge, { agentId, input }));
 

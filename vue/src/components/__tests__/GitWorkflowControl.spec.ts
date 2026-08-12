@@ -93,6 +93,31 @@ describe('GitWorkflowControl', () => {
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
   });
 
+  it('generates an editable commit message from the selected scopes', async () => {
+    const pendingGeneration = deferred<{ kind: 'commit'; message: string }>();
+    const generateMessage = vi.fn(() => pendingGeneration.promise);
+    const wrapper = mountControl({ generateMessage });
+    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await wrapper.get('.git-workflow-control__primary').trigger('click');
+    await wrapper.findAllComponents({ name: 'ElSwitch' })[0]!.setValue(false);
+    await wrapper.findAllComponents({ name: 'ElSwitch' })[1]!.setValue(true);
+    const generate = wrapper.get('[aria-label="Generate commit message with Codex"]');
+    await generate.trigger('click');
+
+    expect(generateMessage).toHaveBeenCalledWith('agent-1', {
+      kind: 'commit',
+      includeUnstaged: false,
+      includeUntracked: true,
+    });
+    expect(wrapper.text()).toContain('Generating…');
+
+    pendingGeneration.resolve({ kind: 'commit', message: 'feat: improve Git drafts' });
+    await flushPromises();
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('feat: improve Git drafts');
+    await wrapper.get('textarea').setValue('feat: edit the generated draft');
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('feat: edit the generated draft');
+  });
+
   it('retries only the push when commit and push partially fails', async () => {
     const commitChanges = vi.fn(async () => ({ ...workflow, files: [], stagedFiles: [], unstagedFiles: [], ahead: 3 }));
     const pushBranch = vi.fn()
@@ -182,11 +207,71 @@ describe('GitWorkflowControl', () => {
   });
 
   it('shows icon-only action menu entries without descriptions', async () => {
-    const wrapper = mountControl();
+    const wrapper = mountControl({ createBranch: vi.fn() });
     await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy());
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
-    expect(wrapper.find('[role="menu"]').text()).toContain('Commit');
+    expect(wrapper.findAll('.app-menu__label').map((item) => item.text())).toStrictEqual([
+      'Commit',
+      'Push',
+      'Branch',
+      'Merge',
+      'Create PR',
+    ]);
     expect(wrapper.find('.app-menu__description').exists()).toBe(false);
+  });
+
+  it('creates and checks out a branch from any initialized Git checkout', async () => {
+    const cleanMain = {
+      ...workflow,
+      branch: 'main',
+      ahead: 0,
+      files: [],
+      stagedFiles: [],
+      unstagedFiles: [],
+    };
+    const createdWorkflow = { ...cleanMain, branch: 'feature/from-main' };
+    const pendingBranch = deferred<AgentGitWorkflow>();
+    const createBranch = vi.fn(() => pendingBranch.promise);
+    const wrapper = mountControl({
+      gitStatus: { ...status, branch: 'main', ahead: 0, changedFiles: 0, addedLines: 0, removedLines: 0, state: 'clean' },
+      getWorkflow: async () => cleanMain,
+      createBranch,
+    });
+    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+
+    await wrapper.get('.git-workflow-control__primary').trigger('click');
+    expect(wrapper.text()).toContain('Create branch');
+    const input = wrapper.get<HTMLInputElement>('.git-workflow-control__branch-form input');
+    expect(input.attributes('placeholder')).toBe('Branch name…');
+    await input.setValue(' feature/from-main ');
+    await submitButton(wrapper, 'Create branch').trigger('click');
+
+    expect(createBranch).toHaveBeenCalledWith('agent-1', { name: 'feature/from-main', confirmed: true });
+    expect(wrapper.text()).toContain('Creating branch');
+
+    vi.useFakeTimers();
+    pendingBranch.resolve(createdWorkflow);
+    await flushPromises();
+    expect(wrapper.text()).toContain('Branch created');
+    expect(wrapper.text()).toContain('feature/from-main');
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+  });
+
+  it('keeps an invalid branch error editable through the Back action', async () => {
+    const createBranch = vi.fn().mockRejectedValue(new Error('Enter a valid branch name.'));
+    const wrapper = mountControl({ createBranch });
+    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy());
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Branch'))?.trigger('click');
+    await wrapper.get('.git-workflow-control__branch-form input').setValue('bad name');
+    await submitButton(wrapper, 'Create branch').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Branch creation failed');
+    expect(wrapper.text()).toContain('Enter a valid branch name.');
+    await submitButton(wrapper, 'Back').trigger('click');
+    expect((wrapper.get('.git-workflow-control__branch-form input').element as HTMLInputElement).value).toBe('bad name');
   });
 
   it('reloads action availability when the selected agent changes', async () => {
@@ -363,9 +448,9 @@ describe('GitWorkflowControl', () => {
     expect(submitButton(wrapper, 'Retry').exists()).toBe(true);
   });
 
-  it('requires changes for a PR from main but allows a clean feature branch', async () => {
-    const cleanMain = { ...workflow, branch: 'main', files: [], unstagedFiles: [] };
-    const mainWrapper = mountControl({ getWorkflow: async () => cleanMain });
+  it('requires a feature branch for a PR even when main has uncommitted changes', async () => {
+    const dirtyMain = { ...workflow, branch: 'main' };
+    const mainWrapper = mountControl({ getWorkflow: async () => dirtyMain });
     await vi.waitFor(() => expect(mainWrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
     await mainWrapper.get('.git-workflow-control__trigger').trigger('click');
     const mainPr = mainWrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'));
@@ -390,6 +475,34 @@ describe('GitWorkflowControl', () => {
     expect(writingSurface.get('input').attributes('placeholder')).toBe('Title');
     expect((writingSurface.get('input').element as HTMLInputElement).value).toBe('');
     expect(writingSurface.get('textarea').attributes('placeholder')).toBe('Describe the change (optional)');
+  });
+
+  it('generates an editable pull request title and body together', async () => {
+    const generateMessage = vi.fn().mockResolvedValue({
+      kind: 'pullRequest',
+      title: 'Improve Git drafts',
+      body: '## Summary\n- Add ephemeral generation',
+    });
+    const wrapper = mountControl({ generateMessage });
+    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
+    await wrapper.get('[aria-label="Generate pull request draft with Codex"]').trigger('click');
+    await flushPromises();
+
+    expect(generateMessage).toHaveBeenCalledWith('agent-1', { kind: 'pullRequest' });
+    expect((wrapper.get('.git-workflow-control__pull-request-form input').element as HTMLInputElement).value).toBe('Improve Git drafts');
+    expect((wrapper.get('.git-workflow-control__pull-request-form textarea').element as HTMLTextAreaElement).value).toContain('ephemeral generation');
+  });
+
+  it('does not offer Codex draft generation for Claude agents', async () => {
+    const wrapper = mountControl({
+      agent: { ...agent, backend: 'claude', backendDefaults: { kind: 'claude' } },
+      generateMessage: vi.fn(),
+    });
+    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await wrapper.get('.git-workflow-control__primary').trigger('click');
+    expect(wrapper.find('.git-workflow-control__generate').exists()).toBe(false);
   });
 
   it('shows pull request progress and passive success before closing automatically', async () => {

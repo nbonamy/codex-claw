@@ -202,8 +202,10 @@
           :subagent-tree="currentSubagentTree"
           :selected-subagent-conversation-id="selectedSubagentConversationIdFor(currentAgent.id)"
           :get-git-workflow="props.getAgentGitWorkflow"
+          :generate-git-message="props.generateAgentGitMessage"
           :commit-git-changes="props.commitAgentGitChanges"
           :push-git-branch="props.pushAgentGitBranch"
+          :create-git-branch="props.createAgentGitBranch"
           :create-git-pull-request="props.createAgentGitPullRequest"
           :merge-git-branch="props.mergeAgentGitBranch"
           @expand-sidebar="agentSidebarCollapsed = false"
@@ -489,9 +491,11 @@ const props = withDefaults(defineProps<{
   previewAgentFile?: (agentId: string, filePath: string) => Promise<AgentFilePreviewResult>;
   openAgentGitDiff?: (agentId: string) => Promise<void>;
   getAgentGitWorkflow?: (agentId: string) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
+  generateAgentGitMessage?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitMessageGenerationInput) => Promise<import('@codex-claw/core/contracts').AgentGitMessageGenerationResult>;
   stageAgentGitFiles?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitStageInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   commitAgentGitChanges?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitCommitInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   pushAgentGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPushInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
+  createAgentGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitBranchInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   createAgentGitPullRequest?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPullRequestInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   mergeAgentGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitMergeInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   openInApplications?: OpenInApplicationCatalog;
@@ -590,9 +594,11 @@ const props = withDefaults(defineProps<{
     throw new Error('Git diff preview is not available.');
   },
   getAgentGitWorkflow: async () => { throw new Error('Git workflow is not available.'); },
+  generateAgentGitMessage: async () => { throw new Error('Git message generation is not available.'); },
   stageAgentGitFiles: async () => { throw new Error('Git staging is not available.'); },
   commitAgentGitChanges: async () => { throw new Error('Git commit is not available.'); },
   pushAgentGitBranch: async () => { throw new Error('Git push is not available.'); },
+  createAgentGitBranch: async () => { throw new Error('Git branch creation is not available.'); },
   createAgentGitPullRequest: async () => { throw new Error('Pull request creation is not available.'); },
   mergeAgentGitBranch: async () => { throw new Error('Git merge is not available.'); },
   openInApplications: () => ({ defaultApplication: 'finder', applications: [] }),

@@ -4,7 +4,7 @@ import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput, updateAgentOpenInApplication } from '@codex-claw/core/snapshot';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitDiff, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitDiff, AgentGitMessageGenerationResult, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/core/backend-driver';
@@ -643,6 +643,40 @@ export class ClawBackendServer {
         const agentId = requireAgentId(message.params);
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitWorkflowGet, { agentId }, (agent) => this.gitWorkflow(agent));
       }
+      case backendMethods.agentGitMessageGenerate: {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitMessageGenerate, params, async (agent) => {
+          const input = requireRecord(params.input);
+          const kind = requireString(input.kind, 'kind');
+          if (kind === 'commit') {
+            const source = await this.agentGitService.commitMessageContext(agent.folder, {
+              includeUnstaged: input.includeUnstaged === true,
+              includeUntracked: input.includeUntracked === true,
+            });
+            const generated = await this.handleAgentDriverRequest(agent, backendMethods.driverTextGenerate, {
+              agent,
+              cwd: agent.folder,
+              prompt: `Write a commit message for these selected changes.\n\n${source.context}`,
+              developerInstructions: 'Return one concise, imperative git commit subject. Follow the repository convention when it is evident. Do not add Markdown or explanations.',
+              outputSchema: commitMessageOutputSchema,
+            });
+            return parseGeneratedGitMessage(generated, 'commit');
+          }
+          if (kind === 'pullRequest') {
+            const source = await this.agentGitService.pullRequestMessageContext(agent.folder);
+            const generated = await this.handleAgentDriverRequest(agent, backendMethods.driverTextGenerate, {
+              agent,
+              cwd: agent.folder,
+              prompt: `Draft a pull request title and body for the changes from ${source.baseRef ?? 'the base branch'} to the current branch.\n\n${source.context}`,
+              developerInstructions: 'Return a concise pull request title and a useful Markdown body describing the outcome, important implementation details, and testing when supported by the supplied context. Do not invent facts.',
+              outputSchema: pullRequestMessageOutputSchema,
+            });
+            return parseGeneratedGitMessage(generated, 'pullRequest');
+          }
+          throw new Error(`Unsupported Git message kind: ${kind}`);
+        });
+      }
       case backendMethods.agentGitStage: {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
@@ -686,6 +720,15 @@ export class ClawBackendServer {
           return this.gitWorkflow(agent);
         });
       }
+      case backendMethods.agentGitBranchCreate: {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitBranchCreate, params, async (agent) => {
+          const input = requireConfirmed(params.input, 'Creating a branch');
+          await this.agentGitService.createBranch(agent.folder, requireString(input.name, 'name'));
+          return this.gitWorkflow(agent);
+        });
+      }
       case backendMethods.agentGitPullRequestCreate: {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
@@ -693,6 +736,7 @@ export class ClawBackendServer {
           const input = requireConfirmed(params.input, 'Creating a pull request');
           const workflow = await this.gitWorkflow(agent, { includePullRequest: true });
           if (!workflow.branch || workflow.detached) throw new Error('Create or check out a branch before creating a pull request.');
+          if (isIntegrationBranchName(workflow.branch)) throw new Error('Create a feature branch before creating a pull request.');
           if (!workflow.remote || !workflow.remoteUrl) throw new Error('Add a GitHub remote before creating a pull request.');
           if (workflow.githubError) throw new Error(`Could not verify existing pull requests: ${workflow.githubError}`);
           if (workflow.existingPullRequest) throw new Error(`Pull request #${workflow.existingPullRequest.number} already exists for this branch.`);
@@ -3385,6 +3429,43 @@ function rendererMessageText(message: RendererMessage): string {
     .filter(Boolean)
     .join('\n\n')
     .trim();
+}
+
+const commitMessageOutputSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: { message: { type: 'string' } },
+  required: ['message'],
+};
+
+const pullRequestMessageOutputSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    title: { type: 'string' },
+    body: { type: 'string' },
+  },
+  required: ['title', 'body'],
+};
+
+function parseGeneratedGitMessage(value: unknown, kind: 'commit' | 'pullRequest'): AgentGitMessageGenerationResult {
+  if (!isRecord(value) || typeof value.text !== 'string') throw new Error('The backend returned an invalid generated message.');
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value.text);
+  } catch {
+    throw new Error('The backend returned malformed generated content.');
+  }
+  if (!isRecord(parsed)) throw new Error('The backend returned malformed generated content.');
+  if (kind === 'commit') {
+    const message = typeof parsed.message === 'string' ? parsed.message.trim() : '';
+    if (!message) throw new Error('The backend returned an empty commit message.');
+    return { kind, message };
+  }
+  const title = typeof parsed.title === 'string' ? parsed.title.trim() : '';
+  const body = typeof parsed.body === 'string' ? parsed.body.trim() : '';
+  if (!title) throw new Error('The backend returned an empty pull request title.');
+  return { kind, title, body };
 }
 
 function planReviewPreview(markdown: string): { title: string; content: string } {

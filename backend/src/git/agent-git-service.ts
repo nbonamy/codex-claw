@@ -9,6 +9,11 @@ const execFileAsync = promisify(execFile);
 export type AgentGitServiceClock = () => Date;
 export type AgentGitRunner = (cwd: string, args: string[]) => Promise<{ stdout: string }>;
 
+export type AgentGitGenerationContext = {
+  context: string;
+  baseRef?: string;
+};
+
 export class AgentGitService {
   constructor(
     private readonly now: AgentGitServiceClock = () => new Date(),
@@ -97,6 +102,46 @@ export class AgentGitService {
     ];
   }
 
+  async commitMessageContext(
+    folder: string,
+    input: { includeUnstaged: boolean; includeUntracked: boolean },
+  ): Promise<AgentGitGenerationContext> {
+    const sections = await this.diffSections(folder);
+    const selected = sections.filter((section) => (
+      section.scope === 'staged'
+      || (section.scope === 'unstaged' && input.includeUnstaged)
+      || (section.scope === 'untracked' && input.includeUntracked)
+    ) && section.diff.trim());
+    if (selected.length === 0) throw new Error('There are no selected changes to describe.');
+    return {
+      context: boundedGenerationContext(selected.map((section) => (
+        `## ${section.scope} changes\n${section.diff.trim()}`
+      )).join('\n\n')),
+    };
+  }
+
+  async pullRequestMessageContext(folder: string): Promise<AgentGitGenerationContext> {
+    const workflow = await this.workflow(folder);
+    if (!workflow.branch || workflow.detached) throw new Error('Create or check out a branch before generating a pull request.');
+    if (isIntegrationBranch(workflow.branch)) throw new Error('Create a feature branch before generating a pull request.');
+    const baseRef = await this.resolvePullRequestBase(folder, workflow.branch, workflow.remote);
+    const [commits, stat, diff] = await Promise.all([
+      this.runGit(folder, ['log', '--format=%h %s%n%b', `${baseRef}..HEAD`]),
+      this.runGit(folder, ['diff', '--stat', `${baseRef}...HEAD`, '--']),
+      this.runGit(folder, ['diff', '--no-ext-diff', `${baseRef}...HEAD`, '--']),
+    ]);
+    if (!commits.stdout.trim() && !diff.stdout.trim()) throw new Error('There are no branch changes to describe.');
+    return {
+      baseRef,
+      context: boundedGenerationContext([
+        `## Base\n${baseRef}`,
+        `## Commits\n${commits.stdout.trim() || '(none)'}`,
+        `## Diff stat\n${stat.stdout.trim() || '(none)'}`,
+        `## Diff\n${diff.stdout.trim() || '(none)'}`,
+      ].join('\n\n')),
+    };
+  }
+
   async workflow(folder: string): Promise<Omit<AgentGitWorkflow, 'githubConnected' | 'existingPullRequest'>> {
     const [root, branch, upstream, remote, status, branchStatusResult, stagedNumstat, unstagedNumstat, worktreeList] = await Promise.all([
       this.runGit(folder, ['rev-parse', '--show-toplevel']),
@@ -168,6 +213,18 @@ export class AgentGitService {
       : ['push', remote, branch]);
   }
 
+  async createBranch(folder: string, name: string): Promise<void> {
+    const normalized = name.trim();
+    if (!normalized) throw new Error('Enter a branch name.');
+    if (normalized.startsWith('-')) throw new Error('Enter a valid branch name.');
+    try {
+      await this.runGit(folder, ['check-ref-format', '--branch', normalized]);
+    } catch {
+      throw new Error('Enter a valid branch name.');
+    }
+    await this.runGit(folder, ['switch', '-c', normalized]);
+  }
+
   async mergeTarget(folder: string): Promise<string> {
     const current = await this.workflow(folder);
     const worktrees = parseWorktrees((await this.runGit(folder, ['worktree', 'list', '--porcelain'])).stdout);
@@ -203,9 +260,37 @@ export class AgentGitService {
     if (deleteBranch) await this.runGit(targetFolder, ['branch', '-d', current.branch]);
     return targetFolder;
   }
+
+  private async resolvePullRequestBase(folder: string, branch: string, remote?: string): Promise<string> {
+    if (remote) {
+      const remoteHead = (await this.runGit(folder, ['symbolic-ref', '--quiet', '--short', `refs/remotes/${remote}/HEAD`])
+        .catch(() => ({ stdout: '' }))).stdout.trim();
+      if (remoteHead && remoteHead !== `${remote}/${branch}`) return remoteHead;
+    }
+    const candidates = [
+      ...(remote ? integrationBranches.map((name) => `${remote}/${name}`) : []),
+      ...integrationBranches,
+    ].filter((candidate) => candidate !== branch);
+    for (const candidate of candidates) {
+      const exists = await this.runGit(folder, ['rev-parse', '--verify', '--quiet', candidate])
+        .then(() => true, () => false);
+      if (exists) return candidate;
+    }
+    throw new Error('A main, master, develop, development, or trunk base branch is required.');
+  }
 }
 
 const integrationBranches = ['main', 'master', 'develop', 'development', 'trunk'] as const;
+const maxGenerationContextLength = 60_000;
+
+function boundedGenerationContext(value: string): string {
+  if (value.length <= maxGenerationContextLength) return value;
+  return `${value.slice(0, maxGenerationContextLength)}\n\n[diff truncated by Codex Claw]`;
+}
+
+function isIntegrationBranch(branch: string): boolean {
+  return integrationBranches.some((candidate) => candidate === branch);
+}
 
 function selectMergeTarget(worktrees: Array<{ path: string; branch?: string }>, currentFolder: string): { path: string; branch?: string } | undefined {
   return worktrees.find((item) => item.path !== currentFolder && integrationBranches.some((branch) => item.branch === branch))

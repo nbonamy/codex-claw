@@ -177,6 +177,69 @@ describe('agent git service parsers', () => {
     expect(runGit).toHaveBeenCalledWith('/repo', ['diff', '--no-ext-diff', '--']);
   });
 
+  it('builds commit generation context from exactly the selected scopes', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'ls-files') return { stdout: 'new.ts\0' };
+      if (args.includes('--no-index')) return { stdout: 'untracked diff\n' };
+      if (args.includes('--cached')) return { stdout: 'staged diff\n' };
+      return { stdout: 'unstaged diff\n' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
+
+    await expect(service.commitMessageContext('/repo', {
+      includeUnstaged: false,
+      includeUntracked: true,
+    })).resolves.toStrictEqual({
+      context: '## staged changes\nstaged diff\n\n## untracked changes\nuntracked diff',
+    });
+  });
+
+  it('builds pull request generation context from the branch merge base', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/repo\n' };
+      if (args[0] === 'symbolic-ref' && args[3] === 'HEAD') return { stdout: 'feature/demo\n' };
+      if (args.includes('@{upstream}')) return { stdout: 'origin/feature/demo\n' };
+      if (args[0] === 'remote' && args[1] === undefined) return { stdout: 'origin\n' };
+      if (args[0] === 'remote') return { stdout: 'git@github.com:owner/repo.git\n' };
+      if (args[0] === 'status') return { stdout: '## feature/demo...origin/feature/demo\n' };
+      if (args[0] === 'worktree') return { stdout: 'worktree /repo\nHEAD abc\nbranch refs/heads/feature/demo\n' };
+      if (args[0] === 'symbolic-ref') return { stdout: 'origin/main\n' };
+      if (args[0] === 'log') return { stdout: 'abc123 feat: add flow\n\n' };
+      if (args[0] === 'diff' && args.includes('--stat')) return { stdout: 'src/a.ts | 2 ++\n' };
+      if (args[0] === 'diff' && args.includes('origin/main...HEAD')) return { stdout: 'branch diff\n' };
+      return { stdout: '' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
+
+    await expect(service.pullRequestMessageContext('/repo')).resolves.toStrictEqual({
+      baseRef: 'origin/main',
+      context: [
+        '## Base\norigin/main',
+        '## Commits\nabc123 feat: add flow',
+        '## Diff stat\nsrc/a.ts | 2 ++',
+        '## Diff\nbranch diff',
+      ].join('\n\n'),
+    });
+    expect(runGit).toHaveBeenCalledWith('/repo', ['diff', '--no-ext-diff', 'origin/main...HEAD', '--']);
+  });
+
+  it('rejects pull request generation from an integration branch', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/repo\n' };
+      if (args[0] === 'symbolic-ref') return { stdout: 'main\n' };
+      if (args.includes('@{upstream}')) return { stdout: 'origin/main\n' };
+      if (args[0] === 'remote' && args[1] === undefined) return { stdout: 'origin\n' };
+      if (args[0] === 'remote') return { stdout: 'git@github.com:owner/repo.git\n' };
+      if (args[0] === 'status') return { stdout: ' M src/a.ts\0' };
+      if (args[0] === 'worktree') return { stdout: 'worktree /repo\nHEAD abc\nbranch refs/heads/main\n' };
+      return { stdout: '' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
+
+    await expect(service.pullRequestMessageContext('/repo')).rejects.toThrow('Create a feature branch');
+    expect(runGit.mock.calls.some(([, args]) => args[0] === 'log')).toBe(false);
+  });
+
   it('inspects workflow state and performs bounded git mutations', async () => {
     const runGit = vi.fn(async (_folder: string, args: string[]) => {
       if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/repo\n' };
@@ -206,6 +269,31 @@ describe('agent git service parsers', () => {
     expect(runGit).toHaveBeenCalledWith('/repo', ['add', '--', 'src/a.ts']);
     expect(runGit).toHaveBeenCalledWith('/repo', ['commit', '-m', 'feat: ship workflow']);
     expect(runGit).toHaveBeenCalledWith('/repo', ['push', '--set-upstream', 'origin', 'feature']);
+  });
+
+  it('validates, creates, and checks out a branch from the current HEAD', async () => {
+    const runGit = vi.fn().mockResolvedValue({ stdout: '' });
+    const service = new AgentGitService(() => new Date(), runGit);
+
+    await service.createBranch('/repo', ' feature/from-current ');
+
+    expect(runGit.mock.calls).toStrictEqual([
+      ['/repo', ['check-ref-format', '--branch', 'feature/from-current']],
+      ['/repo', ['switch', '-c', 'feature/from-current']],
+    ]);
+  });
+
+  it('rejects empty, option-like, and invalid branch names before switching', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'check-ref-format') throw new Error('invalid ref');
+      return { stdout: '' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
+
+    await expect(service.createBranch('/repo', ' ')).rejects.toThrow('Enter a branch name.');
+    await expect(service.createBranch('/repo', '-dangerous')).rejects.toThrow('Enter a valid branch name.');
+    await expect(service.createBranch('/repo', 'bad name')).rejects.toThrow('Enter a valid branch name.');
+    expect(runGit).not.toHaveBeenCalledWith('/repo', expect.arrayContaining(['switch']));
   });
 
   it('reports whether the repository folder is a secondary linked worktree', async () => {

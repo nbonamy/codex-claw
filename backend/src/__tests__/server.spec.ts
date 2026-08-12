@@ -29,6 +29,33 @@ describe('ClawBackendServer', () => {
     expect(stage).not.toHaveBeenCalled();
   });
 
+  it('creates a branch from the agent checkout and returns refreshed workflow state', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{ id: 'agent-dina', teamId: snapshot.teams[0]!.id, name: 'Dina', folder: '/repo', backend: 'codex', status: { type: 'idle' }, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' }];
+    const createBranch = vi.fn();
+    const workflow = vi.fn().mockResolvedValue({
+      repository: 'owner/repo', folder: '/repo', isLinkedWorktree: false,
+      branch: 'feature/from-current', detached: false, ahead: 0, behind: 0,
+      files: [], stagedFiles: [], unstagedFiles: [],
+    });
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      agentGitService: { createBranch, workflow } as unknown as AgentGitService,
+      workIntegrations: { githubConnected: vi.fn().mockResolvedValue(false) } as unknown as WorkIntegrationManager,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0', id: 'branch', method: backendMethods.agentGitBranchCreate,
+      params: { agentId: 'agent-dina', input: { name: 'feature/from-current', confirmed: true } },
+    })).resolves.toMatchObject({ result: { branch: 'feature/from-current' } });
+
+    expect(createBranch).toHaveBeenCalledWith('/repo', 'feature/from-current');
+    expect(workflow).toHaveBeenCalledWith('/repo');
+    await server.close();
+  });
+
   it('requires and forwards an explicit squash commit message', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
@@ -3955,6 +3982,64 @@ describe('ClawBackendServer', () => {
       type: 'git.statusUpdated',
       payload: expect.objectContaining({ addedLines: 1, removedLines: 0 }),
     }));
+    await server.close();
+  });
+
+  it('generates editable Git drafts through the active backend without sending a conversation prompt', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/repo',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const generateText = vi.fn()
+      .mockResolvedValueOnce({ text: '{"message":"feat: describe selected changes"}' })
+      .mockResolvedValueOnce({ text: '{"title":"Improve Git drafts","body":"## Summary\\n- Generate drafts"}' });
+    const sendPrompt = vi.fn();
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      generateText,
+      sendPrompt,
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const commitMessageContext = vi.fn().mockResolvedValue({ context: '## staged changes\ndiff' });
+    const pullRequestMessageContext = vi.fn().mockResolvedValue({ baseRef: 'origin/main', context: '## Diff\nbranch diff' });
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      agentGitService: { commitMessageContext, pullRequestMessageContext } as unknown as AgentGitService,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'commit-draft',
+      method: backendMethods.agentGitMessageGenerate,
+      params: { agentId: 'agent-dina', input: { kind: 'commit', includeUnstaged: false, includeUntracked: true } },
+    })).resolves.toMatchObject({ result: { kind: 'commit', message: 'feat: describe selected changes' } });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'pr-draft',
+      method: backendMethods.agentGitMessageGenerate,
+      params: { agentId: 'agent-dina', input: { kind: 'pullRequest' } },
+    })).resolves.toMatchObject({ result: { kind: 'pullRequest', title: 'Improve Git drafts', body: '## Summary\n- Generate drafts' } });
+
+    expect(commitMessageContext).toHaveBeenCalledWith('/repo', { includeUnstaged: false, includeUntracked: true });
+    expect(pullRequestMessageContext).toHaveBeenCalledWith('/repo');
+    expect(generateText).toHaveBeenCalledTimes(2);
+    expect(generateText.mock.calls[0]?.[1]).toMatchObject({ cwd: '/repo', outputSchema: { type: 'object' } });
+    expect(sendPrompt).not.toHaveBeenCalled();
     await server.close();
   });
 

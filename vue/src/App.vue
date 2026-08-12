@@ -60,9 +60,11 @@
     :preview-agent-file="previewAgentFile"
     :open-agent-git-diff="openAgentGitDiff"
     :get-agent-git-workflow="getAgentGitWorkflow"
+    :generate-agent-git-message="generateAgentGitMessage"
     :stage-agent-git-files="stageAgentGitFiles"
     :commit-agent-git-changes="commitAgentGitChanges"
     :push-agent-git-branch="pushAgentGitBranch"
+    :create-agent-git-branch="createAgentGitBranch"
     :create-agent-git-pull-request="createAgentGitPullRequest"
     :merge-agent-git-branch="mergeAgentGitBranch"
     :open-in-applications="openInApplications"
@@ -240,9 +242,11 @@ const {
   previewAgentFile,
   openAgentGitDiff,
   getAgentGitWorkflow,
+  generateAgentGitMessage,
   stageAgentGitFiles,
   commitAgentGitChanges,
   pushAgentGitBranch,
+  createAgentGitBranch,
   createAgentGitPullRequest,
   mergeAgentGitBranch,
   loadOpenInApplications,

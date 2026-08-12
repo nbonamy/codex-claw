@@ -37,6 +37,8 @@ describe('SettingsView', () => {
     const menuItems = wrapper.findAll('.el-menu-item');
     expect(menuItems.find((item) => item.text() === 'Codex')?.get('svg').attributes('fill')).toBe('none');
     expect(menuItems.find((item) => item.text() === 'Claude Code')?.get('svg').attributes('fill')).toBe('none');
+    expect(menuItems.find((item) => item.text() === 'Plugins')?.get('svg').html())
+      .not.toBe(menuItems.find((item) => item.text() === 'Integrations')?.get('svg').html());
 
     await wrapper.findAll('.el-menu-item').find((item) => item.text() === 'Appearance')?.trigger('click');
 

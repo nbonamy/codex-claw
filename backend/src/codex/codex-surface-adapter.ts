@@ -26,7 +26,7 @@ import type {
   SubagentOperationChange,
   SubagentStatusChange,
 } from '@codex-claw/core/contracts';
-import type { BackendEvent } from '@codex-claw/core/backend-driver';
+import type { BackendEvent, BackendTextGenerationInput, BackendTextGenerationResult } from '@codex-claw/core/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { codexApprovalPresetFromDefaults } from '@codex-claw/core/codex-approval-presets';
 import type { CodexConversation, CodexSurface } from '@codex-app-sdk/backend';
@@ -218,6 +218,18 @@ export class CodexSurfaceAgentAdapter {
         unsubscribe();
         resolve(current.plugins.map((plugin) => ({ ...plugin })));
       }
+    });
+  }
+
+  async generateText(agent: Agent, input: BackendTextGenerationInput): Promise<BackendTextGenerationResult> {
+    const defaults = agent.backendDefaults?.kind === 'codex' ? agent.backendDefaults : undefined;
+    return this.surface.generateText(input.prompt, {
+      cwd: expandHome(input.cwd),
+      ...(defaults?.model ? { model: defaults.model } : {}),
+      ...(defaults?.reasoningEffort ? { reasoningEffort: defaults.reasoningEffort } : {}),
+      ...(defaults?.serviceTier !== undefined ? { serviceTier: defaults.serviceTier } : {}),
+      ...(input.developerInstructions ? { developerInstructions: input.developerInstructions } : {}),
+      ...(input.outputSchema ? { outputSchema: input.outputSchema } : {}),
     });
   }
 

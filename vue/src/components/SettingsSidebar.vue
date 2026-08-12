@@ -28,7 +28,7 @@
         <span>Appshots</span>
       </el-menu-item>
       <el-menu-item index="plugins">
-        <AffiliateIcon aria-hidden="true" />
+        <PuzzleIcon aria-hidden="true" />
         <span>Plugins</span>
       </el-menu-item>
       <el-menu-item index="integrations">
@@ -45,7 +45,7 @@
 
 <script setup lang="ts">
 import type { SettingsTab } from './settings-tabs';
-import { AffiliateIcon, BrandOpenaiIcon, PaletteIcon, PhotoIcon, RobotFaceIcon, SettingsIcon, TerminalIcon } from '../shared/icons/app-icons';
+import { AffiliateIcon, BrandOpenaiIcon, PaletteIcon, PhotoIcon, PuzzleIcon, RobotFaceIcon, SettingsIcon, TerminalIcon } from '../shared/icons/app-icons';
 import { clawHostCapabilities } from '../platform-api';
 
 defineProps<{

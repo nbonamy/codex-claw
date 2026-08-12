@@ -49,20 +49,36 @@
       v-if="commitOperation.status === 'editing'"
       class="git-workflow-control__dialog-form"
     >
-      <textarea
-        ref="commitMessageInput"
-        v-model="commitMessage"
-        autofocus
-        rows="4"
-        placeholder="Commit message…"
-      />
+      <div class="git-workflow-control__message-editor">
+        <textarea
+          ref="commitMessageInput"
+          v-model="commitMessage"
+          autofocus
+          rows="4"
+          placeholder="Commit message…"
+        />
+        <button
+          v-if="canGenerateMessage"
+          class="git-workflow-control__generate"
+          type="button"
+          :disabled="busy || commitAddedLines + commitRemovedLines === 0"
+          :aria-busy="generatingKind === 'commit'"
+          aria-label="Generate commit message with Codex"
+          title="Generate with Codex"
+          @click="generateCommitMessage"
+        >
+          <SparklesIcon aria-hidden="true" />
+          <span>{{ generatingKind === 'commit' ? 'Generating…' : 'Generate' }}</span>
+        </button>
+      </div>
+      <p v-if="generationError && generationErrorKind === 'commit'" class="git-workflow-control__generation-error">{{ generationError }}</p>
       <div class="git-workflow-control__check git-workflow-control__scope-row">
         <span class="git-workflow-control__scope-spacer" aria-hidden="true" />
         <span>Staged changes</span>
         <span class="git-workflow-control__stats">+{{ stagedAddedLines }} <em>−{{ stagedRemovedLines }}</em></span>
       </div>
       <label class="git-workflow-control__check git-workflow-control__scope-row">
-        <el-switch v-model="includeUnstaged" size="small" />
+        <el-switch v-model="includeUnstaged" size="small" :disabled="busy" />
         <span>Include unstaged changes</span>
         <span class="git-workflow-control__stats" :class="{ 'git-workflow-control__stats--muted': !includeUnstaged }">+{{ unstagedAddedLines }} <em>−{{ unstagedRemovedLines }}</em></span>
       </label>
@@ -139,6 +155,46 @@
   </el-dialog>
 
   <el-dialog
+    v-if="branchDialogOpen"
+    v-model="branchDialogOpen"
+    class="claw-dialog git-workflow-control__dialog"
+    :class="{ 'git-workflow-control__dialog--transient': branchOperation.status === 'creating' || branchOperation.status === 'success' }"
+    width="min(520px, calc(100vw - 32px))"
+    :teleported="false"
+    :show-close="false"
+    :close-on-click-modal="!branchOperationRunning"
+    :close-on-press-escape="!branchOperationRunning"
+    destroy-on-close
+  >
+    <template #header><div class="claw-form-dialog__header git-workflow-control__dialog-header"><h2 class="claw-dialog__title">Create branch</h2><span class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch ?? 'detached HEAD' }}</span></div></template>
+    <div
+      v-if="branchOperation.status === 'editing'"
+      class="git-workflow-control__dialog-form git-workflow-control__branch-form"
+    >
+      <input
+        ref="branchNameInput"
+        v-model="branchName"
+        type="text"
+        autofocus
+        placeholder="Branch name…"
+        @keydown.enter.prevent="createBranch"
+      />
+    </div>
+    <GitOperationFeedback
+      v-else
+      :status="branchFeedbackStatus"
+      :title="branchOperationTitle"
+      :detail="branchOperationDetail"
+    >
+      <template #icon><GitBranchIcon /></template>
+    </GitOperationFeedback>
+    <template #footer>
+      <div v-if="branchOperation.status === 'editing'" class="claw-dialog__footer"><button class="git-workflow-control__cancel" type="button" @click="branchDialogOpen = false">Cancel</button><button class="git-workflow-control__submit" type="button" :disabled="busy || !branchName.trim()" @click="createBranch">Create branch</button></div>
+      <div v-else-if="branchOperation.status === 'error'" class="claw-dialog__footer"><button class="git-workflow-control__cancel" type="button" @click="branchDialogOpen = false">Close</button><button class="git-workflow-control__submit" type="button" @click="returnToBranchForm">Back</button></div>
+    </template>
+  </el-dialog>
+
+  <el-dialog
     v-if="pullRequestDialogOpen"
     v-model="pullRequestDialogOpen"
     class="claw-dialog git-workflow-control__dialog"
@@ -155,8 +211,24 @@
       v-if="pullRequestOperation.status === 'editing'"
       class="git-workflow-control__dialog-form git-workflow-control__pull-request-form"
     >
-      <input v-model="pullRequestTitle" autofocus placeholder="Title" />
-      <textarea v-model="pullRequestBody" rows="5" placeholder="Describe the change (optional)" />
+      <div class="git-workflow-control__message-editor git-workflow-control__message-editor--pull-request">
+        <input v-model="pullRequestTitle" autofocus placeholder="Title" />
+        <textarea v-model="pullRequestBody" rows="5" placeholder="Describe the change (optional)" />
+        <button
+          v-if="canGenerateMessage"
+          class="git-workflow-control__generate"
+          type="button"
+          :disabled="busy"
+          :aria-busy="generatingKind === 'pullRequest'"
+          aria-label="Generate pull request draft with Codex"
+          title="Generate with Codex"
+          @click="generatePullRequestMessage"
+        >
+          <SparklesIcon aria-hidden="true" />
+          <span>{{ generatingKind === 'pullRequest' ? 'Generating…' : 'Generate' }}</span>
+        </button>
+      </div>
+      <p v-if="generationError && generationErrorKind === 'pullRequest'" class="git-workflow-control__generation-error">{{ generationError }}</p>
     </div>
     <GitOperationFeedback
       v-else
@@ -246,8 +318,8 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { Agent, AgentGitCommitInput, AgentGitMergeInput, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStatus, AgentGitWorkflow } from '@codex-claw/core/contracts';
-import { ArrowRightIcon, ArrowsMinimizeIcon, ChevronDown, CloudUploadIcon, GitCommitIcon, GitForkIcon, GitHubIcon, GitMergeIcon } from '../shared/icons/app-icons';
+import type { Agent, AgentGitBranchInput, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStatus, AgentGitWorkflow } from '@codex-claw/core/contracts';
+import { ArrowRightIcon, ArrowsMinimizeIcon, ChevronDown, CloudUploadIcon, GitBranchIcon, GitCommitIcon, GitForkIcon, GitHubIcon, GitMergeIcon, SparklesIcon } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import GitOperationFeedback from './GitOperationFeedback.vue';
@@ -256,8 +328,10 @@ const props = defineProps<{
   agent: Agent;
   gitStatus?: AgentGitStatus | null;
   getWorkflow?: (agentId: string) => Promise<AgentGitWorkflow>;
+  generateMessage?: (agentId: string, input: AgentGitMessageGenerationInput) => Promise<AgentGitMessageGenerationResult>;
   commitChanges?: (agentId: string, input: AgentGitCommitInput) => Promise<AgentGitWorkflow>;
   pushBranch?: (agentId: string, input: AgentGitPushInput) => Promise<AgentGitWorkflow>;
+  createBranch?: (agentId: string, input: AgentGitBranchInput) => Promise<AgentGitWorkflow>;
   createPullRequest?: (agentId: string, input: AgentGitPullRequestInput) => Promise<AgentGitWorkflow>;
   mergeBranch?: (agentId: string, input: AgentGitMergeInput) => Promise<AgentGitWorkflow>;
 }>();
@@ -270,20 +344,27 @@ const menuOpen = ref(false);
 const busy = ref(false);
 const commitDialogOpen = ref(false);
 const pushDialogOpen = ref(false);
+const branchDialogOpen = ref(false);
 const pullRequestDialogOpen = ref(false);
 const mergeDialogOpen = ref(false);
 const commitMessageInput = ref<HTMLTextAreaElement | null>(null);
 const squashCommitMessageInput = ref<HTMLTextAreaElement | null>(null);
+const branchNameInput = ref<HTMLInputElement | null>(null);
 const commitMessage = ref('');
 const includeUnstaged = ref(true);
 const includeUntracked = ref(false);
 const pullRequestTitle = ref('');
 const pullRequestBody = ref('');
+const branchName = ref('');
 const mergeStrategy = ref<'merge' | 'squash'>('merge');
 const squashCommitMessage = ref('');
 const deleteBranch = ref(false);
 const deleteWorktree = ref(false);
 const committedMessage = ref('');
+const generatingKind = ref<'commit' | 'pullRequest' | null>(null);
+const generationError = ref<string | null>(null);
+const generationErrorKind = ref<'commit' | 'pullRequest' | null>(null);
+let generationRequestId = 0;
 type CommitOperation =
   | { status: 'editing' }
   | { status: 'committing' }
@@ -297,6 +378,12 @@ type PushOperation =
   | { status: 'success' }
   | { status: 'error'; message: string };
 const pushOperation = ref<PushOperation>({ status: 'confirming' });
+type BranchOperation =
+  | { status: 'editing' }
+  | { status: 'creating' }
+  | { status: 'success'; name: string }
+  | { status: 'error'; message: string };
+const branchOperation = ref<BranchOperation>({ status: 'editing' });
 type PullRequestOperation =
   | { status: 'editing' }
   | { status: 'creating' }
@@ -312,9 +399,11 @@ type MergeOperation =
 const mergeOperation = ref<MergeOperation>({ status: 'confirming' });
 let commitSuccessTimer: ReturnType<typeof setTimeout> | null = null;
 let pushSuccessTimer: ReturnType<typeof setTimeout> | null = null;
+let branchSuccessTimer: ReturnType<typeof setTimeout> | null = null;
 let pullRequestSuccessTimer: ReturnType<typeof setTimeout> | null = null;
 let mergeSuccessTimer: ReturnType<typeof setTimeout> | null = null;
 const mergeUnavailable = computed(() => !props.mergeBranch);
+const canGenerateMessage = computed(() => props.agent.backend === 'codex' && Boolean(props.generateMessage));
 const unstagedAddedLines = computed(() => workflow.value?.unstagedAddedLines ?? props.gitStatus?.addedLines ?? 0);
 const unstagedRemovedLines = computed(() => workflow.value?.unstagedRemovedLines ?? props.gitStatus?.removedLines ?? 0);
 const stagedAddedLines = computed(() => workflow.value?.stagedAddedLines ?? 0);
@@ -344,6 +433,16 @@ const pushOperationRunning = computed(() => pushOperation.value.status === 'push
 const pushFeedbackStatus = computed<'running' | 'success' | 'error'>(() => pushOperation.value.status === 'success' ? 'success' : pushOperation.value.status === 'error' ? 'error' : 'running');
 const pushOperationTitle = computed(() => pushOperation.value.status === 'pushing' ? `Pushing ${pendingPushCount.value} ${pendingPushCount.value === 1 ? 'commit' : 'commits'}` : pushOperation.value.status === 'success' ? 'Push complete' : 'Push failed');
 const pushOperationDetail = computed(() => pushOperation.value.status === 'error' ? pushOperation.value.message : pushDestination.value);
+const branchOperationRunning = computed(() => branchOperation.value.status === 'creating');
+const branchFeedbackStatus = computed<'running' | 'success' | 'error'>(() => branchOperation.value.status === 'success' ? 'success' : branchOperation.value.status === 'error' ? 'error' : 'running');
+const branchOperationTitle = computed(() => branchOperation.value.status === 'creating'
+  ? 'Creating branch'
+  : branchOperation.value.status === 'success'
+    ? 'Branch created'
+    : branchOperation.value.status === 'error'
+      ? 'Branch creation failed'
+      : '');
+const branchOperationDetail = computed(() => branchOperation.value.status === 'error' ? branchOperation.value.message : branchName.value.trim());
 const pullRequestOperationRunning = computed(() => pullRequestOperation.value.status === 'creating');
 const pullRequestFeedbackStatus = computed<'running' | 'success' | 'error'>(() => pullRequestOperation.value.status === 'success' ? 'success' : pullRequestOperation.value.status === 'error' ? 'error' : 'running');
 const pullRequestOperationTitle = computed(() => pullRequestOperation.value.status === 'creating'
@@ -382,23 +481,26 @@ const commitEnabled = computed(() => workflow.value === null
   : Boolean(workflow.value.files.length));
 const pushEnabled = computed(() => Boolean(workflow.value?.branch && workflow.value?.remote && (workflow.value?.ahead ?? props.gitStatus?.ahead ?? 0) > 0));
 const pushCapable = computed(() => Boolean(workflow.value?.branch && workflow.value?.remote && props.pushBranch));
-const branchEnabled = computed(() => Boolean(workflow.value?.branch && !workflow.value?.detached));
+const branchEnabled = computed(() => Boolean(workflow.value && props.createBranch));
+const currentBranchAvailable = computed(() => Boolean(workflow.value?.branch && !workflow.value?.detached));
 const integrationBranch = computed(() => ['main', 'master', 'develop', 'development', 'trunk'].includes(workflow.value?.branch ?? ''));
-const mergeEnabled = computed(() => branchEnabled.value && !integrationBranch.value);
+const mergeEnabled = computed(() => currentBranchAvailable.value && !integrationBranch.value);
 const canMerge = computed(() => mergeStrategy.value === 'merge' || Boolean(squashCommitMessage.value.trim()));
-const prEnabled = computed(() => branchEnabled.value && (!integrationBranch.value || Boolean(workflow.value?.files.length)));
-const firstEnabledAction = computed(() => (commitEnabled.value ? 'commit' : pushEnabled.value ? 'push' : prEnabled.value ? 'create-pr' : mergeEnabled.value && !mergeUnavailable.value ? 'merge' : null));
+const prEnabled = computed(() => currentBranchAvailable.value && !integrationBranch.value);
+const firstEnabledAction = computed(() => (commitEnabled.value ? 'commit' : pushEnabled.value ? 'push' : branchEnabled.value ? 'branch' : mergeEnabled.value && !mergeUnavailable.value ? 'merge' : prEnabled.value ? 'create-pr' : null));
 const menuItems = computed<AppMenuItem[]>(() => [
   { id: 'commit', type: 'action', label: 'Commit', icon: GitCommitIcon, disabled: !commitEnabled.value },
   { id: 'push', type: 'action', label: 'Push', icon: CloudUploadIcon, disabled: !pushEnabled.value },
-  { id: 'create-pr', type: 'action', label: 'Create PR', icon: GitForkIcon, disabled: !prEnabled.value },
+  { id: 'branch', type: 'action', label: 'Branch', icon: GitBranchIcon, disabled: !branchEnabled.value },
   { id: 'merge', type: 'action', label: 'Merge', icon: GitMergeIcon, disabled: !mergeEnabled.value || mergeUnavailable.value },
+  { id: 'create-pr', type: 'action', label: 'Create PR', icon: GitForkIcon, disabled: !prEnabled.value },
 ]);
 
 watch(commitDialogOpen, (open) => {
   if (open && commitOperation.value.status === 'editing') {
     void nextTick(() => commitMessageInput.value?.focus());
   } else if (!open) {
+    generationRequestId += 1;
     resetCommitOperation();
   }
 });
@@ -407,8 +509,19 @@ watch(pushDialogOpen, (open) => {
   if (!open) resetPushOperation();
 });
 
+watch(branchDialogOpen, (open) => {
+  if (open && branchOperation.value.status === 'editing') {
+    void nextTick(() => branchNameInput.value?.focus());
+  } else if (!open) {
+    resetBranchOperation();
+  }
+});
+
 watch(pullRequestDialogOpen, (open) => {
-  if (!open) resetPullRequestOperation();
+  if (!open) {
+    generationRequestId += 1;
+    resetPullRequestOperation();
+  }
 });
 
 watch(mergeDialogOpen, (open) => {
@@ -440,6 +553,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('click', closeMenu);
   clearCommitSuccessTimer();
   clearPushSuccessTimer();
+  clearBranchSuccessTimer();
   clearPullRequestSuccessTimer();
   clearMergeSuccessTimer();
 });
@@ -469,6 +583,11 @@ function selectAction(action: string): void {
   else if (action === 'push' && pushEnabled.value) {
     resetPushOperation();
     pushDialogOpen.value = true;
+  }
+  else if (action === 'branch' && branchEnabled.value) {
+    resetBranchOperation();
+    branchName.value = '';
+    branchDialogOpen.value = true;
   }
   else if (action === 'create-pr' && prEnabled.value) {
     resetPullRequestOperation();
@@ -501,6 +620,33 @@ async function commit(pushAfter: boolean): Promise<void> {
     commitOperation.value = { status: 'error', commitCreated, message };
   } finally {
     busy.value = false;
+  }
+}
+async function generateCommitMessage(): Promise<void> {
+  if (!props.generateMessage || !canGenerateMessage.value || commitAddedLines.value + commitRemovedLines.value === 0) return;
+  const requestId = ++generationRequestId;
+  generatingKind.value = 'commit';
+  generationError.value = null;
+  generationErrorKind.value = null;
+  busy.value = true;
+  try {
+    const result = await props.generateMessage(props.agent.id, {
+      kind: 'commit',
+      includeUnstaged: includeUnstaged.value,
+      includeUntracked: includeUntracked.value,
+    });
+    if (requestId !== generationRequestId || result.kind !== 'commit') return;
+    commitMessage.value = result.message;
+  } catch (error) {
+    if (requestId !== generationRequestId) return;
+    generationError.value = error instanceof Error ? error.message : String(error);
+    generationErrorKind.value = 'commit';
+  } finally {
+    if (requestId === generationRequestId) {
+      generatingKind.value = null;
+      busy.value = false;
+      void nextTick(() => commitMessageInput.value?.focus());
+    }
   }
 }
 async function retryCommitPush(): Promise<void> {
@@ -539,6 +685,27 @@ async function push(): Promise<void> {
     busy.value = false;
   }
 }
+async function createBranch(): Promise<void> {
+  if (!props.createBranch || !branchName.value.trim()) return;
+  clearBranchSuccessTimer();
+  const name = branchName.value.trim();
+  busy.value = true;
+  workflowError.value = null;
+  branchOperation.value = { status: 'creating' };
+  try {
+    workflow.value = await props.createBranch(props.agent.id, { name, confirmed: true });
+    branchOperation.value = { status: 'success', name };
+    branchSuccessTimer = setTimeout(() => {
+      branchDialogOpen.value = false;
+    }, 1500);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    workflowError.value = message;
+    branchOperation.value = { status: 'error', message };
+  } finally {
+    busy.value = false;
+  }
+}
 async function createPullRequest(): Promise<void> {
   if (!props.createPullRequest) return;
   clearPullRequestSuccessTimer();
@@ -561,6 +728,29 @@ async function createPullRequest(): Promise<void> {
     pullRequestOperation.value = { status: 'error', message };
   } finally {
     busy.value = false;
+  }
+}
+async function generatePullRequestMessage(): Promise<void> {
+  if (!props.generateMessage || !canGenerateMessage.value) return;
+  const requestId = ++generationRequestId;
+  generatingKind.value = 'pullRequest';
+  generationError.value = null;
+  generationErrorKind.value = null;
+  busy.value = true;
+  try {
+    const result = await props.generateMessage(props.agent.id, { kind: 'pullRequest' });
+    if (requestId !== generationRequestId || result.kind !== 'pullRequest') return;
+    pullRequestTitle.value = result.title;
+    pullRequestBody.value = result.body;
+  } catch (error) {
+    if (requestId !== generationRequestId) return;
+    generationError.value = error instanceof Error ? error.message : String(error);
+    generationErrorKind.value = 'pullRequest';
+  } finally {
+    if (requestId === generationRequestId) {
+      generatingKind.value = null;
+      busy.value = false;
+    }
   }
 }
 async function merge(pushAfter: boolean): Promise<void> {
@@ -614,6 +804,10 @@ function returnToCommitForm(): void {
   commitOperation.value = { status: 'editing' };
   void nextTick(() => commitMessageInput.value?.focus());
 }
+function returnToBranchForm(): void {
+  branchOperation.value = { status: 'editing' };
+  void nextTick(() => branchNameInput.value?.focus());
+}
 function showCommitSuccess(pushed: boolean): void {
   commitOperation.value = { status: 'success', pushed };
   commitSuccessTimer = setTimeout(() => {
@@ -625,6 +819,7 @@ function resetCommitOperation(): void {
   includeUnstaged.value = true;
   includeUntracked.value = false;
   commitOperation.value = { status: 'editing' };
+  resetGeneration();
 }
 function clearCommitSuccessTimer(): void {
   if (commitSuccessTimer !== null) {
@@ -642,9 +837,26 @@ function clearPushSuccessTimer(): void {
     pushSuccessTimer = null;
   }
 }
+function resetBranchOperation(): void {
+  clearBranchSuccessTimer();
+  branchOperation.value = { status: 'editing' };
+}
+function clearBranchSuccessTimer(): void {
+  if (branchSuccessTimer !== null) {
+    clearTimeout(branchSuccessTimer);
+    branchSuccessTimer = null;
+  }
+}
 function resetPullRequestOperation(): void {
   clearPullRequestSuccessTimer();
   pullRequestOperation.value = { status: 'editing' };
+  resetGeneration();
+}
+function resetGeneration(): void {
+  if (generatingKind.value) busy.value = false;
+  generatingKind.value = null;
+  generationError.value = null;
+  generationErrorKind.value = null;
 }
 function clearPullRequestSuccessTimer(): void {
   if (pullRequestSuccessTimer !== null) {
@@ -768,7 +980,7 @@ function clearMergeSuccessTimer(): void {
 }
 
 .git-workflow-control__dialog-form input[type="text"],
-.git-workflow-control__dialog-form > input:not([type]) {
+.git-workflow-control__dialog-form input:not([type]) {
   width: 100%;
   box-sizing: border-box;
   border: 1px solid var(--color-border);
@@ -781,12 +993,12 @@ function clearMergeSuccessTimer(): void {
 }
 
 .git-workflow-control__dialog-form input[type="text"]:focus,
-.git-workflow-control__dialog-form > input:not([type]):focus {
+.git-workflow-control__dialog-form input:not([type]):focus {
   border-color: var(--color-primary);
   background: var(--color-surface-low);
 }
 
-.git-workflow-control__pull-request-form > input:not([type]) {
+.git-workflow-control__pull-request-form input:not([type]) {
   border: 0;
   border-bottom: 1px solid var(--color-border);
   border-radius: 0;
@@ -794,13 +1006,82 @@ function clearMergeSuccessTimer(): void {
   background: transparent;
 }
 
-.git-workflow-control__pull-request-form > input:not([type]):focus {
+.git-workflow-control__pull-request-form input:not([type]):focus {
   border-color: var(--color-border);
   background: transparent;
 }
 
 .git-workflow-control__pull-request-form textarea {
   padding: var(--space-6) 0 var(--space-4);
+}
+
+.git-workflow-control__branch-form {
+  padding: var(--space-8) 0;
+}
+
+.git-workflow-control__branch-form input[type="text"] {
+  border: 0;
+  border-radius: 0;
+  padding: var(--space-4) 0;
+  background: transparent;
+}
+
+.git-workflow-control__branch-form input[type="text"]:focus {
+  border-color: transparent;
+  background: transparent;
+}
+
+.git-workflow-control__message-editor {
+  position: relative;
+  min-width: 0;
+}
+
+.git-workflow-control__message-editor textarea,
+.git-workflow-control__message-editor--pull-request > input {
+  padding-right: 104px;
+}
+
+.git-workflow-control__pull-request-form .git-workflow-control__message-editor--pull-request > input {
+  padding-right: 104px;
+}
+
+.git-workflow-control__generate {
+  position: absolute;
+  top: var(--space-3);
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 28px;
+  border: 0;
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-3);
+  color: var(--color-primary);
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.git-workflow-control__generate:hover:not(:disabled) {
+  background: var(--color-surface-high);
+}
+
+.git-workflow-control__generate:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.git-workflow-control__generate svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+.git-workflow-control__generation-error {
+  margin: 0 0 var(--space-4);
+  color: var(--color-error);
+  font-size: var(--font-size-13);
 }
 
 .git-workflow-control__branch,

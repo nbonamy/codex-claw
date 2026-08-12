@@ -65,12 +65,26 @@ export type BackendPermissionModeResult = {
   backendDefaults: BackendDefaults;
 };
 
+export type BackendJsonValue = null | boolean | number | string | BackendJsonValue[] | { [key: string]: BackendJsonValue };
+
+export type BackendTextGenerationInput = {
+  prompt: string;
+  cwd: string;
+  developerInstructions?: string;
+  outputSchema?: BackendJsonValue;
+};
+
+export type BackendTextGenerationResult = {
+  text: string;
+};
+
 export type AgentBackendDriver = {
   readonly backend: AgentBackend;
   getRuntimeStatus(): BackendRuntimeStatus;
   getCapabilities(agent: Agent): BackendCapabilities;
   getGitStatus?(agent: Agent): Promise<AgentGitStatus | null>;
   getGitDiff?(agent: Agent): Promise<AgentGitDiff | null>;
+  generateText?(agent: Agent, input: BackendTextGenerationInput): Promise<BackendTextGenerationResult>;
   tryHandlePromptCommand?(agent: Agent, prompt: string): Promise<BackendSendResult> | null;
   preparePromptOptions?(agent: Agent, options?: SendPromptOptions): SendPromptOptions | undefined;
   sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>;

@@ -17,6 +17,21 @@ const agent: Agent = {
 };
 
 describe('CodexBackendDriver', () => {
+  it('delegates ephemeral text generation without creating an agent session', async () => {
+    const generateText = vi.fn().mockResolvedValue({ text: '{"message":"feat: generated"}' });
+    const sessionManager = createSessionManager({ generateText });
+    const driver = new CodexBackendDriver(sessionManager);
+    const input = {
+      prompt: 'Describe the diff',
+      cwd: '/repo',
+      outputSchema: { type: 'object' },
+    } as const;
+
+    await expect(driver.generateText(agent, input)).resolves.toStrictEqual({ text: '{"message":"feat: generated"}' });
+    expect(generateText).toHaveBeenCalledWith(agent, input);
+    expect(sessionManager.sendPrompt).not.toHaveBeenCalled();
+  });
+
   it('routes bare compact prompts to manual compaction', async () => {
     const sessionManager = createSessionManager();
     const driver = new CodexBackendDriver(sessionManager);

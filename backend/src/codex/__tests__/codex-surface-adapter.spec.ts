@@ -1,3 +1,5 @@
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { Agent } from '@codex-claw/core/contracts';
 import type { BackendEvent } from '@codex-claw/core/backend-driver';
@@ -225,6 +227,40 @@ class FakeTransport implements RpcTransport {
 }
 
 describe('CodexSurfaceAgentAdapter', () => {
+  it('runs ephemeral generation with the agent folder and Codex defaults', async () => {
+    const generateText = vi.fn().mockResolvedValue({ text: '{"message":"feat: generated"}' });
+    const surface = {
+      generateText,
+      onEvent: vi.fn(() => () => undefined),
+    } as unknown as CodexSurface;
+    const adapter = new CodexSurfaceAgentAdapter(surface, vi.fn());
+    const generationAgent: Agent = {
+      ...agentA,
+      folder: '~/src/project',
+      backendDefaults: {
+        kind: 'codex',
+        model: 'gpt-test',
+        reasoningEffort: 'high',
+        serviceTier: 'fast',
+      },
+    };
+
+    await expect(adapter.generateText(generationAgent, {
+      prompt: 'Describe the change',
+      cwd: generationAgent.folder,
+      developerInstructions: 'Return JSON.',
+      outputSchema: { type: 'object' },
+    })).resolves.toStrictEqual({ text: '{"message":"feat: generated"}' });
+    expect(generateText).toHaveBeenCalledWith('Describe the change', expect.objectContaining({
+      cwd: path.join(os.homedir(), 'src/project'),
+      model: 'gpt-test',
+      reasoningEffort: 'high',
+      serviceTier: 'fast',
+      developerInstructions: 'Return JSON.',
+      outputSchema: { type: 'object' },
+    }));
+  });
+
   it('delegates runtime ownership to the embedding backend host', async () => {
     const surface = new CodexSurface();
     const closeSurface = vi.fn().mockResolvedValue(undefined);

@@ -141,7 +141,7 @@ implemented:
   git stats into subagents,
   without a duplicate activity indicator. The agent's Review workspace supports
   explicit file staging, editable commit messages, safe push, existing-PR
-  detection, and editable draft PR creation. Its Git workflow control keeps
+  detection, and editable draft PR creation from non-integration branches. Its Git workflow control keeps
   branch merges local: Merge commit always creates a merge commit, while Squash
   and merge asks for an editable commit message before creating one local squash
   commit. A primary feature checkout switches that same folder to its local base
@@ -166,7 +166,12 @@ implemented:
   scopes separately: staged changes are fixed, unstaged changes default on,
   and untracked changes default off. Git Review includes all three scopes and
   exposes local visibility toggles for each one without reloading repository
-  state;
+  state. The Git action menu is ordered Commit, Push, Branch, Merge, and Create
+  PR. Branch is available for every initialized Git checkout and creates plus
+  checks out a new branch from the current HEAD, with the shared progress and
+  passive-success treatment. Commit and pull-request editors can ask Codex for an ephemeral draft;
+  generated text stays editable and never creates or appears in a visible agent
+  conversation;
 - ChatGPT-style split Open In controls in the active-agent header and project-file
   previews, plus the same installed-app list in agent context menus. The primary
   button reuses each agent's last choice; agents without one default to VS Code,
