@@ -271,25 +271,30 @@ implemented:
 - repository-first agent creation that puts custom folder selection first,
   progressively reveals checkout controls, uses Codex without a redundant
   coding-agent field by default, and reveals experimental Claude Code selection
-  only when enabled from General → Advanced; Loop creation and editing remain
-  Codex-only. Resolved-path implementation details stay hidden, while identity
-  and workspace settings use grouped surfaces with compact row controls;
+  only when enabled from the dedicated Claude Code settings screen; Loop
+  creation and editing remain Codex-only. Resolved-path implementation details
+  stay hidden, while identity and workspace settings use grouped surfaces with
+  compact row controls;
 - a theme-aware What’s New dialog that embeds the complete released changelog,
   opens on the current version, allows browsing previous versions, and opens
   from both the native Help menu and lower-left account menu;
 - full-space Settings surface launched from the rail, with its own category
-  sidebar and screen-level panels instead of dialog chrome. Desktop launches
-  the ChatGPT process with Claw's isolated `CODEX_HOME`, while web opens the
-  `codex://` deep link. Plugins keeps Computer Use and Chrome disabled by
-  default, persists explicit capability choices, and opens plugin management
+  sidebar and screen-level panels instead of dialog chrome. General holds only
+  provider-neutral app behavior, source-folder, and system-permission controls;
+  Codex groups ChatGPT launch, shared skills/plugins, and runtime selection;
+  Claude Code contains its experimental enable flags. Desktop launches the
+  ChatGPT process with Claw's isolated `CODEX_HOME`, while web opens the
+  `codex://` deep link. Plugins separates Claw's Computer Use capability from
+  Codex's Chrome and external plugins, keeps Computer Use and Chrome disabled
+  by default, persists explicit capability choices, and opens plugin management
   through the built-in platform behavior (ChatGPT on desktop and
   `https://chatgpt.com/plugins` on web); Connections keeps
   remote Claw hosts separate from official Codex device pairing, including
   pairing progress and paired-device revocation. Appshots configures a
   left-and-right modifier chord, active-agent destination, and capture sound;
   General → System permissions reports both Accessibility and the Computer Use
-  helper's Screen Recording permission. General → Advanced shares ChatGPT's
-  skills and plugins by default and can return to fresh or copied isolated
+  helper's Screen Recording permission. Codex shares ChatGPT's skills and
+  plugins by default and can return to fresh or copied isolated
   resources only while all chats are idle. Existing non-linked Claw homes show
   an explicit launch-time migration choice instead of changing in the
   background. Settings is also available

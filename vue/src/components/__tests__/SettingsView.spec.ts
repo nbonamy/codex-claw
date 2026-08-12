@@ -12,7 +12,7 @@ describe('SettingsView', () => {
     document.body.innerHTML = '';
   });
 
-  it('opens on ChatGPT by default, lists it before General, and emits tab selections', async () => {
+  it('opens on General by default, orders provider settings first, and emits tab selections', async () => {
     const wrapper = mount(SettingsView, {
       props: {
         settings: defaultThemeSettings,
@@ -23,18 +23,46 @@ describe('SettingsView', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('Manage Codex settings in ChatGPT');
-    expect(wrapper.findAll('.el-menu-item').map((item) => item.text()).slice(0, 2)).toStrictEqual([
-      'ChatGPT',
+    expect(wrapper.text()).toContain('Accessibility');
+    expect(wrapper.findAll('.el-menu-item').map((item) => item.text()).slice(0, 5)).toStrictEqual([
       'General',
+      'Codex',
+      'Claude Code',
+      'Appearance',
+      'Appshots',
     ]);
-    expect(wrapper.text()).not.toContain('Accessibility');
+    expect(wrapper.text()).not.toContain('Launch ChatGPT');
+    expect(wrapper.text()).not.toContain('Enable Claude Code');
     expect(wrapper.text()).not.toContain('Theme');
-    expect(wrapper.findAll('.el-menu-item').map((item) => item.text())).toContain('Appshots');
+    const menuItems = wrapper.findAll('.el-menu-item');
+    expect(menuItems.find((item) => item.text() === 'Codex')?.get('svg').attributes('fill')).toBe('none');
+    expect(menuItems.find((item) => item.text() === 'Claude Code')?.get('svg').attributes('fill')).toBe('none');
 
     await wrapper.findAll('.el-menu-item').find((item) => item.text() === 'Appearance')?.trigger('click');
 
     expect(wrapper.emitted('selectTab')).toStrictEqual([['appearance']]);
+  });
+
+  it('routes Codex and Claude Code controls to separate provider panels', async () => {
+    const wrapper = mount(SettingsView, {
+      props: {
+        activeTab: 'codex',
+        settings: defaultThemeSettings,
+        generalSettings: defaultGeneralSettings,
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    expect(wrapper.text()).toContain('Launch ChatGPT');
+    expect(wrapper.text()).toContain('Share skills and plugins with ChatGPT');
+    expect(wrapper.text()).toContain('Codex executable');
+    expect(wrapper.text()).not.toContain('Enable Claude Code');
+
+    await wrapper.setProps({ activeTab: 'claude-code' } as never);
+
+    expect(wrapper.text()).toContain('Enable Claude Code (experimental)');
+    expect(wrapper.text()).not.toContain('Launch ChatGPT');
+    expect(wrapper.text()).not.toContain('Codex executable');
   });
 
   it('renders controlled appearance settings and emits appearance updates', async () => {

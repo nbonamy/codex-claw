@@ -1,6 +1,6 @@
 <template>
   <SettingsSection
-    title="Device pairing"
+    title="Codex Device Pairing"
     title-id="settings-connections-device-pairing-title"
   >
     <div class="settings-device-pairing">

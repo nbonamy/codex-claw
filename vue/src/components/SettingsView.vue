@@ -13,22 +13,34 @@
 
     <main class="settings-view__content">
       <div class="settings-view__panel">
-        <SettingsChatGptPanel
-          v-if="activeTab === 'chatgpt'"
-          :launch-chat-gpt-app="launchChatGptApp"
-        />
         <SettingsGeneralPanel
-          v-else-if="activeTab === 'general'"
-          :choose-codex-binary="chooseCodexBinary"
+          v-if="activeTab === 'general'"
           :choose-source-folder="chooseSourceFolder"
           :daemon-status="daemonStatus"
           :daemon-status-error="daemonStatusError"
           :settings="generalSettings"
           :source-folder="sourceFolder"
           :set-daemon-enabled="setDaemonEnabled"
+          :restart-app="restartApp"
+          :update-settings="updateSettings"
+        />
+        <SettingsCodexPanel
+          v-else-if="activeTab === 'codex'"
+          :choose-codex-binary="chooseCodexBinary"
+          :launch-chat-gpt-app="launchChatGptApp"
+          :settings="generalSettings"
           :set-codex-resource-sharing="setCodexResourceSharing"
           :codex-resource-sharing-blocked="codexResourceSharingBlocked"
-          :restart-app="restartApp"
+          :update-settings="updateSettings"
+        />
+        <SettingsClaudeCodePanel
+          v-else-if="activeTab === 'claude-code'"
+          :settings="generalSettings"
+          :update-settings="updateSettings"
+        />
+        <SettingsAppearancePanel
+          v-else-if="activeTab === 'appearance'"
+          :settings="settings"
           :update-settings="updateSettings"
         />
         <SettingsAppshotsPanel
@@ -75,11 +87,6 @@
           :list-paired-devices="listPairedDevices"
           :revoke-paired-device="revokePairedDevice"
         />
-        <SettingsAppearancePanel
-          v-else
-          :settings="settings"
-          :update-settings="updateSettings"
-        />
       </div>
     </main>
   </section>
@@ -90,7 +97,8 @@ import type { AddSshConnectionInput, AppGeneralSettings, AppPluginStatus, AppThe
 import { defaultGeneralSettings, defaultSourceFolderState } from '@codex-claw/core/settings';
 import SettingsAppearancePanel from './SettingsAppearancePanel.vue';
 import SettingsAppshotsPanel from './SettingsAppshotsPanel.vue';
-import SettingsChatGptPanel from './SettingsChatGptPanel.vue';
+import SettingsClaudeCodePanel from './SettingsClaudeCodePanel.vue';
+import SettingsCodexPanel from './SettingsCodexPanel.vue';
 import SettingsConnectionsPanel from './SettingsConnectionsPanel.vue';
 import SettingsGeneralPanel from './SettingsGeneralPanel.vue';
 import SettingsIntegrationsPanel from './SettingsIntegrationsPanel.vue';
@@ -140,7 +148,7 @@ withDefaults(defineProps<{
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
   getPluginStatus?: () => Promise<AppPluginStatus>;
 }>(), {
-  activeTab: 'chatgpt',
+  activeTab: 'general',
   workBacklogConnections: () => [],
   workBacklogError: null,
   workBacklogStatus: 'notLoaded',

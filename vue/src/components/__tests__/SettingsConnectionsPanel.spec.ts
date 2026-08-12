@@ -231,7 +231,7 @@ describe('SettingsConnectionsPanel', () => {
     });
     await flushPromises();
 
-    expect(wrapper.text()).toContain('Device pairing');
+    expect(wrapper.text()).toContain('Codex Device Pairing');
     expect(wrapper.text()).toContain('No paired devices');
     await wrapper.findAll('button').find((button) => button.text() === 'Add device')?.trigger('click');
     await flushPromises();

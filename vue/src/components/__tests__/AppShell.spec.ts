@@ -2624,7 +2624,7 @@ describe('AppShell', () => {
     });
   });
 
-  it('opens settings on ChatGPT, remembers the last settings pane, updates appearance, and quits', async () => {
+  it('opens settings on General, remembers the last settings pane, updates appearance, and quits', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.accountRateLimits = {
       limitId: 'codex',
@@ -2655,8 +2655,8 @@ describe('AppShell', () => {
     expect(wrapper.get('[aria-label="Account menu"]').classes()).toContain('settings-menu__trigger--active');
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.get('[aria-label="Codex Claw"]').classes()).not.toContain('team-rail__team--active');
-    expect(wrapper.text()).toContain('Manage Codex settings in ChatGPT');
-    expect(wrapper.text()).not.toContain('Accessibility');
+    expect(wrapper.text()).toContain('Accessibility');
+    expect(wrapper.text()).not.toContain('Launch ChatGPT');
     expect(wrapper.text()).not.toContain('Theme');
 
     await wrapper.findAll('.el-menu-item').find((item) => item.text() === 'Appearance')?.trigger('click');

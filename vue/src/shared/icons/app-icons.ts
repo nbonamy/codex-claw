@@ -56,6 +56,7 @@ export {
   IconQuote as QuoteIcon,
   IconRectangle as RectangleIcon,
   IconRefresh as RefreshIcon,
+  IconRobotFace as RobotFaceIcon,
   IconRotateClockwise as RotateClockwiseIcon,
   IconSend as SendIcon,
   IconSettings as SettingsIcon,

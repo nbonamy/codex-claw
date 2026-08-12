@@ -83,9 +83,9 @@ Codex Claw always gives the SDK an isolated Codex home at
 `~/.codex-claw/codex-home` (or `$CODEX_CLAW_HOME/codex-home`). Threads, config,
 and auth remain isolated so Claw cannot pollute the normal Codex CLI/Desktop
 home. By default, only the isolated home's `skills` and `plugins` entries are
-links to `~/.codex/skills` and `~/.codex/plugins`. General → Advanced can turn
-that sharing off when every chat is idle, either with fresh Claw directories
-or by copying the current ChatGPT resources. A fresh home creates the links
+links to `~/.codex/skills` and `~/.codex/plugins`. The Codex settings screen can
+turn that sharing off when every chat is idle, either with fresh Claw
+directories or by copying the current ChatGPT resources. A fresh home creates the links
 before any Codex driver starts. An existing non-linked home is left untouched;
 after launch, Claw asks whether to migrate it or keep it isolated. Migration is
 blocked while chats are active because it restarts `clawd` and its app-server

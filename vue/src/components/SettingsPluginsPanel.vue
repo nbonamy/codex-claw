@@ -7,9 +7,12 @@
       <SettingsPluginsBanner />
     </template>
 
-    <SettingsSection>
+    <SettingsSection
+      v-if="clawHostCapabilities.computerUse"
+      title="Claw"
+      title-id="settings-plugins-claw-title"
+    >
       <SettingsRow
-        v-if="clawHostCapabilities.computerUse"
         as="label"
         title="Computer Use"
         :error="settingsError"
@@ -23,6 +26,12 @@
           />
         </template>
       </SettingsRow>
+    </SettingsSection>
+
+    <SettingsSection
+      title="Codex"
+      title-id="settings-plugins-codex-title"
+    >
       <SettingsRow
         as="label"
         title="Chrome"

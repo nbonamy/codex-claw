@@ -7,21 +7,25 @@
       :default-active="activeTab"
       @select="selectTab"
     >
-      <el-menu-item index="chatgpt">
-        <BrandOpenaiIcon aria-hidden="true" />
-        <span>ChatGPT</span>
-      </el-menu-item>
       <el-menu-item index="general">
         <SettingsIcon aria-hidden="true" />
         <span>General</span>
       </el-menu-item>
-      <el-menu-item v-if="clawHostCapabilities.appshots" index="appshots">
-        <PhotoIcon aria-hidden="true" />
-        <span>Appshots</span>
+      <el-menu-item index="codex">
+        <BrandOpenaiIcon aria-hidden="true" />
+        <span>Codex</span>
+      </el-menu-item>
+      <el-menu-item index="claude-code">
+        <RobotFaceIcon aria-hidden="true" />
+        <span>Claude Code</span>
       </el-menu-item>
       <el-menu-item index="appearance">
         <PaletteIcon aria-hidden="true" />
         <span>Appearance</span>
+      </el-menu-item>
+      <el-menu-item v-if="clawHostCapabilities.appshots" index="appshots">
+        <PhotoIcon aria-hidden="true" />
+        <span>Appshots</span>
       </el-menu-item>
       <el-menu-item index="plugins">
         <AffiliateIcon aria-hidden="true" />
@@ -41,7 +45,7 @@
 
 <script setup lang="ts">
 import type { SettingsTab } from './settings-tabs';
-import { AffiliateIcon, BrandOpenaiIcon, PaletteIcon, PhotoIcon, SettingsIcon, TerminalIcon } from '../shared/icons/app-icons';
+import { AffiliateIcon, BrandOpenaiIcon, PaletteIcon, PhotoIcon, RobotFaceIcon, SettingsIcon, TerminalIcon } from '../shared/icons/app-icons';
 import { clawHostCapabilities } from '../platform-api';
 
 defineProps<{
@@ -53,7 +57,7 @@ const emit = defineEmits<{
 }>();
 
 function selectTab(tab: string): void {
-  if (tab === 'chatgpt' || tab === 'general' || tab === 'appshots' || tab === 'appearance' || tab === 'integrations' || tab === 'plugins' || tab === 'connections') {
+  if (tab === 'general' || tab === 'codex' || tab === 'claude-code' || tab === 'appearance' || tab === 'appshots' || tab === 'plugins' || tab === 'integrations' || tab === 'connections') {
     emit('select', tab);
   }
 }

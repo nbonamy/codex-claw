@@ -20,6 +20,23 @@ describe('SettingsPluginsPanel', () => {
     document.body.innerHTML = '';
   });
 
+  it('separates Claw capabilities from Codex plugins', () => {
+    const wrapper = mount(SettingsPluginsPanel, {
+      global: { plugins: [ElementPlus] },
+    });
+
+    expect(wrapper.findAll('.settings-section__header h3').map((heading) => heading.text())).toStrictEqual([
+      'Claw',
+      'Codex',
+    ]);
+    const sections = wrapper.findAll('.settings-section');
+    expect(sections[0].text()).toContain('Computer Use');
+    expect(sections[0].text()).not.toContain('Chrome');
+    expect(sections[1].text()).toContain('Chrome');
+    expect(sections[1].text()).toContain('Other plugins');
+    expect(sections[1].text()).not.toContain('Computer Use');
+  });
+
   it('opens the desktop plugin manager without changing Chrome settings', async () => {
     const updateSettings = vi.fn().mockResolvedValue(undefined);
     const getPluginStatus = vi.fn().mockResolvedValue({ chromeEnabled: false });
@@ -97,6 +114,7 @@ describe('SettingsPluginsPanel', () => {
     });
 
     expect(wrapper.find('[aria-label="Enable Computer Use"]').exists()).toBe(false);
+    expect(wrapper.findAll('.settings-section__header h3').map((heading) => heading.text())).toStrictEqual(['Codex']);
   });
 
   it('opens the configured manager directly for other plugins', async () => {
