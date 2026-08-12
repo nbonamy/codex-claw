@@ -39,6 +39,10 @@ describe('AgentDialog', () => {
     expect(wrapper.find('#agent-dialog-backend').exists()).toBe(false);
     expect(wrapper.get('.agent-dialog__text-input').attributes('placeholder')).toBe('Name this agent');
     expect(wrapper.findAllComponents({ name: 'ElOption' })[0]?.props('label')).toBe('Choose folder...');
+    expect(wrapper.findAll('.claw-dialog__footer .claw-button').map((button) => button.classes())).toStrictEqual([
+      ['claw-button', 'claw-button--tertiary'],
+      ['claw-button', 'claw-button--primary'],
+    ]);
     expect(saveButton(wrapper).attributes()).toHaveProperty('disabled');
   });
 
@@ -511,7 +515,7 @@ describe('AgentDialog', () => {
     await emitSelect(wrapper, 'agent-dialog-worktree', '__new_worktree__');
     await nextTick();
     await wrapper.get('.new-source-worktree-dialog__branch-input').setValue('feature/source-folder');
-    await wrapper.find('.new-source-worktree-dialog .el-button--primary').trigger('click');
+    await wrapper.find('.new-source-worktree-dialog .claw-button--primary').trigger('click');
     await flushPromises();
     await saveButton(wrapper).trigger('click');
 

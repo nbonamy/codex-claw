@@ -135,15 +135,16 @@
 
     <template #footer>
       <div class="claw-dialog__footer">
-        <el-button @click="close">Cancel</el-button>
-        <el-button
-          type="primary"
-          :loading="submitting"
-          :disabled="!canSave"
+        <button class="claw-button claw-button--tertiary" type="button" @click="close">Cancel</button>
+        <button
+          class="claw-button claw-button--primary"
+          type="button"
+          :aria-busy="submitting"
+          :disabled="submitting || !canSave"
           @click="submit"
         >
           {{ submitLabel }}
-        </el-button>
+        </button>
       </div>
     </template>
   </el-dialog>

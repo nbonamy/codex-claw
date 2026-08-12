@@ -125,16 +125,20 @@
         </p>
       </el-form>
       <template #footer>
-        <el-button @click="closeConnectionSettings">
-          Cancel
-        </el-button>
-        <el-button
-          type="primary"
-          :loading="savingConnectionSettings"
-          @click="saveConnectionSettings"
-        >
-          Save
-        </el-button>
+        <div class="claw-dialog__footer">
+          <button class="claw-button claw-button--tertiary" type="button" @click="closeConnectionSettings">
+            Cancel
+          </button>
+          <button
+            class="claw-button claw-button--primary"
+            type="button"
+            :aria-busy="savingConnectionSettings"
+            :disabled="savingConnectionSettings"
+            @click="saveConnectionSettings"
+          >
+            Save
+          </button>
+        </div>
       </template>
     </el-dialog>
 

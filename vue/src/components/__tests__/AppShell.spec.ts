@@ -2338,7 +2338,7 @@ describe('AppShell', () => {
     expect(wrapper.find('#agent-dialog-backend').exists()).toBe(false);
     await chooseCustomAgentFolder(wrapper);
     await wrapper.get('.agent-dialog__text-input').setValue('Jules');
-    await wrapper.find('.claw-dialog__footer .el-button--primary').trigger('click');
+    await wrapper.find('.claw-dialog__footer .claw-button--primary').trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
       name: 'Jules',
@@ -2406,7 +2406,7 @@ describe('AppShell', () => {
     expect(wrapper.text()).toContain('New agent');
     await chooseCustomAgentFolder(wrapper);
     await wrapper.get('.agent-dialog__text-input').setValue('Abby');
-    await wrapper.find('.claw-dialog__footer .el-button--primary').trigger('click');
+    await wrapper.find('.claw-dialog__footer .claw-button--primary').trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
       name: 'Abby',
@@ -2461,7 +2461,7 @@ describe('AppShell', () => {
     await teamSelect?.vm.$emit('update:modelValue', '__new_team__');
     await nextTick();
     expect(agentDialog.get<HTMLInputElement>('[aria-label="New team name"]').element.value).toBe('GitHub #12');
-    await wrapper.find('.claw-dialog__footer .el-button--primary').trigger('click');
+    await wrapper.find('.claw-dialog__footer .claw-button--primary').trigger('click');
     await flushPromises();
 
     expect(createTeam).toHaveBeenCalledWith({

@@ -10,6 +10,10 @@ describe('CodexResourceSharingMigrationDialog', () => {
 
     expect(document.body.textContent).toContain('Share skills and plugins with ChatGPT?');
     const buttons = [...document.body.querySelectorAll('button')];
+    expect(buttons.map((button) => [...button.classList])).toStrictEqual([
+      ['claw-button', 'claw-button--tertiary'],
+      ['claw-button', 'claw-button--primary'],
+    ]);
     buttons.find((button) => button.textContent?.includes('Keep isolated'))?.click();
     buttons.find((button) => button.textContent?.includes('Migrate'))?.click();
     await wrapper.vm.$nextTick();
@@ -26,6 +30,16 @@ describe('CodexResourceSharingMigrationDialog', () => {
     const buttons = [...document.body.querySelectorAll('button')];
     expect(buttons.find((button) => button.textContent?.includes('Migrate'))?.disabled).toBe(true);
     expect(buttons.find((button) => button.textContent?.includes('Keep isolated'))?.disabled).toBe(false);
+  });
+
+  it('marks migration busy and disables both decisions while pending', async () => {
+    mountDialog({ pending: true });
+    await flushPromises();
+
+    const buttons = [...document.body.querySelectorAll('button')];
+    const migrate = buttons.find((button) => button.textContent?.includes('Migrate'));
+    expect(buttons.every((button) => button.disabled)).toBe(true);
+    expect(migrate?.getAttribute('aria-busy')).toBe('true');
   });
 });
 

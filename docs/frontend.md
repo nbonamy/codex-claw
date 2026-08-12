@@ -404,6 +404,10 @@ Rules:
   and footer dividers, and evenly padded semantic dialog bodies belong to
   `.claw-dialog`, not individual product dialogs. Form content must not add a
   second outer padding layer.
+- Use native `.claw-button` controls with `--primary`, `--secondary`, or
+  `--tertiary` modifiers in dialog footers. Cancel and dismiss actions are
+  tertiary, alternative actions are secondary, and each footer has at most one
+  primary action.
 - Avoid decorative layouts that slow down real coding workflows.
 - Keep empty, loading, error, offline, and permission states explicit.
 - Ensure text fits in compact desktop windows.

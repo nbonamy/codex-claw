@@ -80,15 +80,16 @@
 
     <template #footer>
       <div class="claw-dialog__footer">
-        <el-button @click="close">Cancel</el-button>
-        <el-button
-          type="primary"
-          :loading="creating"
-          :disabled="!canCreate"
+        <button class="claw-button claw-button--tertiary" type="button" @click="close">Cancel</button>
+        <button
+          class="claw-button claw-button--primary"
+          type="button"
+          :aria-busy="creating"
+          :disabled="creating || !canCreate"
           @click="create"
         >
           Create
-        </el-button>
+        </button>
       </div>
     </template>
   </el-dialog>

@@ -13,12 +13,17 @@ describe('NewSourceWorktreeDialog', () => {
     });
     const wrapper = mountDialog({ chooseDestination, createWorktree });
 
+    expect(wrapper.findAll('.claw-dialog__footer .claw-button').map((button) => button.classes())).toStrictEqual([
+      ['claw-button', 'claw-button--tertiary'],
+      ['claw-button', 'claw-button--primary'],
+    ]);
+
     await wrapper.get('.new-source-worktree-dialog__branch-input').setValue('Fix/source folder!!');
     await flushPromises();
 
     expect(wrapper.get<HTMLInputElement>('.new-source-worktree-dialog__folder-input').element.value).toBe('/Users/nbonamy/src/codex-claw-fix-source-folder');
 
-    await wrapper.find('.new-source-worktree-dialog .el-button--primary').trigger('click');
+    await wrapper.find('.new-source-worktree-dialog .claw-button--primary').trigger('click');
     await flushPromises();
 
     expect(chooseDestination).not.toHaveBeenCalled();
@@ -51,7 +56,7 @@ describe('NewSourceWorktreeDialog', () => {
     expect(chooseDestination).toHaveBeenCalledWith('/Users/nbonamy/src/codex-claw-feature-source-folder');
     expect(wrapper.get<HTMLInputElement>('.new-source-worktree-dialog__folder-input').element.value).toBe('/Users/nbonamy/custom/worktree');
 
-    await wrapper.find('.new-source-worktree-dialog .el-button--primary').trigger('click');
+    await wrapper.find('.new-source-worktree-dialog .claw-button--primary').trigger('click');
     await flushPromises();
 
     expect(createWorktree).toHaveBeenCalledWith({
@@ -86,7 +91,7 @@ describe('NewSourceWorktreeDialog', () => {
 
     await wrapper.get('.new-source-worktree-dialog__branch-input').setValue('feature/broken');
     await flushPromises();
-    await wrapper.find('.new-source-worktree-dialog .el-button--primary').trigger('click');
+    await wrapper.find('.new-source-worktree-dialog .claw-button--primary').trigger('click');
     await flushPromises();
 
     expect(wrapper.text()).toContain('worktree failed');
@@ -109,7 +114,7 @@ describe('NewSourceWorktreeDialog', () => {
 
     await wrapper.findComponent({ name: 'ElDialog' }).vm.$emit('update:modelValue', false);
     await wrapper.get('.new-source-worktree-dialog__folder-picker').trigger('click');
-    await wrapper.find('.new-source-worktree-dialog .el-button--primary').trigger('click');
+    await wrapper.find('.new-source-worktree-dialog .claw-button--primary').trigger('click');
 
     expect(wrapper.emitted('close')).toStrictEqual([[]]);
     expect(chooseDestination).not.toHaveBeenCalled();
@@ -128,7 +133,7 @@ describe('NewSourceWorktreeDialog', () => {
 
     await wrapper.get('.new-source-worktree-dialog__branch-input').setValue('feature/source-folder');
     await flushPromises();
-    await wrapper.find('.new-source-worktree-dialog .el-button--primary').trigger('click');
+    await wrapper.find('.new-source-worktree-dialog .claw-button--primary').trigger('click');
     await flushPromises();
 
     expect(createWorktree).toHaveBeenCalledWith({

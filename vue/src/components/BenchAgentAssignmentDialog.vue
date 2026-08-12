@@ -118,14 +118,15 @@
 
     <template #footer>
       <div class="claw-dialog__footer">
-        <el-button @click="close">Cancel</el-button>
-        <el-button
-          type="primary"
+        <button class="claw-button claw-button--tertiary" type="button" @click="close">Cancel</button>
+        <button
+          class="claw-button claw-button--primary"
+          type="button"
           :disabled="!canSave"
           @click="submit"
         >
           {{ confirmLabel }}
-        </el-button>
+        </button>
       </div>
     </template>
   </el-dialog>

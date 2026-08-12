@@ -185,22 +185,25 @@
 
     <template #footer>
       <div class="claw-dialog__footer image-annotation-dialog__footer">
-        <el-button :disabled="saving" @click="emit('close')">Cancel</el-button>
-        <el-button
+        <button class="claw-button claw-button--tertiary" type="button" :disabled="saving" @click="emit('close')">Cancel</button>
+        <button
+          class="claw-button claw-button--secondary"
+          type="button"
           aria-label="Clear image annotations"
           :disabled="annotations.length === 0 || saving"
           @click="clearAnnotations"
-        >Clear</el-button>
-        <el-button
-          class="image-annotation-dialog__save"
-          type="primary"
+        >Clear</button>
+        <button
+          class="claw-button claw-button--primary image-annotation-dialog__save"
+          type="button"
           aria-label="Save image annotations"
+          :aria-busy="saving"
           :disabled="!imageReady || saving"
           @click="saveAnnotatedImage"
         >
           Save
           <span class="image-annotation-dialog__save-count">{{ annotations.length }}</span>
-        </el-button>
+        </button>
       </div>
     </template>
   </el-dialog>

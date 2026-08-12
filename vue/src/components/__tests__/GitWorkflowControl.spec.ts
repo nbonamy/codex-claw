@@ -40,7 +40,10 @@ describe('GitWorkflowControl', () => {
     await wrapper.get('.git-workflow-control__primary').trigger('click');
     expect(wrapper.find('[role="dialog"]').attributes('aria-labelledby')).toBeDefined();
     expect(wrapper.text()).toContain('Commit and push');
-    expect(wrapper.findAll('.git-workflow-control__submit').every((button) => button.attributes('disabled') !== undefined)).toBe(true);
+    expect(wrapper.findAll('.claw-dialog__footer .claw-button:not(.claw-button--tertiary)').every((button) => button.attributes('disabled') !== undefined)).toBe(true);
+    expect(wrapper.findAll('.claw-dialog__footer .claw-button--tertiary').map((button) => button.text())).toStrictEqual(['Cancel']);
+    expect(submitButton(wrapper, 'Commit').classes()).toContain('claw-button--secondary');
+    expect(submitButton(wrapper, 'Commit and push').classes()).toContain('claw-button--primary');
     expect(wrapper.findAll('.git-workflow-control__scope-row')).toHaveLength(3);
     expect(wrapper.findAll('.git-workflow-control__stats')[0]?.text()).toContain('+4');
     expect(wrapper.findAll('.git-workflow-control__stats')[0]?.text()).toContain('−1');
@@ -601,7 +604,7 @@ describe('GitWorkflowControl', () => {
 });
 
 function submitButton(wrapper: ReturnType<typeof mountControl>, label: string) {
-  const button = wrapper.findAll('.git-workflow-control__submit').find((candidate) => candidate.text() === label);
+  const button = wrapper.findAll('.claw-dialog__footer .claw-button').find((candidate) => candidate.text() === label);
   if (!button) throw new Error(`Submit button not found: ${label}`);
   return button;
 }

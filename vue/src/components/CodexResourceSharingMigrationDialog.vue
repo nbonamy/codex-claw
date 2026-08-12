@@ -20,20 +20,25 @@
       Migration cannot run while chats are active. Wait for them to finish, or keep the current isolated setup.
     </p>
     <template #footer>
-      <el-button
-        :disabled="pending"
-        @click="$emit('decline')"
-      >
-        Keep isolated
-      </el-button>
-      <el-button
-        :disabled="blocked"
-        :loading="pending"
-        type="primary"
-        @click="$emit('migrate')"
-      >
-        Migrate
-      </el-button>
+      <div class="claw-dialog__footer">
+        <button
+          class="claw-button claw-button--tertiary"
+          type="button"
+          :disabled="pending"
+          @click="$emit('decline')"
+        >
+          Keep isolated
+        </button>
+        <button
+          class="claw-button claw-button--primary"
+          type="button"
+          :aria-busy="pending"
+          :disabled="blocked || pending"
+          @click="$emit('migrate')"
+        >
+          Migrate
+        </button>
+      </div>
     </template>
   </el-dialog>
 </template>

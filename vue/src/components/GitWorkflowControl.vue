@@ -100,11 +100,11 @@
       <div
         v-if="commitOperation.status === 'editing'"
         class="claw-dialog__footer"
-      ><button class="git-workflow-control__cancel" type="button" @click="commitDialogOpen = false">Cancel</button><button class="git-workflow-control__submit" type="button" :disabled="busy || !canCommit" @click="commit(false)">Commit</button><button class="git-workflow-control__submit" type="button" :disabled="busy || !canCommit || !pushCapable" @click="commit(true)">Commit and push</button></div>
+      ><button class="claw-button claw-button--tertiary" type="button" @click="commitDialogOpen = false">Cancel</button><button class="claw-button claw-button--secondary" type="button" :disabled="busy || !canCommit" @click="commit(false)">Commit</button><button class="claw-button claw-button--primary" type="button" :disabled="busy || !canCommit || !pushCapable" @click="commit(true)">Commit and push</button></div>
       <div
         v-else-if="commitOperation.status === 'error'"
         class="claw-dialog__footer"
-      ><button class="git-workflow-control__cancel" type="button" @click="commitDialogOpen = false">Close</button><button class="git-workflow-control__submit" type="button" @click="commitOperation.commitCreated ? retryCommitPush() : returnToCommitForm()">{{ commitOperation.commitCreated ? 'Retry push' : 'Back' }}</button></div>
+      ><button class="claw-button claw-button--tertiary" type="button" @click="commitDialogOpen = false">Close</button><button class="claw-button" :class="commitOperation.commitCreated ? 'claw-button--primary' : 'claw-button--secondary'" type="button" @click="commitOperation.commitCreated ? retryCommitPush() : returnToCommitForm()">{{ commitOperation.commitCreated ? 'Retry push' : 'Back' }}</button></div>
     </template>
   </el-dialog>
 
@@ -146,11 +146,11 @@
       <div
         v-if="pushOperation.status === 'confirming'"
         class="claw-dialog__footer"
-      ><button class="git-workflow-control__cancel" type="button" @click="pushDialogOpen = false">Cancel</button><button class="git-workflow-control__submit" type="button" :disabled="busy" @click="push">Push</button></div>
+      ><button class="claw-button claw-button--tertiary" type="button" @click="pushDialogOpen = false">Cancel</button><button class="claw-button claw-button--primary" type="button" :disabled="busy" @click="push">Push</button></div>
       <div
         v-else-if="pushOperation.status === 'error'"
         class="claw-dialog__footer"
-      ><button class="git-workflow-control__cancel" type="button" @click="pushDialogOpen = false">Close</button><button class="git-workflow-control__submit" type="button" @click="push">Retry</button></div>
+      ><button class="claw-button claw-button--tertiary" type="button" @click="pushDialogOpen = false">Close</button><button class="claw-button claw-button--primary" type="button" @click="push">Retry</button></div>
     </template>
   </el-dialog>
 
@@ -189,8 +189,8 @@
       <template #icon><GitBranchIcon /></template>
     </GitOperationFeedback>
     <template #footer>
-      <div v-if="branchOperation.status === 'editing'" class="claw-dialog__footer"><button class="git-workflow-control__cancel" type="button" @click="branchDialogOpen = false">Cancel</button><button class="git-workflow-control__submit" type="button" :disabled="busy || !branchName.trim()" @click="createBranch">Create branch</button></div>
-      <div v-else-if="branchOperation.status === 'error'" class="claw-dialog__footer"><button class="git-workflow-control__cancel" type="button" @click="branchDialogOpen = false">Close</button><button class="git-workflow-control__submit" type="button" @click="returnToBranchForm">Back</button></div>
+      <div v-if="branchOperation.status === 'editing'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="branchDialogOpen = false">Cancel</button><button class="claw-button claw-button--primary" type="button" :disabled="busy || !branchName.trim()" @click="createBranch">Create branch</button></div>
+      <div v-else-if="branchOperation.status === 'error'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="branchDialogOpen = false">Close</button><button class="claw-button claw-button--secondary" type="button" @click="returnToBranchForm">Back</button></div>
     </template>
   </el-dialog>
 
@@ -242,11 +242,11 @@
       <div
         v-if="pullRequestOperation.status === 'editing'"
         class="claw-dialog__footer"
-      ><button class="git-workflow-control__cancel" type="button" @click="pullRequestDialogOpen = false">Cancel</button><button class="git-workflow-control__submit" type="button" :disabled="busy || !pullRequestTitle.trim()" @click="createPullRequest">Create PR</button></div>
+      ><button class="claw-button claw-button--tertiary" type="button" @click="pullRequestDialogOpen = false">Cancel</button><button class="claw-button claw-button--primary" type="button" :disabled="busy || !pullRequestTitle.trim()" @click="createPullRequest">Create PR</button></div>
       <div
         v-else-if="pullRequestOperation.status === 'error'"
         class="claw-dialog__footer"
-      ><button class="git-workflow-control__cancel" type="button" @click="pullRequestDialogOpen = false">Close</button><button class="git-workflow-control__submit" type="button" @click="createPullRequest">Retry</button></div>
+      ><button class="claw-button claw-button--tertiary" type="button" @click="pullRequestDialogOpen = false">Close</button><button class="claw-button claw-button--primary" type="button" @click="createPullRequest">Retry</button></div>
     </template>
   </el-dialog>
 
@@ -310,8 +310,8 @@
       <template #icon><GitMergeIcon /></template>
     </GitOperationFeedback>
     <template #footer>
-      <div v-if="mergeOperation.status === 'confirming'" class="claw-dialog__footer"><button class="git-workflow-control__cancel" type="button" @click="mergeDialogOpen = false">Cancel</button><button class="git-workflow-control__submit" type="button" :disabled="busy || !canMerge" @click="merge(false)">Merge</button><button class="git-workflow-control__submit" type="button" :disabled="busy || !canMerge || !pushCapable" @click="merge(true)">Merge and push</button></div>
-      <div v-else-if="mergeOperation.status === 'error'" class="claw-dialog__footer"><button class="git-workflow-control__cancel" type="button" @click="mergeDialogOpen = false">Close</button><button class="git-workflow-control__submit" type="button" @click="mergeOperation.mergeCreated ? retryMergePush() : merge(mergeOperation.pushAfter)">{{ mergeOperation.mergeCreated ? 'Retry push' : 'Retry' }}</button></div>
+      <div v-if="mergeOperation.status === 'confirming'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="mergeDialogOpen = false">Cancel</button><button class="claw-button claw-button--secondary" type="button" :disabled="busy || !canMerge" @click="merge(false)">Merge</button><button class="claw-button claw-button--primary" type="button" :disabled="busy || !canMerge || !pushCapable" @click="merge(true)">Merge and push</button></div>
+      <div v-else-if="mergeOperation.status === 'error'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="mergeDialogOpen = false">Close</button><button class="claw-button claw-button--primary" type="button" @click="mergeOperation.mergeCreated ? retryMergePush() : merge(mergeOperation.pushAfter)">{{ mergeOperation.mergeCreated ? 'Retry push' : 'Retry' }}</button></div>
     </template>
   </el-dialog>
 </template>
@@ -1041,7 +1041,9 @@ function clearMergeSuccessTimer(): void {
   padding-right: 104px;
 }
 
-.git-workflow-control__pull-request-form .git-workflow-control__message-editor--pull-request > input {
+.git-workflow-control__pull-request-form
+  .git-workflow-control__message-editor--pull-request
+  > input {
   padding-right: 104px;
 }
 
@@ -1251,31 +1253,5 @@ function clearMergeSuccessTimer(): void {
 
 :global(.git-workflow-control__dialog--transient .el-dialog__footer) {
   display: none;
-}
-
-.git-workflow-control__cancel,
-.git-workflow-control__submit {
-  border-radius: var(--radius-md);
-  padding: var(--space-4) var(--space-8);
-  font: inherit;
-  font-size: var(--font-size-13);
-  line-height: var(--line-height-18);
-  cursor: pointer;
-}
-
-.git-workflow-control__cancel {
-  border: 1px solid var(--color-border);
-  background: transparent;
-}
-
-.git-workflow-control__submit {
-  border: 1px solid var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-}
-
-.git-workflow-control__submit:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 </style>

@@ -119,6 +119,86 @@ button {
   gap: var(--space-3);
 }
 
+.claw-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  min-height: var(--space-16);
+  padding: 0 var(--space-8);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-18);
+  cursor: pointer;
+}
+
+.claw-button--primary {
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+}
+
+.claw-button--primary:hover:not(:disabled) {
+  border-color: var(--color-secondary);
+  color: var(--color-on-secondary);
+  background: var(--color-secondary);
+}
+
+.claw-button--secondary {
+  border-color: var(--color-border);
+  color: var(--color-primary);
+  background: transparent;
+}
+
+.claw-button--secondary:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-container);
+}
+
+.claw-button--tertiary {
+  color: var(--color-text-muted);
+  background: transparent;
+}
+
+.claw-button--tertiary:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--color-surface-low);
+}
+
+.claw-button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.claw-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.claw-button[aria-busy='true']::before {
+  width: var(--space-4);
+  height: var(--space-4);
+  border: 2px solid currentcolor;
+  border-top-color: transparent;
+  border-radius: var(--radius-full);
+  content: '';
+  animation: claw-button-spin 800ms linear infinite;
+}
+
+@keyframes claw-button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .claw-button[aria-busy='true']::before {
+    animation: none;
+  }
+}
+
 .claw-form-dialog {
   display: grid;
   gap: var(--space-8);

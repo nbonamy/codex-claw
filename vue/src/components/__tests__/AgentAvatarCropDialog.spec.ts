@@ -36,6 +36,10 @@ describe('AgentAvatarCropDialog', () => {
 
     expect(wrapper.text()).toContain('Adjust Avatar');
     expect(wrapper.find('.agent-avatar-crop-dialog__stage img').attributes('src')).toBe('data:image/png;base64,original');
+    expect(wrapper.findAll('.claw-button').map((button) => button.classes())).toStrictEqual([
+      ['claw-button', 'claw-button--tertiary'],
+      ['claw-button', 'claw-button--primary'],
+    ]);
     await wrapper.get('input[type="range"]').setValue('1.5');
     await wrapper.findAll('button').find((button) => button.text() === 'Use Image')?.trigger('click');
 

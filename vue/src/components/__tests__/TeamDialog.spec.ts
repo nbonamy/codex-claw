@@ -21,6 +21,10 @@ describe('TeamDialog', () => {
     expect(wrapper.get('.team-dialog__text-input').attributes('placeholder')).toBe('Enter team name');
     expect(wrapper.findAll('.team-dialog__color')).toHaveLength(teamColors.length);
     expect(wrapper.find('.team-dialog__preview').exists()).toBe(false);
+    expect(wrapper.findAll('.claw-dialog__footer .claw-button').map((button) => button.classes())).toStrictEqual([
+      ['claw-button', 'claw-button--tertiary'],
+      ['claw-button', 'claw-button--primary'],
+    ]);
     expect(saveButton(wrapper).attributes()).toHaveProperty('disabled');
   });
 

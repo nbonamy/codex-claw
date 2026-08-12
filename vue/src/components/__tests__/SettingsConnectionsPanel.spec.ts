@@ -115,6 +115,10 @@ describe('SettingsConnectionsPanel', () => {
 
     await wrapper.get('[aria-label="Connection settings for devbox"]').trigger('click');
     await flushPromises();
+    expect([...document.body.querySelectorAll('.claw-dialog__footer .claw-button')].map((button) => [...button.classList])).toStrictEqual([
+      ['claw-button', 'claw-button--tertiary'],
+      ['claw-button', 'claw-button--primary'],
+    ]);
     bodyButton('Browse')?.click();
     await flushPromises();
     bodyRemoteFolderRow('src')?.click();

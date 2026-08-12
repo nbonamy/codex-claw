@@ -12,6 +12,10 @@ describe('BenchAgentAssignmentDialog', () => {
     expect(wrapper.text()).toContain('Assign to Bench Agent');
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('id8');
+    expect(wrapper.findAll('.claw-dialog__footer .claw-button').map((button) => button.classes())).toStrictEqual([
+      ['claw-button', 'claw-button--tertiary'],
+      ['claw-button', 'claw-button--primary'],
+    ]);
 
     await wrapper.findAllComponents({ name: 'ElSelect' })[0]?.vm.$emit('update:modelValue', 'bench-jesse');
     await wrapper.findAllComponents({ name: 'ElSelect' })[1]?.vm.$emit('update:modelValue', 'team-skwad');

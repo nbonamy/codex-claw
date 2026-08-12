@@ -114,8 +114,13 @@ describe('ImageAnnotationDialog', () => {
     expect(wrapper.get('.image-annotation-dialog__comments').text()).toContain('Keep this saved comment.');
     expect(wrapper.get('.image-annotation-dialog__save-count').text()).toBe('1');
     expect(wrapper.get('[aria-label="Clear image annotations"]').attributes('disabled')).toBeUndefined();
-    expect(wrapper.findAll('.image-annotation-dialog__footer .el-button').map((button) => button.text()))
+    expect(wrapper.findAll('.image-annotation-dialog__footer .claw-button').map((button) => button.text()))
       .toStrictEqual(['Cancel', 'Clear', 'Save 1']);
+    expect(wrapper.findAll('.image-annotation-dialog__footer .claw-button').map((button) => button.classes())).toStrictEqual([
+      ['claw-button', 'claw-button--tertiary'],
+      ['claw-button', 'claw-button--secondary'],
+      ['claw-button', 'claw-button--primary', 'image-annotation-dialog__save'],
+    ]);
 
     await wrapper.get('[aria-label="Clear image annotations"]').trigger('click');
     expect(wrapper.get('.image-annotation-dialog__comments-empty').text()).toBe('No annotations yet');
