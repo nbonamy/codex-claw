@@ -1040,7 +1040,7 @@ describe('AppShell', () => {
       workspace: { branchName: 'feature/pull-request-42', kind: 'worktree' },
     });
 
-    expect(duplicateAgentAction).toHaveBeenCalledWith('agent-dina');
+    expect(duplicateAgentAction).toHaveBeenCalledWith('agent-dina', { select: false });
     expect(createAgentGitBranch).toHaveBeenCalledWith('agent-reviewer', {
       name: 'feature/pull-request-42',
       createWorktree: true,
@@ -3701,7 +3701,7 @@ function mountShell(overrides: Partial<{
   loadWorkItems: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery) => Promise<WorkItem[] | void>;
   createWorkItem: (input: import('@codex-claw/core/contracts').CreateWorkItemInput) => Promise<WorkItem>;
   createAgentGitBranch: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitBranchInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
-  duplicateAgentAction: (agentId: string) => Promise<Agent | null>;
+  duplicateAgentAction: (agentId: string, options?: { select?: boolean }) => Promise<Agent | null>;
   assignWorkItemAction: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
   loadBench: (location?: BenchLocation) => Promise<void>;
   getLoopSnapshot: (location?: LoopLocation) => Promise<AppSnapshot>;

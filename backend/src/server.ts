@@ -4,7 +4,7 @@ import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput, updateAgentOpenInApplication } from '@codex-claw/core/snapshot';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitDiff, AgentGitMessageGenerationResult, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitDiff, AgentGitMessageGenerationResult, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/core/backend-driver';
@@ -462,9 +462,12 @@ export class ClawBackendServer {
         return createClawRpcResult(message.id, snapshotMetadata(snapshot));
       }
       case backendMethods.agentDuplicate: {
-        const agentId = requireAgentId(message.params);
-        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentDuplicate, { agentId }, async () => {
-          const agent = duplicateAgentInSnapshot(this.snapshot, agentId);
+        const { agentId, options } = requireDuplicateAgentRequest(message.params);
+        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentDuplicate, {
+          agentId,
+          ...(options ? { options } : {}),
+        }, async () => {
+          const agent = duplicateAgentInSnapshot(this.snapshot, agentId, undefined, undefined, options);
           if (!agent) {
             throw new Error(`Agent not found: ${agentId}`);
           }
@@ -3130,6 +3133,23 @@ function requireTeamId(params: unknown): string {
 function requireAgentId(params: unknown): string {
   const record = requireRecord(params);
   return requireString(record.agentId, 'agentId');
+}
+
+function requireDuplicateAgentRequest(params: unknown): { agentId: string; options?: DuplicateAgentOptions } {
+  const record = requireRecord(params);
+  const agentId = requireString(record.agentId, 'agentId');
+  if (record.options === undefined) {
+    return { agentId };
+  }
+
+  const options = requireRecord(record.options);
+  if (options.select !== undefined && typeof options.select !== 'boolean') {
+    throw new Error('select must be a boolean.');
+  }
+  return {
+    agentId,
+    options: options.select === undefined ? {} : { select: options.select },
+  };
 }
 
 function requireMessageId(params: unknown): string {

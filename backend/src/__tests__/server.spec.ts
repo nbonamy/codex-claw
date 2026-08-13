@@ -15,6 +15,38 @@ import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import type { AgentGitService } from '../git/agent-git-service';
 
 describe('ClawBackendServer', () => {
+  it('duplicates an agent in the background when selection is disabled', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/repo',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-08-01T00:00:00.000Z',
+      updatedAt: '2026-08-01T00:00:00.000Z',
+    }];
+    snapshot.activeAgentId = 'agent-dina';
+    const server = new ClawBackendServer({ version: 'test-version', snapshot });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'duplicate-background',
+      method: backendMethods.agentDuplicate,
+      params: { agentId: 'agent-dina', options: { select: false } },
+    })).resolves.toMatchObject({
+      result: {
+        activeAgentId: 'agent-dina',
+        agents: [{ id: 'agent-dina' }, { name: 'Dina (copy)' }],
+      },
+    });
+
+    expect(snapshot.activeAgentId).toBe('agent-dina');
+    await server.close();
+  });
+
   it('rejects unconfirmed git mutations before invoking git', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];

@@ -51,6 +51,7 @@ describe('Claw web operations', () => {
     await invokeClawWebOperation(backend, 'listSourceRepositories', []);
     await invokeClawWebOperation(backend, 'listSourceRepositories', ['ssh-1']);
     await invokeClawWebOperation(backend, 'forkAgent', ['agent-1', undefined]);
+    await invokeClawWebOperation(backend, 'duplicateAgent', ['agent-1', { select: false }]);
     await invokeClawWebOperation(backend, 'listWorkItems', ['github', null, { kind: 'remote' }]);
     await invokeClawWebOperation(backend, 'getPluginStatus', []);
     await invokeClawWebOperation(backend, 'setAgentPermissionMode', ['agent-claude', 'acceptEdits']);
@@ -64,6 +65,7 @@ describe('Claw web operations', () => {
       [backendMethods.sourceRepositoriesList, undefined],
       [backendMethods.sourceRepositoriesList, { remoteConnectionId: 'ssh-1' }],
       [backendMethods.agentFork, { agentId: 'agent-1' }],
+      [backendMethods.agentDuplicate, { agentId: 'agent-1', options: { select: false } }],
       [backendMethods.workProviderItemsList, { provider: 'github', location: { kind: 'remote' } }],
       [backendMethods.settingsPluginStatusGet, undefined],
       [backendMethods.agentPermissionModeUpdate, { agentId: 'agent-claude', mode: 'acceptEdits' }],

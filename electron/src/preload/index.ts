@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AddSshConnectionInput, AgentGitBranchInput, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AppCommand, AppPluginStatus, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, CreateWorkItemInput, DevicePairingSession, DesktopUpdateStatus, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RendererSendPromptOptions, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemQuery, WorkProviderKind } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, AgentGitBranchInput, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AppCommand, AppPluginStatus, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, CreateWorkItemInput, DevicePairingSession, DesktopUpdateStatus, DuplicateAgentOptions, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RendererSendPromptOptions, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemQuery, WorkProviderKind } from '@codex-claw/core/contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
 import { exposeCodexNativeRendererApi, TypedIpcRenderer } from '@codex-app-sdk/electron/preload';
 
@@ -74,7 +74,7 @@ const api: CodexClawApi = {
   updateAgent: (input: UpdateAgentInput) => ipc.invoke(ipcChannels.updateAgent, input),
   assignWorkItemToAgent: (agentId: string, item: WorkItem) => ipc.invoke(ipcChannels.assignWorkItemToAgent, agentId, item),
   removeWorkItemAssignment: (item: WorkItem) => ipc.invoke(ipcChannels.removeWorkItemAssignment, item),
-  duplicateAgent: (agentId: string) => ipc.invoke(ipcChannels.duplicateAgent, agentId),
+  duplicateAgent: (agentId: string, options?: DuplicateAgentOptions) => ipc.invoke(ipcChannels.duplicateAgent, agentId, options),
   forkAgent: (agentId: string, messageIndex?: number) => ipc.invoke(ipcChannels.forkAgent, agentId, messageIndex),
   moveAgentToTeam: (input: MoveAgentToTeamInput) => ipc.invoke(ipcChannels.moveAgentToTeam, input),
   reorderAgents: (input: ReorderAgentsInput) => ipc.invoke(ipcChannels.reorderAgents, input),

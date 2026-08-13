@@ -2,7 +2,13 @@ import type { Agent, AppSnapshot, BackendSession, BenchTemplate, CreateBenchTemp
 import { createEntityId, createUniqueEntityId, type IdGenerator } from './ids';
 import { workBacklogAssignmentFromWorkItem, workItemAssignmentKey, type WorkItemAssignmentSource } from './work-assignments';
 
-export function duplicateAgentInSnapshot(snapshot: AppSnapshot, agentId: string, createdAt = new Date().toISOString(), createId: IdGenerator = () => createEntityId('agent')): Agent | null {
+export function duplicateAgentInSnapshot(
+  snapshot: AppSnapshot,
+  agentId: string,
+  createdAt = new Date().toISOString(),
+  createId: IdGenerator = () => createEntityId('agent'),
+  options: { select?: boolean } = {},
+): Agent | null {
   const source = snapshot.agents.find((agent) => agent.id === agentId);
   if (!source) {
     return null;
@@ -10,8 +16,10 @@ export function duplicateAgentInSnapshot(snapshot: AppSnapshot, agentId: string,
 
   const duplicate = copiedAgent(snapshot, source, 'copy', createdAt, createId);
   insertAgentAfterSource(snapshot, source, duplicate);
-  snapshot.activeTeamId = duplicate.teamId ?? snapshot.activeTeamId;
-  snapshot.activeAgentId = duplicate.id;
+  if (options.select !== false) {
+    snapshot.activeTeamId = duplicate.teamId ?? snapshot.activeTeamId;
+    snapshot.activeAgentId = duplicate.id;
+  }
   return duplicate;
 }
 

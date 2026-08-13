@@ -66,7 +66,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   updateAgent: [backendMethods.agentUpdate, named('input')],
   assignWorkItemToAgent: [backendMethods.agentWorkItemAssign, named('agentId', 'item')],
   removeWorkItemAssignment: [backendMethods.agentWorkItemAssignmentDelete, named('item')],
-  duplicateAgent: [backendMethods.agentDuplicate, named('agentId')],
+  duplicateAgent: [backendMethods.agentDuplicate, namedOptional('agentId', 'options')],
   forkAgent: [backendMethods.agentFork, namedOptional('agentId', 'messageIndex')],
   moveAgentToTeam: [backendMethods.agentTeamMove, named('input')],
   reorderAgents: [backendMethods.agentReorder, named('input')],

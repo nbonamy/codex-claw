@@ -1373,6 +1373,10 @@ export type UpdateAgentInput = {
   backend?: AgentBackend;
 };
 
+export type DuplicateAgentOptions = {
+  select?: boolean;
+};
+
 export type MoveAgentToTeamInput = {
   agentId: string;
   teamId: string;
@@ -1530,7 +1534,7 @@ export type CodexClawApi = {
   updateAgent(input: UpdateAgentInput): Promise<AppSnapshot>;
   assignWorkItemToAgent(agentId: string, item: WorkItem): Promise<AppSnapshot>;
   removeWorkItemAssignment(item: WorkItem): Promise<AppSnapshot>;
-  duplicateAgent(agentId: string): Promise<AppSnapshot>;
+  duplicateAgent(agentId: string, options?: DuplicateAgentOptions): Promise<AppSnapshot>;
   forkAgent(agentId: string, messageIndex?: number): Promise<AppSnapshot>;
   moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot>;
   reorderAgents(input: ReorderAgentsInput): Promise<AppSnapshot>;

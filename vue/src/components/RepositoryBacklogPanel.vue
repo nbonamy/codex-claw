@@ -163,6 +163,7 @@
           :item="item"
           :assignment="assignmentFor(item)"
           :active="openItemId === item.id"
+          @activate="showAssignmentAgent(assignmentFor(item))"
           @open="openItem(item, $event)"
         />
       </section>
@@ -194,31 +195,22 @@
       virtual-triggering
       :virtual-ref="virtualReference"
       placement="bottom-end"
-      :width="340"
+      :width="selectedAssignment ? 220 : 340"
       :teleported="true"
       popper-class="claw-popover repository-backlog__start-popover"
       @update:visible="setStartWorkVisible"
     >
-      <div class="repository-backlog__start-work">
+      <div
+        class="repository-backlog__start-work"
+        :class="{ 'repository-backlog__start-work--menu': selectedAssignment }"
+      >
         <template v-if="selectedAssignment">
-          <header>
-            <strong>{{ t('repositoryBacklog.assignedTo', { name: selectedAssignedAgent?.name ?? selectedAssignment.agentId }) }}</strong>
-            <button type="button" aria-label="Close" @click="closeStartWork"><IconX aria-hidden="true" /></button>
-          </header>
-          <div class="repository-backlog__assignment-actions">
-            <button
-              v-if="selectedAssignment.agentId !== agent.id"
-              type="button"
-              @click="showAssignedAgent"
-            >
-              <IconRobotFace aria-hidden="true" />
-              {{ t('repositoryBacklog.showAgent') }}
-            </button>
-            <button type="button" @click="clearSelectedAssignment">
-              <IconX aria-hidden="true" />
-              {{ t('repositoryBacklog.clearAssignment') }}
-            </button>
-          </div>
+          <AppMenu
+            class="app-menu--embedded repository-backlog__assignment-menu"
+            ariaLabel="Work item assignment actions"
+            :items="assignmentMenuItems"
+            @select="selectAssignmentMenuItem"
+          />
         </template>
         <template v-else-if="operationState === 'idle' || operationState === 'error'">
           <header>
@@ -334,13 +326,14 @@ import {
 import type { Agent, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem } from '@codex-claw/core/contracts';
 import type { WorkItemAssignmentAction } from '@codex-claw/core/work-item-prompts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import AppMenu from '../shared/menu/AppMenu.vue';
+import type { AppMenuItem } from '../shared/menu/app-menu';
 import type { RepositoryWorkStartInput } from './right-workspace';
 
 defineOptions({ name: 'RepositoryBacklogPanel' });
 
 const props = defineProps<{
   agent: Agent;
-  agents: readonly Agent[];
   assignments: Record<string, WorkBacklogAssignment>;
   branch?: string;
   connection?: WorkIntegrationConnection | null;
@@ -373,7 +366,7 @@ const defaultsSaved = ref(false);
 const selectedItem = ref<WorkItem | null>(null);
 const openItemId = ref<string | null>(null);
 const startWorkVisible = ref(false);
-const target = ref<'current' | 'duplicate'>('current');
+const target = ref<'current' | 'duplicate'>('duplicate');
 const workspaceMode = ref<'current' | 'worktree'>('worktree');
 const branchName = ref('');
 const operationState = ref<'idle' | 'running' | 'success' | 'error'>('idle');
@@ -414,7 +407,27 @@ const assignmentGroups = computed(() => ([
 ] as const).filter((group) => group.items.length > 0));
 const unassignedItems = computed(() => filteredItems.value.filter((item) => !assignmentFor(item)));
 const selectedAssignment = computed(() => selectedItem.value ? assignmentFor(selectedItem.value) : null);
-const selectedAssignedAgent = computed(() => props.agents.find((agent) => agent.id === selectedAssignment.value?.agentId) ?? null);
+const assignmentMenuItems = computed<AppMenuItem[]>(() => {
+  const assignment = selectedAssignment.value;
+  if (!assignment) return [];
+  return [
+    {
+      id: 'show-agent',
+      type: 'action',
+      label: assignment.agentId === props.agent.id
+        ? t('repositoryBacklog.assignedToCurrentAgent')
+        : t('repositoryBacklog.showAgent'),
+      icon: IconRobotFace,
+      disabled: assignment.agentId === props.agent.id,
+    },
+    {
+      id: 'clear-assignment',
+      type: 'action',
+      label: t('repositoryBacklog.clearAssignment'),
+      icon: IconX,
+    },
+  ];
+});
 
 watch(target, (value) => {
   if (value === 'duplicate') workspaceMode.value = 'worktree';
@@ -442,11 +455,18 @@ watch([stateFilter, assigneeFilter, labelFilter], () => {
   defaultsSaved.value = false;
 });
 
-const RepositoryItemRow = (rowProps: { item: WorkItem; assignment: WorkBacklogAssignment | null; active: boolean }, context: { emit: (event: 'open', element: HTMLElement) => void }) => {
+const RepositoryItemRow = (rowProps: { item: WorkItem; assignment: WorkBacklogAssignment | null; active: boolean }, context: { emit: (event: 'open' | 'activate', element?: HTMLElement) => void }) => {
   const item = rowProps.item;
   const label = item.labels[0];
+  const assignmentNote = rowProps.assignment?.note?.trim();
   return h('article', {
-    class: ['repository-backlog__item', rowProps.active ? 'repository-backlog__item--active' : ''],
+    class: [
+      'repository-backlog__item',
+      rowProps.active ? 'repository-backlog__item--active' : '',
+      rowProps.assignment ? 'repository-backlog__item--assigned' : '',
+      assignmentNote ? 'repository-backlog__item--commented' : '',
+    ],
+    onClick: rowProps.assignment ? () => context.emit('activate') : undefined,
   }, [
     h(item.kind === 'pullRequest' ? IconGitPullRequest : IconCircleDot, { class: 'repository-backlog__item-kind', 'aria-hidden': 'true' }),
     h('div', { class: 'repository-backlog__item-copy' }, [
@@ -455,23 +475,25 @@ const RepositoryItemRow = (rowProps: { item: WorkItem; assignment: WorkBacklogAs
         href: item.url,
         target: '_blank',
         rel: 'noopener noreferrer',
+        onClick: (event: MouseEvent) => event.stopPropagation(),
       }, [h('span', `#${item.number}`), h('strong', item.title)]),
-      h('div', { class: 'repository-backlog__item-meta' }, [
-        h('span', { class: `repository-backlog__state-dot repository-backlog__state-dot--${item.state}` }),
-        h('span', item.state === 'open' ? t('repositoryBacklog.open') : t('repositoryBacklog.closed')),
-        label ? h('span', { class: 'repository-backlog__label', style: labelStyle(label.color) }, label.name) : null,
-        rowProps.assignment?.note ? h('span', {
-          class: 'repository-backlog__assignment-note',
-          title: rowProps.assignment.note,
-        }, rowProps.assignment.note) : null,
-      ]),
+      assignmentNote
+        ? h('p', { class: 'repository-backlog__assignment-note' }, assignmentNote)
+        : h('div', { class: 'repository-backlog__item-meta' }, [
+          h('span', { class: `repository-backlog__state-dot repository-backlog__state-dot--${item.state}` }),
+          h('span', item.state === 'open' ? t('repositoryBacklog.open') : t('repositoryBacklog.closed')),
+          label ? h('span', { class: 'repository-backlog__label', style: labelStyle(label.color) }, label.name) : null,
+        ]),
     ]),
     h('span', { class: 'repository-backlog__item-time' }, relativeTime(item.updatedAt)),
     h('button', {
       class: 'repository-backlog__item-actions',
       type: 'button',
       'aria-label': `${t('repositoryBacklog.actions')} #${item.number}`,
-      onClick: (event: MouseEvent) => context.emit('open', event.currentTarget as HTMLElement),
+      onClick: (event: MouseEvent) => {
+        event.stopPropagation();
+        context.emit('open', event.currentTarget as HTMLElement);
+      },
     }, [h(IconDots, { 'aria-hidden': 'true' })]),
   ]);
 };
@@ -547,7 +569,7 @@ function openItem(item: WorkItem, element?: HTMLElement): void {
   selectedItem.value = item;
   openItemId.value = item.id;
   startWorkVisible.value = true;
-  target.value = 'current';
+  target.value = 'duplicate';
   workspaceMode.value = 'worktree';
   branchName.value = item.kind === 'pullRequest' ? item.branchName?.trim() ?? '' : suggestedBranch(item);
   operationState.value = 'idle';
@@ -562,8 +584,15 @@ function assignedItems(status: WorkBacklogAssignment['status']): WorkItem[] {
   return filteredItems.value.filter((item) => assignmentFor(item)?.status === status);
 }
 
-function showAssignedAgent(): void {
-  const assignment = selectedAssignment.value;
+function selectAssignmentMenuItem(itemId: string): void {
+  if (itemId === 'show-agent') {
+    showAssignmentAgent(selectedAssignment.value);
+  } else if (itemId === 'clear-assignment') {
+    clearSelectedAssignment();
+  }
+}
+
+function showAssignmentAgent(assignment: WorkBacklogAssignment | null): void {
   if (!assignment || assignment.agentId === props.agent.id) return;
   props.showAgentAction?.(assignment.agentId);
   closeStartWork();
@@ -1026,6 +1055,10 @@ function relativeLuminance(rgb: number[]): number {
   margin-top: var(--space-2);
 }
 
+:deep(.repository-backlog__item--assigned) {
+  cursor: pointer;
+}
+
 :deep(.repository-backlog__item:hover),
 :deep(.repository-backlog__item--active) {
   border-color: var(--color-border-strong);
@@ -1045,6 +1078,8 @@ function relativeLuminance(rgb: number[]): number {
 :deep(.repository-backlog__item-kind) {
   width: var(--icon-md);
   height: var(--icon-md);
+  align-self: start;
+  margin-top: 2px;
   color: var(--color-text-muted);
 }
 
@@ -1096,10 +1131,16 @@ function relativeLuminance(rgb: number[]): number {
 
 :deep(.repository-backlog__assignment-note) {
   min-width: 0;
+  display: -webkit-box;
+  margin: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   color: var(--color-error);
+  font-size: var(--font-size-11);
+  line-height: 1.35;
 }
 
 :deep(.repository-backlog__state-dot) {
@@ -1209,9 +1250,15 @@ function relativeLuminance(rgb: number[]): number {
 }
 
 .repository-backlog__start-work {
+  position: relative;
   display: grid;
   gap: var(--space-4);
   padding: var(--space-3);
+}
+
+.repository-backlog__start-work--menu {
+  gap: 0;
+  padding: 0;
 }
 
 .repository-backlog__start-work > header {
@@ -1235,37 +1282,6 @@ function relativeLuminance(rgb: number[]): number {
 .repository-backlog__start-work > header > button svg {
   width: var(--icon-sm);
   height: var(--icon-sm);
-}
-
-.repository-backlog__assignment-actions {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3) 0 0;
-}
-
-.repository-backlog__assignment-actions button {
-  min-height: 34px;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: 0 var(--space-4);
-  border: 0;
-  border-radius: var(--radius-md);
-  color: var(--color-text);
-  background: transparent;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.repository-backlog__assignment-actions button:hover {
-  background: var(--color-surface-low);
-}
-
-.repository-backlog__assignment-actions svg {
-  width: var(--icon-md);
-  height: var(--icon-md);
-  color: var(--color-text-muted);
 }
 
 .repository-backlog__target-options {

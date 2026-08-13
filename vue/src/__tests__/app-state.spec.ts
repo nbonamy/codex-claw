@@ -3228,6 +3228,40 @@ describe('useAppState', () => {
     expect(state.snapshot.value).toBe(before);
   });
 
+  it('keeps the current agent selected when duplicating in the background', async () => {
+    const initialSnapshot = createInitialSnapshot();
+    const copy = {
+      ...initialSnapshot.agents[0]!,
+      id: 'agent-dina-copy',
+      name: 'Dina (copy)',
+    };
+    const duplicatedSnapshot = {
+      ...initialSnapshot,
+      agents: [initialSnapshot.agents[0]!, copy],
+      teams: initialSnapshot.teams.map((team) => team.id === initialSnapshot.activeTeamId
+        ? { ...team, agentIds: [initialSnapshot.agents[0]!.id, copy.id] }
+        : team),
+      activeAgentId: copy.id,
+    };
+    const duplicateAgent = vi.fn().mockResolvedValue(duplicatedSnapshot);
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(initialSnapshot),
+        onEvent: vi.fn(),
+        duplicateAgent,
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    await expect(state.duplicateAgent('agent-dina', { select: false })).resolves.toMatchObject({ id: copy.id });
+
+    expect(duplicateAgent).toHaveBeenCalledWith('agent-dina', { select: false });
+    expect(state.snapshot.value.activeAgentId).toBe('agent-dina');
+    expect(state.snapshot.value.agents).toContainEqual(copy);
+  });
+
   it('routes optional desktop operations through the preload bridge and adopts their results', async () => {
     const initialSnapshot = createInitialSnapshot();
     initialSnapshot.sourceFolder.path = '/Users/nbonamy/src';

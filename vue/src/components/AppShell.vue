@@ -559,7 +559,7 @@ const props = withDefaults(defineProps<{
   loadWorkRepositories?: (provider: WorkProviderKind, location?: LoopLocation) => Promise<WorkRepository[] | void>;
   loadWorkItems?: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: WorkItemQuery) => Promise<WorkItem[] | void>;
   createWorkItem?: (input: import('@codex-claw/core/contracts').CreateWorkItemInput) => Promise<WorkItem>;
-  duplicateAgentAction?: (agentId: string) => Promise<Agent | null>;
+  duplicateAgentAction?: (agentId: string, options?: import('@codex-claw/core/contracts').DuplicateAgentOptions) => Promise<Agent | null>;
   assignWorkItemAction?: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
   loadOlderAgentHistory?: (agentId: string) => Promise<void>;
   quit?: () => Promise<void>;
@@ -1550,7 +1550,7 @@ async function startRepositoryWork(agentId: string, input: RepositoryWorkStartIn
   }
 
   const targetAgent = input.target === 'duplicate'
-    ? await props.duplicateAgentAction(sourceAgent.id)
+    ? await props.duplicateAgentAction(sourceAgent.id, { select: false })
     : sourceAgent;
   if (!targetAgent) throw new Error('The duplicate agent could not be created.');
 

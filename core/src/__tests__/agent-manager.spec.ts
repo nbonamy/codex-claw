@@ -44,6 +44,22 @@ describe('agent-manager', () => {
     expect(snapshot.agents.slice(0, 2).map((agent) => agent.id)).toStrictEqual(['agent-dina', duplicate?.id]);
   });
 
+  it('duplicates an agent without changing the active agent when selection is disabled', () => {
+    const snapshot = createInitialSnapshot();
+    const activeAgentId = snapshot.activeAgentId;
+    const duplicate = duplicateAgentInSnapshot(
+      snapshot,
+      'agent-dina',
+      '2026-06-05T10:11:12.000Z',
+      () => 'agent-background-copy',
+      { select: false },
+    );
+
+    expect(duplicate?.id).toBe('agent-background-copy');
+    expect(snapshot.activeAgentId).toBe(activeAgentId);
+    expect(snapshot.teams[0].agentIds.slice(0, 2)).toStrictEqual(['agent-dina', 'agent-background-copy']);
+  });
+
   it('generates collision-safe ids for duplicated agents and bench templates', () => {
     const snapshot = createInitialSnapshot();
 

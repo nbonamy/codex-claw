@@ -883,7 +883,7 @@ describe('AppController', () => {
 
     await expect(createAgent(controller, createInput)).resolves.toBe(backendSnapshot);
     await expect(updateAgent(controller, updateInput)).resolves.toBe(backendSnapshot);
-    await expect(duplicateAgent(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
+    await expect(duplicateAgent(controller, 'agent-dina', { select: false })).resolves.toBe(backendSnapshot);
     await expect(forkAgent(controller, 'agent-dina', 4)).resolves.toBe(backendSnapshot);
     await expect(moveAgentToTeam(controller, moveInput)).resolves.toBe(backendSnapshot);
     await expect(reorderAgents(controller, reorderInput)).resolves.toBe(backendSnapshot);
@@ -893,7 +893,7 @@ describe('AppController', () => {
 
     expect(request).toHaveBeenNthCalledWith(1, 'agent/create', { input: createInput });
     expect(request).toHaveBeenNthCalledWith(2, 'agent/update', { input: updateInput });
-    expect(request).toHaveBeenNthCalledWith(3, 'agent/duplicate', { agentId: 'agent-dina' });
+    expect(request).toHaveBeenNthCalledWith(3, 'agent/duplicate', { agentId: 'agent-dina', options: { select: false } });
     expect(request).toHaveBeenNthCalledWith(4, 'agent/fork', { agentId: 'agent-dina', messageIndex: 4 });
     expect(request).toHaveBeenNthCalledWith(5, 'agent/team/move', { input: moveInput });
     expect(request).toHaveBeenNthCalledWith(6, 'agent/reorder', { input: reorderInput });
@@ -2380,10 +2380,10 @@ async function updateAgent(controller: AppController, input: UpdateAgentInput): 
   }).updateAgent(input);
 }
 
-async function duplicateAgent(controller: AppController, agentId: string): Promise<AppSnapshot> {
+async function duplicateAgent(controller: AppController, agentId: string, options?: { select?: boolean }): Promise<AppSnapshot> {
   return (controller as unknown as {
-    duplicateAgent(agentId: string): Promise<AppSnapshot>;
-  }).duplicateAgent(agentId);
+    duplicateAgent(agentId: string, options?: { select?: boolean }): Promise<AppSnapshot>;
+  }).duplicateAgent(agentId, options);
 }
 
 async function forkAgent(controller: AppController, agentId: string, messageIndex?: number): Promise<AppSnapshot> {

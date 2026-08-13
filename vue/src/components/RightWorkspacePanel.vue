@@ -120,7 +120,6 @@
       v-if="tabs.includes('backlog') && githubRepository && prefillRepositoryWork && startRepositoryWork && createRepositoryIssue"
       v-show="activeTab === 'backlog'"
       :agent="agent"
-      :agents="agents ?? []"
       :assignments="workAssignments"
       :branch="gitStatus?.branch"
       :connection="githubConnection"
