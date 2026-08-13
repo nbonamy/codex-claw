@@ -1001,19 +1001,37 @@ export class ClawBackendServer {
           return this.snapshot;
         });
       }
+      case backendMethods.agentQueuedPromptUpdate: {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const promptId = requireString(params.promptId, 'promptId');
+        const prompt = requireString(params.prompt, 'prompt').trim();
+        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentQueuedPromptUpdate, { agentId, promptId, prompt }, async () => {
+          const queuedPrompt = (this.snapshot.queuedPrompts ?? []).find((candidate) => candidate.agentId === agentId && candidate.id === promptId);
+          if (!queuedPrompt) return this.snapshot;
+          queuedPrompt.text = prompt;
+          return this.persistAndEmitSnapshot();
+        });
+      }
       case backendMethods.agentQueuedPromptSteer: {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
         const promptId = requireString(params.promptId, 'promptId');
-        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentQueuedPromptSteer, { agentId, promptId }, async (agent) => {
+        const replacement = params.prompt === undefined ? undefined : requireString(params.prompt, 'prompt').trim();
+        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentQueuedPromptSteer, {
+          agentId,
+          promptId,
+          ...(replacement === undefined ? {} : { prompt: replacement }),
+        }, async (agent) => {
           const queuedPrompt = (this.snapshot.queuedPrompts ?? []).find((prompt) => prompt.agentId === agentId && prompt.id === promptId);
           if (!queuedPrompt) return this.snapshot;
+          const prompt = replacement ?? queuedPrompt.text;
           if (canDrainQueuedPrompt(agent.status.type)) {
-            return this.startAgentPrompt(agent, queuedPrompt.text, queuedPrompt.options, queuedPrompt.id);
+            return this.startAgentPrompt(agent, prompt, queuedPrompt.options, queuedPrompt.id);
           }
           const result = await this.handleAgentDriverRequest(agent, backendMethods.driverPromptSteer, {
             agent,
-            prompt: queuedPrompt.text,
+            prompt,
             options: queuedPrompt.options,
           }) as BackendSendResult;
           agent.backendSession = result.backendSession;
@@ -1025,7 +1043,7 @@ export class ClawBackendServer {
             turnId: result.turnId,
             type: 'message.steer',
             payload: {
-              prompt: queuedPrompt.text,
+              prompt,
               ...(queuedPrompt.options?.attachments?.length ? { attachments: queuedPrompt.options.attachments } : {}),
             },
           });

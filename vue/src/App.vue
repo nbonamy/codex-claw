@@ -149,6 +149,7 @@
     @send-prompt="sendPrompt"
     @steer-prompt="steerPrompt"
     @steer-queued-prompt="steerQueuedPrompt"
+    @update-queued-prompt="updateQueuedPrompt"
     @update:composer-state="updateComposerState($event.agentId, $event.state)"
     @update:composer-attachments="updateComposerAttachments($event.agentId, $event.attachments)"
     @install-update="installUpdate"
@@ -330,6 +331,7 @@ const {
   editMessage,
   retryMessage,
   steerQueuedPrompt,
+  updateQueuedPrompt,
   removeQueuedPrompt,
   quit,
   restartApp,

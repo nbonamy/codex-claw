@@ -300,6 +300,35 @@
         </div>
       </div>
     </el-popover>
+
+    <el-dialog
+      class="claw-dialog repository-backlog__clear-dialog"
+      :model-value="pendingClearAssignment !== null"
+      :teleported="false"
+      width="440px"
+      :show-close="false"
+      destroy-on-close
+      @update:model-value="onClearDialogVisibilityChanged"
+    >
+      <template #header>
+        <div class="claw-form-dialog__header">
+          <h2 class="claw-dialog__title">{{ t('repositoryBacklog.clearAssignmentTitle') }}</h2>
+        </div>
+      </template>
+      <p class="repository-backlog__clear-copy">
+        {{ t('repositoryBacklog.clearAssignmentPrompt', { name: pendingClearAssignment?.agent.name ?? '' }) }}
+      </p>
+      <template #footer>
+        <div class="claw-dialog__footer">
+          <button class="claw-button claw-button--tertiary" type="button" @click="confirmClearAssignment(false)">
+            {{ t('repositoryBacklog.keepAgent') }}
+          </button>
+          <button class="claw-button claw-button--primary" type="button" @click="confirmClearAssignment(true)">
+            {{ t('repositoryBacklog.closeAgent') }}
+          </button>
+        </div>
+      </template>
+    </el-dialog>
   </section>
 </template>
 
@@ -334,6 +363,7 @@ defineOptions({ name: 'RepositoryBacklogPanel' });
 
 const props = defineProps<{
   agent: Agent;
+  agents: readonly Agent[];
   assignments: Record<string, WorkBacklogAssignment>;
   branch?: string;
   connection?: WorkIntegrationConnection | null;
@@ -342,6 +372,7 @@ const props = defineProps<{
   repositoryId: string;
   prefillAction: (item: WorkItem) => void;
   clearAssignmentAction?: (item: WorkItem) => void;
+  closeAgentAction?: (agentId: string) => void;
   createIssueAction: (description: string) => Promise<WorkItem>;
   showAgentAction?: (agentId: string) => void;
   status: 'notLoaded' | 'loading' | 'loaded' | 'error';
@@ -371,6 +402,7 @@ const workspaceMode = ref<'current' | 'worktree'>('worktree');
 const branchName = ref('');
 const operationState = ref<'idle' | 'running' | 'success' | 'error'>('idle');
 const operationError = ref<string | null>(null);
+const pendingClearAssignment = ref<{ agent: Agent; item: WorkItem } | null>(null);
 const virtualReference = ref({ getBoundingClientRect: () => new DOMRect() });
 
 const secondaryAction = computed<WorkItemAssignmentAction>(() => selectedItem.value?.kind === 'pullRequest' ? 'addressFeedback' : 'investigate');
@@ -601,8 +633,30 @@ function showAssignmentAgent(assignment: WorkBacklogAssignment | null): void {
 function clearSelectedAssignment(): void {
   const item = selectedItem.value;
   if (!item) return;
+  const assignment = assignmentFor(item);
+  const assignedAgent = props.agents.find((agent) => agent.id === assignment?.agentId);
+  if (assignedAgent) {
+    pendingClearAssignment.value = { agent: assignedAgent, item };
+    closeStartWork();
+    return;
+  }
   props.clearAssignmentAction?.(item);
   closeStartWork();
+}
+
+function confirmClearAssignment(closeAgent: boolean): void {
+  const pending = pendingClearAssignment.value;
+  if (!pending) return;
+  pendingClearAssignment.value = null;
+  if (closeAgent && props.closeAgentAction) {
+    props.closeAgentAction(pending.agent.id);
+  } else {
+    props.clearAssignmentAction?.(pending.item);
+  }
+}
+
+function onClearDialogVisibilityChanged(visible: boolean): void {
+  if (!visible) pendingClearAssignment.value = null;
 }
 
 function closeStartWork(): void {
@@ -1237,6 +1291,13 @@ function relativeLuminance(rgb: number[]): number {
   background: transparent;
   font: inherit;
   cursor: pointer;
+}
+
+.repository-backlog__clear-copy {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-14);
+  line-height: var(--line-height-20);
 }
 
 .repository-backlog__loader,

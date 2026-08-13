@@ -209,6 +209,45 @@ describe('RepositoryBacklogPanel', () => {
     expect(showAgentAction).not.toHaveBeenCalled();
   });
 
+  it('asks whether to close an existing assigned agent before clearing its assignment', async () => {
+    const clearAssignmentAction = vi.fn();
+    const closeAgentAction = vi.fn();
+    const otherAgent = { ...agent, id: 'agent-jesse', name: 'Jesse' };
+    const wrapper = mountPanel({
+      agents: [agent, otherAgent],
+      assignments: {
+        'github:nbonamy/codex-claw#12': {
+          provider: 'github',
+          itemId: 'nbonamy/codex-claw#12',
+          agentId: otherAgent.id,
+          assignedAt: '2026-08-12T00:00:00.000Z',
+          policy: 'review',
+          status: 'inProgress',
+        },
+      },
+      clearAssignmentAction,
+      closeAgentAction,
+    });
+
+    await wrapper.get('[aria-label="Work item actions #12"]').trigger('click');
+    await wrapper.findAll('.repository-backlog__assignment-menu [role="menuitem"]')[1]!.trigger('click');
+
+    expect(wrapper.get('.repository-backlog__clear-dialog').text()).toContain('Do you want to close the assigned agent Jesse?');
+    expect(clearAssignmentAction).not.toHaveBeenCalled();
+    expect(closeAgentAction).not.toHaveBeenCalled();
+
+    await wrapper.findAll('.repository-backlog__clear-dialog .claw-button')[0]!.trigger('click');
+    expect(clearAssignmentAction).toHaveBeenCalledWith(expect.objectContaining({ id: 'nbonamy/codex-claw#12' }));
+    expect(closeAgentAction).not.toHaveBeenCalled();
+
+    clearAssignmentAction.mockClear();
+    await wrapper.get('[aria-label="Work item actions #12"]').trigger('click');
+    await wrapper.findAll('.repository-backlog__assignment-menu [role="menuitem"]')[1]!.trigger('click');
+    await wrapper.findAll('.repository-backlog__clear-dialog .claw-button')[1]!.trigger('click');
+    expect(clearAssignmentAction).not.toHaveBeenCalled();
+    expect(closeAgentAction).toHaveBeenCalledWith(otherAgent.id);
+  });
+
   it('keeps search collapsed until requested and clears it when closed', async () => {
     const wrapper = mountPanel();
 
@@ -432,6 +471,7 @@ describe('RepositoryBacklogPanel', () => {
 function mountPanel(overrides: Partial<InstanceType<typeof RepositoryBacklogPanel>['$props']> = {}) {
   const props = {
     agent,
+    agents: [agent],
     assignments: {},
     branch: 'main',
     connection: { provider: 'github', status: 'connected', accountLabel: 'nbonamy' },

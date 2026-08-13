@@ -319,6 +319,10 @@ describe('AppShell', () => {
     const actions = conversationControllerActions(wrapper);
     await actions.forkMessage?.(3);
     expect(wrapper.emitted('fork-message')).toStrictEqual([[3]]);
+    await actions.updateQueuedPrompt?.('queued-1', 'Edited queued prompt');
+    await actions.steerQueuedPrompt?.('queued-1', 'Edited steer');
+    expect(wrapper.emitted('update-queued-prompt')).toStrictEqual([['queued-1', 'Edited queued prompt']]);
+    expect(wrapper.emitted('steer-queued-prompt')).toStrictEqual([['queued-1', 'Edited steer']]);
     const openExternal = vi.spyOn(window, 'open').mockImplementation(() => null);
     await actions.updateComposerState?.({ text: 'updated', selectionStart: 7, selectionEnd: 7 });
     await actions.updateAttachments?.([{

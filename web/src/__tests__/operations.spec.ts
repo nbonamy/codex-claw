@@ -59,6 +59,8 @@ describe('Claw web operations', () => {
     await invokeClawWebOperation(backend, 'createAgentGitBranch', ['agent-1', { name: 'feature/demo', confirmed: true }]);
     await invokeClawWebOperation(backend, 'createWorkItem', [{ agentId: 'agent-1', provider: 'github', repositoryId: 'o/r', description: 'Describe it' }]);
     await invokeClawWebOperation(backend, 'createWorkItem', [{ agentId: 'agent-1', provider: 'github', repositoryId: 'o/r', description: 'Describe it' }]);
+    await invokeClawWebOperation(backend, 'updateQueuedPrompt', ['agent-1', 'queued-1', 'Edited queue']);
+    await invokeClawWebOperation(backend, 'steerQueuedPrompt', ['agent-1', 'queued-1', 'Edited steer']);
 
     expect(request.mock.calls).toStrictEqual([
       [backendMethods.sourceFoldersList, { kind: 'remote' }],
@@ -73,6 +75,8 @@ describe('Claw web operations', () => {
       [backendMethods.agentGitBranchCreate, { agentId: 'agent-1', input: { name: 'feature/demo', confirmed: true } }],
       [backendMethods.workProviderItemCreate, { input: { agentId: 'agent-1', provider: 'github', repositoryId: 'o/r', description: 'Describe it' } }],
       [backendMethods.workProviderItemCreate, { input: { agentId: 'agent-1', provider: 'github', repositoryId: 'o/r', description: 'Describe it' } }],
+      [backendMethods.agentQueuedPromptUpdate, { agentId: 'agent-1', promptId: 'queued-1', prompt: 'Edited queue' }],
+      [backendMethods.agentQueuedPromptSteer, { agentId: 'agent-1', promptId: 'queued-1', prompt: 'Edited steer' }],
     ]);
   });
 

@@ -1730,11 +1730,17 @@ describe('AppController', () => {
     const controller = new AppController(snapshot, createBackendClient({ request }));
     await controller.initialize();
 
-    await expect(steerQueuedPrompt(controller, 'agent-dina', 'prompt-1')).resolves.toBe(snapshot);
+    await expect(updateQueuedPrompt(controller, 'agent-dina', 'prompt-1', 'edited queue')).resolves.toBe(snapshot);
+    await expect(steerQueuedPrompt(controller, 'agent-dina', 'prompt-1', 'edited steer')).resolves.toBe(snapshot);
     await expect(deleteQueuedPrompt(controller, 'agent-dina', 'prompt-2')).resolves.toBe(snapshot);
 
-    expect(request).toHaveBeenNthCalledWith(1, 'agent/queuedPrompt/steer', { agentId: 'agent-dina', promptId: 'prompt-1' });
-    expect(request).toHaveBeenNthCalledWith(2, 'agent/queuedPrompt/delete', { agentId: 'agent-dina', promptId: 'prompt-2' });
+    expect(request).toHaveBeenNthCalledWith(1, 'agent/queuedPrompt/update', {
+      agentId: 'agent-dina', promptId: 'prompt-1', prompt: 'edited queue',
+    });
+    expect(request).toHaveBeenNthCalledWith(2, 'agent/queuedPrompt/steer', {
+      agentId: 'agent-dina', promptId: 'prompt-1', prompt: 'edited steer',
+    });
+    expect(request).toHaveBeenNthCalledWith(3, 'agent/queuedPrompt/delete', { agentId: 'agent-dina', promptId: 'prompt-2' });
   });
 
   it('routes interruption through clawd', async () => {
@@ -2580,10 +2586,16 @@ function registerNativeAttachment(
   }).nativeAttachmentRegistry.register(input);
 }
 
-async function steerQueuedPrompt(controller: AppController, agentId: string, promptId: string): Promise<AppSnapshot> {
+async function updateQueuedPrompt(controller: AppController, agentId: string, promptId: string, prompt: string): Promise<AppSnapshot> {
   return (controller as unknown as {
-    steerQueuedPrompt(agentId: string, promptId: string): Promise<AppSnapshot>;
-  }).steerQueuedPrompt(agentId, promptId);
+    updateQueuedPrompt(agentId: string, promptId: string, prompt: string): Promise<AppSnapshot>;
+  }).updateQueuedPrompt(agentId, promptId, prompt);
+}
+
+async function steerQueuedPrompt(controller: AppController, agentId: string, promptId: string, prompt?: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    steerQueuedPrompt(agentId: string, promptId: string, prompt?: string): Promise<AppSnapshot>;
+  }).steerQueuedPrompt(agentId, promptId, prompt);
 }
 
 async function deleteQueuedPrompt(controller: AppController, agentId: string, promptId: string): Promise<AppSnapshot> {

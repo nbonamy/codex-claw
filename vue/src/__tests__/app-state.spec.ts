@@ -2382,20 +2382,44 @@ describe('useAppState', () => {
     ]);
   });
 
-  it('steers busy drafts and queued prompts through preload', async () => {
+  it('updates and steers busy drafts and queued prompts through preload', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0].status = { type: 'working' };
     remoteSnapshot.queuedPrompts = [{ id: 'queued-1', agentId: 'agent-dina', text: 'queued but steerable', createdAt: '2026-06-05T00:00:01.000Z' }];
     const steerPrompt = vi.fn().mockResolvedValue(remoteSnapshot);
-    const steerQueuedPrompt = vi.fn().mockResolvedValue({ ...remoteSnapshot, queuedPrompts: [] });
+    const updatedSnapshot = {
+      ...remoteSnapshot,
+      queuedPrompts: [{ ...remoteSnapshot.queuedPrompts[0]!, text: 'edited queued prompt' }],
+    };
+    const updateQueuedPrompt = vi.fn().mockResolvedValue(updatedSnapshot);
+    const steeredMessage: RendererMessage = {
+      id: 'steer-turn-1-20260605t000003000z',
+      agentId: 'agent-dina',
+      kind: 'steer',
+      role: 'user',
+      status: 'complete',
+      turnId: 'turn-1',
+      createdAt: '2026-06-05T00:00:03.000Z',
+      parts: [{ type: 'text', text: 'edited steer' }],
+    };
+    const steerQueuedPrompt = vi.fn().mockResolvedValue({
+      ...remoteSnapshot,
+      messages: [steeredMessage],
+      queuedPrompts: [],
+    });
 
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         steerPrompt,
+        updateQueuedPrompt,
         steerQueuedPrompt,
         sendPrompt: vi.fn().mockResolvedValue(remoteSnapshot),
-        onEvent: vi.fn(),
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
       } satisfies Partial<CodexClawApi>,
     });
 
@@ -2412,10 +2436,29 @@ describe('useAppState', () => {
     const queuedPromptId = state.activeQueuedPrompts.value[0]?.id;
     expect(queuedPromptId).toBeTruthy();
 
-    await state.steerQueuedPrompt(queuedPromptId as string);
+    await state.updateQueuedPrompt(queuedPromptId as string, 'edited queued prompt');
+    expect(updateQueuedPrompt).toHaveBeenCalledWith('agent-dina', 'queued-1', 'edited queued prompt');
+    expect(state.activeQueuedPrompts.value).toEqual([
+      expect.objectContaining({ id: 'queued-1', text: 'edited queued prompt' }),
+    ]);
 
-    expect(steerQueuedPrompt).toHaveBeenCalledWith('agent-dina', 'queued-1');
+    await state.steerQueuedPrompt(queuedPromptId as string, 'edited steer');
+
+    expect(steerQueuedPrompt).toHaveBeenCalledWith('agent-dina', 'queued-1', 'edited steer');
     expect(state.activeQueuedPrompts.value).toStrictEqual([]);
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'message.steer',
+      payload: { prompt: 'edited steer' },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+    expect(state.visibleMessages.value.filter((message) => message.kind === 'steer')).toEqual([
+      steeredMessage,
+    ]);
   });
 
   it('interrupts the active busy agent through preload', async () => {

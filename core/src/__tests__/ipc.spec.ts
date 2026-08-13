@@ -112,6 +112,7 @@ describe('ipc channels', () => {
       sendPrompt: 'agent:send-prompt',
       steerPrompt: 'agent:steer-prompt',
       steerQueuedPrompt: 'agent:steer-queued-prompt',
+      updateQueuedPrompt: 'agent:update-queued-prompt',
       interruptAgent: 'agent:interrupt',
       deleteMessage: 'message:delete',
       deleteQueuedPrompt: 'agent:delete-queued-prompt',

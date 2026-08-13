@@ -36,6 +36,7 @@ export const backendMethods = {
   agentPromptSteer: 'agent/prompt/steer',
   agentQueuedPromptDelete: 'agent/queuedPrompt/delete',
   agentQueuedPromptSteer: 'agent/queuedPrompt/steer',
+  agentQueuedPromptUpdate: 'agent/queuedPrompt/update',
   agentReorder: 'agent/reorder',
   agentRestart: 'agent/restart',
   agentSelect: 'agent/select',

@@ -584,6 +584,30 @@ describe('snapshot reducer', () => {
     ]);
   });
 
+  it('applies a repeated steer event idempotently after a response snapshot already contains it', () => {
+    const snapshot = createInitialSnapshot();
+    const event = {
+      seq: 3,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'message.steer' as const,
+      payload: { prompt: 'edited queued prompt' },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    };
+
+    applyMainEventToSnapshot(snapshot, event);
+    applyMainEventToSnapshot(snapshot, event);
+
+    expect(snapshot.messages.filter((message) => message.kind === 'steer')).toEqual([
+      expect.objectContaining({
+        id: 'steer-turn-1-20260605t000003000z',
+        parts: [{ type: 'text', text: 'edited queued prompt' }],
+      }),
+    ]);
+    expect(snapshot.messages.filter((message) => message.role === 'assistant')).toHaveLength(1);
+  });
+
   it('records thread starts and backend runtime status updates', () => {
     const snapshot = createInitialSnapshot();
 

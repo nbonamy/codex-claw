@@ -372,6 +372,10 @@ export function closeAgentInSnapshot(snapshot: AppSnapshot, agentId: string): Ag
 
   snapshot.agents = snapshot.agents.filter((candidate) => candidate.id !== agentId);
   snapshot.messages = snapshot.messages.filter((message) => message.agentId !== agentId);
+  snapshot.workBacklog.assignments = Object.fromEntries(
+    Object.entries(snapshot.workBacklog.assignments)
+      .filter(([, assignment]) => assignment.agentId !== agentId),
+  );
 
   for (const team of snapshot.teams) {
     team.agentIds = team.agentIds.filter((candidate) => candidate !== agentId);

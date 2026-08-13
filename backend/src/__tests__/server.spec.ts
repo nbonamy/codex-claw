@@ -5342,6 +5342,83 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
+  it('updates queued prompt text in place and steers edited text atomically', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina', teamId: 'team-test', name: 'Dina', folder: '/workspace/dina', backend: 'codex',
+      backendSession: { kind: 'codex', threadId: 'thread-dina' }, status: { type: 'working' },
+      createdAt: '2026-06-13T00:00:00.000Z', updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    snapshot.queuedPrompts = [
+      { id: 'queued-1', agentId: 'agent-dina', text: 'first', createdAt: '2026-06-13T00:00:01.000Z' },
+      {
+        id: 'queued-2',
+        agentId: 'agent-dina',
+        text: 'second',
+        createdAt: '2026-06-13T00:00:02.000Z',
+        options: { attachments: [{ type: 'file', path: '/tmp/queue.txt', name: 'queue.txt' }] },
+      },
+    ];
+    const steerPrompt = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex' as const, threadId: 'thread-dina' },
+      turnId: 'turn-steered',
+    });
+    const events: Array<{ type: string; payload: unknown }> = [];
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: vi.fn(),
+      steerPrompt,
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-dina' } }),
+      respondToRequest: async () => undefined,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version', pid: 123, snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      onEvent: (event) => events.push(event),
+    });
+
+    await server.handleMessage({
+      jsonrpc: '2.0', id: 'update', method: 'agent/queuedPrompt/update',
+      params: { agentId: 'agent-dina', promptId: 'queued-2', prompt: 'edited second' },
+    });
+
+    expect(snapshot.queuedPrompts).toStrictEqual([
+      expect.objectContaining({ id: 'queued-1', text: 'first' }),
+      expect.objectContaining({
+        id: 'queued-2',
+        text: 'edited second',
+        options: { attachments: [{ type: 'file', path: '/tmp/queue.txt', name: 'queue.txt' }] },
+      }),
+    ]);
+
+    await server.handleMessage({
+      jsonrpc: '2.0', id: 'steer', method: 'agent/queuedPrompt/steer',
+      params: { agentId: 'agent-dina', promptId: 'queued-2', prompt: 'edited steer' },
+    });
+
+    expect(steerPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-dina' }),
+      'edited steer',
+      { attachments: [{ type: 'file', path: '/tmp/queue.txt', name: 'queue.txt' }] },
+    );
+    expect(snapshot.queuedPrompts).toEqual([
+      expect.objectContaining({ id: 'queued-1', text: 'first' }),
+    ]);
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'message.steer',
+      payload: {
+        prompt: 'edited steer',
+        attachments: [{ type: 'file', path: '/tmp/queue.txt', name: 'queue.txt' }],
+      },
+    }));
+    await server.close();
+  });
+
   it('retries failed queue drains without losing the item or duplicating its user message', async () => {
     vi.useFakeTimers();
     const snapshot = createTestSnapshot();

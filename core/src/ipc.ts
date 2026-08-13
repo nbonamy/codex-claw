@@ -109,6 +109,7 @@ export const ipcChannels = {
   steerPrompt: 'agent:steer-prompt',
   deleteQueuedPrompt: 'agent:delete-queued-prompt',
   steerQueuedPrompt: 'agent:steer-queued-prompt',
+  updateQueuedPrompt: 'agent:update-queued-prompt',
   interruptAgent: 'agent:interrupt',
   deleteMessage: 'message:delete',
   editMessage: 'message:edit',

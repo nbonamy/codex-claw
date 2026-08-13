@@ -515,6 +515,7 @@ describe('agent-manager', () => {
     const snapshot = createInitialSnapshot();
     appendUserPrompt(snapshot, 'agent-dina', 'old prompt');
     appendUserPrompt(snapshot, 'agent-jesse', 'keep prompt');
+    assignWorkItemToAgentInSnapshot(snapshot, 'agent-dina', workItem(12, 'Fix cockpit drag target'));
 
     expect(closeAgentInSnapshot(snapshot, 'agent-dina')).toMatchObject({ id: 'agent-dina' });
 
@@ -522,6 +523,7 @@ describe('agent-manager', () => {
     expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-jesse']);
     expect(snapshot.activeAgentId).toBe('agent-jesse');
     expect(snapshot.messages.map((message) => message.agentId)).toStrictEqual(['agent-jesse']);
+    expect(snapshot.workBacklog.assignments).toStrictEqual({});
   });
 
   it('closes the last active team agent without selecting another team agent', () => {

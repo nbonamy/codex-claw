@@ -276,6 +276,7 @@
             :work-assignments="snapshot.workBacklog.assignments"
             :prefill-repository-work="(item) => prefillRepositoryWork(agent.id, item)"
             :clear-repository-work-assignment="(item) => $emit('remove-work-item-assignment', item)"
+            :close-repository-work-agent="(agentId) => $emit('close-agent', agentId)"
             :start-repository-work="(input) => startRepositoryWork(agent.id, input)"
             :show-repository-work-agent="selectAgentFromShell"
             :create-repository-issue="(description) => createRepositoryIssue(agent.id, description)"
@@ -705,7 +706,8 @@ const emit = defineEmits<{
   'select-approval-preset': [preset: ApprovalPreset];
   'select-permission-mode': [mode: string];
   'select-team': [teamId: string];
-  'steer-queued-prompt': [promptId: string];
+  'steer-queued-prompt': [promptId: string, prompt?: string];
+  'update-queued-prompt': [promptId: string, prompt: string];
   'update:planMode': [enabled: boolean];
   'update:composerState': [payload: { agentId: string; state: CodexComposerState }];
   'update:composerAttachments': [payload: { agentId: string; attachments: readonly CodexNativeAttachment[] }];
@@ -1046,7 +1048,8 @@ const conversationPaneActions: CodexConversationPaneActions = {
   resolveApproval: forwardApprovalResolution,
   retryMessage: (index) => emit('retry-message', index),
   steer: forwardCodexSteerPrompt,
-  steerQueuedPrompt: (promptId) => emit('steer-queued-prompt', promptId),
+  steerQueuedPrompt: (promptId, prompt) => emit('steer-queued-prompt', promptId, prompt),
+  updateQueuedPrompt: (promptId, prompt) => emit('update-queued-prompt', promptId, prompt),
   submit: forwardCodexPrompt,
   updateAttachments: updateConversationAttachments,
   updateComposerState: updateConversationComposerState,

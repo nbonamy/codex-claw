@@ -227,6 +227,12 @@ export function appendSteerPrompt(
   createdAt = new Date().toISOString(),
   attachments: readonly PromptAttachment[] = [],
 ): RendererMessage {
+  const message = createUserMessage(agentId, prompt, createdAt, `steer-${turnId}`, turnId, attachments);
+  const existing = snapshot.messages.find((candidate) => (
+    candidate.agentId === agentId && candidate.id === message.id
+  ));
+  if (existing) return existing;
+
   const activeAssistantMessage = findAssistantMessage(snapshot, agentId, turnId);
   if (activeAssistantMessage?.parts.length === 0 && activeAssistantMessage.id.startsWith(`${assistantMessageId(turnId)}-segment-`)) {
     snapshot.messages = snapshot.messages.filter((message) => message.id !== activeAssistantMessage.id);
@@ -234,7 +240,6 @@ export function appendSteerPrompt(
     activeAssistantMessage.status = 'complete';
   }
 
-  const message = createUserMessage(agentId, prompt, createdAt, `steer-${turnId}`, turnId, attachments);
   snapshot.messages.push(message);
   ensureAssistantMessage(snapshot, agentId, turnId, assistantSegmentMessageId(turnId, createdAt), createdAt);
   pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);

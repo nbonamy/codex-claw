@@ -445,12 +445,20 @@ export function useAppState() {
     }
   }
 
-  async function steerQueuedPrompt(promptId: string): Promise<void> {
+  async function updateQueuedPrompt(promptId: string, prompt: string): Promise<void> {
+    const agentId = activeAgent.value?.id;
+    if (!agentId || !codexClawApi?.updateQueuedPrompt) {
+      return;
+    }
+    adoptBackgroundSnapshot(await codexClawApi.updateQueuedPrompt(agentId, promptId, prompt));
+  }
+
+  async function steerQueuedPrompt(promptId: string, prompt?: string): Promise<void> {
     const agentId = activeAgent.value?.id;
     if (!agentId || !codexClawApi?.steerQueuedPrompt) {
       return;
     }
-    adoptBackgroundSnapshot(await codexClawApi.steerQueuedPrompt(agentId, promptId));
+    adoptBackgroundSnapshot(await codexClawApi.steerQueuedPrompt(agentId, promptId, prompt));
   }
 
   async function removeQueuedPrompt(promptId: string): Promise<void> {
@@ -1789,6 +1797,7 @@ export function useAppState() {
     editMessage,
     retryMessage,
     steerQueuedPrompt,
+    updateQueuedPrompt,
     removeQueuedPrompt,
     quit,
     restartApp,

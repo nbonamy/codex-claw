@@ -1573,7 +1573,8 @@ export type CodexClawApi = {
   sendPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): Promise<AppSnapshotMetadata>;
   steerPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): Promise<AppSnapshotMetadata>;
   deleteQueuedPrompt(agentId: string, promptId: string): Promise<AppSnapshot>;
-  steerQueuedPrompt(agentId: string, promptId: string): Promise<AppSnapshot>;
+  steerQueuedPrompt(agentId: string, promptId: string, prompt?: string): Promise<AppSnapshot>;
+  updateQueuedPrompt(agentId: string, promptId: string, prompt: string): Promise<AppSnapshot>;
   interruptAgent(agentId: string): Promise<AppSnapshot>;
   deleteMessage(agentId: string, messageId: string): Promise<AppSnapshot>;
   editMessage(agentId: string, messageId: string, prompt: string): Promise<AppSnapshot>;
