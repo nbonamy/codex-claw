@@ -25,6 +25,7 @@ describe('ipc channels', () => {
       disconnectWorkProvider: 'work-provider:disconnect',
       listWorkRepositories: 'work-provider:repositories:list',
       configureWorkBacklog: 'work-provider:backlog:configure',
+      listAssignedWorkItems: 'work-provider:assigned-items:list',
       listWorkItems: 'work-provider:items:list',
       createWorkItem: 'work-provider:item:create',
       listBackendModels: 'backend:models:list',

@@ -39,6 +39,7 @@
     :work-provider-authorization="workProviderAuthorization"
     :work-repositories-by-provider="workRepositoriesByProvider"
     :work-items-by-repository="workItemsByRepository"
+    :assigned-work-items-by-provider="assignedWorkItemsByProvider"
     :work-backlog-status="workBacklogStatus"
     :work-backlog-error="workBacklogError"
     :remote-bench-by-connection-id="remoteBenchByConnectionId"
@@ -108,6 +109,7 @@
     :configure-work-backlog="configureWorkBacklog"
     :load-work-repositories="loadWorkRepositories"
     :load-work-items="loadWorkItems"
+    :load-assigned-work-items="loadAssignedWorkItems"
     :create-work-item="createWorkItem"
     :duplicate-agent-action="duplicateAgent"
     :assign-work-item-action="assignWorkItemToAgent"
@@ -231,6 +233,7 @@ const {
   workProviderAuthorization,
   workRepositoriesByProvider,
   workItemsByRepository,
+  assignedWorkItemsByProvider,
   workBacklogStatus,
   workBacklogError,
   remoteBenchByConnectionId,
@@ -316,6 +319,7 @@ const {
   configureWorkBacklog,
   loadWorkRepositories,
   loadWorkItems,
+  loadAssignedWorkItems,
   createWorkItem,
   assignWorkItemToAgent,
   removeWorkItemAssignment,

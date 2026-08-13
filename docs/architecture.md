@@ -937,8 +937,20 @@ Implemented product surfaces:
   `clawd` calls the state-neutral `codex-app-sdk` remote-control facade, converts
   app-server timestamps and client records, and Electron exposes only explicit
   typed IPC methods to the renderer.
-- Cockpit can show connected repository issues and assign them to agents by
-  drag and drop.
+- Cockpit is a backlog-first operator inbox across connected repositories. It
+  groups work by attention, review, progress, and ready states; filters the
+  queue through All, Backlog, WIP, and Focus views; and opens or assigns work
+  without making agent navigation the primary organizing model. Its local
+  navigation keeps Backlog and the original team-grouped Agents view together,
+  then lists repositories by recent activity so one click scopes the backlog
+  and a compact adjacent action opens agent creation preselected to that repo.
+  Unscoped All and Backlog views do not eagerly enumerate every repository:
+  they guide the user toward a repository, offer a bounded provider-level
+  "assigned to me" query, and require explicit confirmation before loading
+  every visible repository. Confirming the global scope persists that choice,
+  so later Cockpit visits load all repositories automatically. Global loading
+  preserves successful repository results when individual repositories fail
+  and reports the failed subset without discarding useful work.
 - Claw's backend-owned local MCP server supports agent registration, status, listing,
   direct messages, broadcast, and inbox checks.
 

@@ -190,6 +190,10 @@ export class AppController {
       return this.configureWorkBacklog(input, location);
     });
 
+    ipc.handle(ipcChannels.listAssignedWorkItems, async (_event, provider: WorkProviderKind, location?: LoopLocation) => {
+      return this.listAssignedWorkItems(provider, location);
+    });
+
     ipc.handle(ipcChannels.listWorkItems, async (_event, provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery) => {
       return this.listWorkItems(provider, repositoryId, location, query);
     });
@@ -689,6 +693,13 @@ export class AppController {
       repositoryId,
       ...(location ? { location } : {}),
       ...(query ? { query } : {}),
+    });
+  }
+
+  private async listAssignedWorkItems(provider: WorkProviderKind, location?: LoopLocation): Promise<WorkItem[]> {
+    return this.requireBackendClient().request(backendMethods.workProviderAssignedItemsList, {
+      provider,
+      ...(location ? { location } : {}),
     });
   }
 

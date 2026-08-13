@@ -1255,7 +1255,7 @@ describe('useAppState', () => {
     expect(state.workRepositoriesByProvider.value.github).toStrictEqual([]);
     expect(state.workBacklogError.value).toBe('repos failed');
 
-    await state.loadWorkItems('github', 'nbonamy/codex-claw');
+    await expect(state.loadWorkItems('github', 'nbonamy/codex-claw')).resolves.toBeUndefined();
     expect(state.workBacklogError.value).toBe('items failed');
   });
 
@@ -1282,7 +1282,7 @@ describe('useAppState', () => {
     await state.loadWorkRepositories('github');
     expect(state.workBacklogError.value).toBe('repo object failed');
 
-    await state.loadWorkItems('github', 'nbonamy/codex-claw');
+    await expect(state.loadWorkItems('github', 'nbonamy/codex-claw')).resolves.toBeUndefined();
     expect(state.workBacklogError.value).toBe('item object failed');
   });
 

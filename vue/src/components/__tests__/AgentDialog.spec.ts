@@ -337,6 +337,30 @@ describe('AgentDialog', () => {
     });
   });
 
+  it('prefers an explicitly requested repository for quick agent creation', async () => {
+    const repositories: SourceRepository[] = [
+      {
+        name: 'codex-claw',
+        path: '/Users/nbonamy/src/codex-claw',
+        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/codex-claw' }],
+      },
+      {
+        name: 'mediastation',
+        path: '/Users/nbonamy/src/mediastation',
+        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/mediastation' }],
+      },
+    ];
+    const wrapper = mountDialog({
+      initialSourceRepositoryName: 'mediastation',
+      sourceRecentRepoNames: ['codex-claw'],
+      sourceRepositories: repositories,
+    });
+    await flushPromises();
+
+    expect(wrapper.findAllComponents({ name: 'ElSelect' })[0]?.props('modelValue')).toBe('/Users/nbonamy/src/mediastation');
+    expect(wrapper.get<HTMLInputElement>('[aria-label="Agent name"]').element.value).toBe('mediastation');
+  });
+
   it('keeps the selected repository when streaming snapshots replace team state', async () => {
     const teams: Team[] = [{
       id: 'team-codex-claw',
@@ -541,6 +565,7 @@ function mountDialog(overrides: Partial<{
   listSourceRepositories: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
   listSourceWorktrees: (repoPath: string, remoteConnectionId?: string) => Promise<SourceWorktree[]>;
   initialNewTeamName: string;
+  initialSourceRepositoryName: string | null;
   initialTeamId: string | null;
   mode: 'create' | 'edit';
   remoteConnectionId: string;

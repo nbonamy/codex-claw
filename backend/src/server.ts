@@ -1526,6 +1526,15 @@ export class ClawBackendServer {
             : this.requireWorkIntegrations().listItems(requireWorkProvider(params), requireString(params.repositoryId, 'repositoryId')),
         );
       }
+      case backendMethods.workProviderAssignedItemsList: {
+        return this.respondInLocation(
+          message.id,
+          this.loopLocationFromParams(message.params),
+          backendMethods.workProviderAssignedItemsList,
+          { provider: requireWorkProvider(message.params) },
+          () => this.requireWorkIntegrations().listAssignedItems(requireWorkProvider(message.params)),
+        );
+      }
       case backendMethods.workProviderItemCreate: {
         const params = requireRecord(message.params);
         const input = requireRecord(params.input);

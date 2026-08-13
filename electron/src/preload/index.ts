@@ -26,6 +26,7 @@ const api: CodexClawApi = {
   disconnectWorkProvider: (provider: WorkProviderKind) => ipc.invoke(ipcChannels.disconnectWorkProvider, provider),
   listWorkRepositories: (provider: WorkProviderKind, location?: LoopLocation) => ipc.invoke(ipcChannels.listWorkRepositories, provider, location),
   configureWorkBacklog: (input: WorkBacklogConfigurationInput, location?: LoopLocation) => ipc.invoke(ipcChannels.configureWorkBacklog, input, location),
+  listAssignedWorkItems: (provider: WorkProviderKind, location?: LoopLocation) => ipc.invoke(ipcChannels.listAssignedWorkItems, provider, location),
   listWorkItems: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: WorkItemQuery) => ipc.invoke(ipcChannels.listWorkItems, provider, repositoryId, location, query),
   createWorkItem: (input: CreateWorkItemInput) => ipc.invoke(ipcChannels.createWorkItem, input),
   listBackendModels: (agentId: string) => ipc.invoke(ipcChannels.listBackendModels, agentId),

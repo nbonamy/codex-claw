@@ -287,6 +287,13 @@ export class WorkIntegrationManager {
       : this.driver(provider).listItems(token, repositoryId);
   }
 
+  async listAssignedItems(provider: WorkProviderKind): Promise<WorkItem[]> {
+    const token = await this.connectedToken(provider);
+    const driver = this.driver(provider);
+    if (!driver.listAssignedItems) throw new Error(`${providerLabel(provider)} cannot list assigned work across repositories.`);
+    return driver.listAssignedItems(token);
+  }
+
   private async connectedToken(provider: WorkProviderKind): Promise<WorkProviderToken> {
     const token = await this.options.tokenStore.get(provider);
     if (!token) {

@@ -288,6 +288,7 @@ const props = withDefaults(defineProps<{
   createAgent: (input: AgentDialogCreateInput) => Promise<Agent | null | void>;
   createSourceWorktree?: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   initialNewTeamName?: string;
+  initialSourceRepositoryName?: string | null;
   initialTeamId?: string | null;
   mode: 'create' | 'edit';
   remoteConnectionId?: string;
@@ -301,6 +302,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   claudeCodeEnabled: false,
   initialNewTeamName: '',
+  initialSourceRepositoryName: null,
   initialTeamId: null,
   remoteConnectionId: '',
   showTeamField: false,
@@ -392,6 +394,7 @@ watch([
   () => props.mode,
   () => props.agent?.id,
   () => props.initialNewTeamName,
+  () => props.initialSourceRepositoryName,
   () => props.initialTeamId,
   () => props.teams.length,
 ], () => {
@@ -699,6 +702,11 @@ function resetForm(): void {
 }
 
 function preferredSourceRepositoryPath(): string {
+  const requestedRepository = props.initialSourceRepositoryName?.trim();
+  if (requestedRepository) {
+    const requested = sourceRepositories.value.find((repository) => repository.name === requestedRepository);
+    if (requested) return requested.path;
+  }
   const recent = props.sourceRecentRepoNames ?? [];
   const recentRepository = sourceRepositories.value.find((repository) => recent.includes(repository.name));
   return recentRepository?.path ?? sourceRepositories.value[0]?.path ?? '';

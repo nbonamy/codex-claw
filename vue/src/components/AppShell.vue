@@ -164,6 +164,7 @@
         :teams="snapshot.teams"
         :work-backlog="cockpitWorkBacklog"
         @add-agent="openNewAgent"
+        @add-agent-for-repository="openNewAgentForRepository"
         @assign-work-item-to-bench-agent="openBenchAgentAssignmentDialog"
         @assign-work-item-to-new-agent="openNewAgentForWorkItem"
         @assign-work-item="assignExistingAgentWorkItem"
@@ -173,10 +174,12 @@
         @fork-agent="$emit('fork-agent', $event)"
         @edit-agent="openEditAgent"
         @move-agent-to-team="$emit('move-agent-to-team', $event)"
+        @open-settings="openSettings"
         @prompt-agent="$emit('send-agent-prompt', $event)"
         @remove-bench-template="$emit('remove-bench-template', $event)"
         @remove-work-item-assignment="$emit('remove-work-item-assignment', $event)"
         @refresh-work-items="refreshWorkItems"
+        @select-global-scope="selectGlobalBacklogScope"
         @restart-agent="$emit('restart-agent', $event)"
         @save-agent-to-bench="$emit('save-agent-to-bench', $event)"
         @select-work-tag="selectWorkTagForCockpit"
@@ -317,6 +320,7 @@
       :list-source-worktrees="listSourceWorktrees"
       :suggest-source-worktree-path="suggestSourceWorktreePath"
       :initial-new-team-name="pendingNewAgentTeamName"
+      :initial-source-repository-name="agentDialogSourceRepositoryName"
       :initial-team-id="agentDialogTeamId"
       :remote-connection-id="agentDialogRemoteConnectionId"
       :source-folder-path="snapshot.sourceFolder.path"
@@ -489,6 +493,7 @@ const props = withDefaults(defineProps<{
   workProviderAuthorization?: WorkProviderAuthorization | null;
   workRepositoriesByProvider?: Partial<Record<WorkProviderKind, WorkRepository[]>>;
   workItemsByRepository?: Record<string, WorkItem[]>;
+  assignedWorkItemsByProvider?: Partial<Record<WorkProviderKind, WorkItem[]>>;
   workBacklogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   workBacklogError?: string | null;
   remoteBenchByConnectionId?: Record<string, BenchTemplate[]>;
@@ -559,6 +564,7 @@ const props = withDefaults(defineProps<{
   loadBench?: (location?: BenchLocation) => Promise<BenchTemplate[] | void>;
   loadWorkRepositories?: (provider: WorkProviderKind, location?: LoopLocation) => Promise<WorkRepository[] | void>;
   loadWorkItems?: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: WorkItemQuery) => Promise<WorkItem[] | void>;
+  loadAssignedWorkItems?: (provider: WorkProviderKind, location?: LoopLocation) => Promise<WorkItem[] | void>;
   createWorkItem?: (input: import('@codex-claw/core/contracts').CreateWorkItemInput) => Promise<WorkItem>;
   duplicateAgentAction?: (agentId: string, options?: import('@codex-claw/core/contracts').DuplicateAgentOptions) => Promise<Agent | null>;
   assignWorkItemAction?: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
@@ -592,6 +598,7 @@ const props = withDefaults(defineProps<{
   workProviderAuthorization: null,
   workRepositoriesByProvider: () => ({}),
   workItemsByRepository: () => ({}),
+  assignedWorkItemsByProvider: () => ({}),
   workBacklogStatus: 'notLoaded',
   workBacklogError: null,
   remoteBenchByConnectionId: () => ({}),
@@ -667,6 +674,7 @@ const props = withDefaults(defineProps<{
   loadBench: async () => undefined,
   loadWorkRepositories: async () => undefined,
   loadWorkItems: async () => undefined,
+  loadAssignedWorkItems: async () => undefined,
   createWorkItem: async () => { throw new Error('Issue creation is not available.'); },
   duplicateAgentAction: async () => null,
   assignWorkItemAction: async () => undefined,
@@ -791,10 +799,13 @@ const agentDialogVisible = ref(false);
 const agentDialogMode = ref<'create' | 'edit'>('create');
 const editingAgentId = ref<string | null>(null);
 const agentDialogTeamId = ref<string | null>(null);
+const agentDialogSourceRepositoryName = ref<string | null>(null);
 const pendingNewAgentWorkItem = ref<WorkItem | null>(null);
 const pendingBenchAgentWorkItem = ref<WorkItem | null>(null);
 const pendingBenchAgentTeamId = ref<string | null>(null);
 const pendingCockpitBacklogConfiguration = ref<CockpitBacklogConfiguration | null>(null);
+const cockpitGlobalScope = ref<'assignedToMe' | 'all' | null>(null);
+const cockpitGlobalScopeStorageKey = 'cockpitGlobalScope:github';
 const benchAssignmentDialogVisible = ref(false);
 const teamDialogVisible = ref(false);
 const teamDialogMode = ref<'create' | 'edit'>('create');
@@ -808,6 +819,7 @@ let filePreviewRequestId = 0;
 let markdownPreviewId = 0;
 let unsubscribeAppCommand: (() => void) | null = null;
 let quickAgentShortcutTimer: ReturnType<typeof setTimeout> | null = null;
+let cockpitInitialized = false;
 let commandKeyHeld = false;
 const quickAgentShortcutDelayMs = 350;
 const activeTeam = computed<Team | null>(() => {
@@ -1149,16 +1161,26 @@ const cockpitWorkBacklog = computed(() => {
   const provider = connection.provider;
   const repositories = props.workRepositoriesByProvider[provider] ?? [];
   const configuration = effectiveCockpitBacklogConfiguration.value;
-  const selectedRepositoryId = configuration.repositoryId ?? repositories[0]?.id ?? null;
+  const selectedRepositoryId = configuration.repositoryId ?? null;
+  const items = selectedRepositoryId
+    ? props.workItemsByRepository[workItemsKey(provider, selectedRepositoryId)] ?? []
+    : cockpitGlobalScope.value === 'assignedToMe'
+      ? props.assignedWorkItemsByProvider[provider] ?? []
+      : cockpitGlobalScope.value === 'all'
+        ? repositories.flatMap((repository) => props.workItemsByRepository[workItemsKey(provider, repository.id)] ?? [])
+        : [];
 
   return {
     assignments: props.snapshot.workBacklog.assignments,
     connection,
+    globalScope: cockpitGlobalScope.value,
     repositories,
-    selectedAssigneeLogin: configuration.assigneeLogin ?? null,
+    selectedAssigneeLogin: cockpitGlobalScope.value === 'assignedToMe'
+      ? connection.accountLabel ?? configuration.assigneeLogin ?? null
+      : configuration.assigneeLogin ?? null,
     selectedRepositoryId,
     selectedTagName: configuration.tagName ?? null,
-    items: selectedRepositoryId ? props.workItemsByRepository[workItemsKey(provider, selectedRepositoryId)] ?? [] : [],
+    items,
     status: props.workBacklogStatus,
     error: props.workBacklogError,
   };
@@ -1669,11 +1691,16 @@ function startRightWorkspaceResize(event: PointerEvent): void {
   window.addEventListener('pointerup', stop, { once: true });
 }
 
-function openNewAgent(teamId?: string): void {
+function openNewAgent(teamId?: string, sourceRepositoryName: string | null = null): void {
   agentDialogMode.value = 'create';
   editingAgentId.value = null;
   agentDialogTeamId.value = teamId ?? activeTeam.value?.id ?? null;
+  agentDialogSourceRepositoryName.value = sourceRepositoryName;
   agentDialogVisible.value = true;
+}
+
+function openNewAgentForRepository(repository: WorkRepository): void {
+  openNewAgent(activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined, repository.name);
 }
 
 async function openNewAgentForWorkItem(intent: WorkItemAssignmentIntent): Promise<void> {
@@ -1759,6 +1786,7 @@ function openEditAgent(agentId: string): void {
   agentDialogMode.value = 'edit';
   editingAgentId.value = agentId;
   agentDialogTeamId.value = null;
+  agentDialogSourceRepositoryName.value = null;
   agentDialogVisible.value = true;
 }
 
@@ -1766,6 +1794,7 @@ function closeAgentDialog(): void {
   agentDialogVisible.value = false;
   editingAgentId.value = null;
   agentDialogTeamId.value = null;
+  agentDialogSourceRepositoryName.value = null;
   pendingNewAgentWorkItem.value = null;
 }
 
@@ -1823,8 +1852,26 @@ async function resolveSelectedTeam(teamId: string | null | undefined, newTeamNam
   return teamId?.trim() || props.snapshot.activeTeamId;
 }
 
-function openCockpit(): void {
+async function openCockpit(): Promise<void> {
+  if (cockpitVisible.value && cockpitInitialized) return;
   activeSurface.value = 'cockpit';
+  cockpitInitialized = true;
+  cockpitGlobalScope.value = null;
+  const crossRepositoryConfiguration = normalizedCockpitBacklogConfiguration({
+    repositoryId: null,
+    assigneeLogin: null,
+    tagName: null,
+  });
+  let repositories = props.workRepositoriesByProvider.github ?? [];
+  if (repositories.length === 0) {
+    repositories = await props.loadWorkRepositories('github') ?? [];
+    await nextTick();
+  }
+  pendingCockpitBacklogConfiguration.value = crossRepositoryConfiguration;
+  if (rememberedCockpitGlobalScope() === 'all') {
+    cockpitGlobalScope.value = 'all';
+    await loadAllWorkRepositories(repositories);
+  }
 }
 
 function openLoops(): void {
@@ -2830,6 +2877,7 @@ async function disconnectWorkProvider(provider: WorkProviderKind): Promise<void>
 }
 
 async function selectWorkRepositoryForCockpit(repositoryId: string | null): Promise<void> {
+  cockpitGlobalScope.value = null;
   await configureCockpitWorkBacklog({
     repositoryId,
     assigneeLogin: null,
@@ -2841,6 +2889,9 @@ async function selectWorkRepositoryForCockpit(repositoryId: string | null): Prom
 }
 
 async function selectWorkAssigneeForCockpit(assigneeLogin: string | null): Promise<void> {
+  if (cockpitGlobalScope.value === 'assignedToMe' && !assigneeLogin) {
+    cockpitGlobalScope.value = null;
+  }
   const repositoryId = cockpitWorkBacklog.value?.selectedRepositoryId ?? null;
   await configureCockpitWorkBacklog({
     repositoryId,
@@ -2896,8 +2947,77 @@ function normalizedOptionalString(value: string | null | undefined): string | nu
 async function refreshWorkItems(repositoryId: string | null): Promise<void> {
   if (repositoryId) {
     await props.loadWorkItems('github', repositoryId);
+  } else if (cockpitGlobalScope.value === 'assignedToMe') {
+    await props.loadAssignedWorkItems('github');
+  } else if (cockpitGlobalScope.value === 'all') {
+    await loadAllWorkRepositories(props.workRepositoriesByProvider.github ?? []);
+  }
+}
+
+async function selectGlobalBacklogScope(scope: 'assignedToMe' | 'all'): Promise<void> {
+  if (scope === 'all') {
+    try {
+      await ElMessageBox.confirm(
+        'This loads open issues and pull requests from every visible repository. It can take a while and use a significant amount of your GitHub quota.',
+        'Load every repository?',
+        { confirmButtonText: 'Load everything', cancelButtonText: 'Cancel', type: 'warning' },
+      );
+    } catch {
+      return;
+    }
+  }
+  cockpitGlobalScope.value = scope;
+  if (scope === 'assignedToMe') {
+    try {
+      await props.loadAssignedWorkItems('github');
+    } catch (error) {
+      cockpitGlobalScope.value = null;
+      ElMessage.error(error instanceof Error ? error.message : String(error));
+    }
   } else {
-    await props.loadWorkRepositories('github');
+    rememberCockpitGlobalScope('all');
+    await loadAllWorkRepositories(props.workRepositoriesByProvider.github ?? []);
+  }
+}
+
+async function loadAllWorkRepositories(repositories: WorkRepository[]): Promise<void> {
+  const failed: WorkRepository[] = [];
+  let loaded = 0;
+  for (const repository of repositories) {
+    try {
+      const items = await props.loadWorkItems('github', repository.id);
+      if (items === undefined) failed.push(repository);
+      else loaded += 1;
+    } catch {
+      failed.push(repository);
+    }
+  }
+  if (failed.length === 0) return;
+
+  const names = failed.slice(0, 3).map((repository) => repository.name).join(', ');
+  const overflow = failed.length > 3 ? ` and ${failed.length - 3} more` : '';
+  const message = `Loaded ${loaded} of ${repositories.length} repositories. Could not load: ${names}${overflow}.`;
+  if (loaded === 0) {
+    cockpitGlobalScope.value = null;
+    ElMessage.error(message);
+  } else {
+    ElMessage.warning(message);
+  }
+}
+
+function rememberedCockpitGlobalScope(): 'all' | null {
+  try {
+    return window.localStorage.getItem(cockpitGlobalScopeStorageKey) === 'all' ? 'all' : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberCockpitGlobalScope(scope: 'all'): void {
+  try {
+    window.localStorage.setItem(cockpitGlobalScopeStorageKey, scope);
+  } catch {
+    // Persistence can be unavailable in hardened renderer contexts.
   }
 }
 

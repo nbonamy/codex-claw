@@ -1,5 +1,5 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
-import ElementPlus, { ElMessageBox } from 'element-plus';
+import ElementPlus, { ElMessage, ElMessageBox } from 'element-plus';
 import type {
   CodexConversationPaneActions,
   CodexConversationPaneController,
@@ -34,6 +34,7 @@ function pointerEvent(type: string, clientX: number): PointerEvent {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  window.localStorage.removeItem('cockpitGlobalScope:github');
   delete window.codexClaw;
   delete (window as Window & { codexAppSdkNative?: CodexNativeRendererApi }).codexAppSdkNative;
 });
@@ -2165,11 +2166,11 @@ describe('AppShell', () => {
     expect(wrapper.get('[aria-label="Cockpit"]').attributes('aria-pressed')).toBe('true');
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('false');
 
-    await wrapper.findAll('.cockpit-view__agent-card')[1].trigger('click');
+    await wrapper.get('[aria-label="Codex Claw"]').trigger('click');
 
     expect(wrapper.find('.cockpit-view').exists()).toBe(false);
     expect(wrapper.emitted('select-team')).toStrictEqual([['team-codex-claw']]);
-    expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-jesse']]);
+    expect(wrapper.emitted('select-agent')).toBeUndefined();
   });
 
   it('opens loops from the rail without keeping a team active', async () => {
@@ -2255,65 +2256,6 @@ describe('AppShell', () => {
     expect(wrapper.text()).toContain('Loop work is ready.');
   });
 
-  it('forwards cockpit agent context menu actions', async () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
-    const wrapper = mountShell({ snapshot });
-
-    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
-    await wrapper.get('.cockpit-view__agent-card').trigger('contextmenu', {
-      clientX: 20,
-      clientY: 40,
-    });
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Duplicate Agent')?.trigger('click');
-
-    expect(wrapper.emitted('duplicate-agent')).toStrictEqual([['agent-dina']]);
-
-    await wrapper.get('.cockpit-view__agent-card').trigger('contextmenu');
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Fork Agent')?.trigger('click');
-
-    expect(wrapper.emitted('fork-agent')).toStrictEqual([['agent-dina']]);
-  });
-
-  it('forwards cockpit prompts for the targeted agent', async () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.agents[1].status = { type: 'idle' };
-    const wrapper = mountShell({ snapshot });
-
-    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
-    await wrapper.get('[aria-label="Prompt Jesse"]').setValue('  check the tests  ');
-    await wrapper.findAll('.cockpit-view__prompt')[1].trigger('submit');
-
-    expect(wrapper.emitted('send-agent-prompt')).toStrictEqual([[{
-      agentId: 'agent-jesse',
-      prompt: 'check the tests',
-    }]]);
-  });
-
-  it('forwards cockpit Bench deploys with the target team', async () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.bench.push({
-      id: 'bench-dina',
-      name: 'Dina',
-      avatar: 'DI',
-      folder: '~/src/codex-claw',
-      backend: 'codex',
-      createdAt: '2026-06-05T00:00:00.000Z',
-      updatedAt: '2026-06-05T00:00:00.000Z',
-    });
-    const wrapper = mountShell({ snapshot });
-
-    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
-    await wrapper.get('.cockpit-view__add-card [aria-label="Open Bench"]').trigger('click');
-    await flushPromises();
-    await wrapper.findAll('.new-agent-menu__template').find((row) => row.text().includes('Dina'))?.trigger('click');
-
-    expect(wrapper.emitted('deploy-bench-template')).toStrictEqual([[{
-      templateId: 'bench-dina',
-      teamId: 'team-codex-claw',
-    }]]);
-  });
-
   it('forwards cockpit work item assignments', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.workBacklog.connections = [{
@@ -2356,6 +2298,166 @@ describe('AppShell', () => {
       item,
     }]]);
     expect(wrapper.emitted('remove-work-item-assignment')).toStrictEqual([[item]]);
+  });
+
+  it('waits for an explicit global scope before loading cross-repository work', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.connections = [{
+      provider: 'github',
+      status: 'connected',
+      accountLabel: 'nbonamy',
+    }];
+    const repositories: WorkRepository[] = ['codex-claw', 'multi-llm-ts'].map((name) => ({
+      provider: 'github',
+      id: `nbonamy/${name}`,
+      owner: 'nbonamy',
+      name,
+      fullName: `nbonamy/${name}`,
+      url: `https://github.com/nbonamy/${name}`,
+      isPrivate: true,
+    }));
+    const loadWorkRepositories = vi.fn().mockResolvedValue(repositories);
+    const loadWorkItems = vi.fn().mockResolvedValue([]);
+    const loadAssignedWorkItems = vi.fn().mockResolvedValue([]);
+    const wrapper = mountShell({ snapshot, loadWorkRepositories, loadWorkItems, loadAssignedWorkItems });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    await flushPromises();
+
+    expect(loadWorkRepositories).toHaveBeenCalledWith('github');
+    expect(loadWorkItems).not.toHaveBeenCalled();
+
+    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('select-global-scope', 'assignedToMe');
+    await flushPromises();
+
+    expect(loadAssignedWorkItems).toHaveBeenCalledWith('github');
+    expect(loadWorkItems).not.toHaveBeenCalled();
+    expect(wrapper.findComponent({ name: 'CockpitWorkInbox' }).props('selectedAssigneeLogin')).toBe('nbonamy');
+  });
+
+  it('automatically loads every repository after the user remembers that scope', async () => {
+    window.localStorage.setItem('cockpitGlobalScope:github', 'all');
+    const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected', accountLabel: 'nbonamy' }];
+    const repositories: WorkRepository[] = ['codex-claw', 'multi-llm-ts'].map((name) => ({
+      provider: 'github', id: `nbonamy/${name}`, owner: 'nbonamy', name,
+      fullName: `nbonamy/${name}`, url: `https://github.com/nbonamy/${name}`, isPrivate: true,
+    }));
+    const loadWorkRepositories = vi.fn().mockResolvedValue(repositories);
+    const loadWorkItems = vi.fn().mockResolvedValue([]);
+    const confirm = vi.spyOn(ElMessageBox, 'confirm');
+    const wrapper = mountShell({ snapshot, loadWorkRepositories, loadWorkItems });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    await flushPromises();
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(loadWorkItems.mock.calls).toStrictEqual([
+      ['github', 'nbonamy/codex-claw'],
+      ['github', 'nbonamy/multi-llm-ts'],
+    ]);
+    expect(wrapper.findComponent({ name: 'CockpitWorkInbox' }).props('globalScope')).toBe('all');
+  });
+
+  it('remembers the explicit load-everything confirmation', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected', accountLabel: 'nbonamy' }];
+    const repository: WorkRepository = {
+      provider: 'github', id: 'nbonamy/codex-claw', owner: 'nbonamy', name: 'codex-claw',
+      fullName: 'nbonamy/codex-claw', url: 'https://github.com/nbonamy/codex-claw', isPrivate: true,
+    };
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
+    const loadWorkItems = vi.fn().mockResolvedValue([]);
+    const wrapper = mountShell({
+      snapshot,
+      loadWorkItems,
+      workRepositoriesByProvider: { github: [repository] },
+    });
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    await flushPromises();
+
+    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('select-global-scope', 'all');
+    await flushPromises();
+
+    expect(window.localStorage.getItem('cockpitGlobalScope:github')).toBe('all');
+    expect(loadWorkItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw');
+  });
+
+  it('keeps successful repositories visible when part of a global load fails', async () => {
+    window.localStorage.setItem('cockpitGlobalScope:github', 'all');
+    const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected', accountLabel: 'nbonamy' }];
+    const repositories: WorkRepository[] = ['working', 'broken'].map((name) => ({
+      provider: 'github', id: `nbonamy/${name}`, owner: 'nbonamy', name,
+      fullName: `nbonamy/${name}`, url: `https://github.com/nbonamy/${name}`, isPrivate: true,
+    }));
+    const loadWorkItems = vi.fn(async (_provider: WorkProviderKind, repositoryId: string) => (
+      repositoryId.endsWith('/broken') ? undefined : []
+    ));
+    const warning = vi.spyOn(ElMessage, 'warning').mockImplementation(() => undefined as never);
+    const wrapper = mountShell({
+      snapshot,
+      loadWorkRepositories: vi.fn().mockResolvedValue(repositories),
+      loadWorkItems,
+    });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    await flushPromises();
+
+    expect(loadWorkItems).toHaveBeenCalledTimes(2);
+    expect(warning).toHaveBeenCalledWith('Loaded 1 of 2 repositories. Could not load: broken.');
+  });
+
+  it('returns to the safe scope chooser when every repository fails', async () => {
+    window.localStorage.setItem('cockpitGlobalScope:github', 'all');
+    const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected', accountLabel: 'nbonamy' }];
+    const repository: WorkRepository = {
+      provider: 'github', id: 'nbonamy/broken', owner: 'nbonamy', name: 'broken',
+      fullName: 'nbonamy/broken', url: 'https://github.com/nbonamy/broken', isPrivate: true,
+    };
+    const error = vi.spyOn(ElMessage, 'error').mockImplementation(() => undefined as never);
+    const wrapper = mountShell({
+      snapshot,
+      loadWorkRepositories: vi.fn().mockResolvedValue([repository]),
+      loadWorkItems: vi.fn().mockResolvedValue(undefined),
+    });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    await flushPromises();
+
+    expect(error).toHaveBeenCalledWith('Loaded 0 of 1 repositories. Could not load: broken.');
+    expect(wrapper.findComponent({ name: 'CockpitWorkInbox' }).props('globalScope')).toBeNull();
+  });
+
+  it('opens agent creation with the repository selected from the Cockpit sidebar', async () => {
+    const snapshot = createInitialSnapshot();
+    const repository: WorkRepository = {
+      provider: 'github',
+      id: 'nbonamy/mediastation',
+      owner: 'nbonamy',
+      name: 'mediastation',
+      fullName: 'nbonamy/mediastation',
+      url: 'https://github.com/nbonamy/mediastation',
+      isPrivate: true,
+    };
+    const wrapper = mountShell({
+      snapshot,
+      sourceRepositories: [{
+        name: 'mediastation',
+        path: '/Users/nbonamy/src/mediastation',
+        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/mediastation' }],
+      }],
+      workRepositoriesByProvider: { github: [repository] },
+    });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('add-agent-for-repository', repository);
+    await flushPromises();
+
+    const dialog = wrapper.findComponent({ name: 'AgentDialog' });
+    expect(dialog.props('initialSourceRepositoryName')).toBe('mediastation');
+    expect(dialog.findAllComponents({ name: 'ElSelect' })[0]?.props('modelValue')).toBe('/Users/nbonamy/src/mediastation');
   });
 
   it('persists cockpit backlog repository and tag configuration', async () => {
@@ -2588,40 +2690,6 @@ describe('AppShell', () => {
 
     expect(listSourceRepositories).toHaveBeenCalledWith('connection-devbox');
     expect(listSourceWorktrees).toHaveBeenCalledWith('/home/nicolas/src/codex-claw', 'connection-devbox');
-  });
-
-  it('creates agents in the team selected from the cockpit add card', async () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.teams.push({
-      id: 'team-skwad',
-      name: 'Skwad',
-      avatar: 'SK',
-      color: '#46A857',
-      agentIds: [],
-    });
-    const chooseAgentFolder = vi.fn().mockResolvedValue('/Users/nbonamy/src/skwad');
-    const createAgent = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({
-      snapshot,
-      chooseAgentFolder,
-      createAgent,
-    });
-
-    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
-    await wrapper.findAll('.cockpit-view__add-card .new-agent-button__primary')[1].trigger('click');
-
-    expect(wrapper.text()).toContain('New agent');
-    await chooseCustomAgentFolder(wrapper);
-    await wrapper.get('.agent-dialog__text-input').setValue('Abby');
-    await wrapper.find('.claw-dialog__footer .claw-button--primary').trigger('click');
-
-    expect(createAgent).toHaveBeenCalledWith({
-      name: 'Abby',
-      avatar: '🤖',
-      folder: '/Users/nbonamy/src/skwad',
-      backend: 'codex',
-      teamId: 'team-skwad',
-    });
   });
 
   it('assigns a ticket to a new agent and can create a ticket-named team', async () => {
@@ -3686,6 +3754,7 @@ function mountShell(overrides: Partial<{
   createTeam: (input: CreateTeamInput) => Promise<Team | null | void>;
   listSourceFolders: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
   listSourceRepositories: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
+  sourceRepositories: SourceRepository[];
   listSourceWorktrees: (repoPath: string, remoteConnectionId?: string) => Promise<SourceWorktree[]>;
   deployBenchTemplateAction: (input: string | DeployBenchTemplateInput) => Promise<Agent | null | void>;
   updateTeam: (input: UpdateTeamInput) => Promise<void>;
@@ -3701,7 +3770,8 @@ function mountShell(overrides: Partial<{
   readConversationMessages: (ref: BackendConversationRef, agentId: string) => Promise<RendererMessage[]>;
   openAgentGitDiff: (agentId: string) => Promise<void>;
   configureWorkBacklog: (input: WorkBacklogConfigurationInput) => Promise<void>;
-  loadWorkRepositories: (provider: WorkProviderKind) => Promise<void>;
+  loadWorkRepositories: (provider: WorkProviderKind) => Promise<WorkRepository[] | void>;
+  loadAssignedWorkItems: (provider: WorkProviderKind, location?: LoopLocation) => Promise<WorkItem[] | void>;
   loadWorkItems: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery) => Promise<WorkItem[] | void>;
   createWorkItem: (input: import('@codex-claw/core/contracts').CreateWorkItemInput) => Promise<WorkItem>;
   createAgentGitBranch: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitBranchInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
@@ -3730,6 +3800,7 @@ function mountShell(overrides: Partial<{
       chooseAgentFolder: overrides.chooseAgentFolder ?? vi.fn().mockResolvedValue(null),
       listSourceFolders: overrides.listSourceFolders ?? vi.fn().mockResolvedValue({ path: '', parentPath: null, entries: [] }),
       listSourceRepositories: overrides.listSourceRepositories ?? vi.fn().mockResolvedValue([]),
+      sourceRepositories: overrides.sourceRepositories ?? [],
       listSourceWorktrees: overrides.listSourceWorktrees ?? vi.fn().mockResolvedValue([]),
       createAgent: overrides.createAgent ?? vi.fn().mockResolvedValue(undefined),
       createTeam: overrides.createTeam ?? vi.fn().mockResolvedValue(undefined),
@@ -3749,6 +3820,7 @@ function mountShell(overrides: Partial<{
       previewAgentFile: overrides.previewAgentFile ?? vi.fn().mockRejectedValue(new Error('Unavailable')),
       configureWorkBacklog: overrides.configureWorkBacklog ?? vi.fn().mockResolvedValue(undefined),
       loadWorkRepositories: overrides.loadWorkRepositories ?? vi.fn().mockResolvedValue(undefined),
+      loadAssignedWorkItems: overrides.loadAssignedWorkItems ?? vi.fn().mockResolvedValue(undefined),
       loadWorkItems: overrides.loadWorkItems ?? vi.fn().mockResolvedValue(undefined),
       createWorkItem: overrides.createWorkItem ?? vi.fn().mockRejectedValue(new Error('Unavailable')),
       createAgentGitBranch: overrides.createAgentGitBranch ?? vi.fn().mockResolvedValue({}),

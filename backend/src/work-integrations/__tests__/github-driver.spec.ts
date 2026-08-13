@@ -236,6 +236,31 @@ describe('GitHubWorkProviderDriver', () => {
     );
   });
 
+  it('lists work assigned to the authenticated user across repositories in one request', async () => {
+    const fetch = vi.fn().mockResolvedValue(jsonResponse([{
+      number: 24,
+      title: 'Guide global backlog loading',
+      html_url: 'https://github.com/nbonamy/codex-claw/issues/24',
+      repository_url: 'https://api.github.com/repos/nbonamy/codex-claw',
+      state: 'open',
+      assignees: [{ login: 'nbonamy' }],
+      labels: [],
+      created_at: '2026-08-13T12:00:00.000Z',
+      updated_at: '2026-08-13T13:00:00.000Z',
+    }]));
+    vi.stubGlobal('fetch', fetch);
+    const driver = new GitHubWorkProviderDriver('client-id');
+    const token = { provider: 'github' as const, accessToken: 'secret', tokenType: 'bearer', connectedAt: 'now' };
+
+    await expect(driver.listAssignedItems(token)).resolves.toEqual([
+      expect.objectContaining({ repositoryId: 'nbonamy/codex-claw', number: 24, assignees: ['nbonamy'] }),
+    ]);
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.github.com/issues?filter=assigned&state=open&per_page=100',
+      expect.any(Object),
+    );
+  });
+
   it('looks up and creates draft pull requests', async () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(jsonResponse([{ number: 7, title: 'Existing', html_url: 'https://github.com/o/r/pull/7', draft: true }]))

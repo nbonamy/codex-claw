@@ -203,6 +203,14 @@ export class GitHubWorkProviderDriver implements WorkProviderDriver {
     return items;
   }
 
+  async listAssignedItems(token: WorkProviderToken): Promise<WorkItem[]> {
+    const issues = await githubApiRequest(token, '/issues?filter=assigned&state=open&per_page=100');
+    if (!Array.isArray(issues)) throw new Error('GitHub returned an invalid assigned issues response.');
+    return issues
+      .map(githubAssignedIssue)
+      .filter((item): item is WorkItem => item !== null);
+  }
+
   async findPullRequest(token: WorkProviderToken, repositoryId: string, branch: string): Promise<AgentGitPullRequest | null> {
     const repository = parseRepositoryId(repositoryId);
     if (!repository) return null;
@@ -387,6 +395,16 @@ function githubPullRequestItem(value: unknown, repositoryId: string, repositoryF
     return null;
   }
   return { ...item, kind: 'pullRequest', branchName: value.head.ref.trim() };
+}
+
+function githubAssignedIssue(value: unknown): WorkItem | null {
+  if (!isRecord(value) || typeof value.repository_url !== 'string') return null;
+  const marker = '/repos/';
+  const markerIndex = value.repository_url.indexOf(marker);
+  const repositoryId = markerIndex >= 0
+    ? value.repository_url.slice(markerIndex + marker.length).replace(/^\/+|\/+$/g, '')
+    : '';
+  return parseRepositoryId(repositoryId) ? githubIssue(value, repositoryId, repositoryId) : null;
 }
 
 function githubIssueAssignee(value: unknown): string | null {

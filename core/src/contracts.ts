@@ -1487,6 +1487,7 @@ export type CodexClawApi = {
   disconnectWorkProvider(provider: WorkProviderKind): Promise<AppSnapshot>;
   listWorkRepositories(provider: WorkProviderKind, location?: LoopLocation): Promise<WorkRepository[]>;
   configureWorkBacklog(input: WorkBacklogConfigurationInput, location?: LoopLocation): Promise<AppSnapshot>;
+  listAssignedWorkItems?(provider: WorkProviderKind, location?: LoopLocation): Promise<WorkItem[]>;
   listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: WorkItemQuery): Promise<WorkItem[]>;
   createWorkItem(input: CreateWorkItemInput): Promise<WorkItem>;
   listBackendModels(agentId: string): Promise<BackendModelOption[]>;

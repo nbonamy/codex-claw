@@ -1,0 +1,792 @@
+<template>
+  <main class="cockpit-inbox">
+    <div class="cockpit-inbox__toolbar">
+      <nav class="cockpit-inbox__views" aria-label="Cockpit views">
+        <button
+          v-for="option in viewOptions"
+          :key="option.id"
+          type="button"
+          :aria-pressed="activeView === option.id"
+          @click="selectView(option.id)"
+        >
+          <span class="cockpit-inbox__view-label">{{ option.label }}</span>
+          <span class="cockpit-inbox__view-count">{{ option.count }}</span>
+        </button>
+      </nav>
+
+      <div class="cockpit-inbox__actions">
+        <el-input
+          v-if="searchOpen"
+          :model-value="effectiveSearchQuery"
+          class="cockpit-inbox__search-input"
+          clearable
+          placeholder="Search work"
+          aria-label="Search work"
+          @update:model-value="updateSearchQuery"
+        />
+        <button
+          v-else
+          class="cockpit-inbox__icon-button"
+          type="button"
+          aria-label="Search work"
+          @click="openSearch"
+        >
+          <IconSearch aria-hidden="true" />
+        </button>
+
+        <el-popover placement="bottom-end" trigger="click" :width="360" popper-class="claw-popover cockpit-inbox__filters-popover">
+          <template #reference>
+            <button class="cockpit-inbox__filter-button" type="button">
+              <IconFilter aria-hidden="true" />
+              Filters
+              <span v-if="activeFilterCount">{{ activeFilterCount }}</span>
+            </button>
+          </template>
+          <div class="cockpit-inbox__filters" aria-label="Work filters">
+            <label>
+              Repository
+              <el-select :model-value="selectedRepositoryId" clearable filterable placeholder="All repositories" aria-label="Repository filter" @update:model-value="selectRepository">
+                <el-option v-for="repository in sortedRepositories" :key="repository.id" :label="repository.fullName" :value="repository.id" />
+              </el-select>
+            </label>
+            <label>
+              Label
+              <el-select :model-value="selectedTagName" clearable filterable placeholder="All labels" aria-label="Label filter" @update:model-value="selectTag">
+                <el-option v-for="tag in tagOptions" :key="tag" :label="tag" :value="tag" />
+              </el-select>
+            </label>
+            <label>
+              Assignee
+              <el-select :model-value="selectedAssigneeLogin" clearable filterable placeholder="All assignees" aria-label="Assignee filter" @update:model-value="selectAssignee">
+                <el-option v-for="assignee in assigneeOptions" :key="assignee" :label="assignee" :value="assignee" />
+              </el-select>
+            </label>
+            <span class="cockpit-inbox__provider"><GitHubIcon aria-hidden="true" /> {{ providerLabel }}</span>
+          </div>
+        </el-popover>
+
+        <el-button type="primary" :disabled="!firstReadyRow" @click="startNextWork">
+          <PlayerPlayIcon aria-hidden="true" />
+          Start work
+        </el-button>
+        <button class="cockpit-inbox__refresh" type="button" :disabled="status === 'loading'" aria-label="Refresh work items" @click="emit('refresh', selectedRepositoryId)">
+          <RefreshIcon aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+
+    <section v-if="scopePromptVisible" class="cockpit-inbox__scope" aria-labelledby="cockpit-global-scope-title">
+      <div>
+        <span>Global backlog</span>
+        <h2 id="cockpit-global-scope-title">Choose what Claw should load</h2>
+        <p>
+          A backlog across every repository can contain a lot of work and consume significant provider quota.
+          For a focused view, select a repository from the sidebar.
+        </p>
+      </div>
+      <div class="cockpit-inbox__scope-actions">
+        <el-button type="primary" @click="emit('select-global-scope', 'assignedToMe')">
+          Show items assigned to me
+        </el-button>
+        <el-button plain @click="emit('select-global-scope', 'all')">
+          Load everything
+        </el-button>
+      </div>
+    </section>
+    <p v-else-if="status === 'loading' && items.length === 0" class="cockpit-inbox__state">Loading work items…</p>
+    <p v-else-if="error" class="cockpit-inbox__state cockpit-inbox__state--error">{{ error }}</p>
+    <p v-else-if="rows.length === 0" class="cockpit-inbox__state">{{ emptyMessage }}</p>
+
+    <div v-else class="cockpit-inbox__list">
+      <section v-for="group in groupedRows" :key="group.id" class="cockpit-inbox__group" :data-priority="group.id">
+        <header>
+          <span class="cockpit-inbox__group-marker" aria-hidden="true">
+            <IconAlertCircle v-if="group.id === 'attention'" />
+            <IconChevronDown v-else-if="group.id === 'review' || group.id === 'ready'" />
+            <IconCircleFilled v-else />
+          </span>
+          <strong>{{ group.label }}</strong>
+          <span>{{ group.rows.length }}</span>
+          <button v-if="activeView !== 'all'" type="button" @click="selectView('all')">Show all</button>
+        </header>
+
+        <div class="cockpit-inbox__rows">
+          <article
+            v-for="row in group.rows"
+            :key="row.item.id"
+            class="cockpit-inbox__row"
+            :data-priority="row.priority"
+            tabindex="0"
+            @click="selectRow(row)"
+            @keydown.enter="selectRow(row)"
+          >
+            <span class="cockpit-inbox__repository">{{ repositoryName(row.item) }}</span>
+            <span class="cockpit-inbox__number">
+              {{ row.item.kind === 'pullRequest' ? 'PR' : '' }} #{{ row.item.number }}
+            </span>
+            <strong class="cockpit-inbox__title">{{ row.item.title }}</strong>
+
+            <div class="cockpit-inbox__context">
+              <template v-if="row.agent">
+                <AgentAvatar :avatar="row.agent.avatar" :name="row.agent.name" size="sm" />
+                <span>{{ row.agent.name }}</span>
+              </template>
+              <template v-else>
+                <span v-for="label in row.item.labels.slice(0, 2)" :key="label.name" class="cockpit-inbox__label">{{ label.name }}</span>
+              </template>
+            </div>
+
+            <span v-if="row.item.branchName" class="cockpit-inbox__branch">
+              <GitBranchIcon aria-hidden="true" />
+              {{ row.item.branchName }}
+            </span>
+            <span v-else class="cockpit-inbox__branch" />
+
+            <span class="cockpit-inbox__status" :data-status="row.status">{{ row.statusLabel }}</span>
+            <span class="cockpit-inbox__elapsed">{{ elapsed(row.activityAt) }}</span>
+
+            <div class="cockpit-inbox__row-actions">
+              <el-tooltip :content="row.assignment ? 'View agent' : 'Assign work'" placement="top" :show-after="300">
+                <button
+                  class="cockpit-inbox__row-action"
+                  type="button"
+                  :aria-label="row.assignment ? `View agent for #${row.item.number}` : `Assign #${row.item.number}`"
+                  @click.stop="selectRow(row)"
+                >
+                  <EyeIcon v-if="row.assignment" aria-hidden="true" />
+                  <PlusCircleIcon v-else aria-hidden="true" />
+                </button>
+              </el-tooltip>
+              <el-tooltip :content="`View #${row.item.number} in ${providerLabel}`" placement="top" :show-after="300">
+                <button
+                  class="cockpit-inbox__external-action"
+                  type="button"
+                  :aria-label="`View #${row.item.number} in ${providerLabel}`"
+                  @click.stop="openSource(row.item)"
+                >
+                  <ExternalLinkIcon aria-hidden="true" />
+                </button>
+              </el-tooltip>
+            </div>
+          </article>
+        </div>
+      </section>
+    </div>
+  </main>
+</template>
+
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue';
+import { IconAlertCircle, IconChevronDown, IconCircleFilled, IconFilter, IconSearch } from '@tabler/icons-vue';
+import type { Agent, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import { ExternalLinkIcon, EyeIcon, GitBranchIcon, GitHubIcon, PlayerPlayIcon, PlusCircleIcon, RefreshIcon } from '../shared/icons/app-icons';
+import AgentAvatar from './AgentAvatar.vue';
+
+type InboxView = 'all' | 'backlog' | 'wip' | 'focus';
+type SummaryFilter = 'inProgress' | 'blocked' | 'readyForReview';
+type Priority = 'attention' | 'review' | 'progress' | 'ready';
+type InboxRow = { activityAt: string; agent: Agent | null; assignment: WorkBacklogAssignment | null; item: WorkItem; priority: Priority; status: string; statusLabel: string };
+
+const props = withDefaults(defineProps<{
+  agents: Agent[];
+  activeView?: InboxView;
+  assignments: Record<string, WorkBacklogAssignment>;
+  connection: WorkIntegrationConnection;
+  error: string | null;
+  globalScope?: 'assignedToMe' | 'all' | null;
+  items: WorkItem[];
+  repositories: WorkRepository[];
+  searchQuery?: string;
+  selectedAssigneeLogin?: string | null;
+  selectedRepositoryId: string | null;
+  selectedTagName?: string | null;
+  status: 'notLoaded' | 'loading' | 'loaded' | 'error';
+  statusFilter?: SummaryFilter | null;
+}>(), { activeView: 'focus', globalScope: null, searchQuery: '', selectedAssigneeLogin: null, selectedTagName: null, statusFilter: null });
+
+const emit = defineEmits<{
+  refresh: [repositoryId: string | null];
+  'select-global-scope': [scope: 'assignedToMe' | 'all'];
+  'focus-search': [];
+  'remove-assignment': [item: WorkItem];
+  'select-assigned-agent': [agentId: string];
+  'select-assignee': [login: string | null];
+  'select-repository': [repositoryId: string | null];
+  'select-tag': [tag: string | null];
+  'start-work': [item: WorkItem];
+  'update-search-query': [query: string];
+  'update-active-view': [view: InboxView];
+}>();
+
+const searchOpen = ref(false);
+const localActiveView = ref<InboxView>(props.activeView);
+const activeView = computed(() => localActiveView.value);
+const effectiveSearchQuery = ref(props.searchQuery);
+watch(() => props.activeView, (view) => { localActiveView.value = view; });
+watch(() => props.searchQuery, (query) => { effectiveSearchQuery.value = query; });
+const agentsById = computed(() => new Map(props.agents.map((agent) => [agent.id, agent])));
+const sortedRepositories = computed(() => [...props.repositories].sort((a, b) => a.fullName.localeCompare(b.fullName)));
+const providerLabel = computed(() => props.connection.provider === 'github' ? 'GitHub' : 'Provider');
+const tagOptions = computed(() => [...new Set(props.items.flatMap((item) => item.labels.map((label) => label.name)))].sort());
+const assigneeOptions = computed(() => [...new Set(props.items.flatMap((item) => item.assignees ?? []))].sort());
+const activeFilterCount = computed(() => [props.selectedRepositoryId, props.selectedTagName, props.selectedAssigneeLogin].filter(Boolean).length);
+const scopePromptVisible = computed(() => (
+  !props.selectedRepositoryId && !props.globalScope && (activeView.value === 'all' || activeView.value === 'backlog')
+));
+const allRows = computed<InboxRow[]>(() => props.items.filter((item) => item.state === 'open').map(toRow));
+const filteredRows = computed(() => {
+  const query = effectiveSearchQuery.value.trim().toLocaleLowerCase();
+  return allRows.value.filter((row) => {
+    if (props.selectedRepositoryId && row.item.repositoryId !== props.selectedRepositoryId) return false;
+    if (props.selectedTagName && !row.item.labels.some((label) => label.name === props.selectedTagName)) return false;
+    if (props.selectedAssigneeLogin && !(row.item.assignees ?? []).includes(props.selectedAssigneeLogin)) return false;
+    if (query && !`${row.item.repositoryFullName} ${row.item.number} ${row.item.title}`.toLocaleLowerCase().includes(query)) return false;
+    return true;
+  });
+});
+const rows = computed(() => filteredRows.value.filter((row) => {
+  if (props.statusFilter && row.assignment?.status !== props.statusFilter) return false;
+  if (activeView.value === 'backlog') return !row.assignment;
+  if (activeView.value === 'wip') return Boolean(row.assignment);
+  if (activeView.value === 'focus') return row.priority === 'attention' || row.priority === 'review';
+  return true;
+}));
+const priorityOrder: Priority[] = ['attention', 'review', 'progress', 'ready'];
+const groupedRows = computed(() => priorityOrder.map((priority) => ({
+  id: priority,
+  label: priorityLabel(priority),
+  rows: rows.value.filter((row) => row.priority === priority).sort((a, b) => b.activityAt.localeCompare(a.activityAt)),
+})).filter((group) => group.rows.length > 0));
+const viewOptions = computed(() => [
+  { id: 'all' as const, label: 'All', count: filteredRows.value.length },
+  { id: 'backlog' as const, label: 'Backlog', count: filteredRows.value.filter((row) => !row.assignment).length },
+  { id: 'wip' as const, label: 'WIP', count: filteredRows.value.filter((row) => row.assignment).length },
+  { id: 'focus' as const, label: 'Focus', count: filteredRows.value.filter((row) => row.priority === 'attention' || row.priority === 'review').length },
+]);
+const firstReadyRow = computed(() => filteredRows.value.find((row) => !row.assignment) ?? null);
+const emptyMessage = computed(() => activeView.value === 'focus' ? 'Nothing needs your attention.' : `No work in ${viewOptions.value.find((view) => view.id === activeView.value)?.label ?? 'this view'}.`);
+
+function toRow(item: WorkItem): InboxRow {
+  const assignment = props.assignments[workItemAssignmentKey(item)] ?? null;
+  const agent = assignment ? agentsById.value.get(assignment.agentId) ?? null : null;
+  const priority = rowPriority(assignment, agent);
+  const status = assignment?.status ?? 'ready';
+  return { item, assignment, agent, priority, status, statusLabel: statusLabel(assignment, agent), activityAt: assignment?.updatedAt ?? assignment?.completedAt ?? assignment?.assignedAt ?? item.updatedAt };
+}
+
+function rowPriority(assignment: WorkBacklogAssignment | null, agent: Agent | null): Priority {
+  if (assignment?.status === 'blocked' || agent?.status.type === 'awaitingInput' || agent?.status.type === 'error') return 'attention';
+  if (assignment?.status === 'readyForReview') return 'review';
+  return assignment ? 'progress' : 'ready';
+}
+
+function statusLabel(assignment: WorkBacklogAssignment | null, agent: Agent | null): string {
+  if (agent?.status.type === 'awaitingInput') return 'Needs input';
+  if (agent?.status.type === 'error') return 'Failed';
+  if (assignment?.status === 'blocked') return 'Blocked';
+  if (assignment?.status === 'readyForReview') return 'Ready for review';
+  if (assignment?.status === 'completed') return 'Completed';
+  return assignment ? agent?.statusText || 'In progress' : 'Ready';
+}
+
+function priorityLabel(priority: Priority): string {
+  return { attention: 'Needs attention', review: 'Ready for review', progress: 'In progress', ready: 'Ready' }[priority];
+}
+
+function repositoryName(item: WorkItem): string {
+  return item.repositoryFullName.split('/').at(-1) ?? item.repositoryFullName;
+}
+
+function elapsed(value: string): string {
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
+  if (seconds < 60) return 'now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+  return `${Math.floor(seconds / 86400)}d`;
+}
+
+function startNextWork(): void { if (firstReadyRow.value) emit('start-work', firstReadyRow.value.item); }
+function selectView(view: InboxView): void {
+  localActiveView.value = view;
+  emit('update-active-view', view);
+}
+function openSearch(): void { searchOpen.value = true; emit('focus-search'); }
+function updateSearchQuery(value: unknown): void {
+  const query = typeof value === 'string' ? value : '';
+  effectiveSearchQuery.value = query;
+  emit('update-search-query', query);
+}
+function selectRow(row: InboxRow): void { row.agent ? emit('select-assigned-agent', row.agent.id) : emit('start-work', row.item); }
+function openSource(item: WorkItem): void { window.open(item.url, '_blank', 'noreferrer'); }
+function normalized(value: unknown): string | null { return typeof value === 'string' && value ? value : null; }
+function selectRepository(value: unknown): void { emit('select-repository', normalized(value)); }
+function selectTag(value: unknown): void { emit('select-tag', normalized(value)); }
+function selectAssignee(value: unknown): void { emit('select-assignee', normalized(value)); }
+</script>
+
+<style scoped>
+.cockpit-inbox {
+  position: relative;
+  min-height: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.cockpit-inbox__toolbar {
+  width: min(100%, 1440px);
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-16);
+}
+
+.cockpit-inbox__views,
+.cockpit-inbox__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.cockpit-inbox__views button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-8);
+  color: var(--color-text-muted);
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-size-15);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-20);
+  cursor: pointer;
+}
+
+.cockpit-inbox__views button[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-container);
+  font-weight: var(--font-weight-semibold);
+}
+
+.cockpit-inbox__view-label,
+.cockpit-inbox__view-count {
+  line-height: var(--line-height-20);
+}
+
+.cockpit-inbox__view-count {
+  color: var(--color-text-muted);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-regular);
+  font-variant-numeric: tabular-nums;
+}
+
+.cockpit-inbox__actions button {
+  white-space: nowrap;
+}
+
+.cockpit-inbox__actions svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+.cockpit-inbox__icon-button,
+.cockpit-inbox__filter-button,
+.cockpit-inbox__refresh {
+  min-width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.cockpit-inbox__filter-button {
+  padding: 0 var(--space-6);
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-medium);
+}
+
+.cockpit-inbox__filter-button span {
+  min-width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  font-size: var(--font-size-10);
+  line-height: 16px;
+}
+
+.cockpit-inbox__refresh {
+  border-color: transparent;
+  color: var(--color-text-muted);
+  background: transparent;
+}
+
+.cockpit-inbox__search-input {
+  width: 220px;
+}
+
+.cockpit-inbox__filters {
+  display: grid;
+  gap: var(--space-8);
+  padding: var(--space-6);
+}
+
+.cockpit-inbox__filters label {
+  display: grid;
+  gap: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  font-weight: var(--font-weight-medium);
+}
+
+.cockpit-inbox__provider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+}
+
+.cockpit-inbox__provider svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+.cockpit-inbox::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 53px;
+  right: 0;
+  left: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.cockpit-inbox__scope {
+  width: min(calc(100% - (2 * var(--space-32))), 760px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-20);
+  margin: clamp(56px, 10vh, 112px) auto 0;
+  padding: var(--space-20);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-lowest);
+  box-shadow: var(--shadow-sm);
+}
+
+.cockpit-inbox__scope span {
+  color: var(--color-primary);
+  font-size: var(--font-size-12);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-16);
+}
+
+.cockpit-inbox__scope h2 {
+  margin: var(--space-4) 0 var(--space-6);
+  color: var(--color-text);
+  font-size: var(--font-size-20);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-24);
+  letter-spacing: -0.015em;
+}
+
+.cockpit-inbox__scope p {
+  max-width: 500px;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-20);
+}
+
+.cockpit-inbox__scope-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-6);
+}
+
+.cockpit-inbox__scope-actions :deep(.el-button) {
+  min-width: 190px;
+  margin: 0;
+}
+
+.cockpit-inbox__list {
+  width: min(100%, 1440px);
+  min-height: 0;
+  overflow: auto;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-16) var(--space-16);
+}
+
+.cockpit-inbox__group {
+  margin-top: var(--space-6);
+}
+
+.cockpit-inbox__group > header {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-20);
+}
+
+.cockpit-inbox__group > header strong {
+  color: var(--color-text);
+  font-size: var(--font-size-16);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-22);
+  letter-spacing: -0.01em;
+}
+
+.cockpit-inbox__group > header button {
+  margin-left: auto;
+  border: 0;
+  color: var(--color-primary);
+  background: transparent;
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.cockpit-inbox__group-marker {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  display: grid;
+  place-items: center;
+  color: var(--color-success);
+}
+
+.cockpit-inbox__group-marker svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+.cockpit-inbox__group[data-priority="attention"] .cockpit-inbox__group-marker {
+  color: var(--color-warning);
+}
+
+.cockpit-inbox__group[data-priority="review"] .cockpit-inbox__group-marker {
+  color: var(--color-primary);
+}
+
+.cockpit-inbox__rows {
+  overflow: visible;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-lowest);
+}
+
+.cockpit-inbox__group[data-priority="attention"] .cockpit-inbox__rows {
+  border-color: var(--color-warning-container);
+}
+
+.cockpit-inbox__row {
+  position: relative;
+  min-height: 42px;
+  display: grid;
+  grid-template-columns:
+    minmax(180px, 1.1fr) 64px minmax(260px, 2fr) minmax(160px, 1fr)
+    minmax(150px, 1fr) minmax(100px, 0.65fr) 54px 70px;
+  gap: var(--space-6);
+  align-items: center;
+  padding: 0 var(--space-8);
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-18);
+  cursor: pointer;
+}
+
+.cockpit-inbox__row + .cockpit-inbox__row {
+  border-top: 1px solid var(--color-border);
+}
+
+.cockpit-inbox__row:hover,
+.cockpit-inbox__row:focus-visible {
+  background: var(--color-surface-low);
+  outline: none;
+}
+
+.cockpit-inbox__repository,
+.cockpit-inbox__number,
+.cockpit-inbox__context,
+.cockpit-inbox__branch,
+.cockpit-inbox__status,
+.cockpit-inbox__elapsed {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: inherit;
+  line-height: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cockpit-inbox__repository {
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+.cockpit-inbox__number {
+  font-weight: var(--font-weight-medium);
+  text-align: left;
+}
+
+.cockpit-inbox__title {
+  overflow: hidden;
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+  font-size: inherit;
+  line-height: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cockpit-inbox__context,
+.cockpit-inbox__branch {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-weight: var(--font-weight-medium);
+}
+
+.cockpit-inbox__label {
+  overflow: hidden;
+  padding: 1px var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-low);
+  font-size: inherit;
+  line-height: inherit;
+  text-overflow: ellipsis;
+}
+
+.cockpit-inbox__branch svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  flex: 0 0 auto;
+}
+
+.cockpit-inbox__status[data-status="inProgress"] {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.cockpit-inbox__status[data-status="blocked"] {
+  color: var(--color-warning);
+  font-weight: var(--font-weight-medium);
+}
+
+.cockpit-inbox__status[data-status="readyForReview"] {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.cockpit-inbox__elapsed {
+  text-align: right;
+}
+
+.cockpit-inbox__row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding-left: var(--space-8);
+}
+
+.cockpit-inbox__row-action,
+.cockpit-inbox__external-action {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  background: transparent;
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.cockpit-inbox__row-action svg,
+.cockpit-inbox__external-action svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+.cockpit-inbox__row-action:hover,
+.cockpit-inbox__external-action:hover {
+  color: var(--color-text);
+  background: var(--color-surface-low);
+}
+
+.cockpit-inbox__row-action:focus-visible,
+.cockpit-inbox__external-action:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.cockpit-inbox__state {
+  margin: auto;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+}
+
+.cockpit-inbox__state--error {
+  color: var(--color-error);
+}
+
+@media (max-width: 1250px) {
+  .cockpit-inbox__row {
+    grid-template-columns:
+      minmax(150px, 1fr) 58px minmax(200px, 1.5fr) minmax(130px, 1fr)
+      90px 70px;
+  }
+  .cockpit-inbox__branch,
+  .cockpit-inbox__elapsed {
+    display: none;
+  }
+}
+
+@media (max-width: 780px) {
+  .cockpit-inbox__toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .cockpit-inbox__actions {
+    width: 100%;
+  }
+  .cockpit-inbox__actions .el-button {
+    margin-left: auto;
+  }
+  .cockpit-inbox__row {
+    grid-template-columns: minmax(120px, 1fr) 50px minmax(160px, 1.5fr) 70px;
+  }
+  .cockpit-inbox__context,
+  .cockpit-inbox__status {
+    display: none;
+  }
+}
+</style>

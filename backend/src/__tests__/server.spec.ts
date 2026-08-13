@@ -2403,6 +2403,12 @@ describe('ClawBackendServer', () => {
         },
       }),
       configureBacklog: vi.fn().mockResolvedValue(snapshot),
+      listAssignedItems: vi.fn().mockResolvedValue([{
+        provider: 'github',
+        id: 'github:nbonamy/codex-claw#13',
+        title: 'Assigned bug',
+        url: 'https://github.com/nbonamy/codex-claw/issues/13',
+      }]),
       listItems: vi.fn().mockResolvedValue([{
         provider: 'github',
         id: 'github:nbonamy/codex-claw#12',
@@ -2431,6 +2437,14 @@ describe('ClawBackendServer', () => {
     })).resolves.toMatchObject({ result: snapshot });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
+      id: 'assigned-items',
+      method: 'workProvider/assignedItems/list',
+      params: { provider: 'github' },
+    })).resolves.toMatchObject({
+      result: [{ id: 'github:nbonamy/codex-claw#13' }],
+    });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
       id: 'items',
       method: 'workProvider/items/list',
       params: { provider: 'github', repositoryId: 'nbonamy/codex-claw' },
@@ -2452,6 +2466,7 @@ describe('ClawBackendServer', () => {
 
     expect(workIntegrations.connect).toHaveBeenCalledWith('github');
     expect(workIntegrations.configureBacklog).toHaveBeenCalledWith({ provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } });
+    expect(workIntegrations.listAssignedItems).toHaveBeenCalledWith('github');
     expect(workIntegrations.listItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw');
     expect(workIntegrations.listItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw', { kind: 'all', state: 'all' });
   });

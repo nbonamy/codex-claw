@@ -1,193 +1,168 @@
 <template>
-  <section
-    class="cockpit-view"
-    aria-label="Cockpit"
-  >
-    <header class="cockpit-view__header">
-      <div class="cockpit-view__title-block">
-        <h1>Cockpit</h1>
-      </div>
+  <section class="cockpit-view" aria-label="Cockpit">
+    <aside class="cockpit-view__navigation" aria-label="Cockpit navigation">
+      <label class="cockpit-view__search">
+        <IconSearch aria-hidden="true" />
+        <input
+          ref="searchInput"
+          v-model="searchQuery"
+          type="search"
+          placeholder="Search"
+          aria-label="Search Cockpit work"
+        />
+        <kbd>⌘K</kbd>
+      </label>
 
-      <div class="cockpit-view__toolbar">
-        <div
-          class="cockpit-view__summary"
-          aria-label="Agent status summary"
+      <nav>
+        <button
+          class="cockpit-view__navigation-item"
+          :class="{ 'cockpit-view__navigation-item--active': activeSection === 'backlog' && !workBacklog?.selectedRepositoryId }"
+          type="button"
+          :aria-current="activeSection === 'backlog' && !workBacklog?.selectedRepositoryId ? 'page' : undefined"
+          @click="showBacklog"
         >
-          <span
-            v-for="item in statusSummary"
-            :key="item.status"
-            class="cockpit-view__summary-item"
-          >
-            <span
-              class="cockpit-view__status-dot"
-              :data-status="item.status"
-              aria-hidden="true"
-            />
-            {{ item.count }} {{ item.label }}
-          </span>
-        </div>
-      </div>
-    </header>
+          <BacklogIcon aria-hidden="true" />
+          Backlog
+        </button>
+        <button
+          class="cockpit-view__navigation-item"
+          :class="{ 'cockpit-view__navigation-item--active': activeSection === 'agents' }"
+          type="button"
+          :aria-current="activeSection === 'agents' ? 'page' : undefined"
+          @click="activeSection = 'agents'"
+        >
+          <IconUser aria-hidden="true" />
+          Agents
+          <span>{{ agents.length }}</span>
+        </button>
 
-    <div class="cockpit-view__content">
-      <WorkBacklogPanel
-        v-if="workBacklog"
+        <div class="cockpit-view__navigation-section">
+          <span>Repositories</span>
+        </div>
+        <div v-if="workBacklog" class="cockpit-view__repositories">
+          <div
+            v-for="repository in recentRepositories"
+            :key="repository.id"
+          >
+            <button
+              type="button"
+              :aria-pressed="activeSection === 'backlog' && workBacklog.selectedRepositoryId === repository.id"
+              @click="selectRepository(repository.id)"
+            >
+              <IconFolder aria-hidden="true" />
+              <span>{{ repository.name }}</span>
+            </button>
+            <button
+              class="cockpit-view__repository-launch"
+              type="button"
+              :aria-label="`New agent in ${repository.name}`"
+              :title="`New agent in ${repository.name}`"
+              @click="emit('add-agent-for-repository', repository)"
+            >
+              <IconPlus aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+
+        <button class="cockpit-view__navigation-item" type="button" @click="emit('open-settings')">
+          <IconSettings aria-hidden="true" />
+          Settings
+        </button>
+      </nav>
+    </aside>
+
+    <div class="cockpit-view__workspace">
+      <header class="cockpit-view__header" :class="{ 'cockpit-view__header--agents': activeSection === 'agents' }">
+        <div class="cockpit-view__frame">
+          <h1>{{ activeSection === 'backlog' ? 'Cockpit' : 'Agents' }}</h1>
+          <div v-if="activeSection === 'backlog' && workBacklog" class="cockpit-view__summary" aria-label="Work summary filters">
+            <button
+              v-for="metric in summaryMetrics"
+              :key="metric.id"
+              type="button"
+              :data-tone="metric.id"
+              :aria-pressed="activeSummaryFilter === metric.filter"
+              @click="selectSummaryMetric(metric)"
+            >
+              <span>{{ metric.label }}</span>
+              <strong>{{ metric.count }}</strong>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <CockpitWorkInbox
+        v-if="activeSection === 'backlog' && workBacklog"
+        :agents="agents"
+        :active-view="activeWorkView"
+        :assignments="workBacklog.assignments"
         :connection="workBacklog.connection"
         :error="workBacklog.error"
+        :global-scope="workBacklog.globalScope"
         :items="workBacklog.items"
         :repositories="workBacklog.repositories"
+        :search-query="searchQuery"
         :selected-assignee-login="workBacklog.selectedAssigneeLogin ?? null"
         :selected-repository-id="workBacklog.selectedRepositoryId"
         :selected-tag-name="workBacklog.selectedTagName ?? null"
         :status="workBacklog.status"
-        :assigned-agents-by-work-item-key="assignedAgentsByWorkItemKey"
-        :assignments="workBacklog.assignments"
-        :can-assign-to-bench="hasAnyBench"
-        @assign-to-bench-agent="emit('assign-work-item-to-bench-agent', { item: $event })"
-        @assign-to-new-agent="emit('assign-work-item-to-new-agent', { item: $event })"
+        :status-filter="activeSummaryFilter"
+        @focus-search="focusSearch"
         @refresh="emit('refresh-work-items', $event)"
+        @select-global-scope="emit('select-global-scope', $event)"
         @remove-assignment="emit('remove-work-item-assignment', $event)"
-        @select-assigned-agent="selectAssignedAgent"
         @select-assignee="emit('select-work-assignee', $event)"
+        @select-assigned-agent="selectAssignedAgent"
         @select-repository="emit('select-work-repository', $event)"
         @select-tag="emit('select-work-tag', $event)"
-        @work-item-drag-end="clearDraggedWorkItem"
-        @work-item-drag-start="draggedWorkItem = $event"
+        @start-work="emit('assign-work-item-to-new-agent', { item: $event })"
+        @update-active-view="selectWorkView"
+        @update-search-query="searchQuery = $event"
       />
 
-      <div class="cockpit-view__sections">
-        <section
-          v-for="section in teamSections"
-          :key="section.team.id"
-          class="cockpit-view__team"
-        >
-          <header class="cockpit-view__team-header">
-            <span
-              class="cockpit-view__team-marker"
-              :style="{ backgroundColor: section.team.color ?? defaultTeamColor }"
-              aria-hidden="true"
-            />
-            <button
-              class="cockpit-view__team-title"
-              type="button"
-              @click="emit('select-team', section.team.id)"
-            >
-              {{ section.team.name }}
-            </button>
-            <div class="cockpit-view__team-summary">
-              <span
-                v-for="item in section.statusSummary"
-                :key="item.status"
-                class="cockpit-view__summary-item"
-              >
-                <span
-                  class="cockpit-view__status-dot"
-                  :data-status="item.status"
-                  aria-hidden="true"
-                />
-                {{ item.count }} {{ item.label }}
-              </span>
-            </div>
-            <NewAgentButton
-              v-if="section.showHeaderAdd"
-              class="cockpit-view__header-add"
-              label="Add Agent"
-              size="small"
-              tone="ghost"
-              :bench="benchForTeam(section.team.id)"
-              @deploy-bench-template="emit('deploy-bench-template', { templateId: $event, teamId: section.team.id })"
-              @new-agent="emit('add-agent', section.team.id)"
-              @remove-bench-template="emit('remove-bench-template', { templateId: $event, teamId: section.team.id })"
-            />
-          </header>
+      <CockpitAgentsView
+        v-else-if="activeSection === 'agents'"
+        :agents="agents"
+        :bench="bench"
+        :bench-by-team-id="benchByTeamId"
+        :forkable-agent-ids="forkableAgentIds"
+        :teams="teams"
+        @add-agent="emit('add-agent', $event)"
+        @close-agent="emit('close-agent', $event)"
+        @deploy-bench-template="emit('deploy-bench-template', $event)"
+        @duplicate-agent="emit('duplicate-agent', $event)"
+        @edit-agent="emit('edit-agent', $event)"
+        @fork-agent="emit('fork-agent', $event)"
+        @move-agent-to-team="emit('move-agent-to-team', $event)"
+        @prompt-agent="emit('prompt-agent', $event)"
+        @remove-bench-template="emit('remove-bench-template', $event)"
+        @restart-agent="emit('restart-agent', $event)"
+        @save-agent-to-bench="emit('save-agent-to-bench', $event)"
+        @select-agent="emit('select-agent', $event)"
+        @select-team="emit('select-team', $event)"
+      />
 
-          <p
-            v-if="section.agents.length === 0"
-            class="cockpit-view__empty-team"
-          >
-            No agents
-          </p>
-
-          <div
-            :ref="(element) => setGridRef(section.team.id, element)"
-            class="cockpit-view__grid"
-          >
-            <CockpitAgentCard
-              v-for="agent in section.agents"
-              :key="agent.id"
-              :agent="agent"
-              :dragged-work-item="draggedWorkItem"
-              :drop-target="dropTargetAgentId === agent.id"
-              @assign-work-item="assignDraggedWorkItemToAgent"
-              @clear-dragged-work-item="clearDraggedWorkItem"
-              @drop-target-enter="dropTargetAgentId = $event"
-              @drop-target-leave="leaveAgentDropTarget"
-              @open-agent-menu="openAgentMenu"
-              @prompt="emit('prompt-agent', $event)"
-              @select="emit('select-agent', { agentId: agent.id, teamId: section.team.id })"
-            />
-
-            <CockpitAddAgentTile
-              v-if="section.showGridAdd"
-              :bench="benchForTeam(section.team.id)"
-              :dragged-work-item="draggedWorkItem"
-              :team-id="section.team.id"
-              :team-name="section.team.name"
-              @assign-to-bench-agent="assignDraggedWorkItemToBenchAgent"
-              @assign-to-new-agent="assignDraggedWorkItemToNewAgent"
-              @deploy-bench-template="emit('deploy-bench-template', $event)"
-              @new-agent="emit('add-agent', $event)"
-              @remove-bench-template="emit('remove-bench-template', { templateId: $event, teamId: section.team.id })"
-            />
-          </div>
-        </section>
+      <div v-else class="cockpit-view__empty">
+        Connect a work provider to build your operator inbox.
       </div>
     </div>
-
-    <AgentContextMenu
-      v-if="contextMenuAgent"
-      :fork-disabled="!canForkContextMenuAgent"
-      :move-targets="contextMenuMoveTargets"
-      :x="contextMenuPosition.x"
-      :y="contextMenuPosition.y"
-      @action="emitContextAgentAction"
-      @move-agent-to-team="emitContextAgentMove"
-      @close="closeAgentMenu"
-    />
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { ComponentPublicInstance } from 'vue';
-import type { Agent, AgentStatus, BenchTemplate, DeployBenchTemplateInput, RemoveBenchTemplateInput, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
-import { defaultTeamColor } from '@codex-claw/core/team-colors';
-import { assignedAgentsByWorkItemKey as collectAssignedAgentsByWorkItemKey } from '@codex-claw/core/work-assignments';
-import AgentContextMenu from './AgentContextMenu.vue';
-import type { AgentContextMenuAction } from './AgentContextMenu.vue';
-import CockpitAddAgentTile from './CockpitAddAgentTile.vue';
-import CockpitAgentCard from './CockpitAgentCard.vue';
-import NewAgentButton from './NewAgentButton.vue';
-import WorkBacklogPanel from './WorkBacklogPanel.vue';
-
-type StatusSummaryItem = {
-  status: AgentStatus['type'];
-  count: number;
-  label: string;
-};
-
-type TeamSection = {
-  agents: Agent[];
-  showGridAdd: boolean;
-  showHeaderAdd: boolean;
-  statusSummary: StatusSummaryItem[];
-  team: Team;
-};
+import { computed, nextTick, ref } from 'vue';
+import { IconFolder, IconPlus, IconSearch, IconSettings, IconUser } from '@tabler/icons-vue';
+import type { Agent, BenchTemplate, DeployBenchTemplateInput, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import { BacklogIcon } from '../shared/icons/app-icons';
+import CockpitAgentsView from './CockpitAgentsView.vue';
+import CockpitWorkInbox from './CockpitWorkInbox.vue';
 
 type CockpitWorkBacklog = {
   assignments: Record<string, WorkBacklogAssignment>;
   connection: WorkIntegrationConnection;
   error: string | null;
+  globalScope: 'assignedToMe' | 'all' | null;
   items: WorkItem[];
   repositories: WorkRepository[];
   selectedAssigneeLogin?: string | null;
@@ -196,12 +171,11 @@ type CockpitWorkBacklog = {
   status: 'notLoaded' | 'loading' | 'loaded' | 'error';
 };
 
-type WorkItemAssignmentIntent = {
-  item: WorkItem;
-  teamId?: string;
-};
-
-const DEFAULT_GRID_COLUMNS = 3;
+type WorkItemAssignmentIntent = { item: WorkItem; teamId?: string };
+type InboxView = 'all' | 'backlog' | 'wip' | 'focus';
+type CockpitSection = 'backlog' | 'agents';
+type SummaryFilter = 'inProgress' | 'blocked' | 'readyForReview';
+type SummaryMetric = { count: number; filter: SummaryFilter; id: 'working' | 'blocked' | 'review'; label: string; view: InboxView };
 
 const props = defineProps<{
   agents: Agent[];
@@ -214,6 +188,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'add-agent': [teamId: string];
+  'add-agent-for-repository': [repository: WorkRepository];
   'assign-work-item-to-bench-agent': [intent: WorkItemAssignmentIntent];
   'assign-work-item-to-new-agent': [intent: WorkItemAssignmentIntent];
   'assign-work-item': [payload: { agentId: string; item: WorkItem }];
@@ -223,9 +198,11 @@ const emit = defineEmits<{
   'fork-agent': [agentId: string];
   'edit-agent': [agentId: string];
   'move-agent-to-team': [payload: { agentId: string; teamId: string }];
+  'open-settings': [];
   'prompt-agent': [payload: { agentId: string; prompt: string }];
   'refresh-work-items': [repositoryId: string | null];
-  'remove-bench-template': [input: RemoveBenchTemplateInput];
+  'select-global-scope': [scope: 'assignedToMe' | 'all'];
+  'remove-bench-template': [input: { templateId: string; teamId?: string }];
   'remove-work-item-assignment': [item: WorkItem];
   'restart-agent': [agentId: string];
   'save-agent-to-bench': [agentId: string];
@@ -236,269 +213,75 @@ const emit = defineEmits<{
   'select-team': [teamId: string];
 }>();
 
-const draggedWorkItem = ref<WorkItem | null>(null);
-const dropTargetAgentId = ref<string | null>(null);
-const contextMenuAgentId = ref<string | null>(null);
-const contextMenuPosition = ref({ x: 0, y: 0 });
-const columnsByTeam = ref<Record<string, number>>({});
-const gridElements = new Map<string, HTMLElement>();
-let resizeObserver: ResizeObserver | null = null;
-const hasAnyBench = computed(() => props.teams.some((team) => benchForTeam(team.id).length > 0));
-
 const agentsById = computed(() => new Map(props.agents.map((agent) => [agent.id, agent])));
-const contextMenuAgent = computed(() => (
-  contextMenuAgentId.value ? agentsById.value.get(contextMenuAgentId.value) ?? null : null
-));
-const canForkContextMenuAgent = computed(() => (
-  contextMenuAgent.value?.status.type === 'idle' &&
-  Boolean(contextMenuAgent.value.backendSession) &&
-  (props.forkableAgentIds ?? []).includes(contextMenuAgent.value.id)
-));
-const contextMenuMoveTargets = computed(() => {
-  const agent = contextMenuAgent.value;
-  if (!agent) {
-    return [];
-  }
-
-  return props.teams.filter((team) => team.id !== agent.teamId);
-});
-const assignedAgentsByWorkItemKey = computed<Record<string, Agent>>(() => (
-  collectAssignedAgentsByWorkItemKey(props.agents, props.workBacklog?.assignments ?? {})
-));
-const teamSections = computed<TeamSection[]>(() => props.teams.map((team) => {
-  const agents = team.agentIds
-    .map((agentId) => agentsById.value.get(agentId))
-    .filter((agent): agent is Agent => Boolean(agent));
-
-  const columns = columnsForTeam(team.id);
-
-  return {
-    agents,
-    showGridAdd: shouldShowGridAdd(agents.length, columns),
-    showHeaderAdd: shouldShowHeaderAdd(agents.length, columns),
-    statusSummary: statusCounts(agents),
-    team,
-  };
+const activeSection = ref<CockpitSection>('backlog');
+const searchInput = ref<HTMLInputElement | null>(null);
+const searchQuery = ref('');
+const activeWorkView = ref<InboxView>('focus');
+const activeSummaryFilter = ref<SummaryFilter | null>(null);
+const sortedRepositories = computed(() => [...(props.workBacklog?.repositories ?? [])].sort((left, right) => {
+  const activity = repositoryActivityAt(right).localeCompare(repositoryActivityAt(left));
+  return activity || left.name.localeCompare(right.name);
 }));
-const allVisibleAgents = computed(() => teamSections.value.flatMap((section) => section.agents));
-const statusSummary = computed(() => statusCounts(allVisibleAgents.value));
-
-onMounted(() => {
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const teamId = entry.target instanceof HTMLElement ? entry.target.dataset.teamId : undefined;
-        if (teamId) {
-          measureGridColumns(teamId, entry.target as HTMLElement);
-        }
-      }
-    });
-    for (const element of gridElements.values()) {
-      resizeObserver.observe(element);
-    }
-  }
-
-  void nextTick(measureAllGrids);
+const recentRepositories = computed(() => {
+  const recent = sortedRepositories.value.slice(0, 10);
+  const selectedRepositoryId = props.workBacklog?.selectedRepositoryId;
+  if (!selectedRepositoryId || recent.some((repository) => repository.id === selectedRepositoryId)) return recent;
+  const selected = sortedRepositories.value.find((repository) => repository.id === selectedRepositoryId);
+  return selected ? [selected, ...recent.slice(0, 9)] : recent;
 });
-
-onBeforeUnmount(() => {
-  resizeObserver?.disconnect();
-  resizeObserver = null;
-  gridElements.clear();
-});
-
-watch(() => props.teams.map((team) => team.id).join('\0'), () => {
-  void nextTick(measureAllGrids);
-});
-
-function setGridRef(teamId: string, element: Element | ComponentPublicInstance | null): void {
-  const htmlElement = resolvedElement(element);
-  const previous = gridElements.get(teamId);
-  if (previous && previous !== htmlElement) {
-    resizeObserver?.unobserve(previous);
-  }
-
-  if (!htmlElement) {
-    gridElements.delete(teamId);
-    return;
-  }
-
-  htmlElement.dataset.teamId = teamId;
-  gridElements.set(teamId, htmlElement);
-  resizeObserver?.observe(htmlElement);
-  measureGridColumns(teamId, htmlElement);
-}
-
-function benchForTeam(teamId: string): BenchTemplate[] {
-  return props.benchByTeamId?.[teamId] ?? props.bench ?? [];
-}
-
-function resolvedElement(element: Element | ComponentPublicInstance | null): HTMLElement | null {
-  if (element instanceof HTMLElement) {
-    return element;
-  }
-
-  const component = element as ComponentPublicInstance | null;
-  return component?.$el instanceof HTMLElement ? component.$el : null;
-}
-
-function measureAllGrids(): void {
-  for (const [teamId, element] of gridElements.entries()) {
-    measureGridColumns(teamId, element);
-  }
-}
-
-function measureGridColumns(teamId: string, element: HTMLElement): void {
-  const styles = getComputedStyle(element);
-  const tileWidth = cssPixelValue(styles.getPropertyValue('--cockpit-tile-width')) ?? 360;
-  const gap = cssPixelValue(styles.columnGap) ?? 12;
-  const width = element.clientWidth || element.getBoundingClientRect().width;
-  const columns = width > 0
-    ? Math.max(1, Math.floor((width + gap) / (tileWidth + gap)))
-    : DEFAULT_GRID_COLUMNS;
-  if (columnsByTeam.value[teamId] === columns) {
-    return;
-  }
-
-  columnsByTeam.value = {
-    ...columnsByTeam.value,
-    [teamId]: columns,
+const visibleAssignments = computed(() => (props.workBacklog?.items ?? [])
+  .map((item) => props.workBacklog?.assignments[workItemAssignmentKey(item)])
+  .filter((assignment): assignment is WorkBacklogAssignment => Boolean(assignment)));
+const workSummary = computed(() => {
+  const assignments = visibleAssignments.value;
+  return {
+    working: assignments.filter((assignment) => assignment.status === 'inProgress').length,
+    blocked: assignments.filter((assignment) => assignment.status === 'blocked').length,
+    review: assignments.filter((assignment) => assignment.status === 'readyForReview').length,
+    wip: assignments.length,
   };
-}
-
-function cssPixelValue(value: string): number | null {
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function columnsForTeam(teamId: string): number {
-  return columnsByTeam.value[teamId] ?? DEFAULT_GRID_COLUMNS;
-}
-
-function shouldShowGridAdd(agentCount: number, columns: number): boolean {
-  return agentCount === 0 || agentCount % columns !== 0;
-}
-
-function shouldShowHeaderAdd(agentCount: number, columns: number): boolean {
-  return agentCount > 0 && agentCount % columns === 0;
-}
-
-function leaveAgentDropTarget(agentId: string): void {
-  if (dropTargetAgentId.value === agentId) {
-    dropTargetAgentId.value = null;
-  }
-}
-
-function openAgentMenu(payload: { agentId: string; x: number; y: number }): void {
-  contextMenuAgentId.value = payload.agentId;
-  contextMenuPosition.value = {
-    x: payload.x,
-    y: payload.y,
-  };
-}
-
-function emitContextAgentAction(action: AgentContextMenuAction): void {
-  const agentId = contextMenuAgentId.value;
-  if (!agentId) {
-    return;
-  }
-
-  switch (action) {
-    case 'close-agent':
-      emit('close-agent', agentId);
-      break;
-    case 'duplicate-agent':
-      emit('duplicate-agent', agentId);
-      break;
-    case 'fork-agent':
-      emit('fork-agent', agentId);
-      break;
-    case 'edit-agent':
-      emit('edit-agent', agentId);
-      break;
-    case 'restart-agent':
-      emit('restart-agent', agentId);
-      break;
-    case 'save-agent-to-bench':
-      emit('save-agent-to-bench', agentId);
-      break;
-  }
-  closeAgentMenu();
-}
-
-function emitContextAgentMove(teamId: string): void {
-  const agentId = contextMenuAgentId.value;
-  if (!agentId) {
-    return;
-  }
-
-  emit('move-agent-to-team', { agentId, teamId });
-  closeAgentMenu();
-}
-
-function closeAgentMenu(): void {
-  contextMenuAgentId.value = null;
-}
-
-function assignDraggedWorkItemToAgent(payload: { agentId: string; item: WorkItem }): void {
-  emit('assign-work-item', payload);
-  clearDraggedWorkItem();
-}
-
-function assignDraggedWorkItemToNewAgent(intent: WorkItemAssignmentIntent): void {
-  emit('assign-work-item-to-new-agent', intent);
-  clearDraggedWorkItem();
-}
-
-function assignDraggedWorkItemToBenchAgent(intent: WorkItemAssignmentIntent): void {
-  emit('assign-work-item-to-bench-agent', intent);
-  clearDraggedWorkItem();
-}
-
+});
+const summaryMetrics = computed<SummaryMetric[]>(() => [
+  { id: 'working', label: 'working', count: workSummary.value.working, filter: 'inProgress', view: 'wip' },
+  { id: 'blocked', label: 'blocked', count: workSummary.value.blocked, filter: 'blocked', view: 'focus' },
+  { id: 'review', label: 'ready for review', count: workSummary.value.review, filter: 'readyForReview', view: 'focus' },
+]);
 function selectAssignedAgent(agentId: string): void {
   const agent = agentsById.value.get(agentId);
-  if (agent?.teamId) {
-    emit('select-agent', {
-      agentId,
-      teamId: agent.teamId,
-    });
-  }
+  if (agent?.teamId) emit('select-agent', { agentId, teamId: agent.teamId });
 }
 
-function clearDraggedWorkItem(): void {
-  draggedWorkItem.value = null;
-  dropTargetAgentId.value = null;
+function showBacklog(): void {
+  activeSection.value = 'backlog';
+  selectRepository(null);
 }
 
-function statusCounts(agents: Agent[]): StatusSummaryItem[] {
-  const order: AgentStatus['type'][] = ['awaitingInput', 'working', 'starting', 'idle', 'error'];
-  const counts = new Map<AgentStatus['type'], number>();
-  for (const agent of agents) {
-    counts.set(agent.status.type, (counts.get(agent.status.type) ?? 0) + 1);
-  }
-
-  return order
-    .map((status) => ({
-      status,
-      count: counts.get(status) ?? 0,
-      label: summaryLabel(status, counts.get(status) ?? 0),
-    }))
-    .filter((item) => item.count > 0);
+function selectRepository(repositoryId: string | null): void {
+  activeSection.value = 'backlog';
+  emit('select-work-repository', repositoryId);
 }
 
-function summaryLabel(status: AgentStatus['type'], count: number): string {
-  switch (status) {
-    case 'awaitingInput':
-      return 'Awaiting Input';
-    case 'working':
-      return 'Working';
-    case 'starting':
-      return 'Starting';
-    case 'idle':
-      return 'Idle';
-    case 'error':
-      return count === 1 ? 'Error' : 'Errors';
-  }
+function selectSummaryMetric(metric: SummaryMetric): void {
+  activeWorkView.value = metric.view;
+  activeSummaryFilter.value = metric.filter;
+}
+
+function repositoryActivityAt(repository: WorkRepository): string {
+  const workItemActivity = (props.workBacklog?.items ?? [])
+    .filter((item) => item.repositoryId === repository.id)
+    .reduce((latest, item) => item.updatedAt > latest ? item.updatedAt : latest, '');
+  return workItemActivity > (repository.updatedAt ?? '') ? workItemActivity : repository.updatedAt ?? '';
+}
+
+function selectWorkView(view: InboxView): void {
+  activeWorkView.value = view;
+  activeSummaryFilter.value = null;
+}
+
+async function focusSearch(): Promise<void> {
+  await nextTick();
+  searchInput.value?.focus();
 }
 </script>
 
@@ -508,208 +291,326 @@ function summaryLabel(status: AgentStatus['type'], count: number): string {
   flex: 1 1 auto;
   overflow: hidden;
   display: flex;
-  flex-direction: column;
   color: var(--color-text);
   background: var(--color-shell-main);
 }
 
-.cockpit-view__header {
-  min-height: var(--workbench-appbar-height);
+.cockpit-view__navigation {
+  width: 248px;
+  flex: 0 0 248px;
+  padding: var(--space-16) var(--space-12);
+  border-right: 1px solid var(--color-border);
+  background: var(--color-shell-sidebar);
+}
+
+.cockpit-view__search {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin-bottom: var(--space-16);
+  padding: 0 var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.cockpit-view__search svg,
+.cockpit-view__navigation-item svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  flex: 0 0 auto;
+}
+
+.cockpit-view__search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  color: var(--color-text);
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-size-15);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-20);
+}
+
+.cockpit-view__search kbd {
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: var(--font-size-11);
+}
+
+.cockpit-view__navigation nav {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.cockpit-view__navigation-section {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-12);
-  padding: 0 var(--space-16);
-  font-size: var(--font-size-14);
+  margin-top: var(--space-12);
+  padding: 0 var(--space-8) var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-11);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cockpit-view__navigation-item {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-8);
+  color: var(--color-text);
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-size-15);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-20);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cockpit-view__navigation-item > span {
+  min-width: 24px;
+  margin-left: auto;
+  border-radius: var(--radius-full);
+  padding: 2px var(--space-4);
+  color: var(--color-text-muted);
+  background: var(--color-surface-low);
+  font-size: var(--font-size-11);
+  text-align: center;
+}
+
+.cockpit-view__navigation-item:hover:not(:disabled) {
+  background: var(--color-surface-low);
+}
+
+.cockpit-view__navigation-item--active {
+  border-color: color-mix(in srgb, var(--color-primary) 35%, transparent);
+  color: var(--color-primary);
+  background: var(--color-primary-container);
+  font-weight: var(--font-weight-semibold);
+}
+
+.cockpit-view__navigation-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.cockpit-view__repositories {
+  display: grid;
+  gap: 2px;
+  padding-bottom: var(--space-8);
+}
+
+.cockpit-view__repositories > div {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+}
+
+.cockpit-view__repositories > div > button:first-child {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: var(--space-4) var(--space-8);
+  color: var(--color-text-muted);
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-size-13);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cockpit-view__repositories > div > button:first-child svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  flex: 0 0 auto;
+}
+
+.cockpit-view__repositories > div > button:first-child span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cockpit-view__repositories > div:hover,
+.cockpit-view__repositories > div:has(button[aria-pressed="true"]) {
+  color: var(--color-text);
+  background: var(--color-surface-low);
+}
+
+.cockpit-view__repositories button[aria-pressed="true"] {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.cockpit-view__repository-launch {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  display: grid;
+  place-items: center;
+  margin-right: var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.cockpit-view__repository-launch:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-container);
+}
+
+.cockpit-view__repository-launch svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+.cockpit-view__workspace {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.cockpit-view__frame {
+  width: min(100%, 1440px);
+  margin: 0 auto;
+}
+
+.cockpit-view__header {
+  box-sizing: border-box;
+  display: flex;
+  min-height: 168px;
+  padding: var(--space-8) var(--space-16);
   border-bottom: 1px solid var(--color-border);
   -webkit-app-region: drag;
 }
 
-.cockpit-view__title-block {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-8);
+.cockpit-view__header--agents {
+  min-height: 76px;
 }
 
-.cockpit-view h1 {
+.cockpit-view__header .cockpit-view__frame {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.cockpit-view__header h1 {
   margin: 0;
-  color: var(--color-text);
-  font-size: var(--font-size-14);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-16);
-  text-transform: uppercase;
+  font-size: var(--font-size-28);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-32);
+  letter-spacing: -0.02em;
 }
 
-.cockpit-view__toolbar,
-.cockpit-view__summary,
-.cockpit-view__team-summary,
-.cockpit-view__summary-item {
+.cockpit-view__empty {
+  margin: auto;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+}
+
+.cockpit-view__summary {
+  width: min(100%, 640px);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-8);
+  margin-top: var(--space-8);
+}
+
+.cockpit-view__summary button {
+  min-height: 82px;
   display: flex;
-  align-items: center;
-}
-
-.cockpit-view__toolbar {
-  gap: var(--space-12);
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  border: 1px solid
+    color-mix(in srgb, var(--metric-color) 30%, var(--color-border));
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  color: var(--color-text-muted);
+  background: color-mix(in srgb, var(--metric-color) 5%, var(--color-surface));
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  text-align: left;
+  cursor: pointer;
   -webkit-app-region: no-drag;
 }
 
-.cockpit-view__summary,
-.cockpit-view__team-summary {
-  gap: var(--space-8);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-13);
-  line-height: var(--line-height-18);
-}
-
-.cockpit-view__summary-item {
-  gap: var(--space-3);
-  white-space: nowrap;
-}
-
-.cockpit-view__status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-full);
-  background: var(--color-success);
-}
-
-.cockpit-view__status-dot[data-status="working"],
-.cockpit-view__status-dot[data-status="starting"] {
-  background: var(--color-warning);
-}
-
-.cockpit-view__status-dot[data-status="awaitingInput"] {
-  background: var(--color-warning);
-}
-
-.cockpit-view__status-dot[data-status="error"] {
-  background: var(--color-error);
-}
-
-.cockpit-view__content {
-  min-height: 0;
-  flex: 1 1 auto;
-  display: flex;
-  overflow: hidden;
-}
-
-.cockpit-view__sections {
-  width: min(100%, 1220px);
-  min-width: 0;
-  flex: 1 1 auto;
-  display: grid;
-  align-content: start;
-  gap: var(--space-20);
-  margin: 0 auto;
-  padding: var(--space-24) var(--space-20) var(--space-24);
-  overflow: auto;
-}
-
-.cockpit-view__team {
-  display: grid;
-  gap: var(--space-10);
-}
-
-.cockpit-view__team-header {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-8);
-}
-
-.cockpit-view__team-marker {
-  width: 4px;
-  height: 28px;
-  border-radius: var(--radius-full);
-}
-
-.cockpit-view__team-title {
-  min-width: 0;
-  overflow: hidden;
-  border: 0;
-  padding: 0;
-  color: var(--color-text);
-  background: transparent;
-  font-size: var(--font-size-20);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-28);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.cockpit-view__team-title:hover {
-  color: var(--color-primary);
-}
-
-.cockpit-view__team-title:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-}
-
-.cockpit-view__header-add {
-  margin-left: auto;
-}
-
-.cockpit-view__empty-team {
-  margin: 0;
-  padding-left: var(--space-12);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-14);
-}
-
-.cockpit-view__grid {
-  --cockpit-tile-width: 320px;
-  display: grid;
-  grid-template-columns: repeat(
-    auto-fill,
-    minmax(min(100%, var(--cockpit-tile-width)), var(--cockpit-tile-width))
+.cockpit-view__summary button:hover {
+  border-color: color-mix(
+    in srgb,
+    var(--metric-color) 55%,
+    var(--color-border)
   );
-  gap: var(--space-12);
+  background: color-mix(in srgb, var(--metric-color) 9%, var(--color-surface));
 }
 
-@media (max-width: 780px) {
-  .cockpit-view__content {
-    flex-direction: column;
-    overflow: auto;
-  }
+.cockpit-view__summary button[aria-pressed="true"] {
+  border-color: var(--metric-color);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--metric-color) 20%, transparent);
+  background: color-mix(in srgb, var(--metric-color) 12%, var(--color-surface));
+}
 
-  .cockpit-view__content :deep(.work-backlog-panel) {
-    width: auto;
-    min-width: 0;
-    max-width: none;
-    min-height: 220px;
-    border-right: 0;
-    border-bottom: 1px solid var(--color-border);
-  }
+.cockpit-view__summary button > span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-11);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-16);
+}
 
-  .cockpit-view__sections {
-    overflow: visible;
-  }
+.cockpit-view__summary strong {
+  color: var(--metric-color);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-28);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-32);
+  font-variant-numeric: tabular-nums;
+}
 
-  .cockpit-view__header {
-    align-items: flex-start;
-    flex-direction: column;
-    height: auto;
-    padding-block: var(--space-8);
-  }
+.cockpit-view__summary button[data-tone="working"] {
+  --metric-color: var(--color-success);
+}
 
-  .cockpit-view__toolbar {
-    width: 100%;
-    align-items: flex-start;
-    flex-direction: column;
-    gap: var(--space-6);
-  }
+.cockpit-view__summary button[data-tone="blocked"] {
+  --metric-color: var(--color-warning);
+}
 
-  .cockpit-view__team-header {
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
+.cockpit-view__summary button[data-tone="review"] {
+  --metric-color: var(--color-primary);
+}
 
-  .cockpit-view__team-summary {
-    width: 100%;
-    padding-left: var(--space-12);
+@media (max-width: 1050px) {
+  .cockpit-view__navigation {
+    width: 204px;
+    flex-basis: 204px;
+  }
+}
+
+@media (max-width: 820px) {
+  .cockpit-view__navigation {
+    display: none;
   }
 }
 </style>

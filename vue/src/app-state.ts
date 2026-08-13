@@ -41,6 +41,7 @@ const fileActivity = ref<AgentFileActivity | null>(null);
 const workProviderAuthorization = ref<WorkProviderAuthorization | null>(null);
 const workRepositoriesByProvider = ref<Partial<Record<WorkProviderKind, WorkRepository[]>>>({});
 const workItemsByRepository = ref<Record<string, WorkItem[]>>({});
+const assignedWorkItemsByProvider = ref<Partial<Record<WorkProviderKind, WorkItem[]>>>({});
 const workBacklogStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
 const workBacklogError = ref<string | null>(null);
 const remoteBenchByConnectionId = ref<Record<string, BenchTemplate[]>>({});
@@ -1275,7 +1276,7 @@ export function useAppState() {
     }
   }
 
-  async function loadWorkItems(provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: WorkItemQuery): Promise<WorkItem[]> {
+  async function loadWorkItems(provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: WorkItemQuery): Promise<WorkItem[] | undefined> {
     if (!codexClawApi?.listWorkItems || !repositoryId) {
       return [];
     }
@@ -1301,7 +1302,23 @@ export function useAppState() {
     } catch (error) {
       workBacklogStatus.value = 'error';
       workBacklogError.value = error instanceof Error ? error.message : String(error);
-      return [];
+      return undefined;
+    }
+  }
+
+  async function loadAssignedWorkItems(provider: WorkProviderKind, location?: LoopLocation): Promise<WorkItem[]> {
+    if (!codexClawApi?.listAssignedWorkItems) return [];
+    workBacklogStatus.value = 'loading';
+    workBacklogError.value = null;
+    try {
+      const items = await codexClawApi.listAssignedWorkItems(provider, location);
+      assignedWorkItemsByProvider.value = { ...assignedWorkItemsByProvider.value, [provider]: items };
+      workBacklogStatus.value = 'loaded';
+      return items;
+    } catch (error) {
+      workBacklogStatus.value = 'error';
+      workBacklogError.value = error instanceof Error ? error.message : String(error);
+      throw error;
     }
   }
 
@@ -1680,6 +1697,7 @@ export function useAppState() {
     workProviderAuthorization,
     workRepositoriesByProvider,
     workItemsByRepository,
+    assignedWorkItemsByProvider,
     workBacklogStatus,
     workBacklogError,
     remoteBenchByConnectionId,
@@ -1699,6 +1717,7 @@ export function useAppState() {
     loadAgentFiles: loadAgentFilesForActiveAgent,
     loadWorkRepositories,
     loadWorkItems,
+    loadAssignedWorkItems,
     createWorkItem,
     loadSourceRepositories,
     loadDaemonStatus,
