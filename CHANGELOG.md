@@ -4,6 +4,24 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.10.2] - 2026-08-12
+
+### Improvements and fixes
+
+- Repository backlog assignments now stay attached to their agents and are
+  grouped as in progress, blocked, ready for review, or completed; agents can
+  update that lifecycle with a visible note, while users can jump to the owner
+  or clear the assignment and optionally close its agent.
+- Closing an agent that uses a linked worktree now offers safe cleanup of the
+  worktree and local branch, with an explicit option to delete the tracked
+  remote branch; backlog work also reuses existing branches and worktrees when
+  possible.
+- Queued prompts can now be edited directly in the composer, including
+  atomically steering the revised prompt with Command/Ctrl+Enter.
+- Backlog issue and pull-request links now open directly in the system browser,
+  duplicated work starts in the background without stealing focus, and action
+  popovers remain open until dismissed with a click.
+
 ## [0.10.1] - 2026-08-12
 
 ### New features

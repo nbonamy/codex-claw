@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.10.1",
+  "currentVersion": "0.10.2",
   "releases": [
+    {
+      "version": "0.10.2",
+      "releasedAt": "2026-08-12",
+      "sourceSha256": "e1bd04b14fce6dd61815254a57696532b3790d44fd26a23d03a8f6278deb3675",
+      "markdown": "### Improvements and fixes\n\n- Repository backlog assignments now stay attached to their agents and are\n  grouped as in progress, blocked, ready for review, or completed; agents can\n  update that lifecycle with a visible note, while users can jump to the owner\n  or clear the assignment and optionally close its agent.\n- Closing an agent that uses a linked worktree now offers safe cleanup of the\n  worktree and local branch, with an explicit option to delete the tracked\n  remote branch; backlog work also reuses existing branches and worktrees when\n  possible.\n- Queued prompts can now be edited directly in the composer, including\n  atomically steering the revised prompt with Command/Ctrl+Enter.\n- Backlog issue and pull-request links now open directly in the system browser,\n  duplicated work starts in the background without stealing focus, and action\n  popovers remain open until dismissed with a click."
+    },
     {
       "version": "0.10.1",
       "releasedAt": "2026-08-12",
