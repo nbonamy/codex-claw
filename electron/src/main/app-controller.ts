@@ -395,8 +395,8 @@ export class AppController {
       return this.loadOlderAgentHistory(agentId);
     });
 
-    ipc.handle(ipcChannels.closeAgent, async (_event, agentId: string) => {
-      return this.closeAgent(agentId);
+    ipc.handle(ipcChannels.closeAgent, async (_event, agentId: string, input) => {
+      return this.closeAgent(agentId, input);
     });
 
     ipc.handle(ipcChannels.selectAgent, async (_event, agentId: string) => {
@@ -752,8 +752,11 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentReorder, { input }));
   }
 
-  private async closeAgent(agentId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentDelete, { agentId }));
+  private async closeAgent(agentId: string, input?: import('@codex-claw/core/contracts').AgentCloseInput): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentDelete, {
+      agentId,
+      ...(input ? { input } : {}),
+    }));
   }
 
   private async selectAgent(agentId: string): Promise<AppSnapshotMetadata> {

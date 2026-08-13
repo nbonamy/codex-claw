@@ -229,7 +229,9 @@ implemented:
   the current agent or, by default, a background-created duplicate that does
   not interrupt the user's current workspace, either continuing in the agent's
   current workspace or creating a short suggested branch such as `fix/gh-22`
-  in a new worktree by default.
+  in a new worktree by default. Existing local or tracked remote branches are
+  reused, and a branch already checked out in another worktree reuses that
+  worktree instead of creating a conflicting checkout.
   Once assigned, work is grouped by its local `inProgress`, `blocked`,
   `readyForReview`, or `completed` lifecycle. Assigned-item actions always show
   the agent action and assignment removal; the agent action is disabled and
@@ -239,8 +241,12 @@ implemented:
   lines, in place of the default state-and-label metadata row; row icons remain
   top-aligned as comments grow.
   Pull-request work instead checks out the pull request's own head branch in
-  the current folder or in a new worktree. Full
-  working-tree diffs continue to open from the agent header's git statistics;
+  the current folder or in a new worktree.
+  Closing an agent that uses a linked worktree asks whether to preserve that
+  worktree or delete it. Deletion also removes the local branch and can
+  explicitly delete its tracked remote branch; ordinary repository folders
+  close without workspace cleanup choices.
+  Full working-tree diffs continue to open from the agent header's Git statistics;
   the in-app Browser accepts HTTP and HTTPS pages plus local
   `file://` URLs that resolve inside the owning agent's workspace; clicking a
   conversation image opens it in a Claw-owned image tab,

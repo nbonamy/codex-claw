@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import type { AgentGitDiff, AgentGitDiffSection, AgentGitFile, AgentGitWorkflow } from '@codex-claw/core/contracts';
 import type { AgentGitStatus } from '@codex-claw/core/contracts';
-import { createSourceWorktree, suggestedSourceWorktreePath } from '../git-worktrees';
+import { suggestedSourceWorktreePath } from '../git-worktrees';
 
 const execFileAsync = promisify(execFile);
 
@@ -238,31 +238,64 @@ export class AgentGitService {
       await this.runGit(folder, ['fetch', workflow.remote, `pull/${pullRequestNumber}/head`]);
       startPoint = 'FETCH_HEAD';
     }
-    if (createWorktree && startPoint) {
+    if (createWorktree) {
+      const worktrees = parseWorktrees((await this.runGit(folder, ['worktree', 'list', '--porcelain'])).stdout);
+      const existingWorktree = worktrees.find((worktree) => worktree.branch === normalized);
+      if (existingWorktree) return existingWorktree.path;
+
       const worktreePath = suggestedSourceWorktreePath(folder, normalized);
       const branchExists = await this.localBranchExists(folder, normalized);
+      const remoteBranch = branchExists || startPoint ? undefined : await this.remoteBranch(folder, normalized);
       await this.runGit(folder, branchExists
         ? ['worktree', 'add', worktreePath, normalized]
-        : ['worktree', 'add', '-b', normalized, worktreePath, startPoint]);
-      if (branchExists) await this.runGit(worktreePath, ['merge', '--ff-only', startPoint]);
+        : ['worktree', 'add', '-b', normalized, worktreePath, startPoint ?? remoteBranch].filter((value): value is string => Boolean(value)));
+      if (branchExists && startPoint) await this.runGit(worktreePath, ['merge', '--ff-only', startPoint]);
       return worktreePath;
     }
-    if (createWorktree) {
-      const worktree = await createSourceWorktree({ repoPath: folder, branchName: normalized }, {
-        run: async (command, args, options) => {
-          if (command !== 'git') throw new Error(`Unsupported command: ${command}`);
-          return this.runGit(options.cwd, args);
-        },
-      });
-      return worktree.path;
-    }
-    if (startPoint && await this.localBranchExists(folder, normalized)) {
+    const branchExists = await this.localBranchExists(folder, normalized);
+    if (branchExists) {
       await this.runGit(folder, ['switch', normalized]);
-      await this.runGit(folder, ['merge', '--ff-only', startPoint]);
+      if (startPoint) await this.runGit(folder, ['merge', '--ff-only', startPoint]);
     } else {
-      await this.runGit(folder, ['switch', '-c', normalized, ...(startPoint ? [startPoint] : [])]);
+      const remoteBranch = startPoint ? undefined : await this.remoteBranch(folder, normalized);
+      await this.runGit(folder, ['switch', '-c', normalized, ...(startPoint ? [startPoint] : remoteBranch ? [remoteBranch] : [])]);
     }
     return folder;
+  }
+
+  async deleteLinkedWorktree(folder: string, deleteRemoteBranch = false): Promise<void> {
+    const { current, target } = await this.linkedWorktreeDeletionPlan(folder, deleteRemoteBranch);
+
+    if (deleteRemoteBranch) {
+      await this.runGit(target.path, ['push', current.remote!, '--delete', current.upstream!.slice(current.remote!.length + 1)]);
+    }
+    await this.runGit(target.path, ['worktree', 'remove', current.folder]);
+    await this.runGit(target.path, ['branch', '-D', current.branch!]);
+  }
+
+  async validateLinkedWorktreeDeletion(folder: string, deleteRemoteBranch = false): Promise<void> {
+    await this.linkedWorktreeDeletionPlan(folder, deleteRemoteBranch);
+  }
+
+  private async linkedWorktreeDeletionPlan(folder: string, deleteRemoteBranch: boolean): Promise<{
+    current: Omit<AgentGitWorkflow, 'githubConnected' | 'existingPullRequest'>;
+    target: { path: string; branch?: string };
+  }> {
+    const current = await this.workflow(folder);
+    if (!current.isLinkedWorktree) throw new Error('The current folder is not a linked worktree.');
+    if (!current.branch || current.detached) throw new Error('The linked worktree does not have a local branch to delete.');
+    if (current.files.length > 0) throw new Error('Commit or discard the worktree changes before deleting it.');
+
+    const worktrees = parseWorktrees((await this.runGit(folder, ['worktree', 'list', '--porcelain'])).stdout);
+    const target = selectMergeTarget(worktrees, current.folder);
+    if (!target) throw new Error('A primary worktree is required before deleting this worktree.');
+
+    if (deleteRemoteBranch) {
+      if (!current.remote || !current.upstream?.startsWith(`${current.remote}/`)) {
+        throw new Error('The branch does not have a remote branch to delete.');
+      }
+    }
+    return { current, target };
   }
 
   private async localBranchExists(folder: string, branch: string): Promise<boolean> {
@@ -272,6 +305,15 @@ export class AgentGitService {
     } catch {
       return false;
     }
+  }
+
+  private async remoteBranch(folder: string, branch: string): Promise<string | undefined> {
+    const refs = (await this.runGit(folder, ['for-each-ref', '--format=%(refname:short)', 'refs/remotes']))
+      .stdout
+      .split(/\r?\n/)
+      .map((value) => value.trim())
+      .filter((value) => value && !value.endsWith('/HEAD'));
+    return refs.find((ref) => ref.endsWith(`/${branch}`));
   }
 
   async mergeTarget(folder: string): Promise<string> {

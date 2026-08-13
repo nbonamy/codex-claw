@@ -288,27 +288,78 @@ describe('agent git service parsers', () => {
   });
 
   it('validates, creates, and checks out a branch from the current HEAD', async () => {
-    const runGit = vi.fn().mockResolvedValue({ stdout: '' });
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'show-ref') throw new Error('missing ref');
+      return { stdout: '' };
+    });
     const service = new AgentGitService(() => new Date(), runGit);
 
     await expect(service.createBranch('/repo', ' feature/from-current ')).resolves.toBe('/repo');
 
     expect(runGit.mock.calls).toStrictEqual([
       ['/repo', ['check-ref-format', '--branch', 'feature/from-current']],
+      ['/repo', ['show-ref', '--verify', '--quiet', 'refs/heads/feature/from-current']],
+      ['/repo', ['for-each-ref', '--format=%(refname:short)', 'refs/remotes']],
       ['/repo', ['switch', '-c', 'feature/from-current']],
     ]);
   });
 
   it('creates a branch in an adjacent worktree without switching the current checkout', async () => {
-    const runGit = vi.fn().mockResolvedValue({ stdout: '' });
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'show-ref') throw new Error('missing ref');
+      return { stdout: '' };
+    });
     const service = new AgentGitService(() => new Date(), runGit);
 
     await expect(service.createBranch('/repo', 'feature/worktree', true)).resolves.toBe('/repo-feature-worktree');
 
     expect(runGit.mock.calls).toStrictEqual([
       ['/repo', ['check-ref-format', '--branch', 'feature/worktree']],
+      ['/repo', ['worktree', 'list', '--porcelain']],
+      ['/repo', ['show-ref', '--verify', '--quiet', 'refs/heads/feature/worktree']],
+      ['/repo', ['for-each-ref', '--format=%(refname:short)', 'refs/remotes']],
       ['/repo', ['worktree', 'add', '-b', 'feature/worktree', '/repo-feature-worktree']],
     ]);
+  });
+
+  it('reuses an existing branch instead of trying to create it again', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'worktree' && args[1] === 'list') {
+        return { stdout: 'worktree /repo\nHEAD abc\nbranch refs/heads/main\n' };
+      }
+      return { stdout: '' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
+
+    await expect(service.createBranch('/repo', 'fix/gh-22', true)).resolves.toBe('/repo-fix-gh-22');
+
+    expect(runGit).toHaveBeenCalledWith('/repo', ['worktree', 'add', '/repo-fix-gh-22', 'fix/gh-22']);
+    expect(runGit).not.toHaveBeenCalledWith('/repo', expect.arrayContaining(['-b']));
+  });
+
+  it('uses the worktree that already has the requested branch checked out', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'worktree' && args[1] === 'list') {
+        return {
+          stdout: [
+            'worktree /repo',
+            'HEAD abc',
+            'branch refs/heads/main',
+            '',
+            'worktree /repo-fix-gh-22',
+            'HEAD def',
+            'branch refs/heads/fix/gh-22',
+            '',
+          ].join('\n'),
+        };
+      }
+      return { stdout: '' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
+
+    await expect(service.createBranch('/repo', 'fix/gh-22', true)).resolves.toBe('/repo-fix-gh-22');
+
+    expect(runGit).not.toHaveBeenCalledWith('/repo', expect.arrayContaining(['add']));
   });
 
   it('checks out the pull request head branch in either the current folder or a new worktree', async () => {
@@ -377,6 +428,72 @@ describe('agent git service parsers', () => {
     await expect(service.createBranch('/repo', '-dangerous')).rejects.toThrow('Enter a valid branch name.');
     await expect(service.createBranch('/repo', 'bad name')).rejects.toThrow('Enter a valid branch name.');
     expect(runGit).not.toHaveBeenCalledWith('/repo', expect.arrayContaining(['switch']));
+  });
+
+  it('deletes a clean linked worktree, its local branch, and the opted-in remote branch', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'worktree' && args[1] === 'list') {
+        return {
+          stdout: [
+            'worktree /repo',
+            'HEAD abc',
+            'branch refs/heads/main',
+            '',
+            'worktree /repo-fix-gh-22',
+            'HEAD def',
+            'branch refs/heads/fix/gh-22',
+            '',
+          ].join('\n'),
+        };
+      }
+      return { stdout: '' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
+    vi.spyOn(service, 'workflow').mockResolvedValue({
+      repository: 'owner/repo',
+      folder: '/repo-fix-gh-22',
+      isLinkedWorktree: true,
+      branch: 'fix/gh-22',
+      detached: false,
+      remote: 'origin',
+      upstream: 'origin/fix/gh-22',
+      ahead: 0,
+      behind: 0,
+      files: [],
+      stagedFiles: [],
+      unstagedFiles: [],
+    });
+
+    await service.deleteLinkedWorktree('/repo-fix-gh-22', true);
+
+    expect(runGit.mock.calls).toStrictEqual([
+      ['/repo-fix-gh-22', ['worktree', 'list', '--porcelain']],
+      ['/repo', ['push', 'origin', '--delete', 'fix/gh-22']],
+      ['/repo', ['worktree', 'remove', '/repo-fix-gh-22']],
+      ['/repo', ['branch', '-D', 'fix/gh-22']],
+    ]);
+  });
+
+  it('refuses to delete a linked worktree with uncommitted changes', async () => {
+    const runGit = vi.fn();
+    const service = new AgentGitService(() => new Date(), runGit);
+    vi.spyOn(service, 'workflow').mockResolvedValue({
+      repository: 'owner/repo',
+      folder: '/repo-fix-gh-22',
+      isLinkedWorktree: true,
+      branch: 'fix/gh-22',
+      detached: false,
+      ahead: 0,
+      behind: 0,
+      files: [{ path: 'src/index.ts', indexStatus: ' ', worktreeStatus: 'M' }],
+      stagedFiles: [],
+      unstagedFiles: ['src/index.ts'],
+    });
+
+    await expect(service.validateLinkedWorktreeDeletion('/repo-fix-gh-22')).rejects.toThrow(
+      'Commit or discard the worktree changes before deleting it.',
+    );
+    expect(runGit).not.toHaveBeenCalled();
   });
 
   it('reports whether the repository folder is a secondary linked worktree', async () => {

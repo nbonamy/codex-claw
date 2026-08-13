@@ -561,8 +561,16 @@ export class ClawBackendServer {
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.agentDelete: {
-        const agentId = requireAgentId(message.params);
-        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentDelete, { agentId }, async (existingAgent) => {
+        const { agentId, input } = requireAgentCloseRequest(message.params);
+        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentDelete, {
+          agentId,
+          ...(input ? { input } : {}),
+        }, async (existingAgent) => {
+          if (input?.deleteWorktree) {
+            const sharedAgent = this.snapshot.agents.find((agent) => agent.id !== agentId && agent.folder === existingAgent.folder);
+            if (sharedAgent) throw new Error(`The worktree is also used by ${sharedAgent.name}.`);
+            await this.agentGitService.validateLinkedWorktreeDeletion(existingAgent.folder, input.deleteRemoteBranch === true);
+          }
           if (existingAgent.backendSession) {
             await this.handleAgentDriverRequest(existingAgent, backendMethods.driverConversationRetire, {
               agent: existingAgent,
@@ -571,6 +579,9 @@ export class ClawBackendServer {
               backend: existingAgent.backend,
               agentId,
             });
+          }
+          if (input?.deleteWorktree) {
+            await this.agentGitService.deleteLinkedWorktree(existingAgent.folder, input.deleteRemoteBranch === true);
           }
           const agent = closeAgentInSnapshot(this.snapshot, agentId);
           if (!agent) {
@@ -3151,6 +3162,32 @@ function requireTeamId(params: unknown): string {
 function requireAgentId(params: unknown): string {
   const record = requireRecord(params);
   return requireString(record.agentId, 'agentId');
+}
+
+function requireAgentCloseRequest(params: unknown): {
+  agentId: string;
+  input?: { deleteWorktree: boolean; deleteRemoteBranch?: boolean; confirmed: true };
+} {
+  const record = requireRecord(params);
+  const agentId = requireString(record.agentId, 'agentId');
+  if (record.input === undefined) return { agentId };
+  const input = requireRecord(record.input);
+  if (input.confirmed !== true) throw new Error('Deleting a worktree requires confirmation.');
+  if (typeof input.deleteWorktree !== 'boolean') throw new Error('deleteWorktree must be a boolean.');
+  if (input.deleteRemoteBranch !== undefined && typeof input.deleteRemoteBranch !== 'boolean') {
+    throw new Error('deleteRemoteBranch must be a boolean.');
+  }
+  if (input.deleteRemoteBranch === true && input.deleteWorktree !== true) {
+    throw new Error('Delete the worktree before deleting its remote branch.');
+  }
+  return {
+    agentId,
+    input: {
+      deleteWorktree: input.deleteWorktree,
+      ...(input.deleteRemoteBranch === undefined ? {} : { deleteRemoteBranch: input.deleteRemoteBranch }),
+      confirmed: true,
+    },
+  };
 }
 
 function requireDuplicateAgentRequest(params: unknown): { agentId: string; options?: DuplicateAgentOptions } {

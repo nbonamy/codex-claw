@@ -1173,6 +1173,7 @@ export type AgentGitStageInput = { paths: string[]; confirmed: boolean };
 export type AgentGitCommitInput = { message: string; confirmed: boolean; includeUnstaged?: boolean; includeUntracked?: boolean };
 export type AgentGitPushInput = { confirmed: boolean; target?: 'current' | 'mergeTarget' };
 export type AgentGitBranchInput = { name: string; createWorktree?: boolean; pullRequestNumber?: number; confirmed: boolean };
+export type AgentCloseInput = { deleteWorktree: boolean; deleteRemoteBranch?: boolean; confirmed: boolean };
 export type AgentGitPullRequestInput = { title: string; body: string; confirmed: boolean };
 export type AgentGitMergeInput = { strategy: 'merge' | 'squash'; commitMessage?: string; deleteBranch: boolean; deleteWorktree: boolean; confirmed: boolean };
 export type AgentGitMessageGenerationInput =
@@ -1544,7 +1545,7 @@ export type CodexClawApi = {
   restartAgent(agentId: string): Promise<AppSnapshot>;
   hydrateAgentHistory(agentId: string): Promise<AppSnapshotMetadata>;
   loadOlderAgentHistory(agentId: string): Promise<AgentHistoryLoadResult>;
-  closeAgent(agentId: string): Promise<AppSnapshot>;
+  closeAgent(agentId: string, input?: AgentCloseInput): Promise<AppSnapshot>;
   selectAgent(agentId: string): Promise<AppSnapshotMetadata>;
   updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>;
   getCodexResourceSharingStatus(): Promise<CodexResourceSharingStatus>;

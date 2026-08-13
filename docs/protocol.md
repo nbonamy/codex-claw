@@ -112,7 +112,7 @@ therefore never replayed after reconnect or renderer reload.
 | `agent/fork` | `{ agentId, messageIndex? }` | `AppSnapshot` | Forks an idle agent's backend conversation, optionally at an absolute host message index, into a new selected agent directly below the source. |
 | `agent/team/move` | `{ input: MoveAgentToTeamInput }` | `AppSnapshot` | Moves a local agent between local teams. Cross-backend moves are rejected; create a new agent in the target remote team instead. |
 | `agent/reorder` | `{ input: ReorderAgentsInput }` | `AppSnapshot` | Reorders within a team. |
-| `agent/delete` | `{ agentId }` | `AppSnapshot` | Removes the active product agent. |
+| `agent/delete` | `{ agentId, input? }` | `AppSnapshot` | Removes the product agent and, when explicitly confirmed, its clean linked worktree, local branch, and optional tracked remote branch. |
 | `agent/folder/update` | `{ agentId, folder }` | `AppSnapshot` | Folder picker remains client-side; mutation and validation are backend-owned. |
 | `agent/files/list` | `{ agentId }` | `AgentFileSearchItem[]` | Lists files under the agent folder. |
 | `agent/file/preview` | `{ agentId, filePath }` | `AgentFilePreviewResult` | Reads a backend-owned agent resource. The backend confines relative and absolute inputs (including resolved symlinks) to the agent workspace, caps preview bytes, and classifies text, image, binary, and oversized results. Clients must not read workspace files directly. |

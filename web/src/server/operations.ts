@@ -76,7 +76,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   restartAgent: [backendMethods.agentRestart, named('agentId')],
   hydrateAgentHistory: [backendMethods.agentHistoryHydrate, named('agentId')],
   loadOlderAgentHistory: [backendMethods.agentHistoryLoadOlder, named('agentId')],
-  closeAgent: [backendMethods.agentDelete, named('agentId')],
+  closeAgent: [backendMethods.agentDelete, namedOptional('agentId', 'input')],
   selectAgent: [backendMethods.agentSelect, named('agentId')],
   updateSettings: [backendMethods.settingsUpdate, named('input')],
   getCodexResourceSharingStatus: [backendMethods.settingsCodexResourceSharingGet],

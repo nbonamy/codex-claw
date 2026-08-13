@@ -115,7 +115,7 @@
     :restart-app="restartApp"
     @close-team="closeTeam"
     @disconnect-team="disconnectTeam"
-    @close-agent="closeAgent"
+    @close-agent="requestCloseAgent"
     @duplicate-agent="duplicateAgent"
     @fork-agent="forkAgent"
     @fork-message="forkActiveAgentMessage"
@@ -154,6 +154,16 @@
     @update:composer-attachments="updateComposerAttachments($event.agentId, $event.attachments)"
     @install-update="installUpdate"
   />
+  <AgentCloseDialog
+    :visible="pendingAgentClose !== null"
+    :agent="pendingAgentClose?.agent"
+    :workflow="pendingAgentClose?.workflow"
+    :busy="agentCloseBusy"
+    :error="agentCloseError"
+    @close="cancelAgentClose"
+    @keep-worktree="confirmAgentClose(false)"
+    @delete-worktree="confirmAgentClose(true, $event)"
+  />
   <ConfettiOverlay />
   <Transition name="backend-restart-overlay">
     <div
@@ -177,8 +187,9 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { DesktopUpdateStatus } from '@codex-claw/core/contracts';
+import type { Agent, AgentGitWorkflow, DesktopUpdateStatus } from '@codex-claw/core/contracts';
 import AppShell from './components/AppShell.vue';
+import AgentCloseDialog from './components/AgentCloseDialog.vue';
 import { useAppState } from './app-state';
 import ConfettiOverlay from './shared/confetti/ConfettiOverlay.vue';
 import { applyAppTheme, subscribeToSystemAppearance } from './theme/apply-theme';
@@ -271,7 +282,7 @@ const {
   deployBenchTemplate,
   removeBenchTemplate,
   restartAgent,
-  closeAgent,
+  closeAgent: closeAgentAction,
   updateSettings,
   setCodexResourceSharing,
   listSshHosts,
@@ -339,11 +350,55 @@ const {
 } = useAppState();
 
 const updateStatus = ref<DesktopUpdateStatus>({ state: 'idle' });
+const pendingAgentClose = ref<{ agent: Agent; workflow: AgentGitWorkflow } | null>(null);
+const agentCloseBusy = ref(false);
+const agentCloseError = ref<string | null>(null);
 let unsubscribeSystemAppearance: (() => void) | null = null;
 let unsubscribeUpdateStatus: (() => void) | null = null;
 
 async function installUpdate(): Promise<void> {
   await codexClawApi?.installUpdate?.();
+}
+
+async function requestCloseAgent(agentId: string): Promise<void> {
+  const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
+  if (!agent) return;
+  try {
+    const workflow = await getAgentGitWorkflow(agentId);
+    if (workflow.isLinkedWorktree) {
+      pendingAgentClose.value = { agent, workflow };
+      agentCloseError.value = null;
+      return;
+    }
+  } catch {
+    // Non-Git folders and unavailable Git hosts use the normal close behavior.
+  }
+  await closeAgentAction(agentId);
+}
+
+function cancelAgentClose(): void {
+  if (agentCloseBusy.value) return;
+  pendingAgentClose.value = null;
+  agentCloseError.value = null;
+}
+
+async function confirmAgentClose(deleteWorktree: boolean, deleteRemoteBranch = false): Promise<void> {
+  const pending = pendingAgentClose.value;
+  if (!pending || agentCloseBusy.value) return;
+  agentCloseBusy.value = true;
+  agentCloseError.value = null;
+  try {
+    await closeAgentAction(pending.agent.id, deleteWorktree ? {
+      deleteWorktree: true,
+      deleteRemoteBranch,
+      confirmed: true,
+    } : undefined);
+    pendingAgentClose.value = null;
+  } catch (error) {
+    agentCloseError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    agentCloseBusy.value = false;
+  }
 }
 
 function syncRendererWindowFocus(): void {

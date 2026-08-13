@@ -3,6 +3,7 @@ import ElementPlus from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../App.vue';
 import AppShell from '../components/AppShell.vue';
+import AgentCloseDialog from '../components/AgentCloseDialog.vue';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { CodexClawApi } from '@codex-claw/core/contracts';
 import { setElectronTestClient } from '../test/client';
@@ -119,5 +120,56 @@ describe('App', () => {
     expect(installUpdate).toHaveBeenCalledOnce();
     wrapper.unmount();
     expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it('prompts for linked-worktree cleanup and forwards the confirmed cleanup policy', async () => {
+    const snapshot = createInitialSnapshot();
+    const getAgentGitWorkflow = vi.fn().mockResolvedValue({
+      repository: 'owner/repo',
+      folder: snapshot.agents[0]!.folder,
+      isLinkedWorktree: true,
+      branch: 'fix/gh-22',
+      detached: false,
+      remote: 'origin',
+      upstream: 'origin/fix/gh-22',
+      ahead: 0,
+      behind: 0,
+      files: [],
+      stagedFiles: [],
+      unstagedFiles: [],
+      githubConnected: true,
+    });
+    const closeAgent = vi.fn().mockResolvedValue({ ...snapshot, agents: [] });
+    setElectronTestClient({
+      getSnapshot: vi.fn().mockResolvedValue(snapshot),
+      getAgentGitWorkflow,
+      closeAgent,
+      onEvent: vi.fn(),
+    });
+    const wrapper = mount(App, {
+      global: {
+        plugins: [ElementPlus],
+        stubs: {
+          ElPopover: { template: '<div><slot name="reference" /><slot /></div>' },
+        },
+      },
+    });
+    await flushPromises();
+
+    wrapper.findComponent(AppShell).vm.$emit('close-agent', snapshot.agents[0]!.id);
+    await flushPromises();
+
+    expect(getAgentGitWorkflow).toHaveBeenCalledWith(snapshot.agents[0]!.id);
+    const dialog = wrapper.findComponent(AgentCloseDialog);
+    expect(dialog.props('visible')).toBe(true);
+
+    dialog.vm.$emit('delete-worktree', true);
+    await flushPromises();
+
+    expect(closeAgent).toHaveBeenCalledWith(snapshot.agents[0]!.id, {
+      deleteWorktree: true,
+      deleteRemoteBranch: true,
+      confirmed: true,
+    });
   });
 });

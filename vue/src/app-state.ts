@@ -1496,12 +1496,14 @@ export function useAppState() {
     adoptBackgroundSnapshot(await codexClawApi.restartAgent(agentId));
   }
 
-  async function closeAgent(agentId: string): Promise<void> {
+  async function closeAgent(agentId: string, input?: import('@codex-claw/core/contracts').AgentCloseInput): Promise<void> {
     if (!codexClawApi?.closeAgent) {
       return;
     }
 
-    adoptNavigationSnapshot(await codexClawApi.closeAgent(agentId));
+    adoptNavigationSnapshot(await (input
+      ? codexClawApi.closeAgent(agentId, input)
+      : codexClawApi.closeAgent(agentId)));
     await loadActiveAgentCatalogs();
   }
 

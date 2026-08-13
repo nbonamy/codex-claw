@@ -3476,6 +3476,76 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
+  it('deletes an explicitly confirmed linked worktree before removing its agent', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/repo-fix-gh-22',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-08-01T00:00:00.000Z',
+      updatedAt: '2026-08-01T00:00:00.000Z',
+    }];
+    snapshot.activeAgentId = 'agent-dina';
+    const validateLinkedWorktreeDeletion = vi.fn();
+    const deleteLinkedWorktree = vi.fn();
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      agentGitService: { validateLinkedWorktreeDeletion, deleteLinkedWorktree } as unknown as AgentGitService,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'close-agent-worktree',
+      method: backendMethods.agentDelete,
+      params: {
+        agentId: 'agent-dina',
+        input: { deleteWorktree: true, deleteRemoteBranch: true, confirmed: true },
+      },
+    })).resolves.toMatchObject({ result: { agents: [] } });
+
+    expect(validateLinkedWorktreeDeletion).toHaveBeenCalledWith('/repo-fix-gh-22', true);
+    expect(deleteLinkedWorktree).toHaveBeenCalledWith('/repo-fix-gh-22', true);
+    await server.close();
+  });
+
+  it('does not delete a worktree shared by another agent', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina', 'agent-jesse'];
+    snapshot.agents = [
+      {
+        id: 'agent-dina', teamId: 'team-test', name: 'Dina', folder: '/repo-feature', backend: 'codex',
+        status: { type: 'idle' }, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+      },
+      {
+        id: 'agent-jesse', teamId: 'team-test', name: 'Jesse', folder: '/repo-feature', backend: 'codex',
+        status: { type: 'idle' }, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+      },
+    ];
+    snapshot.activeAgentId = 'agent-dina';
+    const deleteLinkedWorktree = vi.fn();
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      agentGitService: { deleteLinkedWorktree } as unknown as AgentGitService,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'close-shared-worktree',
+      method: backendMethods.agentDelete,
+      params: { agentId: 'agent-dina', input: { deleteWorktree: true, confirmed: true } },
+    })).rejects.toThrow('The worktree is also used by Jesse.');
+
+    expect(deleteLinkedWorktree).not.toHaveBeenCalled();
+    expect(snapshot.agents).toHaveLength(2);
+    await server.close();
+  });
+
   it('owns agent file listing and reads by resolving agent folders internally', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-agent-files-'));
     const snapshot = createTestSnapshot();
