@@ -452,13 +452,18 @@ describe('RepositoryBacklogPanel', () => {
     expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({ action: 'review' }));
   });
 
-  it('dismisses start work when the popover closes or the workspace becomes inactive', async () => {
+  it('keeps start work open on pointer exit and dismisses it on outside close or inactive workspace', async () => {
     const wrapper = mountPanel();
 
     await wrapper.get('[aria-label="Work item actions #12"]').trigger('click');
     expect(wrapper.text()).toContain('Start work on #12');
+    const startWorkPopover = wrapper.findAllComponents({ name: 'ElPopover' }).at(-1);
+    expect(startWorkPopover?.props('trigger')).toBe('click');
 
-    wrapper.findAllComponents({ name: 'ElPopover' }).at(-1)?.vm.$emit('update:visible', false);
+    await wrapper.get('.repository-backlog__start-work').trigger('mouseleave');
+    expect(wrapper.text()).toContain('Start work on #12');
+
+    startWorkPopover?.vm.$emit('update:visible', false);
     await nextTick();
     expect(wrapper.text()).not.toContain('Start work on #12');
 
@@ -492,7 +497,7 @@ function mountPanel(overrides: Partial<InstanceType<typeof RepositoryBacklogPane
       stubs: {
         ElPopover: {
           name: 'ElPopover',
-          props: ['visible'],
+          props: ['trigger', 'visible'],
           emits: ['update:visible'],
           template: '<div><slot name="reference" /><slot v-if="visible !== false" /></div>',
         },

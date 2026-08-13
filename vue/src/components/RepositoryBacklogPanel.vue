@@ -194,6 +194,7 @@
       :visible="startWorkVisible"
       virtual-triggering
       :virtual-ref="virtualReference"
+      trigger="click"
       placement="bottom-end"
       :width="selectedAssignment ? 220 : 340"
       :teleported="true"
