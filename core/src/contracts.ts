@@ -1376,6 +1376,7 @@ export type UpdateAgentInput = {
 
 export type DuplicateAgentOptions = {
   select?: boolean;
+  name?: string;
 };
 
 export type MoveAgentToTeamInput = {

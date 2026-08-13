@@ -60,6 +60,20 @@ describe('agent-manager', () => {
     expect(snapshot.teams[0].agentIds.slice(0, 2)).toStrictEqual(['agent-dina', 'agent-background-copy']);
   });
 
+  it('duplicates an agent with a caller-provided name', () => {
+    const snapshot = createInitialSnapshot();
+    const duplicate = duplicateAgentInSnapshot(
+      snapshot,
+      'agent-dina',
+      '2026-06-05T10:11:12.000Z',
+      () => 'agent-work-item',
+      { name: '  Dina gh-24  ', select: false },
+    );
+
+    expect(duplicate?.name).toBe('Dina gh-24');
+    expect(snapshot.activeAgentId).toBe('agent-dina');
+  });
+
   it('generates collision-safe ids for duplicated agents and bench templates', () => {
     const snapshot = createInitialSnapshot();
 

@@ -227,9 +227,11 @@ implemented:
   an item can prefill an editable custom prompt or immediately dispatch a
   contextual issue investigation/fix or pull-request feedback/review action to
   the current agent or, by default, a background-created duplicate that does
-  not interrupt the user's current workspace, either continuing in the agent's
-  current workspace or creating a short suggested branch such as `fix/gh-22`
-  in a new worktree by default. Existing local or tracked remote branches are
+  not interrupt the user's current workspace. Backlog duplicates are named
+  after their source agent and work item, such as `codex-claw gh-24`, instead
+  of using the generic copy suffix. Work can remain in the agent's current
+  workspace or use a short suggested branch such as `fix/gh-22` in a new
+  worktree by default. Existing local or tracked remote branches are
   reused, and a branch already checked out in another worktree reuses that
   worktree instead of creating a conflicting checkout.
   Once assigned, work is grouped by its local `inProgress`, `blocked`,

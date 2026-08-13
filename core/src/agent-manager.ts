@@ -1,4 +1,4 @@
-import type { Agent, AppSnapshot, BackendSession, BenchTemplate, CreateBenchTemplateInput, RendererMessage, WorkBacklogAssignment, WorkBacklogAssignmentStatus } from './contracts';
+import type { Agent, AppSnapshot, BackendSession, BenchTemplate, CreateBenchTemplateInput, DuplicateAgentOptions, RendererMessage, WorkBacklogAssignment, WorkBacklogAssignmentStatus } from './contracts';
 import { createEntityId, createUniqueEntityId, type IdGenerator } from './ids';
 import { workBacklogAssignmentFromWorkItem, workItemAssignmentKey, type WorkItemAssignmentSource } from './work-assignments';
 
@@ -7,14 +7,14 @@ export function duplicateAgentInSnapshot(
   agentId: string,
   createdAt = new Date().toISOString(),
   createId: IdGenerator = () => createEntityId('agent'),
-  options: { select?: boolean } = {},
+  options: DuplicateAgentOptions = {},
 ): Agent | null {
   const source = snapshot.agents.find((agent) => agent.id === agentId);
   if (!source) {
     return null;
   }
 
-  const duplicate = copiedAgent(snapshot, source, 'copy', createdAt, createId);
+  const duplicate = copiedAgent(snapshot, source, 'copy', createdAt, createId, options.name);
   insertAgentAfterSource(snapshot, source, duplicate);
   if (options.select !== false) {
     snapshot.activeTeamId = duplicate.teamId ?? snapshot.activeTeamId;
@@ -433,11 +433,12 @@ function copiedAgent(
   suffix: 'copy' | 'fork',
   createdAt: string,
   createId: IdGenerator,
+  name?: string,
 ): Agent {
   return {
     id: uniqueAgentId(snapshot, createId),
     teamId: source.teamId ?? activeTeamId(snapshot),
-    name: `${source.name} (${suffix})`,
+    name: name?.trim() || `${source.name} (${suffix})`,
     avatar: source.avatar,
     folder: source.folder,
     backend: source.backend,

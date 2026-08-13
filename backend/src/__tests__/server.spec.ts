@@ -35,15 +35,28 @@ describe('ClawBackendServer', () => {
       jsonrpc: '2.0',
       id: 'duplicate-background',
       method: backendMethods.agentDuplicate,
-      params: { agentId: 'agent-dina', options: { select: false } },
+      params: { agentId: 'agent-dina', options: { name: 'Dina gh-24', select: false } },
     })).resolves.toMatchObject({
       result: {
         activeAgentId: 'agent-dina',
-        agents: [{ id: 'agent-dina' }, { name: 'Dina (copy)' }],
+        agents: [{ id: 'agent-dina' }, { name: 'Dina gh-24' }],
       },
     });
 
     expect(snapshot.activeAgentId).toBe('agent-dina');
+    await server.close();
+  });
+
+  it('rejects an empty duplicated agent name', async () => {
+    const server = new ClawBackendServer({ version: 'test-version', snapshot: createTestSnapshot() });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'duplicate-empty-name',
+      method: backendMethods.agentDuplicate,
+      params: { agentId: 'agent-dina', options: { name: '   ' } },
+    })).rejects.toThrow('name must be a non-empty string.');
+
     await server.close();
   });
 

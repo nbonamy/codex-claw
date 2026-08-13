@@ -3210,9 +3210,15 @@ function requireDuplicateAgentRequest(params: unknown): { agentId: string; optio
   if (options.select !== undefined && typeof options.select !== 'boolean') {
     throw new Error('select must be a boolean.');
   }
+  if (options.name !== undefined && (typeof options.name !== 'string' || !options.name.trim())) {
+    throw new Error('name must be a non-empty string.');
+  }
   return {
     agentId,
-    options: options.select === undefined ? {} : { select: options.select },
+    options: {
+      ...(options.select === undefined ? {} : { select: options.select }),
+      ...(options.name === undefined ? {} : { name: options.name.trim() }),
+    },
   };
 }
 

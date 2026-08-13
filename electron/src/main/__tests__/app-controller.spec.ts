@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController, requiresSingleInstanceLock, shouldBlockDisplaySleep } from '../app-controller';
 import { createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ipcChannels } from '@codex-claw/core/ipc';
@@ -893,7 +893,7 @@ describe('AppController', () => {
 
     await expect(createAgent(controller, createInput)).resolves.toBe(backendSnapshot);
     await expect(updateAgent(controller, updateInput)).resolves.toBe(backendSnapshot);
-    await expect(duplicateAgent(controller, 'agent-dina', { select: false })).resolves.toBe(backendSnapshot);
+    await expect(duplicateAgent(controller, 'agent-dina', { name: 'Dina gh-24', select: false })).resolves.toBe(backendSnapshot);
     await expect(forkAgent(controller, 'agent-dina', 4)).resolves.toBe(backendSnapshot);
     await expect(moveAgentToTeam(controller, moveInput)).resolves.toBe(backendSnapshot);
     await expect(reorderAgents(controller, reorderInput)).resolves.toBe(backendSnapshot);
@@ -903,7 +903,7 @@ describe('AppController', () => {
 
     expect(request).toHaveBeenNthCalledWith(1, 'agent/create', { input: createInput });
     expect(request).toHaveBeenNthCalledWith(2, 'agent/update', { input: updateInput });
-    expect(request).toHaveBeenNthCalledWith(3, 'agent/duplicate', { agentId: 'agent-dina', options: { select: false } });
+    expect(request).toHaveBeenNthCalledWith(3, 'agent/duplicate', { agentId: 'agent-dina', options: { name: 'Dina gh-24', select: false } });
     expect(request).toHaveBeenNthCalledWith(4, 'agent/fork', { agentId: 'agent-dina', messageIndex: 4 });
     expect(request).toHaveBeenNthCalledWith(5, 'agent/team/move', { input: moveInput });
     expect(request).toHaveBeenNthCalledWith(6, 'agent/reorder', { input: reorderInput });
@@ -2396,9 +2396,9 @@ async function updateAgent(controller: AppController, input: UpdateAgentInput): 
   }).updateAgent(input);
 }
 
-async function duplicateAgent(controller: AppController, agentId: string, options?: { select?: boolean }): Promise<AppSnapshot> {
+async function duplicateAgent(controller: AppController, agentId: string, options?: DuplicateAgentOptions): Promise<AppSnapshot> {
   return (controller as unknown as {
-    duplicateAgent(agentId: string, options?: { select?: boolean }): Promise<AppSnapshot>;
+    duplicateAgent(agentId: string, options?: DuplicateAgentOptions): Promise<AppSnapshot>;
   }).duplicateAgent(agentId, options);
 }
 

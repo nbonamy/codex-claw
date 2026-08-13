@@ -1045,7 +1045,10 @@ describe('AppShell', () => {
       workspace: { branchName: 'feature/pull-request-42', kind: 'worktree' },
     });
 
-    expect(duplicateAgentAction).toHaveBeenCalledWith('agent-dina', { select: false });
+    expect(duplicateAgentAction).toHaveBeenCalledWith('agent-dina', {
+      name: 'Dina gh-42',
+      select: false,
+    });
     expect(createAgentGitBranch).toHaveBeenCalledWith('agent-reviewer', {
       name: 'feature/pull-request-42',
       createWorktree: true,
@@ -1056,6 +1059,32 @@ describe('AppShell', () => {
       agentId: 'agent-reviewer',
       item,
       prompt: workItemAssignmentPrompt(item, { action: 'review' }),
+    });
+  });
+
+  it('names a duplicated issue agent after its source and work item', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.name = 'codex-claw';
+    const item = workItem({ id: 'nbonamy/codex-claw#24', number: 24 });
+    const duplicate = { ...snapshot.agents[0]!, id: 'agent-gh-24', name: 'codex-claw gh-24' };
+    const duplicateAgentAction = vi.fn().mockResolvedValue(duplicate);
+    const wrapper = mountShell({
+      snapshot,
+      duplicateAgentAction,
+      createAgentGitBranch: vi.fn().mockResolvedValue({}),
+      assignWorkItemAction: vi.fn().mockResolvedValue(undefined),
+    });
+
+    await wrapper.getComponent({ name: 'RightWorkspacePanel' }).props('startRepositoryWork')({
+      action: 'fix',
+      item,
+      target: 'duplicate',
+      workspace: { branchName: 'fix/gh-24', kind: 'worktree' },
+    });
+
+    expect(duplicateAgentAction).toHaveBeenCalledWith('agent-dina', {
+      name: 'codex-claw gh-24',
+      select: false,
     });
   });
 
@@ -3775,7 +3804,7 @@ function mountShell(overrides: Partial<{
   loadWorkItems: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery) => Promise<WorkItem[] | void>;
   createWorkItem: (input: import('@codex-claw/core/contracts').CreateWorkItemInput) => Promise<WorkItem>;
   createAgentGitBranch: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitBranchInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
-  duplicateAgentAction: (agentId: string, options?: { select?: boolean }) => Promise<Agent | null>;
+  duplicateAgentAction: (agentId: string, options?: { name?: string; select?: boolean }) => Promise<Agent | null>;
   assignWorkItemAction: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
   loadBench: (location?: BenchLocation) => Promise<void>;
   getLoopSnapshot: (location?: LoopLocation) => Promise<AppSnapshot>;

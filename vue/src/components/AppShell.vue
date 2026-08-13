@@ -1575,7 +1575,10 @@ async function startRepositoryWork(agentId: string, input: RepositoryWorkStartIn
   }
 
   const targetAgent = input.target === 'duplicate'
-    ? await props.duplicateAgentAction(sourceAgent.id, { select: false })
+    ? await props.duplicateAgentAction(sourceAgent.id, {
+        select: false,
+        name: `${sourceAgent.name} gh-${workItem.number}`,
+      })
     : sourceAgent;
   if (!targetAgent) throw new Error('The duplicate agent could not be created.');
 
