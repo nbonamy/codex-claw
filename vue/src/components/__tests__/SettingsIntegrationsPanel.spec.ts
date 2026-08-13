@@ -17,6 +17,8 @@ describe('SettingsIntegrationsPanel', () => {
     expect(title.element.compareDocumentPosition(banner.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(banner.attributes('aria-hidden')).toBe('true');
     expect(banner.text()).toBe('');
+    expect(wrapper.find('svg.github-icon').exists()).toBe(true);
+    expect(wrapper.find('img.github-icon').exists()).toBe(false);
   });
 
   it('emits connect for disconnected GitHub', async () => {
