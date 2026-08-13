@@ -275,7 +275,10 @@
             :github-connection="snapshot.workBacklog.connections.find((connection) => connection.provider === 'github') ?? null"
             :work-assignments="snapshot.workBacklog.assignments"
             :prefill-repository-work="(item) => prefillRepositoryWork(agent.id, item)"
+            :clear-repository-work-assignment="(item) => $emit('remove-work-item-assignment', item)"
             :start-repository-work="(input) => startRepositoryWork(agent.id, input)"
+            :show-repository-work-agent="selectAgentFromShell"
+            :create-repository-issue="(description) => createRepositoryIssue(agent.id, description)"
             @close-tab="closeRightWorkspaceTab(agent.id, $event)"
             @cancel-plan="cancelPlanReview(agent.id)"
             @comment-plan="commentOnPlan"
@@ -555,6 +558,7 @@ const props = withDefaults(defineProps<{
   loadBench?: (location?: BenchLocation) => Promise<BenchTemplate[] | void>;
   loadWorkRepositories?: (provider: WorkProviderKind, location?: LoopLocation) => Promise<WorkRepository[] | void>;
   loadWorkItems?: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: WorkItemQuery) => Promise<WorkItem[] | void>;
+  createWorkItem?: (input: import('@codex-claw/core/contracts').CreateWorkItemInput) => Promise<WorkItem>;
   duplicateAgentAction?: (agentId: string) => Promise<Agent | null>;
   assignWorkItemAction?: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
   loadOlderAgentHistory?: (agentId: string) => Promise<void>;
@@ -662,6 +666,7 @@ const props = withDefaults(defineProps<{
   loadBench: async () => undefined,
   loadWorkRepositories: async () => undefined,
   loadWorkItems: async () => undefined,
+  createWorkItem: async () => { throw new Error('Issue creation is not available.'); },
   duplicateAgentAction: async () => null,
   assignWorkItemAction: async () => undefined,
   quit: async () => undefined,
@@ -1507,6 +1512,22 @@ async function loadRepositoryBacklog(agentId: string): Promise<void> {
     workspace.backlogStatus = 'error';
     workspace.backlogError = error instanceof Error ? error.message : String(error);
   }
+}
+
+async function createRepositoryIssue(agentId: string, description: string): Promise<WorkItem> {
+  const repositoryId = props.snapshot.agentGitStatuses[agentId]?.githubRepository?.trim();
+  if (!repositoryId) throw new Error('This repository is not connected to GitHub.');
+  const item = await props.createWorkItem({
+    agentId,
+    provider: 'github',
+    repositoryId,
+    description,
+  });
+  const workspace = rightWorkspaceFor(agentId);
+  workspace.backlogItems = [item, ...workspace.backlogItems.filter((candidate) => candidate.id !== item.id)];
+  workspace.backlogStatus = 'loaded';
+  workspace.backlogError = null;
+  return item;
 }
 
 async function startRepositoryWork(agentId: string, input: RepositoryWorkStartInput): Promise<void> {

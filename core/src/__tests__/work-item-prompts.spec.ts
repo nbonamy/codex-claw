@@ -12,7 +12,9 @@ describe('work item prompts', () => {
 
     expect(prompt).toContain('Please take this GitHub issue and drive it to completion.');
     expect(prompt).toContain('Work item ID: github:nbonamy/codex-claw#42');
-    expect(prompt).toContain('`mark-work-item-completed`');
+    expect(prompt).toContain('`update-work-item`');
+    expect(prompt).toContain('status `readyForReview`');
+    expect(prompt).toContain('status `blocked`');
     expect(prompt).toContain('Labels: bug');
     expect(prompt).toContain('Author: nicolas');
     expect(prompt).toContain('Assignment instructions:\nAdd a regression test.');
@@ -48,6 +50,13 @@ describe('work item prompts', () => {
     const pullRequest = workItem({ kind: 'pullRequest' });
     expect(workItemAssignmentPrompt(pullRequest, { action: 'addressFeedback' })).toContain('Inspect the current review comments, update the branch');
     expect(workItemAssignmentPrompt(pullRequest, { action: 'review' })).toContain('Report concrete findings and do not modify files.');
+  });
+
+  it('uses completed as the terminal state for automation assignments', () => {
+    const prompt = workItemAssignmentPrompt(workItem(), { completionPolicy: 'complete' });
+
+    expect(prompt).toContain('status `completed`');
+    expect(prompt).not.toContain('status `readyForReview`');
   });
 
   it('creates an editable composer prompt without dispatch instructions', () => {

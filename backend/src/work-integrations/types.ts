@@ -36,6 +36,7 @@ export interface WorkProviderDriver {
   currentAccountLabel(token: WorkProviderToken): Promise<string>;
   listRepositories(token: WorkProviderToken): Promise<WorkRepository[]>;
   listItems(token: WorkProviderToken, repositoryId: string, query?: WorkItemQuery): Promise<WorkItem[]>;
+  createItem?(token: WorkProviderToken, repositoryId: string, input: { title: string; body: string }): Promise<WorkItem>;
   findPullRequest?(token: WorkProviderToken, repositoryId: string, branch: string): Promise<AgentGitPullRequest | null>;
   createPullRequest?(token: WorkProviderToken, repositoryId: string, input: { branch: string; title: string; body: string }): Promise<AgentGitPullRequest>;
 }

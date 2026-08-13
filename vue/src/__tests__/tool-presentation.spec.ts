@@ -22,7 +22,7 @@ describe('Claw tool presentation', () => {
     ['list-agents', UsersIcon, 'Listed agents'],
     ['create-worktree', GitBranchIcon, 'Created worktree feature/tool-icons'],
     ['display-markdown', MarkdownIcon, 'Displayed Review notes'],
-    ['mark-work-item-completed', SquareCheck, 'Marked work item complete'],
+    ['update-work-item', SquareCheck, 'Updated work item'],
   ])('presents %s with a semantic Claw icon and title', (tool, icon, title) => {
     const args = tool === 'send-message'
       ? { to: 'codex-app-sdk' }

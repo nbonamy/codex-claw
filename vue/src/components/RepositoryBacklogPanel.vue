@@ -155,23 +155,25 @@
     </div>
 
     <div v-else class="repository-backlog__list">
-      <section v-if="attentionItems.length" class="repository-backlog__group">
-        <h3>{{ t('repositoryBacklog.needsAttention') }} <span>{{ attentionItems.length }}</span></h3>
+      <section v-for="group in assignmentGroups" :key="group.status" class="repository-backlog__group" :data-status="group.status">
+        <h3>{{ group.label }} <span>{{ group.items.length }}</span></h3>
         <RepositoryItemRow
-          v-for="item in attentionItems"
+          v-for="item in group.items"
           :key="item.id"
           :item="item"
+          :assignment="assignmentFor(item)"
           :active="openItemId === item.id"
           @open="openItem(item, $event)"
         />
       </section>
 
-      <section v-if="otherItems.length" class="repository-backlog__group">
-        <h3>{{ stateFilter === 'closed' ? t('repositoryBacklog.closed') : t('repositoryBacklog.open') }} <span>{{ otherItems.length }}</span></h3>
+      <section v-if="unassignedItems.length" class="repository-backlog__group">
+        <h3>{{ stateFilter === 'closed' ? t('repositoryBacklog.closed') : t('repositoryBacklog.open') }} <span>{{ unassignedItems.length }}</span></h3>
         <RepositoryItemRow
-          v-for="item in otherItems"
+          v-for="item in unassignedItems"
           :key="item.id"
           :item="item"
+          :assignment="null"
           :active="openItemId === item.id"
           @open="openItem(item, $event)"
         />
@@ -198,7 +200,27 @@
       @update:visible="setStartWorkVisible"
     >
       <div class="repository-backlog__start-work">
-        <template v-if="operationState === 'idle' || operationState === 'error'">
+        <template v-if="selectedAssignment">
+          <header>
+            <strong>{{ t('repositoryBacklog.assignedTo', { name: selectedAssignedAgent?.name ?? selectedAssignment.agentId }) }}</strong>
+            <button type="button" aria-label="Close" @click="closeStartWork"><IconX aria-hidden="true" /></button>
+          </header>
+          <div class="repository-backlog__assignment-actions">
+            <button
+              v-if="selectedAssignment.agentId !== agent.id"
+              type="button"
+              @click="showAssignedAgent"
+            >
+              <IconRobotFace aria-hidden="true" />
+              {{ t('repositoryBacklog.showAgent') }}
+            </button>
+            <button type="button" @click="clearSelectedAssignment">
+              <IconX aria-hidden="true" />
+              {{ t('repositoryBacklog.clearAssignment') }}
+            </button>
+          </div>
+        </template>
+        <template v-else-if="operationState === 'idle' || operationState === 'error'">
           <header>
             <strong>{{ t('repositoryBacklog.startWork', { number: selectedItem.number }) }}</strong>
             <button type="button" aria-label="Close" @click="closeStartWork"><IconX aria-hidden="true" /></button>
@@ -231,8 +253,7 @@
               <input v-model="workspaceMode" type="radio" value="current" :disabled="target === 'duplicate'">
               <IconFolder aria-hidden="true" />
               <span>
-                <strong>{{ t('repositoryBacklog.currentWorkspace') }}</strong>
-                <small>{{ currentWorkspaceDetail }}</small>
+                <strong>{{ selectedItem.kind === 'pullRequest' ? t('repositoryBacklog.pullRequestCurrentFolder') : t('repositoryBacklog.currentWorkspace') }}</strong>
               </span>
             </label>
             <label>
@@ -240,16 +261,25 @@
               <IconGitBranch aria-hidden="true" />
               <span>
                 <strong>{{ t('repositoryBacklog.newWorktree') }}</strong>
-                <small>{{ newWorktreeDetail }}</small>
               </span>
             </label>
-            <input
-              v-if="workspaceMode === 'worktree' && selectedItem.kind !== 'pullRequest'"
-              v-model="branchName"
-              class="repository-backlog__branch"
+            <div
+              v-if="selectedItem.kind !== 'pullRequest'"
+              class="repository-backlog__branch repository-backlog__branch--editable"
+              :class="{ 'repository-backlog__branch--disabled': workspaceMode === 'current' }"
+            >
+              <IconGitBranch aria-hidden="true" />
+              <input
+                v-model="branchName"
+                :disabled="workspaceMode === 'current'"
+                :aria-label="t('repositoryBacklog.branchName')"
+              >
+            </div>
+            <div
+              v-else-if="selectedItem.kind === 'pullRequest'"
+              class="repository-backlog__branch repository-backlog__branch--fixed"
               :aria-label="t('repositoryBacklog.branchName')"
             >
-            <div v-else-if="workspaceMode === 'worktree'" class="repository-backlog__branch repository-backlog__branch--fixed">
               <IconGitPullRequest aria-hidden="true" />
               {{ branchName }}
             </div>
@@ -310,6 +340,7 @@ defineOptions({ name: 'RepositoryBacklogPanel' });
 
 const props = defineProps<{
   agent: Agent;
+  agents: readonly Agent[];
   assignments: Record<string, WorkBacklogAssignment>;
   branch?: string;
   connection?: WorkIntegrationConnection | null;
@@ -317,6 +348,9 @@ const props = defineProps<{
   items: WorkItem[];
   repositoryId: string;
   prefillAction: (item: WorkItem) => void;
+  clearAssignmentAction?: (item: WorkItem) => void;
+  createIssueAction: (description: string) => Promise<WorkItem>;
+  showAgentAction?: (agentId: string) => void;
   status: 'notLoaded' | 'loading' | 'loaded' | 'error';
   startWorkAction: (input: RepositoryWorkStartInput) => Promise<void>;
   visible: boolean;
@@ -351,12 +385,6 @@ const primaryAction = computed<WorkItemAssignmentAction>(() => selectedItem.valu
 const workActionDisabled = computed(() => selectedItem.value?.kind !== 'pullRequest'
   && workspaceMode.value === 'worktree'
   && !branchName.value.trim());
-const currentWorkspaceDetail = computed(() => selectedItem.value?.kind === 'pullRequest'
-  ? t('repositoryBacklog.pullRequestCurrentWorkspaceDetail', { branch: branchName.value || t('repositoryBacklog.unknownBranch') })
-  : t('repositoryBacklog.currentWorkspaceDetail', { branch: props.branch || t('repositoryBacklog.currentBranch') }));
-const newWorktreeDetail = computed(() => selectedItem.value?.kind === 'pullRequest'
-  ? t('repositoryBacklog.pullRequestWorktreeDetail', { branch: branchName.value || t('repositoryBacklog.unknownBranch') })
-  : t('repositoryBacklog.newWorktreeDetail'));
 const operationWorkspaceLabel = computed(() => selectedItem.value?.kind === 'pullRequest' || workspaceMode.value === 'worktree'
   ? branchName.value
   : props.branch || t('repositoryBacklog.currentWorkspace'));
@@ -378,11 +406,15 @@ const filteredItems = computed(() => {
     .filter((item) => !query || `${item.number} ${item.title} ${item.authorName ?? ''}`.toLocaleLowerCase().includes(query))
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
 });
-const attentionItems = computed(() => filteredItems.value.filter((item) => {
-  const assignment = props.assignments[workItemAssignmentKey(item)];
-  return assignment?.agentId === props.agent.id && assignment.status === 'working';
-}));
-const otherItems = computed(() => filteredItems.value.filter((item) => !attentionItems.value.includes(item)));
+const assignmentGroups = computed(() => ([
+  { status: 'blocked', label: t('repositoryBacklog.blocked'), items: assignedItems('blocked') },
+  { status: 'readyForReview', label: t('repositoryBacklog.readyForReview'), items: assignedItems('readyForReview') },
+  { status: 'inProgress', label: t('repositoryBacklog.inProgress'), items: assignedItems('inProgress') },
+  { status: 'completed', label: t('repositoryBacklog.completed'), items: assignedItems('completed') },
+] as const).filter((group) => group.items.length > 0));
+const unassignedItems = computed(() => filteredItems.value.filter((item) => !assignmentFor(item)));
+const selectedAssignment = computed(() => selectedItem.value ? assignmentFor(selectedItem.value) : null);
+const selectedAssignedAgent = computed(() => props.agents.find((agent) => agent.id === selectedAssignment.value?.agentId) ?? null);
 
 watch(target, (value) => {
   if (value === 'duplicate') workspaceMode.value = 'worktree';
@@ -410,7 +442,7 @@ watch([stateFilter, assigneeFilter, labelFilter], () => {
   defaultsSaved.value = false;
 });
 
-const RepositoryItemRow = (rowProps: { item: WorkItem; active: boolean }, context: { emit: (event: 'open', element: HTMLElement) => void }) => {
+const RepositoryItemRow = (rowProps: { item: WorkItem; assignment: WorkBacklogAssignment | null; active: boolean }, context: { emit: (event: 'open', element: HTMLElement) => void }) => {
   const item = rowProps.item;
   const label = item.labels[0];
   return h('article', {
@@ -428,6 +460,10 @@ const RepositoryItemRow = (rowProps: { item: WorkItem; active: boolean }, contex
         h('span', { class: `repository-backlog__state-dot repository-backlog__state-dot--${item.state}` }),
         h('span', item.state === 'open' ? t('repositoryBacklog.open') : t('repositoryBacklog.closed')),
         label ? h('span', { class: 'repository-backlog__label', style: labelStyle(label.color) }, label.name) : null,
+        rowProps.assignment?.note ? h('span', {
+          class: 'repository-backlog__assignment-note',
+          title: rowProps.assignment.note,
+        }, rowProps.assignment.note) : null,
       ]),
     ]),
     h('span', { class: 'repository-backlog__item-time' }, relativeTime(item.updatedAt)),
@@ -518,6 +554,28 @@ function openItem(item: WorkItem, element?: HTMLElement): void {
   operationError.value = null;
 }
 
+function assignmentFor(item: WorkItem): WorkBacklogAssignment | null {
+  return props.assignments[workItemAssignmentKey(item)] ?? null;
+}
+
+function assignedItems(status: WorkBacklogAssignment['status']): WorkItem[] {
+  return filteredItems.value.filter((item) => assignmentFor(item)?.status === status);
+}
+
+function showAssignedAgent(): void {
+  const assignment = selectedAssignment.value;
+  if (!assignment || assignment.agentId === props.agent.id) return;
+  props.showAgentAction?.(assignment.agentId);
+  closeStartWork();
+}
+
+function clearSelectedAssignment(): void {
+  const item = selectedItem.value;
+  if (!item) return;
+  props.clearAssignmentAction?.(item);
+  closeStartWork();
+}
+
 function closeStartWork(): void {
   startWorkVisible.value = false;
   selectedItem.value = null;
@@ -558,11 +616,8 @@ async function startWork(action: WorkItemAssignmentAction): Promise<void> {
 }
 
 function suggestedBranch(item: WorkItem): string {
-  const prefix = item.kind === 'pullRequest'
-    ? 'review'
-    : item.labels.some((label) => /bug|fix/iu.test(label.name)) ? 'fix' : 'feature';
-  const slug = item.title.toLocaleLowerCase().replace(/[^a-z0-9]+/gu, '-').replace(/^-|-$/gu, '').slice(0, 42);
-  return `${prefix}/${item.number}${slug ? `-${slug}` : ''}`;
+  const prefix = item.kind === 'pullRequest' ? 'review' : 'fix';
+  return `${prefix}/gh-${item.number}`;
 }
 
 function relativeTime(value: string): string {
@@ -574,9 +629,33 @@ function relativeTime(value: string): string {
 }
 
 function labelStyle(color?: string): Record<string, string> {
-  return color && /^[0-9a-f]{6}$/iu.test(color)
-    ? { '--repository-label-color': `#${color}` }
-    : {};
+  if (!color || !/^[0-9a-f]{6}$/iu.test(color)) return {};
+  const normalizedColor = `#${color.toLocaleLowerCase()}`;
+  return {
+    '--repository-label-color': normalizedColor,
+    '--repository-label-text-color': readableLabelTextColor(color),
+  };
+}
+
+function readableLabelTextColor(color: string): string {
+  const rgb = [0, 2, 4].map((offset) => Number.parseInt(color.slice(offset, offset + 2), 16));
+  if (relativeLuminance(rgb) <= 0.35) return `#${color.toLocaleLowerCase()}`;
+
+  for (let percentage = 99; percentage >= 0; percentage -= 1) {
+    const darkened = rgb.map((channel) => Math.round(channel * percentage / 100));
+    if (relativeLuminance(darkened) <= 0.18) {
+      return `#${darkened.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
+    }
+  }
+  return '#000000';
+}
+
+function relativeLuminance(rgb: number[]): number {
+  const [red = 0, green = 0, blue = 0] = rgb.map((channel) => {
+    const value = channel / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
 }
 </script>
 
@@ -917,6 +996,18 @@ function labelStyle(color?: string): Record<string, string> {
   font-weight: var(--font-weight-regular);
 }
 
+.repository-backlog__group[data-status="blocked"] h3 {
+  color: var(--color-error);
+}
+
+.repository-backlog__group[data-status="readyForReview"] h3 {
+  color: var(--color-primary);
+}
+
+.repository-backlog__group[data-status="completed"] h3 {
+  color: var(--color-text-muted);
+}
+
 :deep(.repository-backlog__item) {
   min-width: 0;
   display: grid;
@@ -1003,6 +1094,14 @@ function labelStyle(color?: string): Record<string, string> {
   font-size: var(--font-size-11);
 }
 
+:deep(.repository-backlog__assignment-note) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-error);
+}
+
 :deep(.repository-backlog__state-dot) {
   width: 7px;
   height: 7px;
@@ -1021,18 +1120,25 @@ function labelStyle(color?: string): Record<string, string> {
   white-space: nowrap;
   padding: 1px var(--space-3);
   border: 1px solid
-    color-mix(
-      in srgb,
-      var(--repository-label-color, var(--color-outline)) 20%,
-      transparent
+    var(
+      --repository-label-text-color,
+      var(--repository-label-color, var(--color-text-muted))
     );
   border-radius: var(--radius-full);
-  color: var(--repository-label-color, var(--color-text-muted));
+  color: var(
+    --repository-label-text-color,
+    var(--repository-label-color, var(--color-text-muted))
+  );
   background: color-mix(
     in srgb,
     var(--repository-label-color, var(--color-outline)) 15%,
     transparent
   );
+}
+
+:global(html.dark) :deep(.repository-backlog__label) {
+  border-color: var(--repository-label-color, var(--color-text-muted));
+  color: var(--repository-label-color, var(--color-text-muted));
 }
 
 :deep(.repository-backlog__item-time) {
@@ -1131,6 +1237,37 @@ function labelStyle(color?: string): Record<string, string> {
   height: var(--icon-sm);
 }
 
+.repository-backlog__assignment-actions {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) 0 0;
+}
+
+.repository-backlog__assignment-actions button {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.repository-backlog__assignment-actions button:hover {
+  background: var(--color-surface-low);
+}
+
+.repository-backlog__assignment-actions svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  color: var(--color-text-muted);
+}
+
 .repository-backlog__target-options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1182,7 +1319,7 @@ function labelStyle(color?: string): Record<string, string> {
 .repository-backlog__isolation {
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--space-2);
+  gap: var(--space-3);
   padding: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -1226,6 +1363,9 @@ function labelStyle(color?: string): Record<string, string> {
 
 .repository-backlog__branch {
   height: 28px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   margin-left: 27px;
   padding: 0 var(--space-4);
   border: 1px solid var(--color-border);
@@ -1236,13 +1376,29 @@ function labelStyle(color?: string): Record<string, string> {
   font-size: var(--font-size-11);
 }
 
-.repository-backlog__branch--fixed {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
+.repository-backlog__branch--editable:focus-within {
+  border-color: var(--color-primary);
 }
 
-.repository-backlog__branch--fixed svg {
+.repository-backlog__branch--editable input {
+  min-width: 0;
+  height: 100%;
+  flex: 1 1 auto;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+}
+
+.repository-backlog__branch--disabled {
+  color: var(--color-text-muted);
+  background: var(--color-surface-low);
+  cursor: default;
+}
+
+.repository-backlog__branch svg {
   width: var(--icon-sm);
   height: var(--icon-sm);
   color: var(--color-text-muted);

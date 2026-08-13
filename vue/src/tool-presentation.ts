@@ -92,6 +92,6 @@ function clawToolIcon(tool: string): ToolIcon | undefined {
   if (AGENT_TOOLS.has(tool)) return icons.agents;
   if (WORKSPACE_TOOLS.has(tool)) return icons.workspace;
   if (tool === 'display-markdown') return icons.markdown;
-  if (tool === 'mark-work-item-completed') return icons.workItem;
+  if (tool === 'update-work-item') return icons.workItem;
   return undefined;
 }

@@ -1516,9 +1516,13 @@ function workBacklogAssignment(value: unknown): WorkBacklogAssignment | null {
     value.provider !== 'github' ||
     typeof value.itemId !== 'string' ||
     typeof value.agentId !== 'string' ||
-    typeof value.assignedAt !== 'string' ||
-    (value.status !== 'working' && value.status !== 'completed')
+    typeof value.assignedAt !== 'string'
   ) {
+    return null;
+  }
+
+  const status = value.status === 'working' ? 'inProgress' : value.status;
+  if (status !== 'blocked' && status !== 'completed' && status !== 'inProgress' && status !== 'readyForReview') {
     return null;
   }
 
@@ -1527,8 +1531,13 @@ function workBacklogAssignment(value: unknown): WorkBacklogAssignment | null {
     itemId: value.itemId,
     agentId: value.agentId,
     assignedAt: value.assignedAt,
-    status: value.status,
+    policy: value.policy === 'complete' || value.policy === 'review'
+      ? value.policy
+      : typeof value.loopId === 'string' || typeof value.loopExecutionId === 'string' ? 'complete' : 'review',
+    status,
     ...(typeof value.completedAt === 'string' ? { completedAt: value.completedAt } : {}),
+    ...(typeof value.note === 'string' && value.note.trim() ? { note: value.note.trim() } : {}),
+    ...(typeof value.updatedAt === 'string' ? { updatedAt: value.updatedAt } : {}),
     ...(typeof value.loopId === 'string' && value.loopId.trim() ? { loopId: value.loopId.trim() } : {}),
     ...(typeof value.loopExecutionId === 'string' && value.loopExecutionId.trim() ? { loopExecutionId: value.loopExecutionId.trim() } : {}),
     ...(typeof value.completionInstructionsDeliveredAt === 'string' ? { completionInstructionsDeliveredAt: value.completionInstructionsDeliveredAt } : {}),

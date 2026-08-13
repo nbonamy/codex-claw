@@ -748,8 +748,15 @@ function sanitizeWorkBacklogAssignment(value: unknown): WorkBacklogAssignment | 
     itemId: value.itemId,
     agentId: value.agentId,
     assignedAt: value.assignedAt,
-    status: isWorkBacklogAssignmentStatus(value.status) ? value.status : 'working',
+    policy: value.policy === 'complete' || value.policy === 'review'
+      ? value.policy
+      : typeof value.loopId === 'string' || typeof value.loopExecutionId === 'string' ? 'complete' : 'review',
+    status: value.status === 'working'
+      ? 'inProgress'
+      : isWorkBacklogAssignmentStatus(value.status) ? value.status : 'inProgress',
     ...(typeof value.completedAt === 'string' ? { completedAt: value.completedAt } : {}),
+    ...(typeof value.note === 'string' && value.note.trim() ? { note: value.note.trim() } : {}),
+    ...(typeof value.updatedAt === 'string' ? { updatedAt: value.updatedAt } : {}),
     ...(typeof value.loopId === 'string' && value.loopId.trim() ? { loopId: value.loopId.trim() } : {}),
     ...(typeof value.loopExecutionId === 'string' && value.loopExecutionId.trim() ? { loopExecutionId: value.loopExecutionId.trim() } : {}),
     ...(typeof value.completionInstructionsDeliveredAt === 'string' ? { completionInstructionsDeliveredAt: value.completionInstructionsDeliveredAt } : {}),
@@ -796,7 +803,8 @@ function legacyWorkBacklogAssignment(agentId: string, value: unknown): WorkBackl
     itemId: value.id,
     agentId,
     assignedAt: value.assignedAt,
-    status: 'working',
+    policy: 'review',
+    status: 'inProgress',
   };
 }
 
@@ -1188,7 +1196,7 @@ function isWorkIntegrationStatus(value: unknown): value is WorkIntegrationStatus
 }
 
 function isWorkBacklogAssignmentStatus(value: unknown): value is WorkBacklogAssignment['status'] {
-  return value === 'working' || value === 'completed';
+  return value === 'blocked' || value === 'completed' || value === 'inProgress' || value === 'readyForReview';
 }
 
 function sanitizeTeam(value: unknown, agents: Agent[], remoteConnectionIds: Set<string>): Team | null {

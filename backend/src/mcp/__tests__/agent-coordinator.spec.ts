@@ -162,25 +162,28 @@ describe('ClawMcpAgentCoordinator', () => {
       .rejects.toThrowError('Markdown display is not available.');
   });
 
-  it('validates and delegates work item completion', async () => {
-    const onMarkWorkItemCompleted = vi.fn().mockResolvedValue({
+  it('validates and delegates work item lifecycle updates', async () => {
+    const onUpdateWorkItem = vi.fn().mockResolvedValue({
       success: true,
       workItemId: 'github:openai/codex#42',
-      status: 'completed',
-      completedAt: '2026-08-02T12:00:00.000Z',
+      status: 'readyForReview',
+      updatedAt: '2026-08-02T12:00:00.000Z',
     });
-    const { coordinator } = fixture({ onMarkWorkItemCompleted });
+    const { coordinator } = fixture({ onUpdateWorkItem });
 
-    await coordinator.markWorkItemCompleted('agent-dina', ' github:openai/codex#42 ', true);
-    expect(onMarkWorkItemCompleted).toHaveBeenCalledWith(
+    await coordinator.updateWorkItem('agent-dina', ' github:openai/codex#42 ', 'readyForReview');
+    expect(onUpdateWorkItem).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'agent-dina' }),
       'github:openai/codex#42',
-      true,
+      'readyForReview',
+      undefined,
     );
-    await expect(coordinator.markWorkItemCompleted('agent-dina', '   '))
+    await expect(coordinator.updateWorkItem('agent-dina', '   ', 'readyForReview'))
       .rejects.toThrowError('Provide the work item ID from your assignment prompt.');
-    await expect(fixture().coordinator.markWorkItemCompleted('agent-dina', 'github:x/y#1'))
-      .rejects.toThrowError('Work item completion is not available.');
+    await expect(coordinator.updateWorkItem('agent-dina', 'github:x/y#1', 'blocked'))
+      .rejects.toThrowError('Provide a concise note');
+    await expect(fixture().coordinator.updateWorkItem('agent-dina', 'github:x/y#1', 'inProgress'))
+      .rejects.toThrowError('Work item updates are not available.');
   });
 
   it('lists repositories and static or refreshed worktrees', async () => {

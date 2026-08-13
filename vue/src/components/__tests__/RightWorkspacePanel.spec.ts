@@ -149,6 +149,7 @@ describe('RightWorkspacePanel', () => {
 
   it('offers and renders a repository backlog only for linked GitHub repositories', async () => {
     const prefillRepositoryWork = vi.fn();
+    const createRepositoryIssue = vi.fn().mockResolvedValue(undefined);
     const startRepositoryWork = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountPanel(['backlog'], 'backlog');
     await wrapper.setProps({
@@ -156,6 +157,7 @@ describe('RightWorkspacePanel', () => {
       backlogStatus: 'loaded',
       backlogItems: [],
       prefillRepositoryWork,
+      createRepositoryIssue,
       startRepositoryWork,
     });
 
@@ -165,6 +167,7 @@ describe('RightWorkspacePanel', () => {
       repositoryId: 'nbonamy/codex-claw',
       status: 'loaded',
       prefillAction: prefillRepositoryWork,
+      createIssueAction: createRepositoryIssue,
     });
 
     await wrapper.get('[aria-label="Open right workspace tab"]').trigger('click');

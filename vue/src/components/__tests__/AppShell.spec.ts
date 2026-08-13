@@ -954,9 +954,11 @@ describe('AppShell', () => {
     };
     const item = workItem();
     const loadWorkItems = vi.fn().mockResolvedValue([item]);
+    const createdItem = workItem({ id: 'nbonamy/codex-claw#13', number: 13, title: 'Created issue' });
+    const createWorkItem = vi.fn().mockResolvedValue(createdItem);
     const createAgentGitBranch = vi.fn().mockResolvedValue({});
     const assignWorkItemAction = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, loadWorkItems, createAgentGitBranch, assignWorkItemAction });
+    const wrapper = mountShell({ snapshot, loadWorkItems, createWorkItem, createAgentGitBranch, assignWorkItemAction });
 
     await wrapper.get('[aria-label="Open repository backlog"]').trigger('click');
     await flushPromises();
@@ -965,6 +967,16 @@ describe('AppShell', () => {
     expect(wrapper.get('[role="tab"]').text()).toBe('Backlog');
     const backlog = wrapper.getComponent({ name: 'RepositoryBacklogPanel' });
     expect(backlog.props('items')).toStrictEqual([item]);
+
+    await backlog.props('createIssueAction')('Create a keyboard navigation issue.');
+    await nextTick();
+    expect(createWorkItem).toHaveBeenCalledWith({
+      agentId: 'agent-dina',
+      provider: 'github',
+      repositoryId: 'nbonamy/codex-claw',
+      description: 'Create a keyboard navigation issue.',
+    });
+    expect(backlog.props('items')).toStrictEqual([createdItem, item]);
 
     await backlog.props('startWorkAction')({
       action: 'fix',
@@ -3687,6 +3699,7 @@ function mountShell(overrides: Partial<{
   configureWorkBacklog: (input: WorkBacklogConfigurationInput) => Promise<void>;
   loadWorkRepositories: (provider: WorkProviderKind) => Promise<void>;
   loadWorkItems: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery) => Promise<WorkItem[] | void>;
+  createWorkItem: (input: import('@codex-claw/core/contracts').CreateWorkItemInput) => Promise<WorkItem>;
   createAgentGitBranch: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitBranchInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   duplicateAgentAction: (agentId: string) => Promise<Agent | null>;
   assignWorkItemAction: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
@@ -3733,6 +3746,7 @@ function mountShell(overrides: Partial<{
       configureWorkBacklog: overrides.configureWorkBacklog ?? vi.fn().mockResolvedValue(undefined),
       loadWorkRepositories: overrides.loadWorkRepositories ?? vi.fn().mockResolvedValue(undefined),
       loadWorkItems: overrides.loadWorkItems ?? vi.fn().mockResolvedValue(undefined),
+      createWorkItem: overrides.createWorkItem ?? vi.fn().mockRejectedValue(new Error('Unavailable')),
       createAgentGitBranch: overrides.createAgentGitBranch ?? vi.fn().mockResolvedValue({}),
       duplicateAgentAction: overrides.duplicateAgentAction ?? vi.fn().mockResolvedValue(null),
       assignWorkItemAction: overrides.assignWorkItemAction ?? vi.fn().mockResolvedValue(undefined),
@@ -3813,6 +3827,7 @@ function workItemAssignment(item: WorkItem, agentId: string) {
     itemId: item.id,
     agentId,
     assignedAt: '2026-06-09T13:00:00.000Z',
-    status: 'working' as const,
+    policy: 'review' as const,
+    status: 'inProgress' as const,
   };
 }

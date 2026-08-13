@@ -92,7 +92,10 @@ export class LoopRunner {
             agentId: assignment.agent.id,
             workItemId,
           });
-          await this.options.sendPrompt(assignment.agent.id, workItemAssignmentPrompt(assignment.item, loop.instructions), {
+          await this.options.sendPrompt(assignment.agent.id, workItemAssignmentPrompt(assignment.item, {
+            ...loop.instructions,
+            completionPolicy: 'complete',
+          }), {
             loopId: loop.id,
             executionId,
             workItemId,
@@ -157,7 +160,8 @@ export class LoopRunner {
 
     for (const item of matchingItems) {
       const assignmentKey = workItemAssignmentKey(item);
-      if (this.snapshot().workBacklog.assignments[assignmentKey]?.status === 'working') {
+      const existingAssignment = this.snapshot().workBacklog.assignments[assignmentKey];
+      if (existingAssignment && existingAssignment.status !== 'completed') {
         logMain('loop-runner', 'skipped already assigned item', {
           loopId: loop.id,
           executionId,
@@ -175,6 +179,7 @@ export class LoopRunner {
       assignWorkItemToAgentInSnapshot(this.snapshot(), agent.id, item, createdAt, {
         loopExecutionId: executionId,
         loopId: loop.id,
+        policy: 'complete',
       });
       createdAssignments.push({ agent, item });
       logMain('loop-runner', 'created assignment', {

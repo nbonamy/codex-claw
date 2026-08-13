@@ -35,7 +35,7 @@ const TOOL_KEYS: Record<string, string> = {
   'list-agents': 'listAgents',
   'list-repos': 'listRepos',
   'list-worktrees': 'listWorktrees',
-  'mark-work-item-completed': 'markWorkItemCompleted',
+  'update-work-item': 'updateWorkItem',
   'register-agent': 'registerAgent',
   'send-message': 'sendMessage',
   'set-status': 'setStatus',

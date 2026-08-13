@@ -1090,7 +1090,8 @@ describe('useAppState', () => {
       itemId: 'nbonamy/codex-claw#12',
       agentId: 'agent-dina',
       assignedAt: '2026-06-09T13:00:00.000Z',
-      status: 'working' as const,
+      policy: 'review' as const,
+      status: 'inProgress' as const,
     };
     const assignedSnapshot = createInitialSnapshot();
     assignedSnapshot.workBacklog.assignments = {
@@ -1154,7 +1155,8 @@ describe('useAppState', () => {
         itemId: item.id,
         agentId: 'agent-dina',
         assignedAt: '2026-06-09T13:00:00.000Z',
-        status: 'working',
+        policy: 'review',
+        status: 'inProgress',
       },
     };
     const unassignedSnapshot = createInitialSnapshot();
@@ -1182,7 +1184,8 @@ describe('useAppState', () => {
       'Please take this GitHub issue and drive it to completion.',
       '',
       'Work item ID: github:nbonamy/codex-claw#12',
-      'When you are done with this work item, call the codex_claw MCP tool `mark-work-item-completed` with this exact Work item ID.',
+      'When the outcome is ready for the user to review, call the codex_claw MCP tool `update-work-item` with this exact Work item ID and status `readyForReview`.',
+      'If you need help or cannot proceed, call `update-work-item` with status `blocked` and a concise note explaining what you need. Use status `inProgress` when work resumes.',
       '',
       'Repository: nbonamy/codex-claw',
       'Issue: #12 Fix cockpit drag target',
@@ -1448,7 +1451,8 @@ describe('useAppState', () => {
       'Please take this GitHub issue and drive it to completion.',
       '',
       'Work item ID: github:nbonamy/codex-claw#12',
-      'When you are done with this work item, call the codex_claw MCP tool `mark-work-item-completed` with this exact Work item ID.',
+      'When the outcome is ready for the user to review, call the codex_claw MCP tool `update-work-item` with this exact Work item ID and status `readyForReview`.',
+      'If you need help or cannot proceed, call `update-work-item` with status `blocked` and a concise note explaining what you need. Use status `inProgress` when work resumes.',
       '',
       'Repository: nbonamy/codex-claw',
       'Issue: #12 Fix cockpit drag target',

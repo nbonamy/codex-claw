@@ -15,6 +15,7 @@ import {
   resumeAgentConversationInSnapshot,
   saveAgentToBench,
   saveBenchTemplateToSnapshot,
+  updateWorkItemAssignmentInSnapshot,
 } from '../agent-manager';
 import { appendUserPrompt, createInitialSnapshot } from '../snapshot';
 import { createTeamInSnapshot } from '../team-manager';
@@ -242,7 +243,8 @@ describe('agent-manager', () => {
       itemId: 'nbonamy/codex-claw#12',
       agentId: 'agent-dina',
       assignedAt: '2026-06-09T13:00:00.000Z',
-      status: 'working',
+      policy: 'review',
+      status: 'inProgress',
     });
 
     assignWorkItemToAgentInSnapshot(snapshot, 'agent-dina', secondItem, '2026-06-09T13:05:00.000Z');
@@ -258,7 +260,8 @@ describe('agent-manager', () => {
       itemId: 'nbonamy/codex-claw#12',
       agentId: 'agent-jesse',
       assignedAt: '2026-06-09T13:10:00.000Z',
-      status: 'working',
+      policy: 'review',
+      status: 'inProgress',
     });
   });
 
@@ -273,10 +276,33 @@ describe('agent-manager', () => {
       itemId: 'nbonamy/codex-claw#12',
       agentId: 'agent-dina',
       assignedAt: '2026-06-09T13:00:00.000Z',
+      policy: 'review',
       status: 'completed',
       completedAt: '2026-06-09T13:15:00.000Z',
+      updatedAt: '2026-06-09T13:15:00.000Z',
     });
     expect(snapshot.agents[0].updatedAt).toBe('2026-06-09T13:15:00.000Z');
+  });
+
+  it('updates assigned work through blocked, resumed, and review-ready states', () => {
+    const snapshot = createInitialSnapshot();
+    const item = workItem(12, 'Fix cockpit drag target');
+    assignWorkItemToAgentInSnapshot(snapshot, 'agent-dina', item, '2026-06-09T13:00:00.000Z');
+    const workItemId = workItemAssignmentKey(item);
+
+    expect(updateWorkItemAssignmentInSnapshot(snapshot, 'agent-dina', workItemId, 'blocked', '2026-06-09T13:05:00.000Z', 'Need a fixture')).toMatchObject({
+      status: 'blocked',
+      note: 'Need a fixture',
+      updatedAt: '2026-06-09T13:05:00.000Z',
+    });
+    expect(updateWorkItemAssignmentInSnapshot(snapshot, 'agent-dina', workItemId, 'inProgress', '2026-06-09T13:10:00.000Z')).toMatchObject({
+      status: 'inProgress',
+    });
+    expect(snapshot.workBacklog.assignments[workItemId]).not.toHaveProperty('note');
+    expect(updateWorkItemAssignmentInSnapshot(snapshot, 'agent-dina', workItemId, 'readyForReview', '2026-06-09T13:20:00.000Z')).toMatchObject({
+      status: 'readyForReview',
+      updatedAt: '2026-06-09T13:20:00.000Z',
+    });
   });
 
   it('removes assigned work item keys', () => {
@@ -295,7 +321,8 @@ describe('agent-manager', () => {
         itemId: 'nbonamy/codex-claw#13',
         agentId: 'agent-dina',
         assignedAt: '2026-06-09T13:05:00.000Z',
-        status: 'working',
+        policy: 'review',
+        status: 'inProgress',
       },
     });
     expect(removeWorkItemAssignmentFromSnapshot(snapshot, secondItem)).toBe(true);

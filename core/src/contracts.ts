@@ -208,15 +208,20 @@ export type WorkProviderSettings = {
   oauthClientId?: string;
 };
 
-export type WorkBacklogAssignmentStatus = 'working' | 'completed';
+export type WorkBacklogAssignmentPolicy = 'complete' | 'review';
+
+export type WorkBacklogAssignmentStatus = 'blocked' | 'completed' | 'inProgress' | 'readyForReview';
 
 export type WorkBacklogAssignment = {
   provider: WorkProviderKind;
   itemId: string;
   agentId: string;
   assignedAt: string;
+  policy: WorkBacklogAssignmentPolicy;
   status: WorkBacklogAssignmentStatus;
   completedAt?: string;
+  note?: string;
+  updatedAt?: string;
   loopId?: string;
   loopExecutionId?: string;
   completionInstructionsDeliveredAt?: string;
@@ -303,6 +308,13 @@ export type WorkItem = {
   labels: WorkItemLabel[];
   createdAt: string;
   updatedAt: string;
+};
+
+export type CreateWorkItemInput = {
+  agentId: string;
+  provider: WorkProviderKind;
+  repositoryId: string;
+  description: string;
 };
 
 export type LoopSourceConfiguration =
@@ -1471,6 +1483,7 @@ export type CodexClawApi = {
   listWorkRepositories(provider: WorkProviderKind, location?: LoopLocation): Promise<WorkRepository[]>;
   configureWorkBacklog(input: WorkBacklogConfigurationInput, location?: LoopLocation): Promise<AppSnapshot>;
   listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: WorkItemQuery): Promise<WorkItem[]>;
+  createWorkItem(input: CreateWorkItemInput): Promise<WorkItem>;
   listBackendModels(agentId: string): Promise<BackendModelOption[]>;
   listBackendPlugins(agentId: string): Promise<BackendPluginSummary[]>;
   listBackendSkills(agentId: string): Promise<BackendSkillSummary[]>;

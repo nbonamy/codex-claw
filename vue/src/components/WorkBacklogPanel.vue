@@ -195,6 +195,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { IconRobotFace } from '@tabler/icons-vue';
 import type { Agent, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import AppMenu from '../shared/menu/AppMenu.vue';
@@ -302,11 +303,15 @@ const itemRows = computed<WorkBacklogItemRow[]>(() => filteredItems.value.map((i
 }));
 
 function workItemAssignmentStatus(row: WorkBacklogItemRow): WorkBacklogAssignment['status'] {
-  return row.assignment?.status ?? 'working';
+  return row.assignment?.status ?? 'inProgress';
 }
 
 function workItemAssignmentStatusLabel(row: WorkBacklogItemRow): string {
-  return workItemAssignmentStatus(row) === 'completed' ? 'Completed' : 'Working';
+  const status = workItemAssignmentStatus(row);
+  if (status === 'blocked') return 'Blocked';
+  if (status === 'completed') return 'Completed';
+  if (status === 'readyForReview') return 'Ready for review';
+  return 'In progress';
 }
 
 function hasAssignmentContext(row: WorkBacklogItemRow): boolean {
@@ -314,6 +319,23 @@ function hasAssignmentContext(row: WorkBacklogItemRow): boolean {
 }
 
 function menuItemsForRow(row: WorkBacklogItemRow): AppMenuItem[] {
+  if (hasAssignmentContext(row)) {
+    return [
+      ...(row.assignedAgent ? [{
+        id: 'show-agent',
+        type: 'action',
+        label: 'Show agent',
+        icon: IconRobotFace,
+      } satisfies AppMenuItem] : []),
+      {
+        id: 'clear-assignment',
+        type: 'action',
+        label: 'Clear assignment',
+        icon: CircleXIcon,
+        danger: true,
+      },
+    ];
+  }
   return [
     {
       id: 'assign-to-new-agent',
@@ -335,16 +357,6 @@ function menuItemsForRow(row: WorkBacklogItemRow): AppMenuItem[] {
       label: `View on ${integrationLabel.value}`,
       icon: ExternalLinkIcon,
     },
-    ...(hasAssignmentContext(row) ? [
-      { id: 'group-reset', type: 'separator' } satisfies AppMenuItem,
-      {
-        id: 'reset-assignment',
-        type: 'action',
-        label: 'Reset',
-        icon: CircleXIcon,
-        danger: true,
-      } satisfies AppMenuItem,
-    ] : []),
   ];
 }
 
@@ -374,7 +386,10 @@ function selectMenuItem(item: WorkItem, itemId: string): void {
     emit('assign-to-new-agent', item);
   } else if (itemId === 'assign-to-bench' && props.canAssignToBench) {
     emit('assign-to-bench-agent', item);
-  } else if (itemId === 'reset-assignment') {
+  } else if (itemId === 'show-agent') {
+    const assignedAgent = props.assignedAgentsByWorkItemKey[workItemAssignmentKey(item)];
+    if (assignedAgent) emit('select-assigned-agent', assignedAgent.id);
+  } else if (itemId === 'clear-assignment') {
     emit('remove-assignment', item);
   } else if (itemId === 'open') {
     window.open(item.url, '_blank', 'noreferrer');
@@ -643,7 +658,7 @@ function workProviderLabel(provider: WorkIntegrationConnection['provider']): str
   font-weight: var(--font-weight-semibold);
 }
 
-.work-backlog-panel__assignee-status[data-status="working"],
+.work-backlog-panel__assignee-status[data-status="inProgress"],
 .work-backlog-panel__assignee-status[data-status="starting"],
 .work-backlog-panel__assignee-status[data-status="awaitingInput"] {
   color: var(--color-warning);

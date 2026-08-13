@@ -1494,6 +1494,26 @@ export class ClawBackendServer {
             : this.requireWorkIntegrations().listItems(requireWorkProvider(params), requireString(params.repositoryId, 'repositoryId')),
         );
       }
+      case backendMethods.workProviderItemCreate: {
+        const params = requireRecord(message.params);
+        const input = requireRecord(params.input);
+        const agentId = requireString(input.agentId, 'agentId');
+        const provider = requireWorkProvider(input);
+        const repositoryId = requireString(input.repositoryId, 'repositoryId').trim();
+        const description = requireString(input.description, 'description').trim();
+        if (!description) throw new Error('Issue description is required.');
+        if (description.length > 20_000) throw new Error('Issue description is too long.');
+        return this.routeAgentResultRequest(message.id, agentId, backendMethods.workProviderItemCreate, { input }, async (agent) => {
+          const generated = await this.handleAgentDriverRequest(agent, backendMethods.driverTextGenerate, {
+            agent,
+            cwd: agent.folder,
+            prompt: `Draft an issue for ${repositoryId} from this description.\n\n${description}`,
+            developerInstructions: 'Return a concise, actionable issue title and a useful Markdown body. Preserve the user\'s intent and facts. Add context and acceptance criteria only when they are supported by the description. Do not invent facts or add commentary.',
+            outputSchema: workItemDraftOutputSchema,
+          });
+          return this.requireWorkIntegrations().createItem(provider, repositoryId, parseGeneratedWorkItemDraft(generated));
+        });
+      }
       case backendMethods.snapshotLoopsGet: {
         const location = this.loopLocationFromParams(message.params);
         if (location.kind === 'local') {
@@ -3492,6 +3512,31 @@ const pullRequestMessageOutputSchema = {
   },
   required: ['title', 'body'],
 };
+
+const workItemDraftOutputSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    title: { type: 'string' },
+    body: { type: 'string' },
+  },
+  required: ['title', 'body'],
+};
+
+function parseGeneratedWorkItemDraft(value: unknown): { title: string; body: string } {
+  if (!isRecord(value) || typeof value.text !== 'string') throw new Error('The backend returned an invalid issue draft.');
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value.text);
+  } catch {
+    throw new Error('The backend returned malformed issue content.');
+  }
+  if (!isRecord(parsed)) throw new Error('The backend returned malformed issue content.');
+  const title = typeof parsed.title === 'string' ? parsed.title.trim() : '';
+  const body = typeof parsed.body === 'string' ? parsed.body.trim() : '';
+  if (!title) throw new Error('The backend returned an empty issue title.');
+  return { title, body };
+}
 
 function parseGeneratedGitMessage(value: unknown, kind: 'commit' | 'pullRequest'): AgentGitMessageGenerationResult {
   if (!isRecord(value) || typeof value.text !== 'string') throw new Error('The backend returned an invalid generated message.');

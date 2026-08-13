@@ -194,6 +194,10 @@ export class AppController {
       return this.listWorkItems(provider, repositoryId, location, query);
     });
 
+    ipc.handle(ipcChannels.createWorkItem, async (_event, input: import('@codex-claw/core/contracts').CreateWorkItemInput) => {
+      return this.createWorkItem(input);
+    });
+
     ipc.handle(ipcChannels.listBackendModels, async (_event, agentId: string) => {
       return this.listBackendModels(agentId);
     });
@@ -682,6 +686,10 @@ export class AppController {
       ...(location ? { location } : {}),
       ...(query ? { query } : {}),
     });
+  }
+
+  private async createWorkItem(input: import('@codex-claw/core/contracts').CreateWorkItemInput): Promise<WorkItem> {
+    return this.requireBackendClient().request(backendMethods.workProviderItemCreate, { input });
   }
 
   private async createAgent(input: CreateAgentInput): Promise<AppSnapshot> {

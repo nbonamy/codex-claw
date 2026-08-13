@@ -18,15 +18,16 @@ import type {
   SourceRepository,
   SourceWorktree,
   WorkBacklogAssignment,
+  WorkBacklogAssignmentStatus,
 } from '@codex-claw/core/contracts';
-import { closeAgentInSnapshot, completeWorkItemAssignmentInSnapshot, markWorkItemCompletionInstructionsDeliveredInSnapshot } from '@codex-claw/core/agent-manager';
+import { closeAgentInSnapshot, markWorkItemCompletionInstructionsDeliveredInSnapshot, updateWorkItemAssignmentInSnapshot } from '@codex-claw/core/agent-manager';
 import { completeLoopExecutionInSnapshot } from '@codex-claw/core/loop-manager';
 import { createAgentInSnapshot } from '@codex-claw/core/snapshot';
 import { closeTeamInSnapshot } from '@codex-claw/core/team-manager';
 import { createSourceWorktree, listSourceWorktrees } from '../git-worktrees';
 import { scanSourceRepositories } from '../source-repositories';
 import type { BackendDriverRpc } from '../driver-rpc';
-import { ClawMcpAgentCoordinator, McpToolError, type DisplayMarkdownInput, type DisplayMarkdownResponse, type MarkWorkItemCompletedResponse } from './agent-coordinator';
+import { ClawMcpAgentCoordinator, McpToolError, type DisplayMarkdownInput, type DisplayMarkdownResponse, type UpdateWorkItemResponse } from './agent-coordinator';
 import { agentMessagesPrompt, type MessageInfo } from './agent-prompts';
 import { ClawMcpHttpServer } from './http-server';
 import type { ComputerUseClient } from './computer-use-tools';
@@ -72,7 +73,7 @@ export class ClawMcpService {
         void this.deliverUnreadAgentMessages(agentId);
       },
       onDisplayMarkdown: (agent, input) => this.displayMarkdownForAgent(agent, input),
-      onMarkWorkItemCompleted: (agent, workItemId, confirmCompletion) => this.markWorkItemCompletedForAgent(agent, workItemId, confirmCompletion),
+      onUpdateWorkItem: (agent, workItemId, status, note) => this.updateWorkItemForAgent(agent, workItemId, status, note),
       onListSourceRepositories: () => this.listSourceRepositories(),
       onListSourceWorktrees: (repoPath) => this.listSourceWorktrees(repoPath),
       onCreateSourceWorktree: (input) => this.createSourceWorktree(input),
@@ -262,7 +263,7 @@ export class ClawMcpService {
     };
   }
 
-  private markWorkItemCompletedForAgent(agent: Agent, workItemId: string, confirmCompletion = false): MarkWorkItemCompletedResponse {
+  private updateWorkItemForAgent(agent: Agent, workItemId: string, status: WorkBacklogAssignmentStatus, note?: string): UpdateWorkItemResponse {
     const assignment = this.snapshot.workBacklog.assignments[workItemId];
     if (!assignment) {
       throw new McpToolError(`Work item '${workItemId}' is not currently assigned. Use the exact Work item ID from your assignment prompt.`);
@@ -272,7 +273,7 @@ export class ClawMcpService {
       throw new McpToolError(`Work item '${workItemId}' is assigned to ${assignedAgent?.name ?? assignment.agentId}, not ${agent.name}.`);
     }
 
-    const completionInstructions = this.loopCompletionInstructionsForAssignment(assignment.loopId);
+    const completionInstructions = status === 'completed' ? this.loopCompletionInstructionsForAssignment(assignment.loopId) : '';
     if (completionInstructions) {
       if (!assignment.completionInstructionsDeliveredAt) {
         const deliveredAssignment = markWorkItemCompletionInstructionsDeliveredInSnapshot(this.snapshot, agent.id, workItemId, this.now().toISOString());
@@ -282,25 +283,24 @@ export class ClawMcpService {
         this.emitWorkAssignmentUpdated(agent.id, deliveredAssignment);
         return completionInstructionsResponse(workItemId, completionInstructions);
       }
-
-      if (!confirmCompletion) {
-        return completionInstructionsResponse(workItemId, completionInstructions);
-      }
     }
 
-    const completedAt = this.now().toISOString();
-    const completedAssignment = completeWorkItemAssignmentInSnapshot(this.snapshot, agent.id, workItemId, completedAt);
-    if (!completedAssignment?.completedAt) {
-      throw new McpToolError(`Work item '${workItemId}' could not be marked completed.`);
+    const updatedAt = this.now().toISOString();
+    const updatedAssignment = updateWorkItemAssignmentInSnapshot(this.snapshot, agent.id, workItemId, status, updatedAt, note);
+    if (!updatedAssignment) {
+      throw new McpToolError(`Work item '${workItemId}' could not be updated.`);
     }
 
-    this.emitWorkAssignmentUpdated(agent.id, completedAssignment);
-    this.completeOwningLoopExecutionIfReady(agent.id, completedAssignment, completedAt);
+    this.emitWorkAssignmentUpdated(agent.id, updatedAssignment);
+    if (status === 'completed') {
+      this.completeOwningLoopExecutionIfReady(agent.id, updatedAssignment, updatedAt);
+    }
     return {
       success: true,
       workItemId,
-      status: 'completed',
-      completedAt: completedAssignment.completedAt,
+      status,
+      updatedAt,
+      ...(updatedAssignment.note ? { note: updatedAssignment.note } : {}),
     };
   }
 
@@ -468,14 +468,14 @@ export class ClawMcpService {
   }
 }
 
-function completionInstructionsResponse(workItemId: string, instructions: string): MarkWorkItemCompletedResponse {
+function completionInstructionsResponse(workItemId: string, instructions: string): UpdateWorkItemResponse {
   return {
     success: true,
     workItemId,
     status: 'completion-instructions-required',
     instructions,
-    message: 'Follow these completion instructions, then call mark-work-item-completed again with confirmCompletion set to true.',
-    confirmCompletionRequired: true,
+    message: 'Follow these completion instructions, then call update-work-item again with status completed.',
+    repeatUpdateRequired: true,
   };
 }
 

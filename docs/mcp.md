@@ -280,30 +280,31 @@ Effects:
 - returns a structured success result with the displayed title and path when
   available.
 
-### `mark-work-item-completed`
+### `update-work-item`
 
-Marks one of the caller's assigned backlog work items as completed.
+Updates the local lifecycle of one of the caller's assigned backlog work items.
 
 Input:
 
 - `workItemId`: exact Work item ID from the assignment prompt, such as
   `github:owner/repo#123`.
-- `confirmCompletion`: optional boolean. Use `true` only after following any
-  completion instructions returned by the first call.
+- `status`: `inProgress`, `blocked`, `readyForReview`, or `completed`.
+- `note`: concise user-facing context. It is required for `blocked` so the user
+  knows what help or input is needed.
 
 Effects:
 
 - verifies that the work item is currently assigned to the caller;
 - if the assignment came from a loop with before-completion instructions, the
-  first call records that those instructions were delivered and returns them
-  without completing the work item;
-- if loop completion instructions were already delivered, requires
-  `confirmCompletion: true` before completing;
-- updates `workBacklog.assignments[workItemId].status` to `completed`;
+  first `completed` update records that those instructions were delivered and
+  returns them without completing the work item; after following them, the
+  agent repeats the same `completed` update;
+- updates `workBacklog.assignments[workItemId]` with the requested status,
+  timestamp, and optional note;
 - applies any loop cleanup configured for the assignment after confirmed
   completion;
 - emits `workBacklog.assignmentUpdated` so the cockpit backlog reflects the
-  completed state;
+  lifecycle state;
 - persists the updated assignment.
 
 ## Direct Message Delivery

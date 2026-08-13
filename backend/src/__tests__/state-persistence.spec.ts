@@ -213,6 +213,7 @@ describe('AppStatePersistence', () => {
         itemId: 'nbonamy/codex-claw#12',
         agentId: 'agent-dina',
         assignedAt: '2026-06-09T13:00:00.000Z',
+        policy: 'review',
         status: 'completed',
         completedAt: '2026-06-09T13:30:00.000Z',
       },
@@ -272,6 +273,7 @@ describe('AppStatePersistence', () => {
         itemId: 'nbonamy/codex-claw#12',
         agentId: 'agent-dina',
         assignedAt: '2026-06-09T13:00:00.000Z',
+        policy: 'review',
         status: 'completed',
         completedAt: '2026-06-09T13:30:00.000Z',
       },
@@ -450,7 +452,8 @@ describe('AppStatePersistence', () => {
         itemId: 'nbonamy/codex-claw#12',
         agentId: 'agent-dina',
         assignedAt: '2026-06-09T13:00:00.000Z',
-        status: 'working',
+        policy: 'review',
+        status: 'inProgress',
       },
     });
   });
@@ -482,6 +485,7 @@ describe('AppStatePersistence', () => {
           itemId: 'nbonamy/codex-claw#12',
           agentId: 'agent-dina',
           assignedAt: '2026-06-09T13:00:00.000Z',
+          policy: 'complete',
           status: 'completed',
           completedAt: '2026-06-09T13:30:00.000Z',
           loopId: 'loop-bugs',
@@ -518,6 +522,7 @@ describe('AppStatePersistence', () => {
           itemId: 'nbonamy/codex-claw#12',
           agentId: 'agent-dina',
           assignedAt: '2026-06-09T13:00:00.000Z',
+          policy: 'complete',
           status: 'completed',
           completedAt: '2026-06-09T13:30:00.000Z',
           loopId: 'loop-bugs',
@@ -602,6 +607,7 @@ describe('AppStatePersistence', () => {
         itemId: 'nbonamy/codex-claw#12',
         agentId: 'agent-closed',
         assignedAt: '2026-06-09T13:00:00.000Z',
+        policy: 'review',
         status: 'completed',
         completedAt: '2026-06-09T13:30:00.000Z',
       },
@@ -610,7 +616,8 @@ describe('AppStatePersistence', () => {
         itemId: 'nbonamy/codex-claw#13',
         agentId: 'agent-working-gone',
         assignedAt: '2026-06-09T13:00:00.000Z',
-        status: 'working',
+        policy: 'review',
+        status: 'inProgress',
       },
     });
   });
@@ -767,7 +774,8 @@ describe('AppStatePersistence', () => {
           itemId: 'nbonamy/codex-claw#12',
           agentId: 'missing-agent',
           assignedAt: '2026-06-09T13:00:00.000Z',
-          status: 'working',
+          policy: 'review',
+          status: 'inProgress',
         },
       },
     });
@@ -971,7 +979,8 @@ describe('AppStatePersistence', () => {
         itemId: 'nbonamy/codex-claw#12',
         agentId: 'agent-dina',
         assignedAt: '2026-06-14T10:00:00.000Z',
-        status: 'working',
+        policy: 'review',
+        status: 'inProgress',
       },
     };
 

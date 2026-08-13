@@ -444,21 +444,18 @@ describe('ClawMcpService', () => {
     });
     const url = await service.start();
 
-    const first = await callTool(url, 'agent-one', 'mark-work-item-completed', {
+    const first = await callTool(url, 'agent-one', 'update-work-item', {
       workItemId: 'github:nbonamy/codex-claw#5',
+      status: 'completed',
     });
     expect(first.result.structuredContent).toMatchObject({
       status: 'completion-instructions-required',
       instructions: 'Remove the bug label first.',
-      confirmCompletionRequired: true,
+      repeatUpdateRequired: true,
     });
-    const second = await callTool(url, 'agent-one', 'mark-work-item-completed', {
+    const completed = await callTool(url, 'agent-one', 'update-work-item', {
       workItemId: 'github:nbonamy/codex-claw#5',
-    });
-    expect(second.result.structuredContent.status).toBe('completion-instructions-required');
-    const completed = await callTool(url, 'agent-one', 'mark-work-item-completed', {
-      workItemId: 'github:nbonamy/codex-claw#5',
-      confirmCompletion: true,
+      status: 'completed',
     });
     expect(completed.result.structuredContent).toMatchObject({ status: 'completed' });
     expect(events.filter((event) => event.type === 'workBacklog.assignmentUpdated')).toHaveLength(2);
@@ -468,10 +465,51 @@ describe('ClawMcpService', () => {
       headers: { 'content-type': 'application/json', accept: 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0', id: 'missing-work-item', method: 'tools/call',
-        params: { name: 'mark-work-item-completed', arguments: { workItemId: 'missing' } },
+        params: { name: 'update-work-item', arguments: { workItemId: 'missing', status: 'completed' } },
       }),
     });
     expect(missing.status).toBe(500);
+  });
+
+  it('updates only the caller-owned assignment and requires blocked context', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.assignments['github:nbonamy/codex-claw#12'] = {
+      provider: 'github',
+      itemId: 'nbonamy/codex-claw#12',
+      agentId: 'agent-dina',
+      assignedAt: '2026-06-15T01:00:00.000Z',
+      policy: 'review',
+      status: 'inProgress',
+    };
+    const events: any[] = [];
+    service = new ClawMcpService({
+      snapshot,
+      now: () => new Date('2026-06-15T01:30:48.802Z'),
+      onEvent: (event) => events.push(event),
+    });
+    const url = await service.start();
+
+    const missingNote = await callTool(url, 'agent-dina', 'update-work-item', {
+      workItemId: 'github:nbonamy/codex-claw#12',
+      status: 'blocked',
+    });
+    expect(missingNote.result.isError).toBe(true);
+
+    const blocked = await callTool(url, 'agent-dina', 'update-work-item', {
+      workItemId: 'github:nbonamy/codex-claw#12',
+      status: 'blocked',
+      note: 'Need access to the private fixture',
+    });
+    expect(blocked.result.structuredContent).toMatchObject({
+      status: 'blocked',
+      note: 'Need access to the private fixture',
+    });
+    expect(snapshot.workBacklog.assignments['github:nbonamy/codex-claw#12']).toMatchObject({
+      status: 'blocked',
+      note: 'Need access to the private fixture',
+      updatedAt: '2026-06-15T01:30:48.802Z',
+    });
+    expect(events).toContainEqual(expect.objectContaining({ type: 'workBacklog.assignmentUpdated' }));
   });
 
   it('completes existing-team loop executions only after every created assignment is done and deletes the created agents', async () => {
@@ -610,10 +648,10 @@ async function markWorkItemCompleted(url: string, agentId: string, workItemId: s
     id: `complete-${agentId}`,
     method: 'tools/call',
     params: {
-      name: 'mark-work-item-completed',
+      name: 'update-work-item',
       arguments: {
         workItemId,
-        confirmCompletion: true,
+        status: 'completed',
       },
     },
   });
@@ -685,7 +723,8 @@ function createLoopSnapshot(input: {
       itemId: itemId ?? createdAgent.workItemId,
       agentId: createdAgent.agentId,
       assignedAt: '2026-06-15T01:00:00.000Z',
-      status: 'working',
+      policy: 'complete',
+      status: 'inProgress',
       loopId: 'loop-bugs',
       loopExecutionId: 'loop-exec-1',
     };

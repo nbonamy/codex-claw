@@ -1,4 +1,4 @@
-import type { Agent, AppSnapshot, BackendSession, BenchTemplate, CreateBenchTemplateInput, RendererMessage, WorkBacklogAssignment } from './contracts';
+import type { Agent, AppSnapshot, BackendSession, BenchTemplate, CreateBenchTemplateInput, RendererMessage, WorkBacklogAssignment, WorkBacklogAssignmentStatus } from './contracts';
 import { createEntityId, createUniqueEntityId, type IdGenerator } from './ids';
 import { workBacklogAssignmentFromWorkItem, workItemAssignmentKey, type WorkItemAssignmentSource } from './work-assignments';
 
@@ -165,6 +165,7 @@ export function removeBenchTemplateFromSnapshot(snapshot: AppSnapshot, templateI
 export type AssignWorkItemOptions = {
   loopExecutionId?: string;
   loopId?: string;
+  policy?: WorkBacklogAssignment['policy'];
 };
 
 export function assignWorkItemToAgentInSnapshot(
@@ -200,26 +201,41 @@ export function removeWorkItemAssignmentFromSnapshot(snapshot: AppSnapshot, item
 }
 
 export function completeWorkItemAssignmentInSnapshot(snapshot: AppSnapshot, agentId: string, workItemId: string, completedAt = new Date().toISOString()): WorkBacklogAssignment | null {
+  return updateWorkItemAssignmentInSnapshot(snapshot, agentId, workItemId, 'completed', completedAt);
+}
+
+export function updateWorkItemAssignmentInSnapshot(
+  snapshot: AppSnapshot,
+  agentId: string,
+  workItemId: string,
+  status: WorkBacklogAssignmentStatus,
+  updatedAt = new Date().toISOString(),
+  note?: string,
+): WorkBacklogAssignment | null {
   const assignment = snapshot.workBacklog.assignments[workItemId];
   if (!assignment || assignment.agentId !== agentId) {
     return null;
   }
 
-  const completedAssignment: WorkBacklogAssignment = {
+  const updatedAssignment: WorkBacklogAssignment = {
     ...assignment,
-    status: 'completed',
-    completedAt,
+    status,
+    updatedAt,
+    ...(status === 'completed' ? { completedAt: updatedAt } : {}),
+    ...(note?.trim() ? { note: note.trim() } : {}),
   };
+  if (status !== 'completed') delete updatedAssignment.completedAt;
+  if (!note?.trim()) delete updatedAssignment.note;
   snapshot.workBacklog.assignments = {
     ...snapshot.workBacklog.assignments,
-    [workItemId]: completedAssignment,
+    [workItemId]: updatedAssignment,
   };
 
   const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
   if (agent) {
-    agent.updatedAt = completedAt;
+    agent.updatedAt = updatedAt;
   }
-  return completedAssignment;
+  return updatedAssignment;
 }
 
 export function markWorkItemCompletionInstructionsDeliveredInSnapshot(

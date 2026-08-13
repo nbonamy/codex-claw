@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Agent, AgentBackend, AgentStatus, CreateSourceWorktreeInput, SourceRepository, SourceWorktree } from '@codex-claw/core/contracts';
+import type { Agent, AgentBackend, AgentStatus, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, WorkBacklogAssignmentStatus } from '@codex-claw/core/contracts';
 
 export type McpAgentInfo = {
   id: string;
@@ -58,20 +58,21 @@ export type DisplayMarkdownResponse = {
   title?: string;
 };
 
-export type MarkWorkItemCompletedResponse =
+export type UpdateWorkItemResponse =
   | {
     success: true;
     workItemId: string;
     status: 'completion-instructions-required';
     instructions: string;
     message: string;
-    confirmCompletionRequired: true;
+    repeatUpdateRequired: true;
   }
   | {
     success: true;
     workItemId: string;
-    status: 'completed';
-    completedAt: string;
+    status: WorkBacklogAssignmentStatus;
+    updatedAt: string;
+    note?: string;
   };
 
 export type McpCreateAgentInput = {
@@ -95,7 +96,7 @@ export type ClawMcpAgentCoordinatorOptions = {
   onAgentUpdated?: (agent: Agent) => void;
   onInboxMessage?: (agentId: string, messageId: string) => void;
   onDisplayMarkdown?: (agent: Agent, input: DisplayMarkdownInput) => DisplayMarkdownResponse | Promise<DisplayMarkdownResponse>;
-  onMarkWorkItemCompleted?: (agent: Agent, workItemId: string, confirmCompletion: boolean) => MarkWorkItemCompletedResponse | Promise<MarkWorkItemCompletedResponse>;
+  onUpdateWorkItem?: (agent: Agent, workItemId: string, status: WorkBacklogAssignmentStatus, note?: string) => UpdateWorkItemResponse | Promise<UpdateWorkItemResponse>;
   onListSourceRepositories?: () => SourceRepository[] | Promise<SourceRepository[]>;
   onListSourceWorktrees?: (repoPath: string) => SourceWorktree[] | Promise<SourceWorktree[]>;
   onCreateSourceWorktree?: (input: CreateSourceWorktreeInput) => SourceWorktree | Promise<SourceWorktree>;
@@ -117,7 +118,7 @@ export class ClawMcpAgentCoordinator {
   private readonly onAgentUpdated?: (agent: Agent) => void;
   private readonly onInboxMessage?: (agentId: string, messageId: string) => void;
   private readonly onDisplayMarkdown?: (agent: Agent, input: DisplayMarkdownInput) => DisplayMarkdownResponse | Promise<DisplayMarkdownResponse>;
-  private readonly onMarkWorkItemCompleted?: (agent: Agent, workItemId: string, confirmCompletion: boolean) => MarkWorkItemCompletedResponse | Promise<MarkWorkItemCompletedResponse>;
+  private readonly onUpdateWorkItem?: (agent: Agent, workItemId: string, status: WorkBacklogAssignmentStatus, note?: string) => UpdateWorkItemResponse | Promise<UpdateWorkItemResponse>;
   private readonly onListSourceRepositories?: () => SourceRepository[] | Promise<SourceRepository[]>;
   private readonly onListSourceWorktrees?: (repoPath: string) => SourceWorktree[] | Promise<SourceWorktree[]>;
   private readonly onCreateSourceWorktree?: (input: CreateSourceWorktreeInput) => SourceWorktree | Promise<SourceWorktree>;
@@ -130,7 +131,7 @@ export class ClawMcpAgentCoordinator {
     this.onAgentUpdated = options.onAgentUpdated;
     this.onInboxMessage = options.onInboxMessage;
     this.onDisplayMarkdown = options.onDisplayMarkdown;
-    this.onMarkWorkItemCompleted = options.onMarkWorkItemCompleted;
+    this.onUpdateWorkItem = options.onUpdateWorkItem;
     this.onListSourceRepositories = options.onListSourceRepositories;
     this.onListSourceWorktrees = options.onListSourceWorktrees;
     this.onCreateSourceWorktree = options.onCreateSourceWorktree;
@@ -235,17 +236,21 @@ export class ClawMcpAgentCoordinator {
     });
   }
 
-  async markWorkItemCompleted(agentId: string, workItemId: string, confirmCompletion = false): Promise<MarkWorkItemCompletedResponse> {
+  async updateWorkItem(agentId: string, workItemId: string, status: WorkBacklogAssignmentStatus, note?: string): Promise<UpdateWorkItemResponse> {
     const agent = this.requireAgent(agentId);
     const normalizedWorkItemId = workItemId.trim();
     if (!normalizedWorkItemId) {
       throw new McpToolError('Provide the work item ID from your assignment prompt.');
     }
-    if (!this.onMarkWorkItemCompleted) {
-      throw new McpToolError('Work item completion is not available.');
+    const normalizedNote = note?.trim();
+    if (status === 'blocked' && !normalizedNote) {
+      throw new McpToolError('Provide a concise note explaining what help or input is needed when blocking a work item.');
+    }
+    if (!this.onUpdateWorkItem) {
+      throw new McpToolError('Work item updates are not available.');
     }
 
-    return this.onMarkWorkItemCompleted(agent, normalizedWorkItemId, confirmCompletion);
+    return this.onUpdateWorkItem(agent, normalizedWorkItemId, status, normalizedNote);
   }
 
   async listSourceRepositories(agentId: string): Promise<{ repos: SourceRepository[] }> {

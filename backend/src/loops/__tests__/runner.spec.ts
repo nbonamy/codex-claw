@@ -75,7 +75,8 @@ describe('LoopRunner', () => {
       assignedAt: '2026-06-09T11:00:00.000Z',
       loopExecutionId: 'loop-exec-bugs',
       loopId: 'loop-bugs',
-      status: 'working',
+      policy: 'complete',
+      status: 'inProgress',
     });
     expect(snapshot.activeAgentId).toBe('agent-dina');
     expect(snapshot.activeTeamId).toBe('team-codex-claw');
@@ -228,7 +229,7 @@ describe('LoopRunner', () => {
     expect(snapshot.workBacklog.assignments['github:nbonamy/codex-claw#12']).toMatchObject({
       provider: 'github',
       itemId: 'nbonamy/codex-claw#12',
-      status: 'working',
+      status: 'inProgress',
     });
     expect(snapshot.workBacklog.assignments['github:nbonamy/codex-claw#13']).toBeUndefined();
     expect(snapshot.loops[0]).toMatchObject({
@@ -259,7 +260,8 @@ describe('LoopRunner', () => {
       itemId: item.id,
       agentId: 'agent-dina',
       assignedAt: '2026-06-09T10:02:00.000Z',
-      status: 'working',
+      policy: 'complete',
+      status: 'inProgress',
     };
     const sendPrompt = vi.fn().mockResolvedValue(undefined);
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
@@ -294,6 +296,7 @@ describe('LoopRunner', () => {
       itemId: item.id,
       agentId: 'agent-closed',
       assignedAt: '2026-06-09T10:02:00.000Z',
+      policy: 'complete',
       status: 'completed',
       completedAt: '2026-06-09T10:30:00.000Z',
     };
@@ -320,7 +323,8 @@ describe('LoopRunner', () => {
       itemId: item.id,
       loopExecutionId: 'loop-exec-all',
       loopId: 'loop-all',
-      status: 'working',
+      policy: 'complete',
+      status: 'inProgress',
     });
     expect(snapshot.loops[0]?.lastCreatedCount).toBe(1);
     expect(snapshot.loops[0]?.executionLog).toHaveLength(1);

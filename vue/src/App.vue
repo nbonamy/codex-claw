@@ -108,6 +108,7 @@
     :configure-work-backlog="configureWorkBacklog"
     :load-work-repositories="loadWorkRepositories"
     :load-work-items="loadWorkItems"
+    :create-work-item="createWorkItem"
     :duplicate-agent-action="duplicateAgent"
     :assign-work-item-action="assignWorkItemToAgent"
     :quit="quit"
@@ -303,6 +304,7 @@ const {
   configureWorkBacklog,
   loadWorkRepositories,
   loadWorkItems,
+  createWorkItem,
   assignWorkItemToAgent,
   removeWorkItemAssignment,
   resolveBackendApproval,

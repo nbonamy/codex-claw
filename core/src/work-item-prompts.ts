@@ -1,21 +1,26 @@
-import type { LoopInstructions, WorkItem } from './contracts';
+import type { LoopInstructions, WorkBacklogAssignmentPolicy, WorkItem } from './contracts';
 import { workItemAssignmentKey } from './work-assignments';
 
 export type WorkItemAssignmentAction = 'addressFeedback' | 'fix' | 'investigate' | 'review';
 
 type WorkItemPromptOptions = Pick<LoopInstructions, 'assignment'> & {
   action?: WorkItemAssignmentAction;
+  completionPolicy?: WorkBacklogAssignmentPolicy;
 };
 
 export function workItemAssignmentPrompt(item: WorkItem, options: WorkItemPromptOptions = {}): string {
   const body = truncateWorkItemBody(item.body?.trim() ?? '');
   const assignmentInstructions = options.assignment?.trim();
   const workItemId = workItemAssignmentKey(item);
+  const completionPolicy = options.completionPolicy ?? 'review';
   return [
     workItemActionInstruction(item, options.action),
     '',
     `Work item ID: ${workItemId}`,
-    'When you are done with this work item, call the codex_claw MCP tool `mark-work-item-completed` with this exact Work item ID.',
+    completionPolicy === 'complete'
+      ? 'When the work is fully complete, call the codex_claw MCP tool `update-work-item` with this exact Work item ID and status `completed`.'
+      : 'When the outcome is ready for the user to review, call the codex_claw MCP tool `update-work-item` with this exact Work item ID and status `readyForReview`.',
+    'If you need help or cannot proceed, call `update-work-item` with status `blocked` and a concise note explaining what you need. Use status `inProgress` when work resumes.',
     '',
     `Repository: ${item.repositoryFullName}`,
     `${item.kind === 'pullRequest' ? 'Pull request' : 'Issue'}: #${item.number} ${item.title}`,

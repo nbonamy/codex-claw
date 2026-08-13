@@ -1297,6 +1297,13 @@ export function useAppState() {
     }
   }
 
+  async function createWorkItem(input: import('@codex-claw/core/contracts').CreateWorkItemInput): Promise<WorkItem> {
+    if (!codexClawApi?.createWorkItem) {
+      throw new Error('Issue creation is not available.');
+    }
+    return codexClawApi.createWorkItem(input);
+  }
+
   async function getBenchSnapshot(location?: BenchLocation): Promise<AppSnapshot> {
     if (!codexClawApi?.getBenchSnapshot) {
       return isRemoteBenchLocation(location) ? createEmptySnapshot() : snapshot.value;
@@ -1676,6 +1683,7 @@ export function useAppState() {
     loadAgentFiles: loadAgentFilesForActiveAgent,
     loadWorkRepositories,
     loadWorkItems,
+    createWorkItem,
     loadSourceRepositories,
     loadDaemonStatus,
     loadSnapshot,

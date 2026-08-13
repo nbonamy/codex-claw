@@ -22,6 +22,7 @@ export const ipcChannels = {
   listWorkRepositories: 'work-provider:repositories:list',
   configureWorkBacklog: 'work-provider:backlog:configure',
   listWorkItems: 'work-provider:items:list',
+  createWorkItem: 'work-provider:item:create',
   listBackendModels: 'backend:models:list',
   listBackendPlugins: 'backend:plugins:list',
   listBackendSkills: 'backend:skills:list',

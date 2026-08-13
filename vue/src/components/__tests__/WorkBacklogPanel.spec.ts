@@ -173,7 +173,7 @@ describe('WorkBacklogPanel', () => {
 
     const card = wrapper.get('.work-backlog-panel__item');
     expect(card.text()).toContain('Dina');
-    expect(card.text()).toContain('Working');
+    expect(card.text()).toContain('In progress');
     expect(card.text()).not.toContain('bug');
 
     await card.trigger('click');
@@ -193,6 +193,7 @@ describe('WorkBacklogPanel', () => {
           itemId: item.id,
           agentId: 'agent-dina',
           assignedAt: '2026-06-09T13:00:00.000Z',
+          policy: 'review',
           status: 'completed',
           completedAt: '2026-06-09T13:30:00.000Z',
         },
@@ -214,7 +215,8 @@ describe('WorkBacklogPanel', () => {
           itemId: item.id,
           agentId: 'agent-closed',
           assignedAt: '2026-06-09T13:00:00.000Z',
-          status: 'working',
+          policy: 'review',
+          status: 'inProgress',
         },
       },
       items: [item],
@@ -222,15 +224,16 @@ describe('WorkBacklogPanel', () => {
 
     const card = wrapper.get('.work-backlog-panel__item');
     expect(card.classes()).toContain('work-backlog-panel__item--assigned');
-    expect(card.text()).toContain('Working');
+    expect(card.text()).toContain('In progress');
     expect(card.text()).not.toContain('bug');
 
     await wrapper.get('[aria-label="Issue #12 actions"]').trigger('click');
     await nextTick();
 
-    expect(menuText()).toContain('Reset');
+    expect(menuText()).toContain('Clear assignment');
+    expect(menuText()).not.toContain('Assign to New Agent');
 
-    await clickMenuItem('Reset');
+    await clickMenuItem('Clear assignment');
 
     expect(wrapper.emitted('remove-assignment')).toStrictEqual([[item]]);
     expect(wrapper.emitted('select-assigned-agent')).toBeUndefined();
@@ -283,7 +286,7 @@ describe('WorkBacklogPanel', () => {
     expect(wrapper.emitted('assign-to-new-agent')).toStrictEqual([[item]]);
   });
 
-  it('routes reset from assigned issue actions as a danger action', async () => {
+  it('offers only show-agent and clear-assignment actions for assigned work', async () => {
     const item = workItem();
     const wrapper = mountPanel({
       assignedAgentsByWorkItemKey: {
@@ -295,13 +298,13 @@ describe('WorkBacklogPanel', () => {
     await wrapper.get('[aria-label="Issue #12 actions"]').trigger('click');
     await nextTick();
 
-    expect(menuText()).toContain('Reset');
-    expect(document.body.querySelector('.app-menu__item--danger')?.textContent).toContain('Reset');
-    expect(menuTextIndex('Assign to New Agent')).toBeLessThan(menuTextIndex('Assign to Bench Agent'));
-    expect(menuTextIndex('Assign to Bench Agent')).toBeLessThan(menuTextIndex('View on GitHub'));
-    expect(menuTextIndex('View on GitHub')).toBeLessThan(menuTextIndex('Reset'));
+    expect(menuText()).toContain('Show agent');
+    expect(menuText()).toContain('Clear assignment');
+    expect(menuText()).not.toContain('Assign to New Agent');
+    expect(menuText()).not.toContain('View on GitHub');
+    expect(document.body.querySelector('.app-menu__item--danger')?.textContent).toContain('Clear assignment');
 
-    await clickMenuItem('Reset');
+    await clickMenuItem('Clear assignment');
 
     expect(wrapper.emitted('remove-assignment')).toStrictEqual([[item]]);
     expect(wrapper.emitted('select-assigned-agent')).toBeUndefined();

@@ -727,6 +727,9 @@ describe('AppController', () => {
       if (method === 'workProvider/items/list') {
         return [{ provider: 'github', id: 'github:nbonamy/codex-claw#12', title: 'Fix bug', url: 'https://github.com/nbonamy/codex-claw/issues/12' }];
       }
+      if (method === 'workProvider/item/create') {
+        return createWorkItem();
+      }
       return snapshot;
     });
     const controller = new AppController(snapshot, createBackendClient({ request }));
@@ -744,6 +747,12 @@ describe('AppController', () => {
       url: 'https://github.com/nbonamy/codex-claw/issues/12',
     }]);
     await expect(listWorkItems(controller, 'github', 'nbonamy/codex-claw', { kind: 'all', state: 'all' })).resolves.toHaveLength(1);
+    await expect(invokeCreateWorkItem(controller, {
+      agentId: 'agent-dina',
+      provider: 'github',
+      repositoryId: 'nbonamy/codex-claw',
+      description: 'Fix the reconnect banner.',
+    })).resolves.toMatchObject({ number: 12 });
     await expect(configureWorkBacklog(
       controller,
       { provider: 'github', configuration: { repositoryId: 'nbonamy/remote' } },
@@ -758,7 +767,15 @@ describe('AppController', () => {
       repositoryId: 'nbonamy/codex-claw',
       query: { kind: 'all', state: 'all' },
     });
-    expect(request).toHaveBeenNthCalledWith(5, 'workProvider/backlog/configure', {
+    expect(request).toHaveBeenNthCalledWith(5, 'workProvider/item/create', {
+      input: {
+        agentId: 'agent-dina',
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
+        description: 'Fix the reconnect banner.',
+      },
+    });
+    expect(request).toHaveBeenNthCalledWith(6, 'workProvider/backlog/configure', {
       input: { provider: 'github', configuration: { repositoryId: 'nbonamy/remote' } },
       location: { kind: 'remote', remoteConnectionId: 'connection-devbox' },
     });
@@ -778,7 +795,8 @@ describe('AppController', () => {
             itemId: 'github:nbonamy/codex-claw#12',
             agentId: 'agent-dina',
             assignedAt: '2026-06-13T00:00:00.000Z',
-            status: 'working',
+            policy: 'review',
+            status: 'inProgress',
           },
         },
       },
@@ -2726,6 +2744,12 @@ async function listWorkItems(controller: AppController, provider: WorkProviderKi
   return (controller as unknown as {
     listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: import('@codex-claw/core/contracts').LoopLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery): Promise<WorkItem[]>;
   }).listWorkItems(provider, repositoryId, undefined, query);
+}
+
+async function invokeCreateWorkItem(controller: AppController, input: import('@codex-claw/core/contracts').CreateWorkItemInput): Promise<WorkItem> {
+  return (controller as unknown as {
+    createWorkItem(input: import('@codex-claw/core/contracts').CreateWorkItemInput): Promise<WorkItem>;
+  }).createWorkItem(input);
 }
 
 function createWorkItem(): WorkItem {

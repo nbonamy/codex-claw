@@ -58,7 +58,17 @@ describe('RepositoryBacklogPanel', () => {
     expect(wrapper.findAll('[aria-label^="Work item actions"]')).toHaveLength(1);
   });
 
-  it('keeps only active assignments in needs attention', () => {
+  it('darkens pale label text while preserving the source color for its tint', () => {
+    const wrapper = mountPanel({
+      items: [workItem({ labels: [{ name: 'enhancement', color: 'a2eeef' }] })],
+    });
+
+    const label = wrapper.get('.repository-backlog__label');
+    expect(label.attributes('style')).toContain('--repository-label-color: #a2eeef');
+    expect(label.attributes('style')).toContain('--repository-label-text-color: #547c7c');
+  });
+
+  it('groups assigned work by lifecycle status', () => {
     const wrapper = mountPanel({
       assignments: {
         'github:nbonamy/codex-claw#12': {
@@ -66,13 +76,51 @@ describe('RepositoryBacklogPanel', () => {
           itemId: 'nbonamy/codex-claw#12',
           agentId: agent.id,
           assignedAt: '2026-08-12T00:00:00.000Z',
+          policy: 'review',
           status: 'completed',
         },
       },
     });
 
-    expect(wrapper.text()).not.toContain('Needs attention');
+    expect(wrapper.text()).toContain('Completed');
     expect(wrapper.text()).toContain('Fix backlog assignment');
+  });
+
+  it('replaces start-work choices with assigned-item actions', async () => {
+    const clearAssignmentAction = vi.fn();
+    const showAgentAction = vi.fn();
+    const otherAgent = { ...agent, id: 'agent-jesse', name: 'Jesse' };
+    const wrapper = mountPanel({
+      agents: [agent, otherAgent],
+      assignments: {
+        'github:nbonamy/codex-claw#12': {
+          provider: 'github',
+          itemId: 'nbonamy/codex-claw#12',
+          agentId: otherAgent.id,
+          assignedAt: '2026-08-12T00:00:00.000Z',
+          policy: 'review',
+          status: 'blocked',
+          note: 'Need repository access',
+        },
+      },
+      clearAssignmentAction,
+      showAgentAction,
+    });
+
+    expect(wrapper.text()).toContain('Blocked');
+    expect(wrapper.text()).toContain('Need repository access');
+    await wrapper.get('[aria-label="Work item actions #12"]').trigger('click');
+    expect(wrapper.text()).toContain('Assigned to Jesse');
+    expect(wrapper.text()).toContain('Show agent');
+    expect(wrapper.text()).toContain('Clear assignment');
+    expect(wrapper.text()).not.toContain('Use current agent');
+
+    await wrapper.findAll('.repository-backlog__assignment-actions button')[0]!.trigger('click');
+    expect(showAgentAction).toHaveBeenCalledWith(otherAgent.id);
+
+    await wrapper.get('[aria-label="Work item actions #12"]').trigger('click');
+    await wrapper.findAll('.repository-backlog__assignment-actions button')[1]!.trigger('click');
+    expect(clearAssignmentAction).toHaveBeenCalledWith(expect.objectContaining({ id: 'nbonamy/codex-claw#12' }));
   });
 
   it('keeps search collapsed until requested and clears it when closed', async () => {
@@ -100,7 +148,9 @@ describe('RepositoryBacklogPanel', () => {
       ],
     });
 
-    wrapper.findAllComponents({ name: 'ElPopover' }).at(0)?.vm.$emit('update:visible', true);
+    wrapper.findAllComponents({ name: 'ElPopover' })
+      .find((popover) => popover.attributes('popper-class')?.includes('repository-backlog__filters-popover'))
+      ?.vm.$emit('update:visible', true);
     await nextTick();
     wrapper.findAllComponents({ name: 'ElSelect' }).at(0)?.vm.$emit('update:modelValue', 'closed');
     await nextTick();
@@ -148,7 +198,8 @@ describe('RepositoryBacklogPanel', () => {
     expect(wrapper.text()).toContain('Investigate');
     expect(wrapper.text()).toContain('Fix');
     expect(wrapper.text()).not.toContain('Cancel');
-    expect(wrapper.get('[aria-label="Branch name"]').element).toHaveProperty('value', 'fix/12-fix-backlog-assignment');
+    expect(wrapper.find('.repository-backlog__branch--editable svg').exists()).toBe(true);
+    expect(wrapper.get('[aria-label="Branch name"]').element).toHaveProperty('value', 'fix/gh-12');
 
     await wrapper.get('.repository-backlog__start-work .claw-button--primary').trigger('click');
 
@@ -156,10 +207,17 @@ describe('RepositoryBacklogPanel', () => {
       action: 'fix',
       item: expect.objectContaining({ id: 'nbonamy/codex-claw#12' }),
       target: 'current',
-      workspace: { branchName: 'fix/12-fix-backlog-assignment', kind: 'worktree' },
+      workspace: { branchName: 'fix/gh-12', kind: 'worktree' },
     });
     await nextTick();
     expect(wrapper.text()).toContain('Work started');
+  });
+
+  it('keeps experimental issue creation out of the backlog toolbar', () => {
+    const wrapper = mountPanel();
+
+    expect(wrapper.find('[aria-label="Create issue"]').exists()).toBe(false);
+    expect(wrapper.find('.repository-issue-composer').exists()).toBe(false);
   });
 
   it('prefills custom issue work without dispatching it', async () => {
@@ -191,11 +249,12 @@ describe('RepositoryBacklogPanel', () => {
 
     await wrapper.get('[aria-label="Work item actions #12"]').trigger('click');
     expect(wrapper.text()).toContain('Current workspace');
-    expect(wrapper.text()).toContain('Keep feature/current-work in this folder');
     expect(wrapper.text()).toContain('New worktree');
 
     await wrapper.get('input[type="radio"][value="current"]').setValue(true);
-    expect(wrapper.find('[aria-label="Branch name"]').exists()).toBe(false);
+    const branchInput = wrapper.get('input[aria-label="Branch name"]');
+    expect(branchInput.element).toHaveProperty('value', 'fix/gh-12');
+    expect(branchInput.attributes('disabled')).toBeDefined();
     await wrapper.get('.repository-backlog__start-work .claw-button--primary').trigger('click');
 
     expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({
@@ -215,8 +274,8 @@ describe('RepositoryBacklogPanel', () => {
     await wrapper.get('[aria-label="Work item actions #21"]').trigger('click');
     expect(wrapper.text()).toContain('Address feedback');
     expect(wrapper.text()).toContain('Review');
-    expect(wrapper.text()).toContain('Check out feature/backlog-workspace in an isolated folder');
-    expect(wrapper.find('[aria-label="Branch name"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('PR branch in current folder');
+    expect(wrapper.get('[aria-label="Branch name"]').text()).toContain('feature/backlog-workspace');
     await wrapper.findAll('.repository-backlog__target-options > button')[1]?.trigger('click');
     expect(wrapper.get('input[type="radio"][value="current"]').attributes('disabled')).toBeDefined();
     await wrapper.get('.repository-backlog__start-work .claw-button--primary').trigger('click');
@@ -239,7 +298,8 @@ describe('RepositoryBacklogPanel', () => {
     await wrapper.get('[aria-label="Work item actions #22"]').trigger('click');
     await wrapper.get('input[type="radio"][value="current"]').setValue(true);
 
-    expect(wrapper.text()).toContain('Check out feature/current-pr in this folder');
+    expect(wrapper.text()).toContain('PR branch in current folder');
+    expect(wrapper.get('[aria-label="Branch name"]').text()).toContain('feature/current-pr');
     await wrapper.get('.repository-backlog__start-work .claw-button--primary').trigger('click');
     expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({
       action: 'review',
@@ -281,21 +341,24 @@ describe('RepositoryBacklogPanel', () => {
 });
 
 function mountPanel(overrides: Partial<InstanceType<typeof RepositoryBacklogPanel>['$props']> = {}) {
+  const props = {
+    agent,
+    agents: [agent],
+    assignments: {},
+    branch: 'main',
+    connection: { provider: 'github', status: 'connected', accountLabel: 'nbonamy' },
+    error: null,
+    items: [workItem()],
+    repositoryId: 'nbonamy/codex-claw',
+    prefillAction: vi.fn(),
+    createIssueAction: vi.fn().mockResolvedValue(workItem({ number: 24 })),
+    status: 'loaded',
+    startWorkAction: vi.fn().mockResolvedValue(undefined),
+    visible: true,
+    ...overrides,
+  } as InstanceType<typeof RepositoryBacklogPanel>['$props'];
   return mount(RepositoryBacklogPanel, {
-    props: {
-      agent,
-      assignments: {},
-      branch: 'main',
-      connection: { provider: 'github', status: 'connected', accountLabel: 'nbonamy' },
-      error: null,
-      items: [workItem()],
-      repositoryId: 'nbonamy/codex-claw',
-      prefillAction: vi.fn(),
-      status: 'loaded',
-      startWorkAction: vi.fn().mockResolvedValue(undefined),
-      visible: true,
-      ...overrides,
-    },
+    props,
     global: {
       plugins: [ElementPlus, i18n],
       stubs: {

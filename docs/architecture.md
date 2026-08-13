@@ -882,16 +882,18 @@ status change cannot clone and invalidate a long active transcript.
 Dragging a work item onto an agent records provider-neutral assignment metadata
 in `workBacklog.assignments`, keyed by provider and provider-generated item id,
 then sends a deterministic prompt through the existing prompt path. Assignment
-state is local and provider-neutral: newly assigned items are `working`, and
-agents mark them `completed` through the `mark-work-item-completed` Claw MCP
-tool using the exact work item id from that prompt. Loop-created assignments
+state is local and provider-neutral: newly assigned items are `inProgress`, and
+agents update them to `blocked`, `readyForReview`, or `completed` through the
+`update-work-item` Claw MCP tool using the exact work item id from that prompt.
+Blocked updates include a user-facing note explaining what help is needed.
+Loop-created assignments
 also store loop origin metadata so loop completion instructions can be shown at
 completion time without polluting the initial work context. Assigning the same
-work item to another agent overwrites that key and resets it to `working`.
+work item to another agent overwrites that key and resets it to `inProgress`.
 Assignment status belongs to the backlog record, so it is preserved even when
 the stored agent id no longer exists; only the live assignee navigation/avatar
 depends on the agent still being present. Resetting an assignment clears Codex
-Claw's local assignment metadata and its local working/completed state.
+Claw's local assignment metadata and lifecycle state.
 Loops may also clean up their generated workspace after confirmed completion:
 existing-team loops can delete the generated agent, while dedicated-team loops
 can delete the generated team.
