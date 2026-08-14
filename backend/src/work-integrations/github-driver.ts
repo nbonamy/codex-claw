@@ -1,4 +1,4 @@
-import type { AgentGitPullRequest, WorkItem, WorkItemLabel, WorkItemQuery, WorkRepository } from '@codex-claw/core/contracts';
+import type { AgentGitPullRequest, GlobalWorkItemQuery, WorkItem, WorkItemLabel, WorkItemPage, WorkItemQuery, WorkRepository } from '@codex-claw/core/contracts';
 import type { WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
 import { runtimeGitHubOAuthClientId } from '../runtime-config';
 import type { WorkProviderDeviceAuthorization, WorkProviderDeviceTokenResult, WorkProviderDriver } from './types';
@@ -10,6 +10,7 @@ const DEFAULT_SCOPE = 'repo read:user';
 
 export class GitHubWorkProviderDriver implements WorkProviderDriver {
   readonly provider = 'github' as const;
+  private readonly globalItemTotals = new Map<string, number>();
 
   constructor(private readonly clientIdProvider: string | (() => string | null | undefined) = runtimeGitHubOAuthClientId) {}
 
@@ -178,6 +179,33 @@ export class GitHubWorkProviderDriver implements WorkProviderDriver {
     return repositories.map(githubRepository).filter((repository): repository is WorkRepository => Boolean(repository));
   }
 
+  async listGlobalItems(token: WorkProviderToken, query: GlobalWorkItemQuery = {}): Promise<WorkItemPage> {
+    const page = query.page ?? 1;
+    if (!Number.isSafeInteger(page) || page < 1) throw new Error('Invalid work item page.');
+    const pageSize = Math.max(1, Math.min(100, Math.trunc(query.pageSize ?? 50)));
+    const assignment = query.assignment === 'viewer' ? 'assigned' : 'all';
+    const state = query.state ?? 'open';
+    const path = `/issues?filter=${assignment}&state=${state}&sort=updated&direction=desc&per_page=${pageSize}&page=${page}`;
+    const response = await githubApiPageRequest(
+      token,
+      path,
+    );
+    if (!Array.isArray(response.value)) {
+      throw new Error('GitHub returned an invalid global issues response.');
+    }
+    const items = response.value
+      .map(githubAssignedIssue)
+      .filter((item): item is WorkItem => item !== null)
+      .filter((item) => query.kind === undefined || query.kind === 'all' || item.kind === query.kind);
+    const totalKey = `${assignment}:${state}:${pageSize}`;
+    let totalItems = this.globalItemTotals.get(totalKey);
+    if (page === 1 || totalItems === undefined) {
+      totalItems = await githubPageTotal(token, response, page, pageSize);
+      this.globalItemTotals.set(totalKey, totalItems);
+    }
+    return { items, page, pageSize, totalItems };
+  }
+
   async listItems(token: WorkProviderToken, repositoryId: string, query: WorkItemQuery = {}): Promise<WorkItem[]> {
     const repository = parseRepositoryId(repositoryId);
     if (!repository) {
@@ -281,6 +309,19 @@ function githubOAuthErrorMessage(response: Record<string, unknown>): string {
 }
 
 async function githubApiRequest(token: WorkProviderToken, path: string, init: RequestInit = {}): Promise<unknown> {
+  const response = await githubApiResponse(token, path, init);
+  return response.json();
+}
+
+async function githubApiPageRequest(token: WorkProviderToken, path: string): Promise<{ linkHeader: string | null; value: unknown }> {
+  const response = await githubApiResponse(token, path);
+  return {
+    value: await response.json(),
+    linkHeader: response.headers.get('link'),
+  };
+}
+
+async function githubApiResponse(token: WorkProviderToken, path: string, init: RequestInit = {}): Promise<Response> {
   const response = await fetch(`${GITHUB_API_BASE_URL}${path}`, {
     ...init,
     headers: {
@@ -295,8 +336,36 @@ async function githubApiRequest(token: WorkProviderToken, path: string, init: Re
   if (!response.ok) {
     throw await githubApiError(response);
   }
+  return response;
+}
 
-  return response.json();
+async function githubPageTotal(
+  token: WorkProviderToken,
+  response: { linkHeader: string | null; value: unknown },
+  page: number,
+  pageSize: number,
+): Promise<number> {
+  const currentCount = Array.isArray(response.value) ? response.value.length : 0;
+  const lastUrl = linkedPageUrl(response.linkHeader, 'last');
+  if (!lastUrl) return ((page - 1) * pageSize) + currentCount;
+  const lastPage = Number(new URL(lastUrl).searchParams.get('page'));
+  if (!Number.isSafeInteger(lastPage) || lastPage < page) return ((page - 1) * pageSize) + currentCount;
+  if (lastPage === page) return ((page - 1) * pageSize) + currentCount;
+
+  const url = new URL(lastUrl);
+  const lastResponse = await githubApiPageRequest(token, `${url.pathname}${url.search}`);
+  if (!Array.isArray(lastResponse.value)) throw new Error('GitHub returned an invalid final issues page.');
+  return ((lastPage - 1) * pageSize) + lastResponse.value.length;
+}
+
+function linkedPageUrl(linkHeader: string | null, relation: 'last' | 'next'): string | null {
+  if (!linkHeader) return null;
+  for (const part of linkHeader.split(',')) {
+    if (!new RegExp(`;\\s*rel="${relation}"\\s*$`).test(part.trim())) continue;
+    const match = part.match(/<([^>]+)>/);
+    return match?.[1] ?? null;
+  }
+  return null;
 }
 
 async function githubApiError(response: Response): Promise<Error> {

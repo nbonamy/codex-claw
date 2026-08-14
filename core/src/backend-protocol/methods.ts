@@ -150,6 +150,7 @@ export const backendMethods = {
   workProviderConnectionComplete: 'workProvider/connection/complete',
   workProviderConnectionsReload: 'workProvider/connections/reload',
   workProviderDisconnect: 'workProvider/disconnect',
+  workProviderGlobalItemsList: 'workProvider/globalItems/list',
   workProviderAssignedItemsList: 'workProvider/assignedItems/list',
   workProviderItemsList: 'workProvider/items/list',
   workProviderItemCreate: 'workProvider/item/create',

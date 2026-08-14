@@ -53,6 +53,7 @@ describe('Claw web operations', () => {
     await invokeClawWebOperation(backend, 'forkAgent', ['agent-1', undefined]);
     await invokeClawWebOperation(backend, 'duplicateAgent', ['agent-1', { select: false }]);
     await invokeClawWebOperation(backend, 'listWorkItems', ['github', null, { kind: 'remote' }]);
+    await invokeClawWebOperation(backend, 'listGlobalWorkItems', ['github', undefined, { assignment: 'all', page: 2 }]);
     await invokeClawWebOperation(backend, 'getPluginStatus', []);
     await invokeClawWebOperation(backend, 'setAgentPermissionMode', ['agent-claude', 'acceptEdits']);
     await invokeClawWebOperation(backend, 'generateAgentGitMessage', ['agent-1', { kind: 'pullRequest' }]);
@@ -69,6 +70,7 @@ describe('Claw web operations', () => {
       [backendMethods.agentFork, { agentId: 'agent-1' }],
       [backendMethods.agentDuplicate, { agentId: 'agent-1', options: { select: false } }],
       [backendMethods.workProviderItemsList, { provider: 'github', location: { kind: 'remote' } }],
+      [backendMethods.workProviderGlobalItemsList, { provider: 'github', query: { assignment: 'all', page: 2 } }],
       [backendMethods.settingsPluginStatusGet, undefined],
       [backendMethods.agentPermissionModeUpdate, { agentId: 'agent-claude', mode: 'acceptEdits' }],
       [backendMethods.agentGitMessageGenerate, { agentId: 'agent-1', input: { kind: 'pullRequest' } }],

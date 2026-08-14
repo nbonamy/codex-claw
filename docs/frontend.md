@@ -233,6 +233,11 @@ implemented:
   alphabetical sorting, and lists every repository behind an always-visible
   repository filter in an independent scroll region while the primary Cockpit
   navigation stays fixed; ticket search remains in the work-item toolbar;
+  global backlog scopes load one provider-owned page at a time instead of
+  fanning out through every repository; Assigned to me is the default scope,
+  and compact numbered pagination shows the exact total with previous/next
+  controls, caches visited pages, and keeps the current page visible if another
+  page fails to load;
   an item can prefill an editable custom prompt or immediately dispatch a
   contextual issue investigation/fix or pull-request feedback/review action to
   the current agent or, by default, a background-created duplicate that does

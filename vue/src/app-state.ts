@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue';
 import type { AgentGitBranchInput, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitWorkflow } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, AgentHistoryLoadResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendPluginSummary, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, AgentHistoryLoadResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendPluginSummary, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, GlobalWorkItemQuery, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/core/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/core/backend-commands';
@@ -1306,6 +1306,11 @@ export function useAppState() {
     }
   }
 
+  async function loadGlobalWorkItems(provider: WorkProviderKind, location?: LoopLocation, query?: GlobalWorkItemQuery): Promise<WorkItemPage> {
+    if (!codexClawApi?.listGlobalWorkItems) return { items: [], page: 1, pageSize: query?.pageSize ?? 50, totalItems: 0 };
+    return codexClawApi.listGlobalWorkItems(provider, location, query);
+  }
+
   async function loadAssignedWorkItems(provider: WorkProviderKind, location?: LoopLocation): Promise<WorkItem[]> {
     if (!codexClawApi?.listAssignedWorkItems) return [];
     workBacklogStatus.value = 'loading';
@@ -1717,6 +1722,7 @@ export function useAppState() {
     loadAgentFiles: loadAgentFilesForActiveAgent,
     loadWorkRepositories,
     loadWorkItems,
+    loadGlobalWorkItems,
     loadAssignedWorkItems,
     createWorkItem,
     loadSourceRepositories,

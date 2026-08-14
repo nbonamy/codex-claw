@@ -253,6 +253,12 @@ describe('WorkIntegrationManager', () => {
 
     await expect(manager.listRepositories('github')).resolves.toStrictEqual([repository]);
     await expect(manager.listItems('github', 'nbonamy/codex-claw')).resolves.toStrictEqual([item]);
+    await expect(manager.listGlobalItems('github', { assignment: 'viewer', page: 2 })).resolves.toStrictEqual({
+      items: [item],
+      page: 2,
+      pageSize: 50,
+      totalItems: 1,
+    });
   });
 
   it('creates work items through the connected provider driver', async () => {
@@ -408,6 +414,12 @@ function fakeDriver(input: Partial<{
     ...(input.refreshedToken ? { refreshToken: vi.fn().mockResolvedValue(input.refreshedToken) } : {}),
     currentAccountLabel: vi.fn().mockResolvedValue('nbonamy'),
     listRepositories: vi.fn().mockResolvedValue(input.repositories ?? []),
+    listGlobalItems: vi.fn().mockImplementation((_token, query) => Promise.resolve({
+      items: input.items ?? [],
+      page: query?.page ?? 1,
+      pageSize: query?.pageSize ?? 50,
+      totalItems: (input.items ?? []).length,
+    })),
     listItems: vi.fn().mockResolvedValue(input.items ?? []),
   };
 }

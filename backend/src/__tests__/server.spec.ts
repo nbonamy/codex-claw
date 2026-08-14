@@ -2422,6 +2422,17 @@ describe('ClawBackendServer', () => {
         title: 'Assigned bug',
         url: 'https://github.com/nbonamy/codex-claw/issues/13',
       }]),
+      listGlobalItems: vi.fn().mockResolvedValue({
+        items: [{
+          provider: 'github',
+          id: 'github:nbonamy/codex-claw#14',
+          title: 'Page global work',
+          url: 'https://github.com/nbonamy/codex-claw/issues/14',
+        }],
+        page: 1,
+        pageSize: 50,
+        totalItems: 14,
+      }),
       listItems: vi.fn().mockResolvedValue([{
         provider: 'github',
         id: 'github:nbonamy/codex-claw#12',
@@ -2441,6 +2452,14 @@ describe('ClawBackendServer', () => {
         snapshot,
         authorization: { provider: 'github', userCode: 'ABCD-1234' },
       },
+    });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'global-items',
+      method: 'workProvider/globalItems/list',
+      params: { provider: 'github', query: { assignment: 'viewer', page: 1, pageSize: 50 } },
+    })).resolves.toMatchObject({
+      result: { items: [{ id: 'github:nbonamy/codex-claw#14' }], page: 1, pageSize: 50, totalItems: 14 },
     });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
@@ -2480,6 +2499,7 @@ describe('ClawBackendServer', () => {
     expect(workIntegrations.connect).toHaveBeenCalledWith('github');
     expect(workIntegrations.configureBacklog).toHaveBeenCalledWith({ provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } });
     expect(workIntegrations.listAssignedItems).toHaveBeenCalledWith('github');
+    expect(workIntegrations.listGlobalItems).toHaveBeenCalledWith('github', { assignment: 'viewer', page: 1, pageSize: 50 });
     expect(workIntegrations.listItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw');
     expect(workIntegrations.listItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw', { kind: 'all', state: 'all' });
   });

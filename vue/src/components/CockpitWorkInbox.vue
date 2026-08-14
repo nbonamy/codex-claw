@@ -94,7 +94,7 @@
       </div>
     </section>
     <p v-else-if="status === 'loading' && items.length === 0" class="cockpit-inbox__state">Loading work items…</p>
-    <p v-else-if="error" class="cockpit-inbox__state cockpit-inbox__state--error">{{ error }}</p>
+    <p v-else-if="error && items.length === 0" class="cockpit-inbox__state cockpit-inbox__state--error">{{ error }}</p>
     <p v-else-if="rows.length === 0" class="cockpit-inbox__state">{{ emptyMessage }}</p>
 
     <div v-else class="cockpit-inbox__list">
@@ -181,6 +181,36 @@
       </section>
     </div>
 
+    <footer
+      v-if="!selectedRepositoryId && globalScope && items.length > 0"
+      class="cockpit-inbox__pagination"
+      aria-label="Work item pagination"
+    >
+      <span>{{ totalItems }} {{ totalItems === 1 ? 'item' : 'items' }} total</span>
+      <span v-if="error" class="cockpit-inbox__pagination-error" role="alert">{{ error }}</span>
+      <div class="cockpit-inbox__page-controls">
+        <button
+          class="cockpit-inbox__icon-button"
+          type="button"
+          :disabled="pageLoading || page <= 1"
+          aria-label="Previous page"
+          @click="emit('change-page', page - 1)"
+        >
+          <IconChevronLeft aria-hidden="true" />
+        </button>
+        <span>Page {{ page }} of {{ totalPages }}</span>
+        <button
+          class="cockpit-inbox__icon-button"
+          type="button"
+          :disabled="pageLoading || page >= totalPages"
+          aria-label="Next page"
+          @click="emit('change-page', page + 1)"
+        >
+          <IconChevronRight aria-hidden="true" />
+        </button>
+      </div>
+    </footer>
+
     <el-dialog
       class="claw-dialog cockpit-inbox__start-dialog"
       :model-value="startWorkDialogOpen"
@@ -223,7 +253,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import { IconAlertCircle, IconChevronDown, IconCircleFilled, IconFilter, IconSearch } from '@tabler/icons-vue';
+import { IconAlertCircle, IconChevronDown, IconChevronLeft, IconChevronRight, IconCircleFilled, IconFilter, IconSearch } from '@tabler/icons-vue';
 import type { Agent, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { ExternalLinkIcon, EyeIcon, GitBranchIcon, GitHubIcon, PlayerPlayIcon, PlusCircleIcon, RefreshIcon } from '../shared/icons/app-icons';
@@ -242,6 +272,9 @@ const props = withDefaults(defineProps<{
   error: string | null;
   globalScope?: 'assignedToMe' | 'all' | null;
   items: WorkItem[];
+  page?: number;
+  pageLoading?: boolean;
+  pageSize?: number;
   repositories: WorkRepository[];
   searchQuery?: string;
   selectedAssigneeLogin?: string | null;
@@ -250,12 +283,14 @@ const props = withDefaults(defineProps<{
   status: 'notLoaded' | 'loading' | 'loaded' | 'error';
   statusFilter?: SummaryFilter | null;
   teams: Team[];
+  totalItems?: number;
   defaultTeamId?: string | null;
   startWorkAction: (input: { action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string }) => Promise<void>;
-}>(), { activeView: 'focus', defaultTeamId: null, globalScope: null, searchQuery: '', selectedAssigneeLogin: null, selectedTagName: null, statusFilter: null });
+}>(), { activeView: 'focus', defaultTeamId: null, globalScope: null, page: 1, pageLoading: false, pageSize: 50, searchQuery: '', selectedAssigneeLogin: null, selectedTagName: null, statusFilter: null, totalItems: 0 });
 
 const emit = defineEmits<{
   refresh: [repositoryId: string | null];
+  'change-page': [page: number];
   'select-global-scope': [scope: 'assignedToMe' | 'all'];
   'remove-assignment': [item: WorkItem];
   'select-assigned-agent': [agentId: string];
@@ -305,6 +340,16 @@ const rows = computed(() => filteredRows.value.filter((row) => {
   if (activeView.value === 'focus') return row.priority === 'attention' || row.priority === 'review';
   return true;
 }));
+const scopedAssignments = computed(() => Object.values(props.assignments).filter((assignment) => {
+  if (assignment.provider !== props.connection.provider) return false;
+  return !props.selectedRepositoryId || assignment.itemId.startsWith(`${props.selectedRepositoryId}#`);
+}));
+const totalAssignmentCount = computed(() => props.globalScope ? scopedAssignments.value.length : filteredRows.value.filter((row) => row.assignment).length);
+const totalFocusCount = computed(() => props.globalScope
+  ? scopedAssignments.value.filter((assignment) => assignment.status === 'blocked' || assignment.status === 'readyForReview').length
+  : filteredRows.value.filter((row) => row.priority === 'attention' || row.priority === 'review').length);
+const effectiveTotalItems = computed(() => props.globalScope ? props.totalItems : filteredRows.value.length);
+const totalPages = computed(() => Math.max(1, Math.ceil(props.totalItems / props.pageSize)));
 const priorityOrder: Priority[] = ['attention', 'review', 'progress', 'ready'];
 const groupedRows = computed(() => priorityOrder.map((priority) => ({
   id: priority,
@@ -312,10 +357,10 @@ const groupedRows = computed(() => priorityOrder.map((priority) => ({
   rows: rows.value.filter((row) => row.priority === priority).sort((a, b) => b.activityAt.localeCompare(a.activityAt)),
 })).filter((group) => group.rows.length > 0));
 const viewOptions = computed(() => [
-  { id: 'all' as const, label: 'All', count: filteredRows.value.length },
-  { id: 'backlog' as const, label: 'Backlog', count: filteredRows.value.filter((row) => !row.assignment).length },
-  { id: 'wip' as const, label: 'WIP', count: filteredRows.value.filter((row) => row.assignment).length },
-  { id: 'focus' as const, label: 'Focus', count: filteredRows.value.filter((row) => row.priority === 'attention' || row.priority === 'review').length },
+  { id: 'all' as const, label: 'All', count: effectiveTotalItems.value },
+  { id: 'backlog' as const, label: 'Backlog', count: Math.max(0, effectiveTotalItems.value - totalAssignmentCount.value) },
+  { id: 'wip' as const, label: 'WIP', count: totalAssignmentCount.value },
+  { id: 'focus' as const, label: 'Focus', count: totalFocusCount.value },
 ]);
 const selectedItems = computed(() => rows.value
   .filter((row) => !row.assignment && selectedItemIds.value.has(row.item.id))
@@ -656,6 +701,7 @@ function selectAssignee(value: unknown): void { emit('select-assignee', normaliz
 .cockpit-inbox__list {
   width: min(100%, 1440px);
   min-height: 0;
+  flex: 1 1 auto;
   overflow: auto;
   margin: 0 auto;
   padding: var(--space-4) var(--space-16) var(--space-16);
@@ -889,6 +935,41 @@ function selectAssignee(value: unknown): void { emit('select-assignee', normaliz
 
 .cockpit-inbox__state--error {
   color: var(--color-error);
+}
+
+.cockpit-inbox__pagination {
+  width: min(100%, 1440px);
+  min-height: 52px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-12);
+  margin: 0 auto;
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-8) var(--space-16);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+}
+
+.cockpit-inbox__pagination-error {
+  color: var(--color-error);
+}
+
+.cockpit-inbox__page-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.cockpit-inbox__page-controls button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.cockpit-inbox__page-controls svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
 }
 
 .cockpit-inbox__start-body {

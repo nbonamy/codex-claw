@@ -1,4 +1,4 @@
-import type { AgentGitPullRequest, AppSnapshot, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemQuery, WorkProviderAuthorization, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AgentGitPullRequest, AppSnapshot, GlobalWorkItemQuery, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import type { WorkIntegrationTokenStore, WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
 import type { WorkProviderDeviceAuthorization, WorkProviderDriver } from './types';
 
@@ -285,6 +285,13 @@ export class WorkIntegrationManager {
     return query
       ? this.driver(provider).listItems(token, repositoryId, query)
       : this.driver(provider).listItems(token, repositoryId);
+  }
+
+  async listGlobalItems(provider: WorkProviderKind, query?: GlobalWorkItemQuery): Promise<WorkItemPage> {
+    const token = await this.connectedToken(provider);
+    return query
+      ? this.driver(provider).listGlobalItems(token, query)
+      : this.driver(provider).listGlobalItems(token);
   }
 
   async listAssignedItems(provider: WorkProviderKind): Promise<WorkItem[]> {

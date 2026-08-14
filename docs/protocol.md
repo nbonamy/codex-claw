@@ -248,6 +248,7 @@ adopting it as the local product snapshot.
 | `workProvider/repositories/list` | `{ provider, location? }` | `WorkRepository[]` | Lists provider repositories from local `clawd` or the selected remote loop location. |
 | `workProvider/backlog/configure` | `{ input: WorkBacklogConfigurationInput, location? }` | `AppSnapshot` | Saves backlog configuration in local `clawd` or the selected remote loop location. Remote snapshots are returned but not adopted as local product state. |
 | `workProvider/items/list` | `{ provider, repositoryId, location? }` | `WorkItem[]` | Lists provider work items from local `clawd` or the selected remote loop location. |
+| `workProvider/globalItems/list` | `{ provider, location?, query? }` | `WorkItemPage` | Lists one numbered page plus its exact total across visible repositories; Cockpit uses it instead of repository fan-out. |
 
 ## Client To `clawd`: Loops
 

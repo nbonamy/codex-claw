@@ -26,6 +26,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   disconnectWorkProvider: [backendMethods.workProviderDisconnect, named('provider')],
   listWorkRepositories: [backendMethods.workProviderRepositoriesList, namedOptional('provider', 'location')],
   configureWorkBacklog: [backendMethods.workProviderBacklogConfigure, namedOptional('input', 'location')],
+  listGlobalWorkItems: [backendMethods.workProviderGlobalItemsList, namedOptional('provider', 'location', 'query')],
   listWorkItems: [backendMethods.workProviderItemsList, namedOptional('provider', 'repositoryId', 'location')],
   createWorkItem: [backendMethods.workProviderItemCreate, named('input')],
   listBackendModels: [backendMethods.agentModelsList, named('agentId')],

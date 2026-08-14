@@ -91,6 +91,40 @@ describe('CockpitView', () => {
     expect(wrapper.findAll('.cockpit-view__repositories > div')).toHaveLength(12);
   });
 
+  it('keeps recent repository ordering stable when the visible work-item page changes', async () => {
+    const snapshot = createInitialSnapshot();
+    const repositories = [
+      repository('older', '2026-08-10T00:00:00.000Z'),
+      repository('recent', '2026-08-13T00:00:00.000Z'),
+    ];
+    const firstPageItem = {
+      ...item(24),
+      repositoryId: repositories[1]!.id,
+      repositoryFullName: repositories[1]!.fullName,
+      updatedAt: '2026-08-13T12:00:00.000Z',
+    };
+    const secondPageItem = {
+      ...item(25),
+      repositoryId: repositories[0]!.id,
+      repositoryFullName: repositories[0]!.fullName,
+      updatedAt: '2026-08-14T00:00:00.000Z',
+    };
+    const wrapper = mountView(snapshot, [firstPageItem], repositories);
+    const workBacklog = wrapper.props('workBacklog');
+    if (!workBacklog) throw new Error('Expected work backlog props.');
+
+    expect(wrapper.findAll('.cockpit-view__repositories > div').map((row) => row.text())).toStrictEqual(['recent', 'older']);
+
+    await wrapper.setProps({
+      workBacklog: {
+        ...workBacklog,
+        items: [secondPageItem],
+      },
+    });
+
+    expect(wrapper.findAll('.cockpit-view__repositories > div').map((row) => row.text())).toStrictEqual(['recent', 'older']);
+  });
+
   it('routes assigned rows to their team and passes the batch launcher to the inbox', () => {
     const snapshot = createInitialSnapshot();
     const assigned = item(24);

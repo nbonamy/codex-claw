@@ -261,6 +261,62 @@ describe('GitHubWorkProviderDriver', () => {
     );
   });
 
+  it('pages the global backlog across repositories and reports the exact total', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(jsonResponse([{
+      number: 24,
+      title: 'Page the cockpit backlog',
+      html_url: 'https://github.com/nbonamy/codex-claw/issues/24',
+      repository_url: 'https://api.github.com/repos/nbonamy/codex-claw',
+      state: 'open',
+      labels: [],
+      created_at: '2026-08-13T12:00:00.000Z',
+      updated_at: '2026-08-13T13:00:00.000Z',
+      }], {
+      link: '<https://api.github.com/issues?filter=all&state=open&sort=updated&direction=desc&per_page=50&page=3>; rel="next", <https://api.github.com/issues?filter=all&state=open&sort=updated&direction=desc&per_page=50&page=8>; rel="last"',
+      }))
+      .mockResolvedValueOnce(jsonResponse([{ number: 351 }, { number: 352 }, { number: 353 }]))
+      .mockResolvedValueOnce(jsonResponse([]));
+    vi.stubGlobal('fetch', fetch);
+    const driver = new GitHubWorkProviderDriver('client-id');
+    const token = { provider: 'github' as const, accessToken: 'secret', tokenType: 'bearer', connectedAt: 'now' };
+
+    await expect(driver.listGlobalItems(token, {
+      assignment: 'all',
+      state: 'open',
+      page: 2,
+      pageSize: 50,
+    })).resolves.toStrictEqual({
+      items: [expect.objectContaining({ repositoryId: 'nbonamy/codex-claw', number: 24 })],
+      page: 2,
+      pageSize: 50,
+      totalItems: 353,
+    });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenNthCalledWith(1,
+      'https://api.github.com/issues?filter=all&state=open&sort=updated&direction=desc&per_page=50&page=2',
+      expect.any(Object),
+    );
+    expect(fetch).toHaveBeenNthCalledWith(2,
+      'https://api.github.com/issues?filter=all&state=open&sort=updated&direction=desc&per_page=50&page=8',
+      expect.any(Object),
+    );
+
+    await expect(driver.listGlobalItems(token, { assignment: 'all', state: 'open', page: 3, pageSize: 50 }))
+      .resolves.toMatchObject({ page: 3, pageSize: 50, totalItems: 353 });
+    expect(fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('rejects malformed global backlog pages before calling GitHub', async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const driver = new GitHubWorkProviderDriver('client-id');
+    const token = { provider: 'github' as const, accessToken: 'secret', tokenType: 'bearer', connectedAt: 'now' };
+
+    await expect(driver.listGlobalItems(token, { page: 0 })).rejects.toThrow('Invalid work item page');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('looks up and creates draft pull requests', async () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(jsonResponse([{ number: 7, title: 'Existing', html_url: 'https://github.com/o/r/pull/7', draft: true }]))
@@ -321,9 +377,10 @@ describe('GitHubWorkProviderDriver', () => {
   });
 });
 
-function jsonResponse(value: unknown): Response {
+function jsonResponse(value: unknown, headers: Record<string, string> = {}): Response {
   return {
     ok: true,
+    headers: new Headers(headers),
     json: vi.fn().mockResolvedValue(value),
   } as unknown as Response;
 }

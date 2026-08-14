@@ -180,6 +180,7 @@
         @remove-bench-template="$emit('remove-bench-template', $event)"
         @remove-work-item-assignment="$emit('remove-work-item-assignment', $event)"
         @refresh-work-items="refreshWorkItems"
+        @change-work-items-page="changeGlobalWorkItemsPage"
         @select-global-scope="selectGlobalBacklogScope"
         @restart-agent="$emit('restart-agent', $event)"
         @save-agent-to-bench="$emit('save-agent-to-bench', $event)"
@@ -392,7 +393,7 @@
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
-import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BackendPermissionModeOption, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendPluginSummary, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type LoopLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkItemQuery, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
+import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BackendPermissionModeOption, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendPluginSummary, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type GlobalWorkItemQuery, type LoopLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkItemPage, type WorkItemQuery, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
@@ -567,6 +568,7 @@ const props = withDefaults(defineProps<{
   loadBench?: (location?: BenchLocation) => Promise<BenchTemplate[] | void>;
   loadWorkRepositories?: (provider: WorkProviderKind, location?: LoopLocation) => Promise<WorkRepository[] | void>;
   loadWorkItems?: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: WorkItemQuery) => Promise<WorkItem[] | void>;
+  loadGlobalWorkItems?: (provider: WorkProviderKind, location?: LoopLocation, query?: GlobalWorkItemQuery) => Promise<WorkItemPage>;
   loadAssignedWorkItems?: (provider: WorkProviderKind, location?: LoopLocation) => Promise<WorkItem[] | void>;
   createWorkItem?: (input: import('@codex-claw/core/contracts').CreateWorkItemInput) => Promise<WorkItem>;
   duplicateAgentAction?: (agentId: string, options?: import('@codex-claw/core/contracts').DuplicateAgentOptions) => Promise<Agent | null>;
@@ -677,6 +679,7 @@ const props = withDefaults(defineProps<{
   loadBench: async () => undefined,
   loadWorkRepositories: async () => undefined,
   loadWorkItems: async () => undefined,
+  loadGlobalWorkItems: async (_provider, _location, query) => ({ items: [], page: query?.page ?? 1, pageSize: query?.pageSize ?? 50, totalItems: 0 }),
   loadAssignedWorkItems: async () => undefined,
   createWorkItem: async () => { throw new Error('Issue creation is not available.'); },
   duplicateAgentAction: async () => null,
@@ -809,6 +812,20 @@ const pendingBenchAgentTeamId = ref<string | null>(null);
 const pendingCockpitBacklogConfiguration = ref<CockpitBacklogConfiguration | null>(null);
 const cockpitGlobalScope = ref<'assignedToMe' | 'all' | null>(null);
 const cockpitGlobalScopeStorageKey = 'cockpitGlobalScope:github';
+const cockpitGlobalPageSize = 25;
+type CockpitGlobalFeed = {
+  error: string | null;
+  page: number;
+  pages: Record<number, WorkItem[]>;
+  pageSize: number;
+  pendingPage: number | null;
+  status: 'notLoaded' | 'loading' | 'loaded' | 'error';
+  totalItems: number;
+};
+const cockpitGlobalFeeds = reactive<Record<'assignedToMe' | 'all', CockpitGlobalFeed>>({
+  assignedToMe: { error: null, page: 1, pages: {}, pageSize: cockpitGlobalPageSize, pendingPage: null, status: 'notLoaded', totalItems: 0 },
+  all: { error: null, page: 1, pages: {}, pageSize: cockpitGlobalPageSize, pendingPage: null, status: 'notLoaded', totalItems: 0 },
+});
 const benchAssignmentDialogVisible = ref(false);
 const teamDialogVisible = ref(false);
 const teamDialogMode = ref<'create' | 'edit'>('create');
@@ -1167,16 +1184,18 @@ const cockpitWorkBacklog = computed(() => {
   const selectedRepositoryId = configuration.repositoryId ?? null;
   const items = selectedRepositoryId
     ? props.workItemsByRepository[workItemsKey(provider, selectedRepositoryId)] ?? []
-    : cockpitGlobalScope.value === 'assignedToMe'
-      ? props.assignedWorkItemsByProvider[provider] ?? []
-      : cockpitGlobalScope.value === 'all'
-        ? repositories.flatMap((repository) => props.workItemsByRepository[workItemsKey(provider, repository.id)] ?? [])
-        : [];
+    : cockpitGlobalScope.value
+      ? cockpitGlobalFeeds[cockpitGlobalScope.value].pages[cockpitGlobalFeeds[cockpitGlobalScope.value].page] ?? []
+      : [];
+  const globalFeed = cockpitGlobalScope.value ? cockpitGlobalFeeds[cockpitGlobalScope.value] : null;
 
   return {
     assignments: props.snapshot.workBacklog.assignments,
     connection,
     globalScope: cockpitGlobalScope.value,
+    page: globalFeed?.page ?? 1,
+    pageSize: globalFeed?.pageSize ?? items.length,
+    pageLoading: globalFeed?.pendingPage !== null,
     repositories,
     selectedAssigneeLogin: cockpitGlobalScope.value === 'assignedToMe'
       ? connection.accountLabel ?? configuration.assigneeLogin ?? null
@@ -1184,8 +1203,9 @@ const cockpitWorkBacklog = computed(() => {
     selectedRepositoryId,
     selectedTagName: configuration.tagName ?? null,
     items,
-    status: props.workBacklogStatus,
-    error: props.workBacklogError,
+    status: selectedRepositoryId ? props.workBacklogStatus : globalFeed?.status ?? props.workBacklogStatus,
+    error: selectedRepositoryId ? props.workBacklogError : globalFeed?.error ?? null,
+    totalItems: globalFeed?.totalItems ?? items.length,
   };
 });
 
@@ -1573,15 +1593,7 @@ async function startRepositoryWork(agentId: string, input: RepositoryWorkStartIn
   const sourceAgent = props.snapshot.agents.find((agent) => agent.id === agentId);
   if (!sourceAgent) throw new Error('The selected agent is unavailable.');
 
-  let workItem = input.item;
-  if (workItem.kind === 'pullRequest' && !workItem.branchName?.trim()) {
-    const refreshedItems = await props.loadWorkItems(workItem.provider, workItem.repositoryId, undefined, {
-      kind: 'pullRequest',
-      state: 'all',
-    });
-    workItem = refreshedItems?.find((candidate) => candidate.id === workItem.id)
-      ?? workItem;
-  }
+  const workItem = await resolvePullRequestBranch(input.item);
 
   const targetLabel = input.target === 'duplicate' ? `a duplicate of ${sourceAgent.name}` : sourceAgent.name;
   if (!await confirmAssignedWorkItemOverride(workItem, targetLabel, input.target === 'current' ? sourceAgent.id : undefined)) {
@@ -1740,7 +1752,8 @@ async function startCockpitWorkItems(input: {
   const team = props.snapshot.teams.find((candidate) => candidate.id === input.teamId);
   if (!team) throw new Error('The selected team is unavailable.');
 
-  await Promise.all(input.items.map(async (item) => {
+  await Promise.all(input.items.map(async (listedItem) => {
+    const item = await resolvePullRequestBranch(listedItem);
     const repositoryName = workItemRepositoryName(item);
     const repository = props.sourceRepositories.find((candidate) => candidate.name === repositoryName);
     if (!repository) {
@@ -1748,8 +1761,9 @@ async function startCockpitWorkItems(input: {
     }
 
     const branchName = item.kind === 'pullRequest'
-      ? item.branchName?.trim() || `review/gh-${item.number}`
+      ? item.branchName?.trim()
       : `fix/gh-${item.number}`;
+    if (!branchName) throw new Error(`GitHub did not return the branch for ${item.repositoryFullName} #${item.number}.`);
     const remoteConnectionId = team.remoteConnectionId?.trim();
     const worktree = await props.createSourceWorktree({
       repoPath: repository.path,
@@ -1772,6 +1786,16 @@ async function startCockpitWorkItems(input: {
       prompt: workItemAssignmentPrompt(item, { action: input.action }),
     });
   }));
+}
+
+async function resolvePullRequestBranch(item: WorkItem): Promise<WorkItem> {
+  if (item.kind !== 'pullRequest' || item.branchName?.trim()) return item;
+
+  const refreshedItems = await props.loadWorkItems(item.provider, item.repositoryId, undefined, {
+    kind: 'pullRequest',
+    state: 'all',
+  });
+  return refreshedItems?.find((candidate) => candidate.id === item.id) ?? item;
 }
 
 async function openBenchAgentAssignmentDialog(intent: WorkItemAssignmentIntent): Promise<void> {
@@ -1928,16 +1952,14 @@ async function openCockpit(): Promise<void> {
     assigneeLogin: null,
     tagName: null,
   });
-  let repositories = props.workRepositoriesByProvider.github ?? [];
-  if (repositories.length === 0) {
-    repositories = await props.loadWorkRepositories('github') ?? [];
+  if ((props.workRepositoriesByProvider.github ?? []).length === 0) {
+    await props.loadWorkRepositories('github');
     await nextTick();
   }
   pendingCockpitBacklogConfiguration.value = crossRepositoryConfiguration;
-  if (rememberedCockpitGlobalScope() === 'all') {
-    cockpitGlobalScope.value = 'all';
-    await loadAllWorkRepositories(repositories);
-  }
+  const scope = rememberedCockpitGlobalScope() === 'all' ? 'all' : 'assignedToMe';
+  cockpitGlobalScope.value = scope;
+  await ensureGlobalWorkItems(scope);
 }
 
 function openLoops(): void {
@@ -2943,7 +2965,7 @@ async function disconnectWorkProvider(provider: WorkProviderKind): Promise<void>
 }
 
 async function selectWorkRepositoryForCockpit(repositoryId: string | null): Promise<void> {
-  cockpitGlobalScope.value = null;
+  cockpitGlobalScope.value = repositoryId ? null : 'assignedToMe';
   await configureCockpitWorkBacklog({
     repositoryId,
     assigneeLogin: null,
@@ -2951,12 +2973,15 @@ async function selectWorkRepositoryForCockpit(repositoryId: string | null): Prom
   });
   if (repositoryId) {
     await props.loadWorkItems('github', repositoryId);
+  } else {
+    await ensureGlobalWorkItems('assignedToMe');
   }
 }
 
 async function selectWorkAssigneeForCockpit(assigneeLogin: string | null): Promise<void> {
   if (cockpitGlobalScope.value === 'assignedToMe' && !assigneeLogin) {
-    cockpitGlobalScope.value = null;
+    cockpitGlobalScope.value = 'all';
+    await ensureGlobalWorkItems('all');
   }
   const repositoryId = cockpitWorkBacklog.value?.selectedRepositoryId ?? null;
   await configureCockpitWorkBacklog({
@@ -3014,9 +3039,9 @@ async function refreshWorkItems(repositoryId: string | null): Promise<void> {
   if (repositoryId) {
     await props.loadWorkItems('github', repositoryId);
   } else if (cockpitGlobalScope.value === 'assignedToMe') {
-    await props.loadAssignedWorkItems('github');
+    await loadGlobalWorkItems('assignedToMe', 1, true);
   } else if (cockpitGlobalScope.value === 'all') {
-    await loadAllWorkRepositories(props.workRepositoriesByProvider.github ?? []);
+    await loadGlobalWorkItems('all', 1, true);
   }
 }
 
@@ -3024,8 +3049,8 @@ async function selectGlobalBacklogScope(scope: 'assignedToMe' | 'all'): Promise<
   if (scope === 'all') {
     try {
       await ElMessageBox.confirm(
-        'This loads open issues and pull requests from every visible repository. It can take a while and use a significant amount of your GitHub quota.',
-        'Load every repository?',
+        'This loads your global GitHub backlog one page at a time. Large backlogs may use additional GitHub quota as you load more pages.',
+        'Load the global backlog?',
         { confirmButtonText: 'Load everything', cancelButtonText: 'Cancel', type: 'warning' },
       );
     } catch {
@@ -3033,41 +3058,53 @@ async function selectGlobalBacklogScope(scope: 'assignedToMe' | 'all'): Promise<
     }
   }
   cockpitGlobalScope.value = scope;
-  if (scope === 'assignedToMe') {
-    try {
-      await props.loadAssignedWorkItems('github');
-    } catch (error) {
-      cockpitGlobalScope.value = null;
-      ElMessage.error(error instanceof Error ? error.message : String(error));
-    }
-  } else {
-    rememberCockpitGlobalScope('all');
-    await loadAllWorkRepositories(props.workRepositoriesByProvider.github ?? []);
+  if (scope === 'all') rememberCockpitGlobalScope('all');
+  await ensureGlobalWorkItems(scope);
+}
+
+async function ensureGlobalWorkItems(scope: 'assignedToMe' | 'all'): Promise<void> {
+  if (cockpitGlobalFeeds[scope].status === 'notLoaded') {
+    await loadGlobalWorkItems(scope, 1);
   }
 }
 
-async function loadAllWorkRepositories(repositories: WorkRepository[]): Promise<void> {
-  const failed: WorkRepository[] = [];
-  let loaded = 0;
-  for (const repository of repositories) {
-    try {
-      const items = await props.loadWorkItems('github', repository.id);
-      if (items === undefined) failed.push(repository);
-      else loaded += 1;
-    } catch {
-      failed.push(repository);
-    }
-  }
-  if (failed.length === 0) return;
+async function changeGlobalWorkItemsPage(page: number): Promise<void> {
+  const scope = cockpitGlobalScope.value;
+  if (!scope) return;
+  const feed = cockpitGlobalFeeds[scope];
+  const totalPages = Math.max(1, Math.ceil(feed.totalItems / feed.pageSize));
+  if (!Number.isInteger(page) || page < 1 || page > totalPages || page === feed.page) return;
+  await loadGlobalWorkItems(scope, page);
+}
 
-  const names = failed.slice(0, 3).map((repository) => repository.name).join(', ');
-  const overflow = failed.length > 3 ? ` and ${failed.length - 3} more` : '';
-  const message = `Loaded ${loaded} of ${repositories.length} repositories. Could not load: ${names}${overflow}.`;
-  if (loaded === 0) {
-    cockpitGlobalScope.value = null;
-    ElMessage.error(message);
-  } else {
-    ElMessage.warning(message);
+async function loadGlobalWorkItems(scope: 'assignedToMe' | 'all', page: number, force = false): Promise<void> {
+  const feed = cockpitGlobalFeeds[scope];
+  if (feed.pendingPage !== null) return;
+  if (!force && feed.pages[page]) {
+    feed.page = page;
+    feed.error = null;
+    return;
+  }
+  feed.pendingPage = page;
+  if (Object.keys(feed.pages).length === 0) feed.status = 'loading';
+  feed.error = null;
+  try {
+    const result = await props.loadGlobalWorkItems('github', undefined, {
+      assignment: scope === 'assignedToMe' ? 'viewer' : 'all',
+      state: 'open',
+      page,
+      pageSize: cockpitGlobalPageSize,
+    });
+    feed.pages[result.page] = result.items;
+    feed.page = result.page;
+    feed.pageSize = result.pageSize;
+    feed.totalItems = result.totalItems;
+    feed.status = 'loaded';
+  } catch (error) {
+    feed.error = error instanceof Error ? error.message : String(error);
+    if (Object.keys(feed.pages).length === 0) feed.status = 'error';
+  } finally {
+    feed.pendingPage = null;
   }
 }
 

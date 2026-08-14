@@ -117,6 +117,9 @@
         :error="workBacklog.error"
         :global-scope="workBacklog.globalScope"
         :items="workBacklog.items"
+        :page="workBacklog.page"
+        :page-loading="workBacklog.pageLoading"
+        :page-size="workBacklog.pageSize"
         :repositories="workBacklog.repositories"
         :search-query="searchQuery"
         :selected-assignee-login="workBacklog.selectedAssigneeLogin ?? null"
@@ -127,6 +130,8 @@
         :start-work-action="startWorkItemsAction"
         :status="workBacklog.status"
         :status-filter="activeSummaryFilter"
+        :total-items="workBacklog.totalItems"
+        @change-page="emit('change-work-items-page', $event)"
         @refresh="emit('refresh-work-items', $event)"
         @select-global-scope="emit('select-global-scope', $event)"
         @remove-assignment="emit('remove-work-item-assignment', $event)"
@@ -182,11 +187,15 @@ type CockpitWorkBacklog = {
   error: string | null;
   globalScope: 'assignedToMe' | 'all' | null;
   items: WorkItem[];
+  page?: number;
+  pageLoading?: boolean;
+  pageSize?: number;
   repositories: WorkRepository[];
   selectedAssigneeLogin?: string | null;
   selectedRepositoryId: string | null;
   selectedTagName?: string | null;
   status: 'notLoaded' | 'loading' | 'loaded' | 'error';
+  totalItems?: number;
 };
 
 type WorkItemAssignmentIntent = { item: WorkItem; teamId?: string };
@@ -223,6 +232,7 @@ const emit = defineEmits<{
   'move-agent-to-team': [payload: { agentId: string; teamId: string }];
   'prompt-agent': [payload: { agentId: string; prompt: string }];
   'refresh-work-items': [repositoryId: string | null];
+  'change-work-items-page': [page: number];
   'select-global-scope': [scope: 'assignedToMe' | 'all'];
   'remove-bench-template': [input: { templateId: string; teamId?: string }];
   'remove-work-item-assignment': [item: WorkItem];
@@ -300,10 +310,7 @@ function selectSummaryMetric(metric: SummaryMetric): void {
 }
 
 function repositoryActivityAt(repository: WorkRepository): string {
-  const workItemActivity = (props.workBacklog?.items ?? [])
-    .filter((item) => item.repositoryId === repository.id)
-    .reduce((latest, item) => item.updatedAt > latest ? item.updatedAt : latest, '');
-  return workItemActivity > (repository.updatedAt ?? '') ? workItemActivity : repository.updatedAt ?? '';
+  return repository.updatedAt ?? '';
 }
 
 function selectWorkView(view: InboxView): void {

@@ -143,12 +143,33 @@ describe('CockpitWorkInbox', () => {
     await buttons[1]?.trigger('click');
     expect(wrapper.emitted('select-global-scope')).toStrictEqual([['assignedToMe'], ['all']]);
   });
+
+  it('shows the exact global total and requests numbered pages with arrows', async () => {
+    const wrapper = mountInbox([item(21, 'First page work', 'repo-one')], {}, {
+      activeView: 'all',
+      globalScope: 'all',
+      page: 1,
+      pageSize: 5,
+      totalItems: 11,
+    });
+
+    expect(wrapper.get('.cockpit-inbox__pagination').text()).toContain('11 items total');
+    expect(wrapper.get('.cockpit-inbox__pagination').text()).toContain('Page 1 of 3');
+    expect(wrapper.findAll('.cockpit-inbox__view-count')[0]?.text()).toBe('11');
+    expect(wrapper.get<HTMLButtonElement>('[aria-label="Previous page"]').element.disabled).toBe(true);
+    expect(wrapper.get<HTMLButtonElement>('[aria-label="Next page"]').element.disabled).toBe(false);
+    await wrapper.get('[aria-label="Next page"]').trigger('click');
+    expect(wrapper.emitted('change-page')).toStrictEqual([[2]]);
+
+    await wrapper.setProps({ pageLoading: true });
+    expect(wrapper.get<HTMLButtonElement>('[aria-label="Next page"]').element.disabled).toBe(true);
+  });
 });
 
 function mountInbox(
   items: WorkItem[],
   assignments: Record<string, WorkBacklogAssignment> = {},
-  filters: { activeView?: 'all' | 'backlog' | 'wip' | 'focus'; globalScope?: 'assignedToMe' | 'all' | null; statusFilter?: 'inProgress' | 'blocked' | 'readyForReview' | null } = {},
+  filters: { activeView?: 'all' | 'backlog' | 'wip' | 'focus'; globalScope?: 'assignedToMe' | 'all' | null; page?: number; pageLoading?: boolean; pageSize?: number; statusFilter?: 'inProgress' | 'blocked' | 'readyForReview' | null; totalItems?: number } = {},
   startWorkAction = vi.fn().mockResolvedValue(undefined),
 ) {
   return mount(CockpitWorkInbox, {
@@ -160,7 +181,7 @@ function mountInbox(
         { provider: 'github', id: 'repo-one', owner: 'owner', name: 'repo-one', fullName: 'owner/repo-one', url: 'https://github.com/owner/repo-one', isPrivate: false },
         { provider: 'github', id: 'repo-two', owner: 'owner', name: 'repo-two', fullName: 'owner/repo-two', url: 'https://github.com/owner/repo-two', isPrivate: false },
       ],
-      globalScope: 'all', selectedRepositoryId: null, status: 'loaded',
+      globalScope: 'all', selectedRepositoryId: null, status: 'loaded', totalItems: items.length,
       teams: [
         { id: 'team-one', name: 'Team One', agentIds: [] },
         { id: 'team-two', name: 'Team Two', agentIds: [] },

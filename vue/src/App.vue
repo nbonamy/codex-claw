@@ -109,6 +109,7 @@
     :configure-work-backlog="configureWorkBacklog"
     :load-work-repositories="loadWorkRepositories"
     :load-work-items="loadWorkItems"
+    :load-global-work-items="loadGlobalWorkItems"
     :load-assigned-work-items="loadAssignedWorkItems"
     :create-work-item="createWorkItem"
     :duplicate-agent-action="duplicateAgent"
@@ -319,6 +320,7 @@ const {
   configureWorkBacklog,
   loadWorkRepositories,
   loadWorkItems,
+  loadGlobalWorkItems,
   loadAssignedWorkItems,
   createWorkItem,
   assignWorkItemToAgent,

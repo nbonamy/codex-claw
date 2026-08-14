@@ -291,6 +291,19 @@ export type WorkItemQuery = {
   state?: WorkItemState | 'all';
 };
 
+export type GlobalWorkItemQuery = WorkItemQuery & {
+  assignment?: 'all' | 'viewer';
+  page?: number;
+  pageSize?: number;
+};
+
+export type WorkItemPage = {
+  items: WorkItem[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+};
+
 export type WorkItem = {
   provider: WorkProviderKind;
   id: string;
@@ -1488,6 +1501,7 @@ export type CodexClawApi = {
   disconnectWorkProvider(provider: WorkProviderKind): Promise<AppSnapshot>;
   listWorkRepositories(provider: WorkProviderKind, location?: LoopLocation): Promise<WorkRepository[]>;
   configureWorkBacklog(input: WorkBacklogConfigurationInput, location?: LoopLocation): Promise<AppSnapshot>;
+  listGlobalWorkItems(provider: WorkProviderKind, location?: LoopLocation, query?: GlobalWorkItemQuery): Promise<WorkItemPage>;
   listAssignedWorkItems?(provider: WorkProviderKind, location?: LoopLocation): Promise<WorkItem[]>;
   listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: WorkItemQuery): Promise<WorkItem[]>;
   createWorkItem(input: CreateWorkItemInput): Promise<WorkItem>;

@@ -730,6 +730,9 @@ describe('AppController', () => {
       if (method === 'workProvider/assignedItems/list') {
         return [{ provider: 'github', id: 'github:nbonamy/codex-claw#13', title: 'Assigned bug', url: 'https://github.com/nbonamy/codex-claw/issues/13' }];
       }
+      if (method === 'workProvider/globalItems/list') {
+        return { items: [{ provider: 'github', id: 'github:nbonamy/codex-claw#14', title: 'Global bug', url: 'https://github.com/nbonamy/codex-claw/issues/14' }], page: 1, pageSize: 50, totalItems: 14 };
+      }
       if (method === 'workProvider/item/create') {
         return createWorkItem();
       }
@@ -755,6 +758,11 @@ describe('AppController', () => {
       title: 'Assigned bug',
       url: 'https://github.com/nbonamy/codex-claw/issues/13',
     }]);
+    await expect(listGlobalWorkItems(controller, 'github', { assignment: 'all', page: 1, pageSize: 50 })).resolves.toMatchObject({
+      items: [{ id: 'github:nbonamy/codex-claw#14' }],
+      page: 1,
+      totalItems: 14,
+    });
     await expect(listWorkItems(controller, 'github', 'nbonamy/codex-claw', { kind: 'all', state: 'all' })).resolves.toHaveLength(1);
     await expect(invokeCreateWorkItem(controller, {
       agentId: 'agent-dina',
@@ -772,12 +780,16 @@ describe('AppController', () => {
     expect(request).toHaveBeenNthCalledWith(2, 'workProvider/backlog/configure', { input: { provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } } });
     expect(request).toHaveBeenNthCalledWith(3, 'workProvider/items/list', { provider: 'github', repositoryId: 'nbonamy/codex-claw' });
     expect(request).toHaveBeenNthCalledWith(4, 'workProvider/assignedItems/list', { provider: 'github' });
-    expect(request).toHaveBeenNthCalledWith(5, 'workProvider/items/list', {
+    expect(request).toHaveBeenNthCalledWith(5, 'workProvider/globalItems/list', {
+      provider: 'github',
+      query: { assignment: 'all', page: 1, pageSize: 50 },
+    });
+    expect(request).toHaveBeenNthCalledWith(6, 'workProvider/items/list', {
       provider: 'github',
       repositoryId: 'nbonamy/codex-claw',
       query: { kind: 'all', state: 'all' },
     });
-    expect(request).toHaveBeenNthCalledWith(6, 'workProvider/item/create', {
+    expect(request).toHaveBeenNthCalledWith(7, 'workProvider/item/create', {
       input: {
         agentId: 'agent-dina',
         provider: 'github',
@@ -785,7 +797,7 @@ describe('AppController', () => {
         description: 'Fix the reconnect banner.',
       },
     });
-    expect(request).toHaveBeenNthCalledWith(7, 'workProvider/backlog/configure', {
+    expect(request).toHaveBeenNthCalledWith(8, 'workProvider/backlog/configure', {
       input: { provider: 'github', configuration: { repositoryId: 'nbonamy/remote' } },
       location: { kind: 'remote', remoteConnectionId: 'connection-devbox' },
     });
@@ -2772,6 +2784,16 @@ async function listAssignedWorkItems(controller: AppController, provider: WorkPr
   return (controller as unknown as {
     listAssignedWorkItems(provider: WorkProviderKind): Promise<WorkItem[]>;
   }).listAssignedWorkItems(provider);
+}
+
+async function listGlobalWorkItems(
+  controller: AppController,
+  provider: WorkProviderKind,
+  query?: import('@codex-claw/core/contracts').GlobalWorkItemQuery,
+): Promise<import('@codex-claw/core/contracts').WorkItemPage> {
+  return (controller as unknown as {
+    listGlobalWorkItems(provider: WorkProviderKind, location?: import('@codex-claw/core/contracts').LoopLocation, query?: import('@codex-claw/core/contracts').GlobalWorkItemQuery): Promise<import('@codex-claw/core/contracts').WorkItemPage>;
+  }).listGlobalWorkItems(provider, undefined, query);
 }
 
 async function invokeCreateWorkItem(controller: AppController, input: import('@codex-claw/core/contracts').CreateWorkItemInput): Promise<WorkItem> {

@@ -1526,6 +1526,22 @@ export class ClawBackendServer {
             : this.requireWorkIntegrations().listItems(requireWorkProvider(params), requireString(params.repositoryId, 'repositoryId')),
         );
       }
+      case backendMethods.workProviderGlobalItemsList: {
+        const params = requireRecord(message.params);
+        const query = globalWorkItemQuery(params.query);
+        return this.respondInLocation(
+          message.id,
+          this.loopLocationFromParams(params),
+          backendMethods.workProviderGlobalItemsList,
+          {
+            provider: requireWorkProvider(params),
+            ...(query ? { query } : {}),
+          },
+          () => query
+            ? this.requireWorkIntegrations().listGlobalItems(requireWorkProvider(params), query)
+            : this.requireWorkIntegrations().listGlobalItems(requireWorkProvider(params)),
+        );
+      }
       case backendMethods.workProviderAssignedItemsList: {
         return this.respondInLocation(
           message.id,
@@ -3084,6 +3100,30 @@ function workItemQuery(value: unknown): import('@codex-claw/core/contracts').Wor
   return {
     ...(kind ? { kind } : {}),
     ...(state ? { state } : {}),
+  };
+}
+
+function globalWorkItemQuery(value: unknown): import('@codex-claw/core/contracts').GlobalWorkItemQuery | undefined {
+  if (value === undefined) return undefined;
+  const query = requireRecord(value);
+  const base = workItemQuery(query) ?? {};
+  const assignment = query.assignment;
+  const page = query.page;
+  const pageSize = query.pageSize;
+  if (assignment !== undefined && assignment !== 'all' && assignment !== 'viewer') {
+    throw new Error('Invalid global work item assignment filter.');
+  }
+  if (page !== undefined && (typeof page !== 'number' || !Number.isInteger(page) || page < 1)) {
+    throw new Error('Invalid global work item page.');
+  }
+  if (pageSize !== undefined && (typeof pageSize !== 'number' || !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100)) {
+    throw new Error('Invalid global work item page size.');
+  }
+  return {
+    ...base,
+    ...(assignment ? { assignment } : {}),
+    ...(typeof page === 'number' ? { page } : {}),
+    ...(typeof pageSize === 'number' ? { pageSize } : {}),
   };
 }
 
