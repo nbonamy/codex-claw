@@ -10,9 +10,15 @@ python3 -m http.server 4173 --directory website
 
 Then open <http://127.0.0.1:4173>.
 
-## Replacing the hero placeholder
+## Product preview
 
-Put the supplied product screenshot at `website/assets/claw-screenshot.png` and replace the `.hero-screenshot-placeholder` block in `index.html` with an image using the same class. The existing frame preserves the crop, border, and responsive placement.
+The hero uses a lightweight HTML and CSS product composition rather than a release screenshot. Keep its Cockpit labels and sample work states aligned with the current product when the operator workflow changes.
+
+Run the static-site checks with:
+
+```bash
+npm run test:website
+```
 
 ## Deploy
 

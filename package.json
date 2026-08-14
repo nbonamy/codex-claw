@@ -56,6 +56,7 @@
     "test:electron": "npm run test -w @codex-claw/electron",
     "test:watch:electron": "npm run test:watch -w @codex-claw/electron",
     "test:web": "npm run test -w @codex-claw/web",
+    "test:website": "node --test website/site.test.mjs",
     "typecheck": "npm run typecheck --workspaces",
     "typecheck:electron": "npm run typecheck -w @codex-claw/electron",
     "typecheck:web": "npm run typecheck -w @codex-claw/web"

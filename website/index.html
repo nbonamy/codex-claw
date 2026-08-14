@@ -3,124 +3,456 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#080b17" />
-    <meta name="description" content="Codex Claw is a command center for teams of OpenAI Codex agents, with mobile pairing for coding on the road." />
-    <title>Codex Claw — Your Codex team, in one cockpit</title>
+    <meta name="theme-color" content="#f4f3ef" />
+    <meta
+      name="description"
+      content="Codex Claw turns your GitHub backlog into a team of isolated Codex agents—from issue triage to reviewed, merged code."
+    />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:title"
+      content="Codex Claw — Your backlog, already in motion"
+    />
+    <meta
+      property="og:description"
+      content="Triage GitHub work, launch parallel Codex agents, and ship from one native cockpit."
+    />
+    <meta property="og:url" content="https://codex-claw.nabocorp.com/" />
+    <meta name="twitter:card" content="summary" />
+    <title>Codex Claw — Your backlog, already in motion</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=0.3.4" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css?v=0.11.0" />
   </head>
   <body>
-    <div class="noise" aria-hidden="true"></div>
     <header class="site-header shell">
       <a class="brand" href="#top" aria-label="Codex Claw home">
         <img class="brand-icon" src="assets/claw-icon.png" alt="" />
         <span>Codex <strong>Claw</strong></span>
       </a>
       <nav class="nav-links" aria-label="Primary navigation">
-        <a href="#why">Why Codex Claw</a>
-        <a href="#features">Features</a>
-        <a href="#workflow">How it works</a>
-        <a href="#pricing">Pricing</a>
+        <a href="#cockpit">Cockpit</a>
+        <a href="#workflow">Workflow</a>
+        <a href="#git">Git</a>
+        <a href="#more">More</a>
       </nav>
-      <a class="header-cta" href="/desktop/downloads/codex-claw-macos-arm64.dmg" download>Download <span aria-hidden="true">↗</span></a>
+      <a
+        class="header-cta"
+        href="/desktop/downloads/codex-claw-macos-arm64.dmg"
+        download
+        >Download for macOS <span aria-hidden="true">↓</span></a
+      >
     </header>
 
     <main id="top">
       <section class="hero shell">
         <div class="hero-copy reveal">
-          <p class="eyebrow"><span class="pulse"></span> OpenAI Codex, with a command center</p>
-          <h1>Your Codex team,<br /><em>in one cockpit.</em></h1>
-          <p class="hero-lede">Codex Claw gives every agent the full power of the OpenAI Codex harness—then adds the place to steer a team, keep context, and ship together. Pair your phone to keep coding on the road.</p>
+          <p class="eyebrow">
+            <span class="pulse"></span> New in 0.11 · GitHub-native operator
+            inbox
+          </p>
+          <h1>Your backlog,<br /><em>already in motion.</em></h1>
+          <p class="hero-lede">
+            Codex Claw turns GitHub work into a team of isolated Codex agents.
+            Triage across repositories, start work in parallel, and carry every
+            change through review and merge—all from one native cockpit.
+          </p>
           <div class="hero-actions">
-            <a class="button button-primary" href="/desktop/downloads/codex-claw-macos-arm64.dmg" download>Download for macOS <span aria-hidden="true">→</span></a>
-            <a class="text-link" href="#features">Explore the cockpit <span aria-hidden="true">↓</span></a>
+            <a
+              class="button button-primary"
+              href="/desktop/downloads/codex-claw-macos-arm64.dmg"
+              download
+              >Download for macOS <span aria-hidden="true">→</span></a
+            >
+            <a class="text-link" href="#cockpit"
+              >See the new Cockpit <span aria-hidden="true">↓</span></a
+            >
           </div>
-          <div class="hero-meta"><span>macOS desktop app</span><span class="dot"></span><span>Mobile pairing included</span></div>
-        </div>
-        <div class="hero-art reveal delay-1">
-          <div class="hero-orbit hero-orbit-a"></div><div class="hero-orbit hero-orbit-b"></div>
-          <div class="hero-signal signal-a"></div><div class="hero-signal signal-b"></div><div class="hero-signal signal-c"></div>
-          <div class="hero-screenshot-placeholder">
-            <img class="hero-screenshot" src="assets/claw-screenshot.png" alt="Codex Claw coordinating a team of coding agents" />
-          </div>
-          <div class="art-caption"><span class="status-dot"></span><span>Agents in motion</span><span class="caption-rule"></span><span class="mono">LIVE</span></div>
-        </div>
-      </section>
-
-      <section id="why" class="intro shell reveal">
-        <div class="section-kicker">01 / The idea</div>
-        <div class="intro-grid">
-          <h2>The harness you already trust.<br /><span>The team layer it was missing.</span></h2>
-          <p>Codex is remarkably good at doing the work. Codex Claw is built for directing it: launch a team of agents, see what each one is doing, open the browser they are using, and jump in exactly when it matters.</p>
-        </div>
-      </section>
-
-      <section id="features" class="features shell">
-        <div class="section-heading reveal"><div><div class="section-kicker">02 / The cockpit</div><h2>Everything in view.<br /><span>Nothing in the way.</span></h2></div><p>Assign work, automate the queue, and keep every agent moving from one calm surface.</p></div>
-        <div class="feature-grid">
-          <article class="feature-card feature-card-wide reveal">
-            <div class="card-top"><span class="card-index">01</span><span class="card-icon">◎</span></div>
-            <h3>Run a real team</h3><p>Keep agents in their own conversations, with their own context and state. From the Cockpit, drag a GitHub issue onto the right agent and let the team take it from there.</p>
-            <div class="mini-team assignment-flow" aria-hidden="true"><span class="issue-chip"><i>GH</i><b>#142</b><span>Fix auth flow</span><small>DRAG</small></span><span class="assignment-arrow">→</span><span class="agent-chip active"><i></i>Atlas <b>working</b></span><span class="agent-chip"><i></i>Nova <b>queued</b></span></div>
-          </article>
-          <article class="feature-card feature-card-loop reveal delay-1">
-            <div class="card-top"><span class="card-index">02</span><span class="card-icon">↻</span></div>
-            <h3>Loops that keep work moving</h3><p>Watch GitHub for matching issues, create the right agent or Bench template, send the assignment, and clean up when the work is done.</p>
-            <div class="loop-visual" aria-hidden="true"><span class="loop-node"><i>GH</i><b>GitHub issues</b><small>matching #bug</small></span><span class="loop-arrow">→</span><span class="loop-node loop-node-result"><i></i><b>Agent ready</b><small>assignment sent</small></span></div>
-          </article>
-          <article class="feature-card reveal delay-2">
-            <div class="card-top"><span class="card-index">03</span><span class="card-icon">⌁</span></div>
-            <h3>Native Codex, fully visible</h3><p>Follow plans, tool calls, diffs, approvals, and reasoning in the same readable stream Codex understands.</p>
-            <div class="terminal-lines" aria-hidden="true"><span><b>›</b> npm test</span><span class="ok">✓ 42 passed</span><span><b>›</b> Reviewing auth flow</span></div>
-          </article>
-          <article class="feature-card feature-card-mobile feature-card-wide reveal">
-            <div class="card-top"><span class="card-index">04</span><span class="card-icon">⌁</span></div>
-            <div class="mobile-pairing-copy"><h3>Pair your phone. Keep coding.</h3><p>Connect the Codex mobile app to your Claw workspace and pick up wherever the day takes you. Your agents keep working while you stay in the loop from the road.</p></div>
-            <div class="pairing-visual" aria-hidden="true"><span class="pairing-device pairing-phone"><i></i><b>Codex mobile</b><small>PAIRED</small></span><span class="pairing-connector">↔</span><span class="pairing-device pairing-claw"><i></i><b>Claw cockpit</b><small>LIVE</small></span></div>
-          </article>
-          <article class="feature-card feature-card-accent reveal">
-            <div class="card-top"><span class="card-index">05</span><span class="card-icon">✦</span></div>
-            <h3>Computer use, in context</h3><p>When a task leaves the terminal, Codex Claw keeps the computer-use session beside the conversation—visible, inspectable, and ready.</p>
-            <a class="card-link" href="#workflow">See the workflow <span>→</span></a>
-          </article>
-          <article class="feature-card reveal delay-2">
-            <div class="card-top"><span class="card-index">06</span><span class="card-icon">⌗</span></div>
-            <h3>Browse without leaving</h3><p>Give agents an in-app browser for research, local previews, and the web surfaces your code touches.</p>
-            <div class="browser-pill" aria-hidden="true"><span>◉</span> localhost:3000 <b>↗</b></div>
-          </article>
-        </div>
-      </section>
-
-      <section id="workflow" class="workflow shell reveal">
-        <div class="section-kicker">03 / The rhythm</div>
-        <div class="workflow-card">
-          <div class="workflow-copy"><h2>From idea<br /><span>to shipped.</span></h2><p>Codex Claw keeps the human in the loop without making the human the bottleneck.</p><a class="button button-secondary" href="#download">Build with Codex Claw <span aria-hidden="true">→</span></a></div>
-          <div class="timeline">
-            <div class="timeline-item"><span class="timeline-number">01</span><div><strong>Set the direction</strong><p>Give one agent the brief. Let the team split the work.</p></div></div>
-            <div class="timeline-item"><span class="timeline-number">02</span><div><strong>Watch the edges</strong><p>Inspect tool calls, browser state, files, and approvals in one view.</p></div></div>
-            <div class="timeline-item"><span class="timeline-number">03</span><div><strong>Make the call</strong><p>Steer a turn, queue the next move, or let the team finish.</p></div></div>
-            <div class="timeline-item"><span class="timeline-number">04</span><div><strong>Ship the result</strong><p>Review the diff, merge the result, and move on to the next idea.</p></div></div>
+          <div class="hero-meta" aria-label="Product details">
+            <span>macOS · Apple silicon</span><span class="dot"></span
+            ><span>Free with your Codex plan</span>
           </div>
         </div>
+
+        <div
+          class="hero-product reveal delay-1"
+          aria-label="Codex Claw Cockpit preview"
+        >
+          <div class="app-window">
+            <div class="window-bar">
+              <div class="traffic-lights" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </div>
+              <div class="window-title">
+                <img src="assets/claw-icon.png" alt="" /> Codex Claw
+              </div>
+              <div class="window-version">v0.11</div>
+            </div>
+            <div class="cockpit-ui">
+              <aside class="cockpit-nav">
+                <div class="nav-title">Workspace</div>
+                <div class="nav-item active">
+                  <span class="nav-glyph">⌁</span>Cockpit
+                </div>
+                <div class="nav-item">
+                  <span class="nav-glyph">◎</span>Agents <b>7</b>
+                </div>
+                <div class="nav-rule"></div>
+                <div class="nav-title nav-title-row">
+                  <span>Repositories</span><small>RECENT</small>
+                </div>
+                <div class="repo active"><span>▰</span> codex-claw</div>
+                <div class="repo"><span>▱</span> codex-app-sdk</div>
+                <div class="repo"><span>▱</span> computer-use</div>
+                <div class="repo"><span>▱</span> multi-llm-ts</div>
+              </aside>
+              <section class="operator-inbox">
+                <div class="inbox-head">
+                  <div>
+                    <small>OPERATOR INBOX</small>
+                    <h2>Cockpit</h2>
+                  </div>
+                  <div class="work-stats">
+                    <span>Working <b>4</b></span
+                    ><span>Blocked <b>1</b></span
+                    ><span>Review <b>2</b></span>
+                  </div>
+                </div>
+                <div class="inbox-toolbar">
+                  <div class="view-tabs">
+                    <span>All <b>21</b></span
+                    ><span>Backlog <b>14</b></span
+                    ><span>WIP <b>7</b></span
+                    ><span class="selected">Focus <b>3</b></span>
+                  </div>
+                  <button type="button" tabindex="-1">Start work</button>
+                </div>
+                <div class="inbox-group">
+                  <span class="group-dot attention"></span
+                  ><strong>Needs attention</strong><span>1</span>
+                </div>
+                <div class="work-row selected-row">
+                  <i class="check">✓</i><span class="repo-name">codex-claw</span
+                  ><span class="issue">#286</span
+                  ><strong>Keep Cockpit pagination stable</strong
+                  ><span class="tag">bug</span
+                  ><span class="status blocked">Blocked</span><time>8m</time>
+                </div>
+                <div class="inbox-group">
+                  <span class="group-dot review"></span
+                  ><strong>Ready for review</strong><span>2</span>
+                </div>
+                <div class="work-row">
+                  <i class="check">✓</i><span class="repo-name">app-sdk</span
+                  ><span class="issue">PR #94</span
+                  ><strong>Refine tool call presentation</strong
+                  ><span class="avatar">⚙️</span
+                  ><span class="status ready">Review</span><time>2m</time>
+                </div>
+                <div class="work-row">
+                  <i class="check">✓</i><span class="repo-name">codex-claw</span
+                  ><span class="issue">#281</span
+                  ><strong>Add repository recency sorting</strong
+                  ><span class="avatar">🦞</span
+                  ><span class="status ready">Review</span><time>5m</time>
+                </div>
+                <div class="launch-toast">
+                  <span>3</span><strong>agents launched</strong><i>→</i
+                  ><b>isolated worktrees</b>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
       </section>
 
-      <section id="pricing" class="pricing shell reveal">
-        <div class="section-kicker">04 / Simple by design</div>
-        <div class="pricing-card">
-          <div class="pricing-copy"><h2>Free to use.<br /><span>Powered by your Codex plan.</span></h2><p>Codex Claw is a free desktop cockpit for the Codex subscription you already have. No extra per-agent meter, no new workspace bill.</p><a class="button button-primary" href="/desktop/downloads/codex-claw-macos-arm64.dmg" download>Download for macOS <span aria-hidden="true">→</span></a></div>
-          <div class="pricing-details"><span class="pricing-badge">Included with Codex Claw</span><ul><li>Unlimited Codex Claw teams and conversations</li><li>GitHub issue assignment and automatic Loops</li><li>In-app browser and computer use</li><li>Mobile pairing for coding on the road</li><li>Native Codex tools, plans, and diffs</li><li>Your existing OpenAI account and subscription</li></ul></div>
+      <section class="signal-strip" aria-label="Codex Claw workflow">
+        <div class="shell signal-strip-inner">
+          <span>GitHub issue</span><i>→</i><span>Named agent</span><i>→</i
+          ><span>Isolated worktree</span><i>→</i><span>Reviewed change</span
+          ><i>→</i><span>Merged branch</span>
+        </div>
+      </section>
+
+      <section id="cockpit" class="story shell">
+        <div class="story-heading reveal">
+          <p class="section-kicker">01 / The operator inbox</p>
+          <h2>
+            See the whole queue.<br /><span>Act on the part that matters.</span>
+          </h2>
+          <p>
+            The new Cockpit is a backlog-first view across every connected
+            repository. It turns a noisy list of tickets into a live picture of
+            what is unowned, in progress, blocked, or ready for you.
+          </p>
+        </div>
+        <div class="feature-row">
+          <article class="feature reveal">
+            <span class="feature-number">01</span>
+            <div class="feature-icon">⌘</div>
+            <h3>One inbox, every repo</h3>
+            <p>
+              Move between All, Backlog, WIP, and Focus. Filter by repository,
+              assignee, or label without losing the shape of the work.
+            </p>
+          </article>
+          <article class="feature reveal delay-1">
+            <span class="feature-number">02</span>
+            <div class="feature-icon">↗</div>
+            <h3>Select once. Fan out.</h3>
+            <p>
+              Pick several issues and launch them together. Claw creates a
+              clearly named background agent for each one—no repetitive setup
+              dialogs.
+            </p>
+          </article>
+          <article class="feature reveal delay-2">
+            <span class="feature-number">03</span>
+            <div class="feature-icon">⑂</div>
+            <h3>Isolation by default</h3>
+            <p>
+              Every assignment gets its own branch and worktree. Existing
+              branches are reused safely, and your current workspace stays
+              uninterrupted.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="workflow" class="workflow-section">
+        <div class="shell workflow-grid">
+          <div class="workflow-copy reveal">
+            <p class="section-kicker">02 / Parallel by design</p>
+            <h2>
+              From “we should fix that”<br /><span
+                >to three agents working.</span
+              >
+            </h2>
+            <p>
+              Claw keeps the human at the decision points and automates the
+              mechanical ones. Choose the work and the team; it handles names,
+              prompts, branches, worktrees, and background launch.
+            </p>
+            <div class="workflow-callout">
+              <span>3×</span>
+              <p>
+                <strong>More throughput, not more tabs.</strong><br />Each agent
+                keeps its own conversation, context, files, browser, and status.
+              </p>
+            </div>
+          </div>
+          <ol class="workflow-steps reveal delay-1">
+            <li>
+              <span>01</span>
+              <div>
+                <strong>Triage the signal</strong>
+                <p>
+                  Open Focus for blockers and review-ready work, or Backlog to
+                  choose what starts next.
+                </p>
+              </div>
+            </li>
+            <li>
+              <span>02</span>
+              <div>
+                <strong>Choose Investigate or Fix</strong>
+                <p>
+                  Send the selected issues to the right team with one
+                  confirmation.
+                </p>
+              </div>
+            </li>
+            <li>
+              <span>03</span>
+              <div>
+                <strong>Let the team run</strong>
+                <p>
+                  Named agents work in parallel while Cockpit tracks ownership
+                  and lifecycle.
+                </p>
+              </div>
+            </li>
+            <li>
+              <span>04</span>
+              <div>
+                <strong>Review the edges</strong>
+                <p>
+                  Jump in for a blocker, inspect the diff, or open the agent
+                  that is ready for review.
+                </p>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section id="git" class="git-section">
+        <div class="shell git-grid">
+          <div class="git-copy reveal">
+            <p class="section-kicker section-kicker-light">
+              03 / Git, all the way through
+            </p>
+            <h2>The handoff doesn’t<br /><em>stop at the code.</em></h2>
+            <p>
+              Review exactly what changed, then commit, push, create a draft
+              pull request, or merge from the same agent workspace. Claw keeps
+              branch and worktree lifecycle visible instead of hiding it behind
+              automation.
+            </p>
+            <ul>
+              <li>Stage exactly the files you want</li>
+              <li>Ask Codex to draft commit and PR copy</li>
+              <li>Merge, squash, push, and retry safely</li>
+              <li>Clean up linked worktrees without losing the agent</li>
+            </ul>
+          </div>
+          <div
+            class="git-panel reveal delay-1"
+            aria-label="Codex Claw Git review preview"
+          >
+            <div class="git-panel-head">
+              <span>Review</span><small>fix/gh-286 <i>·</i> codex-claw</small
+              ><button type="button" tabindex="-1">Git actions⌄</button>
+            </div>
+            <div class="git-stats">
+              <span class="added">+184</span><span class="removed">−52</span
+              ><span>4 files</span
+              ><span class="branch-pill">2 commits ahead</span>
+            </div>
+            <div class="file-tabs">
+              <span class="active">All changes</span><span>Staged 2</span
+              ><span>Unstaged 1</span><span>Untracked 1</span>
+            </div>
+            <div class="diff-file">
+              <span>vue/src/components/CockpitWorkInbox.vue</span><b>+91 −18</b>
+            </div>
+            <pre
+              class="diff"
+            ><code><span class="context">  const totalPages = computed(() =&gt;</span>
+<span class="removed-line">-   Math.ceil(items.value.length / pageSize)</span>
+<span class="added-line">+   Math.max(1, Math.ceil(totalItems.value / pageSize))</span>
+<span class="context">  );</span>
+<span class="added-line">+ const visiblePage = computed(() =&gt; cachedPages[page.value]);</span></code></pre>
+            <div class="git-menu" aria-hidden="true">
+              <span>Commit changes <kbd>⌘↵</kbd></span
+              ><span>Push branch</span><span>Create draft PR</span
+              ><span>Merge into main</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="more" class="more shell">
+        <div class="section-heading reveal">
+          <div>
+            <p class="section-kicker">04 / The full workspace</p>
+            <h2>
+              Everything agents need.<br /><span
+                >Nothing you have to babysit.</span
+              >
+            </h2>
+          </div>
+          <p>
+            Cockpit and Git are the control plane. Underneath, every agent still
+            gets the complete native Codex experience.
+          </p>
+        </div>
+        <div class="capability-grid">
+          <article class="capability capability-wide reveal">
+            <span class="capability-label">NATIVE CODEX</span>
+            <h3>See the work, not terminal noise.</h3>
+            <p>
+              Messages, plans, reasoning, tool calls, approvals, commands, file
+              changes, and diffs stay in one readable conversation.
+            </p>
+            <div class="tool-stream" aria-hidden="true">
+              <span><i>✓</i> Explored repository</span
+              ><span><i>✓</i> Edited 4 files</span
+              ><span class="running"><i></i> Running tests</span>
+            </div>
+          </article>
+          <article class="capability reveal delay-1">
+            <span class="capability-label">WORKSPACES</span>
+            <h3>Browser, files, and review beside the chat.</h3>
+            <p>
+              Each agent preserves its own tabs—even while another agent is
+              selected.
+            </p>
+            <div class="tab-preview" aria-hidden="true">
+              <span>Review</span><span>Browser</span><span>Files</span>
+            </div>
+          </article>
+          <article class="capability reveal">
+            <span class="capability-label">COLLABORATION</span>
+            <h3>Agents can ask each other for help.</h3>
+            <p>
+              Built-in collaboration tools let teammates share context, delegate
+              bounded work, and report back.
+            </p>
+            <div class="agent-stack" aria-hidden="true">
+              <span>🦞</span><span>⚙️</span><span>🛠️</span><i>3 active</i>
+            </div>
+          </article>
+          <article class="capability reveal delay-1">
+            <span class="capability-label">KEEP MOVING</span>
+            <h3>Close the app. The team keeps working.</h3>
+            <p>
+              The background daemon keeps turns alive, while mobile pairing and
+              unread signals make it easy to return when needed.
+            </p>
+            <div class="daemon-status" aria-hidden="true">
+              <i></i> clawd running <span>7 agents</span>
+            </div>
+          </article>
+          <article class="capability reveal">
+            <span class="capability-label">COMPUTER USE</span>
+            <h3>Use the Mac when code isn’t enough.</h3>
+            <p>
+              Opt-in Computer Use lets agents inspect and operate native
+              applications while every action stays visible in context.
+            </p>
+            <div class="computer-target" aria-hidden="true">
+              <span>◉</span><strong>Inspecting Safari</strong
+              ><i>frontmost window</i>
+            </div>
+          </article>
         </div>
       </section>
 
       <section id="download" class="download shell reveal">
-        <div class="download-orbit" aria-hidden="true"><span></span><span></span><span></span></div>
-        <div class="download-content"><p class="eyebrow"><span class="pulse"></span> The next move is yours</p><h2>Make more room<br /><em>for the work.</em></h2><p>Codex Claw is the team cockpit for the OpenAI Codex harness.</p><a class="button button-primary" href="/desktop/downloads/codex-claw-macos-arm64.dmg" download>Download for macOS <span aria-hidden="true">↗</span></a><span class="download-note">macOS arm64 • latest release</span></div>
+        <div class="download-grid"></div>
+        <div class="download-content">
+          <p class="eyebrow">
+            <span class="pulse"></span> Free with your Codex plan
+          </p>
+          <h2>Put the backlog<br /><em>to work.</em></h2>
+          <p>Codex Claw is available for macOS on Apple silicon.</p>
+          <a
+            class="button button-primary"
+            href="/desktop/downloads/codex-claw-macos-arm64.dmg"
+            download
+            >Download for macOS <span aria-hidden="true">↓</span></a
+          >
+          <small
+            >No extra per-agent meter. Uses your existing OpenAI account.</small
+          >
+        </div>
       </section>
     </main>
 
-    <footer class="site-footer shell"><a class="brand" href="#top"><img class="brand-icon" src="assets/claw-icon.png" alt="" /><span>Codex <strong>Claw</strong></span></a><span>Built for teams who ship with agents.</span><span class="mono">© <span id="year"></span> nabocorp</span></footer>
+    <footer class="site-footer shell">
+      <a class="brand" href="#top"
+        ><img class="brand-icon" src="assets/claw-icon.png" alt="" /><span
+          >Codex <strong>Claw</strong></span
+        ></a
+      >
+      <span>Built for people shipping with agents.</span>
+      <span class="mono">© <span id="year"></span> nabocorp</span>
+    </footer>
     <script src="script.js"></script>
   </body>
 </html>
