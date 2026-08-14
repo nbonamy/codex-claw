@@ -336,19 +336,26 @@ const filteredRows = computed(() => {
 const rows = computed(() => filteredRows.value.filter((row) => {
   if (props.statusFilter && row.assignment?.status !== props.statusFilter) return false;
   if (activeView.value === 'backlog') return !row.assignment;
-  if (activeView.value === 'wip') return Boolean(row.assignment);
-  if (activeView.value === 'focus') return row.priority === 'attention' || row.priority === 'review';
+  if (activeView.value === 'wip') return isActiveAssignment(row.assignment);
+  if (activeView.value === 'focus') return isActiveAssignment(row.assignment) && (row.priority === 'attention' || row.priority === 'review');
   return true;
 }));
 const scopedAssignments = computed(() => Object.values(props.assignments).filter((assignment) => {
   if (assignment.provider !== props.connection.provider) return false;
   return !props.selectedRepositoryId || assignment.itemId.startsWith(`${props.selectedRepositoryId}#`);
 }));
-const totalAssignmentCount = computed(() => props.globalScope ? scopedAssignments.value.length : filteredRows.value.filter((row) => row.assignment).length);
+const scopedActiveAssignments = computed(() => scopedAssignments.value.filter(isActiveAssignment));
+const totalAssignmentCount = computed(() => props.globalScope
+  ? scopedActiveAssignments.value.length
+  : filteredRows.value.filter((row) => isActiveAssignment(row.assignment)).length);
 const totalFocusCount = computed(() => props.globalScope
-  ? scopedAssignments.value.filter((assignment) => assignment.status === 'blocked' || assignment.status === 'readyForReview').length
-  : filteredRows.value.filter((row) => row.priority === 'attention' || row.priority === 'review').length);
+  ? scopedActiveAssignments.value.filter((assignment) => assignment.status === 'blocked' || assignment.status === 'readyForReview').length
+  : filteredRows.value.filter((row) => isActiveAssignment(row.assignment) && (row.priority === 'attention' || row.priority === 'review')).length);
 const effectiveTotalItems = computed(() => props.globalScope ? props.totalItems : filteredRows.value.length);
+const totalBacklogCount = computed(() => props.globalScope
+  ? Math.max(0, effectiveTotalItems.value - scopedAssignments.value.length)
+  : filteredRows.value.filter((row) => !row.assignment).length);
+const viewContextKey = computed(() => props.selectedRepositoryId ?? `global:${props.globalScope ?? 'unselected'}`);
 const totalPages = computed(() => Math.max(1, Math.ceil(props.totalItems / props.pageSize)));
 const priorityOrder: Priority[] = ['attention', 'review', 'progress', 'ready'];
 const groupedRows = computed(() => priorityOrder.map((priority) => ({
@@ -358,7 +365,7 @@ const groupedRows = computed(() => priorityOrder.map((priority) => ({
 })).filter((group) => group.rows.length > 0));
 const viewOptions = computed(() => [
   { id: 'all' as const, label: 'All', count: effectiveTotalItems.value },
-  { id: 'backlog' as const, label: 'Backlog', count: Math.max(0, effectiveTotalItems.value - totalAssignmentCount.value) },
+  { id: 'backlog' as const, label: 'Backlog', count: totalBacklogCount.value },
   { id: 'wip' as const, label: 'WIP', count: totalAssignmentCount.value },
   { id: 'focus' as const, label: 'Focus', count: totalFocusCount.value },
 ]);
@@ -366,6 +373,53 @@ const selectedItems = computed(() => rows.value
   .filter((row) => !row.assignment && selectedItemIds.value.has(row.item.id))
   .map((row) => row.item));
 const emptyMessage = computed(() => activeView.value === 'focus' ? 'Nothing needs your attention.' : `No work in ${viewOptions.value.find((view) => view.id === activeView.value)?.label ?? 'this view'}.`);
+
+let activeViewInitialized = props.activeView !== 'focus';
+let pendingViewContext: string | null = viewContextKey.value;
+let pendingViewContextLoadingObserved = props.status === 'loading';
+
+watch(viewContextKey, (context) => {
+  pendingViewContext = context;
+  pendingViewContextLoadingObserved = props.status === 'loading';
+});
+
+watch([viewContextKey, () => props.status, totalFocusCount, totalAssignmentCount], ([context, status]) => {
+  if (pendingViewContext === context && status === 'loading') {
+    pendingViewContextLoadingObserved = true;
+    return;
+  }
+  if (status !== 'loaded') return;
+
+  if (!activeViewInitialized || (pendingViewContext === context && pendingViewContextLoadingObserved)) {
+    activeViewInitialized = true;
+    pendingViewContext = null;
+    pendingViewContextLoadingObserved = false;
+    applyActiveView(preferredActiveView());
+    return;
+  }
+
+  if (activeView.value === 'focus' && totalFocusCount.value === 0) {
+    applyActiveView(totalAssignmentCount.value > 0 ? 'wip' : 'backlog');
+  } else if (activeView.value === 'wip' && totalAssignmentCount.value === 0) {
+    applyActiveView('backlog');
+  }
+}, { immediate: true });
+
+function preferredActiveView(): InboxView {
+  if (totalFocusCount.value > 0) return 'focus';
+  if (totalAssignmentCount.value > 0) return 'wip';
+  return 'backlog';
+}
+
+function isActiveAssignment(assignment: WorkBacklogAssignment | null): assignment is WorkBacklogAssignment {
+  return Boolean(assignment && assignment.status !== 'completed');
+}
+
+function applyActiveView(view: InboxView): void {
+  if (localActiveView.value === view) return;
+  localActiveView.value = view;
+  emit('update-active-view', view);
+}
 
 function toRow(item: WorkItem): InboxRow {
   const assignment = props.assignments[workItemAssignmentKey(item)] ?? null;

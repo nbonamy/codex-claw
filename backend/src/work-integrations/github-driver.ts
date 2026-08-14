@@ -171,12 +171,24 @@ export class GitHubWorkProviderDriver implements WorkProviderDriver {
   }
 
   async listRepositories(token: WorkProviderToken): Promise<WorkRepository[]> {
-    const repositories = await githubApiRequest(token, '/user/repos?affiliation=owner,collaborator,organization_member&sort=updated&per_page=100');
-    if (!Array.isArray(repositories)) {
+    const [repositoryResponse, activityResponse] = await Promise.all([
+      githubApiRequest(token, '/user/repos?affiliation=owner,collaborator,organization_member&sort=updated&per_page=100'),
+      githubApiRequest(token, '/issues?filter=all&state=open&sort=updated&direction=desc&per_page=100', {
+        signal: AbortSignal.timeout(2_000),
+      }).catch(() => null),
+    ]);
+    if (!Array.isArray(repositoryResponse)) {
       throw new Error('GitHub returned an invalid repositories response.');
     }
 
-    return repositories.map(githubRepository).filter((repository): repository is WorkRepository => Boolean(repository));
+    const repositories = repositoryResponse.map(githubRepository).filter((repository): repository is WorkRepository => Boolean(repository));
+    const activityByRepository = Array.isArray(activityResponse)
+      ? githubRepositoryWorkItemActivity(activityResponse)
+      : new Map<string, string>();
+    return repositories.map((repository) => {
+      const workItemsUpdatedAt = activityByRepository.get(repository.id);
+      return workItemsUpdatedAt ? { ...repository, workItemsUpdatedAt } : repository;
+    });
   }
 
   async listGlobalItems(token: WorkProviderToken, query: GlobalWorkItemQuery = {}): Promise<WorkItemPage> {
@@ -311,6 +323,25 @@ function githubOAuthErrorMessage(response: Record<string, unknown>): string {
 async function githubApiRequest(token: WorkProviderToken, path: string, init: RequestInit = {}): Promise<unknown> {
   const response = await githubApiResponse(token, path, init);
   return response.json();
+}
+
+function githubRepositoryWorkItemActivity(items: unknown[]): Map<string, string> {
+  const activityByRepository = new Map<string, string>();
+  for (const item of items) {
+    if (!isRecord(item) || typeof item.repository_url !== 'string' || typeof item.updated_at !== 'string') continue;
+    const repositoryId = repositoryIdFromUrl(item.repository_url);
+    if (!repositoryId || item.updated_at <= (activityByRepository.get(repositoryId) ?? '')) continue;
+    activityByRepository.set(repositoryId, item.updated_at);
+  }
+  return activityByRepository;
+}
+
+function repositoryIdFromUrl(url: string): string | null {
+  const marker = '/repos/';
+  const markerIndex = url.indexOf(marker);
+  if (markerIndex < 0) return null;
+  const repositoryId = url.slice(markerIndex + marker.length).replace(/^\/+|\/+$/g, '');
+  return parseRepositoryId(repositoryId)?.fullName ?? null;
 }
 
 async function githubApiPageRequest(token: WorkProviderToken, path: string): Promise<{ linkHeader: string | null; value: unknown }> {
@@ -468,12 +499,8 @@ function githubPullRequestItem(value: unknown, repositoryId: string, repositoryF
 
 function githubAssignedIssue(value: unknown): WorkItem | null {
   if (!isRecord(value) || typeof value.repository_url !== 'string') return null;
-  const marker = '/repos/';
-  const markerIndex = value.repository_url.indexOf(marker);
-  const repositoryId = markerIndex >= 0
-    ? value.repository_url.slice(markerIndex + marker.length).replace(/^\/+|\/+$/g, '')
-    : '';
-  return parseRepositoryId(repositoryId) ? githubIssue(value, repositoryId, repositoryId) : null;
+  const repositoryId = repositoryIdFromUrl(value.repository_url);
+  return repositoryId ? githubIssue(value, repositoryId, repositoryId) : null;
 }
 
 function githubIssueAssignee(value: unknown): string | null {

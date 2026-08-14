@@ -276,6 +276,7 @@ export type WorkRepository = {
   url: string;
   isPrivate: boolean;
   updatedAt?: string;
+  workItemsUpdatedAt?: string;
 };
 
 export type WorkItemLabel = {

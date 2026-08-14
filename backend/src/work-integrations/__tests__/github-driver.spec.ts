@@ -130,6 +130,14 @@ describe('GitHubWorkProviderDriver', () => {
         updated_at: '2026-06-09T12:00:00.000Z',
       }]))
       .mockResolvedValueOnce(jsonResponse([{
+        repository_url: 'https://api.github.com/repos/nbonamy/codex-claw',
+        updated_at: '2026-06-09T12:45:00.000Z',
+      }, {
+        repository_url: 'https://api.github.com/repos/nbonamy/codex-claw',
+        pull_request: {},
+        updated_at: '2026-06-09T13:00:00.000Z',
+      }]))
+      .mockResolvedValueOnce(jsonResponse([{
         number: 12,
         title: 'Fix cockpit drag target',
         html_url: 'https://github.com/nbonamy/codex-claw/issues/12',
@@ -176,7 +184,11 @@ describe('GitHubWorkProviderDriver', () => {
       url: 'https://github.com/nbonamy/codex-claw',
       isPrivate: true,
       updatedAt: '2026-06-09T12:00:00.000Z',
+      workItemsUpdatedAt: '2026-06-09T13:00:00.000Z',
     }]);
+    expect(fetch).toHaveBeenNthCalledWith(2,
+      'https://api.github.com/issues?filter=all&state=open&sort=updated&direction=desc&per_page=100',
+      expect.any(Object));
     await expect(driver.listItems(token, 'nbonamy/codex-claw')).resolves.toStrictEqual([{
       provider: 'github',
       id: 'nbonamy/codex-claw#12',
@@ -234,6 +246,31 @@ describe('GitHubWorkProviderDriver', () => {
       'https://api.github.com/repos/nbonamy/codex-claw/pulls?state=closed&per_page=100',
       expect.any(Object),
     );
+  });
+
+  it('keeps repositories available when recent work-item enrichment fails', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(jsonResponse([{
+        full_name: 'nbonamy/codex-claw',
+        html_url: 'https://github.com/nbonamy/codex-claw',
+        private: true,
+        updated_at: '2026-06-09T12:00:00.000Z',
+      }]))
+      .mockResolvedValueOnce(errorResponse(500, { message: 'Temporary failure' }));
+    vi.stubGlobal('fetch', fetch);
+    const driver = new GitHubWorkProviderDriver('client-id');
+    const token = { provider: 'github' as const, accessToken: 'secret', tokenType: 'bearer', connectedAt: 'now' };
+
+    await expect(driver.listRepositories(token)).resolves.toStrictEqual([{
+      provider: 'github',
+      id: 'nbonamy/codex-claw',
+      owner: 'nbonamy',
+      name: 'codex-claw',
+      fullName: 'nbonamy/codex-claw',
+      url: 'https://github.com/nbonamy/codex-claw',
+      isPrivate: true,
+      updatedAt: '2026-06-09T12:00:00.000Z',
+    }]);
   });
 
   it('lists work assigned to the authenticated user across repositories in one request', async () => {

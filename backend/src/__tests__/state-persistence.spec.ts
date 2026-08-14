@@ -569,7 +569,7 @@ describe('AppStatePersistence', () => {
     expect(restored.remoteConnections).toStrictEqual(snapshot.remoteConnections);
   });
 
-  it('keeps work assignment status on load even when the assigned agent no longer exists', () => {
+  it('drops every work assignment when none of its assigned agents exist', () => {
     const restored = snapshotFromPersistedState({
       teams: [],
       agents: [],
@@ -601,25 +601,7 @@ describe('AppStatePersistence', () => {
       },
     });
 
-    expect(restored.workBacklog.assignments).toStrictEqual({
-      'github:nbonamy/codex-claw#12': {
-        provider: 'github',
-        itemId: 'nbonamy/codex-claw#12',
-        agentId: 'agent-closed',
-        assignedAt: '2026-06-09T13:00:00.000Z',
-        policy: 'review',
-        status: 'completed',
-        completedAt: '2026-06-09T13:30:00.000Z',
-      },
-      'github:nbonamy/codex-claw#13': {
-        provider: 'github',
-        itemId: 'nbonamy/codex-claw#13',
-        agentId: 'agent-working-gone',
-        assignedAt: '2026-06-09T13:00:00.000Z',
-        policy: 'review',
-        status: 'inProgress',
-      },
-    });
+    expect(restored.workBacklog.assignments).toStrictEqual({});
   });
 
   it('persists and restores loops', () => {
@@ -768,16 +750,7 @@ describe('AppStatePersistence', () => {
           oauthClientId: 'client-id',
         },
       },
-      assignments: {
-        'github:nbonamy/codex-claw#12': {
-          provider: 'github',
-          itemId: 'nbonamy/codex-claw#12',
-          agentId: 'missing-agent',
-          assignedAt: '2026-06-09T13:00:00.000Z',
-          policy: 'review',
-          status: 'inProgress',
-        },
-      },
+      assignments: {},
     });
   });
 
@@ -966,6 +939,34 @@ describe('AppStatePersistence', () => {
     const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
 
     expect(restored.sourceFolder).toStrictEqual(snapshot.sourceFolder);
+  });
+
+  it('drops persisted work assignments whose local agent no longer exists', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.assignments = {
+      'github:nbonamy/codex-claw#12': {
+        provider: 'github',
+        itemId: 'nbonamy/codex-claw#12',
+        agentId: 'agent-dina',
+        assignedAt: '2026-06-14T10:00:00.000Z',
+        policy: 'review',
+        status: 'inProgress',
+      },
+      'github:nbonamy/codex-claw#13': {
+        provider: 'github',
+        itemId: 'nbonamy/codex-claw#13',
+        agentId: 'agent-closed',
+        assignedAt: '2026-06-14T11:00:00.000Z',
+        policy: 'review',
+        status: 'completed',
+      },
+    };
+
+    const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
+
+    expect(restored.workBacklog.assignments).toStrictEqual({
+      'github:nbonamy/codex-claw#12': snapshot.workBacklog.assignments['github:nbonamy/codex-claw#12'],
+    });
   });
 
   it('restores remote teams as pointer-only state when the connection exists', () => {

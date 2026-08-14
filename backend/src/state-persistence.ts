@@ -174,15 +174,11 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
     : seed.teams;
   const remotePointerTeamIds = localRemoteTeamPointerIds(teams);
   const agents = allAgents.filter((agent) => !agent.teamId || !remotePointerTeamIds.has(agent.teamId));
-  const droppedRemoteAgentIds = new Set(
-    allAgents
-      .filter((agent) => agent.teamId && remotePointerTeamIds.has(agent.teamId))
-      .map((agent) => agent.id),
-  );
-  workBacklog.assignments = assignmentsWithoutAgents({
+  const localAgentIds = new Set(agents.map((agent) => agent.id));
+  workBacklog.assignments = assignmentsForAgents({
     ...legacyWorkBacklogAssignments(value.agents, agents),
     ...workBacklog.assignments,
-  }, droppedRemoteAgentIds);
+  }, localAgentIds);
   const snapshot: AppSnapshot = {
     ...seed,
     teams: teams.length > 0 ? teams : seed.teams,
@@ -1243,9 +1239,9 @@ function localRemoteTeamPointerIds(teams: Team[]): Set<string> {
   return ids;
 }
 
-function assignmentsWithoutAgents(assignments: WorkBacklogState['assignments'], agentIds: Set<string>): WorkBacklogState['assignments'] {
+function assignmentsForAgents(assignments: WorkBacklogState['assignments'], agentIds: Set<string>): WorkBacklogState['assignments'] {
   return Object.fromEntries(
-    Object.entries(assignments).filter(([, assignment]) => !agentIds.has(assignment.agentId)),
+    Object.entries(assignments).filter(([, assignment]) => agentIds.has(assignment.agentId)),
   );
 }
 

@@ -229,15 +229,18 @@ implemented:
   selected item automatically launches a background agent named from its
   repository and ticket, such as `codex-claw - gh-24`, in a dedicated generated
   worktree branch such as `fix/gh-24`, without any per-agent setup dialog;
-  its wider repository navigation keeps full names legible, exposes recent or
-  alphabetical sorting, and lists every repository behind an always-visible
+  its wider repository navigation keeps full names legible, exposes alphabetical
+  sorting or stable recent-backlog sorting based on each repository's latest open
+  issue or pull-request update, and lists every repository behind an always-visible
   repository filter in an independent scroll region while the primary Cockpit
   navigation stays fixed; ticket search remains in the work-item toolbar;
   global backlog scopes load one provider-owned page at a time instead of
   fanning out through every repository; Assigned to me is the default scope,
   and compact numbered pagination shows the exact total with previous/next
   controls, caches visited pages, and keeps the current page visible if another
-  page fails to load;
+  page fails to load. The inbox opens Focus when attention work exists, falls
+  back to WIP and then Backlog as those views empty, and repeats that choice
+  after a selected repository finishes loading;
   an item can prefill an editable custom prompt or immediately dispatch a
   contextual issue investigation/fix or pull-request feedback/review action to
   the current agent or, by default, a background-created duplicate that does
@@ -253,7 +256,9 @@ implemented:
   the agent action and assignment removal; the agent action is disabled and
   labeled as current when its owner is already open. Clicking an assigned row
   opens its owner while its linked number and title continue to open the source
-  work item. Blocked rows surface the agent's wrapping comment, clamped to two
+  work item. Completed assignments remain persisted as history but do not count
+  as active WIP, and restored state discards assignments whose agent no longer
+  exists. Blocked rows surface the agent's wrapping comment, clamped to two
   lines, in place of the default state-and-label metadata row; row icons remain
   top-aligned as comments grow.
   Pull-request work instead checks out the pull request's own head branch in

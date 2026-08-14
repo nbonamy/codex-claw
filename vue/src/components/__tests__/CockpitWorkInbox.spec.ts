@@ -31,6 +31,47 @@ describe('CockpitWorkInbox', () => {
     ]);
   });
 
+  it('falls back from Focus to WIP and Backlog, including after a repository load', async () => {
+    const working = item(21, 'Working item', 'repo-one');
+    const ready = item(22, 'Ready item', 'repo-two');
+    const blocked = item(23, 'Blocked item', 'repo-one');
+    const wrapper = mountInbox([working], {
+      [workItemAssignmentKey(working)]: assignment(working, 'agent-one', 'inProgress'),
+    });
+
+    await wrapper.vm.$nextTick();
+    expect(wrapper.findAll('.cockpit-inbox__views > button')[2]?.attributes('aria-pressed')).toBe('true');
+    expect(wrapper.emitted('update-active-view')?.at(-1)).toStrictEqual(['wip']);
+
+    await wrapper.setProps({ selectedRepositoryId: 'repo-two', globalScope: null, status: 'loading' });
+    await wrapper.setProps({ items: [ready], assignments: {}, status: 'loaded' });
+    expect(wrapper.findAll('.cockpit-inbox__views > button')[1]?.attributes('aria-pressed')).toBe('true');
+    expect(wrapper.emitted('update-active-view')?.at(-1)).toStrictEqual(['backlog']);
+
+    await wrapper.setProps({ selectedRepositoryId: 'repo-one', globalScope: null, status: 'loading' });
+    await wrapper.setProps({
+      items: [blocked],
+      assignments: { [workItemAssignmentKey(blocked)]: assignment(blocked, 'agent-one', 'blocked') },
+      status: 'loaded',
+    });
+    expect(wrapper.findAll('.cockpit-inbox__views > button')[3]?.attributes('aria-pressed')).toBe('true');
+    expect(wrapper.emitted('update-active-view')?.at(-1)).toStrictEqual(['focus']);
+  });
+
+  it('keeps completed assignments out of active WIP', async () => {
+    const completed = item(21, 'Completed item', 'repo-one');
+    const ready = item(22, 'Ready item', 'repo-two');
+    const wrapper = mountInbox([completed, ready], {
+      [workItemAssignmentKey(completed)]: assignment(completed, 'agent-one', 'completed'),
+    });
+
+    await wrapper.vm.$nextTick();
+    expect(wrapper.findAll('.cockpit-inbox__view-count').map((count) => count.text())).toStrictEqual(['2', '1', '0', '0']);
+    expect(wrapper.findAll('.cockpit-inbox__views > button')[1]?.attributes('aria-pressed')).toBe('true');
+    expect(wrapper.text()).toContain('Ready item');
+    expect(wrapper.text()).not.toContain('Completed item');
+  });
+
   it('isolates backlog and WIP and routes assigned and unassigned rows', async () => {
     const assigned = item(21, 'Assigned work', 'repo-one');
     const ready = item(22, 'Ready work', 'repo-two');

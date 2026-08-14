@@ -310,7 +310,7 @@ function selectSummaryMetric(metric: SummaryMetric): void {
 }
 
 function repositoryActivityAt(repository: WorkRepository): string {
-  return repository.updatedAt ?? '';
+  return repository.workItemsUpdatedAt ?? '';
 }
 
 function selectWorkView(view: InboxView): void {

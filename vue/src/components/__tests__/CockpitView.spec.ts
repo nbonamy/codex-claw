@@ -48,8 +48,8 @@ describe('CockpitView', () => {
   it('sorts repositories by recent activity or name, filters the backlog, and launches an agent', async () => {
     const snapshot = createInitialSnapshot();
     const repositories = [
-      repository('older', '2026-08-10T00:00:00.000Z'),
-      repository('recent', '2026-08-13T00:00:00.000Z'),
+      repository('older', '2026-08-14T00:00:00.000Z', '2026-08-10T00:00:00.000Z'),
+      repository('recent', '2026-08-01T00:00:00.000Z', '2026-08-13T00:00:00.000Z'),
     ];
     const wrapper = mountView(snapshot, [item(24)], repositories, vi.fn().mockResolvedValue(undefined), 'nbonamy/recent');
     const rows = wrapper.findAll('.cockpit-view__repositories > div');
@@ -91,11 +91,22 @@ describe('CockpitView', () => {
     expect(wrapper.findAll('.cockpit-view__repositories > div')).toHaveLength(12);
   });
 
+  it('places repositories without open work after repositories with backlog activity', () => {
+    const snapshot = createInitialSnapshot();
+    const repositories = [
+      repository('inactive', '2026-08-14T00:00:00.000Z'),
+      repository('active', '2026-08-01T00:00:00.000Z', '2026-08-10T00:00:00.000Z'),
+    ];
+    const wrapper = mountView(snapshot, [], repositories);
+
+    expect(wrapper.findAll('.cockpit-view__repositories > div').map((row) => row.text())).toStrictEqual(['active', 'inactive']);
+  });
+
   it('keeps recent repository ordering stable when the visible work-item page changes', async () => {
     const snapshot = createInitialSnapshot();
     const repositories = [
-      repository('older', '2026-08-10T00:00:00.000Z'),
-      repository('recent', '2026-08-13T00:00:00.000Z'),
+      repository('older', '2026-08-10T00:00:00.000Z', '2026-08-10T00:00:00.000Z'),
+      repository('recent', '2026-08-13T00:00:00.000Z', '2026-08-13T00:00:00.000Z'),
     ];
     const firstPageItem = {
       ...item(24),
@@ -174,22 +185,28 @@ describe('CockpitView', () => {
     expect(wrapper.findComponent(CockpitWorkInbox).props()).toMatchObject({ activeView: 'all', statusFilter: null });
   });
 
-  it('defaults to Focus regardless of whether attention work exists', () => {
+  it('defaults to Focus, then WIP, then Backlog based on available work', async () => {
     const focusSnapshot = createInitialSnapshot();
     const focusItem = item(24);
     focusSnapshot.workBacklog.assignments[workItemAssignmentKey(focusItem)] = {
       provider: 'github', itemId: focusItem.id, agentId: 'agent-dina', assignedAt: '2026-08-12T00:00:00.000Z', policy: 'review', status: 'blocked',
     };
-    expect(mountView(focusSnapshot, [focusItem]).findComponent(CockpitWorkInbox).props('activeView')).toBe('focus');
+    const focusWrapper = mountView(focusSnapshot, [focusItem]);
+    await focusWrapper.vm.$nextTick();
+    expect(focusWrapper.findComponent(CockpitWorkInbox).props('activeView')).toBe('focus');
 
     const wipSnapshot = createInitialSnapshot();
     const wipItem = item(25);
     wipSnapshot.workBacklog.assignments[workItemAssignmentKey(wipItem)] = {
       provider: 'github', itemId: wipItem.id, agentId: 'agent-dina', assignedAt: '2026-08-12T00:00:00.000Z', policy: 'review', status: 'inProgress',
     };
-    expect(mountView(wipSnapshot, [wipItem]).findComponent(CockpitWorkInbox).props('activeView')).toBe('focus');
+    const wipWrapper = mountView(wipSnapshot, [wipItem]);
+    await wipWrapper.vm.$nextTick();
+    expect(wipWrapper.findComponent(CockpitWorkInbox).props('activeView')).toBe('wip');
 
-    expect(mountView(createInitialSnapshot(), [item(26)]).findComponent(CockpitWorkInbox).props('activeView')).toBe('focus');
+    const backlogWrapper = mountView(createInitialSnapshot(), [item(26)]);
+    await backlogWrapper.vm.$nextTick();
+    expect(backlogWrapper.findComponent(CockpitWorkInbox).props('activeView')).toBe('backlog');
   });
 
   it('shows a provider connection empty state', () => {
@@ -224,7 +241,7 @@ function mountView(
   });
 }
 
-function repository(name: string, updatedAt: string): WorkRepository {
+function repository(name: string, updatedAt: string, workItemsUpdatedAt?: string): WorkRepository {
   return {
     provider: 'github',
     id: `nbonamy/${name}`,
@@ -234,6 +251,7 @@ function repository(name: string, updatedAt: string): WorkRepository {
     url: `https://github.com/nbonamy/${name}`,
     isPrivate: true,
     updatedAt,
+    ...(workItemsUpdatedAt ? { workItemsUpdatedAt } : {}),
   };
 }
 
