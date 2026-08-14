@@ -97,10 +97,12 @@ implemented:
   containing at least one unread agent carry a short, thick red orbital sweep
   at the top-right of their rail avatar, except the
   currently selected team, which is treated as read for team-level display
-  while retaining unread state for agents not being viewed. Selecting a team
-  explicitly marks the agent it opens as read; selecting an agent or focusing
-  its active thread does the same. The macOS Dock badge shows the number of
-  unread agent threads;
+  while its agent workspace is visible. Cockpit shows the unread sweep for every
+  team containing unread agents, including the team selected before Cockpit was
+  opened, while retaining unread state for agents not being viewed. Selecting a
+  team explicitly marks the agent it opens as read; selecting an agent or
+  focusing its active thread does the same. The macOS Dock badge shows the
+  number of unread agent threads;
 - persisted View-menu compact agent-list mode with mini avatars, names, and status icons;
 - agent context actions for duplicating configuration or forking the active
   backend conversation; both insert the new selected agent directly below the

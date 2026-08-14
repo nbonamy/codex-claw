@@ -2183,6 +2183,24 @@ describe('AppShell', () => {
       .toStrictEqual(['team-other']);
   });
 
+  it('shows unread activity for the previously selected team while cockpit is open', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mountShell({
+      snapshot,
+      unreadAgentIds: ['agent-jesse'],
+    });
+
+    expect(wrapper.getComponent({ name: 'TeamRail' }).props('unreadTeamIds')).toStrictEqual([]);
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.getComponent({ name: 'TeamRail' }).props('unreadTeamIds'))
+      .toStrictEqual(['team-codex-claw']);
+    expect(wrapper.get('[aria-label="Codex Claw, unread activity"]').classes())
+      .toContain('team-rail__team--unread');
+  });
+
   it('opens cockpit from the first rail item and navigates back to an agent', async () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mountShell({ snapshot });

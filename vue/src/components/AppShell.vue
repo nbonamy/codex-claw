@@ -874,7 +874,8 @@ const unreadTeamIds = computed(() => {
   const unreadAgentIdSet = new Set(props.unreadAgentIds);
   return props.snapshot.teams
     .filter((team) => (
-      team.id !== activeTeam.value?.id && team.agentIds.some((agentId) => unreadAgentIdSet.has(agentId))
+      (activeSurface.value === 'cockpit' || team.id !== activeTeam.value?.id)
+      && team.agentIds.some((agentId) => unreadAgentIdSet.has(agentId))
     ))
     .map((team) => team.id);
 });
