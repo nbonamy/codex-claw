@@ -98,7 +98,7 @@
                 id="agent-dialog-worktree"
                 v-model="selectedSourceWorktreePath"
                 class="agent-dialog__workspace-select"
-                :disabled="!canEdit"
+                :disabled="!canEdit || Boolean(initialNewWorktreeBranchName.trim())"
                 @update:model-value="selectWorktreeControl"
               >
                 <el-option
@@ -287,7 +287,9 @@ const props = withDefaults(defineProps<{
   chooseSourceWorktreeDestination?: (defaultPath: string) => Promise<string | null>;
   createAgent: (input: AgentDialogCreateInput) => Promise<Agent | null | void>;
   createSourceWorktree?: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
+  initialAgentName?: string;
   initialNewTeamName?: string;
+  initialNewWorktreeBranchName?: string;
   initialSourceRepositoryName?: string | null;
   initialTeamId?: string | null;
   mode: 'create' | 'edit';
@@ -301,7 +303,9 @@ const props = withDefaults(defineProps<{
   visible: boolean;
 }>(), {
   claudeCodeEnabled: false,
+  initialAgentName: '',
   initialNewTeamName: '',
+  initialNewWorktreeBranchName: '',
   initialSourceRepositoryName: null,
   initialTeamId: null,
   remoteConnectionId: '',
@@ -328,6 +332,7 @@ const submitting = ref(false);
 const newTeamOptionId = '__new_team__';
 const customFolderOptionValue = '__custom_folder__';
 const newWorktreeOptionValue = '__new_worktree__';
+const pendingInitialWorktreeOptionValue = '__pending_initial_worktree__';
 const selectedSourceRepositoryPath = ref('');
 const selectedSourceWorktreePath = ref('');
 const repositoryControlValue = ref(customFolderOptionValue);
@@ -369,11 +374,15 @@ const selectedSourceWorktrees = computed(() => {
   const worktrees = listedSourceWorktreesRepoPath.value === selectedSourceRepositoryPath.value
     ? listedSourceWorktrees.value
     : selectedSourceRepository.value?.worktrees ?? [];
+  const pendingBranch = props.initialNewWorktreeBranchName.trim();
+  const pendingWorktree = pendingBranch
+    ? [{ name: `${pendingBranch} (new worktree)`, path: pendingInitialWorktreeOptionValue }]
+    : [];
   const created = createdSourceWorktree.value;
   if (!created || worktrees.some((worktree) => worktree.path === created.path)) {
-    return worktrees;
+    return [...pendingWorktree, ...worktrees];
   }
-  return [...worktrees, created];
+  return [...pendingWorktree, ...worktrees, created];
 });
 const showSourceWorktreeControl = computed(() => selectedSourceRepository.value !== null);
 const customFolderOptionLabel = computed(() => folder.value && !selectedSourceRepository.value ? 'Custom folder' : 'Choose folder...');
@@ -393,7 +402,9 @@ watch([
   () => props.visible,
   () => props.mode,
   () => props.agent?.id,
+  () => props.initialAgentName,
   () => props.initialNewTeamName,
+  () => props.initialNewWorktreeBranchName,
   () => props.initialSourceRepositoryName,
   () => props.initialTeamId,
   () => props.teams.length,
@@ -569,7 +580,7 @@ function selectWorktreeControl(value: string): void {
 function selectSourceWorktree(worktreePath: string): void {
   selectedSourceWorktreePath.value = worktreePath;
   folder.value = worktreePath;
-  if (!isEditing.value) {
+  if (!isEditing.value && !props.initialAgentName.trim()) {
     name.value = worktreePath.split(/[\\/]/).filter(Boolean).at(-1) ?? '';
   }
 }
@@ -629,6 +640,7 @@ async function submit(): Promise<void> {
         backend: backend.value,
       });
     } else {
+      await ensureInitialWorktree();
       const createInput: AgentDialogCreateInput = {
         name: name.value,
         folder: folder.value,
@@ -681,7 +693,7 @@ function resetForm(): void {
     return;
   }
 
-  name.value = '';
+  name.value = props.initialAgentName.trim();
   folder.value = '';
   avatar.value = '🤖';
   backend.value = 'codex';
@@ -698,7 +710,34 @@ function resetForm(): void {
   loadingRemoteSourceRepositories.value = false;
   remoteFolderDialogVisible.value = false;
   newSourceWorktreeDialogVisible.value = false;
-  void resetSourceSelectionForConnection();
+  void resetSourceSelectionForConnection().then(() => {
+    if (
+      props.visible &&
+      !isEditing.value &&
+      selectedSourceRepository.value &&
+      props.initialNewWorktreeBranchName.trim()
+    ) {
+      selectedSourceWorktreePath.value = pendingInitialWorktreeOptionValue;
+    }
+  });
+}
+
+async function ensureInitialWorktree(): Promise<void> {
+  const branchName = props.initialNewWorktreeBranchName.trim();
+  const repository = selectedSourceRepository.value;
+  if (!branchName || !repository || createdSourceWorktree.value) {
+    return;
+  }
+  if (!props.createSourceWorktree) {
+    throw new Error('Source worktree creation is not available.');
+  }
+
+  const worktree = await props.createSourceWorktree({
+    repoPath: repository.path,
+    branchName,
+    ...(selectedRemoteConnectionId.value ? { remoteConnectionId: selectedRemoteConnectionId.value } : {}),
+  });
+  selectCreatedSourceWorktree(worktree);
 }
 
 function preferredSourceRepositoryPath(): string {

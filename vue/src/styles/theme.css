@@ -36,6 +36,12 @@
   --el-button-hover-bg-color: var(--el-color-danger);
 }
 
+.el-checkbox {
+  --el-checkbox-input-width: var(--space-8);
+  --el-checkbox-input-height: var(--space-8);
+  --el-checkbox-border-radius: var(--radius-sm);
+}
+
 .el-dialog {
   --el-dialog-padding-primary: 0;
 }
@@ -52,4 +58,10 @@
 .el-select-dropdown__item {
   display: flex;
   align-items: center;
+}
+
+.el-checkbox__inner:after {
+  border-width: 1.75px;
+  width: 3.5px;
+  top: 45%;
 }

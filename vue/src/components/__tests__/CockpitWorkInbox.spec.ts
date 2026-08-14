@@ -42,7 +42,7 @@ describe('CockpitWorkInbox', () => {
     expect(wrapper.text()).toContain('Ready work');
     expect(wrapper.text()).not.toContain('Assigned work');
     await wrapper.get('.cockpit-inbox__row').trigger('click');
-    expect(wrapper.emitted('start-work')).toStrictEqual([[ready]]);
+    expect(wrapper.getComponent({ name: 'ElCheckbox' }).props('modelValue')).toBe(true);
 
     await wrapper.findAll('.cockpit-inbox__views > button')[2]?.trigger('click');
     expect(wrapper.text()).toContain('Assigned work');
@@ -69,7 +69,7 @@ describe('CockpitWorkInbox', () => {
     await rows[0]?.get('.cockpit-inbox__external-action').trigger('click');
 
     expect(wrapper.emitted('select-assigned-agent')).toStrictEqual([['agent-one']]);
-    expect(wrapper.emitted('start-work')).toStrictEqual([[ready]]);
+    expect(rows[1]?.getComponent({ name: 'ElCheckbox' }).props('modelValue')).toBe(true);
     expect(open).toHaveBeenCalledWith(assigned.url, '_blank', 'noreferrer');
     open.mockRestore();
   });
@@ -104,10 +104,14 @@ describe('CockpitWorkInbox', () => {
     expect(wrapper.emitted('select-assignee')).toStrictEqual([['nicolas']]);
   });
 
-  it('searches work and starts the next ready item from the primary action', async () => {
+  it('selects visible work and confirms a batch action and team', async () => {
     const first = item(21, 'First repo work', 'repo-one');
     const second = item(22, 'Second repo work', 'repo-two');
-    const wrapper = mountInbox([first, second]);
+    const startWorkAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountInbox([first, second], {}, {}, startWorkAction);
+
+    const startButton = wrapper.findAllComponents({ name: 'ElButton' }).find((button) => button.text().includes('Start work'))!;
+    expect(startButton.props('disabled')).toBe(true);
 
     await wrapper.get('[aria-label="Search work"]').trigger('click');
     await wrapper.get('input[aria-label="Search work"]').setValue('second');
@@ -115,8 +119,16 @@ describe('CockpitWorkInbox', () => {
     expect(wrapper.text()).toContain('Second repo work');
     expect(wrapper.text()).not.toContain('First repo work');
 
-    await wrapper.findAllComponents({ name: 'ElButton' }).find((button) => button.text().includes('Start work'))?.trigger('click');
-    expect(wrapper.emitted('start-work')).toStrictEqual([[second]]);
+    await wrapper.get('.cockpit-inbox__row').trigger('click');
+    expect(startButton.props('disabled')).toBe(false);
+    await startButton.trigger('click');
+    expect(wrapper.get('.cockpit-inbox__start-body').text()).toContain('Launch 1 agent?');
+    const teamSelect = wrapper.findAllComponents({ name: 'ElSelect' }).at(-1)!;
+    expect(teamSelect.props('modelValue')).toBe('team-one');
+    await teamSelect.vm.$emit('update:modelValue', 'team-two');
+
+    await wrapper.findAll('.claw-dialog__footer button').find((button) => button.text() === 'Investigate')?.trigger('click');
+    expect(startWorkAction).toHaveBeenCalledWith({ action: 'investigate', items: [second], teamId: 'team-two' });
   });
 
   it('guides unfiltered global views before loading cross-repository work', async () => {
@@ -137,6 +149,7 @@ function mountInbox(
   items: WorkItem[],
   assignments: Record<string, WorkBacklogAssignment> = {},
   filters: { activeView?: 'all' | 'backlog' | 'wip' | 'focus'; globalScope?: 'assignedToMe' | 'all' | null; statusFilter?: 'inProgress' | 'blocked' | 'readyForReview' | null } = {},
+  startWorkAction = vi.fn().mockResolvedValue(undefined),
 ) {
   return mount(CockpitWorkInbox, {
     props: {
@@ -148,6 +161,12 @@ function mountInbox(
         { provider: 'github', id: 'repo-two', owner: 'owner', name: 'repo-two', fullName: 'owner/repo-two', url: 'https://github.com/owner/repo-two', isPrivate: false },
       ],
       globalScope: 'all', selectedRepositoryId: null, status: 'loaded',
+      teams: [
+        { id: 'team-one', name: 'Team One', agentIds: [] },
+        { id: 'team-two', name: 'Team Two', agentIds: [] },
+      ],
+      defaultTeamId: 'team-one',
+      startWorkAction,
       ...filters,
     },
     global: { plugins: [ElementPlus] },

@@ -361,6 +361,54 @@ describe('AgentDialog', () => {
     expect(wrapper.get<HTMLInputElement>('[aria-label="Agent name"]').element.value).toBe('mediastation');
   });
 
+  it('prefills ticket-driven agent identity and creates its named worktree automatically', async () => {
+    const createAgent = vi.fn().mockResolvedValue(undefined);
+    const createSourceWorktree = vi.fn().mockResolvedValue({
+      name: 'fix-gh-24',
+      path: '/Users/nbonamy/src/codex-claw-fix-gh-24',
+    });
+    const wrapper = mountDialog({
+      createAgent,
+      createSourceWorktree,
+      initialAgentName: 'codex-claw - gh-24',
+      initialNewWorktreeBranchName: 'fix/gh-24',
+      initialSourceRepositoryName: 'codex-claw',
+      sourceRepositories: [{
+        name: 'codex-claw',
+        path: '/Users/nbonamy/src/codex-claw',
+        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/codex-claw' }],
+      }],
+    });
+
+    await flushPromises();
+
+    expect(wrapper.findAllComponents({ name: 'ElSelect' })[0]?.props('modelValue')).toBe('/Users/nbonamy/src/codex-claw');
+    expect(wrapper.get<HTMLInputElement>('[aria-label="Agent name"]').element.value).toBe('codex-claw - gh-24');
+    expect(wrapper.findAllComponents({ name: 'ElSelect' })[1]?.props()).toMatchObject({
+      disabled: true,
+      modelValue: '__pending_initial_worktree__',
+    });
+    expect(wrapper.findAllComponents({ name: 'ElOption' }).some((option) => (
+      option.props('label') === 'fix/gh-24 (new worktree)'
+    ))).toBe(true);
+    expect(wrapper.getComponent({ name: 'NewSourceWorktreeDialog' }).props('visible')).toBe(false);
+
+    await saveButton(wrapper).trigger('click');
+    await flushPromises();
+
+    expect(createSourceWorktree).toHaveBeenCalledWith({
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      branchName: 'fix/gh-24',
+    });
+    expect(createAgent).toHaveBeenCalledWith({
+      name: 'codex-claw - gh-24',
+      avatar: '🤖',
+      folder: '/Users/nbonamy/src/codex-claw-fix-gh-24',
+      backend: 'codex',
+      sourceRepositoryName: 'codex-claw',
+    });
+  });
+
   it('keeps the selected repository when streaming snapshots replace team state', async () => {
     const teams: Team[] = [{
       id: 'team-codex-claw',
@@ -564,7 +612,9 @@ function mountDialog(overrides: Partial<{
   createSourceWorktree: (input: { repoPath: string; branchName: string; destinationPath?: string }) => Promise<SourceWorktree>;
   listSourceRepositories: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
   listSourceWorktrees: (repoPath: string, remoteConnectionId?: string) => Promise<SourceWorktree[]>;
+  initialAgentName: string;
   initialNewTeamName: string;
+  initialNewWorktreeBranchName: string;
   initialSourceRepositoryName: string | null;
   initialTeamId: string | null;
   mode: 'create' | 'edit';

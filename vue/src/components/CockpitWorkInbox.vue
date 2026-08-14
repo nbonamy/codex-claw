@@ -65,7 +65,7 @@
           </div>
         </el-popover>
 
-        <el-button type="primary" :disabled="!firstReadyRow" @click="startNextWork">
+        <el-button type="primary" :disabled="selectedItems.length === 0" @click="openStartWorkDialog">
           <PlayerPlayIcon aria-hidden="true" />
           Start work
         </el-button>
@@ -120,6 +120,14 @@
             @click="selectRow(row)"
             @keydown.enter="selectRow(row)"
           >
+            <el-checkbox
+              class="cockpit-inbox__selection"
+              :model-value="selectedItemIds.has(row.item.id)"
+              :disabled="Boolean(row.assignment)"
+              :aria-label="row.assignment ? `#${row.item.number} is already assigned` : `Select #${row.item.number}`"
+              @click.stop
+              @change="toggleSelection(row)"
+            />
             <span class="cockpit-inbox__repository">{{ repositoryName(row.item) }}</span>
             <span class="cockpit-inbox__number">
               {{ row.item.kind === 'pullRequest' ? 'PR' : '' }} #{{ row.item.number }}
@@ -172,13 +180,51 @@
         </div>
       </section>
     </div>
+
+    <el-dialog
+      class="claw-dialog cockpit-inbox__start-dialog"
+      :model-value="startWorkDialogOpen"
+      :teleported="false"
+      width="520px"
+      :show-close="false"
+      destroy-on-close
+      @update:model-value="closeStartWorkDialog"
+    >
+      <template #header>
+        <div class="claw-form-dialog__header">
+          <h2 class="claw-dialog__title">Start work</h2>
+        </div>
+      </template>
+
+      <div class="cockpit-inbox__start-body">
+        <p>
+          Launch <strong>{{ selectedItems.length }} {{ selectedItems.length === 1 ? 'agent' : 'agents' }}</strong>?
+          Each agent will work in a dedicated worktree.
+        </p>
+        <label>
+          Team
+          <el-select v-model="selectedTeamId" aria-label="Team for new agents">
+            <el-option v-for="team in teams" :key="team.id" :label="team.name" :value="team.id" />
+          </el-select>
+        </label>
+        <p v-if="startWorkError" class="cockpit-inbox__start-error" role="alert">{{ startWorkError }}</p>
+      </div>
+
+      <template #footer>
+        <div class="claw-dialog__footer">
+          <button class="claw-button claw-button--tertiary" type="button" :disabled="startingWork" @click="closeStartWorkDialog(false)">Cancel</button>
+          <button class="claw-button claw-button--secondary" type="button" :disabled="startingWork || !selectedTeamId" @click="startSelectedWork('investigate')">Investigate</button>
+          <button class="claw-button claw-button--primary" type="button" :disabled="startingWork || !selectedTeamId" @click="startSelectedWork('fix')">Fix</button>
+        </div>
+      </template>
+    </el-dialog>
   </main>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { IconAlertCircle, IconChevronDown, IconCircleFilled, IconFilter, IconSearch } from '@tabler/icons-vue';
-import type { Agent, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import type { Agent, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { ExternalLinkIcon, EyeIcon, GitBranchIcon, GitHubIcon, PlayerPlayIcon, PlusCircleIcon, RefreshIcon } from '../shared/icons/app-icons';
 import AgentAvatar from './AgentAvatar.vue';
@@ -203,7 +249,10 @@ const props = withDefaults(defineProps<{
   selectedTagName?: string | null;
   status: 'notLoaded' | 'loading' | 'loaded' | 'error';
   statusFilter?: SummaryFilter | null;
-}>(), { activeView: 'focus', globalScope: null, searchQuery: '', selectedAssigneeLogin: null, selectedTagName: null, statusFilter: null });
+  teams: Team[];
+  defaultTeamId?: string | null;
+  startWorkAction: (input: { action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string }) => Promise<void>;
+}>(), { activeView: 'focus', defaultTeamId: null, globalScope: null, searchQuery: '', selectedAssigneeLogin: null, selectedTagName: null, statusFilter: null });
 
 const emit = defineEmits<{
   refresh: [repositoryId: string | null];
@@ -214,12 +263,16 @@ const emit = defineEmits<{
   'select-assignee': [login: string | null];
   'select-repository': [repositoryId: string | null];
   'select-tag': [tag: string | null];
-  'start-work': [item: WorkItem];
   'update-search-query': [query: string];
   'update-active-view': [view: InboxView];
 }>();
 
 const searchOpen = ref(false);
+const selectedItemIds = ref(new Set<string>());
+const startWorkDialogOpen = ref(false);
+const startingWork = ref(false);
+const startWorkError = ref<string | null>(null);
+const selectedTeamId = ref('');
 const localActiveView = ref<InboxView>(props.activeView);
 const activeView = computed(() => localActiveView.value);
 const effectiveSearchQuery = ref(props.searchQuery);
@@ -264,7 +317,9 @@ const viewOptions = computed(() => [
   { id: 'wip' as const, label: 'WIP', count: filteredRows.value.filter((row) => row.assignment).length },
   { id: 'focus' as const, label: 'Focus', count: filteredRows.value.filter((row) => row.priority === 'attention' || row.priority === 'review').length },
 ]);
-const firstReadyRow = computed(() => filteredRows.value.find((row) => !row.assignment) ?? null);
+const selectedItems = computed(() => rows.value
+  .filter((row) => !row.assignment && selectedItemIds.value.has(row.item.id))
+  .map((row) => row.item));
 const emptyMessage = computed(() => activeView.value === 'focus' ? 'Nothing needs your attention.' : `No work in ${viewOptions.value.find((view) => view.id === activeView.value)?.label ?? 'this view'}.`);
 
 function toRow(item: WorkItem): InboxRow {
@@ -306,7 +361,56 @@ function elapsed(value: string): string {
   return `${Math.floor(seconds / 86400)}d`;
 }
 
-function startNextWork(): void { if (firstReadyRow.value) emit('start-work', firstReadyRow.value.item); }
+watch(rows, (visibleRows) => {
+  const selectableIds = new Set(visibleRows.filter((row) => !row.assignment).map((row) => row.item.id));
+  const next = new Set([...selectedItemIds.value].filter((id) => selectableIds.has(id)));
+  if (next.size !== selectedItemIds.value.size) selectedItemIds.value = next;
+});
+
+watch(() => props.defaultTeamId, () => {
+  if (!startWorkDialogOpen.value) selectedTeamId.value = defaultTeamId();
+});
+
+function defaultTeamId(): string {
+  return props.teams.some((team) => team.id === props.defaultTeamId)
+    ? props.defaultTeamId ?? ''
+    : props.teams[0]?.id ?? '';
+}
+
+function toggleSelection(row: InboxRow): void {
+  if (row.assignment) return;
+  const next = new Set(selectedItemIds.value);
+  if (next.has(row.item.id)) next.delete(row.item.id);
+  else next.add(row.item.id);
+  selectedItemIds.value = next;
+}
+
+function openStartWorkDialog(): void {
+  if (selectedItems.value.length === 0) return;
+  selectedTeamId.value = defaultTeamId();
+  startWorkError.value = null;
+  startWorkDialogOpen.value = true;
+}
+
+function closeStartWorkDialog(visible = false): void {
+  if (!visible && !startingWork.value) startWorkDialogOpen.value = false;
+}
+
+async function startSelectedWork(action: 'investigate' | 'fix'): Promise<void> {
+  const items = [...selectedItems.value];
+  if (!selectedTeamId.value || items.length === 0) return;
+  startingWork.value = true;
+  startWorkError.value = null;
+  try {
+    await props.startWorkAction({ action, items, teamId: selectedTeamId.value });
+    selectedItemIds.value = new Set();
+    startWorkDialogOpen.value = false;
+  } catch (error) {
+    startWorkError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    startingWork.value = false;
+  }
+}
 function selectView(view: InboxView): void {
   localActiveView.value = view;
   emit('update-active-view', view);
@@ -317,7 +421,7 @@ function updateSearchQuery(value: unknown): void {
   effectiveSearchQuery.value = query;
   emit('update-search-query', query);
 }
-function selectRow(row: InboxRow): void { row.agent ? emit('select-assigned-agent', row.agent.id) : emit('start-work', row.item); }
+function selectRow(row: InboxRow): void { row.agent ? emit('select-assigned-agent', row.agent.id) : toggleSelection(row); }
 function openSource(item: WorkItem): void { window.open(item.url, '_blank', 'noreferrer'); }
 function normalized(value: unknown): string | null { return typeof value === 'string' && value ? value : null; }
 function selectRepository(value: unknown): void { emit('select-repository', normalized(value)); }
@@ -608,7 +712,7 @@ function selectAssignee(value: unknown): void { emit('select-assignee', normaliz
   min-height: 42px;
   display: grid;
   grid-template-columns:
-    minmax(180px, 1.1fr) 64px minmax(260px, 2fr) minmax(160px, 1fr)
+    28px minmax(180px, 1.1fr) 64px minmax(260px, 2fr) minmax(160px, 1fr)
     minmax(150px, 1fr) minmax(100px, 0.65fr) 54px 70px;
   gap: var(--space-6);
   align-items: center;
@@ -616,6 +720,17 @@ function selectAssignee(value: unknown): void { emit('select-assignee', normaliz
   font-size: var(--font-size-13);
   line-height: var(--line-height-18);
   cursor: pointer;
+}
+
+.cockpit-inbox__selection {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+}
+
+.cockpit-inbox__selection :deep(.el-checkbox__label) {
+  display: none;
 }
 
 .cockpit-inbox__row + .cockpit-inbox__row {
@@ -758,10 +873,38 @@ function selectAssignee(value: unknown): void { emit('select-assignee', normaliz
   color: var(--color-error);
 }
 
+.cockpit-inbox__start-body {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.cockpit-inbox__start-body p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-14);
+  line-height: var(--line-height-20);
+}
+
+.cockpit-inbox__start-body strong {
+  color: var(--color-text);
+}
+
+.cockpit-inbox__start-body label {
+  display: grid;
+  gap: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  font-weight: var(--font-weight-medium);
+}
+
+.cockpit-inbox__start-error {
+  color: var(--color-error) !important;
+}
+
 @media (max-width: 1250px) {
   .cockpit-inbox__row {
     grid-template-columns:
-      minmax(150px, 1fr) 58px minmax(200px, 1.5fr) minmax(130px, 1fr)
+      28px minmax(150px, 1fr) 58px minmax(200px, 1.5fr) minmax(130px, 1fr)
       90px 70px;
   }
   .cockpit-inbox__branch,
@@ -782,7 +925,9 @@ function selectAssignee(value: unknown): void { emit('select-assignee', normaliz
     margin-left: auto;
   }
   .cockpit-inbox__row {
-    grid-template-columns: minmax(120px, 1fr) 50px minmax(160px, 1.5fr) 70px;
+    grid-template-columns:
+      28px minmax(120px, 1fr) 50px minmax(160px, 1.5fr)
+      70px;
   }
   .cockpit-inbox__context,
   .cockpit-inbox__status {

@@ -224,6 +224,11 @@ implemented:
   and label filters whose defaults can be saved per repository;
   issue and pull-request numbers and titles open their source page in the
   system browser without adding another permanent row action;
+  unowned rows can be multi-selected in the global Cockpit. Start work opens one
+  confirmation with a team selector plus Investigate and Fix actions; each
+  selected item automatically launches a background agent named from its
+  repository and ticket, such as `codex-claw - gh-24`, in a dedicated generated
+  worktree branch such as `fix/gh-24`, without any per-agent setup dialog;
   an item can prefill an editable custom prompt or immediately dispatch a
   contextual issue investigation/fix or pull-request feedback/review action to
   the current agent or, by default, a background-created duplicate that does

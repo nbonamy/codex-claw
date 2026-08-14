@@ -16,9 +16,9 @@
       <nav>
         <button
           class="cockpit-view__navigation-item"
-          :class="{ 'cockpit-view__navigation-item--active': activeSection === 'backlog' && !workBacklog?.selectedRepositoryId }"
+          :class="{ 'cockpit-view__navigation-item--active': activeSection === 'backlog' }"
           type="button"
-          :aria-current="activeSection === 'backlog' && !workBacklog?.selectedRepositoryId ? 'page' : undefined"
+          :aria-current="activeSection === 'backlog' ? 'page' : undefined"
           @click="showBacklog"
         >
           <BacklogIcon aria-hidden="true" />
@@ -37,7 +37,7 @@
         </button>
 
         <div class="cockpit-view__navigation-section">
-          <span>Repositories</span>
+          <strong>Repositories</strong>
         </div>
         <div v-if="workBacklog" class="cockpit-view__repositories">
           <div
@@ -55,19 +55,15 @@
             <button
               class="cockpit-view__repository-launch"
               type="button"
-              :aria-label="`New agent in ${repository.name}`"
-              :title="`New agent in ${repository.name}`"
+              :aria-label="`Start agent in ${repository.name}`"
+              :title="`Start agent in ${repository.name}`"
               @click="emit('add-agent-for-repository', repository)"
             >
-              <IconPlus aria-hidden="true" />
+              <PlayerPlayIcon aria-hidden="true" />
             </button>
           </div>
         </div>
 
-        <button class="cockpit-view__navigation-item" type="button" @click="emit('open-settings')">
-          <IconSettings aria-hidden="true" />
-          Settings
-        </button>
       </nav>
     </aside>
 
@@ -105,6 +101,9 @@
         :selected-assignee-login="workBacklog.selectedAssigneeLogin ?? null"
         :selected-repository-id="workBacklog.selectedRepositoryId"
         :selected-tag-name="workBacklog.selectedTagName ?? null"
+        :teams="teams"
+        :default-team-id="defaultTeamId"
+        :start-work-action="startWorkItemsAction"
         :status="workBacklog.status"
         :status-filter="activeSummaryFilter"
         @focus-search="focusSearch"
@@ -115,7 +114,6 @@
         @select-assigned-agent="selectAssignedAgent"
         @select-repository="emit('select-work-repository', $event)"
         @select-tag="emit('select-work-tag', $event)"
-        @start-work="emit('assign-work-item-to-new-agent', { item: $event })"
         @update-active-view="selectWorkView"
         @update-search-query="searchQuery = $event"
       />
@@ -151,10 +149,10 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue';
-import { IconFolder, IconPlus, IconSearch, IconSettings, IconUser } from '@tabler/icons-vue';
+import { IconFolder, IconSearch, IconUser } from '@tabler/icons-vue';
 import type { Agent, BenchTemplate, DeployBenchTemplateInput, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
-import { BacklogIcon } from '../shared/icons/app-icons';
+import { BacklogIcon, PlayerPlayIcon } from '../shared/icons/app-icons';
 import CockpitAgentsView from './CockpitAgentsView.vue';
 import CockpitWorkInbox from './CockpitWorkInbox.vue';
 
@@ -183,8 +181,12 @@ const props = defineProps<{
   benchByTeamId?: Record<string, BenchTemplate[]>;
   forkableAgentIds?: string[];
   teams: Team[];
+  defaultTeamId?: string | null;
+  startWorkItemsAction: (input: { action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string }) => Promise<void>;
   workBacklog?: CockpitWorkBacklog | null;
 }>();
+
+const startWorkItemsAction = props.startWorkItemsAction;
 
 const emit = defineEmits<{
   'add-agent': [teamId: string];
@@ -198,7 +200,6 @@ const emit = defineEmits<{
   'fork-agent': [agentId: string];
   'edit-agent': [agentId: string];
   'move-agent-to-team': [payload: { agentId: string; teamId: string }];
-  'open-settings': [];
   'prompt-agent': [payload: { agentId: string; prompt: string }];
   'refresh-work-items': [repositoryId: string | null];
   'select-global-scope': [scope: 'assignedToMe' | 'all'];
@@ -347,16 +348,16 @@ async function focusSearch(): Promise<void> {
 }
 
 .cockpit-view__navigation-section {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   margin-top: var(--space-12);
-  padding: 0 var(--space-8) var(--space-3);
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-12) var(--space-6) var(--space-4);
   color: var(--color-text-muted);
-  font-size: var(--font-size-11);
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-20);
+}
+
+.cockpit-view__navigation-section strong {
   font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .cockpit-view__navigation-item {
@@ -406,15 +407,18 @@ async function focusSearch(): Promise<void> {
 
 .cockpit-view__repositories {
   display: grid;
-  gap: 2px;
-  padding-bottom: var(--space-8);
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  padding-bottom: var(--space-6);
 }
 
 .cockpit-view__repositories > div {
   min-width: 0;
+  min-height: 36px;
   display: flex;
   align-items: center;
-  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
 }
 
 .cockpit-view__repositories > div > button:first-child {
@@ -425,12 +429,14 @@ async function focusSearch(): Promise<void> {
   gap: var(--space-6);
   overflow: hidden;
   border: 0;
-  border-radius: var(--radius-sm);
-  padding: var(--space-4) var(--space-8);
-  color: var(--color-text-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-6);
+  color: var(--color-text);
   background: transparent;
   font: inherit;
-  font-size: var(--font-size-13);
+  font-size: var(--font-size-14);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-20);
   text-align: left;
   cursor: pointer;
 }
@@ -439,6 +445,7 @@ async function focusSearch(): Promise<void> {
   width: var(--icon-sm);
   height: var(--icon-sm);
   flex: 0 0 auto;
+  color: var(--color-text-muted);
 }
 
 .cockpit-view__repositories > div > button:first-child span {
@@ -453,9 +460,18 @@ async function focusSearch(): Promise<void> {
   background: var(--color-surface-low);
 }
 
-.cockpit-view__repositories button[aria-pressed="true"] {
+.cockpit-view__repositories > div:has(button[aria-pressed="true"]) {
+  border-color: color-mix(in srgb, var(--color-primary) 35%, transparent);
+  background: var(--color-primary-container);
+}
+
+.cockpit-view__repositories > div > button[aria-pressed="true"] {
   color: var(--color-primary);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-semibold);
+}
+
+.cockpit-view__repositories > div > button[aria-pressed="true"] svg {
+  color: var(--color-primary);
 }
 
 .cockpit-view__repository-launch {
@@ -465,15 +481,26 @@ async function focusSearch(): Promise<void> {
   display: grid;
   place-items: center;
   margin-right: var(--space-3);
-  border: 0;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   padding: 0;
   color: var(--color-text-muted);
-  background: transparent;
+  background: var(--color-surface);
   cursor: pointer;
+  opacity: 0;
+}
+
+.cockpit-view__repositories > div:hover .cockpit-view__repository-launch,
+.cockpit-view__repository-launch:focus-visible {
+  opacity: 1;
 }
 
 .cockpit-view__repository-launch:hover {
+  border-color: color-mix(
+    in srgb,
+    var(--color-primary) 45%,
+    var(--color-border)
+  );
   color: var(--color-primary);
   background: var(--color-primary-container);
 }

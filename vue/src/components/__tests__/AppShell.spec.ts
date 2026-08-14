@@ -2744,11 +2744,21 @@ describe('AppShell', () => {
     };
     const createTeam = vi.fn().mockResolvedValue(createdTeam);
     const createAgent = vi.fn().mockResolvedValue(createdAgent);
+    const createSourceWorktree = vi.fn().mockResolvedValue({
+      name: 'fix-gh-12',
+      path: '/Users/nbonamy/src/codex-claw-fix-gh-12',
+    });
     const wrapper = mountShell({
       snapshot,
-      chooseAgentFolder: vi.fn().mockResolvedValue('/Users/nbonamy/src/issue-agent'),
       createAgent,
+      createSourceWorktree,
       createTeam,
+      listSourceWorktrees: vi.fn().mockResolvedValue([{ name: 'main', path: '/Users/nbonamy/src/codex-claw' }]),
+      sourceRepositories: [{
+        name: 'codex-claw',
+        path: '/Users/nbonamy/src/codex-claw',
+        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/codex-claw' }],
+      }],
     });
 
     await wrapper.get('[aria-label="Cockpit"]').trigger('click');
@@ -2757,32 +2767,105 @@ describe('AppShell', () => {
 
     const agentDialog = wrapper.findComponent({ name: 'AgentDialog' });
     expect(agentDialog.find('#agent-dialog-team').exists()).toBe(true);
+    expect(agentDialog.props()).toMatchObject({
+      initialAgentName: 'codex-claw - gh-12',
+      initialNewWorktreeBranchName: 'fix/gh-12',
+      initialSourceRepositoryName: 'codex-claw',
+    });
 
-    await chooseCustomAgentFolder(wrapper);
     const teamSelect = agentDialog.findAllComponents({ name: 'ElSelect' }).find((select) => (
       select.find('#agent-dialog-team').exists()
     ));
     await teamSelect?.vm.$emit('update:modelValue', '__new_team__');
     await nextTick();
     expect(agentDialog.get<HTMLInputElement>('[aria-label="New team name"]').element.value).toBe('GitHub #12');
-    await wrapper.find('.claw-dialog__footer .claw-button--primary').trigger('click');
+    expect(agentDialog.getComponent({ name: 'NewSourceWorktreeDialog' }).props('visible')).toBe(false);
+    await agentDialog.find('.claw-dialog__footer .claw-button--primary').trigger('click');
     await flushPromises();
 
+    expect(createSourceWorktree).toHaveBeenCalledWith({
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      branchName: 'fix/gh-12',
+    });
     expect(createTeam).toHaveBeenCalledWith({
       name: 'GitHub #12',
       color: '#1B4FB2',
     });
     expect(createAgent).toHaveBeenCalledWith({
-      name: 'issue-agent',
+      name: 'codex-claw - gh-12',
       avatar: '🤖',
-      folder: '/Users/nbonamy/src/issue-agent',
+      folder: '/Users/nbonamy/src/codex-claw-fix-gh-12',
       backend: 'codex',
+      sourceRepositoryName: 'codex-claw',
       teamId: 'team-github-12',
     });
     expect(wrapper.emitted('assign-work-item')).toStrictEqual([[{
       agentId: 'agent-issue',
       item,
     }]]);
+  });
+
+  it('launches selected Cockpit work in automatic named worktrees and the selected team', async () => {
+    const snapshot = createInitialSnapshot();
+    const first = workItem();
+    const second = { ...workItem(), id: 'nbonamy/codex-claw#13', number: 13, title: 'Second issue' };
+    const createSourceWorktree = vi.fn().mockImplementation(async ({ branchName }: { branchName: string }) => ({
+      name: branchName.replace('/', '-'),
+      path: `/Users/nbonamy/src/codex-claw-${branchName.replace('/', '-')}`,
+    }));
+    const createAgent = vi.fn().mockImplementation(async (input: CreateAgentInput) => ({
+      id: `agent-${input.name}`,
+      teamId: input.teamId,
+      name: input.name,
+      avatar: input.avatar,
+      folder: input.folder,
+      backend: input.backend,
+      backendDefaults: { kind: 'codex' as const },
+      status: { type: 'idle' as const },
+      createdAt: '2026-08-13T00:00:00.000Z',
+      updatedAt: '2026-08-13T00:00:00.000Z',
+    }));
+    const assignWorkItemAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({
+      snapshot,
+      assignWorkItemAction,
+      createAgent,
+      createSourceWorktree,
+      sourceRepositories: [{
+        name: 'codex-claw',
+        path: '/Users/nbonamy/src/codex-claw',
+        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/codex-claw' }],
+      }],
+    });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    const startWorkItemsAction = wrapper.findComponent({ name: 'CockpitView' }).props('startWorkItemsAction') as (input: {
+      action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string;
+    }) => Promise<void>;
+    await startWorkItemsAction({ action: 'fix', items: [first, second], teamId: 'team-codex-claw' });
+
+    expect(createSourceWorktree).toHaveBeenNthCalledWith(1, {
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      branchName: 'fix/gh-12',
+    });
+    expect(createSourceWorktree).toHaveBeenNthCalledWith(2, {
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      branchName: 'fix/gh-13',
+    });
+    expect(createAgent).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      name: 'codex-claw - gh-12',
+      folder: '/Users/nbonamy/src/codex-claw-fix-gh-12',
+      sourceRepositoryName: 'codex-claw',
+      teamId: 'team-codex-claw',
+    }));
+    expect(createAgent).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      name: 'codex-claw - gh-13',
+      folder: '/Users/nbonamy/src/codex-claw-fix-gh-13',
+      sourceRepositoryName: 'codex-claw',
+      teamId: 'team-codex-claw',
+    }));
+    expect(assignWorkItemAction).toHaveBeenCalledTimes(2);
+    expect(assignWorkItemAction.mock.calls[0]?.[0].prompt).toContain('Fix this GitHub issue');
   });
 
   it('assigns a ticket to a Bench agent with a selected or new team', async () => {
@@ -3780,6 +3863,7 @@ function mountShell(overrides: Partial<{
   composerState: { text: string; selectionStart: number; selectionEnd: number };
   chooseAgentFolder: () => Promise<string | null>;
   createAgent: (input: CreateAgentInput) => Promise<Agent | null | void>;
+  createSourceWorktree: (input: import('@codex-claw/core/contracts').CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   createTeam: (input: CreateTeamInput) => Promise<Team | null | void>;
   listSourceFolders: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
   listSourceRepositories: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
@@ -3827,6 +3911,7 @@ function mountShell(overrides: Partial<{
       composerAttachments: overrides.composerAttachments ?? [],
       composerState: overrides.composerState ?? { text: '', selectionStart: 0, selectionEnd: 0 },
       chooseAgentFolder: overrides.chooseAgentFolder ?? vi.fn().mockResolvedValue(null),
+      createSourceWorktree: overrides.createSourceWorktree ?? vi.fn().mockResolvedValue({ name: '', path: '' }),
       listSourceFolders: overrides.listSourceFolders ?? vi.fn().mockResolvedValue({ path: '', parentPath: null, entries: [] }),
       listSourceRepositories: overrides.listSourceRepositories ?? vi.fn().mockResolvedValue([]),
       sourceRepositories: overrides.sourceRepositories ?? [],

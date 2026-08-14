@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
@@ -32,15 +32,13 @@ describe('CockpitView', () => {
     expect(wrapper.text()).toContain('Codex Claw');
   });
 
-  it('connects settings and shared search to the operator inbox', async () => {
+  it('keeps the Cockpit navigation focused and connects shared search to the operator inbox', async () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mountView(snapshot, [item(24)]);
     const navigation = wrapper.get('[aria-label="Cockpit navigation"]');
-
-    await navigation.findAll('button').find((button) => button.text().includes('Settings'))?.trigger('click');
+    expect(navigation.text()).not.toContain('Settings');
     await wrapper.get('input[aria-label="Search Cockpit work"]').setValue('operator');
 
-    expect(wrapper.emitted('open-settings')).toStrictEqual([[]]);
     expect(wrapper.findComponent(CockpitWorkInbox).props('searchQuery')).toBe('operator');
   });
 
@@ -50,33 +48,40 @@ describe('CockpitView', () => {
       repository('older', '2026-08-10T00:00:00.000Z'),
       repository('recent', '2026-08-13T00:00:00.000Z'),
     ];
-    const wrapper = mountView(snapshot, [item(24)], repositories);
+    const wrapper = mountView(snapshot, [item(24)], repositories, vi.fn().mockResolvedValue(undefined), 'nbonamy/recent');
     const rows = wrapper.findAll('.cockpit-view__repositories > div');
 
+    expect(wrapper.get('.cockpit-view__navigation-section').text()).toBe('Repositories');
     expect(rows.map((row) => row.text())).toStrictEqual(['recent', 'older']);
+    expect(wrapper.get('.cockpit-view__navigation-item').attributes('aria-current')).toBe('page');
+    expect(rows[0]!.findAll('button')[0]!.attributes('aria-pressed')).toBe('true');
 
     await rows[0]!.findAll('button')[0]!.trigger('click');
-    await rows[0]!.findAll('button')[1]!.trigger('click');
+
+    const launchButton = rows[0]!.findAll('button')[1]!;
+    expect(launchButton.attributes('aria-label')).toBe('Start agent in recent');
+    await launchButton.trigger('click');
 
     expect(wrapper.emitted('select-work-repository')).toStrictEqual([['nbonamy/recent']]);
     expect(wrapper.emitted('add-agent-for-repository')).toStrictEqual([[repositories[1]]]);
   });
 
-  it('routes assigned rows to their team and unassigned rows to start-work', () => {
+  it('routes assigned rows to their team and passes the batch launcher to the inbox', () => {
     const snapshot = createInitialSnapshot();
     const assigned = item(24);
     const ready = item(25);
     snapshot.workBacklog.assignments[workItemAssignmentKey(assigned)] = {
       provider: 'github', itemId: assigned.id, agentId: 'agent-dina', assignedAt: '2026-08-12T00:00:00.000Z', policy: 'review', status: 'readyForReview',
     };
-    const wrapper = mountView(snapshot, [assigned, ready]);
+    const startWorkItemsAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountView(snapshot, [assigned, ready], [], startWorkItemsAction);
     const inbox = wrapper.findComponent(CockpitWorkInbox);
 
     inbox.vm.$emit('select-assigned-agent', 'agent-dina');
-    inbox.vm.$emit('start-work', ready);
 
     expect(wrapper.emitted('select-agent')).toStrictEqual([[{ agentId: 'agent-dina', teamId: 'team-codex-claw' }]]);
-    expect(wrapper.emitted('assign-work-item-to-new-agent')).toStrictEqual([[{ item: ready }]]);
+    expect(inbox.props('startWorkAction')).toBe(startWorkItemsAction);
+    expect(inbox.props('defaultTeamId')).toBe('team-codex-claw');
   });
 
   it('summarizes assignments as clickable working, blocked, and review filters', async () => {
@@ -130,19 +135,30 @@ describe('CockpitView', () => {
 
   it('shows a provider connection empty state', () => {
     const snapshot = createInitialSnapshot();
-    const wrapper = mount(CockpitView, { props: { agents: snapshot.agents, teams: snapshot.teams }, global: { plugins: [ElementPlus] } });
+    const wrapper = mount(CockpitView, {
+      props: { agents: snapshot.agents, teams: snapshot.teams, startWorkItemsAction: vi.fn().mockResolvedValue(undefined) },
+      global: { plugins: [ElementPlus] },
+    });
     expect(wrapper.text()).toContain('Connect a work provider');
   });
 });
 
-function mountView(snapshot: ReturnType<typeof createInitialSnapshot>, items: WorkItem[], repositories: WorkRepository[] = []) {
+function mountView(
+  snapshot: ReturnType<typeof createInitialSnapshot>,
+  items: WorkItem[],
+  repositories: WorkRepository[] = [],
+  startWorkItemsAction = vi.fn().mockResolvedValue(undefined),
+  selectedRepositoryId: string | null = null,
+) {
   return mount(CockpitView, {
     props: {
       agents: snapshot.agents, teams: snapshot.teams,
+      defaultTeamId: snapshot.activeTeamId,
+      startWorkItemsAction,
       workBacklog: {
         assignments: snapshot.workBacklog.assignments,
         connection: { provider: 'github', status: 'connected', accountLabel: 'nbonamy' },
-        error: null, globalScope: 'all', items, repositories, selectedRepositoryId: null, status: 'loaded',
+        error: null, globalScope: 'all', items, repositories, selectedRepositoryId, status: 'loaded',
       },
     },
     global: { plugins: [ElementPlus] },

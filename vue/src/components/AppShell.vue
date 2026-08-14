@@ -161,6 +161,8 @@
         :agents="snapshot.agents"
         :forkable-agent-ids="forkableAgentIds"
         :bench-by-team-id="benchByTeamId"
+        :default-team-id="snapshot.activeTeamId"
+        :start-work-items-action="startCockpitWorkItems"
         :teams="snapshot.teams"
         :work-backlog="cockpitWorkBacklog"
         @add-agent="openNewAgent"
@@ -174,7 +176,6 @@
         @fork-agent="$emit('fork-agent', $event)"
         @edit-agent="openEditAgent"
         @move-agent-to-team="$emit('move-agent-to-team', $event)"
-        @open-settings="openSettings"
         @prompt-agent="$emit('send-agent-prompt', $event)"
         @remove-bench-template="$emit('remove-bench-template', $event)"
         @remove-work-item-assignment="$emit('remove-work-item-assignment', $event)"
@@ -319,7 +320,9 @@
       :list-source-folders="listSourceFolders"
       :list-source-worktrees="listSourceWorktrees"
       :suggest-source-worktree-path="suggestSourceWorktreePath"
+      :initial-agent-name="pendingNewAgentName"
       :initial-new-team-name="pendingNewAgentTeamName"
+      :initial-new-worktree-branch-name="pendingNewAgentWorktreeBranchName"
       :initial-source-repository-name="agentDialogSourceRepositoryName"
       :initial-team-id="agentDialogTeamId"
       :remote-connection-id="agentDialogRemoteConnectionId"
@@ -1192,7 +1195,18 @@ watch(savedCockpitBacklogConfiguration, (configuration) => {
   }
 });
 const showAgentDialogTeamSelector = computed(() => agentDialogMode.value === 'create' && pendingNewAgentWorkItem.value !== null);
+const pendingNewAgentName = computed(() => {
+  const item = pendingNewAgentWorkItem.value;
+  return item ? `${workItemRepositoryName(item)} - gh-${item.number}` : '';
+});
 const pendingNewAgentTeamName = computed(() => pendingNewAgentWorkItem.value ? workItemTeamName(pendingNewAgentWorkItem.value) : '');
+const pendingNewAgentWorktreeBranchName = computed(() => {
+  const item = pendingNewAgentWorkItem.value;
+  if (!item) return '';
+  return item.kind === 'pullRequest'
+    ? item.branchName?.trim() || `review/gh-${item.number}`
+    : `fix/gh-${item.number}`;
+});
 const pendingBenchAgentTeamName = computed(() => pendingBenchAgentWorkItem.value ? workItemTeamName(pendingBenchAgentWorkItem.value) : '');
 const isAgentEmpty = computed(() => activeTeamAgents.value.length === 0);
 const cockpitVisible = computed(() => activeSurface.value === 'cockpit');
@@ -1712,7 +1726,52 @@ async function openNewAgentForWorkItem(intent: WorkItemAssignmentIntent): Promis
   }
 
   pendingNewAgentWorkItem.value = intent.item;
-  openNewAgent(intent.teamId ?? activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined);
+  openNewAgent(
+    intent.teamId ?? activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined,
+    workItemRepositoryName(intent.item),
+  );
+}
+
+async function startCockpitWorkItems(input: {
+  action: 'investigate' | 'fix';
+  items: WorkItem[];
+  teamId: string;
+}): Promise<void> {
+  const team = props.snapshot.teams.find((candidate) => candidate.id === input.teamId);
+  if (!team) throw new Error('The selected team is unavailable.');
+
+  await Promise.all(input.items.map(async (item) => {
+    const repositoryName = workItemRepositoryName(item);
+    const repository = props.sourceRepositories.find((candidate) => candidate.name === repositoryName);
+    if (!repository) {
+      throw new Error(`${item.repositoryFullName} is not available in the source folder.`);
+    }
+
+    const branchName = item.kind === 'pullRequest'
+      ? item.branchName?.trim() || `review/gh-${item.number}`
+      : `fix/gh-${item.number}`;
+    const remoteConnectionId = team.remoteConnectionId?.trim();
+    const worktree = await props.createSourceWorktree({
+      repoPath: repository.path,
+      branchName,
+      ...(remoteConnectionId ? { remoteConnectionId } : {}),
+    });
+    const agent = await props.createAgent({
+      name: `${repositoryName} - gh-${item.number}`,
+      avatar: '🤖',
+      folder: worktree.path,
+      backend: 'codex',
+      sourceRepositoryName: repository.name,
+      teamId: team.id,
+    });
+    if (!agent) throw new Error(`Could not create an agent for ${item.repositoryFullName} #${item.number}.`);
+
+    await props.assignWorkItemAction({
+      agentId: agent.id,
+      item,
+      prompt: workItemAssignmentPrompt(item, { action: input.action }),
+    });
+  }));
 }
 
 async function openBenchAgentAssignmentDialog(intent: WorkItemAssignmentIntent): Promise<void> {
@@ -1727,6 +1786,10 @@ async function openBenchAgentAssignmentDialog(intent: WorkItemAssignmentIntent):
 
 function workItemTeamName(item: WorkItem): string {
   return `${workProviderTitle(item.provider)} #${item.number}`;
+}
+
+function workItemRepositoryName(item: WorkItem): string {
+  return item.repositoryFullName.split('/').filter(Boolean).at(-1) ?? item.repositoryFullName;
 }
 
 function workProviderTitle(provider: WorkItem['provider']): string {
