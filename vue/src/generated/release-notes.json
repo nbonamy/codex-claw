@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.11.0",
+  "currentVersion": "0.11.1",
   "releases": [
+    {
+      "version": "0.11.1",
+      "releasedAt": "2026-08-14",
+      "sourceSha256": "acbc05bb729b8e1aaa6dd045af60cb86801e4ef2b8e954bb3a50ed6797a530c8",
+      "markdown": "### Improvements and fixes\n\n- Closing an agent now preserves its provider conversation in history instead\n  of archiving the Codex thread.\n- Completed assignments whose source work item remains open now return to\n  Backlog, keeping Cockpit counts and available work consistent."
+    },
     {
       "version": "0.11.0",
       "releasedAt": "2026-08-14",

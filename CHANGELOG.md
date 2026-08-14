@@ -4,6 +4,15 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.11.1] - 2026-08-14
+
+### Improvements and fixes
+
+- Closing an agent now preserves its provider conversation in history instead
+  of archiving the Codex thread.
+- Completed assignments whose source work item remains open now return to
+  Backlog, keeping Cockpit counts and available work consistent.
+
 ## [0.11.0] - 2026-08-14
 
 ### New features
