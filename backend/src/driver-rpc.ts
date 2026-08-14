@@ -179,11 +179,6 @@ export class BackendDriverRpc {
         await driver.setConversationTitle(agent, requireString(record.title, 'title'));
         return null;
       }
-      case backendMethods.driverConversationRetire: {
-        const { agent } = requireAgentParams(params);
-        await this.requireDriver(agent.backend).retireConversation?.(agent);
-        return null;
-      }
       case backendMethods.driverGoalUpdate: {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);

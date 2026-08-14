@@ -396,10 +396,6 @@ describe('CodexSurfaceAgentAdapter', () => {
     await expect(adapter.interruptTurn(agentA)).resolves.toStrictEqual({ threadId: 'thread-a', turnId: sent.turnId });
 
     expect(lastRequest(transport, 'thread/name/set')).toBeDefined();
-    await expect(adapter.retireConversation(agentA)).resolves.toBeUndefined();
-    expect(lastRequest(transport, 'thread/archive')).toMatchObject({
-      params: { threadId: 'thread-a' },
-    });
     adapter.forgetAgentSession('agent-missing');
     adapter.forgetAgentSession('agent-a');
   });

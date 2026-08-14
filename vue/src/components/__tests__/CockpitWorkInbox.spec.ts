@@ -58,7 +58,7 @@ describe('CockpitWorkInbox', () => {
     expect(wrapper.emitted('update-active-view')?.at(-1)).toStrictEqual(['focus']);
   });
 
-  it('keeps completed assignments out of active WIP', async () => {
+  it('returns completed assignments to Backlog without breaking the view counts', async () => {
     const completed = item(21, 'Completed item', 'repo-one');
     const ready = item(22, 'Ready item', 'repo-two');
     const wrapper = mountInbox([completed, ready], {
@@ -66,10 +66,13 @@ describe('CockpitWorkInbox', () => {
     });
 
     await wrapper.vm.$nextTick();
-    expect(wrapper.findAll('.cockpit-inbox__view-count').map((count) => count.text())).toStrictEqual(['2', '1', '0', '0']);
+    expect(wrapper.findAll('.cockpit-inbox__view-count').map((count) => count.text())).toStrictEqual(['2', '2', '0', '0']);
     expect(wrapper.findAll('.cockpit-inbox__views > button')[1]?.attributes('aria-pressed')).toBe('true');
     expect(wrapper.text()).toContain('Ready item');
-    expect(wrapper.text()).not.toContain('Completed item');
+    expect(wrapper.text()).toContain('Completed item');
+    expect(wrapper.findAll('.cockpit-inbox__row-action').map((button) => button.attributes('aria-label'))).toStrictEqual([
+      'Assign #21', 'Assign #22',
+    ]);
   });
 
   it('isolates backlog and WIP and routes assigned and unassigned rows', async () => {

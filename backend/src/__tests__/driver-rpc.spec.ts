@@ -163,7 +163,6 @@ describe('BackendDriverRpc', () => {
       backendSession: { kind: 'codex', threadId: 'thread-forked' },
       messages: [],
     });
-    const retireConversation = vi.fn().mockResolvedValue(undefined);
     const forgetAgentSession = vi.fn();
     const respondToRequest = vi.fn().mockResolvedValue(undefined);
     const rpc = new BackendDriverRpc(new Map([['codex', createDriver({
@@ -172,7 +171,6 @@ describe('BackendDriverRpc', () => {
       forkConversation,
       interrupt,
       respondToRequest,
-      retireConversation,
       rollbackToTurn,
       resumeConversation,
       setApprovalPreset,
@@ -217,7 +215,6 @@ describe('BackendDriverRpc', () => {
       backendSession: { kind: 'codex', threadId: 'thread-forked' },
       messages: [],
     });
-    await expect(rpc.handle('driver/conversation/retire', { agent })).resolves.toBeNull();
     await expect(rpc.handle('driver/session/forget', { backend: 'codex', agentId: 'agent-dina' })).resolves.toBeNull();
     await expect(rpc.handle('driver/clientRequest/respond', {
       backend: 'codex',
@@ -233,7 +230,6 @@ describe('BackendDriverRpc', () => {
     expect(resumeConversation).toHaveBeenCalledWith(agent, ref);
     expect(forkConversation).toHaveBeenNthCalledWith(1, agent, targetAgent);
     expect(forkConversation).toHaveBeenNthCalledWith(2, agent, targetAgent, 5);
-    expect(retireConversation).toHaveBeenCalledWith(agent);
     expect(forgetAgentSession).toHaveBeenCalledWith('agent-dina');
     expect(respondToRequest).toHaveBeenCalledWith({ id: 'approval-1', payload: { decision: 'allow' } });
   });

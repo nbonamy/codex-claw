@@ -353,7 +353,7 @@ const totalFocusCount = computed(() => props.globalScope
   : filteredRows.value.filter((row) => isActiveAssignment(row.assignment) && (row.priority === 'attention' || row.priority === 'review')).length);
 const effectiveTotalItems = computed(() => props.globalScope ? props.totalItems : filteredRows.value.length);
 const totalBacklogCount = computed(() => props.globalScope
-  ? Math.max(0, effectiveTotalItems.value - scopedAssignments.value.length)
+  ? Math.max(0, effectiveTotalItems.value - scopedActiveAssignments.value.length)
   : filteredRows.value.filter((row) => !row.assignment).length);
 const viewContextKey = computed(() => props.selectedRepositoryId ?? `global:${props.globalScope ?? 'unselected'}`);
 const totalPages = computed(() => Math.max(1, Math.ceil(props.totalItems / props.pageSize)));
@@ -422,7 +422,8 @@ function applyActiveView(view: InboxView): void {
 }
 
 function toRow(item: WorkItem): InboxRow {
-  const assignment = props.assignments[workItemAssignmentKey(item)] ?? null;
+  const persistedAssignment = props.assignments[workItemAssignmentKey(item)] ?? null;
+  const assignment = isActiveAssignment(persistedAssignment) ? persistedAssignment : null;
   const agent = assignment ? agentsById.value.get(assignment.agentId) ?? null : null;
   const priority = rowPriority(assignment, agent);
   const status = assignment?.status ?? 'ready';

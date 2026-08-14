@@ -3420,7 +3420,7 @@ describe('ClawBackendServer', () => {
     }
   });
 
-  it('lets the selected backend retire a conversation before closing its agent', async () => {
+  it('forgets the live backend session before closing its agent without retiring the conversation', async () => {
     const snapshot = createTestSnapshot();
     const agent = {
       id: 'agent-dina',
@@ -3436,9 +3436,6 @@ describe('ClawBackendServer', () => {
     snapshot.teams[0]!.agentIds = [agent.id];
     snapshot.agents = [agent];
     snapshot.activeAgentId = agent.id;
-    const retireConversation = vi.fn(async () => {
-      expect(snapshot.agents).toContainEqual(agent);
-    });
     const forgetAgentSession = vi.fn();
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
     const driver: AgentBackendDriver = {
@@ -3448,7 +3445,6 @@ describe('ClawBackendServer', () => {
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       respondToRequest: async () => undefined,
-      retireConversation,
       forgetAgentSession,
       onEvent: () => () => undefined,
       close: async () => undefined,
@@ -3467,60 +3463,9 @@ describe('ClawBackendServer', () => {
       params: { agentId: agent.id },
     })).resolves.toMatchObject({ result: { agents: [] } });
 
-    expect(retireConversation).toHaveBeenCalledWith(agent);
     expect(forgetAgentSession).toHaveBeenCalledWith(agent.id);
     expect(snapshot.agents).toStrictEqual([]);
     expect(saveSnapshot).toHaveBeenCalledOnce();
-    await server.close();
-  });
-
-  it('keeps an agent when its backend cannot retire the conversation', async () => {
-    const snapshot = createTestSnapshot();
-    const agent = {
-      id: 'agent-dina',
-      teamId: 'team-test',
-      name: 'Dina',
-      folder: '/repo',
-      backend: 'codex' as const,
-      backendSession: { kind: 'codex' as const, threadId: 'thread-dina' },
-      status: { type: 'idle' as const },
-      createdAt: '2026-08-01T00:00:00.000Z',
-      updatedAt: '2026-08-01T00:00:00.000Z',
-    };
-    snapshot.teams[0]!.agentIds = [agent.id];
-    snapshot.agents = [agent];
-    snapshot.activeAgentId = agent.id;
-    const forgetAgentSession = vi.fn();
-    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const driver: AgentBackendDriver = {
-      backend: 'codex',
-      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
-      getCapabilities: () => codexBackendCapabilities,
-      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
-      retireConversation: vi.fn().mockRejectedValue(new Error('archive failed')),
-      forgetAgentSession,
-      onEvent: () => () => undefined,
-      close: async () => undefined,
-    };
-    const server = new ClawBackendServer({
-      version: 'test-version',
-      snapshot,
-      saveSnapshot,
-      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
-    });
-
-    await expect(server.handleMessage({
-      jsonrpc: '2.0',
-      id: 'close-agent',
-      method: backendMethods.agentDelete,
-      params: { agentId: agent.id },
-    })).rejects.toThrow('archive failed');
-
-    expect(forgetAgentSession).not.toHaveBeenCalled();
-    expect(snapshot.agents).toStrictEqual([agent]);
-    expect(saveSnapshot).not.toHaveBeenCalled();
     await server.close();
   });
 

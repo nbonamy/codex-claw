@@ -252,12 +252,6 @@ export class CodexSurfaceAgentAdapter {
     await this.renameSessionIfNeeded(session, title);
   }
 
-  async retireConversation(agent: Agent): Promise<void> {
-    if (agent.backendSession?.kind !== 'codex') return;
-    await this.start();
-    await this.surface.archiveConversation(agent.backendSession.threadId);
-  }
-
   async setThreadGoal(agent: Agent, objective: string) {
     const session = await this.ensureSession(agent);
     const snapshot = await session.handle.setGoal(objective);

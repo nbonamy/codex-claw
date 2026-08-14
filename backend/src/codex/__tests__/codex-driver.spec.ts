@@ -171,14 +171,6 @@ describe('CodexBackendDriver', () => {
     expect(sessionManager.setConversationTitle).toHaveBeenCalledWith(agent, 'Dina - Jun 10, 2026 3:42 PM');
   });
 
-  it('lets the Codex session manager retire conversations', async () => {
-    const sessionManager = createSessionManager();
-    const driver = new CodexBackendDriver(sessionManager);
-
-    await expect(driver.retireConversation(agent)).resolves.toBeUndefined();
-    expect(sessionManager.retireConversation).toHaveBeenCalledWith(agent);
-  });
-
   it('propagates conversation title failures from the session manager', async () => {
     const sessionManager = createSessionManager({
       setConversationTitle: vi.fn().mockRejectedValue(new Error('rename failed')),
@@ -277,7 +269,6 @@ function createSessionManager(overrides: Partial<CodexSurfaceAgentAdapter> = {})
     resumeConversation: vi.fn().mockResolvedValue({ threadId: 'thread-dina', messages: [] }),
     readConversationMessages: vi.fn().mockResolvedValue([]),
     loadOlderHistory: vi.fn().mockResolvedValue({ hasOlder: false }),
-    retireConversation: vi.fn().mockResolvedValue(undefined),
     setConversationTitle: vi.fn().mockResolvedValue(undefined),
     setApprovalPreset: vi.fn().mockResolvedValue({ threadId: 'thread-approval', approvalPreset: 'full-access' }),
     setThreadGoal: vi.fn().mockResolvedValue({

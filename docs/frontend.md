@@ -256,9 +256,10 @@ implemented:
   the agent action and assignment removal; the agent action is disabled and
   labeled as current when its owner is already open. Clicking an assigned row
   opens its owner while its linked number and title continue to open the source
-  work item. Completed assignments remain persisted as history but do not count
-  as active WIP, and restored state discards assignments whose agent no longer
-  exists. Blocked rows surface the agent's wrapping comment, clamped to two
+  work item. Completed assignments remain persisted as history but return a
+  still-open source item to Backlog instead of counting as active WIP, and
+  restored state discards assignments whose agent no longer exists. Blocked
+  rows surface the agent's wrapping comment, clamped to two
   lines, in place of the default state-and-label metadata row; row icons remain
   top-aligned as comments grow.
   Pull-request work instead checks out the pull request's own head branch in

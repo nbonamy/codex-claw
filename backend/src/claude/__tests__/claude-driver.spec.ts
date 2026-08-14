@@ -381,7 +381,6 @@ describe('ClaudeBackendDriver', () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
 
-    await expect(driver.retireConversation(agent)).resolves.toBeUndefined();
     expect(transport.closeSession).not.toHaveBeenCalled();
   });
 

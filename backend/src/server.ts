@@ -572,9 +572,6 @@ export class ClawBackendServer {
             await this.agentGitService.validateLinkedWorktreeDeletion(existingAgent.folder, input.deleteRemoteBranch === true);
           }
           if (existingAgent.backendSession) {
-            await this.handleAgentDriverRequest(existingAgent, backendMethods.driverConversationRetire, {
-              agent: existingAgent,
-            });
             await this.driverRpc?.handle(backendMethods.driverSessionForget, {
               backend: existingAgent.backend,
               agentId,
