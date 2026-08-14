@@ -229,6 +229,10 @@ implemented:
   selected item automatically launches a background agent named from its
   repository and ticket, such as `codex-claw - gh-24`, in a dedicated generated
   worktree branch such as `fix/gh-24`, without any per-agent setup dialog;
+  its wider repository navigation keeps full names legible, exposes recent or
+  alphabetical sorting, and lists every repository behind an always-visible
+  repository filter in an independent scroll region while the primary Cockpit
+  navigation stays fixed; ticket search remains in the work-item toolbar;
   an item can prefill an editable custom prompt or immediately dispatch a
   contextual issue investigation/fix or pull-request feedback/review action to
   the current agent or, by default, a background-created duplicate that does
@@ -442,6 +446,9 @@ Rules:
 - Prefer concrete actions over explanatory in-app text.
 - Use icons for familiar tool buttons.
 - Use text buttons for clear commands.
+- Pass labeled Element Plus button icons through the `icon` prop so Element
+  Plus owns icon sizing and label spacing; do not place a raw SVG beside button
+  text and compensate with component-specific CSS.
 - Do not create nested cards or card-heavy shells.
 - Keep form-dialog chrome shared: title-only compact headers, full-width header
   and footer dividers, and evenly padded semantic dialog bodies belong to

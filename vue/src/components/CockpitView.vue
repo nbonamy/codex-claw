@@ -1,18 +1,6 @@
 <template>
   <section class="cockpit-view" aria-label="Cockpit">
     <aside class="cockpit-view__navigation" aria-label="Cockpit navigation">
-      <label class="cockpit-view__search">
-        <IconSearch aria-hidden="true" />
-        <input
-          ref="searchInput"
-          v-model="searchQuery"
-          type="search"
-          placeholder="Search"
-          aria-label="Search Cockpit work"
-        />
-        <kbd>⌘K</kbd>
-      </label>
-
       <nav>
         <button
           class="cockpit-view__navigation-item"
@@ -38,14 +26,47 @@
 
         <div class="cockpit-view__navigation-section">
           <strong>Repositories</strong>
+          <el-dropdown
+            placement="bottom-end"
+            trigger="click"
+            @command="selectRepositorySortMode"
+          >
+            <button
+              class="cockpit-view__repository-sort"
+              type="button"
+              :aria-label="`Sort repositories by ${repositorySortDescription}`"
+            >
+              {{ repositorySortLabel }}
+              <IconChevronDown aria-hidden="true" />
+            </button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="recent">Recent activity</el-dropdown-item>
+                <el-dropdown-item command="alphabetical">Alphabetical</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
+        <label class="cockpit-view__repository-filter">
+          <IconSearch aria-hidden="true" />
+          <input
+            v-model="repositoryFilter"
+            type="search"
+            placeholder="Filter repositories"
+            aria-label="Filter repositories"
+          />
+        </label>
         <div v-if="workBacklog" class="cockpit-view__repositories">
+          <p v-if="filteredRepositories.length === 0" class="cockpit-view__repositories-empty">
+            No repositories found.
+          </p>
           <div
-            v-for="repository in recentRepositories"
+            v-for="repository in filteredRepositories"
             :key="repository.id"
           >
             <button
               type="button"
+              :title="repository.name"
               :aria-pressed="activeSection === 'backlog' && workBacklog.selectedRepositoryId === repository.id"
               @click="selectRepository(repository.id)"
             >
@@ -106,7 +127,6 @@
         :start-work-action="startWorkItemsAction"
         :status="workBacklog.status"
         :status-filter="activeSummaryFilter"
-        @focus-search="focusSearch"
         @refresh="emit('refresh-work-items', $event)"
         @select-global-scope="emit('select-global-scope', $event)"
         @remove-assignment="emit('remove-work-item-assignment', $event)"
@@ -148,8 +168,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue';
-import { IconFolder, IconSearch, IconUser } from '@tabler/icons-vue';
+import { computed, ref } from 'vue';
+import { IconChevronDown, IconFolder, IconSearch, IconUser } from '@tabler/icons-vue';
 import type { Agent, BenchTemplate, DeployBenchTemplateInput, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { BacklogIcon, PlayerPlayIcon } from '../shared/icons/app-icons';
@@ -172,6 +192,7 @@ type CockpitWorkBacklog = {
 type WorkItemAssignmentIntent = { item: WorkItem; teamId?: string };
 type InboxView = 'all' | 'backlog' | 'wip' | 'focus';
 type CockpitSection = 'backlog' | 'agents';
+type RepositorySortMode = 'recent' | 'alphabetical';
 type SummaryFilter = 'inProgress' | 'blocked' | 'readyForReview';
 type SummaryMetric = { count: number; filter: SummaryFilter; id: 'working' | 'blocked' | 'review'; label: string; view: InboxView };
 
@@ -216,20 +237,26 @@ const emit = defineEmits<{
 
 const agentsById = computed(() => new Map(props.agents.map((agent) => [agent.id, agent])));
 const activeSection = ref<CockpitSection>('backlog');
-const searchInput = ref<HTMLInputElement | null>(null);
 const searchQuery = ref('');
+const repositoryFilter = ref('');
 const activeWorkView = ref<InboxView>('focus');
 const activeSummaryFilter = ref<SummaryFilter | null>(null);
+const repositorySortMode = ref<RepositorySortMode>('recent');
+const repositorySortLabel = computed(() => repositorySortMode.value === 'recent' ? 'Recent' : 'A–Z');
+const repositorySortDescription = computed(() => repositorySortMode.value === 'recent' ? 'recent activity' : 'name');
 const sortedRepositories = computed(() => [...(props.workBacklog?.repositories ?? [])].sort((left, right) => {
+  if (repositorySortMode.value === 'alphabetical') {
+    return left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' });
+  }
   const activity = repositoryActivityAt(right).localeCompare(repositoryActivityAt(left));
   return activity || left.name.localeCompare(right.name);
 }));
-const recentRepositories = computed(() => {
-  const recent = sortedRepositories.value.slice(0, 10);
-  const selectedRepositoryId = props.workBacklog?.selectedRepositoryId;
-  if (!selectedRepositoryId || recent.some((repository) => repository.id === selectedRepositoryId)) return recent;
-  const selected = sortedRepositories.value.find((repository) => repository.id === selectedRepositoryId);
-  return selected ? [selected, ...recent.slice(0, 9)] : recent;
+const filteredRepositories = computed(() => {
+  const query = repositoryFilter.value.trim().toLocaleLowerCase();
+  if (!query) return sortedRepositories.value;
+  return sortedRepositories.value.filter((repository) => (
+    `${repository.owner}/${repository.name}`.toLocaleLowerCase().includes(query)
+  ));
 });
 const visibleAssignments = computed(() => (props.workBacklog?.items ?? [])
   .map((item) => props.workBacklog?.assignments[workItemAssignmentKey(item)])
@@ -263,6 +290,10 @@ function selectRepository(repositoryId: string | null): void {
   emit('select-work-repository', repositoryId);
 }
 
+function selectRepositorySortMode(mode: RepositorySortMode): void {
+  repositorySortMode.value = mode;
+}
+
 function selectSummaryMetric(metric: SummaryMetric): void {
   activeWorkView.value = metric.view;
   activeSummaryFilter.value = metric.filter;
@@ -279,11 +310,6 @@ function selectWorkView(view: InboxView): void {
   activeWorkView.value = view;
   activeSummaryFilter.value = null;
 }
-
-async function focusSearch(): Promise<void> {
-  await nextTick();
-  searchInput.value?.focus();
-}
 </script>
 
 <style scoped>
@@ -297,33 +323,38 @@ async function focusSearch(): Promise<void> {
 }
 
 .cockpit-view__navigation {
-  width: 248px;
-  flex: 0 0 248px;
-  padding: var(--space-16) var(--space-12);
+  width: 320px;
+  min-height: 0;
+  flex: 0 0 320px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: var(--space-24) var(--space-12) var(--space-16);
   border-right: 1px solid var(--color-border);
   background: var(--color-shell-sidebar);
 }
 
-.cockpit-view__search {
-  height: 38px;
+.cockpit-view__repository-filter {
+  height: 30px;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: var(--space-6);
-  margin-bottom: var(--space-16);
-  padding: 0 var(--space-8);
+  margin: calc(-1 * var(--space-2)) var(--space-6) 0;
+  padding: 0 var(--space-6);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--color-surface);
 }
 
-.cockpit-view__search svg,
-.cockpit-view__navigation-item svg {
-  width: var(--icon-md);
-  height: var(--icon-md);
+.cockpit-view__repository-filter svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
   flex: 0 0 auto;
+  color: var(--color-text-muted);
 }
 
-.cockpit-view__search input {
+.cockpit-view__repository-filter input {
   min-width: 0;
   flex: 1;
   border: 0;
@@ -331,26 +362,39 @@ async function focusSearch(): Promise<void> {
   color: var(--color-text);
   background: transparent;
   font: inherit;
-  font-size: var(--font-size-15);
-  font-weight: var(--font-weight-regular);
+  font-size: var(--font-size-13);
   line-height: var(--line-height-20);
 }
 
-.cockpit-view__search kbd {
-  color: var(--color-text-muted);
-  font-family: inherit;
-  font-size: var(--font-size-11);
+.cockpit-view__repository-filter:focus-within {
+  border-color: color-mix(
+    in srgb,
+    var(--color-primary) 55%,
+    var(--color-border)
+  );
+}
+
+.cockpit-view__navigation-item svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  flex: 0 0 auto;
 }
 
 .cockpit-view__navigation nav {
-  display: grid;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-4);
 }
 
 .cockpit-view__navigation-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-top: var(--space-12);
   border-top: 1px solid var(--color-border);
-  padding: var(--space-12) var(--space-6) var(--space-4);
+  padding: var(--space-12) var(--space-6) 0;
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
   line-height: var(--line-height-20);
@@ -358,6 +402,31 @@ async function focusSearch(): Promise<void> {
 
 .cockpit-view__navigation-section strong {
   font-weight: var(--font-weight-semibold);
+}
+
+.cockpit-view__repository-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text-muted);
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-size-12);
+  line-height: var(--line-height-20);
+  cursor: pointer;
+}
+
+.cockpit-view__repository-sort:hover {
+  color: var(--color-text);
+  background: var(--color-surface-low);
+}
+
+.cockpit-view__repository-sort svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
 }
 
 .cockpit-view__navigation-item {
@@ -406,10 +475,21 @@ async function focusSearch(): Promise<void> {
 }
 
 .cockpit-view__repositories {
+  min-height: 0;
+  flex: 1;
   display: grid;
+  align-content: start;
   gap: var(--space-2);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
   padding: 0 var(--space-2);
   padding-bottom: var(--space-6);
+}
+
+.cockpit-view__repositories-empty {
+  margin: var(--space-8) var(--space-6);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
 }
 
 .cockpit-view__repositories > div {

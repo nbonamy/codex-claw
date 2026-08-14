@@ -32,17 +32,20 @@ describe('CockpitView', () => {
     expect(wrapper.text()).toContain('Codex Claw');
   });
 
-  it('keeps the Cockpit navigation focused and connects shared search to the operator inbox', async () => {
+  it('keeps ticket search in the inbox instead of duplicating it in navigation', async () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mountView(snapshot, [item(24)]);
     const navigation = wrapper.get('[aria-label="Cockpit navigation"]');
     expect(navigation.text()).not.toContain('Settings');
-    await wrapper.get('input[aria-label="Search Cockpit work"]').setValue('operator');
+    expect(navigation.find('input[aria-label="Search Cockpit work"]').exists()).toBe(false);
+
+    wrapper.findComponent(CockpitWorkInbox).vm.$emit('update-search-query', 'operator');
+    await wrapper.vm.$nextTick();
 
     expect(wrapper.findComponent(CockpitWorkInbox).props('searchQuery')).toBe('operator');
   });
 
-  it('sorts repositories by recent activity, filters the backlog, and launches an agent', async () => {
+  it('sorts repositories by recent activity or name, filters the backlog, and launches an agent', async () => {
     const snapshot = createInitialSnapshot();
     const repositories = [
       repository('older', '2026-08-10T00:00:00.000Z'),
@@ -51,19 +54,41 @@ describe('CockpitView', () => {
     const wrapper = mountView(snapshot, [item(24)], repositories, vi.fn().mockResolvedValue(undefined), 'nbonamy/recent');
     const rows = wrapper.findAll('.cockpit-view__repositories > div');
 
-    expect(wrapper.get('.cockpit-view__navigation-section').text()).toBe('Repositories');
+    expect(wrapper.get('.cockpit-view__navigation-section').text()).toContain('Repositories');
+    expect(wrapper.get('[aria-label="Sort repositories by recent activity"]').text()).toContain('Recent');
     expect(rows.map((row) => row.text())).toStrictEqual(['recent', 'older']);
     expect(wrapper.get('.cockpit-view__navigation-item').attributes('aria-current')).toBe('page');
     expect(rows[0]!.findAll('button')[0]!.attributes('aria-pressed')).toBe('true');
+    expect(rows[0]!.findAll('button')[0]!.attributes('title')).toBe('recent');
 
-    await rows[0]!.findAll('button')[0]!.trigger('click');
+    await wrapper.get('input[aria-label="Filter repositories"]').setValue('old');
+    expect(wrapper.findAll('.cockpit-view__repositories > div').map((row) => row.text())).toStrictEqual(['older']);
+    await wrapper.get('input[aria-label="Filter repositories"]').setValue('');
 
-    const launchButton = rows[0]!.findAll('button')[1]!;
+    await wrapper.getComponent({ name: 'ElDropdown' }).vm.$emit('command', 'alphabetical');
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.get('[aria-label="Sort repositories by name"]').text()).toContain('A–Z');
+    expect(wrapper.findAll('.cockpit-view__repositories > div').map((row) => row.text())).toStrictEqual(['older', 'recent']);
+
+    await wrapper.findAll('.cockpit-view__repositories > div')[1]!.findAll('button')[0]!.trigger('click');
+
+    const launchButton = wrapper.findAll('.cockpit-view__repositories > div')[1]!.findAll('button')[1]!;
     expect(launchButton.attributes('aria-label')).toBe('Start agent in recent');
     await launchButton.trigger('click');
 
     expect(wrapper.emitted('select-work-repository')).toStrictEqual([['nbonamy/recent']]);
     expect(wrapper.emitted('add-agent-for-repository')).toStrictEqual([[repositories[1]]]);
+  });
+
+  it('shows every repository instead of truncating the navigation list', () => {
+    const snapshot = createInitialSnapshot();
+    const repositories = Array.from({ length: 12 }, (_, index) => (
+      repository(`repository-${index + 1}`, `2026-08-${String(index + 1).padStart(2, '0')}T00:00:00.000Z`)
+    ));
+    const wrapper = mountView(snapshot, [item(24)], repositories);
+
+    expect(wrapper.findAll('.cockpit-view__repositories > div')).toHaveLength(12);
   });
 
   it('routes assigned rows to their team and passes the batch launcher to the inbox', () => {

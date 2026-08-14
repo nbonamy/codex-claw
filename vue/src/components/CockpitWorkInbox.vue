@@ -17,6 +17,7 @@
       <div class="cockpit-inbox__actions">
         <el-input
           v-if="searchOpen"
+          ref="searchInput"
           :model-value="effectiveSearchQuery"
           class="cockpit-inbox__search-input"
           clearable
@@ -65,8 +66,7 @@
           </div>
         </el-popover>
 
-        <el-button type="primary" :disabled="selectedItems.length === 0" @click="openStartWorkDialog">
-          <PlayerPlayIcon aria-hidden="true" />
+        <el-button class="cockpit-inbox__start-work" type="primary" :icon="PlayerPlayIcon" :disabled="selectedItems.length === 0" @click="openStartWorkDialog">
           Start work
         </el-button>
         <button class="cockpit-inbox__refresh" type="button" :disabled="status === 'loading'" aria-label="Refresh work items" @click="emit('refresh', selectedRepositoryId)">
@@ -222,7 +222,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { IconAlertCircle, IconChevronDown, IconCircleFilled, IconFilter, IconSearch } from '@tabler/icons-vue';
 import type { Agent, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
@@ -257,7 +257,6 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   refresh: [repositoryId: string | null];
   'select-global-scope': [scope: 'assignedToMe' | 'all'];
-  'focus-search': [];
   'remove-assignment': [item: WorkItem];
   'select-assigned-agent': [agentId: string];
   'select-assignee': [login: string | null];
@@ -268,6 +267,7 @@ const emit = defineEmits<{
 }>();
 
 const searchOpen = ref(false);
+const searchInput = ref<{ focus: () => void } | null>(null);
 const selectedItemIds = ref(new Set<string>());
 const startWorkDialogOpen = ref(false);
 const startingWork = ref(false);
@@ -415,7 +415,11 @@ function selectView(view: InboxView): void {
   localActiveView.value = view;
   emit('update-active-view', view);
 }
-function openSearch(): void { searchOpen.value = true; emit('focus-search'); }
+async function openSearch(): Promise<void> {
+  searchOpen.value = true;
+  await nextTick();
+  searchInput.value?.focus();
+}
 function updateSearchQuery(value: unknown): void {
   const query = typeof value === 'string' ? value : '';
   effectiveSearchQuery.value = query;
@@ -441,13 +445,15 @@ function selectAssignee(value: unknown): void { emit('select-assignee', normaliz
 
 .cockpit-inbox__toolbar {
   width: min(100%, 1440px);
+  height: 54px;
   min-height: 54px;
+  flex: 0 0 54px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-12);
   margin: 0 auto;
-  padding: var(--space-6) var(--space-16);
+  padding: 0 var(--space-16);
 }
 
 .cockpit-inbox__views,
@@ -458,7 +464,7 @@ function selectAssignee(value: unknown): void { emit('select-assignee', normaliz
 }
 
 .cockpit-inbox__views button {
-  min-height: 34px;
+  height: 34px;
   display: inline-flex;
   align-items: center;
   gap: var(--space-6);
@@ -483,6 +489,9 @@ function selectAssignee(value: unknown): void { emit('select-assignee', normaliz
 
 .cockpit-inbox__view-label,
 .cockpit-inbox__view-count {
+  height: var(--line-height-20);
+  display: inline-flex;
+  align-items: center;
   line-height: var(--line-height-20);
 }
 
@@ -533,6 +542,15 @@ function selectAssignee(value: unknown): void { emit('select-assignee', normaliz
   background: var(--color-primary);
   font-size: var(--font-size-10);
   line-height: 16px;
+}
+
+.cockpit-inbox__start-work {
+  height: 34px;
+  margin: 0;
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-6);
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-medium);
 }
 
 .cockpit-inbox__refresh {
@@ -915,8 +933,11 @@ function selectAssignee(value: unknown): void { emit('select-assignee', normaliz
 
 @media (max-width: 780px) {
   .cockpit-inbox__toolbar {
+    height: auto;
+    flex-basis: auto;
     align-items: flex-start;
     flex-direction: column;
+    padding: var(--space-6) var(--space-16);
   }
   .cockpit-inbox__actions {
     width: 100%;
