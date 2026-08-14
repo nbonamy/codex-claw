@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.10.2",
+  "currentVersion": "0.11.0",
   "releases": [
+    {
+      "version": "0.11.0",
+      "releasedAt": "2026-08-14",
+      "sourceSha256": "e615a7a1bb19029e418cb8d0d9c44492c2086c7a5c14a226bef2a18c07db6aef",
+      "markdown": "### New features\n\n- Cockpit is now a cross-repository backlog-first operator inbox, with\n  repository navigation, All/Backlog/WIP/Focus views, an Assigned to me\n  default, and true paginated GitHub results.\n- Multiple issues can be selected and launched together into a chosen team;\n  each item gets its own automatically named background agent and isolated\n  worktree without additional setup dialogs.\n\n### Improvements and fixes\n\n- Repository recency now follows open issue and pull-request activity, Cockpit\n  automatically falls back to the most useful non-empty view, and completed or\n  orphaned assignments no longer distort active-work counts."
+    },
     {
       "version": "0.10.2",
       "releasedAt": "2026-08-12",

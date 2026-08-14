@@ -4,6 +4,23 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.11.0] - 2026-08-14
+
+### New features
+
+- Cockpit is now a cross-repository backlog-first operator inbox, with
+  repository navigation, All/Backlog/WIP/Focus views, an Assigned to me
+  default, and true paginated GitHub results.
+- Multiple issues can be selected and launched together into a chosen team;
+  each item gets its own automatically named background agent and isolated
+  worktree without additional setup dialogs.
+
+### Improvements and fixes
+
+- Repository recency now follows open issue and pull-request activity, Cockpit
+  automatically falls back to the most useful non-empty view, and completed or
+  orphaned assignments no longer distort active-work counts.
+
 ## [0.10.2] - 2026-08-12
 
 ### Improvements and fixes
