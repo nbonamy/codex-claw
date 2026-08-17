@@ -9,7 +9,7 @@ describe('SettingsPluginsPanel', () => {
   let builtInLaunchChatGpt: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    builtInLaunchChatGpt = vi.fn().mockResolvedValue(undefined);
+    builtInLaunchChatGpt = vi.fn().mockResolvedValue({ status: 'launched' });
     configureClawClient({
       api: { launchChatGptApp: builtInLaunchChatGpt } as unknown as CodexClawApi,
       platform: 'desktop',
@@ -33,7 +33,7 @@ describe('SettingsPluginsPanel', () => {
     expect(sections[0].text()).toContain('Computer Use');
     expect(sections[0].text()).not.toContain('Chrome');
     expect(sections[1].text()).toContain('Chrome');
-    expect(sections[1].text()).toContain('Other plugins');
+    expect(sections[1].text()).toContain('Install Codex plugins and MCP servers');
     expect(sections[1].text()).not.toContain('Computer Use');
   });
 
@@ -117,7 +117,7 @@ describe('SettingsPluginsPanel', () => {
     expect(wrapper.findAll('.settings-section__header h3').map((heading) => heading.text())).toStrictEqual(['Codex']);
   });
 
-  it('opens the configured manager directly for other plugins', async () => {
+  it('opens the configured manager to install Codex plugins and MCP servers', async () => {
     const updateSettings = vi.fn().mockResolvedValue(undefined);
     const wrapper = mount(SettingsPluginsPanel, {
       props: { updateSettings },
@@ -125,7 +125,7 @@ describe('SettingsPluginsPanel', () => {
       attachTo: document.body,
     });
 
-    await wrapper.get('[aria-label="Manage other plugins in ChatGPT"]').trigger('click');
+    await wrapper.get('[aria-label="Install Codex plugins and MCP servers"]').trigger('click');
     await flushPromises();
     expect(builtInLaunchChatGpt).toHaveBeenCalledOnce();
     expect(updateSettings).not.toHaveBeenCalled();
@@ -141,6 +141,11 @@ describe('SettingsPluginsPanel', () => {
     await wrapper.get('[aria-label="Enable Chrome"]').trigger('click');
     await flushPromises();
 
-    expect(wrapper.text()).toContain('ChatGPT is unavailable.');
+    const sections = wrapper.findAll('.settings-section');
+    const clawRows = sections[0].findAll('.settings-row');
+    const codexRows = sections[1].findAll('.settings-row');
+    expect(clawRows[0].text()).not.toContain('ChatGPT is unavailable.');
+    expect(codexRows[0].text()).toContain('ChatGPT is unavailable.');
+    expect(codexRows[1].text()).not.toContain('ChatGPT is unavailable.');
   });
 });

@@ -109,7 +109,7 @@ describe('SettingsView', () => {
   });
 
   it('places plugin controls before integrations and forwards plugin management actions', async () => {
-    const launchChatGptApp = vi.fn().mockResolvedValue(undefined);
+    const launchChatGptApp = vi.fn().mockResolvedValue({ status: 'launched' });
     configureClawClient({
       api: { launchChatGptApp } as unknown as CodexClawApi,
       platform: 'desktop',

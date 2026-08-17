@@ -5,6 +5,7 @@ import {
   type ClawHostCapabilities,
 } from '@codex-claw/core/client';
 import type { CodexClawApi } from '@codex-claw/core/contracts';
+import { ElMessageBox } from 'element-plus';
 
 export const CODEX_APP_DEEP_LINK = 'codex://' as const;
 export const CHATGPT_PLUGINS_URL = 'https://chatgpt.com/plugins' as const;
@@ -33,16 +34,36 @@ export function configureClawClient(client?: ClawClient): void {
 }
 
 function desktopPlatformActions(api: CodexClawApi | undefined): Readonly<ClawPlatformActions> {
-  const launchChatGpt = () => {
+  const launchChatGpt = async () => {
     if (typeof api?.launchChatGptApp !== 'function') {
       throw new Error('ChatGPT could not be launched from this window.');
     }
-    return api.launchChatGptApp();
+    const result = await api.launchChatGptApp();
+    if (result.status !== 'alreadyRunning') return;
+    if (!await confirmChatGptRelaunch()) return;
+    await api.launchChatGptApp({ quitRunning: true });
   };
   return {
     launchChatGpt,
     managePlugins: launchChatGpt,
   };
+}
+
+async function confirmChatGptRelaunch(): Promise<boolean> {
+  try {
+    await ElMessageBox.confirm(
+      'ChatGPT is already open. Codex Claw needs to relaunch it with Claw’s isolated Codex home.',
+      'Quit and relaunch ChatGPT?',
+      {
+        cancelButtonText: 'Cancel',
+        confirmButtonText: 'Quit and relaunch',
+        type: 'warning',
+      },
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function webPlatformActions(): Readonly<ClawPlatformActions> {

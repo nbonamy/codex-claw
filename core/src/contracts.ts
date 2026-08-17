@@ -952,6 +952,14 @@ export type SystemPermissionsStatus = {
   };
 };
 
+export type LaunchChatGptAppInput = {
+  quitRunning?: boolean;
+};
+
+export type LaunchChatGptAppResult = {
+  status: 'alreadyRunning' | 'launched';
+};
+
 export type ClawdDaemonStatus = {
   supported: boolean;
   installed: boolean;
@@ -1580,7 +1588,7 @@ export type CodexClawApi = {
   getSystemPermissions(): Promise<SystemPermissionsStatus>;
   openAccessibilitySettings(): Promise<SystemPermissionsStatus>;
   openScreenRecordingSettings(): Promise<SystemPermissionsStatus>;
-  launchChatGptApp(): Promise<void>;
+  launchChatGptApp(input?: LaunchChatGptAppInput): Promise<LaunchChatGptAppResult>;
   quit(): Promise<void>;
   restartApp(): Promise<void>;
   reloadRenderer(): Promise<void>;

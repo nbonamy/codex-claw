@@ -15,7 +15,7 @@
       <SettingsRow
         as="label"
         title="Computer Use"
-        :error="settingsError"
+        :error="computerUseError"
         description="Let agents inspect and control macOS apps through the local Computer Use helper"
       >
         <template #control>
@@ -35,7 +35,7 @@
       <SettingsRow
         as="label"
         title="Chrome"
-        :error="settingsError"
+        :error="chromeError"
         description="Let agents work with your existing Chrome tabs, sessions, and extensions"
       >
         <template #control>
@@ -47,16 +47,16 @@
         </template>
       </SettingsRow>
       <SettingsRow
-        title="Other plugins"
+        title="Install Codex plugins and MCP servers"
         description="GitHub, Slack, Jira, Linear, Gmail, Google Drive, and more"
-        :error="settingsError"
+        :error="pluginManagerError"
       >
         <template #control>
           <el-button
             circle
             :loading="managingPlugins"
-            aria-label="Manage other plugins in ChatGPT"
-            @click="managePlugins"
+            aria-label="Install Codex plugins and MCP servers"
+            @click="managePlugins('install')"
           >
             <ChevronRightIcon aria-hidden="true" />
           </el-button>
@@ -90,7 +90,9 @@ const props = withDefaults(defineProps<{
 });
 
 const managingPlugins = ref(false);
-const settingsError = ref<string | null>(null);
+const computerUseError = ref<string | null>(null);
+const chromeError = ref<string | null>(null);
+const pluginManagerError = ref<string | null>(null);
 const chromeEnabled = ref(false);
 const pluginSettings = computed(() => props.settings ?? defaultPluginSettings);
 let pluginStatusTimer: number | undefined;
@@ -122,12 +124,10 @@ onBeforeUnmount(() => {
 
 function updatePlugin(plugin: PendingPlugin, enabled: boolean): void {
   if (plugin === 'chrome') {
-    settingsError.value = null;
-    void managePlugins();
+    void managePlugins('chrome');
     return;
   }
   if (enabled) {
-    settingsError.value = null;
     void persistPlugin(plugin, true);
     return;
   }
@@ -137,21 +137,23 @@ function updatePlugin(plugin: PendingPlugin, enabled: boolean): void {
 
 async function persistPlugin(plugin: PendingPlugin, enabled: boolean): Promise<void> {
   const key = plugin === 'computerUse' ? 'computerUseEnabled' : 'chromeEnabled';
-  settingsError.value = null;
+  const errorState = plugin === 'computerUse' ? computerUseError : chromeError;
+  errorState.value = null;
   try {
     await props.updateSettings({ general: { plugins: { [key]: enabled } } });
   } catch (error) {
-    settingsError.value = error instanceof Error ? error.message : String(error);
+    errorState.value = error instanceof Error ? error.message : String(error);
   }
 }
 
-async function managePlugins(): Promise<void> {
+async function managePlugins(source: 'chrome' | 'install'): Promise<void> {
+  const errorState = source === 'chrome' ? chromeError : pluginManagerError;
   managingPlugins.value = true;
-  settingsError.value = null;
+  errorState.value = null;
   try {
     await clawPlatformActions.managePlugins();
   } catch (error) {
-    settingsError.value = error instanceof Error ? error.message : String(error);
+    errorState.value = error instanceof Error ? error.message : String(error);
   } finally {
     managingPlugins.value = false;
   }

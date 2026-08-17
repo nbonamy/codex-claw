@@ -439,7 +439,7 @@ export class AppController {
 
     ipc.handle(ipcChannels.openScreenRecordingSettings, () => this.openScreenRecordingSettings());
 
-    ipc.handle(ipcChannels.launchChatGptApp, () => launchChatGptApp());
+    ipc.handle(ipcChannels.launchChatGptApp, (_event, input) => launchChatGptApp(input));
 
     ipc.handle(ipcChannels.quit, () => {
       this.appLifecycle.quit();

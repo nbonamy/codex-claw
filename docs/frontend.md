@@ -349,10 +349,13 @@ implemented:
   Codex groups ChatGPT launch, shared skills/plugins, and runtime selection;
   Claude Code contains its experimental enable flags. Desktop launches the
   ChatGPT process with Claw's isolated `CODEX_HOME`, while web opens the
-  `codex://` deep link. Plugins separates Claw's Computer Use capability from
-  Codex's Chrome and external plugins, keeps Computer Use and Chrome disabled
-  by default, persists explicit capability choices, and opens plugin management
-  through the built-in platform behavior (ChatGPT on desktop and
+  `codex://` deep link. When ChatGPT is already running, desktop launch asks
+  before quitting it, waits for it to exit, and reopens it with the isolated
+  home so a normal instance cannot silently prevent the requested launch.
+  Plugins separates Claw's Computer Use capability from
+  Codex's Chrome and plugin/MCP installation, keeps Computer Use and Chrome
+  disabled by default, persists explicit capability choices, and opens plugin
+  management through the built-in platform behavior (ChatGPT on desktop and
   `https://chatgpt.com/plugins` on web); Connections keeps
   remote Claw hosts separate from official Codex device pairing, including
   pairing progress and paired-device revocation. Appshots configures a
