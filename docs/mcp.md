@@ -36,6 +36,24 @@ Renderer responsibilities:
 - never import MCP SDK types;
 - never call MCP tools directly.
 
+## Work Routing
+
+The `prepare-work` tool lets an agent pause before substantial implementation
+and ask the user where the work should continue. The tool accepts a
+self-contained `task` plus an optional branch suggestion and blocks until the
+user chooses one of three app-owned outcomes:
+
+- continue in the current conversation and checkout;
+- create or switch to a branch in the same checkout and continue;
+- create an isolated worktree, duplicate the current agent without selecting
+  it, and dispatch the task to that new conversation.
+
+`clawd` emits `workRouting.requested`; the renderer only presents the choice
+and returns it through `client/request/respond`. `clawd` owns all git and agent
+mutations, then resolves the pending MCP call with the resulting folder,
+branch, and delegated-agent identity. Switching the shared checkout is disabled
+when another agent uses the same folder; delegation remains available.
+
 ## Transport
 
 The server uses the official TypeScript MCP SDK with Streamable HTTP on a

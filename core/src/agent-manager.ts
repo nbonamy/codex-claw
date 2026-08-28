@@ -441,6 +441,7 @@ function copiedAgent(
     name: name?.trim() || `${source.name} (${suffix})`,
     avatar: source.avatar,
     folder: source.folder,
+    ...(source.workspace ? { workspace: { ...source.workspace } } : {}),
     backend: source.backend,
     backendDefaults: source.backendDefaults ? { ...source.backendDefaults } : undefined,
     ...(source.openInApplication ? { openInApplication: source.openInApplication } : {}),

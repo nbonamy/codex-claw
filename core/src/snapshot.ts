@@ -55,6 +55,7 @@ export function createEmptySnapshot(): AppSnapshot {
     activeAgentId: null,
     messages: [],
     queuedPrompts: [],
+    workRoutingRequests: [],
     backendApprovals: {},
     agentGitStatuses: {},
     turnGitDiffs: {},
@@ -93,6 +94,7 @@ export function createInitialSnapshot(): AppSnapshot {
     activeAgentId: agents[0]?.id ?? null,
     messages: [],
     queuedPrompts: [],
+    workRoutingRequests: [],
     backendApprovals: {},
     agentGitStatuses: {},
     turnGitDiffs: {},
@@ -184,6 +186,9 @@ export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentIn
   if (folderChanged || backendChanged) {
     clearAgentRuntimeState(agent);
   }
+  if (folderChanged) {
+    delete agent.workspace;
+  }
   agent.updatedAt = updatedAt;
 
   return agent;
@@ -269,10 +274,32 @@ export function updateAgentFolder(snapshot: AppSnapshot, agentId: string, folder
     return null;
   }
 
-  agent.folder = normalizedFolder(folder);
+  const nextFolder = normalizedFolder(folder);
+  if (nextFolder !== agent.folder) {
+    delete agent.workspace;
+  }
+  agent.folder = nextFolder;
   clearAgentRuntimeState(agent);
   agent.updatedAt = updatedAt;
 
+  return agent;
+}
+
+export function updateAgentWorkspace(
+  snapshot: AppSnapshot,
+  agentId: string,
+  workspace: Agent['workspace'],
+  updatedAt = new Date().toISOString(),
+): Agent | null {
+  const agent = findAgent(snapshot, agentId);
+  if (!agent) return null;
+
+  if (workspace) {
+    agent.workspace = { ...workspace };
+  } else {
+    delete agent.workspace;
+  }
+  agent.updatedAt = updatedAt;
   return agent;
 }
 
@@ -305,6 +332,25 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     const nextSnapshot = event.payload as AppSnapshotMetadata;
     if (isRecord(nextSnapshot) && Array.isArray(nextSnapshot.teams) && Array.isArray(nextSnapshot.agents)) {
       applySnapshotMetadata(snapshot, nextSnapshot);
+    }
+    return;
+  }
+
+  if (event.type === 'workRouting.requested') {
+    const request = workRoutingRequest(event.payload);
+    if (request) {
+      snapshot.workRoutingRequests = [
+        ...(snapshot.workRoutingRequests ?? []).filter((candidate) => candidate.id !== request.id),
+        request,
+      ];
+    }
+    return;
+  }
+
+  if (event.type === 'workRouting.resolved') {
+    const id = isRecord(event.payload) && typeof event.payload.id === 'string' ? event.payload.id : '';
+    if (id) {
+      snapshot.workRoutingRequests = (snapshot.workRoutingRequests ?? []).filter((candidate) => candidate.id !== id);
     }
     return;
   }
@@ -2085,6 +2131,25 @@ function askUserRequest(payload: unknown): Extract<ClientRequest, { kind: 'ask_u
   }
 
   return payload as Extract<ClientRequest, { kind: 'ask_user' }>;
+}
+
+function workRoutingRequest(payload: unknown): Extract<ClientRequest, { kind: 'work_routing' }> | null {
+  if (
+    !isRecord(payload) ||
+    payload.kind !== 'work_routing' ||
+    typeof payload.id !== 'string' ||
+    !isRecord(payload.payload) ||
+    !isRecord(payload.payload.request) ||
+    typeof payload.payload.request.agentId !== 'string' ||
+    typeof payload.payload.request.task !== 'string' ||
+    typeof payload.payload.request.suggestedBranchName !== 'string' ||
+    !Array.isArray(payload.payload.request.sharedFolderAgentNames) ||
+    !payload.payload.request.sharedFolderAgentNames.every((name) => typeof name === 'string')
+  ) {
+    return null;
+  }
+
+  return payload as Extract<ClientRequest, { kind: 'work_routing' }>;
 }
 
 function parseJsonPreview(preview: string): unknown {

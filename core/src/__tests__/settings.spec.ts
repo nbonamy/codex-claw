@@ -18,6 +18,7 @@ describe('settings contracts', () => {
       preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: true,
       shareCodexSkillsAndPlugins: true,
+      repositoryIcons: {},
       appshots: defaultAppshotSettings,
       plugins: defaultPluginSettings,
     });
@@ -86,10 +87,27 @@ describe('settings contracts', () => {
       preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: false,
       shareCodexSkillsAndPlugins: true,
+      repositoryIcons: {},
       appshots: defaultAppshotSettings,
       plugins: defaultPluginSettings,
     });
     expect(snapshot.teams).toHaveLength(1);
+  });
+
+  it('normalizes and updates repository icons by canonical repository root', () => {
+    expect(normalizeGeneralSettings({
+      repositoryIcons: {
+        ' /src/codex-claw ': ' 🦞 ',
+        '': '🚫',
+        '/src/invalid': 12,
+      },
+    }).repositoryIcons).toStrictEqual({ '/src/codex-claw': '🦞' });
+
+    const snapshot = createEmptySnapshot();
+    updateSettingsInSnapshot(snapshot, {
+      general: { repositoryIcons: { '/src/codex-claw': '🦞' } },
+    });
+    expect(snapshot.general.repositoryIcons).toStrictEqual({ '/src/codex-claw': '🦞' });
   });
 
   it('updates source folder settings without replacing unrelated state', () => {

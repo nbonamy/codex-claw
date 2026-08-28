@@ -42,6 +42,7 @@ export {
   IconList as ListIcon,
   IconListDetails as ListDetailsIcon,
   IconLogs as LogsIcon,
+  IconMessageCircle as MessageCircleIcon,
   IconLayoutSidebarLeftCollapse as PanelLeftCloseIcon,
   IconLayoutSidebarLeftExpand as PanelLeftOpenIcon,
   IconLogout as QuitIcon,

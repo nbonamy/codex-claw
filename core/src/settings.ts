@@ -18,6 +18,7 @@ export const defaultGeneralSettings: AppGeneralSettings = {
   claudeCodeEnabled: false,
   agentListCompact: false,
   shareCodexSkillsAndPlugins: true,
+  repositoryIcons: {},
   appshots: { ...defaultAppshotSettings },
   plugins: { ...defaultPluginSettings },
 };
@@ -95,9 +96,23 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
     claudeCodeEnabled: value.claudeCodeEnabled === true,
     agentListCompact: value.agentListCompact === true,
     shareCodexSkillsAndPlugins: value.shareCodexSkillsAndPlugins !== false,
+    repositoryIcons: normalizeRepositoryIcons(value.repositoryIcons),
     appshots: normalizeAppshotSettings(value.appshots),
     plugins: normalizePluginSettings(value.plugins),
   };
+}
+
+function normalizeRepositoryIcons(value: unknown): Record<string, string> {
+  if (!isRecord(value)) return {};
+  const icons: Record<string, string> = {};
+  for (const [repositoryRoot, iconValue] of Object.entries(value)) {
+    const root = repositoryRoot.trim();
+    const icon = typeof iconValue === 'string' ? iconValue.trim() : '';
+    if (!root || root.length > 4_096 || !icon || icon.length > 64) continue;
+    icons[root] = icon;
+    if (Object.keys(icons).length >= 200) break;
+  }
+  return icons;
 }
 
 export function normalizeAppshotSettings(value: unknown): AppshotSettings {

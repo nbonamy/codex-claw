@@ -123,7 +123,8 @@ describe('AppShell', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('CODEX CLAW');
+    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe('Codex Claw');
+    expect(wrapper.text()).toContain('Sessions');
     expect(wrapper.get('[aria-label="Codex Claw"]').text()).toBe('CC');
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('Ready to get going');
@@ -2014,7 +2015,7 @@ describe('AppShell', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('CODEX CLAW');
+    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe('Codex Claw');
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('true');
   });
 
@@ -2047,7 +2048,7 @@ describe('AppShell', () => {
     });
 
     expect(wrapper.get('[aria-label="Skwad"]').attributes('aria-pressed')).toBe('true');
-    expect(wrapper.text()).toContain('SKWAD');
+    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe('Skwad');
   });
 
   it('falls back to the first team when active agent team references are stale', () => {
@@ -2089,7 +2090,7 @@ describe('AppShell', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('CODEX CLAW');
+    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe('Codex Claw');
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('true');
   });
@@ -3600,6 +3601,30 @@ describe('AppShell', () => {
 
     wrapper.unmount();
     expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it('persists repository icons selected from the session sidebar', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.general.repositoryIcons = { '/src/existing': '🦞' };
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, updateSettings });
+    const sidebar = wrapper.getComponent({ name: 'AgentSidebar' });
+
+    expect(sidebar.props('repositoryIcons')).toStrictEqual({ '/src/existing': '🦞' });
+    sidebar.vm.$emit('update-repository-icon', {
+      repositoryRoot: '/src/codex-claw',
+      icon: '🚀',
+    });
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      general: {
+        repositoryIcons: {
+          '/src/existing': '🦞',
+          '/src/codex-claw': '🚀',
+        },
+      },
+    });
   });
 
   it('opens deterministic Markdown and approval fixtures from Debug commands', async () => {

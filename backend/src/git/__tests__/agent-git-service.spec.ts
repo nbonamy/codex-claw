@@ -105,6 +105,62 @@ describe('agent git service parsers', () => {
     });
   });
 
+  it('resolves lightweight workspace identity for a primary checkout', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/src/codex-claw\n' };
+      if (args[0] === 'rev-parse' && args[1] === '--git-common-dir') return { stdout: '.git\n' };
+      if (args[0] === 'symbolic-ref') return { stdout: 'main\n' };
+      throw new Error(`Unexpected git command: ${args.join(' ')}`);
+    });
+    const service = new AgentGitService(() => new Date('2026-08-27T12:00:00.000Z'), runGit);
+
+    await expect(service.identity('/src/codex-claw')).resolves.toStrictEqual({
+      kind: 'git',
+      folder: '/src/codex-claw',
+      repositoryName: 'codex-claw',
+      repositoryRoot: '/src/codex-claw',
+      branch: 'main',
+      isLinkedWorktree: false,
+      primaryWorktreeRoot: '/src/codex-claw',
+      updatedAt: '2026-08-27T12:00:00.000Z',
+    });
+  });
+
+  it('resolves linked worktree and detached workspace identity', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/src/codex-claw-feature\n' };
+      if (args[0] === 'rev-parse' && args[1] === '--git-common-dir') return { stdout: '/src/codex-claw/.git\n' };
+      if (args[0] === 'symbolic-ref') throw new Error('detached HEAD');
+      throw new Error(`Unexpected git command: ${args.join(' ')}`);
+    });
+    const service = new AgentGitService(() => new Date('2026-08-27T12:00:00.000Z'), runGit);
+
+    await expect(service.identity('/src/codex-claw-feature')).resolves.toStrictEqual({
+      kind: 'git',
+      folder: '/src/codex-claw-feature',
+      repositoryName: 'codex-claw',
+      repositoryRoot: '/src/codex-claw-feature',
+      branch: null,
+      isLinkedWorktree: true,
+      primaryWorktreeRoot: '/src/codex-claw',
+      updatedAt: '2026-08-27T12:00:00.000Z',
+    });
+  });
+
+  it('falls back to folder identity outside Git', async () => {
+    const runGit = vi.fn(async () => {
+      throw new Error('not a git repository');
+    });
+    const service = new AgentGitService(() => new Date('2026-08-27T12:00:00.000Z'), runGit);
+
+    await expect(service.identity('/src/notes')).resolves.toStrictEqual({
+      kind: 'folder',
+      folder: '/src/notes',
+      label: 'notes',
+      updatedAt: '2026-08-27T12:00:00.000Z',
+    });
+  });
+
   it('reviews staged plus unstaged diffs before the first commit', async () => {
     const runGit = vi.fn(async (_folder: string, args: string[]) => {
       if (args.includes('--cached')) {

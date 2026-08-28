@@ -186,6 +186,35 @@ describe('ClawMcpAgentCoordinator', () => {
       .rejects.toThrowError('Work item updates are not available.');
   });
 
+  it('asks Claw how substantial work should be routed', async () => {
+    const onPrepareWork = vi.fn().mockResolvedValue({
+      mode: 'branch',
+      branchName: 'feat/queue-retries',
+      folder: '/tmp/dina',
+    });
+    const { coordinator } = fixture({ onPrepareWork });
+
+    await expect(coordinator.prepareWork('agent-dina', {
+      task: '  Add queue retries  ',
+      branchName: ' feat/queue-retries ',
+    })).resolves.toStrictEqual({
+      mode: 'branch',
+      branchName: 'feat/queue-retries',
+      folder: '/tmp/dina',
+    });
+    expect(onPrepareWork).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-dina' }),
+      { task: 'Add queue retries', branchName: 'feat/queue-retries' },
+    );
+  });
+
+  it('requires a task and an available work-routing host', async () => {
+    await expect(fixture().coordinator.prepareWork('agent-dina', { task: '   ' }))
+      .rejects.toThrowError('Describe the work to prepare.');
+    await expect(fixture().coordinator.prepareWork('agent-dina', { task: 'Ship it' }))
+      .rejects.toThrowError('Work routing is not available.');
+  });
+
   it('lists repositories and static or refreshed worktrees', async () => {
     const repos = [{
       name: 'codex-claw',

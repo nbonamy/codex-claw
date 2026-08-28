@@ -2,9 +2,9 @@ import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import path from 'node:path';
 import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
-import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput, updateAgentOpenInApplication } from '@codex-claw/core/snapshot';
+import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput, updateAgentOpenInApplication, updateAgentWorkspace } from '@codex-claw/core/snapshot';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitDiff, AgentGitMessageGenerationResult, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitDiff, AgentGitMessageGenerationResult, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AgentWorkspaceIdentity, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkRoutingRequest, WorkRoutingResult } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/core/backend-driver';
@@ -49,6 +49,11 @@ export type ClawBackendServerOptions = {
   inspectCodexResourceSharing?: (enabled: boolean) => Promise<CodexResourceSharingStatus>;
   inspectPluginStatus?: () => Promise<AppPluginStatus>;
   agentGitService?: AgentGitService;
+  workRouting?: WorkRoutingPort;
+};
+
+export type WorkRoutingPort = {
+  resolveWorkRoutingRequest(requestId: string, result: WorkRoutingResult): boolean;
 };
 
 export type SystemPermissionsPort = {
@@ -95,11 +100,16 @@ export class ClawBackendServer {
   private readonly configureCodexResourceSharing: (input: SetCodexResourceSharingInput) => Promise<void>;
   private readonly inspectCodexResourceSharing: (enabled: boolean) => Promise<CodexResourceSharingStatus>;
   private readonly inspectPluginStatus: () => Promise<AppPluginStatus>;
-  private readonly clientRequestOwners = new Map<string, { backend: AgentBackend; remoteConnectionId?: string }>();
+  private readonly clientRequestOwners = new Map<string,
+    | { kind: 'driver'; backend: AgentBackend; remoteConnectionId?: string }
+    | { kind: 'workRouting'; remoteConnectionId?: string }
+  >();
   private readonly remoteSnapshots = new Map<string, AppSnapshot>();
   private readonly queuedPromptRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly agentGitService: AgentGitService;
+  private readonly workRouting?: WorkRoutingPort;
   private readonly gitStatusRefreshPromises = new Map<string, Promise<boolean>>();
+  private workspaceIdentityReconciliationPromise: Promise<void> | null = null;
   private subagentIdentityBackfillPromise: Promise<void> | null = null;
   private readonly transcriptRetention: AgentTranscriptRetention;
   private unsubscribeDriverEvents?: () => void;
@@ -123,6 +133,7 @@ export class ClawBackendServer {
     this.inspectCodexResourceSharing = options.inspectCodexResourceSharing ?? getCodexResourceSharingStatus;
     this.inspectPluginStatus = options.inspectPluginStatus ?? loadPluginStatus;
     this.agentGitService = options.agentGitService ?? new AgentGitService();
+    this.workRouting = options.workRouting;
     this.transcriptRetention = new AgentTranscriptRetention({
       snapshot: this.snapshot,
       onEvicted: (agentId) => this.releaseEvictedAgentTranscript(agentId),
@@ -151,6 +162,7 @@ export class ClawBackendServer {
       case backendMethods.snapshotGet:
         await this.initializeSourceFolderIfNeeded();
         await this.ensureRemoteControlStatus();
+        await this.reconcileAgentWorkspaceIdentities();
         void this.backfillSubagentIdentities();
         const snapshot = await this.clientSnapshot();
         if (snapshot.activeAgentId) {
@@ -362,13 +374,27 @@ export class ClawBackendServer {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `No backend owns client request '${response.id}'.`);
         }
 
-        await this.requestInLocation(
-          this.locationFromRemoteConnectionId(owner.remoteConnectionId),
-          backendMethods.driverClientRequestRespond,
-          { backend: owner.backend, response },
-          () => this.requireDriverRpc().handle(backendMethods.driverClientRequestRespond, { backend: owner.backend, response }),
-        );
+        if (owner.kind === 'workRouting') {
+          await this.requestInLocation(
+            this.locationFromRemoteConnectionId(owner.remoteConnectionId),
+            backendMethods.mcpWorkRoutingRespond,
+            { response },
+            () => this.respondToWorkRoutingRequest(response),
+          );
+        } else {
+          await this.requestInLocation(
+            this.locationFromRemoteConnectionId(owner.remoteConnectionId),
+            backendMethods.driverClientRequestRespond,
+            { backend: owner.backend, response },
+            () => this.requireDriverRpc().handle(backendMethods.driverClientRequestRespond, { backend: owner.backend, response }),
+          );
+        }
         this.clientRequestOwners.delete(response.id);
+        return createClawRpcResult(message.id, await this.clientSnapshot());
+      }
+      case backendMethods.mcpWorkRoutingRespond: {
+        const response = requireClientRequestResponse(message.params);
+        await this.respondToWorkRoutingRequest(response);
         return createClawRpcResult(message.id, this.snapshot);
       }
       case backendMethods.agentCreate: {
@@ -390,6 +416,9 @@ export class ClawBackendServer {
         await this.validateAgentInput(input, null);
         createAgentInSnapshot(this.snapshot, input);
         this.addRecentSourceRepository(input.sourceRepositoryName);
+        if (this.snapshot.activeAgentId) {
+          await this.refreshAgentWorkspaceIdentity(this.snapshot.activeAgentId);
+        }
         const snapshot = await this.persistAndEmitSnapshot();
         if (snapshot.activeAgentId) {
           await this.refreshAgentGitStatus(snapshot.activeAgentId);
@@ -408,6 +437,9 @@ export class ClawBackendServer {
           }
           if (agent.name !== previousName && agent.backendSession) {
             await this.updateConversationTitle(agent.id);
+          }
+          if (agent.folder !== previousFolder) {
+            await this.refreshAgentWorkspaceIdentity(agent.id);
           }
           const snapshot = await this.persistAndEmitSnapshot();
           if (agent.folder !== previousFolder) {
@@ -595,6 +627,7 @@ export class ClawBackendServer {
         return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentFolderUpdate, { agentId, folder }, async (agent) => {
           await this.validateAgentInput({ name: 'Agent', folder }, this.remoteConnectionIdForAgent(agent));
           updateAgentFolder(this.snapshot, agentId, folder);
+          await this.refreshAgentWorkspaceIdentity(agentId);
           return this.persistAndEmitSnapshot();
         });
       }
@@ -763,8 +796,9 @@ export class ClawBackendServer {
           if (input.createWorktree === true) {
             updateAgentFolder(this.snapshot, agentId, targetFolder);
             await this.driverRpc?.handle(backendMethods.driverSessionForget, { backend: agent.backend, agentId });
-            await this.persistAndEmitSnapshot();
           }
+          const workspaceChanged = await this.refreshAgentWorkspaceIdentity(agentId);
+          if (input.createWorktree === true || workspaceChanged) await this.persistAndEmitSnapshot();
           return this.gitWorkflow(agent, { refreshStatus: true });
         });
       }
@@ -799,6 +833,7 @@ export class ClawBackendServer {
           if (deleteWorktree) {
             updateAgentFolder(this.snapshot, agentId, targetFolder);
             await this.driverRpc?.handle(backendMethods.driverSessionForget, { backend: agent.backend, agentId });
+            await this.refreshAgentWorkspaceIdentity(agentId);
             await this.persistAndEmitSnapshot();
           }
           return this.gitWorkflow(agent, { refreshStatus: true });
@@ -1449,6 +1484,17 @@ export class ClawBackendServer {
           backendMethods.sourceWorktreesList,
           request,
           () => this.requireDriverRpc().handle(backendMethods.sourceWorktreesList, request),
+        );
+      }
+      case backendMethods.sourceBranchesList: {
+        const params = requireRecord(message.params);
+        const request = { repoPath: requireString(params.repoPath, 'repoPath') };
+        return this.respondInLocation(
+          message.id,
+          this.locationFromRemoteConnectionId(optionalTrimmedString(params.remoteConnectionId)),
+          backendMethods.sourceBranchesList,
+          request,
+          () => this.requireDriverRpc().handle(backendMethods.sourceBranchesList, request) as Promise<SourceBranch[]> | SourceBranch[],
         );
       }
       case backendMethods.sourceWorktreeCreate: {
@@ -2191,6 +2237,7 @@ export class ClawBackendServer {
       try {
         const remoteSnapshot = await this.remoteSnapshot(pointer.connectionId);
         projectRemoteTeam(snapshot, team, remoteSnapshot, pointer.remoteTeamId);
+        this.recordProjectedWorkRoutingOwners(pointer.connectionId, remoteSnapshot, pointer.remoteTeamId);
       } catch {
         team.agentIds = [];
         delete team.activeAgentId;
@@ -2210,6 +2257,7 @@ export class ClawBackendServer {
       const remoteSnapshot = this.remoteSnapshots.get(pointer.connectionId);
       if (remoteSnapshot) {
         projectRemoteTeam(snapshot, team, remoteSnapshot, pointer.remoteTeamId);
+        this.recordProjectedWorkRoutingOwners(pointer.connectionId, remoteSnapshot, pointer.remoteTeamId);
       } else {
         team.agentIds = [];
         delete team.activeAgentId;
@@ -2227,6 +2275,15 @@ export class ClawBackendServer {
     }
     this.remoteSnapshots.set(connectionId, result.snapshot);
     return result.snapshot;
+  }
+
+  private recordProjectedWorkRoutingOwners(connectionId: string, remoteSnapshot: AppSnapshot, remoteTeamId: string): void {
+    const agentIds = new Set(remoteSnapshot.teams.find((team) => team.id === remoteTeamId)?.agentIds ?? []);
+    for (const request of remoteSnapshot.workRoutingRequests ?? []) {
+      if (agentIds.has(request.payload.request.agentId)) {
+        this.clientRequestOwners.set(request.id, { kind: 'workRouting', remoteConnectionId: connectionId });
+      }
+    }
   }
 
   private sendAgentPrompt(agentId: string, prompt: string, options?: SendPromptOptions): AppSnapshot {
@@ -2629,7 +2686,47 @@ export class ClawBackendServer {
 
   private async hydrateAndRefreshSelectedAgent(agentId: string): Promise<void> {
     await this.hydrateAgentHistory(agentId);
+    await this.refreshAgentWorkspaceIdentity(agentId);
     await this.refreshAgentGitStatus(agentId);
+  }
+
+  private async reconcileAgentWorkspaceIdentities(): Promise<void> {
+    if (this.workspaceIdentityReconciliationPromise) {
+      return this.workspaceIdentityReconciliationPromise;
+    }
+    const targets = this.snapshot.agents.filter((agent) => (
+      !agent.workspace || agent.workspace.folder !== agent.folder
+    ));
+    if (targets.length === 0) return;
+
+    const reconciliation = (async () => {
+      let nextIndex = 0;
+      let changed = false;
+      const workers = Array.from({ length: Math.min(4, targets.length) }, async () => {
+        while (nextIndex < targets.length) {
+          const target = targets[nextIndex++];
+          if (target) changed = (await this.refreshAgentWorkspaceIdentity(target.id)) || changed;
+        }
+      });
+      await Promise.all(workers);
+      if (changed) await this.persistSnapshotOnly();
+    })().finally(() => {
+      if (this.workspaceIdentityReconciliationPromise === reconciliation) {
+        this.workspaceIdentityReconciliationPromise = null;
+      }
+    });
+    this.workspaceIdentityReconciliationPromise = reconciliation;
+    return reconciliation;
+  }
+
+  private async refreshAgentWorkspaceIdentity(agentId: string): Promise<boolean> {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent || typeof this.agentGitService.identity !== 'function') return false;
+
+    const identity = await this.agentGitService.identity(agent.folder);
+    if (sameWorkspaceIdentity(agent.workspace, identity)) return false;
+    updateAgentWorkspace(this.snapshot, agentId, identity, identity.updatedAt);
+    return true;
   }
 
   private async refreshAgentGitStatus(agentId: string): Promise<boolean> {
@@ -2667,6 +2764,15 @@ export class ClawBackendServer {
       type: 'git.statusUpdated',
       payload: status,
     });
+    const workspace = agent.workspace;
+    if (workspace?.kind === 'git' && workspace.folder === agent.folder) {
+      const branch = status.branch ?? null;
+      if (workspace.branch !== branch) {
+        updateAgentWorkspace(this.snapshot, agentId, { ...workspace, branch, updatedAt: status.updatedAt }, status.updatedAt);
+      }
+    } else {
+      await this.refreshAgentWorkspaceIdentity(agentId);
+    }
     return true;
   }
 
@@ -2930,7 +3036,90 @@ export class ClawBackendServer {
     });
   }
 
+  private async respondToWorkRoutingRequest(response: ClientRequestResponse): Promise<void> {
+    const request = this.snapshot.workRoutingRequests?.find((candidate) => candidate.id === response.id);
+    if (!request) {
+      throw new Error(`Work routing request not found: ${response.id}`);
+    }
+    if (!this.workRouting) {
+      throw new Error('Work routing is not configured.');
+    }
+
+    const selection = response.payload?.workRouting;
+    if (response.payload?.cancelled === true || !selection) {
+      this.resolveWorkRouting(request.id, { mode: 'cancelled' });
+      return;
+    }
+    if (selection.mode !== 'current' && selection.mode !== 'branch' && selection.mode !== 'delegate') {
+      throw new Error('Invalid work routing mode.');
+    }
+
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === request.payload.request.agentId);
+    if (!agent) {
+      throw new Error(`Agent not found: ${request.payload.request.agentId}`);
+    }
+
+    if (selection.mode === 'current') {
+      this.resolveWorkRouting(request.id, { mode: 'current', folder: agent.folder });
+      return;
+    }
+
+    const branchName = selection.branchName?.trim() ?? '';
+    if (!branchName) {
+      throw new Error('Enter a branch name.');
+    }
+
+    if (selection.mode === 'branch') {
+      if (request.payload.request.sharedFolderAgentNames.length > 0) {
+        throw new Error(`This folder is also used by ${request.payload.request.sharedFolderAgentNames.join(', ')}. Delegate to a worktree instead.`);
+      }
+      const folder = await this.agentGitService.createBranch(agent.folder, branchName, false);
+      await this.refreshAgentWorkspaceIdentity(agent.id);
+      await this.persistAndEmitSnapshot();
+      this.resolveWorkRouting(request.id, { mode: 'branch', branchName, folder });
+      return;
+    }
+
+    const folder = await this.agentGitService.createBranch(agent.folder, branchName, true);
+    const delegated = duplicateAgentInSnapshot(this.snapshot, agent.id, undefined, undefined, {
+      name: delegatedAgentName(agent.name, branchName),
+      select: false,
+    });
+    if (!delegated) {
+      throw new Error(`Agent not found: ${agent.id}`);
+    }
+    updateAgentFolder(this.snapshot, delegated.id, folder);
+    await this.refreshAgentWorkspaceIdentity(delegated.id);
+    await this.persistAndEmitSnapshot();
+    this.sendAgentPrompt(delegated.id, request.payload.request.task);
+    this.resolveWorkRouting(request.id, {
+      mode: 'delegated',
+      agentId: delegated.id,
+      agentName: delegated.name,
+      branchName,
+      folder,
+    });
+  }
+
+  private resolveWorkRouting(requestId: string, result: WorkRoutingResult): void {
+    if (!this.workRouting?.resolveWorkRoutingRequest(requestId, result)) {
+      throw new Error(`Work routing request is no longer pending: ${requestId}`);
+    }
+  }
+
   private recordClientRequestOwner(event: MainToRendererEvent, remoteConnectionIdOverride?: string): void {
+    if (event.type === 'workRouting.requested') {
+      const request = clientRequest(event.payload);
+      if (!request || request.kind !== 'work_routing') {
+        return;
+      }
+      this.clientRequestOwners.set(request.id, {
+        kind: 'workRouting',
+        ...(remoteConnectionIdOverride ? { remoteConnectionId: remoteConnectionIdOverride } : {}),
+      });
+      return;
+    }
+
     if (
       event.type !== 'approval.requested' &&
       event.type !== 'backendApproval.requested' &&
@@ -2953,6 +3142,7 @@ export class ClawBackendServer {
         : undefined;
       const remoteConnectionId = remoteConnectionIdOverride ?? (ownerAgent ? this.remoteConnectionIdForAgent(ownerAgent) : null);
       this.clientRequestOwners.set(requestId, {
+        kind: 'driver',
         backend,
         ...(remoteConnectionId ? { remoteConnectionId } : {}),
       });
@@ -3011,6 +3201,10 @@ function projectRemoteTeam(target: AppSnapshot, localTeam: Team, remoteSnapshot:
   target.agents = [
     ...target.agents.filter((agent) => !projectedAgentIds.has(agent.id)),
     ...remoteAgents,
+  ];
+  target.workRoutingRequests = [
+    ...(target.workRoutingRequests ?? []).filter((request) => !projectedAgentIds.has(request.payload.request.agentId)),
+    ...(remoteSnapshot.workRoutingRequests ?? []).filter((request) => projectedAgentIds.has(request.payload.request.agentId)),
   ];
   target.messages = [
     ...target.messages.filter((message) => !projectedAgentIds.has(message.agentId)),
@@ -3516,6 +3710,21 @@ function isIntegrationBranchName(branch?: string): boolean {
   return branch === 'main' || branch === 'master' || branch === 'develop' || branch === 'development' || branch === 'trunk';
 }
 
+function sameWorkspaceIdentity(current: AgentWorkspaceIdentity | undefined, next: AgentWorkspaceIdentity): boolean {
+  if (!current || current.kind !== next.kind || current.folder !== next.folder) return false;
+  if (current.kind === 'folder' && next.kind === 'folder') {
+    return current.label === next.label;
+  }
+  if (current.kind === 'git' && next.kind === 'git') {
+    return current.repositoryName === next.repositoryName
+      && current.repositoryRoot === next.repositoryRoot
+      && current.branch === next.branch
+      && current.isLinkedWorktree === next.isLinkedWorktree
+      && current.primaryWorktreeRoot === next.primaryWorktreeRoot;
+  }
+  return false;
+}
+
 function createUnsupportedSystemPermissionsPort(): SystemPermissionsPort {
   return {
     async getStatus() {
@@ -3593,12 +3802,17 @@ function clientRequest(value: unknown): ClientRequest | null {
     !('id' in value) ||
     !('kind' in value) ||
     typeof value.id !== 'string' ||
-    (value.kind !== 'confirm_tool' && value.kind !== 'ask_user')
+    (value.kind !== 'confirm_tool' && value.kind !== 'ask_user' && value.kind !== 'work_routing')
   ) {
     return null;
   }
 
   return value as ClientRequest;
+}
+
+function delegatedAgentName(agentName: string, branchName: string): string {
+  const branchLabel = branchName.split('/').filter(Boolean).at(-1) ?? branchName;
+  return `${agentName} ${branchLabel}`;
 }
 
 function backendApprovalRequestId(value: unknown): string | null {

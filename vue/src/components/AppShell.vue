@@ -54,6 +54,7 @@
         :list-conversations="listAgentConversations"
         :open-in-catalog="openInApplications"
         :quick-switch-shortcuts-visible="quickAgentShortcutsVisible"
+        :repository-icons="snapshot.general.repositoryIcons"
         :resume-conversation="resumeAgentConversation"
         @collapse-sidebar="agentSidebarCollapsed = true"
         @close-agent="$emit('close-agent', $event)"
@@ -70,6 +71,7 @@
         @remove-bench-template="removeBenchTemplateForActiveTeam"
         @save-agent-to-bench="$emit('save-agent-to-bench', $event)"
         @select-agent="selectAgentFromShell"
+        @update-repository-icon="updateRepositoryIcon"
       />
     </Transition>
     <section class="app-shell__content">
@@ -2911,6 +2913,19 @@ function appshotFileName(appName?: string): string {
 
 async function updateSettings(input: UpdateSettingsInput): Promise<void> {
   await props.updateSettings(input);
+}
+
+async function updateRepositoryIcon(payload: {
+  repositoryRoot: string;
+  icon: string | undefined;
+}): Promise<void> {
+  const repositoryIcons = { ...props.snapshot.general.repositoryIcons };
+  if (payload.icon) {
+    repositoryIcons[payload.repositoryRoot] = payload.icon;
+  } else {
+    delete repositoryIcons[payload.repositoryRoot];
+  }
+  await updateSettings({ general: { repositoryIcons } });
 }
 
 async function setCodexResourceSharing(input: SetCodexResourceSharingInput): Promise<void> {

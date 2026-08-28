@@ -9,7 +9,7 @@ import { CodexBackendDriver } from './codex/codex-driver';
 import { CodexSurfaceAgentAdapter } from './codex/codex-surface-adapter';
 import { resolveCodexCommand } from './codex/codex-command';
 import { createCodexSurface } from '@codex-app-sdk/backend';
-import { createSourceWorktree, listSourceWorktrees, suggestedSourceWorktreePath } from './git-worktrees';
+import { createSourceWorktree, listSourceBranches, listSourceWorktrees, suggestedSourceWorktreePath } from './git-worktrees';
 import { buildCodexClawMcpConfigOverrides, buildCodexClawThreadConfig } from './mcp/codex-config';
 import { backendCodexHomeDir } from './state';
 import { listSourceFolders } from './source-folders';
@@ -352,6 +352,10 @@ export class BackendDriverRpc {
       case backendMethods.sourceWorktreesList: {
         const record = requireRecord(params);
         return listSourceWorktrees(requireString(record.repoPath, 'repoPath'));
+      }
+      case backendMethods.sourceBranchesList: {
+        const record = requireRecord(params);
+        return listSourceBranches(requireString(record.repoPath, 'repoPath'));
       }
       case backendMethods.sourceWorktreeCreate: {
         const record = requireRecord(params);

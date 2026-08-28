@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AgentSubagentTree, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Loop, LoopAction, LoopExecutionCreatedAgent, LoopExecutionLogEntry, LoopExecutionStatus, LoopSourceConfiguration, LoopTeamTarget, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, SubagentActivity, SubagentNode, SubagentOperation, SubagentStatus, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/core/contracts';
+import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AgentSubagentTree, AgentWorkspaceIdentity, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Loop, LoopAction, LoopExecutionCreatedAgent, LoopExecutionLogEntry, LoopExecutionStatus, LoopSourceConfiguration, LoopTeamTarget, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, SubagentActivity, SubagentNode, SubagentOperation, SubagentStatus, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/core/contracts';
 import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '@codex-claw/core/codex-approval-presets';
 import { normalizeGeneralSettings, normalizeSourceFolderState, normalizeThemeSettings } from '@codex-claw/core/settings';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
@@ -29,6 +29,7 @@ type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'upda
   backendSession?: BackendSession;
   backendDefaults?: BackendDefaults;
   openInApplication?: OpenInApplication;
+  workspace?: AgentWorkspaceIdentity;
   contextUsage?: AgentContextUsage;
   plan?: ThreadPlan;
   goal?: ThreadGoal;
@@ -143,6 +144,7 @@ function persistedAgentFromSnapshot(agent: Agent): PersistedAgent {
     name: agent.name,
     avatar: agent.avatar,
     folder: agent.folder,
+    ...(agent.workspace ? { workspace: { ...agent.workspace } } : {}),
     backend: agent.backend,
     ...(agent.backendSession ? { backendSession: cloneBackendSession(agent.backendSession) } : {}),
     ...(agent.backendDefaults ? { backendDefaults: cloneBackendDefaults(agent.backendDefaults) } : {}),
@@ -363,12 +365,14 @@ function sanitizeAgent(value: unknown): Agent | null {
   const plan = sanitizeThreadPlan(value.plan);
   const goal = sanitizeThreadGoal(value.goal);
   const openInApplication = sanitizeOpenInApplication(value.openInApplication);
+  const workspace = sanitizeAgentWorkspace(value.workspace);
   return {
     id: value.id,
     teamId: typeof value.teamId === 'string' ? value.teamId : undefined,
     name: value.name,
     avatar: typeof value.avatar === 'string' ? value.avatar : undefined,
     folder: value.folder,
+    ...(workspace ? { workspace } : {}),
     backend,
     ...(backendSession ? { backendSession } : {}),
     ...(backendDefaults ? { backendDefaults } : {}),
@@ -381,6 +385,40 @@ function sanitizeAgent(value: unknown): Agent | null {
     createdAt,
     updatedAt,
   };
+}
+
+function sanitizeAgentWorkspace(value: unknown): AgentWorkspaceIdentity | undefined {
+  if (!isRecord(value) || typeof value.folder !== 'string' || typeof value.updatedAt !== 'string') {
+    return undefined;
+  }
+  if (value.kind === 'folder' && typeof value.label === 'string') {
+    return {
+      kind: 'folder',
+      folder: value.folder,
+      label: value.label,
+      updatedAt: value.updatedAt,
+    };
+  }
+  if (
+    value.kind === 'git'
+    && typeof value.repositoryName === 'string'
+    && typeof value.repositoryRoot === 'string'
+    && (typeof value.branch === 'string' || value.branch === null)
+    && typeof value.isLinkedWorktree === 'boolean'
+    && typeof value.primaryWorktreeRoot === 'string'
+  ) {
+    return {
+      kind: 'git',
+      folder: value.folder,
+      repositoryName: value.repositoryName,
+      repositoryRoot: value.repositoryRoot,
+      branch: value.branch,
+      isLinkedWorktree: value.isLinkedWorktree,
+      primaryWorktreeRoot: value.primaryWorktreeRoot,
+      updatedAt: value.updatedAt,
+    };
+  }
+  return undefined;
 }
 
 function sanitizeOpenInApplication(value: unknown): OpenInApplication | undefined {

@@ -1,8 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus, { ElMessageBox } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgentSidebar from '../AgentSidebar.vue';
 import type { Agent, BenchTemplate, Team } from '@codex-claw/core/contracts';
+
+const agentSidebarSource = readFileSync(resolve(process.cwd(), 'src/components/AgentSidebar.vue'), 'utf8');
 
 function pointerEvent(type: string, clientX: number): PointerEvent {
   const event = new MouseEvent(type, {
@@ -49,6 +53,16 @@ const agents: Agent[] = [
     name: 'Dina',
     avatar: 'DI',
     folder: '~/src/id8',
+    workspace: {
+      kind: 'git',
+      folder: '~/src/id8',
+      repositoryName: 'id8',
+      repositoryRoot: '~/src/id8',
+      branch: 'main',
+      isLinkedWorktree: false,
+      primaryWorktreeRoot: '~/src/id8',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    },
     backend: 'codex',
     backendDefaults: { kind: 'codex' },
     status: { type: 'idle' },
@@ -59,6 +73,16 @@ const agents: Agent[] = [
     id: 'agent-jesse',
     name: 'Jesse',
     folder: '~/src/multi-llm-ts',
+    workspace: {
+      kind: 'git',
+      folder: '~/src/multi-llm-ts',
+      repositoryName: 'multi-llm-ts',
+      repositoryRoot: '~/src/multi-llm-ts',
+      branch: 'feat/testing',
+      isLinkedWorktree: false,
+      primaryWorktreeRoot: '~/src/multi-llm-ts',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    },
     backend: 'codex',
     backendDefaults: { kind: 'codex' },
     status: { type: 'working', detail: 'Testing' },
@@ -102,7 +126,7 @@ afterEach(() => {
 });
 
 describe('AgentSidebar', () => {
-  it('renders the team header, agents, statuses, folder basenames, and active selection without Bench chrome', () => {
+  it('renders repository headers, branch sessions, statuses, and active selection without Bench chrome', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents,
@@ -114,23 +138,18 @@ describe('AgentSidebar', () => {
       },
     });
 
-    expect(wrapper.get('.agent-sidebar__header').text()).toContain('CODEX CLAW');
-    expect(wrapper.text()).toContain('CODEX CLAW');
+    expect(wrapper.get('.agent-sidebar__header').text()).toContain('Sessions');
     expect(wrapper.text()).not.toContain('Bench');
-    expect(wrapper.text()).toContain('Dina');
-    expect(wrapper.text()).toContain('Idle');
     expect(wrapper.text()).toContain('id8');
-    expect(wrapper.text()).not.toContain('~/src/id8');
-    expect(wrapper.text()).toContain('Jesse');
-    expect(wrapper.text()).toContain('Testing');
+    expect(wrapper.text()).toContain('main');
     expect(wrapper.text()).toContain('multi-llm-ts');
-    expect(wrapper.text()).not.toContain('~/src/multi-llm-ts');
-    expect(wrapper.find('.agent-sidebar__agent--active').text()).toContain('Dina');
+    expect(wrapper.text()).toContain('feat/testing');
+    expect(wrapper.find('.agent-sidebar__agent--active').text()).toContain('main');
     expect(wrapper.find('.agent-sidebar__agent--active').attributes('aria-pressed')).toBe('true');
     expect(wrapper.find('[aria-label="Working"]').exists()).toBe(true);
   });
 
-  it('renders compact agent rows with only mini avatars, names, and status icons', () => {
+  it('renders compact workspace rows with repository headers, branches, and status icons', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents,
@@ -144,11 +163,31 @@ describe('AgentSidebar', () => {
     });
 
     expect(wrapper.classes()).toContain('agent-sidebar--compact');
-    expect(wrapper.findAllComponents({ name: 'AgentAvatar' }).map((avatar) => avatar.props('size'))).toStrictEqual(['sm', 'sm']);
-    expect(wrapper.findAll('.agent-sidebar__meta strong').map((name) => name.text())).toStrictEqual(['Dina', 'Jesse']);
+    expect(wrapper.findAll('.agent-sidebar__workspace-header').map((header) => header.text())).toStrictEqual(['id8', 'multi-llm-ts']);
+    expect(wrapper.findAll('.agent-sidebar__meta strong').map((name) => name.text())).toStrictEqual(['main', 'feat/testing']);
     expect(wrapper.findAll('.agent-sidebar__status')).toHaveLength(2);
-    expect(wrapper.find('.agent-sidebar__status-text').exists()).toBe(false);
-    expect(wrapper.find('.agent-sidebar__folder').exists()).toBe(false);
+    expect(wrapper.find('.agent-sidebar__branch').exists()).toBe(false);
+  });
+
+  it('renders and updates repository-specific icons', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        repositoryIcons: { '~/src/id8': '🦞' },
+        teamName: 'Codex Claw',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    const picker = wrapper.findAllComponents({ name: 'RepositoryIconPicker' })
+      .find((component) => component.props('label') === 'id8')!;
+    expect(picker.props('modelValue')).toBe('🦞');
+    picker.vm.$emit('update:modelValue', '🚀');
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted('update-repository-icon')).toStrictEqual([
+      [{ repositoryRoot: '~/src/id8', icon: '🚀' }],
+    ]);
   });
 
   it('replaces an unread agent runtime status with the unread indicator', () => {
@@ -277,7 +316,7 @@ describe('AgentSidebar', () => {
     expect(wrapper.emitted('reorder-agents')).toBeUndefined();
   });
 
-  it('falls back to name initials when an avatar is not set', () => {
+  it('uses branch icons instead of agent avatars', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents,
@@ -289,7 +328,19 @@ describe('AgentSidebar', () => {
       },
     });
 
-    expect(wrapper.find('.agent-sidebar__agent--active .agent-sidebar__avatar').text()).toBe('JE');
+    expect(wrapper.findAll('.agent-sidebar__session-icon')).toHaveLength(2);
+    expect(wrapper.find('.agent-sidebar__avatar').exists()).toBe(false);
+  });
+
+  it('gives normal workspace rows larger icons and breathing room than compact rows', () => {
+    expect(agentSidebarSource).toContain('--agent-sidebar-row-min-height: 30px;');
+    expect(agentSidebarSource).toContain('--agent-sidebar-workspace-icon-size: 16px;');
+    expect(agentSidebarSource).toContain('--agent-sidebar-repository-icon-size: 20px;');
+    expect(agentSidebarSource).toContain('min-height: 30px;');
+    expect(agentSidebarSource).toContain('.agent-sidebar--compact {\n  --agent-sidebar-row-min-height: 28px;\n  --agent-sidebar-workspace-icon-size: 16px;');
+    expect(agentSidebarSource).toContain('--agent-sidebar-repository-icon-column-width: 24px;');
+    expect(agentSidebarSource).toContain('--agent-sidebar-workspace-column-gap: 4px;');
+    expect(agentSidebarSource).toContain('.agent-sidebar__workspace-toggle svg {\n  width: 10px;\n  height: 10px;');
   });
 
   it('labels non-idle statuses for assistive tech', () => {
@@ -313,7 +364,7 @@ describe('AgentSidebar', () => {
     expect(wrapper.find('[aria-label="Error"]').exists()).toBe(true);
   });
 
-  it('surfaces short collaboration statuses while keeping folder basenames visible in compact rows', () => {
+  it('keeps workspace labels stable when collaboration status changes', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents: [
@@ -327,16 +378,16 @@ describe('AgentSidebar', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('Running tests');
+    expect(wrapper.text()).toContain('main');
     expect(wrapper.text()).toContain('id8');
-    expect(wrapper.text()).not.toContain('~/src/id8');
+    expect(wrapper.get('.agent-sidebar__status').attributes('aria-label')).toBe('Idle');
   });
 
-  it('keeps blank folders blank instead of inventing a basename', () => {
+  it('places agents without workspace identity under Quick chats', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents: [
-          { ...agents[0], folder: '' },
+          { ...agents[0], folder: '', workspace: undefined },
         ],
         activeAgentId: 'agent-dina',
         teamName: 'Codex Claw',
@@ -346,7 +397,8 @@ describe('AgentSidebar', () => {
       },
     });
 
-    expect(wrapper.get('.agent-sidebar__folder').text()).toBe('');
+    expect(wrapper.get('.agent-sidebar__workspace-header').text()).toBe('Quick chats');
+    expect(wrapper.find('.agent-sidebar__branch').exists()).toBe(false);
   });
 
   it('renders a taller rounded new agent action', () => {

@@ -8,6 +8,7 @@ import {
   snapshotMetadata,
   updateAgentFromInput,
   updateAgentFolder,
+  updateAgentWorkspace,
 } from '../snapshot';
 import type { RendererMessage, RendererToolPart, RendererToolPartUpdate } from '../contracts';
 import { toolOutputText } from '../tool-output';
@@ -62,6 +63,24 @@ describe('snapshot reducer', () => {
       createdAt: '2026-06-05T00:00:00.000Z',
       updatedAt: '2026-06-05T00:00:01.000Z',
     });
+  });
+
+  it('stores workspace identity and clears it when the folder changes', () => {
+    const snapshot = createInitialSnapshot();
+    const workspace = {
+      kind: 'git' as const,
+      folder: '/Users/nbonamy/src/codex-claw',
+      repositoryName: 'codex-claw',
+      repositoryRoot: '/Users/nbonamy/src/codex-claw',
+      branch: 'main',
+      isLinkedWorktree: false,
+      primaryWorktreeRoot: '/Users/nbonamy/src/codex-claw',
+      updatedAt: '2026-08-27T12:00:00.000Z',
+    };
+
+    expect(updateAgentWorkspace(snapshot, 'agent-dina', workspace)).toMatchObject({ workspace });
+    updateAgentFolder(snapshot, 'agent-dina', '/Users/nbonamy/src/id8');
+    expect(snapshot.agents[0].workspace).toBeUndefined();
   });
 
   it('creates agents in the active team and selects the new agent', () => {
@@ -2991,6 +3010,43 @@ describe('snapshot reducer', () => {
       type: 'awaitingInput',
       detail: 'Which file should I inspect?',
     });
+  });
+
+  it('tracks app-owned work-routing requests outside the transcript', () => {
+    const snapshot = createInitialSnapshot();
+    const request = {
+      id: 'work-routing-1',
+      kind: 'work_routing' as const,
+      payload: {
+        request: {
+          agentId: 'agent-dina',
+          task: 'Add queue retries',
+          suggestedBranchName: 'feat/queue-retries',
+          sharedFolderAgentNames: [],
+        },
+      },
+    };
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'workRouting.requested',
+      payload: request,
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(snapshot.workRoutingRequests).toStrictEqual([request]);
+    expect(snapshot.messages).toHaveLength(0);
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      type: 'workRouting.resolved',
+      payload: { id: 'work-routing-1' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(snapshot.workRoutingRequests).toStrictEqual([]);
   });
 
   it('attaches approval requests to the only running MCP tool when metadata is incomplete', () => {

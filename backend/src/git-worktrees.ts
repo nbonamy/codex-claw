@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import type { CreateSourceWorktreeInput, SourceWorktree } from '@codex-claw/core/contracts';
+import type { CreateSourceWorktreeInput, SourceBranch, SourceWorktree } from '@codex-claw/core/contracts';
 
 const execFileAsync = promisify(execFile);
 
@@ -31,14 +31,63 @@ export async function createSourceWorktree(
   }
 
   const worktreePath = input.destinationPath?.trim() || suggestedSourceWorktreePath(repoPath, branchName);
-  await runner.run('git', ['worktree', 'add', '-b', branchName, worktreePath], {
-    cwd: repoPath,
-  });
+  const localBranch = await branchExists(runner, repoPath, `refs/heads/${branchName}`);
+  if (localBranch) {
+    await runner.run('git', ['worktree', 'add', worktreePath, branchName], { cwd: repoPath });
+  } else {
+    const remoteBranch = await findRemoteBranch(runner, repoPath, branchName);
+    await runner.run('git', remoteBranch
+      ? ['worktree', 'add', '-b', branchName, worktreePath, remoteBranch]
+      : ['worktree', 'add', '-b', branchName, worktreePath], { cwd: repoPath });
+  }
 
   return {
     name: slug(path.basename(branchName)),
     path: worktreePath,
   };
+}
+
+export async function listSourceBranches(
+  repoPath: string,
+  runner: CommandRunner = defaultRunner,
+): Promise<SourceBranch[]> {
+  const normalizedRepoPath = repoPath.trim();
+  if (!normalizedRepoPath) throw new Error('Repository path is required.');
+
+  const [refs, worktrees, defaultRef] = await Promise.all([
+    runner.run('git', ['for-each-ref', '--format=%(refname)', 'refs/heads', 'refs/remotes'], { cwd: normalizedRepoPath }),
+    runner.run('git', ['worktree', 'list', '--porcelain'], { cwd: normalizedRepoPath }),
+    runner.run('git', ['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD'], { cwd: normalizedRepoPath })
+      .catch(() => ({ stdout: '' })),
+  ]);
+  return parseSourceBranches(refs.stdout ?? '', worktrees.stdout ?? '', defaultRef.stdout ?? '', normalizedRepoPath);
+}
+
+export function parseSourceBranches(
+  refsOutput: string,
+  worktreesOutput: string,
+  defaultRefOutput: string,
+  repoPath: string,
+): SourceBranch[] {
+  const worktreeByBranch = new Map(
+    parseGitWorktreeList(worktreesOutput, repoPath).map((worktree) => [worktree.name, worktree.path]),
+  );
+  const names = new Set<string>();
+  for (const rawRef of refsOutput.split(/\r?\n/u).map((value) => value.trim()).filter(Boolean)) {
+    if (rawRef.endsWith('/HEAD')) continue;
+    if (rawRef.startsWith('refs/heads/')) names.add(rawRef.slice('refs/heads/'.length));
+    else if (rawRef.startsWith('refs/remotes/')) names.add(rawRef.slice('refs/remotes/'.length).replace(/^[^/]+\//u, ''));
+  }
+  const explicitDefault = defaultRefOutput.trim().replace(/^[^/]+\//u, '');
+  const fallbackDefault = names.has('main') ? 'main' : names.has('master') ? 'master' : '';
+  const defaultBranch = explicitDefault || fallbackDefault;
+  return [...names]
+    .map((name): SourceBranch => ({
+      name,
+      isDefault: name === defaultBranch,
+      ...(worktreeByBranch.get(name) ? { worktreePath: worktreeByBranch.get(name) } : {}),
+    }))
+    .sort((left, right) => Number(right.isDefault) - Number(left.isDefault) || left.name.localeCompare(right.name));
 }
 
 export async function listSourceWorktrees(
@@ -95,4 +144,21 @@ function slug(value: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '') || 'worktree';
+}
+
+async function branchExists(runner: CommandRunner, repoPath: string, ref: string): Promise<boolean> {
+  try {
+    await runner.run('git', ['show-ref', '--verify', '--quiet', ref], { cwd: repoPath });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function findRemoteBranch(runner: CommandRunner, repoPath: string, branchName: string): Promise<string | undefined> {
+  const result = await runner.run('git', ['for-each-ref', '--format=%(refname:short)', 'refs/remotes'], { cwd: repoPath });
+  return (result.stdout ?? '')
+    .split(/\r?\n/u)
+    .map((value) => value.trim())
+    .find((value) => value.endsWith(`/${branchName}`) && !value.endsWith('/HEAD'));
 }

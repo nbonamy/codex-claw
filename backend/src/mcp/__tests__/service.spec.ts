@@ -33,6 +33,44 @@ describe('ClawMcpService', () => {
     }));
   });
 
+  it('holds prepare-work until Claw resolves the routing choice', async () => {
+    const snapshot = createInitialSnapshot();
+    const events: Array<{ type?: string; payload?: unknown }> = [];
+    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    const url = await service.start();
+
+    const toolCall = postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 2, method: 'tools/call',
+      params: {
+        name: 'prepare-work',
+        arguments: { task: 'Add queue retries', branchName: 'feat/queue-retries' },
+      },
+    });
+
+    await vi.waitFor(() => {
+      expect(events).toContainEqual(expect.objectContaining({ type: 'workRouting.requested' }));
+    });
+    const request = snapshot.workRoutingRequests?.[0];
+    expect(request).toMatchObject({
+      kind: 'work_routing',
+      payload: { request: { agentId: 'agent-dina', task: 'Add queue retries', suggestedBranchName: 'feat/queue-retries' } },
+    });
+
+    service.resolveWorkRoutingRequest(request!.id, {
+      mode: 'current',
+      folder: '/Users/nicolas/src/codex-claw',
+    });
+
+    await expect(toolCall).resolves.toMatchObject({
+      result: { structuredContent: { mode: 'current', folder: '/Users/nicolas/src/codex-claw' } },
+    });
+    expect(snapshot.workRoutingRequests).toStrictEqual([]);
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'workRouting.resolved',
+      payload: { id: request!.id },
+    }));
+  });
+
   it('serves health and debug routes while rejecting invalid HTTP and MCP requests', async () => {
     service = new ClawMcpService({ snapshot: createInitialSnapshot() });
     const mcpUrl = await service.start();

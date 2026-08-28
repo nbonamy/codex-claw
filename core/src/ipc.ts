@@ -46,6 +46,7 @@ export const ipcChannels = {
   chooseSourceFolder: 'source-folder:choose',
   listSourceFolders: 'source-folder:folders:list',
   listSourceRepositories: 'source-folder:repositories:list',
+  listSourceBranches: 'source-folder:branches:list',
   listSourceWorktrees: 'source-folder:worktrees:list',
   suggestSourceWorktreePath: 'source-folder:worktree-path:suggest',
   chooseSourceWorktreeDestination: 'source-folder:worktree-destination:choose',

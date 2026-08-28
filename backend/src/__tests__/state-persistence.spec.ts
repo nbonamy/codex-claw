@@ -71,6 +71,27 @@ describe('AppStatePersistence', () => {
     expect(snapshotFromPersistedState(persisted).agents[0].openInApplication).toBeUndefined();
   });
 
+  it('round-trips workspace identity and ignores invalid legacy metadata', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].workspace = {
+      kind: 'git',
+      folder: '/Users/nbonamy/src/codex-claw-feature',
+      repositoryName: 'codex-claw',
+      repositoryRoot: '/Users/nbonamy/src/codex-claw-feature',
+      branch: 'feat/work-routing',
+      isLinkedWorktree: true,
+      primaryWorktreeRoot: '/Users/nbonamy/src/codex-claw',
+      updatedAt: '2026-08-27T12:00:00.000Z',
+    };
+    const persisted = persistedStateFromSnapshot(snapshot) as unknown as {
+      agents: Array<Record<string, unknown>>;
+    };
+
+    expect(snapshotFromPersistedState(persisted).agents[0].workspace).toStrictEqual(snapshot.agents[0].workspace);
+    persisted.agents[0].workspace = { kind: 'git', repositoryName: 42 };
+    expect(snapshotFromPersistedState(persisted).agents[0].workspace).toBeUndefined();
+  });
+
   it('persists the observed subagent tree for backend and renderer reloads', () => {
     const snapshot = createInitialSnapshot();
     const agentId = snapshot.agents[0].id;
@@ -915,6 +936,7 @@ describe('AppStatePersistence', () => {
       claudeCodeEnabled: true,
       agentListCompact: true,
       shareCodexSkillsAndPlugins: false,
+      repositoryIcons: { '/src/codex-claw': '🦞' },
       appshots: {
         hotkey: 'option',
         destination: 'active-agent',

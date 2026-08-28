@@ -371,6 +371,12 @@ implemented:
 Avoid layout jumps during streaming, loading, plan updates, approval prompts,
 and artifact pane changes.
 
+When an agent calls `prepare-work`, show one blocking Claw dialog with three
+explicit destinations: the current checkout, a new branch in that checkout,
+or a delegated conversation in a new worktree. Default to delegation for
+substantial parallel work, keep the suggested branch editable, and keep git or
+agent mutations out of the renderer.
+
 ## Local SDK Development
 
 `npm run dev` resolves `codex-app-sdk` entrypoints from the sibling
@@ -489,6 +495,16 @@ Rules:
 - Compose the macOS rail and agent sidebar over Electron's native menu vibrancy
   using translucent semantic shell tokens; keep main content opaque and retain
   the native window shadow instead of simulating glass or shadow in CSS.
+
+The team sidebar is a repository-first session navigator rather than an agent
+directory. Repository names are borderless section rows; branch and worktree
+sessions sit directly beneath them on the same dense 30-pixel cadence, with
+almost no space between groups. Main checkouts use the primary-colored branch
+icon, ordinary branches use success, linked worktrees use warning, and detached
+or folder-only sessions stay muted. Users can replace the default repository
+folder icon with a persisted one-grapheme icon without changing the canonical
+repository identity. Agent names remain available for deterministic
+disambiguation when multiple sessions share a branch label.
 
 ## Rendering Surfaces
 

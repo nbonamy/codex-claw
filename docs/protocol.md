@@ -92,7 +92,8 @@ therefore never replayed after reconnect or renderer reload.
 | `backend/health/get` | none | `ClawBackendHealth` | Liveness and version check. |
 | `snapshot/get` | none | `ClawSnapshotGetResult` | Initializes source folder if needed and returns the authoritative snapshot. |
 | `client/state/get` | none | `ClientState` | Backend-derived client hints only. |
-| `client/request/respond` | `{ response: ClientRequestResponse }` | `AppSnapshot` | Resolves a provider-owned approval or ask-user request. |
+| `client/request/respond` | `{ response: ClientRequestResponse }` | `AppSnapshot` | Resolves a provider-owned approval/ask-user request or an app-owned work-routing choice. |
+| `mcp/workRouting/respond` | `{ response: ClientRequestResponse }` | `AppSnapshot` | Internal local/remote `clawd` route that applies the selected branch/worktree behavior and resolves the blocked MCP tool. |
 
 ## Client To `clawd`: System
 
@@ -335,7 +336,8 @@ Event `type` values are the app-owned `MainToRendererEvent['type']` union from
 - message and item streaming: `message.userSubmitted`, `message.delta`, `message.steer`,
   `item.started`, `item.updated`, `item.completed`;
 - approvals and requests: `backendApproval.requested`,
-  `backendApproval.resolved`, `approval.requested`, `toolInput.requested`;
+  `backendApproval.resolved`, `approval.requested`, `toolInput.requested`,
+  `workRouting.requested`, `workRouting.resolved`;
 - backend-owned prompt queue: `agent.promptQueued`, `agent.promptDequeued`,
   `agent.promptRetryScheduled`;
 - artifacts and account state: `diff.updated`, `sidePanel.markdownRequested`,

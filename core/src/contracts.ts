@@ -143,12 +143,31 @@ export type OpenInApplicationCatalog = {
   applications: OpenInApplicationOption[];
 };
 
+export type AgentWorkspaceIdentity =
+  | {
+      kind: 'git';
+      folder: string;
+      repositoryName: string;
+      repositoryRoot: string;
+      branch: string | null;
+      isLinkedWorktree: boolean;
+      primaryWorktreeRoot: string;
+      updatedAt: string;
+    }
+  | {
+      kind: 'folder';
+      folder: string;
+      label: string;
+      updatedAt: string;
+    };
+
 export type Agent = {
   id: string;
   teamId?: string;
   name: string;
   avatar?: string;
   folder: string;
+  workspace?: AgentWorkspaceIdentity;
   backend: AgentBackend;
   backendSession?: BackendSession;
   backendDefaults?: BackendDefaults;
@@ -641,6 +660,7 @@ export type AppGeneralSettings = {
   claudeCodeEnabled: boolean;
   agentListCompact: boolean;
   shareCodexSkillsAndPlugins: boolean;
+  repositoryIcons: Record<string, string>;
   appshots: AppshotSettings;
   /** Optional for backwards compatibility with pre-plugin state files. */
   plugins?: AppPluginSettings;
@@ -976,6 +996,12 @@ export type SourceWorktree = {
   path: string;
 };
 
+export type SourceBranch = {
+  name: string;
+  isDefault: boolean;
+  worktreePath?: string;
+};
+
 export type SourceRepository = {
   name: string;
   path: string;
@@ -1222,6 +1248,7 @@ export type AppSnapshot = {
   activeAgentId: string | null;
   messages: RendererMessage[];
   queuedPrompts?: AgentQueuedPrompt[];
+  workRoutingRequests?: WorkRoutingRequest[];
   backendApprovals: Record<string, BackendApprovalRequest[]>;
   agentGitStatuses: Record<string, AgentGitStatus>;
   turnGitDiffs: Record<string, TurnGitDiff>;
@@ -1322,6 +1349,8 @@ export type MainToRendererEvent = {
     | 'backendApproval.resolved'
     | 'clientRequest.resolved'
     | 'toolInput.requested'
+    | 'workRouting.requested'
+    | 'workRouting.resolved'
     | 'browser.annotationCreated'
     | 'error';
   payload: unknown;
@@ -1464,7 +1493,29 @@ export type ClientRequest =
     payload: {
       request: AskUserRequest;
     };
+  }
+  | WorkRoutingRequest;
+
+export type WorkRoutingMode = 'current' | 'branch' | 'delegate';
+
+export type WorkRoutingResult =
+  | { mode: 'cancelled' }
+  | { mode: 'current'; folder: string }
+  | { mode: 'branch'; branchName: string; folder: string }
+  | { mode: 'delegated'; agentId: string; agentName: string; branchName: string; folder: string };
+
+export type WorkRoutingRequest = {
+  id: string;
+  kind: 'work_routing';
+  payload: {
+    request: {
+      agentId: string;
+      task: string;
+      suggestedBranchName: string;
+      sharedFolderAgentNames: string[];
+    };
   };
+};
 
 export type ClientRequestResponse = {
   id: string;
@@ -1472,6 +1523,10 @@ export type ClientRequestResponse = {
     answers?: AskUserAnswers;
     cancelled?: boolean;
     decision?: ToolConfirmationDecision | null;
+    workRouting?: {
+      mode: WorkRoutingMode;
+      branchName?: string;
+    };
   };
 };
 
@@ -1535,6 +1590,7 @@ export type CodexClawApi = {
   chooseSourceFolder(): Promise<string | null>;
   listSourceFolders(input?: SourceFolderListInput): Promise<SourceFolderListing>;
   listSourceRepositories(remoteConnectionId?: string): Promise<SourceRepository[]>;
+  listSourceBranches(repoPath: string, remoteConnectionId?: string): Promise<SourceBranch[]>;
   listSourceWorktrees(repoPath: string, remoteConnectionId?: string): Promise<SourceWorktree[]>;
   suggestSourceWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>): Promise<string>;
   chooseSourceWorktreeDestination(defaultPath: string): Promise<string | null>;

@@ -45,6 +45,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   mergeAgentGitBranch: [backendMethods.agentGitMerge, named('agentId', 'input')],
   listSourceFolders: [backendMethods.sourceFoldersList, firstArgument],
   listSourceRepositories: [backendMethods.sourceRepositoriesList, optionalNamed('remoteConnectionId')],
+  listSourceBranches: [backendMethods.sourceBranchesList, namedOptional('repoPath', 'remoteConnectionId')],
   listSourceWorktrees: [backendMethods.sourceWorktreesList, namedOptional('repoPath', 'remoteConnectionId')],
   suggestSourceWorktreePath: [backendMethods.sourceWorktreePathSuggest, named('input')],
   createSourceWorktree: [backendMethods.sourceWorktreeCreate, named('input')],

@@ -131,6 +131,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
       return pluginStatus;
     },
     sendAgentMessage: (fromAgentId, toAgentId, content) => mcpService.sendMessage(fromAgentId, toAgentId, content),
+    workRouting: mcpService,
     workIntegrations,
     loopRunner,
     remoteClients: new RemoteClawdClientManager({

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Agent, AgentBackend, AgentStatus, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, WorkBacklogAssignmentStatus } from '@codex-claw/core/contracts';
+import type { Agent, AgentBackend, AgentStatus, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, WorkBacklogAssignmentStatus, WorkRoutingResult } from '@codex-claw/core/contracts';
 
 export type McpAgentInfo = {
   id: string;
@@ -91,6 +91,13 @@ export type McpCreateAgentResponse = {
   message: string;
 };
 
+export type PrepareWorkInput = {
+  branchName?: string;
+  task: string;
+};
+
+export type PrepareWorkResponse = WorkRoutingResult;
+
 export type ClawMcpAgentCoordinatorOptions = {
   getAgents: () => Agent[];
   onAgentUpdated?: (agent: Agent) => void;
@@ -101,6 +108,7 @@ export type ClawMcpAgentCoordinatorOptions = {
   onListSourceWorktrees?: (repoPath: string) => SourceWorktree[] | Promise<SourceWorktree[]>;
   onCreateSourceWorktree?: (input: CreateSourceWorktreeInput) => SourceWorktree | Promise<SourceWorktree>;
   onCreateAgent?: (agent: Agent, input: McpCreateAgentInput & { backend: AgentBackend; teamId?: string }) => McpCreateAgentResponse | Promise<McpCreateAgentResponse>;
+  onPrepareWork?: (agent: Agent, input: PrepareWorkInput) => PrepareWorkResponse | Promise<PrepareWorkResponse>;
   createId?: () => string;
   now?: () => Date;
 };
@@ -123,6 +131,7 @@ export class ClawMcpAgentCoordinator {
   private readonly onListSourceWorktrees?: (repoPath: string) => SourceWorktree[] | Promise<SourceWorktree[]>;
   private readonly onCreateSourceWorktree?: (input: CreateSourceWorktreeInput) => SourceWorktree | Promise<SourceWorktree>;
   private readonly onCreateAgent?: (agent: Agent, input: McpCreateAgentInput & { backend: AgentBackend; teamId?: string }) => McpCreateAgentResponse | Promise<McpCreateAgentResponse>;
+  private readonly onPrepareWork?: (agent: Agent, input: PrepareWorkInput) => PrepareWorkResponse | Promise<PrepareWorkResponse>;
   private readonly createId: () => string;
   private readonly now: () => Date;
 
@@ -136,6 +145,7 @@ export class ClawMcpAgentCoordinator {
     this.onListSourceWorktrees = options.onListSourceWorktrees;
     this.onCreateSourceWorktree = options.onCreateSourceWorktree;
     this.onCreateAgent = options.onCreateAgent;
+    this.onPrepareWork = options.onPrepareWork;
     this.createId = options.createId ?? randomUUID;
     this.now = options.now ?? (() => new Date());
   }
@@ -308,6 +318,23 @@ export class ClawMcpAgentCoordinator {
       branchName: input.branchName?.trim(),
       destinationPath: input.destinationPath?.trim() || undefined,
       teamId: agent.teamId,
+    });
+  }
+
+  async prepareWork(agentId: string, input: PrepareWorkInput): Promise<PrepareWorkResponse> {
+    const agent = this.requireAgent(agentId);
+    const task = input.task.trim();
+    if (!task) {
+      throw new McpToolError('Describe the work to prepare.');
+    }
+    if (!this.onPrepareWork) {
+      throw new McpToolError('Work routing is not available.');
+    }
+
+    const branchName = input.branchName?.trim();
+    return this.onPrepareWork(agent, {
+      task,
+      ...(branchName ? { branchName } : {}),
     });
   }
 

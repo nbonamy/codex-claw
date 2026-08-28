@@ -6,7 +6,10 @@
     aria-label="Agents"
   >
     <header class="agent-sidebar__header">
-      <strong>{{ teamTitle }}</strong>
+      <strong :title="teamName">Sessions</strong>
+      <button class="agent-sidebar__header-action" type="button" aria-label="New agent" title="New agent" @click="emit('new-agent')">
+        <PlusIcon aria-hidden="true" />
+      </button>
       <button
         class="agent-sidebar__collapse"
         type="button"
@@ -17,52 +20,99 @@
       </button>
     </header>
 
-    <nav class="agent-sidebar__list">
-      <button
-        v-for="(agent, index) in agents"
-        :key="agent.id"
-        class="agent-sidebar__agent"
-        :class="[
-          { 'agent-sidebar__agent--active': agent.id === activeAgentId },
-          agentReorder.dropTargetClass(agent.id),
-        ]"
-        type="button"
-        v-bind="agentReorder.dragItemAttributes(agent.id)"
-        :aria-pressed="agent.id === activeAgentId"
-        @click="selectAgent(agent.id)"
-        @contextmenu.prevent="openAgentMenu(agent.id, $event)"
-        @dragstart="agentReorder.onDragStart(agent.id, $event)"
-        @dragover="agentReorder.onDragOver(agent.id, $event)"
-        @dragleave="agentReorder.onDragLeave(agent.id, $event)"
-        @drop="agentReorder.onDrop(agent.id, $event)"
-        @dragend="agentReorder.onDragEnd"
+    <nav class="agent-sidebar__list" aria-label="Workspace sessions">
+      <section
+        v-for="group in workspaceGroups"
+        :key="group.id"
+        class="agent-sidebar__workspace-group"
+        :data-group-kind="group.kind"
       >
-        <AgentAvatar
-          class="agent-sidebar__avatar"
-          :avatar="agent.avatar"
-          :name="agent.name"
-          :size="compact ? 'sm' : 'lg'"
-        />
-        <span class="agent-sidebar__meta">
-          <strong>{{ agent.name }}</strong>
-          <template v-if="!compact">
-            <span class="agent-sidebar__status-text">{{ agentStatusText(agent) }}</span>
-            <span class="agent-sidebar__folder">{{ folderBasename(agent.folder) }}</span>
-          </template>
-        </span>
-        <span
-          v-if="!isAgentUnread(agent.id) && quickSwitchShortcutsVisible && index < 9"
-          class="agent-sidebar__quick-switch-shortcut"
-          :aria-label="`Switch to ${agent.name} with Command ${index + 1}`"
-        ><span aria-hidden="true">⌘</span>{{ index + 1 }}</span>
-        <span
-          v-else
-          class="agent-sidebar__status"
-          :class="{ 'agent-sidebar__status--unread': isAgentUnread(agent.id) }"
-          :data-status="agent.status.type"
-          :aria-label="isAgentUnread(agent.id) ? 'Unread activity' : agentStatusLabel(agent.status.type)"
-        />
-      </button>
+        <header class="agent-sidebar__workspace-header">
+          <button
+            class="agent-sidebar__workspace-toggle"
+            type="button"
+            :aria-label="`${isWorkspaceCollapsed(group.id) ? 'Expand' : 'Collapse'} ${group.label}`"
+            :aria-expanded="!isWorkspaceCollapsed(group.id)"
+            @click="toggleWorkspace(group.id)"
+          >
+            <ChevronRightIcon :class="{ 'is-expanded': !isWorkspaceCollapsed(group.id) }" aria-hidden="true" />
+          </button>
+          <MessageCircleIcon
+            v-if="group.kind === 'quickChats'"
+            class="agent-sidebar__workspace-icon"
+            aria-hidden="true"
+          />
+          <RepositoryIconPicker
+            v-else
+            :label="group.label"
+            :model-value="repositoryIcon(group.repositoryRoot)"
+            @update:model-value="updateRepositoryIcon(group.repositoryRoot, $event)"
+          />
+          <strong>{{ group.label }}</strong>
+          <span v-if="group.kind === 'repository'" class="agent-sidebar__workspace-actions">
+            <button
+              type="button"
+              aria-label="Create agent from branch, pull request, or issue"
+              title="Create from…"
+              @click.stop="emit('create-agent-from-repository', { agentId: group.sessions[0]!.agentId, repositoryName: group.label, repositoryRoot: group.repositoryRoot! })"
+            >
+              <GitForkIcon aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              aria-label="New agent in repository"
+              title="New agent"
+              @click.stop="emit('create-agent-in-repository', group.label)"
+            >
+              <PlusIcon aria-hidden="true" />
+            </button>
+          </span>
+        </header>
+
+        <button
+          v-for="session in group.sessions"
+          v-show="!isWorkspaceCollapsed(group.id)"
+          :key="session.agentId"
+          class="agent-sidebar__agent"
+          :class="[
+            { 'agent-sidebar__agent--active': session.isActive },
+            agentReorder.dropTargetClass(session.agentId),
+          ]"
+          type="button"
+          v-bind="agentReorder.dragItemAttributes(session.agentId)"
+          :data-session-kind="session.kind"
+          :aria-pressed="session.isActive"
+          @click="selectAgent(session.agentId)"
+          @contextmenu.prevent="openAgentMenu(session.agentId, $event)"
+          @dragstart="agentReorder.onDragStart(session.agentId, $event)"
+          @dragover="agentReorder.onDragOver(session.agentId, $event)"
+          @dragleave="agentReorder.onDragLeave(session.agentId, $event)"
+          @drop="agentReorder.onDrop(session.agentId, $event)"
+          @dragend="agentReorder.onDragEnd"
+        >
+          <GitForkIcon
+            v-if="session.kind === 'worktree'"
+            class="agent-sidebar__session-icon"
+            aria-hidden="true"
+          />
+          <GitBranchIcon v-else class="agent-sidebar__session-icon" aria-hidden="true" />
+          <span class="agent-sidebar__meta">
+            <strong>{{ session.displayTitle }}</strong>
+          </span>
+          <span
+            v-if="!session.isUnread && quickSwitchShortcutsVisible && session.quickSwitchIndex < 9"
+            class="agent-sidebar__quick-switch-shortcut"
+            :aria-label="`Switch to ${session.title} with Command ${session.quickSwitchIndex + 1}`"
+          ><span aria-hidden="true">⌘</span>{{ session.quickSwitchIndex + 1 }}</span>
+          <span
+            v-else
+            class="agent-sidebar__status"
+            :class="{ 'agent-sidebar__status--unread': session.isUnread }"
+            :data-status="session.status.type"
+            :aria-label="session.isUnread ? 'Unread activity' : agentStatusLabel(session.status.type)"
+          />
+        </button>
+      </section>
     </nav>
 
     <ConversationHistoryPanel
@@ -118,15 +168,21 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import type { Agent, BackendConversationRef, BenchTemplate, ConversationSummary, OpenInApplication, OpenInApplicationCatalog, ReorderAgentsInput, Team } from '@codex-claw/core/contracts';
+import { projectWorkspaceSidebar } from '@codex-claw/core/workspace-sidebar';
 import {
+  ChevronRightIcon,
+  GitBranchIcon,
+  GitForkIcon,
+  MessageCircleIcon,
   PanelLeftCloseIcon,
+  PlusIcon,
 } from '../shared/icons/app-icons';
 import AgentContextMenu from './AgentContextMenu.vue';
 import type { AgentContextMenuAction } from './AgentContextMenu.vue';
-import AgentAvatar from './AgentAvatar.vue';
 import ConversationHistoryPanel from './ConversationHistoryPanel.vue';
 import NewAgentButton from './NewAgentButton.vue';
-import { agentStatusLabel, agentStatusText, folderBasename } from '../shared/agent-display';
+import RepositoryIconPicker from './RepositoryIconPicker.vue';
+import { agentStatusLabel } from '../shared/agent-display';
 import { useListReorderDrag } from '../shared/use-list-reorder-drag';
 
 const props = defineProps<{
@@ -143,6 +199,7 @@ const props = defineProps<{
   minWidth?: number;
   maxWidth?: number;
   quickSwitchShortcutsVisible?: boolean;
+  repositoryIcons?: Record<string, string>;
   listConversations?: (agentId: string) => Promise<ConversationSummary[]>;
   openInCatalog?: OpenInApplicationCatalog;
   resumeConversation?: (agentId: string, ref: BackendConversationRef) => Promise<void>;
@@ -151,6 +208,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   'collapse-sidebar': [];
   'close-agent': [agentId: string];
+  'create-agent-from-repository': [payload: { agentId: string; repositoryName: string; repositoryRoot: string }];
+  'create-agent-in-repository': [repositoryName: string];
   'deploy-bench-template': [templateId: string];
   'duplicate-agent': [agentId: string];
   'fork-agent': [agentId: string];
@@ -164,21 +223,26 @@ const emit = defineEmits<{
   'save-agent-to-bench': [agentId: string];
   'select-agent': [agentId: string];
   'remove-bench-template': [templateId: string];
+  'update-repository-icon': [payload: { repositoryRoot: string; icon: string | undefined }];
 }>();
 
 const minWidth = computed(() => props.minWidth ?? 72);
 const maxWidth = computed(() => props.maxWidth ?? 420);
 const resizeStep = 16;
 const currentWidth = computed(() => clampWidth(props.width ?? 260));
-const teamTitle = computed(() => props.teamName.toUpperCase());
 const bench = computed(() => props.bench ?? []);
 const resolvedOpenInCatalog = computed<OpenInApplicationCatalog>(() => props.openInCatalog ?? ({
   defaultApplication: 'finder',
   applications: [],
 }));
 const activeAgent = computed(() => props.agents.find((agent) => agent.id === props.activeAgentId) ?? null);
-const unreadAgentIdSet = computed(() => new Set(props.unreadAgentIds ?? []));
+const workspaceGroups = computed(() => projectWorkspaceSidebar({
+  agents: props.agents,
+  activeAgentId: props.activeAgentId,
+  unreadAgentIds: props.unreadAgentIds,
+}));
 const contextMenuAgentId = ref<string | null>(null);
+const collapsedWorkspaceIds = ref(new Set<string>());
 const contextMenuPosition = ref({ x: 0, y: 0 });
 const contextMenuAgent = computed(() => (
   contextMenuAgentId.value ? props.agents.find((agent) => agent.id === contextMenuAgentId.value) ?? null : null
@@ -247,8 +311,24 @@ function selectAgent(agentId: string): void {
   emit('select-agent', agentId);
 }
 
-function isAgentUnread(agentId: string): boolean {
-  return unreadAgentIdSet.value.has(agentId);
+function isWorkspaceCollapsed(groupId: string): boolean {
+  return collapsedWorkspaceIds.value.has(groupId);
+}
+
+function toggleWorkspace(groupId: string): void {
+  const next = new Set(collapsedWorkspaceIds.value);
+  if (next.has(groupId)) next.delete(groupId);
+  else next.add(groupId);
+  collapsedWorkspaceIds.value = next;
+}
+
+function repositoryIcon(repositoryRoot: string | undefined): string | undefined {
+  return repositoryRoot ? props.repositoryIcons?.[repositoryRoot] : undefined;
+}
+
+function updateRepositoryIcon(repositoryRoot: string | undefined, icon: string | undefined): void {
+  if (!repositoryRoot) return;
+  emit('update-repository-icon', { repositoryRoot, icon });
 }
 
 function openAgentMenu(agentId: string, event: MouseEvent): void {
@@ -346,10 +426,15 @@ function onResizePointerEnd(event: PointerEvent): void {
   --agent-sidebar-width: 260px;
   --agent-sidebar-min-width: 72px;
   --agent-sidebar-max-width: 420px;
-  --agent-sidebar-avatar-size: 36px;
-  --agent-sidebar-row-min-height: 64px;
+  --agent-sidebar-row-min-height: 30px;
+  --agent-sidebar-workspace-icon-size: 16px;
+  --agent-sidebar-repository-icon-size: 20px;
+  --agent-sidebar-repository-icon-column-width: 24px;
+  --agent-sidebar-workspace-toggle-width: 12px;
+  --agent-sidebar-workspace-column-gap: 4px;
+  --agent-sidebar-workspace-inline-padding: 4px;
   --agent-sidebar-status-column-width: 12px;
-  --agent-status-dot-size: 10px;
+  --agent-status-dot-size: 8px;
   position: relative;
   container-type: inline-size;
   flex: 0 0
@@ -376,7 +461,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   height: var(--workbench-appbar-height);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: var(--space-6);
   min-width: 0;
   padding-left: var(--space-16);
@@ -387,7 +472,33 @@ function onResizePointerEnd(event: PointerEvent): void {
   -webkit-app-region: drag;
 }
 
+.agent-sidebar__header-action {
+  width: var(--space-12);
+  height: var(--space-12);
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.agent-sidebar__header-action:hover {
+  color: var(--color-text);
+  background: var(--color-surface-base);
+}
+
+.agent-sidebar__header-action svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
 .agent-sidebar__header strong {
+  margin-right: auto;
   min-width: 0;
   overflow: hidden;
   font-size: var(--font-size-14);
@@ -398,9 +509,11 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__collapse {
-  display: flex;
-  align-items: center;
-  margin-left: auto;
+  width: var(--space-12);
+  height: var(--space-12);
+  display: grid;
+  place-items: center;
+  margin-left: 0;
   padding: 0;
   border: none;
   background: transparent;
@@ -426,7 +539,109 @@ function onResizePointerEnd(event: PointerEvent): void {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: var(--space-6) var(--space-8) var(--space-6) var(--space-6);
+  padding: var(--space-3) var(--space-4);
+}
+
+.agent-sidebar__workspace-group + .agent-sidebar__workspace-group {
+  margin-top: var(--space-2);
+}
+
+.agent-sidebar__workspace-header {
+  box-sizing: border-box;
+  min-width: 0;
+  display: grid;
+  grid-template-columns:
+    var(--agent-sidebar-workspace-toggle-width)
+    var(--agent-sidebar-repository-icon-column-width)
+    minmax(0, 1fr)
+    auto;
+  align-items: center;
+  gap: var(--agent-sidebar-workspace-column-gap);
+  min-height: 30px;
+  padding: 2px var(--agent-sidebar-workspace-inline-padding);
+  color: var(--color-text);
+}
+
+.agent-sidebar__workspace-toggle,
+.agent-sidebar__workspace-actions button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.agent-sidebar__workspace-toggle {
+  width: 20px;
+  height: var(--space-12);
+  margin-inline: -4px;
+  border-radius: var(--radius-sm);
+}
+
+.agent-sidebar__workspace-toggle svg {
+  width: 10px;
+  height: 10px;
+  stroke-width: 2;
+  transition: transform 120ms ease;
+}
+
+.agent-sidebar__workspace-toggle:hover {
+  color: var(--color-text);
+  background: var(--color-surface-base);
+}
+
+.agent-sidebar__workspace-toggle svg.is-expanded {
+  transform: rotate(90deg);
+}
+
+.agent-sidebar__workspace-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 100ms ease;
+}
+
+.agent-sidebar__workspace-header:hover .agent-sidebar__workspace-actions,
+.agent-sidebar__workspace-header:focus-within
+  .agent-sidebar__workspace-actions {
+  opacity: 1;
+}
+
+.agent-sidebar__workspace-actions button {
+  width: var(--space-12);
+  height: var(--space-12);
+  border-radius: var(--radius-sm);
+}
+
+.agent-sidebar__workspace-actions svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+.agent-sidebar__workspace-actions button:hover {
+  color: var(--color-text);
+  background: var(--color-surface-base);
+}
+
+.agent-sidebar__workspace-icon {
+  width: var(--agent-sidebar-repository-icon-size);
+  height: var(--agent-sidebar-repository-icon-size);
+  color: var(--color-text-muted);
+  stroke-width: 1.8;
+  justify-self: center;
+}
+
+.agent-sidebar__workspace-header strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--font-size-14);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-18);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .agent-sidebar__agent {
@@ -434,15 +649,20 @@ function onResizePointerEnd(event: PointerEvent): void {
   width: 100%;
   min-height: var(--agent-sidebar-row-min-height);
   display: grid;
-  grid-template-columns: var(--agent-sidebar-avatar-size) minmax(0, 1fr) var(
-      --agent-sidebar-status-column-width
-    );
+  grid-template-columns:
+    var(--agent-sidebar-repository-icon-column-width) minmax(0, 1fr)
+    var(--agent-sidebar-status-column-width);
   align-items: center;
-  gap: var(--space-8);
-  margin-bottom: var(--space-1);
-  padding: var(--space-4) var(--space-6);
-  border: 1px solid transparent;
-  border-radius: var(--radius-lg);
+  gap: var(--agent-sidebar-workspace-column-gap);
+  margin: 0;
+  padding: 1px var(--agent-sidebar-workspace-inline-padding) 1px
+    calc(
+      var(--agent-sidebar-workspace-inline-padding) +
+        var(--agent-sidebar-workspace-toggle-width) +
+        var(--agent-sidebar-workspace-column-gap)
+    );
+  border: 0;
+  border-radius: var(--radius-md);
   color: var(--color-text);
   background: transparent;
   text-align: left;
@@ -486,8 +706,33 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__agent--active {
-  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
-  border-color: var(--color-primary);
+  background: var(--color-surface-base);
+}
+
+.agent-sidebar__session-icon {
+  width: var(--agent-sidebar-workspace-icon-size);
+  height: var(--agent-sidebar-workspace-icon-size);
+  stroke-width: 1.8;
+  justify-self: center;
+}
+
+.agent-sidebar__agent[data-session-kind="main"] .agent-sidebar__session-icon {
+  color: var(--color-primary);
+}
+
+.agent-sidebar__agent[data-session-kind="branch"] .agent-sidebar__session-icon {
+  color: var(--color-success);
+}
+
+.agent-sidebar__agent[data-session-kind="worktree"]
+  .agent-sidebar__session-icon {
+  color: var(--color-warning);
+}
+
+.agent-sidebar__agent[data-session-kind="detached"]
+  .agent-sidebar__session-icon,
+.agent-sidebar__agent[data-session-kind="folder"] .agent-sidebar__session-icon {
+  color: var(--color-text-muted);
 }
 
 .agent-sidebar__meta {
@@ -507,18 +752,6 @@ function onResizePointerEnd(event: PointerEvent): void {
   font-size: var(--font-size-14);
   font-weight: var(--font-weight-regular);
   line-height: var(--line-height-18);
-}
-
-.agent-sidebar__status-text {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-13);
-  line-height: var(--line-height-16);
-}
-
-.agent-sidebar__folder {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-13);
-  line-height: var(--line-height-16);
 }
 
 .agent-sidebar__status {
@@ -565,15 +798,16 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar--compact {
-  --agent-sidebar-avatar-size: var(--space-10);
-  --agent-sidebar-row-min-height: var(--space-20);
+  --agent-sidebar-row-min-height: 28px;
+  --agent-sidebar-workspace-icon-size: 16px;
+  --agent-sidebar-repository-icon-size: 20px;
   --agent-sidebar-status-column-width: var(--space-4);
   --agent-status-dot-size: var(--space-4);
 }
 
 .agent-sidebar--compact .agent-sidebar__agent {
-  gap: var(--space-6);
-  padding: var(--space-3) var(--space-6);
+  padding-top: 1px;
+  padding-bottom: 1px;
 }
 
 .agent-sidebar--compact .agent-sidebar__meta {
@@ -643,11 +877,31 @@ function onResizePointerEnd(event: PointerEvent): void {
     gap: var(--space-4);
   }
 
+  .agent-sidebar__workspace-group {
+    width: 100%;
+  }
+
+  .agent-sidebar__workspace-header {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-2);
+  }
+
+  .agent-sidebar__workspace-toggle,
+  .agent-sidebar__workspace-actions,
+  .agent-sidebar__header-action {
+    display: none;
+  }
+
+  .agent-sidebar__workspace-header strong {
+    display: none;
+  }
+
   .agent-sidebar__agent {
     position: relative;
     width: 100%;
     min-height: var(--space-20);
-    grid-template-columns: var(--agent-sidebar-avatar-size);
+    grid-template-columns: var(--icon-sm);
     place-items: center;
     gap: 0;
     margin-bottom: 0;
