@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    class="claw-dialog repository-session-source-dialog"
+    class="claw-dialog claw-dialog--compact repository-session-source-dialog"
     :model-value="visible"
     :teleported="false"
     width="720px"
@@ -36,9 +36,18 @@
       <template v-else-if="tab === 'branches'">
         <h3>Recent branches</h3>
         <button v-for="branch in filteredBranches" :key="branch.name" class="repository-session-source-dialog__result" type="button" @click="emit('select-branch', branch)">
-          <GitBranchIcon class="repository-session-source-dialog__result-icon repository-session-source-dialog__result-icon--branch" aria-hidden="true" />
-          <strong>{{ branch.name }}</strong>
-          <span v-if="branch.isDefault" class="repository-session-source-dialog__muted">Default</span>
+          <GitBranchIcon
+            class="repository-session-source-dialog__result-icon repository-session-source-dialog__result-icon--branch"
+            :class="{
+              'repository-session-source-dialog__result-icon--default': branch.isDefault,
+              'repository-session-source-dialog__result-icon--worktree': branch.worktreePath && !branch.isDefault,
+            }"
+            aria-hidden="true"
+          />
+          <span class="repository-session-source-dialog__result-copy">
+            <strong>{{ branch.name }}</strong>
+            <small v-if="branch.isDefault">Default</small>
+          </span>
           <span v-if="branch.worktreePath" class="repository-session-source-dialog__badge">Checked out</span>
           <ArrowRightIcon class="repository-session-source-dialog__arrow" aria-hidden="true" />
         </button>
@@ -49,8 +58,10 @@
         <button v-for="item in filteredWorkItems" :key="item.id" class="repository-session-source-dialog__result" type="button" @click="emit('select-work-item', item)">
           <GitPullRequestIcon v-if="item.kind === 'pullRequest'" class="repository-session-source-dialog__result-icon" aria-hidden="true" />
           <IssueIcon v-else class="repository-session-source-dialog__result-icon" aria-hidden="true" />
-          <span class="repository-session-source-dialog__number">#{{ item.number }}</span>
-          <strong>{{ item.title }}</strong>
+          <span class="repository-session-source-dialog__result-copy">
+            <small>#{{ item.number }}</small>
+            <strong>{{ item.title }}</strong>
+          </span>
           <ArrowRightIcon class="repository-session-source-dialog__arrow" aria-hidden="true" />
         </button>
         <p v-if="filteredWorkItems.length === 0" class="repository-session-source-dialog__state">No matching {{ tab === 'pullRequests' ? 'pull requests' : 'issues' }}.</p>
@@ -193,7 +204,9 @@ function onVisibilityChanged(visible: boolean): void {
 }
 
 .repository-session-source-dialog__results {
-  min-height: 340px;
+  min-height: 260px;
+  max-height: min(52vh, 520px);
+  overflow-y: auto;
   padding: var(--space-8);
 }
 
@@ -205,12 +218,12 @@ function onVisibilityChanged(visible: boolean): void {
 
 .repository-session-source-dialog__result {
   width: 100%;
-  min-height: 44px;
+  min-height: 46px;
   display: grid;
-  grid-template-columns: var(--icon-md) auto minmax(0, 1fr) auto auto;
+  grid-template-columns: var(--icon-md) minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-6);
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-6);
   border: 0;
   border-radius: var(--radius-md);
   color: var(--color-text);
@@ -225,7 +238,14 @@ function onVisibilityChanged(visible: boolean): void {
   background: var(--color-surface-base);
 }
 
-.repository-session-source-dialog__result strong {
+.repository-session-source-dialog__result-copy {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.repository-session-source-dialog__result-copy strong {
   min-width: 0;
   overflow: hidden;
   font-size: var(--font-size-13);
@@ -245,21 +265,32 @@ function onVisibilityChanged(visible: boolean): void {
   color: var(--color-success);
 }
 
-.repository-session-source-dialog__number,
-.repository-session-source-dialog__muted {
+.repository-session-source-dialog__result-icon--default {
+  color: var(--color-primary);
+}
+
+.repository-session-source-dialog__result-icon--worktree {
+  color: var(--color-warning);
+}
+
+.repository-session-source-dialog__result-copy small {
+  flex: none;
   color: var(--color-text-muted);
   font-size: var(--font-size-12);
 }
 
 .repository-session-source-dialog__badge {
+  justify-self: end;
   padding: 1px var(--space-3);
   border-radius: var(--radius-full);
   color: var(--color-text-muted);
   background: var(--color-surface-base);
   font-size: var(--font-size-11);
+  white-space: nowrap;
 }
 
 .repository-session-source-dialog__arrow {
+  grid-column: -2 / -1;
   margin-left: auto;
 }
 

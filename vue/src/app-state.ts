@@ -624,6 +624,13 @@ export function useAppState() {
     return codexClawApi.listSourceRepositories(remoteConnectionId);
   }
 
+  async function cloneSourceRepository(input: import('@codex-claw/core/contracts').CloneSourceRepositoryInput): Promise<SourceRepository> {
+    if (!codexClawApi?.cloneSourceRepository) throw new Error('Repository cloning is not available.');
+    const repository = await codexClawApi.cloneSourceRepository(input);
+    await loadSourceRepositories();
+    return repository;
+  }
+
   async function listSourceBranches(repoPath: string, remoteConnectionId?: string): Promise<SourceBranch[]> {
     if (!codexClawApi?.listSourceBranches) return [];
     return codexClawApi.listSourceBranches(repoPath, remoteConnectionId);
@@ -1738,6 +1745,7 @@ export function useAppState() {
     chooseSourceFolder,
     listSourceFolders,
     listSourceRepositories,
+    cloneSourceRepository,
     listSourceBranches,
     listSourceWorktrees,
     suggestSourceWorktreePath,

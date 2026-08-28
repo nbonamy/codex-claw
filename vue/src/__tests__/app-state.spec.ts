@@ -859,7 +859,7 @@ describe('useAppState', () => {
     });
   });
 
-  it('loads source repositories and creates worktrees through clawd', async () => {
+  it('loads, clones, and creates worktrees through clawd', async () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.sourceFolder = {
       path: '~/src',
@@ -883,10 +883,12 @@ describe('useAppState', () => {
       name: 'source-folder',
       path: '/Users/nbonamy/src/codex-claw-source-folder',
     });
+    const cloneSourceRepository = vi.fn().mockResolvedValue(repositories[0]);
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         listSourceRepositories,
+        cloneSourceRepository,
         listSourceWorktrees,
         createSourceWorktree,
         onEvent: vi.fn(),
@@ -910,7 +912,13 @@ describe('useAppState', () => {
       name: 'source-folder',
       path: '/Users/nbonamy/src/codex-claw-source-folder',
     });
-    expect(listSourceRepositories).toHaveBeenCalledTimes(2);
+    await expect(state.cloneSourceRepository({
+      url: 'https://github.com/nbonamy/codex-claw',
+    })).resolves.toStrictEqual(repositories[0]);
+    expect(cloneSourceRepository).toHaveBeenCalledWith({
+      url: 'https://github.com/nbonamy/codex-claw',
+    });
+    expect(listSourceRepositories).toHaveBeenCalledTimes(3);
   });
 
   it('uses source repository fallbacks when preload helpers are unavailable', async () => {
@@ -3195,6 +3203,7 @@ describe('useAppState', () => {
     await expect(state.chooseSourceFolder()).resolves.toBeNull();
     await expect(state.listSourceFolders()).resolves.toStrictEqual({ path: '', parentPath: null, entries: [] });
     await expect(state.listSourceRepositories()).resolves.toStrictEqual([]);
+    await expect(state.cloneSourceRepository({ url: 'https://github.com/nbonamy/repo' })).rejects.toThrow('Repository cloning is not available.');
     await expect(state.listSourceWorktrees('/repo')).resolves.toStrictEqual([]);
     await expect(state.suggestSourceWorktreePath({ repoPath: '/repo', branchName: 'feature' })).resolves.toBe('');
     await expect(state.chooseSourceWorktreeDestination('/repo-feature')).resolves.toBeNull();

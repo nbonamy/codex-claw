@@ -132,6 +132,7 @@ export const backendMethods = {
   sourceFolderDetect: 'source/folder/detect',
   sourceFoldersList: 'source/folders/list',
   sourceRepositoriesList: 'source/repositories/list',
+  sourceRepositoryClone: 'source/repository/clone',
   sourceBranchesList: 'source/branches/list',
   sourceWorktreeCreate: 'source/worktree/create',
   sourceWorktreePathSuggest: 'source/worktree/path/suggest',

@@ -58,6 +58,8 @@
         :resume-conversation="resumeAgentConversation"
         @collapse-sidebar="agentSidebarCollapsed = true"
         @close-agent="$emit('close-agent', $event)"
+        @create-agent-from-repository="openRepositorySessionSource"
+        @create-agent-in-repository="openNewAgent(activeTeam?.id ?? undefined, $event)"
         @deploy-bench-template="deployBenchTemplateForActiveTeam"
         @duplicate-agent="$emit('duplicate-agent', $event)"
         @fork-agent="$emit('fork-agent', $event)"
@@ -71,6 +73,7 @@
         @remove-bench-template="removeBenchTemplateForActiveTeam"
         @save-agent-to-bench="$emit('save-agent-to-bench', $event)"
         @select-agent="selectAgentFromShell"
+        @start-work="handleStartWorkAction"
         @update-repository-icon="updateRepositoryIcon"
       />
     </Transition>
@@ -311,6 +314,29 @@
         </div>
       </template>
     </section>
+    <RepositorySessionSourceDialog
+      :visible="repositorySessionSourceVisible"
+      :repository-name="repositorySessionSource?.repositoryName ?? ''"
+      :branches="repositorySessionSourceBranches"
+      :work-items="repositorySessionSourceWorkItems"
+      :loading="repositorySessionSourceLoading"
+      :error="repositorySessionSourceError"
+      @close="closeRepositorySessionSource"
+      @select-branch="openNewAgentForSourceBranch"
+      @select-work-item="openNewAgentForSourceWorkItem"
+    />
+    <RepositoryAcquireDialog
+      :visible="repositoryAcquireVisible"
+      :mode="repositoryAcquireMode"
+      :repositories="repositoryAcquireRepositories"
+      :local-repository-names="sourceRepositories.map((repository) => repository.name)"
+      :loading="repositoryAcquireLoading"
+      :busy="repositoryAcquireBusy"
+      :error="repositoryAcquireError"
+      @close="closeRepositoryAcquire"
+      @clone-url="cloneRepositoryAndOpen"
+      @select-repository="selectWorkRepository"
+    />
     <AgentDialog
       :visible="agentDialogVisible"
       :mode="agentDialogMode"
@@ -395,7 +421,7 @@
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
-import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BackendPermissionModeOption, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendPluginSummary, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type GlobalWorkItemQuery, type LoopLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkItemPage, type WorkItemQuery, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
+import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BackendPermissionModeOption, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendPluginSummary, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CloneSourceRepositoryInput, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type GlobalWorkItemQuery, type LoopLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceBranch, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkItemPage, type WorkItemQuery, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
@@ -405,6 +431,8 @@ import AgentDialog from './AgentDialog.vue';
 import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
 import AgentSidebar from './AgentSidebar.vue';
+import RepositorySessionSourceDialog from './RepositorySessionSourceDialog.vue';
+import RepositoryAcquireDialog from './RepositoryAcquireDialog.vue';
 import CockpitView from './CockpitView.vue';
 import ConversationPane from './ConversationPane.vue';
 import ImageAnnotationDialog, { type ImageAnnotationSavePayload } from './ImageAnnotationDialog.vue';
@@ -439,7 +467,7 @@ import {
   type CodexRendererSendMessageOptions,
 } from '@codex-app-sdk/vue';
 import { ShieldCheckIcon } from '../shared/icons/app-icons';
-import { workItemAssignmentPrompt, workItemComposerPrompt } from '@codex-claw/core/work-item-prompts';
+import { workItemAssignmentPrompt, workItemComposerPrompt, type WorkItemAssignmentAction } from '@codex-claw/core/work-item-prompts';
 
 import type { PlanReviewComment, SidePanelGitDiffState, SidePanelImageState, SidePanelMarkdownState } from './side-panel';
 import {
@@ -514,6 +542,8 @@ const props = withDefaults(defineProps<{
   listSourceFolders?: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
   sourceRepositories?: SourceRepository[];
   listSourceRepositories?: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
+  cloneSourceRepository?: (input: CloneSourceRepositoryInput) => Promise<SourceRepository>;
+  listSourceBranches?: (repoPath: string, remoteConnectionId?: string) => Promise<SourceBranch[]>;
   listSourceWorktrees?: (repoPath: string, remoteConnectionId?: string) => Promise<SourceWorktree[]>;
   suggestSourceWorktreePath?: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>) => Promise<string>;
   chooseSourceWorktreeDestination?: (defaultPath: string) => Promise<string | null>;
@@ -620,6 +650,8 @@ const props = withDefaults(defineProps<{
   listSourceFolders: async () => ({ path: '', parentPath: null, entries: [] }),
   sourceRepositories: () => [],
   listSourceRepositories: async () => [],
+  cloneSourceRepository: async () => { throw new Error('Repository cloning is not available.'); },
+  listSourceBranches: async () => [],
   suggestSourceWorktreePath: async () => '',
   chooseSourceWorktreeDestination: async () => null,
   createSourceWorktree: async () => ({ name: '', path: '' }),
@@ -808,6 +840,25 @@ const agentDialogMode = ref<'create' | 'edit'>('create');
 const editingAgentId = ref<string | null>(null);
 const agentDialogTeamId = ref<string | null>(null);
 const agentDialogSourceRepositoryName = ref<string | null>(null);
+const agentDialogSourceBranchName = ref('');
+type RepositorySessionSource = {
+  agentId?: string;
+  teamId?: string;
+  repositoryName: string;
+  repositoryRoot: string;
+};
+const repositorySessionSource = ref<RepositorySessionSource | null>(null);
+const repositorySessionSourceVisible = ref(false);
+const repositorySessionSourceBranches = ref<SourceBranch[]>([]);
+const repositorySessionSourceWorkItems = ref<WorkItem[]>([]);
+const repositorySessionSourceLoading = ref(false);
+const repositorySessionSourceError = ref<string | null>(null);
+const repositoryAcquireVisible = ref(false);
+const repositoryAcquireMode = ref<'github' | 'url'>('github');
+const repositoryAcquireRepositories = ref<WorkRepository[]>([]);
+const repositoryAcquireLoading = ref(false);
+const repositoryAcquireBusy = ref(false);
+const repositoryAcquireError = ref<string | null>(null);
 const pendingNewAgentWorkItem = ref<WorkItem | null>(null);
 const pendingBenchAgentWorkItem = ref<WorkItem | null>(null);
 const pendingBenchAgentTeamId = ref<string | null>(null);
@@ -1225,7 +1276,7 @@ const pendingNewAgentName = computed(() => {
 const pendingNewAgentTeamName = computed(() => pendingNewAgentWorkItem.value ? workItemTeamName(pendingNewAgentWorkItem.value) : '');
 const pendingNewAgentWorktreeBranchName = computed(() => {
   const item = pendingNewAgentWorkItem.value;
-  if (!item) return '';
+  if (!item) return agentDialogSourceBranchName.value;
   return item.kind === 'pullRequest'
     ? item.branchName?.trim() || `review/gh-${item.number}`
     : `fix/gh-${item.number}`;
@@ -1723,12 +1774,244 @@ function startRightWorkspaceResize(event: PointerEvent): void {
   window.addEventListener('pointerup', stop, { once: true });
 }
 
-function openNewAgent(teamId?: string, sourceRepositoryName: string | null = null): void {
+function openNewAgent(
+  teamId?: string,
+  sourceRepositoryName: string | null = null,
+  sourceBranchName = '',
+): void {
   agentDialogMode.value = 'create';
   editingAgentId.value = null;
   agentDialogTeamId.value = teamId ?? activeTeam.value?.id ?? null;
   agentDialogSourceRepositoryName.value = sourceRepositoryName;
+  agentDialogSourceBranchName.value = sourceBranchName;
   agentDialogVisible.value = true;
+}
+
+let repositorySessionSourceRequestId = 0;
+
+async function openRepositorySessionSource(source: RepositorySessionSource): Promise<void> {
+  const requestId = ++repositorySessionSourceRequestId;
+  repositorySessionSource.value = source;
+  repositorySessionSourceVisible.value = true;
+  repositorySessionSourceBranches.value = [];
+  repositorySessionSourceWorkItems.value = [];
+  repositorySessionSourceError.value = null;
+  repositorySessionSourceLoading.value = true;
+
+  const sourceAgent = props.snapshot.agents.find((agent) => agent.id === source.agentId);
+  const sourceTeam = source.teamId
+    ? props.snapshot.teams.find((team) => team.id === source.teamId)
+    : sourceAgent
+    ? props.snapshot.teams.find((team) => team.id === sourceAgent.teamId)
+    : null;
+  const remoteConnectionId = sourceTeam?.remoteConnectionId?.trim();
+  const location: LoopLocation | undefined = remoteConnectionId
+    ? { kind: 'remote', remoteConnectionId }
+    : undefined;
+
+  try {
+    const branches = await props.listSourceBranches(
+      source.repositoryRoot,
+      remoteConnectionId || undefined,
+    );
+    if (requestId !== repositorySessionSourceRequestId) return;
+    repositorySessionSourceBranches.value = branches;
+
+    try {
+      const loadedRepositories = await props.loadWorkRepositories('github', location);
+      if (requestId !== repositorySessionSourceRequestId) return;
+      const repositories = loadedRepositories ?? props.workRepositoriesByProvider.github ?? [];
+      const workRepository = repositories.find((repository) => (
+        repository.name === source.repositoryName ||
+        repository.fullName.endsWith(`/${source.repositoryName}`)
+      ));
+      if (workRepository) {
+        repositorySessionSourceWorkItems.value = await props.loadWorkItems(
+          'github',
+          workRepository.id,
+          location,
+          { kind: 'all', state: 'open' },
+        ) ?? [];
+      }
+    } catch {
+      // Branch-based session creation remains available without a work-provider connection.
+      repositorySessionSourceWorkItems.value = [];
+    }
+  } catch (error) {
+    if (requestId !== repositorySessionSourceRequestId) return;
+    repositorySessionSourceError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    if (requestId === repositorySessionSourceRequestId) {
+      repositorySessionSourceLoading.value = false;
+    }
+  }
+}
+
+function closeRepositorySessionSource(): void {
+  repositorySessionSourceRequestId += 1;
+  repositorySessionSourceVisible.value = false;
+  repositorySessionSource.value = null;
+  repositorySessionSourceLoading.value = false;
+  repositorySessionSourceError.value = null;
+}
+
+function openNewAgentForSourceBranch(branch: SourceBranch): void {
+  const source = repositorySessionSource.value;
+  if (!source) return;
+  const sourceAgent = props.snapshot.agents.find((agent) => agent.id === source.agentId);
+  const teamId = source.teamId ?? sourceAgent?.teamId ?? activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined;
+  void createRepositorySession(source, branch, teamId);
+}
+
+function openNewAgentForSourceWorkItem(item: WorkItem): void {
+  const source = repositorySessionSource.value;
+  if (!source) return;
+  const sourceAgent = props.snapshot.agents.find((agent) => agent.id === source.agentId);
+  const teamId = source.teamId ?? sourceAgent?.teamId ?? activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined;
+  closeRepositorySessionSource();
+  if (!teamId) {
+    ElMessage.error('Create or select a team before starting repository work.');
+    return;
+  }
+  void startCockpitWorkItems({
+    action: item.kind === 'pullRequest' ? 'review' : 'fix',
+    items: [item],
+    teamId,
+  }).catch((error) => ElMessage.error(error instanceof Error ? error.message : String(error)));
+}
+
+async function createRepositorySession(source: RepositorySessionSource, branch: SourceBranch, teamId?: string): Promise<void> {
+  closeRepositorySessionSource();
+  try {
+    const team = teamId ? props.snapshot.teams.find((candidate) => candidate.id === teamId) : null;
+    const remoteConnectionId = team?.remoteConnectionId?.trim();
+    const worktree = branch.worktreePath
+      ? { name: branch.name, path: branch.worktreePath }
+      : await props.createSourceWorktree({
+          repoPath: source.repositoryRoot,
+          branchName: branch.name,
+          ...(remoteConnectionId ? { remoteConnectionId } : {}),
+        });
+    await props.createAgent({
+      name: `${source.repositoryName} · ${branch.name}`,
+      avatar: '🤖',
+      folder: worktree.path,
+      backend: 'codex',
+      sourceRepositoryName: source.repositoryName,
+      ...(teamId ? { teamId } : {}),
+    });
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function handleStartWorkAction(action: 'github' | 'local' | 'repository' | 'url'): Promise<void> {
+  if (action === 'repository') {
+    const agent = currentAgent.value;
+    const workspace = agent?.workspace;
+    if (agent && workspace?.kind === 'git') {
+      await openRepositorySessionSource({
+        agentId: agent.id,
+        teamId: agent.teamId,
+        repositoryName: workspace.repositoryName,
+        repositoryRoot: workspace.repositoryRoot,
+      });
+    }
+    return;
+  }
+
+  if (action === 'local') {
+    await openLocalRepositorySession();
+    return;
+  }
+
+  repositoryAcquireMode.value = action;
+  repositoryAcquireVisible.value = true;
+  repositoryAcquireError.value = null;
+  repositoryAcquireRepositories.value = [];
+  if (action === 'github') await loadRepositoryAcquireCatalog();
+}
+
+async function openLocalRepositorySession(): Promise<void> {
+  const folder = await props.chooseAgentFolder();
+  if (!folder) return;
+  const repositoryName = folder.split(/[\\/]/u).filter(Boolean).at(-1) ?? 'workspace';
+  const teamId = activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined;
+  try {
+    const branches = await props.listSourceBranches(folder);
+    if (branches.length > 0) {
+      await openRepositorySessionSource({
+        teamId,
+        repositoryName,
+        repositoryRoot: folder,
+      });
+      return;
+    }
+  } catch {
+    // A plain folder remains a valid session workspace.
+  }
+  await props.createAgent({
+    name: repositoryName,
+    avatar: '🤖',
+    folder,
+    backend: 'codex',
+    ...(teamId ? { teamId } : {}),
+  });
+}
+
+async function loadRepositoryAcquireCatalog(): Promise<void> {
+  repositoryAcquireLoading.value = true;
+  try {
+    repositoryAcquireRepositories.value = await props.loadWorkRepositories('github')
+      ?? props.workRepositoriesByProvider.github
+      ?? [];
+  } catch (error) {
+    repositoryAcquireError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    repositoryAcquireLoading.value = false;
+  }
+}
+
+function closeRepositoryAcquire(): void {
+  repositoryAcquireVisible.value = false;
+  repositoryAcquireBusy.value = false;
+  repositoryAcquireError.value = null;
+}
+
+async function selectWorkRepository(repository: WorkRepository): Promise<void> {
+  const local = props.sourceRepositories.find((candidate) => candidate.name === repository.name);
+  if (local) {
+    closeRepositoryAcquire();
+    await openRepositorySessionSource({
+      teamId: activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined,
+      repositoryName: local.name,
+      repositoryRoot: local.path,
+    });
+    return;
+  }
+  await cloneRepositoryAndOpen(repository.url);
+}
+
+async function cloneRepositoryAndOpen(url: string): Promise<void> {
+  repositoryAcquireBusy.value = true;
+  repositoryAcquireError.value = null;
+  try {
+    const team = activeTeam.value;
+    const repository = await props.cloneSourceRepository({
+      url,
+      ...(team?.remoteConnectionId ? { remoteConnectionId: team.remoteConnectionId } : {}),
+    });
+    closeRepositoryAcquire();
+    await openRepositorySessionSource({
+      teamId: team?.id ?? props.snapshot.activeTeamId ?? undefined,
+      repositoryName: repository.name,
+      repositoryRoot: repository.path,
+    });
+  } catch (error) {
+    repositoryAcquireError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    repositoryAcquireBusy.value = false;
+  }
 }
 
 function openNewAgentForRepository(repository: WorkRepository): void {
@@ -1748,7 +2031,7 @@ async function openNewAgentForWorkItem(intent: WorkItemAssignmentIntent): Promis
 }
 
 async function startCockpitWorkItems(input: {
-  action: 'investigate' | 'fix';
+  action: WorkItemAssignmentAction;
   items: WorkItem[];
   teamId: string;
 }): Promise<void> {
@@ -1880,6 +2163,7 @@ function openEditAgent(agentId: string): void {
   editingAgentId.value = agentId;
   agentDialogTeamId.value = null;
   agentDialogSourceRepositoryName.value = null;
+  agentDialogSourceBranchName.value = '';
   agentDialogVisible.value = true;
 }
 
@@ -1888,6 +2172,7 @@ function closeAgentDialog(): void {
   editingAgentId.value = null;
   agentDialogTeamId.value = null;
   agentDialogSourceRepositoryName.value = null;
+  agentDialogSourceBranchName.value = '';
   pendingNewAgentWorkItem.value = null;
 }
 

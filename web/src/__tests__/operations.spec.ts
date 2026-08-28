@@ -50,6 +50,7 @@ describe('Claw web operations', () => {
     await invokeClawWebOperation(backend, 'listSourceFolders', [{ kind: 'remote' }]);
     await invokeClawWebOperation(backend, 'listSourceRepositories', []);
     await invokeClawWebOperation(backend, 'listSourceRepositories', ['ssh-1']);
+    await invokeClawWebOperation(backend, 'cloneSourceRepository', [{ url: 'https://github.com/nbonamy/codex-claw' }]);
     await invokeClawWebOperation(backend, 'forkAgent', ['agent-1', undefined]);
     await invokeClawWebOperation(backend, 'duplicateAgent', ['agent-1', { select: false }]);
     await invokeClawWebOperation(backend, 'listWorkItems', ['github', null, { kind: 'remote' }]);
@@ -67,6 +68,7 @@ describe('Claw web operations', () => {
       [backendMethods.sourceFoldersList, { kind: 'remote' }],
       [backendMethods.sourceRepositoriesList, undefined],
       [backendMethods.sourceRepositoriesList, { remoteConnectionId: 'ssh-1' }],
+      [backendMethods.sourceRepositoryClone, { input: { url: 'https://github.com/nbonamy/codex-claw' } }],
       [backendMethods.agentFork, { agentId: 'agent-1' }],
       [backendMethods.agentDuplicate, { agentId: 'agent-1', options: { select: false } }],
       [backendMethods.workProviderItemsList, { provider: 'github', location: { kind: 'remote' } }],

@@ -149,6 +149,54 @@ describe('AgentSidebar', () => {
     expect(wrapper.find('[aria-label="Working"]').exists()).toBe(true);
   });
 
+  it('collapses and expands a repository by clicking its title', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    let repositoryTitle = wrapper.findAll('.agent-sidebar__workspace-label')[0]!;
+    let firstSession = wrapper.findAll('.agent-sidebar__agent')[0]!;
+    expect(firstSession.attributes('style') ?? '').not.toContain('display: none');
+
+    await repositoryTitle.trigger('click');
+    expect(firstSession.attributes('style') ?? '').toContain('display: none');
+    expect(repositoryTitle.attributes('aria-expanded')).toBe('false');
+
+    repositoryTitle = wrapper.findAll('.agent-sidebar__workspace-label')[0]!;
+    await repositoryTitle.trigger('click');
+    await wrapper.vm.$nextTick();
+    repositoryTitle = wrapper.findAll('.agent-sidebar__workspace-label')[0]!;
+    firstSession = wrapper.findAll('.agent-sidebar__agent')[0]!;
+    expect(repositoryTitle.attributes('aria-expanded')).toBe('true');
+    expect(firstSession.attributes('style') ?? '').not.toContain('display: none');
+  });
+
+  it('emits repository-scoped session creation actions', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    await wrapper.get('[aria-label="New agent in repository"]').trigger('click');
+    await wrapper.get('[aria-label="Create agent from branch, pull request, or issue"]').trigger('click');
+
+    expect(wrapper.emitted('create-agent-in-repository')).toStrictEqual([['id8']]);
+    expect(wrapper.emitted('create-agent-from-repository')).toStrictEqual([[{
+      agentId: 'agent-dina',
+      repositoryName: 'id8',
+      repositoryRoot: '~/src/id8',
+    }]]);
+  });
+
   it('renders compact workspace rows with repository headers, branches, and status icons', () => {
     const wrapper = mount(AgentSidebar, {
       props: {

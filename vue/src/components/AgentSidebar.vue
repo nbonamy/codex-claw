@@ -7,9 +7,7 @@
   >
     <header class="agent-sidebar__header">
       <strong :title="teamName">Sessions</strong>
-      <button class="agent-sidebar__header-action" type="button" aria-label="New agent" title="New agent" @click="emit('new-agent')">
-        <PlusIcon aria-hidden="true" />
-      </button>
+      <StartWorkMenu :repository="activeRepository" @select="emit('start-work', $event)" />
       <button
         class="agent-sidebar__collapse"
         type="button"
@@ -48,7 +46,15 @@
             :model-value="repositoryIcon(group.repositoryRoot)"
             @update:model-value="updateRepositoryIcon(group.repositoryRoot, $event)"
           />
-          <strong>{{ group.label }}</strong>
+          <button
+            class="agent-sidebar__workspace-label"
+            type="button"
+            :aria-label="`${isWorkspaceCollapsed(group.id) ? 'Expand' : 'Collapse'} ${group.label} sessions`"
+            :aria-expanded="!isWorkspaceCollapsed(group.id)"
+            @click="toggleWorkspace(group.id)"
+          >
+            <strong>{{ group.label }}</strong>
+          </button>
           <span v-if="group.kind === 'repository'" class="agent-sidebar__workspace-actions">
             <button
               type="button"
@@ -182,6 +188,7 @@ import type { AgentContextMenuAction } from './AgentContextMenu.vue';
 import ConversationHistoryPanel from './ConversationHistoryPanel.vue';
 import NewAgentButton from './NewAgentButton.vue';
 import RepositoryIconPicker from './RepositoryIconPicker.vue';
+import StartWorkMenu from './StartWorkMenu.vue';
 import { agentStatusLabel } from '../shared/agent-display';
 import { useListReorderDrag } from '../shared/use-list-reorder-drag';
 
@@ -222,12 +229,20 @@ const emit = defineEmits<{
   'restart-agent': [agentId: string];
   'save-agent-to-bench': [agentId: string];
   'select-agent': [agentId: string];
+  'start-work': [action: 'github' | 'local' | 'repository' | 'url'];
   'remove-bench-template': [templateId: string];
   'update-repository-icon': [payload: { repositoryRoot: string; icon: string | undefined }];
 }>();
 
 const minWidth = computed(() => props.minWidth ?? 72);
 const maxWidth = computed(() => props.maxWidth ?? 420);
+const activeRepository = computed(() => {
+  const group = workspaceGroups.value.find((candidate) => (
+    candidate.kind === 'repository' && candidate.sessions.some((session) => session.agentId === props.activeAgentId)
+  ));
+  if (!group || group.kind !== 'repository') return null;
+  return { name: group.label };
+});
 const resizeStep = 16;
 const currentWidth = computed(() => clampWidth(props.width ?? 260));
 const bench = computed(() => props.bench ?? []);
@@ -563,6 +578,7 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__workspace-toggle,
+.agent-sidebar__workspace-label,
 .agent-sidebar__workspace-actions button {
   display: grid;
   place-items: center;
@@ -571,6 +587,24 @@ function onResizePointerEnd(event: PointerEvent): void {
   color: var(--color-text-muted);
   background: transparent;
   cursor: pointer;
+}
+
+.agent-sidebar__workspace-label {
+  min-width: 0;
+  min-height: var(--agent-sidebar-row-min-height);
+  justify-content: start;
+  border-radius: var(--radius-sm);
+  text-align: left;
+}
+
+.agent-sidebar__workspace-label:hover,
+.agent-sidebar__workspace-label:focus-visible {
+  color: var(--color-text);
+}
+
+.agent-sidebar__workspace-label:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 
 .agent-sidebar__workspace-toggle {
@@ -634,7 +668,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   justify-self: center;
 }
 
-.agent-sidebar__workspace-header strong {
+.agent-sidebar__workspace-label strong {
   min-width: 0;
   overflow: hidden;
   font-size: var(--font-size-14);
@@ -893,7 +927,7 @@ function onResizePointerEnd(event: PointerEvent): void {
     display: none;
   }
 
-  .agent-sidebar__workspace-header strong {
+  .agent-sidebar__workspace-label {
     display: none;
   }
 

@@ -4,7 +4,7 @@ import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput, updateAgentOpenInApplication, updateAgentWorkspace } from '@codex-claw/core/snapshot';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitDiff, AgentGitMessageGenerationResult, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AgentWorkspaceIdentity, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkRoutingRequest, WorkRoutingResult } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitDiff, AgentGitMessageGenerationResult, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AgentWorkspaceIdentity, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkRoutingRequest, WorkRoutingResult } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/core/backend-driver';
@@ -1448,6 +1448,33 @@ export class ClawBackendServer {
             });
           },
         );
+      }
+      case backendMethods.sourceRepositoryClone: {
+        const input = requireSourceRepositoryCloneInput(message.params);
+        const location = this.locationFromRemoteConnectionId(input.remoteConnectionId ?? null);
+        try {
+          const repository = await this.requestInLocation(
+            location,
+            backendMethods.sourceRepositoryClone,
+            { input: { url: input.url } },
+            async () => {
+              await this.initializeSourceFolderIfNeeded();
+              const sourceFolderPath = this.snapshot.sourceFolder.path.trim();
+              if (!sourceFolderPath) throw new Error('Choose a source folder before cloning a repository.');
+              return this.requireDriverRpc().handle(backendMethods.sourceRepositoryClone, {
+                sourceFolderPath,
+                url: input.url,
+              }) as Promise<SourceRepository> | SourceRepository;
+            },
+          );
+          if (location.kind === 'local') {
+            this.addRecentSourceRepository(repository.name);
+            await this.persistAndEmitSnapshot();
+          }
+          return createClawRpcResult(message.id, repository);
+        } catch (error) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error));
+        }
       }
       case backendMethods.sourceFoldersList: {
         const input = requireSourceFolderListInput(message.params);
@@ -3547,6 +3574,15 @@ function remoteConnectionWithSourceFolder(connection: RemoteConnection, sourceFo
 function requireSourceWorktreeInput(params: unknown): CreateSourceWorktreeInput {
   const record = requireRecord(params);
   return requireRecord(record.input) as CreateSourceWorktreeInput;
+}
+
+function requireSourceRepositoryCloneInput(params: unknown): CloneSourceRepositoryInput {
+  const record = requireRecord(params);
+  const input = requireRecord(record.input);
+  return {
+    url: requireString(input.url, 'url'),
+    ...(optionalTrimmedString(input.remoteConnectionId) ? { remoteConnectionId: optionalTrimmedString(input.remoteConnectionId)! } : {}),
+  };
 }
 
 function requireSourceWorktreeSuggestionInput(params: unknown): Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'> {

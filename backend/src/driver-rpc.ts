@@ -14,6 +14,7 @@ import { buildCodexClawMcpConfigOverrides, buildCodexClawThreadConfig } from './
 import { backendCodexHomeDir } from './state';
 import { listSourceFolders } from './source-folders';
 import { detectSourceFolder, scanSourceRepositories } from './source-repositories';
+import { cloneSourceRepository } from './clone-source-repository';
 
 export type BackendDriverRegistryOptions = {
   clawMcpServerUrl?: string | null;
@@ -339,6 +340,13 @@ export class BackendDriverRpc {
         const record = requireRecord(params);
         const sourceFolderPath = requireString(record.sourceFolderPath, 'sourceFolderPath').trim();
         return sourceFolderPath ? scanSourceRepositories(sourceFolderPath) : [];
+      }
+      case backendMethods.sourceRepositoryClone: {
+        const record = requireRecord(params);
+        return cloneSourceRepository(
+          requireString(record.sourceFolderPath, 'sourceFolderPath'),
+          requireString(record.url, 'url'),
+        );
       }
       case backendMethods.sourceFoldersList: {
         const record = params === undefined ? {} : requireRecord(params);

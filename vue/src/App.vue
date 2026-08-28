@@ -54,6 +54,7 @@
     :choose-source-folder="chooseSourceFolder"
     :list-source-folders="listSourceFolders"
     :list-source-repositories="listSourceRepositories"
+    :clone-source-repository="cloneSourceRepository"
     :list-source-branches="listSourceBranches"
     :list-source-worktrees="listSourceWorktrees"
     :suggest-source-worktree-path="suggestSourceWorktreePath"
@@ -264,6 +265,7 @@ const {
   chooseSourceFolder,
   listSourceFolders,
   listSourceRepositories,
+  cloneSourceRepository,
   listSourceBranches,
   listSourceWorktrees,
   suggestSourceWorktreePath,

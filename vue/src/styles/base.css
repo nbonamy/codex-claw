@@ -59,6 +59,19 @@ button {
   background: var(--color-surface-lowest);
 }
 
+.claw-dialog--compact.el-dialog {
+  padding: 0;
+}
+
+.claw-dialog--compact .el-dialog__header,
+.claw-dialog--compact .el-dialog__body {
+  padding: 0;
+}
+
+.claw-dialog--compact .el-dialog__footer {
+  padding: var(--space-6) var(--space-8);
+}
+
 .claw-dialog__header {
   display: flex;
   align-items: center;

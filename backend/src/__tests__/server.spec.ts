@@ -522,6 +522,7 @@ describe('ClawBackendServer', () => {
       [backendMethods.benchTemplateCreate, { input: { name: '', folder: '', backend: 'codex' } }, 'name'],
       [backendMethods.settingsCodexResourceSharingSet, { input: { enabled: false, mode: 'later' } }, 'sharing'],
       [backendMethods.sourceWorktreesList, { repoPath: '' }, 'repoPath'],
+      [backendMethods.sourceRepositoryClone, { input: { url: '' } }, 'url'],
       [backendMethods.sourceWorktreeCreate, { input: { repoPath: '', branchName: '' } }, 'configured'],
       [backendMethods.workProviderConnect, { provider: 'linear' }, 'work integrations'],
       [backendMethods.snapshotBenchGet, { location: { kind: 'elsewhere' } }, 'location'],
@@ -6181,6 +6182,47 @@ describe('ClawBackendServer', () => {
     expect(driverRpc.handle).toHaveBeenCalledWith('source/repositories/list', {
       sourceFolderPath: '/Users/nbonamy/src',
     });
+  });
+
+  it('clones repositories inside the runtime-owned source folder and records them as recent', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.sourceFolder = {
+      path: '/Users/nbonamy/src',
+      initialized: true,
+      recentRepoNames: [],
+    };
+    const repository = {
+      name: 'new-project',
+      path: '/Users/nbonamy/src/new-project',
+      worktrees: [{ name: 'main', path: '/Users/nbonamy/src/new-project' }],
+    };
+    const driverRpc = {
+      handle: vi.fn().mockResolvedValue(repository),
+      onEvent: vi.fn(() => () => undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    } as unknown as BackendDriverRpc;
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      driverRpc,
+      saveSnapshot,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'source-repository-clone',
+      method: backendMethods.sourceRepositoryClone,
+      params: { input: { url: 'https://github.com/nbonamy/new-project' } },
+    })).resolves.toMatchObject({ result: repository });
+
+    expect(driverRpc.handle).toHaveBeenCalledWith(backendMethods.sourceRepositoryClone, {
+      sourceFolderPath: '/Users/nbonamy/src',
+      url: 'https://github.com/nbonamy/new-project',
+    });
+    expect(snapshot.sourceFolder.recentRepoNames).toContain('new-project');
+    expect(saveSnapshot).toHaveBeenCalled();
   });
 
   it('routes source repository discovery to selected SSH connections', async () => {

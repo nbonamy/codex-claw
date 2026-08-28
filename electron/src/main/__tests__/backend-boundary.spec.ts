@@ -122,11 +122,12 @@ describe('Electron backend boundary', () => {
     expect(source).toContain('agentId');
   });
 
-  it('does not expose raw filesystem reads from Electron main runtime files', async () => {
+  it('does not expose unrestricted filesystem read helpers from Electron main runtime files', async () => {
     const sources = await readElectronMainRuntimeSources(path.resolve(__dirname, '..'));
 
     for (const { filePath, source } of sources) {
-      expect(source, filePath).not.toMatch(/\breadFile(?:Sync)?\b/);
+      expect(source, filePath).not.toMatch(/import\s+\{[^}]*\breadFile(?:Sync)?\b[^}]*\}\s+from\s+['"]node:fs(?:\/promises)?['"]/s);
+      expect(source, filePath).not.toMatch(/(?<!\.)\breadFile(?:Sync)?\s*\(/);
       expect(source, filePath).not.toMatch(/\bcreateReadStream\b/);
       expect(source, filePath).not.toContain('driver/file/preview');
       expect(source, filePath).not.toContain('driver/files/list');

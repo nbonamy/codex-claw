@@ -51,6 +51,7 @@ const api: CodexClawApi = {
   chooseSourceFolder: () => ipc.invoke(ipcChannels.chooseSourceFolder),
   listSourceFolders: (input?: SourceFolderListInput) => ipc.invoke(ipcChannels.listSourceFolders, input),
   listSourceRepositories: (remoteConnectionId?: string) => ipc.invoke(ipcChannels.listSourceRepositories, remoteConnectionId),
+  cloneSourceRepository: (input: import('@codex-claw/core/contracts').CloneSourceRepositoryInput) => ipc.invoke(ipcChannels.cloneSourceRepository, input),
   listSourceBranches: (repoPath: string, remoteConnectionId?: string) => ipc.invoke(ipcChannels.listSourceBranches, repoPath, remoteConnectionId),
   listSourceWorktrees: (repoPath: string, remoteConnectionId?: string) => ipc.invoke(ipcChannels.listSourceWorktrees, repoPath, remoteConnectionId),
   suggestSourceWorktreePath: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>) => ipc.invoke(ipcChannels.suggestSourceWorktreePath, input),

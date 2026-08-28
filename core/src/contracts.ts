@@ -1008,6 +1008,11 @@ export type SourceRepository = {
   worktrees: SourceWorktree[];
 };
 
+export type CloneSourceRepositoryInput = {
+  url: string;
+  remoteConnectionId?: string;
+};
+
 export type SourceFolderEntry = {
   name: string;
   path: string;
@@ -1590,6 +1595,7 @@ export type CodexClawApi = {
   chooseSourceFolder(): Promise<string | null>;
   listSourceFolders(input?: SourceFolderListInput): Promise<SourceFolderListing>;
   listSourceRepositories(remoteConnectionId?: string): Promise<SourceRepository[]>;
+  cloneSourceRepository(input: CloneSourceRepositoryInput): Promise<SourceRepository>;
   listSourceBranches(repoPath: string, remoteConnectionId?: string): Promise<SourceBranch[]>;
   listSourceWorktrees(repoPath: string, remoteConnectionId?: string): Promise<SourceWorktree[]>;
   suggestSourceWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>): Promise<string>;

@@ -333,13 +333,16 @@ implemented:
   `Command+9` hints; pressing the matching number switches agents;
 - focused artifact panes for documents, plans, and read-only source previews;
 - Bench entry point in the agent creation flow;
-- repository-first agent creation that puts custom folder selection first,
-  progressively reveals checkout controls, uses Codex without a redundant
-  coding-agent field by default, and reveals experimental Claude Code selection
-  only when enabled from the dedicated Claude Code settings screen; Loop
-  creation and editing remain Codex-only. Resolved-path implementation details
-  stay hidden, while identity and workspace settings use grouped surfaces with
-  compact row controls;
+- repository-first Start work entry points. The global Sessions `+` menu opens
+  an existing local folder or repository, selects and clones a connected GitHub
+  repository, or clones an explicit HTTPS/SSH Git URL. A repository-scoped
+  shortcut opens one searchable picker for branches, pull requests, and issues.
+  Selecting a checked-out branch creates its session directly; selecting any
+  other local or remote branch creates an isolated worktree automatically;
+  issue and pull-request selections reuse the existing contextual assignment
+  flow. The lower-level New Agent dialog remains available for custom identity,
+  workspace, Bench, and experimental Claude Code choices, while resolved paths
+  and clone commands stay backend-owned and hidden;
 - a theme-aware What’s New dialog that embeds the complete released changelog,
   opens on the current version, allows browsing previous versions, and opens
   from both the native Help menu and lower-left account menu;

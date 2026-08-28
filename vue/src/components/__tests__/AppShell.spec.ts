@@ -2491,6 +2491,141 @@ describe('AppShell', () => {
     expect(dialog.findAllComponents({ name: 'ElSelect' })[0]?.props('modelValue')).toBe('/Users/nbonamy/src/mediastation');
   });
 
+  it('wires repository session actions to agent creation and source selection', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents = snapshot.agents.map((agent) => ({
+      ...agent,
+      workspace: {
+        kind: 'git' as const,
+        folder: '/Users/nbonamy/src/codex-claw',
+        repositoryName: 'codex-claw',
+        repositoryRoot: '/Users/nbonamy/src/codex-claw',
+        branch: 'main',
+        isLinkedWorktree: false,
+        primaryWorktreeRoot: '/Users/nbonamy/src/codex-claw',
+        updatedAt: '2026-08-28T00:00:00.000Z',
+      },
+    }));
+    const sourceRepository: SourceRepository = {
+      name: 'codex-claw',
+      path: '/Users/nbonamy/src/codex-claw',
+      worktrees: [{ name: 'main', path: '/Users/nbonamy/src/codex-claw' }],
+    };
+    const githubRepository: WorkRepository = {
+      provider: 'github',
+      id: 'nbonamy/codex-claw',
+      owner: 'nbonamy',
+      name: 'codex-claw',
+      fullName: 'nbonamy/codex-claw',
+      url: 'https://github.com/nbonamy/codex-claw',
+      isPrivate: true,
+    };
+    const issue = workItem({
+      id: 'github:nbonamy/codex-claw#24',
+      repositoryId: githubRepository.id,
+      repositoryFullName: githubRepository.fullName,
+      number: 24,
+      title: 'Repository-first sessions',
+    });
+    const listSourceBranches = vi.fn().mockResolvedValue([
+      { name: 'main', isDefault: true, worktreePath: '/Users/nbonamy/src/codex-claw' },
+      { name: 'feat/work-routing', isDefault: false },
+    ]);
+    const loadWorkItems = vi.fn().mockResolvedValue([issue]);
+    const createSourceWorktree = vi.fn().mockResolvedValue({
+      name: 'work-routing',
+      path: '/Users/nbonamy/src/codex-claw-work-routing',
+    });
+    const createAgent = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({
+      snapshot,
+      sourceRepositories: [sourceRepository],
+      listSourceBranches,
+      loadWorkItems,
+      createSourceWorktree,
+      createAgent,
+      workRepositoriesByProvider: { github: [githubRepository] },
+    });
+    const sidebar = wrapper.getComponent({ name: 'AgentSidebar' });
+
+    sidebar.vm.$emit('create-agent-in-repository', 'codex-claw');
+    await flushPromises();
+    expect(wrapper.getComponent({ name: 'AgentDialog' }).props('initialSourceRepositoryName')).toBe('codex-claw');
+    wrapper.getComponent({ name: 'AgentDialog' }).vm.$emit('close');
+    await flushPromises();
+
+    sidebar.vm.$emit('create-agent-from-repository', {
+      agentId: 'agent-dina',
+      repositoryName: 'codex-claw',
+      repositoryRoot: '/Users/nbonamy/src/codex-claw',
+    });
+    await flushPromises();
+
+    const sourceDialog = wrapper.getComponent({ name: 'RepositorySessionSourceDialog' });
+    expect(listSourceBranches).toHaveBeenCalledWith('/Users/nbonamy/src/codex-claw', undefined);
+    expect(loadWorkItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw', undefined, {
+      kind: 'all',
+      state: 'open',
+    });
+    expect(sourceDialog.props('branches')).toHaveLength(2);
+    expect(sourceDialog.props('workItems')).toStrictEqual([issue]);
+
+    sourceDialog.vm.$emit('select-branch', { name: 'feat/work-routing', isDefault: false });
+    await flushPromises();
+    expect(createSourceWorktree).toHaveBeenCalledWith({
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      branchName: 'feat/work-routing',
+    });
+    expect(createAgent).toHaveBeenCalledWith({
+      name: 'codex-claw · feat/work-routing',
+      avatar: '🤖',
+      folder: '/Users/nbonamy/src/codex-claw-work-routing',
+      backend: 'codex',
+      sourceRepositoryName: 'codex-claw',
+      teamId: 'team-codex-claw',
+    });
+    expect(wrapper.getComponent({ name: 'RepositorySessionSourceDialog' }).props('visible')).toBe(false);
+  });
+
+  it('clones a GitHub repository before opening its contextual session picker', async () => {
+    const snapshot = createInitialSnapshot();
+    const githubRepository: WorkRepository = {
+      provider: 'github',
+      id: 'nbonamy/new-project',
+      owner: 'nbonamy',
+      name: 'new-project',
+      fullName: 'nbonamy/new-project',
+      url: 'https://github.com/nbonamy/new-project',
+      isPrivate: true,
+    };
+    const cloneSourceRepository = vi.fn().mockResolvedValue({
+      name: 'new-project',
+      path: '/Users/nbonamy/src/new-project',
+      worktrees: [{ name: 'main', path: '/Users/nbonamy/src/new-project' }],
+    });
+    const listSourceBranches = vi.fn().mockResolvedValue([
+      { name: 'main', isDefault: true, worktreePath: '/Users/nbonamy/src/new-project' },
+    ]);
+    const wrapper = mountShell({
+      snapshot,
+      cloneSourceRepository,
+      listSourceBranches,
+      loadWorkRepositories: vi.fn().mockResolvedValue([githubRepository]),
+    });
+
+    wrapper.getComponent({ name: 'AgentSidebar' }).vm.$emit('start-work', 'github');
+    await flushPromises();
+    const acquire = wrapper.getComponent({ name: 'RepositoryAcquireDialog' });
+    expect(acquire.props('repositories')).toStrictEqual([githubRepository]);
+
+    acquire.vm.$emit('select-repository', githubRepository);
+    await flushPromises();
+
+    expect(cloneSourceRepository).toHaveBeenCalledWith({ url: githubRepository.url });
+    expect(listSourceBranches).toHaveBeenCalledWith('/Users/nbonamy/src/new-project', undefined);
+    expect(wrapper.getComponent({ name: 'RepositorySessionSourceDialog' }).props('repositoryName')).toBe('new-project');
+  });
+
   it('persists cockpit backlog repository and tag configuration', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.workBacklog.connections = [{
@@ -3945,11 +4080,13 @@ function mountShell(overrides: Partial<{
   composerAttachments: readonly CodexNativeAttachment[];
   composerState: { text: string; selectionStart: number; selectionEnd: number };
   chooseAgentFolder: () => Promise<string | null>;
+  cloneSourceRepository: (input: import('@codex-claw/core/contracts').CloneSourceRepositoryInput) => Promise<SourceRepository>;
   createAgent: (input: CreateAgentInput) => Promise<Agent | null | void>;
   createSourceWorktree: (input: import('@codex-claw/core/contracts').CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   createTeam: (input: CreateTeamInput) => Promise<Team | null | void>;
   listSourceFolders: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
   listSourceRepositories: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
+  listSourceBranches: (repoPath: string, remoteConnectionId?: string) => Promise<import('@codex-claw/core/contracts').SourceBranch[]>;
   sourceRepositories: SourceRepository[];
   listSourceWorktrees: (repoPath: string, remoteConnectionId?: string) => Promise<SourceWorktree[]>;
   deployBenchTemplateAction: (input: string | DeployBenchTemplateInput) => Promise<Agent | null | void>;
@@ -3995,9 +4132,11 @@ function mountShell(overrides: Partial<{
       composerAttachments: overrides.composerAttachments ?? [],
       composerState: overrides.composerState ?? { text: '', selectionStart: 0, selectionEnd: 0 },
       chooseAgentFolder: overrides.chooseAgentFolder ?? vi.fn().mockResolvedValue(null),
+      cloneSourceRepository: overrides.cloneSourceRepository ?? vi.fn().mockRejectedValue(new Error('Unavailable')),
       createSourceWorktree: overrides.createSourceWorktree ?? vi.fn().mockResolvedValue({ name: '', path: '' }),
       listSourceFolders: overrides.listSourceFolders ?? vi.fn().mockResolvedValue({ path: '', parentPath: null, entries: [] }),
       listSourceRepositories: overrides.listSourceRepositories ?? vi.fn().mockResolvedValue([]),
+      listSourceBranches: overrides.listSourceBranches ?? vi.fn().mockResolvedValue([]),
       sourceRepositories: overrides.sourceRepositories ?? [],
       listSourceWorktrees: overrides.listSourceWorktrees ?? vi.fn().mockResolvedValue([]),
       createAgent: overrides.createAgent ?? vi.fn().mockResolvedValue(undefined),

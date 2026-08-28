@@ -24,6 +24,14 @@ describe('shared dialog chrome', () => {
     expect(rule('.claw-form-dialog')).not.toContain('padding:');
   });
 
+  it('offers compact dialog chrome without changing the default gutters', () => {
+    expect(rule('.claw-dialog--compact.el-dialog')).toContain('padding: 0;');
+    expect(rule('.claw-dialog--compact .el-dialog__body')).toContain('padding: 0;');
+    expect(rule('.claw-dialog .el-dialog__body')).toContain(
+      'padding: 0 var(--space-12) var(--space-8);',
+    );
+  });
+
   it('rounds the body when a dialog has no footer', () => {
     expect(rule('.claw-dialog .el-dialog__body:last-child')).toContain(
       'border-radius: 0 0 var(--radius-xl) var(--radius-xl);',
