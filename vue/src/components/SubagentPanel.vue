@@ -2,7 +2,17 @@
   <section class="subagent-panel" :aria-label="t('chat.subagents.detailsLabel')">
     <div class="subagent-panel__conversation">
       <div v-if="loading" class="subagent-panel__state">{{ t('chat.subagents.loadingConversation') }}</div>
-      <div v-else-if="error" class="subagent-panel__state subagent-panel__state--error">{{ error }}</div>
+      <div v-else-if="error" class="subagent-panel__state subagent-panel__state--error">
+        <span>{{ t('chat.subagents.loadError') }}</span>
+        <button
+          class="claw-button claw-button--secondary"
+          data-testid="subagent-conversation-retry"
+          type="button"
+          @click="refreshMessages"
+        >
+          {{ t('chat.subagents.retryConversation') }}
+        </button>
+      </div>
       <CodexMessageList
         v-else
         :messages="messages"
@@ -84,7 +94,7 @@ async function refreshMessages(): Promise<void> {
     }
   } catch (caught) {
     if (requestId === currentRequest) {
-      error.value = caught instanceof Error ? caught.message : t('chat.subagents.loadError');
+      error.value = caught instanceof Error ? caught.message : String(caught);
     }
   } finally {
     if (requestId === currentRequest) loading.value = false;
@@ -145,6 +155,10 @@ function cancelPoll(): void {
 }
 
 .subagent-panel__state--error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
   color: var(--color-error);
 }
 </style>

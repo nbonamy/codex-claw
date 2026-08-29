@@ -2,6 +2,7 @@ import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 
 const LONG_RUNNING_REQUEST_TIMEOUT_MS = 120_000;
 const longRunningRequestMethods = new Set<string>([
+  backendMethods.agentConversationMessagesGet,
   backendMethods.agentFork,
   backendMethods.agentGitMessageGenerate,
   backendMethods.agentHistoryHydrate,

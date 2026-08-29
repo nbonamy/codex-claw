@@ -114,18 +114,30 @@ describe('SubagentPanel', () => {
     expect(wrapper.text()).not.toContain('codex_claw.set-status');
   });
 
-  it('shows conversation loading errors', async () => {
+  it('hides transport details and recovers from a transient conversation loading error', async () => {
+    const loadMessages = vi.fn()
+      .mockRejectedValueOnce(new Error("Error invoking remote method 'conversation:messages:read': Error: clawd request timed out: agent/conversation/messages/get"))
+      .mockResolvedValue(messages);
     const wrapper = mount(SubagentPanel, {
       props: {
         tree,
         conversationId: 'thread-scout',
-        loadMessages: vi.fn().mockRejectedValue(new Error('History unavailable')),
+        loadMessages,
       },
       global: { plugins: [i18n], stubs: { CodexMessageList: true } },
     });
     await flushPromises();
 
-    expect(wrapper.get('.subagent-panel__state--error').text()).toBe('History unavailable');
+    expect(wrapper.get('.subagent-panel__state--error').text()).toContain('Unable to load subagent conversation');
+    expect(wrapper.text()).not.toContain('Error invoking remote method');
+    expect(wrapper.text()).not.toContain('agent/conversation/messages/get');
+
+    await wrapper.get('[data-testid="subagent-conversation-retry"]').trigger('click');
+    await flushPromises();
+
+    expect(loadMessages).toHaveBeenCalledTimes(2);
+    expect(wrapper.find('.subagent-panel__state--error').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: 'CodexMessageList' }).props('messages')).toStrictEqual(messages);
   });
 
   it('refreshes a visible running conversation until the child completes', async () => {

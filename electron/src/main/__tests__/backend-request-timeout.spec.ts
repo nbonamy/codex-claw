@@ -6,6 +6,7 @@ describe('backendRequestTimeoutMs', () => {
   it('allows complete history hydration to outlive ordinary request timeouts', () => {
     expect(backendRequestTimeoutMs(backendMethods.agentHistoryHydrate, 5_000)).toBe(120_000);
     expect(backendRequestTimeoutMs(backendMethods.agentHistoryLoadOlder, 5_000)).toBe(120_000);
+    expect(backendRequestTimeoutMs(backendMethods.agentConversationMessagesGet, 5_000)).toBe(120_000);
     expect(backendRequestTimeoutMs(backendMethods.agentSelect, 5_000)).toBe(120_000);
     expect(backendRequestTimeoutMs(backendMethods.agentFork, 5_000)).toBe(120_000);
     expect(backendRequestTimeoutMs(backendMethods.agentGitMessageGenerate, 5_000)).toBe(120_000);
