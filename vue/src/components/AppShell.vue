@@ -50,11 +50,9 @@
         :width="agentSidebarWidth"
         :min-width="agentSidebarMinWidth"
         :max-width="agentSidebarMaxWidth"
-        :list-conversations="listAgentConversations"
         :open-in-catalog="openInApplications"
         :quick-switch-shortcuts-visible="quickAgentShortcutsVisible"
         :repository-icons="snapshot.general.repositoryIcons"
-        :resume-conversation="resumeAgentConversation"
         @collapse-sidebar="agentSidebarCollapsed = true"
         @close-agent="$emit('close-agent', $event)"
         @create-agent-from-repository="openRepositorySessionSource"
@@ -69,6 +67,7 @@
         @reorder-agents="$emit('reorder-agents', $event)"
         @restart-agent="$emit('restart-agent', $event)"
         @resize-sidebar="setAgentSidebarWidth"
+        @resume-session="openResumeSession"
         @save-agent-to-bench="$emit('save-agent-to-bench', $event)"
         @select-agent="selectAgentFromShell"
         @start-work="handleStartWorkAction"
@@ -343,6 +342,14 @@
       @clone-url="cloneRepositoryAndOpen"
       @select-repository="selectWorkRepository"
     />
+    <ConversationHistoryDialog
+      v-if="resumeSessionAgent"
+      :agent="resumeSessionAgent"
+      :visible="true"
+      :list-conversations="listAgentConversations"
+      :resume-conversation="resumeAgentConversation"
+      @close="resumeSessionAgentId = null"
+    />
     <AgentDialog
       :visible="agentDialogVisible"
       :mode="agentDialogMode"
@@ -443,6 +450,7 @@ import RepositorySessionSourceDialog from './RepositorySessionSourceDialog.vue';
 import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
 import RepositoryAcquireDialog from './RepositoryAcquireDialog.vue';
 import CockpitView from './CockpitView.vue';
+import ConversationHistoryDialog from './ConversationHistoryDialog.vue';
 import ConversationPane from './ConversationPane.vue';
 import ImageAnnotationDialog, { type ImageAnnotationSavePayload } from './ImageAnnotationDialog.vue';
 import FileQuickOpen from './FileQuickOpen.vue';
@@ -846,6 +854,7 @@ const authenticationError = ref<string | null>(null);
 let authenticationPoll: ReturnType<typeof setInterval> | null = null;
 const settingsActiveTab = ref<SettingsTab>('general');
 const agentDialogVisible = ref(false);
+const resumeSessionAgentId = ref<string | null>(null);
 const agentDialogMode = ref<'create' | 'edit'>('create');
 const editingAgentId = ref<string | null>(null);
 const agentDialogTeamId = ref<string | null>(null);
@@ -2481,6 +2490,10 @@ function selectAgentFromCockpit(payload: { agentId: string; teamId: string }): v
   emit('select-agent', payload.agentId);
 }
 
+function openResumeSession(agentId: string): void {
+  resumeSessionAgentId.value = agentId;
+}
+
 function confirmPlan(): void {
   emit('update:planMode', false);
   emit('sendPrompt', 'implement the plan');
@@ -3661,6 +3674,9 @@ function cycleAgents(direction: 1 | -1, event?: KeyboardEvent): void {
 }
 
 const activeTeamName = computed(() => activeTeam.value?.name ?? 'Codex Claw');
+const resumeSessionAgent = computed(() => (
+  props.snapshot.agents.find((agent) => agent.id === resumeSessionAgentId.value) ?? null
+));
 const benchByTeamId = computed<Record<string, BenchTemplate[]>>(() => {
   const next: Record<string, BenchTemplate[]> = {};
   for (const team of props.snapshot.teams) {

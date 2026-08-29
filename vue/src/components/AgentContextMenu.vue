@@ -24,6 +24,7 @@ import {
   CopyIcon,
   ExternalLinkIcon,
   GitForkIcon,
+  MessageCircleIcon,
   PencilIcon,
   RefreshIcon,
   SaveToBenchIcon,
@@ -37,6 +38,7 @@ export type AgentContextMenuAction =
   | 'duplicate-agent'
   | 'edit-agent'
   | 'fork-agent'
+  | 'resume-session'
   | 'restart-agent'
   | 'save-agent-to-bench';
 
@@ -114,6 +116,12 @@ const menuItems = computed<AppMenuItem[]>(() => [
     icon: SaveToBenchIcon,
   },
   { id: 'group-danger', type: 'separator' },
+  {
+    id: 'resume-session',
+    type: 'action',
+    label: 'Resume Session',
+    icon: MessageCircleIcon,
+  },
   {
     id: 'restart-agent',
     type: 'action',
@@ -207,6 +215,7 @@ function isAgentContextMenuAction(itemId: string): itemId is AgentContextMenuAct
     itemId === 'duplicate-agent' ||
     itemId === 'edit-agent' ||
     itemId === 'fork-agent' ||
+    itemId === 'resume-session' ||
     itemId === 'restart-agent' ||
     itemId === 'save-agent-to-bench';
 }

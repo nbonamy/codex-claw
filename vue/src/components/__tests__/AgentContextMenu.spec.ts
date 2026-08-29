@@ -25,6 +25,7 @@ describe('AgentContextMenu', () => {
       'Fork Agent',
       'Move to Other Team',
       'Save to Bench',
+      'Resume Session',
       'Restart Agent',
       'Close Agent',
     ]);

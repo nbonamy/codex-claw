@@ -202,12 +202,13 @@ On agent selection or startup active-agent hydration, `ClaudeBackendDriver`
 emits `thread.historyLoaded` through the same app-owned event path used by
 Codex, so the renderer remains backend-neutral.
 
-The sidebar conversation history is the Claude implementation of the generic
-driver capability documented in `docs/architecture.md`. Main process scans the
-active agent folder's `~/.claude/projects/.../*.jsonl` entries, sorts them
+The Resume Session dialog opened from an agent's sidebar menu is the Claude
+implementation of the generic driver capability documented in
+`docs/architecture.md`. Main process scans that agent folder's
+`~/.claude/projects/.../*.jsonl` entries, sorts them
 newest first by file modification time, and returns app-owned
 `ConversationSummary` rows with an opaque `BackendConversationRef`. Clicking a
-Claude conversation stores that session id as the agent's current
+session row stores that session id as the agent's current
 `BackendSession`, reloads its transcript messages, and the next prompt resumes
 that session through the Agent SDK. Resume is allowed only while the agent is
 idle.

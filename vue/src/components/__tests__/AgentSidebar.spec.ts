@@ -512,6 +512,7 @@ describe('AgentSidebar', () => {
       'Fork Agent',
       'Move to Other Team',
       'Save to Bench',
+      'Resume Session',
       'Restart Agent',
       'Close Agent',
     ]);
@@ -524,6 +525,7 @@ describe('AgentSidebar', () => {
     const expectedActions = [
       ['Duplicate Agent', 'duplicate-agent'],
       ['Save to Bench', 'save-agent-to-bench'],
+      ['Resume Session', 'resume-session'],
       ['Restart Agent', 'restart-agent'],
       ['Close Agent', 'close-agent'],
     ] as const;
@@ -794,25 +796,19 @@ describe('AgentSidebar', () => {
     expect(wrapper.emitted('resize-sidebar')).toStrictEqual([[244], [276]]);
   });
 
-  it('shows the conversation history panel below repository sessions', async () => {
-    const listConversations = vi.fn().mockResolvedValue([]);
+  it('does not render conversation history in the sidebar footer', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents,
         activeAgentId: 'agent-dina',
         teamName: 'Codex Claw',
-        listConversations,
       },
       global: {
         plugins: [ElementPlus],
       },
     });
 
-    wrapper.get('.agent-sidebar__conversations');
-
-    await wrapper.get('.conversation-history__header').trigger('click');
-    await flushPromises();
-
-    expect(listConversations).toHaveBeenCalledWith('agent-dina');
+    expect(wrapper.find('.agent-sidebar__conversations').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('CONVERSATIONS');
   });
 });

@@ -2514,6 +2514,24 @@ describe('AppShell', () => {
     expect(dialog.findAllComponents({ name: 'ElSelect' })[0]?.props('modelValue')).toBe('/Users/nbonamy/src/mediastation');
   });
 
+  it('opens and closes the resume-session dialog for the agent selected in the sidebar menu', async () => {
+    const snapshot = createInitialSnapshot();
+    const targetAgent = snapshot.agents[0]!;
+    const listAgentConversations = vi.fn().mockResolvedValue([]);
+    const wrapper = mountShell({ snapshot, listAgentConversations });
+
+    wrapper.getComponent({ name: 'AgentSidebar' }).vm.$emit('resume-session', targetAgent.id);
+    await flushPromises();
+
+    const dialog = wrapper.getComponent({ name: 'ConversationHistoryDialog' });
+    expect(dialog.props('agent')).toStrictEqual(targetAgent);
+    expect(listAgentConversations).toHaveBeenCalledWith(targetAgent.id);
+
+    dialog.vm.$emit('close');
+    await nextTick();
+    expect(wrapper.findComponent({ name: 'ConversationHistoryDialog' }).exists()).toBe(false);
+  });
+
   it('wires repository session actions to agent creation and source selection', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents = snapshot.agents.map((agent) => ({

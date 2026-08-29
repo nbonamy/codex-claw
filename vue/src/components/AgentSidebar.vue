@@ -135,14 +135,6 @@
       </section>
     </nav>
 
-    <ConversationHistoryPanel
-      v-if="activeAgent"
-      class="agent-sidebar__conversations"
-      :agent="activeAgent"
-      :list-conversations="listConversations"
-      :resume-conversation="resumeConversation"
-    />
-
     <AgentContextMenu
       v-if="contextMenuAgentId"
       :fork-disabled="!canForkContextMenuAgent"
@@ -178,7 +170,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Agent, BackendConversationRef, ConversationSummary, OpenInApplication, OpenInApplicationCatalog, ReorderAgentsInput, SourceBranch, Team } from '@codex-claw/core/contracts';
+import type { Agent, OpenInApplication, OpenInApplicationCatalog, ReorderAgentsInput, SourceBranch, Team } from '@codex-claw/core/contracts';
 import { projectWorkspaceSidebar, type WorkspaceSidebarGroup } from '@codex-claw/core/workspace-sidebar';
 import {
   GitBranchIcon,
@@ -189,7 +181,6 @@ import {
 } from '../shared/icons/app-icons';
 import AgentContextMenu from './AgentContextMenu.vue';
 import type { AgentContextMenuAction } from './AgentContextMenu.vue';
-import ConversationHistoryPanel from './ConversationHistoryPanel.vue';
 import RepositoryIconPicker from './RepositoryIconPicker.vue';
 import StartWorkMenu from './StartWorkMenu.vue';
 import AppMenu from '../shared/menu/AppMenu.vue';
@@ -211,10 +202,8 @@ const props = defineProps<{
   maxWidth?: number;
   quickSwitchShortcutsVisible?: boolean;
   repositoryIcons?: Record<string, string>;
-  listConversations?: (agentId: string) => Promise<ConversationSummary[]>;
   listRepositoryBranches?: (input: { agentId: string; repositoryRoot: string }) => Promise<SourceBranch[]>;
   openInCatalog?: OpenInApplicationCatalog;
-  resumeConversation?: (agentId: string, ref: BackendConversationRef) => Promise<void>;
 }>();
 
 const emit = defineEmits<{
@@ -230,6 +219,7 @@ const emit = defineEmits<{
   'open-in': [payload: { agentId: string; application: OpenInApplication }];
   'reorder-agents': [payload: ReorderAgentsInput];
   'resize-sidebar': [width: number];
+  'resume-session': [agentId: string];
   'restart-agent': [agentId: string];
   'save-agent-to-bench': [agentId: string];
   'select-agent': [agentId: string];
@@ -245,7 +235,6 @@ const resolvedOpenInCatalog = computed<OpenInApplicationCatalog>(() => props.ope
   defaultApplication: 'finder',
   applications: [],
 }));
-const activeAgent = computed(() => props.agents.find((agent) => agent.id === props.activeAgentId) ?? null);
 const workspaceGroups = computed(() => projectWorkspaceSidebar({
   agents: props.agents,
   activeAgentId: props.activeAgentId,
@@ -303,14 +292,6 @@ const sidebarStyle = computed<Record<string, string>>(() => ({
   '--agent-sidebar-max-width': `${maxWidth.value}px`,
 }));
 let resizeStart: { pointerId: number; clientX: number; width: number } | null = null;
-
-async function listConversations(agentId: string): Promise<ConversationSummary[]> {
-  return props.listConversations ? props.listConversations(agentId) : [];
-}
-
-async function resumeConversation(agentId: string, ref: BackendConversationRef): Promise<void> {
-  await props.resumeConversation?.(agentId, ref);
-}
 
 function clampWidth(width: number): number {
   return Math.min(Math.max(Math.round(width), minWidth.value), maxWidth.value);
@@ -433,6 +414,9 @@ function emitContextAgentAction(action: AgentContextMenuAction): void {
       break;
     case 'edit-agent':
       emit('edit-agent', agentId);
+      break;
+    case 'resume-session':
+      emit('resume-session', agentId);
       break;
     case 'restart-agent':
       emit('restart-agent', agentId);
@@ -995,8 +979,5 @@ function onResizePointerEnd(event: PointerEvent): void {
     display: none;
   }
 
-  .agent-sidebar__conversations {
-    display: none;
-  }
 }
 </style>

@@ -53,6 +53,7 @@ New reusable primitives belong under `vue/src/shared/` and must be added here.
 | Application icon catalog and segmented launcher | `OpenInControl` | `vue/src/shared/OpenInControl.vue` |
 | Product icon glyphs | App icon catalog | `vue/src/shared/icons/app-icons.ts` |
 | Form-dialog chrome and actions | Shared dialog and button styles | `.claw-dialog`, `.claw-button` in `vue/src/styles/base.css` |
+| Searchable compact picker dialog | Header-hosted filter with list-only body | GitHub mode in `RepositoryAcquireDialog`, `RepositorySessionSourceDialog` |
 | Settings page, section, and row structure | `SettingsPanelFrame`, `SettingsSection`, `SettingsRow` | `vue/src/components/Settings*.vue` |
 | Dense tabular/list data | `AppDataList` | `vue/src/components/AppDataList.vue` |
 | Running, successful, or failed operation feedback | `GitOperationFeedback` | `vue/src/components/GitOperationFeedback.vue` |
@@ -63,6 +64,11 @@ valid semantic wrapper because it supplies repository copy and folder fallback
 icons while delegating the complete picker interaction to `IdentityPicker`.
 Popover placement should come from Element Plus; menu rows inside popovers and
 context menus use `AppMenu` rather than local menu markup or typography.
+
+Searchable compact picker dialogs use the filter as the complete dialog header
+row. Do not stack a separate title above a bordered input in the body. The body
+starts directly with loading, error, empty, or result-list content. Keep the
+dialog's purpose available through its accessible label.
 
 ## Small Component Principles
 
@@ -132,7 +138,9 @@ implemented:
 - persisted View-menu compact session-list mode with repository groups, session names, and status icons; custom agent names are optional, and unnamed Git sessions use their branch name after removing a leading `<repository>-` prefix;
 - agent context actions for duplicating configuration or forking the active
   backend conversation; both insert the new selected agent directly below the
-  source agent;
+  source agent. Resume Session appears immediately before Restart Agent and
+  opens a compact searchable session picker whose filter occupies the dialog
+  header row;
 - opted-in Fork actions on user and assistant messages, routed by absolute
   host message index into the same new-agent workflow;
 - a standalone image-annotation dialog that centers the source image within a

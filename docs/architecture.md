@@ -371,11 +371,12 @@ renderer UI. The required path is:
    provider adapter/session tests for protocol behavior, and renderer component
    tests against app-owned data.
 
-Conversation history is the canonical example. The sidebar renders
-`ConversationSummary` rows and sends a `BackendConversationRef` to main. Codex
-implements that with `thread/list` and `thread/resume`; Claude implements it by
-scanning local JSONL transcripts and resuming a session id. The renderer does
-not know either storage model.
+Conversation history is the canonical example. The searchable Resume Session
+dialog opened from the sidebar agent menu renders `ConversationSummary` rows
+and sends a `BackendConversationRef` to main. Codex implements that with
+`thread/list` and `thread/resume`; Claude implements it by scanning local JSONL
+transcripts and resuming a session id. The renderer does not know either
+storage model.
 
 ### Preload
 
