@@ -1,5 +1,19 @@
 export const messages = {
   en: {
+    identityPicker: {
+      change: 'Change identity',
+      chooseImage: 'Choose identity image',
+      chooseImageAction: 'Pick image…',
+      cropTitle: 'Adjust identity',
+      customApply: 'Use custom identity',
+      customCharacter: 'Custom identity character',
+      customCharacterHint: 'Enter one character, or press Control-Command-Space on macOS',
+      dialog: 'Choose identity',
+      empty: 'Use default identity',
+      hint: 'Click to change',
+      presetNoun: 'identity',
+      usePreset: 'Use {preset} {noun}',
+    },
     repositoryBacklog: {
       title: 'Backlog',
       issues: 'Issues',

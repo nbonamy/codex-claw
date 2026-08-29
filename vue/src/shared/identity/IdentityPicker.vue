@@ -15,7 +15,7 @@
         <button
           class="identity-picker__trigger agent-avatar-picker__trigger"
           type="button"
-          :aria-label="ariaLabel"
+          :aria-label="resolvedAriaLabel"
           :aria-expanded="popoverOpen"
           @click.stop="popoverOpen = !popoverOpen"
         >
@@ -39,14 +39,14 @@
       <div
         class="identity-picker__popover agent-avatar-picker__popover"
         role="dialog"
-        :aria-label="dialogLabel"
+        :aria-label="resolvedDialogLabel"
       >
         <strong v-if="title" class="identity-picker__title agent-avatar-picker__title">{{ title }}</strong>
         <div class="identity-picker__grid">
           <button
             class="identity-picker__preset agent-avatar-picker__preset"
             type="button"
-            :aria-label="emptyLabel"
+            :aria-label="resolvedEmptyLabel"
             :aria-pressed="!customAvatarActive && !modelValue"
             @click="selectAvatar(undefined)"
           >
@@ -56,7 +56,7 @@
             :key="preset"
             class="identity-picker__preset agent-avatar-picker__preset"
             type="button"
-            :aria-label="`Use ${preset} ${presetNoun}`"
+            :aria-label="presetAriaLabel(preset)"
             :aria-pressed="!customAvatarActive && modelValue === preset"
             @click="selectAvatar(preset)"
           >
@@ -70,10 +70,10 @@
               'agent-avatar-picker__custom--active': customAvatarActive,
             }"
             type="text"
-            :aria-label="customCharacterAriaLabel"
+            :aria-label="resolvedCustomCharacterAriaLabel"
             :aria-invalid="customAvatarInvalid"
             placeholder="…"
-            title="Enter one character, or press Control-Command-Space on macOS"
+            :title="resolvedCustomCharacterHint"
             @focus="customAvatarActive = true"
             @input="customAvatarInvalid = false"
             @keydown.enter.prevent="applyCustomAvatar"
@@ -81,7 +81,7 @@
           <button
             class="identity-picker__custom-apply agent-avatar-picker__custom-apply"
             type="button"
-            :aria-label="customApplyAriaLabel"
+            :aria-label="resolvedCustomApplyAriaLabel"
             :disabled="!customAvatar.trim()"
             @mousedown.prevent
             @click="applyCustomAvatar"
@@ -95,11 +95,11 @@
         <button
           class="identity-picker__choose-image agent-avatar-picker__choose-image"
           type="button"
-          :aria-label="chooseImageAriaLabel"
+          :aria-label="resolvedChooseImageAriaLabel"
           @click="openImagePicker"
         >
           <PhotoIcon aria-hidden="true" />
-          <span>{{ chooseImageLabel }}</span>
+          <span>{{ resolvedChooseImageLabel }}</span>
         </button>
         <input
           ref="fileInput"
@@ -116,12 +116,12 @@
       type="button"
       @click="popoverOpen = !popoverOpen"
     >
-      Click to change
+      {{ resolvedHint }}
     </button>
     <AgentAvatarCropDialog
       :visible="Boolean(pendingImage)"
       :image="pendingImage"
-      :title="cropTitle"
+      :title="resolvedCropTitle"
       @apply="applyCroppedAvatar"
       @cancel="cancelCrop"
     />
@@ -129,7 +129,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { CheckIcon, PhotoIcon } from '../icons/app-icons';
 import AgentAvatar from '../../components/AgentAvatar.vue';
 import AgentAvatarCropDialog from '../../components/AgentAvatarCropDialog.vue';
@@ -156,16 +157,7 @@ const props = withDefaults(defineProps<{
   showHint?: boolean;
   title?: string;
 }>(), {
-  ariaLabel: 'Change identity',
-  chooseImageAriaLabel: 'Choose identity image',
-  chooseImageLabel: 'Pick image…',
-  cropTitle: 'Adjust identity',
-  customApplyAriaLabel: 'Use custom identity',
-  customCharacterAriaLabel: 'Custom identity character',
-  dialogLabel: 'Choose identity',
-  emptyLabel: 'Use default identity',
   modelValue: undefined,
-  presetNoun: 'identity',
   showHint: true,
   title: '',
 });
@@ -174,12 +166,31 @@ const emit = defineEmits<{
   'update:modelValue': [avatar: string | undefined];
 }>();
 
+const { t } = useI18n();
+const resolvedAriaLabel = computed(() => props.ariaLabel ?? t('identityPicker.change'));
+const resolvedChooseImageAriaLabel = computed(() => props.chooseImageAriaLabel ?? t('identityPicker.chooseImage'));
+const resolvedChooseImageLabel = computed(() => props.chooseImageLabel ?? t('identityPicker.chooseImageAction'));
+const resolvedCropTitle = computed(() => props.cropTitle ?? t('identityPicker.cropTitle'));
+const resolvedCustomApplyAriaLabel = computed(() => props.customApplyAriaLabel ?? t('identityPicker.customApply'));
+const resolvedCustomCharacterAriaLabel = computed(() => props.customCharacterAriaLabel ?? t('identityPicker.customCharacter'));
+const resolvedCustomCharacterHint = computed(() => t('identityPicker.customCharacterHint'));
+const resolvedDialogLabel = computed(() => props.dialogLabel ?? t('identityPicker.dialog'));
+const resolvedEmptyLabel = computed(() => props.emptyLabel ?? t('identityPicker.empty'));
+const resolvedHint = computed(() => t('identityPicker.hint'));
+
 const fileInput = ref<HTMLInputElement | null>(null);
 const pendingImage = ref<string | null>(null);
 const popoverOpen = ref(false);
 const customAvatar = ref('');
 const customAvatarInvalid = ref(false);
 const customAvatarActive = ref(false);
+
+function presetAriaLabel(preset: string): string {
+  return t('identityPicker.usePreset', {
+    preset,
+    noun: props.presetNoun ?? t('identityPicker.presetNoun'),
+  });
+}
 
 watch(() => props.modelValue, (value) => {
   const customValue = customAvatarValue(value);

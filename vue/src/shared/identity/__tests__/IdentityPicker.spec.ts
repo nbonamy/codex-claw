@@ -25,6 +25,21 @@ describe('IdentityPicker', () => {
     expect(wrapper.getComponent({ name: 'ElPopover' }).props('visible')).toBe(false);
   });
 
+  it('uses catalog copy for the shared defaults', async () => {
+    const wrapper = mount(IdentityPicker, {
+      props: { name: 'Dina' },
+      global: { plugins: [ElementPlus], stubs: { teleport: true, AgentAvatarCropDialog: true } },
+    });
+
+    expect(wrapper.get('.agent-avatar-picker__trigger').attributes('aria-label')).toBe('Change identity');
+    expect(wrapper.get('.agent-avatar-picker__hint').text()).toBe('Click to change');
+    await wrapper.get('.agent-avatar-picker__trigger').trigger('click');
+    expect(wrapper.findAll('.agent-avatar-picker__preset').find((button) => button.text() === '🤖')?.attributes('aria-label'))
+      .toBe('Use 🤖 identity');
+    expect(wrapper.get('.agent-avatar-picker__custom').attributes('title'))
+      .toBe('Enter one character, or press Control-Command-Space on macOS');
+  });
+
   it('accepts one custom grapheme and rejects multiple characters', async () => {
     const wrapper = mountPicker({ modelValue: '🤖' });
     await wrapper.get('.agent-avatar-picker__trigger').trigger('click');
